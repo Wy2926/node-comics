@@ -1,0 +1,5 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": { "strict": true, "noUncheckedIndexedAccess": false, "noUnusedLocals": false, "noUnusedParameters": false, "types": ["chrome", "vite/client", "node"], "jsx": "react-jsx" },
+  "include": ["src", "entrypoints", "*.ts", "tests"]
+}

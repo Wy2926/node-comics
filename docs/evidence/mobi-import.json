@@ -1,0 +1,19 @@
+{
+  "fileBytes": 221624973,
+  "pageCount": 194,
+  "firstPage": {
+    "width": 1066,
+    "height": 1600
+  },
+  "lastPage": {
+    "width": 1440,
+    "height": 1920
+  },
+  "totalImageBytes": 105359816,
+  "elapsedMs": 52,
+  "warnings": [
+    "已按 MOBI 正文顺序导入图片；附带缩略图与其他版本资源不会重复加入。"
+  ],
+  "ordering": "MOBI6 body recindex references",
+  "noImageDecode": true
+}

@@ -1,0 +1,14 @@
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn[standard]==0.52.4
+SQLAlchemy==2.0.52
+psycopg[binary]==3.3.5
+celery[redis]==5.6.3
+httpx==0.28.1
+httpcore==1.0.9
+Pillow==12.3.0
+python-multipart==0.0.32
+pydantic-settings==2.15.0
+PyJWT[crypto]==2.14.0
+pytest==9.1.1
+alembic==1.20.0

@@ -1,0 +1,33 @@
+{
+  "broken_doc_links": 0,
+  "openapi_paths": 27,
+  "rerun_quote_required": true,
+  "zip_bytes": 2945830,
+  "zip_sha256": "b16bbe5c8a5acaf004bdb436938d2d7e6fd35ff28bcab3be1cc7f74489309891",
+  "zip_entries": 12,
+  "manifest_version": 3,
+  "private_assets_or_env_in_archive": false,
+  "environment_secrets_in_archive": false,
+  "browser_checks": {
+    "mobi_pages": 194,
+    "restored_page": 100,
+    "decoded_pages": [
+      98,
+      99,
+      100,
+      101,
+      102
+    ],
+    "mobile_viewport": [
+      390,
+      844
+    ],
+    "mobile_document_width": 390,
+    "mobile_default_translation_panel": false
+  },
+  "tests": {
+    "frontend": 27,
+    "backend_contract": 48,
+    "postgres_concurrency_separate": 5
+  }
+}

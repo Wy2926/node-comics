@@ -1,0 +1,70 @@
+name: node-comics
+
+x-backend: &backend
+  build:
+    context: ./backend
+  image: node-comics-backend:local
+  env_file:
+    - .env
+    - deploy/.env.local
+  environment: &backend-env
+    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/nodecomics
+    REDIS_URL: redis://redis:6379/0
+    STORAGE_PATH: /data/images
+    DEV_AUTH: "${DEV_AUTH:-true}"
+    DEV_AUTH_SECRET: ${DEV_AUTH_SECRET}
+    CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:18089,http://127.0.0.1:18089
+  volumes:
+    - comics_images:/data/images
+    - ./backend/app:/app/app:ro
+    - ./backend/migrations:/app/migrations:ro
+    - ./backend/alembic.ini:/app/alembic.ini:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: nodecomics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: nodecomics
+    volumes:
+      - comics_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U nodecomics -d nodecomics"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7.4.5-alpine
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - comics_redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    <<: *backend
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
+    ports:
+      - 127.0.0.1:18088:8000
+  dispatcher:
+    <<: *backend
+    command: [python, -m, app.dispatcher]
+  redraw-worker:
+    <<: *backend
+    command: [celery, -A, app.workers.celery_app, worker, -Q, redraw, --concurrency=2, --loglevel=warning, --hostname=redraw@%h]
+    stop_grace_period: 31m
+volumes:
+  comics_postgres:
+  comics_redis:
+  comics_images:
