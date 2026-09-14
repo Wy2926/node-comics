@@ -12,11 +12,11 @@ from .assets import available, create_asset, inspect_image, object_path
 from .config import settings
 from .db import session_factory
 from .errors import ProcessingError
-from .models import Asset, Attempt, ClassicState, Job, Outbox, TextCall, now, uid
+from .models import Asset, Attempt, ClassicState, Job, TextCall, now, uid
 
 
 def current(db, job_id, attempt_id, phase=None):
-    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update().execution_options(populate_existing=True))
+    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True).execution_options(populate_existing=True))
     if not job or job.status != 'running' or job.attempt_id != attempt_id:
         raise ProcessingError('CLASSIC_SUPERSEDED', '此工作进程已被新的恢复任务替代')
     if job.cancel_requested or job.discard_output or not available(db.get(Asset, job.input_asset_id)):
@@ -96,7 +96,7 @@ def complete_call(call_id, response=None, error=None, translations=None):
         call.request_id = response.request_id if response else getattr(error, 'request_id', None)
         call.error_code = getattr(error, 'code', None)
         call.completed_at = now()
-        job = db.scalar(select(Job).where(Job.id == call.job_id).with_for_update())
+        job = db.scalar(select(Job).where(Job.id == call.job_id).with_for_update(key_share=True))
         if usage is not None:
             call.usage, call.cost_state = usage, 'estimated'
             profile = job.config['text']
@@ -232,7 +232,7 @@ def requeue_local(job_id, attempt_id, error):
     if not retryable:
         return False
     with session_factory()() as db:
-        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
         state = db.get(ClassicState, job_id)
         if not job or job.attempt_id != attempt_id or job.status != 'running' or job.cancel_requested or job.discard_output:
             return False
@@ -241,7 +241,7 @@ def requeue_local(job_id, attempt_id, error):
         attempt = db.get(Attempt, attempt_id)
         attempt.completed_at, attempt.error_code = now(), error.code
         job.status, job.phase, job.attempt_id = 'queued', 'recovering_local', None
-        event = db.scalar(select(Outbox).where(Outbox.job_id == job_id))
-        event.published_at = None
+        from .scheduler import release_admission
+        release_admission(db, job_id)
         db.commit()
         return True

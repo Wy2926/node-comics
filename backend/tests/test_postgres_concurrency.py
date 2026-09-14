@@ -28,6 +28,7 @@ from uuid import uuid4
 import pytest
 from PIL import Image
 from sqlalchemy import URL, create_engine, event, func, select, text
+from conftest import run_job
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_POSTGRES_CONCURRENCY") != "1",
@@ -191,7 +192,7 @@ def test_postgres_concurrent_duplicate_workers_call_and_settle_once(pg, monkeypa
 
     def run():
         barrier.wait(timeout=10)
-        workers.process_job.run(job_id)
+        run_job(job_id)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(run) for _ in range(2)]
@@ -219,8 +220,8 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
     original_claim = workers.claim
     attempts, calls = [], []
 
-    def paused_claim(value):
-        attempt_id = original_claim(value)
+    def paused_claim(value, token):
+        attempt_id = original_claim(value, token)
         if threading.current_thread().name.startswith("old-attempt"):
             attempts.append(attempt_id)
             claimed.set()
@@ -236,7 +237,7 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
     monkeypatch.setattr(workers, "claim", paused_claim)
     monkeypatch.setattr(workers, "redraw", provider)
     with ThreadPoolExecutor(max_workers=1, thread_name_prefix="old-attempt") as old_pool, ThreadPoolExecutor(max_workers=1, thread_name_prefix="new-attempt") as new_pool:
-        old_future = old_pool.submit(workers.process_job.run, job_id)
+        old_future = old_pool.submit(run_job, job_id)
         try:
             assert claimed.wait(10)
             with session_factory()() as db:
@@ -247,7 +248,7 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
                 recover(db)
                 db.commit()
                 assert db.get(Job, job_id).status == "queued"
-            new_future = new_pool.submit(workers.process_job.run, job_id)
+            new_future = new_pool.submit(run_job, job_id)
             assert provider_entered.wait(10)
             resume_old.set()
             old_future.result(timeout=10)
@@ -283,7 +284,7 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
         return real_create_asset(*args, **kwargs)
 
     def observe_delete_lock(connection, cursor, statement, parameters, context, executemany):
-        if threading.current_thread().name.startswith("delete-original") and "FOR UPDATE" in statement and "jobs" in statement:
+        if threading.current_thread().name.startswith("delete-original") and "FOR NO KEY UPDATE" in statement and "jobs" in statement:
             deletion_waiting.set()
 
     def delete():
@@ -295,7 +296,7 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
     event.listen(engine(), "before_cursor_execute", observe_delete_lock)
     try:
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="finalize-result") as worker_pool, ThreadPoolExecutor(max_workers=1, thread_name_prefix="delete-original") as delete_pool:
-            worker_future = worker_pool.submit(workers.process_job.run, job_id)
+            worker_future = worker_pool.submit(run_job, job_id)
             try:
                 assert finalizing.wait(10)
                 delete_future = delete_pool.submit(delete)
@@ -367,7 +368,7 @@ def test_postgres_classic_budget_reservation_is_atomic(pg):
     from app.db import session_factory
     from app.jobs import create_job
     from app.models import Asset, ClassicState, TextCall, User
-    from app.workers import claim
+    from conftest import claim_job as claim
     with session_factory()() as db:
         job = create_job(db, db.get(User, pg['owner_id']), db.get(Asset, pg['asset_id']), 'classic', 'zh-Hans', 'classic-budget')
         db.commit()

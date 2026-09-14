@@ -15,10 +15,13 @@ from .auth import admin, bearer, identity, token_for
 from .config import settings
 from .db import get_db, initialize, session_factory
 from .errors import problem
-from .jobs import batch_status, cancel_job, create_batch, create_job, create_quote, idem_key, job_json, owned_job, quota_json, quote_json, settle
+from .jobs import batch_status, cancel_job, create_batch, create_job, create_quote, idem_key, job_for_request, job_json, owned_job, quota_json, quote_json, settle
+from .batch_items import BatchItem
 from .models import Asset, Attempt, Batch, ClassicState, Job, Ledger, Provider, TextCall, User, now
 from .providers import LANGUAGES, ProviderConfig, configuration, credential, initialize_providers
 from .middleware import BodyLimitMiddleware
+from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
+from .queue_api import router as queue_router
 from .schemas import AccessResponse, AssetResponse, BatchCreatedResponse, BatchResponse, CapabilitiesResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, QuoteResponse, UsageResponse
 
 
@@ -31,6 +34,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Node Comics API", version="0.1.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务和测试额度。图片通过 Bearer 授权网关读取。")
+app.include_router(queue_router)
 cfg = settings()
 origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip()]
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
@@ -179,10 +183,22 @@ async def upload_bytes(image):
 
 
 @app.post("/v1/images", status_code=201, response_model=AssetResponse)
-async def upload_image(image: Annotated[UploadFile, File()], user: User = Depends(identity), db: Session = Depends(get_db)):
-    asset = create_asset(db, user.id, await upload_bytes(image))
+async def upload_image(image: Annotated[UploadFile, File()],
+                       file_hash: Annotated[str | None, Form(pattern=r"^[a-fA-F0-9]{64}$")] = None,
+                       page_index: Annotated[int | None, Form(ge=0, le=1_000_000)] = None,
+                       user: User = Depends(identity), db: Session = Depends(get_db)):
+    if (file_hash is None) != (page_index is None):
+        problem("INVALID_REQUEST", "文件 SHA-256 与原始页索引必须一起提供", 422)
+    data = await upload_bytes(image)
+    asset = (upload_file_page(db, user.id, data, FilePageIdentity(file_hash=file_hash, page_index=page_index))
+             if file_hash is not None else create_asset(db, user.id, data))
     db.commit()
     return asset_json(asset)
+
+
+@app.post("/v1/file-pages/match", response_model=FilePageMatches)
+def file_page_matches(body: FilePageMatchRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
+    return match_file_pages(db, user.id, body)
 
 
 @app.get("/v1/images/{asset_id}/access", response_model=AccessResponse)
@@ -209,11 +225,11 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
         ids.update(db.scalars(select(Asset.id).where(Asset.owner_id == user.id, Asset.parent_id == asset.id)))
         ids.update(value for value in db.scalars(select(Job.output_asset_id).where(Job.owner_id == user.id, Job.input_asset_id == asset.id)) if value)
     # Lock affected jobs before assets, matching completion's job -> asset lock order.
-    affected_jobs = db.scalars(select(Job).where(Job.owner_id == user.id, or_(Job.input_asset_id.in_(ids), Job.output_asset_id.in_(ids))).order_by(Job.id).with_for_update()).all()
+    affected_jobs = db.scalars(select(Job).where(Job.owner_id == user.id, or_(Job.input_asset_id.in_(ids), Job.output_asset_id.in_(ids))).order_by(Job.id).with_for_update(key_share=True)).all()
     if asset.kind == "original":
         ids.update(value for value in db.scalars(select(Job.output_asset_id).where(Job.owner_id == user.id, Job.input_asset_id == asset.id)) if value)
         ids.update(db.scalars(select(Asset.id).where(Asset.owner_id == user.id, Asset.parent_id == asset.id)))
-    assets = db.scalars(select(Asset).where(Asset.id.in_(ids), Asset.owner_id == user.id).with_for_update()).all()
+    assets = db.scalars(select(Asset).where(Asset.id.in_(ids), Asset.owner_id == user.id).with_for_update(key_share=True)).all()
     for item in assets:
         item.deleted_at = item.deleted_at or now()
     for job in affected_jobs:
@@ -258,14 +274,13 @@ async def translate(mode: Literal["redraw", "classic"], target_language: Annotat
         db.commit()
     except IntegrityError:
         db.rollback()
-        # A concurrent duplicate may have won the unique user/operation/key constraint.
-        job = db.scalar(select(Job).where(Job.owner_id == user.id, Job.operation == f"translate:{mode}", Job.idempotency_key == key))
+        # A concurrent duplicate may have won the unique request receipt.
+        from .providers import digest
+        job = job_for_request(db, user.id, f"translate:{mode}", key,
+                              digest({"asset_hash": asset.sha256, "mode": mode, "language": target_language, "force": False}))
         if not job:
             problem("REQUEST_CONFLICT", "任务创建遇到并发冲突，请用相同操作编号重试", 409)
-        from .providers import digest
-        if job.request_hash != digest({"asset_hash": asset.sha256, "mode": mode, "language": target_language, "force": False}):
-            problem("IDEMPOTENCY_CONFLICT", "此操作编号已用于其他输入", 409)
-    return job_json(db, job)
+    return job_json(db, job, requested_asset_id=asset.id)
 
 
 @app.post("/v1/jobs/status", response_model=JobsResponse)
@@ -314,8 +329,18 @@ def quote_create(body: QuoteRequest, user: User = Depends(identity), db: Session
 @app.post("/v1/translation-batches", status_code=202, response_model=BatchCreatedResponse)
 def batch_create(body: BatchRequest, idempotency_key: Annotated[str | None, Header()] = None, user: User = Depends(identity), db: Session = Depends(get_db)):
     batch = create_batch(db, user, body.quote_id, body.max_credits, idem_key(idempotency_key))
-    jobs = db.scalars(select(Job).where(Job.batch_id == batch.id).order_by(Job.ordinal)).all()
-    return {"id": batch.id, "status": batch_status(jobs), "jobs": [job_json(db, job) for job in jobs], "total_cost": batch.total_cost}
+    items = batch_rows(db, batch.id)
+    return {"id": batch.id, "status": batch_status([job for item, job in items]),
+            "jobs": [batch_item_json(db, item, job) for item, job in items], "total_cost": batch.total_cost}
+
+
+def batch_rows(db, batch_id):
+    return db.execute(select(BatchItem, Job).join(Job, Job.id == BatchItem.job_id)
+                      .where(BatchItem.batch_id == batch_id).order_by(BatchItem.ordinal)).all()
+
+
+def batch_item_json(db, item, job):
+    return job_json(db, job, requested_asset_id=item.input_asset_id, batch_id=item.batch_id, ordinal=item.ordinal)
 
 
 def owned_batch(db, batch_id, owner_id):
@@ -328,15 +353,18 @@ def owned_batch(db, batch_id, owner_id):
 @app.get("/v1/translation-batches/{batch_id}", response_model=BatchResponse)
 def batch_get(batch_id: str, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(identity), db: Session = Depends(get_db)):
     batch = owned_batch(db, batch_id, user.id)
-    jobs = db.scalars(select(Job).where(Job.batch_id == batch.id).order_by(Job.ordinal)).all()
-    return {"id": batch.id, "status": batch_status(jobs), "items": [job_json(db, job) for job in jobs[offset:offset + limit]], "total": len(jobs), "next_offset": offset + limit if offset + limit < len(jobs) else None, "total_cost": batch.total_cost}
+    items = batch_rows(db, batch.id)
+    return {"id": batch.id, "status": batch_status([job for item, job in items]),
+            "items": [batch_item_json(db, item, job) for item, job in items[offset:offset + limit]],
+            "total": len(items), "next_offset": offset + limit if offset + limit < len(items) else None, "total_cost": batch.total_cost}
 
 
 @app.post("/v1/translation-batches/{batch_id}/cancel")
 def batch_cancel(batch_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     batch = owned_batch(db, batch_id, user.id)
     batch.cancel_requested = True
-    jobs = db.scalars(select(Job).where(Job.batch_id == batch.id).with_for_update()).all()
+    job_ids = select(BatchItem.job_id).where(BatchItem.batch_id == batch.id)
+    jobs = db.scalars(select(Job).where(Job.id.in_(job_ids), Job.owner_id == user.id).order_by(Job.id).with_for_update(key_share=True)).all()
     for job in jobs:
         cancel_job(db, job)
     db.commit()
@@ -448,7 +476,7 @@ def admin_quota(user_id: str, body: QuotaAdjustment, idempotency_key: Annotated[
 
 @app.post("/v1/admin/jobs/{job_id}/reconcile", response_model=JobResponse)
 def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), db: Session = Depends(get_db)):
-    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
     if not job:
         problem("NOT_FOUND", "任务不存在", 404)
     if job.status != "outcome_unknown":

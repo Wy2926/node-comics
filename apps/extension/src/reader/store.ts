@@ -1,4 +1,6 @@
 import { defaults, type Chapter, type Settings, type User } from '../types';
+import {normalizeConcurrency} from '../concurrency';
+import {mergeJobs} from './recovery';
 const DB = 'node-comics-v1';
 export function readPosition(chapterId:string):{pageId:string;relativeOffset:number}|null {try{const value=JSON.parse(localStorage.getItem(`nc-position:${chapterId}`)??'null');return typeof value?.pageId==='string'&&Number.isFinite(value.relativeOffset)?value:null;}catch{return null;}}
 export function savePosition(chapterId:string,position:{pageId:string;relativeOffset:number}){localStorage.setItem(`nc-position:${chapterId}`,JSON.stringify({...position,relativeOffset:Math.max(0,Math.min(1,position.relativeOffset)),updatedAt:Date.now()}));}
@@ -28,7 +30,7 @@ export async function saveChapter(chapter: Chapter):Promise<void>{
         const jobs=new Map(existing.jobs.map(job=>[job.id,job]));
         for(const job of page.jobs){const old=jobs.get(job.id);if(!old||(rank[job.status]??0)>=(rank[old.status]??0))jobs.set(job.id,old?.status==='succeeded'&&!old.output_asset_id&&job.output_asset_id?{...job,output_asset_id:null}:job);}
         const useExistingAsset=!page.assetId||Date.parse(existing.assetExpiresAt??'')>Date.parse(page.assetExpiresAt??'');
-        return {...page,...(useExistingAsset?{assetId:existing.assetId,assetExpiresAt:existing.assetExpiresAt,ownerId:existing.ownerId,apiOrigin:existing.apiOrigin}:{}),jobs:[...jobs.values()]};
+        return {...page,...(useExistingAsset?{assetId:existing.assetId,assetExpiresAt:existing.assetExpiresAt,ownerId:existing.ownerId,apiOrigin:existing.apiOrigin}:{}),jobs:mergeJobs([], [...jobs.values()])};
       });
       records.put({...chapter,pages});
     };
@@ -40,7 +42,7 @@ export const putBlob = (id: string, blob: Blob) => transaction('blobs','readwrit
 export const removeBlob = (id: string) => transaction('blobs','readwrite',s=>s.delete(id));
 export async function deleteChapter(chapter: Chapter) { for (const p of chapter.pages) for(const key of [p.blobKey,...Object.values(p.outputBlobs)].filter(Boolean)) await removeBlob(key!); await transaction('chapters','readwrite',s=>s.delete(chapter.id));localStorage.removeItem(`nc-position:${chapter.id}`); }
 export async function clearImages(chapters: Chapter[]) { await transaction('blobs','readwrite',s=>s.clear()); for (const c of chapters) { c.pages=c.pages.map(p=>({...p,blobKey:undefined,outputBlobs:{},fetchError:'本地图片已清理，请返回来源重新获取或导入原图。'})); await saveChapter(c); } }
-export function settings(): Settings { try { return {...defaults,...JSON.parse(localStorage.getItem('nc-settings')??'{}'),autoTranslate:false}; } catch {return defaults;} }
+export function settings(): Settings { try { const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');return {...defaults,...value,requestConcurrency:normalizeConcurrency(value.requestConcurrency),autoTranslate:false}; } catch {return {...defaults};} }
 export function saveSettings(value: Settings) { localStorage.setItem('nc-settings',JSON.stringify({...value,autoTranslate:false})); if (typeof chrome!=='undefined' && chrome.storage?.local) void chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}}); }
 export interface Session {token:string;user:User;apiOrigin:string;}
 export function session(): Session|null { try {const value=JSON.parse(localStorage.getItem('nc-session')??'null');return value?.apiOrigin===new URL(settings().apiBase).origin?value:null;} catch{return null;} }

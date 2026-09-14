@@ -1,3 +1,4 @@
+from conftest import run_job, claim_job
 from datetime import timedelta
 from io import BytesIO
 import base64
@@ -11,7 +12,7 @@ from app.adapters.text import TextError, TextResponse, parse_translations
 from app.config import settings
 from app.db import session_factory
 from app.models import Asset, Attempt, ClassicState, Job, Ledger, TextCall, now, uid
-from app.workers import process_job, claim
+from conftest import run_job as process_job, claim_job as claim
 
 
 SEGMENTS = [{'id': 'b001', 'source': 'Hello!'}]

@@ -46,6 +46,7 @@ class AccessResponse(BaseModel):
 class JobResponse(BaseModel):
     id: str
     input_asset_id: str
+    requested_asset_id: str | None = None
     output_asset_id: str | None
     result_available: bool
     result_expired: bool

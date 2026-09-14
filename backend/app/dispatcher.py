@@ -1,4 +1,4 @@
-"""DB outbox delivery, conservative worker recovery, expiration and bounded batches."""
+"""Durable user-fair admission, advisory outbox delivery and conservative recovery."""
 from datetime import timedelta
 import logging
 import time
@@ -9,13 +9,17 @@ from .config import settings
 from .db import initialize, session_factory
 from .jobs import cancel_job, settle
 from .models import Asset, Attempt, ClassicState, Job, Outbox, now
+from .queue_models import QueueAdmission
+from .scheduler import admit_jobs, lock_scheduler, release_admission
 from .workers import process_job
 
 log = logging.getLogger("node_comics.dispatcher")
 
 
 def recover(db):
-    for job in db.scalars(select(Job).where(Job.status == "running").with_for_update(skip_locked=True)).all():
+    if db.get_bind().dialect.name == "sqlite":
+        lock_scheduler(db)
+    for job in db.scalars(select(Job).where(Job.status == "running").with_for_update(skip_locked=True, key_share=True)).all():
         attempt = db.get(Attempt, job.attempt_id)
         if not attempt or attempt.lease_expires_at > now():
             continue
@@ -54,10 +58,10 @@ def recover(db):
             settle(db, job, success=False)
         else:
             job.status, job.phase, job.attempt_id = "queued", "queued", None
-            event = db.scalar(select(Outbox).where(Outbox.job_id == job.id))
-            event.published_at = None
+            attempt.completed_at, attempt.recovered = now(), True
+            release_admission(db, job.id)
     deadline = now() - timedelta(seconds=settings().unknown_release_seconds)
-    for job in db.scalars(select(Job).where(Job.status == "outcome_unknown", Job.settlement == "reserved", Job.unknown_since <= deadline).with_for_update(skip_locked=True)).all():
+    for job in db.scalars(select(Job).where(Job.status == "outcome_unknown", Job.settlement == "reserved", Job.unknown_since <= deadline).with_for_update(skip_locked=True, key_share=True)).all():
         settle(db, job, success=False)
 
 
@@ -66,7 +70,7 @@ def cleanup(db):
     for asset in db.scalars(select(Asset).where(Asset.purged_at.is_(None), or_(Asset.expires_at <= now(), Asset.deleted_at.is_not(None), Asset.parent_id.in_(expired_parents))).order_by(Asset.expires_at, Asset.id).limit(200)).all():
         if not asset.deleted_at:
             asset.deleted_at = now()
-        for job in db.scalars(select(Job).where(Job.input_asset_id == asset.id, Job.status.in_(["queued", "running", "outcome_unknown"])).with_for_update()).all():
+        for job in db.scalars(select(Job).where(Job.input_asset_id == asset.id, Job.status.in_(["queued", "running", "outcome_unknown"])).with_for_update(key_share=True)).all():
             cancel_job(db, job)
         object_path(asset.storage_key).unlink(missing_ok=True)
         asset.purged_at = now()
@@ -87,27 +91,49 @@ def cleanup(db):
 def dispatch_once():
     with session_factory()() as db:
         recover(db)
+        db.commit()
         cleanup(db)
         db.commit()
-    # Redis is advisory. A queued task is periodically republished if the queue loses it.
+    admit_jobs()
+    dispatched = 0
+    for _ in range(settings().dispatch_max_jobs):
+        if not publish_one():
+            break
+        dispatched += 1
+    return dispatched
+
+
+def publish_one():
+    # Admission is ALREADY committed. Crash before/after send can only replay its
+    # token; a worker never accepts an unadmitted task or an old recovery token.
     with session_factory()() as db:
+        if db.get_bind().dialect.name == "sqlite":
+            lock_scheduler(db)
         cutoff = now() - timedelta(seconds=settings().queue_republish_seconds)
-        events = db.scalars(select(Outbox).join(Job, Job.id == Outbox.job_id).where(Job.status == "queued", or_(Outbox.published_at.is_(None), Outbox.published_at <= cutoff)).order_by(Job.batch_id.is_not(None), Job.ordinal, Job.created_at).limit(100).with_for_update(skip_locked=True)).all()
-        dispatched = 0
-        for event in events:
-            job = db.get(Job, event.job_id)
-            if job.batch_id and event.published_at is None:
-                in_flight = db.scalar(select(func.count()).select_from(Job).join(Outbox, Job.id == Outbox.job_id).where(Job.batch_id == job.batch_id, Job.status.in_(["queued", "running"]), Outbox.published_at.is_not(None)))
-                if in_flight >= settings().batch_window:
-                    continue
-            # Publish first then commit. A crash between these steps causes a safe duplicate.
-            timeout = job.config["provider"]["timeout_seconds"]
-            process_job.apply_async(args=[job.id], queue=job.mode, retry=False, soft_time_limit=timeout + 90, time_limit=timeout + 120)
-            event.published_at, event.publish_attempts = now(), event.publish_attempts + 1
-            db.flush()
-            dispatched += 1
+        while True:
+            admission = db.scalar(select(QueueAdmission).join(Job, Job.id == QueueAdmission.job_id).join(Outbox, Outbox.job_id == Job.id)
+                                  .where(Job.status == "queued", Job.cancel_requested.is_(False), Job.discard_output.is_(False),
+                                         or_(Outbox.published_at.is_(None), Outbox.published_at <= cutoff))
+                                  .order_by(func.coalesce(Outbox.published_at, QueueAdmission.admitted_at), QueueAdmission.sequence)
+                                  .limit(1).with_for_update(skip_locked=True, of=QueueAdmission))
+            if admission is None:
+                return False
+            # Under READ COMMITTED, a join can see old Outbox values even though
+            # the admission row's lock becomes available after another publisher
+            # commits. Re-read under the admission lock using a NEW statement.
+            # Lock order matches release_admission: admission -> outbox. Never
+            # lock Job here: cancellation/recovery hold Job before admission.
+            event = db.scalar(select(Outbox).where(Outbox.job_id == admission.job_id)
+                              .with_for_update().execution_options(populate_existing=True))
+            if event.published_at is None or event.published_at <= cutoff:
+                break
+        job = db.get(Job, admission.job_id)
+        timeout = job.config["provider"]["timeout_seconds"]
+        process_job.apply_async(args=[job.id], kwargs={"admission_token": admission.token}, queue=job.mode, retry=False,
+                                soft_time_limit=timeout + 90, time_limit=timeout + 120)
+        event.published_at, event.publish_attempts = now(), event.publish_attempts + 1
         db.commit()
-        return dispatched
+        return True
 
 
 def main():

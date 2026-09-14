@@ -1,3 +1,4 @@
+from conftest import run_job, claim_job
 import base64
 from datetime import timedelta
 from io import BytesIO
@@ -61,7 +62,7 @@ def test_http_errors_do_not_retry_and_preserve_acceptance_uncertainty(client, pn
 
 
 def test_invalid_image_preserves_reported_usage(client, png, monkeypatch):
-    from app.workers import process_job
+    from conftest import run_job as process_job
     from app.db import session_factory
     from app.models import Attempt, Job
     mock_transport(monkeypatch, lambda request: httpx.Response(200, headers={"x-request-id": "paid-invalid"}, json={"data": [{"b64_json": base64.b64encode(b"not a picture").decode()}], "usage": {"total_tokens": 100}}))
@@ -87,7 +88,7 @@ def test_ratio_failure_preserves_reported_usage(client, png, monkeypatch):
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(buffer.getvalue(), request_id="paid-cropped", usage={"total_tokens": 71}))
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    workers.process_job(job_id)
+    run_job(job_id)
     with session_factory()() as db:
         job = db.get(Job, job_id)
         attempt = db.get(Attempt, job.attempt_id)
@@ -101,17 +102,17 @@ def test_expired_old_worker_cannot_write_call_intent_after_reclaim(client, png, 
     from app.models import Attempt, Job, now
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    first_attempt = workers.claim(job_id)
+    first_attempt = claim_job(job_id)
     with session_factory()() as db:
         db.get(Attempt, first_attempt).lease_expires_at = now() - timedelta(seconds=1)
         db.commit()
         recover(db)
         db.commit()
-    second_attempt = workers.claim(job_id)
+    second_attempt = claim_job(job_id)
     assert second_attempt != first_attempt
-    monkeypatch.setattr(workers, "claim", lambda job: first_attempt)
+    monkeypatch.setattr(workers, "claim", lambda job, token: first_attempt)
     monkeypatch.setattr(workers, "redraw", lambda *args: pytest.fail("stale worker must not issue paid request"))
-    workers.process_job(job_id)
+    run_job(job_id)
     with session_factory()() as db:
         assert db.get(Attempt, first_attempt).call_started_at is None
         assert db.get(Job, job_id).attempt_id == second_attempt
@@ -122,7 +123,7 @@ def test_saved_output_is_recovered_after_crash_before_database_commit(client, pn
     from app.db import session_factory
     from app.dispatcher import recover
     from app.models import Attempt, Job, now
-    from app.workers import claim
+    from conftest import claim_job as claim
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
     attempt_id = claim(job_id)

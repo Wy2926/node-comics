@@ -11,6 +11,8 @@ from .db import session_factory
 from .errors import ProcessingError
 from .jobs import settle
 from .models import Asset, Attempt, Job, Provider, now, uid
+from .queue_models import QueueAdmission
+from .scheduler import concurrency_for, lock_scheduler, release_admission
 
 celery_app = Celery("node_comics", broker=settings().redis_url)
 celery_app.conf.update(task_serializer="json", accept_content=["json"], result_serializer="json", task_ignore_result=True,
@@ -38,16 +40,31 @@ def heartbeat(job_id, attempt_id, stopped):
             continue
 
 
-def claim(job_id):
+def claim(job_id, admission_token=None):
+    if not admission_token:
+        return None
     with session_factory()() as db:
-        job = db.get(Job, job_id)
+        lock_scheduler(db)
+        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
         if not job or job.status != "queued":
+            return None
+        admission = db.get(QueueAdmission, job_id)
+        if admission is None or admission.token != admission_token:
+            return None
+        if job.cancel_requested or job.discard_output:
+            job.status, job.phase, job.completed_at = "cancelled", "cancelled", now()
+            settle(db, job, success=False)
+            release_admission(db, job.id)
+            db.commit()
+            return None
+        running = db.scalar(select(func.count()).select_from(Job).where(Job.owner_id == job.owner_id, Job.status == "running"))
+        if running >= concurrency_for(db, job.owner_id):
             return None
         provider_id = job.config["provider"]["id"]
         if job.mode == "redraw":
             provider = db.scalar(select(Provider).where(Provider.id == provider_id).with_for_update())
             if not provider or not provider.enabled:
-                job = db.scalar(select(Job).where(Job.id == job_id).with_for_update().execution_options(populate_existing=True))
+                job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True).execution_options(populate_existing=True))
                 if job.status == "queued":
                     job.status, job.phase, job.completed_at = "failed", "failed", now()
                     job.error_code, job.error_message = "PROVIDER_DISABLED", "管理员已停用此图片编辑服务，请重新选择服务"
@@ -69,7 +86,7 @@ def claim(job_id):
 
 def finish_error(job_id, attempt_id, error):
     with session_factory()() as db:
-        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
         attempt = db.get(Attempt, attempt_id)
         if not job or job.attempt_id != attempt_id or job.status not in ("running", "outcome_unknown"):
             return
@@ -87,8 +104,8 @@ def finish_error(job_id, attempt_id, error):
 
 
 @celery_app.task(name="app.workers.process_job", acks_late=True)
-def process_job(job_id: str):
-    attempt_id = claim(job_id)
+def process_job(job_id: str, admission_token: str | None = None):
+    attempt_id = claim(job_id, admission_token)
     if not attempt_id:
         return
     stopped = Event()
@@ -96,7 +113,7 @@ def process_job(job_id: str):
     thread.start()
     try:
         with session_factory()() as db:
-            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
             attempt = db.get(Attempt, attempt_id)
             if job.attempt_id != attempt_id or job.status != "running" or not attempt or attempt.lease_expires_at <= now():
                 return
@@ -117,7 +134,7 @@ def process_job(job_id: str):
             attempt.cost_state = "reported" if result.usage is not None else "unknown"
             db.commit()
         with session_factory()() as db:
-            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
             attempt = db.get(Attempt, attempt_id)
             if job.attempt_id != attempt_id or job.status not in ("running", "outcome_unknown"):
                 return

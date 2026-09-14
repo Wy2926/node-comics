@@ -1,11 +1,24 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect,vi,beforeAll} from 'vitest';
 import {makeChapter,emptyPage} from '../src/reader/model';
-import {saveChapter,putBlob,getBlob,readChapters,enforceCacheBudget,saveSession,session,saveSettings,savePosition} from '../src/reader/store';
+import {saveChapter,putBlob,getBlob,readChapters,enforceCacheBudget,saveSession,session,saveSettings,savePosition,settings} from '../src/reader/store';
 import {defaults} from '../src/types';
 import type {Job} from '../src/types';
 beforeAll(()=>{const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>data.set(key,value),removeItem:(key:string)=>data.delete(key)});});
 describe('local resource lifecycle',()=>{
+it('persists file identities independently of visible ordering and deletion',async()=>{
+  const pages=[0,1,2].map(pageIndex=>({...emptyPage(`${pageIndex}.png`,10,10),fileHash:'a'.repeat(64),pageIndex}));
+  const chapter=makeChapter('stable ordinals',pages);await saveChapter(chapter);
+  await saveChapter({...chapter,pages:[pages[2],pages[0]],pageId:pages[2].id});
+  const restored=(await readChapters()).find(c=>c.id===chapter.id)!;
+  expect(restored.pages.map(p=>[p.fileHash,p.pageIndex])).toEqual([['a'.repeat(64),2],['a'.repeat(64),0]]);
+});
+it('persists only the local request concurrency, clamping malformed saved settings',()=>{
+  saveSettings({...defaults,requestConcurrency:10});expect(settings().requestConcurrency).toBe(10);
+  localStorage.setItem('nc-settings',JSON.stringify({requestConcurrency:100}));expect(settings().requestConcurrency).toBe(10);
+  localStorage.setItem('nc-settings',JSON.stringify({requestConcurrency:null}));expect(settings().requestConcurrency).toBe(2);
+  saveSettings(defaults);
+});
 it('keeps newly submitted jobs when an older tab saves its chapter snapshot',async()=>{
   const page=emptyPage('job.png',10,10);page.ownerId='reader';page.apiOrigin='http://127.0.0.1:18088';
   const chapter=makeChapter('job merge',[page]);await saveChapter(chapter);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decompressPalmDoc, importMobi } from './mobi';
+import {createHash} from 'node:crypto';
 
 function mobi({encrypted = false, refs = [2,1], badOffset = false} = {}) {
   const header = new Uint8Array(78 + 4 * 8);
@@ -17,8 +18,17 @@ function mobi({encrypted = false, refs = [2,1], badOffset = false} = {}) {
 
 describe('bounded local MOBI import',()=> {
   it('uses body image order, independent from physical resource order',async()=> {
-    const result=await importMobi(mobi()); expect(result.pages.map(p=>p.width)).toEqual([300,200]);
+    const file=mobi();const result=await importMobi(file); expect(result.pages.map(p=>p.width)).toEqual([300,200]);
     expect(result.pages[0].blob.type).toBe('image/png');
+    expect(result.pages.map(p=>p.pageIndex)).toEqual([0,1]);
+    expect(result.fileHash).toBe(createHash('sha256').update(new Uint8Array(await file.arrayBuffer())).digest('hex'));
+  });
+  it('keeps original ordinals after reordering/deleting and distinguishes repeated references',async()=>{
+    const result=await importMobi(mobi({refs:[2,1,2]}));
+    const reordered=[result.pages[2],result.pages[0]];
+    expect(reordered.map(p=>p.pageIndex)).toEqual([2,0]);
+    expect(new Set(result.pages.map(p=>p.pageIndex)).size).toBe(3);
+    expect(await result.pages[0].blob.arrayBuffer()).toEqual(await result.pages[2].blob.arrayBuffer());
   });
   it('rejects DRM before extracting images',async()=> {await expect(importMobi(mobi({encrypted:true}))).rejects.toThrow('DRM');});
   it('rejects record offset corruption',async()=> {await expect(importMobi(mobi({badOffset:true}))).rejects.toThrow('记录表');});

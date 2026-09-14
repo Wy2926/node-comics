@@ -1,8 +1,9 @@
+from conftest import run_job, claim_job
 from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import create, login, upload, quote
+from conftest import create, login, upload, quote, png_variant
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -34,7 +35,7 @@ def test_idempotency_binds_input_and_parameters(client, png):
 
 def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatch):
     from app.adapters.images import TranslationOutput
-    from app.workers import process_job
+    from conftest import run_job as process_job
     import app.workers as workers
     calls = []
     def fake_adapter(*args):
@@ -65,7 +66,7 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
 def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypatch):
     import app.workers as workers
     from app.errors import ProcessingError
-    from app.workers import process_job
+    from conftest import run_job as process_job
     auth = login(client)
     asset = upload(client, auth, png)
     calls = []
@@ -91,7 +92,7 @@ def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypat
 
 
 def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypatch):
-    from app.workers import process_job
+    from conftest import run_job as process_job
     import app.workers as workers
     monkeypatch.setattr(workers, "redraw", lambda *args: (_ for _ in ()).throw(AssertionError("must not call")))
     auth = login(client)
@@ -116,7 +117,7 @@ def test_running_cancel_or_delete_discards_output_without_charge(client, png, mo
         assert response.status_code == 200
         return TranslationOutput(png)
     monkeypatch.setattr(workers, "redraw", cancel_during_provider)
-    workers.process_job(job_id)
+    run_job(job_id)
     job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     assert job["status"] == "cancelled" and job["output_asset_id"] is None
     assert client.get("/v1/me/usage", headers=auth).json()["balance"] == 100
@@ -132,7 +133,7 @@ def test_deleted_or_expired_output_not_a_cache_hit(client, png, monkeypatch):
     auth = login(client)
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
-    workers.process_job(job_id)
+    run_job(job_id)
     original = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     output_id = original["output_asset_id"]
     with session_factory()() as db:
@@ -152,7 +153,7 @@ def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
     alice, bob = login(client), login(client, "bob")
     alice_asset = upload(client, alice, png)
     job_id = create(client, alice, alice_asset).json()["id"]
-    workers.process_job(job_id)
+    run_job(job_id)
     assert client.get(f"/v1/jobs/{job_id}", headers=bob).status_code == 404
     assert client.post("/v1/jobs/status", headers=bob, json={"ids": [job_id]}).json() == {"items": []}
     assert create(client, bob, alice_asset).status_code == 404
@@ -162,7 +163,7 @@ def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
 
 def test_batch_budget_atomicity_and_cancel(client, png):
     auth = login(client)
-    assets = [upload(client, auth, png) for _ in range(3)]
+    assets = [upload(client, auth, png_variant(png, index)) for index in range(3)]
     quote = client.post("/v1/quotes", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
     headers = {**auth, "Idempotency-Key": "batch-1"}
     assert quote["total_cost"] == 24
@@ -206,7 +207,7 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
     auth, admin = login(client), login(client, "admin")
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
-    workers.process_job(job_id)
+    run_job(job_id)
     with session_factory()() as db:
         db.get(Job, job_id).unknown_since = now() - timedelta(hours=2)
         db.commit()
@@ -225,7 +226,7 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
 def test_worker_lease_loss_after_intent_never_requeues(client, png):
     from app.db import session_factory
     from app.models import Attempt, Job, now
-    from app.workers import claim
+    from conftest import claim_job as claim
     from app.dispatcher import recover
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
@@ -244,7 +245,7 @@ def test_worker_lease_loss_after_intent_never_requeues(client, png):
 def test_worker_lease_before_intent_is_safe_to_requeue(client, png):
     from app.db import session_factory
     from app.models import Attempt, Job, now
-    from app.workers import claim
+    from conftest import claim_job as claim
     from app.dispatcher import recover
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
@@ -267,7 +268,7 @@ def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypa
     Image.new("RGB", (800, 100)).save(buffer, "PNG")
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(buffer.getvalue()))
     job_id = create(client, auth, asset).json()["id"]
-    workers.process_job(job_id)
+    run_job(job_id)
     job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     assert job["status"] == "failed" and job["error"]["code"] == "INVALID_PROVIDER_OUTPUT"
     assert client.get("/v1/me/usage", headers=auth).json()["available"] == 100
@@ -275,9 +276,10 @@ def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypa
 
 def test_insufficient_quota_creates_no_job(client, png):
     auth = login(client)
-    asset = upload(client, auth, png)
     for i in range(12):
+        asset = upload(client, auth, png_variant(png, i))
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
+    asset = upload(client, auth, png_variant(png, 12))
     assert create(client, auth, asset, key="no-credit").status_code == 409
     assert client.get("/v1/jobs", headers=auth).json()["total"] == 12
     assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 96

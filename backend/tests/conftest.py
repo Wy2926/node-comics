@@ -63,3 +63,38 @@ def quote(client, headers, asset_id, language="zh-Hans"):
     response = client.post("/v1/quotes", headers=headers, json={"asset_ids": [asset_id], "mode": "redraw", "target_language": language})
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def admit_pending():
+    """Exercise the real durable scheduler, without Redis or a paid supplier."""
+    from app.scheduler import admit_jobs
+    return admit_jobs()
+
+
+def run_job(job_id):
+    from app.workers import process_job
+    admit_pending()
+    return process_job(job_id, admission_token_for(job_id))
+
+
+def claim_job(job_id):
+    from app.workers import claim
+    admit_pending()
+    return claim(job_id, admission_token_for(job_id))
+
+
+def admission_token_for(job_id):
+    from app.db import session_factory
+    from app.queue_models import QueueAdmission
+    with session_factory()() as db:
+        admission = db.get(QueueAdmission, job_id)
+        return admission.token if admission else None
+
+
+def png_variant(png, index):
+    """Distinct valid page bytes for tests that need independent billable jobs."""
+    image = Image.open(BytesIO(png)).copy()
+    image.putpixel((0, 0), (index % 256, index // 256, 0))
+    buffer = BytesIO()
+    image.save(buffer, "PNG")
+    return buffer.getvalue()

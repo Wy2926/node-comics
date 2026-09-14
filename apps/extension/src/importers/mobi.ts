@@ -3,8 +3,9 @@
  * The record table and text references determine image order; HD/KF8 resources
  * are not blindly appended, so thumbnails and duplicate renditions stay out.
  */
-export interface MobiPage { id: string; name: string; blob: Blob; width?: number; height?: number }
-export interface MobiImport { title: string; pages: MobiPage[]; warnings: string[] }
+import {hashFile} from './hash';
+export interface MobiPage { id: string; name: string; pageIndex: number; blob: Blob; width?: number; height?: number }
+export interface MobiImport { title: string; fileHash: string; pages: MobiPage[]; warnings: string[] }
 const MAX_FILE = 512 * 1024 * 1024;
 const MAX_TEXT = 16 * 1024 * 1024;
 const MAX_PAGES = 1500;
@@ -80,7 +81,7 @@ function imageInfo(b: Uint8Array): { mime: string; width?: number; height?: numb
   return undefined;
 }
 
-export async function importMobi(file: File, onProgress?: (done: number, total: number) => void): Promise<MobiImport> {
+export async function importMobi(file: File, onProgress?: (done: number, total: number) => void, onHashProgress?: (done: number, total: number) => void): Promise<MobiImport> {
   if (file.size > MAX_FILE) fail('MOBI 最大支持 512 MB，请拆分或导入章节图片。');
   const header = new Uint8Array(await file.slice(0, 78).arrayBuffer());
   if (header.length < 78 || ascii(header, 60, 8) !== 'BOOKMOBI') fail('文件不是可识别的 MOBI 漫画。');
@@ -125,10 +126,11 @@ export async function importMobi(file: File, onProgress?: (done: number, total: 
     const info = imageInfo(prefix);
     if (!info) fail(`第 ${ordinal + 1} 页不是支持的 PNG、JPEG、GIF 或 WebP 图片。`);
     if (info.width && info.height && (info.width * info.height > 40_000_000 || Math.max(info.width, info.height) > 30000)) fail(`第 ${ordinal + 1} 页尺寸超出阅读器安全限制。`);
-    pages.push({ id: `mobi-${ordinal + 1}-${index}`, name: `第 ${String(ordinal + 1).padStart(3, '0')} 页`,
+    pages.push({ id: `mobi-${ordinal + 1}-${index}`, name: `第 ${String(ordinal + 1).padStart(3, '0')} 页`, pageIndex: ordinal,
       blob: file.slice(offsets[index], offsets[index + 1], info.mime), width: info.width, height: info.height });
     if (ordinal % 10 === 0 || ordinal === refs.length - 1) onProgress?.(ordinal + 1, refs.length);
   }
   if (version === 6) warnings.push('已按 MOBI 正文顺序导入图片；附带缩略图与其他版本资源不会重复加入。');
-  return { title: file.name.replace(/\.mobi$/i, ''), pages, warnings };
+  const fileHash = await hashFile(file, onHashProgress);
+  return { title: file.name.replace(/\.mobi$/i, ''), fileHash, pages, warnings };
 }

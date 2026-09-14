@@ -1,6 +1,9 @@
 from alembic import context
 from app.db import Base, engine
 from app import models
+from app import file_pages
+from app import queue_models
+from app import batch_items
 
 if context.is_offline_mode():
     from app.config import settings

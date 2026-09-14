@@ -6,6 +6,178 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/v1/me/queue": {
+      "get": {
+        "tags": [
+          "queue"
+        ],
+        "summary": "Get My Queue",
+        "operationId": "get_my_queue_v1_me_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "queue"
+        ],
+        "summary": "Put My Queue",
+        "operationId": "put_my_queue_v1_me_queue_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/users/{user_id}/queue": {
+      "get": {
+        "tags": [
+          "queue"
+        ],
+        "summary": "Get User Queue",
+        "operationId": "get_user_queue_v1_admin_users__user_id__queue_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "queue"
+        ],
+        "summary": "Put User Queue",
+        "operationId": "put_user_queue_v1_admin_users__user_id__queue_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -141,6 +313,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/file-pages/match": {
+      "post": {
+        "summary": "File Page Matches",
+        "operationId": "file_page_matches_v1_file_pages_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilePageMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilePageMatches"
                 }
               }
             }
@@ -1616,6 +1831,31 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "Image"
+          },
+          "file_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Hash"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
           }
         },
         "type": "object",
@@ -1722,6 +1962,118 @@
         ],
         "title": "ErrorInfo"
       },
+      "FilePageIdentity": {
+        "properties": {
+          "file_hash": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "title": "File Hash"
+          },
+          "page_index": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Page Index"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_hash",
+          "page_index"
+        ],
+        "title": "FilePageIdentity"
+      },
+      "FilePageMatch": {
+        "properties": {
+          "file_hash": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "title": "File Hash"
+          },
+          "page_index": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Page Index"
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "array",
+            "title": "Jobs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_hash",
+          "page_index",
+          "asset",
+          "jobs"
+        ],
+        "title": "FilePageMatch"
+      },
+      "FilePageMatchRequest": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/FilePageIdentity"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Pages"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "redraw"
+            ],
+            "title": "Mode"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pages",
+          "mode",
+          "target_language"
+        ],
+        "title": "FilePageMatchRequest"
+      },
+      "FilePageMatches": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FilePageMatch"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "FilePageMatches"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1777,6 +2129,17 @@
           "input_asset_id": {
             "type": "string",
             "title": "Input Asset Id"
+          },
+          "requested_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Asset Id"
           },
           "output_asset_id": {
             "anyOf": [
@@ -2159,6 +2522,79 @@
           "enabled"
         ],
         "title": "ProviderToggle"
+      },
+      "QueueSettingsRequest": {
+        "properties": {
+          "concurrency": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concurrency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concurrency"
+        ],
+        "title": "QueueSettingsRequest"
+      },
+      "QueueSettingsResponse": {
+        "properties": {
+          "concurrency": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concurrency"
+          },
+          "effective_concurrency": {
+            "type": "integer",
+            "title": "Effective Concurrency"
+          },
+          "default_concurrency": {
+            "type": "integer",
+            "title": "Default Concurrency"
+          },
+          "max_concurrency": {
+            "type": "integer",
+            "title": "Max Concurrency"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "dispatched": {
+            "type": "integer",
+            "title": "Dispatched"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concurrency",
+          "effective_concurrency",
+          "default_concurrency",
+          "max_concurrency",
+          "queued",
+          "dispatched",
+          "running"
+        ],
+        "title": "QueueSettingsResponse"
       },
       "QuotaAdjustment": {
         "properties": {

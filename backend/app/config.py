@@ -1,6 +1,7 @@
 """Server configuration. Secrets are read from environment, never returned to clients."""
 from functools import lru_cache
 from pathlib import Path
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,10 +30,12 @@ class Settings(BaseSettings):
     max_dimension: int = 8192
     max_batch: int = 100
     max_active_jobs: int = 120
-    batch_window: int = 3
+    user_queue_concurrency: int = Field(default=2, ge=1, le=10)
+    user_queue_max_concurrency: int = Field(default=10, ge=1, le=10)
+    dispatch_max_jobs: int = Field(default=100, ge=1, le=1000)
     unknown_release_seconds: int = 3600
     dispatch_interval_seconds: int = 2
-    queue_republish_seconds: int = 60
+    queue_republish_seconds: int = Field(default=60, ge=1)
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-image-2"
