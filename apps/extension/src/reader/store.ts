@@ -1,4 +1,5 @@
 import { defaults, type Chapter, type Settings, type User } from '../types';
+import {normalizeAhead} from './automatic';
 import {normalizeConcurrency} from '../concurrency';
 import {mergeJobs} from './recovery';
 const DB = 'node-comics-v1';
@@ -47,7 +48,7 @@ export function settings(): Settings {
     const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged={...defaults,...value};
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,autoLimit:Math.max(1,Math.min(50,Math.trunc(Number(value.autoLimit))||defaults.autoLimit)),requestConcurrency:normalizeConcurrency(value.requestConcurrency),autoTranslate:false};
+    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,autoAhead:normalizeAhead(value.autoAhead),requestConcurrency:normalizeConcurrency(value.requestConcurrency),autoTranslate:false};
   } catch {return {...defaults};}
 }
 export function saveSettings(value: Settings) { localStorage.setItem('nc-settings',JSON.stringify({...value,autoTranslate:false})); if (typeof chrome!=='undefined' && chrome.storage?.local) void chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}}); }

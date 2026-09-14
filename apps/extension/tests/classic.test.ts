@@ -3,15 +3,14 @@ import {Api} from '../src/api';
 import {automaticScope} from '../src/reader/model';
 
 describe('classic mode and budget boundaries',()=>{
-  it('does not reuse automatic approval across mode, language, account or page budget changes',()=>{
-    const original=automaticScope('chapter','alice','https://api.example','zh-Hans','classic',10);
+  it('does not reuse automatic approval across mode, language, account, service or chapter changes',()=>{
+    const original=automaticScope('chapter','alice','https://api.example','zh-Hans','classic');
     for(const changed of [
-      automaticScope('chapter','alice','https://api.example','zh-Hans','redraw',10),
-      automaticScope('chapter','alice','https://api.example','en','classic',10),
-      automaticScope('chapter','bob','https://api.example','zh-Hans','classic',10),
-      automaticScope('chapter','alice','https://other.example','zh-Hans','classic',10),
-      automaticScope('chapter','alice','https://api.example','zh-Hans','classic',20),
-      automaticScope('other','alice','https://api.example','zh-Hans','classic',10),
+      automaticScope('chapter','alice','https://api.example','zh-Hans','redraw'),
+      automaticScope('chapter','alice','https://api.example','en','classic'),
+      automaticScope('chapter','bob','https://api.example','zh-Hans','classic'),
+      automaticScope('chapter','alice','https://other.example','zh-Hans','classic'),
+      automaticScope('other','alice','https://api.example','zh-Hans','classic'),
     ])expect(changed).not.toBe(original);
   });
   it('quotes and submits the selected classic mode',async()=>{
