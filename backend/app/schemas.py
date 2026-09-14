@@ -58,6 +58,7 @@ class JobResponse(BaseModel):
     settlement: str
     version: int
     cache_hit: bool
+    reused: bool = False
     batch_id: str | None
     ordinal: int
     cancel_requested: bool

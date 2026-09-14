@@ -178,6 +178,427 @@
         }
       }
     },
+    "/v1/jobs/{job_id}/latest-result": {
+      "get": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Latest Result",
+        "operationId": "latest_result_v1_jobs__job_id__latest_result_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/feedback": {
+      "post": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Submit Feedback",
+        "operationId": "submit_feedback_v1_jobs__job_id__feedback_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/feedback": {
+      "get": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "My Feedback",
+        "operationId": "my_feedback_v1_me_feedback_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/feedback": {
+      "get": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Admin Feedback",
+        "operationId": "admin_feedback_v1_admin_feedback_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/feedback/{feedback_id}": {
+      "patch": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Review Feedback",
+        "operationId": "review_feedback_v1_admin_feedback__feedback_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feedback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Feedback Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/usage/summary": {
+      "get": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Usage Summary",
+        "operationId": "usage_summary_v1_me_usage_summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 7,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "default": "UTC",
+              "title": "Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/translation-history": {
+      "get": {
+        "tags": [
+          "Reader"
+        ],
+        "summary": "Translation History",
+        "operationId": "translation_history_v1_translation_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -1962,6 +2383,149 @@
         ],
         "title": "ErrorInfo"
       },
+      "FeedbackPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "next_offset"
+        ],
+        "title": "FeedbackPage"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "issues": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "missing_text",
+                "meaning",
+                "typesetting",
+                "art_changed",
+                "other"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Issues"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          },
+          "output_asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Asset Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FeedbackRequest"
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "output_asset_id": {
+            "type": "string",
+            "title": "Output Asset Id"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "output_asset_id",
+          "issues",
+          "comment",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "FeedbackResponse"
+      },
+      "FeedbackUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "reviewing",
+              "resolved"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FeedbackUpdate"
+      },
       "FilePageIdentity": {
         "properties": {
           "file_hash": {
@@ -2013,6 +2577,13 @@
             },
             "type": "array",
             "title": "Jobs"
+          },
+          "display_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "array",
+            "title": "Display Jobs"
           }
         },
         "additionalProperties": false,
@@ -2047,6 +2618,11 @@
           "target_language": {
             "type": "string",
             "title": "Target Language"
+          },
+          "include_display": {
+            "type": "boolean",
+            "title": "Include Display",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -2086,6 +2662,120 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "batch",
+              "job"
+            ],
+            "title": "Kind"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "settled": {
+            "type": "integer",
+            "title": "Settled"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "reused": {
+            "type": "integer",
+            "title": "Reused"
+          },
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Job Ids"
+          },
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Asset Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "mode",
+          "target_language",
+          "page_count",
+          "counts",
+          "settled",
+          "reserved",
+          "reused",
+          "job_ids",
+          "asset_ids"
+        ],
+        "title": "HistoryGroup"
+      },
+      "HistoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryGroup"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "next_offset"
+        ],
+        "title": "HistoryPage"
       },
       "JobPageResponse": {
         "properties": {
@@ -2191,6 +2881,11 @@
           "cache_hit": {
             "type": "boolean",
             "title": "Cache Hit"
+          },
+          "reused": {
+            "type": "boolean",
+            "title": "Reused",
+            "default": false
           },
           "batch_id": {
             "anyOf": [
@@ -2302,6 +2997,36 @@
           "label"
         ],
         "title": "LanguageCapability"
+      },
+      "LatestResult": {
+        "properties": {
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "latest",
+          "result"
+        ],
+        "title": "LatestResult"
       },
       "LoginResponse": {
         "properties": {
@@ -2774,6 +3499,18 @@
             "type": "boolean",
             "title": "Acknowledge Unknown Cost",
             "default": false
+          },
+          "input_asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Asset Id"
           }
         },
         "additionalProperties": false,
@@ -2802,6 +3539,39 @@
           "ids"
         ],
         "title": "StatusRequest"
+      },
+      "UsageDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "settled": {
+            "type": "integer",
+            "title": "Settled"
+          },
+          "classic": {
+            "type": "integer",
+            "title": "Classic"
+          },
+          "redraw": {
+            "type": "integer",
+            "title": "Redraw"
+          },
+          "unclassified": {
+            "type": "integer",
+            "title": "Unclassified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "settled",
+          "classic",
+          "redraw",
+          "unclassified"
+        ],
+        "title": "UsageDay"
       },
       "UsageEntry": {
         "properties": {
@@ -2895,6 +3665,80 @@
           "next_offset"
         ],
         "title": "UsageResponse"
+      },
+      "UsageSummary": {
+        "properties": {
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "title": "End Date"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "settled": {
+            "type": "integer",
+            "title": "Settled"
+          },
+          "delivered": {
+            "type": "integer",
+            "title": "Delivered"
+          },
+          "free_delivered": {
+            "type": "integer",
+            "title": "Free Delivered"
+          },
+          "by_mode": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Mode"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/UsageDay"
+            },
+            "type": "array",
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance",
+          "reserved",
+          "available",
+          "timezone",
+          "start_date",
+          "end_date",
+          "generated_at",
+          "settled",
+          "delivered",
+          "free_delivered",
+          "by_mode",
+          "days"
+        ],
+        "title": "UsageSummary"
       },
       "UserResponse": {
         "properties": {

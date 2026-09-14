@@ -42,7 +42,14 @@ export const putBlob = (id: string, blob: Blob) => transaction('blobs','readwrit
 export const removeBlob = (id: string) => transaction('blobs','readwrite',s=>s.delete(id));
 export async function deleteChapter(chapter: Chapter) { for (const p of chapter.pages) for(const key of [p.blobKey,...Object.values(p.outputBlobs)].filter(Boolean)) await removeBlob(key!); await transaction('chapters','readwrite',s=>s.delete(chapter.id));localStorage.removeItem(`nc-position:${chapter.id}`); }
 export async function clearImages(chapters: Chapter[]) { await transaction('blobs','readwrite',s=>s.clear()); for (const c of chapters) { c.pages=c.pages.map(p=>({...p,blobKey:undefined,outputBlobs:{},fetchError:'本地图片已清理，请返回来源重新获取或导入原图。'})); await saveChapter(c); } }
-export function settings(): Settings { try { const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');return {...defaults,...value,requestConcurrency:normalizeConcurrency(value.requestConcurrency),autoTranslate:false}; } catch {return {...defaults};} }
+export function settings(): Settings {
+  try {
+    const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged={...defaults,...value};
+    const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
+    for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
+    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,autoLimit:Math.max(1,Math.min(50,Math.trunc(Number(value.autoLimit))||defaults.autoLimit)),requestConcurrency:normalizeConcurrency(value.requestConcurrency),autoTranslate:false};
+  } catch {return {...defaults};}
+}
 export function saveSettings(value: Settings) { localStorage.setItem('nc-settings',JSON.stringify({...value,autoTranslate:false})); if (typeof chrome!=='undefined' && chrome.storage?.local) void chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}}); }
 export interface Session {token:string;user:User;apiOrigin:string;}
 export function session(): Session|null { try {const value=JSON.parse(localStorage.getItem('nc-session')??'null');return value?.apiOrigin===new URL(settings().apiBase).origin?value:null;} catch{return null;} }

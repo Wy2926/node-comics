@@ -18,7 +18,7 @@ describe('file-page API contract', () => {
     const api=new Api(origin,'token');await api.upload(new Blob(['image']),p.name,pageSource(p));await api.matchPages([pageSource(p)!],'classic','zh-Hans');await api.upload(new Blob(['image']),p.name);
     const body=calls[0].init.body as FormData;
     expect(body.get('file_hash')).toBe(p.fileHash);expect(body.get('page_index')).toBe('0');
-    expect(JSON.parse(calls[1].init.body as string)).toEqual({pages:[{file_hash:p.fileHash,page_index:0}],mode:'classic',target_language:'zh-Hans'});
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({pages:[{file_hash:p.fileHash,page_index:0}],mode:'classic',target_language:'zh-Hans',include_display:true});
     expect((calls[2].init.body as FormData).has('file_hash')).toBe(false);expect((calls[2].init.body as FormData).has('page_index')).toBe(false);
     expect(()=>api.upload(new Blob(),p.name,{file_hash:p.fileHash!,page_index:undefined as never})).toThrow('成对');
   });

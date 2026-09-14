@@ -4,6 +4,7 @@ from app import models
 from app import file_pages
 from app import queue_models
 from app import batch_items
+from app import reader_api
 
 if context.is_offline_mode():
     from app.config import settings

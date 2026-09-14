@@ -1,0 +1,9 @@
+import {useEffect} from 'react';
+import type {Settings} from '../types';
+import {Icon} from '../icons';
+export function useAppearance(settings:Settings){
+  useEffect(()=>{const media=matchMedia('(prefers-color-scheme: dark)');const apply=()=>{document.documentElement.dataset.appearance=settings.appearance==='system'?(media.matches?'dark':'light'):settings.appearance;document.documentElement.dataset.accent=settings.accentTheme;document.documentElement.style.setProperty('--text-scale',String(settings.textScale));};apply();media.addEventListener('change',apply);return()=>media.removeEventListener('change',apply);},[settings.appearance,settings.accentTheme,settings.textScale]);
+}
+export function AppearanceSettings({settings,onChange}:{settings:Settings;onChange:(s:Settings)=>void}){
+  return <section className="settings-card"><h3><Icon name="sun"/>外观与主题</h3><div className="setting-row"><div><b>主题色</b><p>用于选中项、主操作和阅读进度。</p></div><div className="nc-theme-options">{([['sky','晴空蓝'],['rose','樱花粉'],['mint','薄荷绿'],['iris','鸢尾紫']] as const).map(([value,label])=><button key={value} aria-pressed={settings.accentTheme===value} className={settings.accentTheme===value?'selected':''} onClick={()=>onChange({...settings,accentTheme:value})}><i data-color={value}/>{label}</button>)}</div></div><div className="setting-row"><div><b>亮暗外观</b><p>漫画保持原色，阅读背景可单独设置。</p></div><select aria-label="亮暗外观" value={settings.appearance} onChange={e=>onChange({...settings,appearance:e.target.value as Settings['appearance']})}><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div><div className="setting-row"><div><b>界面文字大小</b><p>标题、说明和按钮同步调整。</p></div><select aria-label="界面文字大小" value={settings.textScale} onChange={e=>onChange({...settings,textScale:Number(e.target.value)})}><option value={1}>标准 · 16 px</option><option value={1.125}>大 · 18 px</option><option value={1.25}>更大 · 20 px</option></select></div></section>;
+}

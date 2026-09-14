@@ -1,6 +1,7 @@
 import {Api} from '../api';
 import {assertCurrent, mapConcurrent} from '../concurrency';
 import type {Chapter, FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
+import {newestFirst,pendingStatuses} from './presentation';
 
 export function pageSource(page: Page): FilePageSource | undefined {
   return page.fileHash && /^[a-f0-9]{64}$/.test(page.fileHash) && Number.isSafeInteger(page.pageIndex) && page.pageIndex! >= 0
@@ -28,7 +29,7 @@ export function applyMatch(page: Page, match: FilePageMatch, ownerId: string, ap
     assetId: assetChanged ? page.assetId : match.asset?.id,
     assetExpiresAt: assetChanged ? page.assetExpiresAt : match.asset?.expires_at,
     // The local original determines layout; restoring an asset must not move the reading position.
-    jobs: mergeJobs(sameOwner ? page.jobs : [], match.jobs),
+    jobs: mergeJobs(sameOwner ? page.jobs : [], [...match.jobs,...(match.display_jobs??[])]),
     outputBlobs: sameOwner ? page.outputBlobs : {}, operationIds: sameOwner ? page.operationIds : {},
     translationError: sameOwner ? page.translationError : undefined,
   };
@@ -55,7 +56,12 @@ export function bindSubmission(chapter: Chapter | undefined, preparedPages: Page
   return {chapter: chapter && {...chapter, pages: pages!}, detachedJobIds: [...new Set(returned.filter(job => !attached.has(job.id)).map(job => job.id))]};
 }
 export function rerunSource(page: Page, match: FilePageMatch | undefined, mode: Mode, language: string): RerunSource | undefined {
-  if (!match?.asset) return;
+  if (!match) return;
+  if (match.display_jobs) {
+    const previous=newestFirst(mergeJobs(page.jobs,[...match.jobs,...match.display_jobs])).find(job=>job.mode===mode&&job.target_language===language);
+    return previous&&page.assetId?{pageId:page.id,jobId:previous.id,inputAssetId:page.assetId}:undefined;
+  }
+  if (!match.asset) return;
   const validInputs = new Set([match.asset.id, ...match.jobs.map(job => job.input_asset_id)]);
   const previous = mergeJobs(page.jobs, match.jobs).filter(job => job.mode === mode && job.target_language === language && validInputs.has(job.input_asset_id)).at(-1);
   return previous ? {pageId: page.id, jobId: previous.id, inputAssetId: previous.input_asset_id} : undefined;
@@ -68,6 +74,17 @@ export function planTranslation(pages: Page[], result: MatchResult, mode: Mode, 
     const match = source && result.matches.get(sourceKey(source));
     const message = !source ? '缺少文件页标识，请重新导入。' : result.errors.get(sourceKey(source))?.message ?? (!match ? '尚未核实此页的服务器记录，请重试恢复。' : undefined);
     if (message) { failures.push({page, message}); continue; }
+    if (match?.display_jobs) {
+      const visible=newestFirst(match.display_jobs.filter(j=>j.mode===mode&&j.target_language===language));
+      if (visible.some(j=>pendingStatuses.has(j.status))) {
+        if(regenerate)failures.push({page,message:'此页仍在处理或核实中，请等待当前任务结束。'});
+        continue;
+      }
+      const delivered=visible.find(j=>j.status==='succeeded');
+      if(!regenerate&&(delivered&&(delivered.output_asset_id||page.outputBlobs[delivered.id])||visible[0]?.status==='no_text'))continue;
+      // A tombstone supersedes older reusable server versions.
+      if(delivered&&!delivered.output_asset_id&&!page.outputBlobs[delivered.id]&&!regenerate){selected.push(page);continue;}
+    }
     if (!regenerate && match?.jobs.some(job => reusableJob(job, mode, language))) continue;
     selected.push(page);
   }

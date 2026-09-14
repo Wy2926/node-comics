@@ -6,6 +6,8 @@
 
 阅读器支持“常规翻译”和“AI 重绘翻译”。前者使用独立 OCR／LaMa 引擎与文本 LLM，后者保留 OpenAI 兼容 `POST /v1/images/edits` 多供应商接口；Key 留在后端。
 
+客户端已更新为大封面书架与独立阅读器，支持两种卡片排列、缩略图目录、自动翻译与查看、最新效果、反馈重译、分组记录及用量统计。新接口和本地 API 更新方法见 [UI 实现说明](docs/UI_IMPLEMENTATION.md)。
+
 本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务。前端上传／下载并发默认 2、可设 1–10；后端按用户轮转并限制每用户同时占用的执行名额，多个批次与翻译模式共用该用户限额。详见[运行与实现](docs/IMPLEMENTATION.md#文件匹配与并发)。
 
 ## 本地运行
@@ -37,6 +39,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | 文档 | 内容 |
 | --- | --- |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
+| [客户端 UI 重设计草案](docs/UI_REDESIGN_PROPOSAL.md) | 大卡片书架、简洁阅读器、翻译记录、用量统计与多主题（待评审） |
 | [架构设计](docs/ARCHITECTURE.md) | 插件、任务、权限与供应商 |
 | [技术验证](docs/TECH_RESEARCH.md) | 协议依据、样本与验证边界 |
 | [常规翻译调研](docs/CLASSIC_TRANSLATION_RESEARCH.md) | 开源引擎比较、LaMa、LLM 成本与重试、待实施验证 |

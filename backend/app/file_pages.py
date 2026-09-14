@@ -1,6 +1,7 @@
 """Private source-file identities. Page indices belong to the file, not reader order."""
 import hashlib
 from typing import Literal
+from fastapi import HTTPException
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, tuple_
@@ -40,11 +41,13 @@ class FilePageMatchRequest(BaseModel):
     pages: list[FilePageIdentity] = Field(min_length=1, max_length=100)
     mode: Literal["classic", "redraw"]
     target_language: str
+    include_display: bool = False
 
 
 class FilePageMatch(FilePageIdentity):
     asset: AssetResponse | None
     jobs: list[JobResponse]
+    display_jobs: list[JobResponse] = Field(default_factory=list)
 
 
 class FilePageMatches(BaseModel):
@@ -73,22 +76,32 @@ def upload_file_page(db, owner_id: str, data: bytes, source: FilePageIdentity):
 
 
 def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
-    config = configuration(db, body.mode, body.target_language)
+    try:
+        config = configuration(db, body.mode, body.target_language)
+    except HTTPException as error:
+        if not body.include_display or error.detail.get("code") not in {"PROVIDER_CAPABILITY_UNSUPPORTED", "CLASSIC_NOT_CONFIGURED", "CLASSIC_CONFIG_INVALID"}:
+            raise
+        config = None  # Reading existing images does not require an enabled supplier.
     identities = {(page.file_hash, page.page_index) for page in body.pages}
     mappings = db.scalars(select(FilePage).where(
         FilePage.owner_id == owner_id,
         tuple_(FilePage.file_hash, FilePage.page_index).in_(identities),
     )).all()
     sources = {}
+    display_sources = {}
     cache_keys = {}
     for mapping in mappings:
         asset = db.get(Asset, mapping.asset_id)
-        if not available(asset) or asset.owner_id != owner_id or asset.kind != "original":
+        if not asset or asset.owner_id != owner_id or asset.kind != "original":
             continue
         identity = (mapping.file_hash, mapping.page_index)
+        display_sources[identity] = asset
+        if not available(asset):
+            continue
         sources[identity] = asset
-        cache_keys[identity] = digest({"owner": owner_id, "hash": asset.sha256,
-            "mode": body.mode, "language": body.target_language, "config_version": config["version"]})
+        if config:
+            cache_keys[identity] = digest({"owner": owner_id, "hash": asset.sha256,
+                "mode": body.mode, "language": body.target_language, "config_version": config["version"]})
     jobs_by_key = {}
     if cache_keys:
         candidates = db.scalars(select(Job).where(
@@ -108,8 +121,26 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
                 if output.parent_id and not available(db.get(Asset, output.parent_id)):
                     continue
             jobs_by_key.setdefault(job.cache_key, []).append(job_json(db, job))
+    display_by_hash = {}
+    if body.include_display and display_sources:
+        # A display result is independent of the currently configured provider.
+        # Include the latest delivered tombstone, so a newly signed-in device
+        # cannot silently fall back to an older effect after deletion/expiry.
+        candidates = db.execute(select(Job, Asset.sha256).join(Asset, Asset.id == Job.input_asset_id).where(
+            Job.owner_id == owner_id, Asset.owner_id == owner_id,
+            Asset.sha256.in_({asset.sha256 for asset in display_sources.values()}),
+            Job.mode == body.mode, Job.target_language == body.target_language,
+        ).order_by(Job.created_at.desc(), Job.version.desc(), Job.id.desc()))
+        for job, content_hash in candidates:
+            bucket = display_by_hash.setdefault(content_hash, {})
+            bucket.setdefault("latest", job)
+            if job.status in ("queued", "running", "outcome_unknown"):
+                bucket.setdefault("pending", job)
+            if job.status == "succeeded":
+                bucket.setdefault("result", job)
     # Always return request order, including misses; this is lookup only, with no billing.
     return {"items": [{"file_hash": page.file_hash, "page_index": page.page_index,
         "asset": asset_json(sources[key]) if key in sources else None,
-        "jobs": jobs_by_key.get(cache_keys.get(key), [])}
+        "jobs": jobs_by_key.get(cache_keys.get(key), []),
+        **({"display_jobs": [job_json(db, job) for job in {job.id: job for job in display_by_hash.get(display_sources[key].sha256, {}).values()}.values()] if key in display_sources else []} if body.include_display else {})}
         for page in body.pages for key in [(page.file_hash, page.page_index)]]}

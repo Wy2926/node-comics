@@ -22,6 +22,7 @@ from .providers import LANGUAGES, ProviderConfig, configuration, credential, ini
 from .middleware import BodyLimitMiddleware
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
+from .reader_api import router as reader_router
 from .schemas import AccessResponse, AssetResponse, BatchCreatedResponse, BatchResponse, CapabilitiesResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, QuoteResponse, UsageResponse
 
 
@@ -35,6 +36,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Node Comics API", version="0.1.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务和测试额度。图片通过 Bearer 授权网关读取。")
 app.include_router(queue_router)
+app.include_router(reader_router)
 cfg = settings()
 origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip()]
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
@@ -97,6 +99,7 @@ class RerunRequest(Body):
     quote_id: str
     max_credits: int = Field(ge=0, le=1_000_000)
     acknowledge_unknown_cost: bool = False
+    input_asset_id: str | None = Field(default=None, max_length=36)
 
 
 class QuotaAdjustment(Body):
@@ -196,7 +199,7 @@ async def upload_image(image: Annotated[UploadFile, File()],
     return asset_json(asset)
 
 
-@app.post("/v1/file-pages/match", response_model=FilePageMatches)
+@app.post("/v1/file-pages/match", response_model=FilePageMatches, response_model_exclude_unset=True)
 def file_page_matches(body: FilePageMatchRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
     return match_file_pages(db, user.id, body)
 
@@ -315,7 +318,10 @@ def job_rerun(job_id: str, body: RerunRequest, idempotency_key: Annotated[str | 
     original = owned_job(db, job_id, user.id)
     if original.status == "outcome_unknown" and not body.acknowledge_unknown_cost:
         problem("UNKNOWN_COST_ACK_REQUIRED", "原请求可能已产生供应商消耗。确认后可主动创建新版本", 409)
-    asset = owned_asset(db, original.input_asset_id, user.id)
+    asset = owned_asset(db, body.input_asset_id or original.input_asset_id, user.id)
+    previous_asset = db.get(Asset, original.input_asset_id)
+    if asset.kind != "original" or asset.sha256 != previous_asset.sha256:
+        problem("RERUN_SOURCE_MISMATCH", "重新翻译必须使用同一页的原图", 409)
     job = create_job(db, user, asset, original.mode, original.target_language, idem_key(idempotency_key), operation=f"rerun:{original.id}", force=True, quote_id=body.quote_id, max_credits=body.max_credits)
     db.commit()
     return job_json(db, job)
@@ -340,7 +346,8 @@ def batch_rows(db, batch_id):
 
 
 def batch_item_json(db, item, job):
-    return job_json(db, job, requested_asset_id=item.input_asset_id, batch_id=item.batch_id, ordinal=item.ordinal)
+    return {**job_json(db, job, requested_asset_id=item.input_asset_id, batch_id=item.batch_id, ordinal=item.ordinal),
+            "reused": job.cache_hit or job.batch_id != item.batch_id}
 
 
 def owned_batch(db, batch_id, owner_id):
