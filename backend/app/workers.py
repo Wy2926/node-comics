@@ -4,6 +4,7 @@ from threading import Event, Thread
 from celery import Celery
 from sqlalchemy import func, select, update
 from .adapters.images import redraw
+from .classic import run_classic, requeue_local
 from .assets import available, create_asset, inspect_image, object_path
 from .config import settings
 from .db import session_factory
@@ -104,10 +105,11 @@ def process_job(job_id: str):
                 raise ProcessingError("ASSET_EXPIRED", "原图已删除、过期或任务已取消")
             data = object_path(asset.storage_key).read_bytes()
             mime, language, config, mode = asset.mime, job.target_language, job.config, job.mode
-            attempt.call_started_at = now()
-            job.phase = "calling_image_model"
+            if mode == "redraw":
+                attempt.call_started_at = now()
+                job.phase = "calling_image_model"
             db.commit()  # Write-ahead intent: after this point a crash means unknown, never replay.
-        result = redraw(data, mime, language, config)
+        result = run_classic(job_id, attempt_id, data, language, config) if mode == "classic" else redraw(data, mime, language, config)
         # Preserve provider consumption before output validation, storage or settlement can fail.
         with session_factory()() as db:
             attempt = db.get(Attempt, attempt_id)
@@ -133,24 +135,30 @@ def process_job(job_id: str):
                 job.phase = "validating"
                 info = inspect_image(result.image, output=True)
                 ratio_change = (info["width"] / info["height"]) / (asset.width / asset.height)
-                if ratio_change < 0.8 or ratio_change > 1.25:
+                if (mode == 'classic' and (info['width'], info['height']) != (asset.width, asset.height)) or ratio_change < 0.8 or ratio_change > 1.25:
                     raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果宽高比偏离原图过多，未交付且不扣用户额度", request_id=result.request_id)
                 output = create_asset(db, job.owner_id, result.image, kind=job.mode, parent_id=asset.id, stable_id=attempt_id)
                 job.output_asset_id = output.id
-                job.quality_flags = ["aspect_ratio_changed"] if abs(ratio_change - 1) > 0.03 else []
+                job.quality_flags = (result.quality_flags or []) + (["aspect_ratio_changed"] if abs(ratio_change - 1) > 0.03 else [])
                 job.status, job.phase, job.completed_at = "succeeded", "completed", now()
                 job.error_code, job.error_message = None, None
-                settle(db, job, success=True)
+                settle(db, job, success='unrecognized_regions' not in job.quality_flags)
                 if mode == "redraw":
                     provider = db.get(Provider, config["provider"]["id"])
                     if provider and provider.config == config["provider"]:
                         provider.validated_at, provider.validation_job_id = now(), job.id
             db.commit()
     except ProcessingError as error:
-        finish_error(job_id, attempt_id, error)
+        if not (locals().get('mode') == 'classic' and requeue_local(job_id, attempt_id, error)):
+            finish_error(job_id, attempt_id, error)
     except Exception:
         # No exception body is logged: it may contain provider URLs, OCR text or credentials.
-        finish_error(job_id, attempt_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "任务执行中断，结果待核实；不会自动重复请求", unknown=True))
+        if locals().get('mode') == 'classic':
+            error = ProcessingError('CLASSIC_LOCAL_INTERRUPTED', '常规翻译执行中断，已保存的译文可用于恢复')
+            if not requeue_local(job_id, attempt_id, error):
+                finish_error(job_id, attempt_id, error)
+        else:
+            finish_error(job_id, attempt_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "任务执行中断，结果待核实；不会自动重复请求", unknown=True))
     finally:
         stopped.set()
         thread.join(timeout=1)

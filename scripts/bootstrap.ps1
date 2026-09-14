@@ -1,4 +1,4 @@
-param([switch]$Start)
+param([switch]$Start, [switch]$Classic)
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
@@ -21,10 +21,16 @@ if (-not (Test-Path -LiteralPath $localConfig)) {
     [IO.File]::WriteAllText($localConfig, $configuration, [Text.UTF8Encoding]::new($false))
     Write-Host '已生成仅供本地环境使用的隔离数据库密码与登录签名密钥。'
 }
+if (-not (Select-String -LiteralPath $localConfig -Pattern '^CLASSIC_ENGINE_TOKEN=' -Quiet)) {
+    $engineBytes = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Fill($engineBytes)
+    [IO.File]::AppendAllText($localConfig, "CLASSIC_ENGINE_TOKEN=$([Convert]::ToHexString($engineBytes))`n", [Text.UTF8Encoding]::new($false))
+}
 docker compose --env-file .env --env-file deploy/.env.local config --quiet
 if ($LASTEXITCODE -ne 0) { throw 'Docker Compose 配置验证失败' }
 if ($Start) {
     $composeArgs = @('compose', '--env-file', '.env', '--env-file', 'deploy/.env.local')
+    if ($Classic) { $composeArgs += @('--profile', 'classic') }
     $composeArgs += @('up', '-d', '--build')
     & docker @composeArgs
     if ($LASTEXITCODE -ne 0) { throw 'Docker 启动失败' }

@@ -40,6 +40,27 @@ class Settings(BaseSettings):
     providers_json: str = ""
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
+    classic_enabled: bool = False
+    classic_cost: int = 1
+    classic_engine_url: str = "http://classic-engine:8000"
+    classic_engine_token: str = ""
+    classic_engine_version: str = "mit-95227a2-classic-v1"
+    classic_timeout_seconds: int = 900
+    classic_local_attempts: int = 3
+    text_base_url: str = ""
+    text_api_key: str = ""
+    text_model: str = "gpt-5.6-luna"
+    text_protocol: str = "openai_chat"
+    text_user_agent: str = "Mozilla/5.0"
+    text_timeout_seconds: int = 60
+    text_max_attempts: int = 3
+    text_max_output_tokens: int = 1024
+    text_group_bytes: int = 1800
+    text_page_budget_micros: int = 50_000
+    # CNY per million tokens = micro-CNY per token; operator estimates, not billing facts.
+    text_input_rate: int = 5
+    text_output_rate: int = 30
+    text_pricing_version: str = "operator-estimate-v1"
 
 
 @lru_cache

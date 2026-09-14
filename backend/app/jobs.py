@@ -116,6 +116,7 @@ def create_job(db: Session, user: User, asset: Asset, mode: str, language: str, 
     if cached:
         job.status, job.phase, job.cache_hit = "succeeded", "completed", True
         job.output_asset_id, job.completed_at = cached.output_asset_id, now()
+        job.quality_flags = cached.quality_flags
     db.add(job)
     db.flush()
     reserve(db, user, job)

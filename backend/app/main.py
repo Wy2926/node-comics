@@ -16,7 +16,7 @@ from .config import settings
 from .db import get_db, initialize, session_factory
 from .errors import problem
 from .jobs import batch_status, cancel_job, create_batch, create_job, create_quote, idem_key, job_json, owned_job, quota_json, quote_json, settle
-from .models import Asset, Attempt, Batch, Job, Ledger, Provider, User, now
+from .models import Asset, Attempt, Batch, ClassicState, Job, Ledger, Provider, TextCall, User, now
 from .providers import LANGUAGES, ProviderConfig, configuration, credential, initialize_providers
 from .middleware import BodyLimitMiddleware
 from .schemas import AccessResponse, AssetResponse, BatchCreatedResponse, BatchResponse, CapabilitiesResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, QuoteResponse, UsageResponse
@@ -80,7 +80,7 @@ class StatusRequest(Body):
 
 class QuoteRequest(Body):
     asset_ids: list[str] = Field(min_length=1, max_length=100)
-    mode: Literal["redraw"]
+    mode: Literal["redraw", "classic"]
     target_language: str
 
 
@@ -163,7 +163,9 @@ def me(user: User = Depends(identity)):
 def capabilities(db: Session = Depends(get_db), user: User | None = Depends(optional_identity)):
     cfg = settings()
     redraw_enabled = any(credential(provider.config) for provider in db.scalars(select(Provider).where(Provider.enabled.is_(True))))
-    return {"modes": [{"id": "redraw", "label": "AI 翻译", "enabled": redraw_enabled, "unit_cost": cfg.redraw_cost, "languages": list(LANGUAGES)}],
+    from .classic_config import enabled as classic_enabled
+    return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(), "unit_cost": cfg.classic_cost, "languages": list(LANGUAGES)},
+                      {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "unit_cost": cfg.redraw_cost, "languages": list(LANGUAGES)}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "max_active_jobs": cfg.max_active_jobs},
             "quota": quota_json(user) if user else None, "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds,
@@ -216,6 +218,10 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
         item.deleted_at = item.deleted_at or now()
     for job in affected_jobs:
         cancel_job(db, job)
+        if asset.kind == 'original':
+            state = db.get(ClassicState, job.id)
+            if state:
+                db.delete(state)
     db.commit()
     for item in assets:
         object_path(item.storage_key).unlink(missing_ok=True)
@@ -224,8 +230,23 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
     return {"deleted": True, "asset_ids": list(ids)}
 
 
+@app.get('/v1/jobs/{job_id}/classic')
+def classic_details(job_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
+    job = owned_job(db, job_id, user.id)
+    owned_asset(db, job.input_asset_id, user.id)
+    if job.mode != 'classic':
+        problem('MODE_UNSUPPORTED', '此任务没有常规翻译数据', 422)
+    state = db.get(ClassicState, job.id)
+    if not state:
+        return {'segments': [], 'translations': {}, 'artifacts': {}, 'timings': {}}
+    return {'segments': (state.analysis or {}).get('segments', []), 'translations': state.translations,
+            'unrecognized_regions': (state.analysis or {}).get('unrecognized_regions', []),
+            'artifacts': {name: value for name, value in state.artifacts.items() if available(db.get(Asset, value))},
+            'timings': state.timings}
+
+
 @app.post("/v1/translations/{mode}", status_code=202, response_model=JobResponse)
-async def translate(mode: Literal["redraw"], target_language: Annotated[str, Form()], asset_id: Annotated[str | None, Form()] = None,
+async def translate(mode: Literal["redraw", "classic"], target_language: Annotated[str, Form()], asset_id: Annotated[str | None, Form()] = None,
                     image: Annotated[UploadFile | None, File()] = None, idempotency_key: Annotated[str | None, Header()] = None,
                     user: User = Depends(identity), db: Session = Depends(get_db)):
     key = idem_key(idempotency_key)
@@ -390,8 +411,13 @@ def admin_jobs(status: str | None = Query(None, max_length=24), offset: int = Qu
     items = []
     for job in jobs:
         attempt = db.get(Attempt, job.attempt_id) if job.attempt_id else None
+        calls = db.scalars(select(TextCall).where(TextCall.job_id == job.id).order_by(TextCall.started_at)).all()
         items.append({**job_json(db, job), "owner_id": job.owner_id, "provider_id": attempt.provider_id if attempt else None,
-                      "provider_request_id": attempt.request_id if attempt else None, "provider_usage": attempt.usage if attempt else None, "provider_cost_state": attempt.cost_state if attempt else None})
+                      "provider_request_id": attempt.request_id if attempt else None, "provider_usage": attempt.usage if attempt else None, "provider_cost_state": attempt.cost_state if attempt else None,
+                      'text_cost_micros': sum(call.accounted_micros for call in calls),
+                      'text_calls': [{'id': call.id, 'group': call.group_index, 'sequence': call.sequence, 'model': call.model,
+                                      'request_id': call.request_id, 'usage': call.usage, 'cost_state': call.cost_state,
+                                      'accounted_micros': call.accounted_micros, 'error_code': call.error_code} for call in calls]})
     return {"items": items, "total": total, "next_offset": offset + limit if offset + limit < total else None}
 
 

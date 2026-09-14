@@ -79,6 +79,10 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_BASE_URL", "https://provider.invalid/v1")
     monkeypatch.setenv("OPENAI_MODEL", "contract-image-model")
     monkeypatch.setenv("PROVIDERS_JSON", "")
+    monkeypatch.setenv('CLASSIC_ENABLED', 'true')
+    monkeypatch.setenv('TEXT_API_KEY', 'isolated-pg-text-key')
+    monkeypatch.setenv('TEXT_BASE_URL', 'https://text.invalid/v1')
+    monkeypatch.setenv('CLASSIC_ENGINE_TOKEN', 'isolated-pg-engine-token')
     monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/15")
     from app.config import settings
     from app.db import engine
@@ -92,6 +96,9 @@ def pg_scope(tmp_path, monkeypatch):
         raise AssertionError("Real provider calls are prohibited in PostgreSQL concurrency tests")
 
     monkeypatch.setattr(workers, "redraw", prohibited)
+    from app import classic
+    monkeypatch.setattr(classic, 'call_text', prohibited)
+    monkeypatch.setattr(classic, 'engine_request', prohibited)
     yield {"schema": schema, "application_name": app_name, "administration": administration}
     engine().dispose()
     engine.cache_clear()
@@ -352,3 +359,34 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=5)
+
+
+def test_postgres_classic_budget_reservation_is_atomic(pg):
+    from app.classic import reserve_call
+    from app.adapters.text import TextError
+    from app.db import session_factory
+    from app.jobs import create_job
+    from app.models import Asset, ClassicState, TextCall, User
+    from app.workers import claim
+    with session_factory()() as db:
+        job = create_job(db, db.get(User, pg['owner_id']), db.get(Asset, pg['asset_id']), 'classic', 'zh-Hans', 'classic-budget')
+        db.commit()
+        job_id = job.id
+    attempt_id = claim(job_id)
+    with session_factory()() as db:
+        db.add(ClassicState(job_id=job_id))
+        db.commit()
+    barrier = threading.Barrier(6)
+    def reserve_concurrently(index):
+        barrier.wait(timeout=10)
+        try:
+            return reserve_call(job_id, attempt_id, index, [{'id': 'b001', 'source': 'Hello'}], 'zh-Hans')[0]
+        except TextError as error:
+            return error.code
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(reserve_concurrently, range(6)))
+    assert results.count('TEXT_BUDGET_EXCEEDED') == 5
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall).where(TextCall.job_id == job_id)).all()
+        assert len(calls) == 1
+        assert 0 < sum(call.accounted_micros for call in calls) <= 50_000

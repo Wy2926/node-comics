@@ -1,4 +1,5 @@
-import type { Chapter, Page } from '../types';
+import type { Chapter, Mode, Page } from '../types';
+export const automaticScope = (chapterId:string|undefined, ownerId:string|undefined, origin:string, language:string, mode:Mode, pageLimit:number) => JSON.stringify([chapterId,ownerId,origin,language,mode,pageLimit]);
 export const id = () => crypto.randomUUID();
 export const naturalSort = <T extends {name:string}>(items:T[]) => [...items].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN',{numeric:true,sensitivity:'base'}));
 export const activeWindow = (index:number,count:number,radius=2) => ({start:Math.max(0,index-radius),end:Math.min(count-1,index+radius)});

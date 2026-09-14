@@ -1,7 +1,7 @@
 import type { Capabilities, Job, Mode, Quote, Usage, User } from './types';
 import type { AuthConfig } from './auth/oidc';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0) { super(message); } }
-export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUOTE_EXPIRED','QUOTE_CHANGED','INSUFFICIENT_QUOTA','MAX_CREDITS_EXCEEDED','BUDGET_EXCEEDED','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED'].includes(error.code);}
+export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUOTE_EXPIRED','QUOTE_CHANGED','INSUFFICIENT_QUOTA','MAX_CREDITS_EXCEEDED','BUDGET_EXCEEDED','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
 export class Api {
   constructor(public base: string, public token = '') { this.base = base.replace(/\/+$/, ''); }
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {

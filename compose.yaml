@@ -64,7 +64,36 @@ services:
     <<: *backend
     command: [celery, -A, app.workers.celery_app, worker, -Q, redraw, --concurrency=2, --loglevel=warning, --hostname=redraw@%h]
     stop_grace_period: 31m
+  classic-worker:
+    <<: *backend
+    profiles: [classic]
+    command: [celery, -A, app.workers.celery_app, worker, -Q, classic, --concurrency=1, --loglevel=warning, --hostname=classic@%h]
+    stop_grace_period: 20m
+    depends_on:
+      classic-engine:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  classic-engine:
+    profiles: [classic]
+    build: ./services/classic-engine
+    image: node-comics-classic-engine:local
+    environment:
+      ENGINE_TOKEN: ${CLASSIC_ENGINE_TOKEN}
+      OMP_NUM_THREADS: "4"
+    volumes:
+      - comics_models:/models
+    healthcheck:
+      test: [CMD, python, -c, "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['ready']"]
+      interval: 15s
+      timeout: 5s
+      retries: 80
+      start_period: 10m
+    restart: unless-stopped
 volumes:
   comics_postgres:
   comics_redis:
   comics_images:
+  comics_models:

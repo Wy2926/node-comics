@@ -291,6 +291,48 @@
         }
       }
     },
+    "/v1/jobs/{job_id}/classic": {
+      "get": {
+        "summary": "Classic Details",
+        "operationId": "classic_details_v1_jobs__job_id__classic_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/translations/{mode}": {
       "post": {
         "summary": "Translate",
@@ -306,7 +348,10 @@
             "in": "path",
             "required": true,
             "schema": {
-              "const": "redraw",
+              "enum": [
+                "redraw",
+                "classic"
+              ],
               "type": "string",
               "title": "Mode"
             }
@@ -2173,7 +2218,10 @@
           },
           "mode": {
             "type": "string",
-            "const": "redraw",
+            "enum": [
+              "redraw",
+              "classic"
+            ],
             "title": "Mode"
           },
           "target_language": {

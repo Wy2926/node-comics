@@ -1,6 +1,12 @@
-# Node Comics 架构 v0.2
+# Node Comics 架构 v0.3
 
-2026-09-13。唯一翻译能力为后端AI图片翻译。实际命令和验证见 [运行说明](IMPLEMENTATION.md)。
+2026-09-14：常规翻译 `classic` 与图片重绘 `redraw` 均已接入。常规引擎、文本预算及验证见[常规翻译实现](CLASSIC_IMPLEMENTATION.md)，历史方案见[调研](CLASSIC_TRANSLATION_RESEARCH.md)。
+
+## 常规翻译扩展
+
+建议保留 `redraw`，新增 `classic` 模式，复用现有身份、报价、任务、额度、批次与私有结果访问。检测／OCR／LaMa 抹字／嵌字放入独立引擎进程或容器，文本 LLM 使用单独适配器和能力配置；不复用图片编辑协议。前端仍只与产品 API 通信。
+
+已扩展 worker 阶段与中间产物持久化，逐次记录 LLM 调用意图、用量和未知结果。文本 LLM 在统一重试次数和成本预算内自动恢复，未知调用保守预占预算，单页业务结算仍防重；已完成译文在本地渲染恢复时复用。中间文本、掩膜和译图共享原图的用户隔离、删除与到期规则。常规模式缓存纳入引擎、权重、掩膜、文本模型／提示词、上下文和字体配置版本。具体改动、成本与验证要求见调研文档第 5–7 节。
 
 ## 结构
 
@@ -14,13 +20,17 @@ flowchart LR
   API --> Store[私有图片网关]
   DB --> Dispatcher[Outbox投递与恢复]
   Dispatcher --> Redis[Redis与Celery]
-  Redis --> Worker[AI翻译Worker]
+  Redis --> Worker[AI重绘Worker]
+  Redis --> Classic[常规Worker]
+  Classic --> Engine[检测 / OCR / LaMa / 嵌字引擎]
+  Classic --> Text[文本LLM]
+  Classic --> Store
   Worker --> Provider[多个images/edits供应商]
   Worker --> Store
   Worker --> DB
 ```
 
-WXT+React+TypeScript，FastAPI+SQLAlchemy/Alembic，PostgreSQL、Redis/Celery。一个业务后端按API、投递器和Worker进程部署。本地授权文件存储，未来可加私有S3；服务器无本地图像推理GPU依赖。
+WXT+React+TypeScript，FastAPI+SQLAlchemy/Alembic，PostgreSQL、Redis/Celery。一个业务后端按API、投递器和Worker进程部署。本地授权文件存储，未来可加私有S3；现有重绘链路无本地图像推理GPU依赖，新增常规引擎的硬件需求待实测。
 
 ## 插件与导入
 
@@ -42,7 +52,7 @@ image: <binary image>  # 或asset_id，二选一
 target_language: zh-Hans
 ```
 
-内部稳定模式名redraw，用户界面统一“AI翻译”。业务输入只有原图与目标语言。后端版本化提示词要求翻译图中文字、尽量保留分镜、人物、线条、背景和颜色，不添加说明。图片内文字是数据，不能修改系统任务。
+内部稳定模式名redraw，用户界面显示“AI 重绘翻译”。业务输入只有原图与目标语言。后端版本化提示词要求翻译图中文字、尽量保留分镜、人物、线条、背景和颜色，不添加说明。图片内文字是数据，不能修改系统任务。
 
 供应商base_url含/v1，适配器只追加/images/edits，HTTP客户端创建multipart boundary。profile配置供应商ID、后端credential_ref、模型、image/image[]、参数白名单、尺寸限制、超时、版本和结果域名。只发送该profile支持的参数。一个适配器支持多个供应商，聊天能力不是图片编辑能力证明。管理员显式测试才调用模型。
 
@@ -54,7 +64,7 @@ queued → running → succeeded | failed | cancelled | outcome_unknown。
 
 任务、额度预占、outbox同事务提交。幂等键按用户和接口隔离并绑定请求摘要，改变参数返回冲突。内容缓存独立，包含用户、内容哈希、语言、有效模型profile和提示词版本；输入／输出过期删除不能命中。
 
-队列可重复投递，Worker原子领取、持久attempt/租约/调用意图，仅当前执行权可调用与完成。调用后超时、断连、Worker故障不自动重发收费请求；先查已有对象与证据，无法核实则outcome_unknown。
+队列可重复投递，Worker原子领取、持久attempt/租约/调用意图，仅当前执行权可调用与完成。现有图片重绘调用后超时、断连、Worker故障不自动重发收费请求；先查已有对象与证据，无法核实则outcome_unknown。新增文本 LLM 将采用上述预算内重试策略。
 
 账本唯一交易键防重复结算。成功交付扣测试点数，明确失败和未执行取消释放。运行取消尽力停止，上游费用另记。核实期限释放后补交付不自动补扣。
 
@@ -62,15 +72,16 @@ queued → running → succeeded | failed | cancelled | outcome_unknown。
 
 ## API与实体
 
-实体：User、Asset、Job、Attempt、Batch、Quote、Provider、UsageLedger、Outbox，结果由任务私有输出引用表达。
+实体：User、Asset、Job、Attempt、ClassicState、TextCall、Batch、Quote、Provider、UsageLedger、Outbox，结果由任务私有输出引用表达。
 
 | 接口 | 用途 |
 | --- | --- |
 | GET /v1/auth/config；POST /v1/auth/dev | 登录配置／显式本地测试登录 |
 | GET /v1/capabilities | AI能力、语言、限制与额度 |
 | POST /v1/images | 上传不自动翻译 |
-| POST /v1/translations/redraw | 单图AI翻译 |
-| POST /v1/translation-quotes；/translation-batches | 报价与预算绑定批次 |
+| POST /v1/translations/redraw；/classic | 单图所选模式翻译 |
+| GET /v1/jobs/{id}/classic | 所属用户的文字与阶段产物 |
+| POST /v1/quotes；/translation-batches | 报价与预算绑定批次 |
 | GET /v1/jobs/{id}；POST /v1/jobs/status | 单个／有界批量状态 |
 | GET /v1/translation-batches/{id} | 分页批次状态 |
 | POST /v1/jobs/{id}/cancel；/rerun | 取消／明确新版本 |

@@ -8,7 +8,7 @@ from .errors import ProcessingError
 from .config import settings
 from .db import initialize, session_factory
 from .jobs import cancel_job, settle
-from .models import Asset, Attempt, Job, Outbox, now
+from .models import Asset, Attempt, ClassicState, Job, Outbox, now
 from .workers import process_job
 
 log = logging.getLogger("node_comics.dispatcher")
@@ -70,6 +70,10 @@ def cleanup(db):
             cancel_job(db, job)
         object_path(asset.storage_key).unlink(missing_ok=True)
         asset.purged_at = now()
+    # OCR, translations and masks inherit the original's deletion and expiry.
+    for state in db.scalars(select(ClassicState).join(Job, Job.id == ClassicState.job_id).join(Asset, Asset.id == Job.input_asset_id)
+                            .where(or_(Asset.expires_at <= now(), Asset.deleted_at.is_not(None)))).all():
+        db.delete(state)
     # Ignore young unindexed objects; they may be in the save-before-commit window.
     cutoff = time.time() - 24 * 3600
     root = settings().storage_path

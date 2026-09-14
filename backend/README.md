@@ -1,6 +1,6 @@
 # Node Comics 后端
 
-当前实现只包含图片模型 AI 翻译。`redraw` 是 API 中保留的模式标识；图片与目标语言直接送入服务端的 `images/edits` 适配器，没有 OCR 或普通机翻前置步骤。
+当前实现包含常规翻译 `classic` 与图片模型重绘 `redraw`。[常规翻译运行说明](../docs/CLASSIC_IMPLEMENTATION.md)包含独立 Docker 引擎、文本配置、检查点、费用预占及验证命令。`redraw` 是 API 中保留的模式标识；图片与目标语言直接送入服务端的 `images/edits` 适配器，没有 OCR 或普通机翻前置步骤。
 
 ## 本地运行
 

@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-14",
+  "backend": {
+    "passed": 86,
+    "skipped_postgres": 6
+  },
+  "postgres": {
+    "passed": 6,
+    "isolated_database": "nodecomics_concurrency_test"
+  },
+  "frontend": {
+    "passed": 29,
+    "typescript": "passed",
+    "extension_build": "passed",
+    "web_build": "passed",
+    "browser_usage_test": "assigned_to_user"
+  },
+  "classic_image": "sha256:b5dee653bf76bf216417f9c8e07a38888dd9a7ac8d4673e45931c00cdde56152",
+  "services": {
+    "reader": "http://127.0.0.1:5173",
+    "api": "http://127.0.0.1:18088",
+    "classic_engine": "healthy"
+  }
+}

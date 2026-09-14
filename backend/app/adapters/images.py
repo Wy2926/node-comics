@@ -23,6 +23,7 @@ class TranslationOutput:
     request_id: str | None = None
     usage: dict | None = None
     no_text: bool = False
+    quality_flags: list[str] | None = None
 
 
 def safe_endpoint(url: str, *, allow_private=False, allowed_hosts=None):

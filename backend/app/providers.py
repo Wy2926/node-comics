@@ -103,6 +103,9 @@ def configuration(db: Session, mode: str, language: str, provider_id=None):
         if not provider:
             problem("PROVIDER_CAPABILITY_UNSUPPORTED", "管理员尚未配置可用的图片编辑供应商", 503)
         config = {"mode": mode, "provider": provider.config, "prompt_version": PROMPT_VERSION, "unit_cost": cfg.redraw_cost}
+    elif mode == "classic":
+        from .classic_config import snapshot
+        config = snapshot()
     else:
         problem("MODE_UNSUPPORTED", "不支持此翻译方式", 422)
     config["version"] = digest(config)

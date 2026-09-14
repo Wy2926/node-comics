@@ -13,7 +13,7 @@ def test_auth_private_assets_and_admin_boundaries(client, png):
     assert client.delete(f"/v1/images/{asset}", headers=bob).status_code == 404
     assert client.get("/v1/admin/providers", headers=alice).status_code == 403
     assert client.get(f"/v1/images/{asset}/content", headers=alice).content == png
-    assert client.get("/v1/capabilities").json()["modes"][0]["id"] == "redraw"
+    assert {mode['id'] for mode in client.get('/v1/capabilities').json()['modes']} == {'classic', 'redraw'}
 
 
 def test_idempotency_binds_input_and_parameters(client, png):

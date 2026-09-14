@@ -146,3 +146,34 @@ class Provider(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     validated_at: Mapped[datetime | None] = mapped_column(DateTime)
     validation_job_id: Mapped[str | None] = mapped_column(String(36))
+
+
+class ClassicState(Base):
+    __tablename__ = "classic_states"
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), primary_key=True)
+    analysis: Mapped[dict | None] = mapped_column(JSON)
+    translations: Mapped[dict] = mapped_column(JSON, default=dict)
+    timings: Mapped[dict] = mapped_column(JSON, default=dict)
+    artifacts: Mapped[dict] = mapped_column(JSON, default=dict)
+    local_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class TextCall(Base):
+    __tablename__ = "text_calls"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
+    attempt_id: Mapped[str] = mapped_column(ForeignKey("attempts.id"))
+    group_index: Mapped[int] = mapped_column(Integer)
+    sequence: Mapped[int] = mapped_column(Integer)
+    provider_id: Mapped[str] = mapped_column(String(80))
+    model: Mapped[str] = mapped_column(String(120))
+    request_id: Mapped[str | None] = mapped_column(String(200))
+    usage: Mapped[dict | None] = mapped_column(JSON)
+    reserved_micros: Mapped[int] = mapped_column(Integer)
+    accounted_micros: Mapped[int] = mapped_column(Integer)
+    cost_state: Mapped[str] = mapped_column(String(24), default="unknown")
+    error_code: Mapped[str | None] = mapped_column(String(60))
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (UniqueConstraint("job_id", "group_index", "sequence"), CheckConstraint("accounted_micros >= 0"))
