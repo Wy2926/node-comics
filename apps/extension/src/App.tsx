@@ -39,7 +39,14 @@ const [queue,setQueue]=useState<UserQueue>();const [queueDraft,setQueueDraft]=us
 const [recoveryStatus,setRecoveryStatus]=useState('');const [recovering,setRecovering]=useState(false);const recoveryRun=useRef(0);
 const prepareLock=useRef(false);const submitLock=useRef(false);
 const [caps,setCaps]=useState<Capabilities>();const [usage,setUsage]=useState<Usage>();const [online,setOnline]=useState<'connecting'|'online'|'offline'>('connecting');
-const [busy,setBusy]=useState('');const [toast,setToast]=useState('');const [error,setError]=useState('');const [drag,setDrag]=useState(false);
+const [busy,setBusy]=useState('');const [toast,setToast]=useState('');const [error,setErrorMessage]=useState('');const [drag,setDrag]=useState(false);
+const errorTimer=useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+const setError=useCallback((message:string)=>{
+  clearTimeout(errorTimer.current);
+  setErrorMessage(message);
+  if(message)errorTimer.current=setTimeout(()=>setErrorMessage(''),5000);
+},[]);
+useEffect(()=>()=>clearTimeout(errorTimer.current),[]);
 const [loginOpen,setLoginOpen]=useState(false);const [username,setUsername]=useState('reader');const [authAllowed,setAuthAllowed]=useState(false);const [pendingIntent,setPendingIntent]=useState<Intent>();
 const [authConfig,setAuthConfig]=useState<AuthConfig>();
 const [ready,setReady]=useState<ReadyQuote>();const [confirmAction,setConfirmAction]=useState<{title:string;body:string;action:()=>Promise<void>}>();

@@ -25,6 +25,7 @@ const batches=new Map<string,unknown>();
 const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false};
 // Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
 const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
+const redrawEnabled=new URLSearchParams(location.search).get('redrawEnabled')!=='false';
 const redrawPolls=new Map<string,number>();
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
@@ -36,7 +37,7 @@ window.fetch=async(input,init={})=>{
   if(state.failNext){state.failNext=false;throw Error('Fixture offline');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
   const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:'2099-01-01T00:00:00Z'});
-  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:true,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_batch:4},quota:{balance:10000,available:10000,reserved:0},retention_days:7});
+  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_batch:4},quota:{balance:10000,available:10000,reserved:0},retention_days:7});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   if(url.pathname==='/v1/me/usage')return json({balance:10000,available:10000-state.submitted.length,reserved:state.submitted.length,items:[],total:0});
   if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map((p:{file_hash:string;page_index:number})=>({...p,asset:p.page_index===6?null:asset(p.page_index),jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language),display_jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language)}))});
