@@ -135,20 +135,20 @@ useEffect(()=>{
 
 const recoveryModeEnabled=!!caps?.modes.find(m=>m.id===settings.translationMode)?.enabled;
 const currentLoaded=!!current;
-async function recoverChapter(manual=false){
+async function recoverChapter(manual=false,mode=settings.translationMode,requestedPages?:Page[]){
   const chapterId=currentRef.current;const acc=accountRef.current;
   if(!chapterId||!acc){if(manual&&!acc)setLoginOpen(true);return;}
   const chapter=chaptersRef.current.find(c=>c.id===chapterId);if(!chapter)return;
   const run=++recoveryRun.current;setRecovering(true);setRecoveryStatus('正在查找当前账户的翻译…');
   try{
-    const {matches,errors}=await matchFilePages(api,chapter.pages,settings.translationMode,settings.language);
+    const {matches,errors}=await matchFilePages(api,requestedPages??chapter.pages,mode,settings.language);
     if(!api.isCurrent()||run!==recoveryRun.current||currentRef.current!==chapterId)return;
     const latest=chaptersRef.current.find(c=>c.id===chapterId);if(!latest)return;
     let restored=0;
     const pages=latest.pages.map(page=>{
       const source=pageSource(page);const match=source&&matches.get(sourceKey(source));
       if(!match)return page;
-      if((match.display_jobs??match.jobs).some(j=>reusableJob(j,settings.translationMode,settings.language)))restored++;
+      if((match.display_jobs??match.jobs).some(j=>reusableJob(j,mode,settings.language)))restored++;
       return applyMatch(page,match,acc.user.id,apiOrigin,chapter.pages.find(p=>p.id===page.id));
     });
     updateChapter({...latest,pages});
@@ -283,7 +283,7 @@ return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e
 {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label="返回我的漫画" onClick={()=>nav('library')}><span>✦</span><b>Node Comics</b></button><nav aria-label="主导航">{([['library','我的漫画','book'],['history','翻译记录','clock'],['usage','用量统计','coin']] as const).map(([value,label,icon])=><button key={value} aria-current={view===value?'page':undefined} onClick={()=>nav(value)}><Icon name={icon} size={19}/>{label}</button>)}</nav><div className="nc-header-actions"><button className="icon-button" aria-label="外观与设置" onClick={()=>nav('settings')}><Icon name="settings"/></button><button className="nc-account-button" onClick={()=>account?nav('account'):setLoginOpen(true)}><span className="nc-avatar">{account?account.user.name[0].toUpperCase():<Icon name="user" size={18}/>}</span><span>{account?`${balance??'—'} 点`:'登录'}</span></button></div></header>}
 <div className="nc-workspace">
 {error&&<div className="global-error" role="alert"><Icon name="info" size={18}/><span>{error}</span><button aria-label="关闭错误提示" onClick={()=>setError('')}><Icon name="close" size={16}/></button></div>}
-{current?<Reader key={`${current.id}:${account?.user.id}:${apiOrigin}`} api={api} busy={!!busy} preparingPages={preparingPages} chapter={current} settings={settings} setSettings={setSettings} update={updateChapter} onBack={exitReader} onTranslate={(mode,pages,regenerate)=>void prepareTranslation({mode,pages,regenerate})} onImport={()=>input.current?.click()} notify={notify} autoEnabled={autoState.current.enabled} onAutoToggle={askAuto} onAutoWindow={autoTranslate} caps={caps} userId={account?.user.id} apiOrigin={apiOrigin} recoveryStatus={recoveryStatus} recovering={recovering} onRecover={()=>void recoverChapter(true)} recoveryEnabled={!!account} onCancel={async(job)=>{try{const result=await api.cancel(job.id);if(!api.isCurrent())return;const p=chaptersRef.current.find(c=>c.id===current.id)?.pages.find(p=>p.jobs.some(j=>j.id===job.id));if(p)patchPage(current.id,p.id,page=>({...page,jobs:mergeJobs(page.jobs,[result])}));refreshUsage();}catch(e){setError((e as Error).message);}}}/>:
+{current?<Reader key={`${current.id}:${account?.user.id}:${apiOrigin}`} api={api} busy={!!busy} preparingPages={preparingPages} chapter={current} settings={settings} setSettings={setSettings} update={updateChapter} onBack={exitReader} onTranslate={(mode,pages,regenerate)=>void prepareTranslation({mode,pages,regenerate})} onImport={()=>input.current?.click()} notify={notify} autoEnabled={autoState.current.enabled} onAutoToggle={askAuto} onAutoWindow={autoTranslate} caps={caps} userId={account?.user.id} apiOrigin={apiOrigin} recoveryStatus={recoveryStatus} recovering={recovering} onRecover={(mode,pages)=>void recoverChapter(true,mode,pages)} recoveryEnabled={!!account} onCancel={async(job)=>{try{const result=await api.cancel(job.id);if(!api.isCurrent())return;const p=chaptersRef.current.find(c=>c.id===current.id)?.pages.find(p=>p.jobs.some(j=>j.id===job.id));if(p)patchPage(current.id,p.id,page=>({...page,jobs:mergeJobs(page.jobs,[result])}));refreshUsage();}catch(e){setError((e as Error).message);}}}/>:
 <main className="nc-main">{view==='admin'&&account?.user.role==='admin'&&<><AdminPanel api={api}/><FeedbackInbox api={api} admin/></>}
 {view==='library'&&<Library chapters={chapters} settings={settings} setSettings={setSettings} userId={account?.user.id} apiOrigin={apiOrigin} onOpen={setCurrentId} onImport={()=>input.current?.click()} onDemo={()=>void openDemo()} onUpdate={updateChapter} onDelete={chapter=>setConfirmAction({title:'移除这本漫画？',body:'将删除该漫画的本地图片与阅读进度。服务端翻译记录仍可找回。',action:async()=>{await store.deleteChapter(chapter);const next=chaptersRef.current.filter(c=>c.id!==chapter.id);chaptersRef.current=next;setChapters(next);}})}/>}
 {view==='history'&&<TranslationHistory key={`${apiOrigin}:${account?.user.id??''}`} api={api} chapters={chapters} userId={account?.user.id} onLogin={()=>setLoginOpen(true)} onOpen={(chapter,job,group)=>{const mode=job?.mode??group?.mode;const language=job?.target_language??group?.target_language;if(mode&&language)setSettings(s=>({...s,translationMode:mode,language}));const page=job?chapter.pages.find(p=>p.jobs.some(j=>j.id===job.id)||p.assetId===(job.requested_asset_id??job.input_asset_id)):undefined;if(page){store.savePosition(chapter.id,{pageId:page.id,relativeOffset:0});updateChapter({...chapter,pageId:page.id,relativeOffset:0});}setCurrentId(chapter.id);}} onDelete={job=>setConfirmAction({title:'删除服务器译图？',body:'删除后撤销服务器访问，已保存的本地副本仍可阅读。重新翻译需要新的报价。',action:async()=>{await api.deleteImage(job.output_asset_id!);if(!api.isCurrent())return;for(const c of chaptersRef.current)updateChapter({...c,pages:c.pages.map(p=>p.ownerId===account?.user.id&&p.apiOrigin===apiOrigin?{...p,jobs:p.jobs.map(j=>j.output_asset_id===job.output_asset_id?{...j,output_asset_id:null,result_available:false,result_expired:true}:j)}:p)});notify('服务器译图已删除');}})}/>}

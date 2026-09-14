@@ -1,5 +1,22 @@
 import type {Job,Mode,Page} from '../types';
 
+export type PageView={mode:Mode;preference:'auto'|'original'|'translation'};
+export function resolvePageView(view:PageView|undefined,defaultMode:Mode):PageView{
+  return view??{mode:defaultMode,preference:'auto'};
+}
+/** Redraw may take a while: keep the valid classic result until redraw is available. */
+export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,ownerId?:string,origin?:string){
+  if(translated){
+    const target=pageTranslation(page,mode,language,ownerId,origin);
+    if(target.blobKey)return {key:target.blobKey,job:target.result};
+    if(mode==='redraw'){
+      const classic=pageTranslation(page,'classic',language,ownerId,origin);
+      if(classic.blobKey)return {key:classic.blobKey,job:classic.result};
+    }
+  }
+  return {key:page.blobKey,job:undefined};
+}
+
 export const pendingStatuses=new Set(['queued','running','outcome_unknown']);
 /** Request order, not completion order: a late old worker must not replace a newer result. */
 export function newestFirst(jobs:Job[]){return [...jobs].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.version-a.version||b.id.localeCompare(a.id));}

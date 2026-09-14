@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {defaults,type Job,type Page} from '../src/types';
-import {newestFirst,pageTranslation,latestResults} from '../src/reader/presentation';
+import {newestFirst,pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
 import {emptyPage,makeChapter,restoreImported} from '../src/reader/model';
 import {applyMatch,planTranslation,rerunSource,sourceKey} from '../src/reader/recovery';
 import {settings} from '../src/reader/store';
@@ -8,6 +8,31 @@ const origin='https://api.example';
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',cost:1,version:created,cache_hit:false,...extra});
 const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),fileHash:'a'.repeat(64),pageIndex:0,ownerId:'alice',apiOrigin:origin,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
 afterEach(()=>vi.unstubAllGlobals());
+describe('per-page redraw display',()=>{
+  it.each(['queued','running','failed','outcome_unknown','cancelled'] as const)('keeps classic while redraw is %s',status=>{
+    const p=page([job('first','succeeded',1),job('redraw',status,2,{mode:'redraw'})]);
+    expect(readingImage(p,'redraw',true,'zh-Hans','alice',origin)).toMatchObject({key:'local-first',job:{id:'first',mode:'classic'}});
+  });
+  it('keeps classic before submission and until redraw bytes are downloaded',()=>{
+    const p=page([job('first','succeeded',1)]);
+    expect(readingImage(p,'redraw',true,'zh-Hans','alice',origin).job?.id).toBe('first');
+    p.jobs.push(job('redraw','succeeded',2,{mode:'redraw'}));
+    expect(readingImage(p,'redraw',true,'zh-Hans','alice',origin).job?.id).toBe('first');
+    p.outputBlobs.redraw='local-redraw';
+    expect(readingImage(p,'redraw',true,'zh-Hans','alice',origin).job?.id).toBe('redraw');
+    expect(readingImage(p,'classic',true,'zh-Hans','alice',origin).job?.id).toBe('first');
+  });
+  it('honors explicit original viewing even after redraw finishes',()=>{
+    const p={...page([job('first','succeeded',1),job('second','succeeded',2,{mode:'redraw'})]),blobKey:'original'};
+    expect(readingImage(p,'redraw',false,'zh-Hans','alice',origin)).toEqual({key:'original',job:undefined});
+  });
+  it('never falls back across account, language, origin or an expired latest result',()=>{
+    const p={...page([job('first','succeeded',1)]),blobKey:'original'};
+    for(const [language,owner,api] of [['en','alice',origin],['zh-Hans','bob',origin],['zh-Hans','alice','https://other.example']])expect(readingImage(p,'redraw',true,language,owner,api)).toEqual({key:'original',job:undefined});
+    p.jobs.push(job('expired','succeeded',2,{output_asset_id:null,result_expired:true}));
+    expect(readingImage(p,'redraw',true,'zh-Hans','alice',origin)).toEqual({key:'original',job:undefined});
+  });
+});
 describe('latest effect selection',()=>{
   it.each(['queued','running','failed','outcome_unknown'] as const)('retains delivered effect while newer attempt is %s',status=>{
     const result=pageTranslation(page([job('first','succeeded',1),job('new',status,2)]),'classic','zh-Hans','alice',origin);

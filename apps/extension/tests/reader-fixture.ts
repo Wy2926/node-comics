@@ -23,6 +23,9 @@ const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] a
 const quotes=new Map<string,{asset_ids:string[];mode:Job['mode'];target_language:string}>();
 const batches=new Map<string,unknown>();
 const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false};
+// Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
+const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
+const redrawPolls=new Map<string,number>();
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
@@ -46,7 +49,16 @@ window.fetch=async(input,init={})=>{
     const response={id:key,status:'queued',jobs:result,total_cost:result.length};batches.set(key,response);
     if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}return json(response);
   }
-  if(url.pathname==='/v1/jobs/status')return json({items:body.ids.map((id:string)=>jobs.get(id)).filter(Boolean)});
+  if(url.pathname==='/v1/jobs/status')return json({items:body.ids.map((id:string)=>{
+    const j=jobs.get(id);
+    if(j?.mode==='redraw'&&['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
+      const polls=(redrawPolls.get(id)??0)+1;redrawPolls.set(id,polls);
+      j.status=polls<3?'running':redrawOutcome==='success'?'succeeded':'failed';
+      if(j.status==='succeeded')j.output_asset_id=`output-${id}`;
+      if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟重绘失败，常规译图仍可阅读。'};
+    }
+    return j;
+  }).filter(Boolean)});
   if(url.pathname.endsWith('/access'))return json({url:`${origin}/v1/fixture-output`,expires_at:'2099-01-01T00:00:00Z'});
   if(url.pathname==='/v1/fixture-output')return new Response(blob);
   if(url.pathname.endsWith('/cancel')){const id=url.pathname.split('/')[3];const j=jobs.get(id)!;j.status='cancelled';return json(j);}
