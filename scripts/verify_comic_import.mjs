@@ -42,18 +42,18 @@ while(true) {
 const before=await json('/v1/me/usage',{headers:auth});
 async function configure(context,loggedIn=true) {
   await context.addInitScript(({session,api,loggedIn})=>{
-    if(!localStorage.getItem('nc-settings'))localStorage.setItem('nc-settings',JSON.stringify({apiBase:api,translationMode:'redraw',layout:'single',fit:'window',autoTranslate:false}));
+    if(!localStorage.getItem('nc-settings'))localStorage.setItem('nc-settings',JSON.stringify({apiBase:api,translationMode:'redraw',layout:'single',fit:'window'}));
     if(loggedIn)localStorage.setItem('nc-session',JSON.stringify(session));
   },{session:{token:login.access_token,user:login.user,apiOrigin:api},api,loggedIn});
 }
-async function chapterRecords(page) {
+async function copyRecords(page) {
   return page.evaluate(()=>new Promise((resolve,reject)=>{
-    const request=indexedDB.open('node-comics-v1',1);
+    const request=indexedDB.open('node-comics-library',1);
     request.onerror=()=>reject(request.error);
     request.onsuccess=()=>{
-      const db=request.result;const tx=db.transaction(['chapters','blobs'],'readonly');
-      const chapters=tx.objectStore('chapters').getAll();const blobs=tx.objectStore('blobs').getAllKeys();
-      tx.oncomplete=()=>{resolve({chapters:chapters.result,blobCount:blobs.result.length});db.close();};
+      const db=request.result;const tx=db.transaction(['copies','blobs'],'readonly');
+      const copies=tx.objectStore('copies').getAll();const blobs=tx.objectStore('blobs').getAllKeys();
+      tx.oncomplete=()=>{resolve({copies:copies.result,blobCount:blobs.result.length});db.close();};
     };
   }));
 }
@@ -63,28 +63,34 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   page.on('request',request=>{if(request.url().startsWith(api))requests.push({url:request.url().slice(api.length),method:request.method()});});
   await page.goto(url);
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor({timeout:30000});
   await page.locator('.nc-page-image').first().waitFor();
   if(cache)await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:30000});
-  let records=await chapterRecords(page);const bookCount=records.chapters.length;const chapter=records.chapters.sort((a,b)=>b.createdAt-a.createdAt).find(c=>c.title===name.replace(/\.[^.]+$/,''));
-  assert(chapter,`${label} chapter persisted`);assert.equal(chapter.pages.length,3);
-  assert.deepEqual(chapter.pages.map(p=>p.pageIndex),[0,1,2]);
-  if(!name.endsWith('.pdf'))assert.deepEqual(chapter.pages.map(p=>p.imageSha256),hashes);
-  else assert(chapter.pages.every(p=>p.width===640&&p.height===960&&p.imageSha256));
+  let records=await copyRecords(page);const bookCount=records.copies.length;const copy=records.copies.sort((a,b)=>b.createdAt-a.createdAt).find(c=>c.title===name.replace(/\.[^.]+$/,''));
+  assert(copy,`${label} copy persisted`);assert.equal(copy.pages.length,3);
+  assert.deepEqual(copy.pages.map(p=>p.pageIndex),[0,1,2]);
+  if(!name.endsWith('.pdf'))assert.deepEqual(copy.pages.map(p=>p.imageSha256),hashes);
+  else assert(copy.pages.every(p=>p.width===640&&p.height===960&&p.imageSha256));
   if(cache) {
-    for(const p of chapter.pages)assert(p.jobs.some(j=>jobs.some(old=>old.id===j.id)),`${label} restored job`);
+    for(const p of copy.pages)assert(p.jobs.some(j=>jobs.some(old=>old.id===j.id)),`${label} restored job`);
     assert(!requests.some(r=>r.method==='POST'&&['/v1/images','/v1/quotes','/v1/translation-batches'].includes(r.url)),'Recovery must not upload or submit');
   }
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');
-  await page.waitForFunction(id=>JSON.parse(localStorage.getItem('nc-position:'+id)??'{}').pageId!=null,chapter.id);
+  await page.waitForFunction(id=>JSON.parse(localStorage.getItem('nc-copy-position:'+id+':1')??'{}').pageId!=null,copy.id);
   await page.getByLabel('返回我的漫画').click();
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();
   assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
-  records=await chapterRecords(page);
-  assert.equal(records.chapters.length,bookCount,'Reimport should restore existing book');
-  assert.equal(records.chapters.find(c=>c.id===chapter.id).pages[1].id,chapter.pages[1].id);
+  records=await copyRecords(page);
+  assert.equal(records.copies.length,bookCount,'Reimport should restore existing book');
+  assert.equal(records.copies.find(c=>c.id===copy.id).pages[1].id,copy.pages[1].id);
   await page.locator('.nc-page-image').first().waitFor();
   await page.screenshot({path:path.join(output,label+'.png')});
   assert.deepEqual(errors,[],`${label} browser errors`);
@@ -102,9 +108,10 @@ try {
   for(const name of ['broken-image.cbz','locked.pdf','corrupt.pdf']) {
     const context=await browser.newContext();await configure(context,false);const page=await context.newPage();
     await page.goto(web);await page.locator('input[type=file]').setInputFiles(path.join(output,name));
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
     await page.getByText(/导入未完成/).waitFor();
     await page.waitForFunction(()=>!document.body.innerText.includes('正在保存漫画页'));
-    assert.deepEqual(await chapterRecords(page),{chapters:[],blobCount:0});
+    assert.deepEqual(await copyRecords(page),{copies:[],blobCount:0});
     await page.screenshot({path:path.join(output,'error-'+name+'.png')});
     checks.push({label:name,errorHandled:true,noOrphanBlobs:true});await context.close();
   }

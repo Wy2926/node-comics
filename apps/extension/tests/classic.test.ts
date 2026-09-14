@@ -3,13 +3,13 @@ import {Api} from '../src/api';
 import {automaticScope} from '../src/reader/model';
 
 describe('classic mode and budget boundaries',()=>{
-  it('invalidates in-flight automatic preparation across mode, language, account, service or chapter changes',()=>{
-    const original=automaticScope('chapter','alice','https://api.example','zh-Hans','classic');
+  it('invalidates in-flight automatic preparation across mode, language, account, service or copy changes',()=>{
+    const original=automaticScope('copy','alice','https://api.example','zh-Hans','classic');
     for(const changed of [
-      automaticScope('chapter','alice','https://api.example','zh-Hans','redraw'),
-      automaticScope('chapter','alice','https://api.example','en','classic'),
-      automaticScope('chapter','bob','https://api.example','zh-Hans','classic'),
-      automaticScope('chapter','alice','https://other.example','zh-Hans','classic'),
+      automaticScope('copy','alice','https://api.example','zh-Hans','redraw'),
+      automaticScope('copy','alice','https://api.example','en','classic'),
+      automaticScope('copy','bob','https://api.example','zh-Hans','classic'),
+      automaticScope('copy','alice','https://other.example','zh-Hans','classic'),
       automaticScope('other','alice','https://api.example','zh-Hans','classic'),
     ])expect(changed).not.toBe(original);
   });

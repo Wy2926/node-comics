@@ -1,10 +1,11 @@
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
 import {defaults,type Job,type Page} from '../src/types';
-import {readChapters,saveChapter,putBlob,saveSettings,saveSession} from '../src/reader/store';
-import {emptyPage,makeChapter} from '../src/reader/model';
+import {readCopies,commitCopies,putBlob,saveSettings,saveSession} from '../src/library/store';
+import {emptyPage} from '../src/reader/model';
+import {makeCopy} from '../src/library/model';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5174')throw Error('Use the isolated 127.0.0.1:5174 origin.');
-const existing=await readChapters();
+const existing=await readCopies();
 if(existing.some(c=>!c.id.startsWith('reader-fixture-')))throw Error('This origin contains non-fixture data. Use another browser profile.');
 const origin=location.origin;
 const originalFetch=window.fetch.bind(window);
@@ -16,9 +17,9 @@ if(!existing.length){
   await putBlob('reader-fixture-original',blob);await putBlob('reader-fixture-output',blob);
   const states:Job['status'][]=['queued','running','failed','succeeded','no_text','outcome_unknown'];
   const pages:Page[]=Array.from({length:120},(_,i):Page=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`fixture-page-${i}`,fileHash:'a'.repeat(64),pageIndex:i,blobKey:i===6?undefined:'reader-fixture-original',ownerId:'fixture-reader',apiOrigin:origin,jobs:i<states.length?[job(i,states[i])]:[],outputBlobs:i===3?{'fixture-job-3':'reader-fixture-output'}:{}}));
-  for(const [i,title] of ['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'].entries())await saveChapter({...makeChapter(title,i===0?pages:pages.slice(0,9),i===1?'原创漫画 · 很长的来源说明应保持在同一行并显示省略号':'原创验收样本'),id:`reader-fixture-${i}`});
+  for(const [i,title] of ['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'].entries())await commitCopies([{...makeCopy(title,i===0?pages:pages.slice(0,9),i===1?'原创漫画 · 很长的来源说明应保持在同一行并显示省略号':'原创验收样本'),id:`reader-fixture-${i}`}],[{title,kind:'chapter'}]);
 }
-const stored=await readChapters();
+const stored=await readCopies();
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
 const quotes=new Map<string,{asset_ids:string[];mode:Job['mode'];target_language:string}>();
 const batches=new Map<string,unknown>();

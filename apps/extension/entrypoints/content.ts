@@ -1,9 +1,24 @@
-import { defineContentScript } from 'wxt/utils/define-content-script';
-import { discoverDocument } from '../src/sources/adapters';
-// Manual scripting injection uses the user's per-site permission. Listing broad
-// matches here would make WXT promote them to required host_permissions.
+import {defineContentScript} from 'wxt/utils/define-content-script';
+import {discoverDocument} from '../src/sources/adapters';
+import {discoverMangaCopyCatalog,mangaCopyLocation} from '../src/sources/mangacopy';
+import {advanceMangaCopyDiscovery} from '../src/sources/discovery';
 export default defineContentScript({registration:'runtime',main(){
-  const state=globalThis as typeof globalThis & {__nodeComics?:boolean};if(state.__nodeComics)return;state.__nodeComics=true;
-  const navigationId=crypto.randomUUID();let revision=0;
-  chrome.runtime.onMessage.addListener((message,sender,respond)=>{if(sender.id!==chrome.runtime.id)return;if(message?.type==='NC_NAVIGATION'){respond({navigationId,url:location.href});return;}if(message?.type!=='NC_DISCOVER')return;respond({...discoverDocument(document,location.href),navigationId,revision:++revision});});
+ const state=globalThis as typeof globalThis & {__nodeComics?:boolean};if(state.__nodeComics)return;state.__nodeComics=true;
+ const navigationId=crypto.randomUUID();let revision=0;
+ let advancing:ReturnType<typeof advanceMangaCopyDiscovery>|undefined;
+ const loc=mangaCopyLocation(location.href);
+ if(loc&&!loc.chapterId){
+  const host=document.querySelector('.comicParticulars-title-right');
+  if(host){const button=document.createElement('button');button.textContent='Node Comics · 导入／管理漫画';button.type='button';button.style.cssText='background:#fb7299;color:#fff;border:0;border-radius:8px;padding:10px 16px;margin:12px 0;cursor:pointer;font-weight:600';button.onclick=()=>{button.disabled=true;void chrome.runtime.sendMessage({type:'NC_IMPORT_CURRENT'}).then(r=>{if(!r?.ok)button.textContent=r?.error??'请通过插件弹窗重试';}).finally(()=>button.disabled=false);};host.append(button);}
+ }
+ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+  if(sender.id!==chrome.runtime.id)return;
+  if(message?.type==='NC_NAVIGATION'){respond({navigationId,url:location.href});return;}
+  if(message?.type==='NC_CATALOG_SNAPSHOT'){respond(discoverMangaCopyCatalog(document,location.href));return;}
+  if(message?.type!=='NC_DISCOVER')return;
+  if(!message.advance){respond({...discoverDocument(document,location.href),navigationId,revision:++revision});return;}
+  advancing??=advanceMangaCopyDiscovery(document,window).finally(()=>{advancing=undefined;});
+  void advancing.then(snapshot=>respond({...snapshot,navigationId,revision:++revision})).catch(()=>respond(null));
+  return true;
+ });
 }});

@@ -2,7 +2,8 @@ import {mergeJobs} from '../src/reader/jobs';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Api} from '../src/api';
 import {StaleOperation} from '../src/concurrency';
-import {emptyPage, makeChapter} from '../src/reader/model';
+import {emptyPage} from '../src/reader/model';
+import {makeCopy} from '../src/library/model';
 import {applyMatch, bindSubmission, matchFilePages, pageSource, planTranslation, rerunSource, sourceKey, submittedJobsForPage, uploadPages} from '../src/reader/recovery';
 import type {FilePageMatch, Job, Page} from '../src/types';
 
@@ -79,9 +80,9 @@ describe('reuse and safe recovery', () => {
   });
   it('keeps page identity, dimensions and reader anchor unchanged while replacing another account’s remote data', () => {
     const p={...page(9),pageIndex:37,ownerId:'alice',apiOrigin:origin,jobs:[job()],outputBlobs:{job:'alice-result'},operationIds:{job:'alice-operation'}};
-    const chapter={...makeChapter('book',[p]),relativeOffset:0.42};const found=match(p,[job('queued',{id:'bob-job'})]);
-    const updated={...chapter,pages:chapter.pages.map(item=>applyMatch(item,found,'bob',origin))};
-    expect(updated.pageId).toBe(chapter.pageId);expect(updated.relativeOffset).toBe(.42);
+    const copy={...makeCopy('book',[p]),relativeOffset:0.42};const found=match(p,[job('queued',{id:'bob-job'})]);
+    const updated={...copy,pages:copy.pages.map(item=>applyMatch(item,found,'bob',origin))};
+    expect(updated.pageId).toBe(copy.pageId);expect(updated.relativeOffset).toBe(.42);
     expect(updated.pages[0]).toMatchObject({fileHash:p.fileHash,pageIndex:37,width:100,height:200,ownerId:'bob',outputBlobs:{},operationIds:{}});
     expect(updated.pages[0].jobs.map(j=>j.id)).toEqual(['bob-job']);
   });
@@ -122,23 +123,23 @@ describe('reuse and safe recovery', () => {
     const duplicate={...first,id:'duplicate-local-page'};
     expect(submittedJobsForPage(duplicate.id,[first,duplicate],[returned[0]])).toEqual([returned[0]]);
   });
-  it('retains detached job IDs when selected pages were deleted or changed owners in an existing chapter',()=>{
+  it('retains detached job IDs when selected pages were deleted or changed owners in an existing copy',()=>{
     const first={...page(1),assetId:'asset-a',ownerId:'alice',apiOrigin:origin};
     const removed={...page(2),assetId:'asset-b',ownerId:'alice',apiOrigin:origin};
     const changed={...page(3),assetId:'asset-c',ownerId:'bob',apiOrigin:origin};
     const jobs=[job('queued',{id:'a',input_asset_id:'asset-a'}),job('queued',{id:'b',input_asset_id:'asset-b'}),job('queued',{id:'c',input_asset_id:'asset-c'})];
-    const result=bindSubmission(makeChapter('remaining chapter',[first,changed]),[first,removed,changed],jobs,'alice',origin);
-    expect(result.chapter!.pages[0].jobs.map(j=>j.id)).toEqual(['a']);expect(result.chapter!.pages[1].jobs).toEqual([]);
+    const result=bindSubmission(makeCopy('remaining copy',[first,changed]),[first,removed,changed],jobs,'alice',origin);
+    expect(result.copy!.pages[0].jobs.map(j=>j.id)).toEqual(['a']);expect(result.copy!.pages[1].jobs).toEqual([]);
     expect(result.detachedJobIds).toEqual(['b','c']);
     expect(bindSubmission(undefined,[first],jobs,'alice',origin).detachedJobIds).toEqual(['a','b','c']);
   });
   it('attaches one returned task to all persisted duplicate local pages, even when live assets changed',()=>{
     const first={...page(1),assetId:'shared-source',ownerId:'alice',apiOrigin:origin};const duplicate={...first,id:'duplicate-page'};
     const jobResult=job('queued',{input_asset_id:'shared-source'});
-    const live=makeChapter('duplicates',[{...first,assetId:undefined},{...duplicate,assetId:'newer-source'}]);
+    const live=makeCopy('duplicates',[{...first,assetId:undefined},{...duplicate,assetId:'newer-source'}]);
     const result=bindSubmission(live,[first,duplicate],[jobResult],'alice',origin);
-    expect(result.chapter!.pages.map(p=>p.jobs.map(j=>j.id))).toEqual([['job'],['job']]);expect(result.detachedJobIds).toEqual([]);
-    expect(result.chapter!.pages.map(p=>p.assetId)).toEqual([undefined,'newer-source']);
+    expect(result.copy!.pages.map(p=>p.jobs.map(j=>j.id))).toEqual([['job'],['job']]);expect(result.detachedJobIds).toEqual([]);
+    expect(result.copy!.pages.map(p=>p.assetId)).toEqual([undefined,'newer-source']);
   });
   it('quotes a matched alias input for rerun without replacing the file-page asset mapping', async () => {
     const p=page(1);const previous=job('succeeded',{input_asset_id:'other-book-source'});const found=match(p,[previous]);

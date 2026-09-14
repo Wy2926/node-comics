@@ -1,6 +1,6 @@
 # 代码规范与模块维护
 
-2026-09-14。本文件记录当前实际执行的检查和模块边界；本轮改造不修改产品 API、数据库表结构或供应商协议，不引入新依赖。
+2026-09-14。本文件记录当前实际执行的检查和模块边界。早前模块整理未修改产品 API 或供应商协议；后续[作品管理实现](COMIC_LIBRARY_IMPLEMENTATION.md)使用全新本地数据库，后端数据库与供应商协议保持原有职责。
 
 ## 当前模块边界
 
@@ -11,7 +11,7 @@
 | 偏好页面 | `src/ui/Preferences.tsx` 管理本页表单和账户队列设置；本机请求并发与服务器队列并发独立 |
 | 阅读目录 | `src/reader/ThumbnailDirectory.tsx` 管理缩略图虚拟列表；主阅读器保留图片窗口、导航和阅读位置 |
 | 任务状态 | `src/reader/jobs.ts` 统一状态优先级、排序、合并；恢复、轮询和 IndexedDB 写入共用，不允许旧快照恢复失效译图 |
-| 普通偏好／自动授权 | `reader/store.ts` 只存当前 Settings 字段；自动授权由 `reader/auto-consent.ts` 独立管理，旧 autoTranslate 不再属于 Settings |
+| 作品与副本存储／偏好 | `library/store.ts` 原子保存新模型与副本，按引用清理字节；偏好只存当前 Settings 字段；自动授权由 `reader/auto-consent.ts` 独立管理 |
 | 运营 API | `backend/app/admin_api.py` 包含供应商、额度调整与结果核实；认证、权限、幂等与结算仍复用原有实现 |
 | 请求校验 | `backend/app/request_models.py` 统一 JSON 请求拒绝额外字段的规则；响应模型与请求模型独立 |
 

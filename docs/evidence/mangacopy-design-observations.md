@@ -1,0 +1,84 @@
+# MangaCopy 管理设计调研记录
+
+本文记录实现前的历史观察。后续已经完成代码改造、全话／全卷／番外采集和恢复验证，当前证据见[实现记录](../COMIC_LIBRARY_IMPLEMENTATION.md)；下文“当时未验证”不代表现在仍未实现。
+
+检查日期：2026-09-14，Asia/Shanghai。用途：为[MangaCopy来源适配](../MANGACOPY_LIBRARY_DESIGN.md)提供可复查的来源事实，不作为行业类定义或插件功能验收。通用对象及行业依据见[漫画作品管理设计](../COMIC_LIBRARY_DESIGN.md)；本文中的“分组、话、卷、番外”均按当时源站UI描述，不能直接作为核心分类。
+
+## 方法和边界
+
+- 使用真实浏览器打开公开详情页，等待动态目录加载，读取页面DOM／无障碍结构并检查截图；实际点击类型筛选和目录分页。
+- 普通网页文本抓取在两个详情页均只拿到“章节加载中”。以下目录观察来自已运行网页，不是从搜索摘要猜测。
+- 未登录源站；未调用翻译模型、未执行整本下载、未修改插件代码、未提交或部署。
+- 本机5173端口检查时没有预览服务。本次插件现状依据代码核对，未把历史UI截图或源站截图当成本次插件运行验证。
+
+## 作品A：来自深渊
+
+[详情页](https://www.mangacopy.com/comic/laizishenyuan)。目录动态加载后观察到：
+
+| 源站分组 | “全部”面板中的独立章节链接 | 按源站筛选面板统计 |
+| --- | ---: | --- |
+| 默认 | 82 | 话78、番外4 |
+| 单行本 | 13 | 卷13 |
+| 其它汉化版 | 1 | 话1 |
+| 同人漫画 | 4 | 卷4 |
+
+这些是本次页面DOM计数，不是全站公开API的total字段，也不代表100个互不重复的故事。分组和类型面板会重复引用同一章节。
+
+默认“全部”第1目录页可见50项，起于第1话，止于第46.2话；实际点击第2页，可见32项，起于第47话，止于第73话。图片页和目录分页要分开命名。
+
+点击默认组“话”筛选后，仍能看到“番外篇01、番外篇02、番外篇03”；另有第46.2话、第71.5话。标题关键词不能代替源站类型。默认“番外”面板有第九卷番外、11卷加页、12卷附录、番外篇。
+
+单行本组从第1卷到第13卷；同人漫画组的“官方创作集”条目在“卷”筛选中。说明未知分组名和非标准编号标题都需要原样承载。
+
+本地调研截图（存于Git忽略的artifacts目录）：[类型筛选](../../artifacts/mangacopy-design-20260914/laizishenyuan-type-filter.png)、[默认目录第2页](../../artifacts/mangacopy-design-20260914/laizishenyuan-page-2.png)。本地[目录统计](../../artifacts/mangacopy-design-20260914/catalog-observations.json)只含公开目录元数据，不含图片地址、Cookie或令牌。这些本机附件不会随仓库克隆分发；复查时使用上方源站链接。
+
+## 作品B：碧蓝之海
+
+[详情页](https://www.mangacopy.com/comic/grandblue)。页面内观察到默认、其它汉化版、其他系列三个分组。
+
+- 默认组DOM中104项，类型面板为话71、卷18、番外15；全部目录有3页。
+- 第一页先显示1—18卷，随后是第42话起的条目，途中插入番外。此观察不能证明每一卷和后续话之间的内容对应或重叠。
+- 其它汉化版有2个试看条目；其他系列有10个标题为番外的条目，却归在其“话”筛选中。
+
+本地[混排目录截图](../../artifacts/mangacopy-design-20260914/grandblue-mixed-directory.png)和[补充统计](../../artifacts/mangacopy-design-20260914/supplemental-observations.json)记录当时状态。未逐项打开该作品目录，不将其DOM总数视为图片采集完成。
+
+## 章节阅读页抽查与data-src复核
+
+[来自深渊第73话](https://www.mangacopy.com/comic/laizishenyuan/chapter/0046f30a-9c0d-11f1-bf27-fa163e02432f)：浏览器可见漫画首图，上方为1/43，下方为第82/82话。
+
+初次通过工具统计图片元素时，只观察到当前漫画图片、两个165×211小图和横幅。**该初步统计不足以判断完整图片清单，也不能把两个小图直接认定为广告；经用户提供线索后的复核结论以下文为准。**
+
+用户指出`data-src`为实际图片地址，`src`随阅读位置变化，并指出`class="comicContent-list comic-size-1"`容器。随后针对这一容器实测：
+
+| 项目 | 结果 |
+| --- | ---: |
+| 容器内LI和IMG数量 | 各43 |
+| 非空data-src数量 | 43 |
+| 不同data-src数量 | 43 |
+| 可解析为HTTP(S)的data-src数量 | 43 |
+| 当时src已等于data-src | 21 |
+| 当时src仍不同于data-src | 22 |
+| 上述22项使用的不同占位src数量 | 1 |
+| 占位图当时尺寸 | 165×211 |
+
+这确认了**本次第73话清单已有43个原图候选链接，与页面43页一致**，并确认不能使用占位图的尺寸过滤待加载页。采集位置应限定在漫画容器中；顺序用其DOM顺序，图片地址取`data-src`。没有实际下载、解码和持久化全部43张图片，故尚不能宣称整章已离线获取。
+
+在额外打开的[第1卷](https://www.mangacopy.com/comic/laizishenyuan/chapter/4947b366-1cbc-11ee-b1fb-d3d228a76de6)中，界面显示166页、主容器后缀为`comic-size-2`；[第九卷番外](https://www.mangacopy.com/comic/laizishenyuan/chapter/73248b7f-db19-11ea-8a16-024352452ce0)显示27页、后缀为`comic-size-3`。选择器不应固定`comic-size-1`。
+
+新开这两个页面时，本次工具最初分别观察到3个`data-src`，第1卷滚动后观察到4个，尚未与总页数匹配。没有继续枚举全卷，也没有确定其加载机制；不能从单次部分DOM观察推断全站是否总会一次性呈现全部链接。设计使用“容器就绪＋data-src条目数与可信总页数核对”的完整性条件，未匹配时只报告部分发现。
+
+本地[data-src复核统计](../../artifacts/mangacopy-design-20260914/data-src-verification.json)保存计数与占位差异，不保存原图地址。扩展中的请求来源、CDN权限、地址时效、首末页实际顺序与整章下载仍未验证。
+
+## 当前仓库事实
+
+| 代码 | 已核实内容 |
+| --- | --- |
+| [types.ts](../../apps/extension/src/types.ts) | `Chapter`直接保存`pages[]`，没有作品ID、分组ID或话／卷／番外类型；页对象已有原图、摘要、任务和译图引用 |
+| [Library.tsx](../../apps/extension/src/ui/Library.tsx) | `Chapter[]`直接绘制书架卡片；点击封面打开阅读器，管理为名称／封面编辑与本地移除 |
+| [adapters.ts](../../apps/extension/src/sources/adapters.ts) | 专用分支仅xkcd和gunnerkrigg，其余用通用`img`扫描；最多300项；通用模式不声明完整 |
+| [background.ts](../../apps/extension/entrypoints/background.ts) | 来源图片清单绑定原标签页、URL和导航版本；导航／关闭／刷新后要求重新发现 |
+| [App.tsx](../../apps/extension/src/App.tsx) | `acquireManifest`获取当前清单中的图片，建立一个`Chapter`；不遍历作品分组或多个章节 |
+| 原 `src/reader/store.ts`（已删除） | 调研时 IndexedDB 为chapters与blobs；位置按Chapter ID保存；现由[新存储](../../apps/extension/src/library/store.ts)替换 |
+| [model.ts](../../apps/extension/src/reader/model.ts) | 本地文件重新导入通过文件摘要与页索引恢复旧Chapter，保留整理和阅读位置 |
+
+本记录支持来源映射和导入交互。整本导入的可用性，必须按来源设计第6节及通用设计第7节完成真实插件采集、恢复与通用对象管理验收后才能声明。

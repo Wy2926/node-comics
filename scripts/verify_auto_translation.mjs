@@ -11,7 +11,7 @@ const api='http://127.0.0.1:18089',web='http://127.0.0.1:5174';
 assert(process.env.UI_FIXTURE_DIRECTORY,'UI_FIXTURE_DIRECTORY is required');
 const output=path.resolve('artifacts/auto-validation');await mkdir(output,{recursive:true});
 const auth=await fetch(api+'/v1/auth/dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'auto-'+randomUUID().slice(0,8)})}).then(r=>r.json());
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.TEST_CHROMIUM?{executablePath:process.env.TEST_CHROMIUM}:{channel:'chrome'})});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
 const page=await context.newPage(),errors=[],checks=[],batches=[];
 const baselineCss=process.env.CSS_BASELINE?await readFile(process.env.CSS_BASELINE,'utf8'):undefined;
@@ -22,7 +22,7 @@ const check=name=>{checks.push(name);console.log('PASS '+name);};
 const waitFor=async(fn,label)=>{const until=Date.now()+35000;while(!fn()){assert(Date.now()<until,label);await new Promise(r=>setTimeout(r,100));}};
 const enabled=async value=>assert.equal(await page.getByRole('switch',{name:'自动翻译',exact:true}).getAttribute('aria-checked'),String(value));
 const jump=async n=>{const input=page.getByLabel('跳转页码');await input.fill(String(n));await input.press('Enter');await input.blur();};
-const pending=()=>page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('nc-submission:')).map(k=>JSON.parse(localStorage.getItem(k))));
+const pending=()=>page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('nc-library-submission:')).map(k=>JSON.parse(localStorage.getItem(k))));
 async function compareStyles(name){
   // Wait for lazy thumbnail decoding before comparing CSS; a loading placeholder is not a style regression.
   await page.waitForFunction(()=>[...document.querySelectorAll('.nc-thumbnail')].filter(el=>{
@@ -93,6 +93,9 @@ try{
   check('extracted preferences preserve local/server concurrency separation and saved queue settings');
   const samples=Array.from({length:12},(_,i)=>path.join(process.env.UI_FIXTURE_DIRECTORY,'pages',`page-${String(i+1).padStart(2,'0')}.png`));
   await page.locator('input[type=file]').setInputFiles(samples);
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();await enabled(false);
   await page.getByLabel('打开目录').click();
   await page.waitForFunction(()=>[...document.querySelectorAll('.nc-thumb-list img')].length>0&&[...document.querySelectorAll('.nc-thumb-list img')].every(img=>img.complete));
@@ -105,8 +108,8 @@ try{
   await page.getByLabel('关闭弹窗').click();await enabled(true);check('manual page quote/cancel preserves automatic switch');
   await jump(2);await waitFor(()=>batches.length===2,'next page after manual quote');
   await page.getByLabel('返回我的漫画').click();const count=batches.length;await new Promise(r=>setTimeout(r,1800));assert.equal(batches.length,count);
-  await page.getByRole('button',{name:/^阅读 page-01/}).click();await enabled(true);assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
-  await page.reload();await page.getByRole('button',{name:/^阅读 page-01/}).click();await enabled(true);await jump(3);await waitFor(()=>batches.length===3,'resume after reload');check('back/reopen/reload remembers consent and position');
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'page-01',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await enabled(true);assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
+  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'page-01',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await enabled(true);await jump(3);await waitFor(()=>batches.length===3,'resume after reload');check('back/reopen/reload remembers consent and position');
   quoteFault='network';await jump(4);await page.getByText(/自动翻译暂缓：/).waitFor();await enabled(true);
   assert.equal(await page.locator('dialog[open]').count(),0);await page.screenshot({path:path.join(output,'network-pause.png')});
   await waitFor(()=>batches.length===4,'automatic retry after transient quote failure');check('transient quote failure auto-recovers without dialog');
@@ -115,7 +118,7 @@ try{
   await waitFor(()=>batches.length===6,'quota retry');check('known quota rejection keeps switch and retries without pending uncertainty');
   batchFault='unknown';await jump(7);await page.getByText(/自动翻译暂缓：提交结果待核实/).waitFor();await enabled(true);
   const saved=(await pending())[0];assert(saved);assert.equal(await page.locator('dialog[open]').count(),0);
-  await page.reload();await page.getByRole('button',{name:/^阅读 page-01/}).click();await enabled(true);
+  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'page-01',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await enabled(true);
   assert.equal(await page.locator('dialog[open]').count(),0);assert.equal((await pending())[0].key,saved.key);
   const unknownCount=batches.length;await jump(8);await new Promise(r=>setTimeout(r,1800));assert.equal(batches.length,unknownCount);
   await page.getByRole('button',{name:'处理并继续'}).click();await page.getByRole('button',{name:/确认并开始/}).click();
@@ -124,11 +127,14 @@ try{
   quoteFault='price';await jump(9);await page.getByText(/每页价格已变为/).waitFor();await enabled(true);
   const before=batches.length;await new Promise(r=>setTimeout(r,1800));assert.equal(batches.length,before);await page.screenshot({path:path.join(output,'price-pause.png')});check('price change visibly pauses without switching off or submitting');
   await page.getByRole('switch',{name:'自动翻译',exact:true}).click();await enabled(false);await page.reload();
-  await page.getByRole('button',{name:/^阅读 page-01/}).click();await enabled(false);check('explicit off stays off after reload');
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'page-01',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await enabled(false);check('explicit off stays off after reload');
   // Re-enable, then import a different book; no second approval dialog is needed.
   await page.getByRole('switch',{name:'自动翻译',exact:true}).click();await page.getByRole('button',{name:'确认',exact:true}).click();
   await waitFor(()=>batches.length===before+1,'re-enable');await page.getByLabel('返回我的漫画').click();
   await page.locator('input[type=file]').setInputFiles(path.join(process.env.UI_FIXTURE_DIRECTORY,'pages','page-24.png'));
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();await enabled(true);await waitFor(()=>batches.length===before+2,'new book automatically translates');
   check('switching books retains approved auto translation');
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:30000});
@@ -138,6 +144,9 @@ try{
   await page.reload();
   quoteFault='network';
   await page.locator('input[type=file]').setInputFiles(path.join(process.env.UI_FIXTURE_DIRECTORY,'pages','page-23.png'));
+  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByText(/自动翻译暂缓：/).waitFor();
   await page.locator('.nc-reading-viewport').evaluate(el=>{el.scrollTop=450;el.dispatchEvent(new Event('scroll'));});
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:35000});
@@ -145,7 +154,7 @@ try{
   await page.screenshot({path:path.join(output,'continuous-position.png')});check('continuous scroll position survives retry and translated image replacement');
   }else{await page.getByLabel('关闭弹窗').click();}
   await page.getByLabel('返回我的漫画').click();await compareStyles('library');
-  await page.goto(web+'/entrypoints/popup/index.html');await page.getByRole('button',{name:'发现网页图片',exact:true}).waitFor();
+  await page.goto(web+'/entrypoints/popup/index.html');await page.getByRole('button',{name:'识别当前页面',exact:true}).waitFor();
   await page.setViewportSize({width:380,height:680});await compareStyles('extension-popup');
   assert.deepEqual(errors,[]);check(process.env.UI_ONLY?'UI smoke checks completed without browser exceptions':'translated image displayed and no browser exceptions');
   await writeFile(path.join(output,process.env.UI_ONLY?'ui-results.json':'results.json'),JSON.stringify({checks,errors,batchRequests:batches.length,uniqueSubmissionKeys:new Set(batches.map(b=>b.key)).size,supplier:'synthetic'},null,2));

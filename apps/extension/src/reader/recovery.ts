@@ -1,6 +1,6 @@
 import {Api} from '../api';
 import {assertCurrent, mapConcurrent} from '../concurrency';
-import type {Chapter, FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
+import type {ReadingCopy, FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
 import {mergeJobs,newestFirst,pendingStatuses} from './jobs';
 
 export function pageSource(page: Page): FilePageSource | undefined {
@@ -35,15 +35,15 @@ export function submittedJobsForPage(pageId: string, preparedPages: Page[], retu
     ? job.input_asset_id === rerun.inputAssetId
     : (job.requested_asset_id ?? job.input_asset_id) === prepared.assetId);
 }
-export function bindSubmission(chapter: Chapter | undefined, preparedPages: Page[], returned: Job[], ownerId: string, apiOrigin: string, rerun?: RerunSource) {
+export function bindSubmission(copy: ReadingCopy | undefined, preparedPages: Page[], returned: Job[], ownerId: string, apiOrigin: string, rerun?: RerunSource) {
   const attached = new Set<string>();
-  const pages = chapter?.pages.map(page => {
+  const pages = copy?.pages.map(page => {
     if (page.ownerId !== ownerId || page.apiOrigin !== apiOrigin) return page;
     const jobs = submittedJobsForPage(page.id, preparedPages, returned, rerun);
     jobs.forEach(job => attached.add(job.id));
     return jobs.length ? {...page, jobs: mergeJobs(page.jobs, jobs)} : page;
   });
-  return {chapter: chapter && {...chapter, pages: pages!}, detachedJobIds: [...new Set(returned.filter(job => !attached.has(job.id)).map(job => job.id))]};
+  return {copy: copy && {...copy, pages: pages!}, detachedJobIds: [...new Set(returned.filter(job => !attached.has(job.id)).map(job => job.id))]};
 }
 export function rerunSource(page: Page, match: FilePageMatch | undefined, mode: Mode, language: string): RerunSource | undefined {
   if (!match) return;

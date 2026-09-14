@@ -1,9 +1,10 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {type Job,type Page} from '../src/types';
 import {pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
-import {emptyPage,makeChapter,restoreImported} from '../src/reader/model';
+import {emptyPage} from '../src/reader/model';
+
 import {applyMatch,planTranslation,rerunSource,sourceKey} from '../src/reader/recovery';
-import {settings} from '../src/reader/store';
+import {settings} from '../src/library/store';
 const origin='https://api.example';
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',cost:1,version:created,cache_hit:false,...extra});
 const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),fileHash:'a'.repeat(64),pageIndex:0,ownerId:'alice',apiOrigin:origin,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
@@ -76,11 +77,5 @@ describe('local preferences and original recovery',()=>{
     expect(settings()).not.toHaveProperty('autoLimit');
     expect(settings()).toMatchObject({autoAhead:10,appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
   });
-  it('reimport restores original bytes without losing ordering, results or position',()=>{
-    const old=page([job('first','succeeded',1)]);const existing={...makeChapter('My renamed book',[old]),relativeOffset:.42,coverPageId:old.id};
-    const imported=makeChapter('new filename',[{...old,id:'new-local-id',blobKey:'restored-original',jobs:[],outputBlobs:{}}]);
-    const restored=restoreImported([existing],imported);
-    expect(restored).toMatchObject({id:existing.id,title:existing.title,relativeOffset:.42,pageId:old.id,coverPageId:old.id});
-    expect(restored.pages[0]).toMatchObject({id:old.id,blobKey:'restored-original',jobs:old.jobs,outputBlobs:old.outputBlobs});
-  });
+
 });

@@ -32,6 +32,12 @@ flowchart LR
 
 WXT+React+TypeScript，FastAPI+SQLAlchemy/Alembic，PostgreSQL、Redis/Celery。一个业务后端按API、投递器和Worker进程部署。本地授权文件存储，未来可加私有S3；现有重绘链路无本地图像推理GPU依赖，新增常规引擎的硬件需求待实测。
 
+## 漫画管理领域模型
+
+作品管理按漫画内容与出版关系建立来源无关模型，见[通用漫画作品管理设计](COMIC_LIBRARY_DESIGN.md)。已实现作品、章节、内容版本、出版套系、卷册及收录关系，来源目录通过映射关联`ReadingCopy`。`Chapter`表示章节内容，不保存图片；页面与阅读锚点属于副本及其清单修订。使用独立 IndexedDB `node-comics-library`，事务协调元数据与副本身份，Web Locks 协调来源采集。旧扁平书架及存储模块已删除，没有旧数据迁移、兼容字段或结构回退。模块与运行证据见[实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)。
+
+MangaCopy是来源适配器之一，具体入口、原始标签映射和图片发现规则见[来源设计](MANGACOPY_LIBRARY_DESIGN.md)。站点分组、URL、章节UUID和图片地址不充当全局领域身份；源站变化不要求修改核心类的含义。
+
 ## 插件与导入
 
 站点适配器随插件发布，图片发现、字节获取、后端翻译分别管理。通用模式不声称完整章节。activeTab/scripting/storage/contextMenus与登录identity按功能使用，网站权限按需申请。消息校验sender、标签页、导航版本和登记资源，禁止任意跨域代理。凭据仅在可信扩展上下文。

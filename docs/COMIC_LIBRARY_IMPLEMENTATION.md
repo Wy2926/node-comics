@@ -1,0 +1,94 @@
+# 漫画作品管理与 MangaCopy 实现
+
+日期：2026-09-14。用户已确认[通用模型](COMIC_LIBRARY_DESIGN.md)与[MangaCopy 来源方案](MANGACOPY_LIBRARY_DESIGN.md)，本轮完成首轮实现和本地验收。未提交 Git、发布商店或部署。
+
+## 管理和操作
+
+书架以作品封面网格为入口，提供搜索和排序。2026-09-14 按用户反馈重做管理交互：章节、卷册与副本改成网格卡片；编辑仅按需打开。采集中心统一管理下载、授权、暂停与恢复，原先常驻的范围表单和重复采集区域已移除。详细验证见[管理交互改版记录](COMIC_LIBRARY_REDESIGN.md)。
+
+- 章节有独立身份、字符串编号、顺序和正文／番外／未分类角色。可筛选和排序，批量模式支持逐项选择、Shift 连选与标记已读，下载转到采集中心统一操作。
+- 卷册直接以卡片展示，不以出版套系作为管理前置条件。仅在编辑中保留有数据的既有套系与 ISBN；可按需关联收录章节、合订收录卷册及再版来源，循环出版关系会被拒绝。
+- 内容版本与实际可读副本分开。可为副本选择版本、纠正归属并撤销、指定优先副本、清理图片或移除副本。读过某卷不自动推算未知收录章节已读。
+- 同人、续作等通过作品关系表达。MangaCopy 的同人／其他系列来源条目默认建立单独的待整理作品，不归作原作版本。
+- 本地文件先选择作品与内容归属，支持新建或加入已有作品；整卷文件可以直接归为卷册，内部章节目录保持未知。
+
+在 MangaCopy 漫画详情页，首次从插件弹窗选择“识别当前页面”并授权本站；授权后详情页出现“Node Comics · 导入／管理漫画”。选择来源分组、类型、区间或“来源目录全部”，预览逐项归属，再确认导入。每个“全部”仅指当前已确认目录快照。
+
+默认保存目录，打开条目时获取图片；也可在确认时选择下载原图。后续从“版本与来源”检查更新并预览差异。导入、下载与翻译分别管理，导入目录不会创建翻译任务。用户此前开启的自动翻译仅在进入阅读器后按现有授权生效。
+
+## 代码与存储
+
+| 模块 | 职责 |
+| --- | --- |
+| [library/types.ts](../apps/extension/src/library/types.ts)、[model.ts](../apps/extension/src/library/model.ts) | 作品、章节、内容版本、出版套系、卷册、收录／出版／作品关系、来源目录与副本归属 |
+| [types.ts](../apps/extension/src/types.ts) | `ReadingCopy` 保存实际页面清单、修订、原图与译图引用和阅读位置 |
+| [library/store.ts](../apps/extension/src/library/store.ts) | 原子更新、精确来源去重、资源引用清理、修订及阅读状态 |
+| [local-import.ts](../apps/extension/src/library/local-import.ts)、[reading.ts](../apps/extension/src/library/reading.ts) | 本地格式接入、按作品／出版套系／版本限定阅读序列 |
+| [sources/mangacopy.ts](../apps/extension/src/sources/mangacopy.ts)、[adapters.ts](../apps/extension/src/sources/adapters.ts) | 来源目录、原始分组／类型与页面清单发现 |
+| [sources/client.ts](../apps/extension/src/sources/client.ts)、[acquisition.ts](../apps/extension/src/library/acquisition.ts) | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
+| [background.ts](../apps/extension/entrypoints/background.ts)、[content.ts](../apps/extension/entrypoints/content.ts) | 消息与导航校验、动态站点脚本、详情入口和受管理的来源标签页 |
+| [Library.tsx](../apps/extension/src/ui/Library.tsx)、[CatalogImport.tsx](../apps/extension/src/ui/CatalogImport.tsx) | 作品管理、选择与归属预览 |
+
+使用全新 IndexedDB `node-comics-library`，仅包含 `library`、`copies`、`blobs`。页内位置使用副本 ID、清单修订和页面 ID。旧 `reader/store.ts`、扁平书架及 `restoreImported` 页子集恢复逻辑已删除；旧 `Chapter` 图片集合已从运行代码与测试移除。没有读取旧数据库、迁移、兼容别名、消息桥接或双读双写。原来的阅读偏好与登录设置不承担旧书架转换职责。
+
+相同来源身份重复导入保持副本和归属；相同标题不会合并作品。来源目录修订不会重编号核心对象。已移除来源条目保留排除记录，更新不自动加回。来源页数变化时保留旧副本，用户创建新修订副本重新解析，旧页面和阅读位置不被覆盖。
+
+字节按图片摘要共享，移除一个副本只释放不再被引用的资源。离线副本与临时缓存分别处理，缓存预算不足时停止继续保存并提供原因。迟到的阅读器保存不会复活被删除副本、覆盖更新的清单或丢失采集中新发现的页。
+
+## 来源可靠性
+
+当前只声明支持实际核实的 `https://www.mangacopy.com`，不猜测别名域名或私有 API。
+
+目录从真实动态 DOM 中的各组“全部”面板枚举，包含 CSS 隐藏的分页条目；“话／卷／番外”面板提供原始类型，同 UUID 入口去重。网站分组不等同于出版套系；标题含“番外”不自动推翻网站原类型。
+
+图片严格取 `.comicContent-list img[data-src]` 的 DOM 顺序，容器不固定 `comic-size-1`。重复地址保留不同页槽；`src` 占位图、容器外图片和空 `data-src` 不进入清单。只有条目数、图片槽数量和页面 `.comicCount` 总页数一致才标记清单完整。
+
+实测阅读页最初可能只有 3 张图。源站按实际滚动事件追加槽位，且要求停留在漫画容器前段；跳到占位尾部、反复滚到同一点或一直下滚均可能停滞。当前在首图附近交替小幅滚动并等待 DOM 更新，弹窗识别与后台条目发现共用完整性轮询。发现阶段保留计数，停滞和总时限分别约束，取消／暂停会结束等待。发现完整后逐页获取字节、校验解码与尺寸并持久化。
+
+原图请求不携带 Cookie，单图读取最多 40 MB、30 秒超时；图片域名需单独授权。来源身份和导航变化经过插件校验，用户切换了来源标签页后不继续读取或关闭该页。来源解析异常不静默退回大图扫描并声称整本完成。
+
+采集由打开的插件页面协调，Web Locks 保证同一扩展来源同时只有一个协调者。关闭浏览器后下次打开可继续已保存进度；service worker 不承担常驻队列。后端翻译任务仍独立持久化。
+
+## 首轮实现验证证据（交互改版之前）
+
+以下为首轮实现的隔离数据与浏览器运行结果；当前改版结果以[本次记录](COMIC_LIBRARY_REDESIGN.md)为准：
+
+| 检查 | 结果 |
+| --- | --- |
+| 类型、模块检查 | `npm run check` 通过；53 个模块无运行时循环或不可达源模块 |
+| 单元测试 | 15 个文件，134 项通过；涵盖新模型、原子去重、修订、引用清理、离线保护和既有账户／译图隔离 |
+| 浏览器本地导入及管理 | 10 个场景通过：CBZ、ZIP、CBR、RAR、PDF，重复导入与续读，损坏／加密文件，真实目录 DOM，合订关联及循环拒绝 |
+| 两个实时目录 | 《来自深渊》100 条；《碧蓝之海》116 条。计数是本次样本，不是适配器的固定常量 |
+| 实际扩展目录导入 | 《来自深渊》100 个条目全部保存；来源相关作品独立归属；仅导入目录未创建采集或翻译任务 |
+| 真实原图采集 | 第73话 43/43、第1卷 166/166、第九卷番外 27/27，均取得、解码并保存 |
+| 断点与互斥 | 番外保存至少 5 页后关闭整个浏览器，重开后打开两个阅读器并继续，最终 27/27，副本和已保存页面身份保持 |
+| 截图 | 已检查目录归属预览、书架／作品详情窄屏、阅读器末页、合订关系失败提示 |
+| 翻译回归 | 隔离真实 API／worker、合成供应商下 13 项浏览器检查通过，包括未知提交核实、切换作品与刷新续读；12 次批次请求对应 11 个幂等键，重复一次为原未知提交核实 |
+| 构建与样式清理 | Chrome MV3 构建通过；删除旧书架继续阅读条、菜单及页进度专用样式；桌面／390px 网格与列表状态和操作无重叠、无横向溢出 |
+
+脱敏结果与截图写入被 Git 忽略的 `artifacts/library-validation`、`artifacts/mangacopy-validation`、`artifacts/mangacopy-implementation`。来源测试不上传漫画到翻译服务；原图仅保存在隔离测试配置中。目录导入 100 条不表示已下载全部 100 个条目的图片。
+
+翻译回归结果位于 `artifacts/auto-validation/results.json`，使用原创测试图片及合成输出，不调用实际供应商，不代表模型翻译效果。启动 `backend/tests/manual_ui_server.py` 后，将其输出目录设为 `UI_FIXTURE_DIRECTORY`，运行 `scripts/verify_auto_translation.mjs`；服务仅绑定本机 18089 端口、使用独立临时数据库。
+
+### 可重复命令
+
+在 `apps/extension` 运行 `npm ci`、`npm run check`、`npm test`、`npm run build`。产物为 `.output/chrome-mv3`，可在浏览器扩展管理页加载。
+
+本地浏览器检查：先用带 Pillow、ReportLab 的 Python 运行 `scripts/generate_import_fixtures.py`，再在扩展目录运行 `npm run dev -- --port 5174`。仓库根目录执行：
+
+```powershell
+$env:PLAYWRIGHT_MODULE='<已安装 playwright 模块的路径>'
+$env:TEST_CHROMIUM='<Chromium 可执行文件绝对路径>'
+node scripts/verify_library.mjs
+```
+
+真实站点检查会下载一个来源条目，显式开启：
+
+```powershell
+$env:RUN_LIVE_MANGACOPY='1'
+node scripts/verify_mangacopy.mjs
+```
+
+该脚本复制正式构建到隔离目录，**只在测试副本中**预先授权本站及实际观察到的图片域名，以测试采集、浏览器重启和互斥。正式构建保持按操作请求权限；本轮没有验证原生浏览器权限弹窗，也没有在用户日常浏览器配置中安装插件。
+
+后续范围保持原方案边界：精细跨版本页映射、自动拆章、完整期刊管理、复杂书单、跨设备云书架。登录／验证码及真实图片地址到期后的完整端到端恢复不在本次样本验收结论内。当前实现提供回源、重新解析和补齐操作，不声称全站页面永远完整或所有 CDN 都可访问。

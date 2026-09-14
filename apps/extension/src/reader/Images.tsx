@@ -1,6 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Icon} from '../icons';
-import {getBlob} from './store';
+import {getBlob} from '../library/store';
 import {RequestPool} from '../concurrency';
 import type {Job} from '../types';
 
