@@ -3,7 +3,7 @@ import {Api} from '../src/api';
 import {automaticScope} from '../src/reader/model';
 
 describe('classic mode and budget boundaries',()=>{
-  it('does not reuse automatic approval across mode, language, account, service or chapter changes',()=>{
+  it('invalidates in-flight automatic preparation across mode, language, account, service or chapter changes',()=>{
     const original=automaticScope('chapter','alice','https://api.example','zh-Hans','classic');
     for(const changed of [
       automaticScope('chapter','alice','https://api.example','zh-Hans','redraw'),

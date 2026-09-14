@@ -29,7 +29,7 @@ describe('bounded SHA-256 identities', () => {
     const first = await imageIdentity(new File(['original bytes'], '2.png'));
     const renamed = await imageIdentity(new File(['original bytes'], 'renamed.png'));
     const fromWebsite = await imageIdentity(new Blob(['original bytes']));
-    expect(first).toEqual({fileHash: reference('original bytes'), pageIndex: 0});
+    expect(first).toEqual({fileHash: reference('original bytes'),imageSha256:reference('original bytes'), pageIndex: 0});
     expect(renamed).toEqual(first);expect(fromWebsite).toEqual(first);
     expect((await imageIdentity(new File(['different'], '2.png'))).fileHash).not.toBe(first.fileHash);
   });

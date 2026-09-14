@@ -78,6 +78,7 @@ describe('OIDC public-client boundaries', () => {
     );
     expect(authorization.searchParams.get('state')).toBe(pending.state);
     expect(authorization.searchParams.get('redirect_uri')).toBe(READER);
+    expect(authorization.searchParams.get('resource')).toBe(API);
     successfulResponses();
     current = callback(pending);
     expect(await finishOidc()).toEqual({ token: TOKEN, user, apiOrigin: API });
@@ -88,6 +89,7 @@ describe('OIDC public-client boundaries', () => {
     expect(exchange.body).toBeInstanceOf(URLSearchParams);
     const body = exchange.body as URLSearchParams;
     expect(body.get('code_verifier')).toBe(pending.verifier);
+    expect(body.get('resource')).toBe(API);
     expect(body.get('redirect_uri')).toBe(READER);
     expect(body.get('client_id')).toBe(config.client_id);
     expect(body.get('grant_type')).toBe('authorization_code');

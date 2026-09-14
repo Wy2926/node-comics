@@ -1,7 +1,7 @@
 import { Api } from '../api';
 import type { User } from '../types';
 export interface AuthConfig { mode: 'development'|'oidc'; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
-interface Pending { state:string; verifier:string; redirect:string; apiBase:string; tokenEndpoint:string; clientId:string; created:number }
+interface Pending { state:string; verifier:string; redirect:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
 export interface OidcSession { token:string; user:User; apiOrigin:string }
 const KEY='nc-oidc-pending';
 function encode(bytes:Uint8Array) {return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
@@ -13,7 +13,7 @@ async function exchange(callback:string,pending:Pending):Promise<OidcSession> {
   sessionStorage.removeItem(KEY);
   if(returned.searchParams.has('error'))throw Error('身份服务未完成登录，请重试。');
   const code=returned.searchParams.get('code');if(!code)throw Error('身份服务未返回授权码。');
-  const response=await fetch(pending.tokenEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:pending.clientId,code,redirect_uri:pending.redirect,code_verifier:pending.verifier})});
+  const response=await fetch(pending.tokenEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:pending.clientId,code,redirect_uri:pending.redirect,code_verifier:pending.verifier,...(pending.resource?{resource:pending.resource}:{})})});
   if(!response.ok)throw Error('登录授权码交换失败，请重新登录。');
   const tokens=await response.json();if(typeof tokens.access_token!=='string')throw Error('身份服务未返回访问令牌。');
   // Product API verifies signature, issuer, audience and expiry before trusting identity.
@@ -33,7 +33,7 @@ export async function startOidc(config:AuthConfig,apiBase:string):Promise<OidcSe
   const verifier=encode(crypto.getRandomValues(new Uint8Array(48)));const state=encode(crypto.getRandomValues(new Uint8Array(24)));
   const challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
   const redirect=extension?chrome.identity.getRedirectURL('oidc'):(location.origin+location.pathname);
-  const pending:Pending={state,verifier,redirect,apiBase,tokenEndpoint:token.href,clientId:config.client_id,created:Date.now()};
+  const pending:Pending={state,verifier,redirect,apiBase,tokenEndpoint:token.href,clientId:config.client_id,resource:config.audience,created:Date.now()};
   sessionStorage.setItem(KEY,JSON.stringify(pending));
   authorization.search=new URLSearchParams({response_type:'code',client_id:config.client_id,redirect_uri:redirect,scope:config.scopes||'openid profile',state,code_challenge:challenge,code_challenge_method:'S256',...(config.audience?{resource:config.audience,audience:config.audience}:{})}).toString();
   if(extension){const callback=await chrome.identity.launchWebAuthFlow({url:authorization.href,interactive:true});if(!callback)throw Error('登录窗口已关闭。');return exchange(callback,pending);}

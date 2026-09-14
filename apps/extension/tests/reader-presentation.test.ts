@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {defaults,type Job,type Page} from '../src/types';
-import {newestFirst,pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
+import {type Job,type Page} from '../src/types';
+import {pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
 import {emptyPage,makeChapter,restoreImported} from '../src/reader/model';
 import {applyMatch,planTranslation,rerunSource,sourceKey} from '../src/reader/recovery';
 import {settings} from '../src/reader/store';
@@ -70,9 +70,11 @@ describe('display projection and submission',()=>{
   });
 });
 describe('local preferences and original recovery',()=>{
-  it('migrates old settings and never restores automatic spending',()=>{
+  it('drops retired preferences without treating them as automatic consent',()=>{
     vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({autoTranslate:true,autoLimit:2.5,appearance:'wrong',accentTheme:'wrong',textScale:0,language:'en'})});
-    expect(settings()).toMatchObject({autoTranslate:false,autoAhead:10,appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
+    expect(settings()).not.toHaveProperty('autoTranslate');
+    expect(settings()).not.toHaveProperty('autoLimit');
+    expect(settings()).toMatchObject({autoAhead:10,appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
   });
   it('reimport restores original bytes without losing ordering, results or position',()=>{
     const old=page([job('first','succeeded',1)]);const existing={...makeChapter('My renamed book',[old]),relativeOffset:.42,coverPageId:old.id};

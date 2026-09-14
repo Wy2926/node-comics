@@ -1,25 +1,15 @@
 import {Api} from '../api';
 import {assertCurrent, mapConcurrent} from '../concurrency';
 import type {Chapter, FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
-import {newestFirst,pendingStatuses} from './presentation';
+import {mergeJobs,newestFirst,pendingStatuses} from './jobs';
 
 export function pageSource(page: Page): FilePageSource | undefined {
   return page.fileHash && /^[a-f0-9]{64}$/.test(page.fileHash) && Number.isSafeInteger(page.pageIndex) && page.pageIndex! >= 0
-    ? {file_hash: page.fileHash, page_index: page.pageIndex!} : undefined;
+    ? {file_hash: page.fileHash, page_index: page.pageIndex!, ...(page.imageSha256?{image_sha256:page.imageSha256}:{})} : undefined;
 }
 export const sourceKey = (source: FilePageSource) => `${source.file_hash}:${source.page_index}`;
 export const reusableJob = (job: Job, mode: Mode, language: string) => job.mode === mode && job.target_language === language &&
   (['queued', 'running', 'outcome_unknown', 'no_text'].includes(job.status) || job.status === 'succeeded' && !!job.output_asset_id);
-
-export function mergeJobs(previous: Job[], incoming: Job[]): Job[] {
-  const jobs = new Map(previous.map(job => [job.id, job]));
-  const rank = {queued: 0, running: 1, outcome_unknown: 2, failed: 3, cancelled: 3, no_text: 3, succeeded: 4};
-  for (const job of incoming) {
-    const old = jobs.get(job.id);
-    if (!old || rank[job.status] >= rank[old.status]) jobs.set(job.id, job);
-  }
-  return [...jobs.values()].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.version - b.version);
-}
 
 export function applyMatch(page: Page, match: FilePageMatch, ownerId: string, apiOrigin: string, snapshot: Page = page): Page {
   const sameOwner = page.ownerId === ownerId && page.apiOrigin === apiOrigin;

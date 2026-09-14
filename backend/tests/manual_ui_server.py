@@ -21,7 +21,7 @@ os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()
     DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", INITIAL_QUOTA="500", CLASSIC_ENABLED="true",
     CLASSIC_ENGINE_TOKEN="isolated-ui-engine", TEXT_API_KEY="isolated-ui-text", TEXT_BASE_URL="https://text.example/v1",
     OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
-    CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173")
+    CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174")
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app

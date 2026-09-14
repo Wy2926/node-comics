@@ -1,8 +1,9 @@
+import {mergeJobs} from '../src/reader/jobs';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Api} from '../src/api';
 import {StaleOperation} from '../src/concurrency';
 import {emptyPage, makeChapter} from '../src/reader/model';
-import {applyMatch, bindSubmission, matchFilePages, mergeJobs, pageSource, planTranslation, rerunSource, sourceKey, submittedJobsForPage, uploadPages} from '../src/reader/recovery';
+import {applyMatch, bindSubmission, matchFilePages, pageSource, planTranslation, rerunSource, sourceKey, submittedJobsForPage, uploadPages} from '../src/reader/recovery';
 import type {FilePageMatch, Job, Page} from '../src/types';
 
 const origin = 'https://api.example';
@@ -27,6 +28,15 @@ describe('file-page API contract', () => {
     await expect(api.matchPages(Array.from({length:101},()=>pageSource(first)!),'classic','zh-Hans')).rejects.toThrow('100');
     vi.stubGlobal('fetch', async()=>Response.json({items:[match(second),match(first)]}));
     await expect(api.matchPages([pageSource(first)!,pageSource(second)!],'classic','zh-Hans')).rejects.toThrow('不一致');
+  });
+  it('sends normalized page bytes as a lookup hint without claiming them during upload',async()=>{
+    const api=new Api(origin);const p={...page(0),imageSha256:'b'.repeat(64)};
+    const calls:RequestInit[]=[];
+    vi.stubGlobal('fetch',async(_url:string,init:RequestInit)=>{calls.push(init);return Response.json({items:[match(p)]});});
+    await api.matchPages([pageSource(p)!],'redraw','zh-Hans');
+    expect(JSON.parse(calls[0].body as string).pages[0].image_sha256).toBe(p.imageSha256);
+    await api.upload(new Blob(),p.name,pageSource(p));
+    expect((calls[1].body as FormData).has('image_sha256')).toBe(false);
   });
   it('splits entire books at 100 identities and coalesces only overlapping in-flight matches', async () => {
     const api=new Api(origin);const pages=Array.from({length:205},(_,i)=>page(i));
@@ -79,6 +89,8 @@ describe('reuse and safe recovery', () => {
     expect(mergeJobs([job('succeeded')],[job('running')])[0].status).toBe('succeeded');
     expect(mergeJobs([job('outcome_unknown')],[job('queued')])[0].status).toBe('outcome_unknown');
     expect(mergeJobs([job('succeeded')],[job('succeeded',{output_asset_id:null})])[0].output_asset_id).toBeNull();
+    expect(mergeJobs([job('succeeded',{output_asset_id:null})],[job('succeeded',{output_asset_id:'stale-result'})])[0])
+      .toMatchObject({output_asset_id:null,result_available:false,result_expired:true});
     expect(mergeJobs([job('running')],[job('succeeded')])[0].status).toBe('succeeded');
   });
   it('keeps a newer configuration’s v1 after an older configuration’s v2',()=>{

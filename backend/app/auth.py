@@ -36,7 +36,7 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
             if not all([cfg.oidc_issuer, cfg.oidc_audience, cfg.oidc_jwks_url]):
                 problem("AUTH_UNCONFIGURED", "管理员尚未配置身份服务", 503)
             key = jwks_client().get_signing_key_from_jwt(credentials.credentials)
-            claims = jwt.decode(credentials.credentials, key.key, algorithms=["RS256", "ES256"], audience=cfg.oidc_audience, issuer=cfg.oidc_issuer, options={"require": ["exp", "sub", "iss", "aud"]})
+            claims = jwt.decode(credentials.credentials, key.key, algorithms=["RS256", "ES256", "ES384"], audience=cfg.oidc_audience, issuer=cfg.oidc_issuer, options={"require": ["exp", "sub", "iss", "aud"]})
     except jwt.PyJWTError:
         problem("TOKEN_INVALID", "登录已过期，请重新登录", 401)
     subject = claims["sub"] if cfg.dev_auth else f"{cfg.oidc_issuer}|{claims['sub']}"
@@ -64,3 +64,7 @@ def admin(user: User = Depends(identity)):
     if user.role != "admin":
         problem("FORBIDDEN", "需要管理员权限", 403)
     return user
+
+
+def user_json(user):
+    return {"id": user.id, "name": user.name, "role": user.role}

@@ -21,6 +21,8 @@ npm run dev
 
 ## 文件匹配与并发
 
+2026-09-14 新增 CBZ/ZIP、CBR/RAR、PDF 本地导入，以及按图片 SHA-256 回退的免上传匹配；详见[格式与缓存说明](IMPORT_FORMATS_AND_CACHE.md)和[本次验证](evidence/import-cache-validation.md)。更新前端时须同步更新 API，本次没有重启正在运行的产品服务。
+
 本次验证的隔离方式、测试和 Chrome 检查见[文件页复用与队列验收](evidence/file-reuse-queue-validation.md)。
 
 - MOBI 按整文件 SHA-256＋从 0 开始的原始页索引匹配；单张图片按该文件 SHA-256＋索引 0 匹配。文件名不参与标识，页面排序／移除不重编号。不同字节的文件不视为同一文件。
@@ -64,6 +66,39 @@ docker compose --env-file .env --env-file deploy/.env.local down
 
 `deploy/.env.local` 由引导脚本产生本地数据库和签名密钥，已忽略。`down` 保留数据卷。API 只绑定 `127.0.0.1:18088`；数据库、Redis 无宿主机公开端口。不要在模型调用进行中强制重启 worker。
 
+## Logto 接入配置
+
+2026-09-14 已确认登录服务为 `https://auth.nodelane.net/`，应用 ID 为 `dept2iz42nzidf5pao6fo`（SPA），项目计划上线地址为 `https://comics.nodelane.net/`。已读取线上 discovery 和 JWKS：issuer 带 `/oidc`，当前公钥为 EC / P-384 / ES384；后端已支持 ES384。这里只验证公开元数据可用，尚未完成真实用户登录或项目公开部署。
+
+以下端点已写入本地、被 Git 忽略的 `.env`：
+
+```dotenv
+OIDC_CLIENT_ID=dept2iz42nzidf5pao6fo
+OIDC_ISSUER=https://auth.nodelane.net/oidc
+OIDC_AUTHORIZATION_ENDPOINT=https://auth.nodelane.net/oidc/auth
+OIDC_TOKEN_ENDPOINT=https://auth.nodelane.net/oidc/token
+OIDC_JWKS_URL=https://auth.nodelane.net/oidc/jwks
+```
+
+接入剩余配置：
+
+- 在 Logto「API 资源」创建 Node Comics API，建议 Identifier 为 `https://comics.nodelane.net/api`，再将同一值写入 `OIDC_AUDIENCE`。该值是资源标识，不要求对应实际 HTTP 路由；已有资源时使用其真实 Identifier。此项尚未确认创建，未写入本地有效配置。客户端在授权及授权码换令牌时都携带 `resource`，后端校验对应 JWT 的 audience；不能用 App ID 代替 API audience。
+- 已将用户提供的 Chrome 商店公钥写入 `apps/extension/wxt.config.ts` 的 `manifest.key`，由此计算固定扩展 ID 为 `aiajdjliifeeaogpalejpggkiccjbneo`。在 Logto 应用的 Redirect URIs 中添加 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc`。本地 `.env` 已加入 `EXTENSION_IDS=aiajdjliifeeaogpalejpggkiccjbneo`；部署环境也需设置。重新加载构建后的扩展，并核对扩展管理页和商店条目 ID 一致；回调以扩展内 `chrome.identity.getRedirectURL('oidc')` 为准，其他商店或不同 ID 另行登记。公钥可随源码保存，不需要私钥。
+- 若同时提供网页阅读器，在站点根路径使用时登记 `https://comics.nodelane.net/`；本地网页调试可登记 `http://127.0.0.1:5173/`。当前回调为 `location.origin + location.pathname`，如果实际入口为 `/index.html` 或其他路径，需要登记完整的对应地址。在 Logto Allowed CORS origins 中登记实际网页来源（例如 `https://comics.nodelane.net`），不要包含路径。
+- 部署时设置 `CORS_ORIGINS=https://comics.nodelane.net`；Compose 支持环境覆盖，本地默认来源仍保留。阅读器设置里的服务地址也需要指向实际发布的后端入口；当前默认仍是本地 `http://127.0.0.1:18088`。
+- 所有配置完成后再设置 `DEV_AUTH=false` 并重新创建 API 容器。按上文 Compose 命令加载两个环境文件时，`deploy/.env.local` 中现有 `DEV_AUTH=true` 会覆盖根 `.env`，需要修改最终生效文件；仅修改根 `.env` 不会切换登录。本次未切换、未重启运行服务。
+
+相关验证命令（隔离签名密钥、临时数据库和模拟响应，不访问真实账户）：
+
+```powershell
+cd backend
+.venv/Scripts/python.exe -m pytest tests/test_oidc.py -q
+cd ../apps/extension
+npm test -- src/auth/oidc.test.ts
+```
+
+参考：[本实例 OIDC 元数据](https://auth.nodelane.net/oidc/.well-known/openid-configuration)、[Logto Chrome 扩展接入](https://docs.logto.io/quick-starts/chrome-extension)、[Logto API 资源](https://docs.logto.io/zh-CN/authorization/global-api-resources)。
+
 ## 已获得的证据
 
 | 项目 | 证据与边界 |
@@ -89,7 +124,7 @@ docker compose --env-file .env --env-file deploy/.env.local down
 - 插件可以构建和打包；Chrome 网页阅读器已实际验收。加载解压扩展后的真实站点采集尚未人工完成，不能将浏览器预览等同于已安装插件验收。站点适配与消息权限有本地契约验证。
 - `.env` 的默认图片网关在使用常规 Python User-Agent 时曾返回 403；本地通过供应商可配置 `user_agent=Mozilla/5.0` 接通。该配置不代表任意兼容网关都需要它。
 - 公网 OIDC、HTTPS、正式价格、支付、站点覆盖和发布仍未完成，尚未公开部署。
-- MOBI 首版支持未加密 MOBI6 / MOBI6+KF8 漫画，独立 KF8、EPUB、PDF、CBZ/CBR、长图切片与整卷打包导出属于后续范围。
+- MOBI 首版支持未加密 MOBI6 / MOBI6+KF8 漫画，本次已新增 CBZ/ZIP、CBR/RAR、PDF；独立 KF8、EPUB、长图切片与整卷打包导出属于后续范围。
 - 自动审批拒绝了 `engines/` 下载缓存的递归删除（返回 `blocked by policy`）。源码和运行组件已移除，残余缓存已忽略且不参与构建；没有绕过删除限制。
 
 原创发布样例的来源与生成提示见 [samples/README.md](../samples/README.md)。私有漫画、提取图片和凭据不包含在插件产物中。

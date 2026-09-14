@@ -1,4 +1,5 @@
 import type {Job,Mode,Page} from '../types';
+import {newestFirst,pendingStatuses} from './jobs';
 
 export type PageView={mode:Mode;preference:'auto'|'original'|'translation'};
 export function resolvePageView(view:PageView|undefined,defaultMode:Mode):PageView{
@@ -17,9 +18,6 @@ export function readingImage(page:Page,mode:Mode,translated:boolean,language:str
   return {key:page.blobKey,job:undefined};
 }
 
-export const pendingStatuses=new Set(['queued','running','outcome_unknown']);
-/** Request order, not completion order: a late old worker must not replace a newer result. */
-export function newestFirst(jobs:Job[]){return [...jobs].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.version-a.version||b.id.localeCompare(a.id));}
 export function latestResults(jobs:Job[]){const seen=new Set<string>();return newestFirst(jobs).filter(job=>{const key=`${job.mode}:${job.target_language}`;if(job.status!=='succeeded'||seen.has(key))return false;seen.add(key);return true;});}
 export function pageTranslation(page:Page,mode:Mode,language:string,ownerId?:string,origin?:string){
   const jobs=page.ownerId===ownerId&&page.apiOrigin===origin&&ownerId?newestFirst(page.jobs.filter(j=>j.mode===mode&&j.target_language===language)):[];

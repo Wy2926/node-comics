@@ -42,6 +42,12 @@ describe('reading-position automatic translation',()=>{
     const queue=new AutomaticTranslationQueue();queue.setWindow(pages.slice(0,2));await queue.drain(4,async()=>false);
     const next=vi.fn(async()=>true);await queue.drain(4,next);expect(next).toHaveBeenCalledWith(pages.slice(0,2),expect.any(Function));
   });
+  it('retries only transient preparation failures without retrying completed or permanently failed pages',async()=>{
+    const queue=new AutomaticTranslationQueue();queue.setWindow(pages.slice(0,3));
+    await queue.drain(4,async()=>({retry:['1']}));
+    const next=vi.fn(async()=>true);await queue.drain(4,next);
+    expect(next).toHaveBeenCalledExactlyOnceWith([pages[1]],expect.any(Function));
+  });
 });
 
 describe('available reader area and directory geometry',()=>{

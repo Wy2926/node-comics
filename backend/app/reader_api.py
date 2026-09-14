@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import ForeignKey, Index, JSON, String, UniqueConstraint, exists, func, literal, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from .auth import admin, identity
 from .batch_items import BatchItem
 from .db import Base, get_db
+from .request_models import RequestBody
 from .errors import problem
 from .jobs import idem_key, job_json, locked_user, owned_job, quota_json
 from .models import Asset, Job, Batch, Ledger, User, now, uid
@@ -58,8 +59,7 @@ class Feedback(Base):
                      Index("ix_feedback_job", "job_id"))
 
 
-class FeedbackRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class FeedbackRequest(RequestBody):
     issues: list[Literal["missing_text", "meaning", "typesetting", "art_changed", "other"]] = Field(default_factory=list, max_length=5)
     comment: str = Field(default="", max_length=500)
     output_asset_id: str | None = Field(default=None, max_length=36)
@@ -98,8 +98,7 @@ class FeedbackPage(BaseModel):
     next_offset: int | None
 
 
-class FeedbackUpdate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class FeedbackUpdate(RequestBody):
     status: Literal["received", "reviewing", "resolved"]
 
 

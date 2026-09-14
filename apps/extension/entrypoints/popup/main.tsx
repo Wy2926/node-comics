@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Icon} from '../../src/icons';
 import type {ChapterManifest} from '../../src/sources/adapters';

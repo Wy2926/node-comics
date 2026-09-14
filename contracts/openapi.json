@@ -2526,7 +2526,7 @@
         ],
         "title": "FeedbackUpdate"
       },
-      "FilePageIdentity": {
+      "FilePageLookup": {
         "properties": {
           "file_hash": {
             "type": "string",
@@ -2538,6 +2538,18 @@
             "maximum": 1000000.0,
             "minimum": 0.0,
             "title": "Page Index"
+          },
+          "image_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Sha256"
           }
         },
         "additionalProperties": false,
@@ -2546,7 +2558,7 @@
           "file_hash",
           "page_index"
         ],
-        "title": "FilePageIdentity"
+        "title": "FilePageLookup"
       },
       "FilePageMatch": {
         "properties": {
@@ -2600,7 +2612,7 @@
         "properties": {
           "pages": {
             "items": {
-              "$ref": "#/components/schemas/FilePageIdentity"
+              "$ref": "#/components/schemas/FilePageLookup"
             },
             "type": "array",
             "maxItems": 100,

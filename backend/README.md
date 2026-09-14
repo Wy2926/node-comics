@@ -57,6 +57,8 @@ Celery 推荐在 Docker Linux 容器内运行。API 和 dispatcher 启动时运�
 
 交互式接口文档：`/docs`，机器契约：`/openapi.json`。公共响应模型位于 `app/schemas.py`；队列请求与响应模型单独位于 `app/queue_api.py`。
 
+供应商、额度调整与结果核实路由位于 `app/admin_api.py`，由 `main.py` 注册；共用身份、额度和幂等实现。JSON 请求的额外字段拒绝规则集中在 `app/request_models.py`。本轮拆分保持全部 38 个 API 路径及 OpenAPI 契约不变，见[代码规范与模块维护](../docs/CODE_QUALITY.md)。
+
 - `GET /v1/auth/config`；开发环境 `POST /v1/auth/dev {username}` 返回 Bearer token 和用户。
 - `GET /v1/capabilities` 返回 AI 翻译能力、语言、限制、测试点数及已登录用户额度。
 - `POST /v1/images` multipart `image` 上传原图，不会自动翻译。

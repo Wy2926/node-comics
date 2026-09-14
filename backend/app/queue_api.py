@@ -1,11 +1,12 @@
 """Authenticated queue preferences; lower limits revoke only unclaimed slots."""
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from .auth import admin, identity
 from .config import settings
 from .db import get_db
+from .request_models import RequestBody
 from .errors import problem
 from .models import Job, User
 from .queue_models import QueueAdmission, UserQueueSettings
@@ -14,8 +15,7 @@ from .scheduler import concurrency_for, default_concurrency, lock_scheduler, tri
 router = APIRouter(tags=["queue"])
 
 
-class QueueSettingsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class QueueSettingsRequest(RequestBody):
     concurrency: int | None = Field(ge=1, le=10, strict=True)
 
 

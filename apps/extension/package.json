@@ -9,11 +9,15 @@
     "build": "wxt build",
     "build:web": "vite build",
     "zip": "wxt zip",
-    "check": "wxt prepare && tsc --noEmit",
+    "check": "wxt prepare && tsc --noEmit && npm run check:modules",
     "test": "vitest run",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "check:modules": "node scripts/check-modules.mjs"
   },
   "dependencies": {
+    "@zip.js/zip.js": "2.15.0",
+    "node-unrar-js": "2.0.2",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

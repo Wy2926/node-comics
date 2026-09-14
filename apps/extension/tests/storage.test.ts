@@ -26,6 +26,20 @@ it('keeps newly submitted jobs when an older tab saves its chapter snapshot',asy
   await saveChapter({...chapter,pages:[{...page,jobs:[job]}]});await saveChapter(chapter);
   expect((await readChapters()).find(c=>c.id===chapter.id)!.pages[0].jobs.map(j=>j.id)).toEqual(['new-job']);
 });
+it('does not resurrect a removed result when another tab saves an older successful job',async()=>{
+  const page={...emptyPage('removed.png',10,10),ownerId:'reader',apiOrigin:'http://127.0.0.1:18088'};
+  const job:Job={id:'removed-result',input_asset_id:'original',output_asset_id:'result',mode:'classic',target_language:'en',status:'succeeded',phase:'completed',cost:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+  const stale=makeChapter('removed result',[{...page,jobs:[job]}]);await saveChapter(stale);
+  await saveChapter({...stale,pages:[{...page,jobs:[{...job,output_asset_id:null}]}]});
+  await saveChapter(stale);
+  expect((await readChapters()).find(c=>c.id===stale.id)!.pages[0].jobs[0]).toMatchObject({output_asset_id:null,result_available:false,result_expired:true});
+});
+it('only saves current preference fields, leaving automatic consent in its own store',()=>{
+  saveSettings({...defaults,...{autoTranslate:true,autoLimit:50}});
+  const stored=JSON.parse(localStorage.getItem('nc-settings')!);
+  expect(stored).not.toHaveProperty('autoTranslate');expect(stored).not.toHaveProperty('autoLimit');
+  expect(stored.language).toBe(defaults.language);
+});
 it('preserves a new reader position when another tab writes an old chapter snapshot',async()=>{
   const first=emptyPage('1.png',100,100);const hundred=emptyPage('100.png',100,100);const chapter=makeChapter('cross-tab',[first,hundred]);
   await saveChapter(chapter);savePosition(chapter.id,{pageId:hundred.id,relativeOffset:.42});

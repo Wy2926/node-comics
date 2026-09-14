@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import type {Api} from '../api';
 import {ApiError} from '../api';
-import {Modal} from '../App';
+import {Modal} from './components';
 import {Icon} from '../icons';
 import {languageLabel,modeLabels,type FeedbackIssue,type FeedbackRecord,type Job,type Paginated} from '../types';
 export const issueLabels:Record<FeedbackIssue,string>={missing_text:'漏译或未识别',meaning:'意思不准确',typesetting:'文字排版问题',art_changed:'画面被改动',other:'其他问题'};

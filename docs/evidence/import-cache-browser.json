@@ -1,0 +1,92 @@
+{
+  "checkedAt": "2026-09-14T09:29:51.562Z",
+  "syntheticProvider": true,
+  "checks": [
+    {
+      "label": "web-pages.cbz",
+      "pages": 3,
+      "cache": true,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "web-pages.zip",
+      "pages": 3,
+      "cache": true,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "web-repacked.cbz",
+      "pages": 3,
+      "cache": true,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "web-rar4.cbr",
+      "pages": 3,
+      "cache": true,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "web-rar5.rar",
+      "pages": 3,
+      "cache": true,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "web-pages.pdf",
+      "pages": 3,
+      "cache": false,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "broken-image.cbz",
+      "errorHandled": true,
+      "noOrphanBlobs": true
+    },
+    {
+      "label": "locked.pdf",
+      "errorHandled": true,
+      "noOrphanBlobs": true
+    },
+    {
+      "label": "corrupt.pdf",
+      "errorHandled": true,
+      "noOrphanBlobs": true
+    },
+    {
+      "label": "extension-pages.cbz",
+      "pages": 3,
+      "cache": false,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "extension-rar4.cbr",
+      "pages": 3,
+      "cache": false,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "extension-rar5.rar",
+      "pages": 3,
+      "cache": false,
+      "positionRestored": true,
+      "errors": []
+    },
+    {
+      "label": "extension-pages.pdf",
+      "pages": 3,
+      "cache": false,
+      "positionRestored": true,
+      "errors": []
+    }
+  ],
+  "quotaUnchanged": true
+}

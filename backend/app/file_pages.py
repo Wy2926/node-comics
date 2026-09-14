@@ -3,12 +3,13 @@ import hashlib
 from typing import Literal
 from fastapi import HTTPException
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, tuple_
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .assets import asset_json, available, create_asset
 from .db import Base
+from .request_models import RequestBody
 from .errors import problem
 from .jobs import job_json, locked_user
 from .models import Asset, Job
@@ -25,8 +26,7 @@ class FilePage(Base):
     __table_args__ = (CheckConstraint("page_index >= 0"),)
 
 
-class FilePageIdentity(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class FilePageIdentity(RequestBody):
     file_hash: str = Field(pattern=r"^[a-fA-F0-9]{64}$")
     page_index: int = Field(ge=0, le=1_000_000, strict=True)
 
@@ -36,12 +36,31 @@ class FilePageIdentity(BaseModel):
         return value.lower()
 
 
-class FilePageMatchRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    pages: list[FilePageIdentity] = Field(min_length=1, max_length=100)
+class FilePageLookup(FilePageIdentity):
+    # Hash of the actual upload bytes, after local GIF/PDF normalization.
+    image_sha256: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
+
+    @field_validator("image_sha256")
+    @classmethod
+    def lowercase_image_hash(cls, value):
+        return value.lower() if value else None
+
+
+class FilePageMatchRequest(RequestBody):
+    pages: list[FilePageLookup] = Field(min_length=1, max_length=100)
     mode: Literal["classic", "redraw"]
     target_language: str
     include_display: bool = False
+
+    @model_validator(mode="after")
+    def consistent_sources(self):
+        hashes = {}
+        for page in self.pages:
+            key = (page.file_hash, page.page_index)
+            if key in hashes and hashes[key] != page.image_sha256:
+                raise ValueError("同一文件页不能提供不同的图片摘要")
+            hashes[key] = page.image_sha256
+        return self
 
 
 class FilePageMatch(FilePageIdentity):
@@ -90,15 +109,44 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
     sources = {}
     display_sources = {}
     cache_keys = {}
+    requested = {(page.file_hash, page.page_index): page for page in body.pages}
+    mapped = set()
     for mapping in mappings:
+        identity = (mapping.file_hash, mapping.page_index)
+        mapped.add(identity)
         asset = db.get(Asset, mapping.asset_id)
         if not asset or asset.owner_id != owner_id or asset.kind != "original":
             continue
-        identity = (mapping.file_hash, mapping.page_index)
+        if requested[identity].image_sha256 and requested[identity].image_sha256 != asset.sha256:
+            continue
         display_sources[identity] = asset
         if not available(asset):
             continue
         sources[identity] = asset
+
+    # Repacked archives have new file identities. Look up their page bytes only
+    # inside this account; never create a mapping from an unverified client hash.
+    # Existing expired/deleted mappings stay misses and require a fresh upload.
+    missing = {key: page.image_sha256 for key, page in requested.items()
+               if key not in mapped and page.image_sha256}
+    by_hash, display_by_content = {}, {}
+    if missing:
+        candidates = db.scalars(select(Asset).where(
+            Asset.owner_id == owner_id, Asset.kind == "original",
+            Asset.sha256.in_(set(missing.values())),
+        ).order_by(Asset.created_at.desc(), Asset.id.desc()))
+        for asset in candidates:
+            display_by_content.setdefault(asset.sha256, asset)
+            if asset.sha256 not in by_hash and available(asset):
+                by_hash[asset.sha256] = asset
+        for identity, content_hash in missing.items():
+            if content_hash in by_hash:
+                sources[identity] = by_hash[content_hash]
+                display_sources[identity] = by_hash[content_hash]
+            elif content_hash in display_by_content:
+                display_sources[identity] = display_by_content[content_hash]
+
+    for identity, asset in sources.items():
         if config:
             cache_keys[identity] = digest({"owner": owner_id, "hash": asset.sha256,
                 "mode": body.mode, "language": body.target_language, "config_version": config["version"]})

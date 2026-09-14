@@ -48,4 +48,5 @@ export class Api {
 }
 function validateSource(source: FilePageSource) {
   if (!/^[a-f0-9]{64}$/.test(source.file_hash) || !Number.isSafeInteger(source.page_index) || source.page_index < 0) throw new ApiError('文件 SHA-256 与原始页索引必须成对提供。', 'INVALID_PAGE_SOURCE');
+  if(source.image_sha256!==undefined&&!/^[a-f0-9]{64}$/.test(source.image_sha256))throw new ApiError('图片 SHA-256 无效。','INVALID_IMAGE_HASH');
 }

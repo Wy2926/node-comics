@@ -93,3 +93,9 @@ def owned_asset(db: Session, asset_id: str, owner_id: str):
 
 def asset_json(asset: Asset):
     return {"id": asset.id, "width": asset.width, "height": asset.height, "mime": asset.mime, "sha256": asset.sha256, "byte_size": asset.byte_size, "kind": asset.kind, "expires_at": asset.expires_at.isoformat() + "Z"}
+
+
+async def upload_bytes(image):
+    data = await image.read(settings().max_upload_bytes + 1)
+    await image.close()
+    return data

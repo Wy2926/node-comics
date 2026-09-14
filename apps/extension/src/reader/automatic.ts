@@ -1,4 +1,5 @@
 import type {Page} from '../types';
+export type PreparationResult = boolean | {retry:string[]};
 
 export function normalizeAhead(value: unknown) {
   const number = Number(value);
@@ -30,7 +31,7 @@ export class AutomaticTranslationQueue {
     this.pages = pages;
   }
 
-  async drain(maxBatch: number, prepare: (pages: Page[], current: () => boolean) => Promise<boolean>) {
+  async drain(maxBatch: number, prepare: (pages: Page[], current: () => boolean) => Promise<PreparationResult>) {
     if (this.running) return;
     this.running = true;
     const session = this.session;
@@ -43,7 +44,11 @@ export class AutomaticTranslationQueue {
         const completed = await prepare(batch, current);
         if (session !== this.session) return;
         // A submitted batch remains attempted even if the reader jumped while it was in flight.
-        if (completed) for (const page of batch) this.attempted.add(page.id);
+        if (typeof completed==='object') {
+          for (const page of batch) if (!completed.retry.includes(page.id)) this.attempted.add(page.id);
+          if (current()) return;
+        }
+        else if (completed) for (const page of batch) this.attempted.add(page.id);
         else if (current()) return;
       }
     } finally { this.running = false; }

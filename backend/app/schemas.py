@@ -1,5 +1,5 @@
 """Public response contracts exported through OpenAPI for extension type generation."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ErrorInfo(BaseModel):

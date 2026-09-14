@@ -1,0 +1,46 @@
+import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+let root: string;
+const script = fileURLToPath(new URL('../scripts/check-modules.mjs', import.meta.url));
+beforeEach(() => {
+  root = mkdtempSync(path.join(tmpdir(), 'nc-module-check-'));
+  mkdirSync(path.join(root, 'src'));
+  mkdirSync(path.join(root, 'entrypoints'));
+  writeFileSync(path.join(root, 'tsconfig.json'), '{}');
+});
+afterEach(() => {
+  if (path.dirname(root) !== path.resolve(tmpdir()) || !path.basename(root).startsWith('nc-module-check-')) throw Error('Unexpected fixture directory');
+  rmSync(root, {recursive: true});
+});
+const source = (name: string, code: string) => writeFileSync(path.join(root, name), code);
+const run = () => spawnSync(process.execPath, [script, root], {encoding: 'utf8'});
+
+describe('module boundary check', () => {
+  it('rejects a runtime cycle through a shared component', () => {
+    source('entrypoints/main.ts', "import '../src/app';");
+    source('src/app.ts', "import './modal';");
+    source('src/modal.ts', "import './app';");
+    const result = run();
+    expect(result.status).toBe(1);expect(result.stderr).toContain('Runtime import cycle');
+  });
+  it('allows type-only cycles and follows lazy imports and Vite worker queries', () => {
+    source('entrypoints/main.ts', "import type {A} from '../src/a'; import('../src/lazy'); import Worker from '../src/worker?worker';");
+    source('src/a.ts', "import type {B} from './b'; export interface A {b:B}");
+    source('src/b.ts', "import type {A} from './a'; export interface B {a:A}");
+    source('src/lazy.ts', 'export const value=1;');
+    source('src/worker.ts', 'export const value=2;');
+    const result = run();
+    expect(result.stderr).toBe('');expect(result.status).toBe(0);
+  });
+  it('rejects unused exported modules that TypeScript does not flag', () => {
+    source('entrypoints/main.ts', 'export {};');
+    source('src/orphan.ts', 'export function unused() {}');
+    const result = run();
+    expect(result.status).toBe(1);expect(result.stderr).toContain('Unreachable source module: src/orphan.ts');
+  });
+});
