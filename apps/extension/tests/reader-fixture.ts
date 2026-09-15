@@ -45,7 +45,7 @@ if(new URLSearchParams(location.search).has('empty')&&!localStorage.getItem('rea
 }
 // Separate small chapters exercise boundaries, including repeated page IDs in different copies.
 const flow=new URLSearchParams(location.search).get('flow');
-if(flow&&['complete','incomplete','missing','empty','gap','snapshot'].includes(flow)&&!(await readCopies()).some(c=>c.id===`reader-fixture-flow-${flow}-0`)){
+if(flow&&['complete','backward','incomplete','missing','empty','gap','snapshot'].includes(flow)&&!(await readCopies()).some(c=>c.id===`reader-fixture-flow-${flow}-0`)){
  const chapters=(flow==='snapshot'?[4]:[2,2,1]).map((count,n)=>({...makeCopy(`连读 ${flow} · 第 ${n+1} 话`,Array.from({length:count},(_,i)=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`flow-page-${i}`,blobKey:flow==='missing'&&n===0&&i===0?undefined:'reader-fixture-original'})),'连读验收'),id:`reader-fixture-flow-${flow}-${n}`}));
  if(flow==='incomplete'){chapters[0].discoveryComplete=false;Object.assign(chapters[0],{knownTotal:4,sourceEntryId:'fixture-incomplete-source'});}
  if(flow==='snapshot')Object.assign(chapters[0],{discoveryComplete:false,knownTotal:undefined,source:'网页图片',sourceKey:'web:fixture-snapshot'});

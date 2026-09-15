@@ -22,6 +22,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
  const anchor=useRef(initial),suppressScroll=useRef(false),lastScrollTop=useRef(0);
  const saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
  const pendingJump=useRef<{copyId:string;pageId:string}|undefined>(undefined);
+ const prependAnchor=useRef<{key:string;top:number}|undefined>(undefined);
  const requested=useRef(new Set<string>()),read=useRef(new Set<string>());
  const nextOf=(c:ReadingCopy)=>{const at=sequence.findIndex(item=>item.id===c.id);return at<0?undefined:sequence[at+1];};
  const next=completeManifest(copy)?nextOf(copy):undefined;
@@ -38,7 +39,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
  function activate(c:ReadingCopy,n:number){if(c.id!==copyRef.current.id){persist();copyRef.current=c;onActiveCopy(c.id);}indexRef.current=n;setIndex(n);}
  function scroll(){
   const v=viewport.current;if(!v||suppressScroll.current)return;
-  const forward=v.scrollTop>lastScrollTop.current;lastScrollTop.current=v.scrollTop;
+  const previousTop=lastScrollTop.current;
+  const forward=v.scrollTop>previousTop;lastScrollTop.current=v.scrollTop;
   const line=v.scrollTop+Math.min(80,v.clientHeight*.1);
   if(layout==='continuous'){
    let active=stream[0]??copyRef.current,closest=0;
@@ -49,7 +51,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
   if(forward){
    for(const c of visible){const end=ends.current.get(c.id);if(!end)continue;
     const crossed=layout==='continuous'&&!!nextOf(c)?.pages.length?end.offsetTop<=line:end.offsetTop+end.offsetHeight<=v.scrollTop+v.clientHeight+1;
-    if(crossed&&(layout==='continuous'||indexRef.current===c.pages.length-1))markRead(c);
+    if(crossed&&end.offsetTop>previousTop&&(layout==='continuous'||indexRef.current===c.pages.length-1))markRead(c);
    }
    const end=ends.current.get(copyRef.current.id);
    if(layout==='single'&&indexRef.current===copyRef.current.pages.length-1&&end&&end.offsetTop+end.offsetHeight<=v.scrollTop+v.clientHeight+1&&next)jump(copyRef.current.pages.length);
@@ -65,6 +67,30 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
  }
  // React may commit a different chapter after the next animation frame; restore only once its cell exists.
  useLayoutEffect(()=>{const pending=pendingJump.current;if(!pending||pending.copyId!==copy.id)return;const pageId=pending.pageId||copy.pages[0]?.id;if(!pageId||!cells.current.has(pageKey(copy,pageId)))return;anchor.current={pageId,relativeOffset:0};pendingJump.current=undefined;restore();});
+ // Preserve the actual screen coordinate, including headings and gaps, when inserting above it.
+ useLayoutEffect(()=>{
+  const pending=prependAnchor.current,v=viewport.current;if(!pending||!v)return;
+  const cell=cells.current.get(pending.key);prependAnchor.current=undefined;
+  if(cell)v.scrollTop+=cell.getBoundingClientRect().top-pending.top;
+  lastScrollTop.current=v.scrollTop;
+  requestAnimationFrame(()=>{suppressScroll.current=false;});
+ },[loadedIds]);
+ // Only load one adjacent chapter when the mounted head is near the viewport.
+ useEffect(()=>{
+  if(layout!=='continuous')return;
+  const head=stream[0];if(!head||head.id!==copy.id)return;
+  const at=sequence.findIndex(c=>c.id===head.id),destination=sequence[at-1];
+  const start=head.pages[0]&&cells.current.get(pageKey(head,head.pages[0].id));
+  if(!destination||!start||loadedIds.includes(destination.id))return;
+  const observer=new IntersectionObserver(entries=>{
+   if(!entries.some(e=>e.isIntersecting)||prependAnchor.current||pendingJump.current)return;
+   const c=copyRef.current,p=c.pages[indexRef.current],cell=p&&cells.current.get(pageKey(c,p.id));if(!cell)return;
+   prependAnchor.current={key:pageKey(c,p.id),top:cell.getBoundingClientRect().top};suppressScroll.current=true;
+   setLoadedIds(ids=>ids.includes(destination.id)?ids:[destination.id,...ids]);
+   if(!requested.current.has(destination.id)){requested.current.add(destination.id);onLoadCopy(destination.id);}
+  },{root:viewport.current,rootMargin:'160px 0px 0px 0px'});
+  observer.observe(start);return()=>observer.disconnect();
+ },[layout,copy,sequence,loadedIds]);
  // Append once the end enters the loading margin. Appending never marks a chapter read.
  useEffect(()=>{
   if(layout!=='continuous')return;
