@@ -1,15 +1,17 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '../icons';
-export function Modal({ title, subtitle, children, onClose }: {
+export function Modal({ title, subtitle, children, onClose, className='', closeLabel='关闭弹窗' }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
+  className?: string;
+  closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className="modal" onCancel={event => { event.preventDefault(); onClose(); }}>
-    <button className="modal-close icon-button" aria-label="关闭弹窗" onClick={onClose}><Icon name="close" /></button>
+  return <dialog ref={ref} className={'modal '+className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
+    <button className="modal-close icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
     <span className="modal-spark">✦</span>
     <h2>{title}</h2>
     {subtitle && <p className="modal-subtitle">{subtitle}</p>}

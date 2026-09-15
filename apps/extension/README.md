@@ -24,6 +24,8 @@ Chrome / Edge 的扩展管理页开启开发者模式，选择“加载已解压
 
 2026-09-15 网页采集弹框与导入流程已更新，操作、过滤阈值和隔离浏览器复现见[网页图片发现与加入漫画](../../docs/WEB_IMAGE_IMPORT.md)。
 
+2026-09-15 本地导入改为预检清单与逐份队列：提前标出重复、补齐原图，支持选择／移除、收起进度、暂停／继续及失败重试。交互、运行边界与验收见[本地漫画导入流程](../../docs/LOCAL_IMPORT_FLOW.md)。
+
 `.npmrc` 使用 `legacy-peer-deps` 避免 npm 10 对 Vitest 可选浏览器 peer 递归解析时的 `edgesOut` 异常。实际使用 WXT 0.21.4、React 19、Vite 7 和 Vitest 5；测试与生产构建分别验证。开发工具的 `web-ext → addons-linter → image-size 2.0.2` 有尚无 npm 修复版的高危 ICNS/JXL/HEIF 解析公告，未进入最终扩展包；`npm audit --omit=dev` 单独检查运行依赖。不使用不兼容的旧 web-ext 版本掩盖审计结果。
 
 ## 本地数据和任务

@@ -3,6 +3,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {hashFile} from './hash';
 import {MAX_PAGES,MAX_PAGE,MAX_EXPANDED,type ComicPage} from './comic-shared';
 GlobalWorkerOptions.workerSrc=workerUrl;
+export const pdfFileHash=(originalHash:string)=>hashFile(new Blob([`pdf-png-v1:144dpi:16mp:8192:${version}:${originalHash}`]));
 export async function openPdf(file:File,originalHash:string) {
   const initial=new Uint8Array(await file.slice(0,65536).arrayBuffer());
   class LocalRange extends PDFDataRangeTransport {
@@ -21,7 +22,7 @@ export async function openPdf(file:File,originalHash:string) {
     const pdf=await task.promise;
     if(!pdf.numPages||pdf.numPages>MAX_PAGES)throw Error('PDF 单卷最多支持 1500 页。');
     // Rendering changes may change upload bytes. Keep old PDF identities apart.
-    const fileHash=await hashFile(new Blob([`pdf-png-v1:144dpi:16mp:8192:${version}:${originalHash}`]));
+    const fileHash=await pdfFileHash(originalHash);
     return {fileHash,total:pdf.numPages,close:()=>task.destroy(),warnings:['PDF 按页转换为 PNG；原 PDF 保留在本机，未上传。'],pages:(async function*():AsyncGenerator<ComicPage> {
       let expanded=0;
       for(let pageIndex=0;pageIndex<pdf.numPages;pageIndex++) {

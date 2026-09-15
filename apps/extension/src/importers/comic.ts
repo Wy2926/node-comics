@@ -9,12 +9,12 @@ export function importedFileHash(book:Pick<ComicImport,'format'|'fileHash'>,imag
   return book.format==='PDF'?new Sha256().update(new TextEncoder().encode(`pdf-page-v1:${book.fileHash}:${imageSha256}`)).digest():book.fileHash;
 }
 
-export async function openComic(file:File, progress?:(done:number,total:number)=>void):Promise<ComicImport> {
+export async function openComic(file:File, progress?:(done:number,total:number)=>void,knownHash?:string):Promise<ComicImport> {
   if(!file.size||file.size>MAX_FILE)throw Error('漫画文件为空或超过 512 MB，请拆分为章节后导入。');
   const extension=file.name.split('.').at(-1)!.toLowerCase();
   if(extension==='mobi') {
     const {importMobi}=await import('./mobi');
-    const result=await importMobi(file,undefined,progress);
+    const result=await importMobi(file,undefined,progress,knownHash);
     return {...result,format:'MOBI',total:result.pages.length,close(){}};
   }
   const prefix=new Uint8Array(await file.slice(0,8).arrayBuffer());
@@ -23,7 +23,7 @@ export async function openComic(file:File, progress?:(done:number,total:number)=
   if(!format)throw Error('不支持此漫画文件格式。');
   if(format==='ZIP'&&!signature.startsWith('PK') || format==='RAR'&&!signature.startsWith('Rar!\x1a\x07') || format==='PDF'&&!signature.startsWith('%PDF-'))throw Error('文件内容与扩展名不符，或文件已损坏。');
   if(format==='RAR'&&file.size>128*MiB)throw Error('CBR/RAR 最大支持 128 MB，请拆分或转换为 CBZ/ZIP。');
-  const fileHash=await hashFile(file,progress);
+  const fileHash=knownHash??await hashFile(file,progress);
   const result=format==='ZIP'?await (await import('./zip')).openZip(file):format==='RAR'?await (await import('./rar')).openRar(file):await (await import('./pdf')).openPdf(file,fileHash);
   return {title:file.name.replace(/\.[^.]+$/,''),fileHash,format,warnings:[],...result};
 }

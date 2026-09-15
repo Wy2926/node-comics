@@ -18,15 +18,15 @@ import {useAppearance} from './ui/Appearance';
 import {latestResults} from './reader/presentation';
 import type {PageManifest} from './sources/adapters';
 import {COMIC_ACCEPT} from './importers/comic';
-import {readLocalFiles} from './library/local-import';
+import {LocalImportQueue} from './library/import-queue';
 import {makeCopy,emptyLibrary} from './library/model';
-import type {ImportAssignment,SourceCatalog} from './library/types';
+import type {SourceCatalog} from './library/types';
 import {readingSequence} from './library/reading';
 import {readingDirectory} from './library/directory';
 import type {TranslationEdition} from './library/translations';
 import {AcquisitionCoordinator,queueCopies,pauseCopies,grantImagePermissions} from './library/acquisition';
 import {CatalogImport} from './ui/CatalogImport';
-import {ImportAssignmentFields} from './ui/ImportAssignment';
+import {LocalImport} from './ui/LocalImport';
 import {SourceImport} from './ui/SourceImport';
 import {acquireWebImages,insertWebCopy,type WebDestination} from './library/web-import';
 import {discoverCatalog} from './sources/client';
@@ -41,13 +41,14 @@ type ReadyQuote={quote:Quote;intent:Intent;key:string;copyId:string;ownerId:stri
 export function App(){
 const [copies,setCopies]=useState<ReadingCopy[]>([]);const copiesRef=useRef(copies);copiesRef.current=copies;
 const [library,setLibrary]=useState(emptyLibrary);const [catalog,setCatalog]=useState<SourceCatalog>();
-const [importError,setImportError]=useState('');const [localFiles,setLocalFiles]=useState<File[]>();const [assignment,setAssignment]=useState<ImportAssignment>({title:'',kind:'unclassified'});
+const [importError,setImportError]=useState('');const [localImport]=useState(()=>new LocalImportQueue());const [importExpanded,setImportExpanded]=useState(false);
+useEffect(()=>{localImport.activate();return()=>localImport.dispose();},[localImport]);
 async function reloadLibrary(){const [state,values]=await Promise.all([store.readLibrary(),store.readCopies()]);setLibrary(state);copiesRef.current=values;setCopies(values);setCacheBytes(await store.cacheSize());}
 useEffect(()=>{let timer:ReturnType<typeof setTimeout>;const changed=()=>{clearTimeout(timer);timer=setTimeout(()=>void reloadLibrary().catch(e=>setError(e.message)),60);};window.addEventListener('nc-library-change',changed);const channel=new BroadcastChannel('nc-library');channel.onmessage=changed;const broadcast=()=>channel.postMessage('change');window.addEventListener('nc-library-change',broadcast);return()=>{clearTimeout(timer);channel.close();window.removeEventListener('nc-library-change',changed);window.removeEventListener('nc-library-change',broadcast);};},[]);
 async function openCopy(copyId:string,edition?:TranslationEdition,pageId?:string){setNavigationKey(n=>n+1);autoState.current.enabled=false;autoQueue.current.reset();setReadingEdition(edition);setExistingOnly(!!edition);if(edition)setSettings(s=>({...s,translationMode:edition.mode,language:edition.language}));const destination=copiesRef.current.find(c=>c.id===copyId);if(destination&&pageId&&destination.pages.some(p=>p.id===pageId)){store.savePosition(copyId,destination.manifestRevision,{pageId,relativeOffset:0});}setCurrentId(copyId);const copy=copiesRef.current.find(c=>c.id===copyId);if(copy?.sourceEntryId&&(!copy.discoveryComplete||copy.pages.some(p=>!p.blobKey)))try{await queueCopies([copyId],false);}catch(e){setError('原图采集未启动：'+(e as Error).message);}}
 const sourceLock=useRef(false);
 async function openSource(url:string,propagateError=false){if(sourceLock.current)return;sourceLock.current=true;setBusy('正在发现来源目录…');setError('');try{setCatalog(await discoverCatalog(url));setCurrentId(undefined);setView('library');}catch(e){setError((e as Error).message);if(propagateError)throw e;}finally{sourceLock.current=false;setBusy('');}}
-function chooseFiles(files:File[]){if(!files.length)return;setImportError('');setLocalFiles(files);setAssignment({title:files[0].name.replace(/\.[^.]+$/,''),kind:'unclassified'});}
+function chooseFiles(files:File[]){if(input.current)input.current.value='';if(!files.length)return;setImportExpanded(true);void localImport.add(files).then(added=>{if(!added)notify('请在当前检查或导入结束后添加文件；当前清单已保留。');});}
 const [readingEdition,setReadingEdition]=useState<TranslationEdition>();const [existingOnly,setExistingOnly]=useState(false);const [navigationKey,setNavigationKey]=useState(0);
 const [currentId,setCurrentId]=useState<string>();const current=copies.find(c=>c.id===currentId);
 const [view,setView]=useState<View>((location.hash.slice(1) as View)||'library');
@@ -173,14 +174,8 @@ useEffect(()=>{
   return()=>{++recoveryRun.current;};
 },[api,currentId,currentLoaded,settings.translationMode,settings.language,recoveryModeEnabled]);
 
-useEffect(()=>{const manifestId=new URLSearchParams(location.search).get('manifest');if(!manifestId||typeof chrome==='undefined'||!chrome.storage?.local)return;chrome.storage.local.get([`manifest:${manifestId}`,'pendingLanguage']).then(data=>{if(data.pendingLanguage)setSettings(s=>({...s,language:String(data.pendingLanguage)}));const m=data[`manifest:${manifestId}`] as PageManifest;if(m){setSourceManifest(m);setAssignment({title:m.title,kind:'unclassified'});}});},[]);
+useEffect(()=>{const manifestId=new URLSearchParams(location.search).get('manifest');if(!manifestId||typeof chrome==='undefined'||!chrome.storage?.local)return;chrome.storage.local.get([`manifest:${manifestId}`,'pendingLanguage']).then(data=>{if(data.pendingLanguage)setSettings(s=>({...s,language:String(data.pendingLanguage)}));const m=data[`manifest:${manifestId}`] as PageManifest;if(m)setSourceManifest(m);});},[]);
 useEffect(()=>{const catalogId=new URLSearchParams(location.search).get('catalog');if(!catalogId||typeof chrome==='undefined'||!chrome.storage?.local)return;chrome.storage.local.get('nc-import:'+catalogId).then(data=>{const draft=data['nc-import:'+catalogId] as {catalog:SourceCatalog}|undefined;if(draft?.catalog)setCatalog(draft.catalog);});},[]);
-async function importFiles(){
- if(importLock.current||!localFiles)return;importLock.current=true;setBusy('正在导入…');
- let incoming:ReadingCopy[]=[];
- try{incoming=await readLocalFiles(localFiles,settings.cacheLimitMb,setBusy);const result=await store.commitCopies(incoming,incoming.map(()=>assignment));await reloadLibrary();setLocalFiles(undefined);setView('library');setCurrentId(undefined);notify('已导入 '+result.created+' 份新副本；已有来源保留原归属。');}
- catch(e){await store.collectUnusedBlobs(incoming.flatMap(store.copyBlobKeys)).catch(()=>{});setImportError('导入未完成：'+(e as Error).message);}finally{importLock.current=false;setBusy('');if(input.current)input.current.value='';}
-}
 async function openDemo(){const existing=copiesRef.current.find(c=>c.demo);if(existing){setCurrentId(existing.id);return;}setBusy('正在打开原创阅读示例…');try{const blob=await(await fetch('/samples/starlight-bookshop.png')).blob();const bitmap=await createImageBitmap(blob);const p=emptyPage('星光书店 · 原创示例.png',bitmap.width,bitmap.height);bitmap.close();Object.assign(p,await imageIdentity(blob));p.blobKey=`original:${p.id}`;await store.putBlob(p.blobKey,blob);const c={...makeCopy('星光书店', [p],'原创阅读示例','demo:starlight'),demo:true};const result=await store.commitCopies([c],[{title:'星光书店',kind:'work'}]);await reloadLibrary();setCurrentId(result.copyIds[0]);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
 async function acquireManifest(manifest:PageManifest,destination:WebDestination){
  if(importLock.current)return;
@@ -334,7 +329,7 @@ return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e
   <button className="button primary full" style={{marginTop:20}} disabled={!!busy||(authAllowed?!username.trim():authConfig?.mode!=='oidc'||!authConfig?.authorization_endpoint||!authConfig?.token_endpoint||!authConfig?.client_id)} onClick={()=>void authenticate()}>{authAllowed?'连接测试账户':'继续登录'} <Icon name="arrow" size={18}/></button>
 </Modal>}
 {ready&&<Modal title={ready.intent.regenerate?'重新翻译这一页':`开始${modeLabels[ready.intent.mode]}`} subtitle="确认点数后开始，翻译过程中可以继续阅读。" onClose={()=>{if(!busy)setReady(undefined);}}><div className="quote-summary"><span>本次选中<b>{ready.quote.page_count} <small>页</small></b></span><span>预计预占<b>{ready.quote.total_cost} <small>点</small></b></span><span>目标语言<b className="language-value">{caps?.languages.find(l=>l.id===ready.targetLanguage)?.label??ready.targetLanguage}</b></span></div><p className="modal-copy">逐页交付、逐页结算；原图与已有译图一直保留。{ready.intent.mode==='classic'?'常规翻译只处理文字区域，请检查识别和排版效果。':'图片重绘可能改变画面细节，请在完成后对照检查。'}</p>{ready.intent.regenerate&&<p className="notice warning">将生成新的翻译结果。完成后替换当前模式的显示效果，原图仍可随时查看。</p>}<div className="quote-expiry">报价有效至 {new Date(ready.quote.expires_at).toLocaleTimeString()} · 确认后可继续阅读</div><button className="button primary full" disabled={!!busy} onClick={()=>void submitQuote()}><Icon name="spark" size={18}/>确认并开始 · {ready.quote.total_cost} 点</button></Modal>}
-{localFiles&&<Modal title="导入本地漫画" subtitle={localFiles.length+' 个文件；多张图片组成一份副本，漫画文件分别保留。'} onClose={()=>{if(!busy)setLocalFiles(undefined);}}>{importError&&<p role="alert" className="error-message">{importError}</p>}<ImportAssignmentFields value={assignment} onChange={setAssignment} library={library}/><p className="nc-muted">未知章节、卷次和出版版本可以留空。重复文件按文件内容标识恢复，不根据同名作品合并。</p><button className="button primary full" disabled={!!busy||(!assignment.workId&&!assignment.title.trim())} onClick={()=>void importFiles()}>确认导入</button></Modal>}
+<LocalImport queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onAdd={()=>input.current?.click()} onOpen={id=>{void reloadLibrary().then(()=>openCopy(id)).catch(e=>setError(e.message));}} library={library} limitMb={settings.cacheLimitMb}/>
 {sourceManifest&&<SourceImport key={sourceManifest.id} manifest={sourceManifest} library={library} copies={copies} busy={!!busy} error={importError} onClose={()=>{setSourceManifest(undefined);setImportError('');}} onImport={acquireManifest}/>}
 {confirmAction&&<Modal title={confirmAction.title} subtitle={confirmAction.body} onClose={()=>setConfirmAction(undefined)}><button className="button primary full" onClick={async()=>{const action=confirmAction;setConfirmAction(undefined);try{await action.action();}catch(e){setError((e as Error).message);}}}>确认</button></Modal>}
 </div>;

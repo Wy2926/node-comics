@@ -3,6 +3,7 @@
  * PLAYWRIGHT_MODULE optionally points to a bundled Playwright installation.
  * TEST_CHROMIUM optionally points to Chromium supporting unpacked extensions.
  */
+import {completeLocalImport} from './local_import_helpers.mjs';
 import {createRequire} from 'node:module';
 import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
@@ -63,7 +64,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   page.on('request',request=>{if(request.url().startsWith(api))requests.push({url:request.url().slice(api.length),method:request.method()});});
   await page.goto(url);
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor({timeout:30000});
@@ -83,7 +84,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   await page.waitForFunction(id=>JSON.parse(localStorage.getItem('nc-copy-position:'+id+':1')??'{}').pageId!=null,copy.id);
   await page.getByLabel('返回我的漫画').click();
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();
@@ -108,8 +109,8 @@ try {
   for(const name of ['broken-image.cbz','locked.pdf','corrupt.pdf']) {
     const context=await browser.newContext();await configure(context,false);const page=await context.newPage();
     await page.goto(web);await page.locator('input[type=file]').setInputFiles(path.join(output,name));
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
-    await page.getByText(/导入未完成/).waitFor();
+  await completeLocalImport(page,{close:false});
+    await page.locator('.nc-import-item.failed [role=alert]').waitFor();
     await page.waitForFunction(()=>!document.body.innerText.includes('正在保存漫画页'));
     assert.deepEqual(await copyRecords(page),{copies:[],blobCount:0});
     await page.screenshot({path:path.join(output,'error-'+name+'.png')});

@@ -1,6 +1,7 @@
 // Chrome reader check with simulated R2 responses. No Cloudflare or paid models.
 // Start tests/manual_ui_server.py and Vite :5174; set UI_FIXTURE_DIRECTORY.
 import assert from 'node:assert/strict';
+import {completeLocalImport} from './local_import_helpers.mjs';
 import {createRequire} from 'node:module';
 import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -44,7 +45,7 @@ try {
   await page.reload();
   await page.locator('input[type=file]').setInputFiles([1,2,3].map(i => path.join(process.env.UI_FIXTURE_DIRECTORY,'pages',`page-0${i}.png`)));
   await page.getByLabel('内容归属',{exact:true}).selectOption('publication');
-  await page.getByRole('button', {name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-shelf-detail').first().click();
   await page.getByRole('tab',{name:'卷册',exact:true}).click();

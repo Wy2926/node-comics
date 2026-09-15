@@ -1,6 +1,7 @@
 // Isolated Chrome/API integration check. Start backend/tests/manual_ui_server.py and Vite on 5174.
 // Set UI_FIXTURE_DIRECTORY to the fixture's printed directory and PLAYWRIGHT_MODULE if needed.
 import assert from 'node:assert/strict';
+import {completeLocalImport} from './local_import_helpers.mjs';
 import {createRequire} from 'node:module';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -93,7 +94,7 @@ try{
   check('extracted preferences preserve local/server concurrency separation and saved queue settings');
   const samples=Array.from({length:12},(_,i)=>path.join(process.env.UI_FIXTURE_DIRECTORY,'pages',`page-${String(i+1).padStart(2,'0')}.png`));
   await page.locator('input[type=file]').setInputFiles(samples);
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();await enabled(false);
@@ -132,7 +133,7 @@ try{
   await page.getByRole('switch',{name:'自动翻译',exact:true}).click();await page.getByRole('button',{name:'确认',exact:true}).click();
   await waitFor(()=>batches.length===before+1,'re-enable');await page.getByLabel('返回我的漫画').click();
   await page.locator('input[type=file]').setInputFiles(path.join(process.env.UI_FIXTURE_DIRECTORY,'pages','page-24.png'));
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByLabel('跳转页码').waitFor();await enabled(true);await waitFor(()=>batches.length===before+2,'new book automatically translates');
@@ -144,7 +145,7 @@ try{
   await page.reload();
   quoteFault='network';
   await page.locator('input[type=file]').setInputFiles(path.join(process.env.UI_FIXTURE_DIRECTORY,'pages','page-23.png'));
-  await page.getByRole('button',{name:'确认导入',exact:true}).click();
+  await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-book').first().getByRole('button',{name:'继续阅读'}).click();
   await page.getByText(/自动翻译暂缓：/).waitFor();
