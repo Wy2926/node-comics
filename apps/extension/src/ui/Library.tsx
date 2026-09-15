@@ -1,4 +1,5 @@
 import {useRef,useState} from 'react';
+import type {Api} from '../api';
 import {Icon} from '../icons';
 import {Modal} from './components';
 import type {ReadingCopy,Settings} from '../types';
@@ -11,18 +12,20 @@ import {CopyCard,CopyDetails} from './library/CopyCards';
 import {CardBody} from './library/CardBody';
 import {RecentlyRead,formatReadingTime,recentCopy} from './library/RecentlyRead';
 import {TranslationCopies} from './library/TranslationCopies';
+import {ExportComics} from './library/ExportComics';
 import type {TranslationEdition} from '../library/translations';
 import {LibraryEditor} from './library/LibraryEditor';
 import {PublicationContents} from './library/PublicationContents';
 import {copyComplete,copyCover,savedPages,relationLabels,type EditorKind,type LibraryRun,type UndoAssignment} from './library/shared';
 
-type Props={userId?:string;apiOrigin?:string;onOpenTranslation:(id:string,edition:TranslationEdition)=>void;library:LibraryState;copies:ReadingCopy[];settings:Settings;setSettings:(s:Settings)=>void;onOpen:(id:string)=>void;onImport:()=>void;onDemo:()=>void;onSource:(url:string)=>void;notify:(message:string)=>void;onChanged:()=>void};
+type Props={api?:Api;userId?:string;apiOrigin?:string;onOpenTranslation:(id:string,edition:TranslationEdition)=>void;library:LibraryState;copies:ReadingCopy[];settings:Settings;setSettings:(s:Settings)=>void;onOpen:(id:string)=>void;onImport:()=>void;onDemo:()=>void;onSource:(url:string)=>void;notify:(message:string)=>void;onChanged:()=>void};
 type Feedback={tone:'busy'|'success'|'error';message:string};
 function useSortPreference(key:string,fallback:string){
  const [value,setValue]=useState(()=>{try{return localStorage.getItem(key)||fallback;}catch{return fallback;}});
  return [value,(next:string)=>{setValue(next);try{localStorage.setItem(key,next);}catch{/* Sorting remains usable without persistence. */}}] as const;
 }
-export function Library({userId,apiOrigin,onOpenTranslation,library:s,copies,onOpen,onImport,onDemo,onSource,notify,onChanged}:Props){
+export function Library({api,userId,apiOrigin,settings,onOpenTranslation,library:s,copies,onOpen,onImport,onDemo,onSource,notify,onChanged}:Props){
+ const [exporting,setExporting]=useState(false);
  const [workId,setWorkId]=useState<string>(),[tab,setTab]=useState('chapters'),[search,setSearch]=useState(''),[entrySearch,setEntrySearch]=useState(''),[role,setRole]=useState(''),[readFilter,setReadFilter]=useState('');
  const [shelfSort,setShelfSort]=useSortPreference('nc-library-shelf-sort','recent'),[entrySort,setEntrySort]=useSortPreference('nc-library-entry-sort','asc');
  const [selecting,setSelecting]=useState(false),[selected,setSelected]=useState(new Set<string>()),[anchor,setAnchor]=useState('');
@@ -55,9 +58,9 @@ export function Library({userId,apiOrigin,onOpenTranslation,library:s,copies,onO
  function openAcquisition(ids?:string[]){setDetail(undefined);setFeedback(undefined);setAcquisition({ids});}
  function openCopy(id:string){setFeedback(undefined);setDetail({kind:'copy',id});}
  function openContent(id:string){setFeedback(undefined);setDetail({kind:'content',id});}
- const captureButton=<button className={'button secondary nc-capture-launch '+(activeTasks.length?'is-active':'')} onClick={()=>openAcquisition()}><Icon name="download"/>采集中心{(activeTasks.length>0||attentionTasks.length>0)&&<span className="nc-count-pill">{activeTasks.length||attentionTasks.length}</span>}</button>;
+ const captureButton=<><button className={'button secondary nc-capture-launch '+(activeTasks.length?'is-active':'')} onClick={()=>openAcquisition()}><Icon name="download"/>采集中心{(activeTasks.length>0||attentionTasks.length>0)&&<span className="nc-count-pill">{activeTasks.length||attentionTasks.length}</span>}</button>{work&&<button className="button secondary nc-export-launch" onClick={()=>setExporting(true)}><Icon name="folder"/>导出漫画</button>}</>;
  const detailRow=detail?.kind==='content'?[...allChapters,...allBooks].find(row=>row.id===detail.id):undefined,detailCopy=detail?.kind==='copy'?owned.find(c=>c.id===detail.id):undefined;
- const hasModal=!!editor||!!detailRow||!!detailCopy||!!acquisition;
+ const hasModal=!!editor||!!detailRow||!!detailCopy||!!acquisition||exporting;
  return <div className="nc-library">
   {feedback&&!hasModal&&<div className={'nc-action-feedback '+feedback.tone} role={feedback.tone==='error'?'alert':'status'}>{feedback.tone==='busy'&&<span className="spinner"/>}<span>{feedback.message}</span>{feedback.tone!=='busy'&&<button aria-label="关闭操作反馈" onClick={()=>setFeedback(undefined)}><Icon name="close" size={16}/></button>}</div>}
   {undo&&<div className="nc-undo-notice"><span>副本归属已调整</span><button className="text-link" disabled={!!busy} onClick={()=>void run('undo','正在撤销归属调整',async()=>{await editLibrary(state=>{const current=state.coverage.filter(c=>c.copyId===undo.copyId);if(current.length!==undo.afterIds.length||current.some(c=>!undo.afterIds.includes(c.id)))throw Error('归属已再次修改，无法撤销之前的操作。');state.coverage=state.coverage.filter(c=>c.copyId!==undo.copyId).concat(undo.before);});setUndo(undefined);},'已恢复副本原来的归属')}>撤销</button><button className="text-link" aria-label="关闭撤销提示" onClick={()=>setUndo(undefined)}>×</button></div>}
@@ -106,5 +109,6 @@ export function Library({userId,apiOrigin,onOpenTranslation,library:s,copies,onO
   {work&&detailCopy&&<CopyDetails copy={detailCopy} work={work} library={s} busy={busy} feedback={feedback} run={run} onOpen={onOpen} onEdit={edit} onClose={()=>setDetail(undefined)} onAcquisition={openAcquisition}/>}
   {work&&editor&&<LibraryEditor key={editor.kind+':'+editor.id} {...editor} work={work} library={s} copies={owned} run={run} busy={!!busy} onClose={()=>{if(editor.id&&(editor.kind==='inclusion'||editor.kind==='publicationRelations'))setDetail({kind:'content',id:editor.id,showRelations:true});setEditor(undefined);}} onUndo={setUndo}/>}
   {acquisition&&<AcquisitionCenter library={s} copies={copies} initialWorkId={workId} onlyIds={acquisition.ids} busy={busy} feedback={feedback} run={run} onOpen={onOpen} onSource={onSource} onClose={()=>setAcquisition(undefined)}/>}
+  {work&&exporting&&<ExportComics work={work} library={s} copies={copies} settings={settings} api={api} userId={userId} apiOrigin={apiOrigin} onClose={()=>setExporting(false)}/>}
  </div>;
 }

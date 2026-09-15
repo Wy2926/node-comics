@@ -16,6 +16,9 @@ export function importAssets():Plugin {
   files.set('import-assets/licenses/pdfjs.txt',new URL('LICENSE',root));
   files.set('import-assets/licenses/zip-js.txt',new URL('./node_modules/@zip.js/zip.js/LICENSE',import.meta.url));
   files.set('import-assets/licenses/node-unrar-js.txt',new URL('./node_modules/node-unrar-js/LICENSE.md',import.meta.url));
+  for(const [name,file] of Object.entries({'pdf-lib':'pdf-lib/LICENSE.md','pdf-lib-standard-fonts':'@pdf-lib/standard-fonts/LICENSE.md','pdf-lib-upng':'@pdf-lib/upng/LICENSE','pdf-lib-pako':'pako/LICENSE','pdf-lib-zlib':'pako/lib/zlib/README','pdf-lib-tslib':'tslib/LICENSE.txt'})) {
+    files.set(`import-assets/licenses/${name}.txt`,new URL('./node_modules/'+file,import.meta.url));
+  }
   return {name:'local-comic-import-assets',
     configureServer(server){server.middlewares.use((req,res,next)=>{
       const file=files.get((req.url??'').split('?')[0].replace(/^\//,''));

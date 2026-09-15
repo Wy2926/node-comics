@@ -43,9 +43,10 @@ export class Api {
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
   rerun(id:string,key:string,quote_id:string,max_credits:number,input_asset_id?:string) {return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/rerun`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({quote_id,max_credits,...(input_asset_id?{input_asset_id}:{})})});}
-  async image(id: string): Promise<Blob> {
+  async image(id: string, signal?: AbortSignal): Promise<Blob> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const access = await this.request<{url: string; expires_at: string; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`);
+      signal?.throwIfAborted();
+      const access = await this.request<{url: string; expires_at: string; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`, {signal});
       const url = new URL(access.url, this.base);
       const signed = access.authorization_required === false;
       if (url.username || url.password || (signed ? url.protocol !== 'https:' : url.origin !== new URL(this.base).origin)) {
@@ -53,15 +54,17 @@ export class Api {
       }
       const blob = await this.pool.run(async () => {
         assertCurrent(this.isCurrent);
+        signal?.throwIfAborted();
         // Refresh after waiting in the request pool, without nesting pool slots.
         if (signed && attempt === 0 && Date.parse(access.expires_at) <= Date.now()) return null;
         let response: Response;
         try {
           response = await fetch(url, {
             headers: signed ? {} : {Authorization: `Bearer ${this.token}`},
-            credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'error',
+            credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'error', signal,
           });
         } catch {
+          signal?.throwIfAborted();
           // R2 omits CORS headers for expired signatures, so fetch may reject.
           if (signed && attempt === 0) return null;
           throw new ApiError('暂时无法下载图片，请检查网络或对象存储的跨域配置。', 'ASSET_DOWNLOAD_FAILED');
