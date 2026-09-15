@@ -6,11 +6,11 @@ export function resolvePageView(view:PageView|undefined,defaultMode:Mode):PageVi
   return view??{mode:defaultMode,preference:'auto'};
 }
 /** Redraw may take a while: keep the valid classic result until redraw is available. */
-export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,ownerId?:string,origin?:string){
+export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,ownerId?:string,origin?:string,fallbackClassic=true){
   if(translated){
     const target=pageTranslation(page,mode,language,ownerId,origin);
     if(target.blobKey)return {key:target.blobKey,job:target.result};
-    if(mode==='redraw'){
+    if(mode==='redraw'&&fallbackClassic){
       const classic=pageTranslation(page,'classic',language,ownerId,origin);
       if(classic.blobKey)return {key:classic.blobKey,job:classic.result};
     }
@@ -26,7 +26,7 @@ export function pageTranslation(page:Page,mode:Mode,language:string,ownerId?:str
   const result=jobs.find(j=>j.status==='succeeded');
   const pending=jobs.find(j=>pendingStatuses.has(j.status));
   const blobKey=result?page.outputBlobs[result.id]:undefined;
-  const expired=!!result&&!blobKey&&(!result.output_asset_id||result.result_expired===true);
+  const expired=!!result&&!blobKey&&(!result.output_asset_id||result.result_expired===true||result.result_available===false);
   const ready=!!blobKey;
   return {jobs,latest,result,pending,blobKey,expired,ready};
 }

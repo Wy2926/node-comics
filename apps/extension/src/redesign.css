@@ -1227,6 +1227,7 @@ a {
 .nc-reader-drawer.left {
   left: 0;
   border-left: 0;
+  width: 420px;
 }
 .nc-reader-drawer.right {
   right: 0;

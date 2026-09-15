@@ -1,6 +1,6 @@
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
 import {defaults,type Job,type Page} from '../src/types';
-import {readCopies,commitCopies,putBlob,saveSettings,saveSession} from '../src/library/store';
+import {readCopies,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 
@@ -18,6 +18,30 @@ if(!existing.length){
   const states:Job['status'][]=['queued','running','failed','succeeded','no_text','outcome_unknown'];
   const pages:Page[]=Array.from({length:120},(_,i):Page=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`fixture-page-${i}`,fileHash:'a'.repeat(64),pageIndex:i,blobKey:i===6?undefined:'reader-fixture-original',ownerId:'fixture-reader',apiOrigin:origin,jobs:i<states.length?[job(i,states[i])]:[],outputBlobs:i===3?{'fixture-job-3':'reader-fixture-output'}:{}}));
   for(const [i,title] of ['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'].entries())await commitCopies([{...makeCopy(title,i===0?pages:pages.slice(0,9),i===1?'原创漫画 · 很长的来源说明应保持在同一行并显示省略号':'原创验收样本'),id:`reader-fixture-${i}`}],[{title,kind:'chapter'}]);
+}
+// Optional directory/edition scenarios, limited to this isolated fixture database.
+if(new URLSearchParams(location.search).has('directory')&&!localStorage.getItem('reader-fixture-directory')){
+ await editLibrary((library,copies)=>{
+  const first=copies.find(c=>c.id==='reader-fixture-0')!;
+  const coverage=library.coverage.find(c=>c.copyId===first.id)!;
+  const workId=coverage.workId;
+  for(const c of library.coverage)c.workId=workId;
+  library.chapters.forEach((c,n)=>{c.workId=workId;c.title=['第 1 话 · 雨后的来信','第 2 话 · 夜间营业与一封跨越夏日的长长来信','第 3 话 · 未寄出的明信片'][n];c.order=n;c.number=String(n+1);c.role='main';});
+  library.works=library.works.filter(w=>w.id===workId);
+  for(let n=3;n<12;n++)library.chapters.push({...library.chapters[0],id:'reader-fixture-chapter-'+n,title:'第 '+(n+1)+' 话 · 旅行的猫',number:String(n+1),order:n,role:n===11?'extra':'main'});
+  first.pages[4].jobs.push({...job(4,'succeeded'),id:'fixture-en-4',target_language:'en'});
+  first.pages[5].jobs.push({...job(5,'succeeded'),id:'fixture-redraw-5',mode:'redraw',output_asset_id:null,result_expired:true});
+  first.pages[6].fetchError='模拟原图缺失，请重新导入。';
+  const second=copies.find(c=>c.id==='reader-fixture-1')!;second.title=library.chapters.find(c=>c.id===library.coverage.find(x=>x.copyId===second.id)!.target.id)!.title;second.source='另一个来源';second.versionId='reader-fixture-version';
+  library.versions.push({id:second.versionId,workId,title:'其它扫描版本',evidence:{status:'user',source:'隔离验收'}});
+  const third=copies.find(c=>c.id==='reader-fixture-2')!;third.pages=third.pages.map(p=>({...p,blobKey:undefined}));
+  library.tasks.push({id:'reader-fixture-failed',copyId:third.id,status:'failed',phase:'images',completed:0,total:9,error:'模拟来源暂不可用，已保留进度。',updatedAt:Date.now()});
+ });
+ localStorage.setItem('reader-fixture-directory','v1');
+}
+if(new URLSearchParams(location.search).has('empty')&&!localStorage.getItem('reader-fixture-empty')){
+ await editLibrary((library,copies)=>{const chapter=library.chapters.find(c=>c.id==='reader-fixture-chapter-3');if(!chapter)return;const copy={...makeCopy(chapter.title,[]),id:'reader-fixture-empty'};copies.push(copy);library.coverage.push({id:'reader-fixture-empty-coverage',copyId:copy.id,workId:chapter.workId,target:{kind:'chapter',id:chapter.id},evidence:{status:'user',source:'隔离验收'}});});
+ localStorage.setItem('reader-fixture-empty','v1');
 }
 const stored=await readCopies();
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
@@ -69,3 +93,4 @@ window.fetch=async(input,init={})=>{
   return json({error:{code:'FIXTURE_ROUTE_MISSING',message:`Unimplemented fixture route: ${url.pathname}`}},404);
 };
 await import('../src/main');
+if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 报价 ${state.requests.filter(p=>p==='/v1/quotes').length} 次`;},500);}

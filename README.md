@@ -41,6 +41,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
 | [通用漫画作品管理设计](docs/COMIC_LIBRARY_DESIGN.md) | 已确认；作品、章节、出版套系、卷册、收录关系与来源副本，首轮已实现 |
 | [MangaCopy 来源适配与导入设计](docs/MANGACOPY_LIBRARY_DESIGN.md) | 已实现详情页范围导入与 data-src 采集，映射通用作品模型 |
+| [阅读目录与插件译本](docs/READER_DIRECTORY_AND_EDITIONS.md) | 整部作品目录、已有翻译的派生阅读视图与中段采集滚动 |
 | [作品管理实现与验收](docs/COMIC_LIBRARY_IMPLEMENTATION.md) | 新数据库、旧逻辑清理、操作说明、真实来源与浏览器验收边界 |
 | [客户端 UI 重设计草案](docs/UI_REDESIGN_PROPOSAL.md) | 大卡片书架、简洁阅读器、翻译记录、用量统计与多主题（待评审） |
 | [架构设计](docs/ARCHITECTURE.md) | 插件、任务、权限与供应商 |

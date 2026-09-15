@@ -9,7 +9,7 @@ afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 const snapshot=(count:number,total=6)=>({items:Array.from({length:count},(_,n)=>({id:'slot-'+n,url:'https://images.example/'+n,width:800,height:1200,order:n})),knownTotal:total,discoveryComplete:count===total,note:`已发现 ${count} / ${total} 页`});
 function documentFixture(urls:string[],total:number){
  const images=urls.map(url=>({getAttribute:(name:string)=>name==='data-src'?url:'placeholder.png',naturalWidth:165,naturalHeight:211,getBoundingClientRect:()=>({top:30})}));
- return {title:'MangaCopy sample',querySelectorAll:()=>images,querySelector:(selector:string)=>selector==='.comicCount'?{textContent:String(total)}:selector==='.comicContent-list img'?images[0]:{}} as unknown as Document;
+ return {scrollingElement:{scrollHeight:6000},title:'MangaCopy sample',querySelectorAll:()=>images,querySelector:(selector:string)=>selector==='.comicCount'?{textContent:String(total)}:selector==='.comicContent-list img'?images[0]:{}} as unknown as Document;
 }
 
 describe('MangaCopy source discovery',()=>{
@@ -24,7 +24,7 @@ describe('MangaCopy source discovery',()=>{
   expect(result.discoveryComplete).toBe(false);expect(result.items.map(p=>p.id)).toEqual(['slot-0']);
   expect(result.items[0]).toMatchObject({width:800,height:1200});
  });
- it('waits for delayed scroll growth and moves even when already at the anchor',async()=>{
+ it('waits for delayed scroll growth and moves to the middle and takes a substantial step when already there',async()=>{
   vi.useFakeTimers();
   const doc=documentFixture(['https://images.example/1'],2);
   let changed:()=>void=()=>{};
@@ -33,13 +33,14 @@ describe('MangaCopy source discovery',()=>{
   const view={scrollY:0,innerHeight:800,location:{href:'https://www.mangacopy.com/comic/a/chapter/1'},scrollTo:vi.fn(({top}:{top:number})=>{view.scrollY=top;setTimeout(()=>{images.push(documentFixture(['https://images.example/2'],1).querySelectorAll('img')[0]);changed();},250);})};
   const promise=advanceMangaCopyDiscovery(doc,view as unknown as Window);let returned=false;void promise.then(()=>{returned=true;});
   await vi.advanceTimersByTimeAsync(200);expect(returned).toBe(false);
-  await vi.advanceTimersByTimeAsync(100);expect((await promise).discoveryComplete).toBe(true);expect(view.scrollTo).toHaveBeenCalledWith({top:110,behavior:'instant'});
+  await vi.advanceTimersByTimeAsync(100);expect((await promise).discoveryComplete).toBe(true);expect(view.scrollTo).toHaveBeenCalledWith({top:2600,behavior:'instant'});
   const delayedDoc=documentFixture(['https://images.example/1'],2);
   // The first image's viewport top changes with scrolling, keeping its document anchor stable.
   (delayedDoc.querySelector('.comicContent-list img') as unknown as {getBoundingClientRect:()=>{top:number}}).getBoundingClientRect=()=>({top:30-view.scrollY});
   const next=advanceMangaCopyDiscovery(delayedDoc,view as unknown as Window);
-  expect(view.scrollTo).toHaveBeenLastCalledWith({top:114,behavior:'instant'});
-  await vi.advanceTimersByTimeAsync(1000);expect((await next).discoveryComplete).toBe(false);
+  expect(view.scrollTo).toHaveBeenLastCalledWith({top:3000,behavior:'instant'});
+  await vi.advanceTimersByTimeAsync(1000);expect(view.scrollTo).toHaveBeenLastCalledWith({top:110,behavior:'instant'});
+  await vi.advanceTimersByTimeAsync(1000);expect((await next).discoveryComplete).toBe(false);expect(view.scrollTo).toHaveBeenLastCalledWith({top:2600,behavior:'instant'});
  });
  it('keeps polling slow incremental manifests until the trusted total matches',async()=>{
   vi.useFakeTimers();let count=0;

@@ -9,19 +9,19 @@ export const discoveryDelay=(ms:number,signal?:AbortSignal)=>new Promise<void>((
  signal?.addEventListener('abort',abort,{once:true});
 });
 
-/** MangaCopy appends one slot per scroll event while reading near the start.
- * Scrolling beyond the first third, or repeatedly to the same position, stalls it.
- * Keep both positions inside the first image and wait for the appended data-src.
+/** Move the scrollbar to the middle as lazy slots enlarge the document.
+ * Older source readers only append near the first image: use that position once
+ * if the midpoint makes no progress, then resume midpoint discovery next poll.
  */
 export async function advanceMangaCopyDiscovery(doc:Document,view:Window):Promise<Snapshot>{
  const before=discoverDocument(doc,view.location.href);
  if(before.adapter!=='mangacopy'||before.discoveryComplete)return before;
  const first=doc.querySelector<HTMLImageElement>('.comicContent-list img');
  if(!first){await discoveryDelay(600);return discoverDocument(doc,view.location.href);}
- const top=first.getBoundingClientRect().top+view.scrollY;
- const anchor=Math.max(1,Math.floor(top+Math.min(80,view.innerHeight/5)));
- const target=Math.abs(view.scrollY-anchor)<2?anchor+4:anchor;
- await new Promise<void>(resolve=>{
+ const range=Math.max(0,(doc.scrollingElement??doc.documentElement).scrollHeight-view.innerHeight);
+ const midpoint=Math.round(range/2);
+ const target=Math.abs(view.scrollY-midpoint)<2?Math.min(range,midpoint+Math.max(120,Math.round(view.innerHeight/2))):midpoint;
+ const scrollAndWait=(position:number)=>new Promise<void>(resolve=>{
   const done=()=>{observer.disconnect();clearTimeout(timer);resolve();};
   const observer=new MutationObserver(()=>{
    const next=discoverDocument(doc,view.location.href);
@@ -29,8 +29,16 @@ export async function advanceMangaCopyDiscovery(doc:Document,view:Window):Promis
   });
   const timer=setTimeout(done,1000);
   observer.observe(doc.querySelector('.comicContent-list')!,{childList:true,subtree:true,attributes:true,attributeFilter:['data-src']});
-  view.scrollTo({top:target,behavior:'instant'});
+  view.scrollTo({top:position,behavior:'instant'});
  });
+ await scrollAndWait(target);
+ const next=discoverDocument(doc,view.location.href);
+ if(next.items.length===before.items.length&&!next.discoveryComplete){
+  const top=first.getBoundingClientRect().top+view.scrollY;
+  await scrollAndWait(Math.max(1,Math.round(top+Math.min(80,view.innerHeight/5))));
+  // Leave the visible scrollbar in the middle even on the older lazy reader.
+  view.scrollTo({top:Math.round(Math.max(0,(doc.scrollingElement??doc.documentElement).scrollHeight-view.innerHeight)/2),behavior:'instant'});
+ }
  return discoverDocument(doc,view.location.href);
 }
 
