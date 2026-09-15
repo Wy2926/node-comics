@@ -24,6 +24,29 @@
 .nc-translation-card>.nc-thumbnail{width:45px;height:64px}}
 /* Library: covers and content cards are the primary navigation surface. */
 .nc-library{min-width:0}
+.nc-recent-reading{margin-bottom:32px}
+.nc-recent-reading .nc-section-heading,.nc-shelf-heading{margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.nc-recent-reading h2,.nc-shelf-heading h2{font-size:1.15rem}
+.nc-recent-reading .nc-section-heading>span,.nc-shelf-heading>span{font-size:.8rem}
+.nc-recent-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.nc-recent-card{display:grid;grid-template-columns:clamp(110px,26%,150px) minmax(0,1fr);min-height:184px;min-width:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.nc-recent-card:only-child{grid-column:1 / -1}
+.nc-recent-cover{position:relative;min-width:0;min-height:184px;padding:0;background:var(--surface-soft)}
+.nc-recent-cover>.nc-thumbnail{position:absolute;inset:0;width:100%;height:100%}
+.nc-recent-cover>.nc-thumbnail img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center}
+.nc-recent-body{display:flex;flex-direction:column;gap:5px;min-width:0;padding:16px 18px}
+.nc-recent-body h3{margin:0;font-size:1.1875rem;line-height:1.45;letter-spacing:.01em}
+.nc-recent-body h3>button{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;text-align:left;padding:0;font:inherit;font-weight:700}
+.nc-recent-body p{margin:0;color:var(--muted);font-size:.8125rem;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-recent-body .nc-recent-position{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.nc-recent-position strong{font-size:1rem;font-weight:750}
+.nc-recent-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+.nc-recent-footer time{color:var(--muted);font-size:.75rem;line-height:1.6;white-space:nowrap;font-variant-numeric:tabular-nums}
+.nc-recent-footer>.button{flex-shrink:0}
+@media(max-width:800px){.nc-recent-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+.nc-recent-card{grid-template-columns:110px minmax(0,1fr)}
+.nc-recent-body{padding:14px}
+.nc-recent-body h3{font-size:1.0625rem}}
 .nc-library button:focus-visible,.nc-library summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .nc-library button:disabled{cursor:not-allowed}
 .nc-library .button.small{padding:8px 12px;min-height:36px;font-size:.82rem}
@@ -225,11 +248,29 @@ html:has(.nc-library) {scrollbar-gutter:stable}
 .nc-version-filter strong,.nc-version-picker .nc-choice-card strong {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:inherit;font-weight:650;line-height:1.4}
 .nc-version-filter small,.nc-version-picker .nc-choice-card small {display:block;min-width:0;margin:0;font-size:.73rem;font-weight:400;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nc-version-picker .nc-choice-card>b {flex:0 0 4em;text-align:right}
+/* Shelf typography: title first, reading progress second, storage and dates last. */
+.nc-shelf-grid .nc-library-card-body {--card-title-size:1.125rem;grid-template-rows:calc(var(--card-title-size) * 2.9) auto 36px;gap:.625rem;padding:1rem}
+.nc-shelf-grid .nc-card-title {grid-row:1;color:var(--ink);line-height:1.45;letter-spacing:.01em}
+.nc-shelf-grid .nc-card-title>button {line-height:inherit;max-height:2.9em;font-weight:700}
+.nc-shelf-cover-badge {position:absolute;top:12px;left:12px;max-width:calc(100% - 24px);padding:4px 8px;border-radius:6px;background:#172337db;color:#fff;font-size:.75rem;font-weight:650;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px);pointer-events:none}
+.nc-shelf-grid .nc-card-meta {grid-template-rows:1.375rem 1.25rem auto;row-gap:.125rem}
+.nc-shelf-grid .nc-card-meta p {font-size:.75rem;line-height:1.25rem}
+.nc-shelf-grid .nc-card-meta p:first-child {font-size:.8125rem;line-height:1.375rem;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.nc-shelf-read-count {color:var(--accent);font-size:1rem;font-weight:750}
+.nc-shelf-read-total {color:var(--muted);font-weight:400}
+.nc-shelf-grid .nc-card-meta p:last-child {display:flex;flex-direction:column;gap:.125rem;min-height:3rem;margin-top:.25rem;padding-top:.375rem;border-top:1px solid var(--line);white-space:normal}
+.nc-shelf-reading-label {font-size:.6875rem;line-height:1.125rem;font-weight:500;color:var(--muted);letter-spacing:.04em}
+.nc-shelf-grid .nc-card-meta time {font-size:.78125rem;line-height:1.25rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.nc-shelf-unread {font-size:.78125rem;line-height:1.25rem;color:var(--muted)}
+.nc-library .nc-shelf-grid .nc-library-card-actions>.button {font-size:.8125rem;font-weight:650}
 @media(max-width:640px) {
   .nc-library-card-body {--card-title-size:.9rem;padding:12px}
 .nc-library-card-actions {gap:6px}
 .nc-library .nc-library-card-actions>.button {font-size:.72rem;padding:0 2px}
 .nc-card-meta p {font-size:.7rem}
+.nc-shelf-grid .nc-library-card-body {--card-title-size:1rem;padding:.75rem;gap:.5rem}
+.nc-shelf-grid .nc-card-meta time,.nc-shelf-unread {font-size:.75rem}
+.nc-library .nc-shelf-grid .nc-library-card-actions>.button {font-size:.75rem}
 }
 @media(max-width:359px) {
   .nc-library .nc-books.grid,.nc-content-grid,.nc-copy-grid,.nc-related-grid,.nc-version-filter-grid {grid-template-columns:minmax(0,1fr)}

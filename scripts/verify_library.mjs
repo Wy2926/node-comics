@@ -24,7 +24,7 @@ try{
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();
   await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
   await page.locator('input[type=file]').setInputFiles(path.join(root,'artifacts/import-validation',name));await page.getByRole('button',{name:'确认导入',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
-  assert.equal(await page.locator('.nc-book').count(),1);await page.getByRole('button',{name:'继续阅读',exact:true}).click();assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
+  assert.equal(await page.locator('.nc-book').count(),1);await page.locator('.nc-book').getByRole('button',{name:'继续阅读',exact:true}).click();assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
   await page.screenshot({path:path.join(output,name+'.png')});
   const data=await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('node-comics-library');r.onsuccess=()=>{const tx=r.result.transaction(['library','copies'],'readonly'),s=tx.objectStore('library').get('library'),c=tx.objectStore('copies').getAll();tx.oncomplete=()=>resolve({works:s.result.works.length,chapters:s.result.chapters.length,books:s.result.publications.length,pages:c.result[0].pages.length,ids:c.result[0].pages.map(p=>p.id)});};}));
   assert.equal(data.works,1);assert.equal(data.books,1);assert.equal(data.chapters,0);assert.equal(data.pages,3);assert.equal(new Set(data.ids).size,3);assert.deepEqual(errors,[]);checks.push({name,...data,positionRestored:true});await context.close();

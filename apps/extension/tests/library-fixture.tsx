@@ -49,6 +49,20 @@ if(!previous.works.length){
  store.saveSettings({...store.settings(),apiBase:'http://127.0.0.1:18099',appearance:'light'});
 }
 localStorage.setItem('nc-library-fixture','v1');
+if(new URLSearchParams(location.search).has('recent'))await store.editLibrary((state,copies)=>{
+ if(copies.some(c=>c.sourceKey==='fixture-recent-2'))return;
+ let workId='';
+ for(const number of [10,2,1]){
+  const pages=Array.from({length:3},(_,n)=>({...emptyPage('最近阅读验收第 '+(n+1)+' 页',800,1200),blobKey:'fixture-cover'}));
+  const copy=makeCopy('第 '+number+' 话',pages,'原创验收样本','fixture-recent-'+number);
+  workId=attachCopy(state,copy,{title:'最近阅读验收',workId:workId||undefined,kind:'chapter',number:String(number)});copies.push(copy);
+  if(number===2){copy.lastReadAt=Date.now()-60000;copy.pageId=pages[1].id;}
+  if(number===1){copy.lastReadAt=Date.now()-86400000;state.works.find(w=>w.id===workId)!.preferredCopyId=copy.id;}
+ }
+ const missing=makeCopy('第 2 话',[emptyPage('原图已清理',800,1200)],'原创验收样本','fixture-recent-missing');
+ missing.lastReadAt=Date.now()-3600000;attachCopy(state,missing,{title:'最近阅读验收 · 原图待补齐',kind:'chapter',number:'2'});copies.push(missing);
+ state.works.filter(w=>state.coverage.some(c=>c.workId===w.id&&copies.some(copy=>copy.sourceKey.startsWith('fixture-recent-')&&copy.id===c.copyId))).forEach(w=>{w.evidence={status:'user',source:'漫画管理隔离验收'};});
+});
 if(new URLSearchParams(location.search).has('cards'))await seedCardLayout();
 const fixtureLibrary=await store.readLibrary(),fixtureCopies=await store.readCopies();
 
