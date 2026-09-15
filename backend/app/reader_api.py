@@ -1,14 +1,14 @@
 """Reader-facing history, accounting summaries and private result feedback."""
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, time, timedelta, timezone
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import ForeignKey, Index, JSON, String, UniqueConstraint, exists, func, literal, select, union_all
+from sqlalchemy import ForeignKey, Index, JSON, String, UniqueConstraint, and_, exists, func, literal, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Mapped, Session, mapped_column
+from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
 from .batch_items import BatchItem
@@ -257,22 +257,48 @@ def translation_history(offset: int = Query(0, ge=0), limit: int = Query(20, ge=
         Job.owner_id == user.id, Job.batch_id.is_(None), ~exists(select(BatchItem.job_id).where(BatchItem.job_id == Job.id)))
     groups = union_all(batches, singles).subquery()
     total = db.scalar(select(func.count()).select_from(groups))
-    selected = db.execute(select(groups).order_by(groups.c.created_at.desc(), groups.c.id.desc()).offset(offset).limit(limit))
+    selected = db.execute(select(groups).order_by(groups.c.created_at.desc(), groups.c.id.desc()).offset(offset).limit(limit)).all()
+    batch_ids = [row.id for row in selected if row.kind == "batch"]
+    single_ids = [row.id for row in selected if row.kind == "job"]
+    entries_by_group = defaultdict(list)
+    if selected:
+        references = union_all(
+            select(BatchItem.batch_id.label("group_id"), BatchItem.ordinal,
+                   BatchItem.job_id, BatchItem.input_asset_id.label("requested_asset_id"))
+            .where(BatchItem.batch_id.in_(batch_ids)),
+            select(Job.id, Job.ordinal, Job.id, Job.input_asset_id).where(
+                Job.owner_id == user.id, Job.id.in_(single_ids)),
+        ).subquery()
+        source, output, parent = aliased(Asset), aliased(Asset), aliased(Asset)
+        timestamp = now()
+
+        def retained(asset):
+            return and_(asset.id.is_not(None), asset.owner_id == user.id,
+                        asset.deleted_at.is_(None), asset.purged_at.is_(None), asset.expires_at > timestamp)
+
+        # A history summary is a database snapshot, not an object-store health
+        # check. Image access/download still verifies actual bytes and ownership.
+        expired = and_(Job.output_asset_id.is_not(None), ~and_(
+            retained(source), retained(output), or_(output.parent_id.is_(None), retained(parent))))
+        rows = db.execute(select(
+            references.c.group_id, references.c.requested_asset_id, Job.id, Job.batch_id,
+            Job.mode, Job.target_language, Job.status, Job.quality_flags, Job.cost,
+            Job.settlement, Job.cache_hit, expired.label("result_expired"),
+        ).join(Job, Job.id == references.c.job_id)
+            .outerjoin(source, source.id == Job.input_asset_id)
+            .outerjoin(output, output.id == Job.output_asset_id)
+            .outerjoin(parent, parent.id == output.parent_id)
+            .where(Job.owner_id == user.id)
+            .order_by(references.c.group_id, references.c.ordinal, Job.id))
+        for row in rows:
+            entries_by_group[row.group_id].append(row)
     items = []
     for group_id, created_at, kind in selected:
-        if kind == "batch":
-            entries = db.execute(select(Job, BatchItem.input_asset_id).join(BatchItem, BatchItem.job_id == Job.id)
-                                 .where(BatchItem.batch_id == group_id, Job.owner_id == user.id).order_by(BatchItem.ordinal)).all()
-            if not entries:  # Pre-0006 batches have no BatchItem rows.
-                entries = [(job, job.input_asset_id) for job in db.scalars(select(Job).where(Job.batch_id == group_id, Job.owner_id == user.id).order_by(Job.ordinal))]
-        else:
-            job = owned_job(db, group_id, user.id)
-            entries = [(job, job.input_asset_id)]
-        jobs = list({job.id: job for job, _ in entries}.values())
+        entries = entries_by_group[group_id]
+        jobs = list({job.id: job for job in entries}.values())
         states = Counter()
-        for job, _ in entries:
-            response = job_json(db, job)
-            state = "expired" if response["result_expired"] else "partial" if job.status == "succeeded" and "unrecognized_regions" in (job.quality_flags or []) else job.status
+        for job in entries:
+            state = "expired" if job.result_expired else "partial" if job.status == "succeeded" and "unrecognized_regions" in (job.quality_flags or []) else job.status
             states[state] += 1
         chargeable = [job for job in jobs if kind == "job" or job.batch_id == group_id]
         first = jobs[0] if jobs else None
@@ -281,6 +307,6 @@ def translation_history(offset: int = Query(0, ge=0), limit: int = Query(20, ge=
                       "page_count": len(entries), "counts": dict(states),
                       "settled": sum(job.cost for job in chargeable if job.settlement == "settled"),
                       "reserved": sum(job.cost for job in chargeable if job.settlement == "reserved"),
-                      "reused": sum(1 for job, _ in entries if job.cache_hit or kind == "batch" and job.batch_id != group_id),
-                      "job_ids": [job.id for job, _ in entries], "asset_ids": [asset_id for _, asset_id in entries]})
+                      "reused": sum(1 for job in entries if job.cache_hit or kind == "batch" and job.batch_id != group_id),
+                      "job_ids": [job.id for job in entries], "asset_ids": [job.requested_asset_id for job in entries]})
     return {"items": items, "total": total, "next_offset": offset + limit if offset + limit < total else None}

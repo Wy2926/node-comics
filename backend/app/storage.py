@@ -16,7 +16,7 @@ class StorageError(Exception):
 
 
 class ObjectStore(Protocol):
-    def put(self, key: str, data: bytes, mime: str) -> None: ...
+    def put(self, key: str, data: bytes, mime: str, *, kind: str | None = None) -> None: ...
     def read(self, key: str) -> bytes: ...
     def exists(self, key: str) -> bool: ...
     def delete(self, key: str) -> None: ...
@@ -37,7 +37,7 @@ class LocalStore:
             raise ValueError("Invalid storage key")
         return path
 
-    def put(self, key, data, mime):
+    def put(self, key, data, mime, *, kind=None):
         path = self.path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(f".{uuid4()}.tmp")
@@ -78,7 +78,9 @@ class S3Store:
         except (BotoCoreError, ClientError, OSError):
             raise StorageError() from None
 
-    def put(self, key, data, mime):
+    def put(self, key, data, mime, *, kind=None):
+        if kind not in {"classic", "redraw"}:
+            raise ValueError("Remote storage accepts final translation results only")
         # Bounded images use one atomic PUT; SDK retries overwrite the same key.
         self._call("put_object", **self._params(key), Body=data, ContentType=mime, CacheControl="private, no-store")
 

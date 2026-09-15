@@ -152,7 +152,7 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         if not 0.8 <= ratio <= 1.25:
             problem("INVALID_PROVIDER_OUTPUT", "核实结果宽高比偏离原图", 422)
         if output.storage_backend == "local" and settings().result_storage_backend == "r2":
-            get_store("r2").put(output.storage_key, read_asset(output), output.mime)
+            get_store("r2").put(output.storage_key, read_asset(output), output.mime, kind=job.mode)
             previous_storage = ("local", output.storage_key)
             output.storage_backend = "r2"
         job.output_asset_id = output.id

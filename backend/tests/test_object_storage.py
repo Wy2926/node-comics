@@ -129,16 +129,60 @@ def test_r2_delivery_direct_access_and_account_isolation(client, remote, png, mo
     assert client.get('/v1/me/usage', headers=auth).json()['balance'] == 92
 
 
-def test_missing_expired_and_transient_objects_are_distinct(client, remote, png, monkeypatch):
+@pytest.mark.parametrize('kind', ['original', 'classic_stage', 'mask', None])
+def test_remote_upload_rejects_non_results_at_both_boundaries(client, remote, png, kind):
+    from app.assets import create_asset
+    from app.db import session_factory
+    sdk, store = remote
+    with pytest.raises(ValueError, match='final translation'):
+        store.put('fixture/non-result', png, 'image/png', kind=kind)
+    with session_factory()() as db, pytest.raises(ValueError, match='local storage'):
+        create_asset(db, 'fixture', png, kind=kind, storage_backend='r2')
+    assert sdk.calls == []
+
+
+def test_all_reader_status_queries_avoid_remote_requests(client, remote, png, monkeypatch):
+    from app.assets import create_asset
+    from app.batch_items import BatchItem
+    from app.db import session_factory
+    from app.models import Asset, Batch, now
+    sdk, _ = remote
+    auth, original, job, _ = delivered(client, png, monkeypatch)
+    with session_factory()() as db:
+        source = db.get(Asset, original)
+        stage = create_asset(db, source.owner_id, png, kind='classic_stage', parent_id=source.id)
+        assert stage.storage_backend == 'local'
+        batch = Batch(owner_id=source.owner_id, quote_id='history', idempotency_key='history', request_hash='a'*64, total_cost=0)
+        db.add(batch)
+        db.flush()
+        db.add(BatchItem(batch_id=batch.id, ordinal=0, job_id=job['id'], input_asset_id=original))
+        db.commit()
+        batch_id = batch.id
+    sdk.calls.clear()
+    sdk.fail_head = True
+    for path in ['/v1/translation-history', f'/v1/jobs/{job["id"]}', '/v1/jobs',
+                 f'/v1/jobs/{job["id"]}/latest-result', f'/v1/translation-batches/{batch_id}']:
+        response = client.get(path, headers=auth)
+        assert response.status_code == 200, response.text
+    assert sdk.calls == []
+    with session_factory()() as db:
+        db.get(Asset, job['output_asset_id']).deleted_at = now()
+        db.commit()
+    assert client.get('/v1/translation-history', headers=auth).json()['items'][0]['counts'] == {'expired':1}
+    assert client.get(f'/v1/jobs/{job["id"]}', headers=auth).json()['result_available'] is False
+    assert sdk.calls == []
+
+
+def test_signing_is_local_and_database_expiry_still_revokes_access(client, remote, png, monkeypatch):
     from app.db import session_factory
     from app.models import Asset, now
     sdk, _ = remote
     auth, _, job, _ = delivered(client, png, monkeypatch)
     output = job['output_asset_id']
+    sdk.calls.clear()
     sdk.fail_head = True
     result = client.get(f'/v1/images/{output}/access', headers=auth)
-    assert result.status_code == 503 and result.json()['error']['code'] == 'STORAGE_UNAVAILABLE'
-    assert 'diagnostic' not in result.text
+    assert result.status_code == 200 and sdk.calls == []
     sdk.fail_head = False
     with session_factory()() as db:
         asset = db.get(Asset, output)
@@ -148,12 +192,14 @@ def test_missing_expired_and_transient_objects_are_distinct(client, remote, png,
     assert 1 <= int(parse_qs(urlsplit(access['url']).query)['X-Amz-Expires'][0]) <= 30
     saved = sdk.objects.copy()
     sdk.objects.clear()
-    assert client.get(f'/v1/images/{output}/access', headers=auth).status_code == 410
+    # Out-of-band missing objects surface at signed GET, not by probing during signing.
+    assert client.get(f'/v1/images/{output}/access', headers=auth).status_code == 200
     sdk.objects.update(saved)
     with session_factory()() as db:
         db.get(Asset, output).expires_at = now() - timedelta(seconds=1)
         db.commit()
     assert client.get(f'/v1/images/{output}/access', headers=auth).status_code == 410
+    assert sdk.calls == []
 
 
 def test_delete_tombstone_survives_r2_outage_and_cleanup_retries(client, remote, png, monkeypatch):
@@ -220,9 +266,9 @@ def test_remote_sweep_advances_and_preserves_pending_recovery(client, remote, pn
     attempt = claim_job(job_id)
     with session_factory()() as db:
         job = db.get(Job, job_id)
-        store.put(f'{job.owner_id}/{attempt}', png, 'image/png')
+        store.put(f'{job.owner_id}/{attempt}', png, 'image/png', kind='redraw')
         for index in range(205):
-            store.put(f'orphans/{index:04}', png, 'image/png')
+            store.put(f'orphans/{index:04}', png, 'image/png', kind='redraw')
         cleanup(db)
         db.commit()
         assert db.get(StorageScan, 'r2').cursor
@@ -249,7 +295,7 @@ def test_sdk_contract_and_bounded_reads(client, png):
         stub.add_client_error('head_object', 'NoSuchKey', http_status_code=404, expected_params=params)
         stub.add_client_error('head_object', 'AccessDenied', http_status_code=403, expected_params=params)
         stub.add_response('delete_object', {}, params)
-        store.put('user/result', png, 'image/png')
+        store.put('user/result', png, 'image/png', kind='redraw')
         assert store.exists('user/result')
         assert store.read('user/result') == png and raw.closed
         assert not store.exists('user/result')
@@ -267,7 +313,7 @@ def test_sdk_contract_and_bounded_reads(client, png):
         assert raw.closed
 
 
-def test_classic_restores_r2_checkpoint_without_rerunning_text(configured, remote, monkeypatch):
+def test_classic_keeps_checkpoints_local_and_recovers_without_rerunning_text(configured, remote, monkeypatch):
     from app.assets import object_path
     from app.db import session_factory
     from app.dispatcher import recover
@@ -288,13 +334,14 @@ def test_classic_restores_r2_checkpoint_without_rerunning_text(configured, remot
         state = db.get(ClassicState, job_id)
         for asset_id in state.artifacts.values():
             asset = db.get(Asset, asset_id)
-            assert asset.storage_backend == 'r2' and not object_path(asset.storage_key).exists()
+            assert asset.storage_backend == 'local' and object_path(asset.storage_key).exists()
+        assert remote[0].calls == []  # No stage uploads, including the rendered checkpoint.
         recover(db)
         db.commit()
     run_job(job_id)
     assert calls == {'text': 1, 'analyze': 1, 'render': 1}
     assert client.get(f'/v1/jobs/{job_id}', headers=auth).json()['status'] == 'succeeded'
-    assert any(method == 'GET' for method, _ in remote[0].calls)
+    assert [method for method, _ in remote[0].calls] == ['PUT']  # Only the final delivery is uploaded.
 
 
 def test_reconciled_upload_is_delivered_from_r2_and_local_copy_removed(client, remote, png, monkeypatch):
@@ -331,7 +378,7 @@ def test_cancelled_crash_output_is_removed_without_charging(client, remote, png)
         attempt = db.get(Attempt, attempt_id)
         attempt.call_started_at = now() - timedelta(minutes=5)
         attempt.lease_expires_at = now() - timedelta(seconds=1)
-        remote[1].put(f'{db.get(Job, job_id).owner_id}/{attempt_id}', png, 'image/png')
+        remote[1].put(f'{db.get(Job, job_id).owner_id}/{attempt_id}', png, 'image/png', kind='redraw')
         db.commit()
     assert client.delete(f'/v1/images/{original}', headers=auth).status_code == 200
     with session_factory()() as db:

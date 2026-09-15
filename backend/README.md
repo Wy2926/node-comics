@@ -2,7 +2,7 @@
 
 当前实现包含常规翻译 `classic` 与图片模型重绘 `redraw`。[常规翻译运行说明](../docs/CLASSIC_IMPLEMENTATION.md)包含独立 Docker 引擎、文本配置、检查点、费用预占及验证命令。`redraw` 是 API 中保留的模式标识；图片与目标语言直接送入服务端的 `images/edits` 适配器，没有 OCR 或普通机翻前置步骤。
 
-译图存储支持本地私有文件和 Cloudflare R2（`boto3`）。启用 R2 后，新译图与常规中间图片不落本地磁盘，插件授权后直接从私有桶下载。配置、CORS、保留期及切换限制见[对象存储说明](../docs/OBJECT_STORAGE.md)。
+译图存储支持本地私有文件和 Cloudflare R2（`boto3`）。R2 只保存最终译图，插件授权后直接从私有桶下载；原图和常规翻译中间图片强制保存在后端本地。记录、任务状态、缓存匹配与下载签名查询不发送远端 HEAD。配置、CORS、保留期及限制见[对象存储说明](../docs/OBJECT_STORAGE.md)。
 
 ## 本地运行
 
@@ -32,7 +32,7 @@ Celery 推荐在 Docker Linux 容器内运行。API 和 dispatcher 启动时运�
 | `DATABASE_URL` | 如 `postgresql+psycopg://用户:密码@postgres:5432/nodecomics` |
 | `REDIS_URL` | 如 `redis://redis:6379/0` |
 | `STORAGE_PATH` | 原图及 local 模式结果共用的私有文件卷 |
-| `RESULT_STORAGE_BACKEND` | 新译图和常规中间图片：`local`（默认）或 `r2` |
+| `RESULT_STORAGE_BACKEND` | 仅最终译图：`local`（默认）或 `r2`；原图与中间图片固定本地 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 S3 端点、私有桶及服务端凭据 |
 | `R2_KEY_PREFIX` | 当前数据库独占前缀，默认 `node-comics/` |
 | `STORAGE_URL_TTL_SECONDS` / `STORAGE_TIMEOUT_SECONDS` | 直链有效期默认 300 秒（不超过图片到期时间）；存储请求超时默认 30 秒 |

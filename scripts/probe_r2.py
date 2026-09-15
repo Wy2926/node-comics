@@ -1,20 +1,24 @@
-"""Exercise configured R2 with an isolated synthetic image; no database or AI calls.
+"""Check download of an existing final R2 result; never upload probe images.
 
 Run from the repository root with backend/.venv/Scripts/python.exe.
 Only --configure-cors changes bucket CORS; existing rules are preserved.
 Never print SDK diagnostics, credentials, object keys or signed URLs.
 """
 import argparse
+import hashlib
 from io import BytesIO
 import json
 from pathlib import Path
 import sys
-from uuid import uuid4
 import httpx
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 from app.storage import get_store
+from app.assets import access_json, owned_asset
+from app.db import session_factory
+from app.models import Asset, Job
+from sqlalchemy import select
 from botocore.exceptions import ClientError
 
 
@@ -22,10 +26,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cors-origin', action='append', default=[])
     parser.add_argument('--configure-cors', action='store_true')
+    parser.add_argument('--result-asset-id', help='Existing final translation result to download')
     args = parser.parse_args()
-    report = {'checks': [], 'cleaned_up': False}
-    store = None
-    key = f'{uuid4()}/{uuid4()}'
+    if not args.result_asset_id and not args.configure_cors:
+        parser.error('Provide --result-asset-id or --configure-cors')
+    report = {'checks': []}
     try:
         store = get_store('r2')
         if args.configure_cors:
@@ -44,21 +49,24 @@ def main():
                               'ExposeHeaders': ['Content-Type', 'Content-Length', 'ETag'], 'MaxAgeSeconds': 3600})
                 store.client.put_bucket_cors(Bucket=store.bucket, CORSConfiguration={'CORSRules': rules})
             report['checks'].append('cors_configured_preserving_existing_rules')
-        buffer = BytesIO()
-        Image.new('RGB', (64, 96), '#7cacdb').save(buffer, 'PNG')
-        original = buffer.getvalue()
-        store.put(key, original, 'image/png')
-        assert store.exists(key)
-        assert store.read(key) == original
-        report['checks'].append('sdk_put_head_get_exact_bytes')
-        url = store.download_url(key, 60)
+        if not args.result_asset_id:
+            print(json.dumps(report, ensure_ascii=False))
+            return 0
+        with session_factory()() as db:
+            asset = db.get(Asset, args.result_asset_id)
+            assert asset and asset.kind in {'classic', 'redraw'} and asset.storage_backend == 'r2'
+            assert db.scalar(select(Job.id).where(Job.output_asset_id == asset.id, Job.status == 'succeeded').limit(1))
+            owned_asset(db, asset.id, asset.owner_id)
+            url = access_json(asset)['url']
+            expected_size = (asset.width, asset.height)
+            expected_hash = asset.sha256
         with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
             response = client.get(url)
-            assert response.status_code == 200 and response.content == original
-            assert response.headers.get('content-type', '').startswith('image/png')
+            assert response.status_code == 200
+            assert hashlib.sha256(response.content).hexdigest() == expected_hash
             with Image.open(BytesIO(response.content)) as image:
                 image.load()
-                assert image.size == (64, 96)
+                assert image.size == expected_size
             report['checks'].append('anonymous_signed_get_decodable_image')
             for origin in args.cors_origin:
                 response = client.get(url, headers={'Origin': origin})
@@ -68,21 +76,8 @@ def main():
                 assert response.headers.get('access-control-allow-origin') in (origin, '*')
             if args.cors_origin:
                 report['checks'].append('cors_origins_verified')
-            store.delete(key)
-            assert not store.exists(key)
-            response = client.get(url)
-            assert response.status_code in (403, 404)
-            report['checks'].append('delete_revokes_existing_signed_url')
-        report['cleaned_up'] = True
     except Exception as error:
         report['error_type'] = type(error).__name__
-    finally:
-        if store is not None and not report['cleaned_up']:
-            try:
-                store.delete(key)
-                report['cleaned_up'] = True
-            except Exception:
-                report['cleanup_pending'] = True
     print(json.dumps(report, ensure_ascii=False))
     return 1 if 'error_type' in report else 0
 

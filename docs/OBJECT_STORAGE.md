@@ -5,12 +5,14 @@
 ## 数据路径
 
 - 原图仍由 API 接收、校验并保存到 `STORAGE_PATH`，供翻译使用。
-- 启用 R2 后，新增 `redraw` / `classic` 译图和常规翻译中间图片直接从内存上传私有桶，不在服务器落盘。人工核实交付的本地图片也会先转存 R2。
-- 用户带 Bearer 调用 `GET /v1/images/{id}/access`。API 核对所有者、原图状态、到期时间和对象存在性，返回短时 R2 GET 签名链接与 `authorization_required:false`。
+- R2 **只保存最终 `redraw` / `classic` 译图**。原图、常规翻译的抹字图、文字遮罩及渲染检查点 `classic_stage` 强制使用本地磁盘；OCR 和文本结果保存在后端数据库。`create_asset` 和 `S3Store.put` 两层拒绝非最终结果上传。人工核实通过的结果图片可以转存 R2。
+- 用户带 Bearer 调用 `GET /v1/images/{id}/access`。API 核对所有者、原图状态、删除标记及到期时间，在本地生成短时 R2 GET 签名链接与 `authorization_required:false`；不调用 R2 HEAD。
 - 插件直接从 R2 下载，省去 API 服务器的译图下载流量。下载不带账户 Bearer、Cookie 或 Referer；签名过期最多重新获取一次链接。图片仍解码为 Blob，沿用原有窗口加载、版本切换和阅读位置。
 - `/content` 对 R2 图片只做授权后 307 跳转，不代理字节。本地图片继续使用同源 Bearer 下载。
 
-服务器仍承担原图磁盘、原图上传、供应商通信、向 R2 上传一次结果和必要的检查点恢复流量，以及少量授权 / HEAD 元数据请求；重复阅读和用户下载译图的流量由 R2 承担。没有启用永久公开桶。
+服务器承担原图与中间产物的本地磁盘、供应商通信和最终结果上传；重复阅读及下载译图的流量由 R2 承担。记录、任务轮询、缓存匹配、下载签名均不探测 R2。必要的未决结果恢复保留 HEAD / GET，过期删除与孤立对象清理保留 DELETE / LIST，没有启用永久公开桶。
+
+取舍：状态与缓存可用性按数据库元数据判断。有人在桶外部手动删除文件或 R2 故障时，直到客户端签名 GET 才会发现，沿用下载失败处理；数据库已删除、已物理清理或过期的结果仍立即禁止新访问。不新增旧数据搬迁或兼容逻辑。
 
 ## 配置和启用
 
@@ -77,7 +79,7 @@ npm --prefix apps/extension test -- tests/image-access.test.ts tests/concurrency
 npm --prefix apps/extension run check
 ```
 
-后端专项测试使用临时 SQLite、SDK Stubber 和模拟 S3，覆盖两种模式交付、无本地译图、权限、过期、缺失/故障区分、崩溃恢复、重复结算保护及分页清理；前端测试覆盖登录令牌隔离、同源下载、链接更新和失败上限。这些不代表真实 R2 接入验证或新的翻译效果验证。
+后端专项测试使用临时 SQLite、SDK Stubber 和模拟 S3，覆盖两种模式交付、中间产物只存本地、非法上传拒绝、查询/签名零远端请求、权限、过期、崩溃恢复、重复结算保护及分页清理；前端测试覆盖登录令牌隔离、同源下载、链接更新和失败上限。这些不代表真实 R2 接入验证或新的翻译效果验证。
 
 浏览器复测使用 `scripts/verify_r2_download.mjs`：先运行 `backend/tests/manual_ui_server.py`（隔离数据库、合成图片和模拟翻译供应商），再在另一终端运行 `npm --prefix apps/extension run dev -- --port 5174`。把 fixture 输出的临时目录赋给 `UI_FIXTURE_DIRECTORY`，安装了 Playwright 的运行时模块路径赋给 `PLAYWRIGHT_MODULE`，执行 `node scripts/verify_r2_download.mjs`。脚本用 Chrome 检查实际阅读器，模拟 R2 直链及一次 403，校验无账户请求头、自动更新链接、保留当前页和继续翻页；结果与截图写入 `artifacts/r2-validation/`。仅测试代码代管模拟对象响应，不调用真实 R2。
 
@@ -85,10 +87,10 @@ npm --prefix apps/extension run check
 
 本地 `.env` 已启用 R2 并使用独立部署前缀，凭据未进入 Git；本地 API、dispatcher、两种 worker 已重新构建启动，PostgreSQL 已迁移到 `0008`。容器内使用临时 SQLite、合成图片和模拟供应商验证了实际 worker → R2 → 授权直链交付，以及无本地译图、重复结算保护和删除；未调用真实图片模型，未发布到公网。已有本地译图继续保留原位置。
 
-可重复的真实存储检查命令（均只创建并清理合成测试对象）：
+可重复的真实存储检查命令（只下载指定的已有最终译图，不上传测试图片，也不删除对象）：
 
 ```powershell
-backend/.venv/Scripts/python.exe scripts/probe_r2.py
+backend/.venv/Scripts/python.exe scripts/probe_r2.py --result-asset-id <最终译图资产ID>
 # 可追加 --cors-origin 验证来源；只有显式 --configure-cors 才合并写入桶规则。
 ```
 

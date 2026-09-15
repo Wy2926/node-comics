@@ -50,14 +50,17 @@ def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", pa
     info = inspect_image(data, output=kind != "original")
     asset_id = stable_id or uid()
     key = f"{owner_id}/{asset_id}"
-    backend = storage_backend or ("local" if kind == "original" else settings().result_storage_backend)
+    is_result = kind in {"classic", "redraw"}
+    if not is_result and storage_backend not in (None, "local"):
+        raise ValueError("Originals and intermediate images must use local storage")
+    backend = (storage_backend or settings().result_storage_backend) if is_result else "local"
     expires_at = now() + timedelta(days=settings().retention_days)
     if parent_id:
         parent = db.get(Asset, parent_id)
         if not parent or parent.owner_id != owner_id:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果原图的访问归属无效")
         expires_at = min(expires_at, parent.expires_at)
-    get_store(backend).put(key, data, info["mime"])
+    get_store(backend).put(key, data, info["mime"], kind=kind)
     asset = Asset(id=asset_id, owner_id=owner_id, storage_key=key, storage_backend=backend, kind=kind, parent_id=parent_id, expires_at=expires_at, **info)
     db.add(asset)
     db.flush()
@@ -65,7 +68,11 @@ def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", pa
 
 
 def available(asset: Asset | None):
-    return bool(asset and not asset.deleted_at and asset.expires_at > now() and get_store(asset.storage_backend).exists(asset.storage_key))
+    # Routine job queries/cache matching must not issue remote HEAD requests.
+    # Database tombstones/expiry remain authoritative; the signed GET discovers
+    # missing objects. Local existence checks are cheap and retained.
+    return bool(asset and not asset.deleted_at and not asset.purged_at and asset.expires_at > now()
+                and (asset.storage_backend != "local" or get_store(asset.storage_backend).exists(asset.storage_key)))
 
 
 def read_asset(asset: Asset):
