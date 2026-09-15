@@ -1,3 +1,4 @@
+from conftest import quota_usage
 """Reader projections are private, cost-neutral and not limited by visible pagination."""
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -5,14 +6,14 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
-from conftest import create, login, quote, run_job, upload, png_variant
+from conftest import create, login_plus as login, preview, run_job, upload, png_variant
 from test_file_pages import FILE_HASH, bind, complete
 
 
 def rerun(client, auth, job, asset=None, key="rerun-latest"):
-    price = quote(client, auth, asset or job["input_asset_id"])
+    price = preview(client, auth, asset or job["input_asset_id"])
     response = client.post(f"/v1/jobs/{job['id']}/rerun", headers={**auth, "Idempotency-Key": key},
-                           json={"quote_id": price["id"], "max_credits": price["total_cost"], **({"input_asset_id": asset} if asset else {})})
+                           json={"preview_id": price["id"], "max_quota_pages": price["quota_pages"], **({"input_asset_id": asset} if asset else {})})
     assert response.status_code == 202, response.text
     return response.json()
 
@@ -26,7 +27,7 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
     admin = login(client, "admin")
     original = complete(client, auth, upload(client, auth, png), png, monkeypatch)
     newer = rerun(client, auth, original)
-    before = client.get("/v1/me/usage", headers=auth).json()
+    before = quota_usage(client, auth)
     route = f"/v1/jobs/{original['id']}/feedback"
     payload = {"issues": ["meaning", "meaning"], "comment": "  右下角的对白  ", "output_asset_id": original["output_asset_id"]}
     assert client.post(route, headers={**other, "Idempotency-Key": "feedback"}, json=payload).status_code == 404
@@ -39,7 +40,7 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
     assert first.json()["comment"] == "右下角的对白"
     assert client.post(route, headers={**auth, "Idempotency-Key": "feedback"}, json=payload).json() == first.json()
     assert client.post(route, headers={**auth, "Idempotency-Key": "feedback"}, json={**payload, "comment": "changed"}).status_code == 409
-    assert client.get("/v1/me/usage", headers=auth).json() == before
+    assert quota_usage(client, auth) == before
     assert client.get("/v1/me/feedback", headers=other).json()["total"] == 0
     assert client.get("/v1/admin/feedback", headers=auth).status_code == 403
     feedback_id = first.json()["id"]
@@ -97,16 +98,16 @@ def test_rerun_after_original_reimport_checks_same_bytes_and_receipt(client, png
         db.get(Asset, old_asset).expires_at = now() - timedelta(days=1);db.commit()
     new_asset = bind(client, auth, png).json()["id"]
     assert old_asset != new_asset
-    price = quote(client, auth, new_asset)
-    body = {"quote_id": price["id"], "max_credits": price["total_cost"], "input_asset_id": new_asset}
+    price = preview(client, auth, new_asset)
+    body = {"preview_id": price["id"], "max_quota_pages": price["quota_pages"], "input_asset_id": new_asset}
     route = f"/v1/jobs/{first['id']}/rerun"
     headers = {**auth, "Idempotency-Key": "restore-rerun"}
     created = client.post(route, headers=headers, json=body)
     assert created.status_code == 202, created.text
     assert created.json()["input_asset_id"] == new_asset
-    before = client.get("/v1/me/usage", headers=auth).json()
+    before = quota_usage(client, auth)
     assert client.post(route, headers=headers, json=body).json()["id"] == created.json()["id"]
-    assert client.get("/v1/me/usage", headers=auth).json() == before
+    assert quota_usage(client, auth) == before
     wrong_asset = upload(client, auth, png_variant(png, 23))
     assert client.post(route, headers={**auth, "Idempotency-Key": "wrong-page"}, json={**body,"input_asset_id":wrong_asset}).json()["error"]["code"] == "RERUN_SOURCE_MISMATCH"
 
@@ -123,21 +124,22 @@ def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png
         owner = db.get(Job, done["id"]).owner_id
         for row in db.scalars(select(Ledger).where(Ledger.owner_id == owner)):row.created_at = start - timedelta(seconds=1)
         for i in range(45):
-            db.add(Ledger(owner_id=owner,job_id=done["id"],transaction_key=f"fixture-{i}",kind="settle",amount=2,created_at=start+timedelta(minutes=i)))
+            db.add(Ledger(owner_id=owner,job_id=done["id"],transaction_key=f"fixture-{i}",quota_kind="redraw_monthly",kind="settle",amount=2,created_at=start+timedelta(minutes=i)))
         for kind in ("reserve","release","grant"):
-            db.add(Ledger(owner_id=owner,transaction_key=f"fixture-{kind}",kind=kind,amount=900,created_at=now()))
-        db.add(Ledger(owner_id=owner,transaction_key="outside-day",kind="settle",amount=300,created_at=start+timedelta(days=1)))
+            db.add(Ledger(owner_id=owner,transaction_key=f"fixture-{kind}",quota_kind="redraw_monthly",kind=kind,amount=900,created_at=now()))
+        db.add(Ledger(owner_id=owner,transaction_key="outside-day",quota_kind="redraw_monthly",kind="settle",amount=300,created_at=start+timedelta(days=1)))
         db.commit()
     response = client.get("/v1/me/usage/summary?days=1&timezone=Asia%2FShanghai", headers=auth)
     assert response.status_code == 200, response.text
     data = response.json()
-    assert data["settled"] == data["by_mode"]["redraw"] == 90
-    assert len(data["days"]) == 1 and data["days"][0]["settled"] == 90
+    assert data["quota_used"]["redraw"] == 90
+    assert data["by_mode"]["redraw"] == 1
+    assert len(data["days"]) == 1 and data["days"][0]["redraw"] == 1
     assert data["delivered"] == 1
     assert len(client.get("/v1/me/usage?limit=20", headers=auth).json()["items"]) == 20
     assert client.get("/v1/me/usage/summary?timezone=bad-zone", headers=auth).status_code == 422
     assert client.get("/v1/me/usage/summary?days=0", headers=auth).status_code == 422
-    assert client.get("/v1/me/usage/summary", headers=login(client,"empty")).json()["settled"] == 0
+    assert client.get("/v1/me/usage/summary", headers=login(client,"empty")).json()["delivered"] == 0
 
 
 def test_history_counts_whole_batch_and_does_not_rebill_shared_jobs(client, png, monkeypatch):
@@ -148,12 +150,12 @@ def test_history_counts_whole_batch_and_does_not_rebill_shared_jobs(client, png,
     completed = complete(client, auth, upload(client, auth, png), png, monkeypatch)
     with session_factory()() as db:
         first = db.get(Job,completed["id"])
-        batch=Batch(owner_id=first.owner_id,quote_id="test-full-batch",idempotency_key="test-full-batch",request_hash="a"*64,total_cost=280)
+        batch=Batch(owner_id=first.owner_id,preview_id="test-full-batch",idempotency_key="test-full-batch",request_hash="a"*64,quota_pages=35)
         db.add(batch);db.flush();batch_id=batch.id
         for i in range(35):
-            job=Job(owner_id=first.owner_id,input_asset_id=first.input_asset_id,output_asset_id=first.output_asset_id if i<32 else None,batch_id=batch.id,ordinal=i,mode="redraw",target_language="zh-Hans",idempotency_key=f"test-{i}",operation="fixture",request_hash="a"*64,cache_key="b"*64,config={},cost=8,status="succeeded" if i<32 else "queued",settlement="settled" if i<32 else "reserved",completed_at=now() if i<32 else None)
+            job=Job(owner_id=first.owner_id,input_asset_id=first.input_asset_id,output_asset_id=first.output_asset_id if i<32 else None,batch_id=batch.id,ordinal=i,mode="redraw",target_language="zh-Hans",idempotency_key=f"test-{i}",operation="fixture",request_hash="a"*64,cache_key="b"*64,config={},quota_kind="redraw_monthly",quota_pages=1,status="succeeded" if i<32 else "queued",settlement="settled" if i<32 else "reserved",completed_at=now() if i<32 else None)
             db.add(job);db.flush();db.add(BatchItem(batch_id=batch.id,ordinal=i,input_asset_id=first.input_asset_id,job_id=job.id))
-        shared=Batch(owner_id=first.owner_id,quote_id="test-shared",idempotency_key="test-shared",request_hash="c"*64,total_cost=0)
+        shared=Batch(owner_id=first.owner_id,preview_id="test-shared",idempotency_key="test-shared",request_hash="c"*64,quota_pages=0)
         db.add(shared);db.flush();shared_id=shared.id
         db.add(BatchItem(batch_id=shared.id,ordinal=0,input_asset_id=first.input_asset_id,job_id=first.id));db.commit()
     response=client.get("/v1/translation-history",headers=auth)
@@ -161,7 +163,7 @@ def test_history_counts_whole_batch_and_does_not_rebill_shared_jobs(client, png,
     groups={g["id"]:g for g in response.json()["items"]}
     assert groups[batch_id]["page_count"]==35
     assert groups[batch_id]["counts"]=={"succeeded":32,"queued":3}
-    assert groups[batch_id]["settled"]==256 and groups[batch_id]["reserved"]==24
+    assert groups[batch_id]["settled"]==32 and groups[batch_id]["reserved"]==3
     assert groups[shared_id]["reused"]==1 and groups[shared_id]["settled"]==0
     assert client.get(f"/v1/translation-batches/{shared_id}",headers=auth).json()["items"][0]["reused"] is True
     assert client.get("/v1/translation-history?limit=1",headers=auth).json()["next_offset"]==1

@@ -33,16 +33,17 @@ class Settings(BaseSettings):
     oidc_admin_role: str = "node-comics-admin"
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
-    initial_quota: int = 100
-    redraw_cost: int = 8
+    free_daily_pages: int = Field(default=100, ge=0, le=1_000_000)
+    plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
+    quota_timezone: str = "Asia/Shanghai"
     retention_days: int = 7
     max_upload_bytes: int = 20 * 1024 * 1024
     max_pixels: int = 24_000_000
     max_dimension: int = 8192
     max_batch: int = 100
     max_active_jobs: int = 120
-    user_queue_concurrency: int = Field(default=2, ge=1, le=10)
-    user_queue_max_concurrency: int = Field(default=10, ge=1, le=10)
+    free_concurrency: int = Field(default=2, ge=1, le=10)
+    plus_concurrency: int = Field(default=2, ge=1, le=10)
     dispatch_max_jobs: int = Field(default=100, ge=1, le=1000)
     unknown_release_seconds: int = 3600
     dispatch_interval_seconds: int = 2
@@ -55,7 +56,6 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_cost: int = 1
     classic_engine_url: str = "http://classic-engine:8000"
     classic_engine_token: str = ""
     classic_engine_version: str = "mit-95227a2-classic-v3-parallel"
@@ -78,6 +78,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_storage(self):
+        from zoneinfo import ZoneInfo
+        ZoneInfo(self.quota_timezone)
         if self.result_storage_backend == "r2" or self.r2_endpoint_url:
             url = urlsplit(self.r2_endpoint_url)
             if (url.scheme != "https" or not re.fullmatch(r"[a-f0-9]{32}(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com", url.netloc)

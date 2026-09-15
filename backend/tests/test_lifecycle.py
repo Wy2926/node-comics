@@ -1,9 +1,10 @@
+from conftest import quota_usage
 from conftest import run_job, claim_job
 from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import create, login, upload, quote, png_variant
+from conftest import create, login_plus as login, upload, preview, png_variant
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -27,7 +28,7 @@ def test_idempotency_binds_input_and_parameters(client, png):
     assert first.status_code == second.status_code == 202
     assert first.json()["id"] == second.json()["id"]
     assert create(client, auth, asset, language="en").status_code == 409
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 8
+    assert quota_usage(client, auth)["reserved"] == 1
     with session_factory()() as db:
         for model in (Job, Ledger, Outbox):
             assert db.scalar(select(func.count()).select_from(model)) == 1
@@ -51,16 +52,16 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     assert job["status"] == "succeeded"
     assert client.get(f"/v1/images/{job['output_asset_id']}/content", headers=auth).content == png
-    usage = client.get("/v1/me/usage", headers=auth).json()
-    assert (usage["balance"], usage["reserved"], usage["available"]) == (92, 0, 92)
+    usage = quota_usage(client, auth)
+    assert (usage["used"], usage["reserved"], usage["available"]) == (1, 0, 299)
     cached = create(client, auth, asset, key="cached").json()
-    assert cached["status"] == "succeeded" and cached["cache_hit"] and cached["cost"] == 0
+    assert cached["status"] == "succeeded" and cached["cache_hit"] and cached["quota_pages"] == 0
     assert cached["output_asset_id"] == job["output_asset_id"]
-    confirmed_quote = quote(client, auth, asset)
-    rerun = client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "explicit-rerun"}, json={"quote_id": confirmed_quote["id"], "max_credits": confirmed_quote["total_cost"]})
+    confirmed_quote = preview(client, auth, asset)
+    rerun = client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "explicit-rerun"}, json={"preview_id": confirmed_quote["id"], "max_quota_pages": confirmed_quote["quota_pages"]})
     assert rerun.status_code == 202 and not rerun.json()["cache_hit"]
     assert rerun.json()["version"] > job["version"]
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 8
+    assert quota_usage(client, auth)["reserved"] == 1
 
 
 def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypatch):
@@ -79,16 +80,16 @@ def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypat
     process_job(job_id)
     assert calls == [1]
     assert client.get(f"/v1/jobs/{job_id}", headers=auth).json()["status"] == "outcome_unknown"
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 8
-    confirmed_quote = quote(client, auth, asset)
-    assert client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "retry"}, json={"quote_id": confirmed_quote["id"], "max_credits": confirmed_quote["total_cost"]}).status_code == 409
+    assert quota_usage(client, auth)["reserved"] == 1
+    confirmed_quote = preview(client, auth, asset)
+    assert client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "retry"}, json={"preview_id": confirmed_quote["id"], "max_quota_pages": confirmed_quote["quota_pages"]}).status_code == 409
     def rejected(*args):
         raise ProcessingError("PROVIDER_REJECTED", "请求被拒绝")
     monkeypatch.setattr(workers, "redraw", rejected)
     next_id = create(client, auth, asset, key="known-failure").json()["id"]
     process_job(next_id)
-    usage = client.get("/v1/me/usage", headers=auth).json()
-    assert usage["balance"] == 100 and usage["reserved"] == 8
+    usage = quota_usage(client, auth)
+    assert usage["used"] == 0 and usage["reserved"] == 1
 
 
 def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypatch):
@@ -101,8 +102,8 @@ def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypat
         result = client.post(f"/v1/jobs/{job_id}/cancel", headers=auth)
         assert result.json()["status"] == "cancelled"
     process_job(job_id)
-    usage = client.get("/v1/me/usage", headers=auth).json()
-    assert usage["balance"] == 100 and usage["reserved"] == 0
+    usage = quota_usage(client, auth)
+    assert usage["used"] == 0 and usage["reserved"] == 0
     assert sum(item["kind"] == "release" for item in usage["items"]) == 1
 
 
@@ -120,7 +121,7 @@ def test_running_cancel_or_delete_discards_output_without_charge(client, png, mo
     run_job(job_id)
     job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     assert job["status"] == "cancelled" and job["output_asset_id"] is None
-    assert client.get("/v1/me/usage", headers=auth).json()["balance"] == 100
+    assert quota_usage(client, auth)["used"] == 0
     assert client.get(f"/v1/images/{asset}/content", headers=auth).status_code == 410
 
 
@@ -158,26 +159,26 @@ def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
     assert client.post("/v1/jobs/status", headers=bob, json={"ids": [job_id]}).json() == {"items": []}
     assert create(client, bob, alice_asset).status_code == 404
     bob_job = create(client, bob, upload(client, bob, png)).json()
-    assert not bob_job["cache_hit"] and bob_job["cost"] == 8
+    assert not bob_job["cache_hit"] and bob_job["quota_pages"] == 1
 
 
 def test_batch_budget_atomicity_and_cancel(client, png):
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, index)) for index in range(3)]
-    quote = client.post("/v1/quotes", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
+    preview = client.post("/v1/translation-previews", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
     headers = {**auth, "Idempotency-Key": "batch-1"}
-    assert quote["total_cost"] == 24
-    assert client.post("/v1/translation-batches", headers=headers, json={"quote_id": quote["id"], "max_credits": 23}).status_code == 409
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 0
-    response = client.post("/v1/translation-batches", headers=headers, json={"quote_id": quote["id"], "max_credits": 24})
+    assert preview["quota_pages"] == 3
+    assert client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 2}).status_code == 409
+    assert quota_usage(client, auth)["reserved"] == 0
+    response = client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 3})
     assert response.status_code == 202, response.text
     batch = response.json()
     assert [job["input_asset_id"] for job in batch["jobs"]] == assets
-    repeated = client.post("/v1/translation-batches", headers=headers, json={"quote_id": quote["id"], "max_credits": 24}).json()
+    repeated = client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 3}).json()
     assert repeated["id"] == batch["id"]
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 24
+    assert quota_usage(client, auth)["reserved"] == 3
     assert client.post(f"/v1/translation-batches/{batch['id']}/cancel", headers=auth).json()["status"] == "cancelled"
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 0
+    assert quota_usage(client, auth)["reserved"] == 0
 
 
 def test_batch_bad_asset_rolls_back_all_jobs_and_reservations(client, png):
@@ -185,14 +186,14 @@ def test_batch_bad_asset_rolls_back_all_jobs_and_reservations(client, png):
     from app.models import Asset, now
     auth = login(client)
     assets = [upload(client, auth, png) for _ in range(2)]
-    quote = client.post("/v1/quotes", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
+    preview = client.post("/v1/translation-previews", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
     with session_factory()() as db:
         db.get(Asset, assets[1]).deleted_at = now()
         db.commit()
-    response = client.post("/v1/translation-batches", headers={**auth, "Idempotency-Key": "bad-batch"}, json={"quote_id": quote["id"], "max_credits": 16})
+    response = client.post("/v1/translation-batches", headers={**auth, "Idempotency-Key": "bad-batch"}, json={"preview_id": preview["id"], "max_quota_pages": 2})
     assert response.status_code == 410
     assert client.get("/v1/jobs", headers=auth).json()["total"] == 0
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 0
+    assert quota_usage(client, auth)["reserved"] == 0
 
 
 def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, png, monkeypatch):
@@ -215,12 +216,12 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
         db.commit()
         recover(db)
         db.commit()
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 0
+    assert quota_usage(client, auth)["reserved"] == 0
     output = upload(client, auth, png)
     response = client.post(f"/v1/admin/jobs/{job_id}/reconcile", headers=admin, json={"resolution": "succeeded", "output_asset_id": output, "note": "已向供应商核实"})
     assert response.status_code == 200
     assert response.json()["status"] == "succeeded" and response.json()["settlement"] == "released"
-    assert client.get("/v1/me/usage", headers=auth).json()["balance"] == 100
+    assert quota_usage(client, auth)["used"] == 0
 
 
 def test_worker_lease_loss_after_intent_never_requeues(client, png):
@@ -271,18 +272,23 @@ def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypa
     run_job(job_id)
     job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
     assert job["status"] == "failed" and job["error"]["code"] == "INVALID_PROVIDER_OUTPUT"
-    assert client.get("/v1/me/usage", headers=auth).json()["available"] == 100
+    assert quota_usage(client, auth)["available"] == 300
 
 
 def test_insufficient_quota_creates_no_job(client, png):
     auth = login(client)
+    from app.db import session_factory
+    from app.models import User
+    with session_factory()() as db:
+        db.scalar(select(User).where(User.subject == "dev:alice")).plus_monthly_pages = 12
+        db.commit()
     for i in range(12):
         asset = upload(client, auth, png_variant(png, i))
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
     asset = upload(client, auth, png_variant(png, 12))
     assert create(client, auth, asset, key="no-credit").status_code == 409
     assert client.get("/v1/jobs", headers=auth).json()["total"] == 12
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 96
+    assert quota_usage(client, auth)["reserved"] == 12
 
 
 def test_admin_quota_adjustment_idempotent_and_private_provider_list(client):
@@ -290,8 +296,8 @@ def test_admin_quota_adjustment_idempotent_and_private_provider_list(client):
     user_id = client.get("/v1/me", headers=auth).json()["user"]["id"]
     headers = {**admin, "Idempotency-Key": "grant-10"}
     for _ in range(2):
-        assert client.post(f"/v1/admin/users/{user_id}/quota", headers=headers, json={"amount": 10}).json()["balance"] == 110
-    assert client.post(f"/v1/admin/users/{user_id}/quota", headers=headers, json={"amount": 11}).status_code == 409
+        assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "redraw_monthly", "pages": 10, "note": "test"}).json()["entitlements"]["modes"]["redraw"]["quota"]["available"] == 310
+    assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "redraw_monthly", "pages": 11, "note": "test"}).status_code == 409
     providers = client.get("/v1/admin/providers", headers=admin)
     assert "isolated-test-provider-key" not in providers.text
     assert providers.json()["items"][0]["credential_configured"]

@@ -33,7 +33,6 @@ class ProviderConfig(BaseModel):
     download_hosts: list[str] = Field(default_factory=list)
     concurrency: int = Field(default=2, ge=1, le=32)
     enabled: bool = True
-    pricing_version: str = "test-credits-v1"
 
     @field_validator("base_url")
     @classmethod
@@ -102,7 +101,7 @@ def configuration(db: Session, mode: str, language: str, provider_id=None):
         provider = next((item for item in providers if credential(item.config)), None)
         if not provider:
             problem("PROVIDER_CAPABILITY_UNSUPPORTED", "管理员尚未配置可用的图片编辑供应商", 503)
-        config = {"mode": mode, "provider": provider.config, "prompt_version": PROMPT_VERSION, "unit_cost": cfg.redraw_cost}
+        config = {"mode": mode, "provider": provider.config, "prompt_version": PROMPT_VERSION}
     elif mode == "classic":
         from .classic_config import snapshot
         config = snapshot()

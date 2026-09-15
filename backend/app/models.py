@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -19,10 +19,13 @@ class User(Base):
     subject: Mapped[str] = mapped_column(String(255), unique=True)
     name: Mapped[str] = mapped_column(String(80))
     role: Mapped[str] = mapped_column(String(20), default="user")
-    balance: Mapped[int] = mapped_column(Integer, default=100)
-    reserved: Mapped[int] = mapped_column(Integer, default=0)
+    membership_id: Mapped[str | None] = mapped_column(String(36))
+    plus_started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    plus_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    plus_timezone: Mapped[str | None] = mapped_column(String(80))
+    plus_monthly_pages: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (CheckConstraint("balance >= 0"), CheckConstraint("reserved >= 0"), CheckConstraint("balance >= reserved"))
+    __table_args__ = (CheckConstraint("plus_monthly_pages >= 0"),)
 
 
 class Asset(Base):
@@ -48,25 +51,28 @@ class Batch(Base):
     __tablename__ = "batches"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    quote_id: Mapped[str] = mapped_column(String(36), unique=True)
+    preview_id: Mapped[str] = mapped_column(String(36), unique=True)
     idempotency_key: Mapped[str] = mapped_column(String(128))
     request_hash: Mapped[str] = mapped_column(String(64))
-    total_cost: Mapped[int] = mapped_column(Integer)
+    quota_pages: Mapped[int] = mapped_column(Integer)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
 
 
-class Quote(Base):
-    __tablename__ = "quotes"
+class TranslationPreview(Base):
+    __tablename__ = "translation_previews"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     asset_ids: Mapped[list] = mapped_column(JSON)
     mode: Mapped[str] = mapped_column(String(20))
     language: Mapped[str] = mapped_column(String(20))
     config_version: Mapped[str] = mapped_column(String(64))
-    total_cost: Mapped[int] = mapped_column(Integer)
-    unit_cost: Mapped[int] = mapped_column(Integer)
+    quota_pages: Mapped[int] = mapped_column(Integer)
+    quota_kind: Mapped[str] = mapped_column(String(30))
+    entitlement_version: Mapped[str] = mapped_column(String(64))
+    new_pages: Mapped[int] = mapped_column(Integer)
+    regenerate: Mapped[bool] = mapped_column(Boolean, default=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
 
 
@@ -88,7 +94,10 @@ class Job(Base):
     cache_key: Mapped[str] = mapped_column(String(64), index=True)
     cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
     config: Mapped[dict] = mapped_column(JSON)
-    cost: Mapped[int] = mapped_column(Integer)
+    quota_pages: Mapped[int] = mapped_column(Integer)
+    quota_kind: Mapped[str] = mapped_column(String(30))
+    quota_period_id: Mapped[str | None] = mapped_column(ForeignKey("quota_periods.id"), index=True)
+    entitlement: Mapped[dict] = mapped_column(JSON, default=dict)
     settlement: Mapped[str] = mapped_column(String(20), default="reserved")
     version: Mapped[int] = mapped_column(Integer, default=1)
     attempt_id: Mapped[str | None] = mapped_column(String(36))
@@ -133,11 +142,14 @@ class Ledger(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"))
+    period_id: Mapped[str | None] = mapped_column(ForeignKey("quota_periods.id"), index=True)
+    quota_kind: Mapped[str | None] = mapped_column(String(30))
     transaction_key: Mapped[str] = mapped_column(String(200), unique=True)
     kind: Mapped[str] = mapped_column(String(20))
     amount: Mapped[int] = mapped_column(Integer)
     note: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    __table_args__ = (Index("ix_ledger_owner_created", "owner_id", "created_at"),)
 
 
 class Outbox(Base):

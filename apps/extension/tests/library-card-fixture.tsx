@@ -31,7 +31,7 @@ export function TranslationCardFixture({copies}:{copies:ReadingCopy[]}){
  const [notice,setNotice]=useState('');
  const samples=copies.slice(0,6).map((copy,n)=>({...copy,title:n%2?longTitle:'短译本',source:n%2?longSource:'原创验收',pages:copy.pages.map((page,index)=>{
   const id=`layout-job-${n}-${index}`,status=n%2?(index===0?'running':index===1?'failed':'succeeded'):'succeeded';
-  const job:Job={id,input_asset_id:'layout-input',output_asset_id:status==='succeeded'?'layout-output':null,mode:n%3?'classic':'redraw',target_language:n%3?'zh-Hans':'en',status,phase:'done',cost:0,created_at:'2026-09-15T00:00:00Z',version:1,cache_hit:false,result_expired:n%2===1};
+  const job:Job={id,input_asset_id:'layout-input',output_asset_id:status==='succeeded'?'layout-output':null,mode:n%3?'classic':'redraw',target_language:n%3?'zh-Hans':'en',status,phase:'done',quota_pages:0,created_at:'2026-09-15T00:00:00Z',version:1,cache_hit:false,result_expired:n%2===1};
   return {...page,ownerId:'layout-user',apiOrigin:'https://layout.example',jobs:[job],outputBlobs:n%2?{}:{[id]:'fixture-cover'}};
  })}));
  return <main className="nc-library" style={{padding:24}}><TranslationCopies copies={samples} userId="layout-user" origin="https://layout.example" onOpen={(_,edition)=>setNotice('已打开 '+edition.mode+' · '+edition.language)}/>{notice&&<p role="status">{notice}</p>}</main>;

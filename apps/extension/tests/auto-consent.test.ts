@@ -4,13 +4,13 @@ import {autoConsentScope,readAutoConsents,saveAutoConsents,retryablePreparation}
 
 afterEach(()=>vi.unstubAllGlobals());
 describe('remembered automatic translation consent',()=>{
-  it('persists the confirmed price and explicit off choice across reloads',()=>{
+  it('persists confirmed entitlement and explicit off choice across reloads',()=>{
     const data=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>data.set(k,v)});
     const scope=autoConsentScope('alice','https://api.example','zh-Hans','classic');
     expect(readAutoConsents()).toEqual({});
-    saveAutoConsents({[scope]:{unitCost:2}});
-    expect(readAutoConsents()).toEqual({[scope]:{unitCost:2}});
+    saveAutoConsents({[scope]:{version:'membership-pages-v1',quotaKind:'classic_daily'}});
+    expect(readAutoConsents()).toEqual({[scope]:{version:'membership-pages-v1',quotaKind:'classic_daily'}});
     saveAutoConsents({});expect(readAutoConsents()).toEqual({});
   });
   it('isolates approval by account, service, language and translation mode',()=>{
@@ -23,7 +23,7 @@ describe('remembered automatic translation consent',()=>{
     }
   });
   it('retries recoverable preparation but leaves permanent errors for action',()=>{
-    for(const error of [new ApiError('offline'),new ApiError('busy','RATE_LIMIT',429),new ApiError('unavailable','ERROR',503),new ApiError('quota','INSUFFICIENT_QUOTA',409)])expect(retryablePreparation(error)).toBe(true);
+    for(const error of [new ApiError('offline'),new ApiError('busy','RATE_LIMIT',429),new ApiError('unavailable','ERROR',503),new ApiError('quota','DAILY_QUOTA_EXHAUSTED',409)])expect(retryablePreparation(error)).toBe(true);
     for(const error of [new ApiError('auth','UNAUTHORIZED',401),new ApiError('invalid','INVALID',422),new Error('missing file')])expect(retryablePreparation(error)).toBe(false);
   });
 });

@@ -7,7 +7,7 @@ import {readingImage} from '../src/reader/presentation';
 import type {Job} from '../src/types';
 import {copyComplete,copySummary} from '../src/ui/library/shared';
 
-const job=(id:string,extra:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:id+'-output',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',cost:1,created_at:'2026-09-15T00:00:00Z',version:1,cache_hit:false,...extra});
+const job=(id:string,extra:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:id+'-output',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',quota_pages:1,created_at:'2026-09-15T00:00:00Z',version:1,cache_hit:false,...extra});
 const page=(jobs:Job[],outputBlobs:Record<string,string>={})=>({...emptyPage('page',800,1200),blobKey:'original',ownerId:'owner',apiOrigin:'https://api.example',jobs,outputBlobs});
 
 describe('work directory',()=>{

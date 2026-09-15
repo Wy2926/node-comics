@@ -23,13 +23,13 @@ it('persists only the local request concurrency, clamping malformed saved settin
 it('keeps newly submitted jobs when an older tab saves its copy snapshot',async()=>{
   const page=emptyPage('job.png',10,10);page.ownerId='reader';page.apiOrigin='http://127.0.0.1:18088';
   const copy=makeCopy('job merge',[page]);await commitCopies([copy],[{title:copy.title,kind:'unclassified'}]);
-  const job:Job={id:'new-job',input_asset_id:'asset',output_asset_id:null,mode:'redraw',target_language:'en',status:'queued',phase:'queued',cost:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+  const job:Job={id:'new-job',input_asset_id:'asset',output_asset_id:null,mode:'redraw',target_language:'en',status:'queued',phase:'queued',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
   await saveCopy({...copy,pages:[{...page,jobs:[job]}]});await saveCopy(copy);
   expect((await readCopies()).find(c=>c.id===copy.id)!.pages[0].jobs.map(j=>j.id)).toEqual(['new-job']);
 });
 it('does not resurrect a removed result when another tab saves an older successful job',async()=>{
   const page={...emptyPage('removed.png',10,10),ownerId:'reader',apiOrigin:'http://127.0.0.1:18088'};
-  const job:Job={id:'removed-result',input_asset_id:'original',output_asset_id:'result',mode:'classic',target_language:'en',status:'succeeded',phase:'completed',cost:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+  const job:Job={id:'removed-result',input_asset_id:'original',output_asset_id:'result',mode:'classic',target_language:'en',status:'succeeded',phase:'completed',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
   const stale=makeCopy('removed result',[{...page,jobs:[job]}]);await commitCopies([stale],[{title:stale.title,kind:'unclassified'}]);
   await saveCopy({...stale,pages:[{...page,jobs:[{...job,output_asset_id:null}]}]});
   await saveCopy(stale);

@@ -8,7 +8,7 @@ x-backend: &backend
     - .env
     - deploy/.env.local
   environment: &backend-env
-    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/nodecomics
+    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics}
     REDIS_URL: redis://redis:6379/0
     STORAGE_PATH: /data/images
     DEV_AUTH: "${DEV_AUTH:-true}"
@@ -32,7 +32,7 @@ services:
     environment:
       POSTGRES_USER: nodecomics
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: nodecomics
+      POSTGRES_DB: ${POSTGRES_DB:-nodecomics}
     volumes:
       - comics_postgres:/var/lib/postgresql/data
     healthcheck:

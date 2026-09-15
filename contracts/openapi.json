@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Node Comics API",
-    "description": "私有漫画图片、持久化翻译任务和测试额度。授权后通过本地网关或对象存储短时直链读取图片。",
-    "version": "0.1.0"
+    "description": "私有漫画图片、持久化翻译任务、普通与 PLUS 会员权益及周期页数额度。",
+    "version": "0.2.0"
   },
   "paths": {
     "/v1/me/queue": {
@@ -19,51 +19,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueueSettingsResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "queue"
-        ],
-        "summary": "Put My Queue",
-        "operationId": "put_my_queue_v1_me_queue_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueSettingsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueSettingsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/QueueResponse"
                 }
               }
             }
@@ -105,62 +61,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueueSettingsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "queue"
-        ],
-        "summary": "Put User Queue",
-        "operationId": "put_user_queue_v1_admin_users__user_id__queue_put",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueSettingsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueSettingsResponse"
+                  "$ref": "#/components/schemas/QueueResponse"
                 }
               }
             }
@@ -599,6 +500,101 @@
         }
       }
     },
+    "/v1/admin/users/{user_id}/quota-grants": {
+      "post": {
+        "tags": [
+          "quota grants"
+        ],
+        "summary": "Issue Grant",
+        "operationId": "issue_grant_v1_admin_users__user_id__quota_grants_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/quota-grants": {
+      "get": {
+        "tags": [
+          "quota grants"
+        ],
+        "summary": "My Grants",
+        "operationId": "my_grants_v1_me_quota_grants_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -679,6 +675,29 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/me/entitlements": {
+      "get": {
+        "summary": "My Entitlements",
+        "operationId": "my_entitlements_v1_me_entitlements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsResponse"
+                }
               }
             }
           }
@@ -1302,15 +1321,15 @@
         }
       }
     },
-    "/v1/quotes": {
+    "/v1/translation-previews": {
       "post": {
-        "summary": "Quote Create",
-        "operationId": "quote_create_v1_quotes_post",
+        "summary": "Preview Create",
+        "operationId": "preview_create_v1_translation_previews_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QuoteRequest"
+                "$ref": "#/components/schemas/PreviewRequest"
               }
             }
           },
@@ -1322,7 +1341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuoteResponse"
+                  "$ref": "#/components/schemas/PreviewResponse"
                 }
               }
             }
@@ -1895,10 +1914,10 @@
         }
       }
     },
-    "/v1/admin/users/{user_id}/quota": {
+    "/v1/admin/users/{user_id}/membership": {
       "post": {
-        "summary": "Admin Quota",
-        "operationId": "admin_quota_v1_admin_users__user_id__quota_post",
+        "summary": "Admin Membership",
+        "operationId": "admin_membership_v1_admin_users__user_id__membership_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1936,7 +1955,75 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QuotaAdjustment"
+                "$ref": "#/components/schemas/MembershipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/users/{user_id}/quota-compensations": {
+      "post": {
+        "summary": "Admin Compensation",
+        "operationId": "admin_compensation_v1_admin_users__user_id__quota_compensations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompensationRequest"
               }
             }
           }
@@ -2108,9 +2195,9 @@
             "type": "array",
             "title": "Jobs"
           },
-          "total_cost": {
+          "quota_pages": {
             "type": "integer",
-            "title": "Total Cost"
+            "title": "Quota Pages"
           }
         },
         "type": "object",
@@ -2118,28 +2205,28 @@
           "id",
           "status",
           "jobs",
-          "total_cost"
+          "quota_pages"
         ],
         "title": "BatchCreatedResponse"
       },
       "BatchRequest": {
         "properties": {
-          "quote_id": {
+          "preview_id": {
             "type": "string",
-            "title": "Quote Id"
+            "title": "Preview Id"
           },
-          "max_credits": {
+          "max_quota_pages": {
             "type": "integer",
             "maximum": 1000000.0,
             "minimum": 0.0,
-            "title": "Max Credits"
+            "title": "Max Quota Pages"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "quote_id",
-          "max_credits"
+          "preview_id",
+          "max_quota_pages"
         ],
         "title": "BatchRequest"
       },
@@ -2175,9 +2262,9 @@
             ],
             "title": "Next Offset"
           },
-          "total_cost": {
+          "quota_pages": {
             "type": "integer",
-            "title": "Total Cost"
+            "title": "Quota Pages"
           }
         },
         "type": "object",
@@ -2187,7 +2274,7 @@
           "items",
           "total",
           "next_offset",
-          "total_cost"
+          "quota_pages"
         ],
         "title": "BatchResponse"
       },
@@ -2238,6 +2325,17 @@
               }
             ],
             "title": "Image"
+          },
+          "expected_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Kind"
           }
         },
         "type": "object",
@@ -2308,10 +2406,10 @@
             "type": "object",
             "title": "Limits"
           },
-          "quota": {
+          "entitlements": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QuotaResponse"
+                "$ref": "#/components/schemas/EntitlementsResponse"
               },
               {
                 "type": "null"
@@ -2325,14 +2423,6 @@
           "unknown_release_seconds": {
             "type": "integer",
             "title": "Unknown Release Seconds"
-          },
-          "pricing_version": {
-            "type": "string",
-            "title": "Pricing Version"
-          },
-          "pricing_note": {
-            "type": "string",
-            "title": "Pricing Note"
           }
         },
         "type": "object",
@@ -2340,13 +2430,43 @@
           "modes",
           "languages",
           "limits",
-          "quota",
+          "entitlements",
           "retention_days",
-          "unknown_release_seconds",
-          "pricing_version",
-          "pricing_note"
+          "unknown_release_seconds"
         ],
         "title": "CapabilitiesResponse"
+      },
+      "CompensationRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "classic_daily",
+              "redraw_monthly"
+            ],
+            "title": "Kind"
+          },
+          "pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Pages"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "pages",
+          "note"
+        ],
+        "title": "CompensationRequest"
       },
       "DevLogin": {
         "properties": {
@@ -2364,6 +2484,71 @@
           "username"
         ],
         "title": "DevLogin"
+      },
+      "EntitlementsResponse": {
+        "properties": {
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          },
+          "plus_started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plus Started At"
+          },
+          "plus_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plus Expires At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "concurrency": {
+            "type": "integer",
+            "title": "Concurrency"
+          },
+          "modes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModeEntitlement"
+            },
+            "type": "object",
+            "title": "Modes"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "pending_previous_period_pages": {
+            "type": "integer",
+            "title": "Pending Previous Period Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan",
+          "plus_started_at",
+          "plus_expires_at",
+          "timezone",
+          "concurrency",
+          "modes",
+          "generated_at",
+          "pending_previous_period_pages"
+        ],
+        "title": "EntitlementsResponse"
       },
       "ErrorInfo": {
         "properties": {
@@ -2662,6 +2847,56 @@
         ],
         "title": "FilePageMatches"
       },
+      "GrantRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "redraw"
+            ],
+            "title": "Mode"
+          },
+          "pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Pages"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "pages",
+          "expires_at",
+          "note"
+        ],
+        "title": "GrantRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2878,9 +3113,24 @@
             "type": "string",
             "title": "Phase"
           },
-          "cost": {
+          "quota_pages": {
             "type": "integer",
-            "title": "Cost"
+            "title": "Quota Pages"
+          },
+          "quota_kind": {
+            "type": "string",
+            "title": "Quota Kind"
+          },
+          "quota_period_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Period Id"
           },
           "settlement": {
             "type": "string",
@@ -2962,7 +3212,9 @@
           "target_language",
           "status",
           "phase",
-          "cost",
+          "quota_pages",
+          "quota_kind",
+          "quota_period_id",
           "settlement",
           "version",
           "cache_hit",
@@ -3067,6 +3319,51 @@
         ],
         "title": "LoginResponse"
       },
+      "MembershipRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "extend",
+              "expire"
+            ],
+            "title": "Action",
+            "default": "extend"
+          },
+          "months": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Months",
+            "default": 1
+          },
+          "monthly_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Pages"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "MembershipRequest"
+      },
       "ModeCapability": {
         "properties": {
           "id": {
@@ -3081,10 +3378,6 @@
             "type": "boolean",
             "title": "Enabled"
           },
-          "unit_cost": {
-            "type": "integer",
-            "title": "Unit Cost"
-          },
           "languages": {
             "items": {
               "type": "string"
@@ -3098,10 +3391,222 @@
           "id",
           "label",
           "enabled",
-          "unit_cost",
           "languages"
         ],
         "title": "ModeCapability"
+      },
+      "ModeEntitlement": {
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "unlimited": {
+            "type": "boolean",
+            "title": "Unlimited"
+          },
+          "quota_kind": {
+            "type": "string",
+            "title": "Quota Kind"
+          },
+          "consent_version": {
+            "type": "string",
+            "title": "Consent Version"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed",
+          "unlimited",
+          "quota_kind",
+          "consent_version",
+          "quota"
+        ],
+        "title": "ModeEntitlement"
+      },
+      "PeriodResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "granted": {
+            "type": "integer",
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "starts_at": {
+            "type": "string",
+            "title": "Starts At"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "next_expiry_at": {
+            "type": "string",
+            "title": "Next Expiry At"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaBucketResponse"
+            },
+            "type": "array",
+            "title": "Buckets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "starts_at",
+          "resets_at",
+          "next_expiry_at",
+          "buckets"
+        ],
+        "title": "PeriodResponse"
+      },
+      "PreviewRequest": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Asset Ids"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "redraw",
+              "classic"
+            ],
+            "title": "Mode"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          },
+          "regenerate": {
+            "type": "boolean",
+            "title": "Regenerate",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asset_ids",
+          "mode",
+          "target_language"
+        ],
+        "title": "PreviewRequest"
+      },
+      "PreviewResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "quota_pages": {
+            "type": "integer",
+            "title": "Quota Pages"
+          },
+          "quota_kind": {
+            "type": "string",
+            "title": "Quota Kind"
+          },
+          "new_pages": {
+            "type": "integer",
+            "title": "New Pages"
+          },
+          "reused_pages": {
+            "type": "integer",
+            "title": "Reused Pages"
+          },
+          "entitlement_version": {
+            "type": "string",
+            "title": "Entitlement Version"
+          },
+          "regenerate": {
+            "type": "boolean",
+            "title": "Regenerate"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "config_version": {
+            "type": "string",
+            "title": "Config Version"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "quota_pages",
+          "quota_kind",
+          "new_pages",
+          "reused_pages",
+          "entitlement_version",
+          "regenerate",
+          "page_count",
+          "expires_at",
+          "config_version",
+          "mode",
+          "target_language"
+        ],
+        "title": "PreviewResponse"
       },
       "ProviderConfig": {
         "properties": {
@@ -3230,11 +3735,6 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
-          },
-          "pricing_version": {
-            "type": "string",
-            "title": "Pricing Version",
-            "default": "test-credits-v1"
           }
         },
         "additionalProperties": false,
@@ -3260,53 +3760,15 @@
         ],
         "title": "ProviderToggle"
       },
-      "QueueSettingsRequest": {
+      "QueueResponse": {
         "properties": {
           "concurrency": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 10.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Concurrency"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "concurrency"
-        ],
-        "title": "QueueSettingsRequest"
-      },
-      "QueueSettingsResponse": {
-        "properties": {
-          "concurrency": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Concurrency"
           },
-          "effective_concurrency": {
+          "max_active_jobs": {
             "type": "integer",
-            "title": "Effective Concurrency"
-          },
-          "default_concurrency": {
-            "type": "integer",
-            "title": "Default Concurrency"
-          },
-          "max_concurrency": {
-            "type": "integer",
-            "title": "Max Concurrency"
+            "title": "Max Active Jobs"
           },
           "queued": {
             "type": "integer",
@@ -3319,47 +3781,48 @@
           "running": {
             "type": "integer",
             "title": "Running"
+          },
+          "available_slots": {
+            "type": "integer",
+            "title": "Available Slots"
           }
         },
         "type": "object",
         "required": [
           "concurrency",
-          "effective_concurrency",
-          "default_concurrency",
-          "max_concurrency",
+          "max_active_jobs",
           "queued",
           "dispatched",
-          "running"
+          "running",
+          "available_slots"
         ],
-        "title": "QueueSettingsResponse"
+        "title": "QueueResponse"
       },
-      "QuotaAdjustment": {
+      "QuotaBucketResponse": {
         "properties": {
-          "amount": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": -1000000.0,
-            "title": "Amount"
-          },
-          "note": {
+          "id": {
             "type": "string",
-            "maxLength": 200,
-            "title": "Note",
-            "default": "运营测试额度"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "amount"
-        ],
-        "title": "QuotaAdjustment"
-      },
-      "QuotaResponse": {
-        "properties": {
-          "balance": {
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "granted": {
             "type": "integer",
-            "title": "Balance"
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
           },
           "reserved": {
             "type": "integer",
@@ -3368,96 +3831,40 @@
           "available": {
             "type": "integer",
             "title": "Available"
-          }
-        },
-        "type": "object",
-        "required": [
-          "balance",
-          "reserved",
-          "available"
-        ],
-        "title": "QuotaResponse"
-      },
-      "QuoteRequest": {
-        "properties": {
-          "asset_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "minItems": 1,
-            "title": "Asset Ids"
           },
-          "mode": {
+          "starts_at": {
             "type": "string",
-            "enum": [
-              "redraw",
-              "classic"
-            ],
-            "title": "Mode"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "asset_ids",
-          "mode",
-          "target_language"
-        ],
-        "title": "QuoteRequest"
-      },
-      "QuoteResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "total_cost": {
-            "type": "integer",
-            "title": "Total Cost"
-          },
-          "unit_cost": {
-            "type": "integer",
-            "title": "Unit Cost"
-          },
-          "page_count": {
-            "type": "integer",
-            "title": "Page Count"
+            "title": "Starts At"
           },
           "expires_at": {
             "type": "string",
             "title": "Expires At"
           },
-          "config_version": {
-            "type": "string",
-            "title": "Config Version"
+          "grants_access": {
+            "type": "boolean",
+            "title": "Grants Access"
           },
-          "mode": {
+          "note": {
             "type": "string",
-            "title": "Mode"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language"
+            "title": "Note"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "total_cost",
-          "unit_cost",
-          "page_count",
-          "expires_at",
-          "config_version",
+          "kind",
+          "source",
           "mode",
-          "target_language"
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "starts_at",
+          "expires_at",
+          "grants_access",
+          "note"
         ],
-        "title": "QuoteResponse"
+        "title": "QuotaBucketResponse"
       },
       "ReconcileRequest": {
         "properties": {
@@ -3497,15 +3904,15 @@
       },
       "RerunRequest": {
         "properties": {
-          "quote_id": {
+          "preview_id": {
             "type": "string",
-            "title": "Quote Id"
+            "title": "Preview Id"
           },
-          "max_credits": {
+          "max_quota_pages": {
             "type": "integer",
             "maximum": 1000000.0,
             "minimum": 0.0,
-            "title": "Max Credits"
+            "title": "Max Quota Pages"
           },
           "acknowledge_unknown_cost": {
             "type": "boolean",
@@ -3528,8 +3935,8 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "quote_id",
-          "max_credits"
+          "preview_id",
+          "max_quota_pages"
         ],
         "title": "RerunRequest"
       },
@@ -3558,9 +3965,9 @@
             "type": "string",
             "title": "Date"
           },
-          "settled": {
+          "delivered": {
             "type": "integer",
-            "title": "Settled"
+            "title": "Delivered"
           },
           "classic": {
             "type": "integer",
@@ -3569,19 +3976,14 @@
           "redraw": {
             "type": "integer",
             "title": "Redraw"
-          },
-          "unclassified": {
-            "type": "integer",
-            "title": "Unclassified"
           }
         },
         "type": "object",
         "required": [
           "date",
-          "settled",
+          "delivered",
           "classic",
-          "redraw",
-          "unclassified"
+          "redraw"
         ],
         "title": "UsageDay"
       },
@@ -3606,9 +4008,31 @@
             "type": "string",
             "title": "Kind"
           },
-          "amount": {
+          "period_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Id"
+          },
+          "quota_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Kind"
+          },
+          "pages": {
             "type": "integer",
-            "title": "Amount"
+            "title": "Pages"
           },
           "note": {
             "type": "string",
@@ -3624,7 +4048,9 @@
           "id",
           "job_id",
           "kind",
-          "amount",
+          "period_id",
+          "quota_kind",
+          "pages",
           "note",
           "created_at"
         ],
@@ -3632,17 +4058,8 @@
       },
       "UsageResponse": {
         "properties": {
-          "balance": {
-            "type": "integer",
-            "title": "Balance"
-          },
-          "reserved": {
-            "type": "integer",
-            "title": "Reserved"
-          },
-          "available": {
-            "type": "integer",
-            "title": "Available"
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementsResponse"
           },
           "items": {
             "items": {
@@ -3669,9 +4086,7 @@
         },
         "type": "object",
         "required": [
-          "balance",
-          "reserved",
-          "available",
+          "entitlements",
           "items",
           "total",
           "next_offset"
@@ -3680,17 +4095,8 @@
       },
       "UsageSummary": {
         "properties": {
-          "balance": {
-            "type": "integer",
-            "title": "Balance"
-          },
-          "reserved": {
-            "type": "integer",
-            "title": "Reserved"
-          },
-          "available": {
-            "type": "integer",
-            "title": "Available"
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementsResponse"
           },
           "timezone": {
             "type": "string",
@@ -3708,10 +4114,6 @@
             "type": "string",
             "title": "Generated At"
           },
-          "settled": {
-            "type": "integer",
-            "title": "Settled"
-          },
           "delivered": {
             "type": "integer",
             "title": "Delivered"
@@ -3720,12 +4122,23 @@
             "type": "integer",
             "title": "Free Delivered"
           },
+          "included_delivered": {
+            "type": "integer",
+            "title": "Included Delivered"
+          },
           "by_mode": {
             "additionalProperties": {
               "type": "integer"
             },
             "type": "object",
             "title": "By Mode"
+          },
+          "quota_used": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Quota Used"
           },
           "days": {
             "items": {
@@ -3737,17 +4150,16 @@
         },
         "type": "object",
         "required": [
-          "balance",
-          "reserved",
-          "available",
+          "entitlements",
           "timezone",
           "start_date",
           "end_date",
           "generated_at",
-          "settled",
           "delivered",
           "free_delivered",
+          "included_delivered",
           "by_mode",
+          "quota_used",
           "days"
         ],
         "title": "UsageSummary"

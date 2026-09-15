@@ -9,8 +9,9 @@ need this lock. No account row is used as a scheduler mutex.
 from sqlalchemy import case, delete, func, or_, select, update
 from .config import settings
 from .db import session_factory
-from .models import Job, Outbox, User
-from .queue_models import QueueAdmission, SchedulerState, UserQueueSettings
+from .models import Job, Outbox, User, now
+from .entitlements import is_plus
+from .queue_models import QueueAdmission, SchedulerState
 
 
 def lock_scheduler(db):
@@ -22,13 +23,9 @@ def lock_scheduler(db):
     return state
 
 
-def default_concurrency():
-    return min(settings().user_queue_concurrency, settings().user_queue_max_concurrency)
-
-
 def concurrency_for(db, owner_id):
-    configured = db.scalar(select(UserQueueSettings.concurrency).where(UserQueueSettings.owner_id == owner_id))
-    return min(configured or default_concurrency(), settings().user_queue_max_concurrency)
+    user = db.scalar(select(User).where(User.id == owner_id).execution_options(populate_existing=True))
+    return settings().plus_concurrency if user and is_plus(user) else settings().free_concurrency
 
 
 def release_admission(db, job_id):
@@ -72,15 +69,15 @@ def admit_jobs(limit=None):
                      .outerjoin(QueueAdmission, QueueAdmission.job_id == Job.id)
                      .where(or_(Job.status == "running", (Job.status == "queued") & QueueAdmission.job_id.is_not(None)))
                      .group_by(Job.owner_id).subquery())
-        configured = func.coalesce(UserQueueSettings.concurrency, default_concurrency())
-        effective_limit = case((configured > settings().user_queue_max_concurrency, settings().user_queue_max_concurrency), else_=configured)
+        at = now()
+        effective_limit = case(((User.plus_started_at <= at) & (User.plus_expires_at > at), settings().plus_concurrency),
+                               else_=settings().free_concurrency)
         pending = (select(Job.id).join(Outbox, Outbox.job_id == Job.id)
                    .outerjoin(QueueAdmission, QueueAdmission.job_id == Job.id)
                    .where(Job.owner_id == User.id, *queued_condition(), QueueAdmission.job_id.is_(None)).exists())
         admitted, blocked = [], []
         while len(admitted) < maximum:
             owner_id = db.scalar(select(User.id)
-                                 .outerjoin(UserQueueSettings, UserQueueSettings.owner_id == User.id)
                                  .outerjoin(occupancy, occupancy.c.owner_id == User.id)
                                  .where(pending, func.coalesce(occupancy.c.count, 0) < effective_limit, User.id.not_in(blocked))
                                  .order_by(case((User.id > state.last_owner_id, 0), else_=1), User.id).limit(1))

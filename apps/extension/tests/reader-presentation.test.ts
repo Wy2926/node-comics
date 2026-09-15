@@ -6,7 +6,7 @@ import {emptyPage} from '../src/reader/model';
 import {applyMatch,planTranslation,rerunSource,sourceKey} from '../src/reader/recovery';
 import {settings} from '../src/library/store';
 const origin='https://api.example';
-const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',cost:1,version:created,cache_hit:false,...extra});
+const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
 const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),fileHash:'a'.repeat(64),pageIndex:0,ownerId:'alice',apiOrigin:origin,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
 afterEach(()=>vi.unstubAllGlobals());
 describe('per-page redraw display',()=>{

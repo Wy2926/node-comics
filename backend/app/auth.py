@@ -48,7 +48,7 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
             problem("TOKEN_INVALID", "本地用户不存在", 401)
         roles = claims.get("roles", [])
         role = "admin" if isinstance(roles, list) and cfg.oidc_admin_role in roles else "user"
-        user = User(subject=subject, name=str(claims.get("name", "漫画读者"))[:80], role=role, balance=cfg.initial_quota)
+        user = User(subject=subject, name=str(claims.get("name", "漫画读者"))[:80], role=role)
         db.add(user)
         db.commit()
     elif not cfg.dev_auth:

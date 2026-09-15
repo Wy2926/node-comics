@@ -115,14 +115,17 @@ def pg(pg_scope):
     from app.db import initialize, session_factory
     from app.providers import initialize_providers
     from app.assets import create_asset
-    from app.models import User, uid
+    from app.models import User, uid, now
+    from app.entitlements import month_boundary
     initialize()
     image = BytesIO()
     Image.new("RGB", (320, 480), (231, 225, 248)).save(image, "PNG")
     raw = image.getvalue()
     with session_factory()() as db:
         initialize_providers(db)
-        user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", balance=1000)
+        user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", membership_id=uid(), plus_started_at=now(),
+                    plus_expires_at=month_boundary(now(), 12, "Asia/Shanghai"),
+                    plus_timezone="Asia/Shanghai", plus_monthly_pages=300)
         db.add(user)
         db.flush()
         asset = create_asset(db, user.id, raw)
@@ -145,7 +148,9 @@ def assert_single_charge(pg, job_id):
     from app.models import Job, Ledger, User
     with session_factory()() as db:
         user, job = db.get(User, pg["owner_id"]), db.get(Job, job_id)
-        assert (user.balance, user.reserved) == (992, 0)
+        from app.entitlement_models import QuotaPeriod
+        period = db.get(QuotaPeriod, job.quota_period_id)
+        assert (period.used, period.reserved) == (1, 0)
         assert job.status == "succeeded" and job.settlement == "settled"
         kinds = db.scalars(select(Ledger.kind).where(Ledger.job_id == job_id)).all()
         assert sorted(kinds) == ["reserve", "settle"]
@@ -167,7 +172,9 @@ def test_postgres_concurrent_idempotent_creation_reserves_once(pg):
         for table in (Job, Ledger, Outbox):
             assert db.scalar(select(func.count()).select_from(table)) == 1
         user = db.get(User, pg["owner_id"])
-        assert (user.balance, user.reserved) == (1000, 8)
+        from app.entitlement_models import QuotaPeriod
+        period = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id))
+        assert (period.used, period.reserved) == (0, 1)
 
 
 def test_postgres_concurrent_duplicate_workers_call_and_settle_once(pg, monkeypatch):

@@ -2,6 +2,8 @@
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
+2026-09-15：普通用户每日 100 页常规翻译，PLUS 常规不限量、每会员月 300 页重绘，剩余不累积，年付逐月发放；两档并发均为 2。已实现限时常规／重绘赠送，重绘赠送可给普通用户临时权限。旧点数逻辑已移除，使用全新数据库基线。详见[规则](docs/MEMBERSHIP_AND_QUOTAS.md)与[实现验收](docs/MEMBERSHIP_IMPLEMENTATION.md)，运行服务尚需单独切换。
+
 2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在预算内自动重试。常规模式已基于[开源方案与成本调研](docs/CLASSIC_TRANSLATION_RESEARCH.md)实现，启动与验证见[常规翻译运行说明](docs/CLASSIC_IMPLEMENTATION.md)。
 
 阅读器支持“常规翻译”和“AI 重绘翻译”。前者使用独立 OCR／LaMa 引擎与文本 LLM，后者保留 OpenAI 兼容 `POST /v1/images/edits` 多供应商接口；Key 留在后端。
@@ -41,6 +43,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | 文档 | 内容 |
 | --- | --- |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
+| [会员与翻译额度设计](docs/MEMBERSHIP_AND_QUOTAS.md) | 普通／PLUS 已实现规则、会员月额度、限时赠送与旧计费替换范围 |
 | [通用漫画作品管理设计](docs/COMIC_LIBRARY_DESIGN.md) | 已确认；作品、章节、出版套系、卷册、收录关系与来源副本，首轮已实现 |
 | [MangaCopy 来源适配与导入设计](docs/MANGACOPY_LIBRARY_DESIGN.md) | 已实现详情页范围导入、JS 图片清单与有序采集，映射通用作品模型 |
 | [阅读目录与插件译本](docs/READER_DIRECTORY_AND_EDITIONS.md) | 整部作品目录、已有翻译的派生阅读视图与有序采集 |

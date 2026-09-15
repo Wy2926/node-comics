@@ -18,11 +18,11 @@ def seed_owner(png, owner_id, count, *, modes=("redraw", "classic")):
     from app.assets import create_asset
     from app.providers import configuration
     with session_factory()() as db:
-        user = User(id=owner_id, subject="dev:" + owner_id, name=owner_id, balance=100_000)
+        user = User(id=owner_id, subject="dev:" + owner_id, name=owner_id)
         db.add(user)
         db.flush()
         asset = create_asset(db, owner_id, png)
-        batches = [Batch(owner_id=owner_id, quote_id=uid(), idempotency_key=uid(), request_hash="x" * 64, total_cost=0) for _ in range(2)]
+        batches = [Batch(owner_id=owner_id, preview_id=uid(), idempotency_key=uid(), request_hash="x" * 64, quota_pages=0) for _ in range(2)]
         db.add_all(batches)
         db.flush()
         config = configuration(db, "redraw", "zh-Hans")
@@ -33,7 +33,7 @@ def seed_owner(png, owner_id, count, *, modes=("redraw", "classic")):
                       batch_id=None if index % 3 == 0 else batches[index % 3 - 1].id, ordinal=index // 3,
                       mode=modes[index % len(modes)], target_language="zh-Hans", status="queued", phase="queued",
                       operation="translate", idempotency_key=uid(), request_hash="x" * 64, cache_key=uid(),
-                      config=config, cost=0, settlement="free", created_at=timestamp + timedelta(microseconds=index))
+                      config=config, quota_kind="redraw_monthly", quota_pages=0, settlement="free", created_at=timestamp + timedelta(microseconds=index))
             db.add(job)
             jobs.append(job.id)
         db.flush()
@@ -84,13 +84,14 @@ def test_unadmitted_and_duplicate_messages_cannot_claim_or_bypass_modes(client, 
 def test_limit_changes_revoke_pending_tokens_and_preserve_running_work(client, png):
     jobs = seed_owner(png, "user-a", 5)
     auth = login(client, "user-a")
-    assert client.put("/v1/me/queue", headers=auth, json={"concurrency": 4}).status_code == 200
+    settings().free_concurrency = 4
     assert admit_jobs() == jobs[:4]
     revoked = token_for(jobs[3])
     assert claim(jobs[0], token_for(jobs[0]))
     assert claim(jobs[1], token_for(jobs[1]))
-    response = client.put("/v1/me/queue", headers=auth, json={"concurrency": 1})
-    assert response.status_code == 200, response.text
+    settings().free_concurrency = 1
+    admit_jobs()
+    response = client.get("/v1/me/queue", headers=auth)
     assert response.json()["running"] == 2 and response.json()["dispatched"] == 0
     assert claim(jobs[3], revoked) is None and admit_jobs() == []
     with session_factory()() as db:
@@ -108,7 +109,7 @@ def test_worker_rechecks_global_limit_lowered_after_admission(client, png):
     jobs = seed_owner(png, "user-a", 3)
     admit_jobs()
     assert claim(jobs[0], token_for(jobs[0]))
-    settings().user_queue_max_concurrency = 1
+    settings().free_concurrency = 1
     assert claim(jobs[1], token_for(jobs[1])) is None
     assert admit_jobs() == []
     with session_factory()() as db:
@@ -198,28 +199,18 @@ def test_concurrent_sqlite_dispatchers_and_claims_share_durable_cap(client, png)
     assert len([value for value in claims if value]) == 6
 
 
-@pytest.mark.parametrize("value", [0, 11, -1, True, 1.5, "2"])
-def test_queue_api_rejects_invalid_limits(client, value):
-    auth = login(client)
-    response = client.put("/v1/me/queue", headers=auth, json={"concurrency": value})
-    assert response.status_code == 422
-
-
-def test_queue_preferences_defaults_isolation_reset_admin_and_server_ceiling(client):
-    alice, bob, admin = login(client), login(client, "bob"), login(client, "admin")
+def test_plan_concurrency_is_read_only_and_admin_lookup_is_private(client):
+    from conftest import login_plus
+    alice, bob, admin = login(client), login_plus(client, "bob"), login(client, "admin")
+    settings().free_concurrency = 1
+    settings().plus_concurrency = 3
     owner = client.get("/v1/me", headers=bob).json()["user"]["id"]
     path = f"/v1/admin/users/{owner}/queue"
     assert client.get("/v1/me/queue").status_code == 401
-    assert client.get("/v1/me/queue", headers=alice).json()["effective_concurrency"] == 2
-    assert client.put("/v1/me/queue", headers=alice, json={"concurrency": 10}).json()["effective_concurrency"] == 10
-    assert client.get("/v1/me/queue", headers=bob).json()["effective_concurrency"] == 2
+    assert client.get("/v1/me/queue", headers=alice).json()["concurrency"] == 1
+    assert client.get("/v1/me/queue", headers=bob).json()["concurrency"] == 3
+    assert client.put("/v1/me/queue", headers=alice, json={"concurrency": 10}).status_code == 405
     assert client.get(path, headers=alice).status_code == 403
-    assert client.put(path, headers=alice, json={"concurrency": 1}).status_code == 403
-    assert client.put(path, headers=admin, json={"concurrency": 3}).json()["effective_concurrency"] == 3
+    assert client.put(path, headers=admin, json={"concurrency": 10}).status_code == 405
     assert client.get(path, headers=admin).json()["concurrency"] == 3
-    assert client.put("/v1/me/queue", headers=alice, json={"concurrency": None}).json()["effective_concurrency"] == 2
-    assert client.put("/v1/me/queue", headers=alice, json={"concurrency": 2, "owner_id": owner}).status_code == 422
     assert client.get("/v1/admin/users/no-such-user/queue", headers=admin).status_code == 404
-    settings().user_queue_max_concurrency = 2
-    assert client.put("/v1/me/queue", headers=alice, json={"concurrency": 3}).status_code == 422
-    assert client.get(path, headers=admin).json()["effective_concurrency"] == 2

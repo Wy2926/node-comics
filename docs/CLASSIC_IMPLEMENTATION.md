@@ -12,7 +12,7 @@ Docker Desktop 使用 Linux 容器；首次启动需要下载 CPU 推理依赖�
 
 ```dotenv
 CLASSIC_ENABLED=true
-CLASSIC_COST=1
+FREE_DAILY_PAGES=100
 TEXT_BASE_URL=https://sub2api.nodelane.net/v1
 TEXT_API_KEY=自行填写
 TEXT_MODEL=gpt-5.6-luna
@@ -26,7 +26,7 @@ npm ci
 npm run dev
 ```
 
-阅读器：[http://127.0.0.1:5173](http://127.0.0.1:5173)。登录本地测试账号，导入图片或原创示例，在“翻译方式”选“常规翻译”，确认报价后创建任务。常规翻译默认每成功版本 1 测试点；图片重绘仍为 8 点。这是测试额度，与人民币成本分开。
+阅读器：[http://127.0.0.1:5173](http://127.0.0.1:5173)。登录本地测试账号，导入图片或原创示例，在“翻译方式”选“常规翻译”，常规单页直接提交，批量确认页数。普通用户每日 100 页常规，PLUS 常规不限量；重绘使用会员月或有效赠送额度。用户页数与供应商人民币成本分别记录。
 
 后续 Compose 命令都带两个环境文件与 profile：
 
@@ -54,9 +54,9 @@ docker compose --env-file .env --env-file deploy/.env.local --profile classic up
 
 | 接口 | 内容 |
 | --- | --- |
-| `GET /v1/capabilities` | 两种模式的启用状态与测试点数 |
+| `GET /v1/capabilities` | 两种模式的启用状态与当前用户的会员、页数权益 |
 | `POST /v1/translations/classic` | multipart 图片或已有 `asset_id`，以及 `target_language` |
-| `POST /v1/quotes` | `mode: classic`，支持现有批次和预算确认 |
+| `POST /v1/translation-previews` | `mode: classic`，按普通日额度或 PLUS 无限权益确认批次页数 |
 | `GET /v1/jobs/{id}/classic` | 仅所属用户可读的分块原文、译文、诊断图片 ID 和耗时；原图失效返回 410 |
 | `GET /v1/admin/jobs` | 每次文本调用的 request ID、模型、用量、状态及估算／未知预占 |
 
@@ -98,7 +98,7 @@ npm run build:web
 | 样例 | 结果与计量 |
 | --- | --- |
 | 原创书店漫画（1024×1536） | 11 个文本块全部翻译；2 个低置信检测区域保留原文，部分完成、释放点数；一次文本请求 241 输入／353 输出 token。整项任务约 22 秒；检测与 OCR 6.00 秒、LaMa 4.61 秒、排版 0.98 秒 |
-| 合成纯对白页（600×800） | 3 个文本块完整交付、结算 1 测试点；一次文本请求 126 输入／48 输出 token。检测与 OCR 2.59 秒、LaMa 3.01 秒、排版 0.07 秒 |
+| 合成纯对白页（600×800，历史测试） | 3 个文本块完整交付、旧版本结算 1 测试点；一次文本请求 126 输入／48 输出 token。检测与 OCR 2.59 秒、LaMa 3.01 秒、排版 0.07 秒 |
 | 无字页（600×800） | `no_text`，0 次文本请求，释放点数；检测约 1.89 秒 |
 
 两份译图均为原尺寸 PNG，擦除／字形掩膜之外的 RGB 像素逐像素一致，主要对白已检查生成图片。原图、译图、清理图和掩膜保存在被忽略的 `private-test-data/classic-smoke-v2/`、`private-test-data/classic-dialogue/`，不包含在插件包。首次样例因完整性检查过严而失败，记录保留；该次没有调用 LLM。模型列表探测外另有一次小文本协议探测，20 输入／9 输出 token，不计入页面任务记录。

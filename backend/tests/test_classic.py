@@ -93,7 +93,9 @@ def test_idempotency_cache_mode_language_and_settlement(configured):
     cached_id = submit(configured, 'classic-cache')
     assert status(configured, cached_id)['cache_hit']
     assert not status(configured, submit(configured, 'english', 'en'))['cache_hit']
-    assert not create(client, auth, asset).json()['cache_hit']
+    assert create(client, auth, asset).status_code == 403
+    from conftest import login_plus
+    assert not create(client, login_plus(client), asset).json()['cache_hit']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.job_id == job_id, Ledger.kind == 'settle')) == 1
         call = db.scalar(select(TextCall).where(TextCall.job_id == job_id))

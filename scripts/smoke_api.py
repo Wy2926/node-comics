@@ -29,11 +29,12 @@ def main():
     parser.add_argument("--api", default="http://127.0.0.1:18088")
     parser.add_argument("--mode", choices=("redraw",), default="redraw")
     parser.add_argument("--translate", action="store_true")
+    parser.add_argument("--grant-plus", action="store_true", help="Explicitly grant this isolated local test account one PLUS month")
     parser.add_argument("--wait", action="store_true")
     args = parser.parse_args()
     evidence = ROOT / "docs" / "evidence"
     evidence.mkdir(parents=True, exist_ok=True)
-    record_path = evidence / f"live-{args.mode}.json"
+    record_path = evidence / f"membership-live-{args.mode}.json"
     record = json.loads(record_path.read_text("utf-8")) if record_path.exists() else {
         "mode": args.mode, "username": f"acceptance-{args.mode}-{uuid.uuid4().hex[:10]}",
         "operation_id": str(uuid.uuid4()), "checks": [],
@@ -51,6 +52,12 @@ def main():
         auth = checked(client.post("/v1/auth/dev", json={"username": record["username"]}))
         client.headers["Authorization"] = "Bearer " + auth["access_token"]
         record["user_id"] = auth["user"]["id"]
+        if args.grant_plus:
+            operator = checked(client.post("/v1/auth/dev", json={"username": "admin"}))
+            checked(client.post(f"/v1/admin/users/{auth['user']['id']}/membership",
+                headers={"Authorization": "Bearer " + operator["access_token"],
+                         "Idempotency-Key": "smoke-membership-" + record["operation_id"]},
+                json={"months": 1, "note": "Explicit isolated smoke membership"}))
         record["capabilities"] = checked(client.get("/v1/capabilities"))
         record["usage"] = checked(client.get("/v1/me/usage"))
         passed("isolated_local_login_and_capabilities")
@@ -58,6 +65,8 @@ def main():
             save()
             print(json.dumps({"status": "api_ready", "mode": args.mode}, ensure_ascii=False))
             return
+        if "job_id" not in record and not record["capabilities"]["entitlements"]["modes"][args.mode]["allowed"]:
+            raise RuntimeError("Test account requires PLUS or a valid redraw gift; explicitly use --grant-plus for a local test membership")
         sample = (ROOT / "samples" / "starlight-bookshop.png").read_bytes()
         record["input_sha256"] = hashlib.sha256(sample).hexdigest()
         if "asset_id" not in record:

@@ -22,7 +22,7 @@ if (!previous.works.length) {
   }
   await store.editLibrary((state, copies) => {
     const pages = [0, 1, 2].map(n => ({...emptyPage('原始页-' + n, 360, 540), blobKey: 'export-fixture-' + n, ownerId: 'fixture-owner', apiOrigin: 'http://127.0.0.1:18098'}));
-    const job: Job = {id: 'fixture-translation', input_asset_id: 'fixture-input', output_asset_id: 'fixture-output', mode: 'classic', target_language: 'zh-Hans', status: 'succeeded', phase: 'done', version: 1, cost: 0, cache_hit: false, created_at: '2026-09-15T00:00:00Z'};
+    const job: Job = {id: 'fixture-translation', input_asset_id: 'fixture-input', output_asset_id: 'fixture-output', mode: 'classic', target_language: 'zh-Hans', status: 'succeeded', phase: 'done', version: 1, quota_pages: 0, cache_hit: false, created_at: '2026-09-15T00:00:00Z'};
     pages[0].jobs = [job]; pages[0].outputBlobs = {[job.id]: 'export-fixture-3'};
     pages[1].jobs = [{...job, id: 'fixture-no-text', output_asset_id: null, status: 'no_text'}];
     const copy = makeCopy('第 01 话 · 雨后的来信', pages, '原创样本'); copy.id = 'fixture-complete'; copy.pageId = pages[1].id; copy.relativeOffset = 0.42;

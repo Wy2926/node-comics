@@ -7,10 +7,51 @@ class ErrorInfo(BaseModel):
     message: str
 
 
-class QuotaResponse(BaseModel):
-    balance: int
+class QuotaBucketResponse(BaseModel):
+    id: str
+    kind: str
+    source: str
+    mode: str
+    granted: int
+    used: int
     reserved: int
     available: int
+    starts_at: str
+    expires_at: str
+    grants_access: bool
+    note: str
+
+
+class PeriodResponse(BaseModel):
+    id: str
+    kind: str
+    granted: int
+    used: int
+    reserved: int
+    available: int
+    starts_at: str
+    resets_at: str | None
+    next_expiry_at: str
+    buckets: list[QuotaBucketResponse]
+
+
+class ModeEntitlement(BaseModel):
+    allowed: bool
+    unlimited: bool
+    quota_kind: str
+    consent_version: str
+    quota: PeriodResponse | None
+
+
+class EntitlementsResponse(BaseModel):
+    plan: str
+    plus_started_at: str | None
+    plus_expires_at: str | None
+    timezone: str
+    concurrency: int
+    modes: dict[str, ModeEntitlement]
+    generated_at: str
+    pending_previous_period_pages: int
 
 
 class UserResponse(BaseModel):
@@ -54,7 +95,9 @@ class JobResponse(BaseModel):
     target_language: str
     status: str
     phase: str
-    cost: int
+    quota_pages: int
+    quota_kind: str
+    quota_period_id: str | None
     settlement: str
     version: int
     cache_hit: bool
@@ -77,10 +120,14 @@ class JobPageResponse(JobsResponse):
     next_offset: int | None
 
 
-class QuoteResponse(BaseModel):
+class PreviewResponse(BaseModel):
     id: str
-    total_cost: int
-    unit_cost: int
+    quota_pages: int
+    quota_kind: str
+    new_pages: int
+    reused_pages: int
+    entitlement_version: str
+    regenerate: bool
     page_count: int
     expires_at: str
     config_version: str
@@ -92,7 +139,7 @@ class BatchCreatedResponse(BaseModel):
     id: str
     status: str
     jobs: list[JobResponse]
-    total_cost: int
+    quota_pages: int
 
 
 class BatchResponse(BaseModel):
@@ -101,19 +148,22 @@ class BatchResponse(BaseModel):
     items: list[JobResponse]
     total: int
     next_offset: int | None
-    total_cost: int
+    quota_pages: int
 
 
 class UsageEntry(BaseModel):
     id: str
     job_id: str | None
     kind: str
-    amount: int
+    period_id: str | None
+    quota_kind: str | None
+    pages: int
     note: str
     created_at: str
 
 
-class UsageResponse(QuotaResponse):
+class UsageResponse(BaseModel):
+    entitlements: EntitlementsResponse
     items: list[UsageEntry]
     total: int
     next_offset: int | None
@@ -123,7 +173,6 @@ class ModeCapability(BaseModel):
     id: str
     label: str
     enabled: bool
-    unit_cost: int
     languages: list[str]
 
 
@@ -136,8 +185,6 @@ class CapabilitiesResponse(BaseModel):
     modes: list[ModeCapability]
     languages: list[LanguageCapability]
     limits: dict[str, int]
-    quota: QuotaResponse | None
+    entitlements: EntitlementsResponse | None
     retention_days: int
     unknown_release_seconds: int
-    pricing_version: str
-    pricing_note: str

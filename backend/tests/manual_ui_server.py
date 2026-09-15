@@ -18,7 +18,7 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
 directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
-    DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", INITIAL_QUOTA="500", CLASSIC_ENABLED="true",
+    DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="100", PLUS_MONTHLY_REDRAW_PAGES="300", FREE_CONCURRENCY="2", PLUS_CONCURRENCY="2", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="true",
     CLASSIC_ENGINE_TOKEN="isolated-ui-engine", TEXT_API_KEY="isolated-ui-text", TEXT_BASE_URL="https://text.example/v1",
     OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
     CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174")

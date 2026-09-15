@@ -1,24 +1,26 @@
+from conftest import quota_usage
 """Cross-device submissions share active work while preserving request identity."""
 from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select
-from conftest import create, login, png_variant, run_job, upload
+from conftest import create, login_plus as login, png_variant, run_job, upload
+from app.entitlement_models import QuotaPeriod
 from app.batch_items import BatchItem, JobRequest
 from app.config import settings
 from app.db import session_factory
-from app.models import Asset, Batch, Job, Ledger, Outbox, User, now
+from app.models import Asset, Batch, Job, Ledger, Outbox, Provider, User, now
 
 
 def quoted(client, auth, assets):
-    response = client.post("/v1/quotes", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"})
+    response = client.post("/v1/translation-previews", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"})
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def submit_batch(client, auth, quote, key):
+def submit_batch(client, auth, preview, key):
     return client.post("/v1/translation-batches", headers={**auth, "Idempotency-Key": key},
-                       json={"quote_id": quote["id"], "max_credits": quote["total_cost"]})
+                       json={"preview_id": preview["id"], "max_quota_pages": preview["quota_pages"]})
 
 
 @pytest.mark.parametrize("status", ["queued", "running", "outcome_unknown"])
@@ -30,8 +32,8 @@ def test_active_work_reused_before_quota_and_active_limits(client, png, status):
     with session_factory()() as db:
         job = db.get(Job, first["id"])
         job.status = status
-        user = db.get(User, job.owner_id)
-        user.balance = user.reserved  # No spare quota remains.
+        period = db.get(QuotaPeriod, job.quota_period_id)
+        period.granted = period.used + period.reserved
         db.commit()
     response = create(client, auth, alias, key="device-two")
     assert response.status_code == 202, response.text
@@ -42,7 +44,7 @@ def test_active_work_reused_before_quota_and_active_limits(client, png, status):
     price = quoted(client, auth, [alias])
     batch = submit_batch(client, auth, price, "device-batch")
     assert batch.status_code == 202, batch.text
-    assert batch.json()["total_cost"] == 0
+    assert batch.json()["quota_pages"] == 0
     assert batch.json()["jobs"][0]["id"] == first["id"]
     with session_factory()() as db:
         for model in (Job, Ledger, Outbox):
@@ -68,7 +70,10 @@ def test_reused_request_key_survives_terminal_status_and_config_changes(client, 
             job.status = terminal
             settle(db, job, success=False)
             db.commit()
-    settings().redraw_cost = 80
+    with session_factory()() as db:
+        provider = db.get(Provider, "default")
+        provider.config = {**provider.config, "model": "changed-model"}
+        db.commit()
     repeated = create(client, auth, asset, key="alias")
     assert repeated.status_code == 202 and repeated.json()["id"] == original["id"]
     assert repeated.json()["status"] == terminal
@@ -85,7 +90,7 @@ def test_batch_aliases_keep_requested_page_order_and_share_cancellation(client, 
     first = submit_batch(client, alice, quoted(client, alice, assets), "batch-first").json()
     second_quote = quoted(client, alice, list(reversed(assets)))
     second = submit_batch(client, alice, second_quote, "batch-second").json()
-    assert (first["total_cost"], second["total_cost"]) == (8, 0)
+    assert (first["quota_pages"], second["quota_pages"]) == (1, 0)
     assert len(first["jobs"]) == len(second["jobs"]) == 3
     assert len({job["id"] for job in first["jobs"] + second["jobs"]}) == 1
     for batch, expected in [(first, assets), (second, list(reversed(assets)))]:
@@ -113,22 +118,23 @@ def test_mixed_batch_only_reserves_new_work_and_rolls_back_insufficient_funds(cl
     existing = create(client, auth, assets[0]).json()
     with session_factory()() as db:
         owner = db.get(Job, existing["id"]).owner_id
-        db.get(User, owner).balance = 16  # Existing 8 plus only one additional page.
+        period = db.get(QuotaPeriod, existing["quota_period_id"])
+        period.granted = 2  # One accepted page and one additional page.
         db.commit()
     price = quoted(client, auth, assets)
     failed = submit_batch(client, auth, price, "insufficient")
-    assert failed.status_code == 409 and failed.json()["error"]["code"] == "INSUFFICIENT_QUOTA"
+    assert failed.status_code == 409 and failed.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Batch)) == 0
         assert db.scalar(select(func.count()).select_from(BatchItem)) == 0
         for model in (Job, JobRequest, Ledger, Outbox):
             assert db.scalar(select(func.count()).select_from(model)) == 1
-        assert db.get(User, owner).reserved == 8
+        assert db.get(QuotaPeriod, existing["quota_period_id"]).reserved == 1
     accepted = submit_batch(client, auth, quoted(client, auth, assets[:2]), "mixed")
     assert accepted.status_code == 202, accepted.text
-    assert accepted.json()["total_cost"] == 8
+    assert accepted.json()["quota_pages"] == 1
     assert accepted.json()["jobs"][0]["id"] == existing["id"]
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 16
+    assert quota_usage(client, auth)["reserved"] == 2
 
 
 def test_success_cache_is_free_even_with_full_active_limit_and_zero_spare_quota(client, png, monkeypatch):
@@ -142,12 +148,12 @@ def test_success_cache_is_free_even_with_full_active_limit_and_zero_spare_quota(
     other = create(client, auth, upload(client, auth, png_variant(png, 1)), key="other").json()
     settings().max_active_jobs = 1
     with session_factory()() as db:
-        user = db.get(User, db.get(Job, other["id"]).owner_id)
-        user.balance = user.reserved
+        period = db.get(QuotaPeriod, other["quota_period_id"])
+        period.granted = period.used + period.reserved
         db.commit()
     cached = submit_batch(client, auth, quoted(client, auth, [asset]), "free-cache")
     assert cached.status_code == 202, cached.text
-    assert cached.json()["total_cost"] == 0 and cached.json()["jobs"][0]["cache_hit"]
+    assert cached.json()["quota_pages"] == 0 and cached.json()["jobs"][0]["cache_hit"]
     assert cached.json()["jobs"][0]["output_asset_id"] == client.get(f"/v1/jobs/{first['id']}", headers=auth).json()["output_asset_id"]
 
 
@@ -166,13 +172,13 @@ def test_no_text_completed_between_device_quote_and_confirm_is_free_without_reex
     first = client.post("/v1/translations/classic", headers={**auth, "Idempotency-Key": "first-device"},
                          data={"asset_id": source, "target_language": "zh-Hans"})
     assert first.status_code == 202, first.text
-    price = client.post("/v1/quotes", headers=auth,
+    price = client.post("/v1/translation-previews", headers=auth,
                          json={"asset_ids": [alias], "mode": "classic", "target_language": "zh-Hans"}).json()
     run_job(first.json()["id"])
     second = submit_batch(client, auth, price, "second-device")
     assert second.status_code == 202, second.text
     cached = second.json()["jobs"][0]
-    assert second.json()["total_cost"] == cached["cost"] == 0
+    assert second.json()["quota_pages"] == cached["quota_pages"] == 0
     assert cached["status"] == "no_text" and cached["cache_hit"] and cached["output_asset_id"] is None
     assert cached["requested_asset_id"] == alias and cached["id"] != first.json()["id"]
     run_job(cached["id"])
@@ -180,7 +186,7 @@ def test_no_text_completed_between_device_quote_and_confirm_is_free_without_reex
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Outbox)) == 1
         assert db.scalar(select(func.count()).select_from(Attempt)) == 1
-    assert client.get("/v1/me/usage", headers=auth).json()["reserved"] == 0
+    assert quota_usage(client, auth)["reserved"] == 0
 
 
 @pytest.mark.parametrize("invalid", ["cancel", "discard", "expired", "deleted", "missing"])
@@ -220,8 +226,7 @@ def test_changed_config_cannot_automatically_replay_unknown_redraw_but_does_not_
         provider = db.get(Provider, "default")
         provider.config = {**provider.config, "parameters": {"quality": "high"}}
         db.commit()
-    settings().redraw_cost = 80
-    settings().classic_cost = 3
+    settings().text_model = "changed-text-model"
     second = client.post(f"/v1/translations/{mode}", headers={**auth, "Idempotency-Key": "changed-config"},
                           data={"asset_id": alias, "target_language": "zh-Hans"})
     assert second.status_code == 202, second.text
@@ -229,9 +234,10 @@ def test_changed_config_cannot_automatically_replay_unknown_redraw_but_does_not_
     assert second.json()["requested_asset_id"] == alias
     with session_factory()() as db:
         expected = 1 if mode == "redraw" else 2
-        for model in (Job, Outbox, Ledger):
+        for model in (Job, Outbox):
             assert db.scalar(select(func.count()).select_from(model)) == expected
+        assert db.scalar(select(func.count()).select_from(Ledger)) == (1 if mode == "redraw" else 0)
         assert db.scalar(select(func.count()).select_from(JobRequest)) == 2
         if mode == "redraw":
-            assert db.get(User, db.get(Job, first["id"]).owner_id).reserved == 8
+            assert db.get(QuotaPeriod, first["quota_period_id"]).reserved == 1
             assert second.json()["status"] == "outcome_unknown"

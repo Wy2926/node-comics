@@ -22,9 +22,9 @@ def snapshot():
             and 128 <= cfg.text_group_bytes <= 16000 and 1 <= cfg.text_input_rate <= 1000
             and 1 <= cfg.text_output_rate <= 5000 and 1 <= cfg.text_timeout_seconds <= 180
             and 1 <= cfg.classic_local_attempts <= 5 and 30 <= cfg.classic_timeout_seconds <= 3600
-            and 0 < cfg.text_page_budget_micros <= 10_000_000 and cfg.classic_cost >= 0):
+            and 0 < cfg.text_page_budget_micros <= 10_000_000):
         problem("CLASSIC_CONFIG_INVALID", "常规翻译预算或次数限制无效", 503)
-    return {"mode": "classic", "unit_cost": cfg.classic_cost, "prompt_version": "classic-text-v1",
+    return {"mode": "classic", "prompt_version": "classic-text-v1",
             "provider": {"id": "classic-text", "timeout_seconds": cfg.classic_timeout_seconds},
             "engine": {"version": cfg.classic_engine_version, "detector": "default", "ocr": "48px",
                        "inpainter": "lama_large", "detection_size": 1536, "inpainting_size": 512,

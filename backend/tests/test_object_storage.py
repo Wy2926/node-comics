@@ -1,3 +1,4 @@
+from conftest import quota_usage
 from datetime import timedelta, timezone
 from io import BytesIO
 from urllib.parse import parse_qs, urlsplit
@@ -8,7 +9,7 @@ from botocore.exceptions import ClientError, EndpointConnectionError
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
 import pytest
-from conftest import claim_job, create, login, run_job, upload
+from conftest import claim_job, create, login_plus as login, run_job, upload
 from test_classic import configured  # Reuse the isolated OCR/text/render fixture.
 
 
@@ -126,7 +127,7 @@ def test_r2_delivery_direct_access_and_account_isolation(client, remote, png, mo
     assert len(sdk.calls) == calls
     run_job(job['id'])
     assert supplier.call_count == 1
-    assert client.get('/v1/me/usage', headers=auth).json()['balance'] == 92
+    assert quota_usage(client, auth)['used'] == 1
 
 
 @pytest.mark.parametrize('kind', ['original', 'classic_stage', 'mask', None])
@@ -152,7 +153,7 @@ def test_all_reader_status_queries_avoid_remote_requests(client, remote, png, mo
         source = db.get(Asset, original)
         stage = create_asset(db, source.owner_id, png, kind='classic_stage', parent_id=source.id)
         assert stage.storage_backend == 'local'
-        batch = Batch(owner_id=source.owner_id, quote_id='history', idempotency_key='history', request_hash='a'*64, total_cost=0)
+        batch = Batch(owner_id=source.owner_id, preview_id='history', idempotency_key='history', request_hash='a'*64, quota_pages=0)
         db.add(batch)
         db.flush()
         db.add(BatchItem(batch_id=batch.id, ordinal=0, job_id=job['id'], input_asset_id=original))
@@ -252,8 +253,8 @@ def test_uncertain_put_is_recovered_without_repeating_paid_call(client, remote, 
         assert current.status == 'succeeded' and db.get(Asset, current.output_asset_id).storage_backend == 'r2'
     run_job(job['id'])
     assert supplier.call_count == 1
-    usage = client.get('/v1/me/usage', headers=auth).json()
-    assert usage['balance'] == 92 and usage['reserved'] == 0
+    usage = quota_usage(client, auth)
+    assert usage['used'] == 1 and usage['reserved'] == 0
 
 
 def test_remote_sweep_advances_and_preserves_pending_recovery(client, remote, png):
@@ -386,10 +387,10 @@ def test_cancelled_crash_output_is_removed_without_charging(client, remote, png)
         db.commit()
         assert db.get(Job, job_id).status == 'cancelled'
     assert not remote[0].objects
-    assert client.get('/v1/me/usage', headers=auth).json()['balance'] == 100
+    assert quota_usage(client, auth)['used'] == 0
 
 
-def test_upgrade_preserves_existing_local_assets_and_attempts(client, png):
+def test_repeated_initialization_preserves_current_assets_and_attempts(client, png):
     from pathlib import Path
     from alembic import command
     from alembic.config import Config
@@ -404,7 +405,7 @@ def test_upgrade_preserves_existing_local_assets_and_attempts(client, png):
     config.set_main_option('script_location', str(root / 'migrations'))
     with engine().begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, '0007')
+        command.upgrade(config, 'head')
         command.upgrade(config, 'head')
     with session_factory()() as db:
         asset = db.get(Asset, original)

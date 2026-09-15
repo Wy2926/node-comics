@@ -77,7 +77,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   else assert(copy.pages.every(p=>p.width===640&&p.height===960&&p.imageSha256));
   if(cache) {
     for(const p of copy.pages)assert(p.jobs.some(j=>jobs.some(old=>old.id===j.id)),`${label} restored job`);
-    assert(!requests.some(r=>r.method==='POST'&&['/v1/images','/v1/quotes','/v1/translation-batches'].includes(r.url)),'Recovery must not upload or submit');
+    assert(!requests.some(r=>r.method==='POST'&&['/v1/images','/v1/translation-previews','/v1/translation-batches'].includes(r.url)),'Recovery must not upload or submit');
   }
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');

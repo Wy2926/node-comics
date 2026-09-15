@@ -14,7 +14,7 @@ function sample() {
   return {state, copy, workId, blobs, get: async (key: string) => blobs.get(key)};
 }
 function job(id: string, overrides: Partial<Job> = {}): Job {
-  return {id, input_asset_id: 'in', output_asset_id: id + '-asset', mode: 'classic', target_language: 'zh-Hans', status: 'succeeded', phase: 'done', cost: 0, created_at: '2026-09-15T00:00:00Z', version: 1, cache_hit: false, ...overrides};
+  return {id, input_asset_id: 'in', output_asset_id: id + '-asset', mode: 'classic', target_language: 'zh-Hans', status: 'succeeded', phase: 'done', quota_pages: 0, created_at: '2026-09-15T00:00:00Z', version: 1, cache_hit: false, ...overrides};
 }
 
 describe('export planning', () => {

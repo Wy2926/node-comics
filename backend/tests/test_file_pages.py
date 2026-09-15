@@ -1,3 +1,4 @@
+from conftest import quota_usage
 """Device-independent lookup uses no local IDs and never creates/bills jobs."""
 from datetime import timedelta
 from hashlib import sha256
@@ -5,7 +6,7 @@ from hashlib import sha256
 import pytest
 from sqlalchemy import func, select
 
-from conftest import create, login, run_job
+from conftest import create, login_plus as login, run_job
 
 
 FILE_HASH = sha256(b"synthetic-mobi-container").hexdigest()
@@ -40,7 +41,7 @@ def test_new_device_restores_versions_without_upload_or_billing(client, png, mon
     first = complete(client, auth, asset, png, monkeypatch)
     # A new login/session has no device-local asset or job identifiers.
     another_device = login(client)
-    before = client.get("/v1/me/usage", headers=auth).json()
+    before = quota_usage(client, auth)
     for _ in range(2):
         result = match(client, another_device)
         assert result.status_code == 200, result.text
@@ -48,7 +49,7 @@ def test_new_device_restores_versions_without_upload_or_billing(client, png, mon
         assert page["asset"]["id"] == asset
         assert [job["id"] for job in page["jobs"]] == [first["id"]]
         assert client.get(f"/v1/images/{page['jobs'][0]['output_asset_id']}/content", headers=another_device).content == png
-    assert client.get("/v1/me/usage", headers=auth).json() == before
+    assert quota_usage(client, auth) == before
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Asset)) == 2
         assert db.scalar(select(func.count()).select_from(Job)) == 1
@@ -71,14 +72,14 @@ def test_binding_deduplicates_upload_and_preserves_page_identity(client, png):
 
 
 def test_file_match_keeps_valid_versions_and_reuses_content_across_page_assets(client, png, monkeypatch):
-    from conftest import quote
+    from conftest import preview
     auth = login(client)
     source = bind(client, auth, png).json()["id"]
     alias = bind(client, auth, png, index=1).json()["id"]
     first = complete(client, auth, source, png, monkeypatch)
-    price = quote(client, auth, source)
+    price = preview(client, auth, source)
     response = client.post(f"/v1/jobs/{first['id']}/rerun", headers={**auth, "Idempotency-Key": "second-version"},
-        json={"quote_id": price["id"], "max_credits": price["total_cost"]})
+        json={"preview_id": price["id"], "max_quota_pages": price["quota_pages"]})
     assert response.status_code == 202, response.text
     second = response.json()
     run_job(second["id"])
@@ -175,8 +176,12 @@ def test_match_filters_language_mode_and_effective_config(client, png, monkeypat
     monkeypatch.setenv("CLASSIC_ENABLED", "true")
     settings.cache_clear()
     assert match(client, auth, mode="classic").json()["items"][0]["jobs"] == []
-    monkeypatch.setenv("REDRAW_COST", "9")
-    settings.cache_clear()
+    from app.db import session_factory
+    from app.models import Provider
+    with session_factory()() as db:
+        provider = db.get(Provider, "default")
+        provider.config = {**provider.config, "model": "updated-image-model"}
+        db.commit()
     assert match(client, auth).json()["items"][0]["jobs"] == []
 
 
@@ -213,4 +218,4 @@ def test_classic_no_text_is_reusable_without_new_charge(client, png, monkeypatch
         db.commit()
     result = match(client, auth, mode="classic").json()["items"][0]
     assert result["jobs"][0]["status"] == "no_text"
-    assert client.get("/v1/me/usage", headers=auth).json()["balance"] == 100
+    assert quota_usage(client, auth)["used"] == 0

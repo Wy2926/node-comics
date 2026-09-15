@@ -2,6 +2,7 @@
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 from pydantic import Field
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,8 @@ from .auth import admin, user_json
 from .config import settings
 from .db import get_db
 from .errors import problem
-from .jobs import create_job, idem_key, job_json, quota_json, settle
+from .jobs import create_job, idem_key, job_json, settle
+from .entitlements import change_membership, compensate, entitlements_json
 from .models import Attempt, Job, Ledger, Provider, TextCall, User, now
 from .providers import ProviderConfig, configuration, credential
 from .request_models import RequestBody
@@ -20,9 +22,17 @@ from .schemas import JobResponse
 router = APIRouter()
 
 
-class QuotaAdjustment(RequestBody):
-    amount: int = Field(ge=-1_000_000, le=1_000_000)
-    note: str = Field(default="运营测试额度", max_length=200)
+class MembershipRequest(RequestBody):
+    action: Literal["extend", "expire"] = "extend"
+    months: int = Field(default=1, ge=1, le=120, strict=True)
+    monthly_pages: int | None = Field(default=None, ge=0, le=1_000_000, strict=True)
+    note: str = Field(min_length=1, max_length=200)
+
+
+class CompensationRequest(RequestBody):
+    kind: Literal["classic_daily", "redraw_monthly"]
+    pages: int = Field(ge=1, le=1_000_000, strict=True)
+    note: str = Field(min_length=1, max_length=200)
 
 
 class ProviderToggle(RequestBody):
@@ -79,11 +89,14 @@ def provider_toggle(provider_id: str, body: ProviderToggle, user: User = Depends
 
 @router.post("/v1/admin/providers/{provider_id}/test", status_code=202, response_model=JobResponse)
 async def provider_test(provider_id: str, image: Annotated[UploadFile, File()], target_language: Annotated[str, Form()] = "zh-Hans", idempotency_key: Annotated[str | None, Header()] = None, user: User = Depends(admin), db: Session = Depends(get_db)):
-    config = configuration(db, "redraw", target_language, provider_id)
-    asset = create_asset(db, user.id, await upload_bytes(image))
-    job = create_job(db, user, asset, "redraw", target_language, idem_key(idempotency_key), operation=f"provider-test:{provider_id}", force=True, config=config)
-    db.commit()
-    return job_json(db, job)
+    data = await upload_bytes(image)
+    def submit():
+        config = configuration(db, "redraw", target_language, provider_id)
+        asset = create_asset(db, user.id, data)
+        job = create_job(db, user, asset, "redraw", target_language, idem_key(idempotency_key), operation=f"provider-test:{provider_id}", force=True, config=config)
+        db.commit()
+        return job_json(db, job)
+    return await run_in_threadpool(submit)
 
 
 @router.get("/v1/admin/jobs")
@@ -109,26 +122,19 @@ def admin_jobs(status: str | None = Query(None, max_length=24), offset: int = Qu
 @router.get("/v1/admin/users")
 def admin_users(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(admin), db: Session = Depends(get_db)):
     rows = db.scalars(select(User).order_by(User.created_at.desc()).offset(offset).limit(limit))
-    return {"items": [{**user_json(row), **quota_json(row)} for row in rows], "total": db.scalar(select(func.count()).select_from(User))}
+    return {"items": [{**user_json(row), "entitlements": entitlements_json(db, row)} for row in rows], "total": db.scalar(select(func.count()).select_from(User))}
 
 
-@router.post("/v1/admin/users/{user_id}/quota")
-def admin_quota(user_id: str, body: QuotaAdjustment, idempotency_key: Annotated[str | None, Header()] = None, user: User = Depends(admin), db: Session = Depends(get_db)):
-    key = f"quota:{user.id}:{idem_key(idempotency_key)}"
-    target = db.scalar(select(User).where(User.id == user_id).with_for_update())
-    if not target:
-        problem("NOT_FOUND", "用户不存在", 404)
-    existing = db.scalar(select(Ledger).where(Ledger.transaction_key == key))
-    if existing:
-        if existing.owner_id != user_id or existing.amount != body.amount or existing.note != body.note:
-            problem("IDEMPOTENCY_CONFLICT", "额度操作编号已用于其他调整", 409)
-        return {**user_json(target), **quota_json(target)}
-    if target.balance + body.amount < target.reserved:
-        problem("INSUFFICIENT_QUOTA", "调整后额度不能低于已预占额度", 409)
-    target.balance += body.amount
-    db.add(Ledger(owner_id=user_id, transaction_key=key, kind="adjustment", amount=body.amount, note=body.note))
-    db.commit()
-    return {**user_json(target), **quota_json(target)}
+@router.post("/v1/admin/users/{user_id}/membership")
+def admin_membership(user_id: str, body: MembershipRequest, idempotency_key: Annotated[str | None, Header()] = None,
+                     user: User = Depends(admin), db: Session = Depends(get_db)):
+    return change_membership(db, user_id, user.id, idem_key(idempotency_key), **body.model_dump())
+
+
+@router.post("/v1/admin/users/{user_id}/quota-compensations")
+def admin_compensation(user_id: str, body: CompensationRequest, idempotency_key: Annotated[str | None, Header()] = None,
+                       user: User = Depends(admin), db: Session = Depends(get_db)):
+    return compensate(db, user_id, user.id, idem_key(idempotency_key), **body.model_dump())
 
 
 @router.post("/v1/admin/jobs/{job_id}/reconcile", response_model=JobResponse)

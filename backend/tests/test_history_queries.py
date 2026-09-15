@@ -1,9 +1,10 @@
+from conftest import quota_usage
 from datetime import timedelta
 
 import pytest
 from sqlalchemy import event, select
 
-from conftest import login, upload
+from conftest import login_plus as login, upload
 
 
 def seed_history(client, png, count=15):
@@ -23,13 +24,13 @@ def seed_history(client, png, count=15):
         db.flush()
         ids = []
         for n in range(count):
-            batch = Batch(owner_id=source.owner_id, quote_id=f'quote-{n}', idempotency_key=f'batch-{n}',
-                          request_hash='a'*64, total_cost=1, created_at=now()+timedelta(seconds=n))
+            batch = Batch(owner_id=source.owner_id, preview_id=f'preview-{n}', idempotency_key=f'batch-{n}',
+                          request_hash='a'*64, quota_pages=1, created_at=now()+timedelta(seconds=n))
             db.add(batch)
             db.flush()
             job = Job(owner_id=source.owner_id, input_asset_id=source.id, output_asset_id=output.id,
                       batch_id=batch.id, ordinal=0, mode='classic', target_language='zh-Hans',
-                      status='succeeded', settlement='settled', cost=1, config={},
+                      status='succeeded', settlement='settled', quota_kind='classic_daily', quota_pages=1, config={},
                       idempotency_key=f'job-{n}', operation='fixture', request_hash='a'*64, cache_key='b'*64)
             db.add(job)
             db.flush()

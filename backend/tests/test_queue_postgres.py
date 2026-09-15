@@ -49,10 +49,10 @@ def test_postgres_duplicate_workers_enforce_shared_limit_across_modes(pg):
 
 
 def test_postgres_lowering_limit_races_with_worker_claims_without_deadlock(pg):
-    from app.queue_api import set_queue
+    from app.config import settings
+    from app.scheduler import lock_scheduler, trim_admissions
     jobs = seed_owner(pg["png"], "user-a", 5)
-    with session_factory()() as db:
-        set_queue(db, "user-a", 4)
+    settings().free_concurrency = 4
     admit_jobs()
     tokens = {job_id: token_for(job_id) for job_id in jobs[:4]}
     barrier = threading.Barrier(5)
@@ -62,7 +62,12 @@ def test_postgres_lowering_limit_races_with_worker_claims_without_deadlock(pg):
     def lower():
         barrier.wait(timeout=10)
         with session_factory()() as db:
-            return set_queue(db, "user-a", 1)
+            lock_scheduler(db)
+            settings().free_concurrency = 1
+            trim_admissions(db, "user-a", 1)
+            running = db.scalar(select(func.count()).select_from(Job).where(Job.status == "running"))
+            db.commit()
+            return {"running": running}
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = [pool.submit(receive, job_id) for job_id in jobs[:4]]
         changed = pool.submit(lower)

@@ -16,13 +16,6 @@ class SchedulerState(Base):
     __table_args__ = (CheckConstraint("id = 1"),)
 
 
-class UserQueueSettings(Base):
-    __tablename__ = "user_queue_settings"
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
-    concurrency: Mapped[int | None] = mapped_column(Integer)
-    __table_args__ = (CheckConstraint("concurrency >= 1 AND concurrency <= 10"),)
-
-
 class QueueAdmission(Base):
     __tablename__ = "queue_admissions"
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), primary_key=True)

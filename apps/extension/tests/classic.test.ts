@@ -18,7 +18,7 @@ describe('classic mode and budget boundaries',()=>{
     vi.stubGlobal('fetch',async(url:string,init:RequestInit)=>{calls.push({url,init});return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});});
     try{
       const api=new Api('https://api.example','test-token');
-      await api.quote(['original'],'classic','zh-Hans');
+      await api.preview(['original'],'classic','zh-Hans');
       await api.create('original','classic','zh-Hans','same-operation');
       expect(JSON.parse(calls[0].init.body as string).mode).toBe('classic');
       expect(calls[1].url).toBe('https://api.example/v1/translations/classic');

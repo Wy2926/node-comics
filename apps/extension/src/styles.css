@@ -564,7 +564,7 @@ button {
   color: #c8a36e;
   border-color: #f7ebd8;
 }
-.quote-summary {
+.preview-summary {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   background: linear-gradient(115deg,#fff5f8,#f1f9fe);
@@ -573,28 +573,28 @@ button {
   padding: 20px 15px;
   gap: 12px;
 }
-.quote-summary>span {
+.preview-summary>span {
   font-size: 9px;
   color: #b0a9ba;
 }
-.quote-summary b {
+.preview-summary b {
   font-size: 29px;
   color: #db8fab;
   display: block;
   margin-top: 13px;
   font-weight: 650;
 }
-.quote-summary small {
+.preview-summary small {
   font-size: 10px;
   font-weight: 400;
   color: #b6aaba;
 }
-.quote-summary .language-value {
+.preview-summary .language-value {
   font-size: 15px;
   padding-top: 9px;
   color: #8a9db9;
 }
-.quote-expiry {
+.preview-expiry {
   font-size: 9px;
   color: #b1b8c6;
   text-align: center;
@@ -884,13 +884,13 @@ kbd {
   .modal-subtitle {
     font-size: 11px;
   }
-  .quote-summary b {
+  .preview-summary b {
     font-size: 24px;
   }
-  .quote-summary .language-value {
+  .preview-summary .language-value {
     font-size: 13px;
   }
-  .quote-summary {
+  .preview-summary {
     padding: 16px 12px;
     gap: 8px;
   }

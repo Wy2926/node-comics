@@ -1,8 +1,8 @@
 from fastapi import HTTPException
 
 
-def problem(code: str, message: str, status: int = 400):
-    raise HTTPException(status_code=status, detail={"code": code, "message": message})
+def problem(code: str, message: str, status: int = 400, **details):
+    raise HTTPException(status_code=status, detail={"code": code, "message": message, **details})
 
 
 class ProcessingError(Exception):

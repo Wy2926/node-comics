@@ -11,7 +11,7 @@ const origin=location.origin;
 const originalFetch=window.fetch.bind(window);
 const blob=await (await originalFetch('/samples/starlight-bookshop.png')).blob();
 const bitmap=await createImageBitmap(blob);const width=bitmap.width,height=bitmap.height;bitmap.close();
-const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,input_asset_id:`asset-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',output_asset_id:status==='succeeded'?`output-${index}`:null,cost:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
+const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,input_asset_id:`asset-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',output_asset_id:status==='succeeded'?`output-${index}`:null,quota_pages:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
 if(!existing.length){
   saveSettings({...defaults,apiBase:origin});saveSession({token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
   await putBlob('reader-fixture-original',blob);await putBlob('reader-fixture-output',blob);
@@ -77,13 +77,13 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   if(url.pathname==='/v1/me/usage')return json({balance:10000,available:10000-state.submitted.length,reserved:state.submitted.length,items:[],total:0});
   if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map((p:{file_hash:string;page_index:number})=>({...p,asset:p.page_index===6?null:asset(p.page_index),jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language),display_jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language)}))});
-  if(url.pathname==='/v1/quotes'){const id=crypto.randomUUID();quotes.set(id,body);return json({id,unit_cost:state.price,total_cost:body.asset_ids.length*state.price,page_count:body.asset_ids.length,expires_at:'2099-01-01T00:00:00Z',config_version:'fixture-v1'});}
+  if(url.pathname==='/v1/translation-previews'){const id=crypto.randomUUID();quotes.set(id,body);return json({id,unit_cost:state.price,quota_pages:body.asset_ids.length*state.price,page_count:body.asset_ids.length,expires_at:'2099-01-01T00:00:00Z',config_version:'fixture-v1'});}
   if(url.pathname==='/v1/translation-batches'){
     const key=new Headers(init.headers).get('Idempotency-Key')!;
     if(batches.has(key))return json(batches.get(key));
-    const quote=quotes.get(body.quote_id)!;
-    const result=quote.asset_ids.map(a=>{const i=Number(a.replace('asset-',''));const j={...job(i,'queued'),id:`submitted-${crypto.randomUUID()}`,mode:quote.mode,target_language:quote.target_language};jobs.set(j.id,j);state.submitted.push(i);return j;});
-    const response={id:key,status:'queued',jobs:result,total_cost:result.length};batches.set(key,response);
+    const preview=quotes.get(body.preview_id)!;
+    const result=preview.asset_ids.map(a=>{const i=Number(a.replace('asset-',''));const j={...job(i,'queued'),id:`submitted-${crypto.randomUUID()}`,mode:preview.mode,target_language:preview.target_language};jobs.set(j.id,j);state.submitted.push(i);return j;});
+    const response={id:key,status:'queued',jobs:result,quota_pages:result.length};batches.set(key,response);
     if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}return json(response);
   }
   if(url.pathname==='/v1/jobs/status')return json({items:body.ids.map((id:string)=>{
@@ -104,5 +104,5 @@ window.fetch=async(input,init={})=>{
   return json({error:{code:'FIXTURE_ROUTE_MISSING',message:`Unimplemented fixture route: ${url.pathname}`}},404);
 };
 await import('../src/main');
-if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 报价 ${state.requests.filter(p=>p==='/v1/quotes').length} 次`;},500);}
+if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 报价 ${state.requests.filter(p=>p==='/v1/translation-previews').length} 次`;},500);}
 if(flow){const output=document.createElement('output');output.id='fixture-flow-state';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(async()=>{const s=await readLibrary();output.textContent=`隔离验收 · 已读：${s.chapters.filter(c=>c.title.startsWith(`连读 ${flow}`)&&c.readAt).map(c=>c.number).join('、')||'无'} · 解码 ${document.querySelector('.nc-reading-viewport')?.getAttribute('data-decoded-pages')??0} 页 · 新翻译 ${state.submitted.length} 页`;},500);}

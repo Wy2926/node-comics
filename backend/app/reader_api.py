@@ -15,7 +15,9 @@ from .batch_items import BatchItem
 from .db import Base, get_db
 from .request_models import RequestBody
 from .errors import problem
-from .jobs import idem_key, job_json, locked_user, owned_job, quota_json
+from .jobs import idem_key, job_json, locked_user, owned_job
+from .entitlements import entitlements_json
+from .schemas import EntitlementsResponse
 from .models import Asset, Job, Batch, Ledger, User, now, uid
 from .schemas import JobResponse
 from .providers import digest
@@ -175,24 +177,22 @@ def review_feedback(feedback_id: str, body: FeedbackUpdate, user: User = Depends
 
 class UsageDay(BaseModel):
     date: str
-    settled: int
+    delivered: int
     classic: int
     redraw: int
-    unclassified: int
 
 
 class UsageSummary(BaseModel):
-    balance: int
-    reserved: int
-    available: int
+    entitlements: EntitlementsResponse
     timezone: str
     start_date: str
     end_date: str
     generated_at: str
-    settled: int
     delivered: int
     free_delivered: int
+    included_delivered: int
     by_mode: dict[str, int]
+    quota_used: dict[str, int]
     days: list[UsageDay]
 
 
@@ -207,25 +207,33 @@ def usage_summary(days: int = Query(7, ge=1, le=90), timezone_name: str = Query(
     start_day = end_day - timedelta(days=days - 1)
     start = datetime.combine(start_day, time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
     end = datetime.combine(end_day + timedelta(days=1), time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
-    daily = {(start_day + timedelta(days=i)).isoformat(): {"settled": 0, "classic": 0, "redraw": 0, "unclassified": 0} for i in range(days)}
-    totals = {"classic": 0, "redraw": 0, "unclassified": 0}
+    daily = {(start_day + timedelta(days=i)).isoformat(): {"delivered": 0, "classic": 0, "redraw": 0} for i in range(days)}
+    totals = {"classic": 0, "redraw": 0}
+    consumed = {"classic": 0, "redraw": 0}
     # Stream the whole interval, never just the account ledger's first page.
     # Local dates are derived via IANA timezone rules, including DST transitions.
     entries = select(Ledger.created_at, Ledger.amount, Job.mode).outerjoin(Job, Job.id == Ledger.job_id).where(
         Ledger.owner_id == user.id, Ledger.kind == "settle", Ledger.created_at >= start, Ledger.created_at < end)
     for created_at, amount, mode in db.execute(entries).yield_per(1000):
-        day = created_at.replace(tzinfo=timezone.utc).astimezone(zone).date().isoformat()
-        category = mode if mode in ("classic", "redraw") else "unclassified"
-        daily[day]["settled"] += amount
-        daily[day][category] += amount
-        totals[category] += amount
-    delivered = select(Job).where(Job.owner_id == user.id, Job.status == "succeeded", Job.cache_hit.is_(False),
+        if mode in consumed:
+            consumed[mode] += amount
+    delivered = select(Job.completed_at, Job.mode, Job.settlement).where(Job.owner_id == user.id, Job.status == "succeeded", Job.cache_hit.is_(False),
                                  Job.output_asset_id.is_not(None), Job.completed_at >= start, Job.completed_at < end)
-    count = db.scalar(select(func.count()).select_from(delivered.subquery()))
-    free = db.scalar(select(func.count()).select_from(delivered.where(Job.settlement != "settled").subquery()))
-    return {**quota_json(user), "timezone": timezone_name, "start_date": start_day.isoformat(), "end_date": end_day.isoformat(),
-            "generated_at": now().isoformat() + "Z", "settled": sum(totals.values()), "delivered": count,
-            "free_delivered": free, "by_mode": totals, "days": [{"date": day, **values} for day, values in daily.items()]}
+    count = free = included = 0
+    for completed_at, mode, settlement in db.execute(delivered).yield_per(1000):
+        day = completed_at.replace(tzinfo=timezone.utc).astimezone(zone).date().isoformat()
+        count += 1
+        included += settlement == "included"
+        free += settlement in ("free", "released")
+        daily[day]["delivered"] += 1
+        if mode in totals:
+            totals[mode] += 1
+            daily[day][mode] += 1
+    return {"entitlements": entitlements_json(db, user), "timezone": timezone_name,
+            "start_date": start_day.isoformat(), "end_date": end_day.isoformat(),
+            "generated_at": now().isoformat() + "Z", "delivered": count, "included_delivered": included,
+            "free_delivered": free, "by_mode": totals, "quota_used": consumed,
+            "days": [{"date": day, **values} for day, values in daily.items()]}
 
 
 class HistoryGroup(BaseModel):
@@ -282,7 +290,7 @@ def translation_history(offset: int = Query(0, ge=0), limit: int = Query(20, ge=
             retained(source), retained(output), or_(output.parent_id.is_(None), retained(parent))))
         rows = db.execute(select(
             references.c.group_id, references.c.requested_asset_id, Job.id, Job.batch_id,
-            Job.mode, Job.target_language, Job.status, Job.quality_flags, Job.cost,
+            Job.mode, Job.target_language, Job.status, Job.quality_flags, Job.quota_pages,
             Job.settlement, Job.cache_hit, expired.label("result_expired"),
         ).join(Job, Job.id == references.c.job_id)
             .outerjoin(source, source.id == Job.input_asset_id)
@@ -305,8 +313,8 @@ def translation_history(offset: int = Query(0, ge=0), limit: int = Query(20, ge=
         items.append({"id": group_id, "kind": kind, "created_at": created_at.isoformat() + "Z",
                       "mode": first.mode if first else "", "target_language": first.target_language if first else "",
                       "page_count": len(entries), "counts": dict(states),
-                      "settled": sum(job.cost for job in chargeable if job.settlement == "settled"),
-                      "reserved": sum(job.cost for job in chargeable if job.settlement == "reserved"),
+                      "settled": sum(job.quota_pages for job in chargeable if job.settlement == "settled"),
+                      "reserved": sum(job.quota_pages for job in chargeable if job.settlement == "reserved"),
                       "reused": sum(1 for job in entries if job.cache_hit or kind == "batch" and job.batch_id != group_id),
                       "job_ids": [job.id for job in entries], "asset_ids": [job.requested_asset_id for job in entries]})
     return {"items": items, "total": total, "next_offset": offset + limit if offset + limit < total else None}

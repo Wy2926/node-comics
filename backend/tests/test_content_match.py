@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select
-from conftest import create, login, upload
+from conftest import quota_usage, create, login_plus as login, upload
 from test_file_pages import bind, complete, match, FILE_HASH
 
 
@@ -19,7 +19,7 @@ def test_repacked_page_recovers_without_mapping_upload_job_or_charge(client,png,
     auth=login(client)
     asset=bind(client,auth,png).json()["id"]
     job=complete(client,auth,asset,png,monkeypatch)
-    before=client.get('/v1/me/usage',headers=auth).json()
+    before=quota_usage(client, auth)
     pages=[source(png),source(png,"c"*64,0)]
     result=match(client,login(client),pages)
     assert result.status_code==200,result.text
@@ -27,7 +27,7 @@ def test_repacked_page_recovers_without_mapping_upload_job_or_charge(client,png,
         assert item['file_hash']==requested['file_hash'] and item['page_index']==requested['page_index']
         assert item['asset']['id']==asset
         assert [j['id'] for j in item['jobs']]==[job['id']]
-    assert client.get('/v1/me/usage',headers=auth).json()==before
+    assert quota_usage(client, auth)==before
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(FilePage))==1
         assert db.scalar(select(func.count()).select_from(Asset))==2
@@ -75,7 +75,12 @@ def test_content_matching_uses_mode_language_config_and_preserves_unknown(client
     assert match(client,auth,[source(png)],language='en').json()['items'][0]['jobs']==[]
     with session_factory()() as db:
         db.get(Job,job['id']).status='outcome_unknown';db.commit()
-    monkeypatch.setenv('REDRAW_COST','9');settings.cache_clear()
+    from app.db import session_factory
+    from app.models import Provider
+    with session_factory()() as db:
+        provider=db.get(Provider,'default')
+        provider.config={**provider.config,'model':'changed-image-model'}
+        db.commit();settings.cache_clear()
     assert match(client,auth,[source(png)]).json()['items'][0]['jobs']==[]
     # Display restoration keeps unknown requests observable across config changes.
     result=client.post('/v1/file-pages/match',headers=auth,json={'pages':[source(png)],'mode':'redraw','target_language':'zh-Hans','include_display':True}).json()['items'][0]
@@ -99,9 +104,9 @@ def test_conflicting_and_invalid_client_hashes_cannot_bind_a_page(client,png):
 def test_completed_submission_cache_hits_by_content_without_second_charge(client,png,monkeypatch):
     auth=login(client);asset=bind(client,auth,png).json()['id']
     job=complete(client,auth,asset,png,monkeypatch)
-    before=client.get('/v1/me/usage',headers=auth).json()
+    before=quota_usage(client, auth)
     alias=bind(client,auth,png,file_hash='d'*64).json()['id']
     cached=create(client,auth,alias,key='repacked').json()
-    assert cached['cache_hit'] and cached['cost']==0 and cached['settlement']=='free'
+    assert cached['cache_hit'] and cached['quota_pages']==0 and cached['settlement']=='free'
     assert cached['output_asset_id']==job['output_asset_id']
-    assert client.get('/v1/me/usage',headers=auth).json()==before
+    assert quota_usage(client, auth)==before

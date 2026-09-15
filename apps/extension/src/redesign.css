@@ -1621,7 +1621,7 @@ a {
   color: var(--warning);
   background: var(--surface-soft);
 }
-.nc-app .quote-summary {
+.nc-app .preview-summary {
   display: flex;
   gap: 20px;
   padding: 22px;
@@ -1630,24 +1630,24 @@ a {
   border-radius: 12px;
   flex-wrap: wrap;
 }
-.nc-app .quote-summary>span {
+.nc-app .preview-summary>span {
   font-size: .875rem;
   color: var(--muted);
   flex: 1;
   min-width: 90px;
 }
-.nc-app .quote-summary b {
+.nc-app .preview-summary b {
   font-size: 1.8rem;
   color: var(--ink);
   margin-top: 10px;
 }
-.nc-app .quote-summary small {
+.nc-app .preview-summary small {
   font-size: .875rem;
 }
-.nc-app .quote-summary .language-value {
+.nc-app .preview-summary .language-value {
   font-size: 1.125rem;
 }
-.nc-app .quote-expiry {
+.nc-app .preview-expiry {
   font-size: .875rem;
   color: var(--muted);
   margin: 18px 0;
@@ -1984,11 +1984,11 @@ a {
   .nc-app .modal {
     padding: 24px;
   }
-  .nc-app .quote-summary {
+  .nc-app .preview-summary {
     padding: 18px;
     gap: 16px;
   }
-  .nc-app .quote-summary b {
+  .nc-app .preview-summary b {
     font-size: 1.5rem;
   }
   .nc-technical {
@@ -2635,3 +2635,6 @@ a {
 .nc-auto-status button {
   flex-shrink: 0;
 }
+
+.nc-stat-grid.nc-entitlements-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media(max-width:760px) { .nc-stat-grid.nc-entitlements-grid { grid-template-columns: 1fr; } }

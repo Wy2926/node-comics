@@ -22,9 +22,11 @@ export function PageTranslationBar({page,number,mode,selectedView,shownJob,langu
     if(t.ready)return null;
     const restoring=!!t.result?.output_asset_id&&!t.expired;
     const pending=!!t.pending;
-    return <button key={value} className="nc-translate-page" disabled={!pending&&!restoring&&(busy||preparing||!caps?.modes.find(m=>m.id===value)?.enabled)} onClick={()=>pending||restoring?onView(value):onTranslate(value)} title={pending?taskText(t.pending):restoring?'正在读取已有译图':`仅${labels[value]}当前第 ${number} 页 · 查看报价`}>
+    const benefit=caps?.entitlements?.modes[value];
+    const accessHint=value==='redraw'&&benefit&&!benefit.allowed?'需要 PLUS 或有效重绘赠送额度':value==='classic'&&benefit?.unlimited?'PLUS 常规不限量':benefit?.quota?`可用 ${benefit.quota.available} 页`:'';
+    return <button key={value} className="nc-translate-page" disabled={!pending&&!restoring&&(busy||preparing||!caps?.modes.find(m=>m.id===value)?.enabled)} onClick={()=>pending||restoring?onView(value):onTranslate(value)} title={pending?taskText(t.pending):restoring?'正在读取已有译图':`仅${labels[value]}当前第 ${number} 页${accessHint?` · ${accessHint}`:""}`}>
       {pending&&t.pending?.status!=='outcome_unknown'?<TaskActivity waiting={t.pending?.status==='queued'}/>:<Icon name={value==='redraw'?'spark':'globe'} size={15}/>}
-      {pending?`${labels[value]}${t.pending?.status==='outcome_unknown'?'待核实':t.pending?.status==='queued'?'排队中':'中'}`:restoring?`${labels[value]}读取中`:value==='redraw'?'AI 重绘本页':'翻译本页'}
+      {pending?`${labels[value]}${t.pending?.status==='outcome_unknown'?'待核实':t.pending?.status==='queued'?'排队中':'中'}`:restoring?`${labels[value]}读取中`:value==='redraw'?`AI 重绘本页${benefit&&!benefit.allowed?' · PLUS':''}`:'翻译本页'}
     </button>;
   };
   return <div className="nc-reader-status">

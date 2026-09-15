@@ -1,3 +1,4 @@
+from conftest import quota_usage
 from conftest import run_job, claim_job
 import base64
 from datetime import timedelta
@@ -7,7 +8,7 @@ import socket
 import httpx
 import pytest
 from sqlalchemy import func, select
-from conftest import create, login, upload
+from conftest import create, login_plus as login, upload
 
 
 def mock_transport(monkeypatch, handler):
@@ -141,8 +142,8 @@ def test_saved_output_is_recovered_after_crash_before_database_commit(client, pn
         assert db.get(Job, job_id).status == "succeeded"
         assert db.get(Job, job_id).output_asset_id == attempt_id
         assert db.get(Attempt, attempt_id).recovered
-    usage = client.get("/v1/me/usage", headers=auth).json()
-    assert usage["balance"] == 92 and usage["reserved"] == 0
+    usage = quota_usage(client, auth)
+    assert usage["used"] == 1 and usage["reserved"] == 0
 
 
 def test_cleanup_advances_past_200_tombstones(client, png):

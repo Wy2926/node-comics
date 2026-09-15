@@ -17,13 +17,11 @@ type Props = {
   onClearCache: () => void;
   onSaveApiAddress: (draft: string) => Promise<void>;
 };
-export function Preferences({ api, account, settings, setSettings, caps, cacheBytes, notify, onClearCache, onSaveApiAddress }: Props) {
+export function Preferences({ api, account, settings, setSettings, caps, cacheBytes, onClearCache, onSaveApiAddress }: Props) {
   const [apiDraft, setApiDraft] = useState(settings.apiBase);
   useEffect(() => setApiDraft(settings.apiBase), [settings.apiBase]);
   const [queue, setQueue] = useState<UserQueue>();
-  const [queueDraft, setQueueDraft] = useState('');
   const [queueError, setQueueError] = useState('');
-  const [queueSaving, setQueueSaving] = useState(false);
   useEffect(() => {
     if (!account)
       return;
@@ -31,7 +29,6 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
     void api.queue().then(value => {
       if (active && api.isCurrent()) {
         setQueue(value);
-        setQueueDraft(value.concurrency === null ? '' : String(value.concurrency));
         setQueueError('');
       }
     }).catch(e => {
@@ -40,28 +37,6 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
     });
     return () => { active = false; };
   }, [api, account]);
-  async function saveQueue() {
-    if (!account || queueSaving)
-      return;
-    setQueueSaving(true);
-    setQueueError('');
-    try {
-      const value = await api.updateQueue(queueDraft === '' ? null : normalizeConcurrency(Number(queueDraft)));
-      if (api.isCurrent()) {
-        setQueue(value);
-        setQueueDraft(value.concurrency === null ? '' : String(value.concurrency));
-        notify('账户翻译队列并发已保存');
-      }
-    }
-    catch (e) {
-      if (api.isCurrent())
-        setQueueError((e as Error).message);
-    }
-    finally {
-      if (api.isCurrent())
-        setQueueSaving(false);
-    }
-  }
   return <>
     <PageTitle eyebrow="MAKE IT YOURS" title="外观与偏好" description="调成你喜欢的阅读节奏，偏好保存在本机。" />
     <AppearanceSettings settings={settings} onChange={setSettings} />
@@ -113,11 +88,7 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
         <label className="unit-input">
           <input aria-label="本机请求并发" type="number" min="1" max="10" step="1" value={settings.requestConcurrency} onChange={e => setSettings(s => ({ ...s, requestConcurrency: normalizeConcurrency(Number(e.target.value)) }))} /> 个</label>
       </SettingRow>{account && <>
-        <SettingRow title="账户翻译队列并发" description={queue ? `当前生效 ${queue.effective_concurrency}，默认 ${queue.default_concurrency}，上限 ${queue.max_concurrency}。等待 ${queue.queued} / 已派发 ${queue.dispatched} / 执行中 ${queue.running}。后端按用户轮转派发；实际执行还受服务容量限制。` : '读取当前账户的后端队列配置；与本机上传、下载并发独立。'}>
-          <select aria-label="账户翻译队列并发" value={queueDraft} disabled={!queue || queueSaving} onChange={e => setQueueDraft(e.target.value)}>
-            <option value="">使用服务端默认值</option>{Array.from({ length: Math.min(10, queue?.max_concurrency ?? 10) }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}</select>
-          <button className="button secondary small" disabled={!queue || queueSaving} onClick={() => void saveQueue()}>保存账户设置</button>
-        </SettingRow>{queueError && <p className="inline-error">队列设置未读取或保存：{queueError}</p>}</>}<SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
+        <SettingRow title="账户翻译队列并发" description={queue ? `套餐上限 ${queue.concurrency}。等待 ${queue.queued} / 已派发 ${queue.dispatched} / 执行中 ${queue.running}。所有设备、批次和翻译模式共享名额。` : '正在读取套餐执行上限；与本机上传、下载并发独立。'}><span>{queue?.concurrency??'—'} 个任务</span></SettingRow>{queueError && <p className="inline-error">队列状态读取失败：{queueError}</p>}</>}<SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
         <input aria-label="后端服务地址" className="api-input" type="url" value={apiDraft} onChange={e => setApiDraft(e.target.value)} />
         <button className="button secondary small" onClick={() => void onSaveApiAddress(apiDraft)}>保存并连接</button>
       </SettingRow>

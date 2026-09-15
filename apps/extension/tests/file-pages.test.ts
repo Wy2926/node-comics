@@ -9,7 +9,7 @@ import type {FilePageMatch, Job, Page} from '../src/types';
 
 const origin = 'https://api.example';
 const page = (index: number): Page => ({...emptyPage(`${index}.png`, 100, 200), fileHash: index.toString(16).padStart(64, '0'), pageIndex: 0, blobKey: `original:${index}`});
-const job = (status: Job['status'] = 'succeeded', extra: Partial<Job> = {}): Job => ({id: 'job',input_asset_id:'asset',output_asset_id:status==='succeeded'?'result':null,mode:'classic',target_language:'zh-Hans',status,phase:'',cost:1,created_at:'2026-09-14T00:00:00Z',version:1,cache_hit:false,...extra});
+const job = (status: Job['status'] = 'succeeded', extra: Partial<Job> = {}): Job => ({id: 'job',input_asset_id:'asset',output_asset_id:status==='succeeded'?'result':null,mode:'classic',target_language:'zh-Hans',status,phase:'',quota_pages:1,created_at:'2026-09-14T00:00:00Z',version:1,cache_hit:false,...extra});
 const match = (p: Page, jobs: Job[] = []): FilePageMatch => ({...pageSource(p)!,asset:{id:`asset-${p.name}`,width:999,height:999,expires_at:'2099-01-01T00:00:00Z'},jobs});
 afterEach(() => vi.unstubAllGlobals());
 
@@ -52,12 +52,12 @@ describe('file-page API contract', () => {
     const result=await matchFilePages(api,pages,'classic','zh-Hans');const plan=planTranslation(pages,result,'classic','zh-Hans');
     expect(plan.selected.map(p=>p.id)).toEqual([pages[100].id]);expect(plan.failures).toHaveLength(100);
   });
-  it('changes account queue settings only through the explicit PUT API', async () => {
+  it('keeps transfer concurrency independent of read-only account queue limits', async () => {
     const calls: {url:string;init:RequestInit}[]=[];
     vi.stubGlobal('fetch',async(url:string,init:RequestInit)=>{calls.push({url,init});return Response.json({});});
     const api=new Api(origin);api.pool.setLimit(10);expect(calls).toHaveLength(0);
-    await api.queue();await api.updateQueue(5);await api.updateQueue(null);
-    expect(calls.map(c=>[c.url,c.init.method??'GET',c.init.body])).toEqual([[origin+'/v1/me/queue','GET',undefined],[origin+'/v1/me/queue','PUT','{"concurrency":5}'],[origin+'/v1/me/queue','PUT','{"concurrency":null}']]);
+    await api.queue();
+    expect(calls.map(c=>[c.url,c.init.method??'GET',c.init.body])).toEqual([[origin+'/v1/me/queue','GET',undefined]]);
   });
 });
 
@@ -115,7 +115,7 @@ describe('reuse and safe recovery', () => {
     expect(submittedJobsForPage({...restored,assetId:undefined}.id,[uploaded],[submitted])).toEqual([submitted]);
   });
   it('binds shared jobs using requested asset aliases and persistent selected page ids',()=>{
-    const first={...page(1),assetId:'quote-asset-a'},second={...page(2),assetId:'quote-asset-b'};
+    const first={...page(1),assetId:'preview-asset-a'},second={...page(2),assetId:'preview-asset-b'};
     const returned=[job('queued',{input_asset_id:'original-from-other-book',requested_asset_id:first.assetId}),job('queued',{input_asset_id:'original-from-other-book',requested_asset_id:second.assetId})];
     expect(submittedJobsForPage(first.id,[first,second],returned)).toEqual([returned[0]]);
     expect(submittedJobsForPage(second.id,[first,second],returned)).toEqual([returned[1]]);
@@ -146,10 +146,10 @@ describe('reuse and safe recovery', () => {
     const restored=applyMatch(p,found,'alice',origin);const rerun=rerunSource(restored,found,'classic','zh-Hans')!;
     expect(rerun).toEqual({pageId:p.id,jobId:previous.id,inputAssetId:'other-book-source'});
     expect(restored.assetId).toBe(found.asset!.id);expect(restored.fileHash).toBe(p.fileHash);expect(restored.pageIndex).toBe(0);
-    const api=new Api(origin);const quote=vi.spyOn(api,'quote').mockResolvedValue({id:'quote',total_cost:1,unit_cost:1,page_count:1,expires_at:'',config_version:'config'});
+    const api=new Api(origin);const preview=vi.spyOn(api,'preview').mockResolvedValue({id:'preview',quota_pages:1,quota_kind:'classic_daily',new_pages:1,reused_pages:0,regenerate:true,entitlement_version:'rights',page_count:1,expires_at:'',config_version:'config'});
     const rerunCall=vi.spyOn(api,'rerun').mockResolvedValue(job('queued',{version:2}));
-    const q=await api.quote([rerun.inputAssetId],'classic','zh-Hans');await api.rerun(rerun.jobId,'same-key',q.id,q.total_cost);
-    expect(quote).toHaveBeenCalledWith(['other-book-source'],'classic','zh-Hans');expect(rerunCall).toHaveBeenCalledWith(previous.id,'same-key','quote',1);
+    const q=await api.preview([rerun.inputAssetId],'classic','zh-Hans');await api.rerun(rerun.jobId,'same-key',q.id,q.quota_pages);
+    expect(preview).toHaveBeenCalledWith(['other-book-source'],'classic','zh-Hans');expect(rerunCall).toHaveBeenCalledWith(previous.id,'same-key','preview',1);
   });
   it('rejects late match responses from the previous account/service', async () => {
     let current=true;let resolve!: (value:{items:FilePageMatch[]})=>void;const api=new Api(origin,'token',undefined,()=>current);const p=page(1);
