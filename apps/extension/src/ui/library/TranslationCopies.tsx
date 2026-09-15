@@ -3,6 +3,7 @@ import {languageLabel,modeLabels,type ReadingCopy} from '../../types';
 import {translationSummaries,type TranslationEdition} from '../../library/translations';
 import {Thumbnail} from '../../reader/Images';
 import {copyCover} from './shared';
+import {CardBody} from './CardBody';
 
 export function TranslationCopies({copies,userId,origin,onOpen}:{copies:ReadingCopy[];userId?:string;origin?:string;onOpen:(id:string,edition:TranslationEdition)=>void}){
  const [filter,setFilter]=useState('all');
@@ -15,7 +16,7 @@ export function TranslationCopies({copies,userId,origin,onOpen}:{copies:ReadingC
    const readable=s.local+s.remote;
    return <article className="nc-translation-card" key={s.id}>
     <Thumbnail blobKey={copyCover(copy)?.blobKey} alt={copy.title+'原始副本封面'}/>
-    <div><span className="nc-card-kicker">{modeLabels[s.mode]} · {languageLabel(s.language)}</span><h3>{copy.title}</h3><p>{copy.source} · 原始副本修订 {copy.manifestRevision}</p><strong>{readable} / {s.total??'?'} 页已有译图</strong><p>{s.local} 页在本机{s.remote>0&&` · ${s.remote} 页待恢复`}{s.noText>0&&` · ${s.noText} 页无文字`}</p><p className="nc-translation-attention">{[s.pending&&`${s.pending} 页处理中或待核实`,s.failed&&`${s.failed} 页失败`,s.expired&&`${s.expired} 页译图失效`].filter(Boolean).join(' · ')}</p><button className={'button small '+(readable||s.noText?'primary':'secondary')} onClick={()=>onOpen(copy.id,{mode:s.mode,language:s.language})}>{readable||s.noText?'阅读此译本':'查看进度与原图'}</button></div>
+    <CardBody eyebrow={modeLabels[s.mode]+' · '+languageLabel(s.language)} title={copy.title} metadata={[copy.source+' · 原始副本修订 '+copy.manifestRevision,`${readable} / ${s.total??'?'} 页已有译图`,[`${s.local} 页在本机`,s.remote>0&&`${s.remote} 页待恢复`,s.noText>0&&`${s.noText} 页无文字`].filter(Boolean).join(' · '),[s.pending&&`${s.pending} 页处理中或待核实`,s.failed&&`${s.failed} 页失败`,s.expired&&`${s.expired} 页译图失效`].filter(Boolean).join(' · ')]}><button className={'button small full '+(readable||s.noText?'primary':'secondary')} onClick={()=>onOpen(copy.id,{mode:s.mode,language:s.language})}>{readable||s.noText?'阅读此译本':'查看进度与原图'}</button></CardBody>
    </article>;
   })}</div>
   {!visible.length&&<p className="nc-translation-empty">{!userId?'登录后显示当前账户在此服务上的插件译本。':'还没有对应的翻译结果。阅读时完成翻译后会自动归入这里。'}</p>}

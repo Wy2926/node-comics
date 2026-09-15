@@ -9,6 +9,7 @@ import {attachCopy,makeCopy} from '../src/library/model';
 import {emptyPage} from '../src/reader/model';
 import * as store from '../src/library/store';
 import type {SourceCatalog} from '../src/library/types';
+import {seedCardLayout,TranslationCardFixture} from './library-card-fixture';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
@@ -48,6 +49,7 @@ if(!previous.works.length){
  store.saveSettings({...store.settings(),apiBase:'http://127.0.0.1:18099',appearance:'light'});
 }
 localStorage.setItem('nc-library-fixture','v1');
+if(new URLSearchParams(location.search).has('cards'))await seedCardLayout();
 const fixtureLibrary=await store.readLibrary(),fixtureCopies=await store.readCopies();
 
 function CatalogFixture(){
@@ -57,4 +59,4 @@ function CatalogFixture(){
  if(closed)return <><App/>{notice&&<div className="toast" role="status">{notice}</div>}</>;
  return <div className="nc-app"><main className="nc-main"><CatalogImport catalog={source} library={library} copies={copies} onDone={()=>void reload()} onClose={()=>setClosed(true)} onNotice={setNotice} onRefresh={async()=>{await reload();setNotice('来源目录已刷新');}}/>{notice&&<p role="status">{notice}</p>}</main></div>;
 }
-createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('catalog')?<CatalogFixture/>:<App/>);
+createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('translations')?<TranslationCardFixture copies={fixtureCopies}/>:new URLSearchParams(location.search).has('catalog')?<CatalogFixture/>:<App/>);

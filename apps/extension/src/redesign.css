@@ -418,13 +418,6 @@ a {
   width: 18px;
   height: 18px;
 }
-.nc-books {
-  display: grid;
-  gap: 28px;
-}
-.nc-books.grid {
-  grid-template-columns: repeat(auto-fill,minmax(230px,1fr));
-}
 .nc-book {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -465,29 +458,6 @@ a {
   font-size: .875rem;
   border-radius: 7px;
 }
-.nc-book-info {
-  padding: 20px;
-}
-.nc-book h2 {
-  font-size: 1.25rem;
-  line-height: 1.5;
-  margin-bottom: 9px;
-  min-height: 1.5em;
-}
-.nc-book h2 button {
-  padding: 0;
-  text-align: left;
-  font-weight: 700;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.nc-book p {
-  color: var(--muted);
-  font-size: .875rem;
-  margin: 8px 0;
-}
 .nc-progress {
   height: 5px;
   border-radius: 4px;
@@ -500,54 +470,6 @@ a {
   height: 100%;
   background: var(--accent);
   border-radius: inherit;
-}
-.nc-book-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-}
-.nc-book-actions>.button {
-  font-size: .875rem;
-}
-.nc-books.list {
-  grid-template-columns: 1fr;
-  gap: 18px;
-}
-.nc-books.list .nc-book {
-  display: flex;
-  padding: 18px;
-  gap: 24px;
-  align-items: center;
-}
-.nc-books.list .nc-book-cover {
-  width: 112px;
-  height: 148px;
-  border-radius: 9px;
-  flex: none;
-}
-.nc-books.list .nc-book-info {
-  padding: 0;
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  column-gap: 32px;
-}
-.nc-books.list h2,.nc-books.list p {
-  grid-column: 1;
-}
-.nc-books.list h2 {
-  margin: 0;
-}
-.nc-books.list p {
-  margin: 5px 0;
-}
-.nc-books.list .nc-book-actions {
-  grid-column: 2;
-  grid-row: 1 / 4;
-  align-self: center;
-  margin: 0;
 }
 .nc-empty {
   display: flex;
@@ -1810,9 +1732,6 @@ a {
   }
 }
 @media(min-width:1600px) {
-  .nc-books.grid {
-    grid-template-columns: repeat(5,minmax(0,1fr));
-  }
 }
 @media(max-width:1100px) {
   .nc-app-header {
@@ -1895,28 +1814,6 @@ a {
   .nc-library-tools>.nc-inline {
     width: 100%;
     justify-content: space-between;
-  }
-  .nc-books.grid {
-    grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
-  }
-  .nc-books.list .nc-book {
-    gap: 16px;
-    padding: 16px;
-    align-items: start;
-  }
-  .nc-books.list .nc-book-cover {
-    width: 92px;
-    height: 128px;
-  }
-  .nc-books.list .nc-book-info {
-    display: block;
-  }
-  .nc-books.list .nc-book-actions {
-    margin-top: 14px;
-    gap: 8px;
-  }
-  .nc-book-info {
-    padding: 18px;
   }
   .nc-history-summary {
     padding: 20px;
@@ -2096,9 +1993,6 @@ a {
     padding-left: 16px;
     padding-right: 16px;
   }
-  .nc-books.grid {
-    grid-template-columns: 1fr;
-  }
   .nc-book-cover {
     max-height: 430px;
   }
@@ -2108,17 +2002,6 @@ a {
   }
   .nc-history-summary>.nc-thumbnail {
     display: none;
-  }
-  .nc-books.list .nc-book-cover {
-    width: 78px;
-    height: 112px;
-  }
-  .nc-books.list .nc-book-actions .button {
-    font-size: .875rem;
-    padding: 8px 10px;
-  }
-  .nc-books.list h2 {
-    font-size: 1.125rem;
   }
   .nc-reader-top .nc-mode-button {
     max-width: 158px;
@@ -2446,55 +2329,6 @@ a {
   flex-direction: row;
   gap: 6px;
 }
-/* Identical rows reserve the same space for every card, including one-line titles. */
-.nc-book-info {
-  display: grid;
-  grid-template-rows: 3.75rem 1.375rem 1.375rem minmax(42px,auto);
-  gap: 10px;
-  min-width: 0;
-}
-.nc-book-info h2,.nc-book-info p,.nc-book-info .nc-book-actions {
-  margin: 0;
-  min-width: 0;
-}
-.nc-book-info h2 {
-  min-height: 0;
-  overflow: hidden;
-}
-.nc-book-info h2 button {
-  width: 100%;
-  overflow-wrap: anywhere;
-  line-height: 1.5;
-}
-.nc-book-info p {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.375rem;
-}
-.nc-book-actions {
-  min-height: 42px;
-  align-self: end;
-}
-.nc-book-actions>.button {
-  height: 42px;
-  min-height: 42px;
-}
-.nc-books.list .nc-book-info {
-  grid-template-rows: 3rem 1.375rem 1.375rem;
-  gap: 10px 24px;
-  min-width: 0;
-}
-.nc-books.list .nc-book-info h2,.nc-books.list .nc-book-info p {
-  margin: 0;
-}
-.nc-books.list .nc-book-info h2 {
-  font-size: 1rem;
-}
-.nc-books.list .nc-book-actions {
-  grid-row: 1 / 4;
-  margin: 0;
-}
 @media(max-width:760px) {
   .nc-reader {
     --reader-top: 62px;
@@ -2567,20 +2401,6 @@ a {
   }
   .nc-read-percent {
     min-width: 29px;
-  }
-  .nc-books.list .nc-book-info {
-    display: grid;
-    grid-template-columns: minmax(0,1fr);
-    grid-template-rows: 3rem 1.375rem 1.375rem minmax(42px,auto);
-    gap: 10px;
-  }
-  .nc-books.list .nc-book-actions {
-    grid-column: 1;
-    grid-row: 4;
-    margin: 0;
-  }
-  .nc-books.list .nc-book-cover {
-    height: 148px;
   }
   .nc-app.is-reading .toast {
     bottom: 62px;
