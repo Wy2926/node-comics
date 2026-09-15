@@ -54,6 +54,7 @@ class ExecutionLease(Base):
     stage_id: Mapped[str] = mapped_column(ForeignKey("job_stages.id"), index=True)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
     node_id: Mapped[str] = mapped_column(ForeignKey("compute_nodes.id"), index=True)
+    executor_id: Mapped[str | None] = mapped_column(String(160))
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     generation: Mapped[int] = mapped_column(Integer)
     resource_pool: Mapped[str] = mapped_column(String(120))

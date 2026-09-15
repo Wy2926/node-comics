@@ -89,7 +89,8 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
-    __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),)
+    __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
+                     Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"))
 
 
 class Attempt(Base):

@@ -4,7 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from fastapi import HTTPException
 import hmac
+import os
 import re
+import socket
 from threading import Event, Thread
 import time
 from sqlalchemy import select
@@ -307,6 +309,7 @@ def run_control_stage(lease_id):
 def main():
     initialize()
     cfg = settings()
+    executor_id = f"{socket.gethostname()}:{os.getpid()}"[:160]
     pools = {"text": cfg.cluster_text_slots, "redraw": cfg.cluster_redraw_slots, "validate_upload": cfg.cluster_upload_slots}
     with session_factory()() as db:
         lock_scheduler(db)
@@ -327,7 +330,7 @@ def main():
                 if len(futures) >= sum(pools.values()):
                     break
                 with session_factory()() as db:
-                    lease = claim_stage(db, "control-" + name, [name])
+                    lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)
                     db.commit()
                 if lease:
                     futures.add(executor.submit(run_control_stage, lease.id))

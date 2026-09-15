@@ -55,6 +55,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | [作品管理实现与验收](docs/COMIC_LIBRARY_IMPLEMENTATION.md) | 新数据库、旧逻辑清理、操作说明、真实来源与浏览器验收边界 |
 | [客户端 UI 重设计草案](docs/UI_REDESIGN_PROPOSAL.md) | 大卡片书架、简洁阅读器、翻译记录、用量统计与多主题（待评审） |
 | [架构设计](docs/ARCHITECTURE.md) | 插件、任务、权限与供应商 |
+| [服务端管理后台](docs/ADMIN_CONSOLE.md) | React 管理页面、用户与节点、队列积压、逐页耗时与执行履历、构建和登录 |
 | [技术验证](docs/TECH_RESEARCH.md) | 协议依据、样本与验证边界 |
 | [常规翻译调研](docs/CLASSIC_TRANSLATION_RESEARCH.md) | 开源引擎比较、LaMa、LLM 成本与重试、待实施验证 |
 | [运行与实现](docs/IMPLEMENTATION.md) | 操作命令、配置、交付状态及限制 |

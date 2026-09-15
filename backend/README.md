@@ -53,6 +53,10 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 供应商密钥只通过后端环境引用，不进入任务快照和前端。配置影响生成结果时进入内容缓存版本；会员页数和权重不改变图片缓存身份。
 
+## 管理后台
+
+服务端 `/admin/` 提供独立 **React + TypeScript + Vite** 后台，可查看用户与权益、节点心跳与容量、双模式积压，以及逐页翻译的等待／执行耗时、交付节点和执行机。构建、登录、统计口径和验收见[后台说明](../docs/ADMIN_CONSOLE.md)。Docker 构建自动打包页面；本机启动 API 前先在 `backend/admin-ui` 执行 `npm ci` 和 `npm run build`。
+
 ## API
 
 交互文档 `/docs`，机器契约 `/openapi.json`。

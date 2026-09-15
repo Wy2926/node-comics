@@ -169,7 +169,7 @@ def _runnable(snapshot, node, stage, job, at):
     return True
 
 
-def claim_stage(db, node_id, allowed_stages=None):
+def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None):
     lock_scheduler(db)
     node = db.get(ComputeNode, node_id)
     at = now()
@@ -253,6 +253,7 @@ def claim_stage(db, node_id, allowed_stages=None):
     job.status, job.phase = "running", stage.name
     stage.status, stage.generation, stage.attempts = "running", stage.generation + 1, stage.attempts + 1
     lease = ExecutionLease(id=uid(), stage_id=stage.id, job_id=job.id, node_id=node.id, owner_id=job.owner_id,
+        executor_id=executor_id or (node.id if node.engine_version != "control" else None),
         generation=stage.generation, resource_pool=pool, mode=job.mode, priority_class=cls,
         weight=weight, estimated_seconds=estimate, expires_at=at + timedelta(seconds=cfg.cluster_lease_seconds))
     db.add(lease)

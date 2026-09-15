@@ -26,6 +26,8 @@ from .models import Asset, ClassicState, Job, Ledger, Provider, User, now
 from .providers import LANGUAGES, credential, initialize_providers
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
+from .admin_monitor import router as admin_monitor_router
+from .admin_web import router as admin_web_router
 from .request_models import RequestBody
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
@@ -48,6 +50,8 @@ app.include_router(submission_router)
 app.include_router(cluster_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
+app.include_router(admin_monitor_router)
+app.include_router(admin_web_router)
 cfg = settings()
 origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip()]
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
