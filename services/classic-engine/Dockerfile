@@ -6,10 +6,10 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 ARG MIT_COMMIT=95227a2bb0fd306cd4f0c104d57284026f991b3a
-COPY prepare.py server.py ./
+COPY prepare.py server.py local_inpainting.py ./
 COPY licenses ./licenses
 RUN git clone --filter=blob:none --no-checkout https://github.com/zyddnys/manga-image-translator.git /opt/mit && git -C /opt/mit checkout ${MIT_COMMIT} && python prepare.py --source-only && rm -rf /opt/mit/.git
-ENV PYTHONPATH=/opt/mit MODEL_DIR=/models ENGINE_VERSION=mit-95227a2-classic-v1
+ENV PYTHONPATH=/opt/mit MODEL_DIR=/models ENGINE_VERSION=mit-95227a2-classic-v3-parallel
 RUN useradd --uid 10001 --create-home comics && mkdir -p /models && chown comics:comics /models
 USER comics
 CMD ["sh", "-c", "python prepare.py && uvicorn server:app --host 0.0.0.0 --port 8000 --workers 1 --no-access-log"]

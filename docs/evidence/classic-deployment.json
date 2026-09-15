@@ -1,0 +1,86 @@
+{
+  "date": "2026-09-15",
+  "scope": "local_docker",
+  "status": "activated_and_verified",
+  "engine_version": "mit-95227a2-classic-v3-parallel",
+  "pre_cutover_unfinished_jobs": 0,
+  "after_api_stop_active_jobs": 0,
+  "worker_ping": {
+    "classic": "pong",
+    "redraw": "pong"
+  },
+  "previous_images": {
+    "engine": "node-comics-classic-engine:pre-parallel-20260915",
+    "backend": "node-comics-backend:pre-parallel-20260915"
+  },
+  "containers": [
+    {
+      "name": "/node-comics-api-1",
+      "image_id": "sha256:0735198cbca480e135f27e4772d6c8a850741698776c644d7dc69986847fb66e",
+      "running": "true",
+      "restarts": "0"
+    },
+    {
+      "name": "/node-comics-classic-engine-1",
+      "image_id": "sha256:04854a91b064abb04c336aa26dc06479a2c53280a536e3e85cce9b31c5836d01",
+      "running": "true",
+      "restarts": "0"
+    },
+    {
+      "name": "/node-comics-classic-worker-1",
+      "image_id": "sha256:0735198cbca480e135f27e4772d6c8a850741698776c644d7dc69986847fb66e",
+      "running": "true",
+      "restarts": "0"
+    },
+    {
+      "name": "/node-comics-redraw-worker-1",
+      "image_id": "sha256:0735198cbca480e135f27e4772d6c8a850741698776c644d7dc69986847fb66e",
+      "running": "true",
+      "restarts": "0"
+    },
+    {
+      "name": "/node-comics-dispatcher-1",
+      "image_id": "sha256:0735198cbca480e135f27e4772d6c8a850741698776c644d7dc69986847fb66e",
+      "running": "true",
+      "restarts": "0"
+    }
+  ],
+  "live_stage_checks": {
+    "checked_at": "2026-09-15T08:37:33.008447+00:00",
+    "engine_version": "mit-95227a2-classic-v3-parallel",
+    "api_healthy": true,
+    "engine_ready": true,
+    "paid_text_calls": 0,
+    "samples": [
+      {
+        "sample": "classic-smoke-v2",
+        "segments": 11,
+        "matches_validated_output": true,
+        "timings": {
+          "detect_ocr": 6.084898568999051,
+          "inpaint": 3.8632853089984565,
+          "render": 0.7570581279978796
+        }
+      },
+      {
+        "sample": "classic-dialogue",
+        "segments": 3,
+        "matches_validated_output": true,
+        "timings": {
+          "detect_ocr": 2.9129935260025377,
+          "inpaint": 1.1224810800013074,
+          "render": 0.04912670699923183
+        }
+      }
+    ],
+    "blank_preflight_no_text": true
+  },
+  "worker_smoke": {
+    "status": "no_text",
+    "settlement": "released",
+    "engine_version": "mit-95227a2-classic-v3-parallel",
+    "text_calls": 0,
+    "local_attempts": 1
+  },
+  "paid_text_calls": 0
+}

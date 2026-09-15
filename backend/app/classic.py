@@ -1,5 +1,6 @@
 """Recoverable local stages and page-wide, atomic text-call budgeting."""
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import json
 import time
@@ -108,8 +109,10 @@ def complete_call(call_id, response=None, error=None, translations=None):
         db.commit()
 
 
-def translate_group(job_id, attempt_id, index, segments, language):
+def translate_group(job_id, attempt_id, index, segments, language, before_call=None):
     while True:
+        if before_call:
+            before_call()
         call_id, profile, sequence = reserve_call(job_id, attempt_id, index, segments, language)
         response = None
         try:
@@ -131,6 +134,8 @@ def translate_group(job_id, attempt_id, index, segments, language):
             # Check cancellation while honoring Retry-After; never shorten a server's delay.
             end = time.monotonic() + delay
             while time.monotonic() < end:
+                if before_call:
+                    before_call()
                 time.sleep(min(1, end - time.monotonic()))
                 with session_factory()() as db:
                     current(db, job_id, attempt_id)
@@ -170,6 +175,66 @@ def validate_render(data, result):
         raise ProcessingError('CLASSIC_RENDER_INVALID', '译图尺寸、字形或掩膜外像素验证失败，未交付') from None
 
 
+def validate_cleaned(data, encoded, encoded_mask):
+    try:
+        cleaned = base64.b64decode(encoded, validate=True)
+        inspect_image(cleaned, output=True)
+        with Image.open(BytesIO(data)) as source, Image.open(BytesIO(cleaned)) as target, Image.open(BytesIO(base64.b64decode(encoded_mask, validate=True))) as mask:
+            if target.format != 'PNG' or target.size != source.size or mask.size != source.size:
+                raise ValueError()
+            mask = mask.convert('L').point(lambda p: 255 if p else 0)
+            difference = ImageChops.difference(source.convert('RGB'), target.convert('RGB'))
+            if ImageChops.multiply(difference, ImageChops.invert(mask).convert('RGB')).getbbox():
+                raise ValueError()
+        return cleaned
+    except (ValueError, TypeError, OSError, ProcessingError):
+        raise ProcessingError('CLASSIC_INPAINT_INVALID', '清理图尺寸或掩膜外像素验证失败，未交付') from None
+
+
+def inpaint_checkpoint(job_id, attempt_id, data, analysis, config):
+    # Each branch owns its sessions. Never share ORM entities across threads.
+    with session_factory()() as db:
+        current(db, job_id, attempt_id)
+        state = db.get(ClassicState, job_id)
+        asset = db.get(Asset, state.artifacts['cleaned']) if state.artifacts.get('cleaned') else None
+        if available(asset):
+            return read_asset(asset)
+    result = engine_request('inpaint', data, config, analysis=analysis)
+    cleaned = validate_cleaned(data, result.get('cleaned'), analysis['mask'])
+    with session_factory()() as db:
+        # Cancellation, deletion and a replaced execution invalidate late output.
+        job = current(db, job_id, attempt_id)
+        state = db.get(ClassicState, job_id)
+        asset = create_asset(db, job.owner_id, cleaned, kind='classic_stage', parent_id=job.input_asset_id)
+        state.artifacts = {**state.artifacts, 'cleaned': asset.id}
+        state.timings = {**state.timings, **result.get('timings', {})}
+        db.commit()
+    return cleaned
+
+
+def translate_and_inpaint(job_id, attempt_id, data, analysis, language, config):
+    # Join the local branch even on text failure, before the worker can requeue,
+    # settle or discard this attempt. Already-issued text calls keep their usage.
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix='classic-inpaint') as pool:
+        erasing = pool.submit(inpaint_checkpoint, job_id, attempt_id, data, analysis, config)
+
+        def check_erasing():
+            if erasing.done():
+                erasing.result()  # Stop new text groups/retries after local failure.
+
+        for index, group in enumerate(groups(analysis['segments'], config['text']['group_bytes'])):
+            check_erasing()
+            with session_factory()() as db:
+                current(db, job_id, attempt_id)
+                saved = db.get(ClassicState, job_id).translations
+            if not all(segment['id'] in saved for segment in group):
+                translate_group(job_id, attempt_id, index, group, language, before_call=check_erasing)
+        with session_factory()() as db:
+            current(db, job_id, attempt_id, 'inpainting_rendering')
+            db.commit()
+        return erasing.result()
+
+
 def run_classic(job_id, attempt_id, data, language, config):
     with session_factory()() as db:
         current(db, job_id, attempt_id, 'detecting_ocr')
@@ -198,24 +263,22 @@ def run_classic(job_id, attempt_id, data, language, config):
             db.commit()
     if not analysis['segments']:
         return TranslationOutput(None, no_text=True)
-    for index, group in enumerate(groups(analysis['segments'], config['text']['group_bytes'])):
-        with session_factory()() as db:
-            current(db, job_id, attempt_id)
-            saved = db.get(ClassicState, job_id).translations
-        if all(segment['id'] in saved for segment in group):
-            continue
-        translate_group(job_id, attempt_id, index, group, language)
+    with session_factory()() as db:
+        current(db, job_id, attempt_id, 'translating_text')
+        db.commit()
+    cleaned = translate_and_inpaint(job_id, attempt_id, data, analysis, language, config)
     with session_factory()() as db:
         current(db, job_id, attempt_id, 'inpainting_rendering')
         translations = db.get(ClassicState, job_id).translations
         db.commit()
-    rendered = engine_request('render', data, config, analysis=analysis, translations=translations, language=language)
+    rendered = engine_request('render', data, config, analysis=analysis, translations=translations, language=language,
+                              cleaned=base64.b64encode(cleaned).decode())
     output = validate_render(data, rendered)
     with session_factory()() as db:
         job = current(db, job_id, attempt_id, 'validating')
         state = db.get(ClassicState, job_id)
         artifacts = dict(state.artifacts)
-        for name in ('cleaned', 'mask', 'glyph_mask'):
+        for name in ('mask', 'glyph_mask'):
             raw = base64.b64decode(rendered[name], validate=True)
             asset = create_asset(db, job.owner_id, raw, kind='classic_stage', parent_id=job.input_asset_id)
             artifacts[name] = asset.id
@@ -228,7 +291,7 @@ def run_classic(job_id, attempt_id, data, language, config):
 
 def requeue_local(job_id, attempt_id, error):
     # Text failures finish normally; only local work is automatically replayed here.
-    retryable = error.code in {'CLASSIC_ENGINE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED', 'CLASSIC_RENDER_FAILED', 'CLASSIC_LOCAL_INTERRUPTED'}
+    retryable = error.code in {'CLASSIC_ENGINE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED', 'CLASSIC_LOCAL_INTERRUPTED'}
     if not retryable:
         return False
     with session_factory()() as db:

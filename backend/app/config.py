@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     classic_cost: int = 1
     classic_engine_url: str = "http://classic-engine:8000"
     classic_engine_token: str = ""
-    classic_engine_version: str = "mit-95227a2-classic-v1"
+    classic_engine_version: str = "mit-95227a2-classic-v3-parallel"
     classic_timeout_seconds: int = 900
     classic_local_attempts: int = 3
     text_base_url: str = ""

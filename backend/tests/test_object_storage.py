@@ -339,7 +339,7 @@ def test_classic_keeps_checkpoints_local_and_recovers_without_rerunning_text(con
         recover(db)
         db.commit()
     run_job(job_id)
-    assert calls == {'text': 1, 'analyze': 1, 'render': 1}
+    assert calls == {'text': 1, 'analyze': 1, 'inpaint': 1, 'render': 1}
     assert client.get(f'/v1/jobs/{job_id}', headers=auth).json()['status'] == 'succeeded'
     assert [method for method, _ in remote[0].calls] == ['PUT']  # Only the final delivery is uploaded.
 

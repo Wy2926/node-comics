@@ -28,7 +28,7 @@ def encoded(image):
 def configured(client, monkeypatch, png):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     settings.cache_clear()
-    calls = {'text': 0, 'analyze': 0, 'render': 0}
+    calls = {'text': 0, 'analyze': 0, 'inpaint': 0, 'render': 0}
 
     def engine(stage, data, config, **kwargs):
         calls[stage] += 1
@@ -38,6 +38,9 @@ def configured(client, monkeypatch, png):
         common = {'width': image.width, 'height': image.height, 'version': config['engine']['version']}
         if stage == 'analyze':
             return {**common, 'segments': SEGMENTS, 'regions': [{}], 'mask': encoded(mask)}
+        if stage == 'inpaint':
+            return {**common, 'cleaned': encoded(image), 'timings': {'inpaint': 0.2}}
+        assert kwargs['cleaned'] == encoded(image)
         result = image.copy()
         result.putpixel((10, 10), (0, 0, 0))
         return {**common, 'image': encoded(result), 'cleaned': encoded(image), 'mask': encoded(mask), 'glyph_mask': encoded(mask), 'timings': {'render': 0.1}}
@@ -86,7 +89,7 @@ def test_idempotency_cache_mode_language_and_settlement(configured):
     process_job(job_id)
     process_job(job_id)
     assert status(configured, job_id)['status'] == 'succeeded'
-    assert calls == {'text': 1, 'analyze': 1, 'render': 1}
+    assert calls == {'text': 1, 'analyze': 1, 'inpaint': 1, 'render': 1}
     cached_id = submit(configured, 'classic-cache')
     assert status(configured, cached_id)['cache_hit']
     assert not status(configured, submit(configured, 'english', 'en'))['cache_hit']
@@ -181,7 +184,7 @@ def test_render_failure_recovers_without_repeating_successful_text(configured, m
     assert status(configured, job)['status'] == 'queued'
     process_job(job)
     assert status(configured, job)['status'] == 'succeeded'
-    assert configured[3]['text'] == 1 and configured[3]['analyze'] == 1
+    assert configured[3]['text'] == 1 and configured[3]['analyze'] == 1 and configured[3]['inpaint'] == 1
 
 
 def test_lease_recovery_preserves_text_checkpoint(configured):
@@ -189,7 +192,7 @@ def test_lease_recovery_preserves_text_checkpoint(configured):
     job = submit(configured)
     attempt_id = claim(job)
     with session_factory()() as db:
-        db.add(ClassicState(job_id=job, analysis={'width': 320, 'height': 480, 'segments': SEGMENTS, 'regions': [{}], 'mask': 'unused'}, translations={'b001': '你好'}))
+        db.add(ClassicState(job_id=job, analysis={'width': 320, 'height': 480, 'segments': SEGMENTS, 'regions': [{}], 'mask': encoded(Image.new('L', (320, 480), 255))}, translations={'b001': '你好'}))
         db.get(Attempt, attempt_id).lease_expires_at = now() - timedelta(seconds=1)
         db.commit()
         recover(db)

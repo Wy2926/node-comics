@@ -1,0 +1,215 @@
+{
+  "date": "2026-09-15",
+  "status": "code_and_isolated_container_verified_not_activated",
+  "engine_unit_tests": 9,
+  "backend_contract_tests": 38,
+  "paid_text_calls": 0,
+  "benchmark": {
+    "engine_version": "mit-95227a2-classic-v2-crops",
+    "device": "cpu",
+    "threads": 4,
+    "precision": "fp32",
+    "crop_options": {
+      "max_size": 512,
+      "padding": 48,
+      "merge_gap": 24
+    },
+    "text_calls": 0,
+    "samples": [
+      {
+        "sample": "classic-smoke-v2",
+        "width": 1024,
+        "height": 1536,
+        "regions": 10,
+        "crop_sizes": [
+          [
+            166,
+            231
+          ],
+          [
+            130,
+            227
+          ],
+          [
+            301,
+            219
+          ],
+          [
+            180,
+            174
+          ],
+          [
+            275,
+            225
+          ],
+          [
+            192,
+            226
+          ],
+          [
+            127,
+            178
+          ],
+          [
+            369,
+            218
+          ],
+          [
+            145,
+            234
+          ],
+          [
+            168,
+            183
+          ]
+        ],
+        "source_pixels": 1572864,
+        "crop_input_pixels": 438084,
+        "seconds": {
+          "whole": [
+            5.1426393980000285,
+            5.227437671001098,
+            5.272072613999626
+          ],
+          "crops": [
+            3.6122420209976553,
+            3.5174432300009357,
+            3.5460629150002205
+          ]
+        },
+        "median_seconds": {
+          "whole": 5.227437671001098,
+          "crops": 3.5460629150002205
+        },
+        "outside_mask_unchanged": true
+      },
+      {
+        "sample": "classic-dialogue",
+        "width": 600,
+        "height": 800,
+        "regions": 3,
+        "crop_sizes": [
+          [
+            320,
+            134
+          ],
+          [
+            328,
+            167
+          ],
+          [
+            302,
+            130
+          ]
+        ],
+        "source_pixels": 480000,
+        "crop_input_pixels": 136916,
+        "seconds": {
+          "whole": [
+            3.384154690000287,
+            3.335955662001652,
+            3.356313820997457
+          ],
+          "crops": [
+            1.0535752260002482,
+            1.1043002539990994,
+            1.0087141520016303
+          ]
+        },
+        "median_seconds": {
+          "whole": 3.356313820997457,
+          "crops": 1.0535752260002482
+        },
+        "outside_mask_unchanged": true
+      }
+    ]
+  },
+  "render_check": {
+    "engine_version": "mit-95227a2-classic-v2-crops",
+    "text_calls": 0,
+    "samples": [
+      {
+        "sample": "classic-smoke-v2",
+        "segments": 11,
+        "quality_flags": [
+          "unrecognized_regions"
+        ],
+        "actual_lama_input_sizes": [
+          [
+            166,
+            231
+          ],
+          [
+            130,
+            227
+          ],
+          [
+            301,
+            219
+          ],
+          [
+            180,
+            174
+          ],
+          [
+            275,
+            225
+          ],
+          [
+            192,
+            226
+          ],
+          [
+            127,
+            178
+          ],
+          [
+            369,
+            218
+          ],
+          [
+            145,
+            234
+          ],
+          [
+            168,
+            183
+          ]
+        ],
+        "source_size_preserved": true,
+        "outside_allowed_pixels_unchanged": true,
+        "timings": {
+          "detect_ocr": 6.80441594900185,
+          "inpaint": 4.001090427002055,
+          "render": 1.2554465119974338
+        }
+      },
+      {
+        "sample": "classic-dialogue",
+        "segments": 3,
+        "quality_flags": [],
+        "actual_lama_input_sizes": [
+          [
+            320,
+            134
+          ],
+          [
+            328,
+            167
+          ],
+          [
+            302,
+            130
+          ]
+        ],
+        "source_size_preserved": true,
+        "outside_allowed_pixels_unchanged": true,
+        "timings": {
+          "detect_ocr": 3.1373377890013217,
+          "inpaint": 1.2001747230024193,
+          "render": 0.06368321400077548
+        }
+      }
+    ]
+  }
+}

@@ -25,8 +25,9 @@ from manga_translator.textline_merge import dispatch as merge
 from manga_translator.mask_refinement import dispatch as refine
 from manga_translator.rendering import dispatch as render, text_render
 from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
+from local_inpainting import inpaint_regions
 
-VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v1')
+VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v3-parallel')
 FONT = '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc'
 LANG = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'en': 'ENG', 'ko': 'KOR'}
 Image.MAX_IMAGE_PIXELS = 24_000_000
@@ -110,13 +111,33 @@ async def analyze(image, config):
             'timings': {'detect_ocr': time.monotonic() - start}}
 
 
-async def render_page(image, analysis, translations, config, language):
+async def erase_page(image, analysis, config):
+    mask = decode(analysis['mask'], 'L')
+    if mask.shape != image.shape[:2] or not np.any(mask):
+        raise ValueError('Mask dimensions')
+    start = time.monotonic()
+    if config['inpainting_strategy'] != 'masked-crops-v1':
+        raise ValueError('Unsupported inpainting strategy')
+
+    async def predict(crop, crop_mask):
+        return await models['inpainter'].inpaint(crop, crop_mask, InpainterConfig(inpainting_precision='fp32'), config['inpainting_size'], False)
+
+    cleaned = await inpaint_regions(image, mask, predict, max_size=config['inpainting_size'],
+                                    padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
+    # Enforce original pixels outside the erase mask, even if an engine changes them.
+    cleaned[mask == 0] = image[mask == 0]
+    return {'cleaned': png(cleaned), 'timings': {'inpaint': time.monotonic() - start}}
+
+
+async def render_page(image, analysis, translations, config, language, cleaned):
     regions = [TextBlock(**row) for row in analysis['regions']]
     if len(regions) != len(analysis['segments']) or not regions:
         raise ValueError('Region mismatch')
     mask = decode(analysis['mask'], 'L')
-    if mask.shape != image.shape[:2]:
-        raise ValueError('Mask dimensions')
+    if mask.shape != image.shape[:2] or cleaned.shape != image.shape:
+        raise ValueError('Mask or cleaned image dimensions')
+    if np.any(cleaned[mask == 0] != image[mask == 0]):
+        raise ValueError('Cleaned image changed protected pixels')
     for segment, region in zip(analysis['segments'], regions):
         region.translation = translations[segment['id']]
         face = text_render.get_cached_font(FONT)
@@ -124,11 +145,6 @@ async def render_page(image, analysis, translations, config, language):
             raise ValueError('Font missing glyph')
         region.target_lang = LANG[language]
         region._alignment = 'center'
-    start = time.monotonic()
-    cleaned = await models['inpainter'].inpaint(image.copy(), mask.copy(), InpainterConfig(inpainting_precision='fp32'), config['inpainting_size'], False)
-    # Enforce original pixels outside the erase mask, even if an engine changes them.
-    cleaned[mask == 0] = image[mask == 0]
-    inpaint_seconds = time.monotonic() - start
     start = time.monotonic()
     rendered = cleaned.copy()
     glyph_mask = np.zeros(mask.shape, dtype=np.uint8)
@@ -147,18 +163,18 @@ async def render_page(image, analysis, translations, config, language):
         raise ValueError('Translated text overlaps an unrecognized region')
     output = image.copy()
     output[allowed] = rendered[allowed]
-    return {'image': png(output), 'cleaned': png(cleaned), 'mask': png(mask), 'glyph_mask': png(glyph_mask),
-            'timings': {'inpaint': inpaint_seconds, 'render': time.monotonic() - start}}
+    return {'image': png(output), 'mask': png(mask), 'glyph_mask': png(glyph_mask),
+            'timings': {'render': time.monotonic() - start}}
 
 
 @app.post('/v1/{stage}', dependencies=[Depends(authorized)])
 async def process(stage: str, request: Request):
-    if stage not in ('analyze', 'render'):
+    if stage not in ('analyze', 'inpaint', 'render'):
         raise HTTPException(404)
     raw = bytearray()
     async for chunk in request.stream():
         raw.extend(chunk)
-        if len(raw) > 64 * 1024 * 1024:
+        if len(raw) > (128 if stage == 'render' else 64) * 1024 * 1024:
             raise HTTPException(413)
     try:
         body = json.loads(raw)
@@ -169,8 +185,10 @@ async def process(stage: str, request: Request):
             with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
                 if stage == 'analyze':
                     result = await analyze(image, body['config'])
+                elif stage == 'inpaint':
+                    result = await erase_page(image, body['analysis'], body['config'])
                 else:
-                    result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'])
+                    result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'], decode(body['cleaned']))
         return {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': hashlib.sha256(image.tobytes()).hexdigest()}
     except HTTPException:
         raise

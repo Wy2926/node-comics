@@ -1,0 +1,106 @@
+{
+  "date": "2026-09-15",
+  "status": "activated_locally_and_verified",
+  "engine_version": "mit-95227a2-classic-v3-parallel",
+  "backend_suite": {
+    "passed": 196,
+    "skipped": 21
+  },
+  "focused_classic_tests_passed": 45,
+  "isolated_postgres_tests_passed": 8,
+  "engine_stage_tests_passed": 5,
+  "paid_text_calls": 0,
+  "overlap_verified": "controlled_events_in_sqlite_and_postgresql_tests",
+  "live_provider_parallel_latency_measured": false,
+  "real_image_stage_verification": {
+    "engine_version": "mit-95227a2-classic-v3-parallel",
+    "text_calls": 0,
+    "samples": [
+      {
+        "sample": "classic-smoke-v2",
+        "segments": 11,
+        "quality_flags": [
+          "unrecognized_regions"
+        ],
+        "actual_lama_input_sizes": [
+          [
+            166,
+            231
+          ],
+          [
+            130,
+            227
+          ],
+          [
+            301,
+            219
+          ],
+          [
+            180,
+            174
+          ],
+          [
+            275,
+            225
+          ],
+          [
+            192,
+            226
+          ],
+          [
+            127,
+            178
+          ],
+          [
+            369,
+            218
+          ],
+          [
+            145,
+            234
+          ],
+          [
+            168,
+            183
+          ]
+        ],
+        "source_size_preserved": true,
+        "outside_allowed_pixels_unchanged": true,
+        "matches_previous_crop_output": true,
+        "timings": {
+          "detect_ocr": 7.090608041999076,
+          "inpaint": 3.982696886996564,
+          "render": 0.814785883998411
+        }
+      },
+      {
+        "sample": "classic-dialogue",
+        "segments": 3,
+        "quality_flags": [],
+        "actual_lama_input_sizes": [
+          [
+            320,
+            134
+          ],
+          [
+            328,
+            167
+          ],
+          [
+            302,
+            130
+          ]
+        ],
+        "source_size_preserved": true,
+        "outside_allowed_pixels_unchanged": true,
+        "matches_previous_crop_output": true,
+        "timings": {
+          "detect_ocr": 3.330252924999513,
+          "inpaint": 1.2249454720003996,
+          "render": 0.0567147149995435
+        }
+      }
+    ]
+  },
+  "deployment_evidence": "classic-deployment.json"
+}
