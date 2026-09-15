@@ -4,6 +4,8 @@ import type {ReadingCopy} from '../types';
 import {makeCopy,selectRange,suggestedKind} from '../library/model';
 import {commitCopies} from '../library/store';
 import {queueCopies} from '../library/acquisition';
+import {requestImagePermissions} from '../sources/permissions';
+import {useImagePermissions} from './useImagePermissions';
 import './catalog.css';
 
 const PAGE_SIZE=40;
@@ -33,6 +35,7 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
   return entries.sort((a,b)=>sort==='title'?a.title.localeCompare(b.title,'zh-CN',{numeric:true}):sort==='reverse'?b.order-a.order:a.order-b.order);
  },[catalog,group,type,query,status,sort,already,excluded]);
  const chosen=catalog.entries.filter(e=>selected.has(e.id));
+ const permissions=useImagePermissions(offline&&chosen.length?[{catalog,entryId:chosen[0].id}]:[]);
  const visibleIds=new Set(filtered.map(e=>e.id)),hiddenSelected=chosen.filter(e=>!visibleIds.has(e.id)).length;
  const added=catalog.entries.filter(e=>!previous?.entries.some(p=>p.id===e.id)).length;
  const changed=catalog.entries.filter(e=>previous?.entries.some(p=>p.id===e.id&&(p.title!==e.title||p.rawTypes.join()!==e.rawTypes.join()))).length;
@@ -56,9 +59,10 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
  }
  async function refresh(){if(refreshing)return;setRefreshing(true);setError('');setFeedback('正在读取最新来源目录…');try{await onRefresh();setFeedback('已完成目录刷新。');}catch(e){setError(e instanceof Error?e.message:'目录刷新失败，请重试。');}finally{setRefreshing(false);}}
  async function submit(){
-  if(saving.current||!chosen.length||!assignmentValid)return;
+  if(saving.current||!chosen.length||!assignmentValid||permissions.preparing||permissions.error)return;
   saving.current=true;setBusy(true);setError('');setFeedback('正在保存 '+chosen.length+' 个来源条目…');
   try{
+   if(offline)await requestImagePermissions([new URL(catalog.url).origin+'/*',...permissions.origins]);
    const incoming=chosen.map(entry=>({...makeCopy(entry.title,[],'MangaCopy',entry.id),sourceEntryId:entry.id,sourceUrl:entry.url,retention:offline?'offline' as const:'cache' as const,discoveryComplete:false}));
    const mappings=chosen.map(entry=>entry.related?{title:entry.title,kind:'unclassified' as const}:{...assignment,kind:overrides[entry.id]??suggestedKind(entry)});
    const result=await commitCopies(incoming,mappings,catalog);
@@ -93,8 +97,9 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
    <div className="nc-catalog-grid nc-catalog-review-grid" aria-label="条目归属预览">{chosen.slice(reviewPage*PAGE_SIZE,reviewPage*PAGE_SIZE+PAGE_SIZE).map(entry=><article className="nc-catalog-card nc-catalog-review-card" key={entry.id}><div className="nc-catalog-card-top"><span className="nc-catalog-kind">{kinds[overrides[entry.id]??suggestedKind(entry)]}</span><span className="nc-catalog-review-state">{already.has(entry.id)?'已有内容':'新内容'}</span></div><h3>{entry.title}</h3><p>{already.has(entry.id)?'保留当前作品与内容版本':entry.related?'单独建立「'+entry.title+'」':destination}</p>{!entry.related&&!already.has(entry.id)&&<details className="nc-catalog-kind-picker"><summary>调整分类</summary><div role="group" aria-label={entry.title+'归属'}>{Object.entries(kinds).map(([value,label])=><button key={value} disabled={busy} aria-pressed={(overrides[entry.id]??suggestedKind(entry))===value} onClick={()=>{setOverrides(previous=>({...previous,[entry.id]:value as ImportAssignment['kind']}));setFeedback('「'+entry.title+'」已设为'+label+'。');}}>{label}</button>)}</div></details>}</article>)}</div>
    {pagination(chosen.length,reviewPage,setConfirmPage)}
    <div className="nc-catalog-save-options" role="group" aria-label="原图保存方式"><button aria-pressed={!offline} disabled={busy} onClick={()=>setOffline(false)}><b>按需读取</b><span>先加入书架，阅读时获取原图</span></button><button aria-pressed={offline} disabled={busy} onClick={()=>setOffline(true)}><b>离线保存</b><span>导入后加入统一采集队列</span></button></div>
-   <p className="nc-catalog-save-note">{offline?'保持插件页面打开以下载原图，关闭后可在采集中心恢复。':'已获取的原图按缓存设置保留。'} 导入不会发起翻译。</p>
-   <div className="nc-catalog-actionbar"><div className="nc-catalog-selection-summary"><strong>{chosen.length} 项 · {offline?'离线保存':'按需读取'}</strong><span>{newCount} 项新内容将加入书架</span></div><button className="button primary" disabled={busy||!chosen.length||!assignmentValid} onClick={()=>void submit()}>{busy?'正在保存到书架…':'确认导入 '+chosen.length+' 项'}</button></div>
+   <p className="nc-catalog-save-note">{permissions.preparing?'正在提前读取图片域名…':offline?'确认时先授权图片域名，再按目录顺序边发现边下载。':'已获取的原图按缓存设置保留。'} 导入不会发起翻译。</p>
+   {permissions.error&&<p role="alert">{permissions.error} <button className="text-link" onClick={permissions.retry}>重新检查图片域名</button></p>}
+   <div className="nc-catalog-actionbar"><div className="nc-catalog-selection-summary"><strong>{chosen.length} 项 · {offline?'离线保存':'按需读取'}</strong><span>{newCount} 项新内容将加入书架</span></div><button className="button primary" disabled={busy||permissions.preparing||!!permissions.error||!chosen.length||!assignmentValid} onClick={()=>void submit()}>{busy?'正在保存到书架…':'确认导入 '+chosen.length+' 项'}</button></div>
   </>}
   <p className="nc-catalog-feedback" role="status" aria-live="polite">{feedback||'已保留本次选择，可点击卡片或按住 Shift 选择连续范围。'}</p>
  </section>;

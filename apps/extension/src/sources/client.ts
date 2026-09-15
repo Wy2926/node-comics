@@ -4,11 +4,11 @@ import {pollSourceDiscovery} from './discovery';
 import {sameMangaCopyPage} from './mangacopy';
 export const inExtension=()=>typeof chrome!=='undefined'&&!!chrome.runtime?.id;
 export async function sourceMessage<T>(message:unknown):Promise<T>{if(!inExtension())throw Error('网站采集需在已安装的浏览器插件中执行。');const result=await chrome.runtime.sendMessage(message);if(!result?.ok)throw Error(result?.error??'插件通信失败，请重新打开阅读器。');return result.data as T;}
-export async function discoverEntry(catalog:SourceCatalog,entryId:string,signal:AbortSignal,onProgress:(manifest:PageManifest)=>Promise<void>,assertActive?:()=>Promise<void>){
+export async function discoverEntry(catalog:SourceCatalog,entryId:string,signal:AbortSignal,onProgress:(manifest:PageManifest)=>Promise<void>,assertActive?:()=>Promise<void>,firstLinksOnly=false){
  signal.throwIfAborted();
  await sourceMessage({type:'NC_REGISTER_CATALOG',catalog});const {tabId}=await sourceMessage<{tabId:number}>({type:'NC_OPEN_SOURCE',catalogId:catalog.id,entryId});
  try{
-  return await pollSourceDiscovery(()=>sourceMessage<PageManifest|null>({type:'NC_POLL_SOURCE',tabId}),{signal,onProgress,assertActive});
+  return await pollSourceDiscovery(()=>sourceMessage<PageManifest|null>({type:'NC_POLL_SOURCE',tabId}),{signal,onProgress,assertActive,isComplete:firstLinksOnly?manifest=>manifest.items.length>0:undefined});
  }finally{await sourceMessage({type:'NC_CLOSE_SOURCE',tabId}).catch(()=>{});}
 }
 export async function discoverCatalog(url:string):Promise<SourceCatalog>{

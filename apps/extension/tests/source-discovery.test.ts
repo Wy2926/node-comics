@@ -1,5 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {advanceMangaCopyDiscovery,pollSourceDiscovery} from '../src/sources/discovery';
+import {pollSourceDiscovery} from '../src/sources/discovery';
+import {readMangaCopyData} from '../src/sources/mangacopy-data';
 import {discoverDocument} from '../src/sources/adapters';
 import {grantImagePermissions} from '../src/library/acquisition';
 import {makeCopy} from '../src/library/model';
@@ -7,9 +8,16 @@ import {discoverMangaCopyCatalog} from '../src/sources/mangacopy';
 
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 const snapshot=(count:number,total=6)=>({items:Array.from({length:count},(_,n)=>({id:'slot-'+n,url:'https://images.example/'+n,width:800,height:1200,order:n})),knownTotal:total,discoveryComplete:count===total,note:`已发现 ${count} / ${total} 页`});
-function documentFixture(urls:string[],total:number){
+function documentFixture(urls:string[],total:number,script=''){
  const images=urls.map(url=>({getAttribute:(name:string)=>name==='data-src'?url:'placeholder.png',naturalWidth:165,naturalHeight:211,getBoundingClientRect:()=>({top:30})}));
- return {scrollingElement:{scrollHeight:6000},title:'MangaCopy sample',querySelectorAll:()=>images,querySelector:(selector:string)=>selector==='.comicCount'?{textContent:String(total)}:selector==='.comicContent-list img'?images[0]:{}} as unknown as Document;
+ return {title:'MangaCopy sample',querySelectorAll:(selector:string)=>selector==='script:not([src])'?(script?[{textContent:script}]:[]):images,querySelector:(selector:string)=>selector==='.comicCount'?{textContent:String(total)}:selector==='.comicContent-list img'?images[0]:{}} as unknown as Document;
+}
+const sourceUrl='https://www.mangacopy.com/comic/sample/chapter/724f819b-5306-11ea-b7ea-024352452ce0';
+async function sourceData(value:unknown){
+ const secret='0123456789abcdef',iv='abcdefghijklmnop',encoder=new TextEncoder();
+ const aes=await crypto.subtle.importKey('raw',encoder.encode(secret),'AES-CBC',false,['encrypt']);
+ const bytes=await crypto.subtle.encrypt({name:'AES-CBC',iv:encoder.encode(iv)},aes,encoder.encode(JSON.stringify(value)));
+ return `var cct = "${secret}"; var contentKey = "${iv}${Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('')}";`;
 }
 
 describe('MangaCopy source discovery',()=>{
@@ -24,23 +32,33 @@ describe('MangaCopy source discovery',()=>{
   expect(result.discoveryComplete).toBe(false);expect(result.items.map(p=>p.id)).toEqual(['slot-0']);
   expect(result.items[0]).toMatchObject({width:800,height:1200});
  });
- it('waits for delayed scroll growth and moves to the middle and takes a substantial step when already there',async()=>{
-  vi.useFakeTimers();
-  const doc=documentFixture(['https://images.example/1'],2);
-  let changed:()=>void=()=>{};
-  vi.stubGlobal('MutationObserver',class{constructor(callback:()=>void){changed=callback;}observe(){}disconnect(){}});
-  const images=doc.querySelectorAll('.comicContent-list img') as unknown as unknown[];
-  const view={scrollY:0,innerHeight:800,location:{href:'https://www.mangacopy.com/comic/a/chapter/1'},scrollTo:vi.fn(({top}:{top:number})=>{view.scrollY=top;setTimeout(()=>{images.push(documentFixture(['https://images.example/2'],1).querySelectorAll('img')[0]);changed();},250);})};
-  const promise=advanceMangaCopyDiscovery(doc,view as unknown as Window);let returned=false;void promise.then(()=>{returned=true;});
-  await vi.advanceTimersByTimeAsync(200);expect(returned).toBe(false);
-  await vi.advanceTimersByTimeAsync(100);expect((await promise).discoveryComplete).toBe(true);expect(view.scrollTo).toHaveBeenCalledWith({top:2600,behavior:'instant'});
-  const delayedDoc=documentFixture(['https://images.example/1'],2);
-  // The first image's viewport top changes with scrolling, keeping its document anchor stable.
-  (delayedDoc.querySelector('.comicContent-list img') as unknown as {getBoundingClientRect:()=>{top:number}}).getBoundingClientRect=()=>({top:30-view.scrollY});
-  const next=advanceMangaCopyDiscovery(delayedDoc,view as unknown as Window);
-  expect(view.scrollTo).toHaveBeenLastCalledWith({top:3000,behavior:'instant'});
-  await vi.advanceTimersByTimeAsync(1000);expect(view.scrollTo).toHaveBeenLastCalledWith({top:110,behavior:'instant'});
-  await vi.advanceTimersByTimeAsync(1000);expect((await next).discoveryComplete).toBe(false);expect(view.scrollTo).toHaveBeenLastCalledWith({top:2600,behavior:'instant'});
+ it('decodes the full JS array in source order while only the initial DOM prefix exists',async()=>{
+  const urls=['https://images.example/9','https://images.example/2','https://images.example/2','https://second-cdn.example/1'];
+  const script=await sourceData(urls.map(url=>({url})));
+  const doc=documentFixture(urls.slice(0,1),4,script);
+  const result=await readMangaCopyData(doc,sourceUrl);
+  expect(result).toMatchObject({discoveryComplete:true,knownTotal:4});
+  expect(result.items.map(p=>p.url)).toEqual(urls);expect(result.items.map(p=>p.id)).toEqual(['slot-0','slot-1','slot-2','slot-3']);
+  expect(doc.querySelectorAll('.comicContent-list img')).toHaveLength(1);
+ });
+ it('rejects a mismatched total or a changed visible page order',async()=>{
+  const script=await sourceData([{url:'https://images.example/1'},{url:'https://images.example/2'}]);
+  await expect(readMangaCopyData(documentFixture(['https://images.example/1'],3,script),sourceUrl)).rejects.toThrow('总页数不一致');
+  await expect(readMangaCopyData(documentFixture(['https://images.example/2'],2,script),sourceUrl)).rejects.toThrow('图片顺序');
+ });
+ it.each([[{url:'javascript:alert(1)'}],[{url:'https://user:pass@images.example/1'}],[{}],[],{url:'https://images.example/1'}].map(value=>({value})))('rejects invalid decrypted entries %#',async({value})=>{
+  await expect(readMangaCopyData(documentFixture([],0,await sourceData(value)),sourceUrl)).rejects.toThrow(/清单/);
+ });
+ it('does not execute inline JS and redacts malformed encrypted data errors',async()=>{
+  const doc=documentFixture([],2,'var cct="0123456789abcdef"; var contentKey="abcdefghijklmnopprivate-invalid-data"; throw Error("must not run");');
+  await expect(readMangaCopyData(doc,sourceUrl)).rejects.toThrow('数据格式已变化');
+  const invalid='var cct="0123456789abcdef"; var contentKey="abcdefghijklmnop'+'00'.repeat(16)+'";';
+  await expect(readMangaCopyData(documentFixture([],2,invalid),sourceUrl)).rejects.toThrow('无法解码');
+ });
+ it('returns the first known links immediately for preflight without scrolling or claiming completion',async()=>{
+  const doc=documentFixture(['https://images.example/1'],10);
+  const result=await pollSourceDiscovery(()=>readMangaCopyData(doc,sourceUrl),{isComplete:manifest=>manifest.items.length>0});
+  expect(result.items).toHaveLength(1);expect(result.discoveryComplete).toBe(false);
  });
  it('keeps polling slow incremental manifests until the trusted total matches',async()=>{
   vi.useFakeTimers();let count=0;

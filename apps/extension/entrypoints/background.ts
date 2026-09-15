@@ -10,7 +10,7 @@ async function discover(tabId:number){
  const tab=await chrome.tabs.get(tabId);if(!tab.url||!safeImageUrl(tab.url,tab.url))throw Error('请打开普通漫画网页。');await inject(tabId);
  const loc=mangaCopyLocation(tab.url);
  if(loc&&!loc.chapterId){const catalog=await chrome.tabs.sendMessage(tabId,{type:'NC_CATALOG_SNAPSHOT'});if(!catalog||catalog.url!==new URL('/comic/'+loc.slug,tab.url).href)throw Error('来源详情页已变化。');const id=crypto.randomUUID();await chrome.storage.local.set({['nc-import:'+id]:{catalog,sourceTabId:tabId}});return {kind:'catalog',id,catalog};}
- const read=async()=>{const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER',advance:!!loc?.chapterId});if(!snapshot||snapshot.url!==tab.url||!Array.isArray(snapshot.items))throw Error('来源页面已变化，请重新发现。');return snapshot as PageManifest;};
+ const read=async()=>{const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER'});if(snapshot?.error)throw Error(snapshot.error);if(!snapshot||snapshot.url!==tab.url||!Array.isArray(snapshot.items))throw Error('来源页面已变化，请重新发现。');return snapshot as PageManifest;};
  const result=loc?.chapterId?await pollSourceDiscovery(read):await read();const id=crypto.randomUUID();const manifest={...result,id,sourceTabId:tabId} as PageManifest;manifest.items=manifest.items.filter(i=>safeImageUrl(i.url,tab.url!)===i.url);await chrome.storage.local.set({['manifest:'+id]:manifest});return {kind:'pages',id,manifest};
 }
 export default defineBackground(()=>{
@@ -49,7 +49,7 @@ export default defineBackground(()=>{
     if(message.type==='NC_CLOSE_SOURCE'){if(tab?.url&&(tab.url===managed.url||sameMangaCopyPage(tab.url,managed.url)))await chrome.tabs.remove(tabId);await chrome.storage.session.remove('nc-managed:'+tabId);return true;}
     if(!tab)throw Error('采集页已关闭，请重试。');if(tab.status!=='complete'){if(tab.pendingUrl&&tab.pendingUrl!==managed.url&&!sameMangaCopyPage(tab.pendingUrl,managed.url))throw Error('采集页正在跳转到其他地址。');return null;}
     if(tab.url!==managed.url){if(!tab.url||!sameMangaCopyPage(tab.url,managed.url))throw Error('采集页已跳转，请回源处理后重试。');managed.url=tab.url;await chrome.storage.session.set({['nc-managed:'+tabId]:managed});}
-    await inject(tabId);const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER',advance:true});if(snapshot?.url!==managed.url)throw Error('来源归属已变化。');return snapshot;
+    await inject(tabId);const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER'});if(snapshot?.error)throw Error(snapshot.error);if(snapshot?.url!==managed.url)throw Error('来源归属已变化。');return snapshot;
    }
    if(message?.type==='NC_SOURCE_IMAGE'){
     const data=await chrome.storage.local.get('manifest:'+message.manifestId),manifest=data['manifest:'+message.manifestId] as PageManifest|undefined;

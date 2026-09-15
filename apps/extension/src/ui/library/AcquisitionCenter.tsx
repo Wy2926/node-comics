@@ -1,30 +1,46 @@
 import {useState} from 'react';
 import type {LibraryState} from '../../library/types';
 import type {ReadingCopy} from '../../types';
-import {grantImagePermissions,pauseCopies,queueCopies} from '../../library/acquisition';
+import {grantImagePermissions,pauseCopies} from '../../library/acquisition';
+import {acquisitionCopies} from '../../library/acquisition-order';
 import {copyPageTotal} from '../../library/model';
 import {inExtension} from '../../sources/client';
 import {Thumbnail} from '../../reader/Images';
 import {Modal} from '../components';
 import {copyComplete,copyCover,savedPages,type LibraryRun} from './shared';
+import {useImagePermissions} from '../useImagePermissions';
+import {copyOrigins} from '../../sources/permissions';
 
 export function AcquisitionCenter({library:s,copies,initialWorkId,onlyIds,busy,feedback,run,onOpen,onSource,onClose}:{library:LibraryState;copies:ReadingCopy[];initialWorkId?:string;onlyIds?:string[];busy:string;feedback?:{tone:string;message:string};run:LibraryRun;onOpen:(id:string)=>void;onSource:(url:string)=>void;onClose:()=>void}){
  const [scope,setScope]=useState(initialWorkId??''),[filter,setFilter]=useState('all'),[restricted,setRestricted]=useState(!!onlyIds?.length);
  const extension=inExtension();
  const queuedMessage=(title:string,permission=false)=>extension?(permission?title+'图片权限已确认，已继续采集':title+'已加入采集队列'):title+'已加入队列，请在扩展中执行采集';
- const sourceCopies=copies.filter(c=>c.sourceEntryId&&(!scope||s.coverage.some(x=>x.copyId===c.id&&x.workId===scope))&&(!restricted||onlyIds?.includes(c.id)));
+ const sourceCopies=acquisitionCopies(s,copies).filter(c=>(!scope||s.coverage.some(x=>x.copyId===c.id&&x.workId===scope))&&(!restricted||onlyIds?.includes(c.id)));
  const taskFor=(id:string)=>s.tasks.find(t=>t.copyId===id);
  const active=sourceCopies.filter(c=>['queued','running'].includes(taskFor(c.id)?.status??''));
  const pending=sourceCopies.filter(c=>!copyComplete(c)&&!['queued','running'].includes(taskFor(c.id)?.status??''));
  const complete=sourceCopies.filter(copyComplete);
- const visible=(filter==='active'?active:filter==='pending'?pending:filter==='complete'?complete:sourceCopies).sort((a,b)=>(taskFor(b.id)?.updatedAt??b.updatedAt)-(taskFor(a.id)?.updatedAt??a.updatedAt));
+ const visible=filter==='active'?active:filter==='pending'?pending:filter==='complete'?complete:sourceCopies;
  const catalogs=s.catalogs.filter(c=>!scope||c.workId===scope);
- return <Modal title="采集中心" subtitle="统一查看原图进度、补齐缺页和恢复采集。已保存的页面可以随时阅读。" onClose={onClose}>
+ const permissions=useImagePermissions(catalogs.flatMap(catalog=>{
+  const relevant=pending.filter(c=>catalog.entries.some(e=>e.id===c.sourceEntryId));
+  return relevant.length&&!relevant.some(c=>c.pages.some(p=>p.sourceUrl))?[{catalog,entryId:relevant[0].sourceEntryId!}]:[];
+ }));
+ const permissionBusy=permissions.preparing||!!permissions.error;
+ const grant=(ids:string[])=>{
+  const selected=copies.filter(c=>ids.includes(c.id));
+  const related=s.catalogs.filter(catalog=>selected.some(c=>catalog.entries.some(e=>e.id===c.sourceEntryId)));
+  const known=copies.filter(c=>related.some(catalog=>catalog.entries.some(e=>e.id===c.sourceEntryId)));
+  return grantImagePermissions(ids,copies,[...permissions.origins,...copyOrigins(known)]);
+ };
+ return <Modal title="采集中心" subtitle="按来源目录顺序逐章、逐页采集。已保存的页面可以随时阅读。" onClose={onClose}>
   <div className="nc-acquisition-center">
    {feedback&&<div className={'nc-action-feedback '+feedback.tone} role={feedback.tone==='error'?'alert':'status'}>{feedback.tone==='busy'&&<span className="spinner"/>}{feedback.message}</div>}
+   {permissions.preparing&&<p role="status">正在提前读取图片域名，完成后即可授权并开始采集…</p>}
+   {permissions.error&&<p role="alert">{permissions.error} <button className="text-link" onClick={permissions.retry}>重新检查图片域名</button></p>}
    <div className="nc-library-tools"><label className="nc-sort-label">范围<select aria-label="采集作品范围" value={scope} onChange={e=>{setScope(e.target.value);setRestricted(false);}}><option value="">全部作品</option>{s.works.map(w=><option value={w.id} key={w.id}>{w.title}</option>)}</select></label>{restricted&&<button className="text-link" onClick={()=>setRestricted(false)}>已限定所选 {onlyIds?.length} 份 · 查看全部</button>}</div>
    <div className="nc-filter-chips" aria-label="采集状态筛选">{[['all','全部',sourceCopies.length],['active','进行中',active.length],['pending','待处理',pending.length],['complete','已完成',complete.length]].map(([key,label,count])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(String(key))}>{label}<span>{count}</span></button>)}</div>
-   <div className="nc-acquisition-toolbar"><span className="nc-muted">{extension?'保持插件页面打开以执行采集。':'当前是网页预览，仅保存队列；请在扩展中执行采集。'}</span><div className="nc-inline"><button className="button secondary small" disabled={!!busy||!active.length} onClick={()=>void run('pause-all','正在暂停采集',()=>pauseCopies(active.map(c=>c.id)),`已暂停 ${active.length} 份采集`) }>暂停全部</button><button className="button primary small" disabled={!!busy||!pending.length} onClick={()=>void run('queue-all','正在加入采集队列',()=>queueCopies(pending.map(c=>c.id)),queuedMessage(`${pending.length} 份副本`)) }>{busy==='queue-all'?'加入中…':'补齐待处理'}</button></div></div>
+   <div className="nc-acquisition-toolbar"><span className="nc-muted">{extension?'开始前授权图片域名；发现链接后立即逐页下载。':'当前是网页预览，仅保存队列；请在扩展中执行采集。'}</span><div className="nc-inline"><button className="button secondary small" disabled={!!busy||!active.length} onClick={()=>void run('pause-all','正在暂停采集',()=>pauseCopies(active.map(c=>c.id)),`已暂停 ${active.length} 份采集`) }>暂停全部</button><button className="button primary small" disabled={!!busy||permissionBusy||!pending.length} onClick={()=>void run('queue-all','正在确认图片权限',()=>grant(pending.map(c=>c.id)),queuedMessage(`${pending.length} 份副本`)) }>{busy==='queue-all'?'加入中…':'补齐待处理'}</button></div></div>
    <div className="nc-capture-grid">{visible.map(copy=>{
     const task=taskFor(copy.id),isActive=task?.status==='running'||task?.status==='queued',isComplete=copyComplete(copy),needsPermission=!!task?.error&&/授权|权限|permission/i.test(task.error);
     const total=task?.total??copyPageTotal(copy),completed=task?.phase==='discover'&&!copy.discoveryComplete?task.completed:savedPages(copy);
@@ -34,7 +50,7 @@ export function AcquisitionCenter({library:s,copies,initialWorkId,onlyIds,busy,f
      <div className="nc-capture-progress"><span>{task?.phase==='discover'&&!copy.discoveryComplete?'已发现图片':'已保存原图'}</span><b>{completed} / {total??'待确认'}</b></div>
      <progress aria-label={copy.title+'采集进度'} value={total?Math.min(completed,total):undefined} max={total||1}/>
      {task?.error&&!isComplete&&<p className="nc-capture-error">{task.error}</p>}
-     <div className="nc-card-actions">{isComplete?<span className="nc-muted">原图已完整保存</span>:isActive?<button className="button secondary small" disabled={!!busy} onClick={()=>void run('pause:'+copy.id,'正在暂停 '+copy.title,()=>pauseCopies([copy.id]),copy.title+'已暂停，已保存进度保留')}>{busy==='pause:'+copy.id?'暂停中…':'暂停'}</button>:<button className="button primary small" disabled={!!busy} onClick={()=>void run('queue:'+copy.id,needsPermission&&extension?'正在请求图片授权':'正在加入采集队列',()=>needsPermission?grantImagePermissions([copy.id],copies):queueCopies([copy.id]),queuedMessage(copy.title,needsPermission))}>{busy==='queue:'+copy.id?'处理中…':needsPermission?'授权并继续':task?.status==='paused'?'继续采集':task?.status==='failed'?'重试缺失页':'下载／补齐'}</button>}<button className="button plain small" disabled={!savedPages(copy)} onClick={()=>{onClose();onOpen(copy.id);}}>阅读已有页</button></div>
+     <div className="nc-card-actions">{isComplete?<span className="nc-muted">原图已完整保存</span>:isActive?<button className="button secondary small" disabled={!!busy} onClick={()=>void run('pause:'+copy.id,'正在暂停 '+copy.title,()=>pauseCopies([copy.id]),copy.title+'已暂停，已保存进度保留')}>{busy==='pause:'+copy.id?'暂停中…':'暂停'}</button>:<button className="button primary small" disabled={!!busy||permissionBusy} onClick={()=>void run('queue:'+copy.id,'正在确认图片权限',()=>grant([copy.id]),queuedMessage(copy.title,needsPermission))}>{busy==='queue:'+copy.id?'处理中…':needsPermission?'授权并继续':task?.status==='paused'?'继续采集':task?.status==='failed'?'重试缺失页':'下载／补齐'}</button>}<button className="button plain small" disabled={!savedPages(copy)} onClick={()=>{onClose();onOpen(copy.id);}}>阅读已有页</button></div>
     </article>;
    })}</div>
    {!visible.length&&<div className="nc-empty nc-compact-empty"><h3>{sourceCopies.length?'此状态暂无采集':'还没有来源副本'}</h3><p>{sourceCopies.length?'切换上方筛选查看其他采集。':'从来源目录导入内容后，原图采集会统一显示在这里。'}</p></div>}

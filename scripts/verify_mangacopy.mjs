@@ -38,18 +38,27 @@ if(process.env.MANGACOPY_DISCOVERY_ONLY==='1'){
   for(const title of (process.env.MANGACOPY_ENTRIES||'第73話,第1卷,第九卷番外').split(',')){
    const entry=catalog.entries.find(e=>e.title===title);assert(entry,'Missing sample '+title);
    const {tabId}=await send({type:'NC_OPEN_SOURCE',catalogId:catalog.id,entryId:entry.id});
-   const started=Date.now(),counts=[];let last;
+   const started=Date.now(),counts=[];let last,lastProgress=started,lastLog=0;
    try{
     for(let i=0;i<1200&&Date.now()-started<600000;i++){
      const next=await send({type:'NC_POLL_SOURCE',tabId});
-     if(next){last=next;if(counts.at(-1)!==next.items.length)counts.push(next.items.length);if(next.discoveryComplete)break;}
+     if(next){
+      last=next;
+      if(counts.at(-1)!==next.items.length){counts.push(next.items.length);lastProgress=Date.now();}
+      if(Date.now()-lastLog>10000){lastLog=Date.now();console.log(JSON.stringify({title,found:next.items.length,total:next.knownTotal}));}
+      if(next.discoveryComplete)break;
+     }
+     assert(Date.now()-lastProgress<40000,`${title}: no discovery progress for 40 seconds`);
      await reader.waitForTimeout(200);
     }
     assert(last?.discoveryComplete,title+' incomplete');assert.equal(last.items.length,last.knownTotal);
     assert(last.items.every((item,n)=>item.id==='slot-'+n&&item.order===n&&/^https?:/.test(item.url)));
     assert.equal((await reader.evaluate(id=>chrome.tabs.get(id),tabId)).active,false);
-    const source=context.pages().find(p=>p.url()===entry.url);await source?.screenshot({path:path.join(output,'discovery-'+results.length+'.png')});
-    const result={title,total:last.knownTotal,initial:counts[0],growthSnapshots:counts.length,inactiveTab:true,durationMs:Date.now()-started};results.push(result);console.log(JSON.stringify(result));
+    const source=context.pages().find(p=>p.url()===entry.url);assert(source);
+    const pageState=await source.evaluate(()=>({scrollY,domImages:document.querySelectorAll('.comicContent-list img').length,inlineData:[...document.scripts].some(script=>!script.src&&/var\s+contentKey\s*=/.test(script.textContent))}));
+    assert.equal(pageState.scrollY,0,'Discovery must not scroll the source');assert(pageState.inlineData);assert(pageState.domImages<last.items.length,'The full list should come from JS data, not rendered slots');
+    await source.screenshot({path:path.join(output,'discovery-'+results.length+'.png')});
+    const result={title,total:last.knownTotal,initial:counts[0],growthSnapshots:counts.length,inactiveTab:true,durationMs:Date.now()-started,...pageState};results.push(result);console.log(JSON.stringify(result));
    }finally{await send({type:'NC_CLOSE_SOURCE',tabId});}
   }
   const entry=catalog.entries.find(e=>e.title===sample);assert(entry);
@@ -57,7 +66,7 @@ if(process.env.MANGACOPY_DISCOVERY_ONLY==='1'){
   for(let i=0;i<60;i++){await reader.waitForTimeout(500);if((await reader.evaluate(id=>chrome.tabs.get(id),direct.id)).status==='complete')break;}
   const directResult=await send({type:'NC_DISCOVER_TAB',tabId:direct.id});assert(directResult.manifest?.discoveryComplete);assert.equal(directResult.manifest.items.length,directResult.manifest.knownTotal);
   await reader.evaluate(id=>chrome.tabs.remove(id),direct.id);
-  await writeFile(path.join(output,'discovery-results.json'),JSON.stringify({checkedAt:new Date().toISOString(),catalogEntries:catalog.entries.length,results,directDiscovery:{title:sample,total:directResult.manifest.knownTotal,complete:true},scope:'Live original-link discovery in an isolated extension; no translation and no image download or native permission-dialog acceptance.'},null,2));
+  await writeFile(path.join(output,'discovery-results.json'),JSON.stringify({checkedAt:new Date().toISOString(),catalogEntries:catalog.entries.length,results,directDiscovery:{title:sample,total:directResult.manifest.knownTotal,complete:true},scope:'Live JS image-list decoding in an isolated extension without scrolling; no translation, extension image downloads or native permission-dialog acceptance.'},null,2));
  }finally{await context.close();}
  process.exit(0);
 }
