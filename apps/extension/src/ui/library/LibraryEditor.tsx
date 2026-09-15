@@ -5,6 +5,7 @@ import {editLibrary} from '../../library/store';
 import {attachCopy} from '../../library/model';
 import {Modal} from '../components';
 import {ImportAssignmentFields} from '../ImportAssignment';
+import {PublicationChoices} from './PublicationContents';
 import {relationLabels,type EditorKind,type LibraryRun,type UndoAssignment} from './shared';
 
 const labels:Record<EditorKind,string>={work:'编辑作品',chapter:'编辑章节',publication:'编辑卷册',coverage:'纠正副本归属',inclusion:'关联收录章节',publicationRelations:'关联卷册',version:'新建内容版本',relation:'关联作品'};
@@ -41,11 +42,14 @@ export function LibraryEditor({kind,id,work,library:s,copies,run,busy,onClose,on
   });}catch(reason){setError(reason instanceof Error?reason.message:'保存失败，请重试。');throw reason;}},`${labels[kind]}已保存`);
   if(ok){if(undo)onUndo(undo);onClose();}
  }
+ const availableChapters=s.chapters.filter(c=>c.workId===work.id).sort((a,b)=>a.order-b.order);
+ const availablePublications=s.publications.filter(p=>p.id!==id&&p.workIds.includes(work.id)).sort((a,b)=>a.order-b.order);
+ const noOptions=kind==='inclusion'&&!availableChapters.length||kind==='publicationRelations'&&!availablePublications.length;
  const needsTitle=['work','chapter','publication','version'].includes(kind);
  return <Modal title={labels[kind]} onClose={()=>{if(!busy)onClose();}}>
   {error&&<p className="error-message" role="alert">{error}</p>}
   <div className="nc-editor-fields">
-  {kind==='coverage'?<ImportAssignmentFields value={assignment} onChange={setAssignment} library={s}/>:kind==='inclusion'?<><p className="nc-muted">选择这册实际收录的章节。</p><div className="nc-choice-grid">{s.chapters.filter(c=>c.workId===work.id).map(c=><button className="nc-choice-card" aria-pressed={checks.has(c.id)} onClick={()=>toggle(c.id)} key={c.id}><span>{c.title}</span><b>{checks.has(c.id)?'已收录':'选择'}</b></button>)}</div></>:kind==='publicationRelations'?<>{(['collects','reprint'] as const).map(relationKind=><section key={relationKind} role="group" aria-label={relationKind==='collects'?'合订收录':'再版来源'}><h3>{relationKind==='collects'?'合订收录':'再版来源'}</h3><div className="nc-choice-grid">{s.publications.filter(p=>p.id!==id&&p.workIds.includes(work.id)).map(p=>{const key=relationKind+':'+p.id;return <button className="nc-choice-card" key={key} aria-pressed={checks.has(key)} onClick={()=>toggle(key)}><span>{p.title}</span><b>{checks.has(key)?'已关联':'选择'}</b></button>;})}</div></section>)}</>:kind==='relation'?<><label className="field">作品<select value={value} onChange={e=>setValue(e.target.value)}><option value="">选择一部作品</option>{s.works.filter(w=>w.id!==work.id).map(w=><option key={w.id} value={w.id}>{w.title}</option>)}</select></label><label className="field">关系<select value={extra||'related'} onChange={e=>setExtra(e.target.value)}>{Object.entries(relationLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></>:<>
+  {kind==='coverage'?<ImportAssignmentFields value={assignment} onChange={setAssignment} library={s}/>:kind==='inclusion'||kind==='publicationRelations'?<PublicationChoices kind={kind} title={publication?.title??''} chapters={availableChapters} publications={availablePublications} checks={checks} busy={busy} onToggle={toggle}/>:kind==='relation'?<><label className="field">作品<select value={value} onChange={e=>setValue(e.target.value)}><option value="">选择一部作品</option>{s.works.filter(w=>w.id!==work.id).map(w=><option key={w.id} value={w.id}>{w.title}</option>)}</select></label><label className="field">关系<select value={extra||'related'} onChange={e=>setExtra(e.target.value)}>{Object.entries(relationLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></>:<>
    <label className="field">名称<input value={title} onChange={e=>setTitle(e.target.value)} maxLength={180}/></label>
    {['chapter','publication'].includes(kind)&&<label className="field">显示编号<input value={number} onChange={e=>setNumber(e.target.value)}/></label>}
    {kind==='chapter'&&<label className="field">内容性质<select value={value} onChange={e=>setValue(e.target.value)}><option value="unknown">未分类</option><option value="main">正文</option><option value="extra">番外</option></select></label>}
@@ -54,6 +58,6 @@ export function LibraryEditor({kind,id,work,library:s,copies,run,busy,onClose,on
    {kind==='version'&&<><div className="nc-form-grid"><label className="field">语言（选填）<input value={value} onChange={e=>setValue(e.target.value)}/></label><label className="field">译者／制作者（选填）<input value={extra} onChange={e=>setExtra(e.target.value)}/></label></div><p className="nc-muted">选择要归入此版本的副本，也可以稍后在副本详情中选择。</p><div className="nc-choice-grid">{copies.map(c=><button className="nc-choice-card" key={c.id} aria-pressed={checks.has(c.id)} onClick={()=>toggle(c.id)}><span>{c.title}</span><b>{checks.has(c.id)?'已选择':'选择'}</b></button>)}</div></>}
   </>}
   </div>
-  <div className="nc-modal-footer"><button className="button secondary" disabled={busy} onClick={onClose}>取消</button><button className="button primary" disabled={busy||(needsTitle&&!title.trim())} onClick={()=>void save()}>{busy?'保存中…':'保存修改'}</button></div>
+  <div className="nc-modal-footer"><button className="button secondary" disabled={busy} onClick={onClose}>{noOptions?'返回卷册详情':'取消'}</button><button className="button primary" disabled={busy||noOptions||(needsTitle&&!title.trim())} onClick={()=>void save()}>{busy?'保存中…':'保存修改'}</button></div>
  </Modal>;
 }
