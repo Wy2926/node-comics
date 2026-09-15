@@ -30,7 +30,7 @@ flowchart LR
   Worker --> DB
 ```
 
-WXT+React+TypeScript，FastAPI+SQLAlchemy/Alembic，PostgreSQL、Redis/Celery。一个业务后端按API、投递器和Worker进程部署。本地授权文件存储，未来可加私有S3；现有重绘链路无本地图像推理GPU依赖，新增常规引擎的硬件需求待实测。
+WXT+React+TypeScript，FastAPI+SQLAlchemy/Alembic，PostgreSQL、Redis/Celery。一个业务后端按API、投递器和Worker进程部署。原图使用本地授权文件存储，译图支持本地或私有 Cloudflare R2（boto3/S3 兼容适配器），R2 授权短时直链由客户端直接下载，见[对象存储](OBJECT_STORAGE.md)；现有重绘链路无本地图像推理GPU依赖，新增常规引擎的硬件需求待实测。
 
 ## 漫画管理领域模型
 

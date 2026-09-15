@@ -33,6 +33,7 @@ class Asset(Base):
     kind: Mapped[str] = mapped_column(String(20), default="original")
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
     storage_key: Mapped[str] = mapped_column(String(200))
+    storage_backend: Mapped[str] = mapped_column(String(20), default="local", server_default="local")
     mime: Mapped[str] = mapped_column(String(30))
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
@@ -107,6 +108,7 @@ class Attempt(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
     provider_id: Mapped[str] = mapped_column(String(80))
+    output_storage_backend: Mapped[str] = mapped_column(String(20), default="local", server_default="local")
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     heartbeat_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     lease_expires_at: Mapped[datetime] = mapped_column(DateTime)
@@ -117,6 +119,13 @@ class Attempt(Base):
     cost_state: Mapped[str] = mapped_column(String(20), default="unknown")
     error_code: Mapped[str | None] = mapped_column(String(60))
     recovered: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class StorageScan(Base):
+    __tablename__ = "storage_scans"
+    backend: Mapped[str] = mapped_column(String(20), primary_key=True)
+    cursor: Mapped[str | None] = mapped_column(String(4096))
+    next_scan_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class Ledger(Base):

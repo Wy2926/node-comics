@@ -5,7 +5,8 @@ from celery import Celery
 from sqlalchemy import func, select, update
 from .adapters.images import redraw
 from .classic import run_classic, requeue_local
-from .assets import available, create_asset, inspect_image, object_path
+from .assets import available, create_asset, inspect_image, read_asset
+from .storage import StorageError
 from .config import settings
 from .db import session_factory
 from .errors import ProcessingError
@@ -79,7 +80,8 @@ def claim(job_id, admission_token=None):
         if updated.rowcount != 1:
             db.rollback()
             return None
-        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id=provider_id, lease_expires_at=now() + lease_duration(job)))
+        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id=provider_id, lease_expires_at=now() + lease_duration(job),
+                       output_storage_backend=settings().result_storage_backend))
         db.commit()
         return attempt_id
 
@@ -120,7 +122,7 @@ def process_job(job_id: str, admission_token: str | None = None):
             asset = db.get(Asset, job.input_asset_id)
             if not available(asset) or job.discard_output or job.cancel_requested:
                 raise ProcessingError("ASSET_EXPIRED", "原图已删除、过期或任务已取消")
-            data = object_path(asset.storage_key).read_bytes()
+            data = read_asset(asset)
             mime, language, config, mode = asset.mime, job.target_language, job.config, job.mode
             if mode == "redraw":
                 attempt.call_started_at = now()
@@ -154,7 +156,8 @@ def process_job(job_id: str, admission_token: str | None = None):
                 ratio_change = (info["width"] / info["height"]) / (asset.width / asset.height)
                 if (mode == 'classic' and (info['width'], info['height']) != (asset.width, asset.height)) or ratio_change < 0.8 or ratio_change > 1.25:
                     raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果宽高比偏离原图过多，未交付且不扣用户额度", request_id=result.request_id)
-                output = create_asset(db, job.owner_id, result.image, kind=job.mode, parent_id=asset.id, stable_id=attempt_id)
+                output = create_asset(db, job.owner_id, result.image, kind=job.mode, parent_id=asset.id, stable_id=attempt_id,
+                                      storage_backend=attempt.output_storage_backend)
                 job.output_asset_id = output.id
                 job.quality_flags = (result.quality_flags or []) + (["aspect_ratio_changed"] if abs(ratio_change - 1) > 0.03 else [])
                 job.status, job.phase, job.completed_at = "succeeded", "completed", now()
@@ -165,6 +168,15 @@ def process_job(job_id: str, admission_token: str | None = None):
                     if provider and provider.config == config["provider"]:
                         provider.validated_at, provider.validation_job_id = now(), job.id
             db.commit()
+    except StorageError:
+        # PUT can succeed before a connection loss. Recover the same key without
+        # reissuing a paid image request because storage is unavailable.
+        with session_factory()() as db:
+            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
+            if job and job.attempt_id == attempt_id and job.status == "running":
+                job.error_code, job.error_message = "STORAGE_UNAVAILABLE", "图片存储暂时不可用，等待恢复已保存的结果"
+                db.get(Attempt, attempt_id).lease_expires_at = now()
+                db.commit()
     except ProcessingError as error:
         if not (locals().get('mode') == 'classic' and requeue_local(job_id, attempt_id, error)):
             finish_error(job_id, attempt_id, error)

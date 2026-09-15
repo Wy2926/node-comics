@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "objects"))
+    monkeypatch.setenv("RESULT_STORAGE_BACKEND", "local")
+    monkeypatch.setenv("R2_ENDPOINT_URL", "")
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
     monkeypatch.setenv("OPENAI_API_KEY", "isolated-test-provider-key")

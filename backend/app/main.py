@@ -4,12 +4,13 @@ from typing import Annotated, Literal
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import Field
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from .assets import asset_json, available, create_asset, object_path, owned_asset, upload_bytes
+from .assets import access_json, asset_json, available, create_asset, delete_asset_object, object_path, owned_asset, upload_bytes
+from .storage import StorageError
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
 from .db import get_db, initialize, session_factory
@@ -35,7 +36,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Node Comics API", version="0.1.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务和测试额度。图片通过 Bearer 授权网关读取。")
+app = FastAPI(title="Node Comics API", version="0.1.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务和测试额度。授权后通过本地网关或对象存储短时直链读取图片。")
 app.include_router(queue_router)
 app.include_router(reader_router)
 cfg = settings()
@@ -68,6 +69,11 @@ async def validation_error(request, exc):
 async def api_error(request, exc):
     detail = exc.detail if isinstance(exc.detail, dict) else {"code": "REQUEST_FAILED", "message": str(exc.detail)}
     return JSONResponse(status_code=exc.status_code, content={"error": detail}, headers=exc.headers)
+
+
+@app.exception_handler(StorageError)
+async def storage_error(request, exc):
+    return JSONResponse(status_code=503, content={"error": {"code": "STORAGE_UNAVAILABLE", "message": "图片存储暂时不可用，请稍后重试"}})
 
 
 class DevLogin(RequestBody):
@@ -176,13 +182,15 @@ def file_page_matches(body: FilePageMatchRequest, user: User = Depends(identity)
 @app.get("/v1/images/{asset_id}/access", response_model=AccessResponse)
 def image_access(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     asset = owned_asset(db, asset_id, user.id)
-    return {"url": f"/v1/images/{asset.id}/content", "expires_at": asset.expires_at.isoformat() + "Z", "authorization_required": True}
+    return access_json(asset)
 
 
 @app.get("/v1/images/{asset_id}/content")
 def image_content(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     asset = owned_asset(db, asset_id, user.id)
     extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}[asset.mime]
+    if asset.storage_backend != "local":
+        return RedirectResponse(access_json(asset)["url"], status_code=307)
     return FileResponse(object_path(asset.storage_key), media_type=asset.mime, filename=f"node-comics-{asset.id}.{extension}", content_disposition_type="inline")
 
 
@@ -212,7 +220,7 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
                 db.delete(state)
     db.commit()
     for item in assets:
-        object_path(item.storage_key).unlink(missing_ok=True)
+        delete_asset_object(item)
         item.purged_at = now()
     db.commit()
     return {"deleted": True, "asset_ids": list(ids)}

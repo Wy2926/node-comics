@@ -3,7 +3,9 @@ from datetime import timedelta
 import logging
 import time
 from sqlalchemy import func, or_, select
-from .assets import available, create_asset, inspect_image, object_path
+from .assets import available, create_asset, delete_asset_object, inspect_image
+from .storage import get_store, StorageError
+from .storage_cleanup import cleanup_orphans
 from .errors import ProcessingError
 from .config import settings
 from .db import initialize, session_factory
@@ -17,6 +19,7 @@ log = logging.getLogger("node_comics.dispatcher")
 
 
 def recover(db):
+    unavailable_backends = set()
     if db.get_bind().dialect.name == "sqlite":
         lock_scheduler(db)
     for job in db.scalars(select(Job).where(Job.status == "running").with_for_update(skip_locked=True, key_share=True)).all():
@@ -24,26 +27,41 @@ def recover(db):
         if not attempt or attempt.lease_expires_at > now():
             continue
         if attempt.call_started_at:
-            saved = object_path(f"{job.owner_id}/{attempt.id}")
-            if saved.is_file():
+            if attempt.output_storage_backend in unavailable_backends:
+                continue
+            key = f"{job.owner_id}/{attempt.id}"
+            try:
+                store = get_store(attempt.output_storage_backend)
+                saved = store.read(key) if store.exists(key) else None
+            except StorageError:
+                unavailable_backends.add(attempt.output_storage_backend)
+                attempt.lease_expires_at = now() + timedelta(minutes=1)
+                continue  # Storage downtime is not evidence of missing output.
+            if saved is not None:
                 source = db.get(Asset, job.input_asset_id)
                 if job.cancel_requested or job.discard_output or not available(source):
-                    saved.unlink(missing_ok=True)
+                    try:
+                        store.delete(key)
+                    except StorageError:
+                        continue
                     job.status, job.phase, job.completed_at = "cancelled", "cancelled", now()
                     settle(db, job, success=False)
                 else:
                     try:
-                        data = saved.read_bytes()
+                        data = saved
                         info = inspect_image(data, output=True)
                         ratio = (info["width"] / info["height"]) / (source.width / source.height)
                         if not 0.8 <= ratio <= 1.25:
                             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "已保存结果的宽高比不合格")
-                        output = db.get(Asset, attempt.id) or create_asset(db, job.owner_id, data, kind=job.mode, parent_id=source.id, stable_id=attempt.id)
+                        output = db.get(Asset, attempt.id) or create_asset(db, job.owner_id, data, kind=job.mode, parent_id=source.id,
+                                                                         stable_id=attempt.id, storage_backend=attempt.output_storage_backend)
                         job.output_asset_id = output.id
                         job.status, job.phase, job.completed_at = "succeeded", "completed", now()
                         job.error_code, job.error_message = None, None
                         job.quality_flags = ["aspect_ratio_changed"] if abs(ratio - 1) > 0.03 else []
                         settle(db, job, success=True)
+                    except StorageError:
+                        continue
                     except ProcessingError as error:
                         job.status, job.phase, job.completed_at = "failed", "failed", now()
                         job.error_code, job.error_message = error.code, error.message
@@ -66,26 +84,26 @@ def recover(db):
 
 
 def cleanup(db):
+    unavailable_backends = set()
     expired_parents = select(Asset.id).where(or_(Asset.expires_at <= now(), Asset.deleted_at.is_not(None)))
     for asset in db.scalars(select(Asset).where(Asset.purged_at.is_(None), or_(Asset.expires_at <= now(), Asset.deleted_at.is_not(None), Asset.parent_id.in_(expired_parents))).order_by(Asset.expires_at, Asset.id).limit(200)).all():
         if not asset.deleted_at:
             asset.deleted_at = now()
         for job in db.scalars(select(Job).where(Job.input_asset_id == asset.id, Job.status.in_(["queued", "running", "outcome_unknown"])).with_for_update(key_share=True)).all():
             cancel_job(db, job)
-        object_path(asset.storage_key).unlink(missing_ok=True)
-        asset.purged_at = now()
+        if asset.storage_backend in unavailable_backends:
+            continue
+        try:
+            delete_asset_object(asset)
+            asset.purged_at = now()
+        except StorageError:
+            unavailable_backends.add(asset.storage_backend)
+            continue  # Keep the tombstone for the next physical cleanup attempt.
     # OCR, translations and masks inherit the original's deletion and expiry.
     for state in db.scalars(select(ClassicState).join(Job, Job.id == ClassicState.job_id).join(Asset, Asset.id == Job.input_asset_id)
                             .where(or_(Asset.expires_at <= now(), Asset.deleted_at.is_not(None)))).all():
         db.delete(state)
-    # Ignore young unindexed objects; they may be in the save-before-commit window.
-    cutoff = time.time() - 24 * 3600
-    root = settings().storage_path
-    for path in root.glob("*/*"):
-        if path.is_file() and path.stat().st_mtime < cutoff:
-            key = path.relative_to(root).as_posix()
-            if not db.scalar(select(Asset.id).where(Asset.storage_key == key)):
-                path.unlink(missing_ok=True)
+    cleanup_orphans(db, skip_remote="r2" in unavailable_backends)
 
 
 def dispatch_once():

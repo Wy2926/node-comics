@@ -5,7 +5,8 @@ from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .assets import create_asset, owned_asset, upload_bytes
+from .assets import create_asset, owned_asset, read_asset, upload_bytes
+from .storage import get_store
 from .auth import admin, user_json
 from .config import settings
 from .db import get_db
@@ -132,6 +133,7 @@ def admin_quota(user_id: str, body: QuotaAdjustment, idempotency_key: Annotated[
 
 @router.post("/v1/admin/jobs/{job_id}/reconcile", response_model=JobResponse)
 def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), db: Session = Depends(get_db)):
+    previous_storage = None
     job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
     if not job:
         problem("NOT_FOUND", "任务不存在", 404)
@@ -149,6 +151,10 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         ratio = (output.width / output.height) / (source.width / source.height)
         if not 0.8 <= ratio <= 1.25:
             problem("INVALID_PROVIDER_OUTPUT", "核实结果宽高比偏离原图", 422)
+        if output.storage_backend == "local" and settings().result_storage_backend == "r2":
+            get_store("r2").put(output.storage_key, read_asset(output), output.mime)
+            previous_storage = ("local", output.storage_key)
+            output.storage_backend = "r2"
         job.output_asset_id = output.id
         output.kind, output.parent_id = job.mode, source.id
         output.expires_at = min(output.expires_at, source.expires_at)
@@ -160,4 +166,9 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
     job.completed_at, job.error_code, job.error_message = now(), None, None
     db.add(Ledger(owner_id=job.owner_id, job_id=job.id, transaction_key=f"{job.id}:reconcile", kind="reconcile", amount=0, note=body.note))
     db.commit()
+    if previous_storage:
+        try:
+            get_store(previous_storage[0]).delete(previous_storage[1])
+        except OSError:
+            pass  # The local orphan sweep retries after the durable relocation.
     return job_json(db, job)

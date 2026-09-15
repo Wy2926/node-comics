@@ -43,7 +43,41 @@ export class Api {
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
   rerun(id:string,key:string,quote_id:string,max_credits:number,input_asset_id?:string) {return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/rerun`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({quote_id,max_credits,...(input_asset_id?{input_asset_id}:{})})});}
-  async image(id: string) { const access = await this.request<{url: string; expires_at: string}>(`/v1/images/${encodeURIComponent(id)}/access`); const url = new URL(access.url, this.base); if (url.origin !== new URL(this.base).origin) throw new ApiError('图片访问地址不属于当前服务。','INVALID_ASSET_ORIGIN'); return this.pool.run(async()=>{assertCurrent(this.isCurrent);const response = await fetch(url, {headers:{Authorization:`Bearer ${this.token}`}}); if (!response.ok) throw new ApiError('图片已过期或无法访问，请保留本地副本或重新上传。','ASSET_EXPIRED',response.status); const blob=await response.blob(); const bitmap=await createImageBitmap(blob); bitmap.close(); return blob;}); }
+  async image(id: string): Promise<Blob> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const access = await this.request<{url: string; expires_at: string; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`);
+      const url = new URL(access.url, this.base);
+      const signed = access.authorization_required === false;
+      if (url.username || url.password || (signed ? url.protocol !== 'https:' : url.origin !== new URL(this.base).origin)) {
+        throw new ApiError('图片访问地址无效。', 'INVALID_ASSET_ORIGIN');
+      }
+      const blob = await this.pool.run(async () => {
+        assertCurrent(this.isCurrent);
+        // Refresh after waiting in the request pool, without nesting pool slots.
+        if (signed && attempt === 0 && Date.parse(access.expires_at) <= Date.now()) return null;
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            headers: signed ? {} : {Authorization: `Bearer ${this.token}`},
+            credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'error',
+          });
+        } catch {
+          // R2 omits CORS headers for expired signatures, so fetch may reject.
+          if (signed && attempt === 0) return null;
+          throw new ApiError('暂时无法下载图片，请检查网络或对象存储的跨域配置。', 'ASSET_DOWNLOAD_FAILED');
+        }
+        if (signed && attempt === 0 && [401, 403].includes(response.status)) return null;
+        if (!response.ok) throw new ApiError('图片已过期或无法访问，请保留本地副本或重新上传。', 'ASSET_EXPIRED', response.status);
+        const result = await response.blob();
+        const bitmap = await createImageBitmap(result);
+        bitmap.close();
+        assertCurrent(this.isCurrent);
+        return result;
+      });
+      if (blob) return blob;
+    }
+    throw new ApiError('图片访问链接已过期，请重试。', 'ASSET_EXPIRED');
+  }
   deleteImage(id: string) { return this.request<void>(`/v1/images/${encodeURIComponent(id)}`,{method:'DELETE'}); }
 }
 function validateSource(source: FilePageSource) {

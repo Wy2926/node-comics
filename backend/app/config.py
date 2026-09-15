@@ -1,15 +1,26 @@
 """Server configuration. Secrets are read from environment, never returned to clients."""
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field
+from typing import Literal
+from urllib.parse import urlsplit
+import re
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
+    model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore", hide_input_in_errors=True)
     database_url: str = "sqlite:///./node-comics.db"
     redis_url: str = "redis://localhost:6379/0"
     storage_path: Path = Path("./private-data")
+    result_storage_backend: Literal["local", "r2"] = "local"
+    r2_endpoint_url: str = ""
+    r2_bucket: str = ""
+    r2_access_key_id: SecretStr = SecretStr("")
+    r2_secret_access_key: SecretStr = SecretStr("")
+    r2_key_prefix: str = "node-comics/"
+    storage_url_ttl_seconds: int = Field(default=300, ge=1, le=3600)
+    storage_timeout_seconds: int = Field(default=30, ge=1, le=120)
     dev_auth: bool = False
     dev_auth_secret: str = ""
     dev_admin_username: str = "admin"
@@ -64,6 +75,21 @@ class Settings(BaseSettings):
     text_input_rate: int = 5
     text_output_rate: int = 30
     text_pricing_version: str = "operator-estimate-v1"
+
+    @model_validator(mode="after")
+    def validate_storage(self):
+        if self.result_storage_backend == "r2" or self.r2_endpoint_url:
+            url = urlsplit(self.r2_endpoint_url)
+            if (url.scheme != "https" or not re.fullmatch(r"[a-f0-9]{32}(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com", url.netloc)
+                    or url.path not in ("", "/") or url.query or url.fragment):
+                raise ValueError("R2_ENDPOINT_URL must be the HTTPS R2 S3 account endpoint")
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", self.r2_bucket):
+                raise ValueError("R2_BUCKET must be a valid bucket name")
+            if not self.r2_access_key_id.get_secret_value() or not self.r2_secret_access_key.get_secret_value():
+                raise ValueError("R2 credentials are required")
+            if not re.fullmatch(r"(?:[A-Za-z0-9_-]+/)+", self.r2_key_prefix):
+                raise ValueError("R2_KEY_PREFIX must be a nonempty directory prefix ending in /")
+        return self
 
 
 @lru_cache

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Node Comics API",
-    "description": "私有漫画图片、持久化翻译任务和测试额度。图片通过 Bearer 授权网关读取。",
+    "description": "私有漫画图片、持久化翻译任务和测试额度。授权后通过本地网关或对象存储短时直链读取图片。",
     "version": "0.1.0"
   },
   "paths": {

@@ -1,14 +1,13 @@
 from datetime import timedelta
 import hashlib
 from io import BytesIO
-import os
-from pathlib import Path
 import warnings
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 from .config import settings
 from .errors import problem, ProcessingError
 from .models import Asset, now, uid
+from .storage import get_store, LocalStore
 
 MIMES = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
 
@@ -39,47 +38,53 @@ def inspect_image(data: bytes, *, output=False):
         problem("UNSUPPORTED_IMAGE", "请选择可正常解码的静态 PNG、JPEG 或 WebP 图片", 422)
 
 
-def object_path(key: str) -> Path:
-    root = settings().storage_path.resolve()
-    path = (root / key).resolve()
-    if not path.is_relative_to(root):
-        raise ValueError("Invalid storage key")
-    return path
+def object_path(key: str):
+    return LocalStore().path(key)
 
 
 def write_object(key: str, data: bytes):
-    path = object_path(key)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(f".{uid()}.tmp")
-    try:
-        with temporary.open("xb") as output:
-            output.write(data)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    LocalStore().put(key, data, "application/octet-stream")
 
 
-def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", parent_id=None, stable_id=None):
+def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", parent_id=None, stable_id=None, storage_backend=None):
     info = inspect_image(data, output=kind != "original")
     asset_id = stable_id or uid()
     key = f"{owner_id}/{asset_id}"
-    write_object(key, data)
+    backend = storage_backend or ("local" if kind == "original" else settings().result_storage_backend)
     expires_at = now() + timedelta(days=settings().retention_days)
     if parent_id:
         parent = db.get(Asset, parent_id)
         if not parent or parent.owner_id != owner_id:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果原图的访问归属无效")
         expires_at = min(expires_at, parent.expires_at)
-    asset = Asset(id=asset_id, owner_id=owner_id, storage_key=key, kind=kind, parent_id=parent_id, expires_at=expires_at, **info)
+    get_store(backend).put(key, data, info["mime"])
+    asset = Asset(id=asset_id, owner_id=owner_id, storage_key=key, storage_backend=backend, kind=kind, parent_id=parent_id, expires_at=expires_at, **info)
     db.add(asset)
     db.flush()
     return asset
 
 
 def available(asset: Asset | None):
-    return bool(asset and not asset.deleted_at and asset.expires_at > now() and object_path(asset.storage_key).is_file())
+    return bool(asset and not asset.deleted_at and asset.expires_at > now() and get_store(asset.storage_backend).exists(asset.storage_key))
+
+
+def read_asset(asset: Asset):
+    return get_store(asset.storage_backend).read(asset.storage_key)
+
+
+def delete_asset_object(asset: Asset):
+    get_store(asset.storage_backend).delete(asset.storage_key)
+
+
+def access_json(asset: Asset):
+    if asset.storage_backend == "local":
+        return {"url": f"/v1/images/{asset.id}/content", "expires_at": asset.expires_at.isoformat() + "Z", "authorization_required": True}
+    current = now().replace(microsecond=0)
+    ttl = min(settings().storage_url_ttl_seconds, int((asset.expires_at - now()).total_seconds()) - 1)
+    if ttl < 1:
+        problem("ASSET_EXPIRED", "图片已过期", 410)
+    return {"url": get_store(asset.storage_backend).download_url(asset.storage_key, ttl),
+            "expires_at": (current + timedelta(seconds=ttl)).isoformat() + "Z", "authorization_required": False}
 
 
 def owned_asset(db: Session, asset_id: str, owner_id: str):

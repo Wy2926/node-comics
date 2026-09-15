@@ -8,7 +8,7 @@ import httpx
 from sqlalchemy import func, select
 from .adapters.images import TranslationOutput, read_bounded
 from .adapters.text import TextError, call_text, groups, input_bound, parse_translations
-from .assets import available, create_asset, inspect_image, object_path
+from .assets import available, create_asset, inspect_image, read_asset
 from .config import settings
 from .db import session_factory
 from .errors import ProcessingError
@@ -186,7 +186,7 @@ def run_classic(job_id, attempt_id, data, language, config):
         if rendered:
             asset = db.get(Asset, rendered)
             if available(asset):
-                return TranslationOutput(object_path(asset.storage_key).read_bytes(), quality_flags=(analysis or {}).get('quality_flags', []))
+                return TranslationOutput(read_asset(asset), quality_flags=(analysis or {}).get('quality_flags', []))
     if analysis is None:
         analysis = engine_request('analyze', data, config)
         info = inspect_image(data, output=True)

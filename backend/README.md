@@ -2,6 +2,8 @@
 
 当前实现包含常规翻译 `classic` 与图片模型重绘 `redraw`。[常规翻译运行说明](../docs/CLASSIC_IMPLEMENTATION.md)包含独立 Docker 引擎、文本配置、检查点、费用预占及验证命令。`redraw` 是 API 中保留的模式标识；图片与目标语言直接送入服务端的 `images/edits` 适配器，没有 OCR 或普通机翻前置步骤。
 
+译图存储支持本地私有文件和 Cloudflare R2（`boto3`）。启用 R2 后，新译图与常规中间图片不落本地磁盘，插件授权后直接从私有桶下载。配置、CORS、保留期及切换限制见[对象存储说明](../docs/OBJECT_STORAGE.md)。
+
 ## 本地运行
 
 需要 Python 3.11、PostgreSQL 16+、Redis 7+。推荐使用仓库 Docker Compose，API 映射到 `http://127.0.0.1:18088`；私有图片目录使用持久化卷，不能直接映射为静态站点。
@@ -29,7 +31,11 @@ Celery 推荐在 Docker Linux 容器内运行。API 和 dispatcher 启动时运�
 | --- | --- |
 | `DATABASE_URL` | 如 `postgresql+psycopg://用户:密码@postgres:5432/nodecomics` |
 | `REDIS_URL` | 如 `redis://redis:6379/0` |
-| `STORAGE_PATH` | API/worker/dispatcher 共用的私有文件卷 |
+| `STORAGE_PATH` | 原图及 local 模式结果共用的私有文件卷 |
+| `RESULT_STORAGE_BACKEND` | 新译图和常规中间图片：`local`（默认）或 `r2` |
+| `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 S3 端点、私有桶及服务端凭据 |
+| `R2_KEY_PREFIX` | 当前数据库独占前缀，默认 `node-comics/` |
+| `STORAGE_URL_TTL_SECONDS` / `STORAGE_TIMEOUT_SECONDS` | 直链有效期默认 300 秒（不超过图片到期时间）；存储请求超时默认 30 秒 |
 | `DEV_AUTH` / `DEV_AUTH_SECRET` | 本地测试登录显式开启，签名密钥至少 32 字符 |
 | `DEV_ADMIN_USERNAME` | 开发管理员用户名，默认 `admin`，仅限本地开发 |
 | `OIDC_ISSUER` / `OIDC_AUDIENCE` / `OIDC_JWKS_URL` | 正式账号 JWT 校验，生产缺失时拒绝认证 |
@@ -68,7 +74,7 @@ Celery 推荐在 Docker Linux 容器内运行。API 和 dispatcher 启动时运�
 - 创建单页/批次响应中的 `requested_asset_id` 表示本次提交或报价的图片，`input_asset_id` 始终保留共享任务真实输入；批次响应的 `batch_id` / `ordinal` 属于本次批次。一个任务可能对应多个请求图片或批次页，客户端应按请求关联挂页，不应仅凭任务真实输入或仅凭 job ID 去除批次页。
 - `GET /v1/translation-batches/{id}` 按稳定页序分页；对应 `/cancel` 取消未执行页，并要求运行中任务丢弃结果。
 - `POST /v1/jobs/{id}/rerun {quote_id,max_credits}` 绑定该页及目标语言的有效报价后强制创建新版本；价格或配置变化时要求重新确认，不能静默加价。结果不明任务还必须显式传 `acknowledge_unknown_cost:true`。
-- `GET /v1/images/{id}/access` 返回需要 Bearer 的相对下载路径；前端授权 fetch 后创建本地 Blob URL。地址不携带 token，不公开图片桶。
+- `GET /v1/images/{id}/access` 需 Bearer 授权；本地结果返回相对下载路径和 `authorization_required:true`，R2 结果返回短时 HTTPS 签名链接和 `authorization_required:false`。前端依据该字段决定是否携带 Bearer，R2 下载不发送账户令牌；最终均解码为本地 Blob。
 - `DELETE /v1/images/{id}` 撤销原图及衍生结果访问；`GET /v1/me/usage` 返回可用/预占额度与分页账本。
 - `GET /v1/me/queue` 查看用户后端队列；`PUT /v1/me/queue {concurrency:2}` 持久化并发设置，限定 1–10 且不超过服务端上限，`null` 恢复默认。响应包括 `concurrency`（用户覆盖值）、`effective_concurrency`、`default_concurrency`、`max_concurrency`、`queued`、`dispatched`、`running`；`dispatched` 是 `queued` 中已获执行名额的子集，并不保证消息已进入 Redis。
 - 管理员可通过 `GET/PUT /v1/admin/users/{user_id}/queue` 读取或修改同一设置；普通用户只能操作自己的设置，未知用户返回 404。
