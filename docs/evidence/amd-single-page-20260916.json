@@ -1,0 +1,764 @@
+{
+  "scope": "single-page local HTTP pipeline, no LLM/R2",
+  "phases": [
+    {
+      "name": "v1-serial",
+      "concurrency": 1,
+      "start": 1789508079.4626486,
+      "end": 1789508133.99825,
+      "seconds": 54.53199999999924,
+      "pages": 10,
+      "successes": 10,
+      "failures": 0,
+      "pages_per_minute": 11.002714002787506,
+      "latency_seconds": {
+        "mean": 5.45,
+        "p50": 5.40650000000096,
+        "p95": 5.630750000000262,
+        "max": 5.75,
+        "min": 5.375
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 3.093800000000192,
+          "p50": 3.061999999998079,
+          "p95": 3.265699999999924,
+          "max": 3.4069999999992433,
+          "min": 3.0310000000026776
+        },
+        "inpaint": {
+          "mean": 1.220199999999022,
+          "p50": 1.2184999999990396,
+          "p95": 1.2531000000002677,
+          "max": 1.2810000000026776,
+          "min": 1.2029999999940628
+        },
+        "render": {
+          "mean": 0.40609999999869617,
+          "p50": 0.4059999999990396,
+          "p95": 0.4065500000007887,
+          "max": 0.4069999999992433,
+          "min": 0.4059999999954016
+        }
+      },
+      "http_seconds": {
+        "analyze": {
+          "mean": 3.173399999999674,
+          "p50": 3.140499999997701,
+          "p95": 3.3437000000012627,
+          "max": 3.485000000000582,
+          "min": 3.1090000000040163
+        },
+        "inpaint": {
+          "mean": 1.3202999999994063,
+          "p50": 1.3120000000017171,
+          "p95": 1.363099999996848,
+          "max": 1.3909999999959837,
+          "min": 1.2969999999986612
+        },
+        "render": {
+          "mean": 0.6281999999999244,
+          "p50": 0.625,
+          "p95": 0.6409999999999855,
+          "max": 0.6410000000032596,
+          "min": 0.625
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "health": {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 0,
+        "panel_execution": "serial",
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "cpu",
+          "ocr_cache_update": "original-cpu",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 65
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 11
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 36
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 186
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 3
+            }
+          ]
+        }
+      },
+      "resources": {
+        "samples": 38,
+        "gpu_busiest_engine_percent": {
+          "mean": 5.552631578947368,
+          "p50": 0.0,
+          "p95": 22.15,
+          "max": 23.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 2881204655.1578946,
+          "p50": 3310784512.0,
+          "p95": 3310784512.0,
+          "max": 3310784512.0,
+          "min": 2290532352.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 347123712.0,
+          "p50": 347123712.0,
+          "p95": 347123712.0,
+          "max": 347123712.0,
+          "min": 347123712.0
+        },
+        "working_set_bytes": {
+          "mean": 1994045763.368421,
+          "p50": 1995479040.0,
+          "p95": 2038390784.0,
+          "max": 2051117056.0,
+          "min": 1942552576.0
+        },
+        "private_bytes": {
+          "mean": 5059312370.526316,
+          "p50": 5482211328.0,
+          "p95": 5531130470.4,
+          "max": 5541109760.0,
+          "min": 4425388032.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 296.988085889612,
+          "p50": 294.3998952041594,
+          "p95": 397.2570860222909,
+          "max": 399.55819040473494,
+          "min": 189.5599422043986
+        },
+        "first_private_bytes": 4429463552,
+        "last_private_bytes": 5541109760
+      }
+    },
+    {
+      "name": "v2-parallel-panels",
+      "concurrency": 1,
+      "start": 1789508153.9300308,
+      "end": 1789508198.2852721,
+      "seconds": 44.3440000000046,
+      "pages": 10,
+      "successes": 10,
+      "failures": 0,
+      "pages_per_minute": 13.530579108784453,
+      "latency_seconds": {
+        "mean": 4.43440000000046,
+        "p50": 4.429500000002008,
+        "p95": 4.477249999997002,
+        "max": 4.48399999999674,
+        "min": 4.39100000000326
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 2.0654999999998838,
+          "p50": 2.061999999998079,
+          "p95": 2.109000000000742,
+          "max": 2.1090000000040163,
+          "min": 2.0469999999986612
+        },
+        "inpaint": {
+          "mean": 1.2249999999992724,
+          "p50": 1.2189999999973224,
+          "p95": 1.2345500000021274,
+          "max": 1.235000000000582,
+          "min": 1.2180000000007567
+        },
+        "render": {
+          "mean": 0.4109000000004016,
+          "p50": 0.4065000000009604,
+          "p95": 0.422000000002663,
+          "max": 0.4220000000059372,
+          "min": 0.4059999999954016
+        }
+      },
+      "http_seconds": {
+        "analyze": {
+          "mean": 2.151600000000326,
+          "p50": 2.1410000000032596,
+          "p95": 2.195799999999872,
+          "max": 2.2030000000013388,
+          "min": 2.125
+        },
+        "inpaint": {
+          "mean": 1.3203000000008616,
+          "p50": 1.3205000000016298,
+          "p95": 1.3280000000013388,
+          "max": 1.3280000000013388,
+          "min": 1.3119999999980791
+        },
+        "render": {
+          "mean": 0.6296999999998661,
+          "p50": 0.625,
+          "p95": 0.6409999999999855,
+          "max": 0.6410000000032596,
+          "min": 0.625
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "health": {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-v2",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 0,
+        "panel_execution": "parallel-process",
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "privateuseone:0",
+          "ocr_cache_update": "out-of-place-v1",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 65
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 11
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 36
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 186
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 3
+            }
+          ]
+        }
+      },
+      "resources": {
+        "samples": 31,
+        "gpu_busiest_engine_percent": {
+          "mean": 24.06451612903226,
+          "p50": 22.0,
+          "p95": 56.0,
+          "max": 65.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 3380367360.0,
+          "p50": 3380367360.0,
+          "p95": 3380367360.0,
+          "max": 3380367360.0,
+          "min": 3380367360.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 347123712.0,
+          "p50": 347123712.0,
+          "p95": 347123712.0,
+          "max": 347123712.0,
+          "min": 347123712.0
+        },
+        "working_set_bytes": {
+          "mean": 1189977451.3548386,
+          "p50": 1200021504.0,
+          "p95": 1239144448.0,
+          "max": 1261363200.0,
+          "min": 1123246080.0
+        },
+        "private_bytes": {
+          "mean": 4822748523.354838,
+          "p50": 4832436224.0,
+          "p95": 4882132992.0,
+          "max": 4905615360.0,
+          "min": 4755533824.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 270.6073693894529,
+          "p50": 258.95364717633885,
+          "p95": 350.1400625698518,
+          "max": 359.3205718191554,
+          "min": 177.38261519275983
+        },
+        "first_private_bytes": 4755533824,
+        "last_private_bytes": 4849844224
+      }
+    },
+    {
+      "name": "v1-repeat",
+      "concurrency": 1,
+      "start": 1789508217.4431493,
+      "end": 1789508271.9033067,
+      "seconds": 54.4690000000046,
+      "pages": 10,
+      "successes": 10,
+      "failures": 0,
+      "pages_per_minute": 11.01543997503074,
+      "latency_seconds": {
+        "mean": 5.443699999999808,
+        "p50": 5.414499999998952,
+        "p95": 5.539800000000469,
+        "max": 5.546999999998661,
+        "min": 5.359000000004016
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 3.056099999999424,
+          "p50": 3.0469999999986612,
+          "p95": 3.117799999998533,
+          "max": 3.125,
+          "min": 3.0
+        },
+        "inpaint": {
+          "mean": 1.2391999999999825,
+          "p50": 1.2265000000006694,
+          "p95": 1.290250000002925,
+          "max": 1.2970000000059372,
+          "min": 1.2030000000013388
+        },
+        "render": {
+          "mean": 0.415499999999156,
+          "p50": 0.4140000000006694,
+          "p95": 0.43024999999834107,
+          "max": 0.43699999999807915,
+          "min": 0.4059999999954016
+        }
+      },
+      "http_seconds": {
+        "analyze": {
+          "mean": 3.1358000000000175,
+          "p50": 3.125,
+          "p95": 3.1962499999983267,
+          "max": 3.2030000000013388,
+          "min": 3.0780000000013388
+        },
+        "inpaint": {
+          "mean": 1.3343000000000758,
+          "p50": 1.3204999999979918,
+          "p95": 1.3920500000014726,
+          "max": 1.4060000000026776,
+          "min": 1.3119999999980791
+        },
+        "render": {
+          "mean": 0.639100000000326,
+          "p50": 0.632499999999709,
+          "p95": 0.6652500000029249,
+          "max": 0.6720000000059372,
+          "min": 0.625
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "health": {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 0,
+        "panel_execution": "serial",
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "cpu",
+          "ocr_cache_update": "original-cpu",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 65
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 11
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 36
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 186
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 3
+            }
+          ]
+        }
+      },
+      "resources": {
+        "samples": 38,
+        "gpu_busiest_engine_percent": {
+          "mean": 5.2368421052631575,
+          "p50": 0.0,
+          "p95": 22.0,
+          "max": 22.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 3308466176.0,
+          "p50": 3308466176.0,
+          "p95": 3308466176.0,
+          "max": 3308466176.0,
+          "min": 3308466176.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 348172288.0,
+          "p50": 348172288.0,
+          "p95": 348172288.0,
+          "max": 348172288.0,
+          "min": 348172288.0
+        },
+        "working_set_bytes": {
+          "mean": 1994473903.1578948,
+          "p50": 1996140544.0,
+          "p95": 2038870016.0,
+          "max": 2049540096.0,
+          "min": 1941508096.0
+        },
+        "private_bytes": {
+          "mean": 5481705795.368421,
+          "p50": 5483827200.0,
+          "p95": 5527314227.2,
+          "max": 5537046528.0,
+          "min": 5429755904.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 294.3049120939806,
+          "p50": 296.5157819551897,
+          "p95": 399.4346216883687,
+          "max": 438.6348004900901,
+          "min": 163.95245597987343
+        },
+        "first_private_bytes": 5433757696,
+        "last_private_bytes": 5537046528
+      }
+    }
+  ],
+  "component_trials": [
+    {
+      "seconds": 4.745807100000093,
+      "analyze": 3.034340999998676,
+      "inpaint": 1.2003913000007742,
+      "render": 0.5110748000006424,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": false,
+      "threads": 4,
+      "run": 1
+    },
+    {
+      "seconds": 5.1403730000020005,
+      "analyze": 3.3405533999975887,
+      "inpaint": 1.2869388000035542,
+      "render": 0.5128808000008576,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": false,
+      "threads": 4,
+      "run": 2
+    },
+    {
+      "seconds": 4.780012200004421,
+      "analyze": 3.0437418000001344,
+      "inpaint": 1.2299442000003182,
+      "render": 0.5063262000039686,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": false,
+      "threads": 4,
+      "run": 3
+    },
+    {
+      "seconds": 4.629217000001518,
+      "analyze": 2.8663107000029413,
+      "inpaint": 1.2557835999978124,
+      "render": 0.5071227000007639,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 1
+    },
+    {
+      "seconds": 4.6613930000021355,
+      "analyze": 2.9166393999985303,
+      "inpaint": 1.2148008000003756,
+      "render": 0.5299528000032296,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 2
+    },
+    {
+      "seconds": 4.678528899996309,
+      "analyze": 2.9418751999983215,
+      "inpaint": 1.2206232999960775,
+      "render": 0.5160304000019096,
+      "pixel_identical": true,
+      "mode": "serial",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 3
+    },
+    {
+      "seconds": 4.505759900006524,
+      "analyze": 2.773019700005534,
+      "inpaint": 1.218309899995802,
+      "render": 0.5144303000051877,
+      "pixel_identical": true,
+      "mode": "thread",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 1
+    },
+    {
+      "seconds": 4.521482099997229,
+      "analyze": 2.78553319999628,
+      "inpaint": 1.2212595000019064,
+      "render": 0.5146893999990425,
+      "pixel_identical": true,
+      "mode": "thread",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 2
+    },
+    {
+      "seconds": 4.514156700002786,
+      "analyze": 2.7874198999998043,
+      "inpaint": 1.2212212000013096,
+      "render": 0.5055156000016723,
+      "pixel_identical": true,
+      "mode": "thread",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 3
+    },
+    {
+      "seconds": 3.8038388999993913,
+      "analyze": 2.0936348999966867,
+      "inpaint": 1.2035476000019116,
+      "render": 0.5066564000007929,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 1
+    },
+    {
+      "seconds": 3.8061443000042345,
+      "analyze": 2.080969800001185,
+      "inpaint": 1.2170203999994555,
+      "render": 0.5081541000035941,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 2
+    },
+    {
+      "seconds": 3.8137564999997267,
+      "analyze": 2.0672072999950615,
+      "inpaint": 1.2272683000046527,
+      "render": 0.5192809000000125,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 4,
+      "run": 3
+    },
+    {
+      "seconds": 4.612888399999065,
+      "analyze": 2.051346200001717,
+      "inpaint": 2.05575300000055,
+      "render": 0.5057891999967978,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 1,
+      "run": 1
+    },
+    {
+      "seconds": 4.748317600002338,
+      "analyze": 2.173942100002023,
+      "inpaint": 2.0781276999987313,
+      "render": 0.49624780000158353,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 1,
+      "run": 2
+    },
+    {
+      "seconds": 4.62174419999792,
+      "analyze": 2.052991299999121,
+      "inpaint": 2.0647165999980643,
+      "render": 0.5040363000007346,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 1,
+      "run": 3
+    },
+    {
+      "seconds": 4.063842800002021,
+      "analyze": 2.056992000005266,
+      "inpaint": 1.4993961000000127,
+      "render": 0.5074546999967424,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 2,
+      "run": 1
+    },
+    {
+      "seconds": 4.073070799997367,
+      "analyze": 2.0518088999961037,
+      "inpaint": 1.503322600001411,
+      "render": 0.5179392999998527,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 2,
+      "run": 2
+    },
+    {
+      "seconds": 4.063495400005195,
+      "analyze": 2.038136499999382,
+      "inpaint": 1.4969201000058092,
+      "render": 0.5284388000000035,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 2,
+      "run": 3
+    },
+    {
+      "seconds": 3.777300200003083,
+      "analyze": 2.0671698000005563,
+      "inpaint": 1.2047216999999364,
+      "render": 0.5054087000025902,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 8,
+      "run": 1
+    },
+    {
+      "seconds": 3.863691699996707,
+      "analyze": 2.1216082999962964,
+      "inpaint": 1.2291070999999647,
+      "render": 0.5129763000004459,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 8,
+      "run": 2
+    },
+    {
+      "seconds": 3.7990600999983144,
+      "analyze": 2.069285099998524,
+      "inpaint": 1.2252587000039057,
+      "render": 0.5045162999958848,
+      "pixel_identical": true,
+      "mode": "process",
+      "gpu_ocr": true,
+      "threads": 8,
+      "run": 3
+    }
+  ],
+  "validation": {
+    "engine_tests": 26,
+    "backend_profile_tests": 1,
+    "measured_http_pages": 30,
+    "output_pixel_max_difference": 0,
+    "local_only": true
+  },
+  "previous_online_v1": {
+    "total_including_transfer_seconds": 48.859,
+    "stage_lease_seconds": {
+      "validate_upload": 7.436061,
+      "analyze": 6.022818,
+      "inpaint": 2.267681,
+      "text": 9.316133,
+      "render": 5.572685
+    },
+    "text_call_seconds": 9.272352,
+    "text_and_inpaint_overlapped": true
+  }
+}

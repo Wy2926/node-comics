@@ -128,6 +128,9 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
             statuses = {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
             if statuses.get("text") == statuses.get("inpaint") == "succeeded":
                 db.scalar(select(JobStage).where(JobStage.job_id == job.id, JobStage.name == "render")).status = "ready"
+                job.phase = "render"
+            else:
+                job.phase = "text" if statuses.get("text") != "succeeded" else "inpaint"
         touch_job(db, job)
         db.commit()
 

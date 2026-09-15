@@ -26,7 +26,7 @@ def snapshot():
         problem("CLASSIC_CONFIG_INVALID", "常规翻译预算或次数限制无效", 503)
     return {"mode": "classic", "prompt_version": "classic-text-v1",
             "provider": {"id": "classic-text", "timeout_seconds": cfg.classic_timeout_seconds},
-            "engine": {"version": ('mit-95227a2-classic-v4-dml-v1' if cfg.classic_engine_profile == 'mit-directml' else cfg.classic_engine_version), "detector": "default", "ocr": "48px",
+            "engine": {"version": ('mit-95227a2-classic-v4-dml-v3' if cfg.classic_engine_profile == 'mit-directml' else cfg.classic_engine_version), "detector": "default", "ocr": "48px",
                        "inpainter": "lama_large", "detection_size": 1536, "inpainting_size": 512,
                        "inpainting_strategy": "masked-crops-v1", "inpainting_padding": 48, "inpainting_merge_gap": 24,
                        "mask_dilation": 3, "font_minimum": 10, "font": "NotoSansMonoCJK-VF@b861b923e105",

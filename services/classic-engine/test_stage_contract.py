@@ -31,7 +31,7 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
                      'scope': 'task-1', 'analysis': {'mask': 'stage-only-test'}}
 
     async def test_inpaint_needs_no_translation_or_language(self):
-        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase:
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})) as erase:
             result = await server.process('inpaint', Request(self.body))
         erase.assert_awaited_once()
         self.assertEqual((result['width'], result['height'], result['version']), (80, 64, server.VERSION))
@@ -40,7 +40,7 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('cleaned', result)
 
     async def test_render_receives_cleaned_image_without_calling_inpaint(self):
-        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})):
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})):
             painted = await server.process('inpaint', Request(self.body))
         self.body.update(cache_key=painted['cache_key'], translations={'b001': 'translated'}, language='en')
         with patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})) as render, \
@@ -52,7 +52,7 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_new_node_rebuilds_missing_cache_without_needing_text_provider(self):
         self.body.update(translations={}, language='en')
-        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase, \
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})) as erase, \
              patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})) as render:
             result = await server.process('render', Request(self.body))
         self.assertTrue(result['cache_rebuilt'])
@@ -60,10 +60,10 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
         render.assert_awaited_once()
 
     async def test_cache_scope_prevents_cross_task_reuse(self):
-        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})):
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})):
             painted = await server.process('inpaint', Request(self.body))
         self.body.update(scope='task-2', cache_key=painted['cache_key'], translations={}, language='en')
-        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase, \
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})) as erase, \
              patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})):
             result = await server.process('render', Request(self.body))
         self.assertTrue(result['cache_rebuilt'])
@@ -84,13 +84,43 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.status_code, 409)
         erase.assert_not_awaited()
 
+    async def test_original_and_cleaned_arrays_reused_without_decode(self):
+        with patch.object(server, 'erase_page', AsyncMock(return_value={'cleaned': self.image.copy()})):
+            painted = await server.process('inpaint', Request(self.body))
+        self.body.pop('image')
+        self.body.update(image_ref=painted['image_ref'], input_hash=painted['input_hash'],
+                         cache_key=painted['cache_key'], translations={}, language='en')
+        with patch.object(server, 'decode', side_effect=AssertionError('unnecessary PNG decode')), \
+             patch.object(server, 'erase_page', AsyncMock()) as erase, \
+             patch.object(server, 'render_page', AsyncMock(return_value={'image': 'result'})) as render:
+            result = await server.process('render', Request(self.body))
+        self.assertFalse(result['cache_rebuilt'])
+        erase.assert_not_awaited()
+        np.testing.assert_array_equal(render.call_args.args[0], self.image)
+        np.testing.assert_array_equal(render.call_args.args[-1], self.image)
+
+    async def test_evicted_reference_fails_before_inference_and_cannot_cross_scope(self):
+        with patch.object(server, 'analyze', AsyncMock(return_value={'segments': []})):
+            analyzed = await server.process('analyze', Request(self.body))
+        self.body.pop('image')
+        self.body.update(image_ref=analyzed['image_ref'], input_hash=analyzed['input_hash'])
+        with patch.object(server, 'analyze', AsyncMock()) as analyze:
+            wrong = {**self.body, 'scope': 'other-owner-job'}
+            response = await server.process('analyze', Request(wrong))
+            self.assertEqual(response.status_code, 422)
+            server.cache.entries.clear(); server.cache.size = 0
+            response = await server.process('analyze', Request(self.body))
+            self.assertEqual(response.status_code, 410)
+            self.assertEqual(json.loads(response.body)['error'], 'ENGINE_INPUT_CACHE_MISS')
+            analyze.assert_not_awaited()
+
     async def test_parallel_transport_cannot_overlap_two_image_stages(self):
         entered, release = asyncio.Event(), asyncio.Event()
 
-        async def erase(*args):
+        async def erase(*args, **kwargs):
             entered.set()
             await release.wait()
-            return {'cleaned': self.body['image']}
+            return {'cleaned': self.image.copy()}
 
         with patch.object(server, 'erase_page', new=erase), \
              patch.object(server, 'analyze', new=AsyncMock(return_value={})) as analyze:

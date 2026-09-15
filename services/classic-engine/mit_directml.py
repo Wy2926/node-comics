@@ -28,6 +28,7 @@ class DirectMLRuntime:
         self.counts = Counter()
         self.handles = []
         self.fourier_units = 0
+        self.optimized = os.environ.get('ENGINE_DIRECTML_OPTIMIZED', '1') == '1'
         self.profile_dir = Path(os.environ['ENGINE_PROFILE_DIR']) if os.environ.get('ENGINE_PROFILE_DIR') else None
         if self.profile_dir:
             self.profile_dir.mkdir(parents=True, exist_ok=True)
@@ -67,11 +68,16 @@ class DirectMLRuntime:
                             raise RuntimeError('Model/input device mismatch')
                         self.counts[(component, mod.__class__.__name__, actual)] += 1
                     self.handles.append(module.register_forward_pre_hook(record))
+        if self.optimized:
+            from ocr_directml import enable_gpu_ocr
+            enable_gpu_ocr(models['ocr'], self.device)
 
     def evidence(self):
         return {'adapter': self.name, 'torch': torch.__version__, 'runtime': 'torch-directml-0.2.5.dev240914',
                 'fourier_units_on_cpu': self.fourier_units,
-                'ocr_decoder_device': 'cpu', 'ocr_visual_encoder_device': str(self.device),
+                'ocr_decoder_device': str(self.device) if self.optimized else 'cpu',
+                'ocr_cache_update': 'out-of-place-v1' if self.optimized else 'original-cpu',
+                'ocr_visual_encoder_device': str(self.device),
                 'executed': [{'stage': stage, 'module': module, 'device': device, 'calls': count}
                              for (stage, module, device), count in sorted(self.counts.items())]}
 

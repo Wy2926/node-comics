@@ -28,7 +28,12 @@ from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
 
 PROFILE = os.environ.get('ENGINE_PROFILE', 'mit')
-VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v4-dml-v1' if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v4-cluster')
+DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECTML_OPTIMIZED', '1') == '1'
+INPAINT_WORKERS = int(os.environ.get('ENGINE_INPAINT_WORKERS', '2')) if DIRECTML_OPTIMIZED else 1
+if INPAINT_WORKERS not in (1, 2):
+    raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
+AMD_VERSION = 'mit-95227a2-classic-v4-dml-v3' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v2' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1')
+VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v4-cluster')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
@@ -44,11 +49,13 @@ MAX_RESPONSE = 96 * 1024 * 1024
 models = {}
 ready = False
 device_evidence = None
+panel_worker = None
+inpaint_pool = None
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global ready, device_evidence
+    global ready, device_evidence, panel_worker, inpaint_pool
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '4')))
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
@@ -67,7 +74,9 @@ async def lifespan(app):
         torch.cuda.set_device(torch.device(DEVICE))
     async with lock.hold():
         with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
-            models.update(detector=DefaultDetector(), ocr=Model48pxOCR(), inpainter=LamaLargeInpainter())
+            models.update(detector=DefaultDetector(), ocr=Model48pxOCR())
+            if INPAINT_WORKERS == 1:
+                models['inpainter'] = LamaLargeInpainter()
             if device_evidence:
                 await device_evidence.load(models)
             else:
@@ -78,12 +87,31 @@ async def lifespan(app):
             await models['detector'].detect(sample, 256, 0.5, 0.7, 2.3, False, False, False, False, False)
             warm_mask = np.zeros((256, 256), np.uint8)
             warm_mask[120:128, 120:128] = 255
-            await models['inpainter'].inpaint(sample, warm_mask, InpainterConfig(inpainting_precision='fp32'), 256, False)
-    ready = True
+            if INPAINT_WORKERS == 1:
+                await models['inpainter'].inpaint(sample, warm_mask, InpainterConfig(inpainting_precision='fp32'), 256, False)
     try:
+        if INPAINT_WORKERS == 2:
+            from parallel_lama import ParallelLama
+            async with lock.hold():
+                inpaint_pool = ParallelLama(threads=int(os.environ.get('OMP_NUM_THREADS', '4')))
+                inpaint_pool.warm()
+        if DIRECTML_OPTIMIZED:
+            from parallel_panels import ParallelPanels
+            panel_worker = ParallelPanels()
+            # Spawn/import CPU helper before admitting the first real page.
+            panel_worker.submit(sample, True).result()
+        ready = True
         yield
     finally:
         ready = False
+        if panel_worker:
+            panel_worker.close()
+            panel_worker = None
+        if inpaint_pool:
+            if device_evidence and device_evidence.profile_dir:
+                (device_evidence.profile_dir / 'inpainting-workers.json').write_text(json.dumps(inpaint_pool.evidence(), indent=2), encoding='utf-8')
+            inpaint_pool.close()
+            inpaint_pool = None
         cache.entries.clear()
         cache.size = 0
         models.clear()
@@ -105,6 +133,9 @@ def authorized(authorization: str = Header(default='')):
 def health():
     return {'ready': ready, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
             'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
+            'panel_execution': 'parallel-process' if panel_worker else 'serial',
+            'input_cache_protocol': 1,
+            'inpaint_workers': inpaint_pool.evidence() if inpaint_pool else [],
             **({'inference': device_evidence.evidence()} if device_evidence else {})}
 
 
@@ -133,6 +164,19 @@ def region_json(block):
 
 
 async def analyze(image, config):
+    future = panel_worker.submit(image, config['reading_order'] == 'rtl') if panel_worker else None
+    try:
+        return await analyze_regions(image, config, future)
+    finally:
+        if future is not None:
+            # Bound outstanding CPU work even for no-text/error/cancelled pages.
+            try:
+                future.result()
+            except Exception:
+                pass
+
+
+async def analyze_regions(image, config, panel_future=None):
     start = time.monotonic()
     lines, raw_mask, _ = await models['detector'].detect(image, config['detection_size'], 0.5, 0.7, 2.3, False, False, False, False, False)
     if not lines:
@@ -145,7 +189,12 @@ async def analyze(image, config):
         raise ValueError('OCR incomplete')
     recognized = {id(line) for line in lines}
     unrecognized = [line.pts.tolist() for line in detected_lines if id(line) not in recognized]
-    regions = sort_regions(await merge(lines, image.shape[1], image.shape[0]), right_to_left=config['reading_order'] == 'rtl', img=image)
+    regions = await merge(lines, image.shape[1], image.shape[0])
+    if panel_future is None:
+        regions = sort_regions(regions, right_to_left=config['reading_order'] == 'rtl', img=image)
+    else:
+        from parallel_panels import sort_with_panels
+        regions = sort_with_panels(regions, panel_future, config['reading_order'] == 'rtl')
     if not regions or len(regions) > 200:
         raise ValueError('Region count')
     mask = await refine(regions, image, raw_mask, dilation_offset=config['mask_dilation'], kernel_size=3)
@@ -159,7 +208,7 @@ async def analyze(image, config):
             'timings': {'detect_ocr': time.monotonic() - start}}
 
 
-async def erase_page(image, analysis, config):
+async def erase_page(image, analysis, config, *, encode=True):
     mask = decode(analysis['mask'], 'L')
     if mask.shape != image.shape[:2] or not np.any(mask):
         raise ValueError('Mask dimensions')
@@ -170,11 +219,15 @@ async def erase_page(image, analysis, config):
     async def predict(crop, crop_mask):
         return await models['inpainter'].inpaint(crop, crop_mask, InpainterConfig(inpainting_precision='fp32'), config['inpainting_size'], False)
 
-    cleaned = await inpaint_regions(image, mask, predict, max_size=config['inpainting_size'],
-                                    padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
+    if inpaint_pool:
+        cleaned = inpaint_pool.inpaint(image, mask, max_size=config['inpainting_size'],
+                                       padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
+    else:
+        cleaned = await inpaint_regions(image, mask, predict, max_size=config['inpainting_size'],
+                                        padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
     # Enforce original pixels outside the erase mask, even if an engine changes them.
     cleaned[mask == 0] = image[mask == 0]
-    return {'cleaned': png(cleaned), 'timings': {'inpaint': time.monotonic() - start}}
+    return {'cleaned': png(cleaned) if encode else cleaned, 'timings': {'inpaint': time.monotonic() - start}}
 
 
 async def render_page(image, analysis, translations, config, language, cleaned):
@@ -228,11 +281,27 @@ async def process(stage: str, request: Request):
         body = json.loads(raw)
         if body['config']['version'] != VERSION:
             raise HTTPException(409, 'Engine version changed')
-        image = decode(body['image'])
-        input_hash = hashlib.sha256(base64.b64decode(body['image'], validate=True)).hexdigest()
         if stage != 'analyze' and len(json.dumps(body['analysis'], allow_nan=False).encode()) > MAX_CHECKPOINT:
             raise ValueError('Checkpoint size')
         async with lock.hold():
+            if 'image' in body:
+                image = decode(body['image'])
+                input_hash = hashlib.sha256(base64.b64decode(body['image'], validate=True)).hexdigest()
+                if body.get('input_hash', input_hash) != input_hash:
+                    raise ValueError('Input hash mismatch')
+                input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
+                input_cached = cache.put('source:' + input_ref, image.copy())
+            else:
+                input_hash = body['input_hash']
+                input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
+                if body.get('image_ref') != input_ref:
+                    raise ValueError('Input cache scope mismatch')
+                cached_input = cache.get('source:' + input_ref)
+                if cached_input is None:
+                    # No inference has run. The agent may safely retry once with
+                    # authorized original bytes after an eviction/node restart.
+                    return JSONResponse(status_code=410, content={'error': 'ENGINE_INPUT_CACHE_MISS'})
+                image, input_cached = cached_input.copy(), True
             with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
                 if stage == 'analyze':
                     result = await analyze(image, body['config'])
@@ -240,24 +309,25 @@ async def process(stage: str, request: Request):
                         raise ValueError('Checkpoint size')
                 elif stage == 'inpaint':
                     key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
-                    result = await erase_page(image, body['analysis'], body['config'])
-                    cached = cache.put(key, base64.b64decode(result.pop('cleaned'), validate=True))
+                    result = await erase_page(image, body['analysis'], body['config'], encode=False)
+                    cached = cache.put('cleaned:' + key, result.pop('cleaned'))
                     result.update(cache_key=key, cached=cached)
                 else:
                     key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
-                    cleaned = cache.get(key) if body.get('cache_key') == key else None
+                    cleaned = cache.get('cleaned:' + key) if body.get('cache_key') == key else None
                     recovered = cleaned is None
                     recovery_timings = {}
                     if recovered:
-                        erased = await erase_page(image, body['analysis'], body['config'])
-                        cleaned = base64.b64decode(erased['cleaned'], validate=True)
+                        erased = await erase_page(image, body['analysis'], body['config'], encode=False)
+                        cleaned = erased['cleaned']
                         recovery_timings = erased.get('timings', {})
-                        cache.put(key, cleaned)
+                        cache.put('cleaned:' + key, cleaned)
                     result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'],
-                                               decode(base64.b64encode(cleaned).decode()))
+                                               cleaned.copy())
                     result['cache_rebuilt'] = recovered
                     result['timings'] = {**recovery_timings, **result.get('timings', {})}
-        response = {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': input_hash}
+        response = {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': input_hash,
+                    'image_ref': input_ref if input_cached else None}
         if len(json.dumps(response, allow_nan=False).encode()) > MAX_RESPONSE:
             raise ValueError('Response size')
         return response

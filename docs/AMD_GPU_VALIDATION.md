@@ -1,5 +1,9 @@
 # RX 6900 XT 原模型部署与验收
 
+持续吞吐、并发排队与资源占用见 [AMD 负载测试](AMD_LOAD_TEST.md)。
+
+2026-09-16 更新：AMD 默认入口已升级为 v3，在 GPU OCR 和分镜进程基础上增加图像缓存复用、两个 LaMa 裁剪进程，并修正等待 LLM 的图像水位计数，见 [流水线优化](AMD_PIPELINE_OPTIMIZATION.md)。v2 的对照保留在 [单张速度优化](AMD_SINGLE_PAGE.md)。下方「实际证据」保留 9 月 15 日 v1 的在线任务结果；后续版本另行验证本地图像流水线，未重复付费文本调用及 R2 全链路。
+
 2026-09-15，本机 Windows、RX 6900 XT 16 GiB。已完成真实常规翻译、R2 上传与授权下载、CPU/AMD 同图对照。此入口使用本地开发认证和独立 SQLite 数据库，不代表公开部署或 PostgreSQL 多机验收。
 
 ## 最终方案
@@ -10,13 +14,14 @@
 | --- | --- |
 | 原检测网络 | RX 6900 XT / DirectML |
 | 原 OCR 视觉骨干与编码器 | RX 6900 XT / DirectML |
-| 原 OCR 自回归解码、束搜索与颜色预测 | CPU |
-| 原 LaMa 空间网络 | RX 6900 XT / DirectML |
+| 原 OCR 自回归解码、颜色预测及束搜索张量运算 | RX 6900 XT / DirectML；Python 控制与结果后处理仍在 CPU |
+| 原 LaMa 空间网络 | RX 6900 XT / DirectML，两个独立裁剪进程 |
 | LaMa 的 36 个 FourierUnit（含内部 1×1 卷积） | CPU；保留原始 FFT 运算 |
 | 区域合并、掩膜处理、字体嵌字 | CPU，原实现 |
+| 原分镜检测 | 独立 CPU 进程，与检测/OCR 重叠执行 |
 | 文本翻译 | 配置的在线 LLM，控制服务调用 |
 
-DirectML 完整执行 OCR 解码时实测结果偏离 CPU，因此保留 CPU 解码；不通过降低识别阈值接受劣化结果。LaMa 的复杂数/FFT 模块保持在 CPU，其余网络在 GPU。检测/编码/修复都有实际模块调用和输入、权重设备记录；不能把这称为全部计算都在 GPU。
+v1 因 DirectML 解码结果偏离 CPU 而保留 CPU 解码。v2 定位到缓存切片写入偏差，使用等价的非原地缓存更新，保留权重、阈值、束搜索及解码数学运算；样本 OCR、掩膜、字形和整页像素均与 v1 相同。LaMa 的复杂数/FFT 模块保持在 CPU，其余网络在 GPU。检测/编码/解码/修复都有实际模块调用和输入、权重设备记录；不能把这称为全部计算都在 GPU。
 
 Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torchvision==0.19.1`。PyTorch 显示 `2.4.1+cpu` 是宿主 wheel 标识，DirectML 插件通过 `privateuseone:0` 使用显卡。原 CPU/CUDA Docker 路径仍使用既有 PyTorch 2.5.1。DirectML 包许可证与第三方说明保存在 `services/classic-engine/licenses/torch-directml-*`。
 
@@ -47,7 +52,7 @@ Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torch
 backend/.venv/Scripts/python.exe scripts/run_local_amd.py --smoke --directory private-test-data/amd-another-sample --image samples/another.png
 ```
 
-Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_PROFILE=mit-directml`。引擎版本为 `mit-95227a2-classic-v4-dml-v1`，与 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、阶段 API、容量 1、设备锁、租约与缓存恢复协议保持一致。
+Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_PROFILE=mit-directml`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v3`，与 v1/v2 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、阶段 API、容量 1、设备锁、租约与缓存恢复协议保持一致。
 
 ## 实际证据
 

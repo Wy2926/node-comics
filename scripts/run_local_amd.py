@@ -77,7 +77,7 @@ def cluster(folder, api_port, engine_port):
                    'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': tokens['auth'], 'PROVIDERS_JSON': '[]',
                    'OPENAI_API_KEY': '', 'CLUSTER_NODE_TOKEN': tokens['node'],
                    'CLASSIC_ENABLED': 'true', 'CLASSIC_ENGINE_PROFILE': 'mit-directml',
-                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v1',
+                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v3',
                    'TEXT_PAGE_BUDGET_MICROS': config.get('TEXT_PAGE_BUDGET_MICROS', '50000'), 'TEXT_MAX_ATTEMPTS': '3',
                    'DISPATCH_INTERVAL_SECONDS': '1'}
     # Explicit allowlist: do not forward credentials inherited from the caller.

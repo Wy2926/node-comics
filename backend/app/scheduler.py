@@ -117,8 +117,13 @@ def _eligibility_snapshot(db, rows):
     if "analyze" in names:
         from sqlalchemy.orm import aliased
         analyzed = aliased(JobStage)
+        # Bound OCR ahead of unfinished image preparation, not ahead of an LLM.
+        # A cleaned page waiting for text owns no device slot and must not stop
+        # admission of the next page. User in-flight capacity remains unchanged.
         pending = db.scalar(select(func.count()).select_from(JobStage).join(analyzed, analyzed.job_id == JobStage.job_id)
-            .where(JobStage.name == "render", JobStage.status.in_(["waiting", "ready", "running"]),
+            .join(Job, Job.id == JobStage.job_id)
+            .where(JobStage.name == "inpaint", JobStage.status.in_(["waiting", "ready", "running"]),
+                   Job.status.in_(["queued", "running"]),
                    analyzed.name == "analyze", analyzed.status == "succeeded"))
     recent = 0
     if "text" in names:

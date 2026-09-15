@@ -55,7 +55,7 @@ def image(index):
 
 
 @contextmanager
-def cluster(tmp_path):
+def cluster(tmp_path, *, text_gate=None):
     control_port, first_port, second_port = port(), port(), port()
     assert len({control_port, first_port, second_port}) == 3
     database = tmp_path / 'http-cluster.db'
@@ -74,6 +74,8 @@ def cluster(tmp_path):
         'ENGINE_TOKEN': 'isolated-http-engine-token', 'NODE_POLL_SECONDS': '.05',
         'NODE_HEARTBEAT_SECONDS': '.2', 'NODE_REQUEST_SECONDS': '3', 'NODE_STAGE_SECONDS': '30'}
     children, outputs = [], []
+    if text_gate:
+        environment.update(TEST_TEXT_GATE=str(text_gate), CLUSTER_MAX_IMAGE_STAGES='1')
     flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
     def start(name, args, **extra):
@@ -146,6 +148,27 @@ def job_statuses(client, auth, ids):
     result = response.json()['items']
     assert not any(row['status'] in {'failed', 'cancelled', 'outcome_unknown'} for row in result), result
     return result if all(row['status'] == 'succeeded' for row in result) else None
+
+
+def test_single_real_agent_keeps_preparing_pages_while_text_pool_is_blocked(tmp_path):
+    gate = tmp_path / 'release-text'
+    with cluster(tmp_path, text_gate=gate) as running, httpx.Client(base_url=running['url'], timeout=5, trust_env=False) as client:
+        running['second'].terminate()
+        running['second'].wait(timeout=5)
+        login = client.post('/v1/auth/dev', json={'username': 'slow-text-reader'}).raise_for_status()
+        auth = {'Authorization': 'Bearer ' + login.json()['access_token']}
+        try:
+            ids = submit(client, auth, [image(i+30) for i in range(5)], 'slow-text-batch')
+            until(lambda: rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='inpaint' AND status='succeeded'")[0][0] == 5,
+                  timeout=25, label='all image preparation before any text returns')
+            assert rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='text' AND status='succeeded'")[0][0] == 0
+            assert rows(running['database'], "SELECT count(*) FROM jobs WHERE status='succeeded'")[0][0] == 0
+            assert rows(running['database'], "SELECT count(*) FROM execution_leases WHERE node_id='http-node-1' AND completed_at IS NULL")[0][0] == 0
+        finally:
+            gate.touch()
+        completed = until(lambda: job_statuses(client, auth, ids), label='late text renders all prepared pages')
+        assert len(completed) == 5
+        assert rows(running['database'], "SELECT count(*) FROM usage_ledger WHERE kind='settle'")[0][0] == 5
 
 
 def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_path):

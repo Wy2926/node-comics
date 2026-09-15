@@ -97,6 +97,14 @@ def run():
         from app import classic, workers
         from app.adapters.text import TextResponse
         def simulated_text(segments, language, profile):
+            if os.environ.get('TEST_TEXT_GATE'):
+                import time
+                from pathlib import Path
+                deadline = time.monotonic() + 45
+                while not Path(os.environ['TEST_TEXT_GATE']).exists():
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('Isolated text gate timed out')
+                    time.sleep(.05)
             return TextResponse(json.dumps({'translations': [{'id': segment['id'], 'text': '你好'} for segment in segments]}),
                                 {'input_tokens': 100, 'output_tokens': 10}, 'isolated-http-text')
         def forbidden(*args, **kwargs):

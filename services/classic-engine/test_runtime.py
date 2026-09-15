@@ -16,6 +16,21 @@ def acquire_in_process(directory, entered):
 
 
 class CacheTests(unittest.TestCase):
+    def test_tiny_entries_cannot_exhaust_metadata_memory(self):
+        cache = ImageCache(1024, 60, max_entries=2)
+        for key in ('a', 'b', 'c'):
+            cache.put(key, b'')
+        self.assertEqual(len(cache.entries), 2)
+        self.assertIsNone(cache.get('a'))
+    def test_array_budget_uses_bytes_not_rows(self):
+        import numpy as np
+        cache = ImageCache(12, 60)
+        self.assertTrue(cache.put('array', np.zeros((2, 2, 3), dtype=np.uint8)))
+        self.assertEqual(cache.size, 12)
+        self.assertFalse(cache.put('too-large', np.zeros((2, 3, 3), dtype=np.uint8)))
+        cache.put('bytes', b'abc')
+        self.assertIsNone(cache.get('array'))
+        self.assertEqual(cache.size, 3)
     def test_lru_eviction_and_oversized_rejection(self):
         cache = ImageCache(6, 60)
         self.assertTrue(cache.put('a', b'aa'))

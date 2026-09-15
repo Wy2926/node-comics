@@ -54,7 +54,7 @@ volumes:
 
 ### GPU 参数
 
-Windows AMD RX 6900 XT 已完成原模型混合 CPU/DirectML 路径的真实翻译与同图对照，见[AMD 部署与验收](../../docs/AMD_GPU_VALIDATION.md)。使用同一阶段协议，保留原漫画检测、48px OCR、LaMa 与嵌字器；OCR 解码与 Fourier 模块明确在 CPU 执行。
+Windows AMD RX 6900 XT 当前默认 v3，见[AMD 部署与验收](../../docs/AMD_GPU_VALIDATION.md)及[等待文本与缓存优化](../../docs/AMD_PIPELINE_OPTIMIZATION.md)。保留原漫画检测、48px OCR、LaMa 与嵌字器；OCR 解码已通过等价缓存修正在 GPU 执行，Fourier 模块仍在 CPU。设备内两个 LaMa 进程并行处理当前页的独立裁剪，不向控制端注册额外设备位，也不复制检测/OCR 实例。
 
 Dockerfile 支持可配置 PyTorch wheel 源，例如 CUDA 12.4 的构建参数 `--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124`，运行设置 `ENGINE_DEVICE=cuda:0` 并分配匹配 GPU。CPU 与 CUDA 设备使用相同阶段协议；CUDA 不可用时启动失败，不静默改用 CPU。OCR/LaMa 共用同一设备锁，当前每台引擎安全容量为 1。
 
@@ -62,12 +62,15 @@ Dockerfile 支持可配置 PyTorch wheel 源，例如 CUDA 12.4 的构建参数 
 
 ## 数据与恢复边界
 
-- 原图只在单次请求内存中存在，单图传输上限 24 MiB、解码上限 24 百万像素。
+- 原图在代理内按任务、SHA-256 和配置缓存，默认 128 MiB、512 项、15 分钟绝对 TTL；可通过 `NODE_INPUT_CACHE_BYTES`、`NODE_INPUT_CACHE_TTL_SECONDS` 调整或设为 0 禁用。单图传输上限 24 MiB、解码上限 24 百万像素。
+- 每次原图缓存命中都调用当前租约的 `/internal/leases/{id}/input/authorize`，检查节点、执行代次及原图有效性，只返回摘要、不读取 R2。控制 API 与代理需同步更新。
 - OCR 区域和可恢复 PNG 掩膜检查点总共不超过 4 MiB，持久化在控制端数据库。
-- LaMa 结果只存引擎内存 LRU 缓存，有严格字节上限与绝对 TTL。缓存键绑定任务、原图摘要、配置及 OCR 检查点。
+- 原图解码数组和 LaMa 结果共享引擎内存 LRU，默认 256 MiB、512 项、15 分钟绝对 TTL；按数组真实字节数计量，直接缓存像素以避免中间 PNG 编解码。输入引用绑定任务、原图摘要、配置，清理图另绑定 OCR 检查点。
+- 同节点后续阶段通过 `image_ref` 复用解码图像。明确的 `ENGINE_INPUT_CACHE_MISS` 返回在模型执行前，代理用已授权的原图补发一次；超时或其他不确定结果不按缓存缺失重试。
 - `inpaint` 返回缓存键，不上传中间图；`render` 在缓存丢失或换节点时重新抹字，继续使用控制端已保存的译文，不重复 LLM 调用。
 - 渲染回复上限 96 MiB，控制端再次验证尺寸、掩膜外像素和原图归属，再持久化最终译图。
 - 每个阶段使用独立租约。心跳、输入与结果都绑定节点和租约令牌；已过期执行不能覆盖新代次。
+- 抹字完成但等待译文的页面不占设备位、不计图像预存水位；继续领取其他页，译文到达后重新排入 render。缓存满时淘汰旧项，不阻塞设备等待文本；后续必要时重建抹字。
 - 完成通知发生网络错误时只重发同一份结果，不重新计算。代理不记录原图、OCR、译文、签名 URL、凭据或异常正文。
 
 模型、字体的现有固定版本、下载摘要及许可记录位于 `services/classic-engine/prepare.py` 与 `licenses/`；本次没有升级模型或字体。

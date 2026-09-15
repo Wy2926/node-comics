@@ -55,16 +55,21 @@ class DeviceLock:
 
 
 class ImageCache:
-    """LRU encoded PNG bytes; no user images are written to disk."""
-    def __init__(self, max_bytes, ttl_seconds):
+    """LRU bytes or arrays, charged by actual buffer size, with absolute TTL."""
+    def __init__(self, max_bytes, ttl_seconds, max_entries=512):
         self.max_bytes = max(0, int(max_bytes))
         self.ttl_seconds = max(0, int(ttl_seconds))
+        self.max_entries = max(1, int(max_entries))
         self.entries = OrderedDict()
         self.size = 0
 
     def _remove(self, key):
         value = self.entries.pop(key)
-        self.size -= len(value[1])
+        self.size -= self._bytes(value[1])
+
+    @staticmethod
+    def _bytes(value):
+        return int(value.nbytes) if hasattr(value, 'nbytes') else len(value)
 
     def expire(self):
         cutoff = time.monotonic() - self.ttl_seconds
@@ -76,12 +81,13 @@ class ImageCache:
         self.expire()
         if key in self.entries:
             self._remove(key)
-        if len(value) > self.max_bytes or self.ttl_seconds == 0:
+        size = self._bytes(value)
+        if size > self.max_bytes or self.ttl_seconds == 0:
             return False
-        while self.size + len(value) > self.max_bytes:
+        while self.size + size > self.max_bytes or len(self.entries) >= self.max_entries:
             self._remove(next(iter(self.entries)))
         self.entries[key] = (time.monotonic(), value)
-        self.size += len(value)
+        self.size += size
         return True
 
     def get(self, key):

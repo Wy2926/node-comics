@@ -6,7 +6,7 @@ from fastapi.responses import Response
 from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from .assets import read_asset
+from .assets import available, read_asset
 from .config import settings
 from .db import get_db
 from .errors import problem, ProcessingError
@@ -107,6 +107,17 @@ def input_image(lease_id: str, x_lease_token: str = Header(), identity=Depends(n
     lease, stage, job = node_lease(db, lease_id, x_lease_token, identity)
     source = db.get(Asset, job.input_asset_id)
     return Response(read_asset(source), media_type=source.mime)
+
+
+@router.get("/internal/leases/{lease_id}/input/authorize")
+def authorize_cached_input(lease_id: str, x_lease_token: str = Header(), identity=Depends(node_auth), db: Session = Depends(get_db)):
+    # Cache hits still require a current lease and a live asset. No R2 probe or
+    # bytes are needed; only validated immutable content can be reused locally.
+    _, _, job = node_lease(db, lease_id, x_lease_token, identity)
+    source = db.get(Asset, job.input_asset_id)
+    if not available(source):
+        problem("ASSET_EXPIRED", "原图已失效", 410)
+    return {"sha256": source.sha256}
 
 
 class StageError(RequestBody):

@@ -13,7 +13,10 @@ def test_directml_changes_cache_identity_without_downgrading_models(client, monk
     settings.cache_clear()
     amd = snapshot()
     assert digest(cpu) != digest(amd)
-    assert amd['engine']['version'] == 'mit-95227a2-classic-v4-dml-v1'
+    assert amd['engine']['version'] == 'mit-95227a2-classic-v4-dml-v3'
+    for version in ('mit-95227a2-classic-v4-dml-v1', 'mit-95227a2-classic-v4-dml-v2'):
+        old = {**amd, 'engine': {**amd['engine'], 'version': version}}
+        assert digest(old) != digest(amd)
     assert {k: v for k, v in cpu['engine'].items() if k != 'version'} == {
         k: v for k, v in amd['engine'].items() if k != 'version'}
     assert amd['text'] == cpu['text']

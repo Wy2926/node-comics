@@ -2,13 +2,76 @@ import hashlib
 import json
 import threading
 import unittest
+from unittest.mock import patch
 
 import httpx
 
-from agent import Agent, Config, INPUT_LIMIT, StageError
+from agent import Agent, Config, INPUT_LIMIT, InputCache, StageError
 
 
 class AgentTests(unittest.TestCase):
+    def test_tiny_inputs_have_an_entry_limit(self):
+        cache = InputCache(1024, 60, max_entries=2)
+        for key in ('a', 'b', 'c'):
+            cache.put(key, b'')
+        self.assertEqual(len(cache.entries), 2)
+        self.assertIsNone(cache.get('a'))
+    def test_original_downloaded_once_reauthorized_then_reference_miss_retried_once(self):
+        lease = self.lease()
+        calls = {'input': 0, 'authorize': 0, 'engine': []}
+        missed = False
+
+        def route(request):
+            nonlocal missed
+            path = request.url.path
+            if path.endswith('/authorize'):
+                calls['authorize'] += 1
+                return httpx.Response(200, json={'sha256': lease['input']['sha256']})
+            if path.endswith('/input'):
+                calls['input'] += 1
+                return httpx.Response(200, content=b'original')
+            body = json.loads(request.content)
+            calls['engine'].append(body)
+            if path.endswith('/render') and not missed:
+                missed = True
+                return httpx.Response(410, json={'error': 'ENGINE_INPUT_CACHE_MISS'})
+            return httpx.Response(200, json={'version': 'v4', 'input_hash': lease['input']['sha256'], 'image_ref': 'f'*64})
+
+        agent = Agent(self.config(), transport=httpx.MockTransport(route))
+        for stage in ('analyze', 'inpaint', 'render'):
+            agent.execute({**lease, 'stage': stage, 'lease_id': stage, 'lease_token': stage})
+        self.assertEqual((calls['input'], calls['authorize']), (1, 2))
+        self.assertEqual(['image' in body for body in calls['engine']], [True, False, False, True])
+
+    def test_cache_hit_requires_authorization_before_engine_and_other_job_cannot_reuse(self):
+        lease = self.lease()
+        calls = []
+        def route(request):
+            calls.append(request.url.path)
+            if request.url.path.endswith('/authorize'):
+                return httpx.Response(410, json={'error': 'ASSET_EXPIRED'})
+            return httpx.Response(200, content=b'original')
+        agent = Agent(self.config(), transport=httpx.MockTransport(route))
+        key = (lease['job_id'], lease['input']['sha256'], json.dumps(lease['config']['engine'], sort_keys=True))
+        agent.inputs.put(key, b'original')
+        with self.assertRaises(httpx.HTTPStatusError):
+            agent.execute(lease)
+        self.assertEqual(calls, ['/internal/leases/lease-1/input/authorize'])
+        self.assertIsNone(agent.inputs.get(('other-job', *key[1:])))
+
+    def test_cache_is_bounded_and_absolute_ttl_does_not_renew_on_read(self):
+        cache = InputCache(6, 10)
+        with patch('agent.time.monotonic', return_value=1):
+            cache.put('a', b'aaa'); cache.put('b', b'bbb')
+            cache.get('a'); cache.put('c', b'ccc')
+            self.assertIsNone(cache.get('b'))
+            self.assertEqual(cache.size, 6)
+            self.assertIsNone(cache.put('large', b'1234567'))
+        with patch('agent.time.monotonic', return_value=8):
+            self.assertIsNotNone(cache.get('a'))
+        with patch('agent.time.monotonic', return_value=12):
+            self.assertIsNone(cache.get('a'))
+            self.assertEqual(cache.size, 0)
     def config(self):
         return Config('https://control.example', 'service-token', 'node-a', 'http://engine:8000', 'engine-token',
                       heartbeat_seconds=0.01, poll_seconds=0.001)

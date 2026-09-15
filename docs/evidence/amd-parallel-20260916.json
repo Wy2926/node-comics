@@ -1,0 +1,1670 @@
+{
+  "scope": "isolated physical GPU reservation, same-image original-model HTTP pipeline, no LLM/R2",
+  "phases": [
+    {
+      "name": "1x4-hybrid",
+      "start": 1789506675.2057893,
+      "end": 1789506708.9274504,
+      "seconds": 33.71899999999732,
+      "pages": 6,
+      "successes": 6,
+      "failures": 0,
+      "pages_per_minute": 10.676473205018791,
+      "latency_seconds": {
+        "mean": 5.619833333332887,
+        "p50": 5.601500000000669,
+        "p95": 5.703249999996842,
+        "max": 5.7189999999973224,
+        "min": 5.563000000001921
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 3.2111666666666374,
+          "p50": 3.19550000000163,
+          "p95": 3.285249999998996,
+          "max": 3.2969999999986612,
+          "min": 3.1569999999992433
+        },
+        "inpaint": {
+          "mean": 1.2790000000010575,
+          "p50": 1.2819999999992433,
+          "p95": 1.2970000000041182,
+          "max": 1.2970000000059372,
+          "min": 1.25
+        },
+        "render": {
+          "mean": 0.41399999999945675,
+          "p50": 0.4140000000006694,
+          "p95": 0.4219999999986612,
+          "max": 0.4219999999986612,
+          "min": 0.4059999999954016
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "worker_pages": [
+        6
+      ],
+      "summed_model_wall_seconds": 29.42500000000291,
+      "health_after": [
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "cpu",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "cpu",
+                "calls": 17408
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 576
+              }
+            ]
+          }
+        }
+      ],
+      "instances": 1,
+      "threads_per_instance": 4,
+      "gpu_ocr": false,
+      "resources": {
+        "samples": 24,
+        "gpu_busiest_engine_percent": {
+          "mean": 6.5,
+          "p50": 0.0,
+          "p95": 21.849999999999998,
+          "max": 22.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 2290521088.0,
+          "p50": 2290532352.0,
+          "p95": 2290532352.0,
+          "max": 2290532352.0,
+          "min": 2290262016.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 347123712.0,
+          "p50": 347123712.0,
+          "p95": 347123712.0,
+          "max": 347123712.0,
+          "min": 347123712.0
+        },
+        "working_set_bytes": {
+          "mean": 1943822506.6666667,
+          "p50": 1940447232.0,
+          "p95": 1988113408.0,
+          "max": 1995128832.0,
+          "min": 1903796224.0
+        },
+        "private_bytes": {
+          "mean": 4433141760.0,
+          "p50": 4427880448.0,
+          "p95": 4481409843.2,
+          "max": 4511301632.0,
+          "min": 4391079936.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 293.33335631015325,
+          "p50": 291.6992263776459,
+          "p95": 395.7958805712528,
+          "max": 398.49718437458785,
+          "min": 196.55477561693968
+        },
+        "first_private_bytes": 4397846528,
+        "last_private_bytes": 4426121216
+      }
+    },
+    {
+      "name": "1x4-gpuocr",
+      "start": 1789506729.0726917,
+      "end": 1789506761.5690794,
+      "seconds": 32.5,
+      "pages": 6,
+      "successes": 6,
+      "failures": 0,
+      "pages_per_minute": 11.076923076923077,
+      "latency_seconds": {
+        "mean": 5.416666666666667,
+        "p50": 5.4134999999987485,
+        "p95": 5.473250000000917,
+        "max": 5.485000000000582,
+        "min": 5.35899999999674
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 2.997333333334003,
+          "p50": 3.0,
+          "p95": 3.015750000002299,
+          "max": 3.0160000000032596,
+          "min": 2.9530000000013388
+        },
+        "inpaint": {
+          "mean": 1.2786666666664435,
+          "p50": 1.2815000000009604,
+          "p95": 1.2969999999986612,
+          "max": 1.2969999999986612,
+          "min": 1.25
+        },
+        "render": {
+          "mean": 0.42183333333135425,
+          "p50": 0.4219999999986612,
+          "p95": 0.43324999999822467,
+          "max": 0.43699999999807915,
+          "min": 0.4059999999954016
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "worker_pages": [
+        6
+      ],
+      "summed_model_wall_seconds": 28.186999999990803,
+      "health_after": [
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        }
+      ],
+      "instances": 1,
+      "threads_per_instance": 4,
+      "gpu_ocr": true,
+      "resources": {
+        "samples": 23,
+        "gpu_busiest_engine_percent": {
+          "mean": 18.565217391304348,
+          "p50": 10.0,
+          "p95": 50.8,
+          "max": 63.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 3380367360.0,
+          "p50": 3380367360.0,
+          "p95": 3380367360.0,
+          "max": 3380367360.0,
+          "min": 3380367360.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 347123712.0,
+          "p50": 347123712.0,
+          "p95": 347123712.0,
+          "max": 347123712.0,
+          "min": 347123712.0
+        },
+        "working_set_bytes": {
+          "mean": 919196538.4347826,
+          "p50": 920494080.0,
+          "p95": 937955737.6,
+          "max": 951066624.0,
+          "min": 877629440.0
+        },
+        "private_bytes": {
+          "mean": 4471182380.521739,
+          "p50": 4477468672.0,
+          "p95": 4501123891.2,
+          "max": 4502810624.0,
+          "min": 4425277440.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 225.21161231642057,
+          "p50": 205.38869811657742,
+          "p95": 349.4033033955267,
+          "max": 352.46835257464403,
+          "min": 98.1386694224735
+        },
+        "first_private_bytes": 4446797824,
+        "last_private_bytes": 4490809344
+      }
+    },
+    {
+      "name": "2x4-gpuocr",
+      "start": 1789506795.5610712,
+      "end": 1789506835.1716838,
+      "seconds": 39.609000000004016,
+      "pages": 12,
+      "successes": 12,
+      "failures": 0,
+      "pages_per_minute": 18.177686889341487,
+      "latency_seconds": {
+        "mean": 6.566416666667162,
+        "p50": 6.507999999997992,
+        "p95": 6.885700000001452,
+        "max": 7.031999999999243,
+        "min": 6.359000000004016
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 3.63291666666737,
+          "p50": 3.6015000000043074,
+          "p95": 3.8774499999995893,
+          "max": 4.10899999999674,
+          "min": 3.485000000000582
+        },
+        "inpaint": {
+          "mean": 1.6198333333340997,
+          "p50": 1.5940000000009604,
+          "p95": 1.7257500000043364,
+          "max": 1.7340000000040163,
+          "min": 1.5630000000019209
+        },
+        "render": {
+          "mean": 0.4596666666651193,
+          "p50": 0.46050000000104774,
+          "p95": 0.4690000000005966,
+          "max": 0.4690000000045984,
+          "min": 0.4379999999946449
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "worker_pages": [
+        6,
+        6
+      ],
+      "summed_model_wall_seconds": 68.54899999999907,
+      "health_after": [
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        }
+      ],
+      "instances": 2,
+      "threads_per_instance": 4,
+      "gpu_ocr": true,
+      "resources": {
+        "samples": 27,
+        "gpu_busiest_engine_percent": {
+          "mean": 30.48148148148148,
+          "p50": 27.0,
+          "p95": 78.7,
+          "max": 88.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 6697955783.111111,
+          "p50": 6698139648.0,
+          "p95": 6698139648.0,
+          "max": 6736707584.0,
+          "min": 6692790272.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 702674868.1481482,
+          "p50": 705781760.0,
+          "p95": 705781760.0,
+          "max": 705781760.0,
+          "min": 697393152.0
+        },
+        "working_set_bytes": {
+          "mean": 1848430136.8888888,
+          "p50": 1860853760.0,
+          "p95": 1902823014.4,
+          "max": 1920700416.0,
+          "min": 1754411008.0
+        },
+        "private_bytes": {
+          "mean": 8890325978.074074,
+          "p50": 8903532544.0,
+          "p95": 8956033433.6,
+          "max": 8959074304.0,
+          "min": 8785485824.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 416.11937937903895,
+          "p50": 410.39674680923514,
+          "p95": 711.6413742523525,
+          "max": 748.8528435427868,
+          "min": 178.60198913881771
+        },
+        "first_private_bytes": 8880791552,
+        "last_private_bytes": 8959074304
+      }
+    },
+    {
+      "name": "4x4-gpuocr",
+      "start": 1789506901.4576864,
+      "end": 1789506958.4743853,
+      "seconds": 57.01499999999942,
+      "pages": 24,
+      "successes": 24,
+      "failures": 0,
+      "pages_per_minute": 25.256511444357006,
+      "latency_seconds": {
+        "mean": 9.451750000000175,
+        "p50": 8.35150000000067,
+        "p95": 14.753850000001693,
+        "max": 16.32800000000134,
+        "min": 7.7189999999973224
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 5.8529166666661085,
+          "p50": 4.78150000000096,
+          "p95": 11.256750000000828,
+          "max": 12.843999999997322,
+          "min": 4.39100000000326
+        },
+        "inpaint": {
+          "mean": 1.9427083333333333,
+          "p50": 1.9219999999986612,
+          "p95": 2.0892000000036206,
+          "max": 2.139999999999418,
+          "min": 1.7659999999959837
+        },
+        "render": {
+          "mean": 0.5767916666673045,
+          "p50": 0.5780000000013388,
+          "p95": 0.653599999996004,
+          "max": 0.6719999999986612,
+          "min": 0.5
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "worker_pages": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "summed_model_wall_seconds": 200.93800000000192,
+      "health_after": [
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        }
+      ],
+      "instances": 4,
+      "threads_per_instance": 4,
+      "gpu_ocr": true,
+      "resources": {
+        "samples": 38,
+        "gpu_busiest_engine_percent": {
+          "mean": 42.526315789473685,
+          "p50": 34.5,
+          "p95": 94.15,
+          "max": 95.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 15110972685.473684,
+          "p50": 15146221568.0,
+          "p95": 15207475200.0,
+          "max": 15303323648.0,
+          "min": 13523214336.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 2672917665.6842103,
+          "p50": 2695020544.0,
+          "p95": 2965553152.0,
+          "max": 2965553152.0,
+          "min": 1392689152.0
+        },
+        "working_set_bytes": {
+          "mean": 4994054359.578947,
+          "p50": 5042821120.0,
+          "p95": 5362383257.6,
+          "max": 5382041600.0,
+          "min": 3576782848.0
+        },
+        "private_bytes": {
+          "mean": 20701914597.05263,
+          "p50": 20802965504.0,
+          "p95": 21161535283.2,
+          "max": 21182550016.0,
+          "min": 17960169472.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 600.5440906079087,
+          "p50": 589.0009036765033,
+          "p95": 1142.3138671022866,
+          "max": 1170.1143150324683,
+          "min": 0.0
+        },
+        "first_private_bytes": 17960169472,
+        "last_private_bytes": 21182550016
+      }
+    },
+    {
+      "name": "4x2-gpuocr",
+      "start": 1789507023.9747896,
+      "end": 1789507073.5467038,
+      "seconds": 49.56300000000192,
+      "pages": 24,
+      "successes": 24,
+      "failures": 0,
+      "pages_per_minute": 29.053931360086036,
+      "latency_seconds": {
+        "mean": 8.096333333333556,
+        "p50": 7.5939999999973224,
+        "p95": 11.008950000002368,
+        "max": 11.531000000002678,
+        "min": 6.796999999998661
+      },
+      "stage_seconds": {
+        "detect_ocr": {
+          "mean": 4.642083333334085,
+          "p50": 4.132999999997992,
+          "p95": 7.605200000000695,
+          "max": 8.06300000000192,
+          "min": 3.5319999999992433
+        },
+        "inpaint": {
+          "mean": 2.1190833333336436,
+          "p50": 2.0465000000003783,
+          "p95": 2.545300000001225,
+          "max": 3.4210000000020955,
+          "min": 1.7960000000020955
+        },
+        "render": {
+          "mean": 0.4602083333329574,
+          "p50": 0.4530000000013388,
+          "p95": 0.48485000000000583,
+          "max": 0.5,
+          "min": 0.4210000000020955
+        }
+      },
+      "cache_rebuilds": 0,
+      "unique_output_hashes": 1,
+      "max_pixel_difference": 0,
+      "worker_pages": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "summed_model_wall_seconds": 173.31300000001647,
+      "health_after": [
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        },
+        {
+          "ready": true,
+          "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+          "device": "directml:0",
+          "resource_id": "DESKTOP-L9DOIM2:amd:0",
+          "capacity": 1,
+          "capabilities": [
+            "analyze",
+            "inpaint",
+            "render"
+          ],
+          "cache_bytes": 21491376,
+          "inference": {
+            "adapter": "AMD Radeon RX 6900 XT",
+            "torch": "2.4.1+cpu",
+            "runtime": "torch-directml-0.2.5.dev240914",
+            "fourier_units_on_cpu": 36,
+            "ocr_decoder_device": "privateuseone:0",
+            "ocr_visual_encoder_device": "privateuseone:0",
+            "executed": [
+              {
+                "stage": "detector",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 585
+              },
+              {
+                "stage": "detector",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 99
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "cpu",
+                "calls": 2916
+              },
+              {
+                "stage": "inpainter",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 15066
+              },
+              {
+                "stage": "inpainter",
+                "module": "ConvTranspose2d",
+                "device": "privateuseone",
+                "calls": 243
+              },
+              {
+                "stage": "ocr",
+                "module": "Conv2d",
+                "device": "privateuseone",
+                "calls": 2616
+              },
+              {
+                "stage": "ocr",
+                "module": "Linear",
+                "device": "privateuseone",
+                "calls": 17984
+              }
+            ],
+            "ocr_cache_update": "out-of-place-v1"
+          }
+        }
+      ],
+      "instances": 4,
+      "threads_per_instance": 2,
+      "gpu_ocr": true,
+      "resources": {
+        "samples": 33,
+        "gpu_busiest_engine_percent": {
+          "mean": 46.36363636363637,
+          "p50": 46.0,
+          "p95": 91.0,
+          "max": 97.0,
+          "min": 0.0
+        },
+        "gpu_dedicated_bytes": {
+          "mean": 15288939488.969696,
+          "p50": 15296942080.0,
+          "p95": 15297884160.0,
+          "max": 15297884160.0,
+          "min": 15174602752.0
+        },
+        "gpu_shared_bytes": {
+          "mean": 2091485618.4242425,
+          "p50": 2097332224.0,
+          "p95": 2130886656.0,
+          "max": 2130886656.0,
+          "min": 1928511488.0
+        },
+        "working_set_bytes": {
+          "mean": 4457725827.878788,
+          "p50": 4488384512.0,
+          "p95": 4563301171.2,
+          "max": 4614479872.0,
+          "min": 4124172288.0
+        },
+        "private_bytes": {
+          "mean": 19839764914.424244,
+          "p50": 19862941696.0,
+          "p95": 19976149401.6,
+          "max": 19994984448.0,
+          "min": 19523596288.0
+        },
+        "cpu_logical_core_percent": {
+          "mean": 492.76984547440935,
+          "p50": 490.98110609176337,
+          "p95": 670.8085175523008,
+          "max": 678.1870277461896,
+          "min": 97.98909287825668
+        },
+        "first_private_bytes": 19523596288,
+        "last_private_bytes": 19971768320
+      }
+    }
+  ],
+  "sustained": {
+    "name": "sustained-best",
+    "start": 1789507137.5141602,
+    "end": 1789507443.3313591,
+    "seconds": 305.81299999999464,
+    "pages": 141,
+    "successes": 141,
+    "failures": 0,
+    "pages_per_minute": 27.66396457966191,
+    "latency_seconds": {
+      "mean": 8.626212765957256,
+      "p50": 8.296999999998661,
+      "p95": 11.0,
+      "max": 12.875,
+      "min": 6.688000000001921
+    },
+    "stage_seconds": {
+      "detect_ocr": {
+        "mean": 4.842751773049448,
+        "p50": 4.563000000001921,
+        "p95": 6.889999999999418,
+        "max": 7.671999999998661,
+        "min": 3.3590000000040163
+      },
+      "inpaint": {
+        "mean": 2.494014184397234,
+        "p50": 2.2960000000020955,
+        "p95": 3.735000000000582,
+        "max": 4.389999999999418,
+        "min": 1.7189999999973224
+      },
+      "render": {
+        "mean": 0.46520567375900107,
+        "p50": 0.4539999999979045,
+        "p95": 0.5149999999994179,
+        "max": 0.5630000000019209,
+        "min": 0.4210000000020955
+      }
+    },
+    "cache_rebuilds": 0,
+    "unique_output_hashes": 1,
+    "max_pixel_difference": 0,
+    "worker_pages": [
+      37,
+      37,
+      33,
+      34
+    ],
+    "summed_model_wall_seconds": 1100.0780000000013,
+    "health_after": [
+      {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 104770458,
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "privateuseone:0",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 2600
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 440
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 14076
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 72726
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 1173
+            },
+            {
+              "stage": "ocr",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 12753
+            },
+            {
+              "stage": "ocr",
+              "module": "Linear",
+              "device": "privateuseone",
+              "calls": 87672
+            }
+          ],
+          "ocr_cache_update": "out-of-place-v1"
+        }
+      },
+      {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 104770458,
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "privateuseone:0",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 2600
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 440
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 14076
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 72726
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 1173
+            },
+            {
+              "stage": "ocr",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 12753
+            },
+            {
+              "stage": "ocr",
+              "module": "Linear",
+              "device": "privateuseone",
+              "calls": 87672
+            }
+          ],
+          "ocr_cache_update": "out-of-place-v1"
+        }
+      },
+      {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 94024770,
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "privateuseone:0",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 2340
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 396
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 12636
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 65286
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 1053
+            },
+            {
+              "stage": "ocr",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 11445
+            },
+            {
+              "stage": "ocr",
+              "module": "Linear",
+              "device": "privateuseone",
+              "calls": 78680
+            }
+          ],
+          "ocr_cache_update": "out-of-place-v1"
+        }
+      },
+      {
+        "ready": true,
+        "version": "mit-95227a2-classic-v4-dml-gpuocr-v1",
+        "device": "directml:0",
+        "resource_id": "DESKTOP-L9DOIM2:amd:0",
+        "capacity": 1,
+        "capabilities": [
+          "analyze",
+          "inpaint",
+          "render"
+        ],
+        "cache_bytes": 96711192,
+        "inference": {
+          "adapter": "AMD Radeon RX 6900 XT",
+          "torch": "2.4.1+cpu",
+          "runtime": "torch-directml-0.2.5.dev240914",
+          "fourier_units_on_cpu": 36,
+          "ocr_decoder_device": "privateuseone:0",
+          "ocr_visual_encoder_device": "privateuseone:0",
+          "executed": [
+            {
+              "stage": "detector",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 2405
+            },
+            {
+              "stage": "detector",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 407
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "cpu",
+              "calls": 12996
+            },
+            {
+              "stage": "inpainter",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 67146
+            },
+            {
+              "stage": "inpainter",
+              "module": "ConvTranspose2d",
+              "device": "privateuseone",
+              "calls": 1083
+            },
+            {
+              "stage": "ocr",
+              "module": "Conv2d",
+              "device": "privateuseone",
+              "calls": 11772
+            },
+            {
+              "stage": "ocr",
+              "module": "Linear",
+              "device": "privateuseone",
+              "calls": 80928
+            }
+          ],
+          "ocr_cache_update": "out-of-place-v1"
+        }
+      }
+    ],
+    "instances": 4,
+    "threads_per_instance": 2,
+    "gpu_ocr": true,
+    "resources": {
+      "samples": 207,
+      "gpu_busiest_engine_percent": {
+        "mean": 68.59903381642512,
+        "p50": 79.0,
+        "p95": 98.0,
+        "max": 100.0,
+        "min": 0.0
+      },
+      "gpu_dedicated_bytes": {
+        "mean": 15204205751.033817,
+        "p50": 15206637568.0,
+        "p95": 15261421568.0,
+        "max": 15273119744.0,
+        "min": 15019876352.0
+      },
+      "gpu_shared_bytes": {
+        "mean": 4311073717.797101,
+        "p50": 4288856064.0,
+        "p95": 7330775040.0,
+        "max": 7330775040.0,
+        "min": 1400029184.0
+      },
+      "working_set_bytes": {
+        "mean": 7047220713.73913,
+        "p50": 6890942464.0,
+        "p95": 10430882611.199999,
+        "max": 10500333568.0,
+        "min": 3703955456.0
+      },
+      "private_bytes": {
+        "mean": 22265011274.2029,
+        "p50": 22104616960.0,
+        "p95": 25633327923.2,
+        "max": 25728184320.0,
+        "min": 18865061888.0
+      },
+      "cpu_logical_core_percent": {
+        "mean": 471.98796122952234,
+        "p50": 484.24590020999557,
+        "p95": 654.4969358433576,
+        "max": 710.7094125968525,
+        "min": 87.72292295520629
+      },
+      "first_private_bytes": 18865061888,
+      "last_private_bytes": 25556070400
+    }
+  }
+}

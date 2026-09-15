@@ -53,4 +53,5 @@ async def main():
         print(json.dumps({'event':'IMAGE_STAGES_DONE','timings':report['timings']}),flush=True)
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -4,6 +4,7 @@ Only the control endpoint receives the service token. Requests, image bytes,
 signed addresses, OCR and exception strings are intentionally never logged.
 """
 import base64
+from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
@@ -30,8 +31,39 @@ class StageError(Exception):
         super().__init__(code)
 
 
-def bounded(response, limit):
-    response.raise_for_status()
+class InputCache:
+    """Disposable job-scoped originals and engine references; never persisted."""
+    def __init__(self, max_bytes, ttl_seconds, max_entries=512):
+        self.max_bytes, self.ttl_seconds = max_bytes, ttl_seconds
+        self.max_entries = max(1, int(max_entries))
+        self.entries, self.size = OrderedDict(), 0
+
+    def get(self, key):
+        for old, entry in list(self.entries.items()):
+            if time.monotonic() - entry['created'] >= self.ttl_seconds:
+                self.size -= len(self.entries.pop(old)['raw'])
+        entry = self.entries.get(key)
+        if entry:
+            self.entries.move_to_end(key)
+        return entry
+
+    def put(self, key, raw):
+        self.get(key)
+        if len(raw) > self.max_bytes or not self.ttl_seconds:
+            return None
+        if key in self.entries:
+            self.size -= len(self.entries.pop(key)['raw'])
+        while self.size + len(raw) > self.max_bytes or len(self.entries) >= self.max_entries:
+            self.size -= len(self.entries.popitem(last=False)[1]['raw'])
+        entry = {'raw': raw, 'created': time.monotonic(), 'ref': None}
+        self.entries[key] = entry
+        self.size += len(raw)
+        return entry
+
+
+def bounded(response, limit, *, success=True):
+    if success:
+        response.raise_for_status()
     declared = response.headers.get('content-length', '')
     if declared.isdigit() and int(declared) > limit:
         raise StageError('CLASSIC_RESPONSE_TOO_LARGE')
@@ -61,6 +93,8 @@ class Config:
     request_seconds: float = 30.0
     engine_seconds: float = 900.0
     allow_http: bool = False
+    input_cache_bytes: int = 128 * 1024 * 1024
+    input_cache_ttl_seconds: float = 900
 
     def __post_init__(self):
         parsed = urlsplit(self.control_url)
@@ -72,6 +106,8 @@ class Config:
             raise ValueError('NODE_ID, CLUSTER_NODE_TOKEN and ENGINE_TOKEN are required')
         if min(self.poll_seconds, self.heartbeat_seconds, self.request_seconds, self.engine_seconds) <= 0:
             raise ValueError('Timeouts must be positive')
+        if self.input_cache_bytes < 0 or self.input_cache_ttl_seconds < 0:
+            raise ValueError('Cache limits must be nonnegative')
 
     @classmethod
     def environment(cls):
@@ -83,13 +119,16 @@ class Config:
                    heartbeat_seconds=float(os.environ.get('NODE_HEARTBEAT_SECONDS', '10')),
                    request_seconds=float(os.environ.get('NODE_REQUEST_SECONDS', '30')),
                    engine_seconds=float(os.environ.get('NODE_STAGE_SECONDS', '900')),
-                   allow_http=os.environ.get('CONTROL_ALLOW_HTTP', 'false').lower() == 'true')
+                   allow_http=os.environ.get('CONTROL_ALLOW_HTTP', 'false').lower() == 'true',
+                   input_cache_bytes=int(os.environ.get('NODE_INPUT_CACHE_BYTES', str(128*1024*1024))),
+                   input_cache_ttl_seconds=float(os.environ.get('NODE_INPUT_CACHE_TTL_SECONDS', '900')))
 
 
 class Agent:
     def __init__(self, config, *, transport=None):
         self.config = config
         self.stop = threading.Event()
+        self.inputs = InputCache(config.input_cache_bytes, config.input_cache_ttl_seconds)
         self.client = httpx.Client(timeout=config.request_seconds, trust_env=False,
                                    follow_redirects=False, transport=transport)
         self.engine = httpx.Client(timeout=config.engine_seconds, trust_env=False,
@@ -160,22 +199,48 @@ class Agent:
         if lease['stage'] not in STAGES:
             raise StageError('CLASSIC_STAGE_UNSUPPORTED')
         config = lease['config']['engine']
-        raw = self.read_input(lease)
-        payload = {'image': base64.b64encode(raw).decode(), 'config': config, 'scope': lease['job_id']}
+        identity = (lease['job_id'], lease['input']['sha256'], json.dumps(config, sort_keys=True))
+        cached = self.inputs.get(identity)
+        if cached is not None:
+            permission = self.control('/internal/leases/' + lease['lease_id'] + '/input/authorize',
+                                      lease_token=lease['lease_token'], limit=8192)
+            if permission.get('sha256') != lease['input']['sha256']:
+                raise StageError('CLASSIC_INPUT_CHANGED')
+            raw = cached['raw']
+        else:
+            raw = self.read_input(lease)
+            cached = self.inputs.put(identity, raw)
+        payload = {'config': config, 'scope': lease['job_id'], 'input_hash': lease['input']['sha256']}
+        if cached and cached['ref']:
+            payload['image_ref'] = cached['ref']
+        else:
+            payload['image'] = base64.b64encode(raw).decode()
         for field in ('analysis', 'translations', 'language', 'cache_key'):
             if lease.get(field) is not None:
                 payload[field] = lease[field]
         if len(json.dumps(payload.get('analysis'), allow_nan=False).encode()) > CHECKPOINT_LIMIT:
             raise StageError('CLASSIC_CHECKPOINT_TOO_LARGE')
-        with self.engine.stream('POST', self.config.engine_url + '/v1/' + lease['stage'], json=payload,
-                                headers={'Authorization': 'Bearer ' + self.config.engine_token}) as response:
-            if response.status_code == 422:
-                raise StageError('CLASSIC_' + lease['stage'].upper() + '_FAILED')
-            if response.status_code == 409:
-                raise StageError('CLASSIC_ENGINE_CHANGED')
-            result = json.loads(bounded(response, JSON_LIMIT))
+        for attempt in range(2):
+            with self.engine.stream('POST', self.config.engine_url + '/v1/' + lease['stage'], json=payload,
+                                    headers={'Authorization': 'Bearer ' + self.config.engine_token}) as response:
+                if response.status_code == 410 and 'image_ref' in payload and attempt == 0:
+                    miss = json.loads(bounded(response, 8192, success=False))
+                    if miss.get('error') == 'ENGINE_INPUT_CACHE_MISS':
+                        # A definite miss occurs before model execution. Never
+                        # retry uncertain HTTP failures or inference errors here.
+                        payload.pop('image_ref')
+                        payload['image'] = base64.b64encode(raw).decode()
+                        continue
+                if response.status_code == 422:
+                    raise StageError('CLASSIC_' + lease['stage'].upper() + '_FAILED')
+                if response.status_code == 409:
+                    raise StageError('CLASSIC_ENGINE_CHANGED')
+                result = json.loads(bounded(response, JSON_LIMIT))
+                break
         if result.get('version') != config['version'] or result.get('input_hash') != lease['input']['sha256']:
             raise StageError('CLASSIC_ENGINE_CHANGED')
+        if cached is not None:
+            cached['ref'] = result.get('image_ref')
         return result
 
     def finish(self, lease, body, stale):
@@ -242,6 +307,8 @@ class Agent:
                     log.warning('control or engine unavailable')
                     self.stop.wait(max(2, self.config.poll_seconds))
         finally:
+            self.inputs.entries.clear()
+            self.inputs.size = 0
             self.engine.close()
             self.client.close()
 
