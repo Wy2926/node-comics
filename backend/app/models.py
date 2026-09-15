@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -41,48 +41,28 @@ class Asset(Base):
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
     byte_size: Mapped[int] = mapped_column(Integer)
+    active_references: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime)
-
-
-class Batch(Base):
-    __tablename__ = "batches"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    preview_id: Mapped[str] = mapped_column(String(36), unique=True)
-    idempotency_key: Mapped[str] = mapped_column(String(128))
-    request_hash: Mapped[str] = mapped_column(String(64))
-    quota_pages: Mapped[int] = mapped_column(Integer)
-    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
-
-
-class TranslationPreview(Base):
-    __tablename__ = "translation_previews"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    asset_ids: Mapped[list] = mapped_column(JSON)
-    mode: Mapped[str] = mapped_column(String(20))
-    language: Mapped[str] = mapped_column(String(20))
-    config_version: Mapped[str] = mapped_column(String(64))
-    quota_pages: Mapped[int] = mapped_column(Integer)
-    quota_kind: Mapped[str] = mapped_column(String(30))
-    entitlement_version: Mapped[str] = mapped_column(String(64))
-    new_pages: Mapped[int] = mapped_column(Integer)
-    regenerate: Mapped[bool] = mapped_column(Boolean, default=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class Job(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    input_asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
+    input_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
+    input_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), default="", index=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64))
+    page_index: Mapped[int | None] = mapped_column(Integer)
+    priority_rank: Mapped[int] = mapped_column(Integer, default=1000000)
+    realtime_until: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now, index=True)
+    change_sequence: Mapped[int] = mapped_column(BigInteger, default=0, index=True)
     output_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
-    batch_id: Mapped[str | None] = mapped_column(ForeignKey("batches.id"), index=True)
     ordinal: Mapped[int] = mapped_column(Integer, default=0)
     mode: Mapped[str] = mapped_column(String(20))
     target_language: Mapped[str] = mapped_column(String(20))
@@ -152,14 +132,6 @@ class Ledger(Base):
     __table_args__ = (Index("ix_ledger_owner_created", "owner_id", "created_at"),)
 
 
-class Outbox(Base):
-    __tablename__ = "outbox"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), unique=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime)
-    publish_attempts: Mapped[int] = mapped_column(Integer, default=0)
-
-
 class Provider(Base):
     __tablename__ = "providers"
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
@@ -176,7 +148,6 @@ class ClassicState(Base):
     translations: Mapped[dict] = mapped_column(JSON, default=dict)
     timings: Mapped[dict] = mapped_column(JSON, default=dict)
     artifacts: Mapped[dict] = mapped_column(JSON, default=dict)
-    local_attempts: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
@@ -185,6 +156,7 @@ class TextCall(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
     attempt_id: Mapped[str] = mapped_column(ForeignKey("attempts.id"))
+    execution_lease_id: Mapped[str | None] = mapped_column(String(36), index=True)
     group_index: Mapped[int] = mapped_column(Integer)
     sequence: Mapped[int] = mapped_column(Integer)
     provider_id: Mapped[str] = mapped_column(String(80))

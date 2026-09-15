@@ -14,7 +14,7 @@
 
 2026-09-15 起 MangaCopy／Copy4000 已加入安装权限，详情页自动出现“Node Comics · 导入／管理漫画”；弹框打开即发现，也可刷新。选择来源分组、类型、区间或“来源目录全部”，预览逐项归属，再确认导入。每个“全部”仅指当前已确认目录快照。通用图片也支持选择、排序、归入作品和插入已有副本，见[网页导入更新](WEB_IMAGE_IMPORT.md)。
 
-默认保存目录，打开条目时获取图片；也可在确认时选择下载原图。后续从“版本与来源”检查更新并预览差异。导入、下载与翻译分别管理，导入目录不会创建翻译任务。用户此前开启的自动翻译仅在进入阅读器后按现有授权生效。
+默认保存目录，打开条目时获取图片；也可在确认时选择下载原图。后续从“版本与来源”检查更新并预览差异。导入、下载与翻译分别管理，导入目录不会创建翻译任务。阅读时可确认当前页、本章或指定范围加入持久化上传清单；进入或切换漫画只调整已受理任务的本人顺序，不扩大已确认范围。
 
 ## 代码与存储
 
@@ -68,7 +68,7 @@
 
 脱敏结果与截图写入被 Git 忽略的 `artifacts/library-validation`、`artifacts/mangacopy-validation`、`artifacts/mangacopy-implementation`。来源测试不上传漫画到翻译服务；原图仅保存在隔离测试配置中。目录导入 100 条不表示已下载全部 100 个条目的图片。
 
-翻译回归结果位于 `artifacts/auto-validation/results.json`，使用原创测试图片及合成输出，不调用实际供应商，不代表模型翻译效果。启动 `backend/tests/manual_ui_server.py` 后，将其输出目录设为 `UI_FIXTURE_DIRECTORY`，运行 `scripts/verify_auto_translation.mjs`；服务仅绑定本机 18089 端口、使用独立临时数据库。
+上述翻译回归属于旧流程的历史记录。当前使用原创测试图片及合成输出，启动 `backend/tests/manual_ui_server.py` 后，将其输出目录设为 `UI_FIXTURE_DIRECTORY`，运行 `scripts/verify_cluster_reader.mjs`，结果位于 `artifacts/cluster-validation/`；服务仅绑定本机 18089 端口、使用独立临时数据库。脚本验证集群队列与阅读恢复，不调用实际供应商，不代表模型翻译效果。
 
 ### 可重复命令
 

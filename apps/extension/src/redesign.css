@@ -1692,6 +1692,8 @@ a {
 .nc-app .toast,.nc-app .busy-pill {
   font-size: .9375rem;
   padding: 14px 22px;
+  left: 50%;
+  width: max-content;
   max-width: calc(100vw - 32px);
   min-width: 0;
   border: 1px solid var(--line);
@@ -1701,6 +1703,14 @@ a {
   z-index: 60;
   bottom: 100px;
   box-shadow: var(--shadow);
+}
+.nc-app .toast>span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.nc-app .toast>svg,.nc-app .toast>button {
+  flex-shrink: 0;
 }
 .nc-app .toast svg {
   color: var(--success);
@@ -1973,7 +1983,11 @@ a {
     background: #14223825;
   }
   .nc-app .toast {
-    bottom: 136px;
+    left: 16px;
+    width: calc(100vw - 32px);
+    transform: none;
+    padding: 12px 14px;
+    bottom: max(16px,env(safe-area-inset-bottom));
   }
   .nc-app .busy-pill {
     top: 74px;

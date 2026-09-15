@@ -4,7 +4,18 @@ from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import create, login_plus as login, upload, preview, png_variant
+from conftest import create, login_plus as login, upload, submit_asset, png_variant
+
+
+def submit_pages(client, auth, asset_ids, key="batch-1", max_pages=None):
+    from app.db import session_factory
+    from app.models import Asset
+    with session_factory()() as db:
+        items = [{"client_item_id": str(index), "asset_id": asset.id, "image_sha256": asset.sha256,
+                  "byte_size": asset.byte_size, "content_type": asset.mime}
+                 for index, asset in enumerate(db.get(Asset, aid) for aid in asset_ids)]
+    return client.post("/v1/translation-submissions", headers={**auth, "Idempotency-Key": key},
+        json={"mode": "redraw", "target_language": "zh-Hans", "max_quota_pages": len(items) if max_pages is None else max_pages, "items": items})
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -20,7 +31,8 @@ def test_auth_private_assets_and_admin_boundaries(client, png):
 
 def test_idempotency_binds_input_and_parameters(client, png):
     from app.db import session_factory
-    from app.models import Job, Ledger, Outbox
+    from app.models import Job, Ledger
+    from app.queue_models import JobStage
     auth = login(client)
     asset = upload(client, auth, png)
     first = create(client, auth, asset)
@@ -30,7 +42,7 @@ def test_idempotency_binds_input_and_parameters(client, png):
     assert create(client, auth, asset, language="en").status_code == 409
     assert quota_usage(client, auth)["reserved"] == 1
     with session_factory()() as db:
-        for model in (Job, Ledger, Outbox):
+        for model in (Job, Ledger, JobStage):
             assert db.scalar(select(func.count()).select_from(model)) == 1
 
 
@@ -54,13 +66,12 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     assert client.get(f"/v1/images/{job['output_asset_id']}/content", headers=auth).content == png
     usage = quota_usage(client, auth)
     assert (usage["used"], usage["reserved"], usage["available"]) == (1, 0, 299)
-    cached = create(client, auth, asset, key="cached").json()
-    assert cached["status"] == "succeeded" and cached["cache_hit"] and cached["quota_pages"] == 0
-    assert cached["output_asset_id"] == job["output_asset_id"]
-    confirmed_quote = preview(client, auth, asset)
-    rerun = client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "explicit-rerun"}, json={"preview_id": confirmed_quote["id"], "max_quota_pages": confirmed_quote["quota_pages"]})
-    assert rerun.status_code == 202 and not rerun.json()["cache_hit"]
-    assert rerun.json()["version"] > job["version"]
+    cached = submit_asset(client, auth, asset, key="cached").json()
+    assert cached["quota_pages"] == 0 and cached["items"][0]["reused"]
+    assert cached["items"][0]["job"]["output_asset_id"] == job["output_asset_id"]
+    rerun = submit_asset(client, auth, asset, key="explicit-rerun", regenerate=True, rerun_job_id=job_id)
+    assert rerun.status_code == 202 and not rerun.json()["items"][0]["reused"]
+    assert rerun.json()["items"][0]["job"]["version"] > job["version"]
     assert quota_usage(client, auth)["reserved"] == 1
 
 
@@ -81,12 +92,11 @@ def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypat
     assert calls == [1]
     assert client.get(f"/v1/jobs/{job_id}", headers=auth).json()["status"] == "outcome_unknown"
     assert quota_usage(client, auth)["reserved"] == 1
-    confirmed_quote = preview(client, auth, asset)
-    assert client.post(f"/v1/jobs/{job_id}/rerun", headers={**auth, "Idempotency-Key": "retry"}, json={"preview_id": confirmed_quote["id"], "max_quota_pages": confirmed_quote["quota_pages"]}).status_code == 409
+    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).status_code == 409
     def rejected(*args):
         raise ProcessingError("PROVIDER_REJECTED", "请求被拒绝")
     monkeypatch.setattr(workers, "redraw", rejected)
-    next_id = create(client, auth, asset, key="known-failure").json()["id"]
+    next_id = create(client, auth, upload(client, auth, png_variant(png, 3)), key="known-failure").json()["id"]
     process_job(next_id)
     usage = quota_usage(client, auth)
     assert usage["used"] == 0 and usage["reserved"] == 1
@@ -165,19 +175,16 @@ def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
 def test_batch_budget_atomicity_and_cancel(client, png):
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, index)) for index in range(3)]
-    preview = client.post("/v1/translation-previews", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
-    headers = {**auth, "Idempotency-Key": "batch-1"}
-    assert preview["quota_pages"] == 3
-    assert client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 2}).status_code == 409
+    assert submit_pages(client, auth, assets, max_pages=2).status_code == 409
     assert quota_usage(client, auth)["reserved"] == 0
-    response = client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 3})
+    response = submit_pages(client, auth, assets, max_pages=3)
     assert response.status_code == 202, response.text
     batch = response.json()
-    assert [job["input_asset_id"] for job in batch["jobs"]] == assets
-    repeated = client.post("/v1/translation-batches", headers=headers, json={"preview_id": preview["id"], "max_quota_pages": 3}).json()
+    assert [item["job"]["input_asset_id"] for item in batch["items"]] == assets
+    repeated = submit_pages(client, auth, assets, max_pages=3).json()
     assert repeated["id"] == batch["id"]
     assert quota_usage(client, auth)["reserved"] == 3
-    assert client.post(f"/v1/translation-batches/{batch['id']}/cancel", headers=auth).json()["status"] == "cancelled"
+    assert client.post(f"/v1/translation-submissions/{batch['id']}/cancel", headers=auth).json()["status"] == "cancelled"
     assert quota_usage(client, auth)["reserved"] == 0
 
 
@@ -186,11 +193,10 @@ def test_batch_bad_asset_rolls_back_all_jobs_and_reservations(client, png):
     from app.models import Asset, now
     auth = login(client)
     assets = [upload(client, auth, png) for _ in range(2)]
-    preview = client.post("/v1/translation-previews", headers=auth, json={"asset_ids": assets, "mode": "redraw", "target_language": "zh-Hans"}).json()
     with session_factory()() as db:
         db.get(Asset, assets[1]).deleted_at = now()
         db.commit()
-    response = client.post("/v1/translation-batches", headers={**auth, "Idempotency-Key": "bad-batch"}, json={"preview_id": preview["id"], "max_quota_pages": 2})
+    response = submit_pages(client, auth, assets, key="bad-batch", max_pages=2)
     assert response.status_code == 410
     assert client.get("/v1/jobs", headers=auth).json()["total"] == 0
     assert quota_usage(client, auth)["reserved"] == 0
@@ -200,7 +206,7 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
     import app.workers as workers
     from app.db import session_factory
     from app.models import Job, now
-    from app.dispatcher import recover
+    from app.dispatcher import recover_once
     from app.errors import ProcessingError
     def timeout(*args):
         raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "待核实", unknown=True)
@@ -212,10 +218,8 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
     with session_factory()() as db:
         db.get(Job, job_id).unknown_since = now() - timedelta(hours=2)
         db.commit()
-        recover(db)
-        db.commit()
-        recover(db)
-        db.commit()
+    recover_once()
+    recover_once()
     assert quota_usage(client, auth)["reserved"] == 0
     output = upload(client, auth, png)
     response = client.post(f"/v1/admin/jobs/{job_id}/reconcile", headers=admin, json={"resolution": "succeeded", "output_asset_id": output, "note": "已向供应商核实"})
@@ -227,37 +231,42 @@ def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, p
 def test_worker_lease_loss_after_intent_never_requeues(client, png):
     from app.db import session_factory
     from app.models import Attempt, Job, now
+    from app.queue_models import ExecutionLease
     from conftest import claim_job as claim
-    from app.dispatcher import recover
+    from app.dispatcher import recover_lease
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    attempt_id = claim(job_id)
+    lease_id = claim(job_id)
     with session_factory()() as db:
-        attempt = db.get(Attempt, attempt_id)
+        attempt = db.get(Attempt, db.get(Job, job_id).attempt_id)
         attempt.call_started_at = now() - timedelta(hours=1)
-        attempt.lease_expires_at = now() - timedelta(seconds=1)
+        db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        recover(db)
-        db.commit()
+    recover_lease(lease_id)
+    with session_factory()() as db:
         assert db.get(Job, job_id).status == "outcome_unknown"
     assert claim(job_id) is None
 
 
 def test_worker_lease_before_intent_is_safe_to_requeue(client, png):
     from app.db import session_factory
-    from app.models import Attempt, Job, now
+    from app.models import Job, now
+    from app.queue_models import ExecutionLease, JobStage
     from conftest import claim_job as claim
-    from app.dispatcher import recover
+    from app.dispatcher import recover_lease
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    attempt_id = claim(job_id)
+    lease_id = claim(job_id)
     with session_factory()() as db:
-        db.get(Attempt, attempt_id).lease_expires_at = now() - timedelta(seconds=1)
+        db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        recover(db)
+    recover_lease(lease_id)
+    with session_factory()() as db:
+        stage = db.get(JobStage, db.get(ExecutionLease, lease_id).stage_id)
+        assert stage.status == "ready"
+        stage.available_at = now()
         db.commit()
-        assert db.get(Job, job_id).status == "queued"
-    assert claim(job_id) != attempt_id
+    assert claim(job_id) != lease_id
 
 
 def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypatch):
@@ -305,8 +314,8 @@ def test_admin_quota_adjustment_idempotent_and_private_provider_list(client):
 
 def test_upload_signature_limits_and_inputs(client, png):
     auth = login(client)
-    assert client.post("/v1/images", headers=auth, files={"image": ("fake.png", b"not a PNG", "image/png")}).status_code == 422
     asset = upload(client, auth, png)
     assert create(client, auth, asset, language="unsupported").status_code == 422
-    assert client.post("/v1/translations/redraw", headers=auth, data={"asset_id": asset, "target_language": "zh-Hans"}).status_code == 422
-    assert client.post("/v1/translations/standard", headers={**auth, "Idempotency-Key": "wrong-mode"}, data={"asset_id": asset, "target_language": "zh-Hans"}).status_code == 422
+    assert submit_asset(client, auth, asset, mode="standard").status_code == 422
+    assert client.post("/v1/translation-submissions", headers=auth, json={}).status_code == 422
+    assert client.post("/v1/images", headers=auth).status_code == 404

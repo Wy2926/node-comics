@@ -1,5 +1,5 @@
 export function historyPollDelay(states: string[]): number | null {
-  if (states.some(state => state === 'queued' || state === 'running')) return 15_000;
+  if (states.some(state => ['awaiting_upload','validating_upload','queued','running'].includes(state))) return 15_000;
   if (states.includes('outcome_unknown')) return 60_000;
   return null;
 }

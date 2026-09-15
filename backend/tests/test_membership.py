@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 import pytest
 from sqlalchemy import func, select
-from conftest import login, upload, png_variant
+from conftest import login, upload, png_variant, submit_asset
 
 
 def entitlement(client, auth):
@@ -21,8 +21,20 @@ def grant(client, auth, *, months=1, pages=None, key='open-plus'):
 
 
 def submit(client, auth, asset, mode='classic', key='new-page', **fields):
-    return client.post(f'/v1/translations/{mode}', headers={**auth, 'Idempotency-Key': key},
-                       data={'asset_id': asset, 'target_language': 'zh-Hans', **fields})
+    import httpx
+    response = submit_asset(client, auth, asset, key=f'{mode}:{key}', mode=mode, **fields)
+    return httpx.Response(response.status_code, json=response.json()['items'][0]['job'] if response.status_code == 202 else response.json())
+
+
+def submit_many(client, auth, assets, mode='classic', key='manifest', maximum=None):
+    from app.db import session_factory
+    from app.models import Asset
+    with session_factory()() as db:
+        items = [{'client_item_id': str(n), 'asset_id': asset.id, 'image_sha256': asset.sha256,
+                  'byte_size': asset.byte_size, 'content_type': asset.mime}
+                 for n, asset_id in enumerate(assets) for asset in [db.get(Asset, asset_id)]]
+    return client.post('/v1/translation-submissions', headers={**auth, 'Idempotency-Key':key},
+                       json={'items':items,'mode':mode,'target_language':'zh-Hans','max_quota_pages':len(items) if maximum is None else maximum})
 
 
 def finish(job_id, success=True):
@@ -31,8 +43,8 @@ def finish(job_id, success=True):
     from app.models import Job
     with session_factory()() as db:
         job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
-        settle(db, job, success=success)
         job.status = 'succeeded' if success else 'failed'
+        settle(db, job, success=success)
         db.commit()
 
 
@@ -46,25 +58,24 @@ def test_defaults_and_admin_role_do_not_grant_plus(client):
     for name in ('alice', 'admin'):
         rights = entitlement(client, login(client, name))
         assert rights['plan'] == 'free'
-        assert rights['concurrency'] == 2
+        assert rights['realtime_slots'] == 2 and rights['queue_capacity'] == 10
         assert rights['modes']['classic']['quota']['available'] == 100
         assert rights['modes']['redraw']['allowed'] is False
         assert rights['modes']['redraw']['quota'] is None
 
 
-def test_free_cannot_create_redraw_through_direct_or_preview(client, png):
+def test_free_cannot_create_redraw_submission_or_reserve_capacity(client, png):
     auth = login(client)
     asset = upload(client, auth, png)
     response = submit(client, auth, asset, 'redraw')
     assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
-    response = client.post('/v1/translation-previews', headers=auth,
-        json={'asset_ids': [asset], 'mode': 'redraw', 'target_language': 'zh-Hans'})
-    assert response.status_code == 403
     from app.db import session_factory
-    from app.models import Job, Outbox
+    from app.models import Job
+    from app.queue_models import Submission
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 0
-        assert db.scalar(select(func.count()).select_from(Outbox)) == 0
+        assert db.scalar(select(func.count()).select_from(Submission)) == 0
+    assert all(q['in_flight'] == 0 for q in client.get('/v1/me/queues',headers=auth).json()['items'])
 
 
 def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
@@ -73,6 +84,7 @@ def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
     assert first.status_code == 200, first.text
     rights = entitlement(client, auth)
     assert rights['plan'] == 'plus' and rights['modes']['classic']['unlimited']
+    assert rights['queue_capacity'] == 500 and rights['realtime_slots'] == 10
     assert rights['modes']['classic']['quota'] is None
     assert rights['modes']['redraw']['quota']['granted'] == 300
     assert grant(client, auth, months=12).json() == first.json()
@@ -162,16 +174,12 @@ def test_expiry_honors_accepted_job_and_rejects_new_work(client, png, monkeypatc
     assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 100
 
 
-def test_preview_deduplicates_and_atomic_batch_limit(client, png):
+def test_submission_rolls_back_all_pages_when_period_allowance_is_insufficient(client, png):
     from app.config import settings
     settings().free_daily_pages = 1
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, i)) for i in (1, 2)]
-    preview = client.post('/v1/translation-previews', headers=auth,
-        json={'asset_ids': assets, 'mode': 'classic', 'target_language': 'zh-Hans'}).json()
-    assert preview['new_pages'] == preview['quota_pages'] == 2
-    response = client.post('/v1/translation-batches', headers={**auth, 'Idempotency-Key': 'batch'},
-        json={'preview_id': preview['id'], 'max_quota_pages': 2})
+    response = submit_many(client, auth, assets, maximum=2)
     assert response.status_code == 409
     assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 0
     assert client.get('/v1/jobs', headers=auth).json()['total'] == 0
@@ -191,7 +199,8 @@ def test_membership_and_compensation_are_private_and_idempotent(client):
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 307
-    assert client.put('/v1/me/queue', headers=auth, json={'concurrency': 10}).status_code == 405
+    queues = client.get('/v1/me/queues', headers=auth).json()['items']
+    assert len(queues) == 2 and all(queue['capacity'] == 500 and queue['realtime_limit'] == 10 for queue in queues)
 
 
 def test_simultaneous_last_page_admission(client, png):

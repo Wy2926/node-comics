@@ -1,24 +1,23 @@
-# 译图对象存储（R2）
+# 原图与译图对象存储（R2）
 
-实现状态：代码支持 `local` 和 `r2`，默认 `local`。R2 通过 AWS Python SDK `boto3` 接入 S3 兼容协议，签名、HTTP 和存储请求重试由 SDK 处理。`ObjectStore` 隔离业务与存储，`S3Store` 可供后续其他兼容供应商复用；当前没有开放其他供应商的部署配置。
+2026-09-15：原图与最终 `classic` / `redraw` 结果统一使用私有 R2。公开部署不允许本地持久原图；隔离测试才可设置 `DEV_AUTH=true` 与 `RESULT_STORAGE_BACKEND=local`。真实 R2 新链路与模拟 S3／SDK 检查分别记录于[集群验收](CLUSTER_VALIDATION.md)。
 
 ## 数据路径
 
-- 原图仍由 API 接收、校验并保存到 `STORAGE_PATH`，供翻译使用。
-- R2 **只保存最终 `redraw` / `classic` 译图**。原图、常规翻译的抹字图、文字遮罩及渲染检查点 `classic_stage` 强制使用本地磁盘；OCR 和文本结果保存在后端数据库。`create_asset` 和 `S3Store.put` 两层拒绝非最终结果上传。人工核实通过的结果图片可以转存 R2。
-- 用户带 Bearer 调用 `GET /v1/images/{id}/access`。API 核对所有者、原图状态、删除标记及到期时间，在本地生成短时 R2 GET 签名链接与 `authorization_required:false`；不调用 R2 HEAD。
-- 插件直接从 R2 下载，省去 API 服务器的译图下载流量。下载不带账户 Bearer、Cookie 或 Referer；签名过期最多重新获取一次链接。图片仍解码为 Blob，沿用原有窗口加载、版本切换和阅读位置。
-- `/content` 对 R2 图片只做授权后 307 跳转，不代理字节。本地图片继续使用同源 Bearer 下载。
+- 原图先取得用户/模式容量内的有限上传会话。API 按实际字节上限接收至内存，写 R2 临时对象；complete 指令排入后台校验，不把客户端声明直接视为有效图片。
+- 校验任务核对同一缓冲的摘要、大小、格式和解码尺寸，写不可变原图对象，再提交资产、引用保护和阶段状态。未校验图不可作为其他任务输入。
+- 计算代理通过控制 API 的当前租约读取输入，无 R2 凭据。常规清理图只存节点有界内存缓存，OCR/遮罩检查点和译文存数据库。
+- 最终结果先固定租约的结果摘要，再写独立租约键；数据库提交前失联可按该键恢复。原图和译图长期存储不占服务器磁盘。默认不自动删除有效原图或译图。
+- 用户通过 `GET /v1/images/{id}/access` 获得短时签名下载链接；签名、列表、状态与缓存匹配不发送远端 HEAD。
+- 浏览器直连 R2 下载原图/译图，不带账户 Bearer、Cookie 或 Referer；签名过期可刷新一次。API `/content` 对 R2 只授权后跳转。
 
-服务器承担原图与中间产物的本地磁盘、供应商通信和最终结果上传；重复阅读及下载译图的流量由 R2 承担。记录、任务轮询、缓存匹配、下载签名均不探测 R2。必要的未决结果恢复保留 HEAD / GET，过期删除与孤立对象清理保留 DELETE / LIST，没有启用永久公开桶。
-
-取舍：状态与缓存可用性按数据库元数据判断。有人在桶外部手动删除文件或 R2 故障时，直到客户端签名 GET 才会发现，沿用下载失败处理；数据库已删除、已物理清理或过期的结果仍立即禁止新访问。不新增旧数据搬迁或兼容逻辑。
+服务器仍承担上传接收、校验读写和节点输入传输。这里解决持久磁盘与跨机器共享文件问题，暂未承诺消除所有 API 带宽。R2 临时上传使用独立键，验证后才能成为有效资产；正常状态查询不探测远端对象。
 
 ## 配置和启用
 
 1. 在 Cloudflare 创建私有 R2 桶，保持 `r2.dev` 和公开域名访问关闭。
 2. 创建限定到该桶的 **Object Read & Write** S3 凭据（Access Key ID 和 Secret Access Key）。需要读、写、删对象和列举前缀用于清理。
-3. 将下列配置写入仓库根目录 `.env` 或部署秘密管理；API、两种 worker 和 dispatcher 必须使用相同值。
+3. 将下列配置写入仓库根目录 `.env` 或部署秘密管理；API、control-worker 和 maintenance 必须使用相同值。
 
 ```dotenv
 RESULT_STORAGE_BACKEND=r2
@@ -53,46 +52,26 @@ STORAGE_TIMEOUT_SECONDS=30
 
 本地 Web 验证时单独加入实际 `http://127.0.0.1:端口`。插件从自己的页面发起跨域下载，不需要新增覆盖全部 R2 的主机权限。R2 过期签名响应可能没有 CORS 头，因此客户端也对首次网络/CORS 失败刷新一次链接。
 
-5. 重新构建并启动所有后端进程以安装依赖和应用配置，例如现有 Docker 启动入口：
+5. 配置后使用新集群启动入口，见[后端说明](../backend/README.md)。原图不挂载持久图片卷；模型权重卷独立保留。新 `cluster_0001` 基线需要空数据库，不迁移旧资产位置。
 
-```powershell
-./scripts/bootstrap.ps1 -Start -Classic
-```
+## 删除、保留与恢复
 
-只使用重绘时省略 `-Classic`。Compose 已把 `.env` 共享给后端进程；无需公开图片卷。启动自动运行 Alembic `0008`，为旧资产和 attempt 标注 `local` 并建立远端清理游标。
-
-## 删除、恢复和切换
-
-- 每个 Asset 记录存储后端，attempt 在领取时固定输出存储位置。切换默认配置只影响后续新结果，既有本地结果保留原位置，不自动迁移或删除。
-- 从 R2 切回 `local` 时继续保留 R2 端点、桶、前缀和凭据，直到旧结果及未决任务全部过期/处理完毕。不能直接把同一个 `r2` 配置改指另一桶或前缀，否则已有对象无法定位。
-- 写入 R2 成功而数据库未提交时，可按稳定 attempt key 找回结果；写入超时也先核实同一对象。R2 不可用时保留恢复状态；对象确实不存在时，重绘按既有 `outcome_unknown` 流程核实，绝不因此重发图片模型请求。
-- 删除先提交数据库墓碑，再删本地/R2 对象。删除失败返回 503，墓碑继续拒绝新访问，由 dispatcher 重试；成功物理删除后已有直链也失效。删除故障期间，**此前签发的直链可能继续有效至签名到期**，默认最长约 5 分钟。
-- 到期/删除资产分批物理清理。远端孤立对象每次最多扫描 200 个，游标持久化；扫完整个前缀后等待 1 小时。只删超过 24 小时、无资产记录且无运行/未决 attempt 引用的对象，不扫描其他前缀。
-- 不在数据库、任务、默认日志或浏览器持久化签名链接；不要开启 `boto3` / `botocore` 的 HTTP DEBUG 日志。
+- 活跃任务通过 `active_references` 保护原图，即使自然保留期已到也不回收；任务终态只释放一次引用。
+- 原图与最终译图默认 `expires_at=null`，无限期保留，翻译完成不删除。`last_accessed_at` 记录最近签发授权访问的时间；当前没有长期未访问自动删除任务，不逐次统计 R2 GET。未来显式期限策略不能让仍有效的译图失去父原图。
+- 删除先提交数据库墓碑、任务取消/丢弃和增量状态，再访问 R2 DELETE；删除失败由维护进程重试。已签发直链可能继续有效至签名到期。
+- 对象存储写入成功但 DB 提交失败时，按 ExecutionLease 对象键恢复。已写图片模型调用意图的任务不因存储故障而重新调用模型。
+- 孤儿扫描限定本部署前缀并保存游标；保护当前资产、活跃/未决租约和上传对象，只清理超过宽限时间的无引用对象。不扫描其他部署前缀。
+- 默认日志和持久化记录不保存签名链接、用户图片字节、OCR全文或存储请求秘密。不要开启 SDK HTTP DEBUG 日志。
 
 ## 验证
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
-backend/.venv/Scripts/python.exe -m pytest backend/tests/test_object_storage.py -q
-npm --prefix apps/extension test -- tests/image-access.test.ts tests/concurrency.test.ts
-npm --prefix apps/extension run check
+backend/.venv/Scripts/python.exe -m pytest backend/tests/test_upload_storage.py backend/tests/test_cluster_submissions.py backend/tests/test_object_storage.py -q
+# 显式真实R2验收：读取给定配置，独立临时DB、合成图和随机测试前缀。
+backend/.venv/Scripts/python.exe scripts/verify_cluster_r2.py --env-file .env
 ```
 
-后端专项测试使用临时 SQLite、SDK Stubber 和模拟 S3，覆盖两种模式交付、中间产物只存本地、非法上传拒绝、查询/签名零远端请求、权限、过期、崩溃恢复、重复结算保护及分页清理；前端测试覆盖登录令牌隔离、同源下载、链接更新和失败上限。这些不代表真实 R2 接入验证或新的翻译效果验证。
-
-浏览器复测使用 `scripts/verify_r2_download.mjs`：先运行 `backend/tests/manual_ui_server.py`（隔离数据库、合成图片和模拟翻译供应商），再在另一终端运行 `npm --prefix apps/extension run dev -- --port 5174`。把 fixture 输出的临时目录赋给 `UI_FIXTURE_DIRECTORY`，安装了 Playwright 的运行时模块路径赋给 `PLAYWRIGHT_MODULE`，执行 `node scripts/verify_r2_download.mjs`。脚本用 Chrome 检查实际阅读器，模拟 R2 直链及一次 403，校验无账户请求头、自动更新链接、保留当前页和继续翻页；结果与截图写入 `artifacts/r2-validation/`。仅测试代码代管模拟对象响应，不调用真实 R2。
-
-2026-09-15 本地验证：前端 159 项测试、类型/模块检查、Chrome MV3 和 Web 构建通过；后端 177 项通过，14 项需独立 PostgreSQL 的并发用例未启用。Chrome 上述 3 项阅读器检查及截图复核通过。随后已使用用户提供的 R2 配置完成真实桶验收：SDK 上传/HEAD/读取、签名下载与解码、指定来源 CORS、删除后撤销直链均通过，合成测试对象已清理。Chrome 也通过真实 R2 CORS 下载检查，证据位于 `artifacts/r2-validation/live-results.json` 与 `live-r2-chrome.png`。
-
-本地 `.env` 已启用 R2 并使用独立部署前缀，凭据未进入 Git；本地 API、dispatcher、两种 worker 已重新构建启动，PostgreSQL 已迁移到 `0008`。容器内使用临时 SQLite、合成图片和模拟供应商验证了实际 worker → R2 → 授权直链交付，以及无本地译图、重复结算保护和删除；未调用真实图片模型，未发布到公网。已有本地译图继续保留原位置。
-
-可重复的真实存储检查命令（只下载指定的已有最终译图，不上传测试图片，也不删除对象）：
-
-```powershell
-backend/.venv/Scripts/python.exe scripts/probe_r2.py --result-asset-id <最终译图资产ID>
-# 可追加 --cors-origin 验证来源；只有显式 --configure-cors 才合并写入桶规则。
-```
+实际参数以脚本 `--help` 为准。R2 脚本只调用存储，不调用付费模型，退出时仅删除本次随机前缀内测试对象并确认清空。没有配置时明确输出 `not_verified`，不以模拟结果替代实际接入证据。此前旧存储链路的验收记录不能证明本次新上传协议已在线验证。
 
 ## SDK 版本与许可
 

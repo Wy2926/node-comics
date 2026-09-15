@@ -4,6 +4,7 @@
  * TEST_CHROMIUM optionally points to Chromium supporting unpacked extensions.
  */
 import {completeLocalImport} from './local_import_helpers.mjs';
+import {submitImages} from './submission_helpers.mjs';
 import {createRequire} from 'node:module';
 import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
@@ -25,13 +26,14 @@ async function json(url,options={}) {
 }
 const login=await json('/v1/auth/dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'import-'+randomUUID().slice(0,8)})});
 const auth={Authorization:`Bearer ${login.access_token}`};
+const admin=await json('/v1/auth/dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin'})});
+await json(`/v1/admin/users/${login.user.id}/membership`,{method:'POST',headers:{Authorization:`Bearer ${admin.access_token}`,
+  'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:JSON.stringify({months:1,note:'Isolated import acceptance'})});
 const hashes=[];const jobs=[];
 for(const name of ['1.png','2.png','10.png']) {
   const bytes=await readFile(path.join(output,name));const hash=sha(bytes);hashes.push(hash);
-  const form=new FormData();form.set('image',new Blob([bytes],{type:'image/png'}),name);form.set('file_hash',hash);form.set('page_index','0');
-  const asset=await json('/v1/images',{method:'POST',headers:auth,body:form});
-  const task=new FormData();task.set('asset_id',asset.id);task.set('target_language','zh-Hans');
-  jobs.push(await json('/v1/translations/redraw',{method:'POST',headers:{...auth,'Idempotency-Key':randomUUID()},body:task}));
+  const receipt=await submitImages({api,token:login.access_token,images:[{name,bytes,fileHash:hash,pageIndex:0}]});
+  jobs.push(receipt.items[0].job);
 }
 const deadline=Date.now()+60000;
 while(true) {
@@ -66,7 +68,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
   await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
-  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:/^(继续阅读|开始阅读)$/}).click();
   await page.getByLabel('跳转页码').waitFor({timeout:30000});
   await page.locator('.nc-page-image').first().waitFor();
   if(cache)await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:30000});
@@ -77,7 +79,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   else assert(copy.pages.every(p=>p.width===640&&p.height===960&&p.imageSha256));
   if(cache) {
     for(const p of copy.pages)assert(p.jobs.some(j=>jobs.some(old=>old.id===j.id)),`${label} restored job`);
-    assert(!requests.some(r=>r.method==='POST'&&['/v1/images','/v1/translation-previews','/v1/translation-batches'].includes(r.url)),'Recovery must not upload or submit');
+    assert(!requests.some(r=>(r.method==='POST'&&r.url==='/v1/translation-submissions')||(r.method==='PUT'&&r.url.startsWith('/v1/uploads/'))),'Recovery must not upload or submit');
   }
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');
@@ -86,7 +88,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   await page.locator('input[type=file]').setInputFiles(path.join(output,name));
   await completeLocalImport(page);
   await page.getByRole('dialog').waitFor({state:'hidden'});
-  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:'继续阅读'}).click();
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:name.replace(/\.[^.]+$/,''),exact:true})}).getByRole('button',{name:/^(继续阅读|开始阅读)$/}).click();
   await page.getByLabel('跳转页码').waitFor();
   assert.equal(await page.getByLabel('跳转页码').inputValue(),'2');
   records=await copyRecords(page);
@@ -128,6 +130,6 @@ if(process.env.TEST_CHROMIUM) {
     for(const name of ['pages.cbz','rar4.cbr','rar5.rar','pages.pdf'])await importAndRead(context,name,url,{label:'extension-'+name});
   } finally {await context.close();}
 }
-const after=await json('/v1/me/usage',{headers:auth});assert.deepEqual(after,before,'Imports and recovery must not charge');
+const after=await json('/v1/me/usage',{headers:auth});assert.deepEqual(after.items,before.items,'Imports and recovery must not change the ledger');for(const mode of ['classic','redraw'])assert.deepEqual(after.entitlements.modes[mode].quota,before.entitlements.modes[mode].quota,'Imports and recovery must not change quota');
 await writeFile(path.join(output,'browser-results.json'),JSON.stringify({checkedAt:new Date().toISOString(),syntheticProvider:true,checks,quotaUnchanged:true},null,2));
 console.log(`All ${checks.length} import checks passed; quota unchanged.`);

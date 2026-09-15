@@ -1,6 +1,8 @@
-# 自动翻译开关与阅读连续性检查
+# 自动翻译开关与阅读连续性检查（历史）
 
 2026-09-14，本地实现与 Chrome 验证；未发布或部署。
+
+此页保留旧自动翻译设计的历史证据。旧开关、授权存储与验证脚本已在集群重构中移除；以下复现入口已更新为当前独立队列流程，不能据此宣称历史开关仍受支持。当前方案见 [翻译集群与队列设计](../TRANSLATION_CLUSTER_DESIGN.md)。
 
 ## 原因与调整
 
@@ -16,7 +18,7 @@
 
 ```powershell
 npm --prefix apps/extension run check
-npm --prefix apps/extension test -- tests/automatic.test.ts tests/auto-consent.test.ts tests/classic.test.ts tests/reader-presentation.test.ts tests/file-pages.test.ts tests/concurrency.test.ts
+npm --prefix apps/extension test -- tests/translation-queue.test.ts tests/classic.test.ts tests/reader-presentation.test.ts tests/file-pages.test.ts tests/concurrency.test.ts
 npm --prefix apps/extension run build
 ```
 
@@ -39,9 +41,9 @@ npm run dev -- --port 5174
 ```powershell
 $env:UI_FIXTURE_DIRECTORY='<UI_FIXTURE_DIRECTORY>'
 $env:PLAYWRIGHT_MODULE='<playwright package path>'
-node scripts/verify_auto_translation.mjs
+node scripts/verify_cluster_reader.mjs
 ```
 
-脚本检查首次确认、手动单页报价与取消、退出停止新增、重开／刷新恢复、断网自动重试、同价配置变更、额度拒绝后恢复、未知提交跨刷新保留且复用原键、价格变化暂停、主动关闭持久化、换漫画继续，以及连续阅读时暂停消失和译图替换后的滚动位置。输出 JSON 与截图写入 `artifacts/auto-validation/`，不包含认证令牌。
+当前脚本检查独立模式队列、会员容量与实时名额、预存清单确认、暂停后上传、关闭页面后服务器持续消费、阅读位置与结果恢复、窄屏布局。输出 JSON 与截图写入 `artifacts/cluster-validation/`，不包含认证令牌。未知提交保留原请求与幂等键的恢复另由 `translation-queue.test.ts` 覆盖。
 
 供应商是模拟实现，API、任务、持久化、幂等与结算使用实际后端；这轮验证不代表真实 OCR 或图片翻译效果。

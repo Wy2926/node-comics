@@ -10,16 +10,19 @@ from pydantic import Field
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from .assets import access_json, asset_json, available, create_asset, delete_asset_object, object_path, owned_asset, upload_bytes
+from .assets import access_json, asset_json, available, create_asset, delete_asset_object, object_path, owned_asset, record_user_access, upload_bytes
 from .storage import StorageError
+from .errors import ProcessingError
+from .scheduler import lock_scheduler, touch_job
+from .submission_api import router as submission_router
+from .cluster_api import router as cluster_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
 from .db import get_db, initialize, session_factory
 from .errors import problem
-from .jobs import batch_status, cancel_job, create_batch, create_job, create_preview, idem_key, job_for_request, job_json, owned_job, preview_json
+from .jobs import cancel_job, job_json, owned_job
 from .entitlements import entitlements_json
-from .batch_items import BatchItem
-from .models import Asset, Batch, ClassicState, Job, Ledger, Provider, User, now
+from .models import Asset, ClassicState, Job, Ledger, Provider, User, now
 from .providers import LANGUAGES, credential, initialize_providers
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
@@ -28,7 +31,7 @@ from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches,
 from .queue_api import router as queue_router
 from .reader_api import router as reader_router
 from .quota_grants import router as grants_router
-from .schemas import AccessResponse, AssetResponse, BatchCreatedResponse, BatchResponse, CapabilitiesResponse, EntitlementsResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, PreviewResponse, UsageResponse
+from .schemas import AccessResponse, CapabilitiesResponse, EntitlementsResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, UsageResponse
 
 
 @asynccontextmanager
@@ -39,8 +42,10 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Node Comics API", version="0.2.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务、普通与 PLUS 会员权益及周期页数额度。")
+app = FastAPI(title="Node Comics API", version="0.3.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务、普通与 PLUS 会员权益及周期页数额度。")
 app.include_router(queue_router)
+app.include_router(submission_router)
+app.include_router(cluster_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
 cfg = settings()
@@ -55,7 +60,7 @@ app.add_middleware(BodyLimitMiddleware)
 @app.middleware("http")
 async def request_guards(request: Request, call_next):
     length = request.headers.get("content-length", "")
-    if length.isdigit() and int(length) > settings().max_upload_bytes + 1024 * 1024:
+    if length.isdigit() and int(length) > (settings().cluster_max_result_bytes if request.url.path.startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024):
         return JSONResponse(status_code=413, content={"error": {"code": "IMAGE_TOO_LARGE", "message": "请求图片超过上传限制"}})
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -88,25 +93,6 @@ class StatusRequest(RequestBody):
     ids: list[str] = Field(min_length=1, max_length=100)
 
 
-class PreviewRequest(RequestBody):
-    asset_ids: list[str] = Field(min_length=1, max_length=100)
-    mode: Literal["redraw", "classic"]
-    target_language: str
-    regenerate: bool = False
-
-
-class BatchRequest(RequestBody):
-    preview_id: str
-    max_quota_pages: int = Field(ge=0, le=1_000_000)
-
-
-class RerunRequest(RequestBody):
-    preview_id: str
-    max_quota_pages: int = Field(ge=0, le=1_000_000)
-    acknowledge_unknown_cost: bool = False
-    input_asset_id: str | None = Field(default=None, max_length=36)
-
-
 def optional_identity(credentials=Depends(bearer), db: Session = Depends(get_db)):
     return identity(credentials, db) if credentials else None
 
@@ -114,7 +100,7 @@ def optional_identity(credentials=Depends(bearer), db: Session = Depends(get_db)
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"status": "ok", "service": "node-comics", "version": "0.2.0"}
+    return {"status": "ok", "service": "node-comics", "version": "0.3.0"}
 
 
 @app.get("/v1/auth/config")
@@ -165,23 +151,9 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": list(LANGUAGES)}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
-            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "max_active_jobs": cfg.max_active_jobs},
+            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": cfg.free_queue_capacity, "plus_queue_capacity": cfg.plus_queue_capacity},
             "entitlements": entitlements_json(db, user) if user else None,
             "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds}
-
-
-@app.post("/v1/images", status_code=201, response_model=AssetResponse)
-async def upload_image(image: Annotated[UploadFile, File()],
-                       file_hash: Annotated[str | None, Form(pattern=r"^[a-fA-F0-9]{64}$")] = None,
-                       page_index: Annotated[int | None, Form(ge=0, le=1_000_000)] = None,
-                       user: User = Depends(identity), db: Session = Depends(get_db)):
-    if (file_hash is None) != (page_index is None):
-        problem("INVALID_REQUEST", "文件 SHA-256 与原始页索引必须一起提供", 422)
-    data = await upload_bytes(image)
-    asset = (upload_file_page(db, user.id, data, FilePageIdentity(file_hash=file_hash, page_index=page_index))
-             if file_hash is not None else create_asset(db, user.id, data))
-    db.commit()
-    return asset_json(asset)
 
 
 @app.post("/v1/file-pages/match", response_model=FilePageMatches, response_model_exclude_unset=True)
@@ -192,7 +164,10 @@ def file_page_matches(body: FilePageMatchRequest, user: User = Depends(identity)
 @app.get("/v1/images/{asset_id}/access", response_model=AccessResponse)
 def image_access(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     asset = owned_asset(db, asset_id, user.id)
-    return access_json(asset)
+    result = access_json(asset)
+    record_user_access(db, asset)
+    db.commit()
+    return result
 
 
 @app.get("/v1/images/{asset_id}/content")
@@ -200,12 +175,18 @@ def image_content(asset_id: str, user: User = Depends(identity), db: Session = D
     asset = owned_asset(db, asset_id, user.id)
     extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}[asset.mime]
     if asset.storage_backend != "local":
-        return RedirectResponse(access_json(asset)["url"], status_code=307)
+        result = RedirectResponse(access_json(asset)["url"], status_code=307)
+        record_user_access(db, asset)
+        db.commit()
+        return result
+    record_user_access(db, asset)
+    db.commit()
     return FileResponse(object_path(asset.storage_key), media_type=asset.mime, filename=f"node-comics-{asset.id}.{extension}", content_disposition_type="inline")
 
 
 @app.delete("/v1/images/{asset_id}")
 def delete_image(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
+    lock_scheduler(db)
     asset = db.get(Asset, asset_id)
     if not asset or asset.owner_id != user.id:
         problem("NOT_FOUND", "找不到此图片", 404)
@@ -224,6 +205,7 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
         item.deleted_at = item.deleted_at or now()
     for job in affected_jobs:
         cancel_job(db, job)
+        touch_job(db, job)
         if asset.kind == 'original':
             state = db.get(ClassicState, job.id)
             if state:
@@ -239,45 +221,18 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
 @app.get('/v1/jobs/{job_id}/classic')
 def classic_details(job_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     job = owned_job(db, job_id, user.id)
-    owned_asset(db, job.input_asset_id, user.id)
     if job.mode != 'classic':
         problem('MODE_UNSUPPORTED', '此任务没有常规翻译数据', 422)
+    if not job.input_asset_id:
+        problem('INPUT_NOT_READY', '原图尚未上传并通过校验，请等待服务器受理', 409)
+    owned_asset(db, job.input_asset_id, user.id)
     state = db.get(ClassicState, job.id)
     if not state:
         return {'segments': [], 'translations': {}, 'artifacts': {}, 'timings': {}}
     return {'segments': (state.analysis or {}).get('segments', []), 'translations': state.translations,
             'unrecognized_regions': (state.analysis or {}).get('unrecognized_regions', []),
-            'artifacts': {name: value for name, value in state.artifacts.items() if available(db.get(Asset, value))},
+            'artifacts': {},
             'timings': state.timings}
-
-
-@app.post("/v1/translations/{mode}", status_code=202, response_model=JobResponse)
-async def translate(mode: Literal["redraw", "classic"], target_language: Annotated[str, Form()], asset_id: Annotated[str | None, Form()] = None,
-                    image: Annotated[UploadFile | None, File()] = None, idempotency_key: Annotated[str | None, Header()] = None,
-                    expected_kind: Annotated[str | None, Form()] = None,
-                    user: User = Depends(identity), db: Session = Depends(get_db)):
-    key = idem_key(idempotency_key)
-    if (image is None) == (asset_id is None):
-        problem("INVALID_REQUEST", "image 与 asset_id 必须且只能提供一个", 422)
-    image_data = await upload_bytes(image) if image else None
-    # DB lock waits must run off the event loop, so other failed requests can
-    # finish dependency cleanup and release their transactions promptly.
-    def submit():
-        asset = owned_asset(db, asset_id, user.id) if asset_id else create_asset(db, user.id, image_data)
-        try:
-            job = create_job(db, user, asset, mode, target_language, key, expected_kind=expected_kind)
-            db.commit()
-        except IntegrityError:
-            db.rollback()
-            # A concurrent duplicate may have won the unique request receipt.
-            from .providers import digest
-            job = job_for_request(db, user.id, f"translate:{mode}", key,
-                                  digest({"asset_hash": asset.sha256, "mode": mode, "language": target_language, "force": False,
-                                          **({"expected_kind": expected_kind} if expected_kind is not None else {})}))
-            if not job:
-                problem("REQUEST_CONFLICT", "任务创建遇到并发冲突，请用相同操作编号重试", 409)
-        return job_json(db, job, requested_asset_id=asset.id)
-    return await run_in_threadpool(submit)
 
 
 @app.post("/v1/jobs/status", response_model=JobsResponse)
@@ -307,71 +262,6 @@ def job_cancel(job_id: str, user: User = Depends(identity), db: Session = Depend
     return job_json(db, job)
 
 
-@app.post("/v1/jobs/{job_id}/rerun", status_code=202, response_model=JobResponse)
-def job_rerun(job_id: str, body: RerunRequest, idempotency_key: Annotated[str | None, Header()] = None, user: User = Depends(identity), db: Session = Depends(get_db)):
-    original = owned_job(db, job_id, user.id)
-    if original.status == "outcome_unknown" and not body.acknowledge_unknown_cost:
-        problem("UNKNOWN_COST_ACK_REQUIRED", "原请求可能已产生供应商消耗。确认后可主动创建新版本", 409)
-    asset = owned_asset(db, body.input_asset_id or original.input_asset_id, user.id)
-    previous_asset = db.get(Asset, original.input_asset_id)
-    if asset.kind != "original" or asset.sha256 != previous_asset.sha256:
-        problem("RERUN_SOURCE_MISMATCH", "重新翻译必须使用同一页的原图", 409)
-    job = create_job(db, user, asset, original.mode, original.target_language, idem_key(idempotency_key), operation=f"rerun:{original.id}", force=True, preview_id=body.preview_id, max_quota_pages=body.max_quota_pages)
-    db.commit()
-    return job_json(db, job)
-
-
-@app.post("/v1/translation-previews", status_code=201, response_model=PreviewResponse)
-def preview_create(body: PreviewRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
-    return preview_json(create_preview(db, user, body.asset_ids, body.mode, body.target_language, regenerate=body.regenerate))
-
-
-@app.post("/v1/translation-batches", status_code=202, response_model=BatchCreatedResponse)
-def batch_create(body: BatchRequest, idempotency_key: Annotated[str | None, Header()] = None, user: User = Depends(identity), db: Session = Depends(get_db)):
-    batch = create_batch(db, user, body.preview_id, body.max_quota_pages, idem_key(idempotency_key))
-    items = batch_rows(db, batch.id)
-    return {"id": batch.id, "status": batch_status([job for item, job in items]),
-            "jobs": [batch_item_json(db, item, job) for item, job in items], "quota_pages": batch.quota_pages}
-
-
-def batch_rows(db, batch_id):
-    return db.execute(select(BatchItem, Job).join(Job, Job.id == BatchItem.job_id)
-                      .where(BatchItem.batch_id == batch_id).order_by(BatchItem.ordinal)).all()
-
-
-def batch_item_json(db, item, job):
-    return {**job_json(db, job, requested_asset_id=item.input_asset_id, batch_id=item.batch_id, ordinal=item.ordinal),
-            "reused": job.cache_hit or job.batch_id != item.batch_id}
-
-
-def owned_batch(db, batch_id, owner_id):
-    batch = db.get(Batch, batch_id)
-    if not batch or batch.owner_id != owner_id:
-        problem("NOT_FOUND", "找不到此批次", 404)
-    return batch
-
-
-@app.get("/v1/translation-batches/{batch_id}", response_model=BatchResponse)
-def batch_get(batch_id: str, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(identity), db: Session = Depends(get_db)):
-    batch = owned_batch(db, batch_id, user.id)
-    items = batch_rows(db, batch.id)
-    return {"id": batch.id, "status": batch_status([job for item, job in items]),
-            "items": [batch_item_json(db, item, job) for item, job in items[offset:offset + limit]],
-            "total": len(items), "next_offset": offset + limit if offset + limit < len(items) else None, "quota_pages": batch.quota_pages}
-
-
-@app.post("/v1/translation-batches/{batch_id}/cancel")
-def batch_cancel(batch_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
-    batch = owned_batch(db, batch_id, user.id)
-    batch.cancel_requested = True
-    job_ids = select(BatchItem.job_id).where(BatchItem.batch_id == batch.id)
-    jobs = db.scalars(select(Job).where(Job.id.in_(job_ids), Job.owner_id == user.id).order_by(Job.id).with_for_update(key_share=True)).all()
-    for job in jobs:
-        cancel_job(db, job)
-    db.commit()
-    return {"id": batch.id, "status": batch_status(jobs), "cancel_requested": True}
-
-
 @app.get("/v1/me/usage", response_model=UsageResponse)
 def usage(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(identity), db: Session = Depends(get_db)):
     total = db.scalar(select(func.count()).select_from(Ledger).where(Ledger.owner_id == user.id))
@@ -383,3 +273,8 @@ def usage(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), us
 
 
 app.include_router(admin_router)
+
+
+@app.exception_handler(ProcessingError)
+async def processing_error(request, exc):
+    return JSONResponse(status_code=409 if exc.code == "LEASE_EXPIRED" else 422, content={"error": {"code": exc.code, "message": exc.message}})

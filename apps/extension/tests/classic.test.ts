@@ -1,28 +1,12 @@
 import {describe,expect,it,vi} from 'vitest';
 import {Api} from '../src/api';
-import {automaticScope} from '../src/reader/model';
+import {translationScope} from '../src/translation/store';
 
-describe('classic mode and budget boundaries',()=>{
-  it('invalidates in-flight automatic preparation across mode, language, account, service or copy changes',()=>{
-    const original=automaticScope('copy','alice','https://api.example','zh-Hans','classic');
-    for(const changed of [
-      automaticScope('copy','alice','https://api.example','zh-Hans','redraw'),
-      automaticScope('copy','alice','https://api.example','en','classic'),
-      automaticScope('copy','bob','https://api.example','zh-Hans','classic'),
-      automaticScope('copy','alice','https://other.example','zh-Hans','classic'),
-      automaticScope('other','alice','https://api.example','zh-Hans','classic'),
-    ])expect(changed).not.toBe(original);
-  });
-  it('quotes and submits the selected classic mode',async()=>{
-    const calls:{url:string;init:RequestInit}[]=[];
-    vi.stubGlobal('fetch',async(url:string,init:RequestInit)=>{calls.push({url,init});return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});});
-    try{
-      const api=new Api('https://api.example','test-token');
-      await api.preview(['original'],'classic','zh-Hans');
-      await api.create('original','classic','zh-Hans','same-operation');
-      expect(JSON.parse(calls[0].init.body as string).mode).toBe('classic');
-      expect(calls[1].url).toBe('https://api.example/v1/translations/classic');
-      expect((calls[1].init.body as FormData).get('target_language')).toBe('zh-Hans');
-    }finally{vi.unstubAllGlobals();}
-  });
+describe('independent mode submission contracts',()=>{
+ it('scopes durable manifests by account and service',()=>{expect(translationScope('https://a','alice')).not.toBe(translationScope('https://a','bob'));expect(translationScope('https://a','alice')).not.toBe(translationScope('https://b','alice'));});
+ it.each(['classic','redraw'] as const)('submits %s with an explicit finite consent and stable key',async mode=>{
+  const calls:{url:string;init:RequestInit}[]=[];
+  vi.stubGlobal('fetch',async(url:string,init:RequestInit)=>{calls.push({url,init});return Response.json({});});
+  try{await new Api('https://api.example','token').submit({mode,target_language:'zh-Hans',regenerate:false,max_quota_pages:1,items:[{client_item_id:'page',image_sha256:'a'.repeat(64),byte_size:4,content_type:'image/png',name:'1.png'}]},'stable-key');expect(calls[0].url).toBe('https://api.example/v1/translation-submissions');expect(JSON.parse(calls[0].init.body as string)).toMatchObject({mode,max_quota_pages:1});expect(calls[0].init.headers).toMatchObject({'Idempotency-Key':'stable-key'});}finally{vi.unstubAllGlobals();}
+ });
 });

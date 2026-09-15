@@ -11,7 +11,7 @@ export function entitlementDescription(rights:ModeEntitlement|undefined, mode:Mo
 export function EntitlementCards({data}:{data?:Entitlements}) {
   if(!data)return <p className="nc-loading">正在读取会员权益…</p>;
   return <section aria-label="会员权益与翻译额度">
-    <div className="nc-section-heading"><h2>{data.plan==='plus'?'PLUS 会员':'普通用户'}</h2><span>账户并发 {data.concurrency} · 所有设备共用</span></div>
+    <div className="nc-section-heading"><h2>{data.plan==='plus'?'PLUS 会员':'普通用户'}</h2><span>每模式容量 {data.queue_capacity} 页 · 实时 {data.realtime_slots} 页</span></div>
     {data.plan==='plus'&&data.plus_expires_at&&<p className="nc-muted">会员有效至 {new Date(data.plus_expires_at).toLocaleString()} · 重绘额度按会员月刷新，剩余不累积</p>}
     <div className="nc-stat-grid nc-entitlements-grid">{(['classic','redraw'] as const).map(mode=>{
       const rights=data.modes[mode],quota=rights.quota;

@@ -2,7 +2,9 @@
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
-2026-09-15：普通用户每日 100 页常规翻译，PLUS 常规不限量、每会员月 300 页重绘，剩余不累积，年付逐月发放；两档并发均为 2。已实现限时常规／重绘赠送，重绘赠送可给普通用户临时权限。旧点数逻辑已移除，使用全新数据库基线。详见[规则](docs/MEMBERSHIP_AND_QUOTAS.md)与[实现验收](docs/MEMBERSHIP_IMPLEMENTATION.md)，运行服务尚需单独切换。
+2026-09-15：已完成双模式持久队列和集群阶段调度重构。每种模式分别提供普通 10／PLUS 500 页在途容量，实时名额普通 2／PLUS 10；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
+
+会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `cluster_0001` 数据库。
 
 2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在预算内自动重试。常规模式已基于[开源方案与成本调研](docs/CLASSIC_TRANSLATION_RESEARCH.md)实现，启动与验证见[常规翻译运行说明](docs/CLASSIC_IMPLEMENTATION.md)。
 
@@ -12,13 +14,13 @@
 
 作品详情页支持[导出漫画](docs/COMIC_EXPORT_DESIGN.md)：按副本生成 CBZ、图片 ZIP 或 PDF，原图与译图分别成册，未译页可用原图补齐。导出前检查缺页和范围，多份结果打包下载。
 
-本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后端按用户轮转并限制每用户同时占用的执行名额，多个批次与翻译模式共用该用户限额。详见[运行与实现](docs/IMPLEMENTATION.md#文件匹配与并发)。
+本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后台按每模式容量、阅读优先级和用户权重独立调度。
 
 ## 本地运行
 
 启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，并按常规翻译说明配置文本接口。
 
-环境：Docker Desktop、Node.js 22、npm；在 `.env` 填图片模型配置，模板见 [.env.example](.env.example)。
+环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2、文本与图片模型配置，模板见 [.env.example](.env.example)。
 
 ```powershell
 ./scripts/bootstrap.ps1 -Start
@@ -27,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-阅读器：[本地预览](http://127.0.0.1:5173)，API：[接口文档](http://127.0.0.1:18088/docs)。默认本地测试登录，Docker 数据与其他项目隔离。公开环境必须关闭 DEV_AUTH 并配置 OIDC。
+阅读器：[本地预览](http://127.0.0.1:5173)，API：[接口文档](http://127.0.0.1:18088/docs)。登录配置位于 `deploy/.env.local`，Docker 新集群卷与旧实例隔离；端口被占用时修改 `API_PORT`。公开环境必须关闭 DEV_AUTH 并配置 OIDC。
 
 ```powershell
 npm run check
@@ -44,6 +46,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | --- | --- |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
 | [会员与翻译额度设计](docs/MEMBERSHIP_AND_QUOTAS.md) | 普通／PLUS 已实现规则、会员月额度、限时赠送与旧计费替换范围 |
+| [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) | 已实现：每模式 10/500 在途、2/10 实时、双队列、可配置权重、公平借用、R2 长期保留与多机计算 |
 | [通用漫画作品管理设计](docs/COMIC_LIBRARY_DESIGN.md) | 已确认；作品、章节、出版套系、卷册、收录关系与来源副本，首轮已实现 |
 | [MangaCopy 来源适配与导入设计](docs/MANGACOPY_LIBRARY_DESIGN.md) | 已实现详情页范围导入、JS 图片清单与有序采集，映射通用作品模型 |
 | [阅读目录与插件译本](docs/READER_DIRECTORY_AND_EDITIONS.md) | 整部作品目录、已有翻译的派生阅读视图与有序采集 |

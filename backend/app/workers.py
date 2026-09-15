@@ -1,193 +1,335 @@
-"""Durable job execution. A committed call intent forbids automatic paid-call replay."""
+"""Fenced stage completion and bounded control-side upload/text/redraw executors."""
+import base64
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from fastapi import HTTPException
+import hmac
+import re
 from threading import Event, Thread
-from celery import Celery
-from sqlalchemy import func, select, update
+import time
+from sqlalchemy import select
 from .adapters.images import redraw
-from .classic import run_classic, requeue_local
 from .assets import available, create_asset, inspect_image, read_asset
-from .storage import StorageError
+from .classic import run_text_stage, validate_analysis, validate_render
 from .config import settings
-from .db import session_factory
-from .errors import ProcessingError
+from .db import initialize, session_factory
+from .errors import ProcessingError, problem
 from .jobs import settle
-from .models import Asset, Attempt, Job, Provider, now, uid
-from .queue_models import QueueAdmission
-from .scheduler import concurrency_for, lock_scheduler, release_admission
-
-celery_app = Celery("node_comics", broker=settings().redis_url)
-celery_app.conf.update(task_serializer="json", accept_content=["json"], result_serializer="json", task_ignore_result=True,
-                       task_acks_late=True, task_reject_on_worker_lost=True, worker_prefetch_multiplier=1,
-                       broker_connection_retry_on_startup=True, broker_transport_options={"visibility_timeout": 7200},
-                       task_routes={"app.workers.process_job": {"queue": "redraw"}})
+from .models import Asset, Attempt, ClassicState, Job, Provider, now
+from .providers import digest
+from .queue_models import ComputeNode, ExecutionLease, JobStage
+from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler, release_lease, touch_job
+from .storage import StorageError, get_store
 
 
-def lease_duration(job):
-    seconds = job.config.get("provider", job.config).get("timeout_seconds", 900)
-    return timedelta(seconds=seconds + 180)
+def _scoped(lease, token, node_id):
+    if not lease or (token is not None and not hmac.compare_digest(lease.token, token)) or (node_id is not None and lease.node_id != node_id):
+        problem("NODE_SCOPE_MISMATCH", "执行授权与节点不匹配", 403)
 
 
-def heartbeat(job_id, attempt_id, stopped):
-    while not stopped.wait(20):
-        try:
-            with session_factory()() as db:
-                job = db.get(Job, job_id)
-                if not job or job.attempt_id != attempt_id or job.status != "running":
-                    return
-                db.execute(update(Attempt).where(Attempt.id == attempt_id).values(heartbeat_at=now(), lease_expires_at=now() + lease_duration(job)))
-                db.commit()
-        except Exception:
-            # The committed intent and lease recovery retain the unknown state if DB is unavailable.
-            continue
+def _finished(db, lease_id, token, node_id, result_hash=None):
+    lease = db.get(ExecutionLease, lease_id)
+    _scoped(lease, token, node_id)
+    if lease.completed_at:
+        if result_hash is not None and lease.outcome == "succeeded" and lease.result_hash == result_hash:
+            return True
+        if lease.outcome in {"failed", "cancelled"} and result_hash is None:
+            return True
+        raise ProcessingError("LEASE_EXPIRED", "此执行代次已结束，不能提交其他结果")
+    return False
 
 
-def claim(job_id, admission_token=None):
-    if not admission_token:
-        return None
+def finish_job(db, job, status, *, error=None):
+    job.status, job.phase, job.completed_at = status, "completed" if status in {"succeeded", "no_text"} else status, now()
+    job.error_code, job.error_message = (error.code, error.message) if error else (None, None)
+    for stage in db.scalars(select(JobStage).where(JobStage.job_id == job.id, JobStage.status.in_(["waiting", "ready"]))):
+        stage.status = "cancelled"
+    if job.attempt_id:
+        db.get(Attempt, job.attempt_id).completed_at = now()
+    settle(db, job, success=status == "succeeded" and "unrecognized_regions" not in (job.quality_flags or []))
+
+
+def complete_stage(lease_id, result, *, token=None, node_id=None):
+    result_hash = digest(result)
     with session_factory()() as db:
         lock_scheduler(db)
-        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
-        if not job or job.status != "queued":
-            return None
-        admission = db.get(QueueAdmission, job_id)
-        if admission is None or admission.token != admission_token:
-            return None
-        if job.cancel_requested or job.discard_output:
-            job.status, job.phase, job.completed_at = "cancelled", "cancelled", now()
-            settle(db, job, success=False)
-            release_admission(db, job.id)
-            db.commit()
-            return None
-        running = db.scalar(select(func.count()).select_from(Job).where(Job.owner_id == job.owner_id, Job.status == "running"))
-        if running >= concurrency_for(db, job.owner_id):
-            return None
-        provider_id = job.config["provider"]["id"]
-        if job.mode == "redraw":
-            provider = db.scalar(select(Provider).where(Provider.id == provider_id).with_for_update())
-            if not provider or not provider.enabled:
-                job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True).execution_options(populate_existing=True))
-                if job.status == "queued":
-                    job.status, job.phase, job.completed_at = "failed", "failed", now()
-                    job.error_code, job.error_message = "PROVIDER_DISABLED", "管理员已停用此图片编辑服务，请重新选择服务"
-                    settle(db, job, success=False)
-                    db.commit()
-                return None
-            running = db.scalar(select(func.count()).select_from(Attempt).join(Job, Job.attempt_id == Attempt.id).where(Attempt.provider_id == provider_id, Job.status == "running"))
-            if running >= job.config["provider"]["concurrency"]:
-                return None
-        attempt_id = uid()
-        updated = db.execute(update(Job).where(Job.id == job_id, Job.status == "queued").values(status="running", phase="preprocessing", attempt_id=attempt_id))
-        if updated.rowcount != 1:
-            db.rollback()
-            return None
-        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id=provider_id, lease_expires_at=now() + lease_duration(job),
-                       output_storage_backend=settings().result_storage_backend))
-        db.commit()
-        return attempt_id
-
-
-def finish_error(job_id, attempt_id, error):
-    with session_factory()() as db:
-        job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
-        attempt = db.get(Attempt, attempt_id)
-        if not job or job.attempt_id != attempt_id or job.status not in ("running", "outcome_unknown"):
+        if _finished(db, lease_id, token, node_id, result_hash):
             return
-        job.error_code, job.error_message = error.code, error.message
-        attempt.error_code, attempt.request_id, attempt.completed_at = error.code, error.request_id, now()
-        if error.usage is not None:
-            attempt.usage, attempt.cost_state = error.usage, "reported"
-        if error.unknown:
-            job.status, job.phase, job.unknown_since = "outcome_unknown", "reconciliation", now()
-        else:
-            job.status = "cancelled" if job.cancel_requested or job.discard_output else "failed"
-            job.phase, job.completed_at = job.status, now()
-            settle(db, job, success=False)
+        lease, stage, job = current_lease(db, lease_id, token)
+        # Freeze the accepted payload before any output PUT. Concurrent retries
+        # with the same bytes are safe; a conflicting reply must never overwrite
+        # the object that a previous completion has already delivered.
+        if lease.result_hash is not None and lease.result_hash != result_hash:
+            raise ProcessingError("COMPLETION_CONFLICT", "此执行代次已经接收了另一份阶段结果")
+        lease.result_hash = result_hash
+        name, owner_id, input_id, attempt_id, mode = stage.name, job.owner_id, job.input_asset_id, job.attempt_id, job.mode
+        source = db.get(Asset, input_id) if input_id else None
+        config = job.config
+        backend = db.get(Attempt, attempt_id).output_storage_backend
+        db.commit()
+    # Image decoding, object reads and PUTs hold neither row nor scheduler locks.
+    if name in {"analyze", "inpaint", "render"}:
+        if result.get("input_hash") != source.sha256 or result.get("version") != config["engine"]["version"]:
+            raise ProcessingError("ENGINE_RESULT_MISMATCH", "图像结果与输入或引擎版本不一致")
+    image, info = None, None
+    if name == "analyze":
+        validate_analysis(result, source.width, source.height)
+    elif name == "inpaint":
+        if not isinstance(result.get("cache_key"), str) or not re.fullmatch(r"[a-f0-9]{64}", result["cache_key"]):
+            raise ProcessingError("INVALID_ENGINE_RESULT", "抹字缓存标识无效")
+    elif name == "render":
+        image = validate_render(read_asset(source), result)
+    elif name == "redraw":
+        image = base64.b64decode(result["image"], validate=True)
+    if image is not None:
+        info = inspect_image(image, output=True)
+        ratio = (info["width"] / info["height"]) / (source.width / source.height)
+        if (mode == "classic" and (info["width"], info["height"]) != (source.width, source.height)) or not .8 <= ratio <= 1.25:
+            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")
+        # Each generation has its own output key; late uploads cannot overwrite
+        # the object selected by a replacement lease.
+        get_store(backend).put(f"{owner_id}/{lease_id}", image, info["mime"], kind=mode)
+    with session_factory()() as db:
+        lock_scheduler(db)
+        if _finished(db, lease_id, token, node_id, result_hash):
+            return
+        lease, stage, job = current_lease(db, lease_id, token)
+        state = db.get(ClassicState, job.id) if mode == "classic" else None
+        if name == "analyze":
+            state.analysis, state.timings = result, result.get("timings", {})
+            if not result["segments"]:
+                finish_job(db, job, "no_text")
+            else:
+                for nxt in db.scalars(select(JobStage).where(JobStage.job_id == job.id, JobStage.name.in_(["text", "inpaint"]))):
+                    nxt.status = "ready"
+        elif name == "inpaint":
+            state.artifacts = {"cache_key": result["cache_key"], "node_id": lease.node_id}
+            state.timings = {**state.timings, **result.get("timings", {})}
+        elif name in {"render", "redraw"}:
+            if not available(db.get(Asset, input_id)):
+                raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
+            output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
+                stable_id=lease_id, storage_backend=backend, prewritten=True, verified_info=info)
+            job.output_asset_id = output.id
+            job.quality_flags = (state.analysis or {}).get("quality_flags", []) if state else result.get("quality_flags", [])
+            if abs(ratio - 1) > .03:
+                job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]
+            if state:
+                state.timings = {**state.timings, **result.get("timings", {})}
+            finish_job(db, job, "succeeded")
+            if name == "redraw":
+                provider = db.get(Provider, job.config["provider"]["id"])
+                if provider and provider.config == job.config["provider"]:
+                    provider.validated_at, provider.validation_job_id = now(), job.id
+        stage.status, stage.completed_at = "succeeded", now()
+        lease.result_hash = result_hash
+        release_lease(db, lease, "succeeded")
+        if name in {"text", "inpaint"} and job.status == "running":
+            statuses = {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
+            if statuses.get("text") == statuses.get("inpaint") == "succeeded":
+                db.scalar(select(JobStage).where(JobStage.job_id == job.id, JobStage.name == "render")).status = "ready"
+        touch_job(db, job)
         db.commit()
 
 
-@celery_app.task(name="app.workers.process_job", acks_late=True)
-def process_job(job_id: str, admission_token: str | None = None):
-    attempt_id = claim(job_id, admission_token)
-    if not attempt_id:
-        return
+def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
+    with session_factory()() as db:
+        lock_scheduler(db)
+        if _finished(db, lease_id, token, node_id):
+            return
+        lease = db.get(ExecutionLease, lease_id)
+        stage, job = db.get(JobStage, lease.stage_id), db.get(Job, lease.job_id)
+        if recovering and lease.expires_at > now():
+            return  # A heartbeat committed after maintenance's initial snapshot.
+        if stage.generation != lease.generation:
+            raise ProcessingError("LEASE_EXPIRED", "执行代次已更新")
+        if job.status not in {"running", "outcome_unknown"}:
+            stage.status = "cancelled"
+            release_lease(db, lease, "cancelled")
+            db.commit()
+            return
+        if not recovering and not job.cancel_requested and not job.discard_output:
+            current_lease(db, lease_id, token)
+        attempt = db.get(Attempt, job.attempt_id)
+        if recovering and stage.name == "redraw" and attempt.call_started_at is not None:
+            # Re-read the call intent under the scheduler lock; a maintenance
+            # snapshot taken before its commit cannot authorize another request.
+            error = ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "图片调用已开始，等待核实供应商结果", unknown=True)
+        retryable = stage.name in {"analyze", "inpaint", "render", "validate_upload", "text"} and error.code in {
+            "CLASSIC_ENGINE_UNAVAILABLE", "CLASSIC_ANALYZE_FAILED", "CLASSIC_INPAINT_FAILED", "CLASSIC_RENDER_FAILED",
+            "STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED", "ENGINE_UNAVAILABLE"}
+        if stage.name == "redraw" and attempt.call_started_at is None:
+            retryable = error.code in {"STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED"}
+        if job.cancel_requested or job.discard_output:
+            finish_job(db, job, "cancelled")
+            stage.status = "cancelled"
+        elif error.unknown and stage.name == "redraw":
+            job.status, job.phase, job.unknown_since = "outcome_unknown", "reconciliation", now()
+            job.error_code, job.error_message = error.code, error.message
+            stage.status = "unknown"
+        elif retryable and stage.attempts < settings().cluster_stage_attempts:
+            stage.status, stage.available_at = "ready", now() + timedelta(seconds=min(30, stage.attempts * 2))
+            job.phase = "recovering_" + stage.name
+        else:
+            finish_job(db, job, "failed", error=error)
+            stage.status = "failed"
+        release_lease(db, lease, "cancelled" if job.cancel_requested else "failed")
+        touch_job(db, job)
+        db.commit()
+
+
+def _heartbeat(lease_id, token, stopped):
+    while not stopped.wait(max(1, settings().cluster_lease_seconds // 3)):
+        try:
+            with session_factory()() as db:
+                heartbeat_lease(db, lease_id, token)
+                db.commit()
+        except Exception:
+            return
+
+
+def finish_stopped_lease(lease_id, token=None, node_id=None):
+    """A returned call no longer consumes a slot after user/sibling termination.
+
+    This is intentionally separate from normal completion: current_lease rejects
+    cancelled jobs, but only the still-matching generation may clear its slot.
+    """
+    with session_factory()() as db:
+        lock_scheduler(db)
+        lease = db.get(ExecutionLease, lease_id)
+        _scoped(lease, token, node_id)
+        if lease.completed_at:
+            return
+        stage, job = db.get(JobStage, lease.stage_id), db.get(Job, lease.job_id)
+        if stage.generation != lease.generation:
+            return
+        if not job.cancel_requested and not job.discard_output and job.status in {"running", "outcome_unknown"}:
+            return
+        if job.status in {"running", "outcome_unknown"}:
+            finish_job(db, job, "cancelled")
+        stage.status = "cancelled"
+        release_lease(db, lease, "cancelled")
+        touch_job(db, job)
+        db.commit()
+
+
+def run_control_stage(lease_id):
+    with session_factory()() as db:
+        lease, stage, job = current_lease(db, lease_id)
+        name, token, job_id = stage.name, lease.token, job.id
     stopped = Event()
-    thread = Thread(target=heartbeat, args=(job_id, attempt_id, stopped), daemon=True)
+    thread = Thread(target=_heartbeat, args=(lease_id, token, stopped), daemon=True)
     thread.start()
     try:
-        with session_factory()() as db:
-            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
-            attempt = db.get(Attempt, attempt_id)
-            if job.attempt_id != attempt_id or job.status != "running" or not attempt or attempt.lease_expires_at <= now():
-                return
-            asset = db.get(Asset, job.input_asset_id)
-            if not available(asset) or job.discard_output or job.cancel_requested:
-                raise ProcessingError("ASSET_EXPIRED", "原图已删除、过期或任务已取消")
-            data = read_asset(asset)
-            mime, language, config, mode = asset.mime, job.target_language, job.config, job.mode
-            if mode == "redraw":
+        if name == "validate_upload":
+            from .upload_models import UploadReservation
+            from .uploads import complete_upload
+            from .submission_api import bind_file_page
+            with session_factory()() as db:
+                reservation = db.scalar(select(UploadReservation).where(UploadReservation.job_id == job_id))
+                complete_upload(db, reservation, reservation.owner_id, lease_id=lease_id, lease_token=token)
+                lease = db.get(ExecutionLease, lease_id)
+                stage = db.get(JobStage, lease.stage_id)
+                job = db.get(Job, job_id)
+                if job.input_asset_id:
+                    bind_file_page(db, job)
+                stage.status, stage.completed_at = ("succeeded" if job.input_asset_id else "failed"), now()
+                release_lease(db, lease, stage.status)
+                touch_job(db, job)
+                db.commit()
+        elif name == "text":
+            result = run_text_stage(job_id, lease_id)
+            complete_stage(lease_id, result or {}, token=token)
+        elif name == "redraw":
+            with session_factory()() as db:
+                _, _, job = current_lease(db, lease_id, token)
+                source = db.get(Asset, job.input_asset_id)
+                data, mime, config, language, attempt_id = read_asset(source), source.mime, job.config, job.target_language, job.attempt_id
+            with session_factory()() as db:
+                lock_scheduler(db)
+                current_lease(db, lease_id, token)
+                attempt = db.get(Attempt, attempt_id)
+                if attempt.call_started_at:
+                    raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "此调用已开始，不能自动重发", unknown=True)
                 attempt.call_started_at = now()
-                job.phase = "calling_image_model"
-            db.commit()  # Write-ahead intent: after this point a crash means unknown, never replay.
-        result = run_classic(job_id, attempt_id, data, language, config) if mode == "classic" else redraw(data, mime, language, config)
-        # Preserve provider consumption before output validation, storage or settlement can fail.
-        with session_factory()() as db:
-            attempt = db.get(Attempt, attempt_id)
-            attempt.request_id, attempt.usage = result.request_id, result.usage
-            attempt.cost_state = "reported" if result.usage is not None else "unknown"
-            db.commit()
-        with session_factory()() as db:
-            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
-            attempt = db.get(Attempt, attempt_id)
-            if job.attempt_id != attempt_id or job.status not in ("running", "outcome_unknown"):
-                return
-            attempt.request_id, attempt.usage = result.request_id, result.usage
-            attempt.cost_state = "reported" if result.usage is not None else "unknown"
-            attempt.completed_at = now()
-            asset = db.get(Asset, job.input_asset_id)
-            if job.discard_output or job.cancel_requested or not available(asset):
-                job.status, job.phase, job.completed_at = "cancelled", "cancelled", now()
-                settle(db, job, success=False)
-            elif result.no_text:
-                job.status, job.phase, job.completed_at = "no_text", "completed", now()
-                settle(db, job, success=False)
-            else:
-                job.phase = "validating"
-                info = inspect_image(result.image, output=True)
-                ratio_change = (info["width"] / info["height"]) / (asset.width / asset.height)
-                if (mode == 'classic' and (info['width'], info['height']) != (asset.width, asset.height)) or ratio_change < 0.8 or ratio_change > 1.25:
-                    raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果宽高比偏离原图过多，未交付且不扣用户额度", request_id=result.request_id)
-                output = create_asset(db, job.owner_id, result.image, kind=job.mode, parent_id=asset.id, stable_id=attempt_id,
-                                      storage_backend=attempt.output_storage_backend)
-                job.output_asset_id = output.id
-                job.quality_flags = (result.quality_flags or []) + (["aspect_ratio_changed"] if abs(ratio_change - 1) > 0.03 else [])
-                job.status, job.phase, job.completed_at = "succeeded", "completed", now()
-                job.error_code, job.error_message = None, None
-                settle(db, job, success='unrecognized_regions' not in job.quality_flags)
-                if mode == "redraw":
-                    provider = db.get(Provider, config["provider"]["id"])
-                    if provider and provider.config == config["provider"]:
-                        provider.validated_at, provider.validation_job_id = now(), job.id
-            db.commit()
+                db.commit()
+            result = redraw(data, mime, language, config)
+            with session_factory()() as db:
+                lock_scheduler(db)
+                attempt = db.get(Attempt, attempt_id)
+                attempt.request_id, attempt.usage = result.request_id, result.usage
+                attempt.cost_state = "reported" if result.usage is not None else "unknown"
+                db.commit()
+            complete_stage(lease_id, {"image": base64.b64encode(result.image).decode(), "quality_flags": result.quality_flags or []}, token=token)
+    except HTTPException as error:
+        detail = error.detail if isinstance(error.detail, dict) else {}
+        code = detail.get("code", "STAGE_REQUEST_REJECTED")
+        message = detail.get("message", "阶段请求不符合任务约束")
+        fail_stage(lease_id, ProcessingError(code, message), token=token)
     except StorageError:
-        # PUT can succeed before a connection loss. Recover the same key without
-        # reissuing a paid image request because storage is unavailable.
+        # Keep a possibly uploaded output for maintenance reconciliation.
         with session_factory()() as db:
-            job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
-            if job and job.attempt_id == attempt_id and job.status == "running":
-                job.error_code, job.error_message = "STORAGE_UNAVAILABLE", "图片存储暂时不可用，等待恢复已保存的结果"
-                db.get(Attempt, attempt_id).lease_expires_at = now()
+            lock_scheduler(db)
+            lease = db.get(ExecutionLease, lease_id)
+            if lease and not lease.completed_at:
+                lease.expires_at = now()
                 db.commit()
     except ProcessingError as error:
-        if not (locals().get('mode') == 'classic' and requeue_local(job_id, attempt_id, error)):
-            finish_error(job_id, attempt_id, error)
+        if error.code == "LEASE_EXPIRED":
+            finish_stopped_lease(lease_id, token)
+        elif error.code != "COMPLETION_CONFLICT":
+            if name == "redraw":
+                with session_factory()() as db:
+                    lock_scheduler(db)
+                    job = db.get(Job, job_id)
+                    attempt = db.get(Attempt, job.attempt_id)
+                    if error.usage is not None:
+                        attempt.usage, attempt.cost_state = error.usage, "reported"
+                    attempt.request_id, attempt.error_code = error.request_id, error.code
+                    db.commit()
+            fail_stage(lease_id, error, token=token)
     except Exception:
-        # No exception body is logged: it may contain provider URLs, OCR text or credentials.
-        if locals().get('mode') == 'classic':
-            error = ProcessingError('CLASSIC_LOCAL_INTERRUPTED', '常规翻译执行中断，已保存的译文可用于恢复')
-            if not requeue_local(job_id, attempt_id, error):
-                finish_error(job_id, attempt_id, error)
-        else:
-            finish_error(job_id, attempt_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "任务执行中断，结果待核实；不会自动重复请求", unknown=True))
+        unknown = False
+        if name == "redraw":
+            with session_factory()() as db:
+                attempt = db.get(Attempt, db.get(Job, job_id).attempt_id)
+                unknown = attempt.call_started_at is not None
+        fail_stage(lease_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN" if unknown else "CLASSIC_LOCAL_INTERRUPTED",
+            "执行中断，已保存检查点供恢复", unknown=unknown), token=token)
     finally:
         stopped.set()
         thread.join(timeout=1)
+
+
+def main():
+    initialize()
+    cfg = settings()
+    pools = {"text": cfg.cluster_text_slots, "redraw": cfg.cluster_redraw_slots, "validate_upload": cfg.cluster_upload_slots}
+    with session_factory()() as db:
+        lock_scheduler(db)
+        for name, capacity in pools.items():
+            node_id = "control-" + name
+            node = db.get(ComputeNode, node_id)
+            if not node:
+                db.add(ComputeNode(id=node_id, name=node_id, resource_id=node_id, capabilities=[name], capacity=capacity,
+                    engine_version="control", device="network", enabled=True))
+            else:
+                node.capacity, node.enabled = capacity, True
+        db.commit()
+    with ThreadPoolExecutor(max_workers=sum(pools.values()), thread_name_prefix="translation") as executor:
+        futures = set()
+        while True:
+            futures = {future for future in futures if not future.done()}
+            for name in pools:
+                if len(futures) >= sum(pools.values()):
+                    break
+                with session_factory()() as db:
+                    lease = claim_stage(db, "control-" + name, [name])
+                    db.commit()
+                if lease:
+                    futures.add(executor.submit(run_control_stage, lease.id))
+            time.sleep(.25)
+
+
+if __name__ == "__main__":
+    main()

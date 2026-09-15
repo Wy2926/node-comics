@@ -37,7 +37,8 @@ def get_db():
 def initialize():
     from . import models  # noqa: F401
     from . import queue_models  # noqa: F401
-    from . import batch_items  # noqa: F401
+    from . import job_requests  # noqa: F401
+    from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

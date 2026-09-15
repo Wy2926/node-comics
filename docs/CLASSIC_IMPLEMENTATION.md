@@ -1,80 +1,45 @@
 # 常规翻译运行说明
 
-2026-09-14 实现：`classic` 与原有 `redraw` 并存。常规模式复用 manga-image-translator 固定提交的检测、48px OCR、LaMa Large 和字体渲染模块；Node Comics 管理文本接口、持久化任务、预算和用户权限。模型列表和小型文本请求已连通用户提供的兼容网关，使用 `gpt-5.6-luna`、`POST /v1/chat/completions`。没有用图片编辑模型执行常规翻译。
-
-2026-09-15 更新：LaMa 改为文字区域裁切推理，单块输入上限 512，背景边距 48 像素，合并间距 24 像素。OCR 后文本翻译与局部擦字并行，两路完成后嵌字；清理图单独保存为本地检查点。当前引擎版本为 `mit-95227a2-classic-v3-parallel`。已完成代码、隔离验证和本地 Docker 服务切换；API、调度器、两类 worker 及引擎运行新版，实际 HTTP 图像步骤与无字页任务链路检查通过，未新增付费文本调用。详见[局部擦字与单页并行](CLASSIC_LOCAL_INPAINTING.md)和[切换记录](evidence/classic-deployment.json)。
+2026-09-15：常规改为可独立部署的阶段计算节点。客户端统一使用[提交清单与双队列](TRANSLATION_CLUSTER_DESIGN.md)；原图和译图存私有 R2，中间图仅节点有界内存缓存。引擎版本 `mit-95227a2-classic-v4-cluster`，模型、字体和权重版本未升级。
 
 ## 启动
 
-Docker Desktop 使用 Linux 容器；首次启动需要下载 CPU 推理依赖与模型。API、数据库与引擎各自使用本项目容器和数据卷。引擎没有宿主机端口，不获得文本或图片供应商密钥。
-
-在根目录 `.env` 配置以下内容（不要提交密钥）：
-
-```dotenv
-CLASSIC_ENABLED=true
-FREE_DAILY_PAGES=100
-TEXT_BASE_URL=https://sub2api.nodelane.net/v1
-TEXT_API_KEY=自行填写
-TEXT_MODEL=gpt-5.6-luna
-TEXT_PROTOCOL=openai_chat
-```
+在 `.env` 填写 `CLASSIC_ENABLED=true`、`TEXT_BASE_URL`、`TEXT_API_KEY`、`TEXT_MODEL` 和私有 R2 配置，再运行：
 
 ```powershell
 ./scripts/bootstrap.ps1 -Start -Classic
-cd apps/extension
-npm ci
-npm run dev
 ```
 
-阅读器：[http://127.0.0.1:5173](http://127.0.0.1:5173)。登录本地测试账号，导入图片或原创示例，在“翻译方式”选“常规翻译”，常规单页直接提交，批量确认页数。普通用户每日 100 页常规，PLUS 常规不限量；重绘使用会员月或有效赠送额度。用户页数与供应商人民币成本分别记录。
+控制服务为 API/control-worker/maintenance；每台图像设备运行 compute-agent 和常驻 classic-engine。跨机器只通过认证 HTTPS API 通信；同机引擎无公开端口、不持有文本密钥。CPU/CUDA、第二台机器、稳定资源 ID 和锁目录见[节点部署](../services/compute-agent/README.md)。
 
-后续 Compose 命令都带两个环境文件与 profile：
+## 阶段与恢复
 
-```powershell
-docker compose --env-file .env --env-file deploy/.env.local --profile classic ps
-docker compose --env-file .env --env-file deploy/.env.local --profile classic up -d --build
-```
+1. analyze 检测和 OCR，将分块文字、置信标记和有界遮罩检查点写入数据库，释放图像租约。
+2. text 调用 LLM，与 inpaint LaMa 局部抹字并行。文本等待期间图像设备可服务其他页面；每个文本调用独立记录预算、用量、请求标识和未知消耗。
+3. 两路完成后 render 嵌字。清理图缓存丢失或换节点时重新执行本地抹字，不重发已成功文本调用。
+4. 输出核验尺寸、允许区域外像素及有效租约，写 R2 后结算。空白页 no_text 不消耗页数，明确失败释放预占；部分识别保留原文并标记。
 
-`deploy/.env.local` 自动生成数据库密码、登录签名密钥和引擎令牌。引擎健康后 classic worker 才启动；首次模型下载时间不代表热启动单页耗时。`redraw-worker` 与 `classic-worker` 消费独立队列，常规并发默认 1，CPU 推理默认 4 线程。停止服务保留数据卷即可，不要在已开始的图片重绘调用中强制结束 worker。
-
-## 已实现的处理与恢复
-
-1. 校验原图、模式和目标语言，通过同一套报价／批次入口预占用户点数。
-2. 独立引擎检测文字、执行 OCR、合并排序文字行、精化文字像素掩膜。未检测到文字返回 `no_text`，不请求文本服务且释放点数；检测到文字但 OCR 全部失败则报错。部分检测区域没有可靠识别时保留对应原文区域，并将输出标为部分完成、不扣用户点数。
-3. OCR 完成后同时启动文本翻译和局部擦字。文本一路把有序文本块按 UTF-8 大小分组、依次调用，只发送文本、固定 ID 和目标语言。目标响应须包含全部且唯一的 ID，拒绝缺块、空白、额外字段和截断；有限代码围栏在本地去除。
-4. 每次调用前锁定任务、检查有效执行权并提交一条 TextCall，先占用整次请求的成本上界。成功译文与该次用量一起提交；网络错误和格式错误共用每组最多 3 次调用。
-5. 擦字一路根据文字掩膜合并邻近区域、保留背景边距后裁切，LaMa 逐块推理；超大区域继续切分，不自动回退整页推理。每块读取原图，只贴回归属该块的文字掩膜像素。清理图先验证并存为本地检查点；两路成功后才调用嵌字步骤，保存擦除掩膜、字形掩膜和最终图。检查 PNG 解码、原尺寸与允许区域外的 RGB 像素一致性，保留源图 alpha。
-6. 合格译图作为独立模式／语言／版本的私有资产交付，用户点数结算一次。检测或本地渲染异常最多恢复 3 次；租约过期可重新投递。已保存的 OCR、译文和渲染结果可以复用，文本调用历史及预算不会重置。
-
-取消或删除会在阶段边界停止后续调用；已经发出的文本请求仍保留消耗记录。旧执行进程的晚到回复只更新自身用量，不覆盖新执行进程的译文或清理图。文本一路失败时等待已经启动的本地擦字退出后再结束任务；擦字失败后停止新文本组及后续文本重试，已发出调用仍记账并保存有效译文，供本地恢复复用。嵌字失败可复用两路检查点。文本预算耗尽返回普通失败，用户点数释放，未知供应商成本仍保留。`redraw` 的未知结果继续禁止自动重发。
-
-所有处理中间数据继承原图的账户隔离、到期与删除规则。OCR 和译文存在私有数据库检查点，不进入日志；诊断图片通过原有 Bearer 资产接口访问。默认只使用同页上下文，没有跨页历史、术语表、备用文本供应商或人工编辑器。
+节点每阶段的重试受 `CLUSTER_STAGE_ATTEMPTS` 控制。过期租约和已完成任务的晚到结果不能重新交付。低成本 LLM 在统一次数/页预算内重试和格式修复，未知成本继续预占；AI 重绘不使用该文本重试策略。
 
 ## 接口与配置
 
-| 接口 | 内容 |
+| 配置或接口 | 用途 |
 | --- | --- |
-| `GET /v1/capabilities` | 两种模式的启用状态与当前用户的会员、页数权益 |
-| `POST /v1/translations/classic` | multipart 图片或已有 `asset_id`，以及 `target_language` |
-| `POST /v1/translation-previews` | `mode: classic`，按普通日额度或 PLUS 无限权益确认批次页数 |
-| `GET /v1/jobs/{id}/classic` | 仅所属用户可读的分块原文、译文、诊断图片 ID 和耗时；原图失效返回 410 |
-| `GET /v1/admin/jobs` | 每次文本调用的 request ID、模型、用量、状态及估算／未知预占 |
+| `POST /v1/translation-submissions` | mode=classic、有限页数、摘要及上传会话 |
+| `GET /v1/jobs/{id}/classic` | 所属用户的分块原文/译文与计量；未上传返回未就绪 |
+| `GET /v1/admin/jobs` | 每次文本调用与预算记录 |
+| `CLASSIC_ENGINE_VERSION` | 影响缓存与节点能力匹配 |
+| `ENGINE_DEVICE` / `ENGINE_RESOURCE_ID` | CPU/CUDA与稳定物理设备身份 |
+| `ENGINE_CACHE_BYTES` | 默认256 MiB有界中间图内存 |
+| `CLUSTER_STAGE_ATTEMPTS` | 默认3次安全阶段执行 |
+| `CLUSTER_TEXT_SLOTS` / `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 独立文本并发与实际请求限速 |
+| `TEXT_TIMEOUT_SECONDS` / `TEXT_MAX_ATTEMPTS` | 默认60秒／每组3次 |
+| `TEXT_GROUP_BYTES` / `TEXT_MAX_OUTPUT_TOKENS` | 1800字节／1024输出token |
+| `TEXT_PAGE_BUDGET_MICROS` | 50000 micro-CNY，每页运营估价预算0.05元 |
+| `TEXT_INPUT_RATE` / `TEXT_OUTPUT_RATE` | 运营估价，非已核实供应商账单 |
+| `TEXT_PROTOCOL` | openai_chat，另支持openai_responses契约 |
 
-缓存／报价版本包含引擎实现版本、检测与 OCR、LaMa、掩膜、字体、阅读顺序、文本模型／端点／协议、提示词及费率和限制。模型、权重或实际处理代码升级时同步更新 `CLASSIC_ENGINE_VERSION` 和引擎 `ENGINE_VERSION`；版本不匹配时拒绝继续处理旧任务。
-
-| 环境变量 | 默认值／单位 |
-| --- | --- |
-| `CLASSIC_ENGINE_URL` / `CLASSIC_ENGINE_TOKEN` | 内网引擎地址与服务令牌 |
-| `CLASSIC_TIMEOUT_SECONDS` | 900 秒，页内文本处理总期限／单次本地引擎等待上限 |
-| `CLASSIC_LOCAL_ATTEMPTS` | 3 次本地执行（含首次） |
-| `TEXT_TIMEOUT_SECONDS` / `TEXT_MAX_ATTEMPTS` | 60 秒／每组最多 3 次，SDK 无隐式重试 |
-| `TEXT_GROUP_BYTES` / `TEXT_MAX_OUTPUT_TOKENS` | 1800 字节文本组／1024 输出 token |
-| `TEXT_PAGE_BUDGET_MICROS` | 50000 micro-CNY，即按配置估价每页 0.05 元 |
-| `TEXT_INPUT_RATE` / `TEXT_OUTPUT_RATE` | 5／30 元每百万 token，当前为运营估价参数 |
-| `TEXT_PRICING_VERSION` | `operator-estimate-v1` |
-| `TEXT_PROTOCOL` | `openai_chat`；另支持 `openai_responses`，后者仅契约测试 |
-
-**网关没有提供已核实的实际费率。** 当前人民币数值是显式运营估价，不能当成实际账单或实际费用的保证。调用使用 token 用量乘配置费率计入 `estimated`；无用量、超时及不明确响应保持 `unknown`，按请求输入字节上界与输出上限继续占用预算。实际账单需与该网关核对并更新费率。异常上报的高用量如超过原预占，会保留实际 token 计算值并阻止后续调用。
+模型、权重、字体来源与许可沿用现有 prepare.py 和 licenses 记录。当前完整测试与浏览器交付证据见[集群验收](CLUSTER_VALIDATION.md)。以下旧效果样本记录仅说明样本质量与当时环境，不代表本次新集群吞吐或GPU验收。
 
 ## 验证与交付边界
 

@@ -1,5 +1,5 @@
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
-import {defaults,type Job,type Page} from '../src/types';
+import {defaults,type Job,type Page,type Entitlements,type ModeQueue,type SubmissionInput,type SubmissionReceipt} from '../src/types';
 import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
@@ -56,8 +56,13 @@ if(flow&&['complete','backward','incomplete','missing','empty','gap','snapshot']
 }
 const stored=await readCopies();
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
-const quotes=new Map<string,{asset_ids:string[];mode:Job['mode'];target_language:string}>();
-const batches=new Map<string,unknown>();
+const submissions=new Map<string,SubmissionReceipt>();
+const submissionKeys=new Map<string,string>();
+const rights:Entitlements={plan:new URLSearchParams(location.search).has('plus')?'plus':'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',queue_capacity:new URLSearchParams(location.search).has('plus')?500:10,realtime_slots:new URLSearchParams(location.search).has('plus')?10:2,scheduler_weight:new URLSearchParams(location.search).has('plus')?2:1,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'fixture-v2',quota:{id:'daily',kind:'classic_daily',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}},redraw:{allowed:true,unlimited:false,quota_kind:'redraw_grant',consent_version:'fixture-v2',quota:{id:'redraw',kind:'redraw_grant',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}}}};
+const queues:ModeQueue[]=(['classic','redraw'] as const).map(mode=>({mode,capacity:rights.plan==='plus'?500:10,in_flight:0,available_slots:rights.plan==='plus'?500:10,realtime_limit:rights.plan==='plus'?10:2,realtime_count:0,queued:0,running:0,awaiting_upload:0,paused:false,version:0}));
+const summaries=()=>queues.map(queue=>{const active=[...jobs.values()].filter(j=>j.mode===queue.mode&&['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status));return {...queue,in_flight:active.length,available_slots:Math.max(0,queue.capacity-active.length),realtime_count:active.filter(j=>j.priority==='realtime').length,queued:active.filter(j=>j.status==='queued').length,running:active.filter(j=>j.status==='running').length,awaiting_upload:active.filter(j=>['awaiting_upload','validating_upload'].includes(j.status)).length};});
+for(const copy of stored)for(const page of copy.pages){for(const job of page.jobs)Object.assign(job,{file_hash:page.fileHash,page_index:page.pageIndex,image_sha256:page.imageSha256});}
+
 const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false};
 // Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
 const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
@@ -72,37 +77,51 @@ window.fetch=async(input,init={})=>{
   if(state.delay)await new Promise(r=>setTimeout(r,state.delay));
   if(state.failNext){state.failNext=false;throw Error('Fixture offline');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
-  const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:'2099-01-01T00:00:00Z'});
-  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_batch:4},quota:{balance:10000,available:10000,reserved:0},retention_days:7});
+  const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:null});
+  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_batch:500,max_active_jobs:1000,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
-  if(url.pathname==='/v1/me/usage')return json({balance:10000,available:10000-state.submitted.length,reserved:state.submitted.length,items:[],total:0});
+  if(url.pathname==='/v1/me/entitlements')return json(rights);
+  if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map((p:{file_hash:string;page_index:number})=>({...p,asset:p.page_index===6?null:asset(p.page_index),jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language),display_jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language)}))});
-  if(url.pathname==='/v1/translation-previews'){const id=crypto.randomUUID();quotes.set(id,body);return json({id,unit_cost:state.price,quota_pages:body.asset_ids.length*state.price,page_count:body.asset_ids.length,expires_at:'2099-01-01T00:00:00Z',config_version:'fixture-v1'});}
-  if(url.pathname==='/v1/translation-batches'){
-    const key=new Headers(init.headers).get('Idempotency-Key')!;
-    if(batches.has(key))return json(batches.get(key));
-    const preview=quotes.get(body.preview_id)!;
-    const result=preview.asset_ids.map(a=>{const i=Number(a.replace('asset-',''));const j={...job(i,'queued'),id:`submitted-${crypto.randomUUID()}`,mode:preview.mode,target_language:preview.target_language};jobs.set(j.id,j);state.submitted.push(i);return j;});
-    const response={id:key,status:'queued',jobs:result,quota_pages:result.length};batches.set(key,response);
-    if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}return json(response);
+  if(url.pathname==='/v1/me/queues')return json({items:summaries()});
+  if(url.pathname.endsWith('/priority')){
+    const queue=queues.find(q=>q.mode===url.pathname.split('/')[4])!;
+    if(body.expected_version!==queue.version)return json({error:{code:'QUEUE_VERSION_CONFLICT',message:'模拟队列版本变化'}},409);
+    if(body.realtime_job_ids.length>queue.realtime_limit)return json({error:{code:'REALTIME_LIMIT',message:'实时名额超过套餐'}},422);
+    for(const j of jobs.values())if(j.mode===queue.mode)j.priority=body.realtime_job_ids.includes(j.id)?'realtime':'preload';
+    queue.version++;return json({version:queue.version,realtime_job_ids:body.realtime_job_ids,expires_at:'2099-01-01',session_id:body.session_id});
   }
-  if(url.pathname==='/v1/jobs/status')return json({items:body.ids.map((id:string)=>{
-    const j=jobs.get(id);
-    if(j?.mode==='redraw'&&['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
-      const polls=(redrawPolls.get(id)??0)+1;redrawPolls.set(id,polls);
-      j.status=polls<3?'running':redrawOutcome==='success'?'succeeded':'failed';
-      if(j.status==='succeeded')j.output_asset_id=`output-${id}`;
-      if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟重绘失败，常规译图仍可阅读。'};
+  if(url.pathname.endsWith('/pause')){const queue=queues.find(q=>q.mode===url.pathname.split('/')[4])!;queue.paused=body.paused;return json(queue);}
+  if(url.pathname==='/v1/translation-submissions'&&init.method==='POST'){
+    const value=body as SubmissionInput,key=new Headers(init.headers).get('Idempotency-Key')!;
+    if(submissionKeys.has(key))return json(submissions.get(submissionKeys.get(key)!));
+    const queue=summaries().find(q=>q.mode===value.mode)!;if(value.items.length>queue.available_slots)return json({error:{code:'QUEUE_CAPACITY_EXCEEDED',message:'模拟队列容量已满'}},409);
+    const receipt:SubmissionReceipt={id:crypto.randomUUID(),mode:value.mode,target_language:value.target_language,items:value.items.map(item=>{const j={...job(item.page_index??0,item.asset_id?'queued':'awaiting_upload'),id:'submitted-'+crypto.randomUUID(),mode:value.mode,target_language:value.target_language,file_hash:item.file_hash,page_index:item.page_index,image_sha256:item.image_sha256,created_at:new Date().toISOString(),input_asset_id:item.asset_id??'awaiting'};jobs.set(j.id,j);state.submitted.push(item.page_index??0);return {client_item_id:item.client_item_id,job:j,upload:item.asset_id?null:{id:j.id,url:origin+'/v1/uploads/'+j.id+'/content',method:'PUT',headers:{'Content-Type':'image/png'},authorization_required:true,expires_at:'2099-01-01'}};})};
+    submissions.set(receipt.id,receipt);submissionKeys.set(key,receipt.id);
+    if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}return json(receipt,202);
+  }
+  if(url.pathname==='/v1/translation-submissions')return json({items:[...submissions.values()].map(receipt=>({id:receipt.id,status:'queued',mode:receipt.mode,target_language:receipt.target_language,quota_pages:receipt.items.length,page_count:receipt.items.length,created_at:new Date().toISOString(),job_ids:receipt.items.map(i=>i.job.id),asset_ids:receipt.items.map(i=>i.job.input_asset_id)})),total:submissions.size,next_offset:null});
+  if(url.pathname.startsWith('/v1/translation-submissions/'))return json(submissions.get(url.pathname.split('/')[3]));
+  if(url.pathname.startsWith('/v1/uploads/')&&url.pathname.endsWith('/content'))return new Response(null,{status:204});
+  if(url.pathname.startsWith('/v1/uploads/')&&url.pathname.endsWith('/complete')){const j=jobs.get(url.pathname.split('/')[3])!;j.status='validating_upload';return json(j);}
+  if(url.pathname==='/v1/me/translation-changes'){
+    for(const j of jobs.values()){
+      if(j.status==='validating_upload'){j.status='queued';j.input_asset_id='asset-'+j.page_index;}
+      if(j.id.startsWith('submitted-')&&['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
+        const count=(redrawPolls.get(j.id)??0)+1;redrawPolls.set(j.id,count);if(!queues.find(q=>q.mode===j.mode)!.paused)j.status=count<3?'running':redrawOutcome==='success'?'succeeded':'failed';
+        if(j.status==='succeeded')j.output_asset_id='output-'+j.id;
+        if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟处理失败，已有译图仍可阅读。'};
+      }
     }
-    return j;
-  }).filter(Boolean)});
+    return json({items:[...jobs.values()],deleted_job_ids:[],cursor:String(state.requests.length),has_more:false});
+  }
   if(url.pathname.endsWith('/access'))return json({url:`${origin}/v1/fixture-output`,expires_at:'2099-01-01T00:00:00Z'});
   if(url.pathname==='/v1/fixture-output')return new Response(blob);
   if(url.pathname.endsWith('/cancel')){const id=url.pathname.split('/')[3];const j=jobs.get(id)!;j.status='cancelled';return json(j);}
-  if(url.pathname==='/v1/me/queue')return json({concurrency:2,effective_concurrency:2,default_concurrency:2,max_concurrency:10,queued:0,dispatched:0,running:0});
   if(url.pathname==='/v1/me/feedback')return json({items:[],total:0});
   return json({error:{code:'FIXTURE_ROUTE_MISSING',message:`Unimplemented fixture route: ${url.pathname}`}},404);
 };
+await editLibrary((_library,copies)=>{for(const copy of copies)for(const page of copy.pages)delete page.imageSha256;});
 await import('../src/main');
-if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 报价 ${state.requests.filter(p=>p==='/v1/translation-previews').length} 次`;},500);}
+if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 清单提交 ${state.requests.filter(p=>p==='/v1/translation-submissions').length} 次`;},500);}
 if(flow){const output=document.createElement('output');output.id='fixture-flow-state';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(async()=>{const s=await readLibrary();output.textContent=`隔离验收 · 已读：${s.chapters.filter(c=>c.title.startsWith(`连读 ${flow}`)&&c.readAt).map(c=>c.number).join('、')||'无'} · 解码 ${document.querySelector('.nc-reading-viewport')?.getAttribute('data-decoded-pages')??0} 页 · 新翻译 ${state.submitted.length} 页`;},500);}

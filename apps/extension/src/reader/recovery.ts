@@ -1,6 +1,6 @@
 import {Api} from '../api';
-import {assertCurrent, mapConcurrent} from '../concurrency';
-import type {ReadingCopy, FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
+import {assertCurrent} from '../concurrency';
+import type {FilePageMatch, FilePageSource, Job, Mode, Page} from '../types';
 import {mergeJobs,newestFirst,pendingStatuses} from './jobs';
 
 export function pageSource(page: Page): FilePageSource | undefined {
@@ -9,53 +9,24 @@ export function pageSource(page: Page): FilePageSource | undefined {
 }
 export const sourceKey = (source: FilePageSource) => `${source.file_hash}:${source.page_index}`;
 export const reusableJob = (job: Job, mode: Mode, language: string) => job.mode === mode && job.target_language === language &&
-  (['queued', 'running', 'outcome_unknown', 'no_text'].includes(job.status) || job.status === 'succeeded' && !!job.output_asset_id);
+  (['awaiting_upload','validating_upload','queued', 'running', 'outcome_unknown', 'no_text'].includes(job.status) || job.status === 'succeeded' && !!job.output_asset_id);
 
 export function applyMatch(page: Page, match: FilePageMatch, ownerId: string, apiOrigin: string, snapshot: Page = page): Page {
   const sameOwner = page.ownerId === ownerId && page.apiOrigin === apiOrigin;
   const assetChanged = sameOwner && (page.assetId !== snapshot.assetId || page.assetExpiresAt !== snapshot.assetExpiresAt || page.ownerId !== snapshot.ownerId || page.apiOrigin !== snapshot.apiOrigin);
-  return {...page, ownerId, apiOrigin,
+  return {...page, ownerId, apiOrigin,imageSha256:page.imageSha256??match.asset?.sha256,imageByteSize:match.asset?.byte_size??page.imageByteSize,imageMime:match.asset?.mime??page.imageMime,
     // An earlier chunk's miss must not erase an upload completed while the rest of the book matched.
     assetId: assetChanged ? page.assetId : match.asset?.id,
     assetExpiresAt: assetChanged ? page.assetExpiresAt : match.asset?.expires_at,
     // The local original determines layout; restoring an asset must not move the reading position.
     jobs: mergeJobs(sameOwner ? page.jobs : [], [...match.jobs,...(match.display_jobs??[])]),
-    outputBlobs: sameOwner ? page.outputBlobs : {}, operationIds: sameOwner ? page.operationIds : {},
+    outputBlobs: sameOwner ? page.outputBlobs : {},
     translationError: sameOwner ? page.translationError : undefined,
   };
 }
 
 // Only in-flight matches are shared. A later translation always checks live configuration/expiry.
 export interface MatchResult { matches: Map<string, FilePageMatch>; errors: Map<string, Error>; }
-export interface RerunSource { pageId: string; jobId: string; inputAssetId: string; }
-export function submittedJobsForPage(pageId: string, preparedPages: Page[], returned: Job[], rerun?: RerunSource): Job[] {
-  const prepared = preparedPages.find(page => page.id === pageId);
-  if (!prepared) return [];
-  return returned.filter(job => rerun?.pageId === pageId
-    ? job.input_asset_id === rerun.inputAssetId
-    : (job.requested_asset_id ?? job.input_asset_id) === prepared.assetId);
-}
-export function bindSubmission(copy: ReadingCopy | undefined, preparedPages: Page[], returned: Job[], ownerId: string, apiOrigin: string, rerun?: RerunSource) {
-  const attached = new Set<string>();
-  const pages = copy?.pages.map(page => {
-    if (page.ownerId !== ownerId || page.apiOrigin !== apiOrigin) return page;
-    const jobs = submittedJobsForPage(page.id, preparedPages, returned, rerun);
-    jobs.forEach(job => attached.add(job.id));
-    return jobs.length ? {...page, jobs: mergeJobs(page.jobs, jobs)} : page;
-  });
-  return {copy: copy && {...copy, pages: pages!}, detachedJobIds: [...new Set(returned.filter(job => !attached.has(job.id)).map(job => job.id))]};
-}
-export function rerunSource(page: Page, match: FilePageMatch | undefined, mode: Mode, language: string): RerunSource | undefined {
-  if (!match) return;
-  if (match.display_jobs) {
-    const previous=newestFirst(mergeJobs(page.jobs,[...match.jobs,...match.display_jobs])).find(job=>job.mode===mode&&job.target_language===language);
-    return previous&&page.assetId?{pageId:page.id,jobId:previous.id,inputAssetId:page.assetId}:undefined;
-  }
-  if (!match.asset) return;
-  const validInputs = new Set([match.asset.id, ...match.jobs.map(job => job.input_asset_id)]);
-  const previous = mergeJobs(page.jobs, match.jobs).filter(job => job.mode === mode && job.target_language === language && validInputs.has(job.input_asset_id)).at(-1);
-  return previous ? {pageId: page.id, jobId: previous.id, inputAssetId: previous.input_asset_id} : undefined;
-}
 export function planTranslation(pages: Page[], result: MatchResult, mode: Mode, language: string, regenerate = false) {
   const selected: Page[] = [];
   const failures: {page: Page; message: string}[] = [];
@@ -75,6 +46,7 @@ export function planTranslation(pages: Page[], result: MatchResult, mode: Mode, 
       // A tombstone supersedes older reusable server versions.
       if(delivered&&!delivered.output_asset_id&&!page.outputBlobs[delivered.id]&&!regenerate){selected.push(page);continue;}
     }
+    if(!regenerate&&match?.jobs.some(job=>job.status==='unknown_released')){failures.push({page,message:'原请求可能已产生费用，请使用单页重新翻译并明确确认。'});continue;}
     if (!regenerate && match?.jobs.some(job => reusableJob(job, mode, language))) continue;
     selected.push(page);
   }
@@ -105,38 +77,4 @@ export function matchFilePages(api: Api, pages: Page[], mode: Mode, language: st
   requests.set(key, request);
   void request.finally(() => requests!.delete(key)).catch(() => {});
   return request;
-}
-
-export interface UploadCandidate { page: Page; assetId: string; }
-/** Failed pages stay retryable; successful pages retain their original selection order. */
-export async function uploadPages(api: Api, pages: Page[], ownerId: string, apiOrigin: string, concurrency: number,
-  getBlob: (key: string) => Promise<Blob | undefined>, onPage: (page: Page) => void, current = api.isCurrent) {
-  const uploads = new Map<string, Promise<{id: string; expires_at: string}>>();
-  return mapConcurrent(pages, concurrency, async requested => {
-    assertCurrent(current);
-    const source = pageSource(requested);
-    if (!source) throw Error(`${requested.name} 缺少文件页标识，请重新导入。`);
-    const sameOwner = requested.ownerId === ownerId && requested.apiOrigin === apiOrigin;
-    let asset = sameOwner && requested.assetId && Date.parse(requested.assetExpiresAt ?? '') > Date.now()
-      ? {id: requested.assetId, expires_at: requested.assetExpiresAt!} : undefined;
-    if (!asset) {
-      let upload = uploads.get(sourceKey(source));
-      if (!upload) {
-        upload = (async () => {
-          if (!requested.blobKey) throw Error(`${requested.name} 原图未获取，请返回来源或重新导入。`);
-          const blob = await getBlob(requested.blobKey);
-          assertCurrent(current);
-          if (!blob) throw Error(`${requested.name} 本地图片已清理，请重新导入。`);
-          return api.upload(blob, requested.name, source);
-        })();
-        uploads.set(sourceKey(source), upload);
-      }
-      asset = await upload;
-    }
-    assertCurrent(current);
-    const page = {...requested, assetId: asset.id, assetExpiresAt: asset.expires_at, ownerId, apiOrigin,
-      jobs: sameOwner ? requested.jobs : [], outputBlobs: sameOwner ? requested.outputBlobs : {}, operationIds: sameOwner ? requested.operationIds : {}, translationError: undefined};
-    onPage(page);
-    return {page, assetId: asset.id};
-  });
 }

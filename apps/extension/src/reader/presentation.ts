@@ -33,5 +33,5 @@ export function pageTranslation(page:Page,mode:Mode,language:string,ownerId?:str
 export function taskText(job?:Job){
   if(!job)return '尚未翻译';
   if(job.status==='succeeded')return job.quality_flags?.includes('unrecognized_regions')?'部分文字保留原文':(!job.output_asset_id?'译图已过期或删除':'翻译完成');
-  return {queued:'排队中',running:'翻译中',outcome_unknown:'结果待核实',failed:'翻译失败',cancelled:'已取消',no_text:'未检测到文字'}[job.status];
+  return {awaiting_upload:'等待原图上传',validating_upload:'正在校验原图',queued:job.priority==='realtime'?'实时阅读优先':'服务器排队 · 预存',running:'翻译中',outcome_unknown:'结果待核实',unknown_released:'核实期限已结束 · 原请求可能已产生费用',failed:'翻译失败',cancelled:'已取消',no_text:'未检测到文字'}[job.status];
 }

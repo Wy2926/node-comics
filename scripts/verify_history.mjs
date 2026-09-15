@@ -24,13 +24,13 @@ try {
     window.fetch=async(input,init)=>{
       const url=new URL(String(input),location.origin);
       if(init?.method==='DELETE'&&url.pathname==='/v1/images/output-0'){state.deleted=true;return json({deleted:true});}
-      if(!['/v1/translation-history','/v1/translation-batches/history-0'].includes(url.pathname))return original(input,init);
+      if(!['/v1/translation-submissions','/v1/translation-submissions/history-0'].includes(url.pathname))return original(input,init);
       state.calls.push(url.pathname);
       if(state.hold)await new Promise(resolve=>{state.pending=resolve;});
       if(state.fail)return new Response(JSON.stringify({error:{message:'隔离测试：记录服务暂不可用'}}),{status:503});
-      if(url.pathname.includes('translation-batches'))return json({items:[0,1].map(n=>({id:`fixture-job-${n}`,input_asset_id:`asset-${n}`,output_asset_id:state.status==='succeeded'&&!(n===0&&state.deleted)?`output-${n}`:null,result_available:state.status==='succeeded'&&!(n===0&&state.deleted),result_expired:n===0&&state.deleted,batch_id:'history-0',reused:false,mode:'classic',target_language:'zh-Hans',status:state.status,phase:'translating_text',quota_pages:1,quota_kind:"classic_daily",settlement:state.status==='running'?'reserved':'settled',version:1,cache_hit:false,created_at:'2026-09-15T00:00:00Z'})),total:2,next_offset:null});
+      if(url.pathname.endsWith('/history-0'))return json({id:'history-0',mode:'classic',target_language:'zh-Hans',quota_pages:2,page_count:2,status:state.status,items:[0,1].map(n=>({client_item_id:String(n),reused:false,upload:null,job:{id:`fixture-job-${n}`,input_asset_id:`asset-${n}`,output_asset_id:state.status==='succeeded'&&!(n===0&&state.deleted)?`output-${n}`:null,result_available:state.status==='succeeded'&&!(n===0&&state.deleted),result_expired:n===0&&state.deleted,submission_id:'history-0',reused:false,mode:'classic',target_language:'zh-Hans',status:state.status,phase:'translating_text',quota_pages:1,quota_kind:"classic_daily",settlement:state.status==='running'?'reserved':'settled',version:1,cache_hit:false,created_at:'2026-09-15T00:00:00Z'}}))});
       const offset=Number(url.searchParams.get('offset')||0);
-      return json({items:Array.from({length:13},(_,i)=>({id:`history-${i}`,kind:'batch',mode:'classic',target_language:'zh-Hans',page_count:2,counts:i===0&&state.deleted?{expired:1,succeeded:1}:{[i===0?state.status:'succeeded']:2},settled:i===0&&state.status==='running'?0:2,reserved:i===0&&state.status==='running'?2:0,reused:0,created_at:'2026-09-15T00:00:00Z',job_ids:i===0?['fixture-job-0','fixture-job-1']:[],asset_ids:[]})).slice(offset,offset+12),total:13,next_offset:offset===0?12:null});
+      return json({items:Array.from({length:13},(_,i)=>({id:`history-${i}`,kind:'submission',status:i===0?state.status:'succeeded',quota_pages:2,mode:'classic',target_language:'zh-Hans',page_count:2,counts:i===0&&state.deleted?{expired:1,succeeded:1}:{[i===0?state.status:'succeeded']:2},settled:i===0&&state.status==='running'?0:2,reserved:i===0&&state.status==='running'?2:0,reused:0,created_at:'2026-09-15T00:00:00Z',job_ids:i===0?['fixture-job-0','fixture-job-1']:[],asset_ids:[]})).slice(offset,offset+12),total:13,next_offset:offset===0?12:null});
     };
   });
   const calls=()=>page.evaluate(()=>window.historyFixture.calls.length);

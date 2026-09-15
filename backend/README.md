@@ -1,135 +1,85 @@
 # Node Comics 后端
 
-当前实现包含常规翻译 `classic` 与图片模型重绘 `redraw`。[常规翻译运行说明](../docs/CLASSIC_IMPLEMENTATION.md)包含独立 Docker 引擎、文本配置、检查点、费用预占及验证命令。`redraw` 是 API 中保留的模式标识；图片与目标语言直接送入服务端的 `images/edits` 适配器，没有 OCR 或普通机翻前置步骤。
+FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终译图，独立计算代理按阶段拉取常规翻译。前后端使用持久提交清单和双模式队列，已删除旧 preview/batch、Celery/Redis 与固定用户执行上限。产品规则见[集群说明](../docs/TRANSLATION_CLUSTER_DESIGN.md)。
 
-译图存储支持本地私有文件和 Cloudflare R2（`boto3`）。R2 只保存最终译图，插件授权后直接从私有桶下载；原图和常规翻译中间图片强制保存在后端本地。记录、任务状态、缓存匹配与下载签名查询不发送远端 HEAD。配置、CORS、保留期及限制见[对象存储说明](../docs/OBJECT_STORAGE.md)。
+## 运行
 
-会员与额度已经替换为普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，两档并发 2。限时赠送支持两种模式，重绘赠送提供临时权限。规则与 API 见[会员额度](../docs/MEMBERSHIP_AND_QUOTAS.md)，交付证据见[实现验收](../docs/MEMBERSHIP_IMPLEMENTATION.md)。
-
-## 本地运行
-
-需要 Python 3.11、PostgreSQL 16+、Redis 7+。推荐使用仓库 Docker Compose，API 映射到 `http://127.0.0.1:18088`；私有图片目录使用持久化卷，不能直接映射为静态站点。
-
-在 `backend/` 下安装和启动：
+需要 Python 3.11、PostgreSQL（隔离验证使用 17.6）、私有 R2。生产关闭 `DEV_AUTH` 并配置 OIDC。在根目录填写 `.env` 后：
 
 ```powershell
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -r requirements.txt
+./scripts/bootstrap.ps1
+# 填写 R2、文本/图片供应商与身份配置后启动新集群：
+./scripts/bootstrap.ps1 -Start -Classic
+```
+
+Compose 项目 `node-comics-cluster` 使用独立 `cluster_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `cluster_0001` 不升级旧表；本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。不能把多个环境指向相同 R2 清理前缀。
+
+三个控制进程可独立运行：
+
+```powershell
+cd backend
 .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 18088 --no-access-log
+# 另两个终端：
+.venv/Scripts/python.exe -m app.workers
+.venv/Scripts/python.exe -m app.dispatcher
 ```
 
-另外两个独立进程运行：
+API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../services/compute-agent/README.md)。`local` 存储仅供 `DEV_AUTH=true` 的隔离测试，不能作为公开部署。
 
-```text
-celery -A app.workers.celery_app worker -Q redraw --concurrency=2
-python -m app.dispatcher
-```
+## 配置
 
-Celery 推荐在 Docker Linux 容器内运行。API 和 dispatcher 启动时运行 Alembic 迁移；PostgreSQL advisory lock 保护多进程同时启动。SQLite 仅用于隔离的契约和状态测试，生产状态以 PostgreSQL 为准。
-
-## 环境配置
-
-| 变量 | 用途 |
+| 配置 | 默认／用途 |
 | --- | --- |
-| `DATABASE_URL` | 如 `postgresql+psycopg://用户:密码@postgres:5432/nodecomics` |
-| `REDIS_URL` | 如 `redis://redis:6379/0` |
-| `STORAGE_PATH` | 原图及 local 模式结果共用的私有文件卷 |
-| `RESULT_STORAGE_BACKEND` | 仅最终译图：`local`（默认）或 `r2`；原图与中间图片固定本地 |
-| `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 S3 端点、私有桶及服务端凭据 |
-| `R2_KEY_PREFIX` | 当前数据库独占前缀，默认 `node-comics/` |
-| `STORAGE_URL_TTL_SECONDS` / `STORAGE_TIMEOUT_SECONDS` | 直链有效期默认 300 秒（不超过图片到期时间）；存储请求超时默认 30 秒 |
-| `DEV_AUTH` / `DEV_AUTH_SECRET` | 本地测试登录显式开启，签名密钥至少 32 字符 |
-| `DEV_ADMIN_USERNAME` | 开发管理员用户名，默认 `admin`，仅限本地开发 |
-| `OIDC_ISSUER` / `OIDC_AUDIENCE` / `OIDC_JWKS_URL` | 正式账号 JWT 校验，生产缺失时拒绝认证 |
-| `OIDC_CLIENT_ID` / `OIDC_AUTHORIZATION_ENDPOINT` / `OIDC_TOKEN_ENDPOINT` | 提供给插件 PKCE 登录流程的公开配置 |
-| `OIDC_ADMIN_ROLE` | 已验证 JWT `roles` 数组中的运营角色，默认 `node-comics-admin` |
-| `CORS_ORIGINS` | 允许的本地阅读器地址，逗号分隔；生产仅明确列出的源 |
-| `EXTENSION_IDS` | 生产允许的 Chrome 扩展 ID，逗号分隔；开发模式可用任意本地扩展 ID |
-| `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` | 默认图片编辑供应商，Base URL 自带 `/v1` 等版本前缀 |
-| `OPENAI_USER_AGENT` | 默认供应商 User-Agent，针对已验证的网关兼容性配置 |
-| `PROVIDERS_JSON` | 多供应商配置数组，不含密钥明文，以 `credential_ref` 引用环境变量 |
-| `ALLOW_PRIVATE_PROVIDERS` | 隔离测试中的内网供应商开关，默认关闭；结果下载始终禁用内网 |
-| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 普通每日常规 100 页 / PLUS 每会员月重绘 300 页 |
-| `QUOTA_TIMEZONE` | 基础额度周期时区，默认 Asia/Shanghai；客户端时区不改变额度 |
-| `RETENTION_DAYS` / `UNKNOWN_RELEASE_SECONDS` | 图片保留天数、结果不明预占释放期限，默认 7 天 / 3600 秒 |
-| `MAX_UPLOAD_BYTES` / `MAX_PIXELS` / `MAX_DIMENSION` | 平台图片限制，默认 20 MB / 2400 万像素 / 单边 8192 |
-| `MAX_BATCH` / `MAX_ACTIVE_JOBS` | 默认 100 页 / 每用户 120 活动任务（包含等待、运行和结果不明任务） |
-| `FREE_CONCURRENCY` / `PLUS_CONCURRENCY` | 两档服务端并发均默认 2，各限定 1–10；用户只读 |
-| `DISPATCH_MAX_JOBS` | 每次 dispatcher 最多新增名额及最多发布消息的数量，默认 100；不是全平台并发上限 |
-| `DISPATCH_INTERVAL_SECONDS` / `QUEUE_REPUBLISH_SECONDS` | 轮询间隔默认 2 秒 / 已获名额的丢失消息重投间隔默认 60 秒 |
+| `FREE_QUEUE_CAPACITY` / `PLUS_QUEUE_CAPACITY` | 每模式 10 / 500 页 |
+| `FREE_REALTIME_SLOTS` / `PLUS_REALTIME_SLOTS` | 每模式 2 / 10 页 |
+| `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
+| `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
+| `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
+| `CLUSTER_NODE_TOKEN` | 至少 32 字符，仅内部节点认证 |
+| `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
+| `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，所有控制副本共享限额 |
+| `CLUSTER_UPLOAD_SLOTS` | 2，后台校验原图 |
+| `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 60，实际文本请求计量 |
+| `CLUSTER_MAX_IMAGE_STAGES` | 64，预存已 OCR 待渲染水位 |
+| `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
+| `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
+| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 100 / 300，独立于队列容量 |
+| `RETENTION_DAYS` | 默认0表示无限期保留；当前部署为0 |
+| `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
+| `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
+| `R2_KEY_PREFIX` | 独立部署专用前缀 |
+| `CLASSIC_ENABLED` / `TEXT_*` | 常规及预算配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
+| `OPENAI_*` / `PROVIDERS_JSON` | 初始化图片供应商，后续管理员维护 |
 
-开发登录只适用于回环地址和隔离测试。公开部署必须关闭 `DEV_AUTH`，配置实际 OIDC、扩展 ID、HTTPS 入口和持久化备份。用户名登录不会用于生产身份校验。
+供应商密钥只通过后端环境引用，不进入任务快照和前端。配置影响生成结果时进入内容缓存版本；会员页数和权重不改变图片缓存身份。
 
-`OPENAI_*` / `PROVIDERS_JSON` 只初始化数据库中尚不存在的供应商，保留运营界面之后修改的配置。已有供应商通过管理员 PUT 更新，配置变更会改变缓存与报价版本。密钥仅通过后端环境变量引用，不进入 API 响应、队列、任务快照或前端。
+## API
 
-## API 契约
+交互文档 `/docs`，机器契约 `/openapi.json`。
 
-交互式接口文档：`/docs`，机器契约：`/openapi.json`。公共响应模型位于 `app/schemas.py`；队列请求与响应模型单独位于 `app/queue_api.py`。
+- `POST /v1/translation-submissions`：稳定 `Idempotency-Key`、模式、语言、`max_quota_pages`、有序图片摘要/大小/文件页身份；受理与预占原子提交。
+- `PUT /v1/uploads/{id}/content`、`POST /v1/uploads/{id}/complete`：上传原图后排入异步校验，复用图不重复上传。
+- `GET /v1/translation-submissions` 与 `GET .../{id}`：分页摘要／原回执；`POST .../{id}/cancel` 停止所属任务。
+- `GET /v1/me/queues`、`GET .../{mode}/items`、`POST .../{mode}/priority`、`POST .../{mode}/pause`：独立模式状态与实时意图。
+- `GET /v1/me/translation-changes`：游标增量同步；`GET /v1/jobs/{id}`、`POST /v1/jobs/status`：有界查询。
+- `GET /v1/images/{id}/access`：所有权、元数据寿命核验后签名直链；状态查询不探测 R2。
+- `/internal/nodes/register`、`/internal/nodes/{id}/claim`、`/internal/leases/{id}/{input,heartbeat,complete}`：受认证阶段协议。
+- `GET /v1/admin/compute-nodes`：设备在线和忙碌状态。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。
+- 权益、限时赠送、用量账本、作品文件页匹配和私有反馈接口继续适用。
 
-供应商、额度调整与结果核实路由位于 `app/admin_api.py`，由 `main.py` 注册；共用身份、额度和幂等实现。JSON 请求的额外字段拒绝规则集中在 `app/request_models.py`。本轮拆分保持全部 38 个 API 路径及 OpenAPI 契约不变，见[代码规范与模块维护](../docs/CODE_QUALITY.md)。
+## 故障与安全
 
-- `GET /v1/auth/config`；开发环境 `POST /v1/auth/dev {username}` 返回 Bearer token 和用户。
-- `GET /v1/capabilities` 返回 AI 翻译能力、语言、限制及已登录用户的会员和两种页数权益。
-- `POST /v1/images` multipart `image` 上传原图，不会自动翻译。
-- `POST /v1/translations/redraw` multipart `asset_id` 或 `image`（二选一）及 `target_language`；必须携带 `Idempotency-Key`；HTTP 202 返回持久化任务。
-- `POST /v1/jobs/status {ids}` 最多 100 个任务；`GET /v1/jobs` 为当前用户分页历史。
-- `POST /v1/translation-previews {asset_ids,mode,target_language,regenerate:false}`；`POST /v1/translation-batches {preview_id,max_quota_pages}` 绑定同模式页数上限和幂等键。
-- 创建单页/批次响应中的 `requested_asset_id` 表示本次提交或报价的图片，`input_asset_id` 始终保留共享任务真实输入；批次响应的 `batch_id` / `ordinal` 属于本次批次。一个任务可能对应多个请求图片或批次页，客户端应按请求关联挂页，不应仅凭任务真实输入或仅凭 job ID 去除批次页。
-- `GET /v1/translation-batches/{id}` 按稳定页序分页；对应 `/cancel` 取消未执行页，并要求运行中任务丢弃结果。
-- `POST /v1/jobs/{id}/rerun {preview_id,max_quota_pages}` 绑定 `regenerate:true` 的单页预览后生成新版本；权益或配置变化要求重新确认。结果不明任务还必须显式传 `acknowledge_unknown_cost:true`。
-- `GET /v1/images/{id}/access` 需 Bearer 授权；本地结果返回相对下载路径和 `authorization_required:true`，R2 结果返回短时 HTTPS 签名链接和 `authorization_required:false`。前端依据该字段决定是否携带 Bearer，R2 下载不发送账户令牌；最终均解码为本地 Blob。
-- `DELETE /v1/images/{id}` 撤销原图及衍生结果访问；`GET /v1/me/usage` 返回当前权益、分模式页数与分页账本。
-- `GET /v1/me/entitlements` 返回套餐、会员到期、并发、按模式的基础／赠送额度及生效／到期信息。
-- `GET /v1/me/queue` 返回套餐 `concurrency`、`max_active_jobs`、`queued`、`dispatched`、`running`、`available_slots`，所有设备共用，PUT 已删除；`dispatched` 是排队中已经获得执行名额的子集。
-- `GET /v1/admin/users/{user_id}/queue` 仅供管理员查询，写入接口已删除。
-- 管理员通过 `/v1/admin/users/{id}/membership`、`quota-compensations`、`quota-grants` 开通／续期、补偿当前周期或发放任意期限额度，均要求幂等键与备注。
-- `/v1/admin/providers`、`/v1/admin/jobs`、`/v1/admin/users` 仅允许运营角色；供应商 PUT/PATCH、明确的收费测试、幂等发放额度与结果核实均有对应端点。
+调度、受理、排序、租约和结算按 scheduler → user/job 锁顺序短事务完成。网络和模型 I/O 不持调度锁。固定结果摘要与每租约对象键防止迟到结果覆盖，恢复重新核验租约。重绘已持久化调用意图后不自动重发；未知期限释放后补交付不补扣。
 
-## 执行与结算保证
-
-创建任务、预占额度和 outbox 同一事务提交。Redis 丢失的排队消息可重新投递；worker 原子领取当前 attempt，调用前持久化 intent，并验证执行版本与租约。重复消息、重复创建和重复结算由条件更新与唯一键防重。
-
-### 跨设备确认去重
-
-文件匹配是只读操作，两个设备可能同时匹配不到结果，再分别获取报价并确认。真正的执行去重在 `create_job` 持有用户锁时完成：相同用户、内容 SHA-256、模式、语言和有效配置版本，优先复用仍有效且没有取消/丢弃标记的 `queued`、`running`、`outcome_unknown` 任务。复用不创建 outbox、不增加执行名额、不再次预占，活动数满额或没有剩余额度也允许复用；结果不明任务保持等待核实。显式 `force`/`rerun` 仍创建新版本，并保留结果不明重跑的额外确认。
-
-图片重绘的结果不明保护跨配置生效：只要同用户、内容和语言的旧 `outcome_unknown` 原图仍有效且未取消/丢弃，普通新请求即使改了供应商配置，也返回该未决任务并记录请求收据，防止配置变化触发重复付费调用。此保护不改变成功结果的配置隔离，也不跨配置阻塞常规模式；明确确认的 `force`/`rerun` 不受普通请求去重限制。
-
-每个操作编号通过 `JobRequest` 保存请求摘要与实际任务引用，包括复用别人的操作所创建的任务。相同编号重发会返回原绑定任务，不受后续成功、失败、配置变化影响；修改请求参数仍返回幂等冲突。每个批次通过独立 `BatchItem` 保存请求图片、页序与任务引用，多个批次或同批次相同内容页可以共享同一执行。取消任一引用该任务的批次，或直接取消该任务，会同时影响本账户其他引用；取消和结算仍只发生一次。
-
-预览与 `max_quota_pages` 限制同模式的新增预占页数。批次 `quota_pages` 是本次实际新增预占；Job 的 `quota_pages` 描述任务原始预占，跨批次引用不再次扣量。PLUS 常规记录 `settlement=included` 与实际交付量，页数预占为 0。有限任务从最早到期的基础／赠送额度中原子预占一页，绑定实际 `quota_period_id`；失败退回原记录，跨周期不转移。任何新页超限或输入无效，整个批次及新增回执／额度回滚；无字和有效结果可免费复用。
-
-新基线 `membership_0001` 建立全部 20 张表，包括 `quota_periods`、`membership_operations`、`translation_previews`、`batch_items` 和 `job_requests`。旧迁移链已移除，需要新数据库，不做旧余额兑换或历史回填。账户、任务和图片主键不变更，使用 `FOR NO KEY UPDATE` 串行状态更新，同时允许外键引用，防止创建、发放与完成形成锁循环。管理操作还按操作编号串行核对回执，跨用户误用同编号返回冲突。
-
-
-### 用户公平队列
-
-调度单位是用户，单页、多个批次、`classic` 和 `redraw` 共用该用户的后端名额。数据库中的 `scheduler_state` 持久化轮转游标和递增序号：从上次用户之后开始，按稳定用户 ID 顺序寻找有等待任务且有空闲名额的用户，每轮为其分配一页，再轮到下一用户；用户内部按任务创建时间、页序和任务 ID 排序。某用户积压超过 100 页不会挡住其他用户，也不能通过创建新批次或切换模式扩大自己的名额。已完成、取消和等待人工核实的任务不占执行名额。
-
-名额表 `queue_admissions` 在发布 Redis 消息之前提交，统计“已分配但未领取 + 正在运行”的任务总数。多个 dispatcher、worker 领取和设置变更通过数据库调度锁协调，不依赖进程内计数。worker 必须提供匹配当前名额的投递 token，并重新检查用户运行数及图片供应商并发限制；没有 token、旧 token、重复消息和已结束任务均不能执行。发布后数据库提交失败最多产生同 token 的重复消息；丢失消息重投复用同一名额，不推进轮转游标或重复预占额度。
-
-套餐执行上限降低时保留已经运行的任务，并撤销超额的、尚未领取的名额；旧消息立即失效。当前运行数可能暂时高于新值，待其自然完成后才继续领取。取消单页/批次、原图删除、完成或失败会使名额在下次调度时可复用；运行中取消仍占名额直到执行结束或租约恢复。调用前失联和常规翻译本地恢复会撤销旧名额，使用新 token 重新参与用户轮转；已写入图片模型调用意图的任务仍遵守结果不明处理，不自动重发付费调用。
-
-公平性保证的是数据库分配顺序和每用户占用上限。两种模式的 worker 数量、供应商并发及执行耗时不同，实际开始/结束顺序不保证完全交替。供应商暂时满载时，worker 放弃本次领取、任务保留名额并等待 `QUEUE_REPUBLISH_SECONDS` 后重投，默认最多另等约 60 秒加调度间隔；不会在 worker 内持续重试。全平台可同时存在“用户数 × 每用户名额”的已获名额任务，`DISPATCH_MAX_JOBS` 只限制每次调度工作量。前端请求并发与这些服务端限制独立。
-
-队列模型和逻辑位于 `queue_models.py` / `scheduler.py`，新基线创建状态与索引；API 与 dispatcher 启动时自动迁移。新 worker 不接受旧版只含 job ID 的消息，不提供旧队列数据兼容逻辑。
-
-模型请求可能已经被受理的 5xx、连接中断、超时、调用后进程失联进入 `outcome_unknown`；不会自动重复调用或切换供应商。无真实查询协议时由管理员核实，超过期限自动释放用户预占。已释放的任务后来补交付不会再次扣款。供应商 usage 与用户账本分开保存，缺少 usage 表示未知；已收到 usage 的坏图和比例失败仍保存实际报告。
-
-Base64 严格解码，临时图片 URL 按显式域名名单、每次跳转和 IP 范围验证，并将 HTTPS socket 绑定到已检查的公网 IP，保留 TLS 主机名验证。响应字节、图片格式、尺寸、总处理 deadline 和 Celery 最终时限受限。成功结果必须可解码、宽高比合理并已保存；这些校验不等同于翻译质量验收。
-
-图片删除先持久化 tombstone，访问同时检查原图祖先状态。运行中任务丢弃返回结果；dispatcher 分批清理过期、删除与孤立对象，并标记物理清理完成以避免清理饥饿。不存在永久公开链接。
+输入图按实际接收字节、摘要、可解码尺寸验证。图片供应商 URL 通过白名单、DNS/IP 和每次跳转校验；输出需解码和持久化成功才结算。原图和译图默认无限期保留，最近授权访问时间供未来清理策略使用；活跃引用保护原图。删除先提交墓碑；签名已经发出时可能在其短暂有效期内继续读取。
 
 ## 验证
 
 ```powershell
-.venv/Scripts/python.exe -m pytest -q
+cd backend
+.venv/Scripts/python.exe -m pytest tests -q
 ```
 
-本地 SQLite 测试使用临时目录、临时账号与模拟上游，覆盖任务幂等、重复投递、worker 租约恢复、结果不明处理、取消/删除竞争、预算原子性、额度调整、缓存过期、跨用户隔离、multipart 协议、供应商错误分类、usage 保留、200 个以上对象清理与 chunked 请求限制。模拟上游验证契约与业务行为，不构成真实 AI 翻译效果证据。真实供应商测试与截图对照由仓库验证记录单独报告。
+PostgreSQL 并发套件必须显式设置 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`；只接受 `nodecomics_concurrency_test`，每例随机 schema。未启用的用例显示 skipped。节点与引擎单元检查见节点说明。
 
-`tests/test_queue.py` 覆盖持久轮转、多批次/单页/跨模式共用名额、超过扫描窗口的积压、发布失败和丢消息重投、取消恢复、token 失效、下调上限、接口权限及多 SQLite 连接竞争。原有 worker 测试通过 `conftest.admit_pending/run_job/claim_job` 使用真实调度入口与投递 token，没有测试专用领取绕过。
-
-`tests/test_shared_jobs.py` 验证多请求幂等收据、活动/未知任务复用、跨图片别名的批次页序、实际成本、共享取消及预算失败原子回滚。`tests/test_shared_jobs_postgres.py` 还验证两设备先同时匹配未命中再分别确认、单页与批次竞争，以及 worker 持任务锁并被用户锁阻塞时插入共享任务外键的受控竞争；这些测试沿用独立 PostgreSQL 测试库，供应商均为模拟。
-
-`tests/test_postgres_concurrency.py` 和 `tests/test_queue_postgres.py` 是显式启用的真实 PostgreSQL 并发验证，使用独立的 `nodecomics_concurrency_test` 数据库及每例随机 schema，禁止使用产品数据库。前者文件头记录 Docker 命令和 `RUN_POSTGRES_CONCURRENCY=1` 环境要求；后者验证多 dispatcher 轮转、跨模式重复 worker、限额下调竞争和多个发布者领取同一名额。运行 Docker 命令时将这两个测试文件传给 pytest 即可。未启用时明确跳过，不能将跳过报告成通过。
+`tests/manual_ui_server.py` 使用临时 SQLite、合成图片与模拟重绘供应商启动真实 API/control-worker，监听 18089；不读取生产环境文件，不调用付费模型。浏览器及完整证据见[验收说明](../docs/CLUSTER_VALIDATION.md)。

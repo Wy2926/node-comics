@@ -11,7 +11,7 @@ From the repository root (the database is deliberately not the product database)
 The create-database command is needed only once. Every test creates and drops its
 own random schema in nodecomics_concurrency_test; image storage is under pytest's
 temporary directory, never the product volume. The fixture replaces provider
-credentials, endpoint and adapter. No Redis dispatch or real model call occurs.
+credentials, endpoint and adapter. No real model call occurs.
 """
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -74,6 +74,8 @@ def pg_scope(tmp_path, monkeypatch):
     })
     monkeypatch.setenv("DATABASE_URL", url.render_as_string(hide_password=False))
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "images"))
+    monkeypatch.setenv("RESULT_STORAGE_BACKEND", "local")
+    monkeypatch.setenv("R2_ENDPOINT_URL", "")
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-postgres-test-auth-key-not-used-for-product")
     monkeypatch.setenv("OPENAI_API_KEY", "postgres-test-placeholder-no-paid-access")
@@ -84,7 +86,6 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setenv('TEXT_API_KEY', 'isolated-pg-text-key')
     monkeypatch.setenv('TEXT_BASE_URL', 'https://text.invalid/v1')
     monkeypatch.setenv('CLASSIC_ENGINE_TOKEN', 'isolated-pg-engine-token')
-    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/15")
     from app.config import settings
     from app.db import engine
     if engine.cache_info().currsize:
@@ -99,7 +100,6 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setattr(workers, "redraw", prohibited)
     from app import classic
     monkeypatch.setattr(classic, 'call_text', prohibited)
-    monkeypatch.setattr(classic, 'engine_request', prohibited)
     yield {"schema": schema, "application_name": app_name, "administration": administration}
     engine().dispose()
     engine.cache_clear()
@@ -129,6 +129,9 @@ def pg(pg_scope):
         db.add(user)
         db.flush()
         asset = create_asset(db, user.id, raw)
+        from conftest import control_node
+        control_node(db, "redraw")
+        control_node(db, "text")
         db.commit()
         return {**pg_scope, "owner_id": user.id, "asset_id": asset.id, "png": raw}
 
@@ -158,7 +161,8 @@ def assert_single_charge(pg, job_id):
 
 def test_postgres_concurrent_idempotent_creation_reserves_once(pg):
     from app.db import session_factory
-    from app.models import Job, Ledger, Outbox, User
+    from app.models import Job, Ledger, User
+    from app.queue_models import JobStage
     barrier = threading.Barrier(8)
 
     def create_concurrently(_):
@@ -169,7 +173,7 @@ def test_postgres_concurrent_idempotent_creation_reserves_once(pg):
         results = list(pool.map(create_concurrently, range(8)))
     assert len(set(results)) == 1
     with session_factory()() as db:
-        for table in (Job, Ledger, Outbox):
+        for table in (Job, Ledger, JobStage):
             assert db.scalar(select(func.count()).select_from(table)) == 1
         user = db.get(User, pg["owner_id"])
         from app.entitlement_models import QuotaPeriod
@@ -220,56 +224,45 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
     from app import workers
     from app.adapters.images import TranslationOutput
     from app.db import session_factory
-    from app.dispatcher import recover
+    from app.dispatcher import recover_lease
+    from app.errors import ProcessingError
     from app.models import Attempt, Job, now
+    from app.queue_models import ExecutionLease, JobStage
+    from conftest import claim_job
     job_id = new_job(pg)
-    claimed, resume_old, provider_entered, release_provider = [threading.Event() for _ in range(4)]
-    original_claim = workers.claim
-    attempts, calls = [], []
-
-    def paused_claim(value, token):
-        attempt_id = original_claim(value, token)
-        if threading.current_thread().name.startswith("old-attempt"):
-            attempts.append(attempt_id)
-            claimed.set()
-            assert resume_old.wait(15)
-        return attempt_id
-
+    old_lease = claim_job(job_id)
+    with session_factory()() as db:
+        old = db.get(ExecutionLease, old_lease)
+        old.expires_at = now() - timedelta(seconds=1)
+        assert db.get(Attempt, db.get(Job, job_id).attempt_id).call_started_at is None
+        db.commit()
+    recover_lease(old_lease)
+    with session_factory()() as db:
+        db.get(JobStage, db.get(ExecutionLease, old_lease).stage_id).available_at = now()
+        db.commit()
+    new_lease = claim_job(job_id)
+    assert new_lease and new_lease != old_lease
+    calls, barrier = [], threading.Barrier(2)
     def provider(*args):
         calls.append(1)
-        provider_entered.set()
-        assert release_provider.wait(15)
         return TranslationOutput(pg["png"], usage={"total_tokens": 7})
-
-    monkeypatch.setattr(workers, "claim", paused_claim)
     monkeypatch.setattr(workers, "redraw", provider)
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="old-attempt") as old_pool, ThreadPoolExecutor(max_workers=1, thread_name_prefix="new-attempt") as new_pool:
-        old_future = old_pool.submit(run_job, job_id)
-        try:
-            assert claimed.wait(10)
-            with session_factory()() as db:
-                old = db.get(Attempt, attempts[0])
-                assert old.call_started_at is None
-                old.lease_expires_at = now() - timedelta(seconds=1)
-                db.commit()
-                recover(db)
-                db.commit()
-                assert db.get(Job, job_id).status == "queued"
-            new_future = new_pool.submit(run_job, job_id)
-            assert provider_entered.wait(10)
-            resume_old.set()
-            old_future.result(timeout=10)
-            assert calls == [1]
-        finally:
-            resume_old.set()
-            release_provider.set()
-        new_future.result(timeout=15)
+    def stale():
+        barrier.wait(timeout=10)
+        with pytest.raises(ProcessingError, match="LEASE_EXPIRED"):
+            workers.run_control_stage(old_lease)
+    def fresh():
+        barrier.wait(timeout=10)
+        workers.run_control_stage(new_lease)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(stale), pool.submit(fresh)]
+        for future in futures:
+            future.result(timeout=15)
+    assert calls == [1]
     assert_single_charge(pg, job_id)
     with session_factory()() as db:
-        old = db.get(Attempt, attempts[0])
-        assert old.call_started_at is None
-        assert db.get(Job, job_id).attempt_id != old.id
-        assert db.scalar(select(func.count()).select_from(Attempt)) == 2
+        assert db.get(ExecutionLease, new_lease).generation == 2
+        assert db.scalar(select(func.count()).select_from(Attempt)) == 1
 
 
 def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monkeypatch):
@@ -291,7 +284,7 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
         return real_create_asset(*args, **kwargs)
 
     def observe_delete_lock(connection, cursor, statement, parameters, context, executemany):
-        if threading.current_thread().name.startswith("delete-original") and "FOR NO KEY UPDATE" in statement and "jobs" in statement:
+        if threading.current_thread().name.startswith("delete-original") and "pg_advisory_xact_lock" in statement:
             deletion_waiting.set()
 
     def delete():
@@ -374,21 +367,27 @@ def test_postgres_classic_budget_reservation_is_atomic(pg):
     from app.adapters.text import TextError
     from app.db import session_factory
     from app.jobs import create_job
-    from app.models import Asset, ClassicState, TextCall, User
+    from app.models import Asset, TextCall, User
+    from app.queue_models import JobStage
     from conftest import claim_job as claim
     with session_factory()() as db:
         job = create_job(db, db.get(User, pg['owner_id']), db.get(Asset, pg['asset_id']), 'classic', 'zh-Hans', 'classic-budget')
         db.commit()
         job_id = job.id
-    attempt_id = claim(job_id)
     with session_factory()() as db:
-        db.add(ClassicState(job_id=job_id))
+        for stage in db.scalars(select(JobStage).where(JobStage.job_id == job_id)):
+            if stage.name == "analyze":
+                stage.status = "succeeded"
+            elif stage.name == "text":
+                stage.status = "ready"
         db.commit()
+    lease_id = claim(job_id)
+    assert lease_id
     barrier = threading.Barrier(6)
     def reserve_concurrently(index):
         barrier.wait(timeout=10)
         try:
-            return reserve_call(job_id, attempt_id, index, [{'id': 'b001', 'source': 'Hello'}], 'zh-Hans')[0]
+            return reserve_call(job_id, lease_id, index, [{'id': 'b001', 'source': 'Hello'}], 'zh-Hans')[0]
         except TextError as error:
             return error.code
     with ThreadPoolExecutor(max_workers=6) as pool:

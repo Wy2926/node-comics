@@ -18,7 +18,7 @@ class BodyLimitMiddleware:
             return await self.app(scope, receive, send)
         consumed = 0
         started = False
-        limit = settings().max_upload_bytes + 1024 * 1024
+        limit = settings().cluster_max_result_bytes if scope.get("path", "").startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024
 
         async def bounded_receive():
             nonlocal consumed

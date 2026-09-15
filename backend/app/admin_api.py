@@ -1,12 +1,13 @@
 """Operator-only provider, quota and reconciliation routes."""
 from typing import Annotated, Literal
+from datetime import timedelta
 from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .assets import create_asset, owned_asset, read_asset, upload_bytes
+from .assets import create_asset, extend_original_retention, owned_asset, read_asset, retention_deadline, upload_bytes
 from .storage import get_store
 from .auth import admin, user_json
 from .config import settings
@@ -14,7 +15,9 @@ from .db import get_db
 from .errors import problem
 from .jobs import create_job, idem_key, job_json, settle
 from .entitlements import change_membership, compensate, entitlements_json
-from .models import Attempt, Job, Ledger, Provider, TextCall, User, now
+from .models import Asset, Attempt, Job, Ledger, Provider, TextCall, User, now
+from .scheduler import lock_scheduler
+from .queue_models import ComputeNode, ExecutionLease
 from .providers import ProviderConfig, configuration, credential
 from .request_models import RequestBody
 from .schemas import JobResponse
@@ -139,11 +142,11 @@ def admin_compensation(user_id: str, body: CompensationRequest, idempotency_key:
 
 @router.post("/v1/admin/jobs/{job_id}/reconcile", response_model=JobResponse)
 def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), db: Session = Depends(get_db)):
-    previous_storage = None
+    lock_scheduler(db)
     job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
     if not job:
         problem("NOT_FOUND", "任务不存在", 404)
-    if job.status != "outcome_unknown":
+    if job.status not in {"outcome_unknown", "unknown_released"}:
         problem("INVALID_STATE", "仅可核实结果不明的任务", 409)
     if body.resolution == "succeeded":
         if job.discard_output or job.cancel_requested:
@@ -157,13 +160,10 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         ratio = (output.width / output.height) / (source.width / source.height)
         if not 0.8 <= ratio <= 1.25:
             problem("INVALID_PROVIDER_OUTPUT", "核实结果宽高比偏离原图", 422)
-        if output.storage_backend == "local" and settings().result_storage_backend == "r2":
-            get_store("r2").put(output.storage_key, read_asset(output), output.mime, kind=job.mode)
-            previous_storage = ("local", output.storage_key)
-            output.storage_backend = "r2"
         job.output_asset_id = output.id
         output.kind, output.parent_id = job.mode, source.id
-        output.expires_at = min(output.expires_at, source.expires_at)
+        output.expires_at = retention_deadline()
+        extend_original_retention(db, source, output.expires_at)
         job.status, job.phase = "succeeded", "completed"
         settle(db, job, success=True)
     else:
@@ -172,9 +172,33 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
     job.completed_at, job.error_code, job.error_message = now(), None, None
     db.add(Ledger(owner_id=job.owner_id, job_id=job.id, transaction_key=f"{job.id}:reconcile", kind="reconcile", amount=0, note=body.note))
     db.commit()
-    if previous_storage:
-        try:
-            get_store(previous_storage[0]).delete(previous_storage[1])
-        except OSError:
-            pass  # The local orphan sweep retries after the durable relocation.
     return job_json(db, job)
+
+
+@router.post("/v1/admin/jobs/{job_id}/reconcile-image", response_model=JobResponse)
+async def reconcile_image(job_id: str, image: Annotated[UploadFile, File()], note: Annotated[str, Form(min_length=1, max_length=200)],
+                          user: User = Depends(admin), db: Session = Depends(get_db)):
+    job = db.get(Job, job_id)
+    if not job:
+        problem("NOT_FOUND", "任务不存在", 404)
+    if job.status not in {"outcome_unknown", "unknown_released"} or job.cancel_requested or job.discard_output:
+        problem("INVALID_STATE", "仅可为未取消的结果不明任务补交译图", 409)
+    data = await upload_bytes(image)
+    def save_and_reconcile():
+        # Object I/O precedes the scheduler lock. Reconciliation rechecks state;
+        # a rejected late upload remains an unreferenced object for normal cleanup.
+        output = create_asset(db, job.owner_id, data, kind=job.mode, parent_id=job.input_asset_id)
+        db.commit()
+        return reconcile(job_id, ReconcileRequest(resolution="succeeded", output_asset_id=output.id, note=note), user, db)
+    return await run_in_threadpool(save_and_reconcile)
+
+
+@router.get("/v1/admin/compute-nodes")
+def compute_nodes(user: User = Depends(admin), db: Session = Depends(get_db)):
+    busy = dict(db.execute(select(ExecutionLease.node_id, func.count()).where(ExecutionLease.completed_at.is_(None)).group_by(ExecutionLease.node_id)).all())
+    at = now()
+    return {"items": [{"id": n.id, "name": n.name, "resource_id": n.resource_id, "device": n.device,
+        "capabilities": n.capabilities, "engine_version": n.engine_version, "capacity": n.capacity,
+        "running": busy.get(n.id, 0), "enabled": n.enabled,
+        "online": n.heartbeat_at > at - timedelta(seconds=settings().cluster_node_timeout_seconds),
+        "heartbeat_at": n.heartbeat_at.isoformat() + "Z"} for n in db.scalars(select(ComputeNode).order_by(ComputeNode.id))]}

@@ -3,7 +3,7 @@ from app.db import Base, engine
 from app import models
 from app import file_pages
 from app import queue_models
-from app import batch_items
+from app import job_requests
 from app import reader_api
 
 if context.is_offline_mode():

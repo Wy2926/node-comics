@@ -76,7 +76,7 @@ try{await probe.goto(url);await probe.locator('.upLoop .tab-pane').first().waitF
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));manifest.host_permissions=[...manifest.host_permissions,new URL(url).origin+'/*',...origins];await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
 const profile=path.join(run,'profile'),options={...launch,args:['--disable-extensions-except='+extension,'--load-extension='+extension],viewport:{width:1440,height:1000}};
 let context=await chromium.launchPersistentContext(profile,options);const errors=[];let translationWrites=0;const checks={sample,permissions:'test-only pregrant',completeCatalog:false,restarted:false,multipleReaders:false};
-const track=page=>{page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/\/(translation-previews|translation-batches|translations)\b/.test(r.url()))translationWrites++;});};
+const track=page=>{page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/\/v1\/translation-submissions(?:\?|$)/.test(r.url()))translationWrites++;});};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{
  const r=indexedDB.open('node-comics-library');
  r.onsuccess=()=>{

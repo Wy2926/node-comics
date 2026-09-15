@@ -1,19 +1,19 @@
-from conftest import run_job, claim_job
+"""Control-plane LLM budgets and image checkpoints; no live upstream calls."""
+import base64
 from datetime import timedelta
 from io import BytesIO
-import base64
 import json
 import pytest
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import login, upload, create
+
 from app import classic
 from app.adapters.text import TextError, TextResponse, parse_translations
 from app.config import settings
-from app.db import session_factory
-from app.models import Asset, Attempt, ClassicState, Job, Ledger, TextCall, now, uid
-from conftest import run_job as process_job, claim_job as claim
-
+from app.db import Base, engine, session_factory
+from app.models import Asset, Attempt, ClassicState, Job, TextCall, User, now, uid
+from app.queue_models import ComputeNode, ExecutionLease, JobStage, SchedulerMutex
+from app import entitlement_models  # noqa: F401
 
 SEGMENTS = [{'id': 'b001', 'source': 'Hello!'}]
 
@@ -24,310 +24,188 @@ def encoded(image):
     return base64.b64encode(buffer.getvalue()).decode()
 
 
+def analysis(segments=None):
+    segments = segments or SEGMENTS
+    mask = Image.new('L', (80, 64), 0)
+    mask.putpixel((10, 10), 255)
+    return {'width': 80, 'height': 64, 'segments': segments,
+            'regions': [{'lines': [[[8, 8], [20, 8], [20, 20], [8, 20]]]} for _ in segments], 'mask': encoded(mask)}
+
+
 @pytest.fixture
-def configured(client, monkeypatch, png):
+def text_database(tmp_path, monkeypatch):
+    monkeypatch.setenv('DATABASE_URL', 'sqlite:///' + (tmp_path / 'stages.db').as_posix())
+    monkeypatch.setenv('DEV_AUTH', 'true')
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
+    monkeypatch.setenv('TEXT_API_KEY', 'isolated-text-test-key')
+    monkeypatch.setenv('TEXT_BASE_URL', 'https://text.example/v1')
+    monkeypatch.setenv('STORAGE_PATH', str(tmp_path / 'images'))
     settings.cache_clear()
-    calls = {'text': 0, 'analyze': 0, 'inpaint': 0, 'render': 0}
+    if engine.cache_info().currsize:
+        engine().dispose()
+    engine.cache_clear()
+    Base.metadata.create_all(engine())
+    with session_factory()() as db:
+        db.add(SchedulerMutex(id=1, revision=0))
+        db.commit()
+    yield
+    engine().dispose()
+    engine.cache_clear()
+    settings.cache_clear()
 
-    def engine(stage, data, config, **kwargs):
-        calls[stage] += 1
-        image = Image.open(BytesIO(data)).convert('RGB')
-        mask = Image.new('L', image.size, 0)
-        mask.putpixel((10, 10), 255)
-        common = {'width': image.width, 'height': image.height, 'version': config['engine']['version']}
-        if stage == 'analyze':
-            return {**common, 'segments': SEGMENTS, 'regions': [{}], 'mask': encoded(mask)}
-        if stage == 'inpaint':
-            return {**common, 'cleaned': encoded(image), 'timings': {'inpaint': 0.2}}
-        assert kwargs['cleaned'] == encoded(image)
-        result = image.copy()
-        result.putpixel((10, 10), (0, 0, 0))
-        return {**common, 'image': encoded(result), 'cleaned': encoded(image), 'mask': encoded(mask), 'glyph_mask': encoded(mask), 'timings': {'render': 0.1}}
 
+@pytest.fixture
+def text_case(text_database, monkeypatch):
+    from app.classic_config import snapshot
+    config = snapshot()
+    job_id, attempt_id, lease_id = uid(), uid(), uid()
+    owner_id, asset_id, stage_id = uid(), uid(), uid()
+    with session_factory()() as db:
+        db.add(User(id=owner_id, subject='isolated-stage-user', name='reader'))
+        db.flush()
+        db.add(Asset(id=asset_id, owner_id=owner_id, sha256='a' * 64, storage_key='isolated-original',
+                     storage_backend='r2', mime='image/png', width=80, height=64, byte_size=100,
+                     expires_at=now() + timedelta(days=1)))
+        db.add(ComputeNode(id='text-node', name='text pool', capabilities=['text'], capacity=4,
+                           resource_id='isolated:text', engine_version='none', device='http'))
+        db.flush()
+        db.add(Job(id=job_id, owner_id=owner_id, input_asset_id=asset_id, mode='classic',
+                   target_language='zh-Hans', status='running', attempt_id=attempt_id, quota_pages=1,
+                   quota_kind='classic', config=config, operation='translate', request_hash='r' * 64,
+                   idempotency_key=uid(), cache_key='c' * 64))
+        db.flush()
+        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id='classic-text', lease_expires_at=now() + timedelta(minutes=5)))
+        db.add(JobStage(id=stage_id, job_id=job_id, name='text', status='running', generation=1))
+        db.add(ClassicState(job_id=job_id, analysis=analysis()))
+        db.flush()
+        db.add(ExecutionLease(id=lease_id, job_id=job_id, stage_id=stage_id, node_id='text-node', owner_id=owner_id,
+                              generation=1, resource_pool='text:classic-text', mode='classic', priority_class='preload',
+                              weight=1, estimated_seconds=10, expires_at=now() + timedelta(minutes=5)))
+        db.commit()
     def text(*args):
-        calls['text'] += 1
-        return TextResponse('{"translations":[{"id":"b001","text":"你好！"}]}', {'input_tokens': 100, 'output_tokens': 20}, 'request-test')
-
-    monkeypatch.setattr(classic, 'engine_request', engine)
+        return TextResponse('{"translations":[{"id":"b001","text":"你好！"}]}',
+                            {'input_tokens': 100, 'output_tokens': 20}, 'isolated-request')
     monkeypatch.setattr(classic, 'call_text', text)
-    auth = login(client)
-    asset = upload(client, auth, png)
-    return client, auth, asset, calls
+    return job_id, lease_id
 
 
-def submit(configured, key='classic-1', language='zh-Hans'):
-    client, auth, asset, _ = configured
-    response = client.post('/v1/translations/classic', headers={**auth, 'Idempotency-Key': key}, data={'asset_id': asset, 'target_language': language})
-    assert response.status_code == 202, response.text
-    return response.json()['id']
-
-
-def status(configured, job_id):
-    return configured[0].post('/v1/jobs/status', headers=configured[1], json={'ids': [job_id]}).json()['items'][0]
-
-
-@pytest.mark.parametrize('content', [
-    '{}', '{"translations":[]}', '{"translations":[{"id":"wrong","text":"好"}]}',
+@pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"translations":[{"id":"wrong","text":"好"}]}',
     '{"translations":[{"id":"b001","text":""}]}', '{"translations":[{"id":"b001","text":2}]}',
     '{"translations":[{"id":"b001","text":"好"},{"id":"b001","text":"好"}]}',
-    '{"translations":[{"id":"b001","text":"好"}],"note":"injected"}', 'not json',
-])
+    '{"translations":[{"id":"b001","text":"好"}],"note":"injected"}', 'not json'])
 def test_rejects_incomplete_or_ambiguous_contract(content):
     with pytest.raises(TextError):
         parse_translations(content, SEGMENTS)
 
 
-def test_parses_fenced_json_locally():
-    assert parse_translations('```json\n{"translations":[{"id":"b001","text":"你好"}]}\n```', SEGMENTS) == {'b001': '你好'}
-
-
-def test_idempotency_cache_mode_language_and_settlement(configured):
-    client, auth, asset, calls = configured
-    job_id = submit(configured)
-    assert submit(configured) == job_id
-    process_job(job_id)
-    process_job(job_id)
-    assert status(configured, job_id)['status'] == 'succeeded'
-    assert calls == {'text': 1, 'analyze': 1, 'inpaint': 1, 'render': 1}
-    cached_id = submit(configured, 'classic-cache')
-    assert status(configured, cached_id)['cache_hit']
-    assert not status(configured, submit(configured, 'english', 'en'))['cache_hit']
-    assert create(client, auth, asset).status_code == 403
-    from conftest import login_plus
-    assert not create(client, login_plus(client), asset).json()['cache_hit']
+def test_text_stage_checkpoint_replay_never_repeats_paid_call(text_case):
+    job, lease = text_case
+    assert classic.run_text_stage(job, lease) == {'translations': {'b001': '你好！'}}
+    assert classic.run_text_stage(job, lease) == {'translations': {'b001': '你好！'}}
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.job_id == job_id, Ledger.kind == 'settle')) == 1
-        call = db.scalar(select(TextCall).where(TextCall.job_id == job_id))
+        assert db.scalar(select(func.count()).select_from(TextCall)) == 1
+        call = db.scalar(select(TextCall))
         assert (call.accounted_micros, call.cost_state) == (1100, 'estimated')
 
 
-def test_no_text_never_calls_llm_or_charges(configured, monkeypatch):
-    def empty(stage, data, config, **kwargs):
-        return {'width': 320, 'height': 480, 'segments': [], 'regions': [], 'mask': None}
-    monkeypatch.setattr(classic, 'engine_request', empty)
-    job = submit(configured)
-    process_job(job)
-    result = status(configured, job)
-    assert (result['status'], result['settlement']) == ('no_text', 'released')
-    assert configured[3]['text'] == 0
-
-
-def test_detected_but_invalid_ocr_does_not_become_no_text(configured, monkeypatch):
-    monkeypatch.setattr(classic, 'engine_request', lambda *a, **k: {'width': 320, 'height': 480, 'segments': SEGMENTS, 'regions': []})
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['error']['code'] == 'CLASSIC_OCR_INVALID'
-    assert configured[3]['text'] == 0
-
-
-def test_json_repair_usage_is_recorded_for_each_call(configured, monkeypatch):
+def test_json_repair_records_cost_for_every_subcall(text_case, monkeypatch):
     original = classic.call_text
-    n = 0
-    def broken_once(*args):
-        nonlocal n
-        n += 1
-        if n == 1:
-            return TextResponse('invalid', {'input_tokens': 100, 'output_tokens': 5}, 'invalid-json-call')
-        return original(*args)
-    monkeypatch.setattr(classic, 'call_text', broken_once)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['status'] == 'succeeded'
+    replies = iter([TextResponse('invalid', {'input_tokens': 100, 'output_tokens': 5}, 'invalid'), original()])
+    monkeypatch.setattr(classic, 'call_text', lambda *args: next(replies))
+    monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
+    classic.run_text_stage(*text_case)
     with session_factory()() as db:
-        calls = db.scalars(select(TextCall).where(TextCall.job_id == job).order_by(TextCall.sequence)).all()
+        calls = db.scalars(select(TextCall).order_by(TextCall.sequence)).all()
         assert len(calls) == 2
         assert calls[0].error_code == 'TEXT_INVALID_RESPONSE'
         assert calls[0].accounted_micros == 650
         assert all(call.usage for call in calls)
 
 
-def test_unknown_timeout_retains_reservation_and_blocks_budget_overrun(configured, monkeypatch):
-    n = 0
+def test_unknown_call_keeps_reservation_and_cannot_overrun_page_budget(text_case, monkeypatch):
+    calls = []
     def timeout(*args):
-        nonlocal n
-        n += 1
-        raise TextError('TEXT_TRANSPORT_FAILED', 'timeout', retryable=True)
+        calls.append(1)
+        raise TextError('TEXT_TRANSPORT_FAILED', 'isolated timeout', retryable=True)
     monkeypatch.setattr(classic, 'call_text', timeout)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['error']['code'] == 'TEXT_BUDGET_EXCEEDED'
-    assert n == 1
+    monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
+    with pytest.raises(TextError, match='TEXT_BUDGET_EXCEEDED'):
+        classic.run_text_stage(*text_case)
+    assert len(calls) == 1
     with session_factory()() as db:
-        call = db.scalar(select(TextCall).where(TextCall.job_id == job))
-        assert call.accounted_micros == call.reserved_micros > 0
-        assert call.cost_state == 'unknown'
+        call = db.scalar(select(TextCall))
+        assert call.accounted_micros == call.reserved_micros > 0 and call.cost_state == 'unknown'
 
 
-def test_auth_error_not_retried(configured, monkeypatch):
-    def rejected(*args):
-        raise TextError('TEXT_AUTH_FAILED', 'invalid credentials')
-    monkeypatch.setattr(classic, 'call_text', rejected)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['error']['code'] == 'TEXT_AUTH_FAILED'
+def test_late_translation_accounts_usage_without_overwriting_new_generation(text_case):
+    job, lease = text_case
+    call, _, _ = classic.reserve_call(job, lease, 0, SEGMENTS, 'zh-Hans')
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(TextCall).where(TextCall.job_id == job)) == 1
-
-
-def test_render_failure_recovers_without_repeating_successful_text(configured, monkeypatch):
-    original = classic.engine_request
-    n = 0
-    def flaky(stage, *args, **kwargs):
-        nonlocal n
-        if stage == 'render':
-            n += 1
-            if n == 1:
-                raise classic.ProcessingError('CLASSIC_RENDER_FAILED', 'render failed')
-        return original(stage, *args, **kwargs)
-    monkeypatch.setattr(classic, 'engine_request', flaky)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['status'] == 'queued'
-    process_job(job)
-    assert status(configured, job)['status'] == 'succeeded'
-    assert configured[3]['text'] == 1 and configured[3]['analyze'] == 1 and configured[3]['inpaint'] == 1
-
-
-def test_lease_recovery_preserves_text_checkpoint(configured):
-    from app.dispatcher import recover
-    job = submit(configured)
-    attempt_id = claim(job)
-    with session_factory()() as db:
-        db.add(ClassicState(job_id=job, analysis={'width': 320, 'height': 480, 'segments': SEGMENTS, 'regions': [{}], 'mask': encoded(Image.new('L', (320, 480), 255))}, translations={'b001': '你好'}))
-        db.get(Attempt, attempt_id).lease_expires_at = now() - timedelta(seconds=1)
+        db.get(JobStage, db.get(ExecutionLease, lease).stage_id).generation += 1
         db.commit()
-        recover(db)
-        db.commit()
-    process_job(job)
-    assert status(configured, job)['status'] == 'succeeded'
-    assert configured[3]['text'] == 0 and configured[3]['analyze'] == 0
-
-
-def test_cancel_during_text_records_usage_but_does_not_render(configured, monkeypatch):
-    original = classic.call_text
-    job = submit(configured)
-    def cancel(*args):
-        configured[0].post(f'/v1/jobs/{job}/cancel', headers=configured[1])
-        return original(*args)
-    monkeypatch.setattr(classic, 'call_text', cancel)
-    process_job(job)
-    assert status(configured, job)['status'] == 'cancelled'
-    assert configured[3]['render'] == 0
-    with session_factory()() as db:
-        assert db.scalar(select(TextCall).where(TextCall.job_id == job)).usage
-
-
-def test_private_stage_access_and_parent_deletion(configured):
-    client, auth, asset, calls = configured
-    job = submit(configured)
-    process_job(job)
-    detail = client.get(f'/v1/jobs/{job}/classic', headers=auth)
-    assert detail.json()['translations'] == {'b001': '你好！'}
-    artifact = detail.json()['artifacts']['mask']
-    other = login(client, 'bob')
-    assert client.get(f'/v1/jobs/{job}/classic', headers=other).status_code == 404
-    assert client.get(f'/v1/images/{artifact}/content', headers=other).status_code == 404
-    client.delete(f'/v1/images/{asset}', headers=auth)
-    assert client.get(f'/v1/jobs/{job}/classic', headers=auth).status_code == 410
-    assert client.get(f'/v1/images/{artifact}/content', headers=auth).status_code == 410
-    with session_factory()() as db:
-        assert db.get(ClassicState, job) is None
-        assert db.scalar(select(TextCall).where(TextCall.job_id == job)) is not None
-
-
-def test_late_result_accounts_cost_without_overwriting_new_attempt(configured):
-    job = submit(configured)
-    attempt_id = claim(job)
-    with session_factory()() as db:
-        db.add(ClassicState(job_id=job))
-        db.commit()
-    call_id, _, _ = classic.reserve_call(job, attempt_id, 0, SEGMENTS, 'zh-Hans')
-    with session_factory()() as db:
-        db.get(Job, job).attempt_id = uid()
-        db.commit()
-    classic.complete_call(call_id, response=TextResponse('unused', {'input_tokens': 10, 'output_tokens': 10}, 'late'), translations={'b001': 'late'})
+    classic.complete_call(call, lease, response=TextResponse('unused', {'input_tokens': 10, 'output_tokens': 10}, 'late'),
+                          translations={'b001': 'late'})
     with session_factory()() as db:
         assert db.get(ClassicState, job).translations == {}
-        assert db.get(TextCall, call_id).accounted_micros == 350
+        assert db.get(TextCall, call).accounted_micros == 350
 
 
-def test_outside_mask_changes_rejected(configured, monkeypatch):
-    original = classic.engine_request
-    def corrupt(stage, *args, **kwargs):
-        result = original(stage, *args, **kwargs)
-        if stage == 'render':
-            image = Image.open(BytesIO(base64.b64decode(result['image'])))
-            image.putpixel((0, 0), (255, 0, 0))
-            result['image'] = encoded(image)
-        return result
-    monkeypatch.setattr(classic, 'engine_request', corrupt)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['error']['code'] == 'CLASSIC_RENDER_INVALID'
-
-
-def test_partial_ocr_output_is_labeled_free_and_cached_without_losing_warning(configured, monkeypatch):
-    original = classic.engine_request
-    def partial(stage, *args, **kwargs):
-        result = original(stage, *args, **kwargs)
-        if stage == 'analyze':
-            result['quality_flags'] = ['unrecognized_regions']
-            result['unrecognized_regions'] = [[[0, 0], [2, 0], [2, 2], [0, 2]]]
-        return result
-    monkeypatch.setattr(classic, 'engine_request', partial)
-    job = submit(configured)
-    process_job(job)
-    result = status(configured, job)
-    assert result['status'] == 'succeeded' and result['result_available']
-    assert result['settlement'] == 'released'
-    assert result['quality_flags'] == ['unrecognized_regions']
-    cached = status(configured, submit(configured, 'partial-cache'))
-    assert cached['cache_hit'] and cached['quality_flags'] == ['unrecognized_regions']
-
-
-def test_source_expiry_erases_checkpoint_and_revokes_stage_access(configured):
-    from app.dispatcher import cleanup
-    job = submit(configured)
-    process_job(job)
+def test_cancel_during_text_keeps_cost_and_discards_translation(text_case, monkeypatch):
+    original = classic.call_text
+    def cancel(*args):
+        with session_factory()() as db:
+            db.get(Job, text_case[0]).cancel_requested = True
+            db.commit()
+        return original(*args)
+    monkeypatch.setattr(classic, 'call_text', cancel)
+    with pytest.raises(classic.ProcessingError, match='LEASE_EXPIRED'):
+        classic.run_text_stage(*text_case)
     with session_factory()() as db:
-        db.get(Asset, configured[2]).expires_at = now() - timedelta(seconds=1)
-        db.commit()
-        cleanup(db)
-        db.commit()
-        assert db.get(ClassicState, job) is None
-    assert configured[0].get(f'/v1/jobs/{job}/classic', headers=configured[1]).status_code == 410
+        assert db.get(ClassicState, text_case[0]).translations == {}
+        assert db.scalar(select(TextCall)).usage
 
 
-def test_each_group_keeps_its_own_usage_and_translation(configured, monkeypatch):
-    monkeypatch.setenv('TEXT_GROUP_BYTES', '128')
+def test_ocr_wait_time_does_not_spend_text_deadline(text_case):
+    with session_factory()() as db:
+        db.get(ClassicState, text_case[0]).started_at = now() - timedelta(days=1)
+        db.commit()
+    classic.run_text_stage(*text_case)
+
+
+def test_every_call_checks_shared_provider_rate_limit(text_case, monkeypatch):
+    monkeypatch.setenv('CLUSTER_TEXT_REQUESTS_PER_MINUTE', '1')
     settings.cache_clear()
-    segments = [{'id': f'b{n:03}', 'source': 'a' * 70} for n in range(1, 4)]
-    original = classic.engine_request
-    def engine(stage, *args, **kwargs):
-        result = original(stage, *args, **kwargs)
-        if stage == 'analyze':
-            result['segments'], result['regions'] = segments, [{}, {}, {}]
-        return result
-    def text(group, language, profile):
-        assert len(group) == 1
-        return TextResponse(json.dumps({'translations': [{'id': group[0]['id'], 'text': '你好'}]}), {'input_tokens': 80, 'output_tokens': 20}, 'group-' + group[0]['id'])
-    monkeypatch.setattr(classic, 'engine_request', engine)
-    monkeypatch.setattr(classic, 'call_text', text)
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['status'] == 'succeeded'
+    classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')
+    with pytest.raises(TextError, match='TEXT_RATE_LIMITED'):
+        classic.reserve_call(*text_case, 1, SEGMENTS, 'zh-Hans')
     with session_factory()() as db:
-        calls = db.scalars(select(TextCall).where(TextCall.job_id == job)).all()
-        assert len(calls) == 3 and {call.group_index for call in calls} == {0, 1, 2}
-        assert sum(call.accounted_micros for call in calls) == 3000
-        assert len(db.get(ClassicState, job).translations) == 3
+        assert db.scalar(select(func.count()).select_from(TextCall)) == 1
 
 
-def test_format_errors_stop_at_shared_attempt_limit(configured, monkeypatch):
-    monkeypatch.setattr(classic, 'call_text', lambda *a: TextResponse('bad json', {'input_tokens': 1, 'output_tokens': 1}, None))
-    job = submit(configured)
-    process_job(job)
-    assert status(configured, job)['status'] == 'failed'
+def test_duplicate_execution_cannot_call_same_group_twice_on_one_lease(text_case):
+    classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')
+    with pytest.raises(TextError, match='TEXT_CALL_IN_FLIGHT'):
+        classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(TextCall).where(TextCall.job_id == job)) == 3
+        assert db.scalar(select(func.count()).select_from(TextCall)) == 1
+
+
+def test_strict_ocr_checkpoint_validation():
+    classic.validate_analysis(analysis(), 80, 64)
+    bad = analysis()
+    bad['mask'] = encoded(Image.new('L', (81, 64), 255))
+    with pytest.raises(classic.ProcessingError, match='CLASSIC_OCR_INVALID'):
+        classic.validate_analysis(bad, 80, 64)
+    bad = analysis()
+    bad['regions'][0]['lines'][0][0][0] = float('nan')
+    with pytest.raises(classic.ProcessingError, match='CLASSIC_OCR_INVALID'):
+        classic.validate_analysis(bad, 80, 64)
+
+
+def test_render_rejects_changes_outside_both_masks():
+    original = Image.new('RGB', (80, 64), (255, 255, 255))
+    final = original.copy()
+    final.putpixel((0, 0), (0, 0, 0))
+    mask = analysis()['mask']
+    with pytest.raises(classic.ProcessingError, match='CLASSIC_RENDER_INVALID'):
+        classic.validate_render(base64.b64decode(encoded(original)), {'image': encoded(final), 'mask': mask, 'glyph_mask': mask})

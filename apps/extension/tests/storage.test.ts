@@ -35,11 +35,19 @@ it('does not resurrect a removed result when another tab saves an older successf
   await saveCopy(stale);
   expect((await readCopies()).find(c=>c.id===stale.id)!.pages[0].jobs[0]).toMatchObject({output_asset_id:null,result_available:false,result_expired:true});
 });
-it('only saves current preference fields, leaving automatic consent in its own store',()=>{
+it('only saves current preference fields, keeping upload authorization in durable manifests',()=>{
   saveSettings({...defaults,...{autoTranslate:true,autoLimit:50}});
   const stored=JSON.parse(localStorage.getItem('nc-settings')!);
   expect(stored).not.toHaveProperty('autoTranslate');expect(stored).not.toHaveProperty('autoLimit');
   expect(stored.language).toBe(defaults.language);
+});
+it('stores no-expiry assets and accepts a later explicit retention policy',async()=>{
+  const p={...emptyPage('retained.png',10,10),ownerId:'reader',apiOrigin:'https://api.example',assetId:'permanent',assetExpiresAt:null};
+  const copy=makeCopy('long-term source',[p]);await commitCopies([copy],[{title:copy.title,kind:'unclassified'}]);
+  await saveCopy({...copy,pages:[{...p,assetExpiresAt:undefined}]});
+  expect((await readCopies()).find(c=>c.id===copy.id)!.pages[0].assetExpiresAt).toBeNull();
+  await saveCopy({...copy,pages:[{...p,assetExpiresAt:'2026-09-16T00:00:00Z'}]});
+  expect((await readCopies()).find(c=>c.id===copy.id)!.pages[0].assetExpiresAt).toBe('2026-09-16T00:00:00Z');
 });
 it('preserves a new reader position when another tab writes an old copy snapshot',async()=>{
   const first=emptyPage('1.png',100,100);const hundred=emptyPage('100.png',100,100);const copy=makeCopy('cross-tab',[first,hundred]);

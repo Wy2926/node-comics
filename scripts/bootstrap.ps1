@@ -4,7 +4,7 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
 if (-not (Test-Path -LiteralPath '.env')) {
     Copy-Item -LiteralPath '.env.example' -Destination '.env'
-    Write-Host '已创建 .env；请填写图片模型配置以启用真实 AI 重绘。'
+    Write-Host '已创建 .env；请先填写私有 R2 配置，再按需填写文本与图片供应商配置。'
 }
 $localConfig = Join-Path $projectRoot 'deploy/.env.local'
 New-Item -ItemType Directory -Path (Split-Path -Parent $localConfig) -Force | Out-Null
@@ -21,10 +21,12 @@ if (-not (Test-Path -LiteralPath $localConfig)) {
     [IO.File]::WriteAllText($localConfig, $configuration, [Text.UTF8Encoding]::new($false))
     Write-Host '已生成仅供本地环境使用的隔离数据库密码与登录签名密钥。'
 }
-if (-not (Select-String -LiteralPath $localConfig -Pattern '^CLASSIC_ENGINE_TOKEN=' -Quiet)) {
-    $engineBytes = New-Object byte[] 32
-    [Security.Cryptography.RandomNumberGenerator]::Fill($engineBytes)
-    [IO.File]::AppendAllText($localConfig, "CLASSIC_ENGINE_TOKEN=$([Convert]::ToHexString($engineBytes))`n", [Text.UTF8Encoding]::new($false))
+foreach ($tokenName in @('CLASSIC_ENGINE_TOKEN', 'CLUSTER_NODE_TOKEN')) {
+    if (-not (Select-String -LiteralPath $localConfig -Pattern "^$tokenName=" -Quiet)) {
+        $tokenBytes = New-Object byte[] 32
+        [Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+        [IO.File]::AppendAllText($localConfig, "$tokenName=$([Convert]::ToHexString($tokenBytes))`n", [Text.UTF8Encoding]::new($false))
+    }
 }
 docker compose --env-file .env --env-file deploy/.env.local config --quiet
 if ($LASTEXITCODE -ne 0) { throw 'Docker Compose 配置验证失败' }

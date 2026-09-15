@@ -1,29 +1,21 @@
-name: node-comics
+name: node-comics-cluster
 
 x-backend: &backend
-  build:
-    context: ./backend
-  image: node-comics-backend:local
-  env_file:
-    - .env
-    - deploy/.env.local
+  build: ./backend
+  image: node-comics-backend:cluster
+  env_file: [.env, deploy/.env.local]
   environment: &backend-env
-    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics}
-    REDIS_URL: redis://redis:6379/0
+    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics_cluster}
+    RESULT_STORAGE_BACKEND: r2
     STORAGE_PATH: /data/images
-    DEV_AUTH: "${DEV_AUTH:-true}"
-    DEV_AUTH_SECRET: ${DEV_AUTH_SECRET}
+    DEV_AUTH: "${DEV_AUTH:-false}"
+    DEV_AUTH_SECRET: ${DEV_AUTH_SECRET:-}
+    CLUSTER_NODE_TOKEN: ${CLUSTER_NODE_TOKEN:?Run scripts/bootstrap.ps1 first}
     CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:18089,http://127.0.0.1:18089}"
-  volumes:
-    - comics_images:/data/images
-    - ./backend/app:/app/app:ro
-    - ./backend/migrations:/app/migrations:ro
-    - ./backend/alembic.ini:/app/alembic.ini:ro
+  tmpfs:
+    - /data/images:uid=10001,gid=10001,mode=0700,size=32m
   depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
+    postgres: {condition: service_healthy}
   restart: unless-stopped
 
 services:
@@ -32,22 +24,11 @@ services:
     environment:
       POSTGRES_USER: nodecomics
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-nodecomics}
+      POSTGRES_DB: ${POSTGRES_DB:-nodecomics_cluster}
     volumes:
-      - comics_postgres:/var/lib/postgresql/data
+      - cluster_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U nodecomics -d nodecomics"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-  redis:
-    image: redis:7.4.5-alpine
-    command: [redis-server, --appendonly, "yes"]
-    volumes:
-      - comics_redis:/data
-    healthcheck:
-      test: [CMD, redis-cli, ping]
+      test: [CMD-SHELL, "pg_isready -U nodecomics -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -55,36 +36,29 @@ services:
   api:
     <<: *backend
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
-    ports:
-      - 127.0.0.1:18088:8000
-  dispatcher:
+    ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
+  maintenance:
     <<: *backend
     command: [python, -m, app.dispatcher]
-  redraw-worker:
+  control-worker:
     <<: *backend
-    command: [celery, -A, app.workers.celery_app, worker, -Q, redraw, --concurrency=2, --loglevel=warning, --hostname=redraw@%h]
+    command: [python, -m, app.workers]
     stop_grace_period: 31m
-  classic-worker:
-    <<: *backend
-    profiles: [classic]
-    command: [celery, -A, app.workers.celery_app, worker, -Q, classic, --concurrency=1, --loglevel=warning, --hostname=classic@%h]
-    stop_grace_period: 20m
-    depends_on:
-      classic-engine:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
   classic-engine:
     profiles: [classic]
     build: ./services/classic-engine
-    image: node-comics-classic-engine:local
+    image: node-comics-classic-engine:cluster
     environment:
       ENGINE_TOKEN: ${CLASSIC_ENGINE_TOKEN}
+      ENGINE_DEVICE: ${ENGINE_DEVICE:-cpu}
+      ENGINE_RESOURCE_ID: ${ENGINE_RESOURCE_ID:-local:cpu}
+      ENGINE_LOCK_DIR: /locks
+      ENGINE_CACHE_BYTES: ${ENGINE_CACHE_BYTES:-268435456}
+      ENGINE_CACHE_TTL_SECONDS: 900
       OMP_NUM_THREADS: "4"
     volumes:
       - comics_models:/models
+      - device_locks:/locks
     healthcheck:
       test: [CMD, python, -c, "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['ready']"]
       interval: 15s
@@ -92,8 +66,24 @@ services:
       retries: 80
       start_period: 10m
     restart: unless-stopped
+  compute-agent:
+    profiles: [classic]
+    build: ./services/compute-agent
+    image: node-comics-compute-agent:cluster
+    environment:
+      CONTROL_URL: http://api:8000
+      CONTROL_ALLOW_HTTP: "true"
+      CLUSTER_NODE_TOKEN: ${CLUSTER_NODE_TOKEN}
+      NODE_ID: ${NODE_ID:-local-cpu}
+      NODE_NAME: ${NODE_NAME:-local-cpu}
+      ENGINE_URL: http://classic-engine:8000
+      ENGINE_TOKEN: ${CLASSIC_ENGINE_TOKEN}
+    depends_on:
+      classic-engine: {condition: service_healthy}
+      api: {condition: service_started}
+    stop_grace_period: 16m
+    restart: unless-stopped
 volumes:
-  comics_postgres:
-  comics_redis:
-  comics_images:
+  cluster_postgres:
   comics_models:
+  device_locks:

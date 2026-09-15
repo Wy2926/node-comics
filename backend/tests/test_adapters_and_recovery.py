@@ -99,49 +99,54 @@ def test_ratio_failure_preserves_reported_usage(client, png, monkeypatch):
 def test_expired_old_worker_cannot_write_call_intent_after_reclaim(client, png, monkeypatch):
     import app.workers as workers
     from app.db import session_factory
-    from app.dispatcher import recover
+    from app.dispatcher import recover_lease
+    from app.errors import ProcessingError
     from app.models import Attempt, Job, now
+    from app.queue_models import ExecutionLease, JobStage
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    first_attempt = claim_job(job_id)
+    first_lease = claim_job(job_id)
     with session_factory()() as db:
-        db.get(Attempt, first_attempt).lease_expires_at = now() - timedelta(seconds=1)
+        db.get(ExecutionLease, first_lease).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        recover(db)
+    recover_lease(first_lease)
+    with session_factory()() as db:
+        stage = db.get(JobStage, db.get(ExecutionLease, first_lease).stage_id)
+        stage.available_at = now()
         db.commit()
-    second_attempt = claim_job(job_id)
-    assert second_attempt != first_attempt
-    monkeypatch.setattr(workers, "claim", lambda job, token: first_attempt)
+    second_lease = claim_job(job_id)
+    assert second_lease and second_lease != first_lease
     monkeypatch.setattr(workers, "redraw", lambda *args: pytest.fail("stale worker must not issue paid request"))
-    run_job(job_id)
+    with pytest.raises(ProcessingError, match="LEASE_EXPIRED"):
+        workers.run_control_stage(first_lease)
     with session_factory()() as db:
-        assert db.get(Attempt, first_attempt).call_started_at is None
-        assert db.get(Job, job_id).attempt_id == second_attempt
+        assert db.get(Attempt, db.get(Job, job_id).attempt_id).call_started_at is None
+        assert db.get(ExecutionLease, second_lease).generation == 2
 
 
 def test_saved_output_is_recovered_after_crash_before_database_commit(client, png):
-    from app.assets import write_object
+    from app.storage import get_store
     from app.db import session_factory
-    from app.dispatcher import recover
+    from app.dispatcher import recover_lease
     from app.models import Attempt, Job, now
+    from app.queue_models import ExecutionLease
     from conftest import claim_job as claim
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    attempt_id = claim(job_id)
+    lease_id = claim(job_id)
     with session_factory()() as db:
         job = db.get(Job, job_id)
-        attempt = db.get(Attempt, attempt_id)
+        attempt = db.get(Attempt, job.attempt_id)
         attempt.call_started_at = now() - timedelta(hours=1)
-        attempt.lease_expires_at = now() - timedelta(seconds=1)
+        db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        write_object(f"{job.owner_id}/{attempt_id}", png)
-        recover(db)
-        db.commit()
-        recover(db)
-        db.commit()
+        get_store(attempt.output_storage_backend).put(f"{job.owner_id}/{lease_id}", png, "image/png", kind="redraw")
+    recover_lease(lease_id)
+    recover_lease(lease_id)
+    with session_factory()() as db:
         assert db.get(Job, job_id).status == "succeeded"
-        assert db.get(Job, job_id).output_asset_id == attempt_id
-        assert db.get(Attempt, attempt_id).recovered
+        assert db.get(Job, job_id).output_asset_id == lease_id
+        assert db.get(Attempt, db.get(Job, job_id).attempt_id).recovered
     usage = quota_usage(client, auth)
     assert usage["used"] == 1 and usage["reserved"] == 0
 
@@ -189,23 +194,18 @@ def test_late_child_of_deleted_original_is_inaccessible_and_purged(client, png):
         assert db.get(Asset, output_id).purged_at is not None and not path.exists()
 
 
-def test_outbox_republishes_lost_queue_without_recreating_job(client, png, monkeypatch):
+def test_ready_stage_survives_reinitialization_without_recreating_job(client, png):
     from app.db import session_factory
-    from app.dispatcher import dispatch_once
-    from app.models import Outbox, now
-    import app.dispatcher as dispatcher
+    from app.db import initialize
+    from app.models import Job
+    from app.queue_models import JobStage
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    published = []
-    monkeypatch.setattr(dispatcher.process_job, "apply_async", lambda **kwargs: published.append(kwargs))
-    assert dispatch_once() == 1
-    assert dispatch_once() == 0
+    initialize()
     with session_factory()() as db:
-        event = db.scalar(select(Outbox).where(Outbox.job_id == job_id))
-        event.published_at = now() - timedelta(minutes=5)
-        db.commit()
-    assert dispatch_once() == 1
-    assert len(published) == 2 and published[0]["args"] == published[1]["args"] == [job_id]
+        assert db.scalar(select(func.count()).select_from(Job)) == 1
+        assert db.scalar(select(JobStage.status).where(JobStage.job_id == job_id)) == "ready"
+    assert claim_job(job_id)
 
 
 def test_chunked_body_rejected_before_unlimited_spool(client):
@@ -218,7 +218,7 @@ def test_chunked_body_rejected_before_unlimited_spool(client):
         yield b'--test-boundary\r\nContent-Disposition: form-data; name="image"; filename="x.png"\r\nContent-Type: image/png\r\n\r\n'
         yield b"x" * (1024 * 1024 + 200)
         yield b"\r\n--test-boundary--\r\n"
-    response = client.post("/v1/images", headers=headers, content=chunks())
+    response = client.post("/v1/translation-submissions", headers=headers, content=chunks())
     assert response.status_code == 413, response.text
 
 

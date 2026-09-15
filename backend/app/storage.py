@@ -1,4 +1,9 @@
-"""Private local/S3 object stores. Never log SDK requests or presigned URLs."""
+"""Private R2 object storage and an explicitly isolated local test adapter.
+
+Originals and final images live remotely. Local objects are disposable stage
+checkpoints only; an execution node must be able to rebuild them from R2.
+Never log SDK requests or presigned URLs.
+"""
 from datetime import timezone
 from functools import lru_cache
 import os
@@ -79,8 +84,10 @@ class S3Store:
             raise StorageError() from None
 
     def put(self, key, data, mime, *, kind=None):
-        if kind not in {"classic", "redraw"}:
-            raise ValueError("Remote storage accepts final translation results only")
+        if kind not in {"original", "upload", "classic", "redraw"}:
+            raise ValueError("Remote storage accepts originals, uploads and final translation results only")
+        if len(data) > settings().max_upload_bytes:
+            raise StorageError()
         # Bounded images use one atomic PUT; SDK retries overwrite the same key.
         self._call("put_object", **self._params(key), Body=data, ContentType=mime, CacheControl="private, no-store")
 

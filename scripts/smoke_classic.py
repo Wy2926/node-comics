@@ -7,6 +7,7 @@ import uuid
 import httpx
 from PIL import Image
 from io import BytesIO
+from submission_client import submit_page, download
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -19,22 +20,18 @@ if not args.record.replace('-', '').replace('_', '').isalnum():
     parser.error('record must be a simple name')
 folder = ROOT / 'private-test-data' / args.record
 folder.mkdir(parents=True, exist_ok=True)
-record = folder / 'operation.json'
+record = folder / 'cluster-operation.json'
 state = json.loads(record.read_text()) if record.exists() else {'key': str(uuid.uuid4())}
 record.write_text(json.dumps(state))
 
 with httpx.Client(base_url='http://127.0.0.1:18088', timeout=30, trust_env=False) as client:
     auth = client.post('/v1/auth/dev', json={'username': 'classic-smoke'}).raise_for_status().json()
     client.headers['Authorization'] = 'Bearer ' + auth['access_token']
-    if args.run and not state.get('job_id'):
-        if not state.get('asset_id'):
-            source = (args.image or ROOT / 'apps/extension/public/samples/starlight-bookshop.png').read_bytes()
-            asset = client.post('/v1/images', files={'image': ('sample.png', source, 'image/png')}).raise_for_status().json()
-            state['asset_id'] = asset['id']
-            (folder / 'original.png').write_bytes(source)
-            record.write_text(json.dumps(state))
-        result = client.post('/v1/translations/classic', data={'asset_id': state['asset_id'], 'target_language': 'zh-Hans'}, headers={'Idempotency-Key': state['key']}).raise_for_status().json()
+    if args.run:
+        source = (args.image or ROOT / 'apps/extension/public/samples/starlight-bookshop.png').read_bytes()
+        result = submit_page(client, source, state['key'], 'classic')
         state['job_id'] = result['id']
+        (folder / 'original.png').write_bytes(source)
         record.write_text(json.dumps(state))
     if not state.get('job_id'):
         raise SystemExit('No recorded task. Use --run to create one.')
@@ -49,13 +46,13 @@ with httpx.Client(base_url='http://127.0.0.1:18088', timeout=30, trust_env=False
             break
         time.sleep(3)
     (folder / 'job.json').write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding='utf-8')
-    detail = client.get('/v1/jobs/' + state['job_id'] + '/classic').raise_for_status().json()
+    detail = client.get('/v1/jobs/' + state['job_id'] + '/classic').raise_for_status().json() if job['input_asset_id'] else {'artifacts': {}, 'segments': [], 'translations': [], 'timings': {}}
     (folder / 'stages.json').write_text(json.dumps(detail, ensure_ascii=False, indent=2), encoding='utf-8')
     artifacts = dict(detail['artifacts'])
     if job.get('output_asset_id'):
         artifacts['result'] = job['output_asset_id']
     for name, asset_id in artifacts.items():
-        raw = client.get('/v1/images/' + asset_id + '/content').raise_for_status().content
+        raw = download(client, asset_id)
         with Image.open(BytesIO(raw)) as image:
             image.load()
         (folder / (name + '.png')).write_bytes(raw)

@@ -20,6 +20,6 @@ export function TranslationCopies({copies,userId,origin,onOpen}:{copies:ReadingC
    </article>;
   })}</div>
   {!visible.length&&<p className="nc-translation-empty">{!userId?'登录后显示当前账户在此服务上的插件译本。':'还没有对应的翻译结果。阅读时完成翻译后会自动归入这里。'}</p>}
-  {!!visible.length&&<p className="nc-translation-footnote">译本与原始副本共用阅读位置。打开已有结果不启动自动翻译；本地图片清理后，保留期内可恢复服务器译图。</p>}
+  {!!visible.length&&<p className="nc-translation-footnote">译本与原始副本共用阅读位置。打开已有结果不新建翻译任务；本地图片清理后，可恢复账户中仍可用的服务器原图与译图。</p>}
  </section>;
 }

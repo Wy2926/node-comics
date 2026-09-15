@@ -14,6 +14,7 @@ from pathlib import Path
 
 import httpx
 from PIL import Image
+from submission_client import submit_page, body_for, download
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,9 +33,9 @@ def main():
     parser.add_argument("--grant-plus", action="store_true", help="Explicitly grant this isolated local test account one PLUS month")
     parser.add_argument("--wait", action="store_true")
     args = parser.parse_args()
-    evidence = ROOT / "docs" / "evidence"
+    evidence = ROOT / "artifacts" / "cluster-smoke"
     evidence.mkdir(parents=True, exist_ok=True)
-    record_path = evidence / f"membership-live-{args.mode}.json"
+    record_path = evidence / f"cluster-live-{args.mode}.json"
     record = json.loads(record_path.read_text("utf-8")) if record_path.exists() else {
         "mode": args.mode, "username": f"acceptance-{args.mode}-{uuid.uuid4().hex[:10]}",
         "operation_id": str(uuid.uuid4()), "checks": [],
@@ -69,29 +70,22 @@ def main():
             raise RuntimeError("Test account requires PLUS or a valid redraw gift; explicitly use --grant-plus for a local test membership")
         sample = (ROOT / "samples" / "starlight-bookshop.png").read_bytes()
         record["input_sha256"] = hashlib.sha256(sample).hexdigest()
-        if "asset_id" not in record:
-            asset = checked(client.post("/v1/images", files={"image": ("sample.png", sample, "image/png")}), (200, 201))
-            record["asset_id"] = asset["id"]
-            save()
-        request_data = {"asset_id": record["asset_id"], "target_language": "zh-Hans"}
-        # Replaying this product operation is safe even if an earlier HTTP response was lost.
-        result = checked(client.post(f"/v1/translations/{args.mode}", data=request_data,
-                                     headers={"Idempotency-Key": record["operation_id"]}), (200, 202))
+        result = submit_page(client, sample, record["operation_id"], args.mode)
         record["job_id"] = result["id"]
         save()
-        replay = checked(client.post(f"/v1/translations/{args.mode}", data=request_data,
-                                     headers={"Idempotency-Key": record["operation_id"]}), (200, 202))
-        assert replay["id"] == result["id"], "Duplicate platform operation created another job"
+        replay = submit_page(client, sample, record["operation_id"], args.mode)
+        assert replay["id"] == result["id"]
         passed("duplicate_click_returns_same_job")
-        conflict = client.post(f"/v1/translations/{args.mode}", data={**request_data, "target_language": "en"},
+        conflict = client.post("/v1/translation-submissions", json=body_for(sample, record["operation_id"], args.mode, "en"),
                                headers={"Idempotency-Key": record["operation_id"]})
-        assert conflict.status_code == 409, f"Expected idempotency conflict, got {conflict.status_code}"
+        assert conflict.status_code == 409
         passed("idempotency_key_rejects_changed_payload")
         with httpx.Client(base_url=args.api, timeout=30, trust_env=False) as stranger:
             other = checked(stranger.post("/v1/auth/dev", json={"username": record["username"] + "-other"}))
             stranger.headers["Authorization"] = "Bearer " + other["access_token"]
             assert stranger.get(f"/v1/jobs/{record['job_id']}").status_code == 404
-            assert stranger.get(f"/v1/images/{record['asset_id']}/content").status_code == 404
+            if result["input_asset_id"]:
+                assert stranger.get(f"/v1/images/{result['input_asset_id']}/content").status_code == 404
             passed("another_user_cannot_read_job_or_original")
         deadline = time.monotonic() + (1200 if args.wait else 0)
         while True:
@@ -101,17 +95,16 @@ def main():
             save()
             print(json.dumps({"job_id": job["id"], "mode": args.mode, "status": job["status"],
                               "phase": job["phase"], "error": job.get("error")}, ensure_ascii=False), flush=True)
-            if job["status"] not in ("queued", "running") or time.monotonic() >= deadline:
+            if job["status"] not in ("awaiting_upload", "validating_upload", "queued", "running") or time.monotonic() >= deadline:
                 break
             time.sleep(5)
         if job["status"] == "succeeded":
-            output = client.get(f"/v1/images/{job['output_asset_id']}/content")
-            assert output.status_code == 200
-            picture = Image.open(io.BytesIO(output.content))
+            output = download(client, job["output_asset_id"])
+            picture = Image.open(io.BytesIO(output))
             picture.load()
             assert picture.width > 0 and picture.height > 0
             record["output"] = {"width": picture.width, "height": picture.height, "format": picture.format,
-                                "sha256": hashlib.sha256(output.content).hexdigest(), "bytes": len(output.content)}
+                                "sha256": hashlib.sha256(output).hexdigest(), "bytes": len(output)}
             output_path = evidence / f"translated-{args.mode}.png"
             picture.save(output_path)
             passed("delivered_image_downloaded_and_decoded")

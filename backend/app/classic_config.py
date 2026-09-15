@@ -1,4 +1,4 @@
-"""Immutable, secret-free classic configuration used in quotes and cache keys."""
+"""Immutable, secret-free classic stage configuration and cache identity."""
 from urllib.parse import urlsplit
 from .config import settings
 from .errors import problem
@@ -6,7 +6,7 @@ from .errors import problem
 
 def enabled():
     cfg = settings()
-    return bool(cfg.classic_enabled and cfg.text_api_key and cfg.text_base_url and cfg.classic_engine_token)
+    return bool(cfg.classic_enabled and cfg.text_api_key and cfg.text_base_url)
 
 
 def snapshot():
@@ -21,7 +21,7 @@ def snapshot():
     if not (1 <= cfg.text_max_attempts <= 3 and 128 <= cfg.text_max_output_tokens <= 8192
             and 128 <= cfg.text_group_bytes <= 16000 and 1 <= cfg.text_input_rate <= 1000
             and 1 <= cfg.text_output_rate <= 5000 and 1 <= cfg.text_timeout_seconds <= 180
-            and 1 <= cfg.classic_local_attempts <= 5 and 30 <= cfg.classic_timeout_seconds <= 3600
+            and 1 <= cfg.cluster_stage_attempts <= 10 and 30 <= cfg.classic_timeout_seconds <= 3600
             and 0 < cfg.text_page_budget_micros <= 10_000_000):
         problem("CLASSIC_CONFIG_INVALID", "常规翻译预算或次数限制无效", 503)
     return {"mode": "classic", "prompt_version": "classic-text-v1",
@@ -31,7 +31,7 @@ def snapshot():
                        "inpainting_strategy": "masked-crops-v1", "inpainting_padding": 48, "inpainting_merge_gap": 24,
                        "mask_dilation": 3, "font_minimum": 10, "font": "NotoSansMonoCJK-VF@b861b923e105",
                        "reading_order": "rtl", "render_version": "masked-png-v1"},
-            "local_attempts": cfg.classic_local_attempts,
+            "stage_attempts": cfg.cluster_stage_attempts,
             "text": {"base_url": cfg.text_base_url.rstrip("/"), "model": cfg.text_model,
                      "protocol": cfg.text_protocol, "user_agent": cfg.text_user_agent,
                      "timeout_seconds": cfg.text_timeout_seconds, "max_attempts": cfg.text_max_attempts,

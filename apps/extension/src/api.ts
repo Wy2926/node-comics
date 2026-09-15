@@ -1,8 +1,8 @@
-import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, ImageAsset, Job, Mode, TranslationPreview, Usage, User, UserQueue, UsageSummary, HistoryGroup, Paginated, FeedbackIssue, FeedbackRecord } from './types';
+import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, ModeQueue, SubmissionInput, SubmissionReceipt, UploadPlan, TranslationChanges, QueuePriority, PriorityReceipt, UsageSummary, SubmissionSummary, Paginated, FeedbackIssue, FeedbackRecord } from './types';
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool} from './concurrency';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null) { super(message); } }
-export function submissionRejected(error:unknown){return error instanceof ApiError&&['PREVIEW_EXPIRED','PREVIEW_CHANGED','PREVIEW_MISMATCH','PREVIEW_ALREADY_USED','DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','QUOTA_CONFLICT','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED','PLUS_REQUIRED','TOO_MANY_JOBS','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
+export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUEUE_FULL','READING_UPLOAD_RESERVED','INVALID_BATCH','RERUN_SOURCE_REQUIRED','RERUN_SOURCE_MISMATCH','UNKNOWN_COST_ACK_REQUIRED','IMAGE_TOO_LARGE','IMAGE_HASH_MISMATCH','INVALID_INPUT_ASSET','FILE_PAGE_CONFLICT','QUEUE_CAPACITY_EXCEEDED','INVALID_SUBMISSION','SUBMISSION_TOO_LARGE','DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','QUOTA_CONFLICT','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED','PLUS_REQUIRED','TOO_MANY_JOBS','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
 export class Api {
   constructor(public base: string, public token = '', public pool = new RequestPool(), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -22,13 +22,12 @@ export class Api {
   entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}
-  history(offset=0) {return this.request<Paginated<HistoryGroup>>(`/v1/translation-history?offset=${offset}&limit=12`);}
+  history(offset=0) {return this.request<Paginated<SubmissionSummary>>(`/v1/translation-submissions?offset=${offset}&limit=12`);}
   latestResult(jobId:string) {return this.request<{latest:Job|null;result:Job|null}>(`/v1/jobs/${encodeURIComponent(jobId)}/latest-result`);}
-  historyJobs(group:HistoryGroup,offset=0) {return group.kind==='batch'?this.request<Paginated<Job>>(`/v1/translation-batches/${encodeURIComponent(group.id)}?offset=${offset}&limit=30`):this.request<Job>(`/v1/jobs/${encodeURIComponent(group.id)}`).then(job=>({items:[job],total:1,next_offset:null}));}
+  async historyJobs(group:SubmissionSummary,offset=0) {const receipt=await this.submission(group.id);return {items:receipt.items.slice(offset,offset+30).map(item=>({...item.job,reused:!!item.reused})),total:receipt.items.length,next_offset:offset+30<receipt.items.length?offset+30:null};}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;output_asset_id?:string|null},key:string) {return this.request<FeedbackRecord>(`/v1/jobs/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(admin=false,offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/${admin?'admin':'me'}/feedback?offset=${offset}&limit=20`);}
   reviewFeedback(id:string,status:FeedbackRecord['status']) {return this.request<FeedbackRecord>(`/v1/admin/feedback/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status})});}
-  upload(blob: Blob, name: string, source?: FilePageSource) { const body = new FormData(); body.set('image', blob, name); if (source) { validateSource(source); body.set('file_hash', source.file_hash); body.set('page_index', String(source.page_index)); } return this.request<ImageAsset>('/v1/images', {method:'POST',body}); }
   async matchPages(pages: FilePageSource[], mode: Mode, target_language: string) {
     if (!pages.length || pages.length > 100) throw new ApiError('每次匹配需提供 1–100 页。', 'INVALID_PAGE_COUNT');
     pages.forEach(validateSource);
@@ -36,17 +35,33 @@ export class Api {
     if (!Array.isArray(result.items) || result.items.length !== pages.length || result.items.some((item, index) => item.file_hash !== pages[index].file_hash || item.page_index !== pages[index].page_index || !Array.isArray(item.jobs))) throw new ApiError('服务器匹配结果与请求页标识不一致。', 'INVALID_MATCH_RESPONSE');
     return result;
   }
-  queue() { return this.request<UserQueue>('/v1/me/queue'); }
-  preview(asset_ids: string[], mode: Mode, target_language: string, regenerate=false) { return this.request<TranslationPreview>('/v1/translation-previews', {method:'POST',body: JSON.stringify({asset_ids,mode,target_language,regenerate})}); }
-  batch(preview_id: string, max_quota_pages: number, key: string) { return this.request<{id: string; status: string; jobs: Job[]; quota_pages: number}>('/v1/translation-batches', {method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({preview_id,max_quota_pages})}); }
-  create(asset_id: string, mode: Mode, target_language: string, key: string) { const body = new FormData(); body.set('asset_id',asset_id); body.set('target_language',target_language); return this.request<Job>(`/v1/translations/${mode}`,{method:'POST',headers:{'Idempotency-Key':key},body}); }
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
-  rerun(id:string,key:string,preview_id:string,max_quota_pages:number,input_asset_id?:string) {return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/rerun`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({preview_id,max_quota_pages,...(input_asset_id?{input_asset_id}:{})})});}
+  queues() {return this.request<{items:ModeQueue[]}>('/v1/me/queues');}
+  queueItems(mode:Mode,offset=0) {return this.request<Paginated<Job>>(`/v1/me/queues/${mode}/items?offset=${offset}&limit=100`);}
+  submit(body:SubmissionInput,key:string) {return this.request<SubmissionReceipt>('/v1/translation-submissions',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
+  submission(id:string) {return this.request<SubmissionReceipt>(`/v1/translation-submissions/${encodeURIComponent(id)}`);}
+  completeUpload(id:string) {return this.request<Job>(`/v1/uploads/${encodeURIComponent(id)}/complete`,{method:'POST'});}
+  translationChanges(cursor?:string) {return this.request<TranslationChanges>(`/v1/me/translation-changes${cursor?'?cursor='+encodeURIComponent(cursor):''}`);}
+  priority(mode:Mode,body:QueuePriority) {return this.request<PriorityReceipt>(`/v1/me/queues/${mode}/priority`,{method:'POST',body:JSON.stringify(body)});}
+  pauseQueue(mode:Mode,paused:boolean) {return this.request<ModeQueue>(`/v1/me/queues/${mode}/pause`,{method:'POST',body:JSON.stringify({paused})});}
+  async uploadOriginal(plan:UploadPlan,blob:Blob) {
+    const url=new URL(plan.url,this.base),origin=new URL(this.base).origin,local=['127.0.0.1','localhost','[::1]'].includes(url.hostname);
+    if(url.username||url.password||url.protocol!=='https:'&&!(local&&url.protocol==='http:')||plan.method!=='PUT'||plan.authorization_required&&url.origin!==origin)throw new ApiError('原图上传授权地址无效。','INVALID_UPLOAD_PLAN');
+    if(Date.parse(plan.expires_at)<=Date.now())throw new ApiError('上传授权已到期，请刷新后继续。','UPLOAD_URL_EXPIRED');
+    return this.pool.run(async()=>{
+      assertCurrent(this.isCurrent);
+      let response:Response;
+      try {response=await fetch(url,{method:'PUT',body:blob,headers:{...plan.headers,...(plan.authorization_required?{Authorization:`Bearer ${this.token}`}:{})},credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});}
+      catch {throw new ApiError('原图上传暂未完成，请检查网络和对象存储跨域配置。','UPLOAD_FAILED');}
+      if(!response.ok)throw new ApiError('原图上传未完成，将刷新上传授权后重试。','UPLOAD_FAILED',response.status);
+      assertCurrent(this.isCurrent);
+    });
+  }
   async image(id: string, signal?: AbortSignal): Promise<Blob> {
     for (let attempt = 0; attempt < 2; attempt++) {
       signal?.throwIfAborted();
-      const access = await this.request<{url: string; expires_at: string; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`, {signal});
+      const access = await this.request<{url: string; expires_at: string|null; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`, {signal});
       const url = new URL(access.url, this.base);
       const signed = access.authorization_required === false;
       if (url.username || url.password || (signed ? url.protocol !== 'https:' : url.origin !== new URL(this.base).origin)) {
@@ -56,7 +71,7 @@ export class Api {
         assertCurrent(this.isCurrent);
         signal?.throwIfAborted();
         // Refresh after waiting in the request pool, without nesting pool slots.
-        if (signed && attempt === 0 && Date.parse(access.expires_at) <= Date.now()) return null;
+        if (signed && attempt === 0 && access.expires_at && Date.parse(access.expires_at) <= Date.now()) return null;
         let response: Response;
         try {
           response = await fetch(url, {

@@ -1,14 +1,15 @@
 import type { Job, JobStatus } from '../types';
-export const pendingStatuses: ReadonlySet<JobStatus> = new Set(['queued', 'running', 'outcome_unknown']);
+export const pendingStatuses: ReadonlySet<JobStatus> = new Set(['awaiting_upload', 'validating_upload', 'queued', 'running', 'outcome_unknown']);
 const statusRank: Record<JobStatus, number> = {
-  queued: 0, running: 1, outcome_unknown: 2, failed: 3, cancelled: 3, no_text: 3, succeeded: 4,
+  awaiting_upload: -2, validating_upload: -1, queued: 0, running: 1, outcome_unknown: 2, unknown_released:3, failed: 3, cancelled: 3, no_text: 3, succeeded: 4,
 };
 /** Late snapshots cannot regress a task or resurrect a deleted/expired result. */
 export function mergeJobs(previous: Job[], incoming: Job[]): Job[] {
   const jobs = new Map(previous.map(job => [job.id, job]));
   for (const job of incoming) {
     const old = jobs.get(job.id);
-    if (old && statusRank[job.status] < statusRank[old.status])
+    if(old?.change_sequence!==undefined&&job.change_sequence!==undefined&&job.change_sequence<old.change_sequence)continue;
+    if (old && statusRank[job.status] < statusRank[old.status] && !(job.change_sequence!==undefined&&job.change_sequence>(old.change_sequence??-1)) && !(job.updated_at&&(!old.updated_at||job.updated_at>old.updated_at)))
       continue;
     const tombstone = old?.status === 'succeeded' && !old.output_asset_id;
     jobs.set(job.id, tombstone && job.output_asset_id

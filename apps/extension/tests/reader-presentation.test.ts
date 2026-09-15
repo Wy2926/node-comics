@@ -3,7 +3,7 @@ import {type Job,type Page} from '../src/types';
 import {pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
 import {emptyPage} from '../src/reader/model';
 
-import {applyMatch,planTranslation,rerunSource,sourceKey} from '../src/reader/recovery';
+import {applyMatch,planTranslation,sourceKey} from '../src/reader/recovery';
 import {settings} from '../src/library/store';
 const origin='https://api.example';
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
@@ -62,7 +62,6 @@ describe('display projection and submission',()=>{
     const restored=applyMatch(p,match,'alice',origin);const result={matches:new Map([[sourceKey(match),match]]),errors:new Map()};
     expect(planTranslation([restored],result,'classic','zh-Hans').selected).toEqual([]);
     expect(planTranslation([restored],result,'classic','zh-Hans',true).selected).toHaveLength(1);
-    expect(rerunSource(restored,match,'classic','zh-Hans')).toMatchObject({jobId:'first',inputAssetId:'new-source'});
   });
   it.each(['queued','running','outcome_unknown'] as const)('blocks rerun while a fresh display lookup finds %s',status=>{
     const p=page([]);const match={file_hash:p.fileHash!,page_index:0,asset:null,jobs:[],display_jobs:[job('current',status,2)]};
@@ -75,7 +74,7 @@ describe('local preferences and original recovery',()=>{
     vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({autoTranslate:true,autoLimit:2.5,appearance:'wrong',accentTheme:'wrong',textScale:0,language:'en'})});
     expect(settings()).not.toHaveProperty('autoTranslate');
     expect(settings()).not.toHaveProperty('autoLimit');
-    expect(settings()).toMatchObject({autoAhead:10,appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
+    expect(settings()).toMatchObject({appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
   });
 
 });

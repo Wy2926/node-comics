@@ -2,12 +2,14 @@
 import asyncio
 import json
 import unittest
+import tempfile
 from unittest.mock import AsyncMock, patch
 
 import numpy as np
 from fastapi import HTTPException
 
 import server
+from runtime import DeviceLock, ImageCache
 
 
 class Request:
@@ -20,19 +22,27 @@ class Request:
 
 class StageTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        server.lock = DeviceLock('isolated-test-device', self.temp.name)
+        server.cache = ImageCache(1024 * 1024, 60)
         self.image = np.full((64, 80, 3), 200, np.uint8)
         self.body = {'image': server.png(self.image), 'config': {'version': server.VERSION},
-                     'analysis': {'mask': 'stage-only-test'}}
+                     'scope': 'task-1', 'analysis': {'mask': 'stage-only-test'}}
 
     async def test_inpaint_needs_no_translation_or_language(self):
         with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase:
             result = await server.process('inpaint', Request(self.body))
         erase.assert_awaited_once()
         self.assertEqual((result['width'], result['height'], result['version']), (80, 64, server.VERSION))
-        self.assertEqual(result['cleaned'], self.body['image'])
+        self.assertTrue(result['cached'])
+        self.assertEqual(len(result['cache_key']), 64)
+        self.assertNotIn('cleaned', result)
 
     async def test_render_receives_cleaned_image_without_calling_inpaint(self):
-        self.body.update(cleaned=self.body['image'], translations={'b001': 'translated'}, language='en')
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})):
+            painted = await server.process('inpaint', Request(self.body))
+        self.body.update(cache_key=painted['cache_key'], translations={'b001': 'translated'}, language='en')
         with patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})) as render, \
              patch.object(server, 'erase_page', new=AsyncMock()) as erase:
             await server.process('render', Request(self.body))
@@ -40,10 +50,29 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
         render.assert_awaited_once()
         np.testing.assert_array_equal(render.call_args.args[-1], self.image)
 
-    async def test_missing_cleaned_image_fails_without_falling_back_to_inpaint(self):
+    async def test_new_node_rebuilds_missing_cache_without_needing_text_provider(self):
         self.body.update(translations={}, language='en')
-        with patch.object(server, 'erase_page', new=AsyncMock()) as erase:
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase, \
+             patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})) as render:
             result = await server.process('render', Request(self.body))
+        self.assertTrue(result['cache_rebuilt'])
+        erase.assert_awaited_once()
+        render.assert_awaited_once()
+
+    async def test_cache_scope_prevents_cross_task_reuse(self):
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})):
+            painted = await server.process('inpaint', Request(self.body))
+        self.body.update(scope='task-2', cache_key=painted['cache_key'], translations={}, language='en')
+        with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.body['image']})) as erase, \
+             patch.object(server, 'render_page', new=AsyncMock(return_value={'image': self.body['image']})):
+            result = await server.process('render', Request(self.body))
+        self.assertTrue(result['cache_rebuilt'])
+        erase.assert_awaited_once()
+
+    async def test_checkpoint_limit_rejected_before_device_execution(self):
+        self.body['analysis'] = {'text': 'x' * server.MAX_CHECKPOINT}
+        with patch.object(server, 'erase_page', new=AsyncMock()) as erase:
+            result = await server.process('inpaint', Request(self.body))
         self.assertEqual(result.status_code, 422)
         erase.assert_not_awaited()
 

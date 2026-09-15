@@ -8,9 +8,9 @@ from conftest import login_plus as login, upload
 
 
 def seed_history(client, png, count=15):
-    from app.batch_items import BatchItem
+    from app.queue_models import Submission, SubmissionItem
     from app.db import session_factory
-    from app.models import Asset, Batch, Job, now
+    from app.models import Asset, Job, now
     auth = login(client)
     source_id = upload(client, auth, png)
     with session_factory()() as db:
@@ -24,17 +24,18 @@ def seed_history(client, png, count=15):
         db.flush()
         ids = []
         for n in range(count):
-            batch = Batch(owner_id=source.owner_id, preview_id=f'preview-{n}', idempotency_key=f'batch-{n}',
+            batch = Submission(owner_id=source.owner_id, mode='classic',target_language='zh-Hans', idempotency_key=f'submission-{n}',
                           request_hash='a'*64, quota_pages=1, created_at=now()+timedelta(seconds=n))
             db.add(batch)
             db.flush()
             job = Job(owner_id=source.owner_id, input_asset_id=source.id, output_asset_id=output.id,
-                      batch_id=batch.id, ordinal=0, mode='classic', target_language='zh-Hans',
+                      source_sha256=source.sha256, ordinal=0, mode='classic', target_language='zh-Hans',
                       status='succeeded', settlement='settled', quota_kind='classic_daily', quota_pages=1, config={},
                       idempotency_key=f'job-{n}', operation='fixture', request_hash='a'*64, cache_key='b'*64)
             db.add(job)
             db.flush()
-            db.add(BatchItem(batch_id=batch.id, ordinal=0, job_id=job.id, input_asset_id=source.id))
+            db.add(SubmissionItem(submission_id=batch.id, ordinal=0, client_item_id='page-0',
+                                  job_id=job.id, descriptor={}, reused=False))
             ids.append(batch.id)
         db.commit()
         return auth, source_id, output.id, ids
@@ -50,19 +51,19 @@ def test_history_query_count_is_constant_and_pagination_is_complete(client, png,
         statements.append(statement)
     event.listen(engine(), 'before_cursor_execute', record)
     try:
-        small = client.get('/v1/translation-history?limit=1', headers=auth)
+        small = client.get('/v1/translation-submissions?limit=1', headers=auth)
         assert small.status_code == 200
         small_count = len(statements)
         statements.clear()
-        first = client.get('/v1/translation-history?limit=12', headers=auth).json()
-        assert len(statements) == small_count == 4  # Identity + count + groups + projected rows.
+        first = client.get('/v1/translation-submissions?limit=12', headers=auth).json()
+        assert len(statements) == small_count  # The page size must not add per-submission queries.
         assert not any('jobs.config' in sql for sql in statements)
         assert [item['id'] for item in first['items']] == list(reversed(ids))[:12]
         assert first['total'] == 15 and first['next_offset'] == 12
-        last = client.get('/v1/translation-history?offset=12&limit=12', headers=auth).json()
+        last = client.get('/v1/translation-submissions?offset=12&limit=12', headers=auth).json()
         assert len(last['items']) == 3 and last['next_offset'] is None
-        assert client.get('/v1/translation-history?offset=99', headers=auth).json()['items'] == []
-        assert client.get('/v1/translation-history', headers=login(client, 'bob')).json()['total'] == 0
+        assert client.get('/v1/translation-submissions?offset=99', headers=auth).json()['items'] == []
+        assert client.get('/v1/translation-submissions', headers=login(client, 'bob')).json()['total'] == 0
     finally:
         event.remove(engine(), 'before_cursor_execute', record)
 
@@ -73,24 +74,24 @@ def test_history_expiry_is_database_authoritative(client, png, target, field):
     from app.db import session_factory
     from app.models import Asset, now
     auth, source, output, _ = seed_history(client, png, count=1)
-    assert client.get('/v1/translation-history', headers=auth).json()['items'][0]['counts'] == {'succeeded':1}
+    assert client.get('/v1/translation-submissions', headers=auth).json()['items'][0]['counts'] == {'succeeded':1}
     with session_factory()() as db:
         setattr(db.get(Asset, source if target == 'source' else output), field, now()-timedelta(seconds=1))
         db.commit()
-    group = client.get('/v1/translation-history', headers=auth).json()['items'][0]
+    group = client.get('/v1/translation-submissions', headers=auth).json()['items'][0]
     assert group['counts'] == {'expired':1} and group['settled'] == 1
 
 
 def test_history_duplicate_references_count_pages_but_charge_once(client, png):
-    from app.batch_items import BatchItem
+    from app.queue_models import Submission, SubmissionItem
     from app.db import session_factory
     from app.models import Job
     auth, source, _, ids = seed_history(client, png, count=1)
     with session_factory()() as db:
-        job = db.scalar(select(Job).where(Job.batch_id == ids[0]))
+        job = db.scalar(select(Job).join(SubmissionItem,SubmissionItem.job_id==Job.id).where(SubmissionItem.submission_id == ids[0]))
         job.quality_flags = ['unrecognized_regions']
-        db.add(BatchItem(batch_id=ids[0], ordinal=1, job_id=job.id, input_asset_id=source))
+        db.add(SubmissionItem(submission_id=ids[0], ordinal=1, client_item_id='page-1', job_id=job.id, descriptor={}, reused=True))
         db.commit()
-    group = client.get('/v1/translation-history', headers=auth).json()['items'][0]
+    group = client.get('/v1/translation-submissions', headers=auth).json()['items'][0]
     assert group['page_count'] == 2 and group['counts'] == {'partial':2}
     assert group['settled'] == 1 and group['asset_ids'] == [source, source]

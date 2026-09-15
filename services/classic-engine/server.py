@@ -1,5 +1,4 @@
 """Private stage service. No LLM credentials, task database or public ports."""
-import asyncio
 import base64
 from contextlib import asynccontextmanager, redirect_stdout, redirect_stderr
 import hashlib
@@ -15,7 +14,7 @@ import cv2
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 import torch
 from manga_translator.config import OcrConfig, InpainterConfig
 from manga_translator.detection.default import DefaultDetector
@@ -26,26 +25,58 @@ from manga_translator.mask_refinement import dispatch as refine
 from manga_translator.rendering import dispatch as render, text_render
 from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
 from local_inpainting import inpaint_regions
+from runtime import DeviceLock, ImageCache, cache_key
 
-VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v3-parallel')
+VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v4-cluster')
+DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
+if DEVICE == 'cuda':
+    DEVICE = 'cuda:0'
+RESOURCE_ID = os.environ.get('ENGINE_RESOURCE_ID', DEVICE)
 FONT = '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc'
 LANG = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'en': 'ENG', 'ko': 'KOR'}
 Image.MAX_IMAGE_PIXELS = 24_000_000
-lock = asyncio.Lock()
+lock = DeviceLock(RESOURCE_ID, os.environ.get('ENGINE_LOCK_DIR', '/tmp/comics-device-locks'))
+cache = ImageCache(int(os.environ.get('ENGINE_CACHE_BYTES', str(256 * 1024 * 1024))),
+                   int(os.environ.get('ENGINE_CACHE_TTL_SECONDS', '900')))
+MAX_CHECKPOINT = 4 * 1024 * 1024
+MAX_RESPONSE = 96 * 1024 * 1024
 models = {}
+ready = False
 
 
 @asynccontextmanager
 async def lifespan(app):
+    global ready
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '4')))
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
     text_render.FALLBACK_FONTS = [FONT]
-    with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
-        models.update(detector=DefaultDetector(), ocr=Model48pxOCR(), inpainter=LamaLargeInpainter())
-        for model in models.values():
-            await model.load('cpu')
-    yield
+    # Fail startup instead of silently moving a requested GPU workload to CPU.
+    if DEVICE != 'cpu' and not DEVICE.startswith('cuda'):
+        raise RuntimeError('ENGINE_DEVICE must be cpu or cuda[:index]')
+    if DEVICE.startswith('cuda'):
+        if not torch.cuda.is_available():
+            raise RuntimeError('Configured CUDA device is unavailable')
+        torch.cuda.set_device(torch.device(DEVICE))
+    async with lock.hold():
+        with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
+            models.update(detector=DefaultDetector(), ocr=Model48pxOCR(), inpainter=LamaLargeInpainter())
+            for model in models.values():
+                await model.load(DEVICE)
+            # Warm both device pipelines before reporting admission readiness.
+            sample = np.full((256, 256, 3), 255, np.uint8)
+            await models['detector'].detect(sample, 256, 0.5, 0.7, 2.3, False, False, False, False, False)
+            warm_mask = np.zeros((256, 256), np.uint8)
+            warm_mask[120:128, 120:128] = 255
+            await models['inpainter'].inpaint(sample, warm_mask, InpainterConfig(inpainting_precision='fp32'), 256, False)
+    ready = True
+    try:
+        yield
+    finally:
+        ready = False
+        cache.entries.clear()
+        cache.size = 0
+        models.clear()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -59,15 +90,18 @@ def authorized(authorization: str = Header(default='')):
 
 @app.get('/health')
 def health():
-    return {'ready': len(models) == 3, 'version': VERSION}
+    return {'ready': ready, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
+            'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size}
 
 
 def decode(value, mode='RGB'):
+    if not isinstance(value, str) or len(value) > 32 * 1024 * 1024:
+        raise ValueError('Image size')
     raw = base64.b64decode(value, validate=True)
     if len(raw) > 24 * 1024 * 1024:
         raise ValueError('Image size')
     with Image.open(BytesIO(raw)) as image:
-        if image.width * image.height > 24_000_000 or max(image.size) > 8192:
+        if image.width * image.height > 24_000_000 or max(image.size) > 8192 or getattr(image, 'n_frames', 1) != 1:
             raise ValueError('Image dimensions')
         return np.array(image.convert(mode))
 
@@ -174,22 +208,45 @@ async def process(stage: str, request: Request):
     raw = bytearray()
     async for chunk in request.stream():
         raw.extend(chunk)
-        if len(raw) > (128 if stage == 'render' else 64) * 1024 * 1024:
+        if len(raw) > 40 * 1024 * 1024:
             raise HTTPException(413)
     try:
         body = json.loads(raw)
         if body['config']['version'] != VERSION:
             raise HTTPException(409, 'Engine version changed')
         image = decode(body['image'])
-        async with lock:
+        input_hash = hashlib.sha256(base64.b64decode(body['image'], validate=True)).hexdigest()
+        if stage != 'analyze' and len(json.dumps(body['analysis'], allow_nan=False).encode()) > MAX_CHECKPOINT:
+            raise ValueError('Checkpoint size')
+        async with lock.hold():
             with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
                 if stage == 'analyze':
                     result = await analyze(image, body['config'])
+                    if len(json.dumps(result, allow_nan=False).encode()) > MAX_CHECKPOINT:
+                        raise ValueError('Checkpoint size')
                 elif stage == 'inpaint':
+                    key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
                     result = await erase_page(image, body['analysis'], body['config'])
+                    cached = cache.put(key, base64.b64decode(result.pop('cleaned'), validate=True))
+                    result.update(cache_key=key, cached=cached)
                 else:
-                    result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'], decode(body['cleaned']))
-        return {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': hashlib.sha256(image.tobytes()).hexdigest()}
+                    key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
+                    cleaned = cache.get(key) if body.get('cache_key') == key else None
+                    recovered = cleaned is None
+                    recovery_timings = {}
+                    if recovered:
+                        erased = await erase_page(image, body['analysis'], body['config'])
+                        cleaned = base64.b64decode(erased['cleaned'], validate=True)
+                        recovery_timings = erased.get('timings', {})
+                        cache.put(key, cleaned)
+                    result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'],
+                                               decode(base64.b64encode(cleaned).decode()))
+                    result['cache_rebuilt'] = recovered
+                    result['timings'] = {**recovery_timings, **result.get('timings', {})}
+        response = {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': input_hash}
+        if len(json.dumps(response, allow_nan=False).encode()) > MAX_RESPONSE:
+            raise ValueError('Response size')
+        return response
     except HTTPException:
         raise
     except Exception:

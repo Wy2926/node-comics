@@ -1,8 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Api } from '../api';
-import { fallbackLanguages, type Capabilities, type Settings, type UserQueue } from '../types';
+import { fallbackLanguages, type Capabilities, type Settings, type ModeQueue } from '../types';
 import { normalizeConcurrency } from '../concurrency';
-import { normalizeAhead } from '../reader/automatic';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
@@ -20,15 +19,15 @@ type Props = {
 export function Preferences({ api, account, settings, setSettings, caps, cacheBytes, onClearCache, onSaveApiAddress }: Props) {
   const [apiDraft, setApiDraft] = useState(settings.apiBase);
   useEffect(() => setApiDraft(settings.apiBase), [settings.apiBase]);
-  const [queue, setQueue] = useState<UserQueue>();
+  const [queue, setQueue] = useState<ModeQueue[]>([]);
   const [queueError, setQueueError] = useState('');
   useEffect(() => {
     if (!account)
       return;
     let active = true;
-    void api.queue().then(value => {
+    void api.queues().then(value => {
       if (active && api.isCurrent()) {
-        setQueue(value);
+        setQueue(value.items);
         setQueueError('');
       }
     }).catch(e => {
@@ -58,10 +57,7 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
           <option value="single">单页翻页</option>
         </select>
       </SettingRow>
-      <SettingRow title="自动翻译提前页数" description="跟随当前阅读位置，不限制本次总页数；默认提前 10 页，可设 0–50 页。">
-        <label className="unit-input">
-          <input aria-label="自动翻译提前页数" type="number" min="0" max="50" value={settings.autoAhead} onChange={e => setSettings(s => ({ ...s, autoAhead: normalizeAhead(e.target.value) }))} /> 页 / 向后预译</label>
-      </SettingRow>
+
     </section>
     <section className="settings-card">
       <h3>
@@ -78,7 +74,7 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
       </SettingRow>
       <div className="privacy-note">
         <Icon name="shield" />
-        <p>服务器原图与译图暂存 {caps?.retention_days ?? 7} 天。图片归你的账户私有，不接收源网站 Cookie，也不会公开分享。</p>
+        <p>原图与译图保存在私有对象存储；{caps?.retention_days?`当前服务设置 ${caps.retention_days} 天保留期`:'当前长期保留，未设自动清理'}。图片归你的账户私有，不接收源网站 Cookie，也不会公开分享；用户主动删除或未来清理策略仍可能使资源不可用。</p>
       </div>
     </section>
     <section className="settings-card">
@@ -88,7 +84,7 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
         <label className="unit-input">
           <input aria-label="本机请求并发" type="number" min="1" max="10" step="1" value={settings.requestConcurrency} onChange={e => setSettings(s => ({ ...s, requestConcurrency: normalizeConcurrency(Number(e.target.value)) }))} /> 个</label>
       </SettingRow>{account && <>
-        <SettingRow title="账户翻译队列并发" description={queue ? `套餐上限 ${queue.concurrency}。等待 ${queue.queued} / 已派发 ${queue.dispatched} / 执行中 ${queue.running}。所有设备、批次和翻译模式共享名额。` : '正在读取套餐执行上限；与本机上传、下载并发独立。'}><span>{queue?.concurrency??'—'} 个任务</span></SettingRow>{queueError && <p className="inline-error">队列状态读取失败：{queueError}</p>}</>}<SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
+        {queue.map(value=><SettingRow key={value.mode} title={value.mode==='classic'?'常规翻译队列':'AI 重绘队列'} description={`等待 ${value.queued} / 处理中 ${value.running}，实时名额 ${value.realtime_limit}。空闲资源可借用，同级用户按套餐权重公平分配。`}><span>{value.in_flight} / {value.capacity} 页</span></SettingRow>)}{queueError && <p className="inline-error">队列状态读取失败：{queueError}</p>}</>}<SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
         <input aria-label="后端服务地址" className="api-input" type="url" value={apiDraft} onChange={e => setApiDraft(e.target.value)} />
         <button className="button secondary small" onClick={() => void onSaveApiAddress(apiDraft)}>保存并连接</button>
       </SettingRow>

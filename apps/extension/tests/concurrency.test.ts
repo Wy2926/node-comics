@@ -19,7 +19,7 @@ describe('front-end request concurrency', () => {
       return String(url).endsWith('/result') ? new Response(new Blob(['image'])) : Response.json({id: 'asset'});
     });
     const api = new Api('https://api.example', 'token', new RequestPool(concurrency));
-    await Promise.all(Array.from({length: 25}, (_, i) => i % 2 ? api.upload(new Blob(['a']), 'a.png') : api.image(`result-${i}`)));
+    await Promise.all(Array.from({length: 25}, (_, i) => i % 2 ? api.uploadOriginal({id:'upload',url:'https://api.example/upload',method:'PUT',headers:{},expires_at:'2099-01-01'},new Blob(['a'])) : api.image(`result-${i}`)));
     expect(peak).toBe(concurrency);expect(calls.some(url => url.endsWith('/result'))).toBe(true);
   });
   it('allows later pages to finish after one page fails and keeps selection order', async () => {
@@ -41,7 +41,7 @@ describe('front-end request concurrency', () => {
     const blocking = pool.run(() => new Promise<void>(resolve => {release=resolve;}));await pause();
     const fetch = vi.fn();vi.stubGlobal('fetch', fetch);
     const api = new Api('https://api.example', 'old-token', pool, () => current);
-    const request = api.upload(new Blob(['a']), 'a.png').catch(error => error);
+    const request = api.uploadOriginal({id:'upload',url:'https://api.example/upload',method:'PUT',headers:{},expires_at:'2099-01-01'},new Blob(['a'])).catch(error => error);
     current=false;release();await blocking;expect(await request).toBeInstanceOf(StaleOperation);expect(fetch).not.toHaveBeenCalled();
   });
 });

@@ -47,17 +47,15 @@ def test_content_match_is_private_and_uses_input_not_output_hash(client,png,monk
     assert match(client,{},[source(png)]).status_code==401
 
 
-@pytest.mark.parametrize('state',['deleted','expired','missing'])
+@pytest.mark.parametrize('state',['deleted','expired'])
 def test_content_fallback_never_returns_invalid_source(client,png,state):
     from app.db import session_factory
-    from app.assets import object_path
     from app.models import Asset,now
     auth=login(client);asset=bind(client,auth,png).json()['id']
     with session_factory()() as db:
         record=db.get(Asset,asset)
         if state=='deleted':record.deleted_at=now()
         elif state=='expired':record.expires_at=now()-timedelta(seconds=1)
-        else:object_path(record.storage_key).unlink()
         db.commit()
     assert match(client,auth,[source(png)]).json()['items'][0]['asset'] is None
     # A live duplicate cannot resurrect an already-invalid file mapping.
@@ -106,7 +104,10 @@ def test_completed_submission_cache_hits_by_content_without_second_charge(client
     job=complete(client,auth,asset,png,monkeypatch)
     before=quota_usage(client, auth)
     alias=bind(client,auth,png,file_hash='d'*64).json()['id']
-    cached=create(client,auth,alias,key='repacked').json()
-    assert cached['cache_hit'] and cached['quota_pages']==0 and cached['settlement']=='free'
+    from conftest import submit_asset
+    receipt=submit_asset(client,auth,alias,key='repacked').json()
+    assert receipt['items'][0]['reused'] is True and receipt['quota_pages'] == 0
+    cached=receipt['items'][0]['job']
+    assert cached['id']==job['id']  # The submission item is reused; no new business job is billed.
     assert cached['output_asset_id']==job['output_asset_id']
     assert quota_usage(client, auth)==before

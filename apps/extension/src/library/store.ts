@@ -1,5 +1,4 @@
 import { defaults, type ReadingCopy, type Settings, type User } from '../types';
-import {normalizeAhead} from '../reader/automatic';
 import {normalizeConcurrency} from '../concurrency';
 import {mergeJobs} from '../reader/jobs';
 import {attachCopy,emptyLibrary,validateLibrary} from './model';
@@ -33,7 +32,7 @@ export async function saveCopy(copy: ReadingCopy):Promise<void>{
       const pages=input.map(page=>{
         const existing=previous?.pages.find(p=>p.id===page.id);
         if(!existing||page.ownerId&&(page.ownerId!==existing.ownerId||page.apiOrigin!==existing.apiOrigin))return page;
-        const useExistingAsset=!page.assetId||Date.parse(existing.assetExpiresAt??'')>Date.parse(page.assetExpiresAt??'');
+        const useExistingAsset=!page.assetId||(page.assetExpiresAt===undefined&&existing.assetExpiresAt!==undefined);
         const blobKey=page.blobKey??existing.blobKey;
         return {...page,...(!page.blobKey&&existing.blobKey?{width:existing.width,height:existing.height,imageSha256:existing.imageSha256,fileHash:existing.fileHash,pageIndex:existing.pageIndex,sourceUrl:existing.sourceUrl}:{}),blobKey:blobKey&&available.has(blobKey)?blobKey:undefined,outputBlobs:Object.fromEntries(Object.entries({...existing.outputBlobs,...page.outputBlobs}).filter(([,key])=>available.has(key))),...(useExistingAsset?{assetId:existing.assetId,assetExpiresAt:existing.assetExpiresAt,ownerId:existing.ownerId,apiOrigin:existing.apiOrigin}:{}),jobs:mergeJobs(existing.jobs,page.jobs)};
       });
@@ -52,7 +51,7 @@ export function settings(): Settings {
     const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged=knownSettings(value);
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,autoAhead:normalizeAhead(value.autoAhead),requestConcurrency:normalizeConcurrency(value.requestConcurrency)};
+    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,requestConcurrency:normalizeConcurrency(value.requestConcurrency)};
   } catch {return {...defaults};}
 }
 function knownSettings(value:Partial<Settings>):Settings {

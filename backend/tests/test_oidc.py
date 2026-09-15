@@ -13,6 +13,11 @@ def oidc(client, monkeypatch):
     from app.config import settings
 
     monkeypatch.setenv("DEV_AUTH", "false")
+    monkeypatch.setenv("RESULT_STORAGE_BACKEND", "r2")
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://" + "a" * 32 + ".r2.cloudflarestorage.com")
+    monkeypatch.setenv("R2_BUCKET", "isolated-oidc-test")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "isolated-not-real")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "isolated-not-real")
     monkeypatch.setenv("OIDC_ISSUER", "https://identity.example.test/oidc")
     monkeypatch.setenv("OIDC_AUDIENCE", "https://comics.example.test/api")
     monkeypatch.setenv("OIDC_JWKS_URL", "https://identity.example.test/oidc/jwks")

@@ -6,16 +6,14 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
-from conftest import create, login_plus as login, preview, run_job, upload, png_variant
+from conftest import create, login_plus as login, submit_asset, run_job, upload, png_variant
 from test_file_pages import FILE_HASH, bind, complete
 
 
 def rerun(client, auth, job, asset=None, key="rerun-latest"):
-    price = preview(client, auth, asset or job["input_asset_id"])
-    response = client.post(f"/v1/jobs/{job['id']}/rerun", headers={**auth, "Idempotency-Key": key},
-                           json={"preview_id": price["id"], "max_quota_pages": price["quota_pages"], **({"input_asset_id": asset} if asset else {})})
+    response = submit_asset(client, auth, asset or job['input_asset_id'], key=key, regenerate=True, rerun_job_id=job['id'])
     assert response.status_code == 202, response.text
-    return response.json()
+    return response.json()['items'][0]['job']
 
 
 def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypatch):
@@ -52,6 +50,7 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
 
 def test_latest_effect_survives_pending_and_failure_but_never_expired_fallback(client, png, monkeypatch):
     from app.db import session_factory
+    from app.jobs import settle
     from app.models import Asset, Job, Provider, now
     auth = login(client)
     asset = bind(client, auth, png).json()["id"]
@@ -68,6 +67,7 @@ def test_latest_effect_survives_pending_and_failure_but_never_expired_fallback(c
     third = rerun(client, auth, second, key="failed-third")
     with session_factory()() as db:
         job = db.get(Job, third["id"]);job.status = "failed";job.completed_at = now()
+        settle(db, job, success=False)
         output = db.get(Asset, db.get(Job, second["id"]).output_asset_id);output.deleted_at = now()
         db.commit()
     result = client.get(latest_route, headers=auth).json()
@@ -98,18 +98,14 @@ def test_rerun_after_original_reimport_checks_same_bytes_and_receipt(client, png
         db.get(Asset, old_asset).expires_at = now() - timedelta(days=1);db.commit()
     new_asset = bind(client, auth, png).json()["id"]
     assert old_asset != new_asset
-    price = preview(client, auth, new_asset)
-    body = {"preview_id": price["id"], "max_quota_pages": price["quota_pages"], "input_asset_id": new_asset}
-    route = f"/v1/jobs/{first['id']}/rerun"
-    headers = {**auth, "Idempotency-Key": "restore-rerun"}
-    created = client.post(route, headers=headers, json=body)
+    created = submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id'])
     assert created.status_code == 202, created.text
-    assert created.json()["input_asset_id"] == new_asset
+    assert created.json()['items'][0]['job']['input_asset_id'] == new_asset
     before = quota_usage(client, auth)
-    assert client.post(route, headers=headers, json=body).json()["id"] == created.json()["id"]
+    assert submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id']).json()['id'] == created.json()['id']
     assert quota_usage(client, auth) == before
     wrong_asset = upload(client, auth, png_variant(png, 23))
-    assert client.post(route, headers={**auth, "Idempotency-Key": "wrong-page"}, json={**body,"input_asset_id":wrong_asset}).json()["error"]["code"] == "RERUN_SOURCE_MISMATCH"
+    assert submit_asset(client,auth,wrong_asset,key='wrong-page',regenerate=True,rerun_job_id=first['id']).json()['error']['code'] == 'RERUN_SOURCE_MISMATCH'
 
 
 def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png, monkeypatch):
@@ -142,29 +138,29 @@ def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png
     assert client.get("/v1/me/usage/summary", headers=login(client,"empty")).json()["delivered"] == 0
 
 
-def test_history_counts_whole_batch_and_does_not_rebill_shared_jobs(client, png, monkeypatch):
+def test_history_counts_whole_submission_and_does_not_rebill_shared_jobs(client, png, monkeypatch):
     from app.db import session_factory
-    from app.models import Asset, Batch, Job, User, now
-    from app.batch_items import BatchItem
+    from app.models import Asset, Job, User, now
+    from app.queue_models import Submission, SubmissionItem
     auth = login(client)
     completed = complete(client, auth, upload(client, auth, png), png, monkeypatch)
     with session_factory()() as db:
-        first = db.get(Job,completed["id"])
-        batch=Batch(owner_id=first.owner_id,preview_id="test-full-batch",idempotency_key="test-full-batch",request_hash="a"*64,quota_pages=35)
-        db.add(batch);db.flush();batch_id=batch.id
+        first = db.get(Job,completed['id'])
+        submission=Submission(owner_id=first.owner_id,mode='redraw',target_language='zh-Hans',idempotency_key='test-full',request_hash='a'*64,quota_pages=35)
+        db.add(submission);db.flush();submission_id=submission.id
         for i in range(35):
-            job=Job(owner_id=first.owner_id,input_asset_id=first.input_asset_id,output_asset_id=first.output_asset_id if i<32 else None,batch_id=batch.id,ordinal=i,mode="redraw",target_language="zh-Hans",idempotency_key=f"test-{i}",operation="fixture",request_hash="a"*64,cache_key="b"*64,config={},quota_kind="redraw_monthly",quota_pages=1,status="succeeded" if i<32 else "queued",settlement="settled" if i<32 else "reserved",completed_at=now() if i<32 else None)
-            db.add(job);db.flush();db.add(BatchItem(batch_id=batch.id,ordinal=i,input_asset_id=first.input_asset_id,job_id=job.id))
-        shared=Batch(owner_id=first.owner_id,preview_id="test-shared",idempotency_key="test-shared",request_hash="c"*64,quota_pages=0)
+            job=Job(owner_id=first.owner_id,input_asset_id=first.input_asset_id,source_sha256=first.source_sha256,output_asset_id=first.output_asset_id if i<32 else None,ordinal=i,mode='redraw',target_language='zh-Hans',idempotency_key=f'test-{i}',operation='fixture',request_hash='a'*64,cache_key='b'*64,config={},quota_kind='redraw_monthly',quota_pages=1,status='succeeded' if i<32 else 'queued',settlement='settled' if i<32 else 'reserved',completed_at=now() if i<32 else None)
+            db.add(job);db.flush();db.add(SubmissionItem(submission_id=submission.id,ordinal=i,client_item_id=str(i),job_id=job.id,descriptor={},reused=False))
+        shared=Submission(owner_id=first.owner_id,mode='redraw',target_language='zh-Hans',idempotency_key='test-shared',request_hash='c'*64,quota_pages=0)
         db.add(shared);db.flush();shared_id=shared.id
-        db.add(BatchItem(batch_id=shared.id,ordinal=0,input_asset_id=first.input_asset_id,job_id=first.id));db.commit()
-    response=client.get("/v1/translation-history",headers=auth)
+        db.add(SubmissionItem(submission_id=shared.id,ordinal=0,client_item_id='shared',job_id=first.id,descriptor={},reused=True));db.commit()
+    response=client.get('/v1/translation-submissions',headers=auth)
     assert response.status_code==200,response.text
-    groups={g["id"]:g for g in response.json()["items"]}
-    assert groups[batch_id]["page_count"]==35
-    assert groups[batch_id]["counts"]=={"succeeded":32,"queued":3}
-    assert groups[batch_id]["settled"]==32 and groups[batch_id]["reserved"]==3
-    assert groups[shared_id]["reused"]==1 and groups[shared_id]["settled"]==0
-    assert client.get(f"/v1/translation-batches/{shared_id}",headers=auth).json()["items"][0]["reused"] is True
-    assert client.get("/v1/translation-history?limit=1",headers=auth).json()["next_offset"]==1
-    assert client.get("/v1/translation-history",headers=login(client,"unrelated")).json()["total"]==0
+    groups={g['id']:g for g in response.json()['items']}
+    assert groups[submission_id]['page_count']==35
+    assert groups[submission_id]['counts']=={'succeeded':32,'queued':3}
+    assert groups[submission_id]['settled']==32 and groups[submission_id]['reserved']==3
+    assert groups[shared_id]['reused']==1 and groups[shared_id]['settled']==0
+    assert client.get(f'/v1/translation-submissions/{shared_id}',headers=auth).json()['items'][0]['reused'] is True
+    assert client.get('/v1/translation-submissions?limit=1',headers=auth).json()['next_offset']==1
+    assert client.get('/v1/translation-submissions',headers=login(client,'unrelated')).json()['total']==0

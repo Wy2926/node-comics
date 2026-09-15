@@ -1,28 +1,60 @@
-"""Run the same controlled branch races against an isolated PostgreSQL schema."""
+"""Opt-in PostgreSQL proof of atomic stage budgeting and lease fencing."""
 import os
-
+from uuid import uuid4
 import pytest
-from test_postgres_concurrency import pg_scope
-from test_classic import configured
+from sqlalchemy import URL, create_engine, text
+from app.config import settings
+from app.db import Base, engine, session_factory
+from app.queue_models import SchedulerMutex
+from test_classic import text_case
 from test_classic_parallel import (
-    test_branches_overlap_and_render_waits_for_both_checkpoints,
-    test_local_failure_stops_new_groups_and_recovery_reuses_successful_text,
-    test_text_failure_joins_local_work_and_never_renders,
-    test_cancel_or_delete_during_both_branches_discards_late_images_and_accounts_text,
-    test_old_inpaint_reply_cannot_replace_new_attempt_checkpoint,
-    test_invalid_cleaned_background_never_reaches_render,
+    test_inflight_llm_does_not_hold_scheduler_or_image_resources,
+    test_atomic_unknown_cost_budget_cannot_be_overreserved,
+    test_new_node_reuses_paid_translation_after_image_cache_loss,
 )
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
-                                reason='Requires the dedicated PostgreSQL concurrency-test database')
+                                reason='Requires the dedicated nodecomics_concurrency_test database')
 
 
 @pytest.fixture
-def client(pg_scope, monkeypatch):
-    monkeypatch.setenv('RESULT_STORAGE_BACKEND', 'local')
-    from app.config import settings
-    settings.cache_clear()
-    from fastapi.testclient import TestClient
-    from app.main import app
-    with TestClient(app) as client:
-        yield client
+def text_database(tmp_path, monkeypatch):
+    database = os.environ.get('TEST_PG_DATABASE', 'nodecomics_concurrency_test')
+    if database != 'nodecomics_concurrency_test':
+        pytest.fail('Refusing to use a product database')
+    password = os.environ.get('TEST_PG_PASSWORD') or os.environ.get('POSTGRES_PASSWORD')
+    if not password:
+        pytest.fail('TEST_PG_PASSWORD is required')
+    base = URL.create('postgresql+psycopg', username=os.environ.get('TEST_PG_USER', 'nodecomics'), password=password,
+                      host=os.environ.get('TEST_PG_HOST', 'postgres'), port=int(os.environ.get('TEST_PG_PORT', '5432')),
+                      database=database)
+    administration = create_engine(base, isolation_level='AUTOCOMMIT')
+    schema = 'nc_classic_' + uuid4().hex
+    with administration.connect() as connection:
+        assert connection.scalar(text('SELECT current_database()')) == database
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    try:
+        url = base.update_query_dict({'options': f'-csearch_path={schema} -clock_timeout=8000 -cstatement_timeout=15000'})
+        monkeypatch.setenv('DATABASE_URL', url.render_as_string(hide_password=False))
+        monkeypatch.setenv('DEV_AUTH', 'true')
+        monkeypatch.setenv('CLASSIC_ENABLED', 'true')
+        monkeypatch.setenv('TEXT_API_KEY', 'isolated-pg-text-key')
+        monkeypatch.setenv('TEXT_BASE_URL', 'https://text.invalid/v1')
+        monkeypatch.setenv('STORAGE_PATH', str(tmp_path / 'images'))
+        settings.cache_clear()
+        if engine.cache_info().currsize:
+            engine().dispose()
+        engine.cache_clear()
+        Base.metadata.create_all(engine())
+        with session_factory()() as db:
+            db.add(SchedulerMutex(id=1, revision=0))
+            db.commit()
+        yield
+    finally:
+        if engine.cache_info().currsize:
+            engine().dispose()
+        engine.cache_clear()
+        settings.cache_clear()
+        with administration.connect() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        administration.dispose()

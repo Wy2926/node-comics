@@ -9,7 +9,8 @@ from conftest import png_variant
 from app.db import session_factory
 from app.models import Asset, Job, Ledger, User, now
 from app.entitlement_models import QuotaPeriod
-from app.jobs import create_job, settle
+from app.jobs import settle
+from app.submission_api import ItemRequest, SubmissionRequest, submit
 from app.quota_grants import GrantRequest, grant_pages
 
 
@@ -30,9 +31,11 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
             user, asset = db.get(User, pg['owner_id']), db.get(Asset, ids[n])
             barrier.wait(timeout=10)
             try:
-                job = create_job(db, user, asset, 'classic', 'zh-Hans', str(n))
-                db.commit()
-                return job.id
+                receipt = submit(SubmissionRequest(mode='classic', target_language='zh-Hans', max_quota_pages=1,
+                    items=[ItemRequest(client_item_id=str(n), asset_id=asset.id, image_sha256=asset.sha256,
+                                       byte_size=asset.byte_size, content_type=asset.mime)]),
+                    idempotency_key=str(n), user=user, db=db)
+                return receipt['items'][0]['job']['id']
             except HTTPException as error:
                 assert error.detail['code'] == 'DAILY_QUOTA_EXHAUSTED'
                 db.rollback()
@@ -47,6 +50,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
     def finish(job_id):
         with session_factory()() as db:
             job = db.scalar(select(Job).where(Job.id == job_id).with_for_update(key_share=True))
+            job.status = 'succeeded'
             settle(db, job, success=True)
             db.commit()
     with ThreadPoolExecutor(6) as pool:
@@ -55,6 +59,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
         assert sum(db.scalars(select(QuotaPeriod.used))) == 2
         assert sum(db.scalars(select(QuotaPeriod.reserved))) == 0
         assert len(db.scalars(select(Ledger).where(Ledger.kind == 'settle')).all()) == 2
+        assert sum(db.scalars(select(Asset.active_references))) == 0
 
 
 def test_postgres_concurrent_grant_receipt_issues_only_one_bucket(pg):

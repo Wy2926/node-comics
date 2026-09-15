@@ -11,7 +11,7 @@
 | 偏好页面 | `src/ui/Preferences.tsx` 管理本页表单和账户队列设置；本机请求并发与服务器队列并发独立 |
 | 阅读目录 | `src/reader/ThumbnailDirectory.tsx` 管理缩略图虚拟列表；主阅读器保留图片窗口、导航和阅读位置 |
 | 任务状态 | `src/reader/jobs.ts` 统一状态优先级、排序、合并；恢复、轮询和 IndexedDB 写入共用，不允许旧快照恢复失效译图 |
-| 作品与副本存储／偏好 | `library/store.ts` 原子保存新模型与副本，按引用清理字节；偏好只存当前 Settings 字段；自动授权由 `reader/auto-consent.ts` 独立管理 |
+| 作品与副本存储／偏好 | `library/store.ts` 原子保存副本并按引用清理本机缓存；偏好只存当前 Settings 字段；本次确认的翻译范围、幂等请求与上传进度由 `translation/store.ts` 的持久化清单管理 |
 | 运营 API | `backend/app/admin_api.py` 包含供应商、额度调整与结果核实；认证、权限、幂等与结算仍复用原有实现 |
 | 请求校验 | `backend/app/request_models.py` 统一 JSON 请求拒绝额外字段的规则；响应模型与请求模型独立 |
 
@@ -60,9 +60,9 @@ cd backend
 - 前端 122 项测试通过；TypeScript、43 模块检查、Chrome MV3 与 Web 构建通过。
 - 后端 159 项通过，14 项 PostgreSQL 相关用例跳过；现有测试依赖产生两项弃用警告，本轮未升级依赖。
 - 重构后内存生成的 OpenAPI 与已有契约逐项相同，共 38 个路径；不需要数据库迁移。
-- 浏览器验证复用 [自动翻译检查脚本](../scripts/verify_auto_translation.mjs) 与临时 API／模拟供应商。设置页、目录、报价弹窗、书架和弹出页使用清理前后 CSS 做截图对照；阅读位置、开关记忆、异常恢复和未知提交仍按原流程验证。输出保存在 `artifacts/auto-validation/`。提供 `CSS_BASELINE` 指向清理前的 `styles.css` 时启用像素对比。
+- 本节的 CSS 对照是历史验证记录。当前翻译流程使用 [集群阅读器检查脚本](../scripts/verify_cluster_reader.mjs) 与临时 API／模拟供应商，验证独立队列、预上传、关闭页面后继续消费、阅读位置与译图恢复；输出位于 `artifacts/cluster-validation/`。该脚本不提供旧自动翻译开关或 `CSS_BASELINE` 对比功能。
 
-六组样式截图对照通过（含宽／窄设置页），`UI_ONLY=1` 可单独复测设置与样式而不重复翻译流程。对照等待缩略图解码完成；允许 Chromium 阴影重绘中至多 0.5% 像素出现 1/255 的通道舍入差异，布局或明显颜色差异仍会失败。完整自动翻译检查已覆盖到连续滚动位置保持，UI 对照的独立复测结果为 `artifacts/auto-validation/ui-results.json`。供应商结果为模拟图片，不代表本轮重新验证了真实翻译质量。
+历史六组样式截图对照通过（含宽／窄设置页）；当时等待缩略图解码完成后做像素比较，并覆盖连续滚动位置保持。旧脚本的 `UI_ONLY` 与 `CSS_BASELINE` 参数已移除，历史结果保留在 `artifacts/auto-validation/ui-results.json`。供应商结果为模拟图片，不代表当前集群或真实翻译质量验收。
 
 保留阅读器的窗口管理、持久化提交记录、结果未知保护和各导入格式的独立适配器：这些逻辑具有不同的生命周期或协议，不能为了减少函数数量强行合并。保留尚有用途的 CSS 层叠规则与现有本地记录结构，不在无迁移方案的情况下批量重写用户数据。
 

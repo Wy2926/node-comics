@@ -6,7 +6,7 @@ from sqlalchemy import func, select, text, update
 from .config import settings
 from .entitlement_models import MembershipOperation, QuotaPeriod
 from .errors import problem
-from .models import Job, Ledger, User, now, uid
+from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
 
 DAILY = "classic_daily"
@@ -139,7 +139,9 @@ def entitlements_json(db, user, at=None):
                        "quota": allowance_json(db, user, kind, at)}
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(user.plus_started_at),
             "plus_expires_at": iso(user.plus_expires_at), "timezone": settings().quota_timezone,
-            "concurrency": settings().plus_concurrency if plus else settings().free_concurrency,
+            "queue_capacity": settings().plus_queue_capacity if plus else settings().free_queue_capacity,
+            "realtime_slots": settings().plus_realtime_slots if plus else settings().free_realtime_slots,
+            "scheduler_weight": settings().plus_scheduler_weight if plus else settings().free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}
@@ -187,6 +189,12 @@ def reserve(db, user, job, at=None):
 
 def settle(db, job, *, success):
     """Caller holds the Job lock. Late results never debit a released period."""
+    if job.input_pinned and job.status not in {"queued", "running", "awaiting_upload", "validating_upload", "outcome_unknown"}:
+        db.execute(update(Asset).where(Asset.id == job.input_asset_id, Asset.active_references > 0)
+                   .values(active_references=Asset.active_references - 1))
+        job.input_pinned = False
+    from .scheduler import touch_job
+    touch_job(db, job)
     if job.settlement != "reserved":
         return
     changes = {"reserved": QuotaPeriod.reserved - job.quota_pages}

@@ -1,287 +1,167 @@
-from conftest import quota_usage
-from datetime import timedelta, timezone
+"""R2 contracts and durable storage lifecycle under the cluster design."""
+from datetime import timedelta
 from io import BytesIO
 from urllib.parse import parse_qs, urlsplit
-from unittest.mock import Mock
-import boto3
-from botocore.config import Config
-from botocore.exceptions import ClientError, EndpointConnectionError
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
+from fastapi import HTTPException
 import pytest
-from conftest import claim_job, create, login_plus as login, run_job, upload
-from test_classic import configured  # Reuse the isolated OCR/text/render fixture.
+from storage_fakes import MemoryS3, sdk_client
+from test_upload_storage import storage_db, remote, owner, pending
 
 
-def sdk_client():
-    return boto3.session.Session().client('s3', endpoint_url='https://' + 'a' * 32 + '.r2.cloudflarestorage.com',
-        region_name='auto', aws_access_key_id='isolated-access', aws_secret_access_key='isolated-secret',
-        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}))
-
-
-class MemoryS3:
-    """Simulated S3 only: production adapter, jobs, API and billing remain real."""
-    def __init__(self):
-        self.objects, self.calls = {}, []
-        self.fail_delete = False
-        self.fail_head = False
-        self.uncertain_put = False
-        self.generate_presigned_url = sdk_client().generate_presigned_url
-
-    def put_object(self, **params):
-        self.calls.append(('PUT', params['Key']))
-        self.objects[params['Key']] = params['Body']
-        assert params['ContentType'] == 'image/png'
-        assert params['CacheControl'] == 'private, no-store'
-        if self.uncertain_put:
-            self.uncertain_put = False
-            raise EndpointConnectionError(endpoint_url='secret diagnostic must not escape')
-        return {}
-
-    def head_object(self, **params):
-        self.calls.append(('HEAD', params['Key']))
-        if self.fail_head:
-            raise EndpointConnectionError(endpoint_url='secret diagnostic must not escape')
-        if params['Key'] not in self.objects:
-            raise ClientError({'Error': {'Code': '404'}, 'ResponseMetadata': {'HTTPStatusCode': 404}}, 'HeadObject')
-        return {}
-
-    def get_object(self, **params):
-        self.calls.append(('GET', params['Key']))
-        data = self.objects[params['Key']]
-        return {'Body': StreamingBody(BytesIO(data), len(data))}
-
-    def delete_object(self, **params):
-        self.calls.append(('DELETE', params['Key']))
-        if self.fail_delete:
-            raise EndpointConnectionError(endpoint_url='secret diagnostic must not escape')
-        self.objects.pop(params['Key'], None)
-        return {}
-
-    def list_objects_v2(self, **params):
-        from app.models import now
-        keys = sorted(k for k in self.objects if k > params.get('ContinuationToken', ''))
-        page = keys[:params['MaxKeys']]
-        return {'Contents': [{'Key': k, 'LastModified': (now() - timedelta(days=2)).replace(tzinfo=timezone.utc)} for k in page],
-                'IsTruncated': len(keys) > len(page), 'NextContinuationToken': page[-1] if page else None}
-
-
-@pytest.fixture
-def remote(client, monkeypatch):
-    from app.config import settings
-    from app.storage import S3Store
-    import app.storage as storage
-    cfg = settings()
-    cfg.result_storage_backend = 'r2'
-    cfg.r2_endpoint_url = 'https://' + 'a' * 32 + '.r2.cloudflarestorage.com'
-    sdk = MemoryS3()
-    store = S3Store(sdk, 'test-bucket', 'isolated/')
-    monkeypatch.setattr(storage, 'r2_store', lambda *args: store)
-    return sdk, store
-
-
-def delivered(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
-    import app.workers as workers
-    supplier = Mock(return_value=TranslationOutput(png, usage={'total_tokens': 17}))
-    monkeypatch.setattr(workers, 'redraw', supplier)
-    auth = login(client)
-    original = upload(client, auth, png)
-    job_id = create(client, auth, original).json()['id']
-    run_job(job_id)
-    job = client.get(f'/v1/jobs/{job_id}', headers=auth).json()
-    return auth, original, job, supplier
-
-
-def test_r2_delivery_direct_access_and_account_isolation(client, remote, png, monkeypatch):
-    from app.assets import object_path
-    from app.config import settings
-    from app.db import session_factory
-    from app.models import Asset
-    sdk, _ = remote
-    auth, original, job, supplier = delivered(client, png, monkeypatch)
-    assert job['status'] == 'succeeded'
-    output = job['output_asset_id']
-    with session_factory()() as db:
-        asset = db.get(Asset, output)
-        assert asset.storage_backend == 'r2'
-        assert not object_path(asset.storage_key).exists()
-        assert object_path(db.get(Asset, original).storage_key).is_file()
-    settings().result_storage_backend = 'local'  # Existing output keeps its R2 location.
-    response = client.get(f'/v1/images/{output}/access', headers=auth)
-    access = response.json()
-    assert response.headers['cache-control'] == 'private, no-store'
-    assert access['authorization_required'] is False
-    parsed = urlsplit(access['url'])
-    query = parse_qs(parsed.query)
-    assert parsed.hostname.endswith('.r2.cloudflarestorage.com')
-    assert parsed.path.startswith('/test-bucket/isolated/')
-    assert query['X-Amz-Expires'] == ['300']
-    assert query['X-Amz-SignedHeaders'] == ['host']
-    assert '/auto/s3/' in query['X-Amz-Credential'][0]
-    assert client.get(f'/v1/images/{output}/content', headers=auth, follow_redirects=False).status_code == 307
-    assert not any(method == 'GET' for method, _ in sdk.calls)  # API never proxies image bytes.
-    calls = len(sdk.calls)
-    assert client.get(f'/v1/images/{output}/access', headers=login(client, 'bob')).status_code == 404
-    assert client.get(f'/v1/images/{output}/access').status_code == 401
-    assert len(sdk.calls) == calls
-    run_job(job['id'])
-    assert supplier.call_count == 1
-    assert quota_usage(client, auth)['used'] == 1
-
-
-@pytest.mark.parametrize('kind', ['original', 'classic_stage', 'mask', None])
-def test_remote_upload_rejects_non_results_at_both_boundaries(client, remote, png, kind):
+@pytest.mark.parametrize("kind", ["classic_stage", "mask", None])
+def test_remote_storage_rejects_disposable_intermediates(storage_db, remote, png, kind):
     from app.assets import create_asset
     from app.db import session_factory
     sdk, store = remote
-    with pytest.raises(ValueError, match='final translation'):
-        store.put('fixture/non-result', png, 'image/png', kind=kind)
-    with session_factory()() as db, pytest.raises(ValueError, match='local storage'):
-        create_asset(db, 'fixture', png, kind=kind, storage_backend='r2')
+    with pytest.raises(ValueError, match="originals, uploads and final"):
+        store.put("fixture/disposable", png, "image/png", kind=kind)
+    with session_factory()() as db, pytest.raises(ValueError, match="disposable local"):
+        create_asset(db, "fixture", png, kind=kind, storage_backend="r2")
     assert sdk.calls == []
 
 
-def test_all_reader_status_queries_avoid_remote_requests(client, remote, png, monkeypatch):
-    from app.assets import create_asset
-    from app.batch_items import BatchItem
+def test_signing_and_cross_account_queries_never_contact_r2(storage_db, remote, png):
+    from app.assets import access_json, create_asset, owned_asset
     from app.db import session_factory
-    from app.models import Asset, Batch, now
+    from app.models import now
     sdk, _ = remote
-    auth, original, job, _ = delivered(client, png, monkeypatch)
+    owner_id = owner(storage_db)
     with session_factory()() as db:
-        source = db.get(Asset, original)
-        stage = create_asset(db, source.owner_id, png, kind='classic_stage', parent_id=source.id)
-        assert stage.storage_backend == 'local'
-        batch = Batch(owner_id=source.owner_id, preview_id='history', idempotency_key='history', request_hash='a'*64, quota_pages=0)
-        db.add(batch)
-        db.flush()
-        db.add(BatchItem(batch_id=batch.id, ordinal=0, job_id=job['id'], input_asset_id=original))
+        source = create_asset(db, owner_id, png)
+        output = create_asset(db, owner_id, png, kind="redraw", parent_id=source.id)
         db.commit()
-        batch_id = batch.id
-    sdk.calls.clear()
-    sdk.fail_head = True
-    for path in ['/v1/translation-history', f'/v1/jobs/{job["id"]}', '/v1/jobs',
-                 f'/v1/jobs/{job["id"]}/latest-result', f'/v1/translation-batches/{batch_id}']:
-        response = client.get(path, headers=auth)
-        assert response.status_code == 200, response.text
-    assert sdk.calls == []
-    with session_factory()() as db:
-        db.get(Asset, job['output_asset_id']).deleted_at = now()
-        db.commit()
-    assert client.get('/v1/translation-history', headers=auth).json()['items'][0]['counts'] == {'expired':1}
-    assert client.get(f'/v1/jobs/{job["id"]}', headers=auth).json()['result_available'] is False
-    assert sdk.calls == []
-
-
-def test_signing_is_local_and_database_expiry_still_revokes_access(client, remote, png, monkeypatch):
-    from app.db import session_factory
-    from app.models import Asset, now
-    sdk, _ = remote
-    auth, _, job, _ = delivered(client, png, monkeypatch)
-    output = job['output_asset_id']
-    sdk.calls.clear()
-    sdk.fail_head = True
-    result = client.get(f'/v1/images/{output}/access', headers=auth)
-    assert result.status_code == 200 and sdk.calls == []
-    sdk.fail_head = False
-    with session_factory()() as db:
-        asset = db.get(Asset, output)
-        asset.expires_at = now() + timedelta(seconds=30)
-        db.commit()
-    access = client.get(f'/v1/images/{output}/access', headers=auth).json()
-    assert 1 <= int(parse_qs(urlsplit(access['url']).query)['X-Amz-Expires'][0]) <= 30
-    saved = sdk.objects.copy()
-    sdk.objects.clear()
-    # Out-of-band missing objects surface at signed GET, not by probing during signing.
-    assert client.get(f'/v1/images/{output}/access', headers=auth).status_code == 200
-    sdk.objects.update(saved)
-    with session_factory()() as db:
-        db.get(Asset, output).expires_at = now() - timedelta(seconds=1)
-        db.commit()
-    assert client.get(f'/v1/images/{output}/access', headers=auth).status_code == 410
-    assert sdk.calls == []
-
-
-def test_delete_tombstone_survives_r2_outage_and_cleanup_retries(client, remote, png, monkeypatch):
-    from app.db import session_factory
-    from app.dispatcher import cleanup
-    from app.models import Asset
-    sdk, _ = remote
-    auth, original, job, _ = delivered(client, png, monkeypatch)
-    sdk.fail_delete = True
-    assert client.delete(f'/v1/images/{original}', headers=auth).status_code == 503
-    assert client.get(f"/v1/images/{job['output_asset_id']}/access", headers=auth).status_code == 410
-    with session_factory()() as db:
-        assert db.get(Asset, job['output_asset_id']).deleted_at
-        cleanup(db)
-        db.commit()
-        assert db.get(Asset, job['output_asset_id']).purged_at is None
-        sdk.fail_delete = False
-        cleanup(db)
-        db.commit()
-        assert db.get(Asset, job['output_asset_id']).purged_at
-    assert not sdk.objects
-
-
-def test_uncertain_put_is_recovered_without_repeating_paid_call(client, remote, png, monkeypatch):
-    from app.config import settings
-    from app.db import session_factory
-    from app.dispatcher import recover
-    from app.models import Asset, Attempt, Job, now
-    sdk, _ = remote
-    sdk.uncertain_put = True
-    auth, _, job, supplier = delivered(client, png, monkeypatch)
-    assert job['status'] == 'running'
-    settings().result_storage_backend = 'local'
-    with session_factory()() as db:
-        current = db.get(Job, job['id'])
-        assert current.error_code == 'STORAGE_UNAVAILABLE'
-        attempt = db.get(Attempt, current.attempt_id)
-        assert attempt.output_storage_backend == 'r2' and attempt.usage == {'total_tokens': 17}
+        sdk.calls.clear()
         sdk.fail_head = True
-        recover(db)
-        db.commit()
-        assert current.status == 'running'
-        sdk.fail_head = False
-        attempt.lease_expires_at = now() - timedelta(seconds=1)
-        db.commit()
-        recover(db)
-        db.commit()
-        recover(db)
-        db.commit()
-        assert current.status == 'succeeded' and db.get(Asset, current.output_asset_id).storage_backend == 'r2'
-    run_job(job['id'])
-    assert supplier.call_count == 1
-    usage = quota_usage(client, auth)
-    assert usage['used'] == 1 and usage['reserved'] == 0
+        with pytest.raises(HTTPException) as failure:
+            owned_asset(db, output.id, "other-owner")
+        assert failure.value.status_code == 404
+        receipt = access_json(owned_asset(db, output.id, owner_id))
+        assert not receipt["authorization_required"]
+        parsed = urlsplit(receipt["url"])
+        query = parse_qs(parsed.query)
+        assert parsed.hostname.endswith(".r2.cloudflarestorage.com")
+        assert parsed.path.startswith("/test-bucket/isolated/")
+        assert query["X-Amz-Expires"] == ["300"]
+        assert query["X-Amz-SignedHeaders"] == ["host"]
+        assert "/auto/s3/" in query["X-Amz-Credential"][0]
+        output.expires_at = now() + timedelta(seconds=30)
+        shorter = access_json(owned_asset(db, output.id, owner_id))
+        assert 1 <= int(parse_qs(urlsplit(shorter["url"]).query)["X-Amz-Expires"][0]) <= 30
+        sdk.objects.clear()
+        assert access_json(owned_asset(db, output.id, owner_id))["url"]
+        output.expires_at = now() - timedelta(seconds=1)
+        with pytest.raises(HTTPException) as failure:
+            owned_asset(db, output.id, owner_id)
+        assert failure.value.status_code == 410
+        assert sdk.calls == []
 
 
-def test_remote_sweep_advances_and_preserves_pending_recovery(client, remote, png):
+def test_deleted_ancestor_revokes_late_result_without_head_requests(storage_db, remote, png):
+    from app.assets import create_asset, owned_asset
     from app.db import session_factory
-    from app.dispatcher import cleanup
-    from app.models import Job, StorageScan, now
-    sdk, store = remote
-    auth = login(client)
-    job_id = create(client, auth, upload(client, auth, png)).json()['id']
-    attempt = claim_job(job_id)
+    from app.models import now
+    owner_id = owner(storage_db)
     with session_factory()() as db:
-        job = db.get(Job, job_id)
-        store.put(f'{job.owner_id}/{attempt}', png, 'image/png', kind='redraw')
+        source = create_asset(db, owner_id, png)
+        source.deleted_at = now()
+        db.commit()
+        output = create_asset(db, owner_id, png, kind="redraw", parent_id=source.id)
+        remote[0].calls.clear()
+        with pytest.raises(HTTPException) as failure:
+            owned_asset(db, output.id, owner_id)
+        assert failure.value.status_code == 410
+        assert remote[0].calls == []
+
+
+def test_delete_failure_preserves_tombstone_and_retries_idempotently(storage_db, remote, png):
+    from app.assets import create_asset, delete_asset_object, owned_asset
+    from app.db import session_factory
+    from app.models import now
+    from app.storage import StorageError
+    owner_id = owner(storage_db)
+    with session_factory()() as db:
+        source = create_asset(db, owner_id, png)
+        source.deleted_at = now()
+        db.commit()
+        remote[0].fail_delete = True
+        with pytest.raises(StorageError):
+            delete_asset_object(source)
+        with pytest.raises(HTTPException) as failure:
+            owned_asset(db, source.id, owner_id)
+        assert failure.value.status_code == 410
+        assert source.deleted_at and not source.purged_at
+        remote[0].fail_delete = False
+        delete_asset_object(source)
+        delete_asset_object(source)
+        source.purged_at = now()
+        db.commit()
+        assert not remote[0].objects
+
+
+def test_remote_sweep_paginates_and_preserves_active_originals_and_uploads(storage_db, remote, png):
+    from app.assets import create_asset
+    from app.db import session_factory
+    from app.models import StorageScan, now
+    from app.storage_cleanup import cleanup_orphans
+    from app.uploads import receive_upload
+    owner_id = owner(storage_db)
+    sdk, store = remote
+    with session_factory()() as db:
+        source = create_asset(db, owner_id, png)
+        job, receipt = pending(db, owner_id, png)
+        receive_upload(db, receipt, owner_id, png)
+        provisional_key = f"{owner_id}/{receipt.id}"
+        store.put(provisional_key, png, "image/png", kind="original")
         for index in range(205):
-            store.put(f'orphans/{index:04}', png, 'image/png', kind='redraw')
-        cleanup(db)
+            store.put(f"orphans/{index:04}", png, "image/png", kind="redraw")
         db.commit()
-        assert db.get(StorageScan, 'r2').cursor
-        db.get(StorageScan, 'r2').next_scan_at = now()
+        cleanup_orphans(db)
         db.commit()
-        cleanup(db)
+        scan = db.get(StorageScan, "r2")
+        assert scan.cursor
+        scan.next_scan_at = now()
         db.commit()
-        assert list(sdk.objects) == [f'isolated/{job.owner_id}/{attempt}']
-        assert db.get(StorageScan, 'r2').cursor is None
+        cleanup_orphans(db)
+        db.commit()
+        assert scan.cursor is None
+        assert set(sdk.objects) == {store.prefix + key for key in (source.storage_key, receipt.storage_key, provisional_key)}
 
 
-def test_sdk_contract_and_bounded_reads(client, png):
+@pytest.mark.parametrize("status", ["running", "outcome_unknown", "unknown_released"])
+def test_provisional_delivery_is_protected_by_execution_lease_key(storage_db, remote, png, status):
+    from app.db import session_factory
+    from app.models import Attempt, now, uid
+    from app.queue_models import ComputeNode, ExecutionLease, JobStage
+    from app.storage_cleanup import referenced
+    owner_id = owner(storage_db)
+    with session_factory()() as db:
+        job, _ = pending(db, owner_id, png)
+        attempt = Attempt(id=uid(), job_id=job.id, provider_id="fixture", output_storage_backend="r2",
+                          lease_expires_at=now() + timedelta(minutes=1))
+        node = ComputeNode(id=uid(), name="fixture", resource_id=uid(), capabilities=["redraw"], capacity=1,
+                           engine_version="control", device="network")
+        stage = JobStage(id=uid(), job_id=job.id, name="redraw", status="running", generation=1)
+        db.add_all([attempt, node, stage])
+        db.flush()
+        lease = ExecutionLease(id=uid(), stage_id=stage.id, job_id=job.id, node_id=node.id, owner_id=owner_id,
+            generation=1, resource_pool="redraw:fixture", mode="redraw", priority_class="preload", weight=1,
+            estimated_seconds=60, expires_at=now() + timedelta(minutes=1),
+            completed_at=now() if status != "running" else None)
+        job.attempt_id, job.status = attempt.id, status
+        db.add(lease)
+        db.flush()
+        assert referenced(db, "r2", f"{owner_id}/{lease.id}")
+        assert not referenced(db, "r2", f"{owner_id}/{attempt.id}")
+        assert not referenced(db, "r2", f"other-user/{lease.id}")
+        assert not referenced(db, "local", f"{owner_id}/{lease.id}")
+        job.status = "cancelled"
+        db.flush()
+        assert not referenced(db, "r2", f"{owner_id}/{lease.id}")
+
+
+def test_sdk_contract_and_bounded_reads(storage_db, png):
     from app.storage import S3Store, StorageError
     from app.config import settings
     sdk = sdk_client()
@@ -312,105 +192,6 @@ def test_sdk_contract_and_bounded_reads(client, png):
         with pytest.raises(StorageError):
             store.read('user/result')
         assert raw.closed
-
-
-def test_classic_keeps_checkpoints_local_and_recovers_without_rerunning_text(configured, remote, monkeypatch):
-    from app.assets import object_path
-    from app.db import session_factory
-    from app.dispatcher import recover
-    from app.models import Asset, ClassicState, Job
-    from app.storage import StorageError
-    import app.workers as workers
-    from test_classic import submit
-    client, auth, _, calls = configured
-    actual_create = workers.create_asset
-    def interrupted(*args, **kwargs):
-        monkeypatch.setattr(workers, 'create_asset', actual_create)
-        raise StorageError()
-    monkeypatch.setattr(workers, 'create_asset', interrupted)
-    job_id = submit(configured)
-    run_job(job_id)
-    with session_factory()() as db:
-        assert db.get(Job, job_id).status == 'running'
-        state = db.get(ClassicState, job_id)
-        for asset_id in state.artifacts.values():
-            asset = db.get(Asset, asset_id)
-            assert asset.storage_backend == 'local' and object_path(asset.storage_key).exists()
-        assert remote[0].calls == []  # No stage uploads, including the rendered checkpoint.
-        recover(db)
-        db.commit()
-    run_job(job_id)
-    assert calls == {'text': 1, 'analyze': 1, 'inpaint': 1, 'render': 1}
-    assert client.get(f'/v1/jobs/{job_id}', headers=auth).json()['status'] == 'succeeded'
-    assert [method for method, _ in remote[0].calls] == ['PUT']  # Only the final delivery is uploaded.
-
-
-def test_reconciled_upload_is_delivered_from_r2_and_local_copy_removed(client, remote, png, monkeypatch):
-    from app.assets import object_path
-    from app.db import session_factory
-    from app.errors import ProcessingError
-    from app.models import Asset
-    import app.workers as workers
-    def unknown(*args):
-        raise ProcessingError('UPSTREAM_OUTCOME_UNKNOWN', 'test', unknown=True)
-    monkeypatch.setattr(workers, 'redraw', unknown)
-    auth, admin = login(client), login(client, 'admin')
-    job_id = create(client, auth, upload(client, auth, png)).json()['id']
-    run_job(job_id)
-    output = upload(client, auth, png)
-    response = client.post(f'/v1/admin/jobs/{job_id}/reconcile', headers=admin,
-        json={'resolution': 'succeeded', 'output_asset_id': output, 'note': 'isolated test'})
-    assert response.status_code == 200 and response.json()['status'] == 'succeeded'
-    with session_factory()() as db:
-        asset = db.get(Asset, output)
-        assert asset.storage_backend == 'r2' and not object_path(asset.storage_key).exists()
-    assert client.get(f'/v1/images/{output}/access', headers=auth).json()['authorization_required'] is False
-
-
-def test_cancelled_crash_output_is_removed_without_charging(client, remote, png):
-    from app.db import session_factory
-    from app.dispatcher import recover
-    from app.models import Attempt, Job, now
-    auth = login(client)
-    original = upload(client, auth, png)
-    job_id = create(client, auth, original).json()['id']
-    attempt_id = claim_job(job_id)
-    with session_factory()() as db:
-        attempt = db.get(Attempt, attempt_id)
-        attempt.call_started_at = now() - timedelta(minutes=5)
-        attempt.lease_expires_at = now() - timedelta(seconds=1)
-        remote[1].put(f'{db.get(Job, job_id).owner_id}/{attempt_id}', png, 'image/png', kind='redraw')
-        db.commit()
-    assert client.delete(f'/v1/images/{original}', headers=auth).status_code == 200
-    with session_factory()() as db:
-        recover(db)
-        db.commit()
-        assert db.get(Job, job_id).status == 'cancelled'
-    assert not remote[0].objects
-    assert quota_usage(client, auth)['used'] == 0
-
-
-def test_repeated_initialization_preserves_current_assets_and_attempts(client, png):
-    from pathlib import Path
-    from alembic import command
-    from alembic.config import Config
-    from app.assets import read_asset
-    from app.db import engine, session_factory
-    from app.models import Asset, Attempt
-    auth = login(client)
-    original = upload(client, auth, png)
-    attempt_id = claim_job(create(client, auth, original).json()['id'])
-    root = Path(__file__).resolve().parents[1]
-    config = Config(str(root / 'alembic.ini'))
-    config.set_main_option('script_location', str(root / 'migrations'))
-    with engine().begin() as connection:
-        config.attributes['connection'] = connection
-        command.upgrade(config, 'head')
-        command.upgrade(config, 'head')
-    with session_factory()() as db:
-        asset = db.get(Asset, original)
-        assert asset.storage_backend == 'local' and read_asset(asset) == png
-        assert db.get(Attempt, attempt_id).output_storage_backend == 'local'
 
 
 @pytest.mark.parametrize('changes', [

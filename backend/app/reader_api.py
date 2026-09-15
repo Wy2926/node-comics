@@ -1,5 +1,4 @@
 """Reader-facing history, accounting summaries and private result feedback."""
-from collections import Counter, defaultdict
 from datetime import datetime, time, timedelta, timezone
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -11,14 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
-from .batch_items import BatchItem
 from .db import Base, get_db
 from .request_models import RequestBody
 from .errors import problem
 from .jobs import idem_key, job_json, locked_user, owned_job
 from .entitlements import entitlements_json
 from .schemas import EntitlementsResponse
-from .models import Asset, Job, Batch, Ledger, User, now, uid
+from .models import Asset, Job, Ledger, User, now, uid
 from .schemas import JobResponse
 from .providers import digest
 
@@ -33,9 +31,8 @@ class LatestResult(BaseModel):
 @router.get("/v1/jobs/{job_id}/latest-result", response_model=LatestResult)
 def latest_result(job_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     reference = owned_job(db, job_id, user.id)
-    source = db.get(Asset, reference.input_asset_id)
-    query = select(Job).join(Asset, Asset.id == Job.input_asset_id).where(
-        Job.owner_id == user.id, Asset.owner_id == user.id, Asset.sha256 == source.sha256,
+    query = select(Job).where(
+        Job.owner_id == user.id, Job.source_sha256 == reference.source_sha256,
         Job.mode == reference.mode, Job.target_language == reference.target_language
     ).order_by(Job.created_at.desc(), Job.version.desc(), Job.id.desc())
     latest = db.scalar(query.limit(1))
@@ -234,87 +231,3 @@ def usage_summary(days: int = Query(7, ge=1, le=90), timezone_name: str = Query(
             "generated_at": now().isoformat() + "Z", "delivered": count, "included_delivered": included,
             "free_delivered": free, "by_mode": totals, "quota_used": consumed,
             "days": [{"date": day, **values} for day, values in daily.items()]}
-
-
-class HistoryGroup(BaseModel):
-    id: str
-    kind: Literal["batch", "job"]
-    created_at: str
-    mode: str
-    target_language: str
-    page_count: int
-    counts: dict[str, int]
-    settled: int
-    reserved: int
-    reused: int
-    job_ids: list[str]
-    asset_ids: list[str]
-
-
-class HistoryPage(BaseModel):
-    items: list[HistoryGroup]
-    total: int
-    next_offset: int | None
-
-
-@router.get("/v1/translation-history", response_model=HistoryPage)
-def translation_history(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=50),
-                        user: User = Depends(identity), db: Session = Depends(get_db)):
-    batches = select(Batch.id.label("id"), Batch.created_at.label("created_at"), literal("batch").label("kind")).where(Batch.owner_id == user.id)
-    singles = select(Job.id.label("id"), Job.created_at.label("created_at"), literal("job").label("kind")).where(
-        Job.owner_id == user.id, Job.batch_id.is_(None), ~exists(select(BatchItem.job_id).where(BatchItem.job_id == Job.id)))
-    groups = union_all(batches, singles).subquery()
-    total = db.scalar(select(func.count()).select_from(groups))
-    selected = db.execute(select(groups).order_by(groups.c.created_at.desc(), groups.c.id.desc()).offset(offset).limit(limit)).all()
-    batch_ids = [row.id for row in selected if row.kind == "batch"]
-    single_ids = [row.id for row in selected if row.kind == "job"]
-    entries_by_group = defaultdict(list)
-    if selected:
-        references = union_all(
-            select(BatchItem.batch_id.label("group_id"), BatchItem.ordinal,
-                   BatchItem.job_id, BatchItem.input_asset_id.label("requested_asset_id"))
-            .where(BatchItem.batch_id.in_(batch_ids)),
-            select(Job.id, Job.ordinal, Job.id, Job.input_asset_id).where(
-                Job.owner_id == user.id, Job.id.in_(single_ids)),
-        ).subquery()
-        source, output, parent = aliased(Asset), aliased(Asset), aliased(Asset)
-        timestamp = now()
-
-        def retained(asset):
-            return and_(asset.id.is_not(None), asset.owner_id == user.id,
-                        asset.deleted_at.is_(None), asset.purged_at.is_(None), asset.expires_at > timestamp)
-
-        # A history summary is a database snapshot, not an object-store health
-        # check. Image access/download still verifies actual bytes and ownership.
-        expired = and_(Job.output_asset_id.is_not(None), ~and_(
-            retained(source), retained(output), or_(output.parent_id.is_(None), retained(parent))))
-        rows = db.execute(select(
-            references.c.group_id, references.c.requested_asset_id, Job.id, Job.batch_id,
-            Job.mode, Job.target_language, Job.status, Job.quality_flags, Job.quota_pages,
-            Job.settlement, Job.cache_hit, expired.label("result_expired"),
-        ).join(Job, Job.id == references.c.job_id)
-            .outerjoin(source, source.id == Job.input_asset_id)
-            .outerjoin(output, output.id == Job.output_asset_id)
-            .outerjoin(parent, parent.id == output.parent_id)
-            .where(Job.owner_id == user.id)
-            .order_by(references.c.group_id, references.c.ordinal, Job.id))
-        for row in rows:
-            entries_by_group[row.group_id].append(row)
-    items = []
-    for group_id, created_at, kind in selected:
-        entries = entries_by_group[group_id]
-        jobs = list({job.id: job for job in entries}.values())
-        states = Counter()
-        for job in entries:
-            state = "expired" if job.result_expired else "partial" if job.status == "succeeded" and "unrecognized_regions" in (job.quality_flags or []) else job.status
-            states[state] += 1
-        chargeable = [job for job in jobs if kind == "job" or job.batch_id == group_id]
-        first = jobs[0] if jobs else None
-        items.append({"id": group_id, "kind": kind, "created_at": created_at.isoformat() + "Z",
-                      "mode": first.mode if first else "", "target_language": first.target_language if first else "",
-                      "page_count": len(entries), "counts": dict(states),
-                      "settled": sum(job.quota_pages for job in chargeable if job.settlement == "settled"),
-                      "reserved": sum(job.quota_pages for job in chargeable if job.settlement == "reserved"),
-                      "reused": sum(1 for job in entries if job.cache_hit or kind == "batch" and job.batch_id != group_id),
-                      "job_ids": [job.id for job in entries], "asset_ids": [job.requested_asset_id for job in entries]})
-    return {"items": items, "total": total, "next_offset": offset + limit if offset + limit < total else None}

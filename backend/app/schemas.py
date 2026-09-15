@@ -48,7 +48,9 @@ class EntitlementsResponse(BaseModel):
     plus_started_at: str | None
     plus_expires_at: str | None
     timezone: str
-    concurrency: int
+    queue_capacity: int
+    realtime_slots: int
+    scheduler_weight: float
     modes: dict[str, ModeEntitlement]
     generated_at: str
     pending_previous_period_pages: int
@@ -75,18 +77,23 @@ class AssetResponse(BaseModel):
     sha256: str
     byte_size: int
     kind: str
-    expires_at: str
+    expires_at: str | None
 
 
 class AccessResponse(BaseModel):
     url: str
-    expires_at: str
+    expires_at: str | None
     authorization_required: bool
 
 
 class JobResponse(BaseModel):
     id: str
-    input_asset_id: str
+    input_asset_id: str | None
+    image_sha256: str
+    file_hash: str | None = None
+    page_index: int | None = None
+    change_sequence: int = 0
+    priority: str = "preload"
     requested_asset_id: str | None = None
     output_asset_id: str | None
     result_available: bool
@@ -102,7 +109,7 @@ class JobResponse(BaseModel):
     version: int
     cache_hit: bool
     reused: bool = False
-    batch_id: str | None
+    submission_id: str | None = None
     ordinal: int
     cancel_requested: bool
     error: ErrorInfo | None
@@ -118,37 +125,6 @@ class JobsResponse(BaseModel):
 class JobPageResponse(JobsResponse):
     total: int
     next_offset: int | None
-
-
-class PreviewResponse(BaseModel):
-    id: str
-    quota_pages: int
-    quota_kind: str
-    new_pages: int
-    reused_pages: int
-    entitlement_version: str
-    regenerate: bool
-    page_count: int
-    expires_at: str
-    config_version: str
-    mode: str
-    target_language: str
-
-
-class BatchCreatedResponse(BaseModel):
-    id: str
-    status: str
-    jobs: list[JobResponse]
-    quota_pages: int
-
-
-class BatchResponse(BaseModel):
-    id: str
-    status: str
-    items: list[JobResponse]
-    total: int
-    next_offset: int | None
-    quota_pages: int
 
 
 class UsageEntry(BaseModel):
