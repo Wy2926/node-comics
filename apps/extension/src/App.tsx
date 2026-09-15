@@ -27,9 +27,10 @@ import type {TranslationEdition} from './library/translations';
 import {AcquisitionCoordinator,queueCopies,pauseCopies,grantImagePermissions} from './library/acquisition';
 import {CatalogImport} from './ui/CatalogImport';
 import {ImportAssignmentFields} from './ui/ImportAssignment';
+import {SourceImport} from './ui/SourceImport';
+import {acquireWebImages,insertWebCopy,type WebDestination} from './library/web-import';
 import {discoverCatalog} from './sources/client';
-import {hashFile,imageIdentity} from './importers/hash';
-import {sourceImage} from './sources/image-fetch';
+import {imageIdentity} from './importers/hash';
 import {assertCurrent,mapConcurrent,RequestPool,StaleOperation} from './concurrency';
 import {applyMatch,bindSubmission,matchFilePages,pageSource,planTranslation,reusableJob,rerunSource,sourceKey,uploadPages,type RerunSource} from './reader/recovery';
 import {AdminPanel} from './admin/AdminPanel';
@@ -181,37 +182,26 @@ async function importFiles(){
  catch(e){await store.collectUnusedBlobs(incoming.flatMap(store.copyBlobKeys)).catch(()=>{});setImportError('导入未完成：'+(e as Error).message);}finally{importLock.current=false;setBusy('');if(input.current)input.current.value='';}
 }
 async function openDemo(){const existing=copiesRef.current.find(c=>c.demo);if(existing){setCurrentId(existing.id);return;}setBusy('正在打开原创阅读示例…');try{const blob=await(await fetch('/samples/starlight-bookshop.png')).blob();const bitmap=await createImageBitmap(blob);const p=emptyPage('星光书店 · 原创示例.png',bitmap.width,bitmap.height);bitmap.close();Object.assign(p,await imageIdentity(blob));p.blobKey=`original:${p.id}`;await store.putBlob(p.blobKey,blob);const c={...makeCopy('星光书店', [p],'原创阅读示例','demo:starlight'),demo:true};const result=await store.commitCopies([c],[{title:'星光书店',kind:'work'}]);await reloadLibrary();setCurrentId(result.copyIds[0]);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
-async function acquireManifest(){
- if(!sourceManifest||importLock.current)return;
- importLock.current=true;setBusy('正在获取已发现的原图…');
- const pages:Page[]=[];
+async function acquireManifest(manifest:PageManifest,destination:WebDestination){
+ if(importLock.current)return;
+ importLock.current=true;setBusy('正在获取已发现的原图…');setImportError('');
+ let copy:ReadingCopy|undefined;
  try{
-  const origins=[...new Set(sourceManifest.items.map(i=>new URL(i.url).origin+'/*'))];
-  if(origins.length&&!await chrome.permissions.request({origins}))throw Error('未取得图片域名权限。你仍可导入本地图片。');
-  const manifestHash=await hashFile(new Blob([JSON.stringify(sourceManifest.items.map(i=>i.url))]));
-  const copy={...makeCopy(sourceManifest.title,pages,sourceManifest.adapter,'web:'+sourceManifest.url+':'+manifestHash),sourceUrl:sourceManifest.url,discoveryComplete:sourceManifest.discoveryComplete,knownTotal:sourceManifest.knownTotal};
-  for(const item of sourceManifest.items){
-   const page=emptyPage(`第 ${item.order+1} 页`,item.width,item.height);page.sourceUrl=item.url;pages.push(page);
-   try{
-    const valid=await chrome.runtime.sendMessage({type:'NC_SOURCE_IMAGE',manifestId:sourceManifest.id,pageId:item.id});if(!valid.ok)throw Error(valid.error);
-    const blob=await sourceImage(valid.data.url);
-    const bitmap=await createImageBitmap(blob);page.width=bitmap.width;page.height=bitmap.height;bitmap.close();
-    if(!page.width||!page.height||page.width*page.height>100000000)throw Error('原图尺寸不可用。');
-    Object.assign(page,await imageIdentity(blob));const key='original:'+page.imageSha256;
-    if(!await store.getBlob(key)){
-     await store.enforceCacheBudget([...(await store.readCopies()),copy],Math.max(0,settings.cacheLimitMb-blob.size/1024/1024),copy.id);
-     if(await store.cacheSize()+blob.size>settings.cacheLimitMb*1024*1024)throw Error('本地空间预算不足，请提高上限或清理副本后重试。');
-     await store.putBlob(key,blob);
-    }
-    page.blobKey=key;
-   }catch(e){page.fetchError=(e as Error).message;}
-   setBusy(`正在获取原图 ${pages.length} / ${sourceManifest.items.length}…`);
+  copy=await acquireWebImages(manifest,settings.cacheLimitMb,setBusy,destination.mode==='insert'?destination.copyId:undefined);
+  let copyId:string,message:string;
+  if(destination.mode==='insert'){
+   const result=await insertWebCopy(copy,destination);copyId=result.copyId;message=result.added?`已插入 ${result.added} 页，保留原阅读位置`:'这些图片已插入，已保留原页序与阅读位置';
+  }else{
+   copy.title=destination.title;
+   const result=await store.commitCopies([copy],[destination.assignment]);copyId=result.copyIds[0];message=result.created?'已加入漫画':'此来源已加入，保留原归属与阅读位置';
+   setSettings(s=>({...s,direction:manifest.direction}));
   }
-  const result=await store.commitCopies([copy],[assignment]);await reloadLibrary();
-  setSettings(s=>({...s,direction:sourceManifest.direction}));setCurrentId(result.copyIds[0]);setSourceManifest(undefined);
-  notify(`已获取 ${pages.filter(p=>p.blobKey).length} / ${pages.length} 张原图`);
- }catch(e){await store.collectUnusedBlobs(pages.flatMap(p=>p.blobKey?[p.blobKey]:[])).catch(()=>{});setError((e as Error).message);}
- finally{importLock.current=false;setBusy('');}
+  await reloadLibrary();const state=await store.readLibrary(),workId=state.coverage.find(item=>item.copyId===copyId)?.workId;
+  if(workId)localStorage.setItem('nc-web-import-work',workId);
+  setCurrentId(copyId);setNavigationKey(n=>n+1);setSourceManifest(undefined);
+  notify(`${message}；已获取 ${copy.pages.filter(page=>page.blobKey).length} / ${copy.pages.length} 张原图`);
+ }catch(e){setImportError('加入未完成：'+(e as Error).message);}
+ finally{if(copy)await store.collectUnusedBlobs(store.copyBlobKeys(copy)).catch(()=>{});importLock.current=false;setBusy('');}
 }
 async function authenticate(){setBusy('正在登录…');setError('');try{let value:store.Session;if(authAllowed){const auth=await api.login(username.trim());value={token:auth.access_token,user:auth.user,apiOrigin};}else{if(!authConfig)throw Error('无法读取身份服务配置。');if(currentId)sessionStorage.setItem('nc-login-copy',currentId);const result=await startOidc(authConfig,settings.apiBase);if(!result)return;value=result;}if(value.apiOrigin!==new URL(store.settings().apiBase).origin)throw Error('登录期间服务地址已切换，请重新登录。');store.saveSession(value);setAccount(value);setLoginOpen(false);notify('已连接账户，可以开始翻译了');}catch(e){setError((e as Error).message);}finally{setBusy('');}}
 useEffect(()=>{if(account&&pendingIntent){const intent=pendingIntent;setPendingIntent(undefined);void prepareTranslation(intent);} },[account]);
@@ -345,7 +335,7 @@ return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e
 </Modal>}
 {ready&&<Modal title={ready.intent.regenerate?'重新翻译这一页':`开始${modeLabels[ready.intent.mode]}`} subtitle="确认点数后开始，翻译过程中可以继续阅读。" onClose={()=>{if(!busy)setReady(undefined);}}><div className="quote-summary"><span>本次选中<b>{ready.quote.page_count} <small>页</small></b></span><span>预计预占<b>{ready.quote.total_cost} <small>点</small></b></span><span>目标语言<b className="language-value">{caps?.languages.find(l=>l.id===ready.targetLanguage)?.label??ready.targetLanguage}</b></span></div><p className="modal-copy">逐页交付、逐页结算；原图与已有译图一直保留。{ready.intent.mode==='classic'?'常规翻译只处理文字区域，请检查识别和排版效果。':'图片重绘可能改变画面细节，请在完成后对照检查。'}</p>{ready.intent.regenerate&&<p className="notice warning">将生成新的翻译结果。完成后替换当前模式的显示效果，原图仍可随时查看。</p>}<div className="quote-expiry">报价有效至 {new Date(ready.quote.expires_at).toLocaleTimeString()} · 确认后可继续阅读</div><button className="button primary full" disabled={!!busy} onClick={()=>void submitQuote()}><Icon name="spark" size={18}/>确认并开始 · {ready.quote.total_cost} 点</button></Modal>}
 {localFiles&&<Modal title="导入本地漫画" subtitle={localFiles.length+' 个文件；多张图片组成一份副本，漫画文件分别保留。'} onClose={()=>{if(!busy)setLocalFiles(undefined);}}>{importError&&<p role="alert" className="error-message">{importError}</p>}<ImportAssignmentFields value={assignment} onChange={setAssignment} library={library}/><p className="nc-muted">未知章节、卷次和出版版本可以留空。重复文件按文件内容标识恢复，不根据同名作品合并。</p><button className="button primary full" disabled={!!busy||(!assignment.workId&&!assignment.title.trim())} onClick={()=>void importFiles()}>确认导入</button></Modal>}
-{sourceManifest&&<Modal title={`发现 ${sourceManifest.items.length} 张图片`} subtitle={sourceManifest.title} onClose={()=>setSourceManifest(undefined)}><div className="notice"><Icon name="info"/><span>{sourceManifest.note}</span></div><ImportAssignmentFields value={assignment} onChange={setAssignment} library={library}/><p className="modal-copy">下一步按需申请图片域名权限，并把原图缓存到当前设备。此时不会上传到翻译后端。</p><button className="button primary full" onClick={()=>void acquireManifest()} disabled={!!busy||!sourceManifest.items.length}>获取原图并阅读 <Icon name="arrow"/></button></Modal>}
+{sourceManifest&&<SourceImport key={sourceManifest.id} manifest={sourceManifest} library={library} copies={copies} busy={!!busy} error={importError} onClose={()=>{setSourceManifest(undefined);setImportError('');}} onImport={acquireManifest}/>}
 {confirmAction&&<Modal title={confirmAction.title} subtitle={confirmAction.body} onClose={()=>setConfirmAction(undefined)}><button className="button primary full" onClick={async()=>{const action=confirmAction;setConfirmAction(undefined);try{await action.action();}catch(e){setError((e as Error).message);}}}>确认</button></Modal>}
 </div>;
 }

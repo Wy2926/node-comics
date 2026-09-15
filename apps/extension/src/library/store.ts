@@ -4,6 +4,7 @@ import {normalizeConcurrency} from '../concurrency';
 import {mergeJobs} from '../reader/jobs';
 import {attachCopy,emptyLibrary,validateLibrary} from './model';
 import type {ImportAssignment,LibraryState,SourceCatalog} from './types';
+import {sourcePageIdentity} from '../sources/mangacopy';
 const DB = 'node-comics-library';
 export function readPosition(copyId:string,revision:number):{pageId:string;relativeOffset:number}|null {try{const value=JSON.parse(localStorage.getItem(`nc-copy-position:${copyId}:${revision}`)??'null');return typeof value?.pageId==='string'&&Number.isFinite(value.relativeOffset)?value:null;}catch{return null;}}
 export function savePosition(copyId:string,revision:number,position:{pageId:string;relativeOffset:number}){localStorage.setItem(`nc-copy-position:${copyId}:${revision}`,JSON.stringify({...position,relativeOffset:Math.max(0,Math.min(1,position.relativeOffset)),updatedAt:Date.now()}));}
@@ -86,10 +87,17 @@ export async function commitCopies(incoming:ReadingCopy[],assignments:ImportAssi
   const workIds:string[]=[],copyIds:string[]=[];let created=0;
   let commonWork=assignments[0]?.workId??s.catalogs.find(c=>c.id===catalog?.id)?.workId;
   for(const [i,copy] of incoming.entries()){
-   const existing=copies.find(c=>c.sourceKey===copy.sourceKey);
+   const normalizedKey=(value:ReadingCopy)=>{const digest=value.sourceKey.match(/:([a-f0-9]{64})$/)?.[1];return value.sourceKey.startsWith('web:')&&value.sourceUrl&&digest?'web:'+sourcePageIdentity(value.sourceUrl)+':'+digest:value.sourceKey;};
+   const existing=copies.find(c=>normalizedKey(c)===normalizedKey(copy));
    if(existing){
     // Exact source identity only; title and page-subset heuristics are deliberately absent.
-    if(copy.pages.length&&existing.pages.length===copy.pages.length&&copy.pages.every((p,n)=>p.imageSha256===existing.pages[n].imageSha256))existing.pages=existing.pages.map((p,n)=>({...p,blobKey:copy.pages[n].blobKey??p.blobKey,fetchError:copy.pages[n].fetchError}));
+    if(copy.pages.length&&existing.pages.length===copy.pages.length)existing.pages=existing.pages.map((page,n)=>{
+     const fresh=copy.pages[n];
+     const sameBytes=!!page.imageSha256&&page.imageSha256===fresh.imageSha256;
+     const neverFetched=!page.imageSha256&&!!page.sourceUrl&&page.sourceUrl===fresh.sourceUrl;
+     if(!fresh.blobKey||!sameBytes&&!neverFetched)return page;
+     return {...page,...(neverFetched?{width:fresh.width,height:fresh.height,imageSha256:fresh.imageSha256,fileHash:fresh.fileHash,pageIndex:fresh.pageIndex}:{}),blobKey:fresh.blobKey,fetchError:undefined};
+    });
     copyIds.push(existing.id);continue;
    }
    const assignment={...assignments[i]};if(!assignment.workId&&!catalog?.entries.find(e=>e.id===copy.sourceEntryId)?.related&&commonWork)assignment.workId=commonWork;
@@ -112,5 +120,5 @@ export async function removeWork(workId:string){
 export async function collectUnusedBlobs(candidates:string[]){const database=await db();await new Promise<void>((resolve,reject)=>{const tx=database.transaction(['copies','blobs'],'readwrite');const req=tx.objectStore('copies').getAll();req.onsuccess=()=>{const used=new Set((req.result as ReadingCopy[]).flatMap(c=>c.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)])));for(const key of new Set(candidates))if(!used.has(key))tx.objectStore('blobs').delete(key);};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
 export const copyBlobKeys=(copy:ReadingCopy)=>copy.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)]).filter((key):key is string=>!!key);
 export async function clearCopyImages(copyId:string){const copy=(await readCopies()).find(c=>c.id===copyId);if(!copy)return;await editLibrary((s,copies)=>{const current=copies.find(c=>c.id===copyId);if(current){current.pages=current.pages.map(p=>({...p,blobKey:undefined,outputBlobs:{}}));current.retention='cache';}const task=s.tasks.find(t=>t.copyId===copyId);if(task){task.status='paused';task.error='本地副本已清理，可补齐原图。';}});await collectUnusedBlobs(copyBlobKeys(copy));}
-export async function forkSourceRevision(copyId:string){return editLibrary((s,copies)=>{const copy=copies.find(c=>c.id===copyId);if(!copy?.sourceEntryId)throw Error('此副本没有可重新解析的来源。');const revised={...copy,id:crypto.randomUUID(),sourceKey:copy.sourceEntryId+':revision:'+crypto.randomUUID(),manifestRevision:copy.manifestRevision+1,pages:[],pageId:'',relativeOffset:0,discoveryComplete:false,lastReadAt:undefined,createdAt:Date.now(),updatedAt:Date.now()};copies.push(revised);s.coverage.push(...s.coverage.filter(c=>c.copyId===copyId).map(c=>({...c,id:crypto.randomUUID(),copyId:revised.id})));return revised.id;});}
+export async function forkSourceRevision(copyId:string){return editLibrary((s,copies)=>{const copy=copies.find(c=>c.id===copyId);if(!copy?.sourceEntryId)throw Error('此副本没有可重新解析的来源。');const revised={...copy,id:crypto.randomUUID(),sourceKey:copy.sourceEntryId+':revision:'+crypto.randomUUID(),manifestRevision:copy.manifestRevision+1,pages:[],pageId:'',relativeOffset:0,sourcePagesEdited:undefined,webImports:undefined,discoveryComplete:false,lastReadAt:undefined,createdAt:Date.now(),updatedAt:Date.now()};copies.push(revised);s.coverage.push(...s.coverage.filter(c=>c.copyId===copyId).map(c=>({...c,id:crypto.randomUUID(),copyId:revised.id})));return revised.id;});}
 export async function markCopyRead(copyId:string){await editLibrary(s=>{for(const c of s.coverage.filter(c=>c.copyId===copyId&&!c.startPageId&&!c.endPageId)){const target=c.target.kind==='chapter'?s.chapters.find(x=>x.id===c.target.id):c.target.kind==='publication'?s.publications.find(x=>x.id===c.target.id):c.target.kind==='work'?s.works.find(x=>x.id===c.workId):undefined;if(target)target.readAt=Date.now();}});}

@@ -32,7 +32,7 @@ export class AcquisitionCoordinator{
   await editLibrary(s=>{const t=s.tasks.find(t=>t.copyId===copyId);if(t){t.status='running';t.error=undefined;}});
   let copy=(await readCopies()).find(c=>c.id===copyId);if(!copy)throw Error('副本已移除。');
   const state=await readLibrary(),catalog=state.catalogs.find(c=>c.entries.some(e=>e.id===copy!.sourceEntryId));if(!catalog)throw Error('来源目录不存在。');
-  if(!copy.discoveryComplete||copy.pages.some(p=>p.fetchError&&p.sourceUrl)){
+  if(!copy.sourcePagesEdited&&(!copy.discoveryComplete||copy.pages.some(p=>p.fetchError&&p.sourceUrl))){
    const update=async(manifest:PageManifest)=>{await this.active(copyId);await editLibrary((s,copies)=>{const c=copies.find(c=>c.id===copyId),t=s.tasks.find(t=>t.copyId===copyId);if(!c||!t)return;t.phase='discover';t.total=manifest.knownTotal;t.completed=manifest.items.length;
     // Existing byte/page identity remains intact when refreshing only expired URLs.
     if(c.discoveryComplete&&c.pages.length!==manifest.items.length&&!manifest.discoveryComplete)return;

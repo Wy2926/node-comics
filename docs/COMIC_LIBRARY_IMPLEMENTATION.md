@@ -12,7 +12,7 @@
 - 同人、续作等通过作品关系表达。MangaCopy 的同人／其他系列来源条目默认建立单独的待整理作品，不归作原作版本。
 - 本地文件先选择作品与内容归属，支持新建或加入已有作品；整卷文件可以直接归为卷册，内部章节目录保持未知。
 
-在 MangaCopy 漫画详情页，首次从插件弹窗选择“识别当前页面”并授权本站；授权后详情页出现“Node Comics · 导入／管理漫画”。选择来源分组、类型、区间或“来源目录全部”，预览逐项归属，再确认导入。每个“全部”仅指当前已确认目录快照。
+2026-09-15 起 MangaCopy／Copy4000 已加入安装权限，详情页自动出现“Node Comics · 导入／管理漫画”；弹框打开即发现，也可刷新。选择来源分组、类型、区间或“来源目录全部”，预览逐项归属，再确认导入。每个“全部”仅指当前已确认目录快照。通用图片也支持选择、排序、归入作品和插入已有副本，见[网页导入更新](WEB_IMAGE_IMPORT.md)。
 
 默认保存目录，打开条目时获取图片；也可在确认时选择下载原图。后续从“版本与来源”检查更新并预览差异。导入、下载与翻译分别管理，导入目录不会创建翻译任务。用户此前开启的自动翻译仅在进入阅读器后按现有授权生效。
 
@@ -26,7 +26,7 @@
 | [local-import.ts](../apps/extension/src/library/local-import.ts)、[reading.ts](../apps/extension/src/library/reading.ts) | 本地格式接入、按作品／出版套系／版本限定阅读序列 |
 | [sources/mangacopy.ts](../apps/extension/src/sources/mangacopy.ts)、[adapters.ts](../apps/extension/src/sources/adapters.ts) | 来源目录、原始分组／类型与页面清单发现 |
 | [sources/client.ts](../apps/extension/src/sources/client.ts)、[acquisition.ts](../apps/extension/src/library/acquisition.ts) | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
-| [background.ts](../apps/extension/entrypoints/background.ts)、[content.ts](../apps/extension/entrypoints/content.ts) | 消息与导航校验、动态站点脚本、详情入口和受管理的来源标签页 |
+| [background.ts](../apps/extension/entrypoints/background.ts)、[content.ts](../apps/extension/entrypoints/content.ts) | 消息与导航校验、安装时注册的站点脚本、详情入口和受管理的来源标签页 |
 | [Library.tsx](../apps/extension/src/ui/Library.tsx)、[CatalogImport.tsx](../apps/extension/src/ui/CatalogImport.tsx) | 作品管理、选择与归属预览 |
 
 使用全新 IndexedDB `node-comics-library`，仅包含 `library`、`copies`、`blobs`。页内位置使用副本 ID、清单修订和页面 ID。旧 `reader/store.ts`、扁平书架及 `restoreImported` 页子集恢复逻辑已删除；旧 `Chapter` 图片集合已从运行代码与测试移除。没有读取旧数据库、迁移、兼容别名、消息桥接或双读双写。原来的阅读偏好与登录设置不承担旧书架转换职责。

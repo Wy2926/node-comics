@@ -1,16 +1,11 @@
 import {defineBackground} from 'wxt/utils/define-background';
 import {safeImageUrl,type PageManifest} from '../src/sources/adapters';
-import {mangaCopyLocation} from '../src/sources/mangacopy';
+import {mangaCopyLocation,sameMangaCopyPage} from '../src/sources/mangacopy';
 import {pollSourceDiscovery} from '../src/sources/discovery';
 import type {SourceCatalog} from '../src/library/types';
+import {selectManifest} from '../src/sources/selection';
 function trusted(sender:chrome.runtime.MessageSender){return sender.id===chrome.runtime.id&&!!sender.url?.startsWith(chrome.runtime.getURL(''));}
 async function inject(tabId:number){await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/content.js']});}
-async function registerSite(){
- if(await chrome.permissions.contains({origins:['https://www.mangacopy.com/*']})){
-  const registered=await chrome.scripting.getRegisteredContentScripts();
-  if(!registered.some(s=>s.id==='nc-mangacopy'))await chrome.scripting.registerContentScripts([{id:'nc-mangacopy',matches:['https://www.mangacopy.com/comic/*'],js:['content-scripts/content.js'],runAt:'document_idle',persistAcrossSessions:true}]);
- }
-}
 async function discover(tabId:number){
  const tab=await chrome.tabs.get(tabId);if(!tab.url||!safeImageUrl(tab.url,tab.url))throw Error('请打开普通漫画网页。');await inject(tabId);
  const loc=mangaCopyLocation(tab.url);
@@ -19,8 +14,8 @@ async function discover(tabId:number){
  const result=loc?.chapterId?await pollSourceDiscovery(read):await read();const id=crypto.randomUUID();const manifest={...result,id,sourceTabId:tabId} as PageManifest;manifest.items=manifest.items.filter(i=>safeImageUrl(i.url,tab.url!)===i.url);await chrome.storage.local.set({['manifest:'+id]:manifest});return {kind:'pages',id,manifest};
 }
 export default defineBackground(()=>{
- void registerSite();chrome.permissions.onAdded.addListener(()=>void registerSite());
- chrome.permissions.onRemoved.addListener(()=>void chrome.permissions.contains({origins:['https://www.mangacopy.com/*']}).then(has=>{if(!has)void chrome.scripting.unregisterContentScripts({ids:['nc-mangacopy']}).catch(()=>{});}));
+ // Both mirror domains now use manifest content scripts. Remove the older dynamic registration on upgrade.
+ void chrome.scripting.unregisterContentScripts({ids:['nc-mangacopy']}).catch(()=>{});
  chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>chrome.contextMenus.create({id:'nc-read-image',title:'在 Node Comics 中阅读 / 翻译',contexts:['image']}));});
  chrome.contextMenus.onClicked.addListener(async(info,tab)=>{
   if(info.menuItemId!=='nc-read-image'||!tab?.id||!tab.url)return;const url=safeImageUrl(info.srcUrl??'',tab.url);if(!url)return;
@@ -34,6 +29,12 @@ export default defineBackground(()=>{
   if(!trusted(sender))return;
   (async()=>{
    if(message?.type==='NC_DISCOVER_TAB')return discover(Number(message.tabId));
+   if(message?.type==='NC_SELECT_MANIFEST'){
+    const data=await chrome.storage.local.get('manifest:'+message.manifestId),original=data['manifest:'+message.manifestId] as PageManifest|undefined;
+    if(!original)throw Error('来源清单已失效，请重新发现。');
+    const manifest={...selectManifest(original,message.itemIds),id:crypto.randomUUID()};
+    await chrome.storage.local.set({['manifest:'+manifest.id]:manifest});return {id:manifest.id};
+   }
    if(message?.type==='NC_REGISTER_CATALOG'){
     const catalog=message.catalog as SourceCatalog;const loc=mangaCopyLocation(catalog?.url);
     if(!loc||loc.chapterId||catalog.sourceId!=='mangacopy'||!Array.isArray(catalog.entries)||catalog.entries.some(e=>{const l=mangaCopyLocation(e.url);return !l?.chapterId||l.slug!==loc.slug;}))throw Error('来源目录无效。');
@@ -45,8 +46,9 @@ export default defineBackground(()=>{
    }
    if(message?.type==='NC_POLL_SOURCE'||message?.type==='NC_CLOSE_SOURCE'){
     const tabId=Number(message.tabId),data=await chrome.storage.session.get('nc-managed:'+tabId);const managed=data['nc-managed:'+tabId] as {url:string}|undefined;if(!managed)throw Error('采集标签页已失效。');const tab=await chrome.tabs.get(tabId).catch(()=>null);
-    if(message.type==='NC_CLOSE_SOURCE'){if(tab?.url===managed.url)await chrome.tabs.remove(tabId);await chrome.storage.session.remove('nc-managed:'+tabId);return true;}
-    if(!tab)throw Error('采集页已关闭，请重试。');if(tab.status!=='complete'){if(tab.pendingUrl&&tab.pendingUrl!==managed.url)throw Error('采集页正在跳转到其他地址。');return null;}if(tab.url!==managed.url)throw Error('采集页已跳转，请回源处理后重试。');
+    if(message.type==='NC_CLOSE_SOURCE'){if(tab?.url&&(tab.url===managed.url||sameMangaCopyPage(tab.url,managed.url)))await chrome.tabs.remove(tabId);await chrome.storage.session.remove('nc-managed:'+tabId);return true;}
+    if(!tab)throw Error('采集页已关闭，请重试。');if(tab.status!=='complete'){if(tab.pendingUrl&&tab.pendingUrl!==managed.url&&!sameMangaCopyPage(tab.pendingUrl,managed.url))throw Error('采集页正在跳转到其他地址。');return null;}
+    if(tab.url!==managed.url){if(!tab.url||!sameMangaCopyPage(tab.url,managed.url))throw Error('采集页已跳转，请回源处理后重试。');managed.url=tab.url;await chrome.storage.session.set({['nc-managed:'+tabId]:managed});}
     await inject(tabId);const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER',advance:true});if(snapshot?.url!==managed.url)throw Error('来源归属已变化。');return snapshot;
    }
    if(message?.type==='NC_SOURCE_IMAGE'){

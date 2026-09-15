@@ -1,6 +1,6 @@
 import type {ReadingCopy} from '../types';
 import type {LibraryState} from './types';
-import {mangaCopyLocation,MANGACOPY_HOST} from '../sources/mangacopy';
+import {mangaCopyLocation} from '../sources/mangacopy';
 
 export interface DirectoryEntry {
  id:string;title:string;number?:string;kind:'chapter'|'publication'|'copy';group:string;
@@ -32,5 +32,5 @@ export function readingDirectory(state:LibraryState,copies:ReadingCopy[],current
  }
  if(!entries.some(e=>e.current))entries.unshift({id:current.id,title:current.title,kind:'copy',group:'当前副本',copyId:current.id,current:true,read:false,available:current.pages.filter(p=>p.blobKey).length,total:current.knownTotal??current.pages.length,status:'阅读中'});
  const location=current.sourceUrl?mangaCopyLocation(current.sourceUrl):null;
- return {title:work?.title??current.title,entries,catalogUrl:catalogs[0]?.url??(location?`https://${MANGACOPY_HOST}/comic/${location.slug}`:undefined),catalogCount:catalogs.reduce((n,c)=>n+c.entries.length,0)};
+ return {title:work?.title??current.title,entries,catalogUrl:catalogs[0]?.url??(location?new URL('/comic/'+location.slug,current.sourceUrl).href:undefined),catalogCount:catalogs.reduce((n,c)=>n+c.entries.length,0)};
 }

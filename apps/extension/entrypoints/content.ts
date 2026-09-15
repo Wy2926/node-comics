@@ -1,8 +1,8 @@
 import {defineContentScript} from 'wxt/utils/define-content-script';
 import {discoverDocument} from '../src/sources/adapters';
-import {discoverMangaCopyCatalog,mangaCopyLocation} from '../src/sources/mangacopy';
+import {discoverMangaCopyCatalog,mangaCopyLocation,MANGACOPY_MATCHES} from '../src/sources/mangacopy';
 import {advanceMangaCopyDiscovery} from '../src/sources/discovery';
-export default defineContentScript({registration:'runtime',main(){
+export default defineContentScript({matches:MANGACOPY_MATCHES,runAt:'document_idle',main(){
  const state=globalThis as typeof globalThis & {__nodeComics?:boolean};if(state.__nodeComics)return;state.__nodeComics=true;
  const navigationId=crypto.randomUUID();let revision=0;
  let advancing:ReturnType<typeof advanceMangaCopyDiscovery>|undefined;
