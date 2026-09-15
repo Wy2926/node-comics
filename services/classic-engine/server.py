@@ -27,12 +27,13 @@ from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
 
-VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v4-cluster')
+PROFILE = os.environ.get('ENGINE_PROFILE', 'mit')
+VERSION = os.environ.get('ENGINE_VERSION', 'mit-95227a2-classic-v4-dml-v1' if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v4-cluster')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
 RESOURCE_ID = os.environ.get('ENGINE_RESOURCE_ID', DEVICE)
-FONT = '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc'
+FONT = os.environ.get('ENGINE_FONT', '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc')
 LANG = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'en': 'ENG', 'ko': 'KOR'}
 Image.MAX_IMAGE_PIXELS = 24_000_000
 lock = DeviceLock(RESOURCE_ID, os.environ.get('ENGINE_LOCK_DIR', '/tmp/comics-device-locks'))
@@ -42,17 +43,23 @@ MAX_CHECKPOINT = 4 * 1024 * 1024
 MAX_RESPONSE = 96 * 1024 * 1024
 models = {}
 ready = False
+device_evidence = None
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global ready
+    global ready, device_evidence
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '4')))
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
     text_render.FALLBACK_FONTS = [FONT]
     # Fail startup instead of silently moving a requested GPU workload to CPU.
-    if DEVICE != 'cpu' and not DEVICE.startswith('cuda'):
+    if PROFILE == 'mit-directml':
+        from mit_directml import DirectMLRuntime
+        device_evidence = DirectMLRuntime(DEVICE)
+    elif PROFILE != 'mit':
+        raise RuntimeError('Unknown ENGINE_PROFILE')
+    elif DEVICE != 'cpu' and not DEVICE.startswith('cuda'):
         raise RuntimeError('ENGINE_DEVICE must be cpu or cuda[:index]')
     if DEVICE.startswith('cuda'):
         if not torch.cuda.is_available():
@@ -61,8 +68,11 @@ async def lifespan(app):
     async with lock.hold():
         with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
             models.update(detector=DefaultDetector(), ocr=Model48pxOCR(), inpainter=LamaLargeInpainter())
-            for model in models.values():
-                await model.load(DEVICE)
+            if device_evidence:
+                await device_evidence.load(models)
+            else:
+                for model in models.values():
+                    await model.load(DEVICE)
             # Warm both device pipelines before reporting admission readiness.
             sample = np.full((256, 256, 3), 255, np.uint8)
             await models['detector'].detect(sample, 256, 0.5, 0.7, 2.3, False, False, False, False, False)
@@ -77,6 +87,9 @@ async def lifespan(app):
         cache.entries.clear()
         cache.size = 0
         models.clear()
+        if device_evidence:
+            device_evidence.close()
+            device_evidence = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -91,7 +104,8 @@ def authorized(authorization: str = Header(default='')):
 @app.get('/health')
 def health():
     return {'ready': ready, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
-            'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size}
+            'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
+            **({'inference': device_evidence.evidence()} if device_evidence else {})}
 
 
 def decode(value, mode='RGB'):

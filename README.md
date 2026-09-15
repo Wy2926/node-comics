@@ -18,6 +18,8 @@
 
 ## 本地运行
 
+本机 Windows + RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装加 `-Setup`，一页完整翻译验证加 `-Smoke`。此原模型 DirectML 路径使用本地进程，配置与同图验收见 [AMD GPU 说明](docs/AMD_GPU_VALIDATION.md)。
+
 启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，并按常规翻译说明配置文本接口。
 
 环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2、文本与图片模型配置，模板见 [.env.example](.env.example)。

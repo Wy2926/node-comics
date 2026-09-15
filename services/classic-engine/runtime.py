@@ -24,10 +24,9 @@ class DeviceLock:
         async with self.local:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             handle = self.path.open('a+b')
-            handle.seek(0)
-            if not handle.read(1):
-                handle.write(b'0')
-                handle.flush()
+            # Windows byte-range locks also cover bytes beyond EOF. Reading or
+            # initializing byte zero before acquiring it races another process
+            # and raises PermissionError when that process already holds it.
             acquired = False
             try:
                 while not acquired:

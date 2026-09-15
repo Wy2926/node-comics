@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import urllib.request
 
-ROOT = Path('/opt/mit')
+ROOT = Path(os.environ.get('MIT_ROOT', '/opt/mit'))
 RESOURCES = [
     ('detection/detect-20241225.ckpt', 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect-20241225.ckpt', '67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e'),
     ('ocr/ocr_ar_48px.ckpt', 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr_ar_48px.ckpt', '29daa46d080818bb4ab239a518a88338cbccff8f901bef8c9db191a7cb97671d'),

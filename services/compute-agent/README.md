@@ -54,6 +54,8 @@ volumes:
 
 ### GPU 参数
 
+Windows AMD RX 6900 XT 已完成原模型混合 CPU/DirectML 路径的真实翻译与同图对照，见[AMD 部署与验收](../../docs/AMD_GPU_VALIDATION.md)。使用同一阶段协议，保留原漫画检测、48px OCR、LaMa 与嵌字器；OCR 解码与 Fourier 模块明确在 CPU 执行。
+
 Dockerfile 支持可配置 PyTorch wheel 源，例如 CUDA 12.4 的构建参数 `--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124`，运行设置 `ENGINE_DEVICE=cuda:0` 并分配匹配 GPU。CPU 与 CUDA 设备使用相同阶段协议；CUDA 不可用时启动失败，不静默改用 CPU。OCR/LaMa 共用同一设备锁，当前每台引擎安全容量为 1。
 
 设备映射、驱动、显存、CUDA 镜像与真实样本吞吐需要在目标硬件验收；CPU 镜像的契约测试不代表 GPU 或两台物理机器测试通过。
