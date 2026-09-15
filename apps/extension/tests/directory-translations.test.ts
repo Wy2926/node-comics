@@ -5,11 +5,26 @@ import {readingDirectory} from '../src/library/directory';
 import {translationSummaries} from '../src/library/translations';
 import {readingImage} from '../src/reader/presentation';
 import type {Job} from '../src/types';
+import {copyComplete,copySummary} from '../src/ui/library/shared';
 
 const job=(id:string,extra:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:id+'-output',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',cost:1,created_at:'2026-09-15T00:00:00Z',version:1,cache_hit:false,...extra});
 const page=(jobs:Job[],outputBlobs:Record<string,string>={})=>({...emptyPage('page',800,1200),blobKey:'original',ownerId:'owner',apiOrigin:'https://api.example',jobs,outputBlobs});
 
 describe('work directory',()=>{
+ it('counts all four imported images even for a legacy snapshot with unknown source completeness',()=>{
+  const state=emptyLibrary(),copy={...makeCopy('发现图片导入',Array.from({length:4},()=>page([job('translated')],{translated:'result'})),'网页图片','web:legacy-selection'),discoveryComplete:false,knownTotal:undefined};
+  attachCopy(state,copy,{title:'四页漫画',kind:'chapter'});
+  expect(readingDirectory(state,[copy],copy).entries[0]).toMatchObject({available:4,total:4,status:'可阅读'});
+  expect(copyComplete(copy)).toBe(true);expect(copySummary(copy)).toBe('离线可读 · 4 页');
+  expect(translationSummaries(copy,'owner','https://api.example')[0]).toMatchObject({total:4,local:4});
+  copy.pages[0].blobKey='';expect(readingDirectory(state,[copy],copy).entries[0]).toMatchObject({available:3,total:4,status:'部分可读'});expect(copyComplete(copy)).toBe(false);
+ });
+ it('retains an unknown or larger total for an unfinished catalog acquisition',()=>{
+  const state=emptyLibrary(),copy={...makeCopy('采集章节',[page([])]),sourceEntryId:'source-entry',discoveryComplete:false,knownTotal:undefined as number|undefined};
+  attachCopy(state,copy,{title:'作品',kind:'chapter'});
+  expect(readingDirectory(state,[copy],copy).entries[0]).toMatchObject({available:1,total:undefined,status:'部分可读'});
+  copy.knownTotal=4;expect(readingDirectory(state,[copy],copy).entries[0]).toMatchObject({available:1,total:4,status:'部分可读'});
+ });
  it('shows every content item despite different sources or versions and includes missing copies',()=>{
   const state=emptyLibrary(),first=makeCopy('第一话',[page([])],'source-a'),second=makeCopy('第二话',[],'source-b');
   const workId=attachCopy(state,first,{title:'作品',kind:'chapter'});

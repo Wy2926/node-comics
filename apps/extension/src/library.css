@@ -10,7 +10,6 @@
 .nc-work-tabs button{padding:12px}}
 .nc-source-status{display:flex;justify-content:center;align-items:center;gap:16px;padding:8px 16px;background:var(--accent-soft);color:var(--ink);flex-shrink:0}
 .nc-source-status button{border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:8px;padding:6px 10px}
-.nc-reader-end .nc-inline{justify-content:center}
 .nc-translation-copies{padding:22px;background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-bottom:30px}
 .nc-translation-copies h2{font-size:1.15rem}
 .nc-translation-copies .nc-section-heading p{font-size:.8rem;line-height:1.7;margin:7px 0 16px}

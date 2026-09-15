@@ -1035,6 +1035,20 @@ a {
   font-size: .875rem;
   color: var(--muted);
 }
+.nc-stream-chapter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+.nc-chapter-heading {
+  color: var(--reading-ink);
+  text-align: center;
+  padding: 24px 20px 32px;
+  max-width: min(640px, 90vw);
+}
+.nc-chapter-heading span { font-size: .8rem; opacity: .65; }
+.nc-chapter-heading h2 { font-size: 1.1rem; margin-top: 8px; }
 .nc-reader-end {
   display: flex;
   align-items: center;

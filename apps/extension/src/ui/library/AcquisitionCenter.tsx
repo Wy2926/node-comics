@@ -2,6 +2,7 @@ import {useState} from 'react';
 import type {LibraryState} from '../../library/types';
 import type {ReadingCopy} from '../../types';
 import {grantImagePermissions,pauseCopies,queueCopies} from '../../library/acquisition';
+import {copyPageTotal} from '../../library/model';
 import {inExtension} from '../../sources/client';
 import {Thumbnail} from '../../reader/Images';
 import {Modal} from '../components';
@@ -26,7 +27,7 @@ export function AcquisitionCenter({library:s,copies,initialWorkId,onlyIds,busy,f
    <div className="nc-acquisition-toolbar"><span className="nc-muted">{extension?'保持插件页面打开以执行采集。':'当前是网页预览，仅保存队列；请在扩展中执行采集。'}</span><div className="nc-inline"><button className="button secondary small" disabled={!!busy||!active.length} onClick={()=>void run('pause-all','正在暂停采集',()=>pauseCopies(active.map(c=>c.id)),`已暂停 ${active.length} 份采集`) }>暂停全部</button><button className="button primary small" disabled={!!busy||!pending.length} onClick={()=>void run('queue-all','正在加入采集队列',()=>queueCopies(pending.map(c=>c.id)),queuedMessage(`${pending.length} 份副本`)) }>{busy==='queue-all'?'加入中…':'补齐待处理'}</button></div></div>
    <div className="nc-capture-grid">{visible.map(copy=>{
     const task=taskFor(copy.id),isActive=task?.status==='running'||task?.status==='queued',isComplete=copyComplete(copy),needsPermission=!!task?.error&&/授权|权限|permission/i.test(task.error);
-    const total=task?.total??copy.knownTotal??(copy.discoveryComplete?copy.pages.length:undefined),completed=task?.phase==='discover'&&!copy.discoveryComplete?task.completed:savedPages(copy);
+    const total=task?.total??copyPageTotal(copy),completed=task?.phase==='discover'&&!copy.discoveryComplete?task.completed:savedPages(copy);
     const status=isComplete?'采集完成':task?.status==='running'?(task.phase==='discover'?'正在读取完整图片清单':'正在下载原图'):task?.status==='queued'?'等待采集':needsPermission?'等待图片授权':task?.status==='paused'?'已暂停':task?.status==='failed'?'需要处理':'等待采集';
     return <article className={'nc-capture-card '+(task?.status==='failed'?'has-error':'')} key={copy.id} aria-busy={busy.endsWith(copy.id)}>
      <div className="nc-capture-heading"><Thumbnail blobKey={copyCover(copy)?.blobKey} alt={copy.title}/><div><span className={'nc-status-badge '+(isComplete?'complete':isActive?'active':task?.status==='failed'?'failed':'')}>{isActive&&<span className="nc-pulse-dot"/>}{status}</span><h3>{copy.title}</h3><p>{copy.source} · 修订 {copy.manifestRevision}</p></div></div>

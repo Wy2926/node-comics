@@ -2,6 +2,10 @@ import type {Page,ReadingCopy} from '../types';
 import type {LibraryState,ImportAssignment,SourceEntry} from './types';
 export const emptyLibrary=():LibraryState=>({id:'library',revision:0,works:[],chapters:[],versions:[],series:[],publications:[],inclusions:[],publicationRelations:[],coverage:[],relations:[],catalogs:[],tasks:[]});
 export const makeCopy=(title:string,pages:Page[],source='本地导入',sourceKey:string=crypto.randomUUID()):ReadingCopy=>({id:crypto.randomUUID(),title,source,sourceKey,manifestRevision:1,retention:'offline',createdAt:Date.now(),updatedAt:Date.now(),pages,pageId:pages[0]?.id??'',relativeOffset:0,discoveryComplete:true});
+// A manually imported selection is a fixed reading copy, even if the source page can discover more images.
+// Only catalog acquisition (sourceEntryId) can still expand its page manifest in the background.
+export const copyPageTotal=(copy:ReadingCopy):number|undefined=>copy.sourceEntryId?copy.knownTotal??(copy.discoveryComplete?copy.pages.length:undefined):copy.pages.length;
+export const completePageList=(copy:ReadingCopy)=>copy.pages.length>0&&(!copy.sourceEntryId||copy.discoveryComplete&&copy.pages.length>=(copy.knownTotal??0));
 export function attachCopy(state:LibraryState,copy:ReadingCopy,assignment:ImportAssignment){
  const stamp=Date.now(),evidence={status:'user' as const,source:'用户导入确认'};
  let work=state.works.find(w=>w.id===assignment.workId);

@@ -24,7 +24,7 @@ export async function acquireWebImages(manifest:PageManifest,limitMb:number,prog
  if(origins.length&&!await chrome.permissions.request({origins}))throw Error('未取得图片域名权限，请重试授权或导入本地图片。');
  const digest=await hashFile(new Blob([JSON.stringify(manifest.items.map(item=>item.url))]));
  const source=({generic:'网页图片','context-menu':'网页图片',mangacopy:'MangaCopy',xkcd:'xkcd',gunnerkrigg:'Gunnerkrigg'} as Record<string,string>)[manifest.adapter]??'网页图片';
- const copy={...makeCopy(manifest.title,[],source,'web:'+sourcePageIdentity(manifest.url)+':'+digest),sourceUrl:manifest.url,discoveryComplete:manifest.discoveryComplete,knownTotal:manifest.knownTotal};
+ const copy={...makeCopy(manifest.title,[],source,'web:'+sourcePageIdentity(manifest.url)+':'+digest),sourceUrl:manifest.url,discoveryComplete:manifest.discoveryComplete,knownTotal:manifest.items.length};
  try{
   for(const item of manifest.items){
    const page={...emptyPage(`第 ${copy.pages.length+1} 页`,item.width||800,item.height||1200),sourceUrl:item.url};copy.pages.push(page);
@@ -72,7 +72,7 @@ export async function insertWebCopy(incoming:ReadingCopy,destination:Extract<Web
   const pages=incoming.pages.map(page=>({...page,id:crypto.randomUUID()}));
   copy.pages.splice(at,0,...pages);copy.manifestRevision++;copy.updatedAt=Date.now();
   if(copy.sourceEntryId)copy.sourcePagesEdited=true;
-  if(copy.discoveryComplete)copy.knownTotal=copy.pages.length;
+  if(!copy.sourceEntryId||copy.discoveryComplete)copy.knownTotal=copy.pages.length;
   if(!copy.pages.some(page=>page.id===position.pageId)){position.pageId=copy.pages[0].id;position.relativeOffset=0;}
   Object.assign(copy,position);
   (copy.webImports??=[]).push({key,pageIds:pages.map(page=>page.id)});

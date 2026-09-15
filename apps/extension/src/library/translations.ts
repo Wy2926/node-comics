@@ -1,5 +1,6 @@
 import type {Mode,ReadingCopy} from '../types';
 import {pageTranslation} from '../reader/presentation';
+import {copyPageTotal} from './model';
 
 export interface TranslationEdition {mode:Mode;language:string;}
 export interface TranslationSummary extends TranslationEdition {
@@ -15,7 +16,7 @@ export function translationSummaries(copy:ReadingCopy,ownerId?:string,origin?:st
   if(page.ownerId!==ownerId||page.apiOrigin!==origin)continue;
   for(const job of page.jobs){
    const key=JSON.stringify([job.mode,job.target_language]);
-   if(!groups.has(key))groups.set(key,{id:JSON.stringify([copy.id,job.mode,job.target_language]),copyId:copy.id,mode:job.mode,language:job.target_language,local:0,remote:0,expired:0,pending:0,failed:0,noText:0,total:copy.knownTotal??(copy.discoveryComplete?copy.pages.length:undefined),updatedAt:''});
+   if(!groups.has(key))groups.set(key,{id:JSON.stringify([copy.id,job.mode,job.target_language]),copyId:copy.id,mode:job.mode,language:job.target_language,local:0,remote:0,expired:0,pending:0,failed:0,noText:0,total:copyPageTotal(copy),updatedAt:''});
   }
  }
  for(const summary of groups.values())for(const page of copy.pages){

@@ -1,6 +1,6 @@
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
 import {defaults,type Job,type Page} from '../src/types';
-import {readCopies,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
+import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 
@@ -42,6 +42,17 @@ if(new URLSearchParams(location.search).has('directory')&&!localStorage.getItem(
 if(new URLSearchParams(location.search).has('empty')&&!localStorage.getItem('reader-fixture-empty')){
  await editLibrary((library,copies)=>{const chapter=library.chapters.find(c=>c.id==='reader-fixture-chapter-3');if(!chapter)return;const copy={...makeCopy(chapter.title,[]),id:'reader-fixture-empty'};copies.push(copy);library.coverage.push({id:'reader-fixture-empty-coverage',copyId:copy.id,workId:chapter.workId,target:{kind:'chapter',id:chapter.id},evidence:{status:'user',source:'隔离验收'}});});
  localStorage.setItem('reader-fixture-empty','v1');
+}
+// Separate small chapters exercise boundaries, including repeated page IDs in different copies.
+const flow=new URLSearchParams(location.search).get('flow');
+if(flow&&['complete','incomplete','missing','empty','gap','snapshot'].includes(flow)&&!(await readCopies()).some(c=>c.id===`reader-fixture-flow-${flow}-0`)){
+ const chapters=(flow==='snapshot'?[4]:[2,2,1]).map((count,n)=>({...makeCopy(`连读 ${flow} · 第 ${n+1} 话`,Array.from({length:count},(_,i)=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`flow-page-${i}`,blobKey:flow==='missing'&&n===0&&i===0?undefined:'reader-fixture-original'})),'连读验收'),id:`reader-fixture-flow-${flow}-${n}`}));
+ if(flow==='incomplete'){chapters[0].discoveryComplete=false;Object.assign(chapters[0],{knownTotal:4,sourceEntryId:'fixture-incomplete-source'});}
+ if(flow==='snapshot')Object.assign(chapters[0],{discoveryComplete:false,knownTotal:undefined,source:'网页图片',sourceKey:'web:fixture-snapshot'});
+ if(flow==='empty')chapters[1].pages=[];
+ if(flow==='gap')chapters[1].source='其它版本';
+ await commitCopies(chapters,chapters.map((c,n)=>({title:c.title,kind:'chapter',number:String(n+1)})));
+ if(flow==='empty')await editLibrary(s=>{s.tasks.push({id:'reader-fixture-flow-empty-task',copyId:chapters[1].id,status:'failed',phase:'images',completed:0,error:'模拟下一话采集失败，请重试。',updatedAt:Date.now()});});
 }
 const stored=await readCopies();
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
@@ -94,3 +105,4 @@ window.fetch=async(input,init={})=>{
 };
 await import('../src/main');
 if(new URLSearchParams(location.search).has('directory')){const output=document.createElement('output');output.id='fixture-requests';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(()=>{output.textContent=`隔离验收 · 新翻译 ${state.submitted.length} 页 · 报价 ${state.requests.filter(p=>p==='/v1/quotes').length} 次`;},500);}
+if(flow){const output=document.createElement('output');output.id='fixture-flow-state';output.style.cssText='position:fixed;bottom:0;right:0;z-index:100;font-size:10px;background:#fff;color:#555;padding:2px 6px';document.body.append(output);setInterval(async()=>{const s=await readLibrary();output.textContent=`隔离验收 · 已读：${s.chapters.filter(c=>c.title.startsWith(`连读 ${flow}`)&&c.readAt).map(c=>c.number).join('、')||'无'} · 解码 ${document.querySelector('.nc-reading-viewport')?.getAttribute('data-decoded-pages')??0} 页 · 新翻译 ${state.submitted.length} 页`;},500);}
