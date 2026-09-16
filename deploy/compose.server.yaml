@@ -1,0 +1,62 @@
+name: node-comics-production
+
+# Only the control plane. PostgreSQL is an existing external service;
+# image engines and compute agents run on the operator's own machines.
+x-server: &server
+  image: ${SERVER_IMAGE:?Set SERVER_IMAGE to a versioned backend image}
+  env_file: [.env.server]
+  environment:
+    APP_ENV: production
+    DEV_AUTH: "false"
+    DEV_AUTH_SECRET: ""
+    RESULT_STORAGE_BACKEND: r2
+    STORAGE_PATH: /data/images
+  networks: [infrastructure]
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:uid=10001,gid=10001,mode=0700,size=32m
+    - /data/images:uid=10001,gid=10001,mode=0700,size=32m
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  api:
+    <<: *server
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
+    ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 3
+      start_period: 120s
+  control-worker:
+    <<: *server
+    command: [python, -m, app.workers]
+    stop_grace_period: 31m
+    healthcheck:
+      test: [CMD, python, -m, app.health, control-worker]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+  maintenance:
+    <<: *server
+    command: [python, -m, app.dispatcher]
+    healthcheck:
+      test: [CMD, python, -m, app.health, maintenance]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+networks:
+  infrastructure:
+    external: true
+    name: ${INFRA_NETWORK:-1panel-network}

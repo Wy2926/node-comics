@@ -5,6 +5,7 @@ services/compute-agent/node.local.json
 .env.*
 !.env.example
 !deploy/.env.production.example
+!deploy/.env.server.example
 node_modules/
 .venv/
 __pycache__/

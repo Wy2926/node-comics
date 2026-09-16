@@ -100,6 +100,8 @@ def rotating_jwks(client, monkeypatch):
     class Opener:
         def open(self, request, timeout):
             assert request.full_url == cfg.oidc_jwks_url
+            # The production identity proxy rejects urllib's default user agent.
+            assert request.get_header("User-agent") == "NodeComics/0.3"
             state["requests"] += 1
             if state["unavailable"]:
                 raise URLError("isolated outage")

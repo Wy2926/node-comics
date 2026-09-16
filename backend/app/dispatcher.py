@@ -1,6 +1,8 @@
 """Lease reconciliation and retention maintenance. No message broker or dispatch backlog."""
 from datetime import timedelta
 import logging
+import signal
+from threading import Event
 import time
 from sqlalchemy import and_, or_, select
 from .assets import available, content_storage_key, create_asset, inspect_image
@@ -134,10 +136,13 @@ def cleanup(db):
 
 
 def main():
+    stopping = Event()
+    for name in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(name, lambda *_: stopping.set())
     initialize()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     next_oidc_probe = 0
-    while True:
+    while not stopping.is_set():
         try:
             recover_once()
             with session_factory()() as db:
@@ -148,7 +153,7 @@ def main():
             report_progress("maintenance")
         except Exception as error:
             report_failure("maintenance", error)
-        time.sleep(settings().dispatch_interval_seconds)
+        stopping.wait(settings().dispatch_interval_seconds)
 
 
 if __name__ == "__main__":

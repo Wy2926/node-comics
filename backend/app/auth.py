@@ -20,7 +20,8 @@ def jwks_client():
     # Per-key LRU caches have no expiry and bypass JWKS revocation indefinitely.
     # Retain only the bounded whole-set cache; an expired set must refresh or fail.
     return jwt.PyJWKClient(cfg.oidc_jwks_url, cache_keys=False, cache_jwk_set=True,
-                          lifespan=cfg.oidc_jwks_cache_seconds, timeout=cfg.oidc_jwks_timeout_seconds)
+                          lifespan=cfg.oidc_jwks_cache_seconds, timeout=cfg.oidc_jwks_timeout_seconds,
+                          headers={"User-Agent": "NodeComics/0.3"})
 
 
 def token_for(user: User):

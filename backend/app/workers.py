@@ -7,6 +7,7 @@ import hmac
 import logging
 import os
 import re
+import signal
 import socket
 from threading import Event, Thread
 import time
@@ -317,6 +318,9 @@ def run_control_stage(lease_id):
 
 
 def main():
+    stopping = Event()
+    for name in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(name, lambda *_: stopping.set())
     initialize()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     from .control_pools import POOL_LIMITS, initialize_pools, report_pools
@@ -329,7 +333,7 @@ def main():
     next_heartbeat = 0
     with ThreadPoolExecutor(max_workers=maximum, thread_name_prefix="translation") as executor:
         futures = {}
-        while True:
+        while not stopping.is_set():
             try:
                 completed = {future: lease_id for future, lease_id in futures.items() if future.done()}
                 for future in completed:
@@ -342,7 +346,7 @@ def main():
                         # still uses the durable lease and upstream call intent.
                         log_failure("control-stage-future", error, lease_id=completed[future])
                 for name in POOL_LIMITS:
-                    if len(futures) >= maximum:
+                    if stopping.is_set() or len(futures) >= maximum:
                         break
                     with session_factory()() as db:
                         lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)
@@ -356,8 +360,9 @@ def main():
                     next_heartbeat = time.monotonic() + 5
             except Exception as error:
                 report_failure("control-worker", error)
-                time.sleep(1)
-            time.sleep(.25)
+                stopping.wait(1)
+            stopping.wait(.25)
+        # The executor context drains accepted stages before PID 1 exits.
 
 
 if __name__ == "__main__":
