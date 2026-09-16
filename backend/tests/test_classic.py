@@ -14,6 +14,7 @@ from app.db import Base, engine, session_factory
 from app.models import Asset, Attempt, ClassicState, Job, TextCall, User, now, uid
 from app.queue_models import ComputeNode, ExecutionLease, JobStage, SchedulerMutex
 from app import entitlement_models  # noqa: F401
+from translation_fixtures import configure_text_provider
 
 SEGMENTS = [{'id': 'b001', 'source': 'Hello!'}]
 
@@ -37,8 +38,6 @@ def text_database(tmp_path, monkeypatch):
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///' + (tmp_path / 'stages.db').as_posix())
     monkeypatch.setenv('DEV_AUTH', 'true')
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-    monkeypatch.setenv('TEXT_API_KEY', 'isolated-text-test-key')
-    monkeypatch.setenv('TEXT_BASE_URL', 'https://text.example/v1')
     monkeypatch.setenv('STORAGE_PATH', str(tmp_path / 'images'))
     settings.cache_clear()
     if engine.cache_info().currsize:
@@ -48,6 +47,7 @@ def text_database(tmp_path, monkeypatch):
     with session_factory()() as db:
         db.add(SchedulerMutex(id=1, revision=0))
         db.commit()
+        configure_text_provider(db)
     yield
     engine().dispose()
     engine.cache_clear()
@@ -57,10 +57,11 @@ def text_database(tmp_path, monkeypatch):
 @pytest.fixture
 def text_case(text_database, monkeypatch):
     from app.classic_config import snapshot
-    config = snapshot()
     job_id, attempt_id, lease_id = uid(), uid(), uid()
     owner_id, asset_id, stage_id = uid(), uid(), uid()
     with session_factory()() as db:
+        config = snapshot(db)
+        provider_id = config['text']['provider_id']
         db.add(User(id=owner_id, subject='isolated-stage-user', name='reader'))
         db.flush()
         db.add(Asset(id=asset_id, owner_id=owner_id, sha256='a' * 64, storage_key='isolated-original',
@@ -74,12 +75,12 @@ def text_case(text_database, monkeypatch):
                    quota_kind='classic', config=config, operation='translate', request_hash='r' * 64,
                    idempotency_key=uid(), cache_key='c' * 64))
         db.flush()
-        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id='classic-text', lease_expires_at=now() + timedelta(minutes=5)))
+        db.add(Attempt(id=attempt_id, job_id=job_id, provider_id=provider_id, lease_expires_at=now() + timedelta(minutes=5)))
         db.add(JobStage(id=stage_id, job_id=job_id, name='text', status='running', generation=1))
         db.add(ClassicState(job_id=job_id, analysis=analysis()))
         db.flush()
         db.add(ExecutionLease(id=lease_id, job_id=job_id, stage_id=stage_id, node_id='text-node', owner_id=owner_id,
-                              generation=1, resource_pool='text:classic-text', mode='classic', priority_class='preload',
+                              generation=1, resource_pool='text:' + provider_id, mode='classic', priority_class='preload',
                               weight=1, estimated_seconds=10, expires_at=now() + timedelta(minutes=5)))
         db.commit()
     def text(*args):
@@ -176,9 +177,10 @@ def test_ocr_wait_time_does_not_spend_text_deadline(text_case):
     classic.run_text_stage(*text_case)
 
 
-def test_every_call_checks_shared_provider_rate_limit(text_case, monkeypatch):
-    monkeypatch.setenv('CLUSTER_TEXT_REQUESTS_PER_MINUTE', '1')
-    settings.cache_clear()
+def test_every_call_checks_shared_provider_rate_limit(text_case):
+    with session_factory()() as db:
+        provider_id = db.get(Job, text_case[0]).config['text']['provider_id']
+        configure_text_provider(db, provider_id, requests_per_minute=1)
     classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')
     with pytest.raises(TextError, match='TEXT_RATE_LIMITED'):
         classic.reserve_call(*text_case, 1, SEGMENTS, 'zh-Hans')

@@ -11,8 +11,9 @@ import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, select, text
 from sqlalchemy.orm import Session
 
-HEAD = "shared_0003_system_settings"
-NEW_TABLES = {"upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings"}
+HEAD = "shared_0004_text_providers"
+NEW_TABLES = {"upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
+              "translation_providers", "translation_provider_revisions"}
 
 
 @pytest.fixture
@@ -46,6 +47,8 @@ def assert_current_schema_matches_models(engine):
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
         inspector = inspect(connection)
         assert NEW_TABLES <= set(inspector.get_table_names())
+        assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
+        assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
         # Alembic's metadata comparison does not detect CHECK constraints. Cover
         # them explicitly, together with the admission ownership/uniqueness keys.

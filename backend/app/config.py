@@ -79,7 +79,6 @@ class Settings(BaseSettings):
     cluster_text_slots: int = Field(default=4, ge=1, le=100)
     cluster_upload_slots: int = Field(default=2, ge=1, le=32)
     cluster_redraw_slots: int = Field(default=4, ge=1, le=100)
-    cluster_text_requests_per_minute: int = Field(default=60, ge=1, le=10000)
     cluster_max_result_bytes: int = Field(default=88 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
     cluster_max_image_stages: int = Field(default=64, ge=1, le=1000)
     unknown_release_seconds: int = 3600
@@ -93,20 +92,7 @@ class Settings(BaseSettings):
     allow_private_providers: bool = False
     classic_enabled: bool = False
     classic_engine_version: str = "mit-95227a2-classic-v8-qt"
-    classic_timeout_seconds: int = 900
-    text_base_url: str = ""
-    text_api_key: str = ""
-    text_model: str = "gpt-5.6-luna"
-    text_protocol: str = "openai_chat"
-    text_user_agent: str = "Mozilla/5.0"
-    text_timeout_seconds: int = 60
-    text_max_attempts: int = 3
-    text_max_output_tokens: int = 1024
-    text_group_bytes: int = 1800
-    # CNY per million tokens = micro-CNY per token; operator estimates, not billing facts.
-    text_input_rate: int = 5
-    text_output_rate: int = 30
-    text_pricing_version: str = "operator-estimate-v1"
+    classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
 
     @model_validator(mode="after")
     def validate_identity(self):

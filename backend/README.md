@@ -4,7 +4,9 @@
 
 2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](../docs/PRODUCTION_FIXES.md)，未公开部署。
 
-当前迁移头为 `shared_0003_system_settings`，在 `shared_0001` 基础上增量增加上传门禁、反馈预算和统一系统设置，不重置已有业务数据。后台 `/admin/#settings` 管理本轮新增的 8 项保护参数，保存后供所有 API 副本的新请求使用，见[系统设置与验证](../docs/SYSTEM_SETTINGS.md)。
+当前代码迁移头为 `shared_0004_text_providers`，新增 DB 文本供应商及版本表和请求计量索引，无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据；本轮未部署或更新真实实例。后台 `/admin/#translation-providers` 创建供应商，首次创建自动设为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置仅影响新任务；独立 RPM、停用暂停及迁移边界见 [LLM 翻译供应商](../docs/TRANSLATION_PROVIDERS.md)。
+
+此前 `shared_0003_system_settings` 增加上传门禁、反馈预算和统一系统设置。后台 `/admin/#settings` 管理 8 项保护参数，保存后供所有 API 副本的新请求使用，见[系统设置与验证](../docs/SYSTEM_SETTINGS.md)。
 
 FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终译图，独立计算代理按阶段拉取常规翻译。前后端使用持久提交清单和双模式队列，已删除旧 preview/batch、Celery/Redis 与固定用户执行上限。产品规则见[集群说明](../docs/TRANSLATION_CLUSTER_DESIGN.md)。
 
@@ -14,8 +16,9 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终
 
 ```powershell
 ./scripts/bootstrap.ps1
-# 填写 R2、文本/图片供应商后启动本地开发集群：
+# 填写 R2、图片供应商后启动本地开发集群：
 ./scripts/bootstrap.ps1 -Start -Classic
+# 启动后在 /admin/#translation-providers 创建文本供应商。
 ```
 
 本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `shared_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
@@ -45,7 +48,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
 | `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，仅首次创建资源池时使用，后续在后台配置，所有控制副本共享限额 |
 | `CLUSTER_UPLOAD_SLOTS` | 2，仅首次创建时使用，后续在后台配置 |
-| `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 60，实际文本请求计量 |
+| 后台文本供应商 `config.requests_per_minute` | 默认60，每供应商独立 RPM，跨副本与该供应商历史版本共享；与文本执行位分开 |
 | `CLUSTER_MAX_IMAGE_STAGES` | 64，预存已 OCR 待渲染水位 |
 | `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
 | `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
@@ -55,10 +58,10 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
 | `R2_KEY_PREFIX` | 独立部署专用前缀 |
-| `CLASSIC_ENABLED` / `TEXT_*` | 常规翻译、计量和重试配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
+| `CLASSIC_ENABLED` | 常规引擎总开关；文本模型、协议、密钥、计量和重试在后台供应商中配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
 | `OPENAI_*` / `PROVIDERS_JSON` | 初始化图片供应商，后续管理员维护 |
 
-供应商密钥只通过后端环境引用，不进入任务快照和前端。配置影响生成结果时进入内容缓存版本；会员页数和权重不改变图片缓存身份。
+文本供应商密钥保存在后端 DB revision 中，调用前严格校验完整配置快照并加载对应版本密钥，不读取环境变量或借用图片供应商配置。密钥不进入 API 响应、任务快照或计算节点；数据库及备份包含敏感密钥，必须限制访问权限。有效供应商及版本进入内容缓存身份；会员页数和权重不改变图片缓存身份。
 
 ## 管理后台
 
@@ -93,4 +96,8 @@ cd backend
 
 PostgreSQL 并发套件必须显式设置 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`；只接受 `nodecomics_concurrency_test`，每例随机 schema。未启用的用例显示 skipped。节点与引擎单元检查见节点说明。
 
-`tests/manual_ui_server.py` 使用临时 SQLite、合成图片与模拟重绘供应商启动真实 API/control-worker，监听 18089；不读取生产环境文件，不调用付费模型。浏览器及完整证据见[验收说明](../docs/CLUSTER_VALIDATION.md)。
+在独立测试库配置完成后，从 `backend` 执行 `.venv/Scripts/python.exe -m pytest tests -k postgres -q`。调度负载基准另需 `RUN_SCHEDULER_SCALE=1`，常规回归无需启用。DB 供应商 fixture 的本轮结果与真实接入边界见[常规翻译验证](../docs/CLASSIC_IMPLEMENTATION.md#验证与交付边界)。
+
+`tests/translation_fixtures.py` 为 SQLite、PostgreSQL、HTTP 子进程及手工 UI 显式创建隔离 DB 文本供应商，使用假密钥；修改协议或模型先写新 revision 再获取快照。测试 fixture 的创建不属于应用启动 seed。
+
+`tests/manual_ui_server.py` 使用临时 SQLite、合成图片与模拟重绘供应商启动真实 API/control-worker，监听 18089；`tests/manual_admin_server.py` 提供 18090 管理后台隔离数据。两者均显式创建 DB 文本供应商，不读取生产环境文件、不调用付费模型。浏览器及完整证据见[验收说明](../docs/CLUSTER_VALIDATION.md)。

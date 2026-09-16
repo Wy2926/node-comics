@@ -7,6 +7,7 @@ from app.config import settings
 from app.db import Base, engine, session_factory
 from app.queue_models import SchedulerMutex
 from test_classic import text_case
+from translation_fixtures import configure_text_provider
 from test_classic_parallel import (
     test_inflight_llm_does_not_hold_scheduler_or_image_resources,
     test_parallel_groups_meter_every_call_without_cost_cap,
@@ -39,8 +40,6 @@ def text_database(tmp_path, monkeypatch):
         monkeypatch.setenv('DATABASE_URL', url.render_as_string(hide_password=False))
         monkeypatch.setenv('DEV_AUTH', 'true')
         monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-        monkeypatch.setenv('TEXT_API_KEY', 'isolated-pg-text-key')
-        monkeypatch.setenv('TEXT_BASE_URL', 'https://text.invalid/v1')
         monkeypatch.setenv('STORAGE_PATH', str(tmp_path / 'images'))
         settings.cache_clear()
         if engine.cache_info().currsize:
@@ -50,6 +49,7 @@ def text_database(tmp_path, monkeypatch):
         with session_factory()() as db:
             db.add(SchedulerMutex(id=1, revision=0))
             db.commit()
+            configure_text_provider(db)
         yield
     finally:
         if engine.cache_info().currsize:

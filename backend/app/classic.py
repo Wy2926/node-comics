@@ -5,10 +5,9 @@ import json
 import math
 import time
 from PIL import Image, ImageChops
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from .adapters.text import TextError, call_text, groups, input_bound, parse_translations
 from .assets import available, inspect_image
-from .config import settings
 from .db import session_factory
 from .errors import ProcessingError
 from .models import Asset, ClassicState, Job, TextCall, now, uid
@@ -38,7 +37,8 @@ def current(db, job_id, lease_id):
 
 
 def text_remaining(db, job):
-    started = db.scalar(select(func.min(TextCall.started_at)).where(TextCall.job_id == job.id))
+    started = db.scalar(select(func.min(TextCall.started_at)).where(TextCall.job_id == job.id,
+        or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED')))
     elapsed = (now() - started).total_seconds() if started else 0
     return job.config['provider']['timeout_seconds'] - elapsed
 
@@ -86,7 +86,9 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
     with session_factory()() as db:
         job = current(db, job_id, lease_id)
         profile = job.config['text']
-        if text_remaining(db, job) <= 0:
+        from .translation_providers import require_enabled
+        provider = require_enabled(db, profile)
+        if text_remaining(db, job) < profile['timeout_seconds']:
             raise TextError('TEXT_DEADLINE_EXCEEDED', '此页已达到文本处理总时限')
         pending = db.scalar(select(TextCall.id).where(TextCall.job_id == job_id, TextCall.group_index == group_index,
                                                       TextCall.execution_lease_id == lease_id, TextCall.completed_at.is_(None)))
@@ -94,18 +96,21 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
             raise TextError('TEXT_CALL_IN_FLIGHT', '当前文本组已经在执行')
         from datetime import timedelta
         cutoff = now() - timedelta(seconds=60)
-        recent = db.scalars(select(TextCall.started_at).where(TextCall.provider_id == job.config['provider']['id'],
+        recent = db.scalars(select(TextCall.started_at).where(TextCall.provider_id == provider.id,
+                                                              or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED'),
                                                               TextCall.started_at > cutoff).order_by(TextCall.started_at)).all()
-        if len(recent) >= settings().cluster_text_requests_per_minute:
+        if len(recent) >= provider.requests_per_minute:
             delay = max(0.1, 60 - (now() - recent[0]).total_seconds())
             raise TextError('TEXT_RATE_LIMITED', '文本服务已达到本分钟调用上限', retryable=True, retry_after=delay)
-        count = db.scalar(select(func.count()).select_from(TextCall).where(TextCall.job_id == job_id, TextCall.group_index == group_index))
+        count, sequence = db.execute(select(
+            func.count().filter(or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED')),
+            func.coalesce(func.max(TextCall.sequence), 0)).where(TextCall.job_id == job_id, TextCall.group_index == group_index)).one()
         if count >= profile['max_attempts']:
             raise TextError('TEXT_RETRY_EXHAUSTED', '此文本组已达到自动调用次数上限')
         reserved = input_bound(segments, language) * profile['input_rate'] + profile['max_output_tokens'] * profile['output_rate']
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
-                        group_index=group_index, sequence=count + 1,
-                        provider_id=job.config['provider']['id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)
+                        group_index=group_index, sequence=sequence + 1,
+                        provider_id=profile['provider_id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)
         db.add(call)
         db.commit()  # Intent and full unknown-cost reservation must exist before any request.
         return call.id, profile, count + 1
@@ -154,8 +159,9 @@ def translate_group(job_id, lease_id, index, segments, language, before_call=Non
                 job = current(db, job_id, lease_id)
                 if error.retry_after + job.config['text']['timeout_seconds'] > text_remaining(db, job):
                     raise TextError('TEXT_DEADLINE_EXCEEDED', '供应商限流等待超过此页剩余时限') from None
-            wait_for_retry(job_id, lease_id, error.retry_after, before_call)
-            continue
+            # Let the durable scheduler wait; holding this lease could prevent a
+            # completely different supplier from using the shared text pool.
+            raise
         response = None
         try:
             response = call_text(segments, language, profile)
@@ -164,6 +170,8 @@ def translate_group(job_id, lease_id, index, segments, language, before_call=Non
             return
         except TextError as error:
             complete_call(call_id, lease_id, response=response, error=error)
+            if error.code == 'TEXT_RATE_LIMITED' and sequence >= profile['max_attempts']:
+                raise TextError('TEXT_RETRY_EXHAUSTED', '此文本组已达到自动调用次数上限') from None
             if not error.retryable or sequence >= profile['max_attempts']:
                 raise
             delay = max(error.retry_after, min(2 ** (sequence - 1), 8))
@@ -172,6 +180,9 @@ def translate_group(job_id, lease_id, index, segments, language, before_call=Non
                 remaining = text_remaining(db, job)
             if delay + profile['timeout_seconds'] > remaining:
                 raise TextError('TEXT_DEADLINE_EXCEEDED', '供应商要求等待的时间超过此页剩余时限')
+            if error.code == 'TEXT_RATE_LIMITED':
+                error.retry_after = delay
+                raise
             # Check cancellation while honoring Retry-After; never shorten a server's delay.
             wait_for_retry(job_id, lease_id, delay, before_call)
         except Exception:

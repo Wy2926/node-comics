@@ -1,6 +1,7 @@
 """An AMD execution profile must never reuse a result from another runtime."""
 from app.classic_config import snapshot
 from app.config import settings
+from app.db import session_factory
 from app.providers import digest
 
 
@@ -8,10 +9,12 @@ def test_directml_changes_cache_identity_without_downgrading_models(client, monk
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     monkeypatch.setenv('CLASSIC_ENGINE_VERSION', 'mit-95227a2-classic-v5-cluster')
     settings.cache_clear()
-    cpu = snapshot()
+    with session_factory()() as db:
+        cpu = snapshot(db)
     monkeypatch.setenv('CLASSIC_ENGINE_VERSION', 'mit-95227a2-classic-v4-dml-v4')
     settings.cache_clear()
-    amd = snapshot()
+    with session_factory()() as db:
+        amd = snapshot(db)
     assert digest(cpu) != digest(amd)
     assert amd['engine']['version'] == 'mit-95227a2-classic-v4-dml-v4'
     for version in ('mit-95227a2-classic-v4-dml-v1', 'mit-95227a2-classic-v4-dml-v2', 'mit-95227a2-classic-v4-dml-v3'):

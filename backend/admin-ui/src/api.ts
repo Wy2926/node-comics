@@ -12,14 +12,21 @@ export function saveToken(value: string) {
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {super(message);}
 }
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function fetchResponse(path: string, options: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {cache: 'no-store', ...options,
     headers: {...(token ? {Authorization: `Bearer ${token}`} : {}), ...options.headers}});
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new ApiError(body.error?.message || `请求失败 (${response.status})`, response.status, body.error?.code);
   }
-  return response.json();
+  return response;
+}
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return (await fetchResponse(path, options)).json();
+}
+// Mutations need only the HTTP status; their success response may have no body.
+export async function sendRequest(path: string, options: RequestInit): Promise<void> {
+  await fetchResponse(path, options);
 }
 export const errorText = (error: unknown) => error instanceof TypeError
   ? '连接失败，请检查服务是否运行，再点击刷新重试。' : error instanceof Error ? error.message : '请求失败，请重试。';

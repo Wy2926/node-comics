@@ -104,7 +104,7 @@ def configuration(db: Session, mode: str, language: str, provider_id=None):
         config = {"mode": mode, "provider": provider.config, "prompt_version": PROMPT_VERSION}
     elif mode == "classic":
         from .classic_config import snapshot
-        config = snapshot()
+        config = snapshot(db, provider_id)
     else:
         problem("MODE_UNSUPPORTED", "不支持此翻译方式", 422)
     config["version"] = digest(config)

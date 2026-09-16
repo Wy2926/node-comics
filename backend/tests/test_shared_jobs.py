@@ -230,7 +230,11 @@ def test_changed_config_cannot_automatically_replay_unknown_redraw(client, png, 
         provider = db.get(Provider, "default")
         provider.config = {**provider.config, "parameters": {"quality": "high"}}
         db.commit()
-    settings().text_model = "changed-text-model"
+    from translation_fixtures import configure_text_provider
+    if mode == "classic":
+        with session_factory()() as db:
+            provider_id = db.get(Job, first["id"]).config['text']['provider_id']
+            configure_text_provider(db, provider_id, model="changed-text-model")
     second = submit_asset(client, auth, alias, key="changed-config", mode=mode)
     assert second.status_code == 202, second.text
     assert (second.json()["items"][0]["job"]["id"] == first["id"]) is (mode == "redraw")

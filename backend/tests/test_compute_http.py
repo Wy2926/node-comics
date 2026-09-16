@@ -56,7 +56,6 @@ def cluster(tmp_path, *, text_gate=None):
         'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': 'isolated-http-auth-key-no-product-access',
         'RESULT_STORAGE_BACKEND': 'local', 'R2_ENDPOINT_URL': '', 'PROVIDERS_JSON': '[]', 'OPENAI_API_KEY': '',
         'CLASSIC_ENABLED': 'true', 'CLASSIC_ENGINE_VERSION': version,
-        'TEXT_BASE_URL': 'https://text.invalid/v1', 'TEXT_API_KEY': 'isolated-text-key-not-used-for-requests',
         'CLUSTER_LEASE_SECONDS': '10', 'CLUSTER_NODE_TIMEOUT_SECONDS': '10',
         'CLUSTER_TEXT_SLOTS': '2', 'CLUSTER_UPLOAD_SLOTS': '2', 'CLUSTER_REDRAW_SLOTS': '1',
         'DISPATCH_INTERVAL_SECONDS': '1', 'CONTROL_ALLOW_HTTP': 'true',

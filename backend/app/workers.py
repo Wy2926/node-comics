@@ -181,6 +181,13 @@ def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
             job.status, job.phase, job.unknown_since = "outcome_unknown", "reconciliation", now()
             job.error_code, job.error_message = error.code, error.message
             stage.status = "unknown"
+        elif stage.name == 'text' and error.code in {'TEXT_PROVIDER_DISABLED', 'TEXT_RATE_LIMITED'}:
+            # Pauses and rate waits release the shared execution slot without
+            # consuming a stage attempt. Per-call limits remain durable.
+            delay = min(3600, max(0, getattr(error, 'retry_after', 0)))
+            stage.status, stage.available_at = 'ready', now() + timedelta(seconds=delay)
+            stage.attempts = max(0, stage.attempts - 1)
+            job.phase = 'text'
         elif retryable and stage.attempts < settings().cluster_stage_attempts:
             stage.status, stage.available_at = "ready", now() + timedelta(seconds=min(30, stage.attempts * 2))
             job.phase = "recovering_" + stage.name

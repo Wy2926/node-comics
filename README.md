@@ -4,7 +4,9 @@
 
 2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](docs/PRODUCTION_FIXES.md)，未公开部署。
 
-同日补充：已修复慢上传持有数据库连接、并发领取嵌套连接和反馈无预算，并新增后台“系统设置”，统一维护上传并发、超时及反馈预算。当前迁移头为 `shared_0003_system_settings`，可从 `shared_0001` 增量升级。生效规则及验证见[系统设置](docs/SYSTEM_SETTINGS.md)。
+同日补充：已修复慢上传持有数据库连接、并发领取嵌套连接和反馈无预算，并新增后台“系统设置”，统一维护上传并发、超时及反馈预算。该轮迁移为 `shared_0003_system_settings`，生效规则及验证见[系统设置](docs/SYSTEM_SETTINGS.md)。
+
+当前代码迁移头为 `shared_0004_text_providers`，文本供应商改在 `/admin/#translation-providers` 创建，首个自动成为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置只影响新任务，供应商独立 RPM、停用暂停排队文本阶段。DB revision 保存后台密钥且不出 API；数据库及备份须限制访问。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。本轮未部署真实实例，完整运行与迁移边界见 [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md)。
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
@@ -36,9 +38,9 @@ Windows AMD RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装�
 
 本机 NVIDIA RTX 4060 Laptop GPU 已跑通 `./scripts/start-local-nvidia.ps1 -Smoke`，首次安装加 `-Setup`。
 
-启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，并按常规翻译说明配置文本接口。
+启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，启动后在 `/admin/#translation-providers` 配置文本供应商。本机 `-Smoke` 在缺少启用的默认供应商时保持服务运行，等待后台配置后继续。
 
-环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2、文本与图片模型配置，模板见 [.env.example](.env.example)。
+环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2 与图片模型配置，模板见 [.env.example](.env.example)。文本供应商由管理员在服务启动后保存到数据库。
 
 ```powershell
 ./scripts/bootstrap.ps1 -Start
@@ -77,6 +79,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | [技术验证](docs/TECH_RESEARCH.md) | 协议依据、样本与验证边界 |
 | [常规翻译调研](docs/CLASSIC_TRANSLATION_RESEARCH.md) | 开源引擎比较、LaMa、LLM 成本与重试、待实施验证 |
 | [运行与实现](docs/IMPLEMENTATION.md) | 操作命令、配置、交付状态及限制 |
+| [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md) | 后台 DB 配置、协议、版本密钥、停用暂停、独立 RPM 与迁移边界 |
 | [代码规范与模块维护](docs/CODE_QUALITY.md) | 模块边界、冗余清理、自动检查与本轮验证 |
 
 用户漫画位于被忽略的 `临时资源/`，提取结果在 `private-test-data/`。发布示例只包含项目生成的原创图片。支付订阅、长期云书架、长图分段和其他电子书格式属于后续范围。

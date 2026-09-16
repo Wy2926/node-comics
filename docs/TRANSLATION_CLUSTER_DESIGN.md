@@ -69,6 +69,8 @@ flowchart TB
 
 同图像引擎的 analyze/inpaint/render 共享物理设备容量。文本与重绘是不同控制执行池，分别受后台配置的执行位、文本 RPM、调用次数/时限和供应商并发限制，文本成本只计量。所有 API／控制副本通过 PostgreSQL 事务级 advisory lock 顺序更新调度状态、用户和任务；网络 I/O、图像计算均在短锁之外。[PostgreSQL 锁说明](https://www.postgresql.org/docs/current/explicit-locking.html)
 
+文本 RPM 由后台供应商记录管理，每个供应商跨副本、跨历史版本共享额度；一个供应商限流或停用，不阻塞其他供应商的可执行阶段。任务提交时固定供应商和版本，默认切换仅影响后续任务；停用后的排队阶段等待重新启用。旧环境文本配置不再读取，见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。
+
 ## 6. 常规流水线与集群
 
 ```mermaid

@@ -1,16 +1,24 @@
 # 常规翻译运行说明
 
+2026-09-16 文本供应商更新：改由数据库维护，迁移头为 `shared_0004_text_providers`。本轮仅更新代码、测试与运行说明，未部署或切换真实实例；下文历史图片与性能证据不代表新版供应商接入验收。
+
 2026-09-16：嵌字已扩展至 16 个目标项，并整体接入固定 Manga Translator UI Qt 排版引擎；当前运行准备、版本与验收边界见[气泡与嵌字说明](LETTERING_LAYOUT.md)，字体和语言范围见[语言清单](LANGUAGE_SUPPORT.md)。下文版本与样本记录按各自日期保留。
 
 2026-09-15：常规改为可独立部署的阶段计算节点。客户端统一使用[提交清单与双队列](TRANSLATION_CLUSTER_DESIGN.md)；原图和译图存私有 R2，中间图仅节点有界内存缓存。引擎版本 `mit-95227a2-classic-v4-cluster`，模型、字体和权重版本未升级。
 
 ## 启动
 
-在 `.env` 填写 `CLASSIC_ENABLED=true`、`TEXT_BASE_URL`、`TEXT_API_KEY`、`TEXT_MODEL` 和私有 R2 配置，再运行：
+在 `.env` 填写 `CLASSIC_ENABLED=true` 和私有 R2 配置，再运行：
 
 ```powershell
 ./scripts/bootstrap.ps1 -Start -Classic
 ```
+
+启动后以管理员身份打开 `/admin/#translation-providers`，创建供应商并填写名称、OpenAI 渠道、Base URL、模型和 API Key。支持 OpenAI Chat Completions（`chat_completions`，默认）和 Responses（`responses`）；首个供应商自动成为默认。默认选择及版本化配置修改只影响新任务，已有任务固定引用 DB revision；调用时校验完整快照并从对应 revision 读取密钥，无环境变量 fallback。
+
+停用会暂停排队文本阶段；请求间遇到停用时释放租约并回到 ready，不消耗阶段重试次数，已发生调用的计量保留。暂停时间仍计入首次文本请求之后的页处理总时限。启停和 RPM 对供应商各历史版本统一生效；每供应商 RPM 独立，与共享文本执行位分开。密钥留在后端、不出 API；数据库与备份包含敏感密钥，须限制访问。
+
+迁移只新增供应商表及索引，无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据；验证使用新隔离数据库及运行目录。完整参数、暂停语义、API 和迁移边界以 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md) 为准。
 
 控制服务为 API/control-worker/maintenance；每台图像设备运行 compute-agent 和常驻 classic-engine。跨机器只通过认证 HTTPS API 通信；同机引擎无公开端口、不持有文本密钥。CPU/CUDA、第二台机器、稳定资源 ID 和锁目录见[节点部署](../services/compute-agent/README.md)。
 
@@ -34,11 +42,8 @@
 | `ENGINE_DEVICE` / `ENGINE_RESOURCE_ID` | CPU/CUDA与稳定物理设备身份 |
 | `ENGINE_CACHE_BYTES` | 默认256 MiB有界中间图内存 |
 | `CLUSTER_STAGE_ATTEMPTS` | 默认3次安全阶段执行 |
-| `CLUSTER_TEXT_SLOTS` / `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 独立文本并发与实际请求限速 |
-| `TEXT_TIMEOUT_SECONDS` / `TEXT_MAX_ATTEMPTS` | 默认60秒／每组3次 |
-| `TEXT_GROUP_BYTES` / `TEXT_MAX_OUTPUT_TOKENS` | 1800字节／1024输出token |
-| `TEXT_INPUT_RATE` / `TEXT_OUTPUT_RATE` | 运营估价，非已核实供应商账单 |
-| `TEXT_PROTOCOL` | openai_chat，另支持openai_responses契约 |
+| `CLUSTER_TEXT_SLOTS` | 文本控制池初始并发，后续在后台修改 |
+| 后台供应商 `config` | 协议、模型、RPM、分组、超时、重试和估价；见[参数说明](TRANSLATION_PROVIDERS.md#限流缓存与计量) |
 
 模型、权重、字体来源与许可沿用现有 prepare.py 和 licenses 记录。当前完整测试与浏览器交付证据见[集群验收](CLUSTER_VALIDATION.md)。以下旧效果样本记录仅说明样本质量与当时环境，不代表本次新集群吞吐或GPU验收。
 
@@ -53,9 +58,11 @@ npm run build
 npm run build:web
 ```
 
-需要真实 PostgreSQL 的并发测试在独立数据库及随机 schema 运行，命令见 [后端说明](../backend/README.md)。测试替换全部供应商与引擎调用，真实调用与模拟测试分别记录。
+需要真实 PostgreSQL 的并发测试在独立数据库及随机 schema 运行，命令见 [后端说明](../backend/README.md)。SQLite、PostgreSQL、HTTP 子进程和手工 UI fixture 通过 `backend/tests/translation_fixtures.py` 显式写入隔离 DB 供应商，使用假密钥及模拟响应；协议变化必须写新 revision 后重新获取快照。真实调用与模拟测试分别记录。
 
-最终自动化验证：后端 86 项通过，默认跳过的 6 项 PostgreSQL 用独立入口全部通过；前端 29 项通过，TypeScript 检查、Chrome MV3 扩展与 Web 构建通过。[汇总记录](evidence/classic-validation.json)
+2026-09-16 DB 供应商 fixture 回归：完整后端测试 456 项通过、82 项按默认条件跳过；另在一次性 PostgreSQL 17.6 容器、独立测试库及随机 schema 中运行 `pytest tests -k postgres -q`，82 项通过、1 项调度负载基准未启用。两轮均仅有 2 条依赖弃用警告。手工阅读器／管理后台 fixture 已实际启动并经 HTTP 确认 DB 供应商及密钥不出 API；本机 smoke 等待配置逻辑通过模拟检查，未调用真实模型、运行 GPU 全链路或部署真实实例。
+
+历史自动化验证（旧供应商实现）：后端 86 项通过，默认跳过的 6 项 PostgreSQL 用独立入口全部通过；前端 29 项通过，TypeScript 检查、Chrome MV3 扩展与 Web 构建通过。[汇总记录](evidence/classic-validation.json)
 
 本轮浏览器使用测试按用户要求交由用户。建议依次检查：常规翻译按钮及报价、逐页完成与失败、原图／常规／重绘版本切换、语言版本、阅读位置、切换模式后自动翻译暂停、取消、重开任务恢复和结果下载。
 

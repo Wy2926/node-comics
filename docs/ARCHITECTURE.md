@@ -28,6 +28,8 @@ MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执
 
 图片供应商适配器调用兼容 `POST /v1/images/edits`，配置 endpoint、model、image/image[]、参数白名单、尺寸和超时。密钥仅引用后端环境变量。输出 URL 进行域名、DNS/IP 和重定向检查；可解码、归属正确、持久化成功后交付。聊天接口或模型列表不构成图片编辑验收。
 
+文本翻译独立使用数据库中的 `TranslationProvider` 和不可变 `TranslationProviderRevision`，不读取旧 `TEXT_*` 或借用图片供应商配置。后台可创建多个 OpenAI 供应商并选择默认，任务固定供应商版本，运行时解析该版本的后台密钥。渠道注册表隔离来源差异，首期实现 Chat Completions 与 Responses；按供应商独立限流，统一执行器负责重试、计量和检查点。详细接口与部署边界见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。
+
 ## 任务、权益与数据
 
 - Job 保存内容/模式/语言/有效生成配置；Submission/SubmissionItem 保存有序用户意图和共享任务引用；UploadReservation 保存实际字节校验前的有限占位；JobRequest 保证操作幂等。

@@ -28,8 +28,6 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_MODEL", "gpt-image-2")
     monkeypatch.setenv("PROVIDERS_JSON", "")
     monkeypatch.setenv("CLASSIC_ENABLED", "false")
-    monkeypatch.setenv("TEXT_API_KEY", "isolated-test-text-key")
-    monkeypatch.setenv("TEXT_BASE_URL", "https://text.example/v1")
     monkeypatch.setenv("CLASSIC_ENGINE_TOKEN", "isolated-engine-token")
     from app.config import settings
     from app.db import engine
@@ -39,7 +37,11 @@ def client(tmp_path, monkeypatch):
     engine.cache_clear()
     from fastapi.testclient import TestClient
     from app.main import app
+    from app.db import session_factory
+    from translation_fixtures import configure_text_provider
     with TestClient(app) as test_client:
+        with session_factory()() as db:
+            configure_text_provider(db)
         yield test_client
     engine().dispose()
     engine.cache_clear()

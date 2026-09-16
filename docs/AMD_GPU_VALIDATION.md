@@ -1,5 +1,7 @@
 # RX 6900 XT 原模型部署与验收
 
+2026-09-16 文本供应商更新：本机启动后在 `/admin/#translation-providers` 创建 DB 供应商；本轮未重新运行真实 AMD／R2／付费文本链路，也未部署真实实例。以下性能和图片记录保留原验证范围。
+
 2026-09-16 后续更新：当前 AMD 入口为 `mit-95227a2-classic-v4-dml-v4`，修复英文断词字典重复下载；预下载指定语言、离线校验及新版本切换见[字典说明](HYPHENATION_DICTIONARIES.md)。下文的 v1/v2/v3 性能记录保留原测试日期与范围。
 
 持续吞吐、并发排队与资源占用见 [AMD 负载测试](AMD_LOAD_TEST.md)。
@@ -40,18 +42,21 @@ Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torch
 # 后续启动；Ctrl+C 停止本次启动的服务。
 ./scripts/start-local-amd.ps1
 
-# 一页真实翻译验证，结束后关闭本次服务。
+# 一页真实翻译验证；无默认供应商时保持服务运行，等待后台创建后继续。
+# 验证结束后关闭本次服务。
 ./scripts/start-local-amd.ps1 -Smoke
 ```
 
 入口沿用 API、control-worker、maintenance、compute-agent、classic-engine 的职责与 HTTPS/令牌协议。本机进程之间显式允许回环 HTTP，API 为 `http://127.0.0.1:18088`，引擎为 `http://127.0.0.1:18090`。所有服务只在回环地址监听，图像节点不获得 R2 或供应商密钥。
 
-私有 `.env` 配置 R2 及 `TEXT_API_KEY`、`TEXT_BASE_URL`、`TEXT_MODEL`。为复用本机现有兼容网关，脚本在未配置文本密钥时使用 `OPENAI_API_KEY` / `OPENAI_BASE_URL`，默认文本模型 `gpt-5.6-luna`；原有页预算和自动重试上限继续生效。服务未就绪或端口已占用时启动失败。
+私有 `.env` 配置 R2。脚本启动后会提示管理地址 `http://127.0.0.1:18088/admin/#translation-providers`，本地开发管理员用户名为 `admin`。在后台填写文本端点、模型和密钥，选择 OpenAI Chat Completions（默认）或 Responses；首个供应商自动成为默认。`-Smoke` 在没有启用的默认供应商时保持服务运行并等待，配置完成后自动继续。脚本不再读取旧文本密钥或回退到图片供应商密钥；服务未就绪或端口被占用时启动失败。
 
-本地数据库、令牌、任务回执和验证图片位于被 Git 忽略的 `private-test-data/amd-original-models/`。原图和最终译图仍保存私有 R2。相同验证目录重跑时沿用原任务，不重复调用已完成的文本任务；换图或换模型版本需使用不同验证目录：
+配置和默认选择只影响新任务；已有任务绑定 DB revision。数据库和备份含敏感密钥，必须限制访问权限。独立 RPM、停用暂停与总时限、API 及迁移边界见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据；首次验证本版请使用下方 Python 命令指定全新的 `--directory`，PowerShell 包装脚本的固定目录不应直接沿用旧任务。
+
+PowerShell 包装脚本将本地数据库、令牌、任务回执和验证图片放在被 Git 忽略的 `private-test-data/local-amd-nodes/`；历史图片证据在 `private-test-data/amd-original-models/`。原图和最终译图仍保存私有 R2。本版新建的验证目录重跑时沿用原任务，不重复调用已完成的文本任务；旧快照不能沿用，换图或换模型版本也需使用不同验证目录：
 
 ```powershell
-backend/.venv/Scripts/python.exe scripts/run_local_node.py --device directml:0 --smoke --directory private-test-data/amd-another-sample --image samples/another.png
+backend/.venv/Scripts/python.exe scripts/run_local_node.py --device directml:0 --smoke --directory private-test-data/amd-db-text-v1 --image samples/starlight-bookshop.png
 ```
 
 Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_VERSION=mit-95227a2-classic-v4-dml-v4`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v4`，与 v1/v2/v3 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、设备锁、租约与缓存恢复保持一致；节点身份、注册与容量已改为[后台配置](NODE_CONFIGURATION.md)。

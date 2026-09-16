@@ -1371,3 +1371,39 @@ dialog::backdrop {
   .settings-save-bar, .settings-conflict {align-items: stretch; flex-direction: column; gap: 12px;}
   .system-settings .page-heading > .secondary {margin-top: 16px;}
 }
+
+.provider-actions, .provider-name {display: flex; flex-wrap: wrap; align-items: center; gap: 8px;}
+.translation-providers .page-heading {gap: 20px;}
+.translation-providers .page-heading > .provider-actions {align-self: center; justify-content: flex-end;}
+.translation-providers button:disabled, .provider-dialog button:disabled {cursor: not-allowed;}
+.provider-guide {padding: 20px 24px; margin-bottom: 20px; display: grid; gap: 6px; color: var(--muted); font-size: 12px;}
+.provider-guide strong {color: #414459; font-size: 13px;}
+.provider-warning {border: 1px solid #f0ddba; background: #fff8eb; color: #79560a; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 12px; overflow-wrap: anywhere;}
+.provider-row-actions {display: flex; flex-wrap: wrap; gap: 8px 14px; min-width: 150px;}
+.provider-row-actions button {padding: 4px 0;}
+.provider-list .empty > .primary {margin-top: 20px;}
+.provider-footnote {margin-top: 16px;}
+.translation-providers .error .text-link {margin-left: 12px;}
+.provider-dialog {width: min(900px, calc(100vw - 48px));}
+.provider-description {margin-bottom: 18px;}
+.provider-revision {display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fc; color: var(--muted); font-size: 11px; margin-bottom: 20px; overflow-wrap: anywhere;}
+.provider-form, .provider-form > .config-body {display: grid; gap: 24px;}
+.provider-section {display: grid; gap: 16px;}
+.provider-form .settings-field input, .provider-form .settings-field select {width: 100%;}
+.provider-form [aria-invalid=true] {border-color: #c45468; background: #fff9fa;}
+.provider-form .settings-field > label {font-size: 12px;}
+.provider-required {font-size: 10px; color: var(--muted); font-weight: 400;}
+.provider-enabled {display: flex; align-items: center; gap: 8px; font-size: 13px;}
+.provider-save-bar {border-top: 1px solid var(--border); padding-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;}
+.provider-save-bar .provider-actions {flex-shrink: 0;}
+.provider-form > .error {margin: 0;}
+@media (max-width: 680px) {
+  .translation-providers .page-heading > .provider-actions {justify-content: flex-start; margin-top: 18px;}
+  .provider-dialog {width: calc(100vw - 20px);}
+  .provider-guide {padding: 18px;}
+  .provider-save-bar {flex-direction: column; align-items: stretch;}
+  .provider-save-bar .provider-actions {justify-content: flex-end;}
+}
+@media (max-width: 600px) {
+  nav {grid-template-columns: repeat(3, minmax(0, 1fr));}
+}

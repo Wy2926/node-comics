@@ -167,4 +167,5 @@ class TextCall(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("job_id", "group_index", "sequence"), CheckConstraint("accounted_micros >= 0"),
-                     Index("ix_text_calls_started_at", "started_at"))
+                     Index("ix_text_calls_started_at", "started_at"),
+                     Index("ix_text_calls_provider_started", "provider_id", "started_at"))

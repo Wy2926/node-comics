@@ -29,6 +29,7 @@ import pytest
 from PIL import Image
 from sqlalchemy import URL, create_engine, event, func, select, text
 from conftest import run_job
+from translation_fixtures import configure_text_provider
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_POSTGRES_CONCURRENCY") != "1",
@@ -84,8 +85,6 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_MODEL", "contract-image-model")
     monkeypatch.setenv("PROVIDERS_JSON", "")
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-    monkeypatch.setenv('TEXT_API_KEY', 'isolated-pg-text-key')
-    monkeypatch.setenv('TEXT_BASE_URL', 'https://text.invalid/v1')
     monkeypatch.setenv('CLASSIC_ENGINE_TOKEN', 'isolated-pg-engine-token')
     from app.config import settings
     from app.db import engine
@@ -123,6 +122,7 @@ def pg(pg_scope):
     Image.new("RGB", (320, 480), (231, 225, 248)).save(image, "PNG")
     raw = image.getvalue()
     with session_factory()() as db:
+        configure_text_provider(db)
         initialize_providers(db)
         user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", membership_id=uid(), plus_started_at=now(),
                     plus_expires_at=month_boundary(now(), 12, "Asia/Shanghai"),
@@ -353,7 +353,9 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert len(revisions) == 1
+            assert revisions == ['shared_0004_text_providers']
+            assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
+            assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0
             assert connection.scalar(text("SELECT count(*) FROM jobs")) == 0
     finally:

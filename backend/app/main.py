@@ -33,6 +33,7 @@ from .admin_web import router as admin_web_router
 from .request_models import RequestBody
 from .health import readiness
 from .system_settings import initialize_system_settings, router as system_settings_router
+from .translation_providers import router as translation_providers_router
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
 from .reader_api import router as reader_router
@@ -61,6 +62,7 @@ app.include_router(grants_router)
 app.include_router(admin_monitor_router)
 app.include_router(admin_web_router)
 app.include_router(system_settings_router)
+app.include_router(translation_providers_router)
 cfg = settings()
 origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip()]
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
@@ -171,7 +173,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     cfg = settings()
     redraw_enabled = any(credential(provider.config) for provider in db.scalars(select(Provider).where(Provider.enabled.is_(True))))
     from .classic_config import enabled as classic_enabled
-    return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(), "languages": list(LANGUAGES)},
+    return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": cfg.free_queue_capacity, "plus_queue_capacity": cfg.plus_queue_capacity},

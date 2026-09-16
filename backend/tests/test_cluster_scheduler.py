@@ -27,8 +27,8 @@ from test_classic import encoded, text_database
 @pytest.fixture
 def scheduler_case(text_database):
     from app.classic_config import snapshot
-    config = snapshot()
     with session_factory()() as db:
+        config = snapshot(db)
         free = User(id='free-user', subject='isolated-free', name='free')
         plus = User(id='plus-user', subject='isolated-plus', name='plus', membership_id=uid(),
                     plus_started_at=now() - timedelta(days=1), plus_expires_at=now() + timedelta(days=30),

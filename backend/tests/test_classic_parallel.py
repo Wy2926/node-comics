@@ -29,7 +29,7 @@ def test_inflight_llm_does_not_hold_scheduler_or_image_resources(text_case, monk
             with session_factory()() as db:
                 lock_scheduler(db)
                 lease = db.get(ExecutionLease, text_case[1])
-                assert lease.resource_pool == 'text:classic-text'
+                assert lease.resource_pool == 'text:' + db.get(Job, text_case[0]).config['text']['provider_id']
                 assert db.scalar(select(func.count()).select_from(ExecutionLease)) == 1
                 # A node loss/recovery transaction proceeds while the LLM waits.
                 stage = db.get(JobStage, lease.stage_id)

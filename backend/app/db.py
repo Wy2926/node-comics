@@ -16,7 +16,7 @@ _migration_lock = Lock()
 def engine():
     url = settings().database_url
     kwargs = {"connect_args": {"check_same_thread": False, "timeout": 30}} if url.startswith("sqlite") else {}
-    db = create_engine(url, pool_pre_ping=True, **kwargs)
+    db = create_engine(url, pool_pre_ping=True, hide_parameters=True, **kwargs)
     if url.startswith("sqlite"):
         @event.listens_for(db, "connect")
         def sqlite_pragmas(connection, _):
@@ -35,6 +35,7 @@ def get_db():
 
 
 def initialize():
+    from . import translation_models  # noqa: F401
     from . import models  # noqa: F401
     from . import health_models  # noqa: F401
     from . import system_settings, feedback_models  # noqa: F401

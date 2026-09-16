@@ -57,12 +57,6 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
     require_free(engine_port)
     folder.mkdir(parents=True, exist_ok=True)
     config = {**dotenv_values(ROOT / '.env'), **dotenv_values(ROOT / 'deploy/.env.local')}
-    if not config.get('TEXT_API_KEY'):
-        config['TEXT_API_KEY'] = config.get('OPENAI_API_KEY', '')
-        config['TEXT_BASE_URL'] = config.get('OPENAI_BASE_URL', '')
-    if not config.get('TEXT_API_KEY') or not config.get('TEXT_BASE_URL'):
-        raise RuntimeError('Configure TEXT_API_KEY and TEXT_BASE_URL in the private environment')
-    config.setdefault('TEXT_MODEL', 'gpt-5.6-luna')
     # Preserve the original and final images in R2; only test metadata is local.
     secret_file = folder / 'local-auth.json'
     if not secret_file.exists():
@@ -78,7 +72,6 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
                    'OPENAI_API_KEY': '', 'R2_KEY_PREFIX': tokens['r2_prefix'],
                    'CLASSIC_ENABLED': 'true',
                    'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v7-qt' if device.startswith('directml') else 'mit-95227a2-classic-v8-qt',
-                   'TEXT_MAX_ATTEMPTS': '3',
                    'DISPATCH_INTERVAL_SECONDS': '1'}
     # Explicit allowlist: do not forward credentials inherited from the caller.
     runtime_env = {k: v for k, v in common.items() if k.upper() in {
@@ -133,6 +126,8 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
         start('agent', ENGINE_PYTHON, [ROOT / 'services/compute-agent/agent.py'], agent_env)
         print(json.dumps({'event': 'CLUSTER_READY', 'api': url, 'engine': engine_url,
                           'device': health['device'], 'model_version': health['version']}, ensure_ascii=False), flush=True)
+        print(f'Text suppliers are managed at {url}/admin/#translation-providers (local username: admin). '
+              'Create an enabled default supplier before submitting classic translations.', flush=True)
         yield url, engine_url, health, children
     finally:
         # Let Uvicorn save device execution evidence and close model resources.
@@ -152,6 +147,25 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
                     child.wait(timeout=5)
         for handle in handles:
             handle.close()
+
+
+def wait_text_provider(url, children):
+    """Let the operator create DB configuration while all local services stay up."""
+    with httpx.Client(base_url=url, timeout=30, trust_env=False) as admin:
+        auth = admin.post('/v1/auth/dev', json={'username': 'admin'}).raise_for_status().json()
+        admin.headers['Authorization'] = 'Bearer ' + auth['access_token']
+        announced = False
+        while True:
+            if any(child.poll() is not None for child in children):
+                raise RuntimeError('A cluster service exited while waiting for a text supplier')
+            providers = admin.get('/v1/admin/translation-providers').raise_for_status().json()['items']
+            if any(provider['enabled'] and provider['is_default'] for provider in providers):
+                return
+            if not announced:
+                print(f'Waiting for an enabled default text supplier at {url}/admin/#translation-providers. '
+                      'The first supplier becomes default automatically; smoke translation will then continue.', flush=True)
+                announced = True
+            time.sleep(1)
 
 
 def smoke(folder, url, engine_url, health, image):
@@ -283,6 +297,7 @@ def main():
         return
     with cluster(args.directory.resolve(), args.api_port, args.engine_port, args.device, args.engine_config) as (url, engine_url, health, children):
         if args.smoke:
+            wait_text_provider(url, children)
             smoke(args.directory.resolve(), url, engine_url, health, args.image)
         if args.verify_config:
             verify_configuration(args.directory.resolve(), url, engine_url)

@@ -1,19 +1,22 @@
 import httpx
 import pytest
-from app.adapters import text
+from app.adapters import openai_text, text
 from app.classic_config import snapshot
 from app.config import settings
+from app.db import session_factory
+from translation_fixtures import configure_text_provider
 
 
 @pytest.fixture
 def profile(client, monkeypatch):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     settings.cache_clear()
-    return snapshot()['text']
+    with session_factory()() as db:
+        return snapshot(db)['text']
 
 
 def install(monkeypatch, handler):
-    monkeypatch.setattr(text, 'CheckedTransport', lambda: httpx.MockTransport(handler))
+    monkeypatch.setattr(openai_text, 'CheckedTransport', lambda: httpx.MockTransport(handler))
 
 
 def test_chat_payload_sends_only_text_and_bounds_output(profile, monkeypatch):
@@ -36,14 +39,17 @@ def test_chat_payload_sends_only_text_and_bounds_output(profile, monkeypatch):
 
 def test_responses_protocol(profile, monkeypatch):
     import json
-    profile['protocol'] = 'openai_responses'
+    with session_factory()() as db:
+        configure_text_provider(db, profile['provider_id'], protocol='responses')
+        revised = snapshot(db, profile['provider_id'])['text']
+    assert revised['revision_id'] != profile['revision_id']
     def handler(request):
         data = json.loads(request.content)
         assert request.url.path == '/v1/responses'
         assert data['store'] is False and data['max_output_tokens'] == 1024
         return httpx.Response(200, json={'status': 'completed', 'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': '{}'}]}], 'usage': {'input_tokens': 9, 'output_tokens': 3}})
     install(monkeypatch, handler)
-    assert text.call_text([], 'en', profile).usage['output_tokens'] == 3
+    assert text.call_text([], 'en', revised).usage['output_tokens'] == 3
 
 
 @pytest.mark.parametrize('status,retryable', [(401, False), (403, False), (400, False), (404, False), (429, True), (500, True), (503, True), (302, False)])

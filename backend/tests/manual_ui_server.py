@@ -20,13 +20,13 @@ sys.path.insert(0, str(root))
 directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
     APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="100", PLUS_MONTHLY_REDRAW_PAGES="300", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
-     TEXT_API_KEY="isolated-ui-text", TEXT_BASE_URL="https://text.example/v1",
     OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
     CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174")
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app
 from app.db import initialize, session_factory
+from translation_fixtures import configure_text_provider
 from app.models import Job
 from app.adapters.images import TranslationOutput
 from app.errors import ProcessingError
@@ -49,6 +49,8 @@ def output(data):
     return TranslationOutput(stream.getvalue(),usage={"fixture":True},quality_flags=["unrecognized_regions"] if control.get("outcome")=="partial" else [])
 workers.redraw=lambda data,*args:output(data)
 initialize()
+with session_factory()() as db:
+    configure_text_provider(db)
 threading.Thread(target=workers.main,daemon=True).start()
 # Classic stages are exercised by cluster tests; this fixture uses the real
 # redraw/control protocol with a synthetic image provider.

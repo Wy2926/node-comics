@@ -123,6 +123,11 @@ def run():
         return
     if role == 'api':
         from app.main import app
+        from app.db import initialize, session_factory
+        from translation_fixtures import configure_text_provider
+        initialize()
+        with session_factory()() as db:
+            configure_text_provider(db)
         serve(app, sys.argv[2])
         return
     if role == 'worker':

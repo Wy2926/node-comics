@@ -116,7 +116,7 @@ def admin_jobs(status: str | None = Query(None, max_length=24), offset: int = Qu
         items.append({**job_json(db, job), "owner_id": job.owner_id, "provider_id": attempt.provider_id if attempt else None,
                       "provider_request_id": attempt.request_id if attempt else None, "provider_usage": attempt.usage if attempt else None, "provider_cost_state": attempt.cost_state if attempt else None,
                       'text_cost_micros': sum(call.accounted_micros for call in calls),
-                      'text_calls': [{'id': call.id, 'group': call.group_index, 'sequence': call.sequence, 'model': call.model,
+                      'text_calls': [{'id': call.id, 'group': call.group_index, 'sequence': call.sequence, 'model': call.model, 'provider_id': call.provider_id,
                                       'request_id': call.request_id, 'usage': call.usage, 'cost_state': call.cost_state,
                                       'accounted_micros': call.accounted_micros, 'error_code': call.error_code} for call in calls]})
     return {"items": items, "total": total, "next_offset": offset + limit if offset + limit < total else None}

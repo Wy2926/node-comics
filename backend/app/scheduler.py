@@ -9,6 +9,7 @@ from .entitlements import is_plus
 from .errors import ProcessingError
 from .models import Asset, Attempt, ClassicState, Job, Provider, TextCall, User, now, uid
 from .queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage, SchedulerMutex, UserModeQueue
+from .translation_models import TranslationProvider
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
 IMAGE_STAGES = {"analyze", "inpaint", "render"}
@@ -144,10 +145,14 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
         if pending >= cfg.cluster_max_image_stages:
             eligible = eligible.where(or_(JobStage.name != "analyze", cls == "realtime"))
     if "text" in stages:
-        recent_rows = select(TextCall.id).where(TextCall.started_at > at - timedelta(minutes=1)).limit(cfg.cluster_text_requests_per_minute).subquery()
-        recent = db.scalar(select(func.count()).select_from(recent_rows))
-        if recent >= cfg.cluster_text_requests_per_minute:
-            eligible = eligible.where(JobStage.name != "text")
+        recent = (select(TextCall.provider_id, func.count().label('calls'))
+            .where(TextCall.started_at > at - timedelta(minutes=1),
+                   or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED'))
+            .group_by(TextCall.provider_id).subquery())
+        eligible = (eligible.outerjoin(TranslationProvider, TranslationProvider.id == Job.config['text']['provider_id'].as_string())
+            .outerjoin(recent, recent.c.provider_id == TranslationProvider.id)
+            .where(or_(JobStage.name != 'text', and_(TranslationProvider.enabled.is_(True),
+                func.coalesce(recent.c.calls, 0) < TranslationProvider.requests_per_minute))))
     if "redraw" in stages:
         running_job, unknown_job = aliased(Job), aliased(Job)
         provider_id = Job.config["provider"]["id"].as_string()

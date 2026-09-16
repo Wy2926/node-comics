@@ -17,6 +17,7 @@ from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app
 from app.db import initialize, session_factory
+from translation_fixtures import configure_text_provider
 from admin_fixture import seed
 from fastapi.responses import JSONResponse
 
@@ -36,6 +37,7 @@ async def fixture_faults(request, call_next):
 
 initialize()
 with session_factory()() as db:
+    configure_text_provider(db)
     seed(db)
 print(f"Synthetic admin fixture: http://127.0.0.1:{port}/admin/ (username: admin)", flush=True)
 print(f"ADMIN_FIXTURE_CONTROLS={controls}", flush=True)
