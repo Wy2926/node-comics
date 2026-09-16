@@ -26,7 +26,7 @@ controls.write_text('{"delay":0,"fail":false}', encoding="utf-8")
 
 @app.middleware("http")
 async def fixture_faults(request, call_next):
-    if request.url.path.startswith(("/v1/admin/monitor/", "/v1/admin/compute-nodes")):
+    if request.url.path.startswith(("/v1/admin/monitor/", "/v1/admin/compute-nodes", "/v1/admin/system-settings")):
         state = json.loads(controls.read_text(encoding="utf-8"))
         if state.get("delay"):
             await asyncio.sleep(min(float(state["delay"]), 10))

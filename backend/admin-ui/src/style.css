@@ -1339,3 +1339,35 @@ dialog::backdrop {
 .language-option small {display: block; color: #73768b; font-size: 11px; margin-top: 3px;}
 .language-options:disabled {opacity: .6;}
 @media (max-width: 540px) {.config-grid {grid-template-columns: 1fr;} .language-option {padding: 8px; font-size: 12px;}}
+
+.settings-form {display: grid; gap: 20px; max-width: 1060px;}
+.settings-form > .config-body {gap: 20px;}
+.settings-panel {padding: 24px;}
+.settings-section-heading {display: flex; align-items: center; gap: 12px; margin-bottom: 24px;}
+.settings-section-heading h2 {margin-bottom: 3px;}
+.settings-section-icon {display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: #efebff; color: var(--purple); font-size: 24px; flex-shrink: 0;}
+.settings-fields {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 32px;}
+.settings-field {display: grid; gap: 8px; align-content: start; min-width: 0;}
+.settings-field > label {display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; font-size: 13px;}
+.settings-number {display: flex; align-items: center; gap: 10px;}
+.settings-number input {width: 100%; min-width: 0; max-width: 220px;}
+.settings-number > span {white-space: nowrap; color: var(--muted); font-size: 12px;}
+.settings-field input[aria-invalid=true] {border-color: #c45468; background: #fff9fa;}
+.settings-dirty-mark {color: #79560a; background: #fff3d8; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 500;}
+.settings-field-error {color: #ad3c50; font-size: 12px;}
+.settings-current-value {font-size: 11px; color: var(--purple);}
+.settings-section-note {border-top: 1px solid var(--border); padding-top: 16px; margin-top: 24px; font-size: 12px; color: var(--muted);}
+.settings-save-bar {display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 24px;}
+.settings-save-bar strong {font-size: 13px;}
+.settings-save-bar .primary {white-space: nowrap;}
+.settings-loading {padding: 40px 24px; color: var(--muted);}
+.settings-conflict {display: flex; align-items: center; justify-content: space-between; gap: 20px;}
+.settings-conflict button {flex-shrink: 0;}
+.settings-notice {margin-bottom: 18px; padding: 12px 16px; border: 1px solid #cce7dc; border-radius: 8px; color: #28684f; background: #eff9f4; font-size: 12px;}
+.system-settings button:disabled {cursor: not-allowed;}
+@media (max-width: 680px) {
+  .settings-fields {grid-template-columns: 1fr; gap: 22px;}
+  .settings-panel {padding: 20px 18px;}
+  .settings-save-bar, .settings-conflict {align-items: stretch; flex-direction: column; gap: 12px;}
+  .system-settings .page-heading > .secondary {margin-top: 16px;}
+}

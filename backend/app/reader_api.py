@@ -6,19 +6,20 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import ForeignKey, Index, JSON, String, UniqueConstraint, and_, exists, func, literal, or_, select, union_all
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
 from .db import Base, get_db
 from .request_models import RequestBody
 from .errors import problem
-from .jobs import idem_key, job_json, locked_user, owned_job
+from .jobs import idem_key, job_json, owned_job
 from .entitlements import entitlements_json
 from .schemas import EntitlementsResponse
 from .models import Asset, Job, Ledger, User, now, uid
+from .system_settings import get_request_limits
 from .schemas import JobResponse
 from .providers import digest
+from .feedback_limits import lock_feedback_admission, reserve_feedback_receipt
 
 router = APIRouter(tags=["Reader"])
 
@@ -111,7 +112,13 @@ def submit_feedback(job_id: str, body: FeedbackRequest,
                     idempotency_key: Annotated[str | None, Header()] = None,
                     user: User = Depends(identity), db: Session = Depends(get_db)):
     key = idem_key(idempotency_key)
-    job = owned_job(db, job_id, user.id)
+    owner_id = user.id
+    # End the identity read transaction before taking the account admission lock.
+    # One connection then covers the receipt check, budget and feedback insert.
+    db.rollback()
+    limits = get_request_limits(db)
+    admission = lock_feedback_admission(db, owner_id, limits=limits)
+    job = owned_job(db, job_id, owner_id)
     # Local copies can outlive access grants. Feedback still targets that exact,
     # immutable job output; it does not restore image access or attach new bytes.
     if job.status != "succeeded" or not job.output_asset_id:
@@ -120,23 +127,18 @@ def submit_feedback(job_id: str, body: FeedbackRequest,
         problem("RESULT_MISMATCH", "反馈与正在查看的译图不一致", 409)
     request_hash = digest({"job_id": job_id, "output_asset_id": job.output_asset_id,
                            "issues": body.issues, "comment": body.comment})
-    locked_user(db, user.id)
-    previous = db.scalar(select(Feedback).where(Feedback.owner_id == user.id, Feedback.idempotency_key == key))
+    previous = db.scalar(select(Feedback).where(Feedback.owner_id == owner_id, Feedback.idempotency_key == key))
     if previous:
         if previous.request_hash != request_hash:
             problem("IDEMPOTENCY_CONFLICT", "此反馈编号已用于其他内容", 409)
-        return feedback_json(previous)
-    row = Feedback(owner_id=user.id, job_id=job_id, output_asset_id=job.output_asset_id,
+        result = feedback_json(previous)
+        db.commit()
+        return result
+    reserve_feedback_receipt(db, admission, limits=limits)
+    row = Feedback(owner_id=owner_id, job_id=job_id, output_asset_id=job.output_asset_id,
                    issues=body.issues, comment=body.comment, idempotency_key=key, request_hash=request_hash)
     db.add(row)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        previous = db.scalar(select(Feedback).where(Feedback.owner_id == user.id, Feedback.idempotency_key == key))
-        if not previous or previous.request_hash != request_hash:
-            problem("IDEMPOTENCY_CONFLICT", "反馈提交发生冲突，请核对已提交内容", 409)
-        return feedback_json(previous)
+    db.commit()
     return feedback_json(row)
 
 

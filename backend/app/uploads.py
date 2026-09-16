@@ -7,6 +7,7 @@ one bounded byte buffer and writes those exact bytes to a server-only asset key.
 All functions leave transaction ownership to the API/scheduler.
 """
 from datetime import timedelta
+import asyncio
 import hashlib
 import re
 from fastapi import HTTPException
@@ -83,7 +84,7 @@ def upload_json(reservation):
                       if reservation.error_code else None)}
 
 
-async def read_upload_stream(request, expected_size):
+async def read_upload_stream(request, expected_size, *, limits=None):
     """Count bytes including chunked requests; never trust a declared length."""
     maximum = min(settings().max_upload_bytes, expected_size)
     if not 0 < maximum <= settings().max_upload_bytes:
@@ -92,10 +93,26 @@ async def read_upload_stream(request, expected_size):
     if length is not None and (not length.isdigit() or int(length) > maximum):
         problem("IMAGE_TOO_LARGE", "上传字节数超过预留限制", 413)
     data = bytearray()
-    async for chunk in request.stream():
+    loop = asyncio.get_running_loop()
+    cfg = limits or settings()
+    deadline = loop.time() + cfg.upload_body_timeout_seconds
+    idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
+    stream = request.stream().__aiter__()
+    while True:
+        remaining = min(deadline, idle_deadline) - loop.time()
+        if remaining <= 0:
+            problem("UPLOAD_TIMEOUT", "上传接收超时，请重试", 408)
+        try:
+            chunk = await asyncio.wait_for(anext(stream), timeout=remaining)
+        except StopAsyncIteration:
+            break
+        except TimeoutError:
+            problem("UPLOAD_TIMEOUT", "上传接收超时，请重试", 408)
         if len(data) + len(chunk) > maximum:
             problem("IMAGE_TOO_LARGE", "上传字节数超过预留限制", 413)
         data.extend(chunk)
+        if chunk:
+            idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
     if len(data) != expected_size:
         problem("UPLOAD_SIZE_MISMATCH", "实际图片大小与提交清单不一致", 422)
     return bytes(data)
@@ -164,7 +181,7 @@ def _active_locked(db, reservation):
     return True
 
 
-def receive_upload(db, reservation, owner, data):
+def receive_upload(db, reservation, owner, data, *, prewritten=False):
     """Persist bounded staging bytes. API reads the stream before entering a DB lock."""
     _owned(reservation, owner)
     if reservation.status == "verified":
@@ -181,7 +198,8 @@ def receive_upload(db, reservation, owner, data):
     if hashlib.sha256(data).hexdigest() != reservation.expected_sha256:
         fail_upload(db, reservation, "UPLOAD_HASH_MISMATCH", "实际图片摘要与提交清单不一致", awaiting_only=True)
         return reservation
-    get_store(reservation.storage_backend).put(reservation.storage_key, data, reservation.mime, kind="upload")
+    if not prewritten:
+        get_store(reservation.storage_backend).put(reservation.storage_key, data, reservation.mime, kind="upload")
     reservation = _lock_current(db, reservation)
     if not _active_locked(db, reservation):
         return reservation

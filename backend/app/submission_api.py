@@ -1,5 +1,6 @@
 """One durable submission protocol for uploaded, reusable and regenerated pages."""
 from collections import Counter, defaultdict
+import asyncio
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import Field, model_validator
@@ -22,7 +23,7 @@ from .request_models import RequestBody
 from .scheduler import ACTIVE, active_count, limits_for, lock_scheduler, queue_for, touch_job
 from .submission_limits import acquire_submission, release_submission
 from .upload_models import UploadReservation
-from .uploads import create_upload, fail_upload, owned_upload, read_upload_stream, receive_upload, upload_json
+from .uploads import create_upload, fail_upload, owned_upload, upload_json
 
 router = APIRouter(tags=["submissions"])
 
@@ -283,20 +284,32 @@ def submission_cancel(submission_id: str, user: User = Depends(identity), db: Se
 
 @router.put("/v1/uploads/{upload_id}/content")
 async def upload_content(upload_id: str, request: Request, user: User = Depends(identity), db: Session = Depends(get_db)):
-    reservation = owned_upload(db, upload_id, user.id)
+    from .upload_ingress import (Ingress, begin_ingress, finish_thread, keep_ingress_alive,
+                                persist_received_upload, read_ingress_body, record_body_failure, release_ingress)
+    owner_id = user.id
+    # identity() has already queried using this dependency. Closing it returns
+    # that connection before any client-controlled await or storage request.
+    await run_in_threadpool(db.close)
+    admission = await begin_ingress(upload_id, owner_id)
+    if not isinstance(admission, Ingress):
+        return admission
+    stopped, lost = asyncio.Event(), asyncio.Event()
+    heartbeat = asyncio.create_task(keep_ingress_alive(admission, stopped, lost))
     try:
-        data = await read_upload_stream(request, reservation.expected_size)
-    except HTTPException as error:
-        details = error.detail if isinstance(error.detail, dict) else {}
-        await run_in_threadpool(fail_upload, db, reservation, details.get("code", "INVALID_UPLOAD"),
-                               details.get("message", "上传不完整"), awaiting_only=True)
-        db.commit()
-        raise
-    await run_in_threadpool(receive_upload, db, reservation, user.id, data)
-    db.commit()
-    if reservation.error_code:
-        problem(reservation.error_code, reservation.error_message, 422)
-    return upload_json(reservation)
+        try:
+            data = await read_ingress_body(request, admission, lost)
+        except HTTPException as error:
+            await finish_thread(record_body_failure, admission, error)
+            raise
+        if lost.is_set():
+            problem("UPLOAD_LEASE_EXPIRED", "上传连接已失效，请重试", 409)
+        return await finish_thread(persist_received_upload, admission, data)
+    finally:
+        stopped.set()
+        try:
+            await asyncio.shield(heartbeat)
+        finally:
+            await finish_thread(release_ingress, admission)
 
 
 @router.post("/v1/uploads/{upload_id}/complete")

@@ -32,6 +32,7 @@ from .admin_monitor import router as admin_monitor_router
 from .admin_web import router as admin_web_router
 from .request_models import RequestBody
 from .health import readiness
+from .system_settings import initialize_system_settings, router as system_settings_router
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
 from .reader_api import router as reader_router
@@ -46,6 +47,8 @@ async def lifespan(app):
         initialize_providers(db)
         from .control_pools import initialize_pools
         initialize_pools(db)
+        initialize_system_settings(db)
+        db.commit()
     yield
 
 
@@ -57,6 +60,7 @@ app.include_router(reader_router)
 app.include_router(grants_router)
 app.include_router(admin_monitor_router)
 app.include_router(admin_web_router)
+app.include_router(system_settings_router)
 cfg = settings()
 origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip()]
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]

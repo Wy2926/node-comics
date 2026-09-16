@@ -5,11 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 import hashlib
 from io import BytesIO
-from threading import Event
+from threading import Barrier, Event
 
 import pytest
 from PIL import Image
-from sqlalchemy import event, func, select
+from sqlalchemy import create_engine, event, func, select
+from sqlalchemy.orm import Session
 
 from app import dispatcher, scheduler, workers
 from app.assets import create_asset
@@ -185,6 +186,96 @@ def test_concurrent_nodes_never_lease_same_stage_twice(scheduler_case):
         leases = list(pool.map(claim, ['node-0', 'node-1', 'node-2', 'node-3']))
     accepted = [lease for lease in leases if lease]
     assert len(accepted) == 1 and accepted[0].job_id == job
+
+
+def test_default_pool_concurrent_claims_do_not_checkout_nested_connections(scheduler_case, monkeypatch):
+    job = add_job(scheduler_case)
+    pool = engine().pool
+    assert pool.size() == 5 and pool._max_overflow == 10
+    # Keep the actual default 15-connection ceiling; shorten only the failure
+    # timeout so the previous nested-checkout deadlock fails promptly.
+    monkeypatch.setattr(pool, '_timeout', .5)
+    synchronized = Barrier(15)
+    original = scheduler._preselect
+
+    def preselect(db, node, stages):
+        # Every claimant already holds its initial node-query connection.
+        synchronized.wait(timeout=10)
+        return original(db, node, stages)
+
+    monkeypatch.setattr(scheduler, '_preselect', preselect)
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        leases = list(executor.map(lambda _: claim(), range(15)))
+    accepted = [lease for lease in leases if lease]
+    assert len(accepted) == 1 and accepted[0].job_id == job
+
+
+@pytest.mark.parametrize('flush_first', [False, True])
+def test_claim_uses_one_connection_and_preserves_caller_uncommitted_writes(scheduler_case, flush_first):
+    # One connection cannot support a hidden snapshot Session. The pending
+    # node/page must be visible to the election without committing its caller.
+    options = {'connect_args': {'check_same_thread': False, 'timeout': 30}} if engine().dialect.name == 'sqlite' else {}
+    single = create_engine(engine().url, pool_size=1, max_overflow=0, pool_timeout=.5, **options)
+    if single.dialect.name == 'sqlite':
+        @event.listens_for(single, 'connect')
+        def foreign_keys(connection, _):
+            connection.execute('PRAGMA foreign_keys=ON')
+    node_id, job_id, stage_id = uid(), uid(), uid()
+    try:
+        with Session(bind=single) as db:
+            lock_scheduler(db)
+            db.add(Job(id=job_id, owner_id='free-user', input_asset_id='free-user-image',
+                source_sha256='a' * 64, mode='classic', target_language='zh-Hans',
+                status='queued', quota_pages=0, quota_kind='unlimited', settlement='free',
+                config=scheduler_case, operation='pending-claim-test', request_hash='r' * 64,
+                idempotency_key=uid(), cache_key=hashlib.sha256(job_id.encode()).hexdigest()))
+            # The schema has no ORM relationships: insert the parent before its
+            # stage, as create_job does, while keeping the whole transaction open.
+            db.flush()
+            db.add(ComputeNode(id=node_id, name='pending node', resource_id=node_id,
+                capabilities=['analyze'], capacity=1, engine_version=scheduler_case['engine']['version'],
+                device='cpu', supported_languages=['zh-Hans'], applied_config_version=1))
+            db.add(JobStage(id=stage_id, job_id=job_id, name='analyze', status='ready'))
+            db.add(ClassicState(job_id=job_id, analysis={'segments': [], 'quality_flags': []}))
+            if flush_first:
+                db.flush()
+            lease = claim_stage(db, node_id)
+            assert lease is not None and lease.job_id == job_id
+            lease_id = lease.id
+            db.rollback()
+        with Session(bind=single) as db:
+            assert db.get(ComputeNode, node_id) is None
+            assert db.get(Job, job_id) is None
+            assert db.get(JobStage, stage_id) is None
+            assert db.get(ExecutionLease, lease_id) is None
+    finally:
+        single.dispose()
+
+
+def test_claim_locks_scheduler_before_autoflushing_caller_job_changes(scheduler_case):
+    job_id = add_job(scheduler_case)
+    statements = []
+
+    def record(connection, cursor, statement, parameters, context, many):
+        statements.append(statement.lower())
+
+    with session_factory()() as db:
+        # Cache the node first: db.get must not accidentally mask the election's
+        # own autoflush behavior by issuing another node query.
+        node = db.get(ComputeNode, 'node-0')
+        job = db.get(Job, job_id)
+        job.priority_rank = 7
+        event.listen(engine(), 'before_cursor_execute', record)
+        try:
+            assert claim_stage(db, node.id).job_id == job_id
+            assert job.priority_rank == 7
+        finally:
+            event.remove(engine(), 'before_cursor_execute', record)
+            db.rollback()
+    lock = next(index for index, statement in enumerate(statements)
+        if 'pg_advisory_xact_lock' in statement or statement.startswith('update scheduler_mutex'))
+    write = next(index for index, statement in enumerate(statements) if statement.startswith('update jobs'))
+    assert lock < write, statements
 
 
 def test_deep_queue_is_ranked_in_database_without_loading_each_job(scheduler_case):

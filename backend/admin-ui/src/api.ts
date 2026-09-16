@@ -10,14 +10,14 @@ export function saveToken(value: string) {
   else {sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(PENDING_KEY);}
 }
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {super(message);}
+  constructor(message: string, public status: number, public code?: string) {super(message);}
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {cache: 'no-store', ...options,
     headers: {...(token ? {Authorization: `Bearer ${token}`} : {}), ...options.headers}});
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new ApiError(body.error?.message || `请求失败 (${response.status})`, response.status);
+    throw new ApiError(body.error?.message || `请求失败 (${response.status})`, response.status, body.error?.code);
   }
   return response.json();
 }

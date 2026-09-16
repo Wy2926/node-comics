@@ -2,7 +2,7 @@
 from datetime import timedelta
 import hmac
 from sqlalchemy import and_, case, func, literal, or_, select, text, update
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import aliased
 from .assets import available
 from .config import settings
 from .entitlements import is_plus
@@ -181,17 +181,24 @@ def _candidate_signature(stage, job, queue_version):
 
 
 def _preselect(db, node, allowed_stages):
-    # An independent read transaction avoids upgrading a SQLite read snapshot
-    # into a writer, and never commits or rolls back the caller's transaction.
+    # Reuse the caller's connection, including its uncommitted nodes/pages.
+    # A second Session can deadlock a full pool while every claimant holds its
+    # first connection. PostgreSQL READ COMMITTED rechecks after the mutex;
+    # our SQLite driver does not BEGIN on SELECT, while pending DML already
+    # owns its writer lock. Transaction ownership always stays with the caller.
     stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
     if not node.enabled or not stages:
         return {}
-    with Session(bind=db.get_bind()) as snapshot:
-        rows = _election_rows(snapshot, node, stages, now(), materialize=False)
-        return {row[0]: tuple(row[1:]) for row in rows}
+    rows = _election_rows(db, node, stages, now(), materialize=False)
+    return {row[0]: tuple(row[1:]) for row in rows}
 
 
 def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_version=None):
+    if db.new or db.dirty or db.deleted:
+        # Internal callers may bring pending changes. Acquire the mutex before
+        # their first autoflush; normal read-only claimers still elect outside it.
+        with db.no_autoflush:
+            lock_scheduler(db)
     observed_node = db.get(ComputeNode, node_id)
     candidates_before_lock = _preselect(db, observed_node, allowed_stages) if observed_node else {}
     lock_scheduler(db)

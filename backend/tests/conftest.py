@@ -152,3 +152,16 @@ def png_variant(png, index):
     buffer = BytesIO()
     image.save(buffer, "PNG")
     return buffer.getvalue()
+
+
+def configure_system_limits(**values):
+    """Update isolated database settings, never process-local runtime fallbacks."""
+    from app.db import session_factory
+    from app.models import now
+    from app.system_settings import RequestLimits, initialize_system_settings
+    with session_factory()() as db:
+        row = initialize_system_settings(db)
+        row.values = RequestLimits.model_validate({**row.values, **values}).model_dump()
+        row.version += 1
+        row.updated_at = now()
+        db.commit()

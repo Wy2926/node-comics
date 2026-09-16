@@ -4,6 +4,7 @@ import {TaskDetail, UserDetail} from './Details';
 import {Nodes, Tasks, Users} from './Lists';
 import {Overview} from './Overview';
 import {NodeConfigDialog} from './NodeConfig';
+import {SystemSettingsPage} from './SystemSettings';
 import type {Node} from './types';
 import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
@@ -13,6 +14,7 @@ const views = {
   tasks: ['翻译任务', 'TRANSLATION TASKS', '逐页查看执行状态、等待时间与节点履历。', '≡'],
   nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
+  settings: ['系统设置', 'SYSTEM SETTINGS', '统一管理上传与反馈的服务保护设置。', '⚙'],
 } as const;
 type View = keyof typeof views;
 type Target = {kind: 'tasks' | 'users'; id: string};
@@ -84,7 +86,7 @@ function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClos
   </dialog>;
 }
 
-function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: View; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
+function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: Exclude<View, 'settings'>; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
   const [detail, setDetail] = useState<Target>();
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
@@ -168,7 +170,8 @@ export function App() {
     <p className="nav-label">工作空间</p><nav aria-label="后台导航">{Object.entries(views).map(([key, values]) => <a href={href(key)} key={key} aria-current={view === key ? 'page' : undefined}><span aria-hidden="true">{values[3]}</span>{values[0]}</a>)}</nav>
     <div className="sidebar-bottom"><span className="tiny-label">ADMINISTRATOR</span><b>{user.name}</b><button onClick={() => logout()}>退出登录 ↗</button></div>
   </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><span className="top-brand">NODE COMICS <span className="dot"/></span></header>
-    <WorkspacePage key={hash} view={view} params={params} auto={auto} setAuto={setAuto} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/>
+    {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
+      <WorkspacePage key={hash} view={view} params={params} auto={auto} setAuto={setAuto} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/>}
     <footer>Node Comics · Operations <span>用户与任务数据仅供管理使用</span></footer>
   </div></div>}</>;
 }

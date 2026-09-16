@@ -9,7 +9,7 @@ from test_upload_storage import storage_db, remote, owner, pending, validation_l
 
 
 @pytest.mark.parametrize("state", ["uploaded", "validating_upload", "running"])
-def test_rejected_put_retry_preserves_already_accepted_validation(cluster, png, state):
+def test_put_replay_skips_body_and_preserves_already_accepted_validation(cluster, png, state, monkeypatch):
     from app.db import session_factory
     from app.models import Job
     from app.queue_models import ComputeNode
@@ -33,8 +33,13 @@ def test_rejected_put_retry_preserves_already_accepted_validation(cluster, png, 
             db.commit()
             assert claim_stage(db, "audit-validator", ["validate_upload"])
             db.commit()
+    async def forbidden_read(*args, **kwargs):
+        raise AssertionError("Accepted upload replay must not consume another request body")
+    # upload_ingress imports the function directly for the body path.
+    from app import upload_ingress
+    monkeypatch.setattr(upload_ingress, "read_upload_stream", forbidden_read)
     retry = client.put(item["upload"]["url"], headers=auth, content=png[:-1])
-    assert retry.status_code == 422
+    assert retry.status_code == 200
     with session_factory()() as db:
         job = db.get(Job, accepted["id"])
         receipt = db.get(UploadReservation, item["upload"]["id"])

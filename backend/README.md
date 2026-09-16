@@ -2,6 +2,8 @@
 
 2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](../docs/PRODUCTION_FIXES.md)，未公开部署。
 
+当前迁移头为 `shared_0003_system_settings`，在 `shared_0001` 基础上增量增加上传门禁、反馈预算和统一系统设置，不重置已有业务数据。后台 `/admin/#settings` 管理本轮新增的 8 项保护参数，保存后供所有 API 副本的新请求使用，见[系统设置与验证](../docs/SYSTEM_SETTINGS.md)。
+
 FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终译图，独立计算代理按阶段拉取常规翻译。前后端使用持久提交清单和双模式队列，已删除旧 preview/batch、Celery/Redis 与固定用户执行上限。产品规则见[集群说明](../docs/TRANSLATION_CLUSTER_DESIGN.md)。
 
 ## 运行
@@ -45,6 +47,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `CLUSTER_MAX_IMAGE_STAGES` | 64，预存已 OCR 待渲染水位 |
 | `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
 | `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
+| 上传并发、收流超时、反馈预算 | 后台“系统设置”统一维护；对应环境变量只作为首次初始化种子，见[参数表](../docs/SYSTEM_SETTINGS.md) |
 | `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 100 / 300，独立于队列容量 |
 | `RETENTION_DAYS` | 默认0表示无限期保留；当前部署为0 |
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
