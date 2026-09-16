@@ -52,6 +52,13 @@ def test_page_edge_crop_does_not_assign_neighboring_bubble():
     assert find_bubble(image, region(0, 110, 20, 80), []) is None
 
 
+def test_top_page_bubble_keeps_its_source_center_when_enlarging():
+    image = np.full((1000, 600, 3), 120, np.uint8)
+    cv2.ellipse(image, (250, 145), (140, 100), 0, 0, 360, (255, 255, 255), -1)
+    cv2.ellipse(image, (250, 145), (140, 100), 0, 0, 360, (0, 0, 0), 4)
+    assert find_bubble(image, region(170, 100, 160, 90), []) is not None
+
+
 def test_vendored_ballons_translator_source_and_license_integrity():
     root = Path(__file__).parent
     manifest = json.loads((root/'third_party/ballons-translator.json').read_text())

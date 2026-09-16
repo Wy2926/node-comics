@@ -30,6 +30,8 @@ def prepare():
         value = value.replace("device.startswith('cuda') or device == 'mps' or device == 'xpu'", "device != 'cpu'")
         path.write_text(value, encoding='utf-8')
     upstream.prepare_models()
+    from prepare_typesetter import prepare as prepare_typesetter
+    prepare_typesetter()
     print('PINNED_NATIVE_MODELS_READY', flush=True)
 
 

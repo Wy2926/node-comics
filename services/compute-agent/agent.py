@@ -30,11 +30,11 @@ ENGINE_ERRORS = {
     'LANGUAGE_UNSUPPORTED': '此节点不支持目标语言',
     'CLASSIC_RENDER_BOUNDARY': '译文无法在页边内完整排版',
     'CLASSIC_RENDER_BUBBLE_OVERFLOW': '译文无法在气泡边界内完整排版',
-    'CLASSIC_RENDER_OVERLAP': '译文排版与未识别的文字区域重叠',
+    'CLASSIC_RENDER_OVERLAP': '译文排版与受保护文字或其他译文区域重叠',
     'CLASSIC_RENDER_NO_GLYPHS': '嵌字未生成可见字形',
     'CLASSIC_RENDER_FONT_MISSING': '字体缺少译文所需字形',
     'CLASSIC_RENDER_INPUT_INVALID': '嵌字区域或背景检查点无效',
-    'CLASSIC_RENDER_LAYOUT_FAILED': '嵌字排版计算失败',
+    'CLASSIC_RENDER_LAYOUT_FAILED': '译文无法在可用区域内完整排版',
 }
 
 

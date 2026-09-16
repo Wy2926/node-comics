@@ -8,20 +8,6 @@ import render_languages as r
 from hyphenation import DictionaryStore, resolve
 
 
-def test_latin_sentence_spaces_and_font_cache_switching():
-    from types import SimpleNamespace
-    from unittest.mock import Mock
-    compact = lambda text: text.replace('! ', '!')
-    renderer = SimpleNamespace(compact_special_symbols=compact, get_char_glyph=Mock(), set_font=Mock())
-    r.select_font(renderer, 'latin.ttf', 'fr')
-    assert renderer.compact_special_symbols('Bonjour ! Ensemble...') == 'Bonjour ! Ensemble...'
-    r.select_font(renderer, 'latin.ttf', 'pl')
-    assert renderer.get_char_glyph.cache_clear.call_count == 1
-    r.select_font(renderer, 'cjk.ttc', 'ja')
-    assert renderer.compact_special_symbols is compact
-    assert renderer.get_char_glyph.cache_clear.call_count == 2
-
-
 def test_upstream_language_aliases_and_word_wrapping(tmp_path):
     for code, expected in [('PTB', 'pt-BR'), ('ESP', 'es-ES'), ('TRK', None), ('VIN', None), ('IND', None)]:
         assert resolve(code) == expected

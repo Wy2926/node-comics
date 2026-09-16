@@ -18,7 +18,7 @@
 
 2026-09-16：后台可添加独立身份节点，服务端执行位与版本化配置自动同步；语言资源启动补全、线程与缓存参数可声明。见[节点配置](docs/NODE_CONFIGURATION.md)与[NVIDIA 实测](docs/NVIDIA_GPU_VALIDATION.md)。
 
-同日更新：后台配置支持表单／JSON 和 16 语言多选，三个控制池执行位可修改；文本成本仅计量。常规嵌字接入固定版本 BallonsTranslator 气泡提取，并处理页边越界及保护区重叠。本机 CUDA 集群已重新部署，入口与验证范围见[气泡与嵌字说明](docs/LETTERING_LAYOUT.md)。
+同日更新：后台配置支持表单／JSON 和 16 语言多选，三个控制池执行位可修改；文本成本仅计量。常规嵌字已整体接入固定版本 Manga Translator UI 的 Qt 自动排版，支持气泡内重排、中日横竖排与西文断词，保留 BallonsTranslator 气泡提取和未识别文字保护。新引擎已完成本地与容器验证，现有运行集群尚未切换；版本、图片对照和历史部署记录见[气泡与嵌字说明](docs/LETTERING_LAYOUT.md)。
 
 ## 本地运行
 

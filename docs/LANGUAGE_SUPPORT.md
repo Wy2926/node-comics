@@ -1,6 +1,6 @@
 # 常规翻译：嵌字与 OCR 语言清单
 
-核对日期：2026-09-16。范围是当前固定的 manga-image-translator `95227a2bb0fd306cd4f0c104d57284026f991b3a`、48px OCR、Noto Sans Mono CJK 与新增 Noto Sans 字体；不代表 AI 重绘供应商的语言能力。
+核对日期：2026-09-16。OCR 沿用 manga-image-translator `95227a2bb0fd306cd4f0c104d57284026f991b3a` 的 48px 模型；嵌字改用 Manga Translator UI `f0307a063214f915f2b1d6e5cd3233f3bf78339f` 的完整 Qt 排版器，字体仍为固定 Noto Sans Mono CJK 与 Noto Sans。当前版本与准备见[气泡与嵌字说明](LETTERING_LAYOUT.md)；本文不代表 AI 重绘供应商的语言能力。
 
 ## 支持口径
 
@@ -51,7 +51,7 @@
 
 本机只读检查的 `alphabet-all-v7.txt` SHA-256 为 `f5722368146aa0fbcc9f4726866e4efc3203318ebb66c811d8cbbe915576538a`，与固定清单一致。按去重字符的 Unicode 名称前缀计数：CJK 24,950、HIRAGANA 90、KATAKANA 110、HANGUL 10,880、LATIN 823、CYRILLIC 311、THAI 87、ARABIC 0。这些是字符计数，不是语言数，也不是模型训练集或准确率证据。
 
-扩展前，用 fontTools 检查原 CJK 字体集合第一个字体面的 Unicode cmap：ARABIC 0、THAI 0、LATIN 266、CYRILLIC 66。常见必要字母探针发现：法语 `Ÿ`、德语 `ẞ`、乌克兰语 `ґєії`、波兰语 `ąćęłśźż` 等缺失；捷克语、匈牙利语、罗马尼亚语、土耳其语、塞尔维亚语和克罗地亚语也存在缺字。西班牙语、意大利语、葡萄牙语和越南语本次附标探针未发现缺字，但不构成完整字体覆盖验收。这些缺字现由新增 Noto Sans 解决；原 CJK 字体仍用于中日韩与英语，并作为新增语言的 CJK 后备字体。自定义 `ENGINE_FONT` 必须另行核查。
+扩展前，用 fontTools 检查原 CJK 字体集合第一个字体面的 Unicode cmap：ARABIC 0、THAI 0、LATIN 266、CYRILLIC 66。常见必要字母探针发现：法语 `Ÿ`、德语 `ẞ`、乌克兰语 `ґєії`、波兰语 `ąćęłśźż` 等缺失；捷克语、匈牙利语、罗马尼亚语、土耳其语、塞尔维亚语和克罗地亚语也存在缺字。西班牙语、意大利语、葡萄牙语和越南语本次附标探针未发现缺字，但不构成完整字体覆盖验收。这些缺字现由新增 Noto Sans 解决；原 CJK 字体仍用于中日韩与英语；其他目标语言使用已登记的 Noto Sans，缺字时拒绝交付。自定义 `ENGINE_FONT` 必须另行核查。
 
 上游依据：[固定版本翻译器语言枚举](https://github.com/zyddnys/manga-image-translator/blob/95227a2bb0fd306cd4f0c104d57284026f991b3a/manga_translator/translators/common.py)、[固定版本说明中的 OCR 推荐](https://github.com/zyddnys/manga-image-translator/blob/95227a2bb0fd306cd4f0c104d57284026f991b3a/README.md)、[排版方向预设](https://github.com/zyddnys/manga-image-translator/blob/95227a2bb0fd306cd4f0c104d57284026f991b3a/manga_translator/utils/textblock.py)。方向枚举和翻译器枚举并不完全一致；新增语言需要明确方向，不能只增加目标代码。
 
@@ -65,13 +65,13 @@ OCR 应单独记录源语言、模型版本、文字系统和验收状态。用�
 
 新增字体为 `NotoSans-Regular.ttf`，固定到 [notofonts/noto-fonts@ffebf8c1ee449e544955a7e813c54f9b73848eac](https://github.com/notofonts/noto-fonts/tree/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSans)，原始文件 569,208 字节，SHA-256 `b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5`。该字体的 name 表与同版本 [LICENSE](https://github.com/notofonts/noto-fonts/blob/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE) 均标注 SIL OFL 1.1；许可文件 4,377 字节，SHA-256 `0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb`。不修改字体。
 
-[字体准备与选择](../services/classic-engine/render_languages.py)在启动或应用节点语言配置时下载、校验和原子保存字体及许可证到 `${MODEL_DIR}/fonts/noto-ffebf8c1ee44/`。缺失或损坏资源不能报告就绪；已有完整资源复用，渲染期间不下载。切换字体清理上游未包含字体标识的字形缓存，避免结果随前一页语言变化。非中日文保留标点后的空格，避免上游标点压缩把外语句子连在一起。译文先转为 NFC，缺少可用字形则失败，不交付方框字。
+[字体准备与选择](../services/classic-engine/render_languages.py)在启动或应用节点语言配置时下载、校验和原子保存字体及许可证到 `${MODEL_DIR}/fonts/noto-ffebf8c1ee44/`。缺失或损坏资源不能报告就绪；已有完整资源复用，渲染期间不下载。Qt 同时负责字体测量与绘制，按目标语言选择 CJK 字体面，并验证字体切换前后输出一致。译文先转为 NFC，保留西文标点后的空格；所选字体缺少必要字形则失败，不交付方框字或依赖未登记的系统字体。
 
 土耳其语、越南语、印尼语采用明确的整词换行策略，不下载或冒用英语断词字典；单词宽于行时沿用上游逐字符拆分。其他新增语言复用固定目录中对应的语言字典。新增语言强制横排，避免沿用日文原图的竖排方向。
 
-保留上游排版算法；检测到渲染字形触及整页边缘时失败，避免将明显截断文本当作成功。上游仍可能扩展文字框，复杂气泡边界及极长译文的自动适配不是本次全面解决的问题。
+字号搜索、断行、横竖排标点与实际绘制使用固定上游的统一气泡流程；最终检查气泡／页面／保护区域和文字完整性，放不下时失败。共享气泡和原文单行也允许完整译文重排。复杂气泡提取和逐页人工精修质量仍有边界，详见嵌字说明。
 
-CPU/CUDA 版本为 `mit-95227a2-classic-v7-layout`，默认双进程 AMD 为 `mit-95227a2-classic-v4-dml-v6-layout`；渲染缓存版本 `masked-png-v4-bounded-layout-noto-b85c38ec` 包含新字体和换行策略。旧节点不会领取新版配置的任务。已有本地节点配置若显式声明五项语言，需要更新 `runtime.languages` 或后台 `engine.languages`；程序不会擅自覆盖运维限制。
+CPU/CUDA 版本为 `mit-95227a2-classic-v8-qt`，默认双进程 AMD 为 `mit-95227a2-classic-v4-dml-v7-qt`；渲染缓存版本 `masked-png-v5-mtu-f0307a0-qt611-noto-b85c38ec` 标识新排版实现。旧节点不会领取新版配置的任务。已有本地节点配置若显式声明五项语言，需要更新 `runtime.languages` 或后台 `engine.languages`；程序不会擅自覆盖运维限制。
 
 客户端的默认语言、阅读器语言菜单、译本／历史／反馈／导出名称均识别 16 项。选择仅支持常规翻译的语言会把默认模式切到常规；AI 重绘仍只开放原五项，接口按模式验证，客户端禁用不支持的新建重绘操作。OCR 模型和源语言范围未改变。
 
@@ -89,4 +89,4 @@ services/classic-engine/.venv/Scripts/python.exe scripts/verify_lettering_langua
 
 已通过引擎相关 33 项、后端相关 16 项、客户端原有 226 项检查；客户端类型检查、扩展和网页构建通过。浏览器检查设置页和阅读器的全部 16 项，乌克兰语刷新后保留，越南语选择自动切到常规模式，原图保持可读。未公开部署；扩展已重新构建，已安装的解压扩展需在浏览器扩展管理页重新加载。
 
-气泡识别已接入固定版本 BallonsTranslator；排版边界、具体错误码、验证范围见[开源气泡识别与嵌字保护](LETTERING_LAYOUT.md)。2026-09-16 已同步重新部署本机控制服务与新版 CUDA 排版引擎，部署检查及入口见该文档末节；本文此前的 16 语言实测仍属于当时版本的历史证据。
+当前为 Manga Translator UI Qt 排版与 BallonsTranslator 气泡提取，排版边界、错误码与新验证范围见[气泡与嵌字说明](LETTERING_LAYOUT.md)。此前本机部署与本文客户端／GPU 实测属于旧版本历史证据；本轮已验证新引擎，尚未切换现有运行集群。

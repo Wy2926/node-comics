@@ -37,7 +37,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     with session_factory()() as db:
         for language in LANGUAGES:
             config = configuration(db, 'classic', language)
-            assert config['engine']['render_version'] == 'masked-png-v4-bounded-layout-noto-b85c38ec'
+            assert config['engine']['render_version'] == 'masked-png-v5-mtu-f0307a0-qt611-noto-b85c38ec'
         with pytest.raises(HTTPException):
             configuration(db, 'classic', 'xx')
         with pytest.raises(HTTPException):

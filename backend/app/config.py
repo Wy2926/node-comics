@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_engine_version: str = "mit-95227a2-classic-v7-layout"
+    classic_engine_version: str = "mit-95227a2-classic-v8-qt"
     classic_timeout_seconds: int = 900
     text_base_url: str = ""
     text_api_key: str = ""

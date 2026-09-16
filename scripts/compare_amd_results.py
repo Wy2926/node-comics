@@ -26,7 +26,9 @@ args = parser.parse_args()
 async def main():
     source = np.array(Image.open(args.image).convert('RGB'))
     translations = json.loads((args.live/'stages.json').read_text(encoding='utf-8'))['translations']
-    server.text_render.FALLBACK_FONTS = [server.FONT]
+    from hyphenation import DictionaryStore, default_directory
+    from typesetter import initialize
+    initialize(DictionaryStore(default_directory(), ['zh-Hans']))
     analyses, cleaned, masks, rendered, glyphs = {}, {}, {}, {}, {}
     config = {'font_minimum': 10}
     for device in ('cpu', 'directml-0'):

@@ -1,11 +1,11 @@
-"""Bounded lettering around upstream layout, with content-free failure codes."""
-from copy import deepcopy
+"""Validated delivery of the pinned upstream Qt typesetter's full-page layout."""
 import cv2
 import numpy as np
-from manga_translator.rendering import dispatch, render
-from manga_translator.utils import TextBlock
-from render_languages import LANG, normalized_text, select_font
+import re
+from render_languages import LANG, normalized_text
 from speech_bubbles import find_bubble
+from typesetter import initialize, configuration
+from typesetter_inputs import BubbleInput, current_bubbles
 
 
 class LetteringError(ValueError):
@@ -18,62 +18,55 @@ def changed_pixels(before, after, protected, bubble=None):
     changed = np.any(after != before, axis=2)
     if not changed.any():
         raise LetteringError('NO_GLYPHS')
-    if changed[0].any() or changed[-1].any() or changed[:, 0].any() or changed[:, -1].any():
-        raise LetteringError('BOUNDARY')
-    if np.any(changed & protected):
-        raise LetteringError('OVERLAP')
-    if bubble is not None and not bubble.contains(changed):
-        raise LetteringError('BUBBLE_OVERFLOW')
+    validate_glyphs(changed, protected, bubble)
     return changed
 
 
-async def render_region(canvas, region, font, minimum, protected, bubble=None):
-    """Try natural layout, then fit all glyphs into the original OCR rectangle.
+def validate_glyphs(glyphs, protected, bubble=None):
+    if glyphs[0].any() or glyphs[-1].any() or glyphs[:, 0].any() or glyphs[:, -1].any():
+        raise LetteringError('BOUNDARY')
+    if np.any(glyphs & protected):
+        raise LetteringError('OVERLAP')
+    if bubble is not None and not bubble.contains(glyphs):
+        raise LetteringError('BUBBLE_OVERFLOW')
 
-    Upstream expands short vertical boxes without page/protected-region bounds.
-    Re-render from a clean canvas; never crop overflowing glyphs from a result.
-    """
+
+def font_family(renderer, path, language):
+    renderer.text_render.load_font_file(path)
+    families = renderer.text_render.register_font_file(path)
+    suffix = {'zh-Hans': 'SC', 'zh-Hant': 'TC', 'ja': 'JP', 'ko': 'KR'}.get(language)
+    family = next((value for value in families if suffix and value.endswith(' ' + suffix)), None)
+    if not family:
+        family = next(iter(families), None)
+    if not family:
+        raise LetteringError('FONT_MISSING')
+    return family
+
+
+BREAKS = r'\[BR\]|【BR】|<br>|\n'
+
+
+def text_preserved(source, formatted):
+    expected = ''.join(re.sub(BREAKS, '', source, flags=re.IGNORECASE).split())
+    lines = re.split(BREAKS, formatted, flags=re.IGNORECASE)
+    position = 0
+    for number, line in enumerate(lines):
+        content = ''.join(line.split())
+        for index, char in enumerate(content):
+            if position < len(expected) and char == expected[position]:
+                position += 1
+            elif char in '-\u00ad' and index == len(content) - 1 and number < len(lines) - 1:
+                continue  # Only newly inserted line-end hyphens may be omitted.
+            else:
+                return False
+    return position == len(expected)
+
+
+async def letter_page(image, analysis, translations, config, language, cleaned, mask, font, diagnostics=None):
+    from PyQt6.QtGui import QFont, QRawFont
     try:
-        candidate = await dispatch(canvas.copy(), [deepcopy(region)], font,
-                                   font_size_minimum=minimum, hyphenate=False)
-        return candidate, changed_pixels(canvas, candidate, protected, bubble), False
-    except LetteringError as error:
-        reason = error
-    except (ValueError, ZeroDivisionError, cv2.error):
-        reason = LetteringError('LAYOUT_FAILED')
-    original = (bubble.rectangle if bubble is not None else region.min_rect).astype(np.float64)
-    if not np.isfinite(original).all():
-        raise LetteringError('INPUT_INVALID')
-    height, width = canvas.shape[:2]
-    # Fit/translate the whole rectangle within an inset page, keeping its shape.
-    low, high = original.reshape(-1, 2).min(axis=0), original.reshape(-1, 2).max(axis=0)
-    size = high - low
-    if np.any(size <= 0) or min(width, height) <= 4:
-        raise LetteringError('INPUT_INVALID')
-    fit = min(1, (width - 4) / size[0], (height - 4) / size[1])
-    center = (low + high) / 2
-    base = (original - center) * fit
-    extent = size * fit / 2
-    center = np.clip(center, 2 + extent, np.array([width - 2, height - 2]) - extent)
-    for scale in (1, .85, .7):
-        points = base * scale + center
-        if min(size * fit * scale) < minimum:
-            continue
-        bounded_region = deepcopy(region)
-        bounded_region.font_size = max(minimum, int(region.font_size))
-        try:
-            candidate = render(canvas.copy(), bounded_region, points.astype(np.float32), False, None, False)
-            return candidate, changed_pixels(canvas, candidate, protected, bubble), True
-        except LetteringError as error:
-            reason = error
-        except (ValueError, ZeroDivisionError, cv2.error):
-            reason = LetteringError('LAYOUT_FAILED')
-    raise reason
-
-
-async def letter_page(image, analysis, translations, config, language, cleaned, mask, renderer, font, fallback):
-    try:
-        regions = [TextBlock(**row) for row in analysis['regions']]
+        renderer = initialize()
+        regions = [renderer.TextBlock(**row) for row in analysis['regions']]
         if not regions or len(regions) != len(analysis['segments']):
             raise LetteringError('INPUT_INVALID')
         if mask.shape != image.shape[:2] or cleaned.shape != image.shape:
@@ -86,31 +79,93 @@ async def letter_page(image, analysis, translations, config, language, cleaned, 
         protected = protected > 0
         if np.any((mask > 0) & protected):
             raise LetteringError('INPUT_INVALID')
-        select_font(renderer, font, language)
-        faces = [renderer.get_cached_font(path) for path in dict.fromkeys([font, fallback])]
+        minimum = max(1, int(config['font_minimum']))
+        family = font_family(renderer, font, language)
+        face = QRawFont.fromFont(QFont(family))
+        source_sizes = []
+        source_text = {}
         for segment, region in zip(analysis['segments'], regions):
             region.translation = normalized_text(translations[segment['id']])
-            if any(not char.isspace() and not any(face.get_char_index(ord(char)) for face in faces)
-                   for char in region.translation):
+            source_text[id(region)] = region.translation
+            if any(not char.isspace() and not face.supportsCharacter(ord(char)) for char in region.translation):
                 raise LetteringError('FONT_MISSING')
             region.target_lang = LANG[language]
             if language not in {'zh-Hans', 'zh-Hant', 'ja'}:
                 region._direction = 'h'
             region._alignment = 'center'
-        rendered = cleaned.copy()
-        glyph_mask = np.zeros(mask.shape, dtype=np.uint8)
-        fitted = 0
-        bubbles = 0
+            region.font_family = family
+            region.default_stroke_width = .07
+            region.allow_reflow = True
+            source_sizes.append(region.font_size)
+
+        bubbles = {}
+        usable = np.zeros(mask.shape, dtype=np.uint8)
         for region in regions:
-            bubble = find_bubble(cleaned, region, [other for other in regions if other is not region])
-            rendered, changed, used_fit = await render_region(rendered, region, font, config['font_minimum'], protected, bubble)
-            glyph_mask[changed] = 255
-            fitted += used_fit
-            bubbles += bubble is not None
+            bubble = find_bubble(cleaned, region, [])
+            bubbles[id(region)] = bubble
+            if bubble is not None:
+                x, y = bubble.origin
+                h, w = bubble.interior.shape
+                usable[y:y+h, x:x+w] |= bubble.interior.astype(np.uint8) * 255
+            else:
+                cv2.fillConvexPoly(usable, np.rint(region.min_rect.reshape(-1, 2)).astype(np.int32), 255)
+                # Preserve the exact OCR polygons as well as their rotated box;
+                # integer rounding must not disable upstream's mask fitting.
+                cv2.fillPoly(usable, list(np.asarray(region.lines).astype(np.int32)), 255)
+        # Protection constrains layout before fitting as well as final delivery.
+        usable[protected] = 0
+        usable[:2] = usable[-2:] = 0
+        usable[:, :2] = usable[:, -2:] = 0
+        glyph_mask = np.zeros(mask.shape, dtype=np.uint8)
+        occupied = np.zeros(mask.shape, dtype=bool)
+        visible_regions = set()
+        options = configuration(minimum, family)
+
+        def paint(canvas, region, *args, render_alpha=None, paint_part=None, **kwargs):
+            alpha = np.zeros(mask.shape, dtype=np.uint8)
+
+            def check_native_layer(layer_alpha, origin):
+                ys, xs = np.nonzero(layer_alpha)
+                if len(xs) and (xs.min() + origin[0] <= 0 or xs.max() + origin[0] >= image.shape[1] - 1
+                                or ys.min() + origin[1] <= 0 or ys.max() + origin[1] >= image.shape[0] - 1):
+                    raise LetteringError('BOUNDARY')
+
+            result = renderer.render(canvas, region, *args, render_alpha=alpha, paint_part=paint_part,
+                                     layer_callback=check_native_layer, **kwargs)
+            glyphs = alpha > 0
+            validate_glyphs(glyphs, protected, bubbles[id(region)])
+            if region.font_size < minimum:
+                raise LetteringError('LAYOUT_FAILED')
+            if paint_part == 'fill':
+                if not glyphs.any():
+                    raise LetteringError('NO_GLYPHS')
+                if np.any(glyphs & occupied):
+                    raise LetteringError('OVERLAP')
+                occupied[:] |= glyphs
+                visible_regions.add(id(region))
+            glyph_mask[glyphs] = 255
+            return result
+
+        token = current_bubbles.set(BubbleInput(usable))
+        try:
+            rendered = await renderer.dispatch(cleaned.copy(), regions, options, original_img=image,
+                                               skip_text_replacements=True, render_callback=paint)
+        finally:
+            current_bubbles.reset(token)
+        if len(visible_regions) != len(regions):
+            raise LetteringError('NO_GLYPHS')
+        for region in regions:
+            if not text_preserved(source_text[id(region)], region.translation):
+                raise LetteringError('LAYOUT_FAILED')
+            if diagnostics is not None:
+                diagnostics.append({'font_size': int(region.font_size), 'direction': 'h' if region.horizontal else 'v',
+                                    'bubble': bubbles[id(region)] is not None,
+                                    'lines': len(re.split(r'\[BR\]|【BR】|<br>|\n', region.translation))})
         output = image.copy()
         allowed = (mask > 0) | (glyph_mask > 0)
         output[allowed] = rendered[allowed]
-        return output, glyph_mask, fitted, bubbles
+        fitted = sum(abs(region.font_size - before) > .1 for region, before in zip(regions, source_sizes))
+        return output, glyph_mask, fitted, sum(value is not None for value in bubbles.values())
     except LetteringError:
         raise
     except (KeyError, TypeError, ValueError, IndexError):

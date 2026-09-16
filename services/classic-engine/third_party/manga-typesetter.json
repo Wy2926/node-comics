@@ -1,0 +1,209 @@
+{
+  "repository": "https://github.com/hgmzhn/manga-translator-ui.git",
+  "revision": "f0307a063214f915f2b1d6e5cd3233f3bf78339f",
+  "license": "GPL-3.0",
+  "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+  "files": [
+    {
+      "path": "config.py",
+      "source_sha256": "33678d0787a649c20fae25b96afaf5b20ad9fd004971584a9344fe1353ad83fb",
+      "prepared_sha256": "85e6261bd63bc50f4c6e9965dafa816b383d0ec9795745b9b447a62be3eac491"
+    },
+    {
+      "path": "custom_api_params.py",
+      "source_sha256": "e745e1f0342c64418a1736364f7045fa282637700aed05dc31445b889517f9ab",
+      "prepared_sha256": "25b0dd2caa1442bc8bf8b7b9bcca70a6b7b7b9a4721cfafcb465fc5b4e13c853"
+    },
+    {
+      "path": "runtime_paths.py",
+      "source_sha256": "40c9e4c85f2dfef2cedea0b76a6a9b2607dec4c0d5b1c2ba8464cb9e389d4836",
+      "prepared_sha256": "40c9e4c85f2dfef2cedea0b76a6a9b2607dec4c0d5b1c2ba8464cb9e389d4836"
+    },
+    {
+      "path": "image_formats.py",
+      "source_sha256": "e87b45a9817e9470317ee2a924097c2c701932b4e08c6dbd23d34c6cb59963d6",
+      "prepared_sha256": "e87b45a9817e9470317ee2a924097c2c701932b4e08c6dbd23d34c6cb59963d6"
+    },
+    {
+      "path": "rendering/__init__.py",
+      "source_sha256": "1dba8699f386eca0da6ef55e6c898ef0ce6dd04a051a36f00e5298e4897184f0",
+      "prepared_sha256": "e1db21af82d8b7d3c4af3c42b39f56857672b2e8ff0284853c13ab87f08fdfee"
+    },
+    {
+      "path": "rendering/auto_linebreak.py",
+      "source_sha256": "390b62c87d0f8978a4f2d53639cb9b0121dce66d07cdb97b6ff5ce49eaedcf27",
+      "prepared_sha256": "3c3c51fb701f1b250d9032cb9e0bc23e351197ed18c888d8e0e42e301c368007"
+    },
+    {
+      "path": "rendering/ballon_extractor.py",
+      "source_sha256": "990a2617ea7ebe9af076f4950f3d811616d0dea29739a27b088aa9548f191635",
+      "prepared_sha256": "990a2617ea7ebe9af076f4950f3d811616d0dea29739a27b088aa9548f191635"
+    },
+    {
+      "path": "rendering/chinese_linebreak.py",
+      "source_sha256": "fb0675e8ae1119fafe1dbfb184b93ff6c0749fcb3566458b3151d09b6e1efb72",
+      "prepared_sha256": "fb0675e8ae1119fafe1dbfb184b93ff6c0749fcb3566458b3151d09b6e1efb72"
+    },
+    {
+      "path": "rendering/model_api_renderer.py",
+      "source_sha256": "edd8b055c20276ec9896e95abf9633224049b8ffb5cbe472145a0ab4349ea659",
+      "prepared_sha256": "edd8b055c20276ec9896e95abf9633224049b8ffb5cbe472145a0ab4349ea659"
+    },
+    {
+      "path": "rendering/prompt_loader.py",
+      "source_sha256": "1d5166d1ca560eb6617647bda63d650e5683ead623a622095a6ac2ca26758ab7",
+      "prepared_sha256": "1d5166d1ca560eb6617647bda63d650e5683ead623a622095a6ac2ca26758ab7"
+    },
+    {
+      "path": "rendering/rich_text.py",
+      "source_sha256": "a9af7bc86c9fa5b88b515c46f06dfc87d12a92c4ddfd3e4c831b9e3972c002e9",
+      "prepared_sha256": "a9af7bc86c9fa5b88b515c46f06dfc87d12a92c4ddfd3e4c831b9e3972c002e9"
+    },
+    {
+      "path": "rendering/rich_text_rules.py",
+      "source_sha256": "ff7b96025ca1a74bfe2d84bdebb94d1f8daeeef2ff36ba245f17a71d2d1ca040",
+      "prepared_sha256": "155f79b28067c1a24d8f7996b1e36ba6a810b80b8ee7d8b155ee48c31adf09e0"
+    },
+    {
+      "path": "rendering/rich_text_sync.py",
+      "source_sha256": "1fecb74e884412ebe5319d1ff8b46991e8160bdcab595afe9181db992a80031e",
+      "prepared_sha256": "1fecb74e884412ebe5319d1ff8b46991e8160bdcab595afe9181db992a80031e"
+    },
+    {
+      "path": "rendering/text_render/__init__.py",
+      "source_sha256": "cdd549c0b9cebd49cbba71ec85366fa39bee16752fa9e174b2a7123735562093",
+      "prepared_sha256": "cdd549c0b9cebd49cbba71ec85366fa39bee16752fa9e174b2a7123735562093"
+    },
+    {
+      "path": "rendering/text_render/_compose.py",
+      "source_sha256": "fbede8cabfe43e37fd95a00db5c76177b0ae68575e0cfa3a170c1bd03be5d124",
+      "prepared_sha256": "fbede8cabfe43e37fd95a00db5c76177b0ae68575e0cfa3a170c1bd03be5d124"
+    },
+    {
+      "path": "rendering/text_render/_fonts.py",
+      "source_sha256": "5a27f9eee882d5d09456b118e0c1e9fd361bfdfe88836ba9fd340001f11f0ab2",
+      "prepared_sha256": "5a27f9eee882d5d09456b118e0c1e9fd361bfdfe88836ba9fd340001f11f0ab2"
+    },
+    {
+      "path": "rendering/text_render/_glyphs.py",
+      "source_sha256": "b92211e72341dc610de8f8b67c0505d7df4d4918e69240804c9eb5ff896e3edc",
+      "prepared_sha256": "b92211e72341dc610de8f8b67c0505d7df4d4918e69240804c9eb5ff896e3edc"
+    },
+    {
+      "path": "rendering/text_render/_layout.py",
+      "source_sha256": "5aac851ad7cf850c396ec15d8a905a60f81fdd73e67b8fe2d5d23e3b3df2f22b",
+      "prepared_sha256": "5aac851ad7cf850c396ec15d8a905a60f81fdd73e67b8fe2d5d23e3b3df2f22b"
+    },
+    {
+      "path": "rendering/text_render/_plans.py",
+      "source_sha256": "aa5cc4d50e2583e9a1b68e3016ad72c9b9dce7ffa1a4defc398cfb4a03c2fb61",
+      "prepared_sha256": "aa5cc4d50e2583e9a1b68e3016ad72c9b9dce7ffa1a4defc398cfb4a03c2fb61"
+    },
+    {
+      "path": "rendering/text_render/_policy.py",
+      "source_sha256": "0d4044c333b3d0ef6901a7a72920366a091f76a1abc0284c18e9dc3c34a6dd96",
+      "prepared_sha256": "0d4044c333b3d0ef6901a7a72920366a091f76a1abc0284c18e9dc3c34a6dd96"
+    },
+    {
+      "path": "rendering/text_render/_render.py",
+      "source_sha256": "12a217837f5982d0682668208f2c244a92dabb7b23b00171ffa890b821133b58",
+      "prepared_sha256": "12a217837f5982d0682668208f2c244a92dabb7b23b00171ffa890b821133b58"
+    },
+    {
+      "path": "rendering/text_render/_shared.py",
+      "source_sha256": "7b22e65371192db6350a4c5d8a06647f4b87dc4312981926c17abfe27e08ccf1",
+      "prepared_sha256": "7b22e65371192db6350a4c5d8a06647f4b87dc4312981926c17abfe27e08ccf1"
+    },
+    {
+      "path": "rendering/text_render/_vertical_types.py",
+      "source_sha256": "5f4b7605e75037ba734c0923935c68f1be7ac9684c79bcd2826dffc127f52e8a",
+      "prepared_sha256": "5f4b7605e75037ba734c0923935c68f1be7ac9684c79bcd2826dffc127f52e8a"
+    },
+    {
+      "path": "rendering/text_render_eng.py",
+      "source_sha256": "277c545aa76e9a4ffa855372f151fcd156a86530f01fb813f9ec50c29ec39878",
+      "prepared_sha256": "277c545aa76e9a4ffa855372f151fcd156a86530f01fb813f9ec50c29ec39878"
+    },
+    {
+      "path": "rendering/text_replacement_layout.py",
+      "source_sha256": "46d9f89dac9c0e552b08b360f26c9263d5a51f4576cf8c36ffc2a2d1e1dcce82",
+      "prepared_sha256": "46d9f89dac9c0e552b08b360f26c9263d5a51f4576cf8c36ffc2a2d1e1dcce82"
+    },
+    {
+      "path": "rendering/text_replacements.py",
+      "source_sha256": "dc0638ea017718d08463fd0536cb31c6cf8f1f4bb934ba1bc155bb8fcea3c1d6",
+      "prepared_sha256": "9cd3a5ae4d64f6ba8d6498e46ccc7f33a8910a1eb0c76a177426aa8b93957b81"
+    },
+    {
+      "path": "utils/generic.py",
+      "source_sha256": "195be626a675f9bd8684bb787cd27e67bb8193d2aff313609817b254f94fd8e7",
+      "prepared_sha256": "195be626a675f9bd8684bb787cd27e67bb8193d2aff313609817b254f94fd8e7"
+    },
+    {
+      "path": "utils/image_modes.py",
+      "source_sha256": "36dea6c59f311174dce3ec9bf257cf5dec8d7f946cc28ca6c21fb76395719eb8",
+      "prepared_sha256": "36dea6c59f311174dce3ec9bf257cf5dec8d7f946cc28ca6c21fb76395719eb8"
+    },
+    {
+      "path": "utils/log.py",
+      "source_sha256": "51710312f49e25f0d9b4cf885662d6fe64047d1fe3faca1442219fe305872468",
+      "prepared_sha256": "51710312f49e25f0d9b4cf885662d6fe64047d1fe3faca1442219fe305872468"
+    },
+    {
+      "path": "utils/textblock.py",
+      "source_sha256": "a7eb6b35c86dcb5a6617a872b242b0ae2f034a45fb0c766cb8dda920dd120460",
+      "prepared_sha256": "a7eb6b35c86dcb5a6617a872b242b0ae2f034a45fb0c766cb8dda920dd120460"
+    },
+    {
+      "path": "utils/bubble.py",
+      "source_sha256": "9756a691187504f14c0d88899bf2ba74841d585716dfa210beb8ecc9788dae41",
+      "prepared_sha256": "9756a691187504f14c0d88899bf2ba74841d585716dfa210beb8ecc9788dae41"
+    },
+    {
+      "path": "utils/panel/__init__.py",
+      "source_sha256": "c0d356436d1205fc4da2ca34a0184a31aa52ca3f0589ee3cfa78c2d28d88e225",
+      "prepared_sha256": "c0d356436d1205fc4da2ca34a0184a31aa52ca3f0589ee3cfa78c2d28d88e225"
+    },
+    {
+      "path": "utils/panel/kumikolib.py",
+      "source_sha256": "d1397be41c848c893fe1a8f6d9fd158851c43c09638afb9dcc5f8659e987bb2c",
+      "prepared_sha256": "d1397be41c848c893fe1a8f6d9fd158851c43c09638afb9dcc5f8659e987bb2c"
+    },
+    {
+      "path": "utils/panel/lib/debug.py",
+      "source_sha256": "8e9707d86583c46a9fc0a385b0897ed5967dfbc4b7a23f529e81d9ce586e33b2",
+      "prepared_sha256": "8e9707d86583c46a9fc0a385b0897ed5967dfbc4b7a23f529e81d9ce586e33b2"
+    },
+    {
+      "path": "utils/panel/lib/html.py",
+      "source_sha256": "7b6425f19cc4e30d0a7c1b8e7cd132ca94520db3411cfa6625bd9b1b5ef20b7c",
+      "prepared_sha256": "7b6425f19cc4e30d0a7c1b8e7cd132ca94520db3411cfa6625bd9b1b5ef20b7c"
+    },
+    {
+      "path": "utils/panel/lib/page.py",
+      "source_sha256": "efa3cae3e400481890db8263ebe55a4e7e4461f15582b91957aa4080e408c03f",
+      "prepared_sha256": "efa3cae3e400481890db8263ebe55a4e7e4461f15582b91957aa4080e408c03f"
+    },
+    {
+      "path": "utils/panel/lib/panel.py",
+      "source_sha256": "76b00b1b94fa6a21f4f8f75ac6b0e4df0332a2a1fa80dca61e6a4f9828ae39d5",
+      "prepared_sha256": "76b00b1b94fa6a21f4f8f75ac6b0e4df0332a2a1fa80dca61e6a4f9828ae39d5"
+    },
+    {
+      "path": "utils/panel/lib/segment.py",
+      "source_sha256": "11b0bd38635ed67f85bcc4c32cc6b6d307315921fafa9dc353bf4132043906a5",
+      "prepared_sha256": "11b0bd38635ed67f85bcc4c32cc6b6d307315921fafa9dc353bf4132043906a5"
+    },
+    {
+      "path": "__init__.py",
+      "source_sha256": null,
+      "prepared_sha256": "17851f90ded40fe216009b4f66bee041c676ba4d535ae16710c0f1994bd44b18"
+    },
+    {
+      "path": "utils/__init__.py",
+      "source_sha256": null,
+      "prepared_sha256": "ea04182dc4d2da49576f655a068dcacdc01b0aa749e8b348b90ff441e4452342"
+    }
+  ],
+  "modifications": "Absolute import namespace; render-only package and utility facades; optional dispatch paint and pre-composite layer callbacks; route bounded English to upstream unified balloon fitter; allow translation reflow even for one source line. Fitting, wrapping and glyph algorithms unchanged."
+}

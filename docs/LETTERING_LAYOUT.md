@@ -1,53 +1,92 @@
-# 开源气泡识别与嵌字保护
+# 漫画气泡与完整嵌字引擎
 
-2026-09-16：已接入 **BallonsTranslator** 的气泡区域提取模块，配合边界约束排版和具体错误码。未引入自研气泡检测器。代码为 [speech_bubbles.py](../services/classic-engine/speech_bubbles.py) 适配层与 [lettering.py](../services/classic-engine/lettering.py) 排版保护层。
+2026-09-16：常规翻译已整体接入 **Manga Translator UI 的 Qt 排版／渲染模块**，固定提交 `f0307a063214f915f2b1d6e5cd3233f3bf78339f`。字号测量、自动换行、气泡适配、横竖排及字形绘制均走同一上游实现；原先“先自然排版、失败后缩放 OCR 矩形”的实现已移除。OCR、文本翻译、LaMa 与任务结算保持现有流程。本次完成代码、原生运行与容器验证，尚未重启已有本机集群或公开部署。
 
-## 来源与接入
+## 选型与接入范围
 
-采用 [dmMaze/BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 的 `extract_ballon_region` 与依赖的 `enlarge_window`，固定到提交 `84ba500ea1a4f523ca79f1c77d8c642eea3d1d07`，来自 [imgproc_utils.py](https://github.com/dmMaze/BallonsTranslator/blob/84ba500ea1a4f523ca79f1c77d8c642eea3d1d07/ballontranslator/utils/imgproc_utils.py)。项目在漫画排版中使用背景气泡区域；所选模块基于边缘、轮廓和区域填充，不是需要额外权重的深度学习模型。
+选择 [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui)，因为其已有完整的漫画 `balloon_fill`、自动断行与 Qt 原生字形流程，且与当前 OCR 区域结构兼容。相关源码为 [rendering](https://github.com/hgmzhn/manga-translator-ui/tree/f0307a063214f915f2b1d6e5cd3233f3bf78339f/manga_translator/rendering)、[auto_linebreak.py](https://github.com/hgmzhn/manga-translator-ui/blob/f0307a063214f915f2b1d6e5cd3233f3bf78339f/manga_translator/rendering/auto_linebreak.py)。
 
-仅保留这两个函数及必要 import，算法和语句未修改，仅规范行尾空白；[vendored 源码](../services/classic-engine/third_party/ballons_translator.py)、[来源及 SHA-256 清单](../services/classic-engine/third_party/ballons-translator.json)、[GPL-3.0 许可证](../services/classic-engine/licenses/BallonsTranslator-GPL-3.0.txt) 随引擎交付。其余 GUI、翻译器、模型和字体不引入；依赖使用现有固定 OpenCV 4.11.0.86／NumPy 1.26.4，无额外模型下载或远程调用。
+- 中日文沿原文字方向横排或竖排，由上游处理字符换行、横排禁则及竖排字形；按简中／繁中／日语选择现有 CJK 字体集合中的对应字体面。竖排换列的标点限制见下文。
+- 英语及其他已开放目标语言横排，按语言使用既有断词字典／整词策略。Qt 测量与绘制使用同一字体，保持原生字形比例。
+- 可靠气泡使用内区掩膜，由上游完整求解器换行、测量字号并摆放；共享气泡的多块摆放也由上游处理。无框／无法可靠提取的区域，以完整 OCR 多边形作为有界输入，仍使用同一求解器。
+- 未识别文字与页边先从可用掩膜扣除，再进行排版；最后检查所有实际字形、译文完整性与最小字号。放不下时明确失败，不截断文字或交付部分结果。
 
-适配层以 OCR 框定位最多 1024×1024 的局部搜索区，把上游提取的掩膜转成气泡内区。上游返回整块背景、掩膜触及裁剪边缘、面积不合理、未包含当前文字框中心、多个文字块归属不明时，不将其当成可靠气泡。有效掩膜内缩留白，选取完全位于内区的排版矩形；最终字形必须全部位于气泡和页边内，且不覆盖未识别文字。
+没有引入上游 GUI、翻译器、HanLP 语义分词、MangaLens／YOLO 权重或新的模型服务。气泡几何继续来自已固定的 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator/blob/84ba500ea1a4f523ca79f1c77d8c642eea3d1d07/ballontranslator/utils/imgproc_utils.py) 区域提取；适配层在最大 1024×1024 的有界窗口调用原算法，验证闭合内区包含完整源文字，保留内缩留白。开放／复杂气泡可能回退到 OCR 区域；本次样本不能代表所有漫画的气泡识别准确率。
 
-闭合气泡优先受识别边界约束；无框对白、开放或复杂气泡、共享气泡的模糊归属回退到 OCR 框。这是漫画开源工具的区域提取方案，不能据此宣称所有漫画气泡均准确识别。
+## 可审查的上游修改
 
-## 原失败原因与修复
+[prepare_typesetter.py](../services/classic-engine/prepare_typesetter.py) 从固定且干净的 Git 提交准备 38 个上游模块和 2 个包入口，使用独立命名空间，避免替换现有 OCR／LaMa 的 `manga_translator`。以下适配全部由可重复脚本生成并登记 SHA-256：
 
-现有 4 条 `CLASSIC_RENDER_FAILED` 记录的 OCR 区域和译文，在同尺寸合成白背景复现：2 条文字扩展到页边、2 条覆盖未识别文字区域。固定版本上游排版按译文扩展文字框，没有约束扩展后的页面及相邻区域边界；原引擎保护检查拒绝交付，代理又将所有 HTTP 422 压成同一个错误码。
+1. 修改绝对导入命名空间、精简包入口，提供已有气泡掩膜与已校验字典。
+2. 为上游绘制循环增加观察回调，并在原生 RGBA 图层裁入页面前检查实际墨迹，避免漏报截字或把透明留白误判为越界。
+3. 有掩膜时，将英文默认快捷分支导向上游已有的统一气泡求解器。
+4. 允许译文重排，不沿用上游“原文只有一行就不自动换行”的默认策略。
 
-现在先尝试自然排版，出现越界、重叠或无可见字形时，从干净背景重新在原文字框／识别到的气泡内完整渲染。不会裁掉越界字形后假报成功。仍无法安全排版时返回具体错误，不反复执行确定失败的版式。
+没有重写上游的断词、字号搜索、标点、字形栅格化或合成算法。[lettering.py](../services/classic-engine/lettering.py) 负责输入与交付检查，[typesetter.py](../services/classic-engine/typesetter.py) 负责加载和配置，[typesetter_inputs.py](../services/classic-engine/typesetter_inputs.py) 负责几何输入边界。
 
-| 错误码 | 含义 |
-| --- | --- |
-| `CLASSIC_RENDER_BOUNDARY` | 无法在页边内完整排版 |
-| `CLASSIC_RENDER_BUBBLE_OVERFLOW` | 无法在气泡内完整排版 |
-| `CLASSIC_RENDER_OVERLAP` | 与未识别文字区域重叠 |
-| `CLASSIC_RENDER_NO_GLYPHS` | 没有可见字形 |
-| `CLASSIC_RENDER_FONT_MISSING` | 缺少译文所需字形 |
-| `CLASSIC_RENDER_INPUT_INVALID` | 区域或背景检查点无效 |
-| `CLASSIC_RENDER_LAYOUT_FAILED` | 排版计算异常 |
+来源、每个原文件与准备后文件的校验和见 [manga-typesetter.json](../services/classic-engine/third_party/manga-typesetter.json)。准备与引擎启动都会核对该清单；上游源码和集成修改升级时必须一起审查。气泡提取的独立清单仍为 [ballons-translator.json](../services/classic-engine/third_party/ballons-translator.json)。
 
-代理只透传白名单错误码，使用固定中文消息，不传递异常原文或漫画文字。引擎不支持目标语言时返回 `LANGUAGE_UNSUPPORTED`。
+## 资源、许可与版本
 
-CPU/CUDA 引擎版本 `mit-95227a2-classic-v7-layout`，默认双进程 AMD 版本 `mit-95227a2-classic-v4-dml-v6-layout`，排版缓存版本 `masked-png-v4-bounded-layout-noto-b85c38ec`。控制服务与引擎版本必须匹配，没有旧协议／缓存／数据兼容处理。
+| 组件 | 固定版本 | 来源及许可 |
+| --- | --- | --- |
+| Manga Translator UI | `f0307a063214f915f2b1d6e5cd3233f3bf78339f` | 上述 GitHub 源码；[GPL-3.0](../services/classic-engine/licenses/manga-translator-ui-GPL-3.0.txt) |
+| PyQt6 | `6.11.0` | PyPI；[GPL-3.0-only](../services/classic-engine/licenses/PyQt6-GPL-3.0.txt) |
+| PyQt6-Qt6 | `6.11.1` | PyPI 官方 LGPL Qt 轮子；[LGPL-3.0](../services/classic-engine/licenses/Qt6-LGPL-3.0.txt) |
+| PyQt6-sip | `13.11.0` | PyPI；[BSD-2-Clause](../services/classic-engine/licenses/PyQt6-sip-BSD-2-Clause.txt) |
+| BallonsTranslator | `84ba500ea1a4f523ca79f1c77d8c642eea3d1d07` | 既有固定源码；GPL-3.0 |
 
-## 验证与限制
+Qt Python 包、原始来源 URL 和 Windows／Linux 轮子 SHA-256 见 [qt-runtime.json](../services/classic-engine/third_party/qt-runtime.json)；PyQt 与捆绑 Qt 的许可分别核实，依据 [Riverbank 官方说明](https://www.riverbankcomputing.com/software/pyqt)。没有新增权重或字体；现有字体的来源、校验和与 OFL 见[语言清单](LANGUAGE_SUPPORT.md)，字典见[字典准备](HYPHENATION_DICTIONARIES.md)。
+
+CPU/CUDA 引擎版本为 `mit-95227a2-classic-v8-qt`，默认双进程 AMD 为 `mit-95227a2-classic-v4-dml-v7-qt`；排版缓存版本为 `masked-png-v5-mtu-f0307a0-qt611-noto-b85c38ec`。更新运行集群时，控制配置与节点版本需要一起切换；本次未修改现有数据库配置、任务记录或正在运行的服务。
+
+## 准备与验证
+
+原生首次安装仍使用 `scripts/start-local-nvidia.ps1 -Setup` 或 `scripts/start-local-amd.ps1 -Setup`。只准备新的排版依赖与源码（不启动集群）：
+
+```powershell
+uv pip install --python services/classic-engine/.venv/Scripts/python.exe 'PyQt6==6.11.0' 'PyQt6-Qt6==6.11.1' 'PyQt6-sip==13.11.0'
+services/classic-engine/.venv/Scripts/python.exe services/classic-engine/prepare_typesetter.py
+```
+
+默认源码位于被忽略的 `engines/manga-typesetter/`，运行模块位于 `engines/manga-typesetter-runtime/`；`TYPESETTER_ROOT` 可指定已准备的运行目录。Dockerfile 自动准备相同模块，Qt 使用 `offscreen`，不要求显示器；容器依赖包括 fontconfig、xkbcommon、EGL/OpenGL 与 D-Bus 共享库。
 
 ```powershell
 $env:PYTHONPATH='engines/mit-native;services/classic-engine'
 services/classic-engine/.venv/Scripts/python.exe -m pytest services/classic-engine -q
 services/classic-engine/.venv/Scripts/python.exe scripts/verify_lettering_languages.py
 services/classic-engine/.venv/Scripts/python.exe scripts/verify_bubble_lettering.py
+services/classic-engine/.venv/Scripts/python.exe scripts/verify_typesetter_samples.py
+
+docker build -t node-comics-classic-engine:qt-validation services/classic-engine
 ```
 
-合成检查覆盖闭合／开放气泡、整页白底、共享气泡、保护区、污染回滚及错误透传。16 语言离线嵌字仍可验证；气泡脚本额外输出英／日文的横排和竖排对照，实际调用上述开源函数及正式渲染链路，断言字形全部位于气泡内、其余像素不变，结果在被忽略的 `artifacts/bubble-lettering/`。
+`verify_typesetter_samples.py` 需要本地已有样本，每个目录包含 `original.png` 与 `stages.json`。只有重新 OCR 后的完整 ID／原文映射与保存记录相同时才复用译文；随后实际运行 LaMa 和新排版器。默认样本与输出均位于被忽略的 `private-test-data/`；可用 `--source`、`--samples`、`--language`、`--output` 指定其他已保存样本。其检查点和图片不入库，日志报告不含对白全文。
 
-4 条失败布局回放可在不重新调用 LLM 的情况下验证。回放使用已保存 OCR／译文与合成背景，不访问 R2，不等同于原图最终交付或真实漫画气泡准确率验收。
+本轮证据：
 
-本轮结果：后端全套 326 通过／32 跳过，后续相关接口与计量回归 41 通过；图像引擎 66 通过／1 跳过（另 11 个子检查），计算代理 15 通过。16 语言离线渲染、英日气泡对照、4 条失败布局回放均通过。后台生产构建及 Chrome 表单／JSON、多语言、三个执行池、错误恢复与 390px 窄屏操作检查通过。跳过项主要需要显式配置的隔离 PostgreSQL 和 GPU 环境。
+- Windows 图像引擎：73 项通过、1 项环境相关跳过、11 个子检查通过；包含横竖排、共享气泡、未识别文字、缺字、长译文拒绝交付和连字符完整性。后端相关语言、配置缓存及阶段流水线 11 项通过，计算代理 15 项通过。
+- 16 个目标语言离线嵌字通过；检查字体切换稳定、越南语 NFC/NFD 一致及边界内完整渲染。英／日／简中／繁中气泡对照通过；报告与图片分别在 `artifacts/lettering-languages/`、`artifacts/bubble-lettering/`。
+- 两张已有漫画图实际执行 OCR → LaMa → 新排版，共 14 个文字块、9 个提取内区、2 个未识别保护区域；均输出完整尺寸，允许修改区域外逐像素一致。保存译文复用，无 LLM／图片模型／R2 调用。结果在 `private-test-data/qt-lettering-validation/`；这些有限样本不构成所有漫画风格或 OCR 语言的效果验收。
+- Linux Python 3.11 容器构建及相同 16 语言／4 项气泡离线检查通过；结果见 `artifacts/linux-typesetter/`。Windows 为 Python 3.12；20 张单图和 2 张总览的解码像素与 Linux 结果完全一致。这里记录新排版器验证，不复用旧版本的客户端／GPU 部署测试作为本轮证据。
 
-## 本机重新部署（2026-09-16）
+## 交付错误
+
+| 错误码 | 含义 |
+| --- | --- |
+| `CLASSIC_RENDER_BOUNDARY` | 实际字形无法完整留在页边内 |
+| `CLASSIC_RENDER_BUBBLE_OVERFLOW` | 实际字形超出可靠气泡内区 |
+| `CLASSIC_RENDER_OVERLAP` | 与未识别文字或其他已排字形重叠 |
+| `CLASSIC_RENDER_NO_GLYPHS` | 至少一个译文块没有可见字形 |
+| `CLASSIC_RENDER_FONT_MISSING` | 所选字体缺少译文所需字形 |
+| `CLASSIC_RENDER_INPUT_INVALID` | 区域或背景检查点无效 |
+| `CLASSIC_RENDER_LAYOUT_FAILED` | 未满足最小字号／译文完整性等排版要求 |
+
+错误仍由代理白名单透传固定消息，不泄露异常原文。不能容纳的极长译文会失败，需要更短译文或人工排版。目视检查确认：该固定版本的竖排换列尚未实现完整的列首禁则，简繁中文样例存在逗号位于列首；未启用的 HanLP 语义分词也不能在本次作为修复证据。这是上游排版质量限制，不能把边界／内容完整性检查通过表述为标点精修完成；样例图保留原始结果供审查。
+
+## 历史：替换前本机部署（2026-09-16）
+
+以下为此前 `classic-v7-layout`／`dml-v6-layout` 部署记录，不能作为新 Qt 引擎已上线的证明。
 
 已重新构建后台、Chrome MV3 扩展和 Web 阅读器，客户端类型／模块检查与 226 项测试通过。本机 API、控制工作进程、维护进程、计算代理与 CUDA 引擎已切至上述版本；图像节点及三个控制资源池均在线，语言报告为 16 项。保留现有图像执行位 6、文本 4、重绘 4、上传校验 2；后台可继续修改。
 

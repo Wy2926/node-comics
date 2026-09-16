@@ -56,19 +56,5 @@ def font_for(language, cjk_font):
 
 
 def normalized_text(text):
-    # Compose combining accents before the character-based upstream renderer.
+    # Keep canonical composition identical across Qt font measurement and painting.
     return unicodedata.normalize('NFC', text)
-
-
-def select_font(renderer, font, language):
-    if not hasattr(renderer, '_node_comics_compact'):
-        renderer._node_comics_compact = renderer.compact_special_symbols
-    # CJK punctuation compaction removes sentence spaces from European languages.
-    renderer.compact_special_symbols = (renderer._node_comics_compact
-                                       if language in {'zh-Hans', 'zh-Hant', 'ja'} else normalized_text)
-    # Upstream glyph-cache keys omit the font. Clear on switches under the engine
-    # device lock so one language cannot reuse the previous font's glyph metrics.
-    if getattr(renderer, '_node_comics_font', None) != font:
-        renderer.get_char_glyph.cache_clear()
-        renderer.set_font(font)
-        renderer._node_comics_font = font

@@ -28,11 +28,11 @@ from manga_translator.ocr.model_48px import Model48pxOCR
 from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
 from manga_translator.textline_merge import dispatch as merge
 from manga_translator.mask_refinement import dispatch as refine
-from manga_translator.rendering import text_render
 from manga_translator.utils import ModelWrapper, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
-from hyphenation import configure_renderer
+from hyphenation import DictionaryStore
+from typesetter import initialize as initialize_typesetter
 from prepare_dictionaries import prepare as prepare_languages
 
 PROFILE = os.environ.get('ENGINE_PROFILE', 'mit')
@@ -40,8 +40,8 @@ DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECT
 INPAINT_WORKERS = int(os.environ.get('ENGINE_INPAINT_WORKERS', '2')) if DIRECTML_OPTIMIZED else 1
 if INPAINT_WORKERS not in (1, 2):
     raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
-AMD_VERSION = 'mit-95227a2-classic-v4-dml-v6-layout' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-layout' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-layout')
-VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v7-layout')
+AMD_VERSION = 'mit-95227a2-classic-v4-dml-v7-qt' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-qt' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-qt')
+VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v8-qt')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
@@ -71,11 +71,11 @@ async def lifespan(app):
     torch.set_num_interop_threads(INTEROP_THREADS)
     cv2.setNumThreads(LOCAL_RUNTIME.opencv_threads)
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
-    text_render.FALLBACK_FONTS = [FONT]
     from hyphenation import default_directory
     prepare_fonts(LOCAL_RUNTIME.languages)
     prepare_languages(default_directory(), LOCAL_RUNTIME.languages)
-    dictionary_store = configure_renderer(text_render, languages=LOCAL_RUNTIME.languages)
+    dictionary_store = DictionaryStore(default_directory(), LOCAL_RUNTIME.languages)
+    initialize_typesetter(dictionary_store)
     # Fail startup instead of silently moving a requested GPU workload to CPU.
     if PROFILE == 'mit-directml':
         from mit_directml import DirectMLRuntime
@@ -149,7 +149,9 @@ def authorized(authorization: str = Header(default='')):
 
 @app.get('/health')
 def health():
+    from prepare_typesetter import REVISION as TYPESETTER_REVISION
     return {'ready': ready, 'instance_id': INSTANCE_ID, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
+            'typesetter': {'name': 'manga-translator-ui', 'revision': TYPESETTER_REVISION, 'backend': 'Qt 6.11.1'},
             'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
             'supported_languages': effective_runtime.languages, 'runtime': effective_runtime.model_dump(),
             'torch_interop_threads': INTEROP_THREADS,
@@ -187,7 +189,7 @@ async def configure(request: Request):
             if inpaint_pool:
                 inpaint_pool.threads = updated.torch_threads
                 inpaint_pool.opencv_threads = updated.opencv_threads
-            text_render.select_hyphenator = store.select
+            initialize_typesetter(store)
             dictionary_store = store
             if (updated.cache_bytes, updated.cache_ttl_seconds) != (cache.max_bytes, cache.ttl_seconds):
                 cache = ImageCache(updated.cache_bytes, updated.cache_ttl_seconds)
@@ -295,10 +297,12 @@ async def render_page(image, analysis, translations, config, language, cleaned):
     start = time.monotonic()
     mask = decode(analysis['mask'], 'L')
     font = font_for(language, FONT)
+    layout = []
     output, glyph_mask, fitted, bubbles = await letter_page(image, analysis, translations, config, language,
-                                                 cleaned, mask, text_render, font, FONT)
+                                                 cleaned, mask, font, layout)
     return {'image': png(output), 'mask': png(mask), 'glyph_mask': png(glyph_mask),
-            'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'timings': {'render': time.monotonic() - start}}
+            'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'layout': layout,
+            'timings': {'render': time.monotonic() - start}}
 
 
 @app.post('/v1/{stage}', dependencies=[Depends(authorized)])

@@ -19,7 +19,7 @@ os.environ['PYTHONIOENCODING'] = 'utf-8'
 import numpy as np
 from PIL import Image, ImageDraw
 import server
-from hyphenation import configure_renderer, default_directory
+from hyphenation import DictionaryStore, default_directory
 from prepare_dictionaries import prepare
 from render_languages import LANG, prepare_fonts, font_for
 
@@ -48,8 +48,8 @@ async def main():
     destination.mkdir(parents=True, exist_ok=True)
     prepare_fonts(list(LANG))
     prepare(default_directory(), list(LANG))
-    configure_renderer(server.text_render, languages=list(LANG))
-    server.text_render.FALLBACK_FONTS = [server.FONT]
+    from typesetter import initialize
+    initialize(DictionaryStore(default_directory(), list(LANG)))
     image = np.full((520, 600, 3), 245, np.uint8)
     image[35:485, 120:480] = 255
     mask = np.zeros((520, 600), np.uint8)

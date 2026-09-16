@@ -20,4 +20,7 @@ PyHyphen==4.0.4
 langcodes==3.5.0
 pyphen==0.17.2
 fonttools==4.59.1
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.1
+PyQt6-sip==13.11.0
 pydensecrf2==1.1
