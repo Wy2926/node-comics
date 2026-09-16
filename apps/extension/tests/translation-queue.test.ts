@@ -53,6 +53,24 @@ describe('persistent per-operation upload queue',()=>{
   await processManifest({...options,getBlob:async()=>new Blob(['1234'])});saved=(await readManifest(value.id))!;
   expect(send).toHaveBeenCalledTimes(2);expect(saved.items.map(i=>i.state)).toEqual(['accepted','accepted']);expect(saved.pending).toBeUndefined();
  });
+ it('waits for server throttling and retries the same intent without failing or pausing pages',async()=>{
+  const p=page(90),value=manifest([p]);await saveManifest(value);const api=new Api(origin);
+  const submit=vi.spyOn(api,'submit').mockRejectedValueOnce(new ApiError('稍后重试','SUBMISSION_DAILY_LIMIT',429,null,3600));
+  const options={api,manifest:value,available:1,readingPageIds:[],concurrency:2,getBlob:async()=>new Blob(),onJobs:vi.fn(async()=>{}),onChange:vi.fn()};
+  const before=Date.now();await processManifest(options);const saved=(await readManifest(value.id))!;
+  expect(saved.retryAt).toBeGreaterThanOrEqual(before+3600000);expect(saved.paused).toBe(false);expect(saved.items[0].state).toBe('local');expect(saved.error).not.toContain('待核实');
+  await processManifest(options);expect(submit).toHaveBeenCalledTimes(1);
+  saved.retryAt=undefined;await saveManifest(saved);submit.mockResolvedValueOnce({id:'after-throttle',mode:'classic',target_language:'zh-Hans',items:[{client_item_id:p.id,job:job(p)}]});
+  await processManifest(options);expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0]);expect((await readManifest(value.id))!.pending).toBeUndefined();
+ });
+ it('pauses an archived intent without replacing its idempotency key',async()=>{
+  const value=manifest([page(91)]);await saveManifest(value);const api=new Api(origin);
+  const submit=vi.spyOn(api,'submit').mockRejectedValue(new ApiError('回执已归档','SUBMISSION_ARCHIVED',410));
+  const options={api,manifest:value,available:1,readingPageIds:[],concurrency:2,getBlob:async()=>new Blob(),onJobs:vi.fn(async()=>{}),onChange:vi.fn()};
+  await processManifest(options);const saved=(await readManifest(value.id))!;
+  expect(saved.paused).toBe(true);expect(saved.pending!.key).toBe(submit.mock.calls[0][1]);expect(saved.retryAt).toBeUndefined();
+  await processManifest(options);expect(submit).toHaveBeenCalledTimes(1);
+ });
  it('releases a definitively rejected chunk so capacity can be checked again, without losing selected pages',async()=>{
   const value=manifest([page(30)]);await saveManifest(value);const api=new Api(origin);vi.spyOn(api,'submit').mockRejectedValue(new ApiError('full','QUEUE_CAPACITY_EXCEEDED',409));
   await processManifest({api,manifest:value,available:1,readingPageIds:[],concurrency:2,getBlob:async()=>new Blob(),onJobs:vi.fn(async()=>{}),onChange:vi.fn()});

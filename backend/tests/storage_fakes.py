@@ -23,6 +23,8 @@ class MemoryS3:
 
     def put_object(self, **params):
         self.calls.append(('PUT', params['Key']))
+        if params.get('IfNoneMatch') == '*' and params['Key'] in self.objects:
+            raise ClientError({'Error': {'Code': 'PreconditionFailed'}, 'ResponseMetadata': {'HTTPStatusCode': 412}}, 'PutObject')
         self.objects[params['Key']] = params['Body']
         assert params['ContentType'] in {'image/png', 'image/jpeg', 'image/webp', 'application/octet-stream'}
         assert params['CacheControl'] == 'private, no-store'

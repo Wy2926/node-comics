@@ -157,7 +157,7 @@ def test_deleted_or_expired_output_not_a_cache_hit(client, png, monkeypatch):
     assert not new_job["cache_hit"] and new_job["status"] == "queued"
 
 
-def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
+def test_cross_user_jobs_are_private_and_completed_images_are_shared(client, png, monkeypatch):
     import app.workers as workers
     from app.adapters.images import TranslationOutput
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(png))
@@ -169,7 +169,8 @@ def test_cross_user_jobs_and_cache_are_isolated(client, png, monkeypatch):
     assert client.post("/v1/jobs/status", headers=bob, json={"ids": [job_id]}).json() == {"items": []}
     assert create(client, bob, alice_asset).status_code == 404
     bob_job = create(client, bob, upload(client, bob, png)).json()
-    assert not bob_job["cache_hit"] and bob_job["quota_pages"] == 1
+    assert bob_job["cache_hit"] and bob_job["quota_pages"] == 0
+    assert bob_job["id"] != job_id and bob_job["status"] == "succeeded"
 
 
 def test_batch_budget_atomicity_and_cancel(client, png):

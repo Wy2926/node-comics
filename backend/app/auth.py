@@ -4,6 +4,7 @@ import jwt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .config import settings
 from .db import get_db
@@ -15,7 +16,11 @@ bearer = HTTPBearer(auto_error=False)
 
 @lru_cache
 def jwks_client():
-    return jwt.PyJWKClient(settings().oidc_jwks_url, cache_keys=True, lifespan=300)
+    cfg = settings()
+    # Per-key LRU caches have no expiry and bypass JWKS revocation indefinitely.
+    # Retain only the bounded whole-set cache; an expired set must refresh or fail.
+    return jwt.PyJWKClient(cfg.oidc_jwks_url, cache_keys=False, cache_jwk_set=True,
+                          lifespan=cfg.oidc_jwks_cache_seconds, timeout=cfg.oidc_jwks_timeout_seconds)
 
 
 def token_for(user: User):
@@ -39,8 +44,10 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
             claims = jwt.decode(credentials.credentials, key.key, algorithms=["RS256", "ES256", "ES384"], audience=cfg.oidc_audience, issuer=cfg.oidc_issuer, options={"require": ["exp", "sub", "iss", "aud"]})
     except jwt.PyJWTError:
         problem("TOKEN_INVALID", "登录已过期，请重新登录", 401)
+    if not isinstance(claims["sub"], str) or not claims["sub"]:
+        problem("TOKEN_INVALID", "身份令牌无效", 401)
     subject = claims["sub"] if cfg.dev_auth else f"{cfg.oidc_issuer}|{claims['sub']}"
-    if not isinstance(subject, str) or len(subject) > 255:
+    if len(subject) > 255:
         problem("TOKEN_INVALID", "身份令牌无效", 401)
     user = db.scalar(select(User).where(User.subject == subject))
     if not user:
@@ -50,8 +57,16 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
         role = "admin" if isinstance(roles, list) and cfg.oidc_admin_role in roles else "user"
         user = User(subject=subject, name=str(claims.get("name", "漫画读者"))[:80], role=role)
         db.add(user)
-        db.commit()
-    elif not cfg.dev_auth:
+        try:
+            db.commit()
+        except IntegrityError:
+            # Another first request may commit this same issuer/subject while we
+            # insert. Roll back the failed transaction and reuse its unique user.
+            db.rollback()
+            user = db.scalar(select(User).where(User.subject == subject))
+            if user is None:
+                raise
+    if not cfg.dev_auth:
         roles = claims.get("roles", [])
         role = "admin" if isinstance(roles, list) and cfg.oidc_admin_role in roles else "user"
         if role != user.role:

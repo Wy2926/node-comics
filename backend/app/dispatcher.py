@@ -3,21 +3,19 @@ from datetime import timedelta
 import logging
 import time
 from sqlalchemy import and_, or_, select
-from .assets import available, create_asset, delete_asset_object, inspect_image
+from .assets import available, content_storage_key, create_asset, inspect_image
 from .config import settings
 from .db import initialize, session_factory
 from .errors import ProcessingError
+from .health import log_failure, probe_oidc, report_failure, report_progress
 from .jobs import cancel_job, settle
 from .models import Asset, Attempt, ClassicState, Job, Provider, now
 from .queue_models import ExecutionLease, JobStage
 from .scheduler import lock_scheduler, release_lease, touch_job
 from .storage import get_store, StorageError
-from .storage_cleanup import cleanup_orphans
 from .uploads import expire_uploads
+from .submission_limits import archive_submission_receipts
 from .workers import fail_stage, finish_job
-
-log = logging.getLogger("node_comics.maintenance")
-
 
 def recover_lease(lease_id):
     with session_factory()() as db:
@@ -29,9 +27,9 @@ def recover_lease(lease_id):
         image = None
         if stage.name in {"render", "redraw"}:
             store = get_store(attempt.output_storage_backend)
-            key = f"{job.owner_id}/{lease.id}"
+            key = lease.output_key
             try:
-                image = store.read(key) if store.exists(key) else None
+                image = store.read(key) if key and store.exists(key) else None
             except StorageError:
                 return  # An unavailable object store is not evidence of absent output.
         unknown = stage.name == "redraw" and attempt.call_started_at is not None
@@ -39,7 +37,13 @@ def recover_lease(lease_id):
         fail_stage(lease_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN" if unknown else "WORKER_LEASE_EXPIRED",
             "计算节点失联，保留调用记录并恢复可重复阶段", unknown=unknown), recovering=True)
         return
-    info = inspect_image(image, output=True)
+    try:
+        info = inspect_image(image, output=True)
+        if content_storage_key(info["sha256"]) != key:
+            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "已存结果与租约内容摘要不一致")
+    except ProcessingError as error:
+        fail_stage(lease_id, error, recovering=True)
+        return
     with session_factory()() as db:
         lock_scheduler(db)
         lease = db.get(ExecutionLease, lease_id)
@@ -84,19 +88,28 @@ def recover_once():
     for lease_id in ids:
         try:
             recover_lease(lease_id)
-        except (StorageError, ProcessingError):
+        except (StorageError, ProcessingError) as error:
+            log_failure("lease-recovery", error, lease_id=lease_id)
             continue
+    deadline = now() - timedelta(seconds=settings().unknown_release_seconds)
+    unknown_filter = (Job.status == "outcome_unknown", Job.unknown_since <= deadline)
+    provider_join = Provider.id == Job.config["provider"]["id"].as_string()
+    disabled_filter = (Job.status == "queued", Job.mode == "redraw", or_(Provider.id.is_(None), Provider.enabled.is_(False)))
+    # Select bounded candidate IDs without blocking claims. Their eligibility is
+    # rechecked under the scheduler lock before any settlement/status mutation.
+    with session_factory()() as db:
+        unknown_ids = list(db.scalars(select(Job.id).where(*unknown_filter).order_by(Job.unknown_since, Job.id).limit(100)))
+        disabled_ids = list(db.scalars(select(Job.id).outerjoin(Provider, provider_join).where(*disabled_filter)
+            .order_by(Job.created_at, Job.id).limit(100)))
     with session_factory()() as db:
         lock_scheduler(db)
-        deadline = now() - timedelta(seconds=settings().unknown_release_seconds)
-        for job in db.scalars(select(Job).where(Job.status == "outcome_unknown", Job.unknown_since <= deadline)):
+        for job in db.scalars(select(Job).where(Job.id.in_(unknown_ids), *unknown_filter)):
             job.status, job.phase, job.completed_at = "unknown_released", "reconciliation_required", now()
             settle(db, job, success=False)
         expire_uploads(db)
-        for job in db.scalars(select(Job).where(Job.status == "queued", Job.mode == "redraw")):
-            provider = db.get(Provider, job.config["provider"]["id"])
-            if not provider or not provider.enabled:
-                finish_job(db, job, "failed", error=ProcessingError("PROVIDER_DISABLED", "图片服务已停用"))
+        archive_submission_receipts(db)
+        for job in db.scalars(select(Job).outerjoin(Provider, provider_join).where(Job.id.in_(disabled_ids), *disabled_filter)):
+            finish_job(db, job, "failed", error=ProcessingError("PROVIDER_DISABLED", "图片服务已停用"))
         db.commit()
 
 
@@ -114,28 +127,27 @@ def cleanup(db):
             touch_job(db, job)
         for state in db.scalars(select(ClassicState).join(Job, Job.id == ClassicState.job_id).where(Job.input_asset_id == asset.id)):
             db.delete(state)
-    db.commit()  # Revoke access before slow object deletion, without a scheduler lock.
-    for asset in assets:
-        try:
-            delete_asset_object(asset)
-            asset.purged_at = now()
-        except StorageError:
-            continue
-    db.commit()
-    cleanup_orphans(db)
+        # This marks cleanup of the user's grant, never physical object deletion.
+        # Content-addressed originals and outputs can be shared by other users.
+        asset.purged_at = now()
     db.commit()
 
 
 def main():
     initialize()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    next_oidc_probe = 0
     while True:
         try:
             recover_once()
             with session_factory()() as db:
                 cleanup(db)
-        except Exception:
-            log.warning("Translation maintenance paused; retrying from durable state.")
+            if time.monotonic() >= next_oidc_probe:
+                probe_oidc()
+                next_oidc_probe = time.monotonic() + max(1, min(60, settings().cluster_node_timeout_seconds / 3))
+            report_progress("maintenance")
+        except Exception as error:
+            report_failure("maintenance", error)
         time.sleep(settings().dispatch_interval_seconds)
 
 

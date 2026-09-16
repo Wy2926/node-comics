@@ -2,7 +2,7 @@
 
 每台机器按物理设备运行一个计算代理和一个图像引擎。代理只向控制 API 领取阶段与交付结果，无数据库、R2 或供应商凭据。后台预建节点、签发独立身份，服务端配置执行位；不支持共享 Token 自注册。
 
-完整字段和协议见[节点配置](../../docs/NODE_CONFIGURATION.md)，调度规则见[集群设计](../../docs/TRANSLATION_CLUSTER_DESIGN.md)。新数据库基线 `nodes_0001`，旧数据不迁移、不自动清空。
+完整字段和协议见[节点配置](../../docs/NODE_CONFIGURATION.md)，调度规则见[集群设计](../../docs/TRANSLATION_CLUSTER_DESIGN.md)。新数据库基线 `shared_0001`，旧数据不迁移、不自动清空。
 
 ## 接入步骤
 

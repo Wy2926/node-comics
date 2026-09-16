@@ -74,7 +74,7 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
     control_env = {**common, **{k: v for k, v in config.items() if v is not None},
                    'PYTHONPATH': str(BACKEND), 'DATABASE_URL': 'sqlite:///' + (folder / 'cluster.db').as_posix(),
                    'STORAGE_PATH': str(folder / 'transient'), 'RESULT_STORAGE_BACKEND': 'r2',
-                   'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': tokens['auth'], 'PROVIDERS_JSON': '[]',
+                   'APP_ENV': 'development', 'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': tokens['auth'], 'PROVIDERS_JSON': '[]',
                    'OPENAI_API_KEY': '', 'R2_KEY_PREFIX': tokens['r2_prefix'],
                    'CLASSIC_ENABLED': 'true',
                    'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v7-qt' if device.startswith('directml') else 'mit-95227a2-classic-v8-qt',

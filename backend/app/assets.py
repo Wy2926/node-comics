@@ -3,7 +3,7 @@ import hashlib
 from io import BytesIO
 import warnings
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import or_, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 from .config import settings
 from .errors import problem, ProcessingError
@@ -58,6 +58,46 @@ def extend_original_retention(db, original, deadline):
     db.execute(update(Asset).where(Asset.id == original.id, condition).values(expires_at=deadline))
 
 
+def content_storage_key(sha256):
+    return f"objects/sha256/{sha256[:2]}/{sha256}"
+
+
+def grant_asset(db, owner_id, source, *, parent_id=None):
+    """Create an account-local reference without copying shared image bytes."""
+    if source.owner_id == owner_id and source.parent_id == parent_id:
+        return source
+    asset = Asset(owner_id=owner_id, kind=source.kind, parent_id=parent_id,
+        storage_key=source.storage_key, storage_backend=source.storage_backend,
+        sha256=source.sha256, mime=source.mime, width=source.width, height=source.height,
+        byte_size=source.byte_size, expires_at=retention_deadline())
+    db.add(asset)
+    db.flush()
+    if parent_id:
+        extend_original_retention(db, db.get(Asset, parent_id), asset.expires_at)
+    return asset
+
+
+def find_shared_original(db, owner_id, sha256, *, byte_size=None, mime=None):
+    """A submitted content digest can claim a verified shared original.
+
+    Object sharing is explicit product behavior. Asset IDs, jobs and file names
+    remain private to each account; no remote I/O is needed for this lookup.
+    """
+    rows = db.scalars(select(Asset).where(Asset.kind == "original", Asset.sha256 == sha256,
+        Asset.deleted_at.is_(None), Asset.purged_at.is_(None),
+        or_(Asset.expires_at.is_(None), Asset.expires_at > now(), Asset.active_references > 0))
+        .order_by((Asset.owner_id == owner_id).desc(), Asset.created_at.desc(), Asset.id))
+    for source in rows:
+        if not available(source):
+            continue
+        if byte_size is not None and source.byte_size != byte_size:
+            problem("UPLOAD_SIZE_MISMATCH", "图片大小与已验证内容不一致", 422)
+        if mime not in (None, "application/octet-stream", source.mime):
+            problem("UPLOAD_MIME_MISMATCH", "图片格式与已验证内容不一致", 422)
+        return grant_asset(db, owner_id, source)
+    return None
+
+
 def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", parent_id=None, stable_id=None,
                  storage_backend=None, prewritten=False, verified_info=None):
     # Internal control-service callers may prewrite a validated buffer outside
@@ -67,9 +107,9 @@ def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", pa
     if verified_info is not None and not prewritten:
         raise ValueError("Prevalidated metadata requires a prewritten object")
     asset_id = stable_id or uid()
-    key = f"{owner_id}/{asset_id}"
     is_result = kind in {"classic", "redraw"}
     is_durable = is_result or kind == "original"
+    key = content_storage_key(info["sha256"]) if is_durable else f"{owner_id}/{asset_id}"
     if not is_durable and storage_backend not in (None, "local"):
         raise ValueError("Intermediate images must use disposable local storage")
     backend = (storage_backend or settings().result_storage_backend) if is_durable else "local"
@@ -90,7 +130,12 @@ def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", pa
             raise ProcessingError("ASSET_ID_CONFLICT", "图片写入编号已被其他内容使用")
         return existing
     if not prewritten:
-        get_store(backend).put(key, data, info["mime"], kind=kind)
+        # Metadata hits avoid even sending a repeated PUT; the store also fences
+        # concurrent first writes with an immutable content-addressed key.
+        existing_object = db.scalar(select(Asset).where(Asset.storage_backend == backend,
+            Asset.storage_key == key, Asset.deleted_at.is_(None), Asset.purged_at.is_(None)).limit(1))
+        if not existing_object or not available(existing_object):
+            get_store(backend).put(key, data, info["mime"], kind=kind)
     if parent is not None and is_result:
         # Conditional UPDATE avoids shortening retention when different nodes
         # finish translations of one original concurrently. Do it after object
@@ -116,7 +161,10 @@ def read_asset(asset: Asset):
 
 
 def delete_asset_object(asset: Asset):
-    get_store(asset.storage_backend).delete(asset.storage_key)
+    # A user deletes their grant, not the shared physical image. Durable objects
+    # are retained even with no DB references (including after DB restoration).
+    if asset.kind not in {"original", "classic", "redraw"}:
+        get_store(asset.storage_backend).delete(asset.storage_key)
 
 
 def access_json(asset: Asset):

@@ -1,6 +1,6 @@
 """Content identities, idempotent jobs and settlement shared by all submissions."""
 from sqlalchemy import func, select, update
-from .assets import available
+from .assets import available, find_shared_original, grant_asset
 from .job_requests import JobRequest
 from .config import settings
 from .errors import problem
@@ -66,7 +66,18 @@ def remember_request(db, owner_id, operation, key, request_hash, job):
 
 def content_key(user, asset, mode, language, config):
     sha = asset.sha256 if hasattr(asset, "sha256") else asset
-    return digest({"owner": user.id, "hash": sha, "mode": mode, "language": language, "config_version": config["version"]})
+    return digest({"hash": sha, "mode": mode, "language": language, "config_version": config["version"]})
+
+
+def find_shared_result(db, cache_key):
+    rows = db.scalars(select(Job).where(Job.cache_key == cache_key,
+        Job.status.in_({"succeeded", "no_text"}), Job.cancel_requested.is_(False), Job.discard_output.is_(False))
+        .order_by(Job.completed_at.desc(), Job.id))
+    for job in rows:
+        if available(db.get(Asset, job.input_asset_id)) and (job.status == "no_text"
+                or available(db.get(Asset, job.output_asset_id))):
+            return job
+    return None
 
 
 def find_reusable(db, user, asset, mode, language, config):
@@ -109,12 +120,31 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     if cached:
         return remember_request(db, user.id, operation, key, request_hash, cached)
     at = accepted_at or now()
+    ck = content_key(user, sha, mode, language, config)
+    shared = None if force else find_shared_result(db, ck)
+    if shared:
+        # Completed work is shared, not the other account's job or asset IDs.
+        # No supplier call, reservation or quota debit occurs for cache hits.
+        asset = asset or find_shared_original(db, user.id, sha)
+        if asset:
+            output = grant_asset(db, user.id, db.get(Asset, shared.output_asset_id), parent_id=asset.id) if shared.output_asset_id else None
+            version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
+            job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id, source_sha256=sha,
+                output_asset_id=output.id if output else None, file_hash=file_hash, page_index=page_index,
+                mode=mode, target_language=language, operation=operation, idempotency_key=key,
+                request_hash=request_hash, cache_key=ck, config=config, cache_hit=True,
+                quota_pages=0, quota_kind=shared.quota_kind, settlement="free", version=version,
+                ordinal=ordinal, status=shared.status, phase="completed", quality_flags=list(shared.quality_flags),
+                created_at=at, completed_at=at)
+            db.add(job)
+            db.flush()
+            touch_job(db, job)
+            return remember_request(db, user.id, operation, key, request_hash, job)
     kind = require_entitlement(user, mode, at, expected_kind, db)
     if max_quota_pages is not None and kind != UNLIMITED and max_quota_pages < 1:
         problem("QUOTA_BOUND_EXCEEDED", "新增页数超过已确认额度上限", 409)
     if active_count(db, user.id, mode) >= limits_for(user)["capacity"]:
         problem("QUEUE_FULL", "此翻译模式的在途队列已满，请等待任务完成", 409)
-    ck = content_key(user, sha, mode, language, config)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
         file_hash=file_hash, page_index=page_index, mode=mode, target_language=language,

@@ -1,20 +1,22 @@
 # Node Comics 后端
 
+2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](../docs/PRODUCTION_FIXES.md)，未公开部署。
+
 FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终译图，独立计算代理按阶段拉取常规翻译。前后端使用持久提交清单和双模式队列，已删除旧 preview/batch、Celery/Redis 与固定用户执行上限。产品规则见[集群说明](../docs/TRANSLATION_CLUSTER_DESIGN.md)。
 
 ## 运行
 
-需要 Python 3.11、PostgreSQL（隔离验证使用 17.6）、私有 R2。生产关闭 `DEV_AUTH` 并配置 OIDC。在根目录填写 `.env` 后：
+需要 Python 3.11、PostgreSQL（隔离验证使用 17.6）、私有 R2。后端默认生产模式并校验完整身份配置；以下为显式开发环境入口。在根目录填写 `.env` 后：
 
 ```powershell
 ./scripts/bootstrap.ps1
-# 填写 R2、文本/图片供应商与身份配置后启动新集群：
+# 填写 R2、文本/图片供应商后启动本地开发集群：
 ./scripts/bootstrap.ps1 -Start -Classic
 ```
 
-Compose 项目 `node-comics-nodes` 使用独立 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `nodes_0001` 不升级旧表；本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。不能把多个环境指向相同 R2 清理前缀。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `shared_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
-三个控制进程可独立运行：
+三个控制进程可独立运行。以下仅列进程入口；启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
 ```powershell
 cd backend
@@ -24,7 +26,7 @@ cd backend
 .venv/Scripts/python.exe -m app.dispatcher
 ```
 
-API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../services/compute-agent/README.md)。`local` 存储仅供 `DEV_AUTH=true` 的隔离测试，不能作为公开部署。
+API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../services/compute-agent/README.md)。`local` 存储仅供显式开发 / 测试环境、`DEV_AUTH=true` 且配置足够长度签名密钥的隔离验证，不能作为公开部署。
 
 ## 配置
 
@@ -73,7 +75,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 ## 故障与安全
 
-调度、受理、排序、租约和结算按 scheduler → user/job 锁顺序短事务完成。网络和模型 I/O 不持调度锁。固定结果摘要与每租约对象键防止迟到结果覆盖，恢复重新核验租约。重绘已持久化调用意图后不自动重发；未知期限释放后补交付不补扣。
+调度、受理、排序、租约和结算按 scheduler → user/job 锁顺序短事务完成。网络和模型 I/O 不持调度锁。固定结果摘要与租约记录的不可变内容对象键防止迟到结果覆盖，恢复重新核验租约。重绘已持久化调用意图后不自动重发；未知期限释放后补交付不补扣。
 
 输入图按实际接收字节、摘要、可解码尺寸验证。图片供应商 URL 通过白名单、DNS/IP 和每次跳转校验；输出需解码和持久化成功才结算。原图和译图默认无限期保留，最近授权访问时间供未来清理策略使用；活跃引用保护原图。删除先提交墓碑；签名已经发出时可能在其短暂有效期内继续读取。
 

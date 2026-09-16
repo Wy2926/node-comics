@@ -74,6 +74,7 @@ class ExecutionLease(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     outcome: Mapped[str | None] = mapped_column(String(24))
     result_hash: Mapped[str | None] = mapped_column(String(64))
+    output_key: Mapped[str | None] = mapped_column(String(200))
 
 
 class FairnessState(Base):
@@ -99,7 +100,22 @@ class Submission(Base):
     target_language: Mapped[str] = mapped_column(String(20))
     quota_pages: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
+                      Index("ix_submissions_retention", "archived_at", "created_at"))
+
+
+class SubmissionAdmission(Base):
+    """One bounded, shared admission record per account, across API replicas."""
+    __tablename__ = "submission_admissions"
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    request_tokens: Mapped[float] = mapped_column(Float)
+    item_tokens: Mapped[float] = mapped_column(Float)
+    refilled_at: Mapped[datetime] = mapped_column(DateTime)
+    day_started_at: Mapped[datetime] = mapped_column(DateTime)
+    daily_submissions: Mapped[int] = mapped_column(Integer, default=0)
+    daily_items: Mapped[int] = mapped_column(Integer, default=0)
+    leases: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class SubmissionItem(Base):

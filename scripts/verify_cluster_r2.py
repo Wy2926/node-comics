@@ -42,12 +42,13 @@ def run(env_file):
         os.environ[key] = source[key]
     os.environ.update({"R2_KEY_PREFIX": test_prefix, "RESULT_STORAGE_BACKEND": "r2",
         "RETENTION_DAYS": "0",
-        "DEV_AUTH": "true", "DEV_AUTH_SECRET": uuid4().hex + uuid4().hex,
+        "APP_ENV": "test", "DEV_AUTH": "true", "DEV_AUTH_SECRET": uuid4().hex + uuid4().hex,
         "OPENAI_API_KEY": "isolated-smoke-placeholder-no-paid-access", "OPENAI_BASE_URL": "https://provider.invalid/v1",
         "OPENAI_MODEL": "local-smoke-stub", "PROVIDERS_JSON": "", "CLASSIC_ENABLED": "false"})
     logging.getLogger("botocore").setLevel(logging.CRITICAL)
     report = {"status": "failed", "paid_provider_calls": 0, "isolated_prefix_enforced": True}
     counters, store, cleanable = Counter(), None, False
+    written_keys = set()
     with TemporaryDirectory(prefix="node-comics-r2-smoke-") as temporary:
         os.environ["DATABASE_URL"] = "sqlite:///" + (Path(temporary) / "smoke.db").as_posix()
         os.environ["STORAGE_PATH"] = str(Path(temporary) / "objects")
@@ -70,20 +71,27 @@ def run(env_file):
                             assert params.get("Prefix") == test_prefix
                         else:
                             assert params.get("Key", "").startswith(test_prefix)
+                        if operation == "put_object":
+                            written_keys.add(params["Key"][len(test_prefix):])
                         counters[operation] += 1
                         try:
                             return actual(*args, **kwargs)
                         except Exception as error:
                             details = getattr(error, "response", {})
                             code = details.get("Error", {}).get("Code", "")
+                            if operation == "put_object" and params.get("IfNoneMatch") == "*" and details.get("ResponseMetadata", {}).get("HTTPStatusCode") == 412:
+                                report["conditional_write_reused"] = True
+                                raise
+                            if operation == "head_object" and details.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+                                raise  # Expected cleanup verification, not a storage failure.
                             if re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", code):
                                 report["r2_failure_code"] = code
                             report["r2_failure_type"] = type(error).__name__
                             raise
                     return guarded
             store.client = ScopedClient()
-            existing, cursor = store.list_page()
-            assert not existing and cursor is None, "Fresh verification prefix must be empty"
+            initial = store.client.list_objects_v2(Bucket=source["R2_BUCKET"], Prefix=test_prefix, MaxKeys=1)
+            assert not initial.get("Contents"), "Fresh verification prefix must be empty"
             cleanable = True
             from fastapi.testclient import TestClient
             from PIL import Image
@@ -168,6 +176,26 @@ def run(env_file):
                     charges = list(db.scalars(select(Ledger.kind).where(Ledger.job_id == job_id)))
                     assert sorted(charges) == ["reserve", "settle"]
                 assert stub_calls == [1]
+                report["phase"] = "cross_account_reuse"
+                second_login = client.post("/v1/auth/dev", json={"username": "isolated-shared-reader"})
+                assert second_login.status_code == 200
+                second_auth = {"Authorization": "Bearer " + second_login.json()["access_token"],
+                               "Idempotency-Key": "isolated-shared-submission"}
+                io_before = counters.copy()
+                shared = client.post("/v1/translation-submissions", headers=second_auth,
+                    json={**request, "max_quota_pages": 0})
+                assert shared.status_code == 202
+                shared_item = shared.json()["items"][0]
+                assert shared_item["upload"] is None and shared_item["reused"]
+                assert shared_item["job"]["status"] == "succeeded" and shared_item["job"]["cache_hit"]
+                assert shared_item["job"]["quota_pages"] == 0 and counters == io_before and stub_calls == [1]
+                assert client.get(f"/v1/images/{output_id}/access", headers=second_auth).status_code == 404
+                with session_factory()() as db:
+                    output_asset = db.get(Asset, output_id)
+                    store.put(output_asset.storage_key, translated, output_asset.mime, kind="redraw")
+                assert report.get("conditional_write_reused") is True
+                report.update(shared_reuse_without_upload=True, shared_reuse_without_model=True,
+                              shared_quota_pages=0, cross_account_asset_ids_private=True)
                 assert not any(path.is_file() for path in settings().storage_path.rglob("*"))
                 report.update(status="passed", phase="completed", submission_replay="same_receipt", source_storage="r2", result_storage="r2",
                     downloaded_result_decoded=True, persistent_local_image_files=0, quota_settlements=1, mocked_provider_calls=1,
@@ -180,17 +208,12 @@ def run(env_file):
         finally:
             if store is not None and cleanable:
                 try:
-                    keys, cursor = [], None
-                    while True:
-                        objects, cursor = store.list_page(cursor)
-                        keys.extend(key for key, _ in objects)
-                        if cursor is None:
-                            break
-                    for key in keys:
+                    # Delete only keys observed in this exact run, including
+                    # uncertain PUTs. Application orphan enumeration is removed.
+                    for key in written_keys:
                         store.delete(key)
-                    remaining, cursor = store.list_page()
-                    assert not remaining and cursor is None
-                    report.update(cleanup="verified_empty", cleaned_objects=len(keys), existing_product_prefix_modified=False)
+                    assert all(not store.exists(key) for key in written_keys)
+                    report.update(cleanup="verified_written_keys_absent", cleaned_objects=len(written_keys), existing_product_prefix_modified=False)
                 except Exception as error:
                     report.update(status="failed", cleanup="failed", cleanup_failure_type=type(error).__name__)
             if engine.cache_info().currsize:

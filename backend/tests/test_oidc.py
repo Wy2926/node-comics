@@ -70,3 +70,81 @@ def test_oidc_rejects_symmetric_algorithm(oidc):
     client, _, claims = oidc
     token = jwt.encode(claims, "isolated-test-secret-at-least-32-bytes", algorithm="HS256")
     assert client.get("/v1/me", headers={"Authorization": "Bearer " + token}).status_code == 401
+
+
+@pytest.fixture
+def rotating_jwks(client, monkeypatch):
+    """Exercise PyJWT's real cache and HTTP decoder, with an isolated HTTP source."""
+    import json
+    from io import BytesIO
+    from urllib.error import URLError
+    import urllib.request
+    from app import auth
+    from app.config import settings
+
+    cfg = settings()
+    cfg.dev_auth = False
+    cfg.oidc_issuer = "https://identity.example.test/oidc"
+    cfg.oidc_audience = "https://comics.example.test/api"
+    cfg.oidc_jwks_url = cfg.oidc_issuer + "/jwks"
+    cfg.oidc_jwks_cache_seconds = 30
+    old = ec.generate_private_key(ec.SECP384R1())
+    new = ec.generate_private_key(ec.SECP384R1())
+
+    def jwk(key, kid):
+        return {**jwt.algorithms.ECAlgorithm.to_jwk(key.public_key(), as_dict=True), "kid": kid, "use": "sig", "alg": "ES384"}
+
+    clock = [1000.0]
+    state = {"keys": [jwk(old, "old")], "requests": 0, "unavailable": False}
+
+    class Opener:
+        def open(self, request, timeout):
+            assert request.full_url == cfg.oidc_jwks_url
+            state["requests"] += 1
+            if state["unavailable"]:
+                raise URLError("isolated outage")
+            return BytesIO(json.dumps({"keys": state["keys"]}).encode())
+
+    # Replace each module's time binding, leaving pytest's real timeout clock alone.
+    monkeypatch.setattr(jwt.jwk_set_cache, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(jwt.api_jwk, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(jwt.jwks_client, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args: Opener())
+    auth.jwks_client.cache_clear()
+    claims = {"iss": cfg.oidc_issuer, "aud": cfg.oidc_audience, "sub": "rotation-reader",
+              "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+
+    def token_headers(key, kid):
+        token = jwt.encode(claims, key, algorithm="ES384", headers={"kid": kid})
+        return {"Authorization": "Bearer " + token}
+
+    yield client, state, clock, jwk, old, new, token_headers
+    auth.jwks_client.cache_clear()
+
+
+def test_revoked_signing_key_expires_and_rotated_key_is_accepted(rotating_jwks):
+    client, state, clock, jwk, old, new, token_headers = rotating_jwks
+    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 200
+    state["keys"] = [jwk(new, "new")]
+    clock[0] += 29
+    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 200
+    assert state["requests"] == 1
+    clock[0] += 2
+    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 401
+    assert client.get("/v1/me", headers=token_headers(new, "new")).status_code == 200
+    assert state["requests"] == 2
+
+
+def test_expired_jwks_does_not_accept_stale_key_during_outage(rotating_jwks):
+    client, state, clock, _, old, _, token_headers = rotating_jwks
+    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 200
+    state["unavailable"] = True
+    clock[0] += 31
+    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 401
+    assert state["requests"] == 2
+
+
+@pytest.mark.parametrize("subject", ["", 123, "x" * 255])
+def test_oidc_rejects_invalid_subject(oidc, subject):
+    client, key, claims = oidc
+    assert client.get("/v1/me", headers=headers(key, {**claims, "sub": subject})).status_code == 401

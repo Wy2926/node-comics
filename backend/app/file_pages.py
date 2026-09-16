@@ -149,7 +149,7 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
 
     for identity, asset in sources.items():
         if config:
-            cache_keys[identity] = digest({"owner": owner_id, "hash": asset.sha256,
+            cache_keys[identity] = digest({"hash": asset.sha256,
                 "mode": body.mode, "language": body.target_language, "config_version": config["version"]})
     jobs_by_key = {}
     if cache_keys:

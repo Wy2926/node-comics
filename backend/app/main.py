@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 from pydantic import Field
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .assets import access_json, asset_json, available, create_asset, delete_asset_object, object_path, owned_asset, record_user_access, upload_bytes
@@ -31,6 +31,7 @@ from .node_admin import router as node_admin_router
 from .admin_monitor import router as admin_monitor_router
 from .admin_web import router as admin_web_router
 from .request_models import RequestBody
+from .health import readiness
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
 from .reader_api import router as reader_router
@@ -110,9 +111,15 @@ def optional_identity(credentials=Depends(bearer), db: Session = Depends(get_db)
 
 
 @app.get("/health")
-def health(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
+@app.get("/health/live")
+def health():
     return {"status": "ok", "service": "node-comics", "version": "0.3.0"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    payload, ready = readiness()
+    return JSONResponse(status_code=200 if ready else 503, content=payload)
 
 
 @app.get("/v1/auth/config")
@@ -202,7 +209,7 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
     asset = db.get(Asset, asset_id)
     if not asset or asset.owner_id != user.id:
         problem("NOT_FOUND", "找不到此图片", 404)
-    # Persist tombstones before unlinking. Include derived images and cached references.
+    # Revoke this account's grants, including derived images and cached references.
     ids = {asset.id}
     if asset.kind == "original":
         ids.update(db.scalars(select(Asset.id).where(Asset.owner_id == user.id, Asset.parent_id == asset.id)))

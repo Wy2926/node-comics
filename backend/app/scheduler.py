@@ -1,7 +1,8 @@
 """Work-conserving weighted stage scheduling. No broker, prefetch or local counters."""
 from datetime import timedelta
 import hmac
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, case, func, literal, or_, select, text, update
+from sqlalchemy.orm import Session, aliased
 from .assets import available
 from .config import settings
 from .entitlements import is_plus
@@ -100,78 +101,99 @@ def _estimate(db, pool, stage, records=None):
     return max(0.05, min(120, record.service if record else {"validate_upload": 1, "analyze": 10, "inpaint": 15, "render": 5, "text": 10, "redraw": 60}[stage.name]))
 
 
-def _eligibility_snapshot(db, rows):
-    """Read each dependency once per election, not once per queued page."""
-    owners = {job.owner_id for _, job in rows}
-    sources = {job.input_asset_id for _, job in rows if job.input_asset_id}
-    pairs = {(job.owner_id, job.mode) for _, job in rows}
-    queues = {(row.owner_id, row.mode): row for row in db.scalars(
-        select(UserModeQueue).where(UserModeQueue.owner_id.in_(owners)))}
-    for owner_id, mode in pairs - queues.keys():
-        queues[(owner_id, mode)] = UserModeQueue(owner_id=owner_id, mode=mode, paused=False)
-        db.add(queues[(owner_id, mode)])
-    users = {row.id: row for row in db.scalars(select(User).where(User.id.in_(owners)))}
-    assets = {row.id: available(row) for row in db.scalars(select(Asset).where(Asset.id.in_(sources)))}
-    names = {stage.name for stage, _ in rows}
-    pending = 0
-    if "analyze" in names:
-        from sqlalchemy.orm import aliased
+def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
+    """Elect in SQL before materializing: <= two owners per pool and class.
+
+    Eligibility precedes ranking, so an arbitrarily deep paused/unsupported
+    backlog cannot conceal a runnable user. Two heads preserve the virtual
+    service floor after the winning account consumes its next quantum.
+    """
+    cfg = settings()
+    source, account, clock = aliased(Asset), aliased(FairnessState), aliased(FairnessState)
+    image_stage = JobStage.name.in_(IMAGE_STAGES)
+    pool = case((image_stage, literal("image:") + func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version)),
+                (JobStage.name == "validate_upload", literal("upload")), else_=JobStage.name)
+    cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
+    page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
+        case((UserModeQueue.session_expires_at > at, Job.priority_rank), else_=1000000),
+        case((JobStage.name == "render", 0), else_=1), Job.created_at, Job.ordinal, JobStage.id]
+    eligible = select(JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
+        pool.label("pool"), cls.label("priority_class"),
+        func.row_number().over(partition_by=[pool, cls, Job.owner_id], order_by=page_order).label("page_rank"))
+    eligible = (eligible.join(Job, Job.id == JobStage.job_id)
+        .outerjoin(source, source.id == Job.input_asset_id)
+        .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode))
+        .where(JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
+            Job.status.in_(["queued", "running", "validating_upload"]),
+            Job.cancel_requested.is_(False), Job.discard_output.is_(False),
+            or_(UserModeQueue.owner_id.is_(None), UserModeQueue.paused.is_(False)),
+            or_(JobStage.name == "validate_upload", and_(source.id.is_not(None), source.deleted_at.is_(None),
+                source.purged_at.is_(None), or_(source.expires_at.is_(None), source.expires_at > at, source.active_references > 0))),
+            or_(~image_stage, and_(Job.target_language.in_(node.supported_languages),
+                func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version) == node.engine_version))))
+    if stage_ids is not None:
+        eligible = eligible.where(JobStage.id.in_(stage_ids))
+    if "analyze" in stages:
         analyzed = aliased(JobStage)
-        # Bound OCR ahead of unfinished image preparation, not ahead of an LLM.
-        # A cleaned page waiting for text owns no device slot and must not stop
-        # admission of the next page. User in-flight capacity remains unchanged.
-        pending = db.scalar(select(func.count()).select_from(JobStage).join(analyzed, analyzed.job_id == JobStage.job_id)
-            .join(Job, Job.id == JobStage.job_id)
-            .where(JobStage.name == "inpaint", JobStage.status.in_(["waiting", "ready", "running"]),
-                   Job.status.in_(["queued", "running"]),
-                   analyzed.name == "analyze", analyzed.status == "succeeded"))
-    recent = 0
-    if "text" in names:
-        recent = db.scalar(select(func.count()).select_from(TextCall).where(TextCall.started_at > now() - timedelta(minutes=1)))
-    providers, running, unknown = {}, {}, {}
-    if "redraw" in names:
-        provider_ids = {job.config["provider"]["id"] for stage, job in rows if stage.name == "redraw"}
-        providers = {row.id: row for row in db.scalars(select(Provider).where(Provider.id.in_(provider_ids)))}
-        provider_key = Job.config["provider"]["id"].as_string()
-        running = dict(db.execute(select(provider_key, func.count()).select_from(ExecutionLease)
-            .join(Job, Job.id == ExecutionLease.job_id).where(ExecutionLease.resource_pool == "redraw",
-                ExecutionLease.completed_at.is_(None), provider_key.in_(provider_ids)).group_by(provider_key)).all())
-        unknown = dict(db.execute(select(provider_key, func.count()).select_from(Job).where(
-            Job.mode == "redraw", Job.status == "outcome_unknown", provider_key.in_(provider_ids)).group_by(provider_key)).all())
-    return {"users": users, "assets": assets, "queues": queues, "pending": pending, "recent": recent,
-            "providers": providers, "running": running, "unknown": unknown}
+        pending_rows = select(JobStage.id).join(analyzed, analyzed.job_id == JobStage.job_id)
+        pending_rows = (pending_rows
+            .join(Job, Job.id == JobStage.job_id).where(JobStage.name == "inpaint", JobStage.status.in_(["waiting", "ready", "running"]),
+                Job.status.in_(["queued", "running"]), analyzed.name == "analyze", analyzed.status == "succeeded")
+            .limit(cfg.cluster_max_image_stages).subquery())
+        pending = db.scalar(select(func.count()).select_from(pending_rows))
+        if pending >= cfg.cluster_max_image_stages:
+            eligible = eligible.where(or_(JobStage.name != "analyze", cls == "realtime"))
+    if "text" in stages:
+        recent_rows = select(TextCall.id).where(TextCall.started_at > at - timedelta(minutes=1)).limit(cfg.cluster_text_requests_per_minute).subquery()
+        recent = db.scalar(select(func.count()).select_from(recent_rows))
+        if recent >= cfg.cluster_text_requests_per_minute:
+            eligible = eligible.where(JobStage.name != "text")
+    if "redraw" in stages:
+        running_job, unknown_job = aliased(Job), aliased(Job)
+        provider_id = Job.config["provider"]["id"].as_string()
+        running = (select(func.count()).select_from(ExecutionLease).join(running_job, running_job.id == ExecutionLease.job_id)
+            .where(ExecutionLease.resource_pool == "redraw", ExecutionLease.completed_at.is_(None),
+                running_job.config["provider"]["id"].as_string() == Provider.id).correlate(Provider).scalar_subquery())
+        unknown = select(func.count()).select_from(unknown_job).where(unknown_job.mode == "redraw",
+            unknown_job.status == "outcome_unknown", unknown_job.config["provider"]["id"].as_string() == Provider.id).correlate(Provider).scalar_subquery()
+        eligible = eligible.outerjoin(Provider, Provider.id == provider_id).where(or_(JobStage.name != "redraw",
+            and_(Provider.enabled.is_(True), running + unknown < Provider.config["concurrency"].as_integer())))
+    pages = eligible.subquery()
+    floor = func.coalesce(clock.service, 0.0)
+    service = case((account.key.is_(None), floor),
+        (and_(account.updated_at < at - timedelta(seconds=60), account.service < floor), floor), else_=account.service)
+    heads = (select(pages.c.stage_id, pages.c.job_id,
+        func.row_number().over(partition_by=[pages.c.pool, pages.c.priority_class],
+            order_by=[service, func.coalesce(account.updated_at, at), pages.c.owner_id]).label("owner_rank"))
+        .outerjoin(account, account.key == literal("user:") + pages.c.pool + ":" + pages.c.priority_class + ":" + pages.c.owner_id)
+        .outerjoin(clock, clock.key == literal("clock:") + pages.c.pool + ":" + pages.c.priority_class)
+        .where(pages.c.page_rank == 1).subquery())
+    projection = [JobStage, Job, func.coalesce(UserModeQueue.version, 0)] if materialize else [
+        JobStage.id, JobStage.generation, Job.priority_rank, Job.realtime_until, func.coalesce(UserModeQueue.version, 0)]
+    return db.execute(select(*projection).join(Job, Job.id == JobStage.job_id)
+        .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode))
+        .join(heads, heads.c.stage_id == JobStage.id).where(heads.c.owner_rank <= 2)
+        .execution_options(populate_existing=True)).all()
 
 
-def _runnable(snapshot, node, stage, job, at):
-    if job.cancel_requested or job.discard_output:
-        return False
-    if stage.name != "validate_upload" and not snapshot["assets"].get(job.input_asset_id, False):
-        return False
-    queue = snapshot["queues"][(job.owner_id, job.mode)]
-    if queue.paused:
-        return False
-    if stage.name in IMAGE_STAGES:
-        if job.target_language not in node.supported_languages:
-            return False
-        if node.engine_version != job.config.get("engine", {}).get("version", settings().classic_engine_version):
-            return False
-        if stage.name == "analyze":
-            if snapshot["pending"] >= settings().cluster_max_image_stages and priority_of(job, at) != "realtime":
-                return False
-    if stage.name == "redraw":
-        provider = snapshot["providers"].get(job.config["provider"]["id"])
-        if not provider or not provider.enabled:
-            return False
-        # Unknown upstream requests conservatively occupy a provider slot until reconciliation deadline.
-        if snapshot["running"].get(provider.id, 0) + snapshot["unknown"].get(provider.id, 0) >= provider.config["concurrency"]:
-            return False
-    if stage.name == "text":
-        if snapshot["recent"] >= settings().cluster_text_requests_per_minute:
-            return False
-    return True
+def _candidate_signature(stage, job, queue_version):
+    return stage.generation, job.priority_rank, job.realtime_until, queue_version
+
+
+def _preselect(db, node, allowed_stages):
+    # An independent read transaction avoids upgrading a SQLite read snapshot
+    # into a writer, and never commits or rolls back the caller's transaction.
+    stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
+    if not node.enabled or not stages:
+        return {}
+    with Session(bind=db.get_bind()) as snapshot:
+        rows = _election_rows(snapshot, node, stages, now(), materialize=False)
+        return {row[0]: tuple(row[1:]) for row in rows}
 
 
 def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_version=None):
+    observed_node = db.get(ComputeNode, node_id)
+    candidates_before_lock = _preselect(db, observed_node, allowed_stages) if observed_node else {}
     lock_scheduler(db)
     node = db.get(ComputeNode, node_id, populate_existing=True)
     at = now()
@@ -185,16 +207,42 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
     busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
     if busy >= node.capacity:
         return None
-    stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
-    rows = db.execute(select(JobStage, Job).join(Job, Job.id == JobStage.job_id).where(
-        JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
-        Job.status.in_(["queued", "running", "validating_upload"])).order_by(Job.created_at, Job.id, JobStage.name)).all()
-    if not rows:
+    if not candidates_before_lock:
         return None
-    snapshot = _eligibility_snapshot(db, rows)
-    candidates = [(stage, job) for stage, job in rows if _runnable(snapshot, node, stage, job, at)]
+    stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
+    # The full election ran without the mutex. Recheck only this bounded set
+    # under the lock, using current queue/provider/asset/node and stage state.
+    candidates = [(stage, job) for stage, job, version in _election_rows(db, node, stages, at, stage_ids=candidates_before_lock)
+        if _candidate_signature(stage, job, version) == candidates_before_lock[stage.id]]
     if not candidates:
         return None
+    sources = {job.input_asset_id for stage, job in candidates if stage.name != "validate_upload"}
+    assets = {row.id: row for row in db.scalars(select(Asset).where(Asset.id.in_(sources)).execution_options(populate_existing=True))}
+    available_sources = {asset_id: available(asset) for asset_id, asset in assets.items()}
+    failed_jobs = set()
+    for stage, job in candidates:
+        source = assets.get(job.input_asset_id)
+        if (stage.name != "validate_upload" and source and source.storage_backend == "local"
+                and not available_sources[source.id] and job.id not in failed_jobs):
+            # SQL cannot test the isolated local filesystem. Retiring this
+            # bounded invalid head lets the next election reach later pages;
+            # silently skipping it would select the same missing head forever.
+            from .workers import finish_job
+            finish_job(db, job, "failed", error=ProcessingError("LOCAL_SOURCE_MISSING", "本地原图已丢失，请重新导入后重试"))
+            stage.status, stage.completed_at = "failed", at
+            failed_jobs.add(job.id)
+    candidates = [(stage, job) for stage, job in candidates if job.id not in failed_jobs
+        and (stage.name == "validate_upload" or available_sources.get(job.input_asset_id, False))]
+    if not candidates:
+        return None
+    owners = {job.owner_id for _, job in candidates}
+    queues = {(row.owner_id, row.mode): row for row in db.scalars(select(UserModeQueue)
+        .where(UserModeQueue.owner_id.in_(owners)).execution_options(populate_existing=True))}
+    for _, job in candidates:
+        if (job.owner_id, job.mode) not in queues:
+            queues[(job.owner_id, job.mode)] = queue_for(db, job.owner_id, job.mode)
+    snapshot = {"users": {row.id: row for row in db.scalars(select(User).where(User.id.in_(owners)).execution_options(populate_existing=True))},
+                "queues": queues}
     # Resource pools are independent; users cannot gain share by opening more batches.
     groups = {}
     for stage, job in candidates:

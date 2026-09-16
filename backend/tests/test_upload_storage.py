@@ -281,20 +281,6 @@ def test_commit_rollback_keeps_staging_and_retry_creates_one_original(storage_db
         assert len(db.scalars(select(Asset)).all()) == 1
 
 
-def test_sweeper_preserves_active_uploads_and_uncommitted_original_keys(storage_db, remote, png):
-    from app.db import session_factory
-    from app.models import now
-    from app.storage_cleanup import referenced
-    from app.uploads import receive_upload
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        _, receipt = pending(db, owner_id, png)
-        receive_upload(db, receipt, owner_id, png)
-        assert referenced(db, "r2", receipt.storage_key)
-        assert referenced(db, "r2", f"{owner_id}/{receipt.id}")
-        assert not referenced(db, "r2", f"other-owner/{receipt.id}")
-        receipt.expires_at = now() - timedelta(seconds=1)
-        assert not referenced(db, "r2", receipt.storage_key)
 
 
 def test_remote_transfer_and_image_decode_precede_scheduler_lock(storage_db, remote, png, monkeypatch):
@@ -377,7 +363,6 @@ def validation_lease(db, job, receipt):
 
 def test_accepted_validation_does_not_expire_while_waiting_for_resources(storage_db, remote, png):
     from app.db import session_factory
-    from app.storage_cleanup import referenced
     from app.uploads import complete_upload, expire_uploads, receive_upload
     owner_id = owner(storage_db)
     with session_factory()() as db:
@@ -385,7 +370,6 @@ def test_accepted_validation_does_not_expire_while_waiting_for_resources(storage
         receive_upload(db, receipt, owner_id, png)
         lease = validation_lease(db, job, receipt)
         assert expire_uploads(db) == 0
-        assert referenced(db, "r2", receipt.storage_key)
         db.commit()
         asset = complete_upload(db, receipt, owner_id, lease_id=lease.id, lease_token=lease.token)
         assert asset and job.status == "queued" and job.input_pinned

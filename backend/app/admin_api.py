@@ -186,7 +186,7 @@ async def reconcile_image(job_id: str, image: Annotated[UploadFile, File()], not
     data = await upload_bytes(image)
     def save_and_reconcile():
         # Object I/O precedes the scheduler lock. Reconciliation rechecks state;
-        # a rejected late upload remains an unreferenced object for normal cleanup.
+        # a rejected late upload remains retained without granting user access.
         output = create_asset(db, job.owner_id, data, kind=job.mode, parent_id=job.input_asset_id)
         db.commit()
         return reconcile(job_id, ReconcileRequest(resolution="succeeded", output_asset_id=output.id, note=note), user, db)

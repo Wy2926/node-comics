@@ -50,6 +50,7 @@ def wait_until(predicate, *, timeout=10):
 @pytest.fixture
 def pg_scope(tmp_path, monkeypatch):
     """Never use DATABASE_URL from the live application or touch its schema."""
+    monkeypatch.setenv("APP_ENV", "test")
     database = os.environ.get("TEST_PG_DATABASE", TEST_DATABASE)
     if database != TEST_DATABASE:
         pytest.fail("Refusing to run outside the dedicated nodecomics_concurrency_test database")
@@ -314,7 +315,7 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
         for asset_id in (pg["asset_id"], job.output_asset_id):
             asset = db.get(Asset, asset_id)
             assert asset.deleted_at and asset.purged_at
-            assert not object_path(asset.storage_key).exists()
+            assert object_path(asset.storage_key).exists()  # Shared bytes survive grant revocation.
             with pytest.raises(HTTPException) as rejected:
                 owned_asset(db, asset_id, pg["owner_id"])
             assert rejected.value.status_code == 410

@@ -47,6 +47,16 @@ export async function processManifest(options:{api:Api;manifest:UploadManifest;a
    await persist();
   }catch(error){
    if(!api.isCurrent())return;
+   if(error instanceof ApiError&&error.status===429){
+    // Preserve the exact intent through throttling, including daily backoff.
+    // No page has failed and there is no uncertain upstream outcome to reconcile.
+    manifest.error=error.message;manifest.retryAt=Date.now()+(error.retryAfterSeconds??15)*1000;
+    await persist();return;
+   }
+   if(error instanceof ApiError&&error.code==='SUBMISSION_ARCHIVED'){
+    manifest.error=error.message;manifest.paused=true;manifest.retryAt=undefined;
+    await persist();return; // An archived key must never silently become a fresh operation.
+   }
    if(submissionRejected(error)&&!manifest.pending?.submissionId){
     // A definitive rejection created no work. Capacity races may safely retry a new chunk.
     manifest.pending=undefined;

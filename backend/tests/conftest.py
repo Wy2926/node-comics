@@ -7,8 +7,15 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+@pytest.fixture(autouse=True)
+def isolated_identity_environment(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "objects"))
     monkeypatch.setenv("RESULT_STORAGE_BACKEND", "local")

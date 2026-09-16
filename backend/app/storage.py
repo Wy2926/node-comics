@@ -4,7 +4,6 @@ Originals and final images live remotely. Local objects are disposable stage
 checkpoints only; an execution node must be able to rebuild them from R2.
 Never log SDK requests or presigned URLs.
 """
-from datetime import timezone
 from functools import lru_cache
 import os
 from typing import Protocol
@@ -44,6 +43,8 @@ class LocalStore:
 
     def put(self, key, data, mime, *, kind=None):
         path = self.path(key)
+        if key.startswith("objects/sha256/") and path.is_file():
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(f".{uuid4()}.tmp")
         try:
@@ -51,7 +52,13 @@ class LocalStore:
                 output.write(data)
                 output.flush()
                 os.fsync(output.fileno())
-            os.replace(temporary, path)
+            if key.startswith("objects/sha256/"):
+                try:
+                    os.link(temporary, path)
+                except FileExistsError:
+                    pass
+            else:
+                os.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -88,8 +95,17 @@ class S3Store:
             raise ValueError("Remote storage accepts originals, uploads and final translation results only")
         if len(data) > settings().max_upload_bytes:
             raise StorageError()
-        # Bounded images use one atomic PUT; SDK retries overwrite the same key.
-        self._call("put_object", **self._params(key), Body=data, ContentType=mime, CacheControl="private, no-store")
+        params = dict(self._params(key), Body=data, ContentType=mime, CacheControl="private, no-store")
+        if key.startswith("objects/sha256/"):
+            params["IfNoneMatch"] = "*"
+        try:
+            self.client.put_object(**params)
+        except ClientError as error:
+            if params.get("IfNoneMatch") == "*" and error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 412:
+                return
+            raise StorageError() from None
+        except (BotoCoreError, OSError):
+            raise StorageError() from None
 
     def read(self, key):
         body = self._call("get_object", **self._params(key))["Body"]
@@ -122,27 +138,6 @@ class S3Store:
             return self.client.generate_presigned_url("get_object", Params=self._params(key), ExpiresIn=expires, HttpMethod="GET")
         except (BotoCoreError, ClientError, OSError):
             raise StorageError() from None
-
-    def list_page(self, cursor=None):
-        params = {"Bucket": self.bucket, "Prefix": self.prefix, "MaxKeys": 200}
-        if cursor:
-            params["ContinuationToken"] = cursor
-        result = self._call("list_objects_v2", **params)
-        objects = []
-        for item in result.get("Contents", []):
-            if not item["Key"].startswith(self.prefix):
-                raise StorageError()
-            key = item["Key"][len(self.prefix):]
-            try:
-                validate_key(key)
-            except ValueError:
-                continue  # Ignore folder markers/foreign keys in the namespace.
-            objects.append((key, item["LastModified"].astimezone(timezone.utc).replace(tzinfo=None)))
-        next_cursor = result.get("NextContinuationToken") if result.get("IsTruncated") else None
-        if result.get("IsTruncated") and (not next_cursor or next_cursor == cursor):
-            raise StorageError()
-        return objects, next_cursor
-
 
 @lru_cache(maxsize=4)
 def r2_store(endpoint, bucket, access_key, secret_key, prefix, timeout):

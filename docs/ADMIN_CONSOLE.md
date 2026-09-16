@@ -39,7 +39,7 @@ npm run build
 
 构建输出到 `backend/app/admin_web/dist/`，已被仓库忽略。API 进程托管 HTML 和打包资源；同源访问，无需额外管理站点或运行 Node.js 服务。开发预览可运行 `npm run dev`，访问 `http://127.0.0.1:5175/admin/`，默认代理 API `http://127.0.0.1:18088`，可用 `ADMIN_API_ORIGIN` 指定本地测试服务。
 
-容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。API 使用全新空库基线 `nodes_0001`，已包含执行机字段、任务索引与节点身份配置；不升级旧数据库。控制工作进程需使用同版本代码以记录执行机。
+容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。API 使用全新空库基线 `shared_0001`，已包含执行机字段、任务索引与节点身份配置；不升级旧数据库。控制工作进程需使用同版本代码以记录执行机。
 
 ### 登录
 

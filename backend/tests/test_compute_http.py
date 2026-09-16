@@ -10,7 +10,6 @@ import hashlib
 from io import BytesIO
 import os
 from pathlib import Path
-import socket
 import sqlite3
 import subprocess
 import sys
@@ -23,12 +22,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = ROOT / 'tests' / 'compute_http_server.py'
 AGENT = ROOT.parent / 'services' / 'compute-agent' / 'agent.py'
-
-
-def port():
-    with socket.socket() as listener:
-        listener.bind(('127.0.0.1', 0))
-        return listener.getsockname()[1]
 
 
 def until(predicate, *, timeout=30, label='condition'):
@@ -56,11 +49,8 @@ def image(index):
 
 @contextmanager
 def cluster(tmp_path, *, text_gate=None):
-    control_port, first_port, second_port = port(), port(), port()
-    assert len({control_port, first_port, second_port}) == 3
     database = tmp_path / 'http-cluster.db'
     version = 'mit-95227a2-classic-v5-cluster'
-    control = f'http://127.0.0.1:{control_port}'
     environment = {**os.environ, 'PYTHONPATH': str(ROOT), 'PYTHONUNBUFFERED': '1',
         'DATABASE_URL': 'sqlite:///' + database.as_posix(), 'STORAGE_PATH': str(tmp_path / 'objects'),
         'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': 'isolated-http-auth-key-no-product-access',
@@ -69,7 +59,7 @@ def cluster(tmp_path, *, text_gate=None):
         'TEXT_BASE_URL': 'https://text.invalid/v1', 'TEXT_API_KEY': 'isolated-text-key-not-used-for-requests',
         'CLUSTER_LEASE_SECONDS': '10', 'CLUSTER_NODE_TIMEOUT_SECONDS': '10',
         'CLUSTER_TEXT_SLOTS': '2', 'CLUSTER_UPLOAD_SLOTS': '2', 'CLUSTER_REDRAW_SLOTS': '1',
-        'DISPATCH_INTERVAL_SECONDS': '1', 'CONTROL_URL': control, 'CONTROL_ALLOW_HTTP': 'true',
+        'DISPATCH_INTERVAL_SECONDS': '1', 'CONTROL_ALLOW_HTTP': 'true',
         'ENGINE_TOKEN': 'isolated-http-engine-token', 'NODE_POLL_SECONDS': '.05',
         'NODE_HEARTBEAT_SECONDS': '.2', 'NODE_REQUEST_SECONDS': '3', 'NODE_STAGE_SECONDS': '30'}
     children, outputs = [], []
@@ -92,15 +82,29 @@ def cluster(tmp_path, *, text_gate=None):
         except httpx.HTTPError:
             return False
 
+    def start_http(name, role, **extra):
+        ready_path = tmp_path / (name + '.port')
+        child = start(name, [ENTRY, role, ready_path], **extra)
+
+        def ready_port():
+            if child.poll() is not None:
+                pytest.fail(f'{name} exited before publishing its listening port; inspect {name} process log')
+            return int(ready_path.read_text(encoding='ascii')) if ready_path.is_file() else None
+
+        return until(ready_port, label=name + ' bound HTTP socket')
+
     identities = {}
+    engine_ports = {}
 
     def agent(index):
-        selected = first_port if index == 1 else second_port
+        selected = engine_ports[index]
         return start('agent-' + str(index), [AGENT], NODE_ID=identities[index]['node_id'],
                      NODE_TOKEN=identities[index]['token'], ENGINE_URL=f'http://127.0.0.1:{selected}')
 
     try:
-        api = start('control', [ENTRY, 'api', control_port])
+        control_port = start_http('control', 'api')
+        control = f'http://127.0.0.1:{control_port}'
+        environment['CONTROL_URL'] = control
         until(lambda: live(control + '/health'), label='isolated control HTTP readiness')
         with httpx.Client(base_url=control, trust_env=False) as admin:
             auth = admin.post('/v1/auth/dev', json={'username': 'admin'}).raise_for_status().json()
@@ -110,17 +114,21 @@ def cluster(tmp_path, *, text_gate=None):
                     'name': 'HTTP test node ' + str(index), 'resource_id': 'http-machine-' + str(index) + ':cpu',
                     'config': {'poll_seconds': .05, 'heartbeat_seconds': .2, 'config_poll_seconds': 1,
                                'request_seconds': 3, 'stage_seconds': 30}}).raise_for_status().json()
-        for index, selected in ((1, first_port), (2, second_port)):
-            start('engine-' + str(index), [ENTRY, 'engine', selected], ENGINE_RESOURCE_ID='http-machine-' + str(index) + ':cpu')
+        for index in (1, 2):
+            selected = engine_ports[index] = start_http('engine-' + str(index), 'engine',
+                ENGINE_RESOURCE_ID='http-machine-' + str(index) + ':cpu')
             until(lambda: live(f'http://127.0.0.1:{selected}/health'), label='simulated engine readiness')
+        assert httpx.get(control + '/health/ready', timeout=5, trust_env=False).status_code == 503
         start('worker', [ENTRY, 'worker'])
-        start('maintenance', [ENTRY, 'maintenance'])
+        maintenance = start('maintenance', [ENTRY, 'maintenance'])
         first, second = agent(1), agent(2)
         until(lambda: len(rows(database, "SELECT id FROM compute_nodes WHERE engine_version != 'control' AND applied_config_version=1")) == 2,
               label='both actual agents registered')
+        until(lambda: live(control + '/health/ready'), label='all durable service heartbeats ready')
         yield {'url': control, 'database': database, 'first': first, 'second': second, 'agent': agent,
-               'first_engine': f'http://127.0.0.1:{first_port}', 'second_engine': f'http://127.0.0.1:{second_port}',
-               'identities': identities}
+               'first_engine': f'http://127.0.0.1:{engine_ports[1]}', 'second_engine': f'http://127.0.0.1:{engine_ports[2]}',
+               'identities': identities, 'maintenance': maintenance,
+               'restart_maintenance': lambda: start('maintenance', [ENTRY, 'maintenance'])}
     finally:
         for child in reversed(children):
             if child.poll() is None:
@@ -149,6 +157,19 @@ def submit(client, auth, pages, key):
         accepted = client.post('/v1/uploads/' + upload['id'] + '/complete', headers=auth)
         assert accepted.status_code == 200, accepted.text
     return [item['job']['id'] for item in result['items']]
+
+
+def test_health_detects_actual_maintenance_exit_and_restart(tmp_path):
+    with cluster(tmp_path) as running, httpx.Client(base_url=running['url'], timeout=5, trust_env=False) as client:
+        assert client.get('/health/ready').status_code == 200
+        running['maintenance'].terminate()
+        running['maintenance'].wait(timeout=5)
+        until(lambda: client.get('/health/ready').status_code == 503, timeout=15,
+              label='maintenance process heartbeat expired')
+        assert client.get('/health/live').status_code == 200
+        assert client.get('/health/ready').json()['checks']['maintenance'] == 'unavailable'
+        running['restart_maintenance']()
+        until(lambda: client.get('/health/ready').status_code == 200, label='restarted maintenance heartbeat')
 
 
 def job_statuses(client, auth, ids):

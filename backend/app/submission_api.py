@@ -6,7 +6,7 @@ from pydantic import Field, model_validator
 from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.orm import Session, aliased
 from starlette.concurrency import run_in_threadpool
-from .assets import available, owned_asset
+from .assets import available, find_shared_original, owned_asset
 from .auth import identity
 from .config import settings
 from .db import get_db
@@ -20,6 +20,7 @@ from .providers import configuration, digest
 from .queue_models import JobStage, Submission, SubmissionItem
 from .request_models import RequestBody
 from .scheduler import ACTIVE, active_count, limits_for, lock_scheduler, queue_for, touch_job
+from .submission_limits import acquire_submission, release_submission
 from .upload_models import UploadReservation
 from .uploads import create_upload, fail_upload, owned_upload, read_upload_stream, receive_upload, upload_json
 
@@ -59,6 +60,8 @@ def owned_submission(db, submission_id, owner_id):
     row = db.get(Submission, submission_id)
     if not row or row.owner_id != owner_id:
         problem("NOT_FOUND", "找不到此提交清单", 404)
+    if row.archived_at:
+        problem("SUBMISSION_ARCHIVED", "提交回执已归档，请从任务记录查询结果", 410)
     return row
 
 
@@ -76,13 +79,16 @@ def submission_json(db, row):
             for item, job in items]}
 
 
-def bind_file_page(db, job):
+def bind_file_page(db, job, *, submission_id=None):
     if not job.input_asset_id:
         return
     identities = {(job.file_hash, job.page_index)} if job.file_hash and job.page_index is not None else set()
-    # Content-level jobs can serve multiple files, devices and submissions. Keep
-    # every declared page identity, not only the first request's canonical pair.
-    for item in db.scalars(select(SubmissionItem).where(SubmissionItem.job_id == job.id)):
+    # A verified source only needs this submission's new page identities. Upload
+    # completion must bind every receipt that shared the pending upload.
+    statement = select(SubmissionItem).where(SubmissionItem.job_id == job.id)
+    if submission_id is not None:
+        statement = statement.where(SubmissionItem.submission_id == submission_id)
+    for item in db.scalars(statement):
         descriptor = item.descriptor
         if descriptor.get("file_hash") and descriptor.get("page_index") is not None:
             identities.add((descriptor["file_hash"], descriptor["page_index"]))
@@ -103,6 +109,19 @@ def bind_file_page(db, job):
 def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Header()] = None,
            user: User = Depends(identity), db: Session = Depends(get_db)):
     key = idem_key(idempotency_key)
+    owner_id = user.id
+    # The admission transaction must finish before waiting on the scheduler;
+    # release the identity dependency's read transaction as well (SQLite WAL).
+    db.rollback()
+    token = acquire_submission(owner_id, key, len(body.items))
+    try:
+        return _submit(body, key, db.get(User, owner_id), db)
+    finally:
+        db.rollback()
+        release_submission(owner_id, token)
+
+
+def _submit(body, key, user, db):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     request_hash = digest(body.model_dump())
@@ -110,6 +129,8 @@ def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Heade
     if previous:
         if previous.request_hash != request_hash:
             problem("IDEMPOTENCY_CONFLICT", "此操作编号已绑定其他提交内容", 409)
+        if previous.archived_at:
+            problem("SUBMISSION_ARCHIVED", "提交回执已归档；此操作编号不会再次执行", 410)
         return submission_json(db, previous)
     if len(body.items) > settings().max_batch or len({i.client_item_id for i in body.items}) != len(body.items):
         problem("INVALID_BATCH", "提交页数超限或页面编号重复", 422)
@@ -150,6 +171,7 @@ def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Heade
     db.add(row)
     db.flush()
     counted = set()
+    jobs_to_bind = {}
     for ordinal, item in enumerate(body.items):
         if item.byte_size > settings().max_upload_bytes:
             problem("IMAGE_TOO_LARGE", "图片字节数超过平台限制", 413)
@@ -163,10 +185,11 @@ def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Heade
             if asset.sha256 != item.image_sha256:
                 problem("IMAGE_HASH_MISMATCH", "原图与提交摘要不一致", 409)
         else:
-            assets = db.scalars(select(Asset).where(Asset.owner_id == user.id, Asset.kind == "original", Asset.sha256 == item.image_sha256).order_by(Asset.created_at.desc()))
-            asset = next((a for a in assets if available(a)), None)
-        from .jobs import find_reusable
+            asset = find_shared_original(db, user.id, item.image_sha256, byte_size=item.byte_size, mime=item.content_type)
+        from .jobs import content_key, find_reusable, find_shared_result
         reusable = None if body.regenerate else find_reusable(db, user, item.image_sha256, body.mode, body.target_language, config)
+        if not reusable and not body.regenerate:
+            reusable = find_shared_result(db, content_key(user, item.image_sha256, body.mode, body.target_language, config))
         if not reusable and reserved_for_reader and active_count(db, user.id, body.mode) >= limits_for(user)["capacity"] - 1:
             problem("READING_UPLOAD_RESERVED", "下一上传空位已为当前阅读页面预留", 409,
                     available_slots=available_slots, capacity=capacity, in_flight=initial_in_flight)
@@ -181,17 +204,21 @@ def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Heade
                 error.detail.update(available_slots=available_slots, capacity=capacity, in_flight=initial_in_flight)
             raise
         created = job.operation == "submission" and job.idempotency_key == f"{row.id}:{ordinal}"
-        if created and job.id not in counted:
+        if created and not job.cache_hit and job.id not in counted:
             row.quota_pages += job.quota_pages
             counted.add(job.id)
         if row.quota_pages > body.max_quota_pages:
             problem("QUOTA_BOUND_EXCEEDED", "新增翻译超出已确认页数", 409)
         db.add(SubmissionItem(submission_id=row.id, ordinal=ordinal, client_item_id=item.client_item_id,
-                              job_id=job.id, descriptor=item.model_dump(), reused=not created))
+                              job_id=job.id, descriptor=item.model_dump(), reused=not created or job.cache_hit))
         if not job.input_asset_id:
             create_upload(db, job, {"sha256": item.image_sha256, "byte_size": item.byte_size, "mime": item.content_type})
         else:
-            bind_file_page(db, job)
+            jobs_to_bind[job.id] = job
+    # Multiple files/pages can reuse one content job. Bind their complete set
+    # once, rather than rescanning its growing manifest for every duplicate.
+    for job in jobs_to_bind.values():
+        bind_file_page(db, job, submission_id=row.id)
     if counted and reservation_live and queue.next_upload_session == body.reading_session_id:
         queue.next_upload_session = queue.next_upload_until = None
     db.flush()
@@ -203,8 +230,8 @@ def submit(body: SubmissionRequest, idempotency_key: Annotated[str | None, Heade
 @router.get("/v1/translation-submissions")
 def submissions(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100),
                 user: User = Depends(identity), db: Session = Depends(get_db)):
-    total = db.scalar(select(func.count()).select_from(Submission).where(Submission.owner_id == user.id))
-    rows = db.scalars(select(Submission).where(Submission.owner_id == user.id).order_by(Submission.created_at.desc(), Submission.id).offset(offset).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(Submission).where(Submission.owner_id == user.id, Submission.archived_at.is_(None)))
+    rows = db.scalars(select(Submission).where(Submission.owner_id == user.id, Submission.archived_at.is_(None)).order_by(Submission.created_at.desc(), Submission.id).offset(offset).limit(limit)).all()
     grouped = defaultdict(list)
     if rows:
         source, output, parent = aliased(Asset), aliased(Asset), aliased(Asset)

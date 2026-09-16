@@ -1,6 +1,6 @@
 # 翻译集群重构验收记录
 
-当前节点管理已改为 `nodes_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
 
 日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当时前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[计算代理说明](../services/compute-agent/README.md)。
 

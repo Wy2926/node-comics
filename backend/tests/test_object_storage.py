@@ -75,19 +75,17 @@ def test_deleted_ancestor_revokes_late_result_without_head_requests(storage_db, 
         assert remote[0].calls == []
 
 
-def test_delete_failure_preserves_tombstone_and_retries_idempotently(storage_db, remote, png):
+def test_delete_revokes_grant_without_deleting_shared_object(storage_db, remote, png):
     from app.assets import create_asset, delete_asset_object, owned_asset
     from app.db import session_factory
     from app.models import now
-    from app.storage import StorageError
     owner_id = owner(storage_db)
     with session_factory()() as db:
         source = create_asset(db, owner_id, png)
         source.deleted_at = now()
         db.commit()
         remote[0].fail_delete = True
-        with pytest.raises(StorageError):
-            delete_asset_object(source)
+        delete_asset_object(source)
         with pytest.raises(HTTPException) as failure:
             owned_asset(db, source.id, owner_id)
         assert failure.value.status_code == 410
@@ -97,68 +95,12 @@ def test_delete_failure_preserves_tombstone_and_retries_idempotently(storage_db,
         delete_asset_object(source)
         source.purged_at = now()
         db.commit()
-        assert not remote[0].objects
+        assert remote[0].objects
+        assert not any(method == "DELETE" for method, _ in remote[0].calls)
 
 
-def test_remote_sweep_paginates_and_preserves_active_originals_and_uploads(storage_db, remote, png):
-    from app.assets import create_asset
-    from app.db import session_factory
-    from app.models import StorageScan, now
-    from app.storage_cleanup import cleanup_orphans
-    from app.uploads import receive_upload
-    owner_id = owner(storage_db)
-    sdk, store = remote
-    with session_factory()() as db:
-        source = create_asset(db, owner_id, png)
-        job, receipt = pending(db, owner_id, png)
-        receive_upload(db, receipt, owner_id, png)
-        provisional_key = f"{owner_id}/{receipt.id}"
-        store.put(provisional_key, png, "image/png", kind="original")
-        for index in range(205):
-            store.put(f"orphans/{index:04}", png, "image/png", kind="redraw")
-        db.commit()
-        cleanup_orphans(db)
-        db.commit()
-        scan = db.get(StorageScan, "r2")
-        assert scan.cursor
-        scan.next_scan_at = now()
-        db.commit()
-        cleanup_orphans(db)
-        db.commit()
-        assert scan.cursor is None
-        assert set(sdk.objects) == {store.prefix + key for key in (source.storage_key, receipt.storage_key, provisional_key)}
 
 
-@pytest.mark.parametrize("status", ["running", "outcome_unknown", "unknown_released"])
-def test_provisional_delivery_is_protected_by_execution_lease_key(storage_db, remote, png, status):
-    from app.db import session_factory
-    from app.models import Attempt, now, uid
-    from app.queue_models import ComputeNode, ExecutionLease, JobStage
-    from app.storage_cleanup import referenced
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        job, _ = pending(db, owner_id, png)
-        attempt = Attempt(id=uid(), job_id=job.id, provider_id="fixture", output_storage_backend="r2",
-                          lease_expires_at=now() + timedelta(minutes=1))
-        node = ComputeNode(id=uid(), name="fixture", resource_id=uid(), capabilities=["redraw"], capacity=1,
-                           engine_version="control", device="network")
-        stage = JobStage(id=uid(), job_id=job.id, name="redraw", status="running", generation=1)
-        db.add_all([attempt, node, stage])
-        db.flush()
-        lease = ExecutionLease(id=uid(), stage_id=stage.id, job_id=job.id, node_id=node.id, owner_id=owner_id,
-            generation=1, resource_pool="redraw:fixture", mode="redraw", priority_class="preload", weight=1,
-            estimated_seconds=60, expires_at=now() + timedelta(minutes=1),
-            completed_at=now() if status != "running" else None)
-        job.attempt_id, job.status = attempt.id, status
-        db.add(lease)
-        db.flush()
-        assert referenced(db, "r2", f"{owner_id}/{lease.id}")
-        assert not referenced(db, "r2", f"{owner_id}/{attempt.id}")
-        assert not referenced(db, "r2", f"other-user/{lease.id}")
-        assert not referenced(db, "local", f"{owner_id}/{lease.id}")
-        job.status = "cancelled"
-        db.flush()
-        assert not referenced(db, "r2", f"{owner_id}/{lease.id}")
 
 
 def test_sdk_contract_and_bounded_reads(storage_db, png):

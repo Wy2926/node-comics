@@ -47,6 +47,8 @@ class Asset(Base):
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (Index("ix_assets_content_lookup", "kind", "sha256"),
+                     Index("ix_assets_storage_key", "storage_backend", "storage_key"))
 
 
 class Job(Base):
@@ -90,7 +92,8 @@ class Job(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
-                     Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"))
+                     Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
+                     Index("ix_jobs_content_result", "cache_key", "status", "completed_at"))
 
 
 class Attempt(Base):
@@ -109,13 +112,6 @@ class Attempt(Base):
     cost_state: Mapped[str] = mapped_column(String(20), default="unknown")
     error_code: Mapped[str | None] = mapped_column(String(60))
     recovered: Mapped[bool] = mapped_column(Boolean, default=False)
-
-
-class StorageScan(Base):
-    __tablename__ = "storage_scans"
-    backend: Mapped[str] = mapped_column(String(20), primary_key=True)
-    cursor: Mapped[str | None] = mapped_column(String(4096))
-    next_scan_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class Ledger(Base):
@@ -170,4 +166,5 @@ class TextCall(Base):
     error_code: Mapped[str | None] = mapped_column(String(60))
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    __table_args__ = (UniqueConstraint("job_id", "group_index", "sequence"), CheckConstraint("accounted_micros >= 0"))
+    __table_args__ = (UniqueConstraint("job_id", "group_index", "sequence"), CheckConstraint("accounted_micros >= 0"),
+                     Index("ix_text_calls_started_at", "started_at"))

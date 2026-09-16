@@ -1,6 +1,6 @@
 # 本地实现与验证
 
-当前节点管理已改为 `nodes_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
 
 2026-09-15：翻译已采用全新集群基线 `cluster_0001`。现行任务与队列规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，最新代码、测试与浏览器验收边界见[集群验收](CLUSTER_VALIDATION.md)。以下早期样本和截图保留为历史证据，不代表当前部署状态。
 
@@ -88,11 +88,11 @@ OIDC_JWKS_URL=https://auth.nodelane.net/oidc/jwks
 
 接入剩余配置：
 
-- 在 Logto「API 资源」创建 Node Comics API，建议 Identifier 为 `https://comics.nodelane.net/api`，再将同一值写入 `OIDC_AUDIENCE`。该值是资源标识，不要求对应实际 HTTP 路由；已有资源时使用其真实 Identifier。此项尚未确认创建，未写入本地有效配置。客户端在授权及授权码换令牌时都携带 `resource`，后端校验对应 JWT 的 audience；不能用 App ID 代替 API audience。
+- 2026-09-16 用户已确认 Logto「API 资源」创建完成，Identifier 为 `https://comics.nodelane.net/api`，该值已写入根 `.env` 和独立生产配置的 `OIDC_AUDIENCE`。这是资源标识，不要求存在对应 HTTP 路由。客户端在授权及授权码换令牌时都携带 `resource`，后端校验对应 JWT 的 audience；不能用 App ID 代替 API audience。
 - 已将用户提供的 Chrome 商店公钥写入 `apps/extension/wxt.config.ts` 的 `manifest.key`，由此计算固定扩展 ID 为 `aiajdjliifeeaogpalejpggkiccjbneo`。在 Logto 应用的 Redirect URIs 中添加 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc`。本地 `.env` 已加入 `EXTENSION_IDS=aiajdjliifeeaogpalejpggkiccjbneo`；部署环境也需设置。重新加载构建后的扩展，并核对扩展管理页和商店条目 ID 一致；回调以扩展内 `chrome.identity.getRedirectURL('oidc')` 为准，其他商店或不同 ID 另行登记。公钥可随源码保存，不需要私钥。
 - 若同时提供网页阅读器，在站点根路径使用时登记 `https://comics.nodelane.net/`；本地网页调试可登记 `http://127.0.0.1:5173/`。当前回调为 `location.origin + location.pathname`，如果实际入口为 `/index.html` 或其他路径，需要登记完整的对应地址。在 Logto Allowed CORS origins 中登记实际网页来源（例如 `https://comics.nodelane.net`），不要包含路径。
 - 部署时设置 `CORS_ORIGINS=https://comics.nodelane.net`；Compose 支持环境覆盖，本地默认来源仍保留。阅读器设置里的服务地址也需要指向实际发布的后端入口；当前默认仍是本地 `http://127.0.0.1:18088`。
-- 所有配置完成后再设置 `DEV_AUTH=false` 并重新创建 API 容器。按上文 Compose 命令加载两个环境文件时，`deploy/.env.local` 中现有 `DEV_AUTH=true` 会覆盖根 `.env`，需要修改最终生效文件；仅修改根 `.env` 不会切换登录。本次未切换、未重启运行服务。
+- 生产使用独立 `deploy/.env.production`：`APP_ENV=production`、`DEV_AUTH=false`、精确 CORS / 扩展来源和专用数据库凭据，Compose 项目名隔离为 `node-comics-production`。后端默认生产模式，身份配置不完整即拒绝启动；详见 [生产身份说明](PRODUCTION_IDENTITY.md)。`deploy/.env.local` 显式 `APP_ENV=development` 并保留本地开发登录，不用于生产。使用 `scripts/bootstrap.ps1 -Production -Start` 或明确选择 `COMICS_ENV_FILE` 的生产 Compose 命令；仅修改根 `.env` 不会切换本地登录。本次仅补齐配置和预检，未切换、未重启运行服务，未完成真实账号登录验收。
 
 相关验证命令（隔离签名密钥、临时数据库和模拟响应，不访问真实账户）：
 
@@ -117,7 +117,7 @@ npm test -- src/auth/oidc.test.ts
 | 已知不确定请求 | 首次原创样本请求返回 `outcome_unknown`，未自动重发；[记录](evidence/live-redraw.json)。供应商可能已产生费用，用户预占与供应商消耗分别记录 |
 | 后端契约与并发 | 本次 140 项临时 SQLite / 模拟上游测试通过，另有真实 PostgreSQL 的 14 项隔离并发测试通过。默认测试命令跳过 PostgreSQL 专项，另行启用验证；[本次验收记录](evidence/file-reuse-queue-validation.md) |
 | 前端测试与构建 | 本次 77 项测试、TypeScript、扩展和 Web 构建通过，并完成 Chrome 恢复／并发操作验收；[本次验收记录](evidence/file-reuse-queue-validation.md)。早期 ZIP 与依赖审计结果见[模块验证记录](evidence/frontend-validation.md) |
-| 身份 | OIDC/PKCE、回调防重放和服务来源绑定有模拟测试；真实身份服务未配置联调 |
+| 身份 | 早期完成 OIDC/PKCE、回调防重放和服务来源绑定模拟测试；2026-09-16 已补齐确认的 API audience 和独立生产配置，并验证公钥撤销与首次登录并发，见[生产身份说明](PRODUCTION_IDENTITY.md)。真实账号登录仍未验收 |
 
 封面原图 1066×1600，译图 1024×1536。视觉检查确认主标题可读、人物构图基本保持，部分线条、字体与专名表达有变化。按用户最新决定，不增加底部标记、作者署名或专名必须保留的约束，继续使用原提示词 `comics-translate-v1`。这次样本不能证明整卷或所有语言的质量。
 
@@ -129,7 +129,7 @@ npm test -- src/auth/oidc.test.ts
 
 - 插件可以构建和打包；Chrome 网页阅读器已实际验收。加载解压扩展后的真实站点采集尚未人工完成，不能将浏览器预览等同于已安装插件验收。站点适配与消息权限有本地契约验证。
 - `.env` 的默认图片网关在使用常规 Python User-Agent 时曾返回 403；本地通过供应商可配置 `user_agent=Mozilla/5.0` 接通。该配置不代表任意兼容网关都需要它。
-- 公网 OIDC、HTTPS、正式价格、支付、站点覆盖和发布仍未完成，尚未公开部署。
+- 真实 OIDC 账号登录验收、HTTPS 部署、正式价格、支付、站点覆盖和发布仍未完成，尚未公开部署。
 - MOBI 首版支持未加密 MOBI6 / MOBI6+KF8 漫画，本次已新增 CBZ/ZIP、CBR/RAR、PDF；独立 KF8、EPUB、长图切片与整卷打包导出属于后续范围。
 - 自动审批拒绝了 `engines/` 下载缓存的递归删除（返回 `blocked by policy`）。源码和运行组件已移除，残余缓存已忽略且不参与构建；没有绕过删除限制。
 

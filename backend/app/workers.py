@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from fastapi import HTTPException
 import hmac
+import logging
 import os
 import re
 import socket
@@ -11,11 +12,12 @@ from threading import Event, Thread
 import time
 from sqlalchemy import select
 from .adapters.images import redraw
-from .assets import available, create_asset, inspect_image, read_asset
+from .assets import available, content_storage_key, create_asset, inspect_image, read_asset
 from .classic import run_text_stage, validate_analysis, validate_render
 from .config import settings
 from .db import initialize, session_factory
 from .errors import ProcessingError, problem
+from .health import log_failure, report_failure, report_progress
 from .jobs import settle
 from .models import Asset, Attempt, ClassicState, Job, Provider, now
 from .providers import digest
@@ -88,9 +90,15 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         ratio = (info["width"] / info["height"]) / (source.width / source.height)
         if (mode == "classic" and (info["width"], info["height"]) != (source.width, source.height)) or not .8 <= ratio <= 1.25:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")
-        # Each generation has its own output key; late uploads cannot overwrite
-        # the object selected by a replacement lease.
-        get_store(backend).put(f"{owner_id}/{lease_id}", image, info["mime"], kind=mode)
+        # Persist the immutable content key before PUT so a crashed worker can
+        # recover its exact bytes. A late generation cannot overwrite a result.
+        output_key = content_storage_key(info["sha256"])
+        with session_factory()() as db:
+            lock_scheduler(db)
+            lease, _, _ = current_lease(db, lease_id, token)
+            lease.output_key = output_key
+            db.commit()
+        get_store(backend).put(output_key, image, info["mime"], kind=mode)
     with session_factory()() as db:
         lock_scheduler(db)
         if _finished(db, lease_id, token, node_id, result_hash):
@@ -189,7 +197,8 @@ def _heartbeat(lease_id, token, stopped):
             with session_factory()() as db:
                 heartbeat_lease(db, lease_id, token)
                 db.commit()
-        except Exception:
+        except Exception as error:
+            log_failure("lease-heartbeat", error, lease_id=lease_id)
             return
 
 
@@ -293,7 +302,8 @@ def run_control_stage(lease_id):
                     attempt.request_id, attempt.error_code = error.request_id, error.code
                     db.commit()
             fail_stage(lease_id, error, token=token)
-    except Exception:
+    except Exception as error:
+        log_failure("control-stage", error, job_id=job_id, stage=name, lease_id=lease_id)
         unknown = False
         if name == "redraw":
             with session_factory()() as db:
@@ -308,6 +318,7 @@ def run_control_stage(lease_id):
 
 def main():
     initialize()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     from .control_pools import POOL_LIMITS, initialize_pools, report_pools
     executor_id = f"{socket.gethostname()}:{os.getpid()}"[:160]
     with session_factory()() as db:
@@ -317,21 +328,35 @@ def main():
     maximum = sum(POOL_LIMITS.values())
     next_heartbeat = 0
     with ThreadPoolExecutor(max_workers=maximum, thread_name_prefix="translation") as executor:
-        futures = set()
+        futures = {}
         while True:
-            futures = {future for future in futures if not future.done()}
-            if time.monotonic() >= next_heartbeat:
-                with session_factory()() as db:
-                    report_pools(db)
-                next_heartbeat = time.monotonic() + 5
-            for name in POOL_LIMITS:
-                if len(futures) >= maximum:
-                    break
-                with session_factory()() as db:
-                    lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)
-                    db.commit()
-                if lease:
-                    futures.add(executor.submit(run_control_stage, lease.id))
+            try:
+                completed = {future: lease_id for future, lease_id in futures.items() if future.done()}
+                for future in completed:
+                    del futures[future]
+                for future in completed:
+                    try:
+                        future.result()
+                    except Exception as error:
+                        # Never discard unobserved executor failures; recovery
+                        # still uses the durable lease and upstream call intent.
+                        log_failure("control-stage-future", error, lease_id=completed[future])
+                for name in POOL_LIMITS:
+                    if len(futures) >= maximum:
+                        break
+                    with session_factory()() as db:
+                        lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)
+                        db.commit()
+                    if lease:
+                        futures[executor.submit(run_control_stage, lease.id)] = lease.id
+                if time.monotonic() >= next_heartbeat:
+                    with session_factory()() as db:
+                        report_pools(db)
+                    report_progress("control-worker")
+                    next_heartbeat = time.monotonic() + 5
+            except Exception as error:
+                report_failure("control-worker", error)
+                time.sleep(1)
             time.sleep(.25)
 
 

@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore", hide_input_in_errors=True)
+    app_env: Literal["production", "development", "test"] = "production"
     database_url: str = "sqlite:///./node-comics.db"
     storage_path: Path = Path("./private-data")
     result_storage_backend: Literal["local", "r2"] = "local"
@@ -30,6 +31,8 @@ class Settings(BaseSettings):
     oidc_token_endpoint: str = ""
     oidc_client_id: str = ""
     oidc_admin_role: str = "node-comics-admin"
+    oidc_jwks_cache_seconds: int = Field(default=300, ge=1, le=300)
+    oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
     free_daily_pages: int = Field(default=100, ge=0, le=1_000_000)
@@ -40,6 +43,18 @@ class Settings(BaseSettings):
     max_pixels: int = 24_000_000
     max_dimension: int = 8192
     max_batch: int = Field(default=500, ge=1, le=500)
+    submission_requests_per_minute: int = Field(default=60, ge=1, le=10000)
+    submission_request_burst: int = Field(default=30, ge=1, le=1000)
+    submission_items_per_minute: int = Field(default=2000, ge=1, le=100000)
+    submission_item_burst: int = Field(default=1000, ge=500, le=100000)
+    submission_concurrency: int = Field(default=4, ge=1, le=32)
+    submission_large_batch_items: int = Field(default=100, ge=1, le=500)
+    submission_large_batch_concurrency: int = Field(default=1, ge=1, le=8)
+    submission_admission_lease_seconds: int = Field(default=300, ge=30, le=3600)
+    submission_receipts_per_day: int = Field(default=2000, ge=1, le=100000)
+    submission_items_per_day: int = Field(default=20000, ge=500, le=1000000)
+    submission_receipt_retention_days: int = Field(default=30, ge=1, le=365)
+    submission_max_body_bytes: int = Field(default=512 * 1024, ge=1024, le=2 * 1024 * 1024)
     free_queue_capacity: int = Field(default=10, ge=1, le=1000)
     plus_queue_capacity: int = Field(default=500, ge=1, le=5000)
     free_realtime_slots: int = Field(default=2, ge=1, le=100)
@@ -86,6 +101,42 @@ class Settings(BaseSettings):
     text_pricing_version: str = "operator-estimate-v1"
 
     @model_validator(mode="after")
+    def validate_identity(self):
+        if self.app_env == "production":
+            if self.dev_auth:
+                raise ValueError("Production requires DEV_AUTH=false; passwordless development login is forbidden")
+            from sqlalchemy.engine import make_url
+            if make_url(self.database_url).get_backend_name() != "postgresql":
+                raise ValueError("Production requires a PostgreSQL DATABASE_URL")
+            required = ("oidc_issuer", "oidc_audience", "oidc_jwks_url", "oidc_client_id",
+                        "oidc_authorization_endpoint", "oidc_token_endpoint")
+            missing = [name.upper() for name in required if not getattr(self, name).strip()]
+            if missing:
+                raise ValueError("Production identity configuration is missing: " + ", ".join(missing))
+            if self.oidc_audience == self.oidc_client_id:
+                raise ValueError("OIDC_AUDIENCE must identify the API resource, not OIDC_CLIENT_ID")
+            for name in ("oidc_issuer", "oidc_jwks_url", "oidc_authorization_endpoint", "oidc_token_endpoint"):
+                value = getattr(self, name)
+                url = urlsplit(value)
+                if (value != value.strip() or url.scheme != "https" or not url.hostname
+                        or url.username or url.password or url.query or url.fragment):
+                    raise ValueError(name.upper() + " must be an absolute HTTPS URL without credentials, query or fragment")
+            origins = [value.strip() for value in self.cors_origins.split(",") if value.strip()]
+            extension_ids = [value.strip() for value in self.extension_ids.split(",") if value.strip()]
+            if not origins and not extension_ids:
+                raise ValueError("Production requires explicit CORS_ORIGINS or EXTENSION_IDS")
+            for value in origins:
+                url = urlsplit(value)
+                if (url.scheme != "https" or not url.hostname or "*" in value or url.username or url.password
+                        or url.path or url.query or url.fragment):
+                    raise ValueError("Production CORS_ORIGINS must contain exact HTTPS origins without paths or wildcards")
+            if any(not re.fullmatch(r"[a-p]{32}", value) for value in extension_ids):
+                raise ValueError("EXTENSION_IDS must contain exact 32-character Chrome extension IDs")
+        elif self.dev_auth and len(self.dev_auth_secret) < 32:
+            raise ValueError("DEV_AUTH_SECRET must contain at least 32 characters when DEV_AUTH is enabled")
+        return self
+
+    @model_validator(mode="after")
     def validate_storage(self):
         from zoneinfo import ZoneInfo
         ZoneInfo(self.quota_timezone)
@@ -108,3 +159,15 @@ class Settings(BaseSettings):
 @lru_cache
 def settings() -> Settings:
     return Settings()
+
+
+if __name__ == "__main__":
+    # Configuration-only deployment preflight: no database, R2 or provider calls.
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description="Validate backend configuration without external calls")
+    parser.add_argument("--production", action="store_true", help="Require the effective environment to be production")
+    args = parser.parse_args()
+    config = settings()
+    if args.production and config.app_env != "production":
+        parser.error("Production preflight requires effective APP_ENV=production; check shell overrides")
+    print("Backend configuration validated")

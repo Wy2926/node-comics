@@ -1,10 +1,14 @@
 # Node Comics
 
+2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](docs/PRODUCTION_FIXES.md)，未公开部署。
+
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
 2026-09-15：已完成双模式持久队列和集群阶段调度重构。每种模式分别提供普通 10／PLUS 500 页在途容量，实时名额普通 2／PLUS 10；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
 
-会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `nodes_0001` 数据库。
+会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `shared_0001` 数据库。
+
+2026-09-16：相同原图按内容跨账户免重复上传，已完成且模式 / 语言 / 配置相同的译图可免费复用；账户授权、任务和历史保持私有。已移除按一天期限扫描删除无引用对象的逻辑。生产身份、提交限流、健康监控与备份恢复说明见[生产身份](docs/PRODUCTION_IDENTITY.md)、[提交限制](docs/SUBMISSION_SCHEDULING.md)及[运维说明](docs/OPERATIONS.md)。
 
 2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在次数和处理时限内自动重试（成本仅计量，不设页成本上限）。常规模式已基于[开源方案与成本调研](docs/CLASSIC_TRANSLATION_RESEARCH.md)实现，启动与验证见[常规翻译运行说明](docs/CLASSIC_IMPLEMENTATION.md)。
 
@@ -39,7 +43,7 @@ npm ci
 npm run dev
 ```
 
-阅读器：[本地预览](http://127.0.0.1:5173)，API：[接口文档](http://127.0.0.1:18088/docs)。登录配置位于 `deploy/.env.local`，Docker 新集群卷与旧实例隔离；端口被占用时修改 `API_PORT`。公开环境必须关闭 DEV_AUTH 并配置 OIDC。
+阅读器：[本地预览](http://127.0.0.1:5173)，API：[接口文档](http://127.0.0.1:18088/docs)。上述命令是开发入口，`deploy/.env.local` 显式设置 `APP_ENV=development`；端口被占用时修改 `API_PORT`。新 `shared_0001` 基线必须使用空数据库，已有旧版本数据库需另选全新 Compose 项目 / 数据库，不自动迁移或清空。公开环境使用独立生产配置与 `-Production` 引导，强制关闭 DEV_AUTH 并验证 OIDC，见[生产身份说明](docs/PRODUCTION_IDENTITY.md)。
 
 ```powershell
 npm run check

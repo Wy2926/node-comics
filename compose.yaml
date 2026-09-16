@@ -3,8 +3,9 @@ name: node-comics-nodes
 x-backend: &backend
   build: ./backend
   image: node-comics-backend:cluster
-  env_file: [.env, deploy/.env.local]
+  env_file: [.env, "${COMICS_ENV_FILE:-deploy/.env.local}"]
   environment: &backend-env
+    APP_ENV: "${APP_ENV:-production}"
     DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics_cluster}
     RESULT_STORAGE_BACKEND: r2
     STORAGE_PATH: /data/images
@@ -36,13 +37,31 @@ services:
     <<: *backend
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
     ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
   maintenance:
     <<: *backend
     command: [python, -m, app.dispatcher]
+    healthcheck:
+      test: [CMD, python, -m, app.health, maintenance]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
   control-worker:
     <<: *backend
     command: [python, -m, app.workers]
     stop_grace_period: 31m
+    healthcheck:
+      test: [CMD, python, -m, app.health, control-worker]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
   classic-engine:
     profiles: [classic]
     build: ./services/classic-engine

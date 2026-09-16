@@ -1,7 +1,11 @@
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, ModeQueue, SubmissionInput, SubmissionReceipt, UploadPlan, TranslationChanges, QueuePriority, PriorityReceipt, UsageSummary, SubmissionSummary, Paginated, FeedbackIssue, FeedbackRecord } from './types';
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool} from './concurrency';
-export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null) { super(message); } }
+export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number) { super(message); } }
+function retryDelay(body:unknown,header:string|null){
+  const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
+  return Number.isFinite(seconds)&&seconds>0?Math.ceil(seconds):undefined;
+}
 export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUEUE_FULL','READING_UPLOAD_RESERVED','INVALID_BATCH','RERUN_SOURCE_REQUIRED','RERUN_SOURCE_MISMATCH','UNKNOWN_COST_ACK_REQUIRED','IMAGE_TOO_LARGE','IMAGE_HASH_MISMATCH','INVALID_INPUT_ASSET','FILE_PAGE_CONFLICT','QUEUE_CAPACITY_EXCEEDED','INVALID_SUBMISSION','SUBMISSION_TOO_LARGE','DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','QUOTA_CONFLICT','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED','PLUS_REQUIRED','TOO_MANY_JOBS','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
 export class Api {
   constructor(public base: string, public token = '', public pool = new RequestPool(), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
@@ -11,7 +15,7 @@ export class Api {
     let response: Response;
     try { response = await fetch(this.base + path, { ...init, headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers } }); }
     catch { throw new ApiError('暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。'); }
-    if (!response.ok) { const raw = await response.json().catch(() => ({})); if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at); }
+    if (!response.ok) { const raw = await response.json().catch(() => ({})); if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After'))); }
     if (response.status === 204) return undefined as T;
     return response.json();
     });

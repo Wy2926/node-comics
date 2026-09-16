@@ -1,3 +1,4 @@
+import hashlib
 """Focused race reproductions from final upload lifecycle review."""
 from datetime import timedelta
 import pytest
@@ -98,13 +99,14 @@ def test_verified_upload_replay_rejects_unavailable_original(storage_db, remote,
             complete_upload(db, receipt, owner_id)
 
 
-def test_late_validator_put_is_removed_after_successful_original_deletion(storage_db, remote, png, monkeypatch):
+def test_late_validator_put_cannot_restore_deleted_grant(storage_db, remote, png, monkeypatch):
     from app.db import session_factory
     from app.errors import ProcessingError
     from app.main import delete_image
     from app.models import Asset, Job, User, now, uid
     from app.queue_models import ExecutionLease, JobStage
-    from app.storage_cleanup import cleanup_orphans
+    from app.assets import content_storage_key
+    from app.dispatcher import cleanup
     from app.upload_models import UploadReservation
     from app.uploads import complete_upload, receive_upload
     owner_id = owner(storage_db)
@@ -114,7 +116,7 @@ def test_late_validator_put_is_removed_after_successful_original_deletion(storag
         receive_upload(db, receipt, owner_id, png)
         lease = validation_lease(db, job, receipt)
         reservation_id, lease_id, job_id = receipt.id, lease.id, job.id
-        original_key = f"{owner_id}/{reservation_id}"
+        original_key = content_storage_key(hashlib.sha256(png).hexdigest())
         actual_put = store.put
         raced = False
 
@@ -145,7 +147,7 @@ def test_late_validator_put_is_removed_after_successful_original_deletion(storag
                 with session_factory()() as deletion:
                     delete_image(reservation_id, deletion.get(User, owner_id), deletion)
                     assert deletion.get(Asset, reservation_id).purged_at
-                    assert store.prefix + original_key not in sdk.objects
+                    assert store.prefix + original_key in sdk.objects
             return actual_put(key, *args, **kwargs)
 
         monkeypatch.setattr(store, "put", finish_new_generation_then_delete)
@@ -157,6 +159,6 @@ def test_late_validator_put_is_removed_after_successful_original_deletion(storag
     with session_factory()() as db:
         assert db.get(Asset, reservation_id).purged_at
         assert db.get(Job, job_id).status == "cancelled"
-        cleanup_orphans(db)  # MemoryS3 lists these keys as older than 24 hours.
+        cleanup(db)  # Revokes grants only; shared image bytes remain.
         db.commit()
-    assert store.prefix + original_key not in sdk.objects
+    assert store.prefix + original_key in sdk.objects

@@ -11,7 +11,7 @@ import hashlib
 import re
 from fastapi import HTTPException
 from sqlalchemy import select
-from .assets import available, create_asset, inspect_image
+from .assets import available, content_storage_key, create_asset, inspect_image
 from .config import settings
 from .errors import problem, ProcessingError
 from .models import Asset, Job, now, uid
@@ -245,7 +245,7 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
                            lease_id=lease_id, lease_token=lease_token)
     # The stable server-only key survives uncertain PUTs/transaction rollbacks.
     # Never COPY from the temporary key after validation: it may have changed.
-    store.put(f"{reservation.owner_id}/{reservation.id}", data, info["mime"], kind="original")
+    store.put(content_storage_key(info["sha256"]), data, info["mime"], kind="original")
     reservation = _lock_current(db, reservation)
     _check_validation_lease(db, reservation, lease_id, lease_token, refresh=True)
     if reservation.status == "verified":
@@ -262,9 +262,7 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
     from .scheduler import ensure_stages
     ensure_stages(db, job)
     reservation.asset_id, reservation.status, reservation.completed_at = asset.id, "verified", now()
-    # Leave staging cleanup to the sweeper, after the transaction commits. If we
-    # deleted it here and the commit failed, the retryable receipt would point at
-    # a missing upload even though the original PUT may have succeeded.
+    # Retain staging bytes through commit. No age-based orphan sweep is used.
     return asset
 
 

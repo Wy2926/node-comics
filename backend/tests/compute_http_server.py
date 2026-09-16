@@ -5,6 +5,8 @@ import hashlib
 from io import BytesIO
 import json
 import os
+from pathlib import Path
+import socket
 import sys
 
 from fastapi import FastAPI, HTTPException, Request
@@ -94,14 +96,34 @@ def simulated_engine():
     return app
 
 
+def serve(app, ready_path):
+    """Reserve port zero in the serving process and never release it before use."""
+    destination = Path(ready_path)
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1', 0))
+        port = listener.getsockname()[1]
+
+        class ReadyServer(uvicorn.Server):
+            async def startup(self, sockets=None):
+                await super().startup(sockets=sockets)
+                if self.started:
+                    temporary = destination.with_suffix('.tmp')
+                    temporary.write_text(str(port), encoding='ascii')
+                    temporary.replace(destination)
+
+        server = ReadyServer(uvicorn.Config(app, host='127.0.0.1', port=port,
+                                           log_level='warning', access_log=False))
+        server.run(sockets=[listener])
+
+
 def run():
     role = sys.argv[1]
     if role == 'engine':
-        uvicorn.run(simulated_engine(), host='127.0.0.1', port=int(sys.argv[2]), log_level='warning', access_log=False)
+        serve(simulated_engine(), sys.argv[2])
         return
     if role == 'api':
         from app.main import app
-        uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[2]), log_level='warning', access_log=False)
+        serve(app, sys.argv[2])
         return
     if role == 'worker':
         from app import classic, workers

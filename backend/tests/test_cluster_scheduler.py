@@ -187,6 +187,159 @@ def test_concurrent_nodes_never_lease_same_stage_twice(scheduler_case):
     assert len(accepted) == 1 and accepted[0].job_id == job
 
 
+def test_deep_queue_is_ranked_in_database_without_loading_each_job(scheduler_case):
+    """A recently arriving low-service user is visible behind a large backlog."""
+    for index in range(80):
+        add_job(scheduler_case, 'plus-user', suffix=f'backlog-{index:04}')
+    expected = add_job(scheduler_case, 'free-user')
+    loaded = []
+    def capture(job, context):
+        loaded.append(job.id)
+    event.listen(Job, 'load', capture)
+    try:
+        winner = claim()
+    finally:
+        event.remove(Job, 'load', capture)
+    assert winner.job_id == expected
+    assert len(loaded) <= 2, len(loaded)
+
+
+def test_ineligible_heads_do_not_hide_later_runnable_pages(scheduler_case):
+    from app.queue_models import UserModeQueue
+    for index in range(20):
+        job_id = add_job(scheduler_case, 'free-user')
+        with session_factory()() as db:
+            job = db.get(Job, job_id)
+            job.target_language = 'unavailable-language'
+            db.commit()
+    for _ in range(20):
+        add_job(scheduler_case, 'plus-user')
+    with session_factory()() as db:
+        db.add(UserModeQueue(owner_id='plus-user', mode='classic', paused=True))
+        db.commit()
+    expected = add_job(scheduler_case, 'free-user')
+    assert claim().job_id == expected
+
+
+@pytest.mark.parametrize('mutation', ['pause', 'delete_source', 'cancel', 'node_language', 'node_capacity'])
+def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(scheduler_case, monkeypatch, mutation):
+    from app.queue_models import UserModeQueue
+    job_id = add_job(scheduler_case)
+    original = scheduler._preselect
+    def changed(db, node, stages):
+        result = original(db, node, stages)
+        assert result
+        with session_factory()() as writer:
+            if mutation == 'pause':
+                writer.add(UserModeQueue(owner_id='free-user', mode='classic', paused=True, version=1))
+            elif mutation == 'delete_source':
+                writer.get(Asset, 'free-user-image').deleted_at = now()
+            elif mutation == 'cancel':
+                writer.get(Job, job_id).cancel_requested = True
+            elif mutation == 'node_language':
+                writer.get(ComputeNode, 'node-0').supported_languages = ['en']
+            else:
+                writer.get(ComputeNode, 'node-0').capacity = 0
+            writer.commit()
+        return result
+    monkeypatch.setattr(scheduler, '_preselect', changed)
+    assert claim() is None
+
+
+def test_realtime_reorder_between_snapshot_and_lock_retries_fresh_election(scheduler_case, monkeypatch):
+    from app.queue_models import UserModeQueue
+    add_job(scheduler_case)
+    promoted = add_job(scheduler_case)
+    original = scheduler._preselect
+    def changed(db, node, stages):
+        result = original(db, node, stages)
+        with session_factory()() as writer:
+            writer.add(UserModeQueue(owner_id='free-user', mode='classic', version=1))
+            job = writer.get(Job, promoted)
+            job.realtime_until, job.priority_rank = now() + timedelta(minutes=1), 0
+            writer.commit()
+        return result
+    monkeypatch.setattr(scheduler, '_preselect', changed)
+    assert claim() is None
+    monkeypatch.setattr(scheduler, '_preselect', original)
+    assert claim().job_id == promoted
+
+
+def test_local_missing_source_is_not_dispatched_and_pinned_source_survives_expiry(scheduler_case):
+    job_id = add_job(scheduler_case)
+    with session_factory()() as db:
+        source = db.get(Asset, 'free-user-image')
+        source.expires_at, source.active_references = now() - timedelta(days=1), 1
+        db.commit()
+    lease = claim()
+    assert lease and lease.job_id == job_id
+    finish_quantum(lease.id)
+    with session_factory()() as db:
+        db.get(Asset, 'free-user-image').storage_backend = 'local'
+        db.commit()
+    assert claim() is None
+
+
+def test_missing_local_head_releases_reservation_once_and_unblocks_later_page(scheduler_case):
+    from app.entitlements import reserve
+    from app.entitlement_models import QuotaPeriod
+    from app.models import Ledger
+    missing = add_job(scheduler_case)
+    valid = add_job(scheduler_case)
+    with session_factory()() as db:
+        source = db.get(Asset, 'free-user-image')
+        source.storage_backend, source.active_references = 'local', 1
+        source.expires_at = None
+        first = db.get(Job, missing)
+        first.quota_kind, first.input_pinned = 'classic_daily', True
+        reserve(db, db.get(User, 'free-user'), first, now())
+        db.add(Asset(id='later-valid-source', owner_id='free-user', sha256='b' * 64,
+            storage_backend='r2', storage_key='isolated/valid-later', mime='image/png',
+            width=80, height=64, byte_size=100))
+        db.get(Job, valid).input_asset_id = 'later-valid-source'
+        db.commit()
+    assert claim() is None  # This bounded election retires only the missing head.
+    with session_factory()() as db:
+        first = db.get(Job, missing)
+        assert first.status == 'failed' and first.error_code == 'LOCAL_SOURCE_MISSING'
+        assert first.settlement == 'released' and not first.input_pinned
+        assert db.get(Asset, 'free-user-image').active_references == 0
+        assert db.scalar(select(QuotaPeriod)).reserved == 0
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 1
+    assert claim().job_id == valid
+    assert claim('node-1') is None
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 1
+
+
+@pytest.mark.parametrize('mutation', ['disabled', 'unknown_slot'])
+def test_provider_capacity_is_rechecked_after_snapshot(scheduler_case, monkeypatch, mutation):
+    from app.models import Provider
+    config = {**scheduler_case, 'provider': {'id': 'isolated-redraw'}}
+    add_job(config, stage='redraw')
+    occupied = add_job(config, 'plus-user', stage='redraw')
+    with session_factory()() as db:
+        for job in db.scalars(select(Job)):
+            job.mode = 'redraw'
+        db.add(Provider(id='isolated-redraw', config={'concurrency': 1}, enabled=True))
+        node = db.get(ComputeNode, 'node-0')
+        node.capabilities, node.engine_version = ['redraw'], 'control'
+        db.commit()
+    original = scheduler._preselect
+    def changed(db, node, stages):
+        result = original(db, node, stages)
+        assert result
+        with session_factory()() as writer:
+            if mutation == 'disabled':
+                writer.get(Provider, 'isolated-redraw').enabled = False
+            else:
+                writer.get(Job, occupied).status = 'outcome_unknown'
+            writer.commit()
+        return result
+    monkeypatch.setattr(scheduler, '_preselect', changed)
+    assert claim() is None
+
+
 def test_concurrent_claims_cannot_exceed_one_node_capacity(scheduler_case):
     for _ in range(4):
         add_job(scheduler_case)
@@ -289,7 +442,7 @@ def test_late_render_upload_cannot_overwrite_new_generation_output(scheduler_cas
     started, allow_old_put = Event(), Event()
     put = LocalStore.put
     def delayed(store, key, data, *args, **kwargs):
-        if key.endswith('/' + old.id):
+        if data == base64.b64decode(old_reply['image']):
             started.set()
             assert allow_old_put.wait(5)
         return put(store, key, data, *args, **kwargs)
@@ -372,11 +525,15 @@ def test_saved_late_output_recovery_preserves_existing_terminal_failure(schedule
     job_id = add_job(scheduler_case, stage='render')
     lease = claim()
     _, reply = render_reply(scheduler_case['engine']['version'], 10)
-    LocalStore().put('free-user/' + lease.id, base64.b64decode(reply['image']), 'image/png', kind='classic')
+    from app.assets import content_storage_key
+    image = base64.b64decode(reply['image'])
+    output_key = content_storage_key(hashlib.sha256(image).hexdigest())
+    LocalStore().put(output_key, image, 'image/png', kind='classic')
     with session_factory()() as db:
         job = db.get(Job, job_id)
         job.status, job.error_code, job.error_message = 'failed', 'TEXT_AUTH_FAILED', 'original failure'
         db.get(ExecutionLease, lease.id).expires_at = now() - timedelta(seconds=1)
+        db.get(ExecutionLease, lease.id).output_key = output_key
         db.commit()
     dispatcher.recover_lease(lease.id)
     with session_factory()() as db:

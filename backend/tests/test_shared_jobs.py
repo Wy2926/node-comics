@@ -148,6 +148,40 @@ def test_no_text_result_is_reused_without_a_new_job_or_stage(client, png):
         assert db.scalar(select(func.count()).select_from(JobStage)) == 4
 
 
+def test_reusing_verified_source_does_not_reload_historical_page_descriptors(client, png):
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    from app.file_pages import FilePage
+    from test_cluster_submissions import descriptor, submit
+
+    auth = login(client)
+    asset = upload(client, auth, png)
+    initial = submit(client, auth, [descriptor(png, str(index), asset_id=asset,
+        file_hash="a" * 64, page_index=index) for index in range(20)], key="many-old-pages", mode="redraw")
+    assert initial.status_code == 202, initial.text
+    previous = initial.json()
+    historical_loads = []
+
+    def loaded(db, value):
+        if isinstance(value, SubmissionItem) and value.submission_id == previous["id"]:
+            historical_loads.append(value.ordinal)
+
+    event.listen(Session, "loaded_as_persistent", loaded)
+    try:
+        response = submit(client, auth, [descriptor(png, asset_id=asset,
+            file_hash="b" * 64, page_index=7)], key="new-file-page", mode="redraw")
+        assert response.status_code == 202, response.text
+        assert response.json()["items"][0]["job"]["id"] == previous["items"][0]["job"]["id"]
+        assert historical_loads == []
+    finally:
+        event.remove(Session, "loaded_as_persistent", loaded)
+    with session_factory()() as db:
+        bindings = list(db.scalars(select(FilePage)))
+        assert len(bindings) == 21
+        assert {(row.file_hash, row.page_index) for row in bindings} == {
+            *(("a" * 64, index) for index in range(20)), ("b" * 64, 7)}
+
+
 @pytest.mark.parametrize("invalid", ["cancel", "discard", "deleted", "missing"])
 def test_cancelled_or_unavailable_active_source_is_not_reused(client, png, invalid):
     from app.assets import object_path
@@ -166,6 +200,11 @@ def test_cancelled_or_unavailable_active_source_is_not_reused(client, png, inval
             object_path(asset.storage_key).unlink()
         db.commit()
     second = create(client, auth, alias, key="different-device")
+    if invalid == "missing":
+        # Both account-local assets refer to the same physical object; its loss
+        # invalidates both grants, and must not start work with missing bytes.
+        assert second.status_code == 410
+        return
     assert second.status_code == 202 and second.json()["id"] != first["id"]
 
 

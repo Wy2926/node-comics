@@ -18,6 +18,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
     from app.config import settings
     from app.assets import create_asset
     settings().free_daily_pages = 1
+    settings().submission_concurrency = 8  # Exercise quota contention, independently of admission throttling.
     with session_factory()() as db:
         db.get(User, pg['owner_id']).plus_expires_at = now() - timedelta(seconds=1)
         assets = [create_asset(db, pg['owner_id'], png_variant(pg['png'], n)) for n in range(6)]

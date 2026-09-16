@@ -34,14 +34,14 @@ def test_completed_original_and_result_survive_age_and_cleanup(cluster, png, mon
         db.commit()
         cleanup(db)
         assert all(not asset.deleted_at and not asset.purged_at for asset in db.scalars(select(Asset)))
-    assert len(sdk.objects) == 2
+    assert len(sdk.objects) == 1
     history = client.get("/v1/translation-submissions", headers=auth)
     assert history.status_code == 200 and history.json()["items"][0]["counts"] == {"succeeded": 1}
     assert client.get(f"/v1/images/{output_id}/access", headers=auth).status_code == 200
     deleted = client.delete(f"/v1/images/{source_id}", headers=auth)
     assert deleted.status_code == 200
     assert set(deleted.json()["asset_ids"]) == {source_id, output_id}
-    assert not sdk.objects
+    assert sdk.objects  # Deletion revokes personal grants; shared bytes persist.
     for asset_id in (source_id, output_id):
         assert client.get(f"/v1/images/{asset_id}/access", headers=auth).status_code == 410
 

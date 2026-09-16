@@ -4,6 +4,7 @@ services/classic-engine/engine.local.json
 services/compute-agent/node.local.json
 .env.*
 !.env.example
+!deploy/.env.production.example
 node_modules/
 .venv/
 __pycache__/

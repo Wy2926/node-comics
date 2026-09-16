@@ -140,7 +140,11 @@ def test_saved_output_is_recovered_after_crash_before_database_commit(client, pn
         attempt.call_started_at = now() - timedelta(hours=1)
         db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        get_store(attempt.output_storage_backend).put(f"{job.owner_id}/{lease_id}", png, "image/png", kind="redraw")
+        from app.assets import content_storage_key, inspect_image
+        lease = db.get(ExecutionLease, lease_id)
+        lease.output_key = content_storage_key(inspect_image(png)["sha256"])
+        db.commit()
+        get_store(attempt.output_storage_backend).put(lease.output_key, png, "image/png", kind="redraw")
     recover_lease(lease_id)
     recover_lease(lease_id)
     with session_factory()() as db:
@@ -171,7 +175,7 @@ def test_cleanup_advances_past_200_tombstones(client, png):
         cleanup(db)
         db.commit()
         assert db.scalar(select(func.count()).select_from(Asset).where(Asset.purged_at.is_not(None))) == 205
-        assert all(not object_path(db.get(Asset, asset_id).storage_key).exists() for asset_id in ids)
+        assert all(object_path(db.get(Asset, asset_id).storage_key).exists() for asset_id in ids)
 
 
 def test_late_child_of_deleted_original_is_inaccessible_and_purged(client, png):
@@ -191,7 +195,7 @@ def test_late_child_of_deleted_original_is_inaccessible_and_purged(client, png):
     with session_factory()() as db:
         cleanup(db)
         db.commit()
-        assert db.get(Asset, output_id).purged_at is not None and not path.exists()
+        assert db.get(Asset, output_id).purged_at is not None and path.exists()
 
 
 def test_ready_stage_survives_reinitialization_without_recreating_job(client, png):
