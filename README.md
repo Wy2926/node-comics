@@ -6,7 +6,7 @@
 
 同日补充：已修复慢上传持有数据库连接、并发领取嵌套连接和反馈无预算，并新增后台“系统设置”，统一维护上传并发、超时及反馈预算。该轮迁移为 `shared_0003_system_settings`，生效规则及验证见[系统设置](docs/SYSTEM_SETTINGS.md)。
 
-当前代码迁移头为 `shared_0004_text_providers`，文本供应商改在 `/admin/#translation-providers` 创建，首个自动成为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置只影响新任务，供应商独立 RPM、停用暂停排队文本阶段。DB revision 保存后台密钥且不出 API；数据库及备份须限制访问。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。本轮未部署真实实例，完整运行与迁移边界见 [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md)。
+当前代码迁移头为 `shared_0004_text_providers`，文本供应商改在 `<ADMIN_WEB_PATH>#translation-providers` 创建，首个自动成为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置只影响新任务，供应商独立 RPM、停用暂停排队文本阶段。DB revision 保存后台密钥且不出 API；数据库及备份须限制访问。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。本轮未部署真实实例，完整运行与迁移边界见 [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md)。
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
@@ -38,7 +38,7 @@ Windows AMD RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装�
 
 本机 NVIDIA RTX 4060 Laptop GPU 已跑通 `./scripts/start-local-nvidia.ps1 -Smoke`，首次安装加 `-Setup`。
 
-启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，启动后在 `/admin/#translation-providers` 配置文本供应商。本机 `-Smoke` 在缺少启用的默认供应商时保持服务运行，等待后台配置后继续。
+启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，启动后在 `<ADMIN_WEB_PATH>#translation-providers` 配置文本供应商。本机 `-Smoke` 在缺少启用的默认供应商时保持服务运行，等待后台配置后继续。
 
 环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2 与图片模型配置，模板见 [.env.example](.env.example)。文本供应商由管理员在服务启动后保存到数据库。
 

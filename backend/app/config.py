@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     dev_auth: bool = False
     dev_auth_secret: str = ""
     dev_admin_username: str = "admin"
+    admin_web_path: str = ""
     oidc_issuer: str = ""
     oidc_audience: str = ""
     oidc_jwks_url: str = ""
@@ -93,6 +94,14 @@ class Settings(BaseSettings):
     classic_enabled: bool = False
     classic_engine_version: str = "mit-95227a2-classic-v8-qt"
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
+
+    @model_validator(mode="after")
+    def validate_admin_web_path(self):
+        if self.admin_web_path and (not re.fullmatch(r"/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/", self.admin_web_path)
+                or self.admin_web_path.strip("/").lower() in {
+                    "admin", "v1", "internal", "health", "docs", "redoc", "api", "openapi"}):
+            raise ValueError("ADMIN_WEB_PATH must be empty (disabled) or a non-reserved /name/ path using letters, digits, hyphens or underscores")
+        return self
 
     @model_validator(mode="after")
     def validate_identity(self):

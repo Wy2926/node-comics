@@ -14,7 +14,7 @@
 ./scripts/bootstrap.ps1 -Start -Classic
 ```
 
-启动后以管理员身份打开 `/admin/#translation-providers`，创建供应商并填写名称、OpenAI 渠道、Base URL、模型和 API Key。支持 OpenAI Chat Completions（`chat_completions`，默认）和 Responses（`responses`）；首个供应商自动成为默认。默认选择及版本化配置修改只影响新任务，已有任务固定引用 DB revision；调用时校验完整快照并从对应 revision 读取密钥，无环境变量 fallback。
+启动后以管理员身份打开 `<ADMIN_WEB_PATH>#translation-providers`，创建供应商并填写名称、OpenAI 渠道、Base URL、模型和 API Key。支持 OpenAI Chat Completions（`chat_completions`，默认）和 Responses（`responses`）；首个供应商自动成为默认。默认选择及版本化配置修改只影响新任务，已有任务固定引用 DB revision；调用时校验完整快照并从对应 revision 读取密钥，无环境变量 fallback。
 
 停用会暂停排队文本阶段；请求间遇到停用时释放租约并回到 ready，不消耗阶段重试次数，已发生调用的计量保留。暂停时间仍计入首次文本请求之后的页处理总时限。启停和 RPM 对供应商各历史版本统一生效；每供应商 RPM 独立，与共享文本执行位分开。密钥留在后端、不出 API；数据库与备份包含敏感密钥，须限制访问。
 

@@ -57,6 +57,8 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
     require_free(engine_port)
     folder.mkdir(parents=True, exist_ok=True)
     config = {**dotenv_values(ROOT / '.env'), **dotenv_values(ROOT / 'deploy/.env.local')}
+    if not config.get('ADMIN_WEB_PATH'):
+        raise RuntimeError('Configure ADMIN_WEB_PATH in deploy/.env.local before starting the local node')
     # Preserve the original and final images in R2; only test metadata is local.
     secret_file = folder / 'local-auth.json'
     if not secret_file.exists():
@@ -126,7 +128,7 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
         start('agent', ENGINE_PYTHON, [ROOT / 'services/compute-agent/agent.py'], agent_env)
         print(json.dumps({'event': 'CLUSTER_READY', 'api': url, 'engine': engine_url,
                           'device': health['device'], 'model_version': health['version']}, ensure_ascii=False), flush=True)
-        print(f'Text suppliers are managed at {url}/admin/#translation-providers (local username: admin). '
+        print(f'Text suppliers are managed at {url}{config["ADMIN_WEB_PATH"]}#translation-providers (local username: admin). '
               'Create an enabled default supplier before submitting classic translations.', flush=True)
         yield url, engine_url, health, children
     finally:
@@ -162,7 +164,7 @@ def wait_text_provider(url, children):
             if any(provider['enabled'] and provider['is_default'] for provider in providers):
                 return
             if not announced:
-                print(f'Waiting for an enabled default text supplier at {url}/admin/#translation-providers. '
+                print('Waiting for an enabled default text supplier in the admin console shown at startup. '
                       'The first supplier becomes default automatically; smoke translation will then continue.', flush=True)
                 announced = True
             time.sleep(1)

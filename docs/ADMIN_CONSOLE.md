@@ -1,6 +1,6 @@
 # 服务端管理后台
 
-2026-09-16：已实现独立 React + TypeScript + Vite 管理页面，服务端入口 `/admin/`。针对当前集群数据模型实现，不增加旧队列、旧点数或旧数据适配逻辑。
+2026-09-16：已实现独立 React + TypeScript + Vite 管理页面，服务端入口由私有环境变量 `ADMIN_WEB_PATH` 配置。旧 `/admin`、`/admin/` 及其资源返回 404，首页不再跳转后台。针对当前集群数据模型实现，不增加旧队列、旧点数或旧数据适配逻辑。
 
 ## 页面与统计口径
 
@@ -25,7 +25,7 @@
 - **最近提交**表示最近任务创建时间；系统未记录用户最后登录或当前在线状态，后台不会据此推断。
 - 时间按浏览器本地时区显示。列表默认每 15 秒刷新，可暂停；后台标签页隐藏或详情打开时停止列表定时刷新。请求失败保留上次数据并标记可能过时，支持重试。
 
-后台提供运行信息查询、节点／控制池配置、系统设置与文本翻译供应商管理。`/admin/#translation-providers` 可创建多个 OpenAI 供应商、编辑连接参数和密钥、启停及切换默认供应商，见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。会员变更、图片供应商编辑和结果核实仍使用现有运营接口／插件入口。系统设置的范围、生效规则和管理员 API 见[系统设置](SYSTEM_SETTINGS.md)。
+后台提供运行信息查询、节点／控制池配置、系统设置与文本翻译供应商管理。`<ADMIN_WEB_PATH>#translation-providers` 可创建多个 OpenAI 供应商、编辑连接参数和密钥、启停及切换默认供应商，见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。会员变更、图片供应商编辑和结果核实仍使用现有运营接口／插件入口。系统设置的范围、生效规则和管理员 API 见[系统设置](SYSTEM_SETTINGS.md)。
 
 ## 运行与构建
 
@@ -38,13 +38,27 @@ npm run check
 npm run build
 ```
 
-构建输出到 `backend/app/admin_web/dist/`，已被仓库忽略。API 进程托管 HTML 和打包资源；同源访问，无需额外管理站点或运行 Node.js 服务。开发预览可运行 `npm run dev`，访问 `http://127.0.0.1:5175/admin/`，默认代理 API `http://127.0.0.1:18088`，可用 `ADMIN_API_ORIGIN` 指定本地测试服务。
+构建输出到 `backend/app/admin_web/dist/`，已被仓库忽略。API 进程托管 HTML 和打包资源；同源访问，无需额外管理站点或运行 Node.js 服务。资源使用相对路径，改入口只需重启 API，不需重新构建。开发预览可运行 `npm run dev`，访问 `http://127.0.0.1:5175/`，默认代理 API `http://127.0.0.1:18088`，可用 `ADMIN_API_ORIGIN` 指定本地测试服务。Vite 开发服务器不用于验证生产入口限制。
+
+### 私有入口配置
+
+`ADMIN_WEB_PATH` 为空或未设置时关闭后台页面，API 和客户端登录仍可用。启用时设置单层路径，必须以 `/` 开头和结尾，中间为 2–80 位英文字母、数字、短横线或下划线；`admin`、`v1`、`internal`、`health`、`docs` 等保留名不可使用。建议生成随机入口后保存在对应私有环境文件，不写进仓库或公开页面：
+
+```powershell
+python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(16) + '/')"
+```
+
+本地 Compose 使用 `deploy/.env.local`，生产 Compose 使用 `deploy/.env.production`，服务器 Compose 使用 `deploy/.env.server`。开发引导脚本只在本地配置缺少该项时生成，重启不轮换；生产入口需显式配置。`run_local_node.py` 从私有配置读取并输出当前本地后台地址。无尾斜线的新入口会补齐尾斜线并保留回调查询参数。
+
+页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 
 容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库基线 `shared_0001` 已包含执行机字段、任务索引与节点身份配置；当前启动迁移至 `shared_0003_system_settings`，支持从该基线增量升级，不适配基线之前的旧数据库。控制工作进程需使用同版本代码以记录执行机。
 
 ### 登录
 
-生产沿用现有 OIDC 授权码 + PKCE。身份服务需要登记公开客户端回调地址 `https://<服务域名>/admin/`，允许前端从该域名访问 token endpoint；配置沿用 `OIDC_CLIENT_ID / OIDC_AUTHORIZATION_ENDPOINT / OIDC_TOKEN_ENDPOINT / OIDC_AUDIENCE`。管理员角色以服务端的 `OIDC_ADMIN_ROLE` 为准。
+生产沿用现有 OIDC 授权码 + PKCE。身份服务需要登记精确回调地址 `https://<服务域名><ADMIN_WEB_PATH>`（包含尾斜线），允许前端从该域名访问 token endpoint；配置沿用 `OIDC_CLIENT_ID / OIDC_AUTHORIZATION_ENDPOINT / OIDC_TOKEN_ENDPOINT / OIDC_AUDIENCE`。管理员角色以服务端的 `OIDC_ADMIN_ROLE` 为准。前端使用当前 origin + pathname 作为回调，授权与换令牌保持一致，并保留 state、PKCE、时效及回调路径检查。
+
+上线顺序：先在 Logto **新增**新后台回调，保留插件的 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc` 及其他客户端回调；再发布代码、配置 `ADMIN_WEB_PATH` 并更新 OpenResty；真实后台登录成功后移除旧 `/admin/` 回调。仅更换路径时不修改 Client ID、Issuer、Audience、授权／令牌端点或 CORS 来源。
 
 `DEV_AUTH=true` 时显示开发用户名登录，管理员用户名由 `DEV_ADMIN_USERNAME` 配置。公开服务必须关闭开发登录。访问令牌仅保存在当前浏览器标签页会话，退出后清除。服务端每个监控接口都校验管理员权限，普通账户返回 403；静态登录页可公开加载。
 
@@ -63,16 +77,20 @@ npm run build
 
 ## 验证
 
+本轮隐匿入口验证：后端入口／后台／身份相关 **70 passed**，后台前端 OIDC 模拟 **5 passed**，客户端既有 OIDC **11 passed**，后台类型检查与生产构建通过。在隔离浏览器中确认新入口登录、页面资源、导航、刷新恢复、数据请求失败与重试恢复，并检查截图。OIDC 授权和换令牌使用模拟响应验证精确回调、PKCE、state、时效及拒绝后重试；本轮未修改线上 Logto、未公开部署、未完成真实 OIDC 登录。
+
 ```powershell
 cd backend
 .venv/Scripts/python.exe -m pytest tests -q
 # 只检查后台：
 .venv/Scripts/python.exe -m pytest tests/test_admin_monitor.py tests/test_cluster_schema.py -q
+# 隐匿入口与身份回归；后台前端另在 backend/admin-ui 运行 npm test 和 npm run build：
+.venv/Scripts/python.exe -m pytest tests/test_admin_web.py tests/test_admin_monitor.py tests/test_identity_config.py tests/test_oidc.py -q
 # 独立浏览器验收服务，使用一次性 SQLite、合成元数据，不读取生产环境文件：
 .venv/Scripts/python.exe tests/manual_admin_server.py
 ```
 
-验收地址 `http://127.0.0.1:18090/admin/`，开发用户名 `admin`。夹具会输出临时 `controls.json` 路径，将其中 `delay` 设置为 0–10 秒、`fail` 设置为 true/false，可复现加载、失败与恢复。夹具中节点心跳固定，会按真实超时规则自然离线。
+验收地址 `http://127.0.0.1:18090/console-test/`，开发用户名 `admin`。夹具会输出临时 `controls.json` 路径，将其中 `delay` 设置为 0–10 秒、`fail` 设置为 true/false，可复现加载、失败与恢复。夹具中节点心跳固定，会按真实超时规则自然离线。
 
 PostgreSQL 检查使用现有隔离 `pg_scope`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD` 后运行 `tests/test_admin_monitor_postgres.py`。它只使用 `nodecomics_concurrency_test` 内随机 schema，覆盖 PostgreSQL 统计表达式和最终迁移结构。
 

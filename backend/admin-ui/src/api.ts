@@ -53,7 +53,7 @@ export async function startLogin(config: AuthConfig) {
   const verifier = encode(crypto.getRandomValues(new Uint8Array(48)));
   const state = encode(crypto.getRandomValues(new Uint8Array(24)));
   const challenge = encode(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-  const redirect = `${location.origin}/admin/`;
+  const redirect = location.origin + location.pathname;
   sessionStorage.setItem(PENDING_KEY, JSON.stringify({state, verifier, redirect, created: Date.now()}));
   url.search = new URLSearchParams({response_type: 'code', client_id: config.client_id, redirect_uri: redirect,
     scope: config.scopes || 'openid profile', state, code_challenge: challenge, code_challenge_method: 'S256',

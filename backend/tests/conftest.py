@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 @pytest.fixture(autouse=True)
 def isolated_identity_environment(monkeypatch):
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ADMIN_WEB_PATH", "/console-test/")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
 
 

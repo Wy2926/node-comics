@@ -4,7 +4,7 @@
 
 ## 管理与使用
 
-管理员在 `/admin/#translation-providers` 创建供应商。首期渠道为 OpenAI，可创建多个供应商，各自保存名称、Base URL、模型、API Key、协议、重试与计量参数。协议可选 `chat_completions`、`responses`，模型必须明确填写。
+管理员在 `<ADMIN_WEB_PATH>#translation-providers` 创建供应商。首期渠道为 OpenAI，可创建多个供应商，各自保存名称、Base URL、模型、API Key、协议、重试与计量参数。协议可选 `chat_completions`、`responses`，模型必须明确填写。
 
 第一个供应商自动成为默认供应商；后续通过“设为默认”切换。默认选择仅影响新提交。未配置默认供应商，或默认供应商停用时，常规翻译不对新提交开放，不会自动改用另一供应商。`CLASSIC_ENABLED` 仍是图像引擎的总开关，OCR／LaMa／嵌字与计算资源池维持独立配置。
 

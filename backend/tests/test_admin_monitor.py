@@ -149,12 +149,14 @@ def test_shell_and_static_assets(client):
     from app.admin_web import ROOT
     if not (ROOT / "index.html").is_file():
         pytest.skip("Build admin-ui before checking production assets")
-    response=client.get("/admin/")
+    response=client.get("/console-test/")
     assert response.status_code == 200
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
     assert response.headers["cache-control"] == "private, no-store"
     assert "SHOULD_NOT_LEAK" not in response.text
     import re
-    for asset in re.findall(r'(?:src|href)="(/admin/assets/[^\"]+)"', response.text):
-        assert client.get(asset).status_code == 200
-    assert client.get("/admin/assets/secret.env").status_code == 404
+    assets = re.findall(r'(?:src|href)="(\./assets/[^\"]+)"', response.text)
+    assert assets
+    for asset in assets:
+        assert client.get("/console-test/" + asset.removeprefix("./")).status_code == 200
+    assert client.get("/console-test/assets/secret.env").status_code == 404

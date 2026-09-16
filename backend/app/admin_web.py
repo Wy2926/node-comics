@@ -1,11 +1,10 @@
 """Serve the React administration build from the API origin; data requires admin auth."""
 from pathlib import Path
 from urllib.parse import urlsplit
-from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from .config import settings
 
-router = APIRouter()
 ROOT = Path(__file__).parent / "admin_web" / "dist"
 
 
@@ -21,15 +20,28 @@ def page(filename):
         f"connect-src 'self' {token_origin}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"})
 
 
-@router.get("/admin", include_in_schema=False)
-@router.get("/admin/", include_in_schema=False)
 def admin_page():
     return page("index.html")
 
 
-@router.get("/admin/assets/{filename}", include_in_schema=False)
 def admin_asset(filename: str):
     from .errors import problem
     if not filename.endswith((".js", ".css")) or "/" in filename or "\\" in filename:
         problem("NOT_FOUND", "文件不存在", 404)
     return page("assets/" + filename)
+
+
+def create_router(path: str) -> APIRouter:
+    """Only register the configured entry; never publish it in the API schema."""
+    router = APIRouter(include_in_schema=False)
+    if not path:
+        return router
+
+    def canonical_page(request: Request):
+        # Relative assets and the exact OIDC redirect URI require a trailing slash.
+        return RedirectResponse(path + ("?" + request.url.query if request.url.query else ""), status_code=307)
+
+    router.add_api_route(path.rstrip("/"), canonical_page, methods=["GET"])
+    router.add_api_route(path, admin_page, methods=["GET"])
+    router.add_api_route(path + "assets/{filename}", admin_asset, methods=["GET"])
+    return router

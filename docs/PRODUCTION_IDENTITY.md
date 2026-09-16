@@ -15,6 +15,8 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 ## OIDC 必需项
 
+管理后台入口改为私有 `ADMIN_WEB_PATH`，为空时关闭页面。部署前须在 Logto 新增 `https://<服务域名><ADMIN_WEB_PATH>` 精确回调（含尾斜线）；保留插件及其他客户端回调，不改变现有身份端点、Client ID 或 Audience。新入口不会通过公开身份配置返回。迁移顺序见[后台入口与登录](ADMIN_CONSOLE.md#登录)。
+
 | 配置 | 要求 |
 | --- | --- |
 | `OIDC_ISSUER` | 令牌的精确 issuer，HTTPS |

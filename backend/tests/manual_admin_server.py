@@ -12,6 +12,7 @@ port = int(os.environ.get('ADMIN_FIXTURE_PORT', '18090'))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix()}",
     STORAGE_PATH=str(directory / "objects"), APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="admin-ui-isolated-signing-secret-0001",
     DEV_ADMIN_USERNAME="admin", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
+    ADMIN_WEB_PATH="/console-test/",
     OPENAI_API_KEY="", PROVIDERS_JSON="")
 from app.config import Settings
 Settings.model_config["env_file"] = None
@@ -39,7 +40,7 @@ initialize()
 with session_factory()() as db:
     configure_text_provider(db)
     seed(db)
-print(f"Synthetic admin fixture: http://127.0.0.1:{port}/admin/ (username: admin)", flush=True)
+print(f"Synthetic admin fixture: http://127.0.0.1:{port}/console-test/ (username: admin)", flush=True)
 print(f"ADMIN_FIXTURE_CONTROLS={controls}", flush=True)
 if __name__ == "__main__":
     import uvicorn

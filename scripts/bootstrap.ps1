@@ -31,6 +31,12 @@ if (-not (Test-Path -LiteralPath $localConfig)) {
 if (-not $Production -and -not (Select-String -LiteralPath $localConfig -Pattern '^APP_ENV=' -Quiet)) {
     [IO.File]::AppendAllText($localConfig, "`nAPP_ENV=development`n", [Text.UTF8Encoding]::new($false))
 }
+if (-not $Production -and -not (Select-String -LiteralPath $localConfig -Pattern '^ADMIN_WEB_PATH=' -Quiet)) {
+    $entryBytes = New-Object byte[] 16
+    [Security.Cryptography.RandomNumberGenerator]::Fill($entryBytes)
+    [IO.File]::AppendAllText($localConfig, "`nADMIN_WEB_PATH=/console-$([Convert]::ToHexString($entryBytes).ToLowerInvariant())/`n", [Text.UTF8Encoding]::new($false))
+    Write-Host "已在 $environmentFile 生成固定后台入口 ADMIN_WEB_PATH。"
+}
 foreach ($tokenName in $(if ($Production) { @() } else { @('CLASSIC_ENGINE_TOKEN') })) {
     if (-not (Select-String -LiteralPath $localConfig -Pattern "^$tokenName=" -Quiet)) {
         $tokenBytes = New-Object byte[] 32

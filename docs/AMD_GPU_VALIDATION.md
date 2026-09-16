@@ -1,6 +1,6 @@
 # RX 6900 XT 原模型部署与验收
 
-2026-09-16 文本供应商更新：本机启动后在 `/admin/#translation-providers` 创建 DB 供应商；本轮未重新运行真实 AMD／R2／付费文本链路，也未部署真实实例。以下性能和图片记录保留原验证范围。
+2026-09-16 文本供应商更新：本机启动后在 `<ADMIN_WEB_PATH>#translation-providers` 创建 DB 供应商；本轮未重新运行真实 AMD／R2／付费文本链路，也未部署真实实例。以下性能和图片记录保留原验证范围。
 
 2026-09-16 后续更新：当前 AMD 入口为 `mit-95227a2-classic-v4-dml-v4`，修复英文断词字典重复下载；预下载指定语言、离线校验及新版本切换见[字典说明](HYPHENATION_DICTIONARIES.md)。下文的 v1/v2/v3 性能记录保留原测试日期与范围。
 
@@ -49,7 +49,7 @@ Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torch
 
 入口沿用 API、control-worker、maintenance、compute-agent、classic-engine 的职责与 HTTPS/令牌协议。本机进程之间显式允许回环 HTTP，API 为 `http://127.0.0.1:18088`，引擎为 `http://127.0.0.1:18090`。所有服务只在回环地址监听，图像节点不获得 R2 或供应商密钥。
 
-私有 `.env` 配置 R2。脚本启动后会提示管理地址 `http://127.0.0.1:18088/admin/#translation-providers`，本地开发管理员用户名为 `admin`。在后台填写文本端点、模型和密钥，选择 OpenAI Chat Completions（默认）或 Responses；首个供应商自动成为默认。`-Smoke` 在没有启用的默认供应商时保持服务运行并等待，配置完成后自动继续。脚本不再读取旧文本密钥或回退到图片供应商密钥；服务未就绪或端口被占用时启动失败。
+私有 `.env` 配置 R2。脚本启动后会提示管理地址 `http://127.0.0.1:18088<ADMIN_WEB_PATH>#translation-providers`，本地开发管理员用户名为 `admin`。在后台填写文本端点、模型和密钥，选择 OpenAI Chat Completions（默认）或 Responses；首个供应商自动成为默认。`-Smoke` 在没有启用的默认供应商时保持服务运行并等待，配置完成后自动继续。脚本不再读取旧文本密钥或回退到图片供应商密钥；服务未就绪或端口被占用时启动失败。
 
 配置和默认选择只影响新任务；已有任务绑定 DB revision。数据库和备份含敏感密钥，必须限制访问权限。独立 RPM、停用暂停与总时限、API 及迁移边界见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据；首次验证本版请使用下方 Python 命令指定全新的 `--directory`，PowerShell 包装脚本的固定目录不应直接沿用旧任务。
 
