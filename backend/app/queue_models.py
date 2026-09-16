@@ -30,7 +30,14 @@ class ComputeNode(Base):
     engine_version: Mapped[str] = mapped_column(String(120))
     device: Mapped[str] = mapped_column(String(80))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    heartbeat_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime().evaluates_none(), default=now)
+    credential_hash: Mapped[str | None] = mapped_column(String(64))
+    config_version: Mapped[int] = mapped_column(Integer, default=1)
+    applied_config_version: Mapped[int] = mapped_column(Integer, default=0)
+    desired_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    supported_languages: Mapped[list] = mapped_column(JSON, default=list)
+    config_error: Mapped[str | None] = mapped_column(String(80))
+    runtime_report: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class JobStage(Base):

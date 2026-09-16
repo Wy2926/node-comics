@@ -51,10 +51,10 @@ Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torch
 本地数据库、令牌、任务回执和验证图片位于被 Git 忽略的 `private-test-data/amd-original-models/`。原图和最终译图仍保存私有 R2。相同验证目录重跑时沿用原任务，不重复调用已完成的文本任务；换图或换模型版本需使用不同验证目录：
 
 ```powershell
-backend/.venv/Scripts/python.exe scripts/run_local_amd.py --smoke --directory private-test-data/amd-another-sample --image samples/another.png
+backend/.venv/Scripts/python.exe scripts/run_local_node.py --device directml:0 --smoke --directory private-test-data/amd-another-sample --image samples/another.png
 ```
 
-Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_PROFILE=mit-directml`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v4`，与 v1/v2/v3 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、阶段 API、容量 1、设备锁、租约与缓存恢复协议保持一致。
+Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_VERSION=mit-95227a2-classic-v4-dml-v4`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v4`，与 v1/v2/v3 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、设备锁、租约与缓存恢复保持一致；节点身份、注册与容量已改为[后台配置](NODE_CONFIGURATION.md)。
 
 ## 实际证据
 

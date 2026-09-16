@@ -696,6 +696,160 @@
         }
       }
     },
+    "/internal/nodes/{node_id}/config": {
+      "get": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "Fetch Config",
+        "operationId": "fetch_config_internal_nodes__node_id__config_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/nodes/{node_id}/config/applied": {
+      "post": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "Config Applied",
+        "operationId": "config_applied_internal_nodes__node_id__config_applied_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigApplied"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/nodes/{node_id}/claim": {
       "post": {
         "tags": [
@@ -867,6 +1021,87 @@
         ],
         "summary": "Input Image",
         "operationId": "input_image_internal_leases__lease_id__input_get",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "x-lease-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Lease-Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/leases/{lease_id}/input/authorize": {
+      "get": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "Authorize Cached Input",
+        "operationId": "authorize_cached_input_internal_leases__lease_id__input_authorize_get",
         "parameters": [
           {
             "name": "lease_id",
@@ -1476,6 +1711,390 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/v1/admin/monitor/tasks": {
+      "get": {
+        "summary": "Tasks",
+        "operationId": "tasks_v1_admin_monitor_tasks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "attention",
+                    "awaiting_upload",
+                    "validating_upload",
+                    "queued",
+                    "running",
+                    "outcome_unknown",
+                    "unknown_released",
+                    "succeeded",
+                    "no_text",
+                    "failed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "classic",
+                    "redraw"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "realtime",
+                    "preload"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 36
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/monitor/tasks/{job_id}": {
+      "get": {
+        "summary": "Task Detail",
+        "operationId": "task_detail_v1_admin_monitor_tasks__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/monitor/overview": {
+      "get": {
+        "summary": "Overview",
+        "operationId": "overview_v1_admin_monitor_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/monitor/nodes": {
+      "get": {
+        "summary": "Nodes",
+        "operationId": "nodes_v1_admin_monitor_nodes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/monitor/users": {
+      "get": {
+        "summary": "Users",
+        "operationId": "users_v1_admin_monitor_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "plan",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "free",
+                    "plus"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/monitor/users/{user_id}": {
+      "get": {
+        "summary": "User Detail",
+        "operationId": "user_detail_v1_admin_monitor_users__user_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/health": {
@@ -2660,6 +3279,191 @@
             "HTTPBearer": []
           }
         ]
+      },
+      "post": {
+        "tags": [
+          "node administration"
+        ],
+        "summary": "Create",
+        "operationId": "create_v1_admin_compute_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/compute-nodes/{node_id}/config": {
+      "get": {
+        "tags": [
+          "node administration"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_v1_admin_compute_nodes__node_id__config_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "node administration"
+        ],
+        "summary": "Update",
+        "operationId": "update_v1_admin_compute_nodes__node_id__config_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/compute-nodes/{node_id}/rotate-credential": {
+      "post": {
+        "tags": [
+          "node administration"
+        ],
+        "summary": "Rotate",
+        "operationId": "rotate_v1_admin_compute_nodes__node_id__rotate_credential_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -2858,12 +3662,18 @@
             "maxItems": 3,
             "minItems": 1,
             "title": "Stages"
+          },
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "stages"
+          "stages",
+          "config_version"
         ],
         "title": "ClaimRequest"
       },
@@ -2937,6 +3747,51 @@
         ],
         "title": "CompletionRequest"
       },
+      "ConfigApplied": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "ENGINE_CONFIG_FAILED"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineOverrides"
+          },
+          "supported_languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh-Hans",
+                "zh-Hant",
+                "ja",
+                "en",
+                "ko"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Supported Languages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "ConfigApplied"
+      },
       "DevLogin": {
         "properties": {
           "username": {
@@ -2953,6 +3808,88 @@
           "username"
         ],
         "title": "DevLogin"
+      },
+      "EngineOverrides": {
+        "properties": {
+          "languages": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "zh-Hans",
+                    "zh-Hant",
+                    "ja",
+                    "en",
+                    "ko"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 5,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Languages"
+          },
+          "torch_threads": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torch Threads"
+          },
+          "opencv_threads": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opencv Threads"
+          },
+          "cache_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 8589934592.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Bytes"
+          },
+          "cache_ttl_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Ttl Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EngineOverrides"
       },
       "EntitlementsResponse": {
         "properties": {
@@ -3934,21 +4871,107 @@
         ],
         "title": "ModeEntitlement"
       },
-      "NodeRegistration": {
+      "NodeConfig": {
         "properties": {
-          "id": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.-]+$",
-            "title": "Id"
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
           },
+          "execution_slots": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Execution Slots",
+            "default": 1
+          },
+          "poll_seconds": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 0.05,
+            "title": "Poll Seconds",
+            "default": 1
+          },
+          "heartbeat_seconds": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 0.1,
+            "title": "Heartbeat Seconds",
+            "default": 10
+          },
+          "config_poll_seconds": {
+            "type": "number",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Config Poll Seconds",
+            "default": 15
+          },
+          "request_seconds": {
+            "type": "number",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Request Seconds",
+            "default": 30
+          },
+          "stage_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Stage Seconds",
+            "default": 900
+          },
+          "input_cache_bytes": {
+            "type": "integer",
+            "maximum": 8589934592.0,
+            "minimum": 0.0,
+            "title": "Input Cache Bytes",
+            "default": 134217728
+          },
+          "input_cache_ttl_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Input Cache Ttl Seconds",
+            "default": 900
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineOverrides"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NodeConfig"
+      },
+      "NodeCreate": {
+        "properties": {
           "name": {
             "type": "string",
             "maxLength": 120,
             "minLength": 1,
             "title": "Name"
           },
+          "resource_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Resource Id"
+          },
+          "config": {
+            "$ref": "#/components/schemas/NodeConfig"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "resource_id"
+        ],
+        "title": "NodeCreate"
+      },
+      "NodeRegistration": {
+        "properties": {
           "capabilities": {
             "items": {
               "type": "string",
@@ -3963,46 +4986,65 @@
             "minItems": 1,
             "title": "Capabilities"
           },
-          "capacity": {
-            "type": "integer",
-            "maximum": 32.0,
-            "minimum": 1.0,
-            "title": "Capacity",
-            "default": 1
-          },
           "engine_version": {
             "type": "string",
             "maxLength": 120,
+            "minLength": 1,
             "title": "Engine Version"
           },
           "device": {
             "type": "string",
             "maxLength": 80,
+            "minLength": 1,
             "title": "Device"
           },
           "resource_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 120
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
             "title": "Resource Id"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "id",
-          "name",
           "capabilities",
           "engine_version",
-          "device"
+          "device",
+          "resource_id"
         ],
         "title": "NodeRegistration"
+      },
+      "NodeUpdate": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "config": {
+            "$ref": "#/components/schemas/NodeConfig"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "name",
+          "enabled",
+          "config"
+        ],
+        "title": "NodeUpdate"
       },
       "PauseRequest": {
         "properties": {

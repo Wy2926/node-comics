@@ -31,9 +31,10 @@ export type TaskDetail = Task & {
     seconds: number | null; cost_state: string; accounted_micros: number; error_code: string | null}[];
 };
 export type Node = {
+  config_version: number; applied_config_version: number; config_error: string | null; supported_languages: string[];
   id: string; name: string; resource_id: string; device: string; kind: string; capacity: number;
   capabilities: string[]; engine_version: string; enabled: boolean; online: boolean;
-  heartbeat_at: string; heartbeat_age_seconds: number; running: number; expired_leases: number; occupied: number;
+  heartbeat_at: string | null; heartbeat_age_seconds: number | null; running: number; expired_leases: number; occupied: number;
   completed_24h: {outcome: string; count: number; avg_seconds: number}[];
 };
 export type Nodes = {items: Node[]; generated_at: string; timeout_seconds: number};

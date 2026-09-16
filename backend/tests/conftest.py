@@ -21,7 +21,6 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_MODEL", "gpt-image-2")
     monkeypatch.setenv("PROVIDERS_JSON", "")
     monkeypatch.setenv("CLASSIC_ENABLED", "false")
-    monkeypatch.setenv("CLUSTER_NODE_TOKEN", "isolated-cluster-node-token-not-for-production")
     monkeypatch.setenv("TEXT_API_KEY", "isolated-test-text-key")
     monkeypatch.setenv("TEXT_BASE_URL", "https://text.example/v1")
     monkeypatch.setenv("CLASSIC_ENGINE_TOKEN", "isolated-engine-token")
@@ -114,7 +113,7 @@ def control_node(db, stage="redraw"):
     from app.queue_models import ComputeNode
     node_id = "test-control-" + stage
     if not db.get(ComputeNode, node_id):
-        db.add(ComputeNode(id=node_id, name=node_id, resource_id=node_id, capabilities=[stage], capacity=1,
+        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id=node_id, name=node_id, resource_id=node_id, capabilities=[stage], capacity=1,
                            engine_version="control", device="network"))
         db.flush()
     return node_id

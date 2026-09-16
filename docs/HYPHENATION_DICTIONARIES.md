@@ -1,6 +1,6 @@
 # 嵌字字典准备与离线运行
 
-2026-09-16：修复英文嵌字反复联网下载断词字典。正常 AMD 版本为 `mit-95227a2-classic-v4-dml-v4`，CPU/CUDA 为 `mit-95227a2-classic-v5-cluster`；渲染缓存版本为 `masked-png-v2-hyphen-32b006a2`。模型、字体、原排版算法和节点执行容量保持原配置。
+2026-09-16：修复英文嵌字反复联网下载断词字典。正常 AMD 版本为 `mit-95227a2-classic-v4-dml-v4`，CPU/CUDA 为 `mit-95227a2-classic-v5-cluster`；渲染缓存版本为 `masked-png-v2-hyphen-32b006a2`。模型、字体与原排版算法保持原配置；节点执行位现由服务端配置。
 
 ## 原因与修复
 
@@ -8,7 +8,7 @@
 
 `hyphenation.py` 现在将 `en`、`ENG`、`en_GB` 规范化到同一个已加载对象，直接从经过校验的文件初始化 PyHyphen 4.0.4 的原 C 引擎。保留原 `syllables`、长词换行和图像合成语义，不在运行时调用会下载的构造函数。布局与绘制共用同一选择器。
 
-字典必须在节点接单前准备并加载。已配置字典缺失或校验失败时启动失败，提示准备命令；渲染请求不会联网补字典。中、日、韩不使用该拉丁语系断词字典，沿用字符排版路径。`/health` 的 `hyphenation` 字段显示目录版本、已加载地区语言与 `network:false`。
+字典必须在节点接单前准备并加载。启动时自动补全并校验所声明语言资源，无法准备时启动失败；渲染请求不会联网补字典。中、日、韩不使用该拉丁语系断词字典，沿用字符排版路径。`/health` 的 `hyphenation` 字段显示目录版本、已加载地区语言与 `network:false`。
 
 ## 指定语言提前下载
 
@@ -34,27 +34,13 @@ services/classic-engine/.venv/Scripts/python.exe services/classic-engine/prepare
 
 ## 启动配置
 
-| 配置 | 含义 |
-| --- | --- |
-| `ENGINE_DICTIONARY_LANGUAGES` | 接单前准备并加载的语言列表，逗号分隔，默认 `en` |
-| `ENGINE_DICTIONARY_DIR` | 独立引擎字典根目录，默认 `${MODEL_DIR}/hyphenation` |
+使用 `ENGINE_CONFIG_FILE` 指定 JSON，本地 `runtime.languages` 声明产品支持的目标语言，`dictionary_dir` 可指定字典根目录；默认 `${model_dir}/hyphenation`。节点首次启动在模型接单前自动补全缺失／损坏的所需文件，校验通过才 ready。准备工具仍可独立使用 `--languages` / `--all` / `--verify` 管理目录中的其他字典，但不会据此扩展产品目标语言。
 
-本机 `run_local_amd.py` 在启动 API/引擎前调用准备入口，模型目录固定为仓库的 `engines/mit-models`。本机语言列表支持 `.env` / `deploy/.env.local`；进程环境同名变量优先：
-
-```powershell
-$env:ENGINE_DICTIONARY_LANGUAGES = 'en,en-US,de,fr'
-./scripts/start-local-amd.ps1
-```
-
-Docker 镜像在 `prepare.py` 后调用 `prepare_dictionaries.py`，字典随已有 `/models` 卷保存。Compose 向引擎传递 `ENGINE_DICTIONARY_LANGUAGES`。独立离线部署先用准备命令下载/校验，再启动 `uvicorn server:app`；语言列表或字典版本改变后重启引擎。
-
-这是有缓存版本变更的更新。切换控制服务与节点前应排空旧版本任务；旧任务不会自动改写为新配置，已完成译图仍保留。不得为旧任务盲目重复请求文本供应商。
+服务端 `engine.languages` 可覆盖本地声明；变更时节点停止新领取、等待当前阶段完成、准备语言资源并确认应用版本。翻译请求不发起字典下载。配置样例、线程参数和完整协议见[节点配置](NODE_CONFIGURATION.md)。
 
 ## 执行位的含义
 
-当前一个图像节点注册 `capacity=1`，检测/OCR、抹字、嵌字共用该节点唯一执行位。它们是一个引擎暴露的三个阶段能力，不是三个可同时占用的独立服务池。计算代理完成当前阶段及控制端交付后才领取下一阶段。
-
-两个 LaMa 子进程并行的是当前页的修复裁剪。文本 LLM 使用独立控制资源池，能够与图像阶段重叠；多台独立图像节点也可各执行一项。本次修复移除了嵌字的重复字典请求，没有增加节点并发或解除设备锁。
+后台设置每节点 1–32 个在途阶段执行位，代理据此并发处理阶段；单物理设备模型保留串行锁。AMD 两个 LaMa 子进程并行处理当前页裁剪，不是两个额外节点。文本 LLM 仍有独立控制资源池。
 
 ## 字典来源与许可
 

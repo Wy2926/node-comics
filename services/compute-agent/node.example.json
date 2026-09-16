@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "control_url": "https://control.example.com",
+  "node_id": "REPLACE_WITH_ADMIN_ISSUED_NODE_ID",
+  "node_token": "REPLACE_WITH_THIS_NODE_CREDENTIAL",
+  "engine_url": "http://127.0.0.1:8000",
+  "engine_token": "REPLACE_WITH_LOCAL_ENGINE_CREDENTIAL",
+  "allow_http": false
+}

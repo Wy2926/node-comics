@@ -199,6 +199,8 @@ def compute_nodes(user: User = Depends(admin), db: Session = Depends(get_db)):
     at = now()
     return {"items": [{"id": n.id, "name": n.name, "resource_id": n.resource_id, "device": n.device,
         "capabilities": n.capabilities, "engine_version": n.engine_version, "capacity": n.capacity,
+        "config_version": n.config_version, "applied_config_version": n.applied_config_version,
+        "config_error": n.config_error, "supported_languages": n.supported_languages,
         "running": busy.get(n.id, 0), "enabled": n.enabled,
-        "online": n.heartbeat_at > at - timedelta(seconds=settings().cluster_node_timeout_seconds),
-        "heartbeat_at": n.heartbeat_at.isoformat() + "Z"} for n in db.scalars(select(ComputeNode).order_by(ComputeNode.id))]}
+        "online": bool(n.heartbeat_at and n.heartbeat_at > at - timedelta(seconds=settings().cluster_node_timeout_seconds)),
+        "heartbeat_at": n.heartbeat_at.isoformat() + "Z" if n.heartbeat_at else None} for n in db.scalars(select(ComputeNode).order_by(ComputeNode.id))]}

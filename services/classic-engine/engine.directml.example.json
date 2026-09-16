@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profile": "mit-directml",
+  "device": "directml:0",
+  "resource_id": "machine-b:directml:0",
+  "model_dir": "../../engines/mit-models",
+  "font": "../../engines/mit-native/fonts/NotoSansMonoCJK-VF.ttf.ttc",
+  "lock_dir": "../../engines/device-locks",
+  "torch_interop_threads": 1,
+  "inpaint_workers": 2,
+  "runtime": {
+    "languages": ["zh-Hans", "zh-Hant", "ja", "en", "ko"],
+    "torch_threads": 4,
+    "opencv_threads": 2,
+    "cache_bytes": 268435456,
+    "cache_ttl_seconds": 900
+  }
+}

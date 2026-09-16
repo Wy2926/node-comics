@@ -7,8 +7,13 @@ from io import BytesIO
 import json
 import logging
 import os
+import secrets
 from pathlib import Path
 import time
+
+from engine_config import RuntimeConfig, load
+LOCAL_RUNTIME, INTEROP_THREADS = load()
+effective_runtime = LOCAL_RUNTIME
 
 import cv2
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -27,6 +32,7 @@ from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
 from hyphenation import configure_renderer
+from prepare_dictionaries import prepare as prepare_languages
 
 PROFILE = os.environ.get('ENGINE_PROFILE', 'mit')
 DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECTML_OPTIMIZED', '1') == '1'
@@ -43,12 +49,12 @@ FONT = os.environ.get('ENGINE_FONT', '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc'
 LANG = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'en': 'ENG', 'ko': 'KOR'}
 Image.MAX_IMAGE_PIXELS = 24_000_000
 lock = DeviceLock(RESOURCE_ID, os.environ.get('ENGINE_LOCK_DIR', '/tmp/comics-device-locks'))
-cache = ImageCache(int(os.environ.get('ENGINE_CACHE_BYTES', str(256 * 1024 * 1024))),
-                   int(os.environ.get('ENGINE_CACHE_TTL_SECONDS', '900')))
+cache = ImageCache(LOCAL_RUNTIME.cache_bytes, LOCAL_RUNTIME.cache_ttl_seconds)
 MAX_CHECKPOINT = 4 * 1024 * 1024
 MAX_RESPONSE = 96 * 1024 * 1024
 models = {}
 ready = False
+INSTANCE_ID = secrets.token_hex(16)
 device_evidence = None
 panel_worker = None
 inpaint_pool = None
@@ -59,10 +65,14 @@ dictionary_store = None
 async def lifespan(app):
     global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
-    torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '4')))
+    torch.set_num_threads(LOCAL_RUNTIME.torch_threads)
+    torch.set_num_interop_threads(INTEROP_THREADS)
+    cv2.setNumThreads(LOCAL_RUNTIME.opencv_threads)
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
     text_render.FALLBACK_FONTS = [FONT]
-    dictionary_store = configure_renderer(text_render)
+    from hyphenation import default_directory
+    prepare_languages(default_directory(), LOCAL_RUNTIME.languages)
+    dictionary_store = configure_renderer(text_render, languages=LOCAL_RUNTIME.languages)
     # Fail startup instead of silently moving a requested GPU workload to CPU.
     if PROFILE == 'mit-directml':
         from mit_directml import DirectMLRuntime
@@ -75,6 +85,8 @@ async def lifespan(app):
         if not torch.cuda.is_available():
             raise RuntimeError('Configured CUDA device is unavailable')
         torch.cuda.set_device(torch.device(DEVICE))
+        from cuda_runtime import CudaRuntime
+        device_evidence = CudaRuntime(DEVICE)
     async with lock.hold():
         with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
             models.update(detector=DefaultDetector(), ocr=Model48pxOCR())
@@ -111,7 +123,7 @@ async def lifespan(app):
             panel_worker.close()
             panel_worker = None
         if inpaint_pool:
-            if device_evidence and device_evidence.profile_dir:
+            if device_evidence and getattr(device_evidence, 'profile_dir', None):
                 (device_evidence.profile_dir / 'inpainting-workers.json').write_text(json.dumps(inpaint_pool.evidence(), indent=2), encoding='utf-8')
             inpaint_pool.close()
             inpaint_pool = None
@@ -134,13 +146,51 @@ def authorized(authorization: str = Header(default='')):
 
 @app.get('/health')
 def health():
-    return {'ready': ready, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
-            'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
+    return {'ready': ready, 'instance_id': INSTANCE_ID, 'version': VERSION, 'device': DEVICE, 'resource_id': RESOURCE_ID,
+            'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
+            'supported_languages': effective_runtime.languages, 'runtime': effective_runtime.model_dump(),
+            'torch_interop_threads': INTEROP_THREADS,
+            'inference_serialized': True,
+            'cuda': {'available': torch.cuda.is_available(), 'device_name': torch.cuda.get_device_name(DEVICE),
+                     'torch_version': torch.__version__} if DEVICE.startswith('cuda') else None,
             'panel_execution': 'parallel-process' if panel_worker else 'serial',
             'input_cache_protocol': 1,
             'hyphenation': dictionary_store.describe() if dictionary_store else None,
             'inpaint_workers': inpaint_pool.evidence() if inpaint_pool else [],
             **({'inference': device_evidence.evidence()} if device_evidence else {})}
+
+
+@app.post('/internal/config', dependencies=[Depends(authorized)])
+async def configure(request: Request):
+    global effective_runtime, dictionary_store, cache
+    from hyphenation import default_directory, DictionaryStore
+    from starlette.concurrency import run_in_threadpool
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > 8192:
+            raise HTTPException(413)
+    try:
+        overrides = json.loads(raw)
+        updated = RuntimeConfig.model_validate({**LOCAL_RUNTIME.model_dump(), **overrides})
+        # Download and verify before taking the execution lock. Failure leaves the
+        # previous complete runtime active; no unverified language is advertised.
+        await run_in_threadpool(prepare_languages, default_directory(), updated.languages)
+        store = DictionaryStore(default_directory(), updated.languages)
+        async with lock.hold():
+            torch.set_num_threads(updated.torch_threads)
+            cv2.setNumThreads(updated.opencv_threads)
+            if inpaint_pool:
+                inpaint_pool.threads = updated.torch_threads
+                inpaint_pool.opencv_threads = updated.opencv_threads
+            text_render.select_hyphenator = store.select
+            dictionary_store = store
+            if (updated.cache_bytes, updated.cache_ttl_seconds) != (cache.max_bytes, cache.ttl_seconds):
+                cache = ImageCache(updated.cache_bytes, updated.cache_ttl_seconds)
+            effective_runtime = updated
+        return {'runtime': updated.model_dump(), 'supported_languages': updated.languages}
+    except Exception:
+        return JSONResponse(status_code=422, content={'error': 'ENGINE_CONFIG_FAILED'})
 
 
 def decode(value, mode='RGB'):
@@ -283,6 +333,8 @@ async def process(stage: str, request: Request):
             raise HTTPException(413)
     try:
         body = json.loads(raw)
+        if body.get('language') and body['language'] not in effective_runtime.languages:
+            raise ValueError('Unsupported language')
         if body['config']['version'] != VERSION:
             raise HTTPException(409, 'Engine version changed')
         if stage != 'analyze' and len(json.dumps(body['analysis'], allow_nan=False).encode()) > MAX_CHECKPOINT:

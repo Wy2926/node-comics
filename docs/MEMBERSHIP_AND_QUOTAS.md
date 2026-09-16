@@ -128,7 +128,7 @@ User/MembershipOperation 保存会员段与审计，QuotaPeriod 保存自动周�
 
 `GET /v1/me/entitlements` 返回 queue_capacity、realtime_slots 和 scheduler_weight；`GET /v1/me/queues` 返回两个独立模式。用户可暂停和调整本人阅读顺序，不能自行提高容量、实时上限或调度权重。具体 API 见[集群说明](TRANSLATION_CLUSTER_DESIGN.md)。
 
-新基线 `cluster_0001` 删除旧 preview/batch、Outbox 与准入模型；不做旧数据回填、双写或兼容包装。管理员会员、限时赠送、用量统计和反馈保持独立职责。
+新基线 `nodes_0001` 删除旧 preview/batch、Outbox 与准入模型；不做旧数据回填、双写或兼容包装。管理员会员、限时赠送、用量统计和反馈保持独立职责。
 
 ## 7. 实现验收要求
 
@@ -163,6 +163,6 @@ User/MembershipOperation 保存会员段与审计，QuotaPeriod 保存自动周�
 
 ### 初始化与验证
 
-新数据库基线为 `cluster_0001`。API、dispatcher 和 worker 必须使用同一新数据库和匹配版本的客户端；不得将旧迁移版本直接 stamp 为新版本。请配置新的数据库，保留或单独处理旧数据；本次不清空现有产品数据库和存储。
+新数据库基线为 `nodes_0001`。API、dispatcher 和 worker 必须使用同一新数据库和匹配版本的客户端；不得将旧迁移版本直接 stamp 为新版本。请配置新的数据库，保留或单独处理旧数据；本次不清空现有产品数据库和存储。
 
 验证命令、证据与剩余边界见[会员额度实现与验收](MEMBERSHIP_IMPLEMENTATION.md)。支付订阅、会员定价、活动发放前端和公开部署仍在后续范围。

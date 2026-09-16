@@ -81,17 +81,18 @@ class AgentTests(unittest.TestCase):
                 'config': {'engine': {'version': 'v4'}},
                 'input': {'url': '/internal/leases/lease-1/input', 'sha256': hashlib.sha256(b'original').hexdigest()}}
 
-    def test_register_only_advertises_warm_engine_and_single_device_slot(self):
+    def test_register_only_reports_warm_engine_without_self_assigning_slots(self):
         received = []
         def route(request):
             if request.url.path == '/health':
-                return httpx.Response(200, json={'ready': True, 'version': 'v4', 'device': 'cpu',
+                return httpx.Response(200, json={'ready': True, 'instance_id': 'engine-1', 'version': 'v4', 'device': 'cpu',
                     'resource_id': 'machine-a:cpu', 'capabilities': ['analyze', 'inpaint', 'render']})
             received.append(json.loads(request.content))
             return httpx.Response(200, json={'node_id': 'node-a'})
         agent = Agent(self.config(), transport=httpx.MockTransport(route))
         agent.register()
-        self.assertEqual(received[0]['capacity'], 1)
+        self.assertNotIn('capacity', received[0])
+        self.assertNotIn('id', received[0])
         self.assertEqual(received[0]['resource_id'], 'machine-a:cpu')
 
     def test_same_completion_replayed_without_reexecuting_engine(self):

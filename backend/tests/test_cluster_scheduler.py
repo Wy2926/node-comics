@@ -39,7 +39,7 @@ def scheduler_case(text_database):
                          storage_key='isolated/' + owner.id, storage_backend='r2', mime='image/png',
                          width=80, height=64, byte_size=100, expires_at=now() + timedelta(days=1)))
         for index in range(4):
-            db.add(ComputeNode(id='node-' + str(index), name='device', capabilities=['analyze', 'inpaint', 'render'],
+            db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['analyze', 'inpaint', 'render'],
                                capacity=1, resource_id='physical-' + str(index), engine_version=config['engine']['version'], device='cpu'))
         db.commit()
     return config
@@ -86,6 +86,38 @@ def test_free_realtime_precedes_member_preload(scheduler_case):
     add_job(scheduler_case, 'plus-user')
     realtime = add_job(scheduler_case, 'free-user', realtime=True)
     assert claim().job_id == realtime
+
+
+def test_server_slot_reduction_and_pending_configuration_preserve_current_leases(scheduler_case):
+    for _ in range(4):
+        add_job(scheduler_case)
+    with session_factory()() as db:
+        db.get(ComputeNode, 'node-0').capacity = 2
+        db.commit()
+    first, second = claim(), claim()
+    assert first and second and claim() is None
+    with session_factory()() as db:
+        node = db.get(ComputeNode, 'node-0')
+        node.capacity, node.config_version = 1, 2
+        db.commit()
+        assert current_lease(db, first.id, first.token)[0].id == first.id
+    assert claim() is None
+    finish_quantum(first.id, rearm=False)
+    finish_quantum(second.id, rearm=False)
+    assert claim() is None  # no work until the exact desired version is applied
+    with session_factory()() as db:
+        db.get(ComputeNode, 'node-0').applied_config_version = 2
+        db.commit()
+    assert claim() is not None and claim() is None
+
+
+def test_node_language_routing_does_not_consume_unsupported_work(scheduler_case):
+    job = add_job(scheduler_case)
+    with session_factory()() as db:
+        db.get(ComputeNode, 'node-0').supported_languages = ['en']
+        db.commit()
+    assert claim() is None
+    assert claim('node-1').job_id == job
 
 
 def test_realtime_continuous_load_preserves_preload_service(scheduler_case):

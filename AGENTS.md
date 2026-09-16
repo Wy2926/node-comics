@@ -13,6 +13,7 @@
 | 常规翻译、OCR、LaMa 抹字、嵌字、LLM 与成本 | [常规翻译调研](docs/CLASSIC_TRANSLATION_RESEARCH.md) |
 | 普通／PLUS、会员权益、周期额度与计费替换 | [会员与翻译额度设计](docs/MEMBERSHIP_AND_QUOTAS.md) |
 | 翻译集群、预上传、实时／预存优先级与队列重构 | [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) |
+| 节点独立身份、执行位、配置同步、语言与线程 | [节点配置](docs/NODE_CONFIGURATION.md) |
 
 只读取与本次任务有关的部分。代码、配置和实际运行结果用于核实当前实现；文档中的建议、候选与未来里程碑仍保留其状态。发现偏差时说明并在当前范围内修正，不把旧文档或未实现的目录当作现状。
 

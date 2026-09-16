@@ -1,6 +1,6 @@
 # Node Comics 架构 v0.4
 
-2026-09-15：前后端翻译调度已改为持久提交清单、双模式加权阶段队列与独立计算节点。规则、算法、API 和故障边界见[集群设计与实现](TRANSLATION_CLUSTER_DESIGN.md)，启动见[后端说明](../backend/README.md)。新基线 `cluster_0001`，无旧结构兼容。
+2026-09-15：前后端翻译调度已改为持久提交清单、双模式加权阶段队列与独立计算节点。规则、算法、API 和故障边界见[集群设计与实现](TRANSLATION_CLUSTER_DESIGN.md)，启动见[后端说明](../backend/README.md)。新基线 `nodes_0001`，无旧结构兼容。
 
 ## 结构
 

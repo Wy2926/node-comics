@@ -1,7 +1,7 @@
 """Fresh cluster schema; existing installations use a separate database."""
 from alembic import op
 import sqlalchemy as sa
-revision = "cluster_0001"
+revision = "nodes_0001"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -20,7 +20,14 @@ def upgrade():
     sa.Column('engine_version', sa.String(length=120), nullable=False),
     sa.Column('device', sa.String(length=80), nullable=False),
     sa.Column('enabled', sa.Boolean(), nullable=False),
-    sa.Column('heartbeat_at', sa.DateTime(), nullable=False),
+    sa.Column('heartbeat_at', sa.DateTime(), nullable=True),
+    sa.Column('credential_hash', sa.String(length=64), nullable=True),
+    sa.Column('config_version', sa.Integer(), nullable=False),
+    sa.Column('applied_config_version', sa.Integer(), nullable=False),
+    sa.Column('desired_config', sa.JSON(), nullable=False),
+    sa.Column('supported_languages', sa.JSON(), nullable=False),
+    sa.Column('config_error', sa.String(length=80), nullable=True),
+    sa.Column('runtime_report', sa.JSON(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('resource_id')
     )
@@ -370,6 +377,7 @@ def upgrade():
     sa.Column('stage_id', sa.String(length=36), nullable=False),
     sa.Column('job_id', sa.String(length=36), nullable=False),
     sa.Column('node_id', sa.String(length=80), nullable=False),
+    sa.Column('executor_id', sa.String(length=160), nullable=True),
     sa.Column('owner_id', sa.String(length=36), nullable=False),
     sa.Column('generation', sa.Integer(), nullable=False),
     sa.Column('resource_pool', sa.String(length=120), nullable=False),
@@ -393,6 +401,8 @@ def upgrade():
     op.create_index(op.f('ix_execution_leases_job_id'), 'execution_leases', ['job_id'], unique=False)
     op.create_index(op.f('ix_execution_leases_node_id'), 'execution_leases', ['node_id'], unique=False)
     op.create_index(op.f('ix_execution_leases_stage_id'), 'execution_leases', ['stage_id'], unique=False)
+    op.create_index('ix_jobs_created_at', 'jobs', ['created_at'])
+    op.create_index('ix_jobs_completed_at', 'jobs', ['completed_at'])
     op.create_table('text_calls',
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('job_id', sa.String(length=36), nullable=False),

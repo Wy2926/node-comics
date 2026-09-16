@@ -8,6 +8,9 @@ if (-not (Test-Path -LiteralPath '.env')) {
 }
 $localConfig = Join-Path $projectRoot 'deploy/.env.local'
 New-Item -ItemType Directory -Path (Split-Path -Parent $localConfig) -Force | Out-Null
+if (-not (Test-Path -LiteralPath 'deploy/engine.json')) {
+    Copy-Item -LiteralPath 'deploy/engine.example.json' -Destination 'deploy/engine.json'
+}
 if (-not (Test-Path -LiteralPath $localConfig)) {
     $pgBytes = New-Object byte[] 24
     $authBytes = New-Object byte[] 48
@@ -21,7 +24,7 @@ if (-not (Test-Path -LiteralPath $localConfig)) {
     [IO.File]::WriteAllText($localConfig, $configuration, [Text.UTF8Encoding]::new($false))
     Write-Host '已生成仅供本地环境使用的隔离数据库密码与登录签名密钥。'
 }
-foreach ($tokenName in @('CLASSIC_ENGINE_TOKEN', 'CLUSTER_NODE_TOKEN')) {
+foreach ($tokenName in @('CLASSIC_ENGINE_TOKEN')) {
     if (-not (Select-String -LiteralPath $localConfig -Pattern "^$tokenName=" -Quiet)) {
         $tokenBytes = New-Object byte[] 32
         [Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
@@ -34,6 +37,10 @@ if ($Start) {
     $composeArgs = @('compose', '--env-file', '.env', '--env-file', 'deploy/.env.local')
     if ($Classic) { $composeArgs += @('--profile', 'classic') }
     $composeArgs += @('up', '-d', '--build')
+    if ($Classic -and (-not (Select-String -LiteralPath $localConfig -Pattern '^NODE_TOKEN=.+$' -Quiet) -or -not (Select-String -LiteralPath $localConfig -Pattern '^NODE_ID=.+$' -Quiet))) {
+        $composeArgs += @('api', 'control-worker', 'maintenance', 'classic-engine')
+        Write-Host '后台添加翻译节点后，将 NODE_ID 与独立 NODE_TOKEN 写入 deploy/.env.local，再运行 -Start -Classic 启动代理。'
+    }
     & docker @composeArgs
     if ($LASTEXITCODE -ne 0) { throw 'Docker 启动失败' }
 }

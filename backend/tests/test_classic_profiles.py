@@ -6,10 +6,10 @@ from app.providers import digest
 
 def test_directml_changes_cache_identity_without_downgrading_models(client, monkeypatch):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-    monkeypatch.setenv('CLASSIC_ENGINE_PROFILE', 'mit')
+    monkeypatch.setenv('CLASSIC_ENGINE_VERSION', 'mit-95227a2-classic-v5-cluster')
     settings.cache_clear()
     cpu = snapshot()
-    monkeypatch.setenv('CLASSIC_ENGINE_PROFILE', 'mit-directml')
+    monkeypatch.setenv('CLASSIC_ENGINE_VERSION', 'mit-95227a2-classic-v4-dml-v4')
     settings.cache_clear()
     amd = snapshot()
     assert digest(cpu) != digest(amd)

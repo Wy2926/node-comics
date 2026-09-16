@@ -62,7 +62,7 @@ def engine(folder, port, *, optimized=True, threads=4, inpaint_workers=None):
         env['ENGINE_INPAINT_WORKERS'] = str(inpaint_workers)
     flags = subprocess.CREATE_NO_WINDOW
     with (folder/'engine.log').open('w', encoding='utf-8') as log, (folder/'monitor.log').open('w') as monitor_log:
-        child = subprocess.Popen([str(PYTHON), str(ROOT/'scripts/run_local_amd.py'), '--engine-process',
+        child = subprocess.Popen([str(PYTHON), str(ROOT/'scripts/run_local_node.py'), '--engine-process',
                                   '--engine-port', str(port)], env=env, cwd=folder,
                                  stdout=log, stderr=subprocess.STDOUT, creationflags=flags)
         monitor = subprocess.Popen(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(ROOT/'scripts/monitor_amd_pool.ps1'),

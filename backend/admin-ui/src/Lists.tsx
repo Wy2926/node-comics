@@ -1,4 +1,4 @@
-import type {AdminUser, Nodes as NodesData, Task} from './types';
+import type {AdminUser, Node, Nodes as NodesData, Task} from './types';
 import {Badge, duration, Empty, Jump, label, number, Table, time} from './ui';
 
 export function Tasks({items, onTask}: {items: Task[]; onTask: (id: string) => void}) {
@@ -30,7 +30,7 @@ export function Users({items, onUser}: {items: AdminUser[]; onUser: (id: string)
     </tr>)}
   </Table>;
 }
-export function Nodes({data}: {data: NodesData}) {
+export function Nodes({data, onConfigure}: {data: NodesData; onConfigure: (node: Node) => void}) {
   if (!data.items.length) return <Empty>尚未注册计算节点</Empty>;
   return <><div className="node-grid">{data.items.map(n => {
     const completed = n.completed_24h.reduce((s, r) => s + r.count, 0);
@@ -44,9 +44,12 @@ export function Nodes({data}: {data: NodesData}) {
       <progress max={Math.max(n.capacity, n.occupied, 1)} value={n.occupied} aria-label={`${n.name}执行位占用`}/>
       <p className="panel-note">{n.running} 个有效租约 · {n.expired_leases} 个过期待回收</p>
       <dl className="node-info"><dt>资源 ID</dt><dd>{n.resource_id}</dd><dt>引擎版本</dt><dd>{n.engine_version}</dd>
+        {n.kind !== 'control_pool' && <><dt>配置同步</dt><dd>{n.config_error ? '应用失败 · ' + n.config_error : n.config_version === n.applied_config_version ? `已应用 v${n.config_version}` : `等待应用 v${n.config_version}（当前 v${n.applied_config_version}）`}</dd>
+          <dt>支持语言</dt><dd>{n.supported_languages.join(' / ') || '等待节点报告'}</dd></>}
         <dt>最后心跳</dt><dd>{time(n.heartbeat_at)}</dd><dt>心跳间隔</dt><dd>{duration(n.heartbeat_age_seconds)}</dd>
         <dt>24 小时完成阶段</dt><dd>{number(success)} 成功 / {number(completed - success)} 其他</dd><dt>平均阶段占用</dt><dd>{duration(average)}</dd></dl>
       <Jump view="tasks" params={{node_id: n.id}}>查看参与任务 ↗</Jump>
+      {n.kind !== 'control_pool' && <button className="secondary" onClick={() => onConfigure(n)}>配置节点</button>}
     </article>;
   })}</div><p className="footnote">超过 {data.timeout_seconds} 秒未报告心跳视为离线。过期租约在回收前仍占容量；阶段完成数包含上传校验与重试，不等于翻译页数。</p></>;
 }

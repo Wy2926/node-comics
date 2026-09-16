@@ -3,6 +3,8 @@ import {authError, type AuthConfig, errorText, finishLogin, getAdmin, hasSession
 import {TaskDetail, UserDetail} from './Details';
 import {Nodes, Tasks, Users} from './Lists';
 import {Overview} from './Overview';
+import {NodeConfigDialog} from './NodeConfig';
+import type {Node} from './types';
 import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
 
@@ -84,6 +86,7 @@ function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClos
 
 function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: View; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
   const [detail, setDetail] = useState<Target>();
+  const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
   const allowed = view === 'tasks' ? ['mode', 'status', 'priority', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
   for (const key of allowed) if (params.get(key)) query.set(key, params.get(key)!);
@@ -100,13 +103,15 @@ function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}
     <div aria-busy={busy}>
       {!data && (busy ? <div className="loading" role="status">正在读取数据…</div> : <Empty>暂时无法读取数据，请点击刷新重试</Empty>)}
       {data && view === 'overview' && <Overview data={data as OverviewData}/>}
-      {data && view === 'nodes' && <Nodes data={data as NodesData}/>}
+      {view === 'nodes' && <div className="node-actions"><button className="primary" onClick={() => setNodeConfig('new')}>＋ 添加翻译节点</button></div>}
+      {data && view === 'nodes' && <Nodes data={data as NodesData} onConfigure={setNodeConfig}/>}
       {data && (view === 'tasks' || view === 'users') && <><section className="panel list-panel">
         {view === 'tasks' ? <Tasks items={(data as Page<Task>).items} onTask={id => setDetail({kind: 'tasks', id})}/> : <Users items={(data as Page<AdminUser>).items} onUser={id => setDetail({kind: 'users', id})}/>}
         <Pagination total={page!.total} count={page!.items.length} offset={Number(params.get('offset') || 0)} next={page!.next_offset} onPage={offset => onNavigate({...Object.fromEntries(params), offset: String(offset)})}/>
       </section>{view === 'tasks' && <p className="footnote">执行占用按租约时间合并，并行阶段不重复累计；总耗时包含上传、等待与恢复。节点筛选包含该节点曾参与的全部任务。</p>}</>}
     </div>
     {detail && <DetailDialog key={detail.id} target={detail} onClose={() => setDetail(undefined)} onUnauthorized={onUnauthorized}/>}
+    {nodeConfig && <NodeConfigDialog node={nodeConfig} onClose={() => setNodeConfig(undefined)} onSaved={reload}/>}
   </main>;
 }
 

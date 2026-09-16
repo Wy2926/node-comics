@@ -1,4 +1,4 @@
-name: node-comics-cluster
+name: node-comics-nodes
 
 x-backend: &backend
   build: ./backend
@@ -10,7 +10,6 @@ x-backend: &backend
     STORAGE_PATH: /data/images
     DEV_AUTH: "${DEV_AUTH:-false}"
     DEV_AUTH_SECRET: ${DEV_AUTH_SECRET:-}
-    CLUSTER_NODE_TOKEN: ${CLUSTER_NODE_TOKEN:?Run scripts/bootstrap.ps1 first}
     CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:18089,http://127.0.0.1:18089}"
   tmpfs:
     - /data/images:uid=10001,gid=10001,mode=0700,size=32m
@@ -26,7 +25,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-nodecomics_cluster}
     volumes:
-      - cluster_postgres:/var/lib/postgresql/data
+      - nodes_postgres:/var/lib/postgresql/data
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U nodecomics -d $$POSTGRES_DB"]
       interval: 5s
@@ -50,16 +49,11 @@ services:
     image: node-comics-classic-engine:cluster
     environment:
       ENGINE_TOKEN: ${CLASSIC_ENGINE_TOKEN}
-      ENGINE_DEVICE: ${ENGINE_DEVICE:-cpu}
-      ENGINE_RESOURCE_ID: ${ENGINE_RESOURCE_ID:-local:cpu}
-      ENGINE_LOCK_DIR: /locks
-      ENGINE_CACHE_BYTES: ${ENGINE_CACHE_BYTES:-268435456}
-      ENGINE_CACHE_TTL_SECONDS: 900
-      ENGINE_DICTIONARY_LANGUAGES: ${ENGINE_DICTIONARY_LANGUAGES:-en}
-      OMP_NUM_THREADS: "4"
+      ENGINE_CONFIG_FILE: /config/engine.json
     volumes:
       - comics_models:/models
       - device_locks:/locks
+      - ./deploy/engine.json:/config/engine.json:ro
     healthcheck:
       test: [CMD, python, -c, "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['ready']"]
       interval: 15s
@@ -74,9 +68,8 @@ services:
     environment:
       CONTROL_URL: http://api:8000
       CONTROL_ALLOW_HTTP: "true"
-      CLUSTER_NODE_TOKEN: ${CLUSTER_NODE_TOKEN}
-      NODE_ID: ${NODE_ID:-local-cpu}
-      NODE_NAME: ${NODE_NAME:-local-cpu}
+      NODE_TOKEN: ${NODE_TOKEN:-}
+      NODE_ID: ${NODE_ID:-}
       ENGINE_URL: http://classic-engine:8000
       ENGINE_TOKEN: ${CLASSIC_ENGINE_TOKEN}
     depends_on:
@@ -85,6 +78,6 @@ services:
     stop_grace_period: 16m
     restart: unless-stopped
 volumes:
-  cluster_postgres:
+  nodes_postgres:
   comics_models:
   device_locks:

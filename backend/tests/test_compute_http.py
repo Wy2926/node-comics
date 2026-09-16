@@ -67,7 +67,6 @@ def cluster(tmp_path, *, text_gate=None):
         'RESULT_STORAGE_BACKEND': 'local', 'R2_ENDPOINT_URL': '', 'PROVIDERS_JSON': '[]', 'OPENAI_API_KEY': '',
         'CLASSIC_ENABLED': 'true', 'CLASSIC_ENGINE_VERSION': version,
         'TEXT_BASE_URL': 'https://text.invalid/v1', 'TEXT_API_KEY': 'isolated-text-key-not-used-for-requests',
-        'CLUSTER_NODE_TOKEN': 'isolated-http-cluster-token-not-for-production',
         'CLUSTER_LEASE_SECONDS': '10', 'CLUSTER_NODE_TIMEOUT_SECONDS': '10',
         'CLUSTER_TEXT_SLOTS': '2', 'CLUSTER_UPLOAD_SLOTS': '2', 'CLUSTER_REDRAW_SLOTS': '1',
         'DISPATCH_INTERVAL_SECONDS': '1', 'CONTROL_URL': control, 'CONTROL_ALLOW_HTTP': 'true',
@@ -93,25 +92,35 @@ def cluster(tmp_path, *, text_gate=None):
         except httpx.HTTPError:
             return False
 
+    identities = {}
+
     def agent(index):
         selected = first_port if index == 1 else second_port
-        return start('agent-' + str(index), [AGENT], NODE_ID='http-node-' + str(index),
-                     NODE_NAME='HTTP test node ' + str(index), ENGINE_URL=f'http://127.0.0.1:{selected}')
+        return start('agent-' + str(index), [AGENT], NODE_ID=identities[index]['node_id'],
+                     NODE_TOKEN=identities[index]['token'], ENGINE_URL=f'http://127.0.0.1:{selected}')
 
     try:
         api = start('control', [ENTRY, 'api', control_port])
         until(lambda: live(control + '/health'), label='isolated control HTTP readiness')
+        with httpx.Client(base_url=control, trust_env=False) as admin:
+            auth = admin.post('/v1/auth/dev', json={'username': 'admin'}).raise_for_status().json()
+            admin.headers['Authorization'] = 'Bearer ' + auth['access_token']
+            for index in (1, 2):
+                identities[index] = admin.post('/v1/admin/compute-nodes', json={
+                    'name': 'HTTP test node ' + str(index), 'resource_id': 'http-machine-' + str(index) + ':cpu',
+                    'config': {'poll_seconds': .05, 'heartbeat_seconds': .2, 'config_poll_seconds': 1,
+                               'request_seconds': 3, 'stage_seconds': 30}}).raise_for_status().json()
         for index, selected in ((1, first_port), (2, second_port)):
             start('engine-' + str(index), [ENTRY, 'engine', selected], ENGINE_RESOURCE_ID='http-machine-' + str(index) + ':cpu')
             until(lambda: live(f'http://127.0.0.1:{selected}/health'), label='simulated engine readiness')
         start('worker', [ENTRY, 'worker'])
         start('maintenance', [ENTRY, 'maintenance'])
         first, second = agent(1), agent(2)
-        until(lambda: len(rows(database, "SELECT id FROM compute_nodes WHERE id LIKE 'http-node-%'")) == 2,
+        until(lambda: len(rows(database, "SELECT id FROM compute_nodes WHERE engine_version != 'control' AND applied_config_version=1")) == 2,
               label='both actual agents registered')
         yield {'url': control, 'database': database, 'first': first, 'second': second, 'agent': agent,
                'first_engine': f'http://127.0.0.1:{first_port}', 'second_engine': f'http://127.0.0.1:{second_port}',
-               'token': environment['CLUSTER_NODE_TOKEN']}
+               'identities': identities}
     finally:
         for child in reversed(children):
             if child.poll() is None:
@@ -163,7 +172,7 @@ def test_single_real_agent_keeps_preparing_pages_while_text_pool_is_blocked(tmp_
                   timeout=25, label='all image preparation before any text returns')
             assert rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='text' AND status='succeeded'")[0][0] == 0
             assert rows(running['database'], "SELECT count(*) FROM jobs WHERE status='succeeded'")[0][0] == 0
-            assert rows(running['database'], "SELECT count(*) FROM execution_leases WHERE node_id='http-node-1' AND completed_at IS NULL")[0][0] == 0
+            assert rows(running['database'], "SELECT count(*) FROM execution_leases WHERE node_id=? AND completed_at IS NULL", (running['identities'][1]['node_id'],))[0][0] == 0
         finally:
             gate.touch()
         completed = until(lambda: job_statuses(client, auth, ids), label='late text renders all prepared pages')
@@ -181,8 +190,8 @@ def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_
         initial = submit(client, auth, [image(index) for index in range(4)], 'http-initial')
         completed = until(lambda: job_statuses(client, auth, initial), label='first HTTP batch delivery')
         nodes = {row[0] for row in rows(running['database'],
-            "SELECT DISTINCT node_id FROM execution_leases WHERE node_id LIKE 'http-node-%' AND outcome='succeeded'")}
-        assert nodes == {'http-node-1', 'http-node-2'}
+            "SELECT DISTINCT node_id FROM execution_leases WHERE node_id LIKE 'node-%' AND outcome='succeeded'")}
+        assert nodes == {item['node_id'] for item in running['identities'].values()}
         for job in completed:
             delivered = client.get('/v1/images/' + job['output_asset_id'] + '/content', headers=auth)
             assert delivered.status_code == 200
@@ -196,7 +205,7 @@ def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_
         assert httpx.post(running['first_engine'] + '/test/hold/render', trust_env=False).status_code == 200
         target = submit(client, auth, [image(20)], 'http-failover')[0]
         def held_lease():
-            result = rows(running['database'], "SELECT l.id,l.started_at,l.expires_at FROM execution_leases l JOIN job_stages s ON s.id=l.stage_id WHERE l.job_id=? AND l.node_id='http-node-1' AND s.name='render' AND l.completed_at IS NULL", (target,))
+            result = rows(running['database'], "SELECT l.id,l.started_at,l.expires_at FROM execution_leases l JOIN job_stages s ON s.id=l.stage_id WHERE l.job_id=? AND l.node_id=? AND s.name='render' AND l.completed_at IS NULL", (target, running['identities'][1]['node_id']))
             if result and httpx.get(running['first_engine'] + '/test/state', trust_env=False).json()['active'] == 'render':
                 return result[0]
         old = until(held_lease, label='node 1 holding render')
@@ -210,7 +219,7 @@ def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_
         running['agent'](2)
         final = until(lambda: job_statuses(client, auth, [target]), timeout=35, label='node 2 lease recovery and delivery')[0]
         recovered = rows(running['database'], "SELECT l.node_id,l.generation,l.outcome FROM execution_leases l JOIN job_stages s ON s.id=l.stage_id WHERE l.job_id=? AND s.name='render' ORDER BY l.generation", (target,))
-        assert recovered == [('http-node-1', 1, 'failed'), ('http-node-2', 2, 'succeeded')]
+        assert recovered == [(running['identities'][1]['node_id'], 1, 'failed'), (running['identities'][2]['node_id'], 2, 'succeeded')]
         assert rows(running['database'], 'SELECT count(*) FROM text_calls WHERE job_id=?', (target,))[0][0] == 1
         assert final['result_available'] and final['settlement'] == 'settled'
         assert rows(running['database'], "SELECT count(*) FROM usage_ledger WHERE job_id=? AND kind='settle'", (target,))[0][0] == 1

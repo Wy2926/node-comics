@@ -4,7 +4,7 @@
 
 2026-09-15：已完成双模式持久队列和集群阶段调度重构。每种模式分别提供普通 10／PLUS 500 页在途容量，实时名额普通 2／PLUS 10；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
 
-会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `cluster_0001` 数据库。
+会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `nodes_0001` 数据库。
 
 2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在预算内自动重试。常规模式已基于[开源方案与成本调研](docs/CLASSIC_TRANSLATION_RESEARCH.md)实现，启动与验证见[常规翻译运行说明](docs/CLASSIC_IMPLEMENTATION.md)。
 
@@ -16,11 +16,15 @@
 
 本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后台按每模式容量、阅读优先级和用户权重独立调度。
 
+2026-09-16：后台可添加独立身份节点，服务端执行位与版本化配置自动同步；语言资源启动补全、线程与缓存参数可声明。见[节点配置](docs/NODE_CONFIGURATION.md)与[NVIDIA 实测](docs/NVIDIA_GPU_VALIDATION.md)。
+
 ## 本地运行
 
 英文嵌字字典重复下载已修复；指定语言预下载、离线校验及执行位说明见[嵌字字典准备](docs/HYPHENATION_DICTIONARIES.md)。
 
-本机 Windows + RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装加 `-Setup`，一页完整翻译验证加 `-Smoke`。此原模型 DirectML 路径使用本地进程，配置与同图验收见 [AMD GPU 说明](docs/AMD_GPU_VALIDATION.md)。
+Windows AMD RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装加 `-Setup`，一页完整翻译验证加 `-Smoke`。此原模型 DirectML 路径使用本地进程，配置与同图验收见 [AMD GPU 说明](docs/AMD_GPU_VALIDATION.md)。
+
+本机 NVIDIA RTX 4060 Laptop GPU 已跑通 `./scripts/start-local-nvidia.ps1 -Smoke`，首次安装加 `-Setup`。
 
 启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，并按常规翻译说明配置文本接口。
 

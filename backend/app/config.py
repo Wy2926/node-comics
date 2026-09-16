@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     priority_ttl_seconds: int = Field(default=90, ge=10, le=300)
     upload_session_ttl_seconds: int = Field(default=900, ge=30, le=3600)
     upload_session_max_lifetime_seconds: int = Field(default=3600, ge=60, le=86400)
-    cluster_node_token: SecretStr = SecretStr("")
     cluster_lease_seconds: int = Field(default=90, ge=10, le=600)
     cluster_node_timeout_seconds: int = Field(default=120, ge=10, le=600)
     cluster_stage_attempts: int = Field(default=3, ge=1, le=10)
@@ -70,7 +69,6 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_engine_profile: Literal['mit', 'mit-directml'] = 'mit'
     classic_engine_version: str = "mit-95227a2-classic-v5-cluster"
     classic_timeout_seconds: int = 900
     text_base_url: str = ""

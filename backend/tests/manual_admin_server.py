@@ -11,7 +11,7 @@ directory = Path(tempfile.mkdtemp(prefix="nc-admin-ui-"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix()}",
     STORAGE_PATH=str(directory / "objects"), DEV_AUTH="true", DEV_AUTH_SECRET="admin-ui-isolated-signing-secret-0001",
     DEV_ADMIN_USERNAME="admin", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
-    OPENAI_API_KEY="", PROVIDERS_JSON="", CLUSTER_NODE_TOKEN="admin-ui-isolated-cluster-token-0001")
+    OPENAI_API_KEY="", PROVIDERS_JSON="")
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app

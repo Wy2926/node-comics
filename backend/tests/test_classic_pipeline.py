@@ -19,7 +19,7 @@ def pipeline(text_case):
     with session_factory()() as db:
         job = db.get(Job, job_id)
         version = job.config['engine']['version']
-        db.add(ComputeNode(id='image-node', name='image device', capabilities=['analyze', 'inpaint', 'render'],
+        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='image-node', name='image device', capabilities=['analyze', 'inpaint', 'render'],
                            capacity=1, resource_id='isolated:cpu', engine_version=version, device='cpu'))
         db.add(JobStage(job_id=job_id, name='inpaint', status='ready'))
         db.add(JobStage(job_id=job_id, name='render', status='waiting'))

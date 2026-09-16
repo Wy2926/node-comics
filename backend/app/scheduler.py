@@ -151,6 +151,8 @@ def _runnable(snapshot, node, stage, job, at):
     if queue.paused:
         return False
     if stage.name in IMAGE_STAGES:
+        if job.target_language not in node.supported_languages:
+            return False
         if node.engine_version != job.config.get("engine", {}).get("version", settings().classic_engine_version):
             return False
         if stage.name == "analyze":
@@ -169,11 +171,15 @@ def _runnable(snapshot, node, stage, job, at):
     return True
 
 
-def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None):
+def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_version=None):
     lock_scheduler(db)
-    node = db.get(ComputeNode, node_id)
+    node = db.get(ComputeNode, node_id, populate_existing=True)
     at = now()
     if not node or not node.enabled:
+        return None
+    if config_version is not None and config_version != node.config_version:
+        raise ProcessingError('NODE_CONFIG_CONFLICT', '领取前需要同步配置')
+    if node.engine_version != 'control' and node.applied_config_version != node.config_version:
         return None
     node.heartbeat_at = at
     busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))

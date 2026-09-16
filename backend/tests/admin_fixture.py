@@ -1,5 +1,6 @@
 """Synthetic metadata for admin API and browser checks; no private images or model calls."""
 from datetime import timedelta
+from app.node_config import NodeConfig
 from app.models import Attempt, Job, TextCall, User, now
 from app.queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
 
@@ -19,14 +20,16 @@ def seed(db):
     readers[0].plus_monthly_pages = 300
     readers[0].membership_id = "fixture-membership"
     db.add_all(readers)
-    nodes = [ComputeNode(id="gpu-a", name="绘图节点 A", resource_id="gpu-a-device", device="CUDA / GPU 0",
+    nodes = [ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="gpu-a", name="绘图节点 A", resource_id="gpu-a-device", device="CUDA / GPU 0",
         engine_version="fixture-engine-v1", capabilities=["analyze", "inpaint", "render"], capacity=2, heartbeat_at=at),
-        ComputeNode(id="gpu-b", name="绘图节点 B", resource_id="gpu-b-device", device="DirectML / GPU 0",
+        ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="gpu-b", name="绘图节点 B", resource_id="gpu-b-device", device="DirectML / GPU 0",
         engine_version="fixture-engine-v1", capabilities=["analyze", "inpaint", "render"], capacity=1, heartbeat_at=at-timedelta(minutes=8)),
-        ComputeNode(id="control-text", name="control-text", resource_id="control-text", device="network",
+        ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-text", name="control-text", resource_id="control-text", device="network",
         engine_version="control", capabilities=["text"], capacity=4, heartbeat_at=at),
-        ComputeNode(id="control-redraw", name="control-redraw", resource_id="control-redraw", device="network",
+        ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-redraw", name="control-redraw", resource_id="control-redraw", device="network",
         engine_version="control", capabilities=["redraw"], capacity=4, heartbeat_at=at)]
+    for node in nodes:
+        node.desired_config = NodeConfig(execution_slots=node.capacity).model_dump(exclude_none=True)
     db.add_all(nodes); db.flush()
     db.add(UserModeQueue(owner_id=readers[1].id, mode="classic", paused=True))
 

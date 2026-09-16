@@ -11,7 +11,7 @@ MODELS = ROOT / 'engines/mit-models'
 
 def prepare():
     if not (SOURCE / '.git').is_dir():
-        cache = ROOT / 'engines/.cache/manga-image-translator'
+        cache = ROOT / 'engines/manga-image-translator'
         origin = str(cache) if (cache / '.git').is_dir() else 'https://github.com/zyddnys/manga-image-translator.git'
         subprocess.run(['git', 'clone', '--no-checkout', origin, str(SOURCE)], check=True)
         subprocess.run(['git', '-C', str(SOURCE), 'checkout', COMMIT], check=True)

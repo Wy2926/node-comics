@@ -1,6 +1,8 @@
 # 翻译集群重构验收记录
 
-日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当前前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[计算代理说明](../services/compute-agent/README.md)。
+当前节点管理已改为 `nodes_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+
+日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当时前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[计算代理说明](../services/compute-agent/README.md)。
 
 本记录区分代码检查、隔离运行、真实浏览器、真实对象存储和生产部署。测试中的模拟供应商结果只验证协议与交互，不作为翻译效果证据。各组测试存在重叠，数量不相加。
 

@@ -51,8 +51,15 @@ def _ping():
     return os.getpid()
 
 
-def _predict(image, mask, size):
+def _predict(image, mask, size, threads, opencv_threads):
     import asyncio
+    import torch
+    import cv2
+    import cv2
+    torch.set_num_threads(threads)
+    torch.set_num_interop_threads(int(os.environ.get('ENGINE_TORCH_INTEROP_THREADS', '1')))
+    cv2.setNumThreads(int(os.environ.get('ENGINE_OPENCV_THREADS', '2')))
+    cv2.setNumThreads(opencv_threads)
     from manga_translator.config import InpainterConfig
     output = asyncio.run(_model.inpaint(image, mask, InpainterConfig(inpainting_precision='fp32'), size, False))
     return output, _evidence()
@@ -64,6 +71,7 @@ class ParallelLama:
             raise ValueError('The measured DirectML crop pool uses two workers')
         self.workers = workers
         self.threads, self.broken = threads, False
+        self.opencv_threads = int(os.environ.get('ENGINE_OPENCV_THREADS', '2'))
         context = multiprocessing.get_context('spawn')
         self.ready = context.Queue()
         self.executor = ProcessPoolExecutor(max_workers=workers, mp_context=context,
@@ -83,7 +91,9 @@ class ParallelLama:
             # The failed stage is retried by the controller, never inside this
             # call. Recreate the private workers on the next admitted stage.
             self.close()
+            opencv_threads = self.opencv_threads
             self.__init__(self.workers, self.threads)
+            self.opencv_threads = opencv_threads
             try:
                 self.warm()
             except Exception:
@@ -101,7 +111,8 @@ class ParallelLama:
                 return
             core, crop = plan
             x0, y0, x1, y1 = crop
-            future = self.executor.submit(_predict, image[y0:y1, x0:x1].copy(), mask[y0:y1, x0:x1].copy(), max_size)
+            future = self.executor.submit(_predict, image[y0:y1, x0:x1].copy(), mask[y0:y1, x0:x1].copy(),
+                                          max_size, self.threads, self.opencv_threads)
             pending.append((core, crop, future))
 
         try:

@@ -4,13 +4,14 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .assets import available, read_asset
 from .config import settings
 from .db import get_db
 from .errors import problem, ProcessingError
-from .models import Asset, ClassicState
+from .models import Asset, ClassicState, now
+from .node_admin import configuration, token_hash
+from .node_config import EngineOverrides, Language
 from .queue_models import ComputeNode
 from .request_models import RequestBody
 from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler
@@ -18,46 +19,85 @@ from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_schedul
 router = APIRouter(tags=["compute"])
 
 
-def node_auth(authorization: str | None = Header(default=None), x_node_id: str | None = Header(default=None)):
-    expected = settings().cluster_node_token.get_secret_value()
-    if len(expected) < 32 or not authorization or not hmac.compare_digest(authorization, "Bearer " + expected):
+def node_auth(authorization: str | None = Header(default=None), x_node_id: str | None = Header(default=None),
+              db: Session = Depends(get_db)):
+    node = db.get(ComputeNode, x_node_id) if x_node_id else None
+    token = authorization[7:] if authorization and authorization.startswith('Bearer ') else ''
+    if not node or not node.credential_hash or not hmac.compare_digest(token_hash(token), node.credential_hash):
         problem("NODE_AUTH_REQUIRED", "计算节点认证失败", 401)
     return x_node_id
 
 
 class NodeRegistration(RequestBody):
-    id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_.-]+$")
-    name: str = Field(min_length=1, max_length=120)
     capabilities: list[Literal["analyze", "inpaint", "render"]] = Field(min_length=1, max_length=3)
-    capacity: int = Field(default=1, ge=1, le=32)
-    engine_version: str = Field(max_length=120)
-    device: str = Field(max_length=80)
-    resource_id: str | None = Field(default=None, max_length=120)
+    engine_version: str = Field(min_length=1, max_length=120)
+    device: str = Field(min_length=1, max_length=80)
+    resource_id: str = Field(min_length=1, max_length=120)
 
 
 @router.post("/internal/nodes/register")
 def register(body: NodeRegistration, identity=Depends(node_auth), db: Session = Depends(get_db)):
-    if identity and identity != body.id:
-        problem("NODE_SCOPE_MISMATCH", "节点身份不匹配", 403)
+    if body.engine_version == 'control':
+        problem('NODE_ENGINE_INVALID', '图像节点不能声明控制资源池身份', 422)
     lock_scheduler(db)
-    resource_id = body.resource_id or body.id
-    other = db.scalar(select(ComputeNode).where(ComputeNode.resource_id == resource_id, ComputeNode.id != body.id))
-    if other:
-        problem("RESOURCE_ALREADY_REGISTERED", "此物理设备已绑定其他节点", 409)
-    node = db.get(ComputeNode, body.id)
-    if not node:
-        node = ComputeNode(id=body.id)
-        db.add(node)
-    from .models import now
-    for key, value in body.model_dump(exclude={"id", "resource_id"}).items():
+    node = db.get(ComputeNode, identity, populate_existing=True)
+    if node.resource_id != body.resource_id:
+        problem('NODE_RESOURCE_MISMATCH', '设备与后台预设资源标识不一致', 409)
+    for key, value in body.model_dump(exclude={'resource_id'}).items():
         setattr(node, key, value)
-    node.resource_id, node.enabled, node.heartbeat_at = resource_id, True, now()
+    node.heartbeat_at = now()
+    node.applied_config_version = 0
     db.commit()
-    return {"node_id": node.id}
+    return configuration(node)
+
+
+@router.get('/internal/nodes/{node_id}/config')
+def fetch_config(node_id: str, identity=Depends(node_auth), db: Session = Depends(get_db)):
+    if identity != node_id:
+        problem('NODE_SCOPE_MISMATCH', '节点身份不匹配', 403)
+    lock_scheduler(db)
+    node = db.get(ComputeNode, identity, populate_existing=True)
+    node.heartbeat_at = now()
+    db.commit()
+    return configuration(node)
+
+
+class ConfigApplied(RequestBody):
+    version: int = Field(ge=1, strict=True)
+    error: Literal['ENGINE_CONFIG_FAILED'] | None = None
+    engine: EngineOverrides = Field(default_factory=EngineOverrides)
+    supported_languages: list[Language] = Field(default_factory=list, max_length=5)
+
+
+@router.post('/internal/nodes/{node_id}/config/applied')
+def config_applied(node_id: str, body: ConfigApplied, identity=Depends(node_auth), db: Session = Depends(get_db)):
+    if identity != node_id:
+        problem('NODE_SCOPE_MISMATCH', '节点身份不匹配', 403)
+    lock_scheduler(db)
+    node = db.get(ComputeNode, identity, populate_existing=True)
+    if body.version != node.config_version:
+        problem('NODE_CONFIG_CONFLICT', '配置已更新，请重新拉取', 409)
+    node.config_error = body.error
+    node.heartbeat_at = now()
+    if body.error:
+        node.applied_config_version = 0
+    else:
+        effective = body.engine.model_dump(exclude_none=True)
+        expected = node.desired_config['engine']
+        if not body.supported_languages or any(effective.get(k) != v for k, v in expected.items()):
+            problem('NODE_CONFIG_MISMATCH', '引擎未应用预期配置', 422)
+        if effective.get('languages') != body.supported_languages:
+            problem('NODE_CONFIG_MISMATCH', '引擎语言报告不一致', 422)
+        node.applied_config_version = body.version
+        node.supported_languages = body.supported_languages
+        node.runtime_report = effective
+    db.commit()
+    return {'accepted': True}
 
 
 class ClaimRequest(RequestBody):
     stages: list[Literal["analyze", "inpaint", "render"]] = Field(min_length=1, max_length=3)
+    config_version: int = Field(ge=1, strict=True)
 
 
 def lease_payload(db, lease):
@@ -76,7 +116,10 @@ def lease_payload(db, lease):
 def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Session = Depends(get_db)):
     if identity != node_id:
         problem("NODE_SCOPE_MISMATCH", "节点身份不匹配", 403)
-    lease = claim_stage(db, node_id, body.stages)
+    node = db.get(ComputeNode, node_id)
+    if body.config_version != node.config_version:
+        problem('NODE_CONFIG_CONFLICT', '领取前需要同步配置', 409)
+    lease = claim_stage(db, node_id, body.stages, config_version=body.config_version)
     result = {"lease": lease_payload(db, lease) if lease else None}
     db.commit()
     return result

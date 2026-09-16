@@ -138,7 +138,7 @@ def test_pause_is_mode_local_and_running_stages_keep_their_lease(cluster, png):
             assert response.status_code == 202, response.text
             ids[mode].append(response.json()['items'][0]['job']['id'])
     with session_factory()() as db:
-        db.add(ComputeNode(id='priority-node',name='test',resource_id='priority-node',capabilities=['analyze','redraw'],
+        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='priority-node',name='test',resource_id='priority-node',capabilities=['analyze','redraw'],
                            capacity=4,engine_version=settings().classic_engine_version,device='cpu'))
         db.commit()
         lease = claim_stage(db,'priority-node',['analyze'])

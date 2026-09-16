@@ -1291,3 +1291,37 @@ dialog::backdrop {
     padding: 30px 24px;
   }
 }
+ .node-config-form {
+  display: grid;
+  gap: 16px;
+}
+.node-config-form label,
+.credential label {
+  display: grid;
+  gap: 8px;
+}
+.node-config-form textarea,
+.credential textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line, #dedfea);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: monospace;
+  resize: vertical;
+}
+.node-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.credential {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+.node-config-form label:has(input[type=checkbox]) {
+  display: flex;
+  align-items: center;
+}

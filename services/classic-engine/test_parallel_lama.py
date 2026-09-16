@@ -11,7 +11,7 @@ class Executor:
         self.active = self.peak = self.calls = 0
         self.fail = fail
 
-    def submit(self, function, image, mask, size):
+    def submit(self, function, image, mask, size, threads, opencv_threads):
         self.active += 1
         self.calls += 1
         number = self.calls
@@ -37,6 +37,7 @@ class ParallelCropTests(unittest.TestCase):
         pool = ParallelLama.__new__(ParallelLama)
         pool.workers, pool.executor, pool.records = 2, Executor(fail), {}
         pool.threads, pool.broken = 4, False
+        pool.opencv_threads = 2
         image = np.full((800, 800, 3), 128, np.uint8)
         mask = np.zeros((800, 800), np.uint8)
         for x in (30, 330, 630):

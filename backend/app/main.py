@@ -26,6 +26,7 @@ from .models import Asset, ClassicState, Job, Ledger, Provider, User, now
 from .providers import LANGUAGES, credential, initialize_providers
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
+from .node_admin import router as node_admin_router
 from .admin_monitor import router as admin_monitor_router
 from .admin_web import router as admin_web_router
 from .request_models import RequestBody
@@ -277,8 +278,9 @@ def usage(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), us
 
 
 app.include_router(admin_router)
+app.include_router(node_admin_router)
 
 
 @app.exception_handler(ProcessingError)
 async def processing_error(request, exc):
-    return JSONResponse(status_code=409 if exc.code == "LEASE_EXPIRED" else 422, content={"error": {"code": exc.code, "message": exc.message}})
+    return JSONResponse(status_code=409 if exc.code in {"LEASE_EXPIRED", "NODE_CONFIG_CONFLICT"} else 422, content={"error": {"code": exc.code, "message": exc.message}})

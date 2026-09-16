@@ -24,12 +24,22 @@ def simulated_engine():
     release = asyncio.Event()
     release.set()
     version = os.environ['CLASSIC_ENGINE_VERSION']
+    runtime = {'languages': ['zh-Hans', 'en'], 'torch_threads': 4, 'opencv_threads': 2,
+               'cache_bytes': 268435456, 'cache_ttl_seconds': 900}
 
     @app.get('/health')
     def health():
-        return {'ready': True, 'version': version, 'device': 'simulated-cpu',
+        return {'ready': True, 'instance_id': str(os.getpid()), 'version': version, 'device': 'simulated-cpu',
                 'resource_id': os.environ['ENGINE_RESOURCE_ID'], 'capacity': 1,
-                'capabilities': ['analyze', 'inpaint', 'render']}
+                'capabilities': ['analyze', 'inpaint', 'render'], 'runtime': runtime,
+                'supported_languages': runtime['languages']}
+
+    @app.post('/internal/config')
+    async def configure(request: Request):
+        if request.headers.get('authorization') != 'Bearer ' + os.environ['ENGINE_TOKEN']:
+            raise HTTPException(401)
+        runtime.update(await request.json())
+        return {'runtime': runtime, 'supported_languages': runtime['languages']}
 
     @app.get('/test/state')
     def state():

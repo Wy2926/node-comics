@@ -174,7 +174,7 @@ def overview(db: Session = Depends(get_db)):
     stages = db.execute(select(JobStage.name, JobStage.status, func.count()).join(Job, Job.id == JobStage.job_id).where(
         Job.status.in_(ACTIVE)).group_by(JobStage.name, JobStage.status)).all()
     nodes = db.execute(select(ComputeNode.enabled, ComputeNode.heartbeat_at)).all()
-    online = sum(enabled and heartbeat > at - timedelta(seconds=settings().cluster_node_timeout_seconds) for enabled, heartbeat in nodes)
+    online = sum(bool(enabled and heartbeat and heartbeat > at - timedelta(seconds=settings().cluster_node_timeout_seconds)) for enabled, heartbeat in nodes)
     lease_status = case((ExecutionLease.expires_at > at, "running"), else_="expired")
     lease_counts = db.execute(select(lease_status, func.count()).where(
         ExecutionLease.completed_at.is_(None)).group_by(lease_status)).all()
@@ -210,7 +210,9 @@ def nodes(db: Session = Depends(get_db)):
         items.append({"id": node.id, "name": node.name, "resource_id": node.resource_id, "device": node.device,
             "kind": "control_pool" if node.engine_version == "control" else "compute_node", "capacity": node.capacity,
             "capabilities": node.capabilities, "engine_version": node.engine_version, "enabled": node.enabled,
-            "online": node.heartbeat_at > at - timedelta(seconds=settings().cluster_node_timeout_seconds),
+            "config_version": node.config_version, "applied_config_version": node.applied_config_version,
+            "config_error": node.config_error, "supported_languages": node.supported_languages,
+            "online": bool(node.heartbeat_at and node.heartbeat_at > at - timedelta(seconds=settings().cluster_node_timeout_seconds)),
             "heartbeat_at": iso(node.heartbeat_at), "heartbeat_age_seconds": seconds(node.heartbeat_at, at),
             "running": usage["running"], "expired_leases": usage["expired"],
             "occupied": usage["running"] + usage["expired"], "oldest_execution_seconds": seconds(usage["oldest_started_at"], at),

@@ -1,16 +1,19 @@
 """Pull one image stage when this device is idle; never access a task database.
 
-Only the control endpoint receives the service token. Requests, image bytes,
+Only the control endpoint receives the node credential. Requests, image bytes,
 signed addresses, OCR and exception strings are intentionally never logged.
 """
 import base64
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import wraps
 import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import signal
 import threading
 import time
@@ -25,6 +28,14 @@ CHECKPOINT_LIMIT = 4 * 1024 * 1024
 log = logging.getLogger('compute-agent')
 
 
+def cache_locked(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self.lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class StageError(Exception):
     def __init__(self, code):
         self.code = code
@@ -37,7 +48,9 @@ class InputCache:
         self.max_bytes, self.ttl_seconds = max_bytes, ttl_seconds
         self.max_entries = max(1, int(max_entries))
         self.entries, self.size = OrderedDict(), 0
+        self.lock = threading.RLock()
 
+    @cache_locked
     def get(self, key):
         for old, entry in list(self.entries.items()):
             if time.monotonic() - entry['created'] >= self.ttl_seconds:
@@ -47,6 +60,7 @@ class InputCache:
             self.entries.move_to_end(key)
         return entry
 
+    @cache_locked
     def put(self, key, raw):
         self.get(key)
         if len(raw) > self.max_bytes or not self.ttl_seconds:
@@ -87,7 +101,6 @@ class Config:
     node_id: str
     engine_url: str
     engine_token: str
-    name: str = 'image device'
     poll_seconds: float = 1.0
     heartbeat_seconds: float = 10.0
     request_seconds: float = 30.0
@@ -103,7 +116,7 @@ class Config:
         if parsed.scheme != 'https' and not (self.allow_http and parsed.scheme == 'http'):
             raise ValueError('CONTROL_URL must use HTTPS; local tests explicitly enable CONTROL_ALLOW_HTTP')
         if not self.node_id or len(self.node_id) > 80 or not self.token or not self.engine_token:
-            raise ValueError('NODE_ID, CLUSTER_NODE_TOKEN and ENGINE_TOKEN are required')
+            raise ValueError('NODE_ID, NODE_TOKEN and ENGINE_TOKEN are required')
         if min(self.poll_seconds, self.heartbeat_seconds, self.request_seconds, self.engine_seconds) <= 0:
             raise ValueError('Timeouts must be positive')
         if self.input_cache_bytes < 0 or self.input_cache_ttl_seconds < 0:
@@ -111,23 +124,29 @@ class Config:
 
     @classmethod
     def environment(cls):
-        return cls(control_url=os.environ['CONTROL_URL'].rstrip('/'), token=os.environ['CLUSTER_NODE_TOKEN'],
-                   node_id=os.environ['NODE_ID'], name=os.environ.get('NODE_NAME', 'image device'),
+        if os.environ.get('NODE_CONFIG_FILE'):
+            document = json.loads(Path(os.environ['NODE_CONFIG_FILE']).read_text(encoding='utf-8'))
+            if set(document) != {'schema_version', 'control_url', 'node_id', 'node_token', 'engine_url', 'engine_token', 'allow_http'} or document['schema_version'] != 1:
+                raise ValueError('Invalid node configuration file')
+            return cls(control_url=document['control_url'].rstrip('/'), token=document['node_token'],
+                       node_id=document['node_id'], engine_url=document['engine_url'].rstrip('/'),
+                       engine_token=document['engine_token'], allow_http=document['allow_http'])
+        return cls(control_url=os.environ['CONTROL_URL'].rstrip('/'), token=os.environ['NODE_TOKEN'],
+                   node_id=os.environ['NODE_ID'],
                    engine_url=os.environ.get('ENGINE_URL', 'http://classic-engine:8000').rstrip('/'),
                    engine_token=os.environ['ENGINE_TOKEN'],
-                   poll_seconds=float(os.environ.get('NODE_POLL_SECONDS', '1')),
-                   heartbeat_seconds=float(os.environ.get('NODE_HEARTBEAT_SECONDS', '10')),
-                   request_seconds=float(os.environ.get('NODE_REQUEST_SECONDS', '30')),
-                   engine_seconds=float(os.environ.get('NODE_STAGE_SECONDS', '900')),
-                   allow_http=os.environ.get('CONTROL_ALLOW_HTTP', 'false').lower() == 'true',
-                   input_cache_bytes=int(os.environ.get('NODE_INPUT_CACHE_BYTES', str(128*1024*1024))),
-                   input_cache_ttl_seconds=float(os.environ.get('NODE_INPUT_CACHE_TTL_SECONDS', '900')))
+                   allow_http=os.environ.get('CONTROL_ALLOW_HTTP', 'false').lower() == 'true')
 
 
 class Agent:
     def __init__(self, config, *, transport=None):
         self.config = config
         self.stop = threading.Event()
+        self.applied_version = 0
+        self.execution_slots = 0
+        self.config_poll_seconds = 15
+        self.engine_identity = None
+        self.effective_engine = None
         self.inputs = InputCache(config.input_cache_bytes, config.input_cache_ttl_seconds)
         self.client = httpx.Client(timeout=config.request_seconds, trust_env=False,
                                    follow_redirects=False, transport=transport)
@@ -145,16 +164,56 @@ class Agent:
             raw = bounded(response, limit)
         return json.loads(raw)
 
-    def register(self):
-        with self.engine.stream('GET', self.config.engine_url + '/health') as response:
+    def engine_health(self):
+        with self.engine.stream('GET', self.config.engine_url + '/health', timeout=self.config.request_seconds) as response:
             health = json.loads(bounded(response, 8192))
         if not health.get('ready') or set(health.get('capabilities', [])) != set(STAGES):
             raise StageError('CLASSIC_ENGINE_NOT_READY')
-        self.control('/internal/nodes/register', {
-            'id': self.config.node_id, 'name': self.config.name, 'capabilities': list(STAGES),
-            'capacity': 1, 'engine_version': health['version'], 'device': health['device'],
+        return health
+
+    def register(self, health=None):
+        health = health or self.engine_health()
+        self.engine_identity = (health['instance_id'], health['version'], health['resource_id'])
+        return self.control('/internal/nodes/register', {
+            'capabilities': list(STAGES),
+            'engine_version': health['version'], 'device': health['device'],
             'resource_id': health['resource_id'],
         }, limit=8192)
+
+    def apply_config(self, document):
+        values = document['config']
+        if document['node_id'] != self.config.node_id or values['schema_version'] != 1:
+            raise StageError('NODE_CONFIG_INVALID')
+        slots = values['execution_slots']
+        if type(slots) is not int or not 1 <= slots <= 32:
+            raise StageError('NODE_CONFIG_INVALID')
+        updated = replace(self.config, poll_seconds=values['poll_seconds'],
+            heartbeat_seconds=values['heartbeat_seconds'], request_seconds=values['request_seconds'],
+            engine_seconds=values['stage_seconds'], input_cache_bytes=values['input_cache_bytes'],
+            input_cache_ttl_seconds=values['input_cache_ttl_seconds'])
+        path = '/internal/nodes/' + self.config.node_id + '/config/applied'
+        try:
+            with self.engine.stream('POST', self.config.engine_url + '/internal/config', json=values['engine'],
+                    headers={'Authorization': 'Bearer ' + self.config.engine_token}) as response:
+                applied = json.loads(bounded(response, 8192))
+            self.control(path, {'version': document['version'], 'engine': applied['runtime'],
+                               'supported_languages': applied['supported_languages']}, limit=8192)
+        except (httpx.HTTPError, StageError, ValueError, KeyError):
+            try:
+                self.control(path, {'version': document['version'], 'error': 'ENGINE_CONFIG_FAILED'}, limit=8192)
+            except (httpx.HTTPError, StageError, ValueError):
+                pass
+            raise
+        # Only called after every current worker has returned; no running stage
+        # observes a half-applied timeout, cache or engine configuration.
+        self.config = updated
+        self.client.timeout = httpx.Timeout(updated.request_seconds)
+        self.engine.timeout = httpx.Timeout(updated.engine_seconds)
+        self.inputs = InputCache(updated.input_cache_bytes, updated.input_cache_ttl_seconds)
+        self.applied_version = document['version']
+        self.execution_slots = slots
+        self.config_poll_seconds = values['config_poll_seconds']
+        self.effective_engine = applied['runtime']
 
     def read_input(self, lease):
         supplied = lease['input']['url']
@@ -265,7 +324,10 @@ class Agent:
                 return
 
     def run_once(self):
-        reply = self.control('/internal/nodes/' + self.config.node_id + '/claim', {'stages': list(STAGES)})
+        if self.stop.is_set():
+            return False
+        reply = self.control('/internal/nodes/' + self.config.node_id + '/claim',
+                             {'stages': list(STAGES), 'config_version': self.applied_version})
         lease = reply.get('lease')
         if not lease:
             return False
@@ -293,20 +355,54 @@ class Agent:
 
     def run(self):
         registered = False
+        document, next_sync = None, 0
+        futures = set()
+        executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix='image-stage')
         try:
             while not self.stop.is_set():
                 try:
+                    for future in list(futures):
+                        if future.done():
+                            futures.remove(future)
+                            try:
+                                future.result()
+                            except (httpx.HTTPError, StageError, ValueError, KeyError):
+                                # Re-fetch desired config after stale claims; do
+                                # not re-register and fence other running slots.
+                                document, next_sync = None, 0
                     if not registered:
-                        self.register()
+                        document = self.register()
                         registered = True
-                        log.info('node ready')
-                    if not self.run_once():
-                        self.stop.wait(self.config.poll_seconds)
+                    if time.monotonic() >= next_sync:
+                        document = self.control('/internal/nodes/' + self.config.node_id + '/config', limit=8192)
+                        health = self.engine_health()
+                        identity = (health['instance_id'], health['version'], health['resource_id'])
+                        if identity != self.engine_identity:
+                            self.applied_version = 0
+                            if futures:
+                                document = None
+                            else:
+                                document = self.register(health)
+                        elif self.effective_engine is not None and health['runtime'] != self.effective_engine:
+                            self.applied_version = 0
+                        next_sync = time.monotonic() + self.config_poll_seconds
+                    pending = document and document['version'] != self.applied_version
+                    if pending and not futures:
+                        self.apply_config(document)
+                        next_sync = time.monotonic() + self.config_poll_seconds
+                        pending = False
+                    if document and document['enabled'] and not pending:
+                        for _ in range(self.execution_slots - len(futures)):
+                            if self.stop.is_set():
+                                break
+                            futures.add(executor.submit(self.run_once))
+                    self.stop.wait(self.config.poll_seconds)
                 except (httpx.HTTPError, StageError, ValueError, KeyError):
-                    registered = False
+                    document, next_sync = None, 0
                     log.warning('control or engine unavailable')
                     self.stop.wait(max(2, self.config.poll_seconds))
         finally:
+            executor.shutdown(wait=True)
             self.inputs.entries.clear()
             self.inputs.size = 0
             self.engine.close()

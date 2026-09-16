@@ -12,7 +12,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终
 ./scripts/bootstrap.ps1 -Start -Classic
 ```
 
-Compose 项目 `node-comics-cluster` 使用独立 `cluster_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `cluster_0001` 不升级旧表；本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。不能把多个环境指向相同 R2 清理前缀。
+Compose 项目 `node-comics-nodes` 使用独立 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `nodes_0001` 不升级旧表；本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。不能把多个环境指向相同 R2 清理前缀。
 
 三个控制进程可独立运行：
 
@@ -35,7 +35,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
 | `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
 | `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
-| `CLUSTER_NODE_TOKEN` | 至少 32 字符，仅内部节点认证 |
+| 节点身份 | 后台添加后一次性返回 NODE_ID / NODE_TOKEN；每节点独立凭据，数据库仅保存摘要 |
 | `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
 | `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，所有控制副本共享限额 |
 | `CLUSTER_UPLOAD_SLOTS` | 2，后台校验原图 |
@@ -68,7 +68,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 - `GET /v1/me/translation-changes`：游标增量同步；`GET /v1/jobs/{id}`、`POST /v1/jobs/status`：有界查询。
 - `GET /v1/images/{id}/access`：所有权、元数据寿命核验后签名直链；状态查询不探测 R2。
 - `/internal/nodes/register`、`/internal/nodes/{id}/claim`、`/internal/leases/{id}/{input,heartbeat,complete}`：受认证阶段协议。
-- `GET /v1/admin/compute-nodes`：设备在线和忙碌状态。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。
+- `GET/POST /v1/admin/compute-nodes`：查询／添加节点，`/{id}/config` 编辑配置、`/{id}/rotate-credential` 轮换凭据。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。
 - 权益、限时赠送、用量账本、作品文件页匹配和私有反馈接口继续适用。
 
 ## 故障与安全

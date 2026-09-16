@@ -1,5 +1,7 @@
 # 本地实现与验证
 
+当前节点管理已改为 `nodes_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+
 2026-09-15：翻译已采用全新集群基线 `cluster_0001`。现行任务与队列规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，最新代码、测试与浏览器验收边界见[集群验收](CLUSTER_VALIDATION.md)。以下早期样本和截图保留为历史证据，不代表当前部署状态。
 
 2026-09-14 新增[漫画作品管理与 MangaCopy 实现](COMIC_LIBRARY_IMPLEMENTATION.md)：通用领域模型、新书架、详情页范围导入与可恢复原图采集已完成本地验收；旧扁平书架逻辑已移除，无旧数据兼容代码。
