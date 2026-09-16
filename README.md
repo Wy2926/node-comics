@@ -18,6 +18,8 @@
 
 ## 本地运行
 
+英文嵌字字典重复下载已修复；指定语言预下载、离线校验及执行位说明见[嵌字字典准备](docs/HYPHENATION_DICTIONARIES.md)。
+
 本机 Windows + RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装加 `-Setup`，一页完整翻译验证加 `-Smoke`。此原模型 DirectML 路径使用本地进程，配置与同图验收见 [AMD GPU 说明](docs/AMD_GPU_VALIDATION.md)。
 
 启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，并按常规翻译说明配置文本接口。

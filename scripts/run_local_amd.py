@@ -77,7 +77,7 @@ def cluster(folder, api_port, engine_port):
                    'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': tokens['auth'], 'PROVIDERS_JSON': '[]',
                    'OPENAI_API_KEY': '', 'CLUSTER_NODE_TOKEN': tokens['node'],
                    'CLASSIC_ENABLED': 'true', 'CLASSIC_ENGINE_PROFILE': 'mit-directml',
-                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v3',
+                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v4',
                    'TEXT_PAGE_BUDGET_MICROS': config.get('TEXT_PAGE_BUDGET_MICROS', '50000'), 'TEXT_MAX_ATTEMPTS': '3',
                    'DISPATCH_INTERVAL_SECONDS': '1'}
     # Explicit allowlist: do not forward credentials inherited from the caller.
@@ -87,6 +87,7 @@ def cluster(folder, api_port, engine_port):
     engine_env = {**runtime_env, 'PYTHONPATH': os.pathsep.join([str(ENGINE), str(ROOT/'engines/mit-native')]), 'ENGINE_PROFILE': 'mit-directml',
                   'ENGINE_DEVICE': os.environ.get('ENGINE_DEVICE', 'directml:0'),
                   'MODEL_DIR': str(ROOT/'engines/mit-models'),
+                  'ENGINE_DICTIONARY_LANGUAGES': os.environ.get('ENGINE_DICTIONARY_LANGUAGES', config.get('ENGINE_DICTIONARY_LANGUAGES') or 'en'),
                   'ENGINE_FONT': str(ROOT/'engines/mit-native/fonts/NotoSansMonoCJK-VF.ttf.ttc'),
                   'ENGINE_RESOURCE_ID': socket.gethostname() + ':amd:0', 'ENGINE_TOKEN': tokens['engine'],
                   'ENGINE_LOCK_DIR': str(ROOT / 'engines/device-locks'),
@@ -107,6 +108,9 @@ def cluster(folder, api_port, engine_port):
         return child
 
     try:
+        # Preparation is explicit and checksum-idempotent; rendering never downloads.
+        subprocess.run([str(ENGINE_PYTHON), str(ENGINE/'prepare_dictionaries.py')],
+                       env=engine_env, cwd=ROOT, check=True, creationflags=flags)
         start('api', PYTHON, ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', api_port, '--no-access-log'], control_env)
         wait_http(url, children)
         image_process = start('engine', ENGINE_PYTHON, [ENTRY, '--engine-process', '--engine-port', engine_port], engine_env)

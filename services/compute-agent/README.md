@@ -54,7 +54,7 @@ volumes:
 
 ### GPU 参数
 
-Windows AMD RX 6900 XT 当前默认 v3，见[AMD 部署与验收](../../docs/AMD_GPU_VALIDATION.md)及[等待文本与缓存优化](../../docs/AMD_PIPELINE_OPTIMIZATION.md)。保留原漫画检测、48px OCR、LaMa 与嵌字器；OCR 解码已通过等价缓存修正在 GPU 执行，Fourier 模块仍在 CPU。设备内两个 LaMa 进程并行处理当前页的独立裁剪，不向控制端注册额外设备位，也不复制检测/OCR 实例。
+Windows AMD RX 6900 XT 当前默认 v4，在 v3 流水线上修复断词字典重复下载，见[字典准备与离线运行](../../docs/HYPHENATION_DICTIONARIES.md)、[AMD 部署与验收](../../docs/AMD_GPU_VALIDATION.md)及[等待文本与缓存优化](../../docs/AMD_PIPELINE_OPTIMIZATION.md)。保留原漫画检测、48px OCR、LaMa 与嵌字器；OCR 解码已通过等价缓存修正在 GPU 执行，Fourier 模块仍在 CPU。设备内两个 LaMa 进程并行处理当前页的独立裁剪，不向控制端注册额外设备位，也不复制检测/OCR 实例。
 
 Dockerfile 支持可配置 PyTorch wheel 源，例如 CUDA 12.4 的构建参数 `--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124`，运行设置 `ENGINE_DEVICE=cuda:0` 并分配匹配 GPU。CPU 与 CUDA 设备使用相同阶段协议；CUDA 不可用时启动失败，不静默改用 CPU。OCR/LaMa 共用同一设备锁，当前每台引擎安全容量为 1。
 

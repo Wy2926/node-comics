@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     allow_private_providers: bool = False
     classic_enabled: bool = False
     classic_engine_profile: Literal['mit', 'mit-directml'] = 'mit'
-    classic_engine_version: str = "mit-95227a2-classic-v4-cluster"
+    classic_engine_version: str = "mit-95227a2-classic-v5-cluster"
     classic_timeout_seconds: int = 900
     text_base_url: str = ""
     text_api_key: str = ""

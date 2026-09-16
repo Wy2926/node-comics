@@ -26,14 +26,15 @@ from manga_translator.rendering import dispatch as render, text_render
 from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
+from hyphenation import configure_renderer
 
 PROFILE = os.environ.get('ENGINE_PROFILE', 'mit')
 DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECTML_OPTIMIZED', '1') == '1'
 INPAINT_WORKERS = int(os.environ.get('ENGINE_INPAINT_WORKERS', '2')) if DIRECTML_OPTIMIZED else 1
 if INPAINT_WORKERS not in (1, 2):
     raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
-AMD_VERSION = 'mit-95227a2-classic-v4-dml-v3' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v2' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1')
-VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v4-cluster')
+AMD_VERSION = 'mit-95227a2-classic-v4-dml-v4' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v2-hyph1' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-hyph1')
+VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v5-cluster')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
@@ -51,15 +52,17 @@ ready = False
 device_evidence = None
 panel_worker = None
 inpaint_pool = None
+dictionary_store = None
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global ready, device_evidence, panel_worker, inpaint_pool
+    global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '4')))
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
     text_render.FALLBACK_FONTS = [FONT]
+    dictionary_store = configure_renderer(text_render)
     # Fail startup instead of silently moving a requested GPU workload to CPU.
     if PROFILE == 'mit-directml':
         from mit_directml import DirectMLRuntime
@@ -135,6 +138,7 @@ def health():
             'capacity': 1, 'capabilities': ['analyze', 'inpaint', 'render'], 'cache_bytes': cache.size,
             'panel_execution': 'parallel-process' if panel_worker else 'serial',
             'input_cache_protocol': 1,
+            'hyphenation': dictionary_store.describe() if dictionary_store else None,
             'inpaint_workers': inpaint_pool.evidence() if inpaint_pool else [],
             **({'inference': device_evidence.evidence()} if device_evidence else {})}
 

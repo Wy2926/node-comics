@@ -59,7 +59,7 @@ def cluster(tmp_path, *, text_gate=None):
     control_port, first_port, second_port = port(), port(), port()
     assert len({control_port, first_port, second_port}) == 3
     database = tmp_path / 'http-cluster.db'
-    version = 'mit-95227a2-classic-v4-cluster'
+    version = 'mit-95227a2-classic-v5-cluster'
     control = f'http://127.0.0.1:{control_port}'
     environment = {**os.environ, 'PYTHONPATH': str(ROOT), 'PYTHONUNBUFFERED': '1',
         'DATABASE_URL': 'sqlite:///' + database.as_posix(), 'STORAGE_PATH': str(tmp_path / 'objects'),

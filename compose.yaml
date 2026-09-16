@@ -55,6 +55,7 @@ services:
       ENGINE_LOCK_DIR: /locks
       ENGINE_CACHE_BYTES: ${ENGINE_CACHE_BYTES:-268435456}
       ENGINE_CACHE_TTL_SECONDS: 900
+      ENGINE_DICTIONARY_LANGUAGES: ${ENGINE_DICTIONARY_LANGUAGES:-en}
       OMP_NUM_THREADS: "4"
     volumes:
       - comics_models:/models

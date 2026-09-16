@@ -1,5 +1,7 @@
 # RX 6900 XT 原模型部署与验收
 
+2026-09-16 后续更新：当前 AMD 入口为 `mit-95227a2-classic-v4-dml-v4`，修复英文断词字典重复下载；预下载指定语言、离线校验及新版本切换见[字典说明](HYPHENATION_DICTIONARIES.md)。下文的 v1/v2/v3 性能记录保留原测试日期与范围。
+
 持续吞吐、并发排队与资源占用见 [AMD 负载测试](AMD_LOAD_TEST.md)。
 
 2026-09-16 更新：AMD 默认入口已升级为 v3，在 GPU OCR 和分镜进程基础上增加图像缓存复用、两个 LaMa 裁剪进程，并修正等待 LLM 的图像水位计数，见 [流水线优化](AMD_PIPELINE_OPTIMIZATION.md)。v2 的对照保留在 [单张速度优化](AMD_SINGLE_PAGE.md)。下方「实际证据」保留 9 月 15 日 v1 的在线任务结果；后续版本另行验证本地图像流水线，未重复付费文本调用及 R2 全链路。
@@ -52,7 +54,7 @@ Windows 环境固定 `torch-directml==0.2.5.dev240914`、`torch==2.4.1`、`torch
 backend/.venv/Scripts/python.exe scripts/run_local_amd.py --smoke --directory private-test-data/amd-another-sample --image samples/another.png
 ```
 
-Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_PROFILE=mit-directml`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v3`，与 v1/v2 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、阶段 API、容量 1、设备锁、租约与缓存恢复协议保持一致。
+Docker 控制端连接独立 AMD 节点时，设置 `CLASSIC_ENGINE_PROFILE=mit-directml`。当前引擎版本为 `mit-95227a2-classic-v4-dml-v4`，与 v1/v2/v3 及 CPU/CUDA 的结果缓存分开。调度仍严格匹配版本；当前未实现不同配置任务自动分流到多种模型池。节点能力、阶段 API、容量 1、设备锁、租约与缓存恢复协议保持一致。
 
 ## 实际证据
 
