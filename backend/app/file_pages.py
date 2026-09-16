@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .assets import asset_json, available, create_asset
 from .db import Base
 from .request_models import RequestBody
+from .languages import Language
 from .errors import problem
 from .jobs import job_json, locked_user
 from .models import Asset, Job
@@ -49,7 +50,7 @@ class FilePageLookup(FilePageIdentity):
 class FilePageMatchRequest(RequestBody):
     pages: list[FilePageLookup] = Field(min_length=1, max_length=100)
     mode: Literal["classic", "redraw"]
-    target_language: str
+    target_language: Language
     include_display: bool = False
 
     @model_validator(mode="after")

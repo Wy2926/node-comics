@@ -3,7 +3,8 @@ import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends
-from pydantic import Field
+from pydantic import Field, ValidationError
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .auth import admin
@@ -11,7 +12,9 @@ from .config import settings
 from .db import get_db
 from .errors import problem
 from .models import User
-from .node_config import NodeConfig
+from .node_config import NodeConfig, EngineOverrides
+from .control_pools import POOL_LIMITS
+from .languages import LANGUAGES
 from .queue_models import ComputeNode
 from .request_models import RequestBody
 from .scheduler import lock_scheduler
@@ -29,7 +32,11 @@ class NodeUpdate(RequestBody):
     expected_version: int = Field(ge=1, strict=True)
     name: str = Field(min_length=1, max_length=120)
     enabled: bool
-    config: NodeConfig
+    config: dict
+
+
+class PoolConfig(RequestBody):
+    execution_slots: int = Field(ge=1, le=100, strict=True)
 
 
 def token_hash(token):
@@ -48,11 +55,18 @@ def validate_config(config):
         problem('NODE_CONFIG_INVALID', '配置拉取间隔必须小于节点离线时限', 422)
 
 
-def compute_node(db, node_id):
+def compute_node(db, node_id, *, image_only=False):
     node = db.get(ComputeNode, node_id)
-    if not node or node.engine_version == 'control':
-        problem('NODE_NOT_FOUND', '图像计算节点不存在', 404)
+    if not node or (image_only and node.engine_version == 'control'):
+        problem('NODE_NOT_FOUND', '计算节点不存在', 404)
     return node
+
+
+@router.get('/config-schema')
+def config_schema(user: User = Depends(admin)):
+    return {'node': NodeConfig.model_json_schema(), 'engine': EngineOverrides.model_json_schema(),
+            'defaults': NodeConfig().model_dump(exclude_none=True), 'pool_limits': POOL_LIMITS,
+            'languages': [{'id': code, 'label': label} for code, label in LANGUAGES.items()]}
 
 
 @router.post('', status_code=201)
@@ -80,16 +94,29 @@ def get_config(node_id: str, user: User = Depends(admin), db: Session = Depends(
 
 @router.put('/{node_id}/config')
 def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Session = Depends(get_db)):
-    validate_config(body.config)
     lock_scheduler(db)
     node = compute_node(db, node_id)
     if node.config_version != body.expected_version:
         problem('NODE_CONFIG_CONFLICT', '配置已更新，请刷新后重新保存', 409)
+    pool = node.engine_version == 'control'
+    try:
+        config = (PoolConfig if pool else NodeConfig).model_validate(body.config)
+    except ValidationError as error:
+        raise RequestValidationError([{**item, 'loc': ('body', 'config', *item['loc'])}
+                                      for item in error.errors()]) from None
+    if pool:
+        maximum = POOL_LIMITS[node.capabilities[0]]
+        if config.execution_slots > maximum:
+            problem('NODE_CONFIG_INVALID', f'此资源池执行位须为 1–{maximum} 的整数', 422)
+    else:
+        validate_config(config)
     node.name, node.enabled = body.name, body.enabled
-    node.desired_config = body.config.model_dump(exclude_none=True)
-    node.capacity = body.config.execution_slots
+    node.desired_config = config.model_dump(exclude_none=True)
+    node.capacity = config.execution_slots
     node.config_version += 1
     node.config_error = None
+    if pool:
+        node.applied_config_version = node.config_version
     db.commit()
     return configuration(node)
 
@@ -97,7 +124,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
 @router.post('/{node_id}/rotate-credential')
 def rotate(node_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
     lock_scheduler(db)
-    node = compute_node(db, node_id)
+    node = compute_node(db, node_id, image_only=True)
     token = secrets.token_urlsafe(48)
     node.credential_hash = token_hash(token)
     node.applied_config_version = 0

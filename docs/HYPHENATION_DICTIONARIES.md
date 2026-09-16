@@ -1,6 +1,6 @@
 # 嵌字字典准备与离线运行
 
-2026-09-16：修复英文嵌字反复联网下载断词字典。正常 AMD 版本为 `mit-95227a2-classic-v4-dml-v4`，CPU/CUDA 为 `mit-95227a2-classic-v5-cluster`；渲染缓存版本为 `masked-png-v2-hyphen-32b006a2`。模型、字体与原排版算法保持原配置；节点执行位现由服务端配置。
+2026-09-16：修复英文嵌字反复联网下载断词字典。以下为字典修复时的历史验证版本；当前 16 项嵌字及版本见[语言清单](LANGUAGE_SUPPORT.md)。当时 AMD 版本为 `mit-95227a2-classic-v4-dml-v4`，CPU/CUDA 为 `mit-95227a2-classic-v5-cluster`；渲染缓存版本为 `masked-png-v2-hyphen-32b006a2`。模型、字体与原排版算法保持原配置；节点执行位现由服务端配置。
 
 ## 原因与修复
 
@@ -28,7 +28,7 @@ services/classic-engine/.venv/Scripts/python.exe services/classic-engine/prepare
 services/classic-engine/.venv/Scripts/python.exe services/classic-engine/prepare_dictionaries.py --all --verify --directory engines/mit-models/hyphenation
 ```
 
-当前目录有 11 份字典：`en-GB`、`en-US`、`de-DE`、`fr-FR`、`es-ES`、`it-IT`、`pt-BR`、`pt-PT`、`ru-RU`、`pl-PL`、`uk-UA`。支持目录中列出的别名和 ISO 三字母代码；未知语言直接报错。`zh-Hans`、`zh-Hant`、`ja`、`ko` 明确返回“不需要字典”，不会误报下载成功。字典准备能力不改变产品当前支持的五种翻译目标语言。
+当前目录有 11 份字典：`en-GB`、`en-US`、`de-DE`、`fr-FR`、`es-ES`、`it-IT`、`pt-BR`、`pt-PT`、`ru-RU`、`pl-PL`、`uk-UA`。支持目录中列出的别名和 ISO 三字母代码；未知语言直接报错。`zh-Hans`、`zh-Hant`、`ja`、`ko` 明确返回“不需要字典”，不会误报下载成功。`tr`、`vi`、`id` 使用按词换行策略，不需要断词字典。当前产品已开放 16 项嵌字目标，完整清单见[语言支持](LANGUAGE_SUPPORT.md)。
 
 文件按目录版本保存到 `engines/mit-models/hyphenation/`，带原始相对路径与许可说明。下载有 30 秒请求超时和固定长度上限；SHA-256 匹配后才原子替换文件。再次执行时只检查已安装文件，完整且正确的资源不重新下载。失败后可重跑同一命令，已验证文件可复用。
 

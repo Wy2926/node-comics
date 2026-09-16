@@ -1,4 +1,4 @@
-"""Control-plane LLM budgets and image checkpoints; no live upstream calls."""
+"""Control-plane LLM metering and image checkpoints; no live upstream calls."""
 import base64
 from datetime import timedelta
 from io import BytesIO
@@ -122,19 +122,23 @@ def test_json_repair_records_cost_for_every_subcall(text_case, monkeypatch):
         assert all(call.usage for call in calls)
 
 
-def test_unknown_call_keeps_reservation_and_cannot_overrun_page_budget(text_case, monkeypatch):
+def test_unknown_call_keeps_metering_without_cost_cap_and_stops_at_attempt_limit(text_case, monkeypatch):
     calls = []
     def timeout(*args):
         calls.append(1)
         raise TextError('TEXT_TRANSPORT_FAILED', 'isolated timeout', retryable=True)
     monkeypatch.setattr(classic, 'call_text', timeout)
     monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
-    with pytest.raises(TextError, match='TEXT_BUDGET_EXCEEDED'):
+    with pytest.raises(TextError, match='TEXT_TRANSPORT_FAILED'):
         classic.run_text_stage(*text_case)
-    assert len(calls) == 1
+    assert len(calls) == 3
     with session_factory()() as db:
-        call = db.scalar(select(TextCall))
-        assert call.accounted_micros == call.reserved_micros > 0 and call.cost_state == 'unknown'
+        records = db.scalars(select(TextCall)).all()
+        assert len(records) == 3
+        assert sum(call.accounted_micros for call in records) > 50_000
+        assert all(call.accounted_micros == call.reserved_micros > 0 and call.cost_state == 'unknown' for call in records)
+    with pytest.raises(TextError, match='TEXT_RETRY_EXHAUSTED'):
+        classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')
 
 
 def test_late_translation_accounts_usage_without_overwriting_new_generation(text_case):

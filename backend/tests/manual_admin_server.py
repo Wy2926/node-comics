@@ -8,6 +8,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 directory = Path(tempfile.mkdtemp(prefix="nc-admin-ui-"))
+port = int(os.environ.get('ADMIN_FIXTURE_PORT', '18090'))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix()}",
     STORAGE_PATH=str(directory / "objects"), DEV_AUTH="true", DEV_AUTH_SECRET="admin-ui-isolated-signing-secret-0001",
     DEV_ADMIN_USERNAME="admin", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
@@ -25,7 +26,7 @@ controls.write_text('{"delay":0,"fail":false}', encoding="utf-8")
 
 @app.middleware("http")
 async def fixture_faults(request, call_next):
-    if request.url.path.startswith("/v1/admin/monitor/"):
+    if request.url.path.startswith(("/v1/admin/monitor/", "/v1/admin/compute-nodes")):
         state = json.loads(controls.read_text(encoding="utf-8"))
         if state.get("delay"):
             await asyncio.sleep(min(float(state["delay"]), 10))
@@ -36,8 +37,8 @@ async def fixture_faults(request, call_next):
 initialize()
 with session_factory()() as db:
     seed(db)
-print("Synthetic admin fixture: http://127.0.0.1:18090/admin/ (username: admin)", flush=True)
+print(f"Synthetic admin fixture: http://127.0.0.1:{port}/admin/ (username: admin)", flush=True)
 print(f"ADMIN_FIXTURE_CONTROLS={controls}", flush=True)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=18090, access_log=False, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=port, access_log=False, log_level="warning")

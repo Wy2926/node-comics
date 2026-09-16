@@ -3,11 +3,11 @@ from typing import Literal
 from pydantic import Field
 from .request_models import RequestBody
 
-Language = Literal['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko']
+from .languages import Language
 
 
 class EngineOverrides(RequestBody):
-    languages: list[Language] | None = Field(default=None, min_length=1, max_length=5)
+    languages: list[Language] | None = Field(default=None, min_length=1, max_length=16)
     torch_threads: int | None = Field(default=None, ge=1, le=128, strict=True)
     opencv_threads: int | None = Field(default=None, ge=1, le=128, strict=True)
     cache_bytes: int | None = Field(default=None, ge=0, le=8 * 1024**3, strict=True)

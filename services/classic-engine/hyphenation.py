@@ -20,7 +20,8 @@ def language_list(values):
 
 
 def resolve(language):
-    language = {'CHS': 'zh-Hans', 'CHT': 'zh-Hant'}.get(language, language)
+    language = {'CHS': 'zh-Hans', 'CHT': 'zh-Hant', 'PTB': 'pt-BR', 'ESP': 'es',
+                'TRK': 'tr', 'VIN': 'vi', 'IND': 'id'}.get(language, language)
     try:
         tag = standardize_tag(language.replace('_', '-'))
     except (ValueError, TypeError, AttributeError):
@@ -57,6 +58,12 @@ class LocalHyphenator(Hyphenator):
         self.dict_path = str(path)
 
 
+class WordWrapper:
+    # Preserve whole words; upstream only splits a word when it cannot fit a line.
+    def syllables(self, word):
+        return [word]
+
+
 class DictionaryStore:
     def __init__(self, directory, languages):
         self.directory = Path(directory)
@@ -71,6 +78,8 @@ class DictionaryStore:
             self.instances[locale] = LocalHyphenator(locale, path)
 
     def select(self, language):
+        if language in ('tr', 'TRK', 'vi', 'VIN', 'id', 'IND'):
+            return WordWrapper()
         locale = resolve(language)
         if locale is None:
             return None

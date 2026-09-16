@@ -12,6 +12,10 @@
 
 ## 服务端通用配置
 
+后台默认使用表单编辑，可切换 JSON 文本；两种视图共享同一份配置。格式、未知字段或范围无效时保留原输入并阻止切换／保存。默认值、范围和全部 16 种语言由管理员 `GET /v1/admin/compute-nodes/config-schema` 提供。语言支持多选、全选和清空；显式覆盖至少选择一种，勾选「使用节点本地语言设置」则移除覆盖。
+
+公共提交、节点语言配置和报告遇到不支持的语言，返回 HTTP 422、`error.code=LANGUAGE_UNSUPPORTED`；AI 重绘对未开放的语言也返回此错误。其他无效节点字段返回 `NODE_CONFIG_INVALID`，配置版本冲突为 `NODE_CONFIG_CONFLICT`。
+
 数据库保存 `desired_config`、单调递增 `config_version`、`applied_config_version`、脱敏应用错误与实际引擎配置。保存携带 `expected_version`，冲突返回 409。如下配置可直接用于后台创建，省略项由服务端补齐：
 
 ```json
@@ -45,9 +49,9 @@
 | `input_cache_bytes` / `input_cache_ttl_seconds` | 代理原图缓存 128 MiB／900 秒，0 可禁用 |
 | `engine` | 默认 `{}`，字段省略时使用节点本地文件值；显式字段覆盖本地值 |
 
-服务端验证所有字段与范围，拒绝未知字段和不支持的 schema。`engine.languages` 只允许产品现有的简中、繁中、日、英、韩目标语言。支持语言是目标语言能力，检测／OCR 继续使用既有多语言模型。
+服务端验证所有字段与范围，拒绝未知字段和不支持的 schema。`engine.languages` 允许当前 16 项目标语言：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`。支持语言是目标语言能力，检测／OCR 继续使用既有 48px 模型，不表示已通过相同源语言的 OCR 验收。完整列表和资源限制见[嵌字与 OCR 语言清单](LANGUAGE_SUPPORT.md)。
 
-执行位表示在途阶段，并非模型副本数：代理并发处理网络取图、请求和交付；当前单物理设备图像引擎保留串行模型锁，默认一个执行位。增加位数可增加在途请求，不承诺 GPU 吞吐增加。文本、重绘和上传校验池仍由服务端 `CLUSTER_TEXT_SLOTS`、`CLUSTER_REDRAW_SLOTS`、`CLUSTER_UPLOAD_SLOTS` 配置，不由图像节点报告。
+执行位表示在途阶段，并非模型副本数：代理并发处理网络取图、请求和交付；当前单物理设备图像引擎保留串行模型锁，默认一个执行位。增加位数可增加在途请求，不承诺 GPU 吞吐增加。文本、重绘和上传校验池在后台分别配置执行位，文本／重绘 1–100，上传校验 1–32。`CLUSTER_TEXT_SLOTS`、`CLUSTER_REDRAW_SLOTS`、`CLUSTER_UPLOAD_SLOTS` 仅提供首次创建默认值；数据库设置为后续唯一依据，进程重启不覆盖容量或启停状态。修改对下一次领取生效，缩容不会中止已有租约。
 
 ## 拉取与应用顺序
 
@@ -62,11 +66,13 @@
 
 移除语言后，该语言的待执行阶段等待其他支持节点，不改写任务目标语言或已保存的检查点。
 
+控制池的执行位与供应商限制相互独立：扩大重绘池不会绕过供应商并发上限，扩大文本池不会绕过 RPM、重试次数或处理时限。
+
 ## 本地文件与性能参数
 
 - 代理：复制 [node.example.json](../services/compute-agent/node.example.json) 为私有文件，通过 `NODE_CONFIG_FILE` 指定。文件只含控制地址、节点身份和本机引擎连接；执行位与公共轮询参数来自服务端。
 - NVIDIA：[engine.cuda.example.json](../services/classic-engine/engine.cuda.example.json)。AMD：[engine.directml.example.json](../services/classic-engine/engine.directml.example.json)。通过 `ENGINE_CONFIG_FILE` 指定。相对路径按配置文件目录解析，移动示例后须调整路径。
-- `runtime.languages` 声明启动支持列表；缺失／损坏的所需字典及许可证文件自动下载并按固定长度、SHA-256 校验，原子写入模型缓存；完整文件复用。中日韩不需断词字典。下载失败不接单，翻译过程中不下载。来源与许可见[字典说明](HYPHENATION_DICTIONARIES.md)。
+- `runtime.languages` 声明启动支持列表；缺失／损坏的所需字典及许可证文件自动下载并按固定长度、SHA-256 校验，原子写入模型缓存；完整文件复用。中日韩不需断词字典；土耳其语、越南语、印尼语采用按词换行。新增语言的 Noto Sans 字体和许可证也在接单前准备并校验。下载失败不接单，翻译过程中不下载。来源与许可见[字典说明](HYPHENATION_DICTIONARIES.md)。
 - `runtime.torch_threads`、`runtime.opencv_threads`、缓存大小和 TTL 可由服务端覆盖并热更新。AMD LaMa 子进程在后续裁剪调用中使用更新后的线程值。
 - `torch_interop_threads`、`inpaint_workers`、设备、路径属于本机启动参数，修改文件后重启引擎。DirectML 支持 1／2 个 LaMa 裁剪进程，CUDA／CPU 当前为 1。修改 DirectML 裁剪进程数会改变引擎版本，控制服务必须配置匹配版本。
 - 一个物理设备共用锁目录；不要通过多个代理复制同一设备容量。配置文件必须只交给部署该节点的操作者，私有文件不提交到仓库。
@@ -84,4 +90,4 @@
 | `POST /internal/nodes/{id}/claim` | 带 config_version 领取；服务端核对配置与容量 |
 | `POST <engine>/internal/config` | 独立引擎凭据保护，仅应用白名单性能／语言字段 |
 
-租约输入、心跳和完成协议仍校验节点身份与执行代次。模型配置、缓存身份、供应商预算及用户额度沿用现有独立边界。
+租约输入、心跳和完成协议仍校验节点身份与执行代次。模型配置、缓存身份、供应商成本计量及用户额度沿用现有独立边界。

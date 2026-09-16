@@ -103,9 +103,6 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
         if count >= profile['max_attempts']:
             raise TextError('TEXT_RETRY_EXHAUSTED', '此文本组已达到自动调用次数上限')
         reserved = input_bound(segments, language) * profile['input_rate'] + profile['max_output_tokens'] * profile['output_rate']
-        spent = db.scalar(select(func.coalesce(func.sum(TextCall.accounted_micros), 0)).where(TextCall.job_id == job_id))
-        if spent + reserved > profile['page_budget_micros']:
-            raise TextError('TEXT_BUDGET_EXCEEDED', '此页已达到文本成本预算，未知消耗仍保留预占')
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
                         group_index=group_index, sequence=count + 1,
                         provider_id=job.config['provider']['id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)

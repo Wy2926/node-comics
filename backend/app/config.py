@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_engine_version: str = "mit-95227a2-classic-v5-cluster"
+    classic_engine_version: str = "mit-95227a2-classic-v7-layout"
     classic_timeout_seconds: int = 900
     text_base_url: str = ""
     text_api_key: str = ""
@@ -80,7 +80,6 @@ class Settings(BaseSettings):
     text_max_attempts: int = 3
     text_max_output_tokens: int = 1024
     text_group_bytes: int = 1800
-    text_page_budget_micros: int = 50_000
     # CNY per million tokens = micro-CNY per token; operator estimates, not billing facts.
     text_input_rate: int = 5
     text_output_rate: int = 30

@@ -26,6 +26,16 @@ INPUT_LIMIT = 24 * 1024 * 1024
 JSON_LIMIT = 96 * 1024 * 1024
 CHECKPOINT_LIMIT = 4 * 1024 * 1024
 log = logging.getLogger('compute-agent')
+ENGINE_ERRORS = {
+    'LANGUAGE_UNSUPPORTED': '此节点不支持目标语言',
+    'CLASSIC_RENDER_BOUNDARY': '译文无法在页边内完整排版',
+    'CLASSIC_RENDER_BUBBLE_OVERFLOW': '译文无法在气泡边界内完整排版',
+    'CLASSIC_RENDER_OVERLAP': '译文排版与未识别的文字区域重叠',
+    'CLASSIC_RENDER_NO_GLYPHS': '嵌字未生成可见字形',
+    'CLASSIC_RENDER_FONT_MISSING': '字体缺少译文所需字形',
+    'CLASSIC_RENDER_INPUT_INVALID': '嵌字区域或背景检查点无效',
+    'CLASSIC_RENDER_LAYOUT_FAILED': '嵌字排版计算失败',
+}
 
 
 def cache_locked(method):
@@ -291,6 +301,10 @@ class Agent:
                         payload['image'] = base64.b64encode(raw).decode()
                         continue
                 if response.status_code == 422:
+                    detail = json.loads(bounded(response, 8192, success=False))
+                    code = detail.get('error') if isinstance(detail, dict) else None
+                    if isinstance(code, str) and code in ENGINE_ERRORS:
+                        raise StageError(code)
                     raise StageError('CLASSIC_' + lease['stage'].upper() + '_FAILED')
                 if response.status_code == 409:
                     raise StageError('CLASSIC_ENGINE_CHANGED')
@@ -336,7 +350,7 @@ class Agent:
                 result = self.execute(lease)
                 body = {'result': result}
             except StageError as error:
-                body = {'error': {'code': error.code, 'message': '计算阶段失败'}}
+                body = {'error': {'code': error.code, 'message': ENGINE_ERRORS.get(error.code, '计算阶段失败')}}
             except (httpx.HTTPError, ValueError, KeyError, TypeError):
                 body = {'error': {'code': 'CLASSIC_ENGINE_UNAVAILABLE', 'message': '计算节点阶段调用失败'}}
             if stale.is_set():

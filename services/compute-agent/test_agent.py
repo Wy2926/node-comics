@@ -10,6 +10,19 @@ from agent import Agent, Config, INPUT_LIMIT, InputCache, StageError
 
 
 class AgentTests(unittest.TestCase):
+    def test_render_error_code_survives_engine_and_untrusted_details_do_not(self):
+        for code, expected in [('CLASSIC_RENDER_OVERLAP', 'CLASSIC_RENDER_OVERLAP'),
+                               ('LANGUAGE_UNSUPPORTED', 'LANGUAGE_UNSUPPORTED'),
+                               ('private dialogue must not leak', 'CLASSIC_RENDER_FAILED')]:
+            def route(request):
+                if request.url.path.endswith('/input'):
+                    return httpx.Response(200, content=b'original')
+                return httpx.Response(422, json={'error': code})
+            agent = Agent(self.config(), transport=httpx.MockTransport(route))
+            with self.assertRaises(StageError) as caught:
+                agent.execute({**self.lease(), 'stage': 'render'})
+            self.assertEqual(caught.exception.code, expected)
+
     def test_tiny_inputs_have_an_entry_limit(self):
         cache = InputCache(1024, 60, max_entries=2)
         for key in ('a', 'b', 'c'):

@@ -77,8 +77,8 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
                    'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': tokens['auth'], 'PROVIDERS_JSON': '[]',
                    'OPENAI_API_KEY': '', 'R2_KEY_PREFIX': tokens['r2_prefix'],
                    'CLASSIC_ENABLED': 'true',
-                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v4' if device.startswith('directml') else 'mit-95227a2-classic-v5-cluster',
-                   'TEXT_PAGE_BUDGET_MICROS': config.get('TEXT_PAGE_BUDGET_MICROS', '50000'), 'TEXT_MAX_ATTEMPTS': '3',
+                   'CLASSIC_ENGINE_VERSION': 'mit-95227a2-classic-v4-dml-v6-layout' if device.startswith('directml') else 'mit-95227a2-classic-v7-layout',
+                   'TEXT_MAX_ATTEMPTS': '3',
                    'DISPATCH_INTERVAL_SECONDS': '1'}
     # Explicit allowlist: do not forward credentials inherited from the caller.
     runtime_env = {k: v for k, v in common.items() if k.upper() in {
@@ -93,7 +93,7 @@ def cluster(folder, api_port, engine_port, device='cuda:0', engine_config=None):
             'font': str(ROOT/'engines/mit-native/fonts/NotoSansMonoCJK-VF.ttf.ttc'),
             'lock_dir': str(ROOT/'engines/device-locks'), 'torch_interop_threads': 1,
             'inpaint_workers': 2 if device.startswith('directml') else 1,
-            'runtime': {'languages': ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'],
+            'runtime': {'languages': ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'],
                         'torch_threads': 4, 'opencv_threads': 2, 'cache_bytes': 268435456,
                         'cache_ttl_seconds': 900}}, indent=2), encoding='utf-8')
     engine_env = {**runtime_env, 'PYTHONPATH': os.pathsep.join([str(ENGINE), str(ROOT/'engines/mit-native')]),

@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 import numpy as np
 from PIL import Image
+from pydantic import ValidationError
 import torch
 from manga_translator.config import OcrConfig, InpainterConfig
 from manga_translator.detection.default import DefaultDetector
@@ -27,8 +28,8 @@ from manga_translator.ocr.model_48px import Model48pxOCR
 from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
 from manga_translator.textline_merge import dispatch as merge
 from manga_translator.mask_refinement import dispatch as refine
-from manga_translator.rendering import dispatch as render, text_render
-from manga_translator.utils import ModelWrapper, TextBlock, sort_regions
+from manga_translator.rendering import text_render
+from manga_translator.utils import ModelWrapper, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
 from hyphenation import configure_renderer
@@ -39,14 +40,15 @@ DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECT
 INPAINT_WORKERS = int(os.environ.get('ENGINE_INPAINT_WORKERS', '2')) if DIRECTML_OPTIMIZED else 1
 if INPAINT_WORKERS not in (1, 2):
     raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
-AMD_VERSION = 'mit-95227a2-classic-v4-dml-v4' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v2-hyph1' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-hyph1')
-VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v5-cluster')
+AMD_VERSION = 'mit-95227a2-classic-v4-dml-v6-layout' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-layout' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-layout')
+VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v7-layout')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
 RESOURCE_ID = os.environ.get('ENGINE_RESOURCE_ID', DEVICE)
 FONT = os.environ.get('ENGINE_FONT', '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc')
-LANG = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'en': 'ENG', 'ko': 'KOR'}
+from render_languages import prepare_fonts, font_for
+from lettering import LetteringError, letter_page
 Image.MAX_IMAGE_PIXELS = 24_000_000
 lock = DeviceLock(RESOURCE_ID, os.environ.get('ENGINE_LOCK_DIR', '/tmp/comics-device-locks'))
 cache = ImageCache(LOCAL_RUNTIME.cache_bytes, LOCAL_RUNTIME.cache_ttl_seconds)
@@ -71,6 +73,7 @@ async def lifespan(app):
     ModelWrapper._MODEL_DIR = os.environ.get('MODEL_DIR', '/models')
     text_render.FALLBACK_FONTS = [FONT]
     from hyphenation import default_directory
+    prepare_fonts(LOCAL_RUNTIME.languages)
     prepare_languages(default_directory(), LOCAL_RUNTIME.languages)
     dictionary_store = configure_renderer(text_render, languages=LOCAL_RUNTIME.languages)
     # Fail startup instead of silently moving a requested GPU workload to CPU.
@@ -176,6 +179,7 @@ async def configure(request: Request):
         # Download and verify before taking the execution lock. Failure leaves the
         # previous complete runtime active; no unverified language is advertised.
         await run_in_threadpool(prepare_languages, default_directory(), updated.languages)
+        await run_in_threadpool(prepare_fonts, updated.languages)
         store = DictionaryStore(default_directory(), updated.languages)
         async with lock.hold():
             torch.set_num_threads(updated.torch_threads)
@@ -189,6 +193,9 @@ async def configure(request: Request):
                 cache = ImageCache(updated.cache_bytes, updated.cache_ttl_seconds)
             effective_runtime = updated
         return {'runtime': updated.model_dump(), 'supported_languages': updated.languages}
+    except ValidationError as error:
+        unsupported = any(item['type'] == 'literal_error' and item['loc'][0] == 'languages' for item in error.errors())
+        return JSONResponse(status_code=422, content={'error': 'LANGUAGE_UNSUPPORTED' if unsupported else 'ENGINE_CONFIG_FAILED'})
     except Exception:
         return JSONResponse(status_code=422, content={'error': 'ENGINE_CONFIG_FAILED'})
 
@@ -285,41 +292,13 @@ async def erase_page(image, analysis, config, *, encode=True):
 
 
 async def render_page(image, analysis, translations, config, language, cleaned):
-    regions = [TextBlock(**row) for row in analysis['regions']]
-    if len(regions) != len(analysis['segments']) or not regions:
-        raise ValueError('Region mismatch')
-    mask = decode(analysis['mask'], 'L')
-    if mask.shape != image.shape[:2] or cleaned.shape != image.shape:
-        raise ValueError('Mask or cleaned image dimensions')
-    if np.any(cleaned[mask == 0] != image[mask == 0]):
-        raise ValueError('Cleaned image changed protected pixels')
-    for segment, region in zip(analysis['segments'], regions):
-        region.translation = translations[segment['id']]
-        face = text_render.get_cached_font(FONT)
-        if any(not char.isspace() and face.get_char_index(ord(char)) == 0 for char in region.translation):
-            raise ValueError('Font missing glyph')
-        region.target_lang = LANG[language]
-        region._alignment = 'center'
     start = time.monotonic()
-    rendered = cleaned.copy()
-    glyph_mask = np.zeros(mask.shape, dtype=np.uint8)
-    for region in regions:
-        previous = rendered.copy()
-        rendered = await render(rendered, [region], FONT, font_size_minimum=config['font_minimum'], hyphenate=False)
-        changed = np.any(rendered != previous, axis=2)
-        if not changed.any():
-            raise ValueError('Renderer produced no glyphs')
-        glyph_mask[changed] = 255
-    allowed = (mask > 0) | (glyph_mask > 0)
-    protected = np.zeros(mask.shape, dtype=np.uint8)
-    for polygon in analysis.get('unrecognized_regions', []):
-        cv2.fillConvexPoly(protected, np.array(polygon, dtype=np.int32), 255)
-    if np.any(allowed & (protected > 0)):
-        raise ValueError('Translated text overlaps an unrecognized region')
-    output = image.copy()
-    output[allowed] = rendered[allowed]
+    mask = decode(analysis['mask'], 'L')
+    font = font_for(language, FONT)
+    output, glyph_mask, fitted, bubbles = await letter_page(image, analysis, translations, config, language,
+                                                 cleaned, mask, text_render, font, FONT)
     return {'image': png(output), 'mask': png(mask), 'glyph_mask': png(glyph_mask),
-            'timings': {'render': time.monotonic() - start}}
+            'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'timings': {'render': time.monotonic() - start}}
 
 
 @app.post('/v1/{stage}', dependencies=[Depends(authorized)])
@@ -333,8 +312,8 @@ async def process(stage: str, request: Request):
             raise HTTPException(413)
     try:
         body = json.loads(raw)
-        if body.get('language') and body['language'] not in effective_runtime.languages:
-            raise ValueError('Unsupported language')
+        if 'language' in body and body['language'] not in effective_runtime.languages:
+            return JSONResponse(status_code=422, content={'error': 'LANGUAGE_UNSUPPORTED'})
         if body['config']['version'] != VERSION:
             raise HTTPException(409, 'Engine version changed')
         if stage != 'analyze' and len(json.dumps(body['analysis'], allow_nan=False).encode()) > MAX_CHECKPOINT:
@@ -389,5 +368,7 @@ async def process(stage: str, request: Request):
         return response
     except HTTPException:
         raise
+    except LetteringError as error:
+        return JSONResponse(status_code=422, content={'error': error.code})
     except Exception:
         return JSONResponse(status_code=422, content={'error': 'ENGINE_' + stage.upper() + '_FAILED'})

@@ -13,6 +13,7 @@ from .db import get_db
 from .entitlements import locked_user
 from .errors import problem
 from .file_pages import FilePage
+from .languages import Language
 from .jobs import submission_status, cancel_job, create_job, idem_key, job_json, owned_job
 from .models import Asset, Job, User, now
 from .providers import configuration, digest
@@ -44,7 +45,7 @@ class ItemRequest(RequestBody):
 
 class SubmissionRequest(RequestBody):
     mode: Literal["classic", "redraw"]
-    target_language: str
+    target_language: Language
     max_quota_pages: int = Field(ge=0, le=1000000)
     expected_kind: str | None = None
     regenerate: bool = False

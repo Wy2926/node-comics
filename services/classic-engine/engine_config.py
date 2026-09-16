@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    languages: list[Literal['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko']] = Field(
-        default_factory=lambda: ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], min_length=1, max_length=5)
+    languages: list[Literal['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id']] = Field(
+        default_factory=lambda: ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'], min_length=1, max_length=16)
     torch_threads: int = Field(default=4, ge=1, le=128)
     opencv_threads: int = Field(default=2, ge=1, le=128)
     cache_bytes: int = Field(default=256 * 1024**2, ge=0, le=8 * 1024**3)

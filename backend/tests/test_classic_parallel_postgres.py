@@ -1,4 +1,4 @@
-"""Opt-in PostgreSQL proof of atomic stage budgeting and lease fencing."""
+"""Opt-in PostgreSQL proof of atomic call metering and lease fencing."""
 import os
 from uuid import uuid4
 import pytest
@@ -9,7 +9,8 @@ from app.queue_models import SchedulerMutex
 from test_classic import text_case
 from test_classic_parallel import (
     test_inflight_llm_does_not_hold_scheduler_or_image_resources,
-    test_atomic_unknown_cost_budget_cannot_be_overreserved,
+    test_parallel_groups_meter_every_call_without_cost_cap,
+    test_parallel_same_group_cannot_duplicate_calls,
     test_new_node_reuses_paid_translation_after_image_cache_loss,
 )
 

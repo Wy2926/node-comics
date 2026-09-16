@@ -24,6 +24,7 @@ from .jobs import cancel_job, job_json, owned_job
 from .entitlements import entitlements_json
 from .models import Asset, ClassicState, Job, Ledger, Provider, User, now
 from .providers import LANGUAGES, credential, initialize_providers
+from .languages import REDRAW_LANGUAGES
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
 from .node_admin import router as node_admin_router
@@ -42,6 +43,8 @@ async def lifespan(app):
     initialize()
     with session_factory()() as db:
         initialize_providers(db)
+        from .control_pools import initialize_pools
+        initialize_pools(db)
     yield
 
 
@@ -76,6 +79,10 @@ async def request_guards(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, exc):
+    if any(item['type'] == 'language_unsupported' for item in exc.errors()):
+        return JSONResponse(status_code=422, content={"error": {"code": "LANGUAGE_UNSUPPORTED", "message": "此目标语言尚未开放，请选择支持的语言"}})
+    if request.url.path.startswith('/v1/admin/compute-nodes'):
+        return JSONResponse(status_code=422, content={"error": {"code": "NODE_CONFIG_INVALID", "message": "节点配置字段、数值或范围无效，请检查表单提示"}})
     return JSONResponse(status_code=422, content={"error": {"code": "INVALID_REQUEST", "message": "请求字段不完整或格式无效，请检查图片和所选范围"}})
 
 
@@ -154,7 +161,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     redraw_enabled = any(credential(provider.config) for provider in db.scalars(select(Provider).where(Provider.enabled.is_(True))))
     from .classic_config import enabled as classic_enabled
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(), "languages": list(LANGUAGES)},
-                      {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": list(LANGUAGES)}],
+                      {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": cfg.free_queue_capacity, "plus_queue_capacity": cfg.plus_queue_capacity},
             "entitlements": entitlements_json(db, user) if user else None,

@@ -9,7 +9,7 @@ from .config import settings
 from .errors import problem
 from .models import Provider
 
-LANGUAGES = {"zh-Hans": "简体中文", "zh-Hant": "繁體中文", "en": "English", "ja": "日本語", "ko": "한국어"}
+from .languages import LANGUAGES, REDRAW_LANGUAGES
 PROMPT_VERSION = "comics-translate-v1"
 
 
@@ -91,7 +91,7 @@ def initialize_providers(db: Session):
 
 def configuration(db: Session, mode: str, language: str, provider_id=None):
     cfg = settings()
-    if language not in LANGUAGES:
+    if language not in LANGUAGES or (mode == 'redraw' and language not in REDRAW_LANGUAGES):
         problem("LANGUAGE_UNSUPPORTED", "此目标语言尚未开放", 422)
     if mode == "redraw":
         query = select(Provider).where(Provider.enabled.is_(True)).order_by(Provider.id)

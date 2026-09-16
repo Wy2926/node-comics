@@ -5,7 +5,10 @@
   "no_dictionary_languages": [
     "zh",
     "ja",
-    "ko"
+    "ko",
+    "tr",
+    "vi",
+    "id"
   ],
   "dictionaries": {
     "en-GB": {

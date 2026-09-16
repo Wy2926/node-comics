@@ -1325,3 +1325,17 @@ dialog::backdrop {
   display: flex;
   align-items: center;
 }
+.config-body {border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 16px;}
+.sr-only {position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;}
+.config-grid, .language-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;}
+.config-grid input {width: 100%; min-width: 0; box-sizing: border-box;}
+.config-tabs, .language-actions {display: flex; gap: 12px; flex-wrap: wrap;}
+.config-section {border-top: 1px solid var(--line, #dedfea); padding-top: 18px; display: grid; gap: 12px;}
+.config-section h3, .config-section p {margin: 0;}
+.language-options {border: 0; margin: 0; padding: 0; min-width: 0;}
+.language-actions {margin-bottom: 12px;}
+.language-option {padding: 10px 12px; border: 1px solid var(--line, #dedfea); border-radius: 8px; cursor: pointer;}
+.language-option:has(input:checked) {background: #f0f2ff; border-color: #9295e8;}
+.language-option small {display: block; color: #73768b; font-size: 11px; margin-top: 3px;}
+.language-options:disabled {opacity: .6;}
+@media (max-width: 540px) {.config-grid {grid-template-columns: 1fr;} .language-option {padding: 8px; font-size: 12px;}}

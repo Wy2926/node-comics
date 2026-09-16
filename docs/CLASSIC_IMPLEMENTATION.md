@@ -1,5 +1,7 @@
 # 常规翻译运行说明
 
+2026-09-16：嵌字已扩展至 16 个目标项，新增固定 Noto Sans 字体与客户端选项；当前版本、资源和验证边界见[嵌字与 OCR 语言清单](LANGUAGE_SUPPORT.md)。下文版本与样本记录按各自日期保留。
+
 2026-09-15：常规改为可独立部署的阶段计算节点。客户端统一使用[提交清单与双队列](TRANSLATION_CLUSTER_DESIGN.md)；原图和译图存私有 R2，中间图仅节点有界内存缓存。引擎版本 `mit-95227a2-classic-v4-cluster`，模型、字体和权重版本未升级。
 
 ## 启动
@@ -15,11 +17,11 @@
 ## 阶段与恢复
 
 1. analyze 检测和 OCR，将分块文字、置信标记和有界遮罩检查点写入数据库，释放图像租约。
-2. text 调用 LLM，与 inpaint LaMa 局部抹字并行。文本等待期间图像设备可服务其他页面；每个文本调用独立记录预算、用量、请求标识和未知消耗。
+2. text 调用 LLM，与 inpaint LaMa 局部抹字并行。文本等待期间图像设备可服务其他页面；每个文本调用独立记录预估成本、用量、请求标识和未知消耗。
 3. 两路完成后 render 嵌字。清理图缓存丢失或换节点时重新执行本地抹字，不重发已成功文本调用。
 4. 输出核验尺寸、允许区域外像素及有效租约，写 R2 后结算。空白页 no_text 不消耗页数，明确失败释放预占；部分识别保留原文并标记。
 
-节点每阶段的重试受 `CLUSTER_STAGE_ATTEMPTS` 控制。过期租约和已完成任务的晚到结果不能重新交付。低成本 LLM 在统一次数/页预算内重试和格式修复，未知成本继续预占；AI 重绘不使用该文本重试策略。
+节点每阶段的重试受 `CLUSTER_STAGE_ATTEMPTS` 控制。过期租约和已完成任务的晚到结果不能重新交付。低成本 LLM 在统一次数和处理时限内重试和格式修复，未知成本继续计量预占，成本不再作为调用或重试门槛；AI 重绘不使用该文本重试策略。
 
 ## 接口与配置
 
@@ -27,7 +29,7 @@
 | --- | --- |
 | `POST /v1/translation-submissions` | mode=classic、有限页数、摘要及上传会话 |
 | `GET /v1/jobs/{id}/classic` | 所属用户的分块原文/译文与计量；未上传返回未就绪 |
-| `GET /v1/admin/jobs` | 每次文本调用与预算记录 |
+| `GET /v1/admin/jobs` | 每次文本调用与成本计量记录 |
 | `CLASSIC_ENGINE_VERSION` | 影响缓存与节点能力匹配 |
 | `ENGINE_DEVICE` / `ENGINE_RESOURCE_ID` | CPU/CUDA与稳定物理设备身份 |
 | `ENGINE_CACHE_BYTES` | 默认256 MiB有界中间图内存 |
@@ -35,7 +37,6 @@
 | `CLUSTER_TEXT_SLOTS` / `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 独立文本并发与实际请求限速 |
 | `TEXT_TIMEOUT_SECONDS` / `TEXT_MAX_ATTEMPTS` | 默认60秒／每组3次 |
 | `TEXT_GROUP_BYTES` / `TEXT_MAX_OUTPUT_TOKENS` | 1800字节／1024输出token |
-| `TEXT_PAGE_BUDGET_MICROS` | 50000 micro-CNY，每页运营估价预算0.05元 |
 | `TEXT_INPUT_RATE` / `TEXT_OUTPUT_RATE` | 运营估价，非已核实供应商账单 |
 | `TEXT_PROTOCOL` | openai_chat，另支持openai_responses契约 |
 
@@ -71,3 +72,5 @@ npm run build:web
 实际测试环境：Docker Linux、CPU 引擎 4 推理线程、宿主提供 Docker 32 逻辑 CPU／约 15.4 GiB 内存。上述是少量热启动样例的阶段耗时，不是吞吐量或并发承诺。没有完成 24 页日漫／英文漫画对照，也没有对比 BallonsTranslator；首版是可替换的图像引擎实现，不是最终质量选型。OCR 的部分低置信区域保留原文，并标为部分完成、不扣点数；OCR 整体失败、译文缺块、字体或渲染错误时整页保留原图并报错。更细的人工区域校对、GPU 并发调优和正式定价未实现。尚未公开部署。
 
 组件版本、权重校验和及许可来源见 [常规引擎资源](CLASSIC_RESOURCES.md)。
+
+气泡识别已接入固定版本 BallonsTranslator；排版边界、具体错误码、验证范围见[开源气泡识别与嵌字保护](LETTERING_LAYOUT.md)。引擎版本升级须与控制服务同步，本文此前的本地运行证据不表示新排版版本已部署。

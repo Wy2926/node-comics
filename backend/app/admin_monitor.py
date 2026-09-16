@@ -146,7 +146,7 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
         TextCall.group_index, TextCall.started_at, TextCall.completed_at, TextCall.cost_state,
         TextCall.accounted_micros, TextCall.error_code).where(TextCall.job_id == job.id).order_by(TextCall.started_at)).all()
     provider = db.execute(select(Attempt.provider_id, Attempt.cost_state).where(Attempt.id == job.attempt_id)).first() if job.attempt_id else None
-    return {**task_json(job, name, leases, at, paused), "generated_at": iso(at),
+    return {**task_json(job, name, leases, at, paused), "generated_at": iso(at), "error_message": job.error_message,
         "provider": {"id": provider.provider_id, "cost_state": provider.cost_state} if provider else None,
         "stages": [{"name": s.name, "status": s.status, "attempts": s.attempts,
                     "available_at": iso(s.available_at), "completed_at": iso(s.completed_at)}

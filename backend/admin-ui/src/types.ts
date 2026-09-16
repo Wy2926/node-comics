@@ -21,6 +21,7 @@ export type Task = {
   completed_by: {node_id: string; name: string; executor_id: string | null} | null;
 };
 export type TaskDetail = Task & {
+  error_message: string | null;
   generated_at: string; provider: {id: string; cost_state: string} | null;
   stages: {name: string; status: string; attempts: number; available_at: string; completed_at: string | null}[];
   executions: {id: string; stage: string; generation: number; node_id: string; node_name: string;

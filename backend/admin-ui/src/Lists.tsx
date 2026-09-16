@@ -49,7 +49,7 @@ export function Nodes({data, onConfigure}: {data: NodesData; onConfigure: (node:
         <dt>最后心跳</dt><dd>{time(n.heartbeat_at)}</dd><dt>心跳间隔</dt><dd>{duration(n.heartbeat_age_seconds)}</dd>
         <dt>24 小时完成阶段</dt><dd>{number(success)} 成功 / {number(completed - success)} 其他</dd><dt>平均阶段占用</dt><dd>{duration(average)}</dd></dl>
       <Jump view="tasks" params={{node_id: n.id}}>查看参与任务 ↗</Jump>
-      {n.kind !== 'control_pool' && <button className="secondary" onClick={() => onConfigure(n)}>配置节点</button>}
+      <button className="secondary" onClick={() => onConfigure(n)}>{n.kind === 'control_pool' ? '配置执行位' : '配置节点'}</button>
     </article>;
   })}</div><p className="footnote">超过 {data.timeout_seconds} 秒未报告心跳视为离线。过期租约在回收前仍占容量；阶段完成数包含上传校验与重试，不等于翻译页数。</p></>;
 }

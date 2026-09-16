@@ -169,6 +169,7 @@ async function prepareTranslation(intent:Intent){
   const [capabilities,queueData,benefits]=await Promise.all([api.capabilities(),api.queues(),api.entitlements()]);assertCurrent(api.isCurrent);
   setCaps(capabilities);setUsage(benefits);
   if(!capabilities.modes.find(m=>m.id===intent.mode)?.enabled)throw Error(`${modeLabels[intent.mode]}尚未配置就绪。`);
+  if(capabilities.modes.find(m=>m.id===intent.mode)?.languages?.includes(settings.language)===false)throw Error('此目标语言暂不支持所选模式，请使用常规翻译或更换目标语言。');
   const rights=benefits.modes[intent.mode];if(!rights.allowed)throw Error('此模式需要 PLUS 或有效赠送额度。');
   const copy=copiesRef.current.find(c=>c.id===copyId);if(!copy)return;
   const requested=copy.pages.filter(p=>intent.pages.some(i=>i.id===p.id));setPreparingPages(requested.map(p=>p.id));

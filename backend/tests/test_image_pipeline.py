@@ -38,7 +38,7 @@ def test_blocked_llm_does_not_stop_next_page_at_image_watermark(scheduler_case, 
     with session_factory()() as db:
         ensure_stages(db, db.get(Job, first))
         db.add(ComputeNode(id='text-node', name='text', capabilities=['text'], capacity=1,
-                           resource_id='text-worker', engine_version='', device='text'))
+                           resource_id='text-worker', engine_version='control', device='text'))
         db.commit()
     finish_analysis(claim(), scheduler_case)
     text_lease = take('text-node', ['text'])

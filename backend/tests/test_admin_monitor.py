@@ -74,7 +74,7 @@ def test_overview_counts_paused_and_nodes_without_storage(monitor, monkeypatch):
     client, auth, _ = monitor
     overview = client.get("/v1/admin/monitor/overview", headers=auth).json()
     assert overview["users"] == {"total":5,"plus":1,"submitted_24h":4}
-    assert overview["nodes"] == {"total":4,"online_enabled":3}
+    assert overview["nodes"] == {"total":5,"online_enabled":3}
     assert overview["leases"] == {"expired":1,"running":1}
     assert any(q["paused"] and q["count"] > 0 for q in overview["queues"])
     nodes = client.get("/v1/admin/monitor/nodes", headers=auth).json()["items"]

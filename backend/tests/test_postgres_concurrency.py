@@ -362,7 +362,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
                 process.wait(timeout=5)
 
 
-def test_postgres_classic_budget_reservation_is_atomic(pg):
+def test_postgres_classic_metering_has_no_cost_cap(pg):
     from app.classic import reserve_call
     from app.adapters.text import TextError
     from app.db import session_factory
@@ -392,8 +392,8 @@ def test_postgres_classic_budget_reservation_is_atomic(pg):
             return error.code
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(reserve_concurrently, range(6)))
-    assert results.count('TEXT_BUDGET_EXCEEDED') == 5
+    assert len(set(results)) == 6 and all(not value.startswith('TEXT_') for value in results)
     with session_factory()() as db:
         calls = db.scalars(select(TextCall).where(TextCall.job_id == job_id)).all()
-        assert len(calls) == 1
-        assert 0 < sum(call.accounted_micros for call in calls) <= 50_000
+        assert len(calls) == 6
+        assert sum(call.accounted_micros for call in calls) > 50_000

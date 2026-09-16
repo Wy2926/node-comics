@@ -13,7 +13,7 @@ export function TaskDetail({job: j}: {job: TaskData}) {
       <dt>交付节点</dt><dd>{final?.name || (j.cache_hit ? '缓存复用，无新增执行' : '—')}</dd>
       <dt>交付执行机 / 进程</dt><dd>{final ? final.executor_id || '未记录' : '—'}</dd>
       <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.id || '—'}</dd></dl>
-    {j.error_code && <p className="error">错误代码：{j.error_code}</p>}
+    {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
     {j.expired_leases > 0 && <p className="attention">{j.expired_leases} 个租约已过期，等待回收。</p>}
     <h3 className="detail-heading">阶段进度</h3><div className="stage-flow">{j.stages.length ? j.stages.map(s =>
       <div key={s.name}><b>{label(s.name)}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
@@ -25,10 +25,10 @@ export function TaskDetail({job: j}: {job: TaskData}) {
         <td className="numeric">{duration(e.seconds)}</td><td><Badge value={e.outcome}/></td></tr>)}
     </Table> : <Empty>{j.cache_hit ? '此任务复用已有结果' : '尚无执行记录'}</Empty>}
     <p className="panel-note">阶段占用来自持久化租约，包含执行期间的网络与存储操作。多阶段并行时，各阶段之和 {duration(j.worker_seconds)} 可大于合并后的执行占用。</p>
-    {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ${(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。</p>
+    {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ¥{(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。成本仅计量，不限制文本调用；次数、时限与限流仍生效。</p>
       <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>
         <tr key={c.id}><td>{c.model}<small>{c.provider_id}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>
-          <td>${(c.accounted_micros / 1000000).toFixed(6)}<small>{label(c.cost_state)}</small></td><td>{c.error_code || '—'}</td></tr>)}</Table></>}
+          <td>¥{(c.accounted_micros / 1000000).toFixed(6)}<small>{label(c.cost_state)}</small></td><td>{c.error_code || '—'}</td></tr>)}</Table></>}
     <p className="footnote">快照时间 {time(j.generated_at)} · 详情打开时暂停列表自动刷新</p>
   </>;
 }

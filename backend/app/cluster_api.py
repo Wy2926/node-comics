@@ -11,7 +11,8 @@ from .db import get_db
 from .errors import problem, ProcessingError
 from .models import Asset, ClassicState, now
 from .node_admin import configuration, token_hash
-from .node_config import EngineOverrides, Language
+from .node_config import EngineOverrides
+from .languages import Language
 from .queue_models import ComputeNode
 from .request_models import RequestBody
 from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler
@@ -66,7 +67,7 @@ class ConfigApplied(RequestBody):
     version: int = Field(ge=1, strict=True)
     error: Literal['ENGINE_CONFIG_FAILED'] | None = None
     engine: EngineOverrides = Field(default_factory=EngineOverrides)
-    supported_languages: list[Language] = Field(default_factory=list, max_length=5)
+    supported_languages: list[Language] = Field(default_factory=list, max_length=16)
 
 
 @router.post('/internal/nodes/{node_id}/config/applied')

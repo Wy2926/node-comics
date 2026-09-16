@@ -79,7 +79,7 @@ def parse_translations(content, segments):
             raise ValueError()
         return result
     except (ValueError, TypeError, KeyError):
-        raise TextError("TEXT_INVALID_RESPONSE", "译文结构不完整，将在页预算内重试", retryable=True) from None
+        raise TextError("TEXT_INVALID_RESPONSE", "译文结构不完整，将在次数与处理时限内重试", retryable=True) from None
 
 
 def safe_usage(data):
@@ -137,11 +137,11 @@ def call_text(segments, language, profile):
             if not complete or not isinstance(content, str):
                 raise ValueError()
         except (ValueError, KeyError, IndexError, TypeError):
-            raise TextError("TEXT_INCOMPLETE", "文本响应被截断或没有译文，将在页预算内重试", retryable=True, usage=usage, request_id=request_id) from None
+            raise TextError("TEXT_INCOMPLETE", "文本响应被截断或没有译文，将在次数与处理时限内重试", retryable=True, usage=usage, request_id=request_id) from None
         return TextResponse(content, usage, request_id)
     except TextError:
         raise
     except (httpx.HTTPError, OSError):
-        raise TextError("TEXT_TRANSPORT_FAILED", "文本请求超时或连接中断，将在页预算内重试", retryable=True) from None
+        raise TextError("TEXT_TRANSPORT_FAILED", "文本请求超时或连接中断，将在次数与处理时限内重试", retryable=True) from None
     except (ValueError, TypeError, AttributeError, ProcessingError):
-        raise TextError("TEXT_INVALID_RESPONSE", "文本服务响应无效，将在页预算内重试", retryable=True) from None
+        raise TextError("TEXT_INVALID_RESPONSE", "文本服务响应无效，将在次数与处理时限内重试", retryable=True) from None

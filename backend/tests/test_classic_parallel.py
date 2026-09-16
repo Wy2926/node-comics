@@ -44,7 +44,7 @@ def test_inflight_llm_does_not_hold_scheduler_or_image_resources(text_case, monk
         assert db.get(ClassicState, text_case[0]).translations == {}
 
 
-def test_atomic_unknown_cost_budget_cannot_be_overreserved(text_case):
+def test_parallel_groups_meter_every_call_without_cost_cap(text_case):
     def reserve(index):
         try:
             return classic.reserve_call(*text_case, index, SEGMENTS, 'zh-Hans')[0]
@@ -52,11 +52,22 @@ def test_atomic_unknown_cost_budget_cannot_be_overreserved(text_case):
             return error.code
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(reserve, [0, 1]))
-    assert results.count('TEXT_BUDGET_EXCEEDED') == 1
+    assert len(set(results)) == 2 and all(not result.startswith('TEXT_') for result in results)
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(TextCall)) == 1
-        call = db.scalar(select(TextCall))
-        assert call.accounted_micros == call.reserved_micros
+        calls = db.scalars(select(TextCall)).all()
+        assert len(calls) == 2 and sum(call.accounted_micros for call in calls) > 50_000
+        assert all(call.accounted_micros == call.reserved_micros > 0 for call in calls)
+
+
+def test_parallel_same_group_cannot_duplicate_calls(text_case):
+    def reserve(_):
+        try:
+            return classic.reserve_call(*text_case, 0, SEGMENTS, 'zh-Hans')[0]
+        except TextError as error:
+            return error.code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(reserve, [0, 1]))
+    assert results.count('TEXT_CALL_IN_FLIGHT') == 1
 
 
 def test_new_node_reuses_paid_translation_after_image_cache_loss(text_case, monkeypatch):

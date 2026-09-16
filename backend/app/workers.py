@@ -308,26 +308,24 @@ def run_control_stage(lease_id):
 
 def main():
     initialize()
-    cfg = settings()
+    from .control_pools import POOL_LIMITS, initialize_pools, report_pools
     executor_id = f"{socket.gethostname()}:{os.getpid()}"[:160]
-    pools = {"text": cfg.cluster_text_slots, "redraw": cfg.cluster_redraw_slots, "validate_upload": cfg.cluster_upload_slots}
     with session_factory()() as db:
-        lock_scheduler(db)
-        for name, capacity in pools.items():
-            node_id = "control-" + name
-            node = db.get(ComputeNode, node_id)
-            if not node:
-                db.add(ComputeNode(id=node_id, name=node_id, resource_id=node_id, capabilities=[name], capacity=capacity,
-                    engine_version="control", device="network", enabled=True))
-            else:
-                node.capacity, node.enabled = capacity, True
-        db.commit()
-    with ThreadPoolExecutor(max_workers=sum(pools.values()), thread_name_prefix="translation") as executor:
+        initialize_pools(db)
+    # Threads are created lazily. The database enforces live, cluster-wide limits;
+    # a process-local default must not prevent an administrator from scaling up.
+    maximum = sum(POOL_LIMITS.values())
+    next_heartbeat = 0
+    with ThreadPoolExecutor(max_workers=maximum, thread_name_prefix="translation") as executor:
         futures = set()
         while True:
             futures = {future for future in futures if not future.done()}
-            for name in pools:
-                if len(futures) >= sum(pools.values()):
+            if time.monotonic() >= next_heartbeat:
+                with session_factory()() as db:
+                    report_pools(db)
+                next_heartbeat = time.monotonic() + 5
+            for name in POOL_LIMITS:
+                if len(futures) >= maximum:
                     break
                 with session_factory()() as db:
                     lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)

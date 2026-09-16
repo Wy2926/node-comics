@@ -1,5 +1,5 @@
 import {Icon} from '../icons';
-import {type Capabilities,type Job,type Mode,type Page} from '../types';
+import {supportsLanguage,type Capabilities,type Job,type Mode,type Page} from '../types';
 import {pageTranslation,taskText} from './presentation';
 import {TaskActivity} from './TaskActivity';
 
@@ -22,9 +22,10 @@ export function PageTranslationBar({page,number,mode,selectedView,shownJob,langu
     if(t.ready)return null;
     const restoring=!!t.result?.output_asset_id&&!t.expired;
     const pending=!!t.pending;
+    const supported=supportsLanguage(caps,value,languageId);
     const benefit=caps?.entitlements?.modes[value];
     const accessHint=value==='redraw'&&benefit&&!benefit.allowed?'需要 PLUS 或有效重绘赠送额度':value==='classic'&&benefit?.unlimited?'PLUS 常规不限量':benefit?.quota?`可用 ${benefit.quota.available} 页`:'';
-    return <button key={value} className="nc-translate-page" disabled={!pending&&!restoring&&(busy||preparing||!caps?.modes.find(m=>m.id===value)?.enabled)} onClick={()=>pending||restoring?onView(value):onTranslate(value)} title={pending?taskText(t.pending):restoring?'正在读取已有译图':`仅${labels[value]}当前第 ${number} 页${accessHint?` · ${accessHint}`:""}`}>
+    return <button key={value} className="nc-translate-page" disabled={!pending&&!restoring&&(busy||preparing||!supported||!caps?.modes.find(m=>m.id===value)?.enabled)} onClick={()=>pending||restoring?onView(value):onTranslate(value)} title={!supported?'此语言暂不支持 AI 重绘，请使用常规翻译':pending?taskText(t.pending):restoring?'正在读取已有译图':`仅${labels[value]}当前第 ${number} 页${accessHint?` · ${accessHint}`:""}`}>
       {pending&&t.pending?.status!=='outcome_unknown'?<TaskActivity waiting={t.pending?.status==='queued'}/>:<Icon name={value==='redraw'?'spark':'globe'} size={15}/>}
       {pending?`${labels[value]}${t.pending?.status==='outcome_unknown'?'待核实':t.pending?.status==='awaiting_upload'?'等待上传':t.pending?.status==='validating_upload'?'校验中':t.pending?.status==='queued'?'排队中':'处理中'}`:restoring?`${labels[value]}读取中`:value==='redraw'?`AI 重绘本页${benefit&&!benefit.allowed?' · PLUS':''}`:'翻译本页'}
     </button>;

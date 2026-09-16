@@ -29,8 +29,10 @@ def seed(db):
         ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-redraw", name="control-redraw", resource_id="control-redraw", device="network",
         engine_version="control", capabilities=["redraw"], capacity=4, heartbeat_at=at)]
     for node in nodes:
-        node.desired_config = NodeConfig(execution_slots=node.capacity).model_dump(exclude_none=True)
-    db.add_all(nodes); db.flush()
+        node.desired_config = ({'execution_slots': node.capacity} if node.engine_version == 'control'
+                               else NodeConfig(execution_slots=node.capacity).model_dump(exclude_none=True))
+        db.merge(node)
+    db.flush()
     db.add(UserModeQueue(owner_id=readers[1].id, mode="classic", paused=True))
 
     def job(i, status, mode="classic", owner=0, age=600):

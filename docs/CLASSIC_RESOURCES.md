@@ -4,6 +4,8 @@
 
 ## 源码与依赖
 
+2026-09-16 新增 BallonsTranslator 气泡区域提取（GPL-3.0），固定提交 `84ba500ea1a4f523ca79f1c77d8c642eea3d1d07`，只保留两个所需函数，未引入其模型／字体／GUI。来源文件 SHA-256 `3e8a5573c38f6f0f7961fab1cb32b598662e91e42f3e83ad456bd87f2b766a36`；实际 vendored 代码与许可证校验和见[清单](../services/classic-engine/third_party/ballons-translator.json)。源码、完整许可证随容器复制，详见[气泡识别与排版](LETTERING_LAYOUT.md)。
+
 引擎固定 [manga-image-translator 提交 95227a2bb0fd306cd4f0c104d57284026f991b3a](https://github.com/zyddnys/manga-image-translator/tree/95227a2bb0fd306cd4f0c104d57284026f991b3a)，其仓库声明 GPL-3.0，许可证原文保存在 [licenses](../services/classic-engine/licenses/manga-image-translator-GPL-3.0.txt)。本项目封装只直接导入所需图像模块，构建时替换根包及检测／OCR／抹字包的 eager import，避免载入上游文本翻译器、SDK 重试和日志配置。具体变换见 [prepare.py](../services/classic-engine/prepare.py)。没有引入 Stable Diffusion／FLUX 处理路线。
 
 CPU 推理固定 PyTorch 2.5.1、torchvision 0.20.1；图像处理使用 NumPy 1.26.4、OpenCV headless 4.11.0.86、Pillow 12.3.0、FreeType Python 2.5.1。其余直接依赖均锁定于 [requirements.txt](../services/classic-engine/requirements.txt)。`pydensecrf2==1.1` 代替上游浮动 Git 下载，提供相同的 `pydensecrf` 模块；其 [PyPI 发布信息](https://pypi.org/project/pydensecrf2/1.1/)声明 MIT。

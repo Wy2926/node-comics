@@ -37,8 +37,8 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
 | 节点身份 | 后台添加后一次性返回 NODE_ID / NODE_TOKEN；每节点独立凭据，数据库仅保存摘要 |
 | `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
-| `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，所有控制副本共享限额 |
-| `CLUSTER_UPLOAD_SLOTS` | 2，后台校验原图 |
+| `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，仅首次创建资源池时使用，后续在后台配置，所有控制副本共享限额 |
+| `CLUSTER_UPLOAD_SLOTS` | 2，仅首次创建时使用，后续在后台配置 |
 | `CLUSTER_TEXT_REQUESTS_PER_MINUTE` | 60，实际文本请求计量 |
 | `CLUSTER_MAX_IMAGE_STAGES` | 64，预存已 OCR 待渲染水位 |
 | `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
@@ -48,7 +48,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
 | `R2_KEY_PREFIX` | 独立部署专用前缀 |
-| `CLASSIC_ENABLED` / `TEXT_*` | 常规及预算配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
+| `CLASSIC_ENABLED` / `TEXT_*` | 常规翻译、计量和重试配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
 | `OPENAI_*` / `PROVIDERS_JSON` | 初始化图片供应商，后续管理员维护 |
 
 供应商密钥只通过后端环境引用，不进入任务快照和前端。配置影响生成结果时进入内容缓存版本；会员页数和权重不改变图片缓存身份。
