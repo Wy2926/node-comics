@@ -6,6 +6,7 @@ from app import queue_models
 from app import job_requests
 from app import reader_api
 from app import health_models, upload_models, entitlement_models
+from app import billing_models
 
 if context.is_offline_mode():
     from app.config import settings

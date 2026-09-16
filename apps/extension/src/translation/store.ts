@@ -20,6 +20,7 @@ export async function withManifestLock<T>(id:string,action:()=>Promise<T>):Promi
 }
 /** Local priority never modifies the frozen body of an uncertain server submission. */
 export function orderLocalItems(items:UploadItem[],readingPageIds:string[]){const rank=new Map(readingPageIds.map((id,n)=>[id,n]));return [...items].sort((a,b)=>(rank.get(a.pageId)??Infinity)-(rank.get(b.pageId)??Infinity));}
+/** Each chunk is atomic on the server; earlier accepted chunks survive later rejection. */
 export function prepareChunk(manifest:UploadManifest,available:number,readingPageIds:string[]):UploadManifest {
   if(manifest.pending||manifest.paused)return manifest;
   const local=orderLocalItems(manifest.items.filter(i=>i.state==='local'),readingPageIds);

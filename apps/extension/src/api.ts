@@ -24,6 +24,11 @@ export class Api {
   login(username: string) { return this.request<{access_token: string; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
   capabilities() { return this.request<Capabilities>('/v1/capabilities'); }
   entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
+  billingStatus() { return this.request<import('./types').BillingStatus>('/v1/billing/status'); }
+  billingCheckout() { return this.request<{checkout_url:string;trial:boolean;environment:string}>('/v1/billing/checkouts',{method:'POST'}); }
+  billingSync() { return this.request<{billing:import('./types').BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'}); }
+  billingCancel() { return this.request<import('./types').BillingStatus>('/v1/billing/cancel',{method:'POST'}); }
+  billingPortal() { return this.request<{url:string}>('/v1/billing/portal',{method:'POST'}); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}
   history(offset=0) {return this.request<Paginated<SubmissionSummary>>(`/v1/translation-submissions?offset=${offset}&limit=12`);}

@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from types import SimpleNamespace
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
@@ -48,6 +49,9 @@ def output(data):
     stream=BytesIO();image.save(stream,"PNG")
     return TranslationOutput(stream.getvalue(),usage={"fixture":True},quality_flags=["unrecognized_regions"] if control.get("outcome")=="partial" else [])
 workers.redraw=lambda data,*args:output(data)
+# The fixture embeds the control loop in a background thread; uvicorn owns the
+# process signals. Production workers still install their normal drain handlers.
+workers.signal = SimpleNamespace(SIGTERM=workers.signal.SIGTERM, SIGINT=workers.signal.SIGINT, signal=lambda *_: None)
 initialize()
 with session_factory()() as db:
     configure_text_provider(db)

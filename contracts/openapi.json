@@ -3465,6 +3465,126 @@
           }
         }
       }
+    },
+    "/v1/billing/status": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Status",
+        "operationId": "status_v1_billing_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/checkouts": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Checkout",
+        "operationId": "checkout_v1_billing_checkouts_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/sync": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_v1_billing_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/cancel": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_v1_billing_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Portal",
+        "operationId": "portal_v1_billing_portal_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4768,11 +4888,30 @@
             "default": "extend"
           },
           "months": {
-            "type": "integer",
-            "maximum": 120.0,
-            "minimum": 1.0,
-            "title": "Months",
-            "default": 1
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3660.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
           },
           "monthly_pages": {
             "anyOf": [

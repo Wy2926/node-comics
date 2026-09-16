@@ -5,6 +5,9 @@ const PENDING_KEY = 'nc-admin-oidc';
 let token = sessionStorage.getItem(SESSION_KEY) || '';
 export const hasSession = () => !!token;
 export function saveToken(value: string) {
+  if (token !== value) {
+    for (const key of Object.keys(sessionStorage)) if (key.startsWith('nc-admin-benefit:')) sessionStorage.removeItem(key);
+  }
   token = value;
   if (value) sessionStorage.setItem(SESSION_KEY, value);
   else {sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(PENDING_KEY);}

@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     extension_ids: str = ""
     free_daily_pages: int = Field(default=100, ge=0, le=1_000_000)
     plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
+    paddle_enabled: bool = False
+    paddle_environment: Literal['sandbox', 'production'] = 'sandbox'
+    paddle_api_key: SecretStr = SecretStr('')
+    paddle_client_token: str = ''
+    paddle_webhook_secret: SecretStr = SecretStr('')
+    paddle_product_id: str = ''
+    paddle_trial_price_id: str = ''
+    paddle_standard_price_id: str = ''
+    paddle_checkout_url: str = ''
     quota_timezone: str = "Asia/Shanghai"
     retention_days: int = Field(default=0, ge=0)
     max_upload_bytes: int = 20 * 1024 * 1024
@@ -94,6 +103,25 @@ class Settings(BaseSettings):
     classic_enabled: bool = False
     classic_engine_version: str = "mit-95227a2-classic-v8-qt"
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
+
+    @model_validator(mode="after")
+    def validate_billing(self):
+        if self.paddle_enabled:
+            if self.app_env == 'production' and self.paddle_environment != 'production':
+                raise ValueError('Sandbox billing requires an isolated development/test service')
+            if not all((self.paddle_api_key.get_secret_value(), self.paddle_client_token,
+                        self.paddle_webhook_secret.get_secret_value(), self.paddle_product_id,
+                        self.paddle_trial_price_id, self.paddle_standard_price_id, self.paddle_checkout_url)):
+                raise ValueError('Paddle billing configuration is incomplete')
+            sandbox = self.paddle_environment == 'sandbox'
+            if self.paddle_client_token.startswith('test_') != sandbox:
+                raise ValueError('Paddle client token does not match the environment')
+            if ('_sdbx_' in self.paddle_api_key.get_secret_value()) != sandbox:
+                raise ValueError('Paddle API key does not match the environment')
+            url = urlsplit(self.paddle_checkout_url)
+            if (url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment):
+                raise ValueError('Paddle checkout URL must be an HTTPS page without credentials or query')
+        return self
 
     @model_validator(mode="after")
     def validate_admin_web_path(self):

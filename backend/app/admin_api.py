@@ -27,7 +27,8 @@ router = APIRouter()
 
 class MembershipRequest(RequestBody):
     action: Literal["extend", "expire"] = "extend"
-    months: int = Field(default=1, ge=1, le=120, strict=True)
+    months: int | None = Field(default=None, ge=1, le=120, strict=True)
+    days: int | None = Field(default=None, ge=1, le=3660, strict=True)
     monthly_pages: int | None = Field(default=None, ge=0, le=1_000_000, strict=True)
     note: str = Field(min_length=1, max_length=200)
 

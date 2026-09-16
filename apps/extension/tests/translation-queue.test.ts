@@ -16,6 +16,18 @@ const upload:UploadPlan={id:'upload',url:origin+'/upload',method:'PUT',headers:{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('persistent per-operation upload queue',()=>{
+ it('retains an accepted chunk and pauses only the remaining local pages when another device consumes quota',async()=>{
+  const pages=[page(101),page(102)],value=manifest(pages);await saveManifest(value);const api=new Api(origin);
+  const submit=vi.spyOn(api,'submit').mockResolvedValueOnce({id:'first-accepted',mode:'classic',target_language:'zh-Hans',items:[{client_item_id:pages[0].id,job:job(pages[0])}]})
+    .mockRejectedValueOnce(new ApiError('可用常规翻译页数已用完','DAILY_QUOTA_EXHAUSTED',409));
+  const options={api,manifest:value,available:1,readingPageIds:[],concurrency:1,getBlob:async()=>new Blob(),onJobs:vi.fn(async()=>{}),onChange:vi.fn()};
+  await processManifest(options);await processManifest(options);
+  const saved=(await readManifest(value.id))!;
+  expect(saved.items.map(i=>i.state)).toEqual(['accepted','local']);expect(saved.paused).toBe(true);
+  expect(saved.pending).toBeUndefined();expect(saved.error).toContain('已用完');
+  expect(submit.mock.calls[0][1]).not.toBe(submit.mock.calls[1][1]);
+  await processManifest(options);expect(submit).toHaveBeenCalledTimes(2);
+ });
  it('stores several independent manifests without a global pending lock or cross-account leakage',async()=>{
   const a=manifest([page(0)]),b=manifest([page(1)]),other={...manifest([page(2)]),scope:translationScope(origin,'bob')};
   await Promise.all([saveManifest(a),saveManifest(b),saveManifest(other)]);

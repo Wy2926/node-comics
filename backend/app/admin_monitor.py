@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session, defer
 from .auth import admin, user_json
 from .config import settings
 from .db import get_db
-from .entitlements import entitlements_json, is_plus, iso
+from .entitlements import entitlements_json, is_plus, is_operator_plus, iso, period_json
+from .entitlement_models import QuotaPeriod
 from .errors import problem
 from .models import Attempt, Job, TextCall, User, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
@@ -179,7 +180,9 @@ def overview(db: Session = Depends(get_db)):
     lease_counts = db.execute(select(lease_status, func.count()).where(
         ExecutionLease.completed_at.is_(None)).group_by(lease_status)).all()
     user_count = db.scalar(select(func.count()).select_from(User))
-    plus_count = db.scalar(select(func.count()).select_from(User).where(User.plus_started_at <= at, User.plus_expires_at > at))
+    plus_count = db.scalar(select(func.count()).select_from(User).where(or_(
+        and_(User.plus_started_at <= at, User.plus_expires_at > at),
+        and_(User.billing_plus_started_at <= at, User.billing_plus_expires_at > at))))
     return {"generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
         "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).where(Job.created_at >= since))},
         "nodes": {"total": len(nodes), "online_enabled": online}, "leases": dict(lease_counts),
@@ -227,7 +230,8 @@ def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | No
     if q.strip():
         query = query.where(or_(User.name.contains(q.strip(), autoescape=True), User.id.contains(q.strip(), autoescape=True)))
     if plan:
-        plus = and_(User.plus_started_at.is_not(None), User.plus_expires_at.is_not(None), User.plus_started_at <= at, User.plus_expires_at > at)
+        plus = or_(and_(User.plus_started_at.is_not(None), User.plus_expires_at.is_not(None), User.plus_started_at <= at, User.plus_expires_at > at),
+                   and_(User.billing_plus_started_at.is_not(None), User.billing_plus_expires_at.is_not(None), User.billing_plus_started_at <= at, User.billing_plus_expires_at > at))
         query = query.where(plus if plan == "plus" else ~plus)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = list(db.scalars(query.order_by(User.created_at.desc(), User.id).offset(offset).limit(limit)))
@@ -239,7 +243,7 @@ def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | No
             stats[owner][status] = count
         latest = dict(db.execute(select(Job.owner_id, func.max(Job.created_at)).where(Job.owner_id.in_(ids)).group_by(Job.owner_id)).all())
     return {"items": [{**user_json(u), "created_at": iso(u.created_at), "plan": "plus" if is_plus(u, at) else "free",
-        "plus_expires_at": iso(u.plus_expires_at), "last_submitted_at": iso(latest.get(u.id)),
+        "plus_expires_at": iso(max((d for d in (u.plus_expires_at, u.billing_plus_expires_at) if d), default=None)), "last_submitted_at": iso(latest.get(u.id)),
         "jobs": stats[u.id], "active_jobs": sum(stats[u.id].get(s, 0) for s in ACTIVE)} for u in rows],
         "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}
 
@@ -250,5 +254,9 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
     if not user:
         problem("NOT_FOUND", "用户不存在", 404)
     return {**user_json(user), "created_at": iso(user.created_at), "entitlements": entitlements_json(db, user),
+            "operator_membership": {"active": is_operator_plus(user), "expires_at": iso(user.plus_expires_at)},
+            "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
+                QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
+                .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))],
             "queues": [{"mode": row.mode, "paused": row.paused} for row in db.scalars(
                 select(UserModeQueue).where(UserModeQueue.owner_id == user.id))]}

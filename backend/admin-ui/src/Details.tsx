@@ -1,5 +1,6 @@
 import type {Mode, TaskDetail as TaskData, UserDetail as UserData} from './types';
 import {Badge, duration, Empty, Jump, label, number, Stat, Table, time} from './ui';
+import {MembershipActions} from './MembershipActions';
 
 export function TaskDetail({job: j}: {job: TaskData}) {
   const final = j.completed_by;
@@ -32,7 +33,7 @@ export function TaskDetail({job: j}: {job: TaskData}) {
     <p className="footnote">快照时间 {time(j.generated_at)} · 详情打开时暂停列表自动刷新</p>
   </>;
 }
-export function UserDetail({user: u}: {user: UserData}) {
+export function UserDetail({user: u, onChanged}: {user: UserData; onChanged: () => void}) {
   const e = u.entitlements;
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
   return <><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : '普通'}</span></div>
@@ -45,6 +46,11 @@ export function UserDetail({user: u}: {user: UserData}) {
           <dt>额度合计</dt><dd>{number(q.granted)} 页</dd><dt>下次重置</dt><dd>{time(q.resets_at)}</dd></dl>}
         <p className="panel-note">队列{u.queues.some(r => r.mode === mode && r.paused) ? '已暂停' : '正常'}</p></section>;
     })}</div>
+    <MembershipActions key={u.id} user={u} onChanged={onChanged}/>
+    <h3 className="detail-heading">赠送额度（按生效时间，最多 50 笔）</h3>
+    {u.grants.length ? <Table heads={['类型 / 备注', '授予 / 已用 / 预占', '生效 / 到期']}>{u.grants.map(b => <tr key={b.id}>
+      <td>{label(b.mode)}<small>{b.note}</small></td><td>{b.granted} / {b.used} / {b.reserved}</td>
+      <td>{time(b.starts_at)}<small>{time(b.expires_at)}</small></td></tr>)}</Table> : <Empty>暂无赠送额度</Empty>}
     <h3 className="detail-heading">当前有效额度明细</h3>
     {buckets.length ? <Table heads={['类型', '授予 / 已用 / 预占', '到期']}>{buckets.map(b => <tr key={b.id}>
       <td>{label(b.mode)} · {({daily: '每日额度', membership: '会员额度', grant: '赠送额度'} as Record<string, string>)[b.source] || b.source}</td>

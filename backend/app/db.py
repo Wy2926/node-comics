@@ -1,5 +1,5 @@
 from functools import lru_cache
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, select, text
 from threading import Lock
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from .config import settings
@@ -42,6 +42,7 @@ def initialize():
     from . import queue_models  # noqa: F401
     from . import job_requests  # noqa: F401
     from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
+    from . import billing_models  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path
@@ -53,4 +54,9 @@ def initialize():
             connection.execute(text("SELECT pg_advisory_xact_lock(761349210)"))
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
+        if settings().paddle_enabled:
+            mismatch = connection.scalar(select(billing_models.BillingAccount.owner_id).where(
+                billing_models.BillingAccount.environment != settings().paddle_environment).limit(1))
+            if mismatch:
+                raise RuntimeError('Paddle environment does not match this database; use an isolated database')
     settings().storage_path.mkdir(parents=True, exist_ok=True)

@@ -83,7 +83,7 @@ function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClos
     <div className="dialog-content" aria-busy={busy}>
       {error && <p className="error" role="alert">{error} 请点击“刷新详情”重试。{data && ' 当前详情可能已过时。'}</p>}
       {!data && busy && <p className="loading" role="status">正在读取详情…</p>}
-      {data && (target.kind === 'tasks' ? <TaskDetail job={data as TaskData}/> : <UserDetail user={data as UserData}/>)}
+      {data && (target.kind === 'tasks' ? <TaskDetail job={data as TaskData}/> : <UserDetail user={data as UserData} onChanged={reload}/>)}
     </div>
   </dialog>;
 }
@@ -114,7 +114,7 @@ function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}
         <Pagination total={page!.total} count={page!.items.length} offset={Number(params.get('offset') || 0)} next={page!.next_offset} onPage={offset => onNavigate({...Object.fromEntries(params), offset: String(offset)})}/>
       </section>{view === 'tasks' && <p className="footnote">执行占用按租约时间合并，并行阶段不重复累计；总耗时包含上传、等待与恢复。节点筛选包含该节点曾参与的全部任务。</p>}</>}
     </div>
-    {detail && <DetailDialog key={detail.id} target={detail} onClose={() => setDetail(undefined)} onUnauthorized={onUnauthorized}/>}
+    {detail && <DetailDialog key={detail.id} target={detail} onClose={() => {setDetail(undefined); if (detail.kind === 'users') reload();}} onUnauthorized={onUnauthorized}/>}
     {nodeConfig && <NodeConfigDialog node={nodeConfig} onClose={() => setNodeConfig(undefined)} onSaved={reload}/>}
   </main>;
 }

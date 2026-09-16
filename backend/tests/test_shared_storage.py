@@ -32,7 +32,7 @@ def test_second_account_skips_upload_and_translation_and_keeps_private_ids(clust
     before = list(sdk.calls)
     bob_quota = client.get('/v1/me/usage', headers=bob).json()
     response = submit(client, bob, [descriptor(png, file_hash="c" * 64, page_index=4)],
-                      mode="redraw", max_pages=0, reading_session_id='reader-b')
+                      mode="redraw", max_pages=0, expected_kind='unavailable', reading_session_id='reader-b')
     assert response.status_code == 202, response.text
     item = response.json()["items"][0]
     job = item["job"]

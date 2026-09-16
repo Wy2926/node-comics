@@ -141,6 +141,9 @@ def main():
         signal.signal(name, lambda *_: stopping.set())
     initialize()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    from threading import Thread
+    from .billing_sync import run as billing_maintenance
+    Thread(target=billing_maintenance, args=(stopping,), daemon=True).start()
     next_oidc_probe = 0
     while not stopping.is_set():
         try:

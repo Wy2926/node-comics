@@ -1373,6 +1373,14 @@ dialog::backdrop {
 }
 
 .provider-actions, .provider-name {display: flex; flex-wrap: wrap; align-items: center; gap: 8px;}
+.membership-actions {padding: 20px; margin-top: 24px;}
+.membership-actions > p {margin: 12px 0; line-height: 1.7;}
+.benefit-fields {border: 0; padding: 0; margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;}
+.benefit-fields label {display: grid; gap: 8px; font-size: 12px; font-weight: 600;}
+.benefit-fields input, .benefit-fields select {width: 100%; min-width: 0;}
+.benefit-fields p, .benefit-fields label:last-of-type {grid-column: 1 / -1;}
+.benefit-fields button {justify-self: start;}
+@media (max-width: 540px) {.benefit-fields {grid-template-columns: 1fr;}}
 .translation-providers .page-heading {gap: 20px;}
 .translation-providers .page-heading > .provider-actions {align-self: center; justify-content: flex-end;}
 .translation-providers button:disabled, .provider-dialog button:disabled {cursor: not-allowed;}

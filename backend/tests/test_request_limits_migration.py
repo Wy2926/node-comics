@@ -11,9 +11,10 @@ import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, select, text
 from sqlalchemy.orm import Session
 
-HEAD = "shared_0004_text_providers"
+HEAD = "shared_0005_paddle_billing"
 NEW_TABLES = {"upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
-              "translation_providers", "translation_provider_revisions"}
+              "translation_providers", "translation_provider_revisions", "billing_accounts",
+              "billing_checkouts", "billing_subscriptions", "billing_events"}
 
 
 @pytest.fixture
@@ -25,7 +26,7 @@ def isolated_migration_database(tmp_path, monkeypatch):
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
     monkeypatch.setattr(db, "engine", lambda: private_engine)
-    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects"))
+    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", paddle_enabled=False))
     try:
         yield private_engine
     finally:
@@ -78,7 +79,13 @@ def seed_baseline_receipts(engine):
     from app.upload_models import UploadReservation
     at = datetime(2026, 9, 16, 1, 0)
     with Session(engine) as session:
-        session.add(User(id="legacy-owner", subject="isolated:legacy-owner", name="合成旧账户"))
+        # The current User mapper has columns that do not exist before upgrade.
+        # Seed the actual old schema rather than issuing a new-schema ORM insert.
+        session.execute(text("""INSERT INTO users (id, subject, name, role, created_at,
+            membership_id, plus_started_at, plus_expires_at, plus_timezone, plus_monthly_pages)
+            VALUES (:id, :subject, :name, 'user', :at, 'legacy-gift', :at, :end, 'Asia/Shanghai', 300)"""),
+            {'id':'legacy-owner', 'subject':'isolated:legacy-owner', 'name':'合成旧账户',
+             'at':at, 'end':at+timedelta(days=60)})
         session.flush()
         source = Asset(id="legacy-original", owner_id="legacy-owner", sha256="a" * 64,
                        storage_key="isolated/original", storage_backend="r2", kind="original",
@@ -122,7 +129,8 @@ def baseline_snapshot(engine):
     from app.upload_models import UploadReservation
     with engine.connect() as connection:
         return {model.__tablename__: [dict(row) for row in connection.execute(
-                    select(model.__table__).order_by(model.id)).mappings()]
+                    select(*[column for column in model.__table__.columns if not column.name.startswith('billing_')])
+                    .order_by(model.id)).mappings()]
                 for model in (User, Asset, Job, Feedback, UploadReservation)}
 
 
@@ -140,6 +148,10 @@ def test_upgrade_preserves_existing_users_feedback_and_uploads(isolated_migratio
     db.initialize()
     assert baseline_snapshot(engine) == before
     assert_current_schema_matches_models(engine)
+    with Session(engine) as session:
+        user = session.get(User, 'legacy-owner')
+        assert user.billing_plus_started_at is None and user.billing_plus_expires_at is None
+        assert user.billing_membership_id is None and user.membership_id == 'legacy-gift'
     db.initialize()  # Restarting the upgraded application is safe and repeatable.
     assert baseline_snapshot(engine) == before
     monkeypatch.setattr(system_settings, "settings", lambda: SimpleNamespace(
