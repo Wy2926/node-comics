@@ -12,7 +12,7 @@ COPY licenses ./licenses
 COPY third_party ./third_party
 RUN git clone --filter=blob:none --no-checkout https://github.com/zyddnys/manga-image-translator.git /opt/mit && git -C /opt/mit checkout ${MIT_COMMIT} && python prepare.py --source-only && rm -rf /opt/mit/.git
 RUN python prepare_typesetter.py --source /opt/manga-typesetter --destination /opt/typesetter && rm -rf /opt/manga-typesetter
-ENV PYTHONPATH=/opt/mit MODEL_DIR=/models ENGINE_VERSION=mit-95227a2-classic-v8-qt ENGINE_DEVICE=cpu TYPESETTER_ROOT=/opt/typesetter QT_QPA_PLATFORM=offscreen XDG_CACHE_HOME=/tmp/comics-fontcache
+ENV PYTHONPATH=/opt/mit MODEL_DIR=/models ENGINE_VERSION=mit-95227a2-classic-v9-qt-roi ENGINE_DEVICE=cpu TYPESETTER_ROOT=/opt/typesetter QT_QPA_PLATFORM=offscreen XDG_CACHE_HOME=/tmp/comics-fontcache
 RUN useradd --uid 10001 --create-home comics && mkdir -p /models && chown comics:comics /models
 USER comics
 CMD ["sh", "-c", "python prepare.py && uvicorn server:app --host 0.0.0.0 --port 8000 --workers 1 --no-access-log"]

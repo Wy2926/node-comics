@@ -20,7 +20,7 @@ def page():
     return image
 
 
-def test_closed_bubble_has_inset_rectangle_and_rejects_outside_glyphs():
+def test_closed_bubble_has_inset_mask_and_rejects_outside_glyphs():
     bubble = find_bubble(page(), region(), [])
     assert bubble is not None
     changed = np.zeros((300,320), bool)
@@ -28,9 +28,8 @@ def test_closed_bubble_has_inset_rectangle_and_rejects_outside_glyphs():
     assert bubble.contains(changed)
     changed[40,60] = True
     assert not bubble.contains(changed)
-    polygon = np.zeros((300,320), np.uint8)
-    cv2.fillConvexPoly(polygon, bubble.rectangle[0].astype(np.int32), 255)
-    assert bubble.contains(polygon > 0)
+    assert bubble.contains(np.ones((3, 3), bool), (159, 149))
+    assert not bubble.contains(np.ones((3, 3), bool), (-1, 149))
 
 
 def test_unbounded_background_and_ambiguous_shared_bubble_fall_back():
@@ -57,6 +56,20 @@ def test_top_page_bubble_keeps_its_source_center_when_enlarging():
     cv2.ellipse(image, (250, 145), (140, 100), 0, 0, 360, (255, 255, 255), -1)
     cv2.ellipse(image, (250, 145), (140, 100), 0, 0, 360, (0, 0, 0), 4)
     assert find_bubble(image, region(170, 100, 160, 90), []) is not None
+
+
+def test_irregular_interior_does_not_require_a_centroid_rectangle(monkeypatch):
+    import speech_bubbles
+    interior = np.zeros((120, 120), np.uint8)
+    cv2.rectangle(interior, (10, 10), (109, 109), 255, -1)
+    cv2.rectangle(interior, (38, 38), (81, 81), 0, -1)
+    monkeypatch.setattr(speech_bubbles, 'extract_ballon_region', lambda *a, **k: (interior, None, None))
+    # This closed interior contains the complete source, but its centroid is in
+    # a hole. The unused old centered-rectangle search rejected it outright.
+    bubble = speech_bubbles._extract_window(np.zeros((120, 120, 3), np.uint8),
+        region(16, 35, 16, 50), [], (0, 0, 120, 120), np.array([16, 50]))
+    assert bubble is not None
+    assert bubble.contains(np.ones((10, 8), bool), (20, 45))
 
 
 def test_vendored_ballons_translator_source_and_license_integrity():

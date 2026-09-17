@@ -18,6 +18,7 @@ effective_runtime = LOCAL_RUNTIME
 import cv2
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 import numpy as np
 from PIL import Image
 from pydantic import ValidationError
@@ -40,8 +41,8 @@ DIRECTML_OPTIMIZED = PROFILE == 'mit-directml' and os.environ.get('ENGINE_DIRECT
 INPAINT_WORKERS = int(os.environ.get('ENGINE_INPAINT_WORKERS', '2')) if DIRECTML_OPTIMIZED else 1
 if INPAINT_WORKERS not in (1, 2):
     raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
-AMD_VERSION = 'mit-95227a2-classic-v4-dml-v7-qt' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-qt' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-qt')
-VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v8-qt')
+AMD_VERSION = 'mit-95227a2-classic-v4-dml-v8-qt-roi' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-qt-roi' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-qt-roi')
+VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v9-qt-roi')
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
@@ -293,16 +294,28 @@ async def erase_page(image, analysis, config, *, encode=True):
     return {'cleaned': png(cleaned) if encode else cleaned, 'timings': {'inpaint': time.monotonic() - start}}
 
 
-async def render_page(image, analysis, translations, config, language, cleaned):
+def encode_render(result):
+    start = time.monotonic()
+    encoded = {**result, 'image': png(result['image']), 'glyph_mask': png(result['glyph_mask'])}
+    elapsed = time.monotonic() - start
+    encoded['timings'] = {**result['timings'], 'render_encode': elapsed,
+                          'render': result['timings']['render'] + elapsed}
+    return encoded
+
+
+async def render_page(image, analysis, translations, config, language, cleaned, *, encode=True):
     start = time.monotonic()
     mask = decode(analysis['mask'], 'L')
     font = font_for(language, FONT)
     layout = []
     output, glyph_mask, fitted, bubbles = await letter_page(image, analysis, translations, config, language,
                                                  cleaned, mask, font, layout)
-    return {'image': png(output), 'mask': png(mask), 'glyph_mask': png(glyph_mask),
-            'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'layout': layout,
-            'timings': {'render': time.monotonic() - start}}
+    elapsed = time.monotonic() - start
+    # The checked erase mask already has a PNG representation in the checkpoint.
+    result = {'image': output, 'mask': analysis['mask'], 'glyph_mask': glyph_mask,
+              'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'layout': layout,
+              'timings': {'render': elapsed, 'render_layout': elapsed}}
+    return encode_render(result) if encode else result
 
 
 @app.post('/v1/{stage}', dependencies=[Depends(authorized)])
@@ -362,9 +375,13 @@ async def process(stage: str, request: Request):
                         recovery_timings = erased.get('timings', {})
                         cache.put('cleaned:' + key, cleaned)
                     result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'],
-                                               cleaned.copy())
+                                               cleaned, encode=False)
                     result['cache_rebuilt'] = recovered
                     result['timings'] = {**recovery_timings, **result.get('timings', {})}
+        if stage == 'render':
+            # Arrays belong to this request. Qt/model globals and the cache stay
+            # serialized, while independent PNG encoding no longer holds the GPU.
+            result = await run_in_threadpool(encode_render, result)
         response = {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': input_hash,
                     'image_ref': input_ref if input_cached else None}
         if len(json.dumps(response, allow_nan=False).encode()) > MAX_RESPONSE:

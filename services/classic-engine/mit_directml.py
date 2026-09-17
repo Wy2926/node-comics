@@ -28,6 +28,7 @@ class DirectMLRuntime:
         self.counts = Counter()
         self.handles = []
         self.fourier_units = 0
+        self.trace = os.environ.get('ENGINE_TRACE_DEVICES', '0') == '1'
         self.optimized = os.environ.get('ENGINE_DIRECTML_OPTIMIZED', '1') == '1'
         self.profile_dir = Path(os.environ['ENGINE_PROFILE_DIR']) if os.environ.get('ENGINE_PROFILE_DIR') else None
         if self.profile_dir:
@@ -61,7 +62,7 @@ class DirectMLRuntime:
                         self.handles.append(module.register_forward_pre_hook(lambda _, args: (args[0].cpu(),)))
                         self.handles.append(module.register_forward_hook(lambda _, args, output: output.to(self.device)))
             for module in network.modules():
-                if isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.Linear)):
+                if self.trace and isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.Linear)):
                     def record(mod, args, component=label):
                         actual = args[0].device.type
                         if mod.weight.device.type != actual:
@@ -74,6 +75,7 @@ class DirectMLRuntime:
 
     def evidence(self):
         return {'adapter': self.name, 'torch': torch.__version__, 'runtime': 'torch-directml-0.2.5.dev240914',
+                'execution_tracing': self.trace,
                 'fourier_units_on_cpu': self.fourier_units,
                 'ocr_decoder_device': str(self.device) if self.optimized else 'cpu',
                 'ocr_cache_update': 'out-of-place-v1' if self.optimized else 'original-cpu',

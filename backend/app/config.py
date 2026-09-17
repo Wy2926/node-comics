@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_engine_version: str = "mit-95227a2-classic-v8-qt"
+    classic_engine_version: str = "mit-95227a2-classic-v9-qt-roi"
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
 
     @model_validator(mode="after")

@@ -43,6 +43,8 @@ NVIDIA 已在 RTX 4060 Laptop GPU 跑通真实翻译，见[实测报告](../../d
 
 独立引擎启动根据 `runtime.languages` 补全所需字典与许可文件，按固定校验和验证，下载失败不接单；完整缓存不重复下载。`torch_threads`、`opencv_threads`、缓存限额可远程热更新；interop 线程数、设备与 LaMa 子进程数为本地启动参数。
 
+逐层设备执行诊断默认关闭。硬件验收时可为引擎设置 `ENGINE_TRACE_DEVICES=1`，健康信息中的 `execution_tracing` 表示是否启用；未启用时 `executed` 为空，不表示模型未运行。该开关不移除 AMD 必需的数据搬运回调。渲染的 PNG 编码已移出设备锁，模型与 Qt 排版仍受串行保护。
+
 ## 容器
 
 ```powershell

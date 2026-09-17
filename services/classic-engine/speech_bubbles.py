@@ -1,7 +1,7 @@
 """Bounded adapter for BallonsTranslator's pinned manga balloon extractor.
 
-The upstream module owns segmentation; this adapter validates complete masks and
-derives an inset layout rectangle. The page typesetter handles shared balloons.
+The upstream module owns segmentation; this adapter validates inset masks.
+The page typesetter owns rectangle fitting and handles shared balloons.
 """
 from dataclasses import dataclass
 import cv2
@@ -13,14 +13,18 @@ from third_party.ballons_translator import extract_ballon_region
 class Bubble:
     origin: tuple[int, int]
     interior: np.ndarray
-    rectangle: np.ndarray
-
-    def contains(self, changed):
+    def contains(self, changed, origin=(0, 0)):
+        # Limit all work to the supplied ink layer, never its surrounding page.
+        left, top, width, height = cv2.boundingRect(changed.astype(np.uint8, copy=False))
+        if not width or not height:
+            return True
         x, y = self.origin
         h, w = self.interior.shape
-        inside = changed[y:y+h, x:x+w]
-        return (np.count_nonzero(inside) == np.count_nonzero(changed)
-                and not np.any(inside & ~self.interior))
+        dx, dy = origin[0] + left - x, origin[1] + top - y
+        if dx < 0 or dy < 0 or dx + width > w or dy + height > h:
+            return False
+        return not np.any(changed[top:top+height, left:left+width]
+                          & ~self.interior[dy:dy+height, dx:dx+width])
 
 
 def find_bubble(image, region, others):
@@ -90,18 +94,4 @@ def _extract_window(image, region, others, bounds, size):
     cv2.fillPoly(source, list(polygons), 255)
     if np.any((source > 0) & ~interior):
         return None
-    moments = cv2.moments(interior.astype(np.uint8))
-    if not moments['m00']:
-        return None
-    cx, cy = moments['m10'] / moments['m00'], moments['m01'] / moments['m00']
-    for scale in np.arange(.95, .34, -.05):
-        left, top = int(cx - w * scale / 2), int(cy - h * scale / 2)
-        right, bottom = int(cx + w * scale / 2), int(cy + h * scale / 2)
-        if left < 0 or top < 0 or right >= crop.shape[1] or bottom >= crop.shape[0]:
-            continue
-        if right - left < 10 or bottom - top < 10 or not interior[top:bottom+1, left:right+1].all():
-            continue
-        rectangle = np.array([[[left+x0, top+y0], [right+x0, top+y0],
-                               [right+x0, bottom+y0], [left+x0, bottom+y0]]], dtype=np.float32)
-        return Bubble((x0, y0), interior, rectangle)
-    return None
+    return Bubble((x0, y0), interior)

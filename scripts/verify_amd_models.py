@@ -23,7 +23,7 @@ sys.path[:0] = [str(ROOT/'services/classic-engine'), str(ROOT/'engines/mit-nativ
 os.environ.update(ENGINE_PROFILE='mit-directml' if args.device.startswith('directml') else 'mit',
                   ENGINE_DEVICE=args.device, MODEL_DIR=str(ROOT/'engines/mit-models'),
                   ENGINE_FONT=str(ROOT/'engines/mit-native/fonts/NotoSansMonoCJK-VF.ttf.ttc'),
-                  ENGINE_LOCK_DIR=str(ROOT/'engines/device-locks'), ENGINE_PROFILE_DIR=str(folder))
+                  ENGINE_LOCK_DIR=str(ROOT/'engines/device-locks'), ENGINE_PROFILE_DIR=str(folder), ENGINE_TRACE_DEVICES='1')
 import numpy as np
 from PIL import Image
 import server

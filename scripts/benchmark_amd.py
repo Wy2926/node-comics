@@ -56,7 +56,7 @@ def engine(folder, port, *, optimized=True, threads=4, inpaint_workers=None):
                ENGINE_RESOURCE_ID=socket.gethostname()+':amd:0', ENGINE_TOKEN=token,
                ENGINE_FONT=str(ROOT/'engines/mit-native/fonts/NotoSansMonoCJK-VF.ttf.ttc'),
                MODEL_DIR=str(ROOT/'engines/mit-models'), ENGINE_LOCK_DIR=str(ROOT/'engines/device-locks'),
-               ENGINE_PROFILE_DIR=str(folder/'profiles'), ENGINE_STOP_FILE=str(folder/'engine.stop'),
+               ENGINE_PROFILE_DIR=str(folder/'profiles'), ENGINE_TRACE_DEVICES='1', ENGINE_STOP_FILE=str(folder/'engine.stop'),
                ENGINE_DIRECTML_OPTIMIZED='1' if optimized else '0', OMP_NUM_THREADS=str(threads))
     if inpaint_workers is not None:
         env['ENGINE_INPAINT_WORKERS'] = str(inpaint_workers)

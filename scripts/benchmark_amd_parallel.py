@@ -52,7 +52,7 @@ def pool(folder, instances, threads, gpu_ocr):
             worker_folder.mkdir()
             output = (worker_folder/'engine.log').open('w',encoding='utf-8')
             handles.append(output)
-            worker_env = {**env,'ENGINE_PROFILE_DIR':str(worker_folder/'profiles'),
+            worker_env = {**env,'ENGINE_PROFILE_DIR':str(worker_folder/'profiles'), 'ENGINE_TRACE_DEVICES':'1',
                           'ENGINE_STOP_FILE':str(folder/'engine.stop'),'BENCHMARK_POOL_SLOT':str(slot),
                           'BENCHMARK_PORT':str(port)}
             children.append(subprocess.Popen([str(PYTHON),str(ROOT/'scripts/benchmark_amd_worker.py')],

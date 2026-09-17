@@ -83,11 +83,12 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         if not isinstance(result.get("cache_key"), str) or not re.fullmatch(r"[a-f0-9]{64}", result["cache_key"]):
             raise ProcessingError("INVALID_ENGINE_RESULT", "抹字缓存标识无效")
     elif name == "render":
-        image = validate_render(read_asset(source), result)
+        image, info = validate_render(read_asset(source), result)
     elif name == "redraw":
         image = base64.b64decode(result["image"], validate=True)
     if image is not None:
-        info = inspect_image(image, output=True)
+        if info is None:
+            info = inspect_image(image, output=True)
         ratio = (info["width"] / info["height"]) / (source.width / source.height)
         if (mode == "classic" and (info["width"], info["height"]) != (source.width, source.height)) or not .8 <= ratio <= 1.25:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")

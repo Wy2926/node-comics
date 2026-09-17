@@ -14,21 +14,25 @@ class LetteringError(ValueError):
         super().__init__(self.code)
 
 
-def changed_pixels(before, after, protected, bubble=None):
-    changed = np.any(after != before, axis=2)
-    if not changed.any():
-        raise LetteringError('NO_GLYPHS')
-    validate_glyphs(changed, protected, bubble)
-    return changed
+def validate_glyphs(alpha, origin, protected, bubble=None):
+    """Validate native ink before clipping; return only its page-local slice.
 
-
-def validate_glyphs(glyphs, protected, bubble=None):
-    if glyphs[0].any() or glyphs[-1].any() or glyphs[:, 0].any() or glyphs[:, -1].any():
+    Transparent padding may extend outside the page. Actual ink may not.
+    All per-layer scans and temporary arrays are bounded by the native layer.
+    """
+    left, top, width, height = cv2.boundingRect(alpha)
+    if not width or not height:
+        return None
+    x, y = origin[0] + left, origin[1] + top
+    if x <= 0 or y <= 0 or x + width >= protected.shape[1] or y + height >= protected.shape[0]:
         raise LetteringError('BOUNDARY')
-    if np.any(glyphs & protected):
+    glyphs = alpha[top:top+height, left:left+width] > 0
+    area = (slice(y, y + height), slice(x, x + width))
+    if np.any(glyphs & protected[area]):
         raise LetteringError('OVERLAP')
-    if bubble is not None and not bubble.contains(glyphs):
+    if bubble is not None and not bubble.contains(glyphs, (x, y)):
         raise LetteringError('BUBBLE_OVERFLOW')
+    return area, glyphs
 
 
 def font_family(renderer, path, language):
@@ -122,29 +126,23 @@ async def letter_page(image, analysis, translations, config, language, cleaned, 
         options = configuration(minimum, family)
 
         def paint(canvas, region, *args, render_alpha=None, paint_part=None, **kwargs):
-            alpha = np.zeros(mask.shape, dtype=np.uint8)
-
-            def check_native_layer(layer_alpha, origin):
-                ys, xs = np.nonzero(layer_alpha)
-                if len(xs) and (xs.min() + origin[0] <= 0 or xs.max() + origin[0] >= image.shape[1] - 1
-                                or ys.min() + origin[1] <= 0 or ys.max() + origin[1] >= image.shape[0] - 1):
-                    raise LetteringError('BOUNDARY')
-
-            result = renderer.render(canvas, region, *args, render_alpha=alpha, paint_part=paint_part,
-                                     layer_callback=check_native_layer, **kwargs)
-            glyphs = alpha > 0
-            validate_glyphs(glyphs, protected, bubbles[id(region)])
             if region.font_size < minimum:
                 raise LetteringError('LAYOUT_FAILED')
-            if paint_part == 'fill':
-                if not glyphs.any():
-                    raise LetteringError('NO_GLYPHS')
-                if np.any(glyphs & occupied):
-                    raise LetteringError('OVERLAP')
-                occupied[:] |= glyphs
-                visible_regions.add(id(region))
-            glyph_mask[glyphs] = 255
-            return result
+
+            def record_native_layer(alpha, origin):
+                ink = validate_glyphs(alpha, origin, protected, bubbles[id(region)])
+                if ink is None:
+                    return
+                area, glyphs = ink
+                if paint_part == 'fill':
+                    if np.any(glyphs & occupied[area]):
+                        raise LetteringError('OVERLAP')
+                    occupied[area] |= glyphs
+                    visible_regions.add(id(region))
+                glyph_mask[area][glyphs] = 255
+
+            return renderer.render(canvas, region, *args, paint_part=paint_part,
+                                   layer_callback=record_native_layer, **kwargs)
 
         token = current_bubbles.set(BubbleInput(usable))
         try:

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from contextlib import contextmanager
 import hashlib
 from io import BytesIO
 import warnings
@@ -13,8 +14,11 @@ from .storage import get_store, LocalStore
 MIMES = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
 
 
-def inspect_image(data: bytes, *, output=False):
+@contextmanager
+def decoded_image(data: bytes, *, output=False):
+    """Validate once and keep decoded pixels available to the caller."""
     cfg = settings()
+    image = None
     try:
         if not data or len(data) > cfg.max_upload_bytes:
             raise ValueError("size")
@@ -28,15 +32,26 @@ def inspect_image(data: bytes, *, output=False):
                 if width < 1 or height < 1 or width * height > cfg.max_pixels or max(width, height) > cfg.max_dimension:
                     raise ValueError("dimensions")
                 image.verify()
-            with Image.open(BytesIO(data)) as image:
-                image.load()
-        return {"width": width, "height": height, "mime": mime, "byte_size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+            image = Image.open(BytesIO(data))
+            image.load()
     except (ValueError, OSError, UnidentifiedImageError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        if image is not None:
+            image.close()
         if output:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "供应商未返回符合限制的有效图片") from exc
         if str(exc) in ("size", "dimensions"):
             problem("IMAGE_TOO_LARGE", f"图片超过限制：{cfg.max_upload_bytes // 1024 // 1024} MB、{cfg.max_pixels // 1_000_000} 百万像素、单边 {cfg.max_dimension} 像素", 413)
         problem("UNSUPPORTED_IMAGE", "请选择可正常解码的静态 PNG、JPEG 或 WebP 图片", 422)
+    try:
+        yield image, {"width": width, "height": height, "mime": mime,
+                      "byte_size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    finally:
+        image.close()
+
+
+def inspect_image(data: bytes, *, output=False):
+    with decoded_image(data, output=output) as (_, info):
+        return info
 
 
 def object_path(key: str):

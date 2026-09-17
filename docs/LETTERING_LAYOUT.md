@@ -1,5 +1,7 @@
 # 漫画气泡与完整嵌字引擎
 
+2026-09-17：移除未使用的气泡内接矩形门槛，字形检查改为原生图层的局部范围；控制端复用已解码结果，PNG 编码移出设备锁，逐层设备诊断默认关闭。当前仅完成代码和本地验证，未更新运行节点。变更边界与复现见下文“局部校验与交付优化”。
+
 2026-09-16：常规翻译已整体接入 **Manga Translator UI 的 Qt 排版／渲染模块**，固定提交 `f0307a063214f915f2b1d6e5cd3233f3bf78339f`。字号测量、自动换行、气泡适配、横竖排及字形绘制均走同一上游实现；原先“先自然排版、失败后缩放 OCR 矩形”的实现已移除。OCR、文本翻译、LaMa 与任务结算保持现有流程。本次完成代码、原生运行与容器验证，尚未重启已有本机集群或公开部署。
 
 ## 选型与接入范围
@@ -38,7 +40,11 @@
 
 Qt Python 包、原始来源 URL 和 Windows／Linux 轮子 SHA-256 见 [qt-runtime.json](../services/classic-engine/third_party/qt-runtime.json)；PyQt 与捆绑 Qt 的许可分别核实，依据 [Riverbank 官方说明](https://www.riverbankcomputing.com/software/pyqt)。没有新增权重或字体；现有字体的来源、校验和与 OFL 见[语言清单](LANGUAGE_SUPPORT.md)，字典见[字典准备](HYPHENATION_DICTIONARIES.md)。
 
-CPU/CUDA 引擎版本为 `mit-95227a2-classic-v8-qt`，默认双进程 AMD 为 `mit-95227a2-classic-v4-dml-v7-qt`；排版缓存版本为 `masked-png-v5-mtu-f0307a0-qt611-noto-b85c38ec`。更新运行集群时，控制配置与节点版本需要一起切换；本次未修改现有数据库配置、任务记录或正在运行的服务。
+当前代码的 CPU/CUDA 引擎版本为 `mit-95227a2-classic-v9-qt-roi`，默认双进程 AMD 为 `mit-95227a2-classic-v4-dml-v8-qt-roi`；排版缓存版本为 `masked-png-v6-roi-mtu-f0307a0-qt611-noto-b85c38ec`。气泡接受条件变化会改变部分页面的布局，必须区分旧结果缓存。更新运行集群时，控制配置与节点版本需要一起切换；本次未修改现有数据库配置、任务记录或正在运行的服务。
+
+局部校验直接读取 Qt 原生 alpha 图层，保留越界、气泡和重叠检查；整页掩膜只创建一次、局部累计。气泡提取不再要求额外的内接矩形。控制端复用已解码的产物及元数据；PNG 编码移出设备锁，擦字掩膜复用检查点。`render_layout` / `render_encode` 分别计量编码前工作与编码，`render` 为总和；Qt 和模型仍串行访问。逐层设备诊断默认关闭，需要时设置 `ENGINE_TRACE_DEVICES=1`，AMD 必需的搬运回调保留，interop 配置错误暂不修改。
+
+离线 1200×1600、16 块文字样例的修改前后译图和字形掩膜逐像素一致。局部字形检查中位耗时约 0.100 → 0.004 秒；整页排版约 7.44 → 7.56 秒，没有证明整体提速。数据保存在 `artifacts/lettering-optimization/paired-final/report.json`；未调用在线翻译或 R2，未部署。
 
 ## 准备与验证
 

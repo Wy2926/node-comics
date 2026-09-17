@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from hyphenation import DictionaryStore
-from lettering import LetteringError, changed_pixels, letter_page, text_preserved
+from lettering import LetteringError, validate_glyphs, letter_page, text_preserved
 from speech_bubbles import find_bubble
 from typesetter import initialize
 
@@ -109,8 +109,21 @@ def test_translation_content_check_preserves_original_hyphens_and_detects_omissi
 
 @pytest.mark.parametrize('point,protected,code', [((0, 5), False, 'BOUNDARY'), ((5, 5), True, 'OVERLAP')])
 def test_specific_failure_reasons(point, protected, code):
-    before = np.zeros((20, 20, 3), np.uint8)
-    after = before.copy()
-    after[point] = 255
+    alpha = np.zeros((20, 20), np.uint8)
+    alpha[point] = 255
     with pytest.raises(LetteringError, match=code):
-        changed_pixels(before, after, np.full((20, 20), protected))
+        validate_glyphs(alpha, (0, 0), np.full((20, 20), protected))
+
+
+def test_local_ink_ignores_transparent_padding_and_checks_before_clipping():
+    from speech_bubbles import Bubble
+    protected = np.zeros((100, 120), bool)
+    alpha = np.zeros((30, 30), np.uint8)
+    alpha[10:20, 10:20] = 255
+    area, glyphs = validate_glyphs(alpha, (-5, -5), protected)
+    assert area == (slice(5, 15), slice(5, 15)) and glyphs.shape == (10, 10)
+    for origin in [(-10, -5), (-5, -10), (100, 0), (0, 80)]:
+        with pytest.raises(LetteringError, match='BOUNDARY'):
+            validate_glyphs(alpha, origin, protected)
+    with pytest.raises(LetteringError, match='BUBBLE_OVERFLOW'):
+        validate_glyphs(alpha, (-5, -5), protected, Bubble((5, 5), np.zeros((10, 10), bool)))

@@ -1,5 +1,6 @@
 """Control-plane text stages, fenced checkpoints and strict image validation."""
 import base64
+import hashlib
 from io import BytesIO
 import json
 import math
@@ -7,7 +8,7 @@ import time
 from PIL import Image, ImageChops
 from sqlalchemy import func, or_, select
 from .adapters.text import TextError, call_text, groups, input_bound, parse_translations
-from .assets import available, inspect_image
+from .assets import available, decoded_image
 from .db import session_factory
 from .errors import ProcessingError
 from .models import Asset, ClassicState, Job, TextCall, now, uid
@@ -203,8 +204,7 @@ def wait_for_retry(job_id, lease_id, delay, before_call=None):
 def validate_render(data, result):
     try:
         output = decode_bounded(result['image'])
-        inspect_image(output, output=True)
-        with Image.open(BytesIO(data)) as source, Image.open(BytesIO(output)) as target:
+        with Image.open(BytesIO(data)) as source, decoded_image(output, output=True) as (target, info):
             original, final = source.convert('RGB'), target.convert('RGB')
             if target.format != 'PNG' or original.size != final.size:
                 raise ValueError()
@@ -226,7 +226,13 @@ def validate_render(data, result):
                 buffer = BytesIO()
                 final.save(buffer, 'PNG')
                 output = buffer.getvalue()
-        return output
+                # The encoder only restores source alpha; dimensions and format
+                # are unchanged. Validate final byte size and hash these exact bytes.
+                from .config import settings
+                if len(output) > settings().max_upload_bytes:
+                    raise ValueError()
+                info = {**info, 'byte_size': len(output), 'sha256': hashlib.sha256(output).hexdigest()}
+        return output, info
     except (ValueError, KeyError, TypeError, OSError, Image.DecompressionBombError):
         raise ProcessingError('CLASSIC_RENDER_INVALID', '译图尺寸、字形或掩膜外像素验证失败，未交付') from None
 
