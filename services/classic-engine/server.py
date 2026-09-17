@@ -3,7 +3,6 @@ import base64
 from contextlib import asynccontextmanager, redirect_stdout, redirect_stderr
 import hashlib
 import hmac
-from io import BytesIO
 import json
 import logging
 import os
@@ -32,6 +31,9 @@ from manga_translator.mask_refinement import dispatch as refine
 from manga_translator.utils import ModelWrapper, sort_regions
 from local_inpainting import inpaint_regions
 from runtime import DeviceLock, ImageCache, cache_key
+from execution import Pipeline, Execution, drain
+from image_codec import decode, png
+from render_stage import render_page as render_direct, encode_render
 from hyphenation import DictionaryStore
 from typesetter import initialize as initialize_typesetter
 from prepare_dictionaries import prepare as prepare_languages
@@ -53,8 +55,8 @@ if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
 RESOURCE_ID = os.environ.get('ENGINE_RESOURCE_ID', DEVICE)
 FONT = os.environ.get('ENGINE_FONT', '/opt/mit/fonts/NotoSansMonoCJK-VF.ttf.ttc')
-from render_languages import prepare_fonts, font_for
-from lettering import LetteringError, letter_page
+from render_languages import prepare_fonts
+from lettering import LetteringError
 Image.MAX_IMAGE_PIXELS = 24_000_000
 lock = DeviceLock(RESOURCE_ID, os.environ.get('ENGINE_LOCK_DIR', '/tmp/comics-device-locks'))
 cache = ImageCache(LOCAL_RUNTIME.cache_bytes, LOCAL_RUNTIME.cache_ttl_seconds)
@@ -69,11 +71,23 @@ inpaint_pool = None
 dictionary_store = None
 position_cache = None
 neural_runtime = None
+pipeline = None
+
+
+def initialize_device_thread():
+    torch.set_num_threads(effective_runtime.torch_threads)
+    if DEVICE.startswith('cuda'):
+        torch.cuda.set_device(torch.device(DEVICE))
+
+
+def synchronize_device():
+    if DEVICE.startswith('cuda'):
+        torch.cuda.synchronize(torch.device(DEVICE))
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store, position_cache, neural_runtime
+    global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store, position_cache, neural_runtime, pipeline
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(LOCAL_RUNTIME.torch_threads)
     torch.set_num_interop_threads(INTEROP_THREADS)
@@ -137,10 +151,19 @@ async def lifespan(app):
             panel_worker = ParallelPanels(opencv_threads=LOCAL_RUNTIME.opencv_threads)
             # Spawn/import CPU helper before admitting the first real page.
             panel_worker.submit(sample, True).result()
+        pipeline = Pipeline(initialize_device_thread)
+        async with lock.hold():
+            await pipeline.run(pipeline.device_executor, synchronize_device)
+        await pipeline.cpu(torch.set_num_threads, effective_runtime.torch_threads)
+        await pipeline.configure_layout(default_directory(), effective_runtime.languages, effective_runtime.opencv_threads)
         ready = True
         yield
     finally:
         ready = False
+        if pipeline:
+            async with pipeline.admission.exclusive():
+                pipeline.close()
+            pipeline = None
         if panel_worker:
             panel_worker.close()
             panel_worker = None
@@ -181,6 +204,9 @@ def health():
             'supported_languages': effective_runtime.languages, 'runtime': effective_runtime.model_dump(),
             'torch_interop_threads': INTEROP_THREADS,
             'inference_serialized': True,
+            'pipeline': {'implementation': 'cpu-device-overlap-v1', 'capacity': 3,
+                         'device_workers': 1, 'cpu_workers': 1, 'layout_workers': 1,
+                         'active': pipeline.admission.active if pipeline else 0},
             'cuda': {'available': torch.cuda.is_available(), 'device_name': torch.cuda.get_device_name(DEVICE),
                      'torch_version': torch.__version__} if DEVICE.startswith('cuda') else None,
             'panel_execution': 'parallel-process' if panel_worker else 'serial',
@@ -211,19 +237,9 @@ async def configure(request: Request):
         await run_in_threadpool(prepare_languages, default_directory(), updated.languages)
         await run_in_threadpool(prepare_fonts, updated.languages)
         store = DictionaryStore(default_directory(), updated.languages)
-        async with lock.hold():
-            torch.set_num_threads(updated.torch_threads)
-            cv2.setNumThreads(updated.opencv_threads)
-            if panel_worker:
-                panel_worker.opencv_threads = updated.opencv_threads
-            if inpaint_pool:
-                inpaint_pool.threads = updated.torch_threads
-                inpaint_pool.opencv_threads = updated.opencv_threads
-            initialize_typesetter(store)
-            dictionary_store = store
-            if (updated.cache_bytes, updated.cache_ttl_seconds) != (cache.max_bytes, cache.ttl_seconds):
-                cache = ImageCache(updated.cache_bytes, updated.cache_ttl_seconds)
-            effective_runtime = updated
+        async with configuration_guard():
+            async with lock.hold():
+                await drain(apply_runtime(updated, store))
         return {'runtime': updated.model_dump(), 'supported_languages': updated.languages}
     except ValidationError as error:
         unsupported = any(item['type'] == 'literal_error' and item['loc'][0] == 'languages' for item in error.errors())
@@ -232,22 +248,46 @@ async def configure(request: Request):
         return JSONResponse(status_code=422, content={'error': 'ENGINE_CONFIG_FAILED'})
 
 
-def decode(value, mode='RGB'):
-    if not isinstance(value, str) or len(value) > 32 * 1024 * 1024:
-        raise ValueError('Image size')
-    raw = base64.b64decode(value, validate=True)
-    if len(raw) > 24 * 1024 * 1024:
-        raise ValueError('Image size')
-    with Image.open(BytesIO(raw)) as image:
-        if image.width * image.height > 24_000_000 or max(image.size) > 8192 or getattr(image, 'n_frames', 1) != 1:
-            raise ValueError('Image dimensions')
-        return np.array(image.convert(mode))
+@asynccontextmanager
+async def configuration_guard():
+    if pipeline:
+        async with pipeline.admission.exclusive():
+            yield
+    else:
+        yield
 
 
-def png(array):
-    output = BytesIO()
-    Image.fromarray(array).save(output, 'PNG')
-    return base64.b64encode(output.getvalue()).decode()
+async def install_runtime(updated, store):
+    if pipeline:
+        await pipeline.configure_layout(store.directory, updated.languages, updated.opencv_threads)
+        await pipeline.run(pipeline.device_executor, torch.set_num_threads, updated.torch_threads)
+        await pipeline.cpu(torch.set_num_threads, updated.torch_threads)
+    torch.set_num_threads(updated.torch_threads)
+    cv2.setNumThreads(updated.opencv_threads)
+    if panel_worker:
+        panel_worker.opencv_threads = updated.opencv_threads
+    if inpaint_pool:
+        inpaint_pool.threads = updated.torch_threads
+        inpaint_pool.opencv_threads = updated.opencv_threads
+    initialize_typesetter(store)
+
+
+async def apply_runtime(updated, store):
+    global effective_runtime, dictionary_store, cache, ready
+    try:
+        await install_runtime(updated, store)
+    except Exception:
+        try:
+            if dictionary_store is not None:
+                await install_runtime(effective_runtime, dictionary_store)
+        except Exception:
+            # A failed rollback must never advertise a partially applied runtime.
+            ready = False
+        raise
+    dictionary_store = store
+    if (updated.cache_bytes, updated.cache_ttl_seconds) != (cache.max_bytes, cache.ttl_seconds):
+        cache = ImageCache(updated.cache_bytes, updated.cache_ttl_seconds)
+    effective_runtime = updated
 
 
 def region_json(block):
@@ -256,26 +296,34 @@ def region_json(block):
             'bg_color': [int(v) for v in block.bg_colors], 'prob': float(block.prob)}
 
 
-async def analyze(image, config):
+async def analyze(image, config, *, execution=None):
     future = panel_worker.submit(image, config['reading_order'] == 'rtl') if panel_worker else None
     try:
-        return await analyze_regions(image, config, future)
+        return await analyze_regions(image, config, future, execution=execution)
     finally:
         if future is not None:
             # Bound outstanding CPU work even for no-text/error/cancelled pages.
             try:
-                future.result()
+                if execution:
+                    await execution.cpu(future.result)
+                else:
+                    future.result()
             except Exception:
                 pass
 
 
-async def analyze_regions(image, config, panel_future=None):
-    start = time.monotonic()
+async def detect_and_recognize(image, config):
     lines, raw_mask, _ = await models['detector'].detect(image, config['detection_size'], 0.5, 0.7, 2.3, False, False, False, False, False)
     if not lines:
-        return {'segments': [], 'regions': [], 'mask': None, 'timings': {'detect_ocr': time.monotonic() - start}}
+        return [], [], raw_mask
     detected_lines = list(lines)
     lines = await models['ocr'].recognize(image, lines, OcrConfig(prob=0.2), False)
+    return detected_lines, lines, raw_mask
+
+
+async def finish_analysis(image, config, detected_lines, lines, raw_mask, panel_future):
+    if not detected_lines:
+        return {'segments': [], 'regions': [], 'mask': None}
     lines = [line for line in lines if line.text and line.text.strip()]
     # Detection with empty OCR is failure, not a free no-text result.
     if not lines:
@@ -297,12 +345,23 @@ async def analyze_regions(image, config, panel_future=None):
         raise ValueError('Empty text mask')
     return {'segments': [{'id': f'b{n:03}', 'source': region.text} for n, region in enumerate(regions, 1)],
             'regions': [region_json(region) for region in regions], 'mask': png(mask), 'unrecognized_regions': unrecognized,
-            'quality_flags': ['unrecognized_regions'] if unrecognized else [],
-            'timings': {'detect_ocr': time.monotonic() - start}}
+            'quality_flags': ['unrecognized_regions'] if unrecognized else []}
 
 
-async def erase_page(image, analysis, config, *, encode=True):
-    mask = decode(analysis['mask'], 'L')
+async def analyze_regions(image, config, panel_future=None, *, execution=None):
+    start = time.monotonic()
+    if execution:
+        detected_lines, lines, raw_mask = await execution.device(detect_and_recognize, image, config)
+        result = await execution.cpu(finish_analysis, image, config, detected_lines, lines, raw_mask, panel_future)
+    else:
+        detected_lines, lines, raw_mask = await detect_and_recognize(image, config)
+        result = await finish_analysis(image, config, detected_lines, lines, raw_mask, panel_future)
+    result['timings'] = {'detect_ocr': time.monotonic() - start}
+    return result
+
+
+async def erase_page(image, analysis, config, *, encode=True, execution=None):
+    mask = await execution.cpu(decode, analysis['mask'], 'L') if execution else decode(analysis['mask'], 'L')
     if mask.shape != image.shape[:2] or not np.any(mask):
         raise ValueError('Mask dimensions')
     start = time.monotonic()
@@ -310,112 +369,130 @@ async def erase_page(image, analysis, config, *, encode=True):
         raise ValueError('Unsupported inpainting strategy')
 
     async def predict(crop, crop_mask):
-        return await models['inpainter'].inpaint(crop, crop_mask, InpainterConfig(inpainting_precision='fp32'), config['inpainting_size'], False)
+        function = models['inpainter'].inpaint
+        args = (crop, crop_mask, InpainterConfig(inpainting_precision='fp32'), config['inpainting_size'], False)
+        return await execution.device(function, *args) if execution else await function(*args)
 
     if inpaint_pool:
-        cleaned = inpaint_pool.inpaint(image, mask, max_size=config['inpainting_size'],
-                                       padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
+        options = dict(max_size=config['inpainting_size'], padding=config['inpainting_padding'],
+                       merge_gap=config['inpainting_merge_gap'])
+        # The DirectML pool owns two private GPU workers; drain the whole pool
+        # under one device lease, including its recovery/error paths.
+        cleaned = (await execution.device(inpaint_pool.inpaint, image, mask, **options) if execution else
+                   inpaint_pool.inpaint(image, mask, **options))
     else:
         cleaned = await inpaint_regions(image, mask, predict, max_size=config['inpainting_size'],
-                                        padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'])
+                                        padding=config['inpainting_padding'], merge_gap=config['inpainting_merge_gap'],
+                                        run_cpu=execution.cpu if execution else None)
     # Enforce original pixels outside the erase mask, even if an engine changes them.
-    cleaned[mask == 0] = image[mask == 0]
+    if execution:
+        await execution.cpu(restore_unmasked, cleaned, image, mask)
+    else:
+        restore_unmasked(cleaned, image, mask)
     return {'cleaned': png(cleaned) if encode else cleaned, 'timings': {'inpaint': time.monotonic() - start}}
 
 
-def encode_render(result):
-    start = time.monotonic()
-    encoded = {**result, 'image': png(result['image']), 'glyph_mask': png(result['glyph_mask'])}
-    elapsed = time.monotonic() - start
-    encoded['timings'] = {**result['timings'], 'render_encode': elapsed,
-                          'render': result['timings']['render'] + elapsed}
-    return encoded
+def restore_unmasked(cleaned, image, mask):
+    cleaned[mask == 0] = image[mask == 0]
 
 
-async def render_page(image, analysis, translations, config, language, cleaned, *, encode=True):
-    start = time.monotonic()
-    mask = decode(analysis['mask'], 'L')
-    font = font_for(language, FONT)
-    layout = []
-    output, glyph_mask, fitted, bubbles = await letter_page(image, analysis, translations, config, language,
-                                                 cleaned, mask, font, layout)
-    elapsed = time.monotonic() - start
-    # The checked erase mask already has a PNG representation in the checkpoint.
-    result = {'image': output, 'mask': analysis['mask'], 'glyph_mask': glyph_mask,
-              'layout_fitted_regions': fitted, 'bubble_regions': bubbles, 'layout': layout,
-              'timings': {'render': elapsed, 'render_layout': elapsed}}
-    return encode_render(result) if encode else result
+async def render_page(image, analysis, translations, config, language, cleaned, *, encode=True, execution=None):
+    function = execution.render if execution else render_direct
+    return await function(image, analysis, translations, config, language, cleaned, font=FONT, encode=encode)
+
+
+def decode_input(value):
+    image = decode(value)
+    return image, hashlib.sha256(base64.b64decode(value, validate=True)).hexdigest(), image.copy()
+
+
+def validate_response(response):
+    if len(json.dumps(response, allow_nan=False).encode()) > MAX_RESPONSE:
+        raise ValueError('Response size')
+    return response
 
 
 @app.post('/v1/{stage}', dependencies=[Depends(authorized)])
 async def process(stage: str, request: Request):
     if stage not in ('analyze', 'inpaint', 'render'):
         raise HTTPException(404)
+    if pipeline is None or not ready:
+        raise HTTPException(503, 'Engine not ready')
+    started = time.monotonic()
+    async with pipeline.admission.enter():
+        if not ready:
+            raise HTTPException(503, 'Engine not ready')
+        execution = Execution(pipeline, lock, synchronize_device)
+        execution.add('admission_wait', time.monotonic() - started)
+        result = await process_admitted(stage, request, execution)
+        if isinstance(result, dict):
+            execution.add('request_wall', time.monotonic() - started)
+            result['timings'] = {**result.get('timings', {}),
+                **{stage + '_' + key: value for key, value in execution.timings.items()}}
+        return result
+
+
+async def process_admitted(stage, request, execution):
     raw = bytearray()
     async for chunk in request.stream():
         raw.extend(chunk)
         if len(raw) > 40 * 1024 * 1024:
             raise HTTPException(413)
     try:
-        body = json.loads(raw)
+        body = await execution.cpu(json.loads, raw)
+        del raw
         if 'language' in body and body['language'] not in effective_runtime.languages:
             return JSONResponse(status_code=422, content={'error': 'LANGUAGE_UNSUPPORTED'})
         if body['config']['version'] != VERSION:
             raise HTTPException(409, 'Engine version changed')
         if stage != 'analyze' and len(json.dumps(body['analysis'], allow_nan=False).encode()) > MAX_CHECKPOINT:
             raise ValueError('Checkpoint size')
-        async with lock.hold():
-            if 'image' in body:
-                image = decode(body['image'])
-                input_hash = hashlib.sha256(base64.b64decode(body['image'], validate=True)).hexdigest()
-                if body.get('input_hash', input_hash) != input_hash:
-                    raise ValueError('Input hash mismatch')
-                input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
-                input_cached = cache.put('source:' + input_ref, image.copy())
-            else:
-                input_hash = body['input_hash']
-                input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
-                if body.get('image_ref') != input_ref:
-                    raise ValueError('Input cache scope mismatch')
-                cached_input = cache.get('source:' + input_ref)
-                if cached_input is None:
-                    # No inference has run. The agent may safely retry once with
-                    # authorized original bytes after an eviction/node restart.
-                    return JSONResponse(status_code=410, content={'error': 'ENGINE_INPUT_CACHE_MISS'})
-                image, input_cached = cached_input.copy(), True
-            with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
-                if stage == 'analyze':
-                    result = await analyze(image, body['config'])
-                    if len(json.dumps(result, allow_nan=False).encode()) > MAX_CHECKPOINT:
-                        raise ValueError('Checkpoint size')
-                elif stage == 'inpaint':
-                    key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
-                    result = await erase_page(image, body['analysis'], body['config'], encode=False)
-                    cached = cache.put('cleaned:' + key, result.pop('cleaned'))
-                    result.update(cache_key=key, cached=cached)
-                else:
-                    key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
-                    cleaned = cache.get('cleaned:' + key) if body.get('cache_key') == key else None
-                    recovered = cleaned is None
-                    recovery_timings = {}
-                    if recovered:
-                        erased = await erase_page(image, body['analysis'], body['config'], encode=False)
-                        cleaned = erased['cleaned']
-                        recovery_timings = erased.get('timings', {})
-                        cache.put('cleaned:' + key, cleaned)
-                    result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'],
-                                               cleaned, encode=False)
-                    result['cache_rebuilt'] = recovered
-                    result['timings'] = {**recovery_timings, **result.get('timings', {})}
-        if stage == 'render':
-            # Arrays belong to this request. Qt/model globals and the cache stay
-            # serialized, while independent PNG encoding no longer holds the GPU.
-            result = await run_in_threadpool(encode_render, result)
+        # Cache metadata belongs exclusively to the event loop. Native workers
+        # receive strong, request-local array references, never the mutable LRU.
+        if 'image' in body:
+            image, input_hash, cached_image = await execution.cpu(decode_input, body.pop('image'))
+            if body.get('input_hash', input_hash) != input_hash:
+                raise ValueError('Input hash mismatch')
+            input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
+            input_cached = cache.put('source:' + input_ref, cached_image)
+            del cached_image
+        else:
+            input_hash = body['input_hash']
+            input_ref = cache_key(body['scope'], input_hash, body['config'], {'type': 'source-v1'})
+            if body.get('image_ref') != input_ref:
+                raise ValueError('Input cache scope mismatch')
+            cached_input = cache.get('source:' + input_ref)
+            if cached_input is None:
+                return JSONResponse(status_code=410, content={'error': 'ENGINE_INPUT_CACHE_MISS'})
+            image, input_cached = await execution.cpu(cached_input.copy), True
+            del cached_input
+        if stage == 'analyze':
+            result = await analyze(image, body['config'], execution=execution)
+            if len(json.dumps(result, allow_nan=False).encode()) > MAX_CHECKPOINT:
+                raise ValueError('Checkpoint size')
+        elif stage == 'inpaint':
+            key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
+            result = await erase_page(image, body['analysis'], body['config'], encode=False, execution=execution)
+            cached = cache.put('cleaned:' + key, result.pop('cleaned'))
+            result.update(cache_key=key, cached=cached)
+        else:
+            key = cache_key(body['scope'], input_hash, body['config'], body['analysis'])
+            cleaned = cache.get('cleaned:' + key) if body.get('cache_key') == key else None
+            recovered = cleaned is None
+            recovery_timings = {}
+            if recovered:
+                erased = await erase_page(image, body['analysis'], body['config'], encode=False, execution=execution)
+                cleaned = erased['cleaned']
+                recovery_timings = erased.get('timings', {})
+                cache.put('cleaned:' + key, cleaned)
+            result = await render_page(image, body['analysis'], body['translations'], body['config'], body['language'],
+                                       cleaned, encode=False, execution=execution)
+            result['cache_rebuilt'] = recovered
+            result['timings'] = {**recovery_timings, **result.get('timings', {})}
+            result = await execution.cpu(encode_render, result)
         response = {**result, 'version': VERSION, 'width': image.shape[1], 'height': image.shape[0], 'input_hash': input_hash,
                     'image_ref': input_ref if input_cached else None}
-        if len(json.dumps(response, allow_nan=False).encode()) > MAX_RESPONSE:
-            raise ValueError('Response size')
-        return response
+        return await execution.cpu(validate_response, response)
     except HTTPException:
         raise
     except LetteringError as error:

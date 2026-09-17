@@ -56,5 +56,12 @@ def test_unknown_language_returns_specific_code_before_configuration_or_inferenc
     response = asyncio.run(server.configure(Request({'languages':['xx']})))
     assert response.status_code == 422 and json.loads(response.body)['error'] == 'LANGUAGE_UNSUPPORTED'
     assert server.effective_runtime is before
-    response = asyncio.run(server.process('render', Request({'language':'xx'})))
+    from execution import Pipeline
+    from unittest.mock import patch
+    pipeline = Pipeline()
+    try:
+        with patch.object(server, 'pipeline', pipeline), patch.object(server, 'ready', True):
+            response = asyncio.run(server.process('render', Request({'language':'xx'})))
+    finally:
+        pipeline.close()
     assert response.status_code == 422 and json.loads(response.body)['error'] == 'LANGUAGE_UNSUPPORTED'

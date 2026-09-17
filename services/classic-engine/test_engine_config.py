@@ -50,3 +50,29 @@ def test_failed_dictionary_preparation_does_not_publish_new_runtime():
         result = asyncio.run(server.configure(Request()))
     assert result.status_code == 422
     assert server.effective_runtime is before
+
+
+def test_runtime_application_failure_rolls_back_without_replacing_cache():
+    import server
+    from unittest.mock import AsyncMock, Mock
+    before, cache = server.effective_runtime, server.cache
+    old_store, new_store = Mock(), Mock()
+    updated = RuntimeConfig(languages=['en'], cache_bytes=0)
+    install = AsyncMock(side_effect=[RuntimeError('worker configuration failed'), None])
+    with patch.object(server, 'install_runtime', install), patch.object(server, 'dictionary_store', old_store):
+        with pytest.raises(RuntimeError):
+            asyncio.run(server.apply_runtime(updated, new_store))
+        assert server.dictionary_store is old_store
+    assert install.await_args_list[0].args == (updated, new_store)
+    assert install.await_args_list[1].args == (before, old_store)
+    assert server.effective_runtime is before and server.cache is cache
+
+
+def test_failed_rollback_withdraws_readiness():
+    import server
+    from unittest.mock import AsyncMock, Mock
+    with patch.object(server, 'ready', True), patch.object(server, 'dictionary_store', Mock()), \
+         patch.object(server, 'install_runtime', AsyncMock(side_effect=RuntimeError('worker unavailable'))):
+        with pytest.raises(RuntimeError):
+            asyncio.run(server.apply_runtime(RuntimeConfig(languages=['en']), Mock()))
+        assert server.ready is False

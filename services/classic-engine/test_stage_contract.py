@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 import server
 from runtime import DeviceLock, ImageCache
+from execution import Pipeline, Execution
 
 
 class Request:
@@ -26,12 +27,20 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         server.lock = DeviceLock('isolated-test-device', self.temp.name)
+        server.pipeline = Pipeline()
+        server.ready = True
+        self.addCleanup(self.close_pipeline)
         server.cache = ImageCache(1024 * 1024, 60)
         self.image = np.full((64, 80, 3), 200, np.uint8)
         self.body = {'image': server.png(self.image), 'config': {'version': server.VERSION},
                      'scope': 'task-1', 'analysis': {'mask': 'stage-only-test'}}
         self.rendered = {'image': self.image, 'glyph_mask': np.zeros(self.image.shape[:2], np.uint8),
                          'mask': 'checked-erase-mask', 'timings': {'render': 0.01}}
+
+    def close_pipeline(self):
+        server.pipeline.close()
+        server.pipeline = None
+        server.ready = False
 
     async def test_inpaint_needs_no_translation_or_language(self):
         with patch.object(server, 'erase_page', new=AsyncMock(return_value={'cleaned': self.image.copy()})) as erase:
@@ -117,27 +126,37 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(json.loads(response.body)['error'], 'ENGINE_INPUT_CACHE_MISS')
             analyze.assert_not_awaited()
 
-    async def test_parallel_transport_cannot_overlap_two_image_stages(self):
-        entered, release = asyncio.Event(), asyncio.Event()
+    async def test_parallel_transport_cannot_overlap_two_model_calls(self):
+        entered, release, other = Event(), Event(), Event()
+        submitted = asyncio.Event()
 
-        async def erase(*args, **kwargs):
+        def model():
             entered.set()
-            await release.wait()
+            assert release.wait(5)
             return {'cleaned': self.image.copy()}
 
-        with patch.object(server, 'erase_page', new=erase), \
-             patch.object(server, 'analyze', new=AsyncMock(return_value={})) as analyze:
+        async def erase(*args, execution, **kwargs):
+            return await execution.device(model)
+
+        async def analyze(*args, execution, **kwargs):
+            submitted.set()
+            await execution.device(other.set)
+            return {}
+
+        with patch.object(server, 'erase_page', new=erase), patch.object(server, 'analyze', new=analyze):
             erasing = asyncio.create_task(server.process('inpaint', Request(self.body)))
+            analyzing = None
             try:
-                await asyncio.wait_for(entered.wait(), 2)
+                self.assertTrue(await asyncio.to_thread(entered.wait, 3))
                 analyzing = asyncio.create_task(server.process('analyze', Request(self.body)))
-                await asyncio.sleep(0)
-                analyze.assert_not_awaited()
+                await asyncio.wait_for(submitted.wait(), 2)
+                self.assertFalse(other.is_set())
             finally:
                 release.set()
                 await erasing
-            await analyzing
-        analyze.assert_awaited_once()
+                if analyzing:
+                    await analyzing
+        self.assertTrue(other.is_set())
 
     async def test_png_encoding_releases_device(self):
         entered, release = Event(), Event()
@@ -152,11 +171,85 @@ class StageTests(unittest.IsolatedAsyncioTestCase):
             rendering = asyncio.create_task(server.process('render', Request({**self.body, 'translations': {}, 'language': 'en'})))
             try:
                 self.assertTrue(await asyncio.to_thread(entered.wait, 3))
-                await asyncio.wait_for(server.process('analyze', Request(self.body)), 2)
-                analyze.assert_awaited_once()
+                execution = Execution(server.pipeline, server.lock)
+                await asyncio.wait_for(execution.device(lambda: None), 2)
             finally:
                 release.set()
                 await rendering
+
+    async def test_analysis_postprocessing_overlaps_next_page_model(self):
+        model_entered, release_model, cpu_entered, release_cpu, second_model = [Event() for _ in range(5)]
+        second_waiting = asyncio.Event()
+        calls = 0
+        original_device = Execution.device
+
+        async def device(execution, function, *args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                second_waiting.set()
+            return await original_device(execution, function, *args, **kwargs)
+
+        async def detect(image, config):
+            if not model_entered.is_set():
+                model_entered.set()
+                assert release_model.wait(5)
+            else:
+                second_model.set()
+            return [], [], None
+
+        async def finish(*args):
+            cpu_entered.set()
+            assert release_cpu.wait(5)
+            return {'segments': [], 'regions': [], 'mask': None}
+
+        with patch.object(server, 'panel_worker', None), \
+             patch.object(server, 'detect_and_recognize', detect), \
+             patch.object(server, 'finish_analysis', finish), patch.object(Execution, 'device', device):
+            first = asyncio.create_task(server.process('analyze', Request(self.body)))
+            second = None
+            try:
+                self.assertTrue(await asyncio.to_thread(model_entered.wait, 2))
+                second = asyncio.create_task(server.process('analyze', Request(self.body)))
+                await asyncio.wait_for(second_waiting.wait(), 2)
+                release_model.set()
+                self.assertTrue(await asyncio.to_thread(cpu_entered.wait, 2))
+                self.assertTrue(await asyncio.to_thread(second_model.wait, 2))
+            finally:
+                release_model.set()
+                release_cpu.set()
+                await first
+                if second:
+                    await second
+
+    async def test_config_drain_includes_layout_not_only_device_lock(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def render(*args, **kwargs):
+            entered.set()
+            await release.wait()
+            return self.rendered
+
+        with patch.object(server, 'erase_page', AsyncMock(return_value={'cleaned': self.image.copy()})), \
+             patch.object(server, 'render_page', render), patch.object(server, 'prepare_languages'), \
+             patch.object(server, 'prepare_fonts'), patch('hyphenation.DictionaryStore'), \
+             patch.object(server, 'apply_runtime', AsyncMock()) as apply:
+            rendering = asyncio.create_task(server.process('render', Request({**self.body, 'translations': {}, 'language': 'en'})))
+            configuring = None
+            try:
+                await asyncio.wait_for(entered.wait(), 2)
+                configuring = asyncio.create_task(server.configure(Request({})))
+                async def waiting():
+                    while not server.pipeline.admission.writers:
+                        await asyncio.sleep(0)
+                await asyncio.wait_for(waiting(), 2)
+                apply.assert_not_awaited()
+            finally:
+                release.set()
+                await rendering
+                if configuring:
+                    await configuring
+            apply.assert_awaited_once()
 
 
 if __name__ == '__main__':

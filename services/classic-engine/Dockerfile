@@ -10,6 +10,7 @@ ARG MIT_COMMIT=95227a2bb0fd306cd4f0c104d57284026f991b3a
 COPY speech_bubbles.py lettering.py typesetter.py typesetter_inputs.py typesetter_geometry.py prepare_typesetter.py render_languages.py prepare.py server.py engine_config.py cuda_runtime.py local_inpainting.py runtime.py hyphenation.py prepare_dictionaries.py hyphenation-catalog.json ./
 COPY licenses ./licenses
 COPY parallel_panels.py panel_geometry.py mask_geometry.py ocr_position_cache.py neural_acceleration.py ./
+COPY execution.py image_codec.py render_stage.py ./
 COPY third_party ./third_party
 RUN git clone --filter=blob:none --no-checkout https://github.com/zyddnys/manga-image-translator.git /opt/mit && git -C /opt/mit checkout ${MIT_COMMIT} && python prepare.py --source-only && rm -rf /opt/mit/.git
 RUN python prepare_typesetter.py --source /opt/manga-typesetter --destination /opt/typesetter && rm -rf /opt/manga-typesetter

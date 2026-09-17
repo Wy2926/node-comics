@@ -81,20 +81,33 @@ def plan_regions(mask, max_size, padding, merge_gap):
             for core in sorted(cores, key=lambda b: (b[1], b[0], b[3], b[2]))]
 
 
-async def inpaint_regions(image, mask, predict, *, max_size, padding, merge_gap):
+def prepare_crop(image, mask, crop):
+    x0, y0, x1, y1 = crop
+    return image[y0:y1, x0:x1].copy(), mask[y0:y1, x0:x1].copy()
+
+
+def paste_crop(output, mask, predicted, core, crop):
+    x0, y0, x1, y1 = crop
+    if predicted.shape != (y1 - y0, x1 - x0, 3) or predicted.dtype != np.uint8:
+        raise ValueError('Invalid inpainting crop result')
+    cx0, cy0, cx1, cy1 = core
+    owned = mask[cy0:cy1, cx0:cx1] > 0
+    target = output[cy0:cy1, cx0:cx1]
+    result = predicted[cy0 - y0:cy1 - y0, cx0 - x0:cx1 - x0]
+    target[owned] = result[owned]
+
+
+async def inpaint_regions(image, mask, predict, *, max_size, padding, merge_gap, run_cpu=None):
+    async def cpu(function, *args, **kwargs):
+        return await run_cpu(function, *args, **kwargs) if run_cpu else function(*args, **kwargs)
+
     if image.ndim != 3 or image.shape[2] != 3 or image.dtype != np.uint8 or image.shape[:2] != mask.shape:
         raise ValueError('Invalid inpainting image')
-    output = image.copy()
-    for core, crop in plan_regions(mask, max_size, padding, merge_gap):
-        x0, y0, x1, y1 = crop
+    output = await cpu(image.copy)
+    for core, crop in await cpu(plan_regions, mask, max_size, padding, merge_gap):
         # Include all masked text in the context, so nearby letters are not treated
         # as background. Only this core's mask is pasted back, once.
-        predicted = await predict(image[y0:y1, x0:x1].copy(), mask[y0:y1, x0:x1].copy())
-        if predicted.shape != (y1 - y0, x1 - x0, 3) or predicted.dtype != np.uint8:
-            raise ValueError('Invalid inpainting crop result')
-        cx0, cy0, cx1, cy1 = core
-        owned = mask[cy0:cy1, cx0:cx1] > 0
-        target = output[cy0:cy1, cx0:cx1]
-        result = predicted[cy0 - y0:cy1 - y0, cx0 - x0:cx1 - x0]
-        target[owned] = result[owned]
+        crop_image, crop_mask = await cpu(prepare_crop, image, mask, crop)
+        predicted = await predict(crop_image, crop_mask)
+        await cpu(paste_crop, output, mask, predicted, core, crop)
     return output

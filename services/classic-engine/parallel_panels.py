@@ -19,8 +19,8 @@ def detect_panels(image, right_to_left, opencv_threads):
 class ParallelPanels:
     """One bounded CPU worker; upstream panel options/debug state is not reentrant.
 
-    The caller owns the device/stage lock. Finish each future before releasing it,
-    including no-text and failed pages, so images cannot accumulate in the queue.
+    The caller owns a bounded pipeline admission slot. Finish each future before
+    releasing it, including no-text and failed pages; no GPU lock is needed.
     """
     def __init__(self, mode='process', opencv_threads=2):
         self.opencv_threads = opencv_threads
