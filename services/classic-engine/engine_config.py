@@ -28,12 +28,15 @@ class MachineConfig(BaseModel):
     dictionary_dir: str | None = None
     torch_interop_threads: int = Field(default=1, ge=1, le=128)
     inpaint_workers: Literal[1, 2] = 1
+    neural_acceleration: Literal['eager', 'portable-v1'] = 'eager'
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
     @model_validator(mode='after')
     def device_workers(self):
         if self.profile == 'mit' and self.inpaint_workers != 1:
             raise ValueError('Two crop workers are supported only by the DirectML profile')
+        if self.profile == 'mit-directml' and self.neural_acceleration != 'eager':
+            raise ValueError('Portable neural acceleration is not validated on DirectML')
         return self
 
 
@@ -43,7 +46,8 @@ def load():
         config = MachineConfig.model_validate(json.loads(Path(filename).read_text(encoding='utf-8')))
         mapping = {'profile': 'ENGINE_PROFILE', 'device': 'ENGINE_DEVICE', 'resource_id': 'ENGINE_RESOURCE_ID',
                    'model_dir': 'MODEL_DIR', 'font': 'ENGINE_FONT', 'lock_dir': 'ENGINE_LOCK_DIR',
-                   'dictionary_dir': 'ENGINE_DICTIONARY_DIR', 'inpaint_workers': 'ENGINE_INPAINT_WORKERS'}
+                   'dictionary_dir': 'ENGINE_DICTIONARY_DIR', 'inpaint_workers': 'ENGINE_INPAINT_WORKERS',
+                   'neural_acceleration': 'ENGINE_NEURAL_ACCELERATION'}
         for key, env in mapping.items():
             value = getattr(config, key)
             if value is not None:

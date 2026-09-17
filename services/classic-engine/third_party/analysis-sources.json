@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/zyddnys/manga-image-translator",
+  "revision": "95227a2bb0fd306cd4f0c104d57284026f991b3a",
+  "license": "GPL-3.0; XPOS source includes Microsoft MIT notice",
+  "files": [
+    {
+      "path": "utils/panel/lib/panel.py",
+      "sha256": "76b00b1b94fa6a21f4f8f75ac6b0e4df0332a2a1fa80dca61e6a4f9828ae39d5"
+    },
+    {
+      "path": "utils/panel/lib/page.py",
+      "sha256": "fff4e479e97f38cb03c8d1a2e02eeb56bff03605545627eb62d16ef83fc4f944"
+    },
+    {
+      "path": "mask_refinement/text_mask_utils.py",
+      "sha256": "5d331f1c096f864f7f93efe00c7203afdad4c706bc5e2e0373dbb291e848e411"
+    },
+    {
+      "path": "ocr/xpos_relative_position.py",
+      "sha256": "f74f296eea91f1fe7467fb517dd30b210e86df35d1df4b9155eb67070e6de259"
+    },
+    {
+      "path": "ocr/model_48px.py",
+      "sha256": "1cf24e5f59b2573300ba4b29878ce14c2a432292c1974e15945f79d784d09774"
+    }
+  ]
+}

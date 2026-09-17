@@ -1,5 +1,7 @@
 # 漫画气泡与完整嵌字引擎
 
+2026-09-17 性能修复：已替换上游逐文字块、逐整页像素的 Python 最大内接矩形扫描，保留矩形坐标和等面积选择规则。真实页面固定输入对照中，嵌字从 3.62 秒降至 0.70 秒，译图、字形掩膜、字号及断行完全一致。详见下文“最大内接矩形性能修复”；已完成本地代码与实测，未公开部署。
+
 2026-09-17：移除未使用的气泡内接矩形门槛，字形检查改为原生图层的局部范围；控制端复用已解码结果，PNG 编码移出设备锁，逐层设备诊断默认关闭。当前仅完成代码和本地验证，未更新运行节点。变更边界与复现见下文“局部校验与交付优化”。
 
 2026-09-16：常规翻译已整体接入 **Manga Translator UI 的 Qt 排版／渲染模块**，固定提交 `f0307a063214f915f2b1d6e5cd3233f3bf78339f`。字号测量、自动换行、气泡适配、横竖排及字形绘制均走同一上游实现；原先“先自然排版、失败后缩放 OCR 矩形”的实现已移除。OCR、文本翻译、LaMa 与任务结算保持现有流程。本次完成代码、原生运行与容器验证，尚未重启已有本机集群或公开部署。
@@ -23,6 +25,7 @@
 2. 为上游绘制循环增加观察回调，并在原生 RGBA 图层裁入页面前检查实际墨迹，避免漏报截字或把透明留白误判为越界。
 3. 有掩膜时，将英文默认快捷分支导向上游已有的统一气泡求解器。
 4. 允许译文重排，不沿用上游“原文只有一行就不自动换行”的默认策略。
+5. 最大内接矩形改用 [typesetter_geometry.py](../services/classic-engine/typesetter_geometry.py)：裁剪前景边界、合并相同行、NumPy 批量寻找柱状图边界，保留精确最大面积与确定性等面积选择。
 
 没有重写上游的断词、字号搜索、标点、字形栅格化或合成算法。[lettering.py](../services/classic-engine/lettering.py) 负责输入与交付检查，[typesetter.py](../services/classic-engine/typesetter.py) 负责加载和配置，[typesetter_inputs.py](../services/classic-engine/typesetter_inputs.py) 负责几何输入边界。
 
@@ -75,6 +78,30 @@ docker build -t node-comics-classic-engine:qt-validation services/classic-engine
 - 16 个目标语言离线嵌字通过；检查字体切换稳定、越南语 NFC/NFD 一致及边界内完整渲染。英／日／简中／繁中气泡对照通过；报告与图片分别在 `artifacts/lettering-languages/`、`artifacts/bubble-lettering/`。
 - 两张已有漫画图实际执行 OCR → LaMa → 新排版，共 14 个文字块、9 个提取内区、2 个未识别保护区域；均输出完整尺寸，允许修改区域外逐像素一致。保存译文复用，无 LLM／图片模型／R2 调用。结果在 `private-test-data/qt-lettering-validation/`；这些有限样本不构成所有漫画风格或 OCR 语言的效果验收。
 - Linux Python 3.11 容器构建及相同 16 语言／4 项气泡离线检查通过；结果见 `artifacts/linux-typesetter/`。Windows 为 Python 3.12；20 张单图和 2 张总览的解码像素与 Linux 结果完全一致。这里记录新排版器验证，不复用旧版本的客户端／GPU 部署测试作为本轮证据。
+
+## 最大内接矩形性能修复（2026-09-17）
+
+固定上游对每个文字块的整页掩膜执行 Python 柱状图／单调栈扫描。1024×1536、11 块样本累计遍历 17,301,504 个像素位置；实际气泡边界总面积仅 240,627 像素。
+
+[typesetter_geometry.py](../services/classic-engine/typesetter_geometry.py) 先裁剪前景、合并连续相同行，再用 NumPy 批量求柱状图边界；精确保留最大面积和等面积时的下边界、右边界、较高矩形选择。整页输入掩膜仍保留，移除的是逐像素 Python 循环。字号搜索、换行、字形绘制、保护区域及译图缓存语义不变。
+
+同一真实页面输入、固定短译文，CPU 排版每组预热一次、计时五次：
+
+| 方案 | 完整嵌字 | 矩形搜索 |
+| --- | --- | --- |
+| 固定上游 | 3.617 秒 | 3.127 秒 |
+| 有界 NumPy | 0.701 秒 | 0.198 秒 |
+| 固定上游复测 | 3.901 秒 | 3.375 秒 |
+
+矩形、像素、字形及布局全部一致。测试包含独立穷举、固定上游全小掩膜对照、孔洞／分离区域／非连续数组、24MP 稀疏页，以及英／日／简中／繁中长译文。历史图片与报告保留在本机 `private-test-data/typesetter-geometry-20260917/`；短时单图性能不代表所有漫画。
+
+准备包的校验和已更新，运行节点需重新准备并重启；未公开部署。统一模型性能验收与最新耗时见[性能记录](CUDA_ANALYSIS_DIAGNOSIS.md)。
+
+```powershell
+services/classic-engine/.venv/Scripts/python.exe services/classic-engine/prepare_typesetter.py
+$env:PYTHONPATH = "$((Get-Location).Path)/engines/mit-native"
+services/classic-engine/.venv/Scripts/python.exe -m pytest services/classic-engine/test_typesetter_geometry.py services/classic-engine/test_lettering.py -q
+```
 
 ## 交付错误
 

@@ -8,6 +8,7 @@
   "lock_dir": "../../engines/device-locks",
   "torch_interop_threads": 1,
   "inpaint_workers": 1,
+  "neural_acceleration": "portable-v1",
   "runtime": {
     "languages": [
       "zh-Hans",

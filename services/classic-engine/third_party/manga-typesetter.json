@@ -27,7 +27,7 @@
     {
       "path": "rendering/__init__.py",
       "source_sha256": "1dba8699f386eca0da6ef55e6c898ef0ce6dd04a051a36f00e5298e4897184f0",
-      "prepared_sha256": "e1db21af82d8b7d3c4af3c42b39f56857672b2e8ff0284853c13ab87f08fdfee"
+      "prepared_sha256": "90654f9ba10d37fbbaa004a9acbe0b4bb6db6c51dc43219e25f879d9b617c952"
     },
     {
       "path": "rendering/auto_linebreak.py",
@@ -205,5 +205,5 @@
       "prepared_sha256": "ea04182dc4d2da49576f655a068dcacdc01b0aa749e8b348b90ff441e4452342"
     }
   ],
-  "modifications": "Absolute import namespace; render-only package and utility facades; optional dispatch paint and pre-composite layer callbacks; route bounded English to upstream unified balloon fitter; allow translation reflow even for one source line. Fitting, wrapping and glyph algorithms unchanged."
+  "modifications": "Absolute import namespace; render-only package and utility facades; optional dispatch paint and pre-composite layer callbacks; route bounded English to upstream unified balloon fitter; allow translation reflow even for one source line; exact maximum mask rectangle via bounded NumPy geometry with identical tie order. Fitting, wrapping and glyph algorithms unchanged."
 }

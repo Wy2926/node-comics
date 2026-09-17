@@ -73,7 +73,11 @@
 - 代理：复制 [node.example.json](../services/compute-agent/node.example.json) 为私有文件，通过 `NODE_CONFIG_FILE` 指定。文件只含控制地址、节点身份和本机引擎连接；执行位与公共轮询参数来自服务端。
 - NVIDIA：[engine.cuda.example.json](../services/classic-engine/engine.cuda.example.json)。AMD：[engine.directml.example.json](../services/classic-engine/engine.directml.example.json)。通过 `ENGINE_CONFIG_FILE` 指定。相对路径按配置文件目录解析，移动示例后须调整路径。
 - `runtime.languages` 声明启动支持列表；缺失／损坏的所需字典及许可证文件自动下载并按固定长度、SHA-256 校验，原子写入模型缓存；完整文件复用。中日韩不需断词字典；土耳其语、越南语、印尼语采用按词换行。新增语言的 Noto Sans 字体和许可证也在接单前准备并校验。下载失败不接单，翻译过程中不下载。来源与许可见[字典说明](HYPHENATION_DICTIONARIES.md)。
-- `runtime.torch_threads`、`runtime.opencv_threads`、缓存大小和 TTL 可由服务端覆盖并热更新。AMD LaMa 子进程在后续裁剪调用中使用更新后的线程值。
+- `runtime.torch_threads`、`runtime.opencv_threads`、缓存大小和 TTL 可由服务端覆盖并热更新。AMD LaMa 子进程在后续裁剪调用中使用更新后的线程值；CPU／CUDA／优化 DirectML 的分格子进程在下一页使用更新后的 OpenCV 线程值。
+- CPU 与 CUDA 均支持独立 CPU 进程执行分格，与本页检测／OCR 重叠。CUDA 模式由 GPU 执行模型、CPU 处理几何；CPU 模式模型和几何均在 CPU 执行。每引擎仅一个分格子进程，完成或失败均排空当前页。CPU／CUDA OCR 位置编码使用最多 32 MiB／2048 项的有界缓存，按设备、dtype、scale、长度、偏移等隔离；不缓存图片或对白。配置与实测见[分析阶段优化](CUDA_ANALYSIS_DIAGNOSIS.md)。
+- 本机启动项 `neural_acceleration` 可选 `eager`（省略时的默认值）／`portable-v1`（CUDA 示例已启用）。后者保持 FP32，启用 OCR 单批次有界投影缓存／完成结果回传和 LaMa PyTorch 计算图，不引入 TensorRT 或自定义 CUDA 算子。修改后需重启；实际引擎版本自动追加 `-torch-portable-v1`，控制服务应配置匹配版本，避免不同执行方式共用译图缓存。`/health.neural_acceleration` 返回实际执行器、设备、图调用次数和缓存容量／命中；启动图构建或校验失败直接失败，不切 CPU。
+- `portable-v1` 的通用张量代码为后续 PyTorch ROCm 接入保留空间；ROCm 沿用 PyTorch 的 `cuda:0` 设备命名，健康信息按 `torch.version.hip` 报告运行时。AMD 硬件、驱动与 ROCm 软件包仍需单独验收，不能把 NVIDIA 结果视为 AMD 验证。当前 Windows DirectML 保持现有路径，显式拒绝该选项。
+- 本机 CUDA 单进程实测将 OpenCV 从 2 增至 8 线程可缩短检测前滤波；这属于现有 `runtime.opencv_threads` 配置，不改变全局默认。多模型进程、其他 CPU 和 DirectML 节点应按总线程预算另测，不能机械套用 8 线程。
 - `torch_interop_threads`、`inpaint_workers`、设备、路径属于本机启动参数，修改文件后重启引擎。DirectML 支持 1／2 个 LaMa 裁剪进程，CUDA／CPU 当前为 1。修改 DirectML 裁剪进程数会改变引擎版本，控制服务必须配置匹配版本。
 - 一个物理设备共用锁目录；不要通过多个代理复制同一设备容量。配置文件必须只交给部署该节点的操作者，私有文件不提交到仓库。
 

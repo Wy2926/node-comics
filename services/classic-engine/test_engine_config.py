@@ -5,7 +5,7 @@ import os
 from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
-from engine_config import RuntimeConfig, load
+from engine_config import RuntimeConfig, MachineConfig, load
 
 
 def test_file_languages_and_thread_settings_apply_before_model_import(tmp_path, monkeypatch):
@@ -24,6 +24,20 @@ def test_file_languages_and_thread_settings_apply_before_model_import(tmp_path, 
 def test_invalid_runtime_rejected(values):
     with pytest.raises(ValidationError):
         RuntimeConfig.model_validate(values)
+
+
+def test_neural_mode_is_local_validated_and_directml_is_explicitly_excluded(tmp_path, monkeypatch):
+    values = {'resource_id': 'test:cuda:0', 'device': 'cuda:0', 'neural_acceleration': 'portable-v1'}
+    path = tmp_path / 'engine.json'
+    path.write_text(json.dumps(values))
+    monkeypatch.setenv('ENGINE_CONFIG_FILE', str(path))
+    with patch.dict(os.environ):
+        load()
+        assert os.environ['ENGINE_NEURAL_ACCELERATION'] == 'portable-v1'
+    with pytest.raises(ValidationError):
+        MachineConfig.model_validate({**values, 'profile': 'mit-directml'})
+    with pytest.raises(ValidationError):
+        MachineConfig.model_validate({**values, 'neural_acceleration': 'unknown'})
 
 
 def test_failed_dictionary_preparation_does_not_publish_new_runtime():

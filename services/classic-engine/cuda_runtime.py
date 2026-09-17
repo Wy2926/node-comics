@@ -29,7 +29,8 @@ class CudaRuntime:
 
     def evidence(self):
         return {'adapter': torch.cuda.get_device_name(self.device), 'torch': torch.__version__,
-                'runtime': 'cuda-' + str(torch.version.cuda), 'execution_tracing': self.trace,
+                'runtime': ('rocm-' + str(torch.version.hip)) if torch.version.hip else 'cuda-' + str(torch.version.cuda),
+                'execution_tracing': self.trace,
                 'executed': [{'stage': stage, 'device': device, 'calls': calls}
                              for (stage, device), calls in sorted(self.counts.items())]}
 

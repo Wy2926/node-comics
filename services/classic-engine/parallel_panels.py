@@ -6,8 +6,14 @@ utils/sort.py, GPL-3.0; see licenses/manga-image-translator-GPL-3.0.txt.
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import multiprocessing
 
-from manga_translator.utils.panel import get_panels_from_array
+from panel_geometry import get_panels_from_array
 from manga_translator.utils.sort import _simple_sort, _sort_panels_fill, sort_regions
+
+
+def detect_panels(image, right_to_left, opencv_threads):
+    import cv2
+    cv2.setNumThreads(opencv_threads)
+    return get_panels_from_array(image, rtl=right_to_left)
 
 
 class ParallelPanels:
@@ -16,14 +22,15 @@ class ParallelPanels:
     The caller owns the device/stage lock. Finish each future before releasing it,
     including no-text and failed pages, so images cannot accumulate in the queue.
     """
-    def __init__(self, mode='process'):
+    def __init__(self, mode='process', opencv_threads=2):
+        self.opencv_threads = opencv_threads
         if mode == 'thread':
             self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='panels')
         else:
             self.executor = ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context('spawn'))
 
     def submit(self, image, right_to_left):
-        return self.executor.submit(get_panels_from_array, image, rtl=right_to_left)
+        return self.executor.submit(detect_panels, image, right_to_left, self.opencv_threads)
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)

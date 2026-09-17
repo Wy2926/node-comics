@@ -1,7 +1,8 @@
 """Prepare the complete pinned Manga Translator UI layout/rendering modules.
 
 Package imports, input/paint boundaries and two default layout policies change.
-Upstream wrapping, fitting, vertical typography and glyph algorithms stay intact.
+Exact rectangle search uses bounded NumPy geometry; upstream wrapping, fitting,
+vertical typography and glyph algorithms stay intact.
 """
 import argparse
 import hashlib
@@ -66,6 +67,12 @@ def prepare(source=None, destination=None):
                 raise RuntimeError('Typesetter English routing patch no longer matches')
             content = content.replace(selector, selector +
                 "    if config and config.render.layout_mode == 'balloon_fill' and config.render.balloon_fill_mask_layout:\n        return False\n")
+            # Preserve exact rectangle/tie results, without scanning a full page
+            # in Python for every text block. Keep this in the checked package
+            # preparation rather than mutating the downloaded source checkout.
+            start = content.index('def find_largest_inscribed_rect(mask: np.ndarray) -> tuple:\n')
+            end = content.index('\ndef parse_font_paths(', start)
+            content = (content[:start] + 'from typesetter_geometry import find_largest_inscribed_rect\n\n' + content[end:])
         if relative.as_posix() == 'rendering/auto_linebreak.py':
             selector = 'def should_force_no_wrap_single_region(region: Any) -> bool:\n'
             if content.count(selector) != 1:
@@ -90,7 +97,7 @@ def prepare(source=None, destination=None):
     (destination / 'LICENSE-GPL-3.0.txt').write_bytes(license_raw)
     manifest = {'repository': REPOSITORY, 'revision': REVISION, 'license': 'GPL-3.0',
                 'license_sha256': hashlib.sha256(license_raw).hexdigest(), 'files': records,
-                'modifications': 'Absolute import namespace; render-only package and utility facades; optional dispatch paint and pre-composite layer callbacks; route bounded English to upstream unified balloon fitter; allow translation reflow even for one source line. Fitting, wrapping and glyph algorithms unchanged.'}
+                'modifications': 'Absolute import namespace; render-only package and utility facades; optional dispatch paint and pre-composite layer callbacks; route bounded English to upstream unified balloon fitter; allow translation reflow even for one source line; exact maximum mask rectangle via bounded NumPy geometry with identical tie order. Fitting, wrapping and glyph algorithms unchanged.'}
     if LOCK.exists() and json.loads(LOCK.read_text(encoding='utf-8')) != manifest:
         raise RuntimeError('Typesetter source differs from the reviewed checksum manifest')
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')

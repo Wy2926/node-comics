@@ -43,6 +43,11 @@ if INPAINT_WORKERS not in (1, 2):
     raise ValueError('ENGINE_INPAINT_WORKERS must be 1 or 2')
 AMD_VERSION = 'mit-95227a2-classic-v4-dml-v8-qt-roi' if INPAINT_WORKERS == 2 else ('mit-95227a2-classic-v4-dml-v3-qt-roi' if DIRECTML_OPTIMIZED else 'mit-95227a2-classic-v4-dml-v1-qt-roi')
 VERSION = os.environ.get('ENGINE_VERSION', AMD_VERSION if PROFILE == 'mit-directml' else 'mit-95227a2-classic-v9-qt-roi')
+NEURAL_MODE = os.environ.get('ENGINE_NEURAL_ACCELERATION', 'eager')
+if NEURAL_MODE not in ('eager', 'portable-v1') or (PROFILE == 'mit-directml' and NEURAL_MODE != 'eager'):
+    raise ValueError('Unsupported ENGINE_NEURAL_ACCELERATION for this profile')
+if NEURAL_MODE != 'eager':
+    VERSION += '-torch-portable-v1'
 DEVICE = os.environ.get('ENGINE_DEVICE', 'cpu')
 if DEVICE == 'cuda':
     DEVICE = 'cuda:0'
@@ -62,11 +67,13 @@ device_evidence = None
 panel_worker = None
 inpaint_pool = None
 dictionary_store = None
+position_cache = None
+neural_runtime = None
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store
+    global ready, device_evidence, panel_worker, inpaint_pool, dictionary_store, position_cache, neural_runtime
     logging.disable(logging.CRITICAL)  # Upstream OCR log messages include dialogue.
     torch.set_num_threads(LOCAL_RUNTIME.torch_threads)
     torch.set_num_interop_threads(INTEROP_THREADS)
@@ -101,6 +108,12 @@ async def lifespan(app):
             else:
                 for model in models.values():
                     await model.load(DEVICE)
+            if PROFILE == 'mit':
+                from ocr_position_cache import PositionCache
+                position_cache = PositionCache(models['ocr'].model)
+            import manga_translator.mask_refinement as mask_refinement
+            from mask_geometry import complete_mask
+            mask_refinement.complete_mask = complete_mask
             # Warm both device pipelines before reporting admission readiness.
             sample = np.full((256, 256, 3), 255, np.uint8)
             await models['detector'].detect(sample, 256, 0.5, 0.7, 2.3, False, False, False, False, False)
@@ -109,14 +122,19 @@ async def lifespan(app):
             if INPAINT_WORKERS == 1:
                 await models['inpainter'].inpaint(sample, warm_mask, InpainterConfig(inpainting_precision='fp32'), 256, False)
     try:
+        if NEURAL_MODE == 'portable-v1':
+            from neural_acceleration import NeuralAcceleration
+            async with lock.hold():
+                with open(os.devnull, 'w') as sink, redirect_stdout(sink), redirect_stderr(sink):
+                    neural_runtime = NeuralAcceleration(models)
         if INPAINT_WORKERS == 2:
             from parallel_lama import ParallelLama
             async with lock.hold():
                 inpaint_pool = ParallelLama(threads=int(os.environ.get('OMP_NUM_THREADS', '4')))
                 inpaint_pool.warm()
-        if DIRECTML_OPTIMIZED:
+        if PROFILE == 'mit' or DIRECTML_OPTIMIZED:
             from parallel_panels import ParallelPanels
-            panel_worker = ParallelPanels()
+            panel_worker = ParallelPanels(opencv_threads=LOCAL_RUNTIME.opencv_threads)
             # Spawn/import CPU helper before admitting the first real page.
             panel_worker.submit(sample, True).result()
         ready = True
@@ -133,6 +151,12 @@ async def lifespan(app):
             inpaint_pool = None
         cache.entries.clear()
         cache.size = 0
+        if neural_runtime:
+            neural_runtime.close()
+            neural_runtime = None
+        if position_cache:
+            position_cache.close()
+            position_cache = None
         models.clear()
         if device_evidence:
             device_evidence.close()
@@ -160,6 +184,9 @@ def health():
             'cuda': {'available': torch.cuda.is_available(), 'device_name': torch.cuda.get_device_name(DEVICE),
                      'torch_version': torch.__version__} if DEVICE.startswith('cuda') else None,
             'panel_execution': 'parallel-process' if panel_worker else 'serial',
+            'analysis_runtime': 'bounded-panels-mask-xpos-v1',
+            'ocr_position_cache': position_cache.describe() if position_cache else None,
+            'neural_acceleration': neural_runtime.describe() if neural_runtime else {'implementation': 'eager'},
             'input_cache_protocol': 1,
             'hyphenation': dictionary_store.describe() if dictionary_store else None,
             'inpaint_workers': inpaint_pool.evidence() if inpaint_pool else [],
@@ -187,6 +214,8 @@ async def configure(request: Request):
         async with lock.hold():
             torch.set_num_threads(updated.torch_threads)
             cv2.setNumThreads(updated.opencv_threads)
+            if panel_worker:
+                panel_worker.opencv_threads = updated.opencv_threads
             if inpaint_pool:
                 inpaint_pool.threads = updated.torch_threads
                 inpaint_pool.opencv_threads = updated.opencv_threads
