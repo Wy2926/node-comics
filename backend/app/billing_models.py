@@ -46,6 +46,16 @@ class BillingSubscription(Base):
     cancel_at: Mapped[datetime | None] = mapped_column(DateTime)
     provider_updated_at: Mapped[datetime] = mapped_column(DateTime)
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    transactions_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class BillingTransaction(Base):
+    """Last completed transaction revision applied atomically with its quota grant."""
+    __tablename__ = 'billing_transactions'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    subscription_id: Mapped[str] = mapped_column(ForeignKey('billing_subscriptions.id'), index=True)
+    provider_updated_at: Mapped[datetime] = mapped_column(DateTime)
+    processed_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class BillingEvent(Base):

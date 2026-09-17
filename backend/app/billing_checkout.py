@@ -36,8 +36,13 @@ def recover_checkout(checkout_id):
         # Give an in-flight creating request time to finish before reconciliation.
         if checkout.status == 'creating' and checkout.created_at > now() - timedelta(seconds=30):
             raise paddle.PaddleError('PADDLE_CHECKOUT_PENDING')
-    transactions = paddle.request('GET', '/transactions?per_page=200&order_by=id[DESC]')
-    matches = [t for t in transactions if intent_id(t) == checkout_id]
+    # An unknown POST can only have created a transaction after this local intent.
+    # Include a small clock-skew window, and search every page before binding it.
+    filters = {'created_at[GTE]': iso(checkout.created_at - timedelta(minutes=5))}
+    matches = []
+    for transactions in paddle.transaction_pages(**filters):
+        matches.extend(t for t in transactions if intent_id(t) == checkout_id)
+        require(len(matches) <= 1, 'PADDLE_CHECKOUT_UNCERTAIN')
     require(len(matches) == 1, 'PADDLE_CHECKOUT_UNCERTAIN')
     transaction = matches[0]
     with session_factory()() as db:

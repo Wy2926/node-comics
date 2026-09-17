@@ -2,11 +2,11 @@
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import or_, select, update
 from . import paddle_client as paddle
-from .billing_models import BillingAccount, BillingCheckout, BillingEvent, BillingSubscription
+from .billing_models import BillingAccount, BillingCheckout, BillingEvent, BillingSubscription, BillingTransaction
 from .config import settings
 from .db import session_factory
 from .entitlement_models import QuotaPeriod
-from .entitlements import locked_user, MONTHLY
+from .entitlements import locked_user, iso, MONTHLY
 from .models import now
 from .providers import digest
 
@@ -81,31 +81,71 @@ def grant_period(db, user, key, start, end, pages, note):
     return period
 
 
-def reconcile_snapshot(subscription, transaction=None):
+def apply_transactions(db, user, sub, transactions):
+    """Apply one page under the account lock, skipping already committed revisions."""
+    receipts = {row.id: row for row in db.scalars(select(BillingTransaction).where(
+        BillingTransaction.id.in_([t['id'] for t in transactions])))} if transactions else {}
+    access_changed = False
+    for transaction in transactions:
+        require(transaction.get('subscription_id') == sub.id
+                and transaction.get('customer_id') == sub.customer_id)
+        updated = timestamp(transaction.get('updated_at'))
+        require(updated is not None, 'PADDLE_INVALID_TIMESTAMP')
+        receipt = receipts.get(transaction['id'])
+        if receipt is not None:
+            require(receipt.subscription_id == sub.id)
+            if receipt.provider_updated_at >= updated:
+                continue
+        approved_item(transaction)
+        if transaction.get('status') != 'completed':
+            continue
+        totals = (transaction.get('details') or {}).get('totals') or {}
+        dates = transaction.get('billing_period') or {}
+        start, end = timestamp(dates.get('starts_at')), timestamp(dates.get('ends_at'))
+        # Zero-value trial invoices and prorations do not mint a monthly bucket.
+        total = totals.get('grand_total')
+        require(isinstance(total, str) and total.isdigit(), 'PADDLE_TOTAL_INVALID')
+        if int(total) > 0 and start and end and timedelta(days=27) <= end-start <= timedelta(days=32):
+            key = f'paddle:paid:{sub.id}:{start.isoformat()}:{end.isoformat()}'
+            grant_period(db, user, key, start, end, 300, 'PLUS 已付款月账期 · 300 页重绘')
+            if sub.paid_ends_at is None or end > sub.paid_ends_at:
+                sub.paid_starts_at, sub.paid_ends_at = start, end
+            trial = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
+                QuotaPeriod.source_key == 'paddle:trial:' + sub.id))
+            if trial and start < trial.ends_at:
+                trial.ends_at = max(trial.starts_at + timedelta(microseconds=1), start)
+            access_changed = True
+        if receipt is None:
+            receipt = BillingTransaction(id=transaction['id'], subscription_id=sub.id, provider_updated_at=updated)
+            db.add(receipt)
+            receipts[receipt.id] = receipt
+        receipt.provider_updated_at, receipt.processed_at = updated, now()
+    return access_changed
+
+
+def reconcile_snapshot(subscription, transactions=()):
     cfg = settings()
     sub_id = subscription['id']
     with session_factory()() as db:
         known = db.get(BillingSubscription, sub_id)
-        checkout = db.get(BillingCheckout, known.checkout_id if known else intent_id(subscription))
+        checkout_id = known.checkout_id if known else intent_id(subscription)
+        checkout = db.get(BillingCheckout, checkout_id) if checkout_id else None
         if checkout is None:
             raise paddle.PaddleError('PADDLE_ACCOUNT_UNBOUND')
         checkout_id, owner_id, original_id = checkout.id, checkout.owner_id, checkout.transaction_id
+        expected_price = checkout.price_id
         require(checkout.environment == cfg.paddle_environment)
         known_id = known.id if known else None
     if not known_id:
         require(original_id is not None, 'PADDLE_CHECKOUT_PENDING')
-        original = transaction if transaction and transaction.get('id') == original_id else paddle.request('GET', '/transactions/' + original_id)
+        original = next((t for t in transactions if t['id'] == original_id), None)
+        if original is None:
+            original = paddle.request('GET', '/transactions/' + original_id)
         require(original.get('subscription_id') == sub_id and original.get('status') == 'completed'
                 and intent_id(original) == checkout_id, 'PADDLE_CHECKOUT_PENDING')
-        with session_factory()() as db:
-            expected_price = db.get(BillingCheckout, checkout_id).price_id
         approved_item(original, expected_price)
         require(original.get('customer_id') == subscription.get('customer_id'))
     approved_item(subscription)
-    if transaction:
-        approved_item(transaction)
-        require(transaction.get('subscription_id') == sub_id
-                and transaction.get('customer_id') == subscription.get('customer_id'))
     with session_factory()() as db:
         user = locked_user(db, owner_id)
         checkout = db.get(BillingCheckout, checkout_id)
@@ -115,6 +155,7 @@ def reconcile_snapshot(subscription, transaction=None):
         account.customer_id = subscription['customer_id']
         sub = db.get(BillingSubscription, sub_id)
         updated = timestamp(subscription['updated_at'])
+        require(updated is not None, 'PADDLE_INVALID_TIMESTAMP')
         if sub is None:
             sub = BillingSubscription(id=sub_id, owner_id=owner_id, checkout_id=checkout_id,
                 environment=cfg.paddle_environment, customer_id=account.customer_id,
@@ -129,40 +170,36 @@ def reconcile_snapshot(subscription, transaction=None):
             change = subscription.get('scheduled_change') or {}
             sub.cancel_at = timestamp(change.get('effective_at')) if change.get('action') == 'cancel' else None
         sub.synced_at = now()
+        access_changed = False
         if subscription['status'] == 'trialing' and sub.trial_starts_at is None and sub.paid_ends_at is None:
             require(checkout.trial and account.trial_used_at is None, 'PADDLE_TRIAL_ALREADY_USED')
-            dates = subscription['items'][0].get('trial_dates') or subscription.get('current_billing_period') or {}
+            dates = subscription['items'][0].get('trial_dates') or {}
             start, end = timestamp(dates.get('starts_at')), timestamp(dates.get('ends_at'))
             require(start and end and timedelta(0) < end - start <= timedelta(days=7, minutes=1), 'PADDLE_TRIAL_PERIOD_INVALID')
             grant_period(db, user, 'paddle:trial:' + sub_id, start, end, 30, 'PLUS 7 天试用 · 30 页重绘')
             sub.trial_starts_at, sub.trial_ends_at = start, end
+            access_changed = True
         if checkout.trial:
             account.trial_used_at = account.trial_used_at or now()
-        if transaction and transaction.get('status') == 'completed':
-            totals = (transaction.get('details') or {}).get('totals') or {}
-            dates = transaction.get('billing_period') or {}
-            start, end = timestamp(dates.get('starts_at')), timestamp(dates.get('ends_at'))
-            # Zero-value trial invoices and prorations do not mint a monthly bucket.
-            total = totals.get('grand_total', totals.get('total', '0'))
-            if str(total).isdigit() and int(total) > 0 and start and end and timedelta(days=27) <= end-start <= timedelta(days=32):
-                key = f'paddle:paid:{sub_id}:{start.isoformat()}:{end.isoformat()}'
-                grant_period(db, user, key, start, end, 300, 'PLUS 已付款月账期 · 300 页重绘')
-                if sub.paid_ends_at is None or end > sub.paid_ends_at:
-                    sub.paid_starts_at, sub.paid_ends_at = start, end
-                trial = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == owner_id,
-                    QuotaPeriod.source_key == 'paddle:trial:' + sub_id))
-                if trial and start < trial.ends_at:
-                    trial.ends_at = max(trial.starts_at + timedelta(microseconds=1), start)
+        access_changed = apply_transactions(db, user, sub, transactions) or access_changed
         if sub.trial_starts_at is not None or sub.paid_ends_at is not None:
             checkout.status, checkout.error_code = 'completed', None
         checkout.last_checked_at = now()
-        project_access(db, user)
+        if access_changed or (user.billing_plus_expires_at and user.billing_plus_expires_at <= now()):
+            project_access(db, user)
         db.commit()
 
 
 def sync_transaction(transaction_id):
     transaction = paddle.request('GET', '/transactions/' + transaction_id)
     with session_factory()() as db:
+        receipt = db.get(BillingTransaction, transaction_id)
+        if receipt is not None:
+            require(receipt.subscription_id == transaction.get('subscription_id'))
+            updated = timestamp(transaction.get('updated_at'))
+            require(updated is not None, 'PADDLE_INVALID_TIMESTAMP')
+            if receipt.provider_updated_at >= updated:
+                return
         checkout = db.scalar(select(BillingCheckout).where(BillingCheckout.transaction_id == transaction_id))
         if checkout:
             checkout.last_checked_at = now()
@@ -171,16 +208,31 @@ def sync_transaction(transaction_id):
             db.commit()
     if transaction.get('subscription_id'):
         subscription = paddle.request('GET', '/subscriptions/' + transaction['subscription_id'])
-        reconcile_snapshot(subscription, transaction)
+        reconcile_snapshot(subscription, [transaction])
 
 
 def sync_subscription(subscription_id):
+    # A watermark is the scan START, never the newest returned transaction. A
+    # completion behind a page cursor must still be picked up by the next scan.
+    started = now()
+    with session_factory()() as db:
+        known = db.get(BillingSubscription, subscription_id)
+        watermark = known.transactions_synced_at if known else None
     subscription = paddle.request('GET', '/subscriptions/' + subscription_id)
-    reconcile_snapshot(subscription)
-    transactions = paddle.request('GET', '/transactions?subscription_id=' + subscription_id + '&status=completed&per_page=50')
-    # All returned paid periods are idempotent, including catch-up after lost events.
-    for transaction in transactions:
-        reconcile_snapshot(subscription, transaction)
+    filters = {'subscription_id': subscription_id, 'status': 'completed'}
+    if watermark:
+        # Inclusive overlap tolerates clock skew and delayed list visibility.
+        filters['updated_at[GTE]'] = iso(watermark - timedelta(minutes=5))
+    for transactions in paddle.transaction_pages(**filters):
+        reconcile_snapshot(subscription, transactions)
+    # Partial failures retain the old cursor. Committed page receipts make replay
+    # cheap, and an overlapping older scan cannot move progress backwards.
+    with session_factory()() as db:
+        db.execute(update(BillingSubscription).where(BillingSubscription.id == subscription_id,
+            or_(BillingSubscription.transactions_synced_at.is_(None),
+                BillingSubscription.transactions_synced_at < started))
+            .values(transactions_synced_at=started))
+        db.commit()
 
 
 def process_event(event_id):

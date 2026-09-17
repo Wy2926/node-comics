@@ -1,10 +1,11 @@
 """Billing account binding and atomic quota settlement with isolated Paddle contracts."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 import copy
 import hashlib
 import hmac
 import json
 import time
+import httpx
 import pytest
 from sqlalchemy import select, func
 from conftest import login
@@ -29,7 +30,8 @@ def billing(monkeypatch, request):
     client = request.getfixturevalue('client')
     from app.models import now
     from app import paddle_client
-    state = {'posts':0, 'at':now(), 'transactions':{}, 'sub':None, 'uncertain':False}
+    state = {'posts':0, 'at':now(), 'transactions':{}, 'sub':None, 'uncertain':False,
+             'requests':[], 'listed_sizes':[]}
     def price(price_id):
         return {'id':price_id, 'product_id':PRODUCT, 'unit_price':{'amount':'999','currency_code':'USD'},
             'billing_cycle':{'interval':'month','frequency':1},
@@ -41,23 +43,50 @@ def billing(monkeypatch, request):
         if method == 'POST' and path == '/transactions':
             state['posts'] += 1
             transaction = {'id':TXN, 'status':'draft', 'subscription_id':None, 'customer_id':CUSTOMER,
+                'created_at':now().isoformat()+'Z', 'updated_at':now().isoformat()+'Z',
                 'currency_code':'USD', 'custom_data':body['custom_data'],
                 'items':[{'price':price(body['items'][0]['price_id']), 'quantity':1}]}
             state['transactions'][TXN] = transaction
             if state['uncertain']:
-                raise paddle_client.PaddleError(uncertain=True)
+                raise httpx.ReadTimeout('isolated lost POST response')
             return copy.deepcopy(transaction)
         if path.startswith('/transactions/'):
             return copy.deepcopy(state['transactions'][path.split('/')[-1]])
-        if path.startswith('/transactions?'):
-            return copy.deepcopy([v for v in state['transactions'].values() if 'status=completed' not in path or v['status']=='completed'])
         if method == 'POST' and path.endswith('/cancel'):
             state['sub']['scheduled_change']={'action':'cancel','effective_at':state['sub']['current_billing_period']['ends_at']}
             return copy.deepcopy(state['sub'])
         if path.startswith('/subscriptions/'):
             return copy.deepcopy(state['sub'])
         raise AssertionError((method,path))
-    monkeypatch.setattr(paddle_client, 'request', api)
+    def handle(request):
+        method, path, params = request.method, request.url.path, dict(request.url.params)
+        state['requests'].append((method, path, params))
+        if method == 'GET' and path == '/transactions':
+            if params.get('after') and state.get('fail_next_page'):
+                return httpx.Response(503, json={'error':{'code':'service_unavailable'}})
+            rows = list(state['transactions'].values())
+            for key in ('status', 'subscription_id'):
+                if key in params:
+                    rows = [row for row in rows if row.get(key) == params[key]]
+            for key in ('created_at', 'updated_at'):
+                if key+'[GTE]' in params:
+                    cutoff = datetime.fromisoformat(params[key+'[GTE]'].replace('Z', '+00:00'))
+                    rows = [row for row in rows if datetime.fromisoformat(row[key].replace('Z', '+00:00')) >= cutoff]
+            descending = params.get('order_by', 'id[DESC]') == 'id[DESC]'
+            rows.sort(key=lambda row: row['id'], reverse=descending)
+            if params.get('after'):
+                rows = [row for row in rows if (row['id'] < params['after'] if descending else row['id'] > params['after'])]
+            size = min(int(params.get('per_page', 30)), 30)
+            more, rows = len(rows) > size, rows[:size]
+            state['listed_sizes'].append(len(rows))
+            next_url = str(request.url.copy_set_param('after', rows[-1]['id'])) if more else None
+            return httpx.Response(200, json={'data':copy.deepcopy(rows), 'meta':{'pagination':{
+                'has_more':more, 'next':next_url, 'per_page':size}}})
+        data = api(method, path, json.loads(request.content) if request.content else None)
+        return httpx.Response(200, json={'data':data})
+    real_client = httpx.Client
+    monkeypatch.setattr(paddle_client.httpx, 'Client',
+        lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
     state['auth'] = login(client, 'buyer')
     state['owner_id'] = client.get('/v1/me', headers=state['auth']).json()['user']['id']
     state['client'] = client
@@ -71,7 +100,9 @@ def complete_trial(state):
     at = state['at']
     dates = {'starts_at':at.isoformat()+'Z', 'ends_at':(at+timedelta(days=7)).isoformat()+'Z'}
     transaction = state['transactions'][TXN]
-    transaction.update(status='completed', subscription_id=SUB, billing_period=dates, details={'totals':{'grand_total':'0'}})
+    from app.models import now
+    transaction.update(status='completed', subscription_id=SUB, billing_period=dates,
+        updated_at=now().isoformat()+'Z', details={'totals':{'grand_total':'0'}})
     state['sub'] = {'id':SUB,'customer_id':CUSTOMER,'status':'trialing','currency_code':'USD',
         'custom_data':transaction['custom_data'], 'items':[{'price':state['price'](TRIAL),'quantity':1,'trial_dates':dates}],
         'current_billing_period':dates, 'next_billed_at':dates['ends_at'], 'updated_at':at.isoformat()+'Z'}
@@ -92,10 +123,11 @@ def rights(state):
 
 
 def paid_transaction(state, suffix='h', start=None):
+    from app.models import now
     start = start or state['at'] + timedelta(seconds=1)
     txn_id = 'txn_' + suffix * 26
     transaction = copy.deepcopy(state['transactions'][TXN])
-    transaction.update(id=txn_id, status='completed', details={'totals':{'grand_total':'999'}},
+    transaction.update(id=txn_id, status='completed', updated_at=now().isoformat()+'Z', details={'totals':{'grand_total':'999'}},
         billing_period={'starts_at':start.isoformat()+'Z','ends_at':(start+timedelta(days=30)).isoformat()+'Z'})
     state['transactions'][txn_id] = transaction
     state['sub'].update(status='active', updated_at=(start+timedelta(seconds=1)).isoformat()+'Z',
@@ -333,3 +365,38 @@ def test_startup_rejects_mixing_billing_environments_in_one_database(billing):
     settings().paddle_environment = 'production'
     with pytest.raises(RuntimeError, match='isolated database'):
         initialize()
+
+
+def test_missing_grand_total_cannot_fall_back_to_total(billing):
+    from app import paddle_client
+    from app.billing_sync import sync_transaction
+    from app.billing_models import BillingTransaction
+    from app.db import session_factory
+    complete_trial(billing); deliver(billing)
+    txn_id = paid_transaction(billing, start=billing['at'])
+    billing['transactions'][txn_id]['details']['totals'] = {'total':'999'}
+    with pytest.raises(paddle_client.PaddleError, match='PADDLE_TOTAL_INVALID'):
+        sync_transaction(txn_id)
+    with session_factory()() as db:
+        assert db.get(BillingTransaction, txn_id) is None
+    assert rights(billing)['modes']['redraw']['quota']['available'] == 30
+
+
+def test_missing_trial_dates_cannot_fall_back_to_billing_period(billing):
+    from app import paddle_client
+    from app.billing_sync import sync_subscription
+    complete_trial(billing)
+    billing['sub']['items'][0].pop('trial_dates')
+    with pytest.raises(paddle_client.PaddleError, match='PADDLE_TRIAL_PERIOD_INVALID'):
+        sync_subscription(SUB)
+    assert rights(billing)['plan'] == 'free'
+
+
+@pytest.mark.parametrize('body, expected', [(b'not-json', 400), (b'[]', 400), (b'{}', 400),
+                                           (b'x'*(1024*1024+1), 413)], ids=['invalid-json', 'array', 'missing-fields', 'oversized'])
+def test_business_webhook_rejects_invalid_signed_body_and_size(billing, body, expected):
+    stamp = str(int(time.time()))
+    signature = hmac.new(SECRET.encode(), stamp.encode()+b':'+body, hashlib.sha256).hexdigest()
+    response = billing['client'].post('/webhooks/paddle', content=body,
+        headers={'Paddle-Signature':f'ts={stamp};h1={signature}'})
+    assert response.status_code == expected

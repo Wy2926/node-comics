@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import re
 import time
+from urllib.parse import urlencode
 import httpx
 from .config import settings
 
@@ -13,7 +14,7 @@ class PaddleError(Exception):
         self.code, self.uncertain = code, uncertain
 
 
-def request(method, path, body=None):
+def _request(method, path, body=None):
     cfg = settings()
     if not cfg.paddle_enabled:
         raise PaddleError('BILLING_DISABLED')
@@ -35,9 +36,42 @@ def request(method, path, body=None):
         code = code if isinstance(code, str) and re.fullmatch(r'[a-z_]{1,60}', code) else 'upstream_error'
         raise PaddleError('PADDLE_' + code.upper(), uncertain=method != 'GET' and response.status_code >= 500)
     try:
-        return response.json()['data']
-    except (ValueError, KeyError):
+        value = response.json()
+        if not isinstance(value, dict) or not isinstance(value.get('data'), (dict, list)):
+            raise ValueError()
+        return value
+    except ValueError:
         raise PaddleError(uncertain=method != 'GET') from None
+
+
+def request(method, path, body=None):
+    data = _request(method, path, body)['data']
+    if not isinstance(data, dict):
+        raise PaddleError(uncertain=method != 'GET')
+    return data
+
+
+def transaction_pages(**filters):
+    """Keep filters across cursor pages; never follow an upstream URL with credentials."""
+    params = {'per_page': 30, 'order_by': 'id[ASC]', **filters}
+    while True:
+        value = _request('GET', '/transactions?' + urlencode(params))
+        rows = value['data']
+        meta = value.get('meta')
+        pagination = meta.get('pagination') if isinstance(meta, dict) else None
+        more = pagination.get('has_more') if isinstance(pagination, dict) else None
+        if not isinstance(rows, list) or not isinstance(more, bool):
+            raise PaddleError('PADDLE_INVALID_PAGINATION')
+        if more:
+            cursor = rows[-1].get('id') if rows and isinstance(rows[-1], dict) else None
+            previous = params.get('after')
+            if (not isinstance(cursor, str) or not re.fullmatch(r'txn_[a-z0-9]{26}', cursor)
+                    or (previous and cursor <= previous)):
+                raise PaddleError('PADDLE_INVALID_PAGINATION')
+            params['after'] = cursor
+        yield rows
+        if not more:
+            return
 
 
 def valid_signature(body, header, secret, at=None):

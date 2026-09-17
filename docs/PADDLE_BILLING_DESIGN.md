@@ -166,9 +166,9 @@ paddle.Checkout.open({
 
 ## 10. Cloudflare 临时隧道与沙盒回调探针（历史通路验证）
 
-用户已选择通过本机 Cloudflare 临时 HTTPS 隧道联调。新增 [独立接收脚本](../scripts/paddle_sandbox_webhook.py)，仅绑定 `127.0.0.1:18764`，不连接业务数据库、不发放会员和额度。公开端点只有 `GET /health` 和 `POST /webhooks/paddle`；未配置 secret 时拒绝接收，校验原始请求体的 HMAC-SHA256 签名与 300 秒时间容差，限制请求体为 1 MiB。
+早期通过本机 Cloudflare 临时 HTTPS 隧道与独立投递探针验证通路。2026-09-17 已删除该探针及独立测试，只保留 [完整沙盒服务](../scripts/paddle_sandbox_server.py) 与正式业务 Webhook，实现和验证入口见第 11、12 节。
 
-通过验签后，在忽略的 `artifacts/paddle/webhook-receipts.sqlite` 保存事件 ID、类型、资源 ID、发生／接收时间与投递次数，不保存完整请求、客户资料、签名或密钥。相同事件 ID 只保留一条记录；模拟器的 `ntfsimevt_` 与平台的 `evt_` 事件明确区分。本工具是投递探针，不能作为已实现权益结算的证据。
+历史探针记录位于忽略的 `artifacts/paddle/webhook-receipts.sqlite`，只用于证明当时投递与验签通路，不能作为权益结算证据，也不会导入业务库。
 
 已通过 API 创建通知目标：
 
@@ -179,7 +179,7 @@ paddle.Checkout.open({
 | Notification type | Webhook（API `type=url`） |
 | URL | 本地 `.env.paddle.sandbox` 的 `PADDLE_WEBHOOK_URL`；同时记录于 `artifacts/paddle/notification-destination.json` |
 | API version | 1 |
-| Usage type | 平台和模拟事件（API `traffic_source=all`），仅用于本隔离沙盒探针 |
+| Usage type | 平台和模拟事件（API `traffic_source=all`），仅用于隔离沙盒 |
 | 敏感字段 | 关闭 `include_sensitive_fields` |
 | 事件 | 全部 8 种 subscription 事件；transaction 的 completed、payment_failed、past_due、canceled；adjustment 的 created、updated |
 
@@ -188,8 +188,7 @@ paddle.Checkout.open({
 从仓库根目录可重复运行本地服务与检查：
 
 ```powershell
-backend/.venv/Scripts/python.exe -m unittest discover -s scripts -p test_paddle_sandbox_webhook.py -v
-backend/.venv/Scripts/python.exe scripts/paddle_sandbox_webhook.py
+backend/.venv/Scripts/python.exe scripts/paddle_sandbox_server.py
 # 在另一个终端运行；已有服务运行时不要重复启动。
 artifacts/paddle/tools/cloudflared-windows-amd64.exe tunnel --url http://127.0.0.1:18764 --no-autoupdate --protocol http2
 ```
@@ -198,11 +197,11 @@ artifacts/paddle/tools/cloudflared-windows-amd64.exe tunnel --url http://127.0.0
 
 本机默认 DNS 无法解析 tunnel 的 SRV 记录；本次用 `Resolve-DnsName region1.v2.argotunnel.com -Type A -Server 1.1.1.1` 获取官方边缘地址，并为该临时进程增加 `--edge 198.41.192.67:7844 --no-prechecks` 完成连接，未修改系统 DNS 或关闭 TLS 验证。该地址是本次查询结果，后续不可假定永久有效。后台进程 ID 记录于 `artifacts/paddle/processes.json`。
 
-验证结果：8 项本地测试通过（签名、时间容差、无配置拒绝、体积限制、模拟事件格式、并发重复和重启恢复等）；Paddle 模拟器实际经隧道投递 `subscription.trialing`、`transaction.completed`、`subscription.canceled`，三项均返回 HTTP 200 且在本地生成已验签回执。结果见 `artifacts/paddle/webhook-verification.json`。未发起真实用户绑卡、真实付款或权益发放。客户端月付说明通过 TypeScript／模块检查与 Chrome 桌面、390px 窄屏检查，截图位于 `artifacts/paddle/plus-monthly-*.png`。
+历史验证结果：当时探针的 8 项本地测试通过；Paddle 模拟器实际经隧道投递 `subscription.trialing`、`transaction.completed`、`subscription.canceled`，三项均返回 HTTP 200 且在本地生成已验签回执。结果见 `artifacts/paddle/webhook-verification.json`。未发起真实用户绑卡、真实付款或权益发放。客户端月付说明通过 TypeScript／模块检查与 Chrome 桌面、390px 窄屏检查，截图位于 `artifacts/paddle/plus-monthly-*.png`。
 
 ## 11. 业务权益接入与当前验收
 
-新增迁移 `shared_0005_paddle_billing`，在现有新集群数据库上追加支付表及独立订阅权益字段，不覆盖运营会员字段。启用需设置 `.env.example` 中全部 `PADDLE_*` 配置；沙盒只允许隔离的 development/test 服务，生产禁止使用沙盒密钥。API 和维护服务必须使用相同配置及数据库。
+当前支付迁移为 `shared_0005_billing`，直接创建当前支付表及独立订阅权益字段。此前支付表结构不提供升级兼容；旧支付沙盒需新建隔离数据库。启用需设置 `.env.example` 中全部 `PADDLE_*` 配置；沙盒只允许隔离的 development/test 服务，生产禁止使用沙盒密钥。API 和维护服务必须使用相同配置及数据库。
 
 已实现的接口与职责：
 
@@ -241,3 +240,29 @@ cd backend
 完整业务接收器的在线通路已另行验证：Paddle 模拟事件通过现有 HTTPS 隧道投递成功，业务库记录 `ignored / SIMULATION`，额度桶数量保持 0；见 `artifacts/paddle/business-webhook-verification.json`。这验证了业务接收器的实际验签与模拟事件隔离，仍不替代真实绑卡测试。
 
 最终本地回归：后端 505 项通过、86 项按环境条件跳过（包含 16 项支付和 2 项新旧库迁移）；扩展 236 项、独立后台 5 项测试通过，扩展类型／模块检查及两端构建通过。PostgreSQL 和需外部资源的跳过项不记为已验证。
+
+## 12. 增量对账与公共实现
+
+2026-09-17：删除旧投递探针及独立测试，验签只保留正式 `paddle_client.valid_signature`。完整沙盒服务使用正式 `billing_sync.run`，保留独立数据库与公开路由限制；结账地址必须显式配置，不再从旧 Webhook 配置推导。
+
+当前结构在 `shared_0005_billing` 一次创建，包含 `billing_transactions`（交易 ID、所属订阅、已处理的上游更新时间、处理时间）和 `billing_subscriptions.transactions_synced_at`。删除了旧支付数据的独立升级迁移与测试，不读取或回填旧支付记录。回执不保存客户信息或原始支付报文；新订阅第一次对账时进度为空，进行完整分页扫描。交易严格使用 `details.totals.grand_total` 与 `updated_at`，试用严格使用 `items[].trial_dates`，缺少必需字段拒绝处理，不用旧字段兜底。
+
+- 列表请求使用 Paddle 支持的每页 30 笔与 `id[ASC]` 排序，按 `has_more` 和 `after` 取完所有页。未知结账恢复共用这一分页实现，并按本地创建时间前五分钟起查找，覆盖时钟偏差，避免全商户历史扫描；发现多个匹配继续保持未知状态，不创建另一笔付款。
+- 订阅首次扫描完整已完成交易，之后按 `updated_at[GTE]` 查询上次扫描开始时间前五分钟以来的变化。旧交易后来完成也会被补查；包含边界并保留重叠窗口，容忍五分钟以内的时钟偏差及列表可见性延迟，部署时需保持 UTC 时钟同步。这一进度只在所有页成功后推进，且并发扫描不能使其回退。
+- 同一页在用户锁内一次提交交易回执与额度变更，网络请求不持有用户锁。按交易 ID 和上游 `updated_at` 跳过相同或更旧版本；同页多笔新账期只在末尾重算一次会员期限。分页失败时已提交页可保留，下次通过回执跳过；当前页异常则额度和回执一起回滚。
+- 单笔交易通知仍向 Paddle 查询最新交易。若该版本已经处理，不再重复请求订阅和结算额度；订阅状态由订阅通知与周期补查维护。增量优化保留原有价格、付款、取消和退款策略。
+
+分页与更新时间过滤依据：[交易列表](https://developer.paddle.com/api-reference/transactions/list-transactions/)、[游标分页](https://developer.paddle.com/api-reference/about/pagination/)。
+
+验证命令（隔离 SQLite、HTTP MockTransport，不调用真实 Paddle）：
+
+```powershell
+cd backend
+.venv/Scripts/python.exe -m pytest tests/test_paddle_billing.py tests/test_billing_reconciliation.py tests/test_paddle_client.py tests/test_request_limits_migration.py tests/test_membership.py tests/test_membership_days.py tests/test_billing_postgres.py -q
+```
+
+HTTP 模拟执行正式客户端，按官方规则过滤、排序并限制每页 30 笔，不再用直接返回所有交易的 Python 函数替换客户端。覆盖 66 笔历史的三页补查、早先创建的交易后续完成、相同时间戳、新旧上游版本、失败回滚、分页中断恢复、重复通知免额度查询、并发不重复发放及当前表结构创建。`test_billing_postgres.py` 复用专用 `nodecomics_concurrency_test` 数据库与随机 schema；启用方法同后端 README 的 PostgreSQL 并发套件。本机未配置该测试库且 Docker 未运行，真实 PostgreSQL 并发验证仍未完成。
+
+本轮上述后端定向回归 68 项通过、3 项 PostgreSQL 用例因环境未启用而跳过；文档本地链接与 `git diff --check` 通过。旧探针测试已删除，其历史通过数量不计入本轮结果。
+
+本轮未启用生产支付，也未完成真实绑卡验收。上次审查的余额抵扣结清判定、管理端重新登录丢失未知赠送幂等键、超过两天结账的自动补查截止及退款／争议处置，仍需单独修复或确认规则；本轮仅处理代码重复、对账重复与相关分页问题。

@@ -1,8 +1,8 @@
-"""Separate subscription entitlements from operator gifts."""
+"""Create the current Paddle schema, including incremental reconciliation."""
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'shared_0005_paddle_billing'
+revision = 'shared_0005_billing'
 down_revision = 'shared_0004_text_providers'
 branch_labels = None
 depends_on = None
@@ -42,8 +42,15 @@ def upgrade():
         sa.Column('paid_starts_at', sa.DateTime()), sa.Column('paid_ends_at', sa.DateTime()),
         sa.Column('next_billed_at', sa.DateTime()), sa.Column('cancel_at', sa.DateTime()),
         sa.Column('provider_updated_at', sa.DateTime(), nullable=False),
-        sa.Column('synced_at', sa.DateTime(), nullable=False))
+        sa.Column('synced_at', sa.DateTime(), nullable=False),
+        sa.Column('transactions_synced_at', sa.DateTime()))
     op.create_index('ix_billing_subscriptions_owner_id', 'billing_subscriptions', ['owner_id'])
+    op.create_table('billing_transactions',
+        sa.Column('id', sa.String(64), primary_key=True),
+        sa.Column('subscription_id', sa.String(64), sa.ForeignKey('billing_subscriptions.id'), nullable=False),
+        sa.Column('provider_updated_at', sa.DateTime(), nullable=False),
+        sa.Column('processed_at', sa.DateTime(), nullable=False))
+    op.create_index('ix_billing_transactions_subscription_id', 'billing_transactions', ['subscription_id'])
     op.create_table('billing_events',
         sa.Column('id', sa.String(64), primary_key=True),
         sa.Column('environment', sa.String(16), nullable=False),
@@ -60,7 +67,7 @@ def upgrade():
 
 
 def downgrade():
-    for table in ['billing_events', 'billing_subscriptions', 'billing_checkouts', 'billing_accounts']:
+    for table in ['billing_events', 'billing_transactions', 'billing_subscriptions', 'billing_checkouts', 'billing_accounts']:
         op.drop_table(table)
     for name in ['billing_membership_id', 'billing_plus_expires_at', 'billing_plus_started_at']:
         op.drop_column('users', name)
