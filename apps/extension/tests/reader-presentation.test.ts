@@ -3,7 +3,8 @@ import {type Job,type Page} from '../src/types';
 import {pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
 import {emptyPage} from '../src/reader/model';
 
-import {applyMatch,planTranslation,sourceKey} from '../src/reader/recovery';
+import {needsTranslation} from '../src/translation/automatic';
+import {applyMatch} from '../src/reader/recovery';
 import {settings} from '../src/library/store';
 const origin='https://api.example';
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
@@ -59,22 +60,21 @@ describe('latest effect selection',()=>{
 describe('display projection and submission',()=>{
   it('does not retranslate an existing effect after supplier configuration changes',()=>{
     const p=page([]);const match={file_hash:p.fileHash!,page_index:0,asset:{id:'new-source',width:800,height:1200,expires_at:'2099-01-01'},jobs:[],display_jobs:[job('first','succeeded',1)]};
-    const restored=applyMatch(p,match,'alice',origin);const result={matches:new Map([[sourceKey(match),match]]),errors:new Map()};
-    expect(planTranslation([restored],result,'classic','zh-Hans').selected).toEqual([]);
-    expect(planTranslation([restored],result,'classic','zh-Hans',true).selected).toHaveLength(1);
+    const restored=applyMatch(p,match,'alice',origin);
+    expect(needsTranslation(restored,'classic','zh-Hans','alice',origin)).toBe(false);
   });
   it.each(['queued','running','outcome_unknown'] as const)('blocks rerun while a fresh display lookup finds %s',status=>{
     const p=page([]);const match={file_hash:p.fileHash!,page_index:0,asset:null,jobs:[],display_jobs:[job('current',status,2)]};
-    const result=planTranslation([p],{matches:new Map([[sourceKey(match),match]]),errors:new Map()},'classic','zh-Hans',true);
-    expect(result.selected).toEqual([]);expect(result.failures).toHaveLength(1);
+    const restored=applyMatch(p,match,'alice',origin);
+    expect(needsTranslation(restored,'classic','zh-Hans','alice',origin)).toBe(false);
   });
 });
 describe('local preferences and original recovery',()=>{
   it('drops retired preferences without treating them as automatic consent',()=>{
     vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({autoTranslate:true,autoLimit:2.5,appearance:'wrong',accentTheme:'wrong',textScale:0,language:'en'})});
-    expect(settings()).not.toHaveProperty('autoTranslate');
+    expect(settings()).not.toHaveProperty('autoTranslate');expect(settings()).not.toHaveProperty('autoShowTranslation');
     expect(settings()).not.toHaveProperty('autoLimit');
-    expect(settings()).toMatchObject({appearance:'system',accentTheme:'sky',textScale:1,language:'en',autoShowTranslation:true});
+    expect(settings()).toMatchObject({appearance:'system',accentTheme:'sky',textScale:1,language:'en'});
   });
 
 });

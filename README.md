@@ -10,7 +10,7 @@
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
-2026-09-15：已完成双模式持久队列和集群阶段调度重构。每种模式分别提供普通 10／PLUS 500 页在途容量，实时名额普通 2／PLUS 10；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
+2026-09-18：插件改为随读随译，450ms 防抖后优先翻译当前图片与后两张，账户跨模式共用普通 3／PLUS 10 张在途容量。移除翻译队列、批量预存和常规额度展示；等待、翻译中和升级权益入口显示在图内左上角。服务端仍使用持久队列和集群阶段调度；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
 
 会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `shared_0001` 数据库。
 
@@ -24,7 +24,7 @@
 
 作品详情页支持[导出漫画](docs/COMIC_EXPORT_DESIGN.md)：按副本生成 CBZ、图片 ZIP 或 PDF，原图与译图分别成册，未译页可用原图补齐。导出前检查缺页和范围，多份结果打包下载。
 
-本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后台按每模式容量、阅读优先级和用户权重独立调度。
+本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后台按账户总容量、阅读优先级和用户权重调度。
 
 2026-09-16：后台可添加独立身份节点，服务端执行位与版本化配置自动同步；语言资源启动补全、线程与缓存参数可声明。见[节点配置](docs/NODE_CONFIGURATION.md)与[NVIDIA 实测](docs/NVIDIA_GPU_VALIDATION.md)。
 
@@ -68,7 +68,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | --- | --- |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
 | [会员与翻译额度设计](docs/MEMBERSHIP_AND_QUOTAS.md) | 普通／PLUS 已实现规则、会员月额度、限时赠送与旧计费替换范围 |
-| [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) | 已实现：每模式 10/500 在途、2/10 实时、双队列、可配置权重、公平借用、R2 长期保留与多机计算 |
+| [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) | 已实现：账户共用 3/10 在途、自动阅读窗口、可配置权重、公平借用、R2 长期保留与多机计算 |
 | [通用漫画作品管理设计](docs/COMIC_LIBRARY_DESIGN.md) | 已确认；作品、章节、出版套系、卷册、收录关系与来源副本，首轮已实现 |
 | [MangaCopy 来源适配与导入设计](docs/MANGACOPY_LIBRARY_DESIGN.md) | 已实现详情页范围导入、JS 图片清单与有序采集，映射通用作品模型 |
 | [阅读目录与插件译本](docs/READER_DIRECTORY_AND_EDITIONS.md) | 整部作品目录、已有翻译的派生阅读视图与有序采集 |

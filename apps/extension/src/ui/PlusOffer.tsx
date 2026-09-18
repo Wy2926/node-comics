@@ -43,7 +43,7 @@ export function PlusOffer({api,onChanged}:{api:Api;onChanged:()=>void}) {
   const active=!!sub&&(['active','trialing','past_due','paused'].includes(sub.status)||!!billing?.entitlement_expires_at&&Date.parse(billing.entitlement_expires_at)>Date.now());
   const labels:Record<string,string>={trialing:'免费试用中',active:'已订阅 PLUS',past_due:'付款失败，请更新付款方式',canceled:'已取消订阅',paused:'订阅已暂停'};
   return <section className="settings-card" aria-label="PLUS 套餐与免费试用">
-    <div className="nc-section-heading"><div><h2>PLUS · US$9.99 / 月</h2><p className="nc-muted">绑定信用卡，免费试用 7 天。试用含常规翻译不限量与 30 页 AI 重绘。</p></div>
+    <div className="nc-section-heading"><div><h2>PLUS · US$9.99 / 月</h2><p className="nc-muted">绑定信用卡，免费试用 7 天。试用支持同时翻译 10 张，含 30 页 AI 重绘。</p></div>
       <button className="button secondary" onClick={() => setOpen(true)}>了解 PLUS 与免费试用</button></div>
     <p className="nc-muted">试用结束后每月自动续费，可取消。{billing?(billing.enabled?'':'订阅与试用尚未开放。'):'正在读取订阅状态…'}</p>
     {billing?.enabled&&<>
@@ -61,8 +61,8 @@ export function PlusOffer({api,onChanged}:{api:Api;onChanged:()=>void}) {
     {statusError&&<p role="alert">{statusError}</p>}{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
     {checkoutUrl&&<a href={checkoutUrl} target="_blank" rel="noopener noreferrer">重新打开支付页面</a>}
     {open && <Modal title="PLUS 与 7 天免费试用" subtitle="唯一套餐 · US$9.99 / 月" onClose={() => setOpen(false)}>
-      <p className="modal-copy">通过 Paddle 绑定信用卡后开始 7 天免费试用。每个账户限一次；试用期间常规翻译不限量，含 30 页 AI 重绘，剩余试用页数到期失效。</p>
-      <p className="modal-copy">试用结束后自动扣款 US$9.99，之后每月续费。正式 PLUS 每个付费周期含 300 页 AI 重绘，常规翻译不限量；剩余页数不累积。</p>
+      <p className="modal-copy">通过 Paddle 绑定信用卡后开始 7 天免费试用。每个账户限一次；试用期间支持同时翻译 10 张，含 30 页 AI 重绘，剩余试用页数到期失效。</p>
+      <p className="modal-copy">试用结束后自动扣款 US$9.99，之后每月续费。正式 PLUS 每个付费周期含 300 页 AI 重绘，支持同时翻译 10 张；重绘剩余页数不累积。</p>
       <p className="modal-copy">可在试用结束前取消以避免首次扣款，也可取消后续续费。具体扣款时间、税费与最终金额会在 Paddle 结账页展示。</p>
       {billing?.enabled&&!active?<><p className="nc-muted">{billing.trial_eligible?'点击下方按钮后，将前往 Paddle 绑定银行卡并确认自动续费。':'此账户已领取过试用，本次订阅将立即付款。'}</p><button className="button primary" disabled={!!busy} onClick={()=>void launch('checkout')}>{busy==='checkout'?'正在准备结账…':billing.checkout_pending?'继续原结账':billing.trial_eligible?'前往绑定银行卡并试用':'前往订阅 PLUS'}</button>{error&&<p role="alert">{error}</p>}{checkoutUrl&&<p><a href={checkoutUrl} target="_blank" rel="noopener noreferrer">打开支付页面</a></p>}</>:<p className="nc-muted" role="status">{active?'你已有订阅，可在账户页管理续费。':'订阅与试用尚未开放，当前可以查看套餐说明。'}</p>}
     </Modal>}

@@ -5,16 +5,14 @@ import { Thumbnail } from './Images';
 import { thumbnailRows } from './geometry';
 import { pageTranslation, taskText } from './presentation';
 import { TaskActivity } from './TaskActivity';
-export function ThumbnailDirectory({ pages, index, mode, language, ownerId, origin, selected, manage, onSelect, onJump, onMove, onRemove }: {
+export function ThumbnailDirectory({ pages, index, mode, language, ownerId, origin, manage, onJump, onMove, onRemove }: {
   pages: Page[];
   index: number;
   mode: Mode;
   language: string;
   ownerId?: string;
   origin: string;
-  selected: Set<string>;
   manage: boolean;
-  onSelect: (id: string) => void;
   onJump: (n: number) => void;
   onMove: (id: string, delta: number) => void;
   onRemove: (p: Page) => void;
@@ -48,8 +46,6 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
             <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? '译图已过期' : t.ready || t.result?.output_asset_id ? '已有译图' : t.latest ? taskText(t.latest) : p.blobKey ? '原图' : '原图待导入'}</small>
           </span>
         </button>{manage && <div className="nc-thumb-management">
-          <label>
-            <input type="checkbox" aria-label={`选择第 ${n + 1} 页`} checked={selected.has(p.id)} onChange={() => onSelect(p.id)} />选择此页</label>
           <div className="nc-page-order">
             <button aria-label={`上移第 ${n + 1} 页`} disabled={n === 0} onClick={() => onMove(p.id, -1)}>↑</button>
             <button aria-label={`下移第 ${n + 1} 页`} disabled={n === pages.length - 1} onClick={() => onMove(p.id, 1)}>↓</button>

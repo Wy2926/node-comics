@@ -4,7 +4,8 @@ import {Api} from '../src/api';
 import {StaleOperation} from '../src/concurrency';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
-import {applyMatch, matchFilePages, pageSource, planTranslation, sourceKey} from '../src/reader/recovery';
+import {needsTranslation} from '../src/translation/automatic';
+import {applyMatch, matchFilePages, pageSource, sourceKey} from '../src/reader/recovery';
 import type {FilePageMatch, Job, Page} from '../src/types';
 
 const origin = 'https://api.example';
@@ -43,8 +44,8 @@ describe('file-page API contract', () => {
   it('keeps successful chunks usable without treating an unavailable chunk as a miss', async () => {
     const api=new Api(origin);const pages=Array.from({length:101},(_,i)=>page(i));
     vi.spyOn(api,'matchPages').mockRejectedValueOnce(Error('network unavailable')).mockImplementation(async sources=>({items:sources.map(source=>({...source,asset:null,jobs:[]}))}));
-    const result=await matchFilePages(api,pages,'classic','zh-Hans');const plan=planTranslation(pages,result,'classic','zh-Hans');
-    expect(plan.selected.map(p=>p.id)).toEqual([pages[100].id]);expect(plan.failures).toHaveLength(100);
+    const result=await matchFilePages(api,pages,'classic','zh-Hans');
+    expect(result.errors.size).toBe(100);expect(result.matches.size).toBe(1);
   });
   it('keeps transfer concurrency independent of read-only account queue limits', async () => {
     const calls: {url:string;init:RequestInit}[]=[];
@@ -58,16 +59,15 @@ describe('file-page API contract', () => {
 describe('reuse and safe recovery', () => {
   it.each(['succeeded','no_text','queued','running','outcome_unknown'] as const)('does not prepare another charge for a matched %s page, even without local results', async status => {
     const p=page(1);const found=match(p,[job(status)]);const restored=applyMatch(p,found,'alice',origin);
-    const result={matches:new Map([[sourceKey(found),found]]),errors:new Map()};
-    const planned=planTranslation([restored],result,'classic','zh-Hans');
-    expect(planned.selected).toEqual([]);expect(planned.failures).toEqual([]);
-    expect(planTranslation([restored],result,'classic','zh-Hans',true).selected).toEqual([restored]);
+
+    expect(needsTranslation(restored,'classic','zh-Hans','alice',origin)).toBe(false);
+
   });
   it('prepares misses and expired/mismatched local versions while keeping those local versions', () => {
     const p={...page(1),ownerId:'alice',apiOrigin:origin,jobs:[job()],outputBlobs:{job:'local-copy'}};
     const found={...match(p),asset:null};const restored=applyMatch(p,found,'alice',origin);
     expect(restored.jobs).toEqual(p.jobs);expect(restored.outputBlobs).toEqual(p.outputBlobs);
-    expect(planTranslation([restored],{matches:new Map([[sourceKey(found),found]]),errors:new Map()},'classic','zh-Hans').selected).toEqual([restored]);
+    expect(needsTranslation(restored,'classic','zh-Hans','alice',origin)).toBe(false);
     expect(restored.assetId).toBeUndefined();
   });
   it('keeps page identity, dimensions and reader anchor unchanged while replacing another account’s remote data', () => {

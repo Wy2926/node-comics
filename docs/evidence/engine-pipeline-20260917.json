@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-17",
+  "hardware": "Windows / i9-13980HX / RTX 4060 Laptop 8 GiB",
+  "scope": "ASGI stage pipeline; no network/LLM/R2",
+  "model_instances": 1,
+  "torch_threads": 4,
+  "opencv_threads": 2,
+  "neural_acceleration": "portable-v1",
+  "sample": "samples/starlight-bookshop.png, 1024x1536, fixed short Chinese translations",
+  "comparison": "same pipeline, 1/2/3/1 closed-loop clients; not a previous-release performance comparison",
+  "checks": {
+    "analysis_inpaint_layout_final_equal_to_sequential_reference": true,
+    "blank_page_checked_separately": true,
+    "timed_pages": 48
+  },
+  "phases": [
+    {
+      "concurrency": 1,
+      "includes_blank": false,
+      "pages": 12,
+      "seconds": 30.101183500002662,
+      "pages_per_minute": 23.919325298287237,
+      "mean_seconds": 2.504962933333142,
+      "p95_seconds": 2.5623519750010018,
+      "torch_peak_allocated_bytes": 1298850816,
+      "torch_peak_reserved_bytes": 2095054848
+    },
+    {
+      "concurrency": 2,
+      "includes_blank": false,
+      "pages": 12,
+      "seconds": 24.188248000002204,
+      "pages_per_minute": 29.766521328867405,
+      "mean_seconds": 3.966950541666847,
+      "p95_seconds": 4.344657400000323,
+      "torch_peak_allocated_bytes": 1298850816,
+      "torch_peak_reserved_bytes": 2095054848
+    },
+    {
+      "concurrency": 3,
+      "includes_blank": false,
+      "pages": 12,
+      "seconds": 22.74453369999901,
+      "pages_per_minute": 31.655957844500954,
+      "mean_seconds": 5.496575283333186,
+      "p95_seconds": 6.458694244999969,
+      "torch_peak_allocated_bytes": 1298850816,
+      "torch_peak_reserved_bytes": 2095054848
+    },
+    {
+      "concurrency": 1,
+      "includes_blank": false,
+      "pages": 12,
+      "seconds": 32.18666749999829,
+      "pages_per_minute": 22.369510605595877,
+      "mean_seconds": 2.6786188583334174,
+      "p95_seconds": 2.817463619999944,
+      "torch_peak_allocated_bytes": 1298850816,
+      "torch_peak_reserved_bytes": 2095054848
+    }
+  ]
+}

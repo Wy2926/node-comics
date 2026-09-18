@@ -58,7 +58,7 @@ def test_defaults_and_admin_role_do_not_grant_plus(client):
     for name in ('alice', 'admin'):
         rights = entitlement(client, login(client, name))
         assert rights['plan'] == 'free'
-        assert rights['realtime_slots'] == 2 and rights['queue_capacity'] == 10
+        assert rights['realtime_slots'] == 3 and rights['queue_capacity'] == 3
         assert rights['modes']['classic']['quota']['available'] == 100
         assert rights['modes']['redraw']['allowed'] is False
         assert rights['modes']['redraw']['quota'] is None
@@ -84,7 +84,7 @@ def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
     assert first.status_code == 200, first.text
     rights = entitlement(client, auth)
     assert rights['plan'] == 'plus' and rights['modes']['classic']['unlimited']
-    assert rights['queue_capacity'] == 500 and rights['realtime_slots'] == 10
+    assert rights['queue_capacity'] == 10 and rights['realtime_slots'] == 10
     assert rights['modes']['classic']['quota'] is None
     assert rights['modes']['redraw']['quota']['granted'] == 300
     assert grant(client, auth, months=12).json() == first.json()
@@ -200,7 +200,7 @@ def test_membership_and_compensation_are_private_and_idempotent(client):
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 307
     queues = client.get('/v1/me/queues', headers=auth).json()['items']
-    assert len(queues) == 2 and all(queue['capacity'] == 500 and queue['realtime_limit'] == 10 for queue in queues)
+    assert len(queues) == 2 and all(queue['capacity'] == 10 and queue['realtime_limit'] == 10 for queue in queues)
 
 
 def test_simultaneous_last_page_admission(client, png):

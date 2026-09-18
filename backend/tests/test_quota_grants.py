@@ -34,7 +34,7 @@ def test_ordinary_redraw_gift_is_temporary_and_exhaustion_creates_no_job(client,
     result = gift(client, auth, pages=1)
     assert result.status_code == 201, result.text
     rights = entitlement(client, auth)
-    assert rights['plan'] == 'free' and rights['realtime_slots'] == 2 and rights['queue_capacity'] == 10
+    assert rights['plan'] == 'free' and rights['realtime_slots'] == 3 and rights['queue_capacity'] == 3
     assert rights['modes']['redraw']['allowed'] and rights['modes']['redraw']['quota']['available'] == 1
     job = submit(client, auth, upload(client, auth, png), 'redraw').json()
     assert job['quota_kind'] == 'redraw_grant' and job['quota_period_id'] == result.json()['grant']['id']

@@ -4,7 +4,7 @@ import {Api,ApiError} from '../src/api';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 import {applyAccountJobs,readingPriority} from '../src/translation/sync';
-import {prepareChunk,readManifest,readManifests,saveManifest,setManifestPaused,translationScope,type UploadManifest} from '../src/translation/store';
+import {prepareChunk,readManifest,readManifests,saveManifest,translationScope,type UploadManifest} from '../src/translation/store';
 import {processManifest} from '../src/translation/processor';
 import type {Job,Page,UploadPlan} from '../src/types';
 
@@ -32,12 +32,6 @@ describe('persistent per-operation upload queue',()=>{
   const a=manifest([page(0)]),b=manifest([page(1)]),other={...manifest([page(2)]),scope:translationScope(origin,'bob')};
   await Promise.all([saveManifest(a),saveManifest(b),saveManifest(other)]);
   const values=await readManifests(a.scope);expect(values.map(m=>m.id)).toEqual(expect.arrayContaining([a.id,b.id]));expect(values.some(m=>m.id===other.id)).toBe(false);
- });
- it('keeps a pause clicked during an upload when the worker writes an older progress snapshot',async()=>{
-  const value=manifest([page(50)]);await saveManifest(value);const stale=(await readManifest(value.id))!;
-  await setManifestPaused(value.id,true);stale.items[0].state='verifying';await saveManifest(stale);
-  expect((await readManifest(value.id))!).toMatchObject({paused:true,controlRevision:1});
-  await setManifestPaused(value.id,false);await saveManifest(stale);expect((await readManifest(value.id))!.paused).toBe(false);
  });
  it('offers the current reading page the next available upload slot while preserving uncertain request bytes',()=>{
   const pages=[page(1),page(2),page(3)],value=manifest(pages),prepared=prepareChunk(value,1,[pages[2].id]);

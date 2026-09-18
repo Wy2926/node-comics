@@ -164,7 +164,7 @@ def _submit(body, key, user, db):
     queue = queue_for(db, user.id, body.mode)
     reservation_live = queue.next_upload_session and queue.next_upload_until and queue.next_upload_until > now()
     reserved_for_reader = reservation_live and queue.next_upload_session != body.reading_session_id
-    initial_in_flight = active_count(db, user.id, body.mode)
+    initial_in_flight = active_count(db, user.id)
     capacity = limits_for(user)["capacity"]
     available_slots = max(0, capacity - initial_in_flight - int(bool(reserved_for_reader)))
     row = Submission(owner_id=user.id, mode=body.mode, target_language=body.target_language,
@@ -191,7 +191,7 @@ def _submit(body, key, user, db):
         reusable = None if body.regenerate else find_reusable(db, user, item.image_sha256, body.mode, body.target_language, config)
         if not reusable and not body.regenerate:
             reusable = find_shared_result(db, content_key(user, item.image_sha256, body.mode, body.target_language, config))
-        if not reusable and reserved_for_reader and active_count(db, user.id, body.mode) >= limits_for(user)["capacity"] - 1:
+        if not reusable and reserved_for_reader and active_count(db, user.id) >= limits_for(user)["capacity"] - 1:
             problem("READING_UPLOAD_RESERVED", "下一上传空位已为当前阅读页面预留", 409,
                     available_slots=available_slots, capacity=capacity, in_flight=initial_in_flight)
         try:

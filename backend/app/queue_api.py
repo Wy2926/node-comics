@@ -29,7 +29,7 @@ def queue_json(db, user, mode):
     realtime = db.scalar(select(func.count()).select_from(Job).where(Job.owner_id == user.id, Job.mode == mode, Job.status.in_(ACTIVE), Job.realtime_until > now()))
     return {"mode": mode, **limits, "in_flight": count + int(reserved), "upload_reserved": reserved,
         "upload_reservation_session_id": row.next_upload_session if reserved else None,
-        "available_slots": max(0, limits["capacity"] - count - int(reserved)), "realtime_count": realtime,
+        "available_slots": max(0, limits["capacity"] - active_count(db, user.id) - int(reserved)), "realtime_count": realtime,
         "queued": counts.get("queued", 0), "running": counts.get("running", 0),
         "awaiting_upload": counts.get("awaiting_upload", 0) + counts.get("validating_upload", 0),
         "outcome_unknown": counts.get("outcome_unknown", 0), "paused": row.paused, "version": row.version,

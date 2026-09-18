@@ -51,7 +51,7 @@ export function settings(): Settings {
     const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged=knownSettings(value);
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,autoShowTranslation:typeof value.autoShowTranslation==='boolean'?value.autoShowTranslation:true,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,requestConcurrency:normalizeConcurrency(value.requestConcurrency)};
+    return {...merged,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1,requestConcurrency:normalizeConcurrency(value.requestConcurrency)};
   } catch {return {...defaults};}
 }
 function knownSettings(value:Partial<Settings>):Settings {

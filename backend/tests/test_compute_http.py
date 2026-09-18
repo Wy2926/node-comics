@@ -187,8 +187,8 @@ def test_single_real_agent_keeps_preparing_pages_while_text_pool_is_blocked(tmp_
         login = client.post('/v1/auth/dev', json={'username': 'slow-text-reader'}).raise_for_status()
         auth = {'Authorization': 'Bearer ' + login.json()['access_token']}
         try:
-            ids = submit(client, auth, [image(i+30) for i in range(5)], 'slow-text-batch')
-            until(lambda: rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='inpaint' AND status='succeeded'")[0][0] == 5,
+            ids = submit(client, auth, [image(i+30) for i in range(3)], 'slow-text-batch')
+            until(lambda: rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='inpaint' AND status='succeeded'")[0][0] == 3,
                   timeout=25, label='all image preparation before any text returns')
             assert rows(running['database'], "SELECT count(*) FROM job_stages WHERE name='text' AND status='succeeded'")[0][0] == 0
             assert rows(running['database'], "SELECT count(*) FROM jobs WHERE status='succeeded'")[0][0] == 0
@@ -196,8 +196,8 @@ def test_single_real_agent_keeps_preparing_pages_while_text_pool_is_blocked(tmp_
         finally:
             gate.touch()
         completed = until(lambda: job_statuses(client, auth, ids), label='late text renders all prepared pages')
-        assert len(completed) == 5
-        assert rows(running['database'], "SELECT count(*) FROM usage_ledger WHERE kind='settle'")[0][0] == 5
+        assert len(completed) == 3
+        assert rows(running['database'], "SELECT count(*) FROM usage_ledger WHERE kind='settle'")[0][0] == 3
 
 
 def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_path):
@@ -207,7 +207,7 @@ def test_two_real_agents_complete_http_pipeline_and_recover_killed_renderer(tmp_
         auth = {'Authorization': 'Bearer ' + login.json()['access_token']}
         denied = client.post('/internal/nodes/http-node-1/claim', headers=auth, json={'stages': ['analyze']})
         assert denied.status_code == 401
-        initial = submit(client, auth, [image(index) for index in range(4)], 'http-initial')
+        initial = submit(client, auth, [image(index) for index in range(3)], 'http-initial')
         completed = until(lambda: job_statuses(client, auth, initial), label='first HTTP batch delivery')
         nodes = {row[0] for row in rows(running['database'],
             "SELECT DISTINCT node_id FROM execution_leases WHERE node_id LIKE 'node-%' AND outcome='succeeded'")}

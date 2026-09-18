@@ -110,43 +110,39 @@ def test_http_submission_upload_validation_recovers_without_client(cluster, png)
     assert queue_for(client, auth)["in_flight"] == 1
 
 
-def test_free_each_mode_has_ten_independent_atomic_slots(cluster):
+@pytest.mark.parametrize("plus,limit", [(False, 3), (True, 10)])
+def test_account_capacity_is_shared_across_modes_and_devices(cluster, plus, limit):
     from app.db import session_factory
     from app.models import Job, Ledger
     from app.queue_models import Submission
     client, _ = cluster
-    auth = login(client)
-    grant_redraw(client, auth, 20)
+    from app.config import settings
+    # Older deployments may still provide 10/500; they cannot expand current product limits.
+    settings().free_queue_capacity = 10
+    settings().plus_queue_capacity = 500
+    auth = (login_plus if plus else login)(client)
+    if not plus:
+        grant_redraw(client, auth, 20)
+    rejected = submit(client, auth, manifest(limit + 1), key="oversized")
+    assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "QUEUE_FULL"
+    first = submit(client, auth, manifest(limit - 1), key="first")
+    assert first.status_code == 202, first.text
+    second = submit(client, auth, manifest(1, "redraw"), mode="redraw", key="second")
+    assert second.status_code == 202, second.text
     for mode in ("classic", "redraw"):
-        rejected = submit(client, auth, manifest(11, mode), key=f"over-{mode}", mode=mode)
+        assert queue_for(client, auth, mode)["available_slots"] == 0
+        rejected = submit(client, auth, manifest(1, "extra"), key="other-device-" + mode, mode=mode)
         assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "QUEUE_FULL"
-        assert queue_for(client, auth, mode)["in_flight"] == 0
-        accepted = submit(client, auth, manifest(10, mode), key=f"full-{mode}", mode=mode)
-        assert accepted.status_code == 202, accepted.text
-        assert queue_for(client, auth, mode)["in_flight"] == 10
-        blocked = submit(client, auth, manifest(1, "extra-" + mode), key=f"extra-{mode}", mode=mode)
-        assert blocked.status_code == 409
+    replay = submit(client, auth, manifest(limit - 1), key="first")
+    assert replay.json()["id"] == first.json()["id"]
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Job)) == 20
+        assert db.scalar(select(func.count()).select_from(Job)) == limit
         assert db.scalar(select(func.count()).select_from(Submission)) == 2
-        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == "reserve")) == 20
-
-
-def test_plus_each_mode_has_five_hundred_independent_slots(cluster):
-    from app.db import session_factory
-    from app.models import User
-    client, _ = cluster
-    auth = login_plus(client)
-    with session_factory()() as db:
-        db.scalar(select(User).where(User.subject == "dev:alice")).plus_monthly_pages = 1000
-        db.commit()
-    for mode in ("classic", "redraw"):
-        accepted = submit(client, auth, manifest(500, mode), key=f"full-{mode}", mode=mode)
-        assert accepted.status_code == 202, accepted.text
-        queue = queue_for(client, auth, mode)
-        assert queue["capacity"] == queue["in_flight"] == 500
-        blocked = submit(client, auth, manifest(1, "extra-" + mode), key=f"extra-{mode}", mode=mode)
-        assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "QUEUE_FULL"
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == "reserve")) == (1 if plus else limit)
+    cancelled = client.post(f"/v1/translation-submissions/{second.json()['id']}/cancel", headers=auth)
+    assert cancelled.status_code == 200
+    assert queue_for(client, auth)["available_slots"] == 1
+    assert submit(client, auth, manifest(1, "replacement"), key="replacement").status_code == 202
 
 
 def test_replay_and_duplicate_content_only_reserve_once(cluster, png):
@@ -286,7 +282,7 @@ def test_all_reused_file_page_identities_bind_after_validation(cluster, png):
 def test_reading_upload_reservation_blocks_other_sessions_and_survives_reuse(cluster):
     client, _ = cluster
     auth = login(client)
-    first = submit(client, auth, manifest(10)).json()
+    first = submit(client, auth, manifest(3)).json()
     priority = client.post("/v1/me/queues/classic/priority", headers=auth, json={"session_id": "reader-A", "sequence": 1,
         "expected_version": 0, "realtime_job_ids": [], "reserve_next_upload": True})
     assert priority.status_code == 200, priority.text
@@ -301,7 +297,7 @@ def test_reading_upload_reservation_blocks_other_sessions_and_survives_reuse(clu
     accepted = submit(client, auth, manifest(1, "reader-new"), key="reader-page", reading_session_id="reader-A")
     assert accepted.status_code == 202, accepted.text
     assert not queue_for(client, auth)["upload_reserved"]
-    assert queue_for(client, auth)["in_flight"] == 10
+    assert queue_for(client, auth)["in_flight"] == 3
 
 
 def test_idempotent_receipt_survives_provider_configuration_change(cluster, png):
@@ -326,16 +322,16 @@ def test_simultaneous_devices_cannot_partially_admit_a_batch_over_capacity(clust
     barrier = Barrier(3)
     def admission(index):
         barrier.wait()
-        return submit(client, auth, manifest(6, f"device-{index}"), key=f"concurrent-{index}")
+        return submit(client, auth, manifest(2, f"device-{index}"), key=f"concurrent-{index}")
     with ThreadPoolExecutor(max_workers=3) as executor:
         results = list(executor.map(admission, range(3)))
     assert sorted(result.status_code for result in results) == [202, 409, 409]
     for result in results:
         if result.status_code == 409:
-            assert result.json()["error"]["available_slots"] == 4
-    assert queue_for(client, auth)["in_flight"] == 6
+            assert result.json()["error"]["available_slots"] == 1
+    assert queue_for(client, auth)["in_flight"] == 2
     assert client.get("/v1/translation-submissions", headers=auth).json()["total"] == 1
-    assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 6
+    assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 2
 
 
 def test_concurrent_idempotent_replay_creates_one_receipt_and_reservation(cluster, png):

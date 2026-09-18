@@ -178,7 +178,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
-            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": cfg.free_queue_capacity, "plus_queue_capacity": cfg.plus_queue_capacity},
+            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": min(cfg.free_queue_capacity, 3), "plus_queue_capacity": min(cfg.plus_queue_capacity, 10)},
             "entitlements": entitlements_json(db, user) if user else None,
             "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds}
 

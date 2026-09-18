@@ -143,8 +143,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     kind = require_entitlement(user, mode, at, expected_kind, db)
     if max_quota_pages is not None and kind != UNLIMITED and max_quota_pages < 1:
         problem("QUOTA_BOUND_EXCEEDED", "新增页数超过已确认额度上限", 409)
-    if active_count(db, user.id, mode) >= limits_for(user)["capacity"]:
-        problem("QUEUE_FULL", "此翻译模式的在途队列已满，请等待任务完成", 409)
+    if active_count(db, user.id) >= limits_for(user)["capacity"]:
+        problem("QUEUE_FULL", "同时翻译的图片已达上限，请等待任务完成", 409)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
         file_hash=file_hash, page_index=page_index, mode=mode, target_language=language,

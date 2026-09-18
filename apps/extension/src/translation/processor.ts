@@ -43,10 +43,11 @@ export async function processManifest(options:{api:Api;manifest:UploadManifest;a
    assertCurrent(api.isCurrent);
    const failures=outcomes.filter(r=>r.status==='rejected');
    if(failures.length){manifest.error=`${failures.length} 页尚未上传完成；其他页面已独立受理。`;manifest.retryAt=Date.now()+15000;}
-   else {manifest.pending=undefined;manifest.error=undefined;manifest.retryAt=undefined;}
+   else {manifest.pending=undefined;manifest.error=undefined;manifest.errorCode=undefined;manifest.retryAt=undefined;}
    await persist();
   }catch(error){
    if(!api.isCurrent())return;
+   manifest.errorCode=error instanceof ApiError?error.code:'NETWORK_ERROR';
    if(error instanceof ApiError&&error.status===429){
     // Preserve the exact intent through throttling, including daily backoff.
     // No page has failed and there is no uncertain upstream outcome to reconcile.

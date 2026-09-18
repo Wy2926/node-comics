@@ -47,7 +47,6 @@ export class Api {
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
   queues() {return this.request<{items:ModeQueue[]}>('/v1/me/queues');}
-  queueItems(mode:Mode,offset=0) {return this.request<Paginated<Job>>(`/v1/me/queues/${mode}/items?offset=${offset}&limit=100`);}
   submit(body:SubmissionInput,key:string) {return this.request<SubmissionReceipt>('/v1/translation-submissions',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   submission(id:string) {return this.request<SubmissionReceipt>(`/v1/translation-submissions/${encodeURIComponent(id)}`);}
   completeUpload(id:string) {return this.request<Job>(`/v1/uploads/${encodeURIComponent(id)}/complete`,{method:'POST'});}

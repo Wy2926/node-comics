@@ -158,8 +158,8 @@ def entitlements_json(db, user, at=None):
     starts_at, expires_at = plus_dates(user, at)
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "timezone": settings().quota_timezone,
-            "queue_capacity": settings().plus_queue_capacity if plus else settings().free_queue_capacity,
-            "realtime_slots": settings().plus_realtime_slots if plus else settings().free_realtime_slots,
+            "queue_capacity": min(settings().plus_queue_capacity, 10) if plus else min(settings().free_queue_capacity, 3),
+            "realtime_slots": min(settings().plus_realtime_slots, 10) if plus else min(settings().free_realtime_slots, 3),
             "scheduler_weight": settings().plus_scheduler_weight if plus else settings().free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))

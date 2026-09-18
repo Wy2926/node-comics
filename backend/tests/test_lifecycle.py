@@ -290,15 +290,16 @@ def test_insufficient_quota_creates_no_job(client, png):
     from app.db import session_factory
     from app.models import User
     with session_factory()() as db:
-        db.scalar(select(User).where(User.subject == "dev:alice")).plus_monthly_pages = 12
+        db.scalar(select(User).where(User.subject == "dev:alice")).plus_monthly_pages = 2
         db.commit()
-    for i in range(12):
+    for i in range(2):
         asset = upload(client, auth, png_variant(png, i))
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
-    asset = upload(client, auth, png_variant(png, 12))
-    assert create(client, auth, asset, key="no-credit").status_code == 409
-    assert client.get("/v1/jobs", headers=auth).json()["total"] == 12
-    assert quota_usage(client, auth)["reserved"] == 12
+    asset = upload(client, auth, png_variant(png, 2))
+    rejected = create(client, auth, asset, key="no-credit")
+    assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
+    assert client.get("/v1/jobs", headers=auth).json()["total"] == 2
+    assert quota_usage(client, auth)["reserved"] == 2
 
 
 def test_admin_quota_adjustment_idempotent_and_private_provider_list(client):

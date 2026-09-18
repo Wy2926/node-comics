@@ -25,15 +25,15 @@ def delta(client, auth, cursor='0', limit=100):
     return response.json()
 
 
-@pytest.mark.parametrize('plus,limit', [(False,2),(True,10)])
-def test_realtime_limits_are_independent_for_each_mode(cluster, plus, limit):
+@pytest.mark.parametrize('plus,limit', [(False,3),(True,10)])
+def test_realtime_window_respects_account_limit(cluster, plus, limit):
     client, _ = cluster
     auth = (login_plus if plus else login)(client)
     if not plus:
         grant_redraw(client, auth, 20)
     for mode in ('classic','redraw'):
-        ids = accepted(client, auth, limit+1, mode=mode, key=mode)
-        rejected = prioritize(client, auth, ids, mode=mode)
+        ids = accepted(client, auth, limit, mode=mode, key=mode)
+        rejected = prioritize(client, auth, ids+["over-limit"], mode=mode)
         assert rejected.status_code == 422 and rejected.json()['error']['code'] == 'REALTIME_LIMIT'
         assert queue_for(client, auth, mode)['realtime_count'] == 0
         response = prioritize(client, auth, ids[:limit], mode=mode, ordered_job_ids=ids)
@@ -41,7 +41,8 @@ def test_realtime_limits_are_independent_for_each_mode(cluster, plus, limit):
         assert response.json()['realtime_job_ids'] == ids[:limit]
         summary = queue_for(client, auth, mode)
         assert summary['realtime_limit'] == summary['realtime_count'] == limit
-    assert all(item['realtime_count'] == limit for item in client.get('/v1/me/queues',headers=auth).json()['items'])
+        for job_id in ids:
+            assert client.post(f'/v1/jobs/{job_id}/cancel',headers=auth).status_code == 200
 
 
 @pytest.mark.parametrize('field', ['realtime_job_ids','ordered_job_ids'])

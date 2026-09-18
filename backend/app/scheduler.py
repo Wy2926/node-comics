@@ -26,8 +26,8 @@ def lock_scheduler(db):
 
 def limits_for(user):
     cfg, plus = settings(), is_plus(user)
-    return {"capacity": cfg.plus_queue_capacity if plus else cfg.free_queue_capacity,
-            "realtime_limit": cfg.plus_realtime_slots if plus else cfg.free_realtime_slots,
+    return {"capacity": min(cfg.plus_queue_capacity, 10) if plus else min(cfg.free_queue_capacity, 3),
+            "realtime_limit": min(cfg.plus_realtime_slots, 10) if plus else min(cfg.free_realtime_slots, 3),
             "weight": cfg.plus_scheduler_weight if plus else cfg.free_scheduler_weight}
 
 
@@ -40,8 +40,11 @@ def queue_for(db, owner_id, mode):
     return row
 
 
-def active_count(db, owner_id, mode):
-    return db.scalar(select(func.count()).select_from(Job).where(Job.owner_id == owner_id, Job.mode == mode, Job.status.in_(ACTIVE)))
+def active_count(db, owner_id, mode=None):
+    query = select(func.count()).select_from(Job).where(Job.owner_id == owner_id, Job.status.in_(ACTIVE))
+    if mode is not None:
+        query = query.where(Job.mode == mode)
+    return db.scalar(query)
 
 
 def touch_job(db, job):
