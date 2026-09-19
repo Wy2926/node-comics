@@ -4,7 +4,7 @@ import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,edi
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 
-if(location.hostname!=='127.0.0.1'||location.port!=='5174')throw Error('Use the isolated 127.0.0.1:5174 origin.');
+if(location.hostname!=='127.0.0.1'||!['5174','5176'].includes(location.port))throw Error('Use the isolated 127.0.0.1:5174 or :5176 origin.');
 const existing=await readCopies();
 if(existing.some(c=>!c.id.startsWith('reader-fixture-')))throw Error('This origin contains non-fixture data. Use another browser profile.');
 const origin=location.origin;
@@ -60,7 +60,7 @@ if(autoScenario){
  saveSession({token:'isolated-fixture-token',user:{id:'fixture-'+autoScenario,name:'自动翻译验收',role:'reader'},apiOrigin:origin});
  const copyId='reader-fixture-auto-'+autoScenario;
  if(!(await readCopies()).some(c=>c.id===copyId)){
-  const pages=Array.from({length:30},(_,n)=>({...emptyPage(`自动第 ${n+1} 页`,width,height),id:copyId+'-'+n,fileHash:autoScenario==='plus'?'b'.repeat(64):autoScenario==='quota'?'c'.repeat(64):'d'.repeat(64),pageIndex:n,imageSha256:(n+1).toString(16).padStart(64,'0'),imageByteSize:blob.size,imageMime:blob.type,blobKey:'reader-fixture-original',ownerId:'fixture-'+autoScenario,apiOrigin:origin}));
+  const pages=Array.from({length:autoScenario==='retry'?1:30},(_,n)=>({...emptyPage(`自动第 ${n+1} 页`,width,height),id:copyId+'-'+n,fileHash:autoScenario==='plus'?'b'.repeat(64):autoScenario==='quota'?'c'.repeat(64):'d'.repeat(64),pageIndex:n,imageSha256:(n+1).toString(16).padStart(64,'0'),imageByteSize:blob.size,imageMime:blob.type,blobKey:'reader-fixture-original',ownerId:'fixture-'+autoScenario,apiOrigin:origin,...(autoScenario==='retry'?{assetId:`asset-${n}`,jobs:[job(n,'failed')]}:{})}));
   await commitCopies([{...makeCopy('自动翻译 · '+autoScenario,pages,'隔离验收'),id:copyId}],[{title:'自动翻译 · '+autoScenario,kind:'work'}]);
  }
 }
@@ -75,7 +75,7 @@ const queues:ModeQueue[]=(['classic','redraw'] as const).map(mode=>({mode,capaci
 const summaries=()=>queues.map(queue=>{const active=[...jobs.values()].filter(j=>j.mode===queue.mode&&['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status));return {...queue,in_flight:active.length,available_slots:Math.max(0,queue.capacity-[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length),realtime_count:active.filter(j=>j.priority==='realtime').length,queued:active.filter(j=>j.status==='queued').length,running:active.filter(j=>j.status==='running').length,awaiting_upload:active.filter(j=>['awaiting_upload','validating_upload'].includes(j.status)).length};});
 for(const copy of stored)for(const page of copy.pages){for(const job of page.jobs)Object.assign(job,{file_hash:page.fileHash,page_index:page.pageIndex,image_sha256:page.imageSha256});}
 
-const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false};
+const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 // Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
 const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
 const redrawEnabled=new URLSearchParams(location.search).get('redrawEnabled')!=='false';
@@ -87,6 +87,7 @@ window.fetch=async(input,init={})=>{
   if(!url.pathname.startsWith('/v1/'))return originalFetch(input,init);
   state.requests.push(url.pathname);
   if(state.delay)await new Promise(r=>setTimeout(r,state.delay));
+  if(state.offline||state.failDownloads&&url.pathname==='/v1/fixture-output')throw Error('Fixture offline');
   if(state.failNext){state.failNext=false;throw Error('Fixture offline');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
   const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:null});

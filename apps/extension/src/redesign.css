@@ -2057,6 +2057,5 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
   .nc-reader .nc-reader-drawer {top:8px;bottom:8px}
   .nc-translation-popover .nc-drawer-content {padding:0 12px 12px}
   .nc-translation-popover .nc-reader-choices button {white-space:normal}
-  .nc-image-translation.error {align-items:flex-start;flex-wrap:wrap;gap:3px 8px;padding:7px 9px}
-  .nc-image-translation.error .nc-translation-message {flex-basis:100%}
+  .nc-image-translation.error {gap:6px;padding:7px 9px}
 }

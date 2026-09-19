@@ -4,6 +4,7 @@ import {mangaCopyLocation,sameMangaCopyPage} from '../src/sources/mangacopy';
 import {pollSourceDiscovery} from '../src/sources/discovery';
 import type {SourceCatalog} from '../src/library/types';
 import {selectManifest} from '../src/sources/selection';
+import {activateInline,registerInlineBackground} from '../src/inline/background';
 function trusted(sender:chrome.runtime.MessageSender){return sender.id===chrome.runtime.id&&!!sender.url?.startsWith(chrome.runtime.getURL(''));}
 async function inject(tabId:number){await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/content.js']});}
 async function discover(tabId:number){
@@ -14,10 +15,21 @@ async function discover(tabId:number){
  const result=loc?.chapterId?await pollSourceDiscovery(read):await read();const id=crypto.randomUUID();const manifest={...result,id,sourceTabId:tabId} as PageManifest;manifest.items=manifest.items.filter(i=>safeImageUrl(i.url,tab.url!)===i.url);await chrome.storage.local.set({['manifest:'+id]:manifest});return {kind:'pages',id,manifest};
 }
 export default defineBackground(()=>{
+ registerInlineBackground();
+ void chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
  // Both mirror domains now use manifest content scripts. Remove the older dynamic registration on upgrade.
  void chrome.scripting.unregisterContentScripts({ids:['nc-mangacopy']}).catch(()=>{});
- chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>chrome.contextMenus.create({id:'nc-read-image',title:'在 Node Comics 中阅读 / 翻译',contexts:['image']}));});
+ chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>{
+  chrome.contextMenus.create({id:'nc-translate-page',title:'翻译当前页面',contexts:['page','image','link','selection'],documentUrlPatterns:['http://*/*','https://*/*']});
+  chrome.contextMenus.create({id:'nc-read-image',title:'在 Node Comics 中阅读 / 翻译',contexts:['image']});
+ });});
  chrome.contextMenus.onClicked.addListener(async(info,tab)=>{
+  if(info.menuItemId==='nc-translate-page'&&tab?.id!=null){
+   // A webpage's image CDN can be on any origin; Chrome asks once, in this user gesture.
+   const granted=await chrome.permissions.request({origins:['https://*/*','http://*/*']});
+   if(granted)await activateInline(tab.id).catch(()=>chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#settings')}));
+   return;
+  }
   if(info.menuItemId!=='nc-read-image'||!tab?.id||!tab.url)return;const url=safeImageUrl(info.srcUrl??'',tab.url);if(!url)return;
   await inject(tab.id);const source=await chrome.tabs.sendMessage(tab.id,{type:'NC_NAVIGATION'});if(source?.url!==tab.url)return;
   const id=crypto.randomUUID();const manifest:PageManifest={id,sourceTabId:tab.id,navigationId:source.navigationId,revision:1,title:tab.title??'网页图片',url:tab.url,adapter:'context-menu',direction:'rtl',discoveryComplete:false,note:'右键导入的单张图片。',items:[{id:'slot-0',url,width:800,height:1200,order:0}]};

@@ -1,0 +1,19 @@
+import type {Mode} from '../types';
+import type {TranslationState} from '../translation/automatic';
+
+export interface InlineImage {id:string;url:string;width:number;height:number;}
+export interface InlineRequest {type:'NC_INLINE_TICK';navigationId:string;prioritySequence:number;images:InlineImage[];retryId?:string;known:Record<string,string>;}
+export interface InlineResult {id:string;state?:TranslationState;resultKey?:string;data?:string;}
+export interface InlineResponse {mode:Mode;language:string;scope:string;items:InlineResult[];}
+
+// CSS pixels, not source resolution: exclude avatars, thumbnails and thin banners.
+export function comicSize(width:number,height:number){
+  return Number.isFinite(width)&&Number.isFinite(height)&&width>=240&&height>=180&&width*height>=100000&&width/height<=2.8;
+}
+export function readingImages<T extends {rect:{top:number;bottom:number;left:number;right:number}}>(items:T[],width:number,height:number){
+  const visible=items.filter(i=>i.rect.bottom>0&&i.rect.top<height&&i.rect.right>0&&i.rect.left<width);
+  if(!visible.length)return [];
+  const focus=Math.min(height*.3,240);
+  const current=[...visible].sort((a,b)=>Math.max(0,a.rect.top-focus,focus-a.rect.bottom)-Math.max(0,b.rect.top-focus,focus-b.rect.bottom)||a.rect.top-b.rect.top||a.rect.left-b.rect.left)[0];
+  return items.slice(items.indexOf(current),items.indexOf(current)+3);
+}

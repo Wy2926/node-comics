@@ -1,3 +1,4 @@
+import {translationState} from './state';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Api,ApiError} from '../api';
 import {supportsLanguage,type Capabilities,type Entitlements,type Job,type Mode,type ModeQueue,type Page,type ReadingCopy} from '../types';
@@ -10,16 +11,16 @@ import {applyMatch,matchFilePages,pageSource,sourceKey} from '../reader/recovery
 import {processManifest} from './processor';
 import {readManifests,readManifest,saveManifest,withManifestLock,readSync,saveSync,translationScope,type UploadManifest} from './store';
 
-import {ReadingWindow,automaticManifest,exhausted,availableSlots,needsTranslation,targetKey,quotaErrors,capacityErrors,type ReadingTarget,type TranslationState} from './automatic';
+import {ReadingWindow,automaticManifest,exhausted,availableSlots,needsTranslation,targetKey,quotaErrors,type ReadingTarget,type TranslationState} from './automatic';
 
-export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,concurrency,language,currentId,caps,rights,refreshUsage}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;concurrency:number;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;refreshUsage:()=>void}){
+export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,concurrency,language,currentId,caps,rights,refreshUsage,refreshConfiguration}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;concurrency:number;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;refreshUsage:()=>void;refreshConfiguration?:()=>Promise<Entitlements>}){
  const [,render]=useState(0);
  const [queues,setQueues]=useState<ModeQueue[]>([]),[jobs,setJobs]=useState<Job[]>([]),[manifests,setManifests]=useState<UploadManifest[]>([]),[error,setError]=useState('');
  const scope=userId?translationScope(origin,userId):'',copyRef=useRef(copies);copyRef.current=copies;
  const commitCopy=useCallback((copy:ReadingCopy)=>{copyRef.current=copyRef.current.map(value=>value.id===copy.id?copy:value);updateCopy(copy);},[updateCopy]);
  const jobsRef=useRef(jobs);jobsRef.current=jobs;const queueRef=useRef(queues);queueRef.current=queues;
  const windowRef=useRef(new ReadingWindow()),config=useRef({caps,rights,refreshUsage});config.current={caps,rights,refreshUsage};
- const visible=useRef<Page[]>([]),readingSignature=useRef(''),generation=useRef(0),wake=useRef(()=>{});
+ const visible=useRef<Page[]>([]),readingSignature=useRef(''),generation=useRef(0),wake=useRef<(force?:boolean)=>void>(()=>{});
  const session=useRef(crypto.randomUUID()),sequence=useRef(0),lastPriority=useRef('');
  const reload=useCallback(async()=>{if(!scope)return;const records=await readManifests(scope);if(api.isCurrent())setManifests(records.sort((a,b)=>b.createdAt-a.createdAt));},[scope,api]);
  const attach=useCallback(async(incoming:Job[])=>{
@@ -28,6 +29,12 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
   for(const copy of copyRef.current){const updated=applyAccountJobs(copy,incoming,userId,origin);if(updated!==copy)commitCopy(updated);}
  },[api,userId,origin,commitCopy]);
  const refresh=useCallback(async()=>{if(!scope)return;const data=await api.queues();if(api.isCurrent()){queueRef.current=data.items;setQueues(data.items);}await reload();},[scope,api,reload]);
+ const downloadResult=useCallback(async(job:Job,current=api.isCurrent)=>{
+     assertCurrent(current);const key=`result:${origin}:${userId}:${job.id}`;
+     const blob=await libraryStore.getBlob(key)??await api.image(job.output_asset_id!);assertCurrent(current);
+     await libraryStore.putBlob(key,blob);assertCurrent(current);
+     for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{if(page.ownerId!==userId||page.apiOrigin!==origin||!page.jobs.some(j=>j.id===job.id))return page;changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};});if(changed)commitCopy({...copy,pages});}
+ },[api,userId,origin,commitCopy]);
  useEffect(()=>{
   ++generation.current;lastPriority.current='';if(!currentId){windowRef.current.update([]);visible.current=[];}
  },[currentId,language]);
@@ -142,10 +149,7 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
    await mapConcurrent(needed,concurrency,async job=>{
     const current=()=>live()&&stamp===generation.current;
     try{
-     assertCurrent(current);const key=`result:${origin}:${userId}:${job.id}`;
-     const blob=await libraryStore.getBlob(key)??await api.image(job.output_asset_id!);assertCurrent(current);
-     await libraryStore.putBlob(key,blob);assertCurrent(current);
-     for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{if(page.ownerId!==userId||page.apiOrigin!==origin||!page.jobs.some(j=>j.id===job.id))return page;changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};});if(changed)commitCopy({...copy,pages});}
+     await downloadResult(job,current);
     }catch(e){if(!current())return;for(const copy of copyRef.current){const relevant=copy.pages.filter(p=>p.ownerId===userId&&p.apiOrigin===origin&&p.jobs.some(j=>j.id===job.id));if(relevant.length)commitCopy({...copy,pages:copy.pages.map(p=>relevant.includes(p)?{...p,translationError:(e as Error).message}:p)});}}
    });
   }
@@ -160,12 +164,12 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
    }catch(e){if(live()){setError((e as Error).message);retryAt=Date.now()+8000;}}
    finally{running=false;if(live())timer=setTimeout(()=>{lastPriority.current='';void tick();},document.hidden?12000:wakeRequested?450:4000);}
   }
-  wake.current=()=>{wakeRequested=true;if(!running){clearTimeout(timer);timer=setTimeout(()=>void tick(),450);}};
+  wake.current=(force=false)=>{if(force)retryAt=0;wakeRequested=true;if(!running){clearTimeout(timer);timer=setTimeout(()=>void tick(),450);}};
   // A large upload manifest must not prevent already-finished current pages from appearing.
   const stateTimer=setInterval(()=>{if(!running||backgroundState||!live())return;backgroundState=true;void(async()=>{try{await sync();await refresh();await priorities();await downloadVisible();}catch(e){if(live())setError((e as Error).message);}finally{backgroundState=false;}})();},4000);
   void readSync(scope).then(async saved=>{if(!live())return;jobsRef.current=[];cursor=saved?.cursor;await attach(saved?.jobs??[]);await reload();void tick();}).catch(e=>setError(e.message));
   return()=>{stopped=true;clearTimeout(timer);clearInterval(stateTimer);wake.current=()=>{};window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
- },[scope,api,attach,refresh,reload,concurrency,language]);
+ },[scope,api,attach,refresh,reload,concurrency,language,downloadResult]);
  // A newly imported copy can bind account records even when no new server event is emitted.
  useEffect(()=>{if(!userId)return;for(const copy of copies){const updated=applyAccountJobs(copy,jobsRef.current,userId,origin);if(updated!==copy)commitCopy(updated);}},[copies,userId,origin,commitCopy]);
  const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[])=>{
@@ -174,46 +178,26 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
   if(changed||signature!==readingSignature.current){readingSignature.current=signature;++generation.current;wake.current();}
  },[]);
  const retry=useCallback(async(copyId:string,page:Page,mode:Mode)=>{
-  if(!scope||!userId||!rights)return;
+  if(!scope||!userId)throw Error('请先登录');
   const latest=pageTranslation(page,mode,language,userId,origin);
   if(latest.pending||latest.latest?.status==='unknown_released')throw Error('原请求结果待核实，暂不能重复翻译。');
-  if(latest.result?.output_asset_id&&!latest.ready&&!latest.expired){wake.current();return;}
+  const currentRights=await (refreshConfiguration?refreshConfiguration():api.entitlements());
+  assertCurrent(api.isCurrent);setError('');
+  if(latest.result?.output_asset_id&&!latest.ready&&!latest.expired&&latest.latest?.status==='succeeded'){await downloadResult(latest.result);wake.current(true);return;}
   const owned=page.ownerId===userId&&page.apiOrigin===origin;
-  const manifest=await automaticManifest({copyId,page:owned?page:{...page,assetId:undefined},mode},scope,language,rights.modes[mode],libraryStore.getBlob,latest.latest?.id);
+  const manifest=await automaticManifest({copyId,page:owned?page:{...page,assetId:undefined},mode},scope,language,currentRights.modes[mode],libraryStore.getBlob,latest.latest?.id);
   await withManifestLock(manifest.id,async()=>{
    const previous=await readManifest(manifest.id);
    if(previous?.pending)throw Error('正在恢复原提交，请稍后重试。');
    if(previous&&!previous.paused&&(previous.items.some(i=>i.state==='local')||previous.regenerate&&previous.rerunJobId===latest.latest?.id))return;
    assertCurrent(api.isCurrent);await saveManifest(manifest);
   });
-  await reload();wake.current();
- },[scope,userId,rights,language,origin,reload,api]);
+  await reload();wake.current(true);
+ },[scope,userId,language,origin,reload,api,refreshConfiguration,downloadResult]);
  function stateFor(copyId:string,page:Page,mode:Mode):TranslationState|undefined{
-  const t=pageTranslation(page,mode,language,userId,origin);
   const active=windowRef.current.targets.some(target=>target.copyId===copyId&&target.page.id===page.id&&target.mode===mode);
-  if(t.pending)return {kind:t.pending.status==='queued'?'waiting':'translating',message:t.pending.status==='outcome_unknown'?'结果核实中':t.pending.status==='queued'?'等待翻译':'翻译中'};
   const manifest=manifests.find(m=>m.automatic&&m.language===language&&m.mode===mode&&m.items.some(i=>i.copyId===copyId&&i.pageId===page.id));
-  if(manifest?.pending&&!manifest.paused)return {kind:'translating',message:manifest.error?'正在恢复提交':'翻译中'};
-  if(manifest&&!manifest.paused&&manifest.items.some(i=>i.state==='local'))return {kind:'waiting',message:'等待翻译'};
-  if(manifest?.error){
-   if(quotaErrors.has(manifest.errorCode??''))return {kind:'upgrade',message:'升级权益，继续翻译'};
-   if(capacityErrors.has(manifest.errorCode??''))return {kind:'waiting',message:'等待翻译'};
-   return {kind:'error',message:manifest.error};
-  }
-  if(t.latest?.status==='unknown_released')return {kind:'error',message:'原请求结果待核实',retryable:false};
-  if(t.latest?.status==='failed')return {kind:'error',message:t.latest.error?.message??'翻译失败'};
-  if(t.ready)return;
-  if(t.result?.output_asset_id&&!t.expired)return {kind:page.translationError?'error':'translating',message:page.translationError??'正在读取译图',retryLabel:'点击重新加载'};
-  if(t.latest?.status==='no_text')return;
-  if(t.latest)return {kind:'error',message:t.expired?'译图已失效':t.latest.error?.message??'翻译已停止'};
-  if(!active)return;
-  if(page.translationError)return {kind:'error',message:page.translationError};
-  if(!userId)return {kind:'login',message:'登录后自动翻译'};
-  if(!caps)return {kind:error?'error':'waiting',message:error||'正在连接翻译服务'};
-  if(!caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(caps,mode,language))return {kind:'error',message:'此翻译方式暂不可用',retryable:false};
-  if(rights&&exhausted(rights.modes[mode]))return {kind:'upgrade',message:'升级权益，继续翻译'};
-  if(error)return {kind:'error',message:error};
-  return {kind:'waiting',message:'等待翻译'};
+  return translationState({page,mode,language,userId,origin,active,caps,rights,error,manifest});
  }
  return {onReadingWindow,stateFor,retry};
 }

@@ -6,6 +6,9 @@ import {emptyPage} from '../src/reader/model';
 import {readingImage} from '../src/reader/presentation';
 import {ImageTranslationStatus} from '../src/reader/ImageTranslationStatus';
 import {useAutomaticTranslation} from '../src/translation/useAutomaticTranslation';
+import {translationNotice} from '../src/translation/notice';
+import {translationState} from '../src/translation/state';
+import type {UploadManifest} from '../src/translation/store';
 
 const origin='https://fixture.example';
 const noop=()=>{};
@@ -25,7 +28,7 @@ describe('in-image retry status',()=>{
   const page=fixture('failed');
   expect(readingImage(page,'classic',true,'zh-Hans','reader',origin).key).toBe('translated');
   const html=statusMarkup(page);
-  expect(html).toContain('<button');expect(html).toContain('翻译失败 · 点击重新生成');
+  expect(html).toContain('<button');expect(html).toContain('翻译失败 · 重试');expect(html).not.toContain('点击重新生成');
  });
  it.each(['outcome_unknown','unknown_released'] as const)('never presents regeneration for %s',status=>{
   const html=statusMarkup(fixture(status));
@@ -34,6 +37,20 @@ describe('in-image retry status',()=>{
  it('offers reloading rather than regeneration when delivered bytes failed to download',()=>{
   const page=fixture('succeeded');page.jobs=page.jobs.slice(0,1);page.outputBlobs={};page.translationError='下载暂时失败';
   const html=statusMarkup(page);
-  expect(html).toContain('点击重新加载');expect(html).not.toContain('点击重新生成');
+  expect(html).toContain('加载失败 · 重试');expect(html).not.toContain('点击重新生成');
+ });
+ it('keeps long diagnostic text out of the visible label',()=>{
+  const detail='暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。';
+  expect(translationNotice({kind:'error',message:detail})).toEqual({message:'连接失败',action:'重试',label:'连接失败 · 重试',detail});
+  const html=renderToStaticMarkup(<ImageTranslationStatus state={{kind:'error',message:detail}} onRetry={noop} onUpgrade={noop} onLogin={noop}/>);
+  expect(html).toContain(`title="${detail}"`);expect(html.replace(/<[^>]*>/g,'')).toBe('连接失败重试');
+ });
+ it('shows a connection failure instead of silently waiting on a local retry plan',()=>{
+  const manifest:UploadManifest={id:'retry',scope:'reader',title:'page',mode:'classic',language:'zh-Hans',quotaKind:'classic_daily',maxQuotaPages:1,regenerate:true,continuous:true,paused:false,createdAt:0,items:[{id:'page',copyId:'copy',pageId:'page',state:'local',image:{client_item_id:'page',image_sha256:'a'.repeat(64),byte_size:1,content_type:'image/png',name:'page'}}]};
+  const state=translationState({page:fixture('failed'),mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',manifest});
+  // A cached previous image can remain visible while a new attempt waits.
+  expect(state?.kind).toBe('waiting');
+  const page=fixture('failed');page.outputBlobs={};
+  expect(translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',manifest})?.message).toBe('连接失败');
  });
 });
