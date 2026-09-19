@@ -145,7 +145,7 @@ def test_no_text_result_is_reused_without_a_new_job_or_stage(client, png):
     assert item["reused"] and item["job"]["id"] == first["id"] and item["job"]["status"] == "no_text"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
-        assert db.scalar(select(func.count()).select_from(JobStage)) == 4
+        assert db.scalar(select(func.count()).select_from(JobStage)) == 2
 
 
 def test_reusing_verified_source_does_not_reload_historical_page_descriptors(client, png):

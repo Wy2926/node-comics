@@ -11,10 +11,10 @@ import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, select, text
 from sqlalchemy.orm import Session
 
-HEAD = "shared_0005_billing"
+HEAD = "shared_0006_compute_v2"
 NEW_TABLES = {"upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
-              "billing_checkouts", "billing_subscriptions", "billing_events", "billing_transactions"}
+              "billing_checkouts", "billing_subscriptions", "billing_events", "billing_transactions", "compute_claims"}
 
 
 @pytest.fixture

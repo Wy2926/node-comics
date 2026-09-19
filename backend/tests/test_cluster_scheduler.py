@@ -29,6 +29,9 @@ def scheduler_case(text_database):
     from app.classic_config import snapshot
     with session_factory()() as db:
         config = snapshot(db)
+        # These fixtures exercise draining v1 stages; v2 whole-page scheduling
+        # and races use test_compute_v2.py.
+        config['engine'].pop('protocol_version', None)
         free = User(id='free-user', subject='isolated-free', name='free')
         plus = User(id='plus-user', subject='isolated-plus', name='plus', membership_id=uid(),
                     plus_started_at=now() - timedelta(days=1), plus_expires_at=now() + timedelta(days=30),

@@ -16,6 +16,7 @@ from .errors import ProcessingError
 from .scheduler import lock_scheduler, touch_job
 from .submission_api import router as submission_router
 from .cluster_api import router as cluster_router
+from .compute_v2 import router as compute_v2_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
 from .db import get_db, initialize, session_factory
@@ -58,6 +59,7 @@ app = FastAPI(title="Node Comics API", version="0.3.0", lifespan=lifespan, descr
 app.include_router(queue_router)
 app.include_router(submission_router)
 app.include_router(cluster_router)
+app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
 app.include_router(billing_router)
@@ -305,4 +307,5 @@ app.include_router(node_admin_router)
 
 @app.exception_handler(ProcessingError)
 async def processing_error(request, exc):
-    return JSONResponse(status_code=409 if exc.code in {"LEASE_EXPIRED", "NODE_CONFIG_CONFLICT"} else 422, content={"error": {"code": exc.code, "message": exc.message}})
+    status = 503 if exc.code == 'STORAGE_UNAVAILABLE' else 409 if exc.code in {"LEASE_EXPIRED", "NODE_CONFIG_CONFLICT"} else 422
+    return JSONResponse(status_code=status, content={"error": {"code": exc.code, "message": exc.message}})

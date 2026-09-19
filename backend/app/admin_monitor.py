@@ -21,7 +21,7 @@ router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
 Mode = Literal["classic", "redraw"]
 Status = Literal["active", "attention", "awaiting_upload", "validating_upload", "queued", "running",
                  "outcome_unknown", "unknown_released", "succeeded", "no_text", "failed", "cancelled"]
-STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "analyze", "text", "inpaint", "render", "redraw"])}
+STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "analyze", "text", "inpaint", "render", "redraw"])}
 
 
 def seconds(start, end):

@@ -12,7 +12,7 @@ from .queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage, 
 from .translation_models import TranslationProvider
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
-IMAGE_STAGES = {"analyze", "inpaint", "render"}
+IMAGE_STAGES = {"analyze", "inpaint", "render", "page"}
 
 
 def lock_scheduler(db):
@@ -58,6 +58,8 @@ def ensure_stages(db, job):
     if not job.input_asset_id or job.status not in {"queued", "running"}:
         return
     names = ["analyze", "text", "inpaint", "render"] if job.mode == "classic" else ["redraw"]
+    if job.mode == "classic" and job.config.get("engine", {}).get("protocol_version") == 2:
+        names = ["page", "text"]
     existing = {s.name for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
     for name in names:
         if name not in existing:
@@ -102,7 +104,7 @@ def priority_of(job, at):
 def _estimate(db, pool, stage, records=None):
     key = "estimate:" + pool + ":" + stage.name
     record = records.get(key) if records is not None else db.get(FairnessState, key)
-    return max(0.05, min(120, record.service if record else {"validate_upload": 1, "analyze": 10, "inpaint": 15, "render": 5, "text": 10, "redraw": 60}[stage.name]))
+    return max(0.05, min(120, record.service if record else {"validate_upload": 1, "page": 30, "analyze": 10, "inpaint": 15, "render": 5, "text": 10, "redraw": 60}[stage.name]))
 
 
 def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
@@ -216,7 +218,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         return None
     if config_version is not None and config_version != node.config_version:
         raise ProcessingError('NODE_CONFIG_CONFLICT', '领取前需要同步配置')
-    if node.engine_version != 'control' and node.applied_config_version != node.config_version:
+    if node.engine_version != 'control' and 'page' not in node.capabilities and node.applied_config_version != node.config_version:
         return None
     node.heartbeat_at = at
     busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
@@ -319,7 +321,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         job.attempt_id = uid()
         db.add(Attempt(id=job.attempt_id, job_id=job.id, provider_id=job.config["provider"]["id"],
                        lease_expires_at=at + timedelta(seconds=cfg.cluster_lease_seconds), output_storage_backend=cfg.result_storage_backend))
-    job.status, job.phase = "running", stage.name
+    job.status, job.phase = "running", "analyze" if stage.name == "page" else stage.name
     stage.status, stage.generation, stage.attempts = "running", stage.generation + 1, stage.attempts + 1
     lease = ExecutionLease(id=uid(), stage_id=stage.id, job_id=job.id, node_id=node.id, owner_id=job.owner_id,
         executor_id=executor_id or (node.id if node.engine_version != "control" else None),
@@ -335,7 +337,8 @@ def release_lease(db, lease, outcome):
     if lease.completed_at:
         return
     at = now()
-    elapsed = max(0.001, (min(at, lease.expires_at) - lease.started_at).total_seconds())
+    stage = db.get(JobStage, lease.stage_id)
+    elapsed = max(0.001, ((at if stage.name == 'page' else min(at, lease.expires_at)) - lease.started_at).total_seconds())
     delta = elapsed - lease.estimated_seconds
     user_state = _state(db, f"user:{lease.resource_pool}:{lease.priority_class}:{lease.owner_id}")
     class_state = _state(db, f"class:{lease.resource_pool}:{lease.priority_class}")
@@ -348,6 +351,10 @@ def release_lease(db, lease, outcome):
     estimate = _state(db, "estimate:" + lease.resource_pool + ":" + stage.name, elapsed)
     estimate.service = estimate.service * .8 + min(elapsed, 120) * .2
     lease.completed_at, lease.outcome = at, outcome
+    if stage.name == 'page':
+        lease.limits = {**lease.limits, 'receipt': {'lease_id': lease.id, 'status': 'terminal',
+            'outcome': outcome, 'result_hash': lease.result_hash, 'completed_at': at.isoformat() + 'Z',
+            'job_status': db.get(Job, lease.job_id).status}}
 
 
 def heartbeat_lease(db, lease_id, token):

@@ -37,7 +37,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     with session_factory()() as db:
         for language in LANGUAGES:
             config = configuration(db, 'classic', language)
-            assert config['engine'] == {'version': settings().classic_engine_version}
+            assert config['engine'] == {'version': settings().classic_engine_version, 'protocol_version': 2}
         with pytest.raises(HTTPException):
             configuration(db, 'classic', 'xx')
         with pytest.raises(HTTPException):

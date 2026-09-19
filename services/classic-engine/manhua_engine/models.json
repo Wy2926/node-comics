@@ -1,0 +1,84 @@
+{
+  "version": "desktop-multilingual-v1",
+  "note": "Explicit downloads only. SHA-256 verified before use; no runtime model downloads.",
+  "models": [
+    {
+      "role": "detector",
+      "backend": "ncnn",
+      "name": "dbnet_detect.ncnn.param",
+      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v3/dbnet_detect.ncnn.param",
+      "size": 13392,
+      "sha256": "9e6db2f8c6b0662ab00eb2100b3373d3c984a235eaac0e61c0b2a484ee1ff7b5",
+      "license": "GPL-3.0",
+      "source": "https://github.com/zyddnys/manga-image-translator",
+      "note": "DBNet (m-i-t default detector). resize_aspect to 1024 (pad to 256 multiples); rectangular input avoids ncnn's 832-992 square crash band. fp16 storage (153MB); int8 quant drops all boxes so not used."
+    },
+    {
+      "role": "detector",
+      "backend": "ncnn",
+      "name": "dbnet_detect.ncnn.bin",
+      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v3/dbnet_detect.ncnn.bin",
+      "size": 153010556,
+      "sha256": "f57bdbede7764a534c56e88be0269602259a7fcd47e54e8b7d954fd0fcc55c3d",
+      "license": "GPL-3.0",
+      "source": "https://github.com/zyddnys/manga-image-translator"
+    },
+    {
+      "role": "inpainter",
+      "backend": "ncnn",
+      "name": "mit_aot_fixed512.ncnn.param",
+      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v2/mit_aot_fixed512.ncnn.param",
+      "size": 33810,
+      "sha256": "f21ef860d21a6cdf60dfb1742c08d1c0d98837bceeb2ee3fe9c2dbbeee7d32b5",
+      "license": "GPL-3.0",
+      "source": "https://github.com/zyddnys/manga-image-translator",
+      "note": "AOT-GAN manga inpaint (m-i-t). Fully-convolutional; run at whole-page tile 768 by default."
+    },
+    {
+      "role": "inpainter",
+      "backend": "ncnn",
+      "name": "mit_aot_fixed512.ncnn.bin",
+      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v2/mit_aot_fixed512.ncnn.bin",
+      "size": 11366088,
+      "sha256": "a52db45eafc1dd2aa4ce9a339c711917fa98fefb31ce4506d4c95e8b5e3560b6",
+      "license": "GPL-3.0",
+      "source": "https://github.com/zyddnys/manga-image-translator"
+    },
+    {
+      "role": "ocr",
+      "language": "en",
+      "name": "ppocr/en.onnx",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile.onnx",
+      "sha256": "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8",
+      "license": "Apache-2.0",
+      "source": "https://github.com/RapidAI/RapidOCR/tree/v3.9.2"
+    },
+    {
+      "role": "ocr",
+      "language": "ko",
+      "name": "ppocr/ko.onnx",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx",
+      "sha256": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b",
+      "license": "Apache-2.0",
+      "source": "https://github.com/RapidAI/RapidOCR/tree/v3.9.2"
+    },
+    {
+      "role": "ocr",
+      "language": "zh",
+      "name": "ppocr/zh.onnx",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx",
+      "sha256": "5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5",
+      "license": "Apache-2.0",
+      "source": "https://github.com/RapidAI/RapidOCR/tree/v3.9.2"
+    },
+    {
+      "role": "ocr",
+      "language": "latin",
+      "name": "ppocr/latin.onnx",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx",
+      "sha256": "b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a",
+      "license": "Apache-2.0",
+      "source": "https://github.com/RapidAI/RapidOCR/tree/v3.9.2"
+    }
+  ]
+}

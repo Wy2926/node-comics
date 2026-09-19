@@ -6,7 +6,7 @@
 
 同日补充：已修复慢上传持有数据库连接、并发领取嵌套连接和反馈无预算，并新增后台“系统设置”，统一维护上传并发、超时及反馈预算。该轮迁移为 `shared_0003_system_settings`，生效规则及验证见[系统设置](docs/SYSTEM_SETTINGS.md)。
 
-当前代码迁移头为 `shared_0004_text_providers`，文本供应商改在 `<ADMIN_WEB_PATH>#translation-providers` 创建，首个自动成为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置只影响新任务，供应商独立 RPM、停用暂停排队文本阶段。DB revision 保存后台密钥且不出 API；数据库及备份须限制访问。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。本轮未部署真实实例，完整运行与迁移边界见 [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md)。
+2026-09-16 文本供应商迁移为 `shared_0004_text_providers`，文本供应商改在 `<ADMIN_WEB_PATH>#translation-providers` 创建，首个自动成为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置只影响新任务，供应商独立 RPM、停用暂停排队文本阶段。DB revision 保存后台密钥且不出 API；数据库及备份须限制访问。新表无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。本轮未部署真实实例，完整运行与迁移边界见 [LLM 翻译供应商](docs/TRANSLATION_PROVIDERS.md)。
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
@@ -18,7 +18,7 @@
 
 2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在次数和处理时限内自动重试（成本仅计量，不设页成本上限）。常规模式保留中心调度与文本处理；图像引擎需独立接入，见[交互协议](docs/COMPUTE_PROTOCOL.md)。
 
-阅读器支持“常规翻译”和“AI 重绘翻译”。前者使用独立 OCR／LaMa 引擎与文本 LLM，后者保留 OpenAI 兼容 `POST /v1/images/edits` 多供应商接口；Key 留在后端。
+阅读器支持“常规翻译”和“AI 重绘翻译”。前者使用独立 OCR／抹字／嵌字计算节点与中心文本 LLM，后者保留 OpenAI 兼容 `POST /v1/images/edits` 多供应商接口；Key 留在后端。
 
 客户端已更新为大封面书架与独立阅读器，支持两种卡片排列、缩略图目录、自动翻译与查看、最新效果、反馈重译、分组记录及用量统计。新接口和本地 API 更新方法见 [UI 实现说明](docs/UI_IMPLEMENTATION.md)。
 
@@ -28,7 +28,9 @@
 
 ## 本地运行
 
-2026-09-19：仓库已移除自带图像引擎源码、专用启动及测试入口。Compose 只启动控制服务；常规翻译默认关闭，接入独立图像引擎后才能执行图像阶段。协议与状态流转见[计算节点交互](docs/COMPUTE_PROTOCOL.md)。
+本机真实常规翻译启动：`./scripts/start-local-classic.ps1 -TextModel gpt-5.6-luna` 使用根 `.env` 的 R2 与供应商配置，启动 Docker 中心及 Windows AMD 节点。真实样张已完成在线翻译和 R2 交付；启动要求与记录见[本机真实服务](docs/CLASSIC_LOCAL_RUNTIME.md)。
+
+2026-09-19：已将 manhua-engine 迁入 [services/classic-engine](services/classic-engine/README.md)，作为 NCNN/Vulkan 整页计算节点，与中心 v2 协议接通。新页由节点完成检测／OCR、AOT-GAN 抹字和嵌字，文本由中心调用；数据库迁移为 `shared_0006_compute_v2`。Compose 仍只启动控制服务，常规翻译默认关闭；节点模型、凭据和实际引擎版本需按说明配置。已完成本地协议与 Vulkan 样张验收，未切换公开部署。见[计算节点交互](docs/COMPUTE_PROTOCOL.md)及 [v2 实施说明](docs/COMPUTE_V2_IMPLEMENTATION.md)。
 
 环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2 与图片模型配置，模板见 [.env.example](.env.example)。文本供应商由管理员在服务启动后保存到数据库。
 

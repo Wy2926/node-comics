@@ -1,0 +1,23 @@
+{
+  "protocol_version": 2,
+  "control_url": "https://control.example.com",
+  "r2_origin": "https://ACCOUNT_ID.r2.cloudflarestorage.com",
+  "node_id": "REPLACE_WITH_ADMIN_NODE_ID",
+  "node_token": "REPLACE_WITH_NODE_CREDENTIAL_OR_SET_NODE_TOKEN",
+  "resource_id": "machine:vulkan:0",
+  "state_dir": "state",
+  "local_pages": 2,
+  "max_leases": 4,
+  "journal_bytes": 536870912,
+  "languages": ["zh-Hans", "zh-Hant", "en", "ja", "ko"],
+  "engine": {
+    "models": "models",
+    "gpu": 0,
+    "ocr_language": "ja",
+    "ocr_workers": 8,
+    "threads": 2,
+    "detect_size": 1280,
+    "tile": 768,
+    "font": []
+  }
+}

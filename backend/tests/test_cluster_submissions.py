@@ -104,7 +104,7 @@ def test_http_submission_upload_validation_recovers_without_client(cluster, png)
         assert source.storage_backend == "r2" and source.active_references == 1
         assert db.get(ExecutionLease, lease_id).completed_at is not None
         assert {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))} == {
-            "validate_upload": "succeeded", "analyze": "ready", "text": "waiting", "inpaint": "waiting", "render": "waiting"}
+            "validate_upload": "succeeded", "page": "ready", "text": "waiting"}
     repeated = client.post(f"/v1/uploads/{first['upload']['id']}/complete", headers=auth)
     assert repeated.status_code == 200 and repeated.json()["id"] == accepted["id"]
     assert queue_for(client, auth)["in_flight"] == 1

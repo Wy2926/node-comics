@@ -73,7 +73,7 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         backend = db.get(Attempt, attempt_id).output_storage_backend
         db.commit()
     # Image decoding, object reads and PUTs hold neither row nor scheduler locks.
-    if name in {"analyze", "inpaint", "render"}:
+    if name in {"analyze", "inpaint", "render", "page"}:
         if result.get("input_hash") != source.sha256 or result.get("version") != config["engine"]["version"]:
             raise ProcessingError("ENGINE_RESULT_MISMATCH", "图像结果与输入或引擎版本不一致")
     image, info = None, None
@@ -82,7 +82,7 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
     elif name == "inpaint":
         if not isinstance(result.get("cache_key"), str) or not re.fullmatch(r"[a-f0-9]{64}", result["cache_key"]):
             raise ProcessingError("INVALID_ENGINE_RESULT", "抹字缓存标识无效")
-    elif name == "render":
+    elif name in {"render", "page"}:
         image, info = validate_render(read_asset(source), result)
     elif name == "redraw":
         image = base64.b64decode(result["image"], validate=True)
@@ -117,7 +117,7 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         elif name == "inpaint":
             state.artifacts = {"cache_key": result["cache_key"], "node_id": lease.node_id}
             state.timings = {**state.timings, **result.get("timings", {})}
-        elif name in {"render", "redraw"}:
+        elif name in {"render", "redraw", "page"}:
             if not available(db.get(Asset, input_id)):
                 raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
             output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
@@ -138,7 +138,9 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         release_lease(db, lease, "succeeded")
         if name in {"text", "inpaint"} and job.status == "running":
             statuses = {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
-            if statuses.get("text") == statuses.get("inpaint") == "succeeded":
+            if "page" in statuses:
+                job.phase = "render"
+            elif statuses.get("text") == statuses.get("inpaint") == "succeeded":
                 db.scalar(select(JobStage).where(JobStage.job_id == job.id, JobStage.name == "render")).status = "ready"
                 job.phase = "render"
             else:
@@ -170,7 +172,7 @@ def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
             # Re-read the call intent under the scheduler lock; a maintenance
             # snapshot taken before its commit cannot authorize another request.
             error = ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "图片调用已开始，等待核实供应商结果", unknown=True)
-        retryable = stage.name in {"analyze", "inpaint", "render", "validate_upload", "text"} and error.code in {
+        retryable = stage.name in {"page", "analyze", "inpaint", "render", "validate_upload", "text"} and error.code in {
             "CLASSIC_ENGINE_UNAVAILABLE", "CLASSIC_ANALYZE_FAILED", "CLASSIC_INPAINT_FAILED", "CLASSIC_RENDER_FAILED",
             "STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED", "ENGINE_UNAVAILABLE"}
         if stage.name == "redraw" and attempt.call_started_at is None:
@@ -189,7 +191,8 @@ def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
             stage.status, stage.available_at = 'ready', now() + timedelta(seconds=delay)
             stage.attempts = max(0, stage.attempts - 1)
             job.phase = 'text'
-        elif retryable and stage.attempts < settings().cluster_stage_attempts:
+        elif retryable and stage.attempts < (lease.limits.get('max_attempts', settings().cluster_stage_attempts)
+                                            if stage.name == 'page' else settings().cluster_stage_attempts):
             stage.status, stage.available_at = "ready", now() + timedelta(seconds=min(30, stage.attempts * 2))
             job.phase = "recovering_" + stage.name
         else:

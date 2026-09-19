@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "node-comics-classic-engine"
+version = "0.1.0"
+description = "Node Comics compute v2 node with NCNN Vulkan manga translation"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+dependencies = ["ncnn==1.0.20260526", "onnxruntime==1.30.0", "numpy>=2,<3", "opencv-python>=4.11", "Pillow>=11", "networkx>=3", "shapely>=2", "requests>=2.32", "psutil>=7", "portalocker>=3", "rapidocr==3.9.2", "uniseg==0.10.1", "pyphen==0.17.2", "fonttools>=4.60,<5", "httpx==0.28.1"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+manhua = "manhua_engine.cli:main"
+classic-node = "classic_node.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["manhua_engine*", "classic_node*"]
+
+[tool.setuptools.package-data]
+manhua_engine = ["alphabet.txt", "models.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

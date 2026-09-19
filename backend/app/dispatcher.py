@@ -27,7 +27,7 @@ def recover_lease(lease_id):
         job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
         attempt = db.get(Attempt, job.attempt_id)
         image = None
-        if stage.name in {"render", "redraw"}:
+        if stage.name in {"render", "redraw", "page"}:
             store = get_store(attempt.output_storage_backend)
             key = lease.output_key
             try:
@@ -35,8 +35,16 @@ def recover_lease(lease_id):
             except StorageError:
                 return  # An unavailable object store is not evidence of absent output.
         unknown = stage.name == "redraw" and attempt.call_started_at is not None
+        expired_page = False
+        invalid_source = False
+        if stage.name == 'page':
+            from .compute_v2 import lease_deadline
+            expired_page = lease_deadline(db, lease) <= now()
+            invalid_source = not available(db.get(Asset, job.input_asset_id))
     if image is None:
-        fail_stage(lease_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN" if unknown else "WORKER_LEASE_EXPIRED",
+        code = ('ASSET_EXPIRED' if invalid_source else 'PAGE_DEADLINE_EXCEEDED' if expired_page
+                else 'UPSTREAM_OUTCOME_UNKNOWN' if unknown else 'WORKER_LEASE_EXPIRED')
+        fail_stage(lease_id, ProcessingError(code,
             "计算节点失联，保留调用记录并恢复可重复阶段", unknown=unknown), recovering=True)
         return
     try:

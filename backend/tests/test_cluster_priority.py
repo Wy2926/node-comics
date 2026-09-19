@@ -139,10 +139,10 @@ def test_pause_is_mode_local_and_running_stages_keep_their_lease(cluster, png):
             assert response.status_code == 202, response.text
             ids[mode].append(response.json()['items'][0]['job']['id'])
     with session_factory()() as db:
-        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='priority-node',name='test',resource_id='priority-node',capabilities=['analyze','redraw'],
+        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='priority-node',name='test',resource_id='priority-node',capabilities=['page','redraw'],
                            capacity=4,engine_version=settings().classic_engine_version,device='cpu'))
         db.commit()
-        lease = claim_stage(db,'priority-node',['analyze'])
+        lease = claim_stage(db,'priority-node',['page'])
         db.commit()
         assert lease is not None
         running_id,lease_id = lease.job_id,lease.id
@@ -153,7 +153,7 @@ def test_pause_is_mode_local_and_running_stages_keep_their_lease(cluster, png):
     assert not queue_for(client,auth,'redraw')['paused']
     with session_factory()() as db:
         assert current_lease(db,lease_id)[2].id == running_id
-        assert claim_stage(db,'priority-node',['analyze']) is None
+        assert claim_stage(db,'priority-node',['page']) is None
         assert claim_stage(db,'priority-node',['redraw']) is not None
         db.commit()
     running = client.get(f'/v1/jobs/{running_id}',headers=auth).json()
@@ -161,7 +161,7 @@ def test_pause_is_mode_local_and_running_stages_keep_their_lease(cluster, png):
     assert client.post('/v1/me/queues/classic/pause',headers=auth,json={'paused':False}).json()['version'] == version+1
     assert client.post('/v1/me/queues/redraw/pause',headers=auth,json={'paused':True}).json()['paused']
     with session_factory()() as db:
-        assert claim_stage(db,'priority-node',['analyze']) is not None
+        assert claim_stage(db,'priority-node',['page']) is not None
         db.commit()
 
 

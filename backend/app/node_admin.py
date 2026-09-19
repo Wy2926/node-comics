@@ -115,7 +115,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
     node.capacity = config.execution_slots
     node.config_version += 1
     node.config_error = None
-    if pool:
+    if pool or node.runtime_report.get('protocol_version') == 2:
         node.applied_config_version = node.config_version
     db.commit()
     return configuration(node)

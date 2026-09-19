@@ -75,6 +75,17 @@ class ExecutionLease(Base):
     outcome: Mapped[str | None] = mapped_column(String(24))
     result_hash: Mapped[str | None] = mapped_column(String(64))
     output_key: Mapped[str | None] = mapped_column(String(200))
+    limits: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ComputeClaim(Base):
+    """Durable whole-page claim receipt, including empty and reclaimed claims."""
+    __tablename__ = "compute_claims"
+    node_id: Mapped[str] = mapped_column(ForeignKey("compute_nodes.id"), primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    lease_ids: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class FairnessState(Base):

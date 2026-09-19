@@ -122,6 +122,15 @@ def run():
         serve(simulated_engine(), sys.argv[2])
         return
     if role == 'api':
+        # Preserve the old-agent drain regression. New submissions in production
+        # use v2; this isolated server explicitly creates historical v1 jobs.
+        from app import classic_config
+        current_snapshot = classic_config.snapshot
+        def legacy_snapshot(*args, **kwargs):
+            result = current_snapshot(*args, **kwargs)
+            result['engine'].pop('protocol_version', None)
+            return result
+        classic_config.snapshot = legacy_snapshot
         from app.main import app
         from app.db import initialize, session_factory
         from translation_fixtures import configure_text_provider

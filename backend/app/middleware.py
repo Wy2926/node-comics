@@ -21,6 +21,8 @@ class BodyLimitMiddleware:
         limit = settings().cluster_max_result_bytes if scope.get("path", "").startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024
         if scope.get("path") == "/v1/translation-submissions":
             limit = settings().submission_max_body_bytes
+        if scope.get('path', '').startswith('/internal/compute/v2/leases/') and scope['path'].endswith('/analysis'):
+            limit = 4 * 1024 * 1024 + 4096
 
         async def bounded_receive():
             nonlocal consumed

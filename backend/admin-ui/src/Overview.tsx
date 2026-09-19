@@ -38,7 +38,7 @@ export function Overview({data}: {data: OverviewData}) {
       </section>;
     })}</div>
     <div className="bottom-grid"><section className="panel"><div className="panel-heading"><div><h2>阶段积压</h2><p className="muted">待执行包含暂停与暂不可调度阶段；阶段数可多于页数。</p></div></div>
-      <Table heads={['阶段', '待执行', '执行中', '等待依赖']}>{['validate_upload', 'analyze', 'text', 'inpaint', 'render', 'redraw'].map(name => <tr key={name}><td>{label(name)}</td>
+      <Table heads={['阶段', '待执行', '执行中', '等待依赖']}>{['validate_upload', 'page', 'analyze', 'text', 'inpaint', 'render', 'redraw'].map(name => <tr key={name}><td>{label(name)}</td>
         {['ready', 'running', 'waiting'].map(status => <td key={status} className="numeric">{number(data.stages.filter(s => s.name === name && s.status === status).reduce((n, s) => n + s.count, 0))}</td>)}</tr>)}</Table>
     </section><section className="panel account-overview"><h2>用户与资源</h2>
       <div className="mini-stat"><span>注册用户</span><strong>{number(data.users.total)}</strong></div>

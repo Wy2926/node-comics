@@ -15,6 +15,6 @@ def snapshot(db, provider_id=None):
     text = text_profile(db, provider_id)
     return {"mode": "classic", "prompt_version": "translation-channels-v1",
             "provider": {"id": text["provider_id"], "timeout_seconds": cfg.classic_timeout_seconds},
-            "engine": {"version": cfg.classic_engine_version},
+            "engine": {"version": cfg.classic_engine_version, "protocol_version": 2},
             "stage_attempts": cfg.cluster_stage_attempts,
             "text": text}

@@ -130,6 +130,8 @@ def node_lease(db, lease_id, token, identity):
     lease, stage, job = current_lease(db, lease_id, token)
     if lease.node_id != identity:
         problem("NODE_SCOPE_MISMATCH", "此任务未授权给该节点", 403)
+    if stage.name == 'page':
+        problem('PROTOCOL_MISMATCH', '整页租约必须使用 v2 接口', 409)
     return lease, stage, job
 
 
@@ -176,6 +178,12 @@ class CompletionRequest(LeaseRequest):
 
 @router.post("/internal/leases/{lease_id}/complete")
 def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)):
+    from .db import session_factory
+    from .queue_models import ExecutionLease, JobStage
+    with session_factory()() as db:
+        existing = db.get(ExecutionLease, lease_id)
+        if existing and db.get(JobStage, existing.stage_id).name == 'page':
+            problem('PROTOCOL_MISMATCH', '整页租约必须使用 v2 接口', 409)
     if (body.result is None) == (body.error is None):
         problem("INVALID_COMPLETION", "必须且只能提交结果或错误", 422)
     from .workers import complete_stage, fail_stage, finish_stopped_lease
