@@ -41,7 +41,6 @@
 .nc-recent-body .nc-recent-position{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
 .nc-recent-position strong{font-size:1rem;font-weight:750}
 .nc-recent-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
-.nc-recent-footer time{color:var(--muted);font-size:.75rem;line-height:1.6;white-space:nowrap;font-variant-numeric:tabular-nums}
 .nc-recent-footer>.button{flex-shrink:0}
 @media(max-width:800px){.nc-recent-grid{grid-template-columns:minmax(0,1fr);gap:12px}
 .nc-recent-card{grid-template-columns:110px minmax(0,1fr)}
@@ -248,20 +247,20 @@ html:has(.nc-library) {scrollbar-gutter:stable}
 .nc-version-filter strong,.nc-version-picker .nc-choice-card strong {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:inherit;font-weight:650;line-height:1.4}
 .nc-version-filter small,.nc-version-picker .nc-choice-card small {display:block;min-width:0;margin:0;font-size:.73rem;font-weight:400;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nc-version-picker .nc-choice-card>b {flex:0 0 4em;text-align:right}
-/* Shelf typography: title first, reading progress second, storage and dates last. */
-.nc-shelf-grid .nc-library-card-body {--card-title-size:1.125rem;grid-template-rows:calc(var(--card-title-size) * 2.9) auto 36px;gap:.625rem;padding:1rem}
+/* Covers carry reading and storage metadata; the body keeps the title and actions. */
+.nc-shelf-grid .nc-library-card-body {--card-title-size:1.125rem;grid-template-rows:calc(var(--card-title-size) * 2.9) 36px;gap:.625rem;padding:1rem}
 .nc-shelf-grid .nc-card-title {grid-row:1;color:var(--ink);line-height:1.45;letter-spacing:.01em}
 .nc-shelf-grid .nc-card-title>button {line-height:inherit;max-height:2.9em;font-weight:700}
-.nc-shelf-cover-badge {position:absolute;top:12px;left:12px;max-width:calc(100% - 24px);padding:4px 8px;border-radius:6px;background:#172337db;color:#fff;font-size:.75rem;font-weight:650;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px);pointer-events:none}
-.nc-shelf-grid .nc-card-meta {grid-template-rows:1.375rem 1.25rem auto;row-gap:.125rem}
-.nc-shelf-grid .nc-card-meta p {font-size:.75rem;line-height:1.25rem}
-.nc-shelf-grid .nc-card-meta p:first-child {font-size:.8125rem;line-height:1.375rem;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
-.nc-shelf-read-count {color:var(--accent);font-size:1rem;font-weight:750}
-.nc-shelf-read-total {color:var(--muted);font-weight:400}
-.nc-shelf-grid .nc-card-meta p:last-child {display:flex;flex-direction:column;gap:.125rem;min-height:3rem;margin-top:.25rem;padding-top:.375rem;border-top:1px solid var(--line);white-space:normal}
-.nc-shelf-reading-label {font-size:.6875rem;line-height:1.125rem;font-weight:500;color:var(--muted);letter-spacing:.04em}
-.nc-shelf-grid .nc-card-meta time {font-size:.78125rem;line-height:1.25rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.nc-shelf-unread {font-size:.78125rem;line-height:1.25rem;color:var(--muted)}
+.nc-cover-topline {position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:5px;pointer-events:none}
+.nc-cover-tag {display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:4px 7px;border:1px solid #ffffff26;border-radius:6px;background:#172337dc;color:#fff;font-size:11px;font-weight:600;line-height:1.4;backdrop-filter:blur(8px);font-variant-numeric:tabular-nums}
+.nc-cover-details {position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:38px 12px 12px;background:linear-gradient(transparent,#101c2cdd);color:#fff;text-align:left;pointer-events:none}
+.nc-cover-reading {display:flex;align-items:flex-start;gap:6px;font-size:11px;line-height:1.5;font-weight:500;text-shadow:0 1px 3px #0008}
+.nc-cover-reading svg {flex-shrink:0;margin-top:2px}
+.nc-cover-reading>span {display:flex;flex-direction:column;gap:1px}
+.nc-cover-reading time {font-variant-numeric:tabular-nums;white-space:normal;line-height:1.5}
+.nc-cover-reading>span>span {font-size:10px;color:#ffffffc9}
+.nc-recent-cover .nc-cover-details {padding:28px 8px 10px}
+.nc-recent-cover .nc-cover-reading {font-size:10px;gap:4px}
 .nc-library .nc-shelf-grid .nc-library-card-actions>.button {font-size:.8125rem;font-weight:650}
 @media(max-width:640px) {
   .nc-library-card-body {--card-title-size:.9rem;padding:12px}
@@ -269,7 +268,10 @@ html:has(.nc-library) {scrollbar-gutter:stable}
 .nc-library .nc-library-card-actions>.button {font-size:.72rem;padding:0 2px}
 .nc-card-meta p {font-size:.7rem}
 .nc-shelf-grid .nc-library-card-body {--card-title-size:1rem;padding:.75rem;gap:.5rem}
-.nc-shelf-grid .nc-card-meta time,.nc-shelf-unread {font-size:.75rem}
+.nc-cover-topline {top:8px;left:8px;right:8px}
+.nc-cover-tag {font-size:10px;padding:3px 5px}
+.nc-cover-details {padding:30px 9px 10px;gap:6px}
+.nc-cover-reading {font-size:10px}
 .nc-library .nc-shelf-grid .nc-library-card-actions>.button {font-size:.75rem}
 }
 @media(max-width:359px) {

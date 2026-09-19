@@ -5,7 +5,7 @@ import type {Mode,Page,ModeEntitlement,ModeQueue} from '../types';
 import type {UploadManifest} from './store';
 
 export type ReadingTarget={copyId:string;page:Page;mode:Mode};
-export type TranslationState={kind:'waiting'|'translating'|'upgrade'|'error'|'login';message:string};
+export type TranslationState={kind:'waiting'|'translating'|'upgrade'|'error'|'login';message:string;retryable?:boolean;retryLabel?:string};
 export const targetKey=(copyId:string,page:Page,mode:Mode)=>JSON.stringify([copyId,page.id,mode]);
 export const exhausted=(rights:ModeEntitlement)=>!rights.allowed||!rights.unlimited&&(rights.quota?.available??0)<=0;
 export const quotaErrors=new Set(['DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','PLUS_REQUIRED','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED']);

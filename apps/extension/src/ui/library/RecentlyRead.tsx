@@ -1,3 +1,4 @@
+import {Icon} from '../../icons';
 import type {ReadingCopy} from '../../types';
 import type {ComicWork} from '../../library/types';
 import {Thumbnail} from '../../reader/Images';
@@ -14,12 +15,12 @@ export function RecentlyRead({items,onOpen,onWork}:{items:{work:ComicWork;copy:R
   <div className="nc-recent-grid">{items.map(({work,copy})=>{
    const page=copy.pages.findIndex(p=>p.id===copy.pageId),available=savedPages(copy)>0;
    return <article className="nc-recent-card" key={work.id}>
-    <button className="nc-recent-cover" aria-label={'打开作品 '+work.title} onClick={()=>onWork(work.id)}><Thumbnail blobKey={copyCover(copy)?.blobKey} alt={work.title+'封面'}/></button>
+    <button className="nc-recent-cover" aria-label={'打开作品 '+work.title} onClick={()=>onWork(work.id)}><Thumbnail blobKey={copyCover(copy)?.blobKey} alt={work.title+'封面'}/><span className="nc-cover-details"><span className="nc-cover-reading"><Icon name="clock" size={13}/><time dateTime={new Date(copy.lastReadAt!).toISOString()} title={'最近阅读：'+formatReadingTime(copy.lastReadAt)}>{formatReadingTime(copy.lastReadAt)}</time></span></span></button>
     <div className="nc-recent-body">
      <h3 title={work.title}><button onClick={()=>onWork(work.id)}>{work.title}</button></h3>
      <p title={copy.title}>{copy.title}</p>
      <p className="nc-recent-position">{page>=0?<>上次读到第 <strong>{page+1}</strong> 页</>:'阅读位置待恢复'}</p>
-     <div className="nc-recent-footer"><time dateTime={new Date(copy.lastReadAt!).toISOString()} title={'最近阅读：'+formatReadingTime(copy.lastReadAt)}>{formatReadingTime(copy.lastReadAt)}</time><button className="button primary small" onClick={()=>available?onOpen(copy.id):onWork(work.id)}>{available?'继续阅读':'查看内容'}<span aria-hidden="true">→</span></button></div>
+     <div className="nc-recent-footer"><button className="button primary small" onClick={()=>available?onOpen(copy.id):onWork(work.id)}>{available?'继续阅读':'查看内容'}<span aria-hidden="true">→</span></button></div>
     </div>
    </article>;
   })}</div>

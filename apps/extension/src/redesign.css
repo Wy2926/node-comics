@@ -862,8 +862,6 @@ a {
   overflow: hidden;
   background: #e9edf2;
   --reading-ink: #536177;
-  --reader-top: 68px;
-  --reader-bottom: 76px;
 }
 .nc-reader[data-background=paper] {
   background: #f5f2ec;
@@ -873,58 +871,12 @@ a {
   background: #121820;
   --reading-ink: #c0ccdc;
 }
-.nc-reader-top {
-  height: var(--reader-top);
-  min-height: var(--reader-top);
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 24px;
-  z-index: 31;
-  transition: transform .2s;
-}
-.nc-reader-top h1 {
-  font-size: 1.125rem;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  font-weight: 650;
-  flex: 1;
-}
-.nc-reader-top .nc-mode-button {
-  font-size: .875rem;
-  white-space: nowrap;
-  padding: 8px 12px;
-  min-height: 40px;
-}
-.nc-reader-status {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 7px 20px;
-  font-size: .875rem;
-  color: var(--reading-ink);
-  position: relative;
-  z-index: 3;
-}
 .nc-status-dot {
   width: 7px;
   height: 7px;
   background: currentColor;
   border-radius: 50%;
   animation: nc-pulse 1.8s infinite;
-}
-.nc-reader-status .text-link {
-  color: var(--reading-ink);
-  font-size: .875rem;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  min-height: 24px;
 }
 .nc-reading-viewport {
   position: relative;
@@ -1040,51 +992,6 @@ a {
 .nc-reader-end small {
   font-size: .875rem;
 }
-.nc-reader-bottom {
-  height: var(--reader-bottom);
-  min-height: var(--reader-bottom);
-  padding: 0 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  z-index: 31;
-  transition: transform .2s;
-}
-.nc-page-navigation {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.nc-page-navigation label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-}
-.nc-page-navigation input {
-  width: 64px;
-  text-align: center;
-  padding: 6px;
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-.nc-page-navigation input::-webkit-inner-spin-button {
-  appearance: none;
-}
-.nc-reader-primary {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-.nc-bottom-auto {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: .875rem;
-}
 .nc-app .switch {
   height: 26px;
   width: 46px;
@@ -1118,15 +1025,15 @@ a {
 }
 .nc-drawer-scrim {
   position: absolute;
-  inset: var(--reader-top) 0 var(--reader-bottom);
+  inset: 0;
   z-index: 20;
   background: transparent;
   cursor: default;
 }
 .nc-reader-drawer {
   position: absolute;
-  top: var(--reader-top);
-  bottom: var(--reader-bottom);
+  top: 12px;
+  bottom: 12px;
   width: 370px;
   max-width: calc(100% - 24px);
   background: var(--surface);
@@ -1287,15 +1194,6 @@ a {
   place-items: center;
   border-radius: 50%;
   opacity: .85;
-}
-.controls-hidden .nc-reader-top {
-  transform: translateY(-100%);
-}
-.controls-hidden .nc-reader-bottom {
-  transform: translateY(100%);
-}
-.controls-hidden .nc-reader-top:focus-within,.controls-hidden .nc-reader-bottom:focus-within {
-  transform: none;
 }
 /* Existing settings/admin controls share the same type scale and semantic surfaces. */
 .nc-app .page-title {
@@ -1686,16 +1584,6 @@ a {
   .nc-brand b {
     font-size: 1rem;
   }
-  .nc-reader-bottom {
-    gap: 12px;
-    padding: 0 18px;
-  }
-  .nc-reader-primary {
-    gap: 14px;
-  }
-  .nc-reader-top {
-    padding: 0 16px;
-  }
   .nc-header-actions {
     gap: 8px;
   }
@@ -1827,66 +1715,6 @@ a {
   .nc-feedback-record {
     flex-direction: column;
   }
-  .nc-reader {
-    --reader-top: 62px;
-    --reader-bottom: 120px;
-  }
-  .nc-reader-top {
-    gap: 8px;
-    padding: 0 10px;
-  }
-  .nc-reader-top h1 {
-    font-size: 1rem;
-  }
-  .nc-reader-top .nc-mode-button {
-    padding: 6px 10px;
-    max-width: 180px;
-    gap: 6px;
-  }
-  .nc-mode-button>span {
-    white-space: normal;
-    line-height: 1.4;
-    font-size: .8125rem;
-  }
-  .nc-reader-top .nc-mode-button>svg:first-child {
-    display: none;
-  }
-  .nc-reader-status {
-    gap: 7px 12px;
-    padding: 6px 12px;
-    min-height: 44px;
-  }
-  .nc-reader-status .text-link {
-    font-size: .8125rem;
-  }
-  .nc-reader-bottom {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 8px;
-    padding: 10px 14px;
-  }
-  .nc-page-navigation {
-    justify-self: end;
-    gap: 4px;
-  }
-  .nc-reader-primary {
-    grid-column: 1 / -1;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .nc-reader-primary>.button {
-    flex: 1;
-    font-size: .9375rem;
-    max-width: 280px;
-  }
-  .nc-bottom-auto {
-    font-size: .875rem;
-    gap: 8px;
-  }
-  .nc-reader-bottom>.button {
-    font-size: .9375rem;
-    padding: 8px 14px;
-  }
   .nc-reader-drawer {
     max-width: calc(100% - 16px);
     width: 350px;
@@ -1949,9 +1777,6 @@ a {
   .nc-history-summary>.nc-thumbnail {
     display: none;
   }
-  .nc-reader-top .nc-mode-button {
-    max-width: 158px;
-  }
   .nc-app-header nav>button>svg {
     display: none;
   }
@@ -1967,9 +1792,6 @@ a {
   }
 }
 /* Reader controls and full-area sizing. */
-.nc-reader {
-  --reader-bottom: 48px;
-}
 .nc-reading-surface {
   padding-bottom: 0;
 }
@@ -1981,31 +1803,6 @@ a {
 }
 .nc-page-picture .nc-image-placeholder {
   min-height: 0;
-}
-.nc-top-auto {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: none;
-}
-.nc-top-auto>span {
-  font-size: .875rem;
-  line-height: 1.3;
-}
-.nc-top-auto small {
-  display: block;
-  font-size: .6875rem;
-  color: var(--muted);
-  margin-top: 3px;
-}
-.nc-current-page-number {
-  font-size: .8125rem;
-  font-variant-numeric: tabular-nums;
-}
-.nc-reader-status {
-  min-height: 44px;
-  padding: 5px 20px;
-  flex-shrink: 0;
 }
 .nc-reader-choices {
   width: 100%;
@@ -2021,121 +1818,6 @@ a {
 }
 .nc-ahead-field .unit-input input {
   width: 88px;
-}
-.nc-reader-bottom {
-  display: flex;
-  height: var(--reader-bottom);
-  min-height: var(--reader-bottom);
-  padding: 0 22px;
-  gap: 18px;
-}
-.nc-page-navigation {
-  gap: 4px;
-  flex: none;
-  font-size: .8125rem;
-  font-variant-numeric: tabular-nums;
-}
-.nc-page-navigation .icon-button {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-}
-.nc-page-navigation input {
-  width: 48px;
-  height: 30px;
-  min-height: 30px;
-  font-size: .8125rem;
-  padding: 3px;
-}
-.nc-page-navigation label {
-  gap: 4px;
-}
-.nc-seek {
-  position: relative;
-  flex: 1;
-  min-width: 36px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-}
-.nc-seek-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 4px;
-  border-radius: 10px;
-  background: var(--line);
-  overflow: hidden;
-  pointer-events: none;
-}
-.nc-seek-track>span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-}
-.nc-seek input[type=range] {
-  position: relative;
-  width: 100%;
-  height: 30px;
-  min-height: 0;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  z-index: 1;
-}
-.nc-seek input[type=range]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: transparent;
-}
-.nc-seek input[type=range]::-webkit-slider-thumb {
-  appearance: none;
-  height: 12px;
-  width: 12px;
-  margin-top: -4px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--surface);
-}
-.nc-seek input[type=range]::-moz-range-track {
-  height: 4px;
-  background: transparent;
-}
-.nc-seek input[type=range]::-moz-range-thumb {
-  height: 12px;
-  width: 12px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.nc-seek input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-.nc-seek-preview {
-  position: absolute;
-  bottom: 35px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  border-radius: 7px;
-  font-size: .75rem;
-  pointer-events: none;
-  box-shadow: var(--shadow);
-}
-.nc-read-percent {
-  font-size: .75rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  min-width: 32px;
-  text-align: right;
 }
 .nc-task-animation {
   display: inline-flex;
@@ -2258,79 +1940,11 @@ a {
   gap: 6px;
 }
 @media(max-width:760px) {
-  .nc-reader {
-    --reader-top: 62px;
-    --reader-bottom: 46px;
-  }
-  .nc-reader-top {
-    gap: 5px;
-    padding: 0 8px;
-  }
-  .nc-reader-top .icon-button {
-    width: 32px;
-    height: 36px;
-    flex: none;
-  }
-  .nc-reader-top h1 {
-    font-size: .875rem;
-    min-width: 0;
-  }
-  .nc-reader-top .nc-mode-button {
-    width: 36px;
-    min-width: 36px;
-    max-width: 36px;
-    padding: 8px;
-    justify-content: center;
-  }
-  .nc-reader-top .nc-mode-button>span,.nc-reader-top .nc-mode-button>svg:last-child {
-    display: none;
-  }
-  .nc-reader-top .nc-mode-button>svg:first-child {
-    display: block;
-  }
-  .nc-top-auto {
-    gap: 6px;
-    margin-left: 3px;
-  }
-  .nc-top-auto>span {
-    font-size: .75rem;
-  }
-  .nc-top-auto small {
-    font-size: .625rem;
-  }
-  .nc-top-auto .switch {
-    width: 40px;
-    min-width: 40px;
-  }
-  .nc-top-auto .switch.on i {
-    transform: translateX(12px);
-  }
-  .nc-reader-status {
-    gap: 6px 9px;
-    padding: 5px 8px;
-  }
-  .nc-current-page-number {
-    font-size: .75rem;
-  }
-  .nc-reader-bottom {
-    display: flex;
-    padding: 0 10px;
-    gap: 10px;
-  }
-  .nc-page-navigation {
-    gap: 1px;
-  }
-  .nc-page-navigation input {
-    width: 36px;
-  }
-  .nc-read-percent {
-    min-width: 29px;
-  }
   .nc-app.is-reading .toast {
     bottom: 62px;
   }
 }
-/* Keep the original compact status area; only its controls change. */
+
 .nc-reading-viewport {
   scrollbar-width: none;
   scrollbar-gutter: auto;
@@ -2378,78 +1992,71 @@ a {
     padding: 3px 7px;
   }
 }
-/* Immersive controls overlay the pages, so revealing them never resizes the viewport. */
-.nc-reader.is-immersive .nc-reader-top {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-}
-.nc-reader.is-immersive .nc-reader-bottom {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-}
-.nc-reader.is-immersive .nc-reader-status {
-  position: absolute;
-  top: calc(var(--reader-top) + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: calc(100% - 24px);
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  z-index: 19;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .15s,top .2s;
-}
-.nc-reader.is-immersive.controls-hidden .nc-reader-status {
-  top: 12px;
-}
-.nc-reader.is-immersive:has(.nc-page-picture:hover) .nc-reader-status,
-.nc-reader.is-immersive .nc-reader-status:hover,
-.nc-reader.is-immersive .nc-reader-status:has(:focus-visible) {
-  opacity: 1;
-  pointer-events: auto;
-}
-/* Only the page number and view selector determine the center; actions and notes extend to the right. */
+
+
 .nc-page-versions button {
   font-weight: 600;
 }
-.nc-page-status-main {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  max-width: 100%;
-  min-width: 0;
-}
-.nc-page-status-main>.nc-current-page-number {
-  flex: none;
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.nc-reader.is-immersive .nc-page-status-main {
-  min-height: 44px;
-  padding: 5px 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-}
-/* The transparent bridge keeps both panels usable when crossing the gap. */
+
 
 .nc-stat-grid.nc-entitlements-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media(max-width:760px) { .nc-stat-grid.nc-entitlements-grid { grid-template-columns: 1fr; } }
 
 .nc-page-picture { position:relative; }
 .nc-image-translation { position:absolute; top:10px; left:10px; z-index:2; display:flex; align-items:center; gap:8px; max-width:calc(100% - 20px); padding:8px 12px; border:1px solid rgba(255,255,255,.65); border-radius:12px; background:rgba(255,255,255,.94); color:#42526b; box-shadow:0 3px 14px #24355220; font-family:inherit; font-size:12px; font-weight:500; line-height:1.5; text-align:left; }
-.nc-image-translation span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nc-translation-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nc-image-translation.upgrade { color:#755022; background:#fff3d9; border-color:#efcf90; cursor:pointer; }
 .nc-image-translation.error,.nc-image-translation.login { cursor:pointer; }
+.nc-image-translation.error {color:#963a52;border-color:#eec5cf;background:#fff5f7}
+.nc-translation-retry {display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-weight:650}
+button.nc-image-translation:hover {box-shadow:0 4px 18px #24355235}
+button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+
+/* Side tools keep the full viewport height and stay outside the image canvas. */
+.nc-reader {--reader-gutter:92px}
+.nc-reader .nc-reading-viewport {margin-inline:var(--reader-gutter)}
+.nc-reader-rail {position:absolute;top:50%;transform:translateY(-50%);z-index:31;width:72px;max-height:calc(100% - 24px);overflow:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:8px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:0 4px 20px #13213512;transition:opacity .2s}
+.nc-reader-rail.left {left:10px}
+.nc-reader-rail.right {right:10px}
+.nc-reader-rail button {position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px;width:100%;padding:7px 2px;border-radius:9px;font-size:11px;line-height:1.3;color:var(--muted)}
+.nc-reader-rail button:hover,.nc-reader-rail button[aria-expanded=true] {background:var(--accent-soft);color:var(--accent)}
+.nc-reader-rail button:focus-visible {outline:2px solid var(--accent);outline-offset:-2px}
+.nc-rail-notice {position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.nc-rail-divider {height:1px;margin:3px 4px;background:var(--line);flex-shrink:0}
+.nc-reader-rail .nc-page-versions {display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:0;border:0}
+.nc-reader-rail .nc-page-versions button[aria-pressed=true] {color:var(--accent);background:var(--accent-soft);box-shadow:none}
+.nc-reader-navigation {display:flex;flex-direction:column;align-items:center;gap:7px}
+.nc-reader-navigation label {display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nc-reader-navigation input[type=number] {width:48px;min-height:32px;padding:4px 0;text-align:center;font-size:14px;appearance:textfield}
+.nc-reader-navigation input::-webkit-inner-spin-button {appearance:none}
+.nc-reader-navigation .nc-reader-progress {writing-mode:vertical-lr;direction:ltr;width:28px;height:clamp(50px,17dvh,160px);min-height:0;padding:0;accent-color:var(--accent);cursor:pointer}
+.nc-reader.controls-hidden .nc-reader-rail {opacity:0;pointer-events:none}
+.nc-reader.controls-hidden .nc-reader-rail:focus-within {opacity:1;pointer-events:auto}
+.nc-reader .nc-reader-drawer {top:12px;bottom:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;max-width:calc(100% - var(--reader-gutter) - 12px)}
+.nc-reader .nc-reader-drawer.left {left:var(--reader-gutter)}
+.nc-reader .nc-reader-drawer.right {right:var(--reader-gutter)}
+.nc-translation-popover {position:absolute;z-index:35;top:50%;right:var(--reader-gutter);transform:translateY(-50%);width:304px;max-width:calc(100% - var(--reader-gutter) - 12px);max-height:calc(100% - 24px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 36px #13213524;color:var(--ink)}
+.nc-translation-popover .nc-drawer-title {padding:12px 14px;border-bottom:0;flex-shrink:0}
+.nc-translation-popover h2 {font-size:14px}
+.nc-translation-popover .nc-drawer-content {padding:0 16px 16px;flex:0 1 auto}
+.nc-translation-popover .field {margin:0 0 14px;gap:7px;font-size:12px}
+.nc-translation-popover .nc-reader-choices {flex-wrap:wrap}
+.nc-translation-popover .nc-reader-choices button {font-size:12px;min-height:34px;padding:6px}
+.nc-reader .nc-translation-popover .nc-default-mode-note {margin:0;font-size:11px;line-height:1.6}
+.nc-reader .nc-source-status {flex-wrap:wrap;gap:8px;font-size:12px}
+.nc-reader .nc-empty {margin:auto var(--reader-gutter)}
+@media(max-width:760px) {
+  .nc-reader {--reader-gutter:50px}
+  .nc-reader-rail {width:44px;padding:4px;border-radius:12px;gap:3px}
+  .nc-reader-rail.left {left:3px}
+  .nc-reader-rail.right {right:3px}
+  .nc-reader-rail button {min-height:42px;font-size:10px;gap:3px}
+  .nc-reader-rail.right>button>span {display:none}
+  .nc-reader-navigation input[type=number] {width:32px;font-size:12px}
+  .nc-reader-navigation label {font-size:10px}
+  .nc-reader .nc-reader-drawer {top:8px;bottom:8px}
+  .nc-translation-popover .nc-drawer-content {padding:0 12px 12px}
+  .nc-translation-popover .nc-reader-choices button {white-space:normal}
+  .nc-image-translation.error {align-items:flex-start;flex-wrap:wrap;gap:3px 8px;padding:7px 9px}
+  .nc-image-translation.error .nc-translation-message {flex-basis:100%}
+}
