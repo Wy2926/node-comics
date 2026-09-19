@@ -1,13 +1,10 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Api } from '../api';
-import { fallbackLanguages, supportsLanguage, type Capabilities, type Settings, type ModeQueue } from '../types';
+import { fallbackLanguages, supportsLanguage, type Capabilities, type Settings } from '../types';
 import { normalizeConcurrency } from '../concurrency';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
 type Props = {
-  api: Api;
-  account: boolean;
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
@@ -16,26 +13,9 @@ type Props = {
   onClearCache: () => void;
   onSaveApiAddress: (draft: string) => Promise<void>;
 };
-export function Preferences({ api, account, settings, setSettings, caps, cacheBytes, onClearCache, onSaveApiAddress }: Props) {
+export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCache, onSaveApiAddress }: Props) {
   const [apiDraft, setApiDraft] = useState(settings.apiBase);
   useEffect(() => setApiDraft(settings.apiBase), [settings.apiBase]);
-  const [queue, setQueue] = useState<ModeQueue[]>([]);
-  const [queueError, setQueueError] = useState('');
-  useEffect(() => {
-    if (!account)
-      return;
-    let active = true;
-    void api.queues().then(value => {
-      if (active && api.isCurrent()) {
-        setQueue(value.items);
-        setQueueError('');
-      }
-    }).catch(e => {
-      if (active && api.isCurrent())
-        setQueueError((e as Error).message);
-    });
-    return () => { active = false; };
-  }, [api, account]);
   return <>
     <PageTitle eyebrow="MAKE IT YOURS" title="外观与偏好" description="调成你喜欢的阅读节奏，偏好保存在本机。" />
     <AppearanceSettings settings={settings} onChange={setSettings} />
@@ -80,11 +60,10 @@ export function Preferences({ api, account, settings, setSettings, caps, cacheBy
     <section className="settings-card">
       <h3>
         <Icon name="globe" />翻译服务</h3>
-      <SettingRow title="本机请求并发" description="默认 2，可设 1–10。控制本阅读器的上传、匹配与译图下载等请求，不修改账户的服务器队列并发。">
+      <SettingRow title="本机图片传输并发" description="默认 2，可设 1–10。控制本阅读器的图片上传与下载；翻译计划和结果通知独立处理。">
         <label className="unit-input">
           <input aria-label="本机请求并发" type="number" min="1" max="10" step="1" value={settings.requestConcurrency} onChange={e => setSettings(s => ({ ...s, requestConcurrency: normalizeConcurrency(Number(e.target.value)) }))} /> 个</label>
-      </SettingRow>{account && <>
-        {queue.map(value=><SettingRow key={value.mode} title={value.mode==='classic'?'常规翻译队列':'AI 重绘队列'} description={`等待 ${value.queued} / 处理中 ${value.running}，实时名额 ${value.realtime_limit}。空闲资源可借用，同级用户按套餐权重公平分配。`}><span>{value.in_flight} / {value.capacity} 页</span></SettingRow>)}{queueError && <p className="inline-error">队列状态读取失败：{queueError}</p>}</>}<SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
+      </SettingRow><SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
         <input aria-label="后端服务地址" className="api-input" type="url" value={apiDraft} onChange={e => setApiDraft(e.target.value)} />
         <button className="button secondary small" onClick={() => void onSaveApiAddress(apiDraft)}>保存并连接</button>
       </SettingRow>

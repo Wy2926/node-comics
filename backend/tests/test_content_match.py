@@ -106,7 +106,7 @@ def test_completed_submission_cache_hits_by_content_without_second_charge(client
     alias=bind(client,auth,png,file_hash='d'*64).json()['id']
     from conftest import submit_asset
     receipt=submit_asset(client,auth,alias,key='repacked').json()
-    assert receipt['items'][0]['reused'] is True and receipt['quota_pages'] == 0
+    assert receipt['items'][0]['disposition'] == 'ready'
     cached=receipt['items'][0]['job']
     assert cached['id']==job['id']  # The submission item is reused; no new business job is billed.
     assert cached['output_asset_id']==job['output_asset_id']

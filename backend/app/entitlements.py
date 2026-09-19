@@ -149,6 +149,7 @@ def allowance_json(db, user, kind, at=None):
 def entitlements_json(db, user, at=None):
     at = at or now()
     plus = is_plus(user, at)
+    from .plan_limits import image_limit
     modes = {}
     for mode in ("classic", "redraw"):
         kind = quota_kind(user, mode, at, db)
@@ -158,8 +159,7 @@ def entitlements_json(db, user, at=None):
     starts_at, expires_at = plus_dates(user, at)
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "timezone": settings().quota_timezone,
-            "queue_capacity": min(settings().plus_queue_capacity, 10) if plus else min(settings().free_queue_capacity, 3),
-            "realtime_slots": min(settings().plus_realtime_slots, 10) if plus else min(settings().free_realtime_slots, 3),
+            "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
             "scheduler_weight": settings().plus_scheduler_weight if plus else settings().free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
@@ -225,6 +225,10 @@ def settle(db, job, *, success):
                   quota_kind=job.quota_kind, transaction_key=f"{job.id}:{operation}", kind=operation,
                   amount=job.quota_pages))
     job.settlement = "settled" if success else "released"
+    if not success:
+        from .plan_limits import policy_snapshot
+        db.flush()
+        policy_snapshot(db, db.get(User, job.owner_id), released=True)
 
 
 def change_membership(db, owner_id, operator_id, key, *, action, months=None, days=None, monthly_pages=None, note):

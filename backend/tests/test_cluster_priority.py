@@ -1,168 +1,111 @@
-"""Public reading priorities and account changes use the durable submission contract."""
+"""Reading plans fence window updates and directly apply task priorities."""
 from datetime import timedelta
-
 import pytest
 from conftest import login, login_plus, png_variant, run_job, submit_asset, upload
-from test_cluster_submissions import cluster, grant_redraw, manifest, queue_for, submit
+from test_cluster_submissions import cluster, manifest, plan_item, submit
 
 
-def accepted(client, auth, count=1, *, mode='classic', key='pages'):
-    response = submit(client, auth, manifest(count, key), mode=mode, key=key)
-    assert response.status_code == 202, response.text
-    return [item['job']['id'] for item in response.json()['items']]
+def accepted(client,auth,count=1,*,mode="classic",key="pages"):
+    ids=[]
+    for index in range(count):
+        response=submit(client,auth,manifest(1,f"{key}-{index}"),mode=mode,key=f"{key}-{index}")
+        assert response.status_code==202,response.text
+        ids.append(response.json()["items"][0]["job"]["id"])
+    return ids
 
 
-def prioritize(client, auth, jobs, *, mode='classic', **fields):
-    body = {'session_id':'reader-a', 'sequence':1, 'expected_version':0,
-            'realtime_job_ids':jobs, 'ordered_job_ids':jobs, 'ttl_seconds':90, **fields}
-    return client.post(f'/v1/me/queues/{mode}/priority', headers=auth, json=body)
+def window_items(jobs):
+    from sqlalchemy import select
+    from app.db import session_factory
+    from app.models import Job
+    from app.plan_models import TranslationOperation
+    with session_factory()() as db:
+        items=[]
+        for index,job_id in enumerate(jobs):
+            job=db.get(Job,job_id)
+            op=db.scalar(select(TranslationOperation).where(TranslationOperation.job_id==job_id))
+            items.append(plan_item(op.descriptor["image"],op.operation_key,mode=job.mode,
+                role="current" if index==0 else "prefetch",job_id=job.id))
+        return items
 
 
-def delta(client, auth, cursor='0', limit=100):
-    response = client.get('/v1/me/translation-changes', headers=auth,
-                          params={'cursor':cursor, 'limit':limit})
-    assert response.status_code == 200, response.text
+def prioritize(client,auth,jobs,*,session_id="reader-a",sequence=1,**fields):
+    return client.post("/v1/translation-plans",headers=auth,json={"trigger":"reading",
+        "session_id":session_id,"sequence":sequence,"items":window_items(jobs),**fields})
+
+
+def lease(client,auth,session_id="reader-a",**fields):
+    return client.put(f"/v1/reading-sessions/{session_id}/lease",headers=auth,json={"modes":["classic"],**fields})
+
+
+def delta(client,auth,cursor="0",limit=100,**params):
+    response=client.get("/v1/me/translation-changes",headers=auth,
+        params={"cursor":cursor,"limit":limit,**params})
+    assert response.status_code==200,response.text
     return response.json()
 
 
-@pytest.mark.parametrize('plus,limit', [(False,3),(True,10)])
-def test_realtime_window_respects_account_limit(cluster, plus, limit):
-    client, _ = cluster
-    auth = (login_plus if plus else login)(client)
-    if not plus:
-        grant_redraw(client, auth, 20)
-    for mode in ('classic','redraw'):
-        ids = accepted(client, auth, limit, mode=mode, key=mode)
-        rejected = prioritize(client, auth, ids+["over-limit"], mode=mode)
-        assert rejected.status_code == 422 and rejected.json()['error']['code'] == 'REALTIME_LIMIT'
-        assert queue_for(client, auth, mode)['realtime_count'] == 0
-        response = prioritize(client, auth, ids[:limit], mode=mode, ordered_job_ids=ids)
-        assert response.status_code == 200, response.text
-        assert response.json()['realtime_job_ids'] == ids[:limit]
-        summary = queue_for(client, auth, mode)
-        assert summary['realtime_limit'] == summary['realtime_count'] == limit
-        for job_id in ids:
-            assert client.post(f'/v1/jobs/{job_id}/cancel',headers=auth).status_code == 200
+def test_plan_is_limited_to_three_pages_not_three_unfinished_jobs(cluster):
+    client,_=cluster
+    auth=login(client)
+    ids=accepted(client,auth,4)
+    assert prioritize(client,auth,ids).status_code==422
+    assert prioritize(client,auth,ids[:3]).status_code==200
+    assert client.get(f"/v1/jobs/{ids[3]}",headers=auth).json()["status"]=="awaiting_upload"
 
 
-@pytest.mark.parametrize('field', ['realtime_job_ids','ordered_job_ids'])
-@pytest.mark.parametrize('wrong_scope', ['user','mode'])
-def test_priority_rejects_other_accounts_and_modes_without_mutation(cluster, field, wrong_scope):
-    client, _ = cluster
-    auth = login_plus(client)
-    own = accepted(client, auth, key='own')
-    wrong = accepted(client, login_plus(client,'bob') if wrong_scope == 'user' else auth,
-                     mode='redraw' if wrong_scope == 'mode' else 'classic', key='other')
-    response = prioritize(client, auth, own, **{field:wrong})
-    assert response.status_code == 404 and response.json()['error']['code'] == 'NOT_FOUND'
-    assert queue_for(client, auth)['version'] == 0
-    assert queue_for(client, auth)['realtime_count'] == 0
-    assert prioritize(client, {}, own).status_code == 401
+def test_same_sequence_replay_and_conflict_never_reorder_window(cluster):
+    client,_=cluster
+    auth=login(client)
+    ids=accepted(client,auth,2)
+    first=prioritize(client,auth,ids,sequence=5)
+    assert first.status_code==200,first.text
+    cursor=delta(client,auth)["cursor"]
+    repeated=prioritize(client,auth,ids,sequence=5)
+    assert repeated.status_code==200
+    assert delta(client,auth,cursor)["items"]==[]
+    changed=prioritize(client,auth,list(reversed(ids)),sequence=5)
+    assert changed.status_code==409 and changed.json()["error"]["code"]=="READING_SEQUENCE_CONFLICT"
+    stale=prioritize(client,auth,ids,sequence=4)
+    assert stale.status_code==409 and stale.json()["error"]["code"]=="STALE_READING_PLAN"
 
 
-def test_global_ttl_cap_demotes_both_modes_for_all_accounts(cluster, monkeypatch):
-    from app import jobs, queue_api, scheduler
-    from app.config import settings
-    from app.models import now
-    client, _ = cluster
-    accounts = [login_plus(client,name) for name in ('alice','bob')]
-    items = [(auth,mode,accepted(client,auth,mode=mode,key=mode))
-             for auth in accounts for mode in ('classic','redraw')]
-    clock = [now()]
-    for module in (jobs,queue_api,scheduler):
-        monkeypatch.setattr(module,'now',lambda:clock[0])
-    settings().priority_ttl_seconds = 20
-    for auth,mode,ids in items:
-        response = prioritize(client,auth,ids,mode=mode,ttl_seconds=300)
-        assert response.status_code == 200, response.text
-        assert response.json()['expires_at'] == (clock[0]+timedelta(seconds=20)).isoformat()+'Z'
-        assert queue_for(client,auth,mode)['realtime_count'] == 1
-    clock[0] += timedelta(seconds=20)
-    for auth,mode,ids in items:
-        assert queue_for(client,auth,mode)['realtime_count'] == 0
-        assert client.get(f'/v1/jobs/{ids[0]}',headers=auth).json()['priority'] == 'preload'
-        response = prioritize(client,auth,ids,mode=mode,session_id='new-device',sequence=0,expected_version=1)
-        assert response.status_code == 200, response.text  # An expired controller needs no takeover.
+def test_stale_window_cannot_admit_new_work(cluster):
+    client,_=cluster
+    auth=login(client)
+    ids=accepted(client,auth)
+    assert prioritize(client,auth,ids,sequence=2).status_code==200
+    response=client.post("/v1/translation-plans",headers=auth,json={"trigger":"reading",
+        "session_id":"reader-a","sequence":1,"items":[plan_item(manifest(1,"old")[0],"old")]})
+    assert response.status_code==409
+    assert client.get("/v1/jobs",headers=auth).json()["total"]==1
 
 
-def test_priority_sequence_replay_is_idempotent_and_conflicts_are_rejected(cluster):
-    client, _ = cluster
-    auth = login(client)
-    ids = accepted(client,auth,2)
-    first = prioritize(client,auth,[ids[1]],ordered_job_ids=ids,sequence=5)
-    assert first.status_code == 200, first.text
-    before = delta(client,auth)
-    repeated = prioritize(client,auth,[ids[1]],ordered_job_ids=ids,sequence=5,expected_version=0)
-    assert repeated.json() == first.json()
-    assert delta(client,auth,before['cursor'])['items'] == []
-    changed = prioritize(client,auth,[ids[0]],sequence=5,expected_version=1)
-    older = prioritize(client,auth,[ids[0]],sequence=4,expected_version=1)
-    for response in (changed,older):
-        assert response.status_code == 409 and response.json()['error']['code'] == 'STALE_PRIORITY'
-    conflicting = prioritize(client,auth,ids,sequence=6,expected_version=0)
-    assert conflicting.status_code == 409
-    assert conflicting.json()['error']['code'] == 'QUEUE_VERSION_CONFLICT'
-    assert conflicting.json()['error']['version'] == 1
-    current = prioritize(client,auth,ids,sequence=6,expected_version=1)
-    assert current.status_code == 200 and current.json()['version'] == 2
+def test_priority_takeover_fences_former_controller(cluster):
+    client,_=cluster
+    auth=login(client)
+    ids=accepted(client,auth,2)
+    first=prioritize(client,auth,ids[:1])
+    assert first.status_code==200 and first.json()["priority"]["classic"]["owned"]
+    background=prioritize(client,auth,ids[1:],session_id="reader-b")
+    assert background.status_code==200 and not background.json()["priority"]["classic"]["owned"]
+    epoch=background.json()["priority"]["classic"]["epoch"]
+    takeover=lease(client,auth,"reader-b",priority_epochs={"classic":epoch},takeover=True)
+    assert takeover.status_code==200 and takeover.json()["priority"]["classic"]["owned"]
+    former=prioritize(client,auth,ids[:1],sequence=2,
+                      priority_epochs={"classic":first.json()["priority"]["classic"]["epoch"]})
+    assert former.status_code==409
+    assert client.get(f"/v1/jobs/{ids[0]}",headers=auth).json()["priority"]=="preload"
 
 
-def test_foreground_takeover_prevents_background_devices_stealing_priority(cluster):
-    client, _ = cluster
-    auth = login(client)
-    ids = accepted(client,auth,2)
-    assert prioritize(client,auth,[ids[0]]).status_code == 200
-    background = prioritize(client,auth,[ids[1]],session_id='reader-b',sequence=0,expected_version=1)
-    assert background.status_code == 409 and background.json()['error']['code'] == 'READING_SESSION_ACTIVE'
-    takeover = prioritize(client,auth,[ids[1]],session_id='reader-b',sequence=0,expected_version=1,takeover=True)
-    assert takeover.status_code == 200 and takeover.json()['session_id'] == 'reader-b'
-    former = prioritize(client,auth,[ids[0]],sequence=2,expected_version=2)
-    assert former.status_code == 409 and former.json()['error']['code'] == 'READING_SESSION_ACTIVE'
-    summary = queue_for(client,auth)
-    assert summary['session_id'] == 'reader-b' and summary['version'] == 2
-    assert client.get(f'/v1/jobs/{ids[1]}',headers=auth).json()['priority'] == 'realtime'
-    assert client.get(f'/v1/jobs/{ids[0]}',headers=auth).json()['priority'] == 'preload'
-
-
-def test_pause_is_mode_local_and_running_stages_keep_their_lease(cluster, png):
-    from app.config import settings
-    from app.db import session_factory
-    from app.queue_models import ComputeNode
-    from app.scheduler import claim_stage, current_lease
-    client, _ = cluster
-    auth = login_plus(client)
-    ids = {}
-    for mode in ('classic','redraw'):
-        ids[mode] = []
-        for index in range(2):
-            response = submit_asset(client,auth,upload(client,auth,png_variant(png,index)),key=f'{mode}-{index}',mode=mode)
-            assert response.status_code == 202, response.text
-            ids[mode].append(response.json()['items'][0]['job']['id'])
-    with session_factory()() as db:
-        db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='priority-node',name='test',resource_id='priority-node',capabilities=['page','redraw'],
-                           capacity=4,engine_version=settings().classic_engine_version,device='cpu'))
-        db.commit()
-        lease = claim_stage(db,'priority-node',['page'])
-        db.commit()
-        assert lease is not None
-        running_id,lease_id = lease.job_id,lease.id
-    paused = client.post('/v1/me/queues/classic/pause',headers=auth,json={'paused':True})
-    assert paused.status_code == 200 and paused.json()['paused']
-    version = paused.json()['version']
-    assert client.post('/v1/me/queues/classic/pause',headers=auth,json={'paused':True}).json()['version'] == version
-    assert not queue_for(client,auth,'redraw')['paused']
-    with session_factory()() as db:
-        assert current_lease(db,lease_id)[2].id == running_id
-        assert claim_stage(db,'priority-node',['page']) is None
-        assert claim_stage(db,'priority-node',['redraw']) is not None
-        db.commit()
-    running = client.get(f'/v1/jobs/{running_id}',headers=auth).json()
-    assert running['status'] == 'running' and not running['cancel_requested']
-    assert client.post('/v1/me/queues/classic/pause',headers=auth,json={'paused':False}).json()['version'] == version+1
-    assert client.post('/v1/me/queues/redraw/pause',headers=auth,json={'paused':True}).json()['paused']
-    with session_factory()() as db:
-        assert claim_stage(db,'priority-node',['page']) is not None
-        db.commit()
+def test_known_job_reference_is_owner_scoped(cluster):
+    client,_=cluster
+    alice,bob=login(client),login(client,"bob")
+    foreign=accepted(client,bob)
+    response=prioritize(client,alice,foreign)
+    assert response.status_code==200 and response.json()["items"][0]["disposition"]=="blocked"
+    assert response.json()["items"][0]["code"]=="NOT_FOUND"
+    assert client.get("/v1/jobs",headers=alice).json()["total"]==0
 
 
 def test_change_cursor_paginates_account_jobs_and_delivers_later_mutations(cluster, png, monkeypatch):
@@ -214,3 +157,43 @@ def test_unuploaded_classic_details_are_explicitly_not_ready(cluster):
     response = client.get(f'/v1/jobs/{job}/classic',headers=auth)
     assert response.status_code == 409 and response.json()['error']['code'] == 'INPUT_NOT_READY'
     assert client.get(f'/v1/jobs/{job}/classic',headers=login(client,'bob')).status_code == 404
+
+
+def test_newly_admitted_window_is_prioritized_before_reply_and_empty_window_releases_it(cluster):
+    from app.db import session_factory
+    from app.models import Job
+    client,_=cluster
+    auth=login(client)
+    response=submit(client,auth,manifest(3),key='atomic-reading')
+    assert response.status_code==202
+    ids=[item['job']['id'] for item in response.json()['items']]
+    assert all(item['job']['priority']=='realtime' for item in response.json()['items'])
+    with session_factory()() as db:
+        assert [db.get(Job,job).priority_rank for job in ids]==[0,1,2]
+    released=client.post('/v1/translation-plans',headers=auth,json={
+        'trigger':'reading','session_id':'fixture-atomic-reading','sequence':2,'items':[]})
+    assert released.status_code==200
+    assert all(client.get(f'/v1/jobs/{job}',headers=auth).json()['priority']=='preload' for job in ids)
+    assert all(client.get(f'/v1/jobs/{job}',headers=auth).json()['status']=='awaiting_upload' for job in ids)
+
+
+def test_expired_session_can_resolve_accepted_operation_but_cannot_add_new_work(cluster,monkeypatch):
+    from app.db import session_factory
+    from app.models import now
+    from app.plan_models import ReadingSession
+    from test_cluster_submissions import resolve
+    client,_=cluster
+    auth=login(client)
+    ids=accepted(client,auth)
+    first=prioritize(client,auth,ids)
+    assert first.status_code==200
+    owner=client.get('/v1/me',headers=auth).json()['user']['id']
+    with session_factory()() as db:
+        db.get(ReadingSession,(owner,'reader-a')).expires_at=now()-timedelta(seconds=1)
+        db.commit()
+    response=client.post('/v1/translation-plans',headers=auth,json={
+        'trigger':'reading','session_id':'reader-a','sequence':2,
+        'items':[plan_item(manifest(1,'new')[0],'new')]})
+    assert response.status_code==409 and response.json()['error']['code']=='READING_SESSION_EXPIRED'
+    assert resolve(client,auth,['pages-0']).json()['items'][0]['job']['id']==ids[0]
+    assert client.get('/v1/jobs',headers=auth).json()['total']==1

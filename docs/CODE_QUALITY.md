@@ -60,7 +60,7 @@ cd backend
 - 前端 122 项测试通过；TypeScript、43 模块检查、Chrome MV3 与 Web 构建通过。
 - 后端 159 项通过，14 项 PostgreSQL 相关用例跳过；现有测试依赖产生两项弃用警告，本轮未升级依赖。
 - 重构后内存生成的 OpenAPI 与已有契约逐项相同，共 38 个路径；不需要数据库迁移。
-- 本节的 CSS 对照是历史验证记录。当前翻译流程使用 [集群阅读器检查脚本](../scripts/verify_cluster_reader.mjs) 与临时 API／模拟供应商，验证独立队列、预上传、关闭页面后继续消费、阅读位置与译图恢复；输出位于 `artifacts/cluster-validation/`。该脚本不提供旧自动翻译开关或 `CSS_BASELINE` 对比功能。
+- 本节的 CSS 对照是历史验证记录。当前翻译流程使用 [阅读计划检查脚本](../scripts/verify_reading_api.mjs) 与临时 API／模拟供应商，验证阅读计划、原图上传、任务完成、阅读位置与译图恢复；输出位于 `artifacts/cluster-validation/`。该脚本不提供旧自动翻译开关或 `CSS_BASELINE` 对比功能。
 
 历史六组样式截图对照通过（含宽／窄设置页）；当时等待缩略图解码完成后做像素比较，并覆盖连续滚动位置保持。旧脚本的 `UI_ONLY` 与 `CSS_BASELINE` 参数已移除，历史结果保留在 `artifacts/auto-validation/ui-results.json`。供应商结果为模拟图片，不代表当前集群或真实翻译质量验收。
 

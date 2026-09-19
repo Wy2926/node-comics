@@ -23,7 +23,11 @@ def grant(client, auth, *, months=1, pages=None, key='open-plus'):
 def submit(client, auth, asset, mode='classic', key='new-page', **fields):
     import httpx
     response = submit_asset(client, auth, asset, key=f'{mode}:{key}', mode=mode, **fields)
-    return httpx.Response(response.status_code, json=response.json()['items'][0]['job'] if response.status_code == 202 else response.json())
+    result = response.json()
+    if 'items' in result:
+        item = result['items'][0]
+        result = item.get('job') or {'error': item}
+    return httpx.Response(response.status_code, json=result)
 
 
 def submit_many(client, auth, assets, mode='classic', key='manifest', maximum=None):
@@ -33,8 +37,11 @@ def submit_many(client, auth, assets, mode='classic', key='manifest', maximum=No
         items = [{'client_item_id': str(n), 'asset_id': asset.id, 'image_sha256': asset.sha256,
                   'byte_size': asset.byte_size, 'content_type': asset.mime}
                  for n, asset_id in enumerate(assets) for asset in [db.get(Asset, asset_id)]]
-    return client.post('/v1/translation-submissions', headers={**auth, 'Idempotency-Key':key},
-                       json={'items':items,'mode':mode,'target_language':'zh-Hans','max_quota_pages':len(items) if maximum is None else maximum})
+    return client.post('/v1/translation-plans', headers=auth, json={
+        'trigger':'reading', 'session_id':key, 'sequence':1,
+        'items':[{'page_key':str(n), 'operation_key':f'{key}:{n}', 'role':'current' if n == 0 else 'prefetch',
+                  'mode':mode, 'target_language':'zh-Hans', 'max_quota_pages':int(maximum != 0), 'image':item}
+                 for n, item in enumerate(items)]})
 
 
 def finish(job_id, success=True):
@@ -58,24 +65,25 @@ def test_defaults_and_admin_role_do_not_grant_plus(client):
     for name in ('alice', 'admin'):
         rights = entitlement(client, login(client, name))
         assert rights['plan'] == 'free'
-        assert rights['realtime_slots'] == 3 and rights['queue_capacity'] == 3
+        assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 30}
+        assert 'queue_capacity' not in rights and 'realtime_slots' not in rights
         assert rights['modes']['classic']['quota']['available'] == 100
         assert rights['modes']['redraw']['allowed'] is False
         assert rights['modes']['redraw']['quota'] is None
 
 
-def test_free_cannot_create_redraw_submission_or_reserve_capacity(client, png):
+def test_free_cannot_create_redraw_operation_or_consume_rate(client, png):
     auth = login(client)
     asset = upload(client, auth, png)
     response = submit(client, auth, asset, 'redraw')
-    assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
+    assert response.status_code == 200 and response.json()['error']['code'] == 'PLUS_REQUIRED'
     from app.db import session_factory
     from app.models import Job
-    from app.queue_models import Submission
+    from app.plan_models import TranslationOperation, ImageAdmission
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 0
-        assert db.scalar(select(func.count()).select_from(Submission)) == 0
-    assert all(q['in_flight'] == 0 for q in client.get('/v1/me/queues',headers=auth).json()['items'])
+        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 0
+        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 0
 
 
 def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
@@ -84,7 +92,7 @@ def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
     assert first.status_code == 200, first.text
     rights = entitlement(client, auth)
     assert rights['plan'] == 'plus' and rights['modes']['classic']['unlimited']
-    assert rights['queue_capacity'] == 10 and rights['realtime_slots'] == 10
+    assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 100}
     assert rights['modes']['classic']['quota'] is None
     assert rights['modes']['redraw']['quota']['granted'] == 300
     assert grant(client, auth, months=12).json() == first.json()
@@ -112,7 +120,8 @@ def test_period_quota_limit_reservations_and_release(client, png, mode):
     first = submit(client, auth, first_asset, mode).json()
     assert submit(client, auth, first_asset, mode, 'another-device').json()['id'] == first['id']
     rejection = submit(client, auth, second_asset, mode, 'second')
-    assert rejection.status_code == 409 and 'resets_at' in rejection.json()['error']
+    assert rejection.status_code == 200
+    assert rejection.json()['error']['code'] in {'DAILY_QUOTA_EXHAUSTED', 'REDRAW_QUOTA_EXHAUSTED'}
     finish(first['id'], False)
     assert entitlement(client, auth)['modes'][mode]['quota']['available'] == 1
     assert submit(client, auth, second_asset, mode, 'second').status_code == 202
@@ -167,22 +176,25 @@ def test_expiry_honors_accepted_job_and_rejects_new_work(client, png, monkeypatc
     job = submit(client, auth, asset, 'redraw').json()
     freeze(monkeypatch, datetime(2026, 2, 10, 3))
     assert entitlement(client, auth)['plan'] == 'free'
-    assert submit(client, auth, upload(client, auth, png_variant(png, 7)), 'redraw', 'after-expiry').status_code == 403
+    refused = submit(client, auth, upload(client, auth, png_variant(png, 7)), 'redraw', 'after-expiry')
+    assert refused.status_code == 200 and refused.json()['error']['code'] == 'PLUS_REQUIRED'
     # Replaying an accepted operation remains legal after expiration.
     assert submit(client, auth, asset, 'redraw').json()['id'] == job['id']
     finish(job['id'])
     assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 100
 
 
-def test_submission_rolls_back_all_pages_when_period_allowance_is_insufficient(client, png):
+def test_plan_keeps_current_page_when_later_page_exceeds_period_allowance(client, png):
     from app.config import settings
     settings().free_daily_pages = 1
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, i)) for i in (1, 2)]
     response = submit_many(client, auth, assets, maximum=2)
-    assert response.status_code == 409
-    assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 0
-    assert client.get('/v1/jobs', headers=auth).json()['total'] == 0
+    assert response.status_code == 202
+    assert [item['disposition'] for item in response.json()['items']] == ['accepted', 'blocked']
+    assert response.json()['items'][1]['code'] == 'DAILY_QUOTA_EXHAUSTED'
+    assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 1
+    assert client.get('/v1/jobs', headers=auth).json()['total'] == 1
 
 
 def test_membership_and_compensation_are_private_and_idempotent(client):
@@ -199,8 +211,7 @@ def test_membership_and_compensation_are_private_and_idempotent(client):
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 307
-    queues = client.get('/v1/me/queues', headers=auth).json()['items']
-    assert len(queues) == 2 and all(queue['capacity'] == 10 and queue['realtime_limit'] == 10 for queue in queues)
+    assert entitlement(client, auth)['image_rate_limit']['limit'] == 100
 
 
 def test_simultaneous_last_page_admission(client, png):
@@ -211,8 +222,10 @@ def test_simultaneous_last_page_admission(client, png):
     barrier = Barrier(2)
     def attempt(n):
         barrier.wait(timeout=10)
-        return submit(client, auth, assets[n], key=f'concurrent-{n}').status_code
+        result = submit(client, auth, assets[n], key=f'concurrent-{n}')
+        return result.status_code, result.json()
     with ThreadPoolExecutor(2) as pool:
-        codes = list(pool.map(attempt, range(2)))
-    assert sorted(codes) == [202, 409]
+        results = list(pool.map(attempt, range(2)))
+    assert sorted(code for code, _ in results) == [200, 202]
+    assert [body['error']['code'] for code, body in results if code == 200] == ['DAILY_QUOTA_EXHAUSTED']
     assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 1

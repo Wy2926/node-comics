@@ -15,13 +15,13 @@ from conftest import login
 
 def test_unknown_language_has_specific_code_before_admission(client):
     auth = login(client)
-    body = {'mode':'classic','target_language':'xx','max_quota_pages':1,'items':[
-        {'client_item_id':'p1','image_sha256':'a'*64,'byte_size':10,'content_type':'image/png'}]}
-    response = client.post('/v1/translation-submissions', headers={**auth,'Idempotency-Key':'unknown-language'}, json=body)
-    assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
-    response = client.post('/v1/translation-submissions', headers={**auth,'Idempotency-Key':'mode-language'},
-                           json={**body,'mode':'redraw','target_language':'pl'})
-    assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
+    from test_cluster_submissions import plan_item,manifest
+    item=plan_item(manifest(1)[0],'unknown-language',target_language='xx')
+    response=client.post('/v1/translation-plans',headers=auth,json={'trigger':'manual','items':[item]})
+    assert response.status_code==422
+    item.update(mode='redraw',target_language='pl',operation_key='mode-language')
+    response=client.post('/v1/translation-plans',headers=auth,json={'trigger':'manual','items':[item]})
+    assert response.status_code==200 and response.json()['items'][0]['code']=='LANGUAGE_UNSUPPORTED'
     response = client.post('/v1/admin/compute-nodes', headers=login(client,'admin'),
         json={'name':'invalid language','resource_id':'invalid:language','config':{'allowed_languages':['xx']}})
     assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'

@@ -147,7 +147,7 @@ def persist_received_upload(lease, data):
         receipt = current_receipt(db, lease)
         if receipt.status == 'awaiting_upload':
             accept_verified_upload(db, receipt, data, info)
-        from .submission_api import bind_file_page
+        from .plan_api import bind_file_page
         from .models import Job
         if receipt.asset_id:
             bind_file_page(db, db.get(Job, receipt.job_id))

@@ -26,9 +26,7 @@ def lock_scheduler(db):
 
 def limits_for(user):
     cfg, plus = settings(), is_plus(user)
-    return {"capacity": min(cfg.plus_queue_capacity, 10) if plus else min(cfg.free_queue_capacity, 3),
-            "realtime_limit": min(cfg.plus_realtime_slots, 10) if plus else min(cfg.free_realtime_slots, 3),
-            "weight": cfg.plus_scheduler_weight if plus else cfg.free_scheduler_weight}
+    return {"weight": cfg.plus_scheduler_weight if plus else cfg.free_scheduler_weight}
 
 
 def queue_for(db, owner_id, mode):
@@ -38,13 +36,6 @@ def queue_for(db, owner_id, mode):
         db.add(row)
         db.flush()
     return row
-
-
-def active_count(db, owner_id, mode=None):
-    query = select(func.count()).select_from(Job).where(Job.owner_id == owner_id, Job.status.in_(ACTIVE))
-    if mode is not None:
-        query = query.where(Job.mode == mode)
-    return db.scalar(query)
 
 
 def touch_job(db, job):
@@ -111,7 +102,7 @@ def _estimate(db, pool, stage, records=None):
 def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
     """Elect in SQL before materializing: <= two owners per pool and class.
 
-    Eligibility precedes ranking, so an arbitrarily deep paused/unsupported
+    Eligibility precedes ranking, so an arbitrarily deep unsupported
     backlog cannot conceal a runnable user. Two heads preserve the virtual
     service floor after the winning account consumes its next quantum.
     """
@@ -123,7 +114,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
     cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
     page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
         case((UserModeQueue.session_expires_at > at, Job.priority_rank), else_=1000000),
-        Job.created_at, Job.ordinal, JobStage.id]
+        Job.created_at, Job.id, JobStage.id]
     eligible = select(JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
         pool.label("pool"), cls.label("priority_class"),
         func.row_number().over(partition_by=[pool, cls, Job.owner_id], order_by=page_order).label("page_rank"))
@@ -133,7 +124,6 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
         .where(JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
             Job.status.in_(["queued", "running", "validating_upload"]),
             Job.cancel_requested.is_(False), Job.discard_output.is_(False),
-            or_(UserModeQueue.owner_id.is_(None), UserModeQueue.paused.is_(False)),
             or_(JobStage.name == "validate_upload", and_(source.id.is_not(None), source.deleted_at.is_(None),
                 source.purged_at.is_(None), or_(source.expires_at.is_(None), source.expires_at > at, source.active_references > 0))),
             or_(~image_stage, and_(Job.target_language.in_(node.supported_languages),
@@ -295,7 +285,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         stage, job = min(by_user[owner], key=lambda pair: (
             0 if pair[1].created_at < at - timedelta(minutes=30) and chosen_class == "preload" else 1,
             pair[1].priority_rank if snapshot["queues"][(owner, pair[1].mode)].session_expires_at and snapshot["queues"][(owner, pair[1].mode)].session_expires_at > at else 1000000,
-            pair[1].created_at, pair[1].ordinal, pair[0].id))
+            pair[1].created_at, pair[1].id, pair[0].id))
         choices.append((0 if chosen_class == "realtime" else 1, cls_states[chosen_class].updated_at,
                         stage, job, pool, chosen_class, accounts[owner], cls_states[chosen_class], floor, accounts))
     _, _, stage, job, pool, cls, user_state, class_state, floor, accounts = min(choices, key=lambda v: (v[0], v[1]))

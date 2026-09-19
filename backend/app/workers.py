@@ -216,7 +216,7 @@ def run_control_stage(lease_id):
         if name == "validate_upload":
             from .upload_models import UploadReservation
             from .uploads import complete_upload
-            from .submission_api import bind_file_page
+            from .plan_api import bind_file_page
             with session_factory()() as db:
                 reservation = db.scalar(select(UploadReservation).where(UploadReservation.job_id == job_id))
                 complete_upload(db, reservation, reservation.owner_id, lease_id=lease_id, lease_token=token)

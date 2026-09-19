@@ -73,7 +73,7 @@ def timing(job, leases, at):
             "started_at": iso(leases[0].started_at) if leases else None}
 
 
-def task_json(job, owner_name, leases, at, paused=False):
+def task_json(job, owner_name, leases, at):
     live = [r for r in leases if not r.completed_at and r.expires_at > at]
     final = [r for r in leases if r.outcome == "succeeded" and (
         r.stage in {"redraw", "page"} if job.status == "succeeded" else
@@ -82,7 +82,7 @@ def task_json(job, owner_name, leases, at, paused=False):
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
             "priority": priority_of(job, at) if job.status in ACTIVE else (leases[-1].priority_class if leases else None),
-            "queue_paused": paused, "cache_hit": job.cache_hit, "page_index": job.page_index,
+            "cache_hit": job.cache_hit, "page_index": job.page_index,
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
             "cancel_requested": job.cancel_requested, **timing(job, leases, at),
@@ -94,9 +94,7 @@ def task_json(job, owner_name, leases, at, paused=False):
 
 
 def task_query():
-    return select(Job, User.name, func.coalesce(UserModeQueue.paused, False)).options(defer(Job.config)).join(
-        User, User.id == Job.owner_id).outerjoin(UserModeQueue,
-        and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode))
+    return select(Job, User.name).options(defer(Job.config)).join(User, User.id == Job.owner_id)
 
 
 @router.get("/tasks")
@@ -123,8 +121,8 @@ def tasks(status: Status | None = None, mode: Mode | None = None,
         query = query.where(or_(Job.id.contains(value, autoescape=True), User.name.contains(value, autoescape=True)))
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.execute(query.order_by(Job.created_at.desc(), Job.id.desc()).offset(offset).limit(limit)).all()
-    leases = lease_rows(db, [job.id for job, _, _ in rows]) if rows else {}
-    return {"items": [task_json(job, name, leases.get(job.id, []), at, paused) for job, name, paused in rows],
+    leases = lease_rows(db, [job.id for job, _ in rows]) if rows else {}
+    return {"items": [task_json(job, name, leases.get(job.id, []), at) for job, name in rows],
             "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}
 
 
@@ -134,7 +132,7 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
     if not row:
         problem("NOT_FOUND", "任务不存在", 404)
     at = now()
-    job, name, paused = row
+    job, name = row
     leases = lease_rows(db, [job.id])[job.id]
     stages = db.execute(select(JobStage.id, JobStage.name, JobStage.status, JobStage.attempts,
         JobStage.available_at, JobStage.completed_at).where(JobStage.job_id == job.id)).all()
@@ -147,7 +145,7 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
         TextCall.group_index, TextCall.started_at, TextCall.completed_at, TextCall.cost_state,
         TextCall.accounted_micros, TextCall.error_code).where(TextCall.job_id == job.id).order_by(TextCall.started_at)).all()
     provider = db.execute(select(Attempt.provider_id, Attempt.cost_state).where(Attempt.id == job.attempt_id)).first() if job.attempt_id else None
-    return {**task_json(job, name, leases, at, paused), "generated_at": iso(at), "error_message": job.error_message,
+    return {**task_json(job, name, leases, at), "generated_at": iso(at), "error_message": job.error_message,
         "timings": db.scalar(select(ClassicState.timings).where(ClassicState.job_id == job.id)) or {},
         "provider": {"id": provider.provider_id, "cost_state": provider.cost_state} if provider else None,
         "stages": [{"name": s.name, "status": s.status, "attempts": s.attempts,
@@ -164,13 +162,11 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
 def overview(db: Session = Depends(get_db)):
     at = now()
     since = at - timedelta(hours=24)
-    paused = func.coalesce(UserModeQueue.paused, False)
     priority = case((Job.realtime_until > at, "realtime"), else_="preload")
-    groups = db.execute(select(Job.mode, Job.status, priority, paused, func.count(), func.min(Job.created_at)).outerjoin(
-        UserModeQueue, and_(Job.owner_id == UserModeQueue.owner_id, Job.mode == UserModeQueue.mode)).where(
-        Job.status.in_(ACTIVE)).group_by(Job.mode, Job.status, priority, paused)).all()
-    queues = [{"mode": mode, "status": status, "priority": p, "paused": hold, "count": count,
-               "oldest_seconds": seconds(oldest, at)} for mode, status, p, hold, count, oldest in groups]
+    groups = db.execute(select(Job.mode, Job.status, priority, func.count(), func.min(Job.created_at))
+        .where(Job.status.in_(ACTIVE)).group_by(Job.mode, Job.status, priority)).all()
+    queues = [{"mode": mode, "status": status, "priority": p, "count": count,
+               "oldest_seconds": seconds(oldest, at)} for mode, status, p, count, oldest in groups]
     recent = db.execute(select(Job.mode, Job.status, func.count(),
         func.avg(duration_sql(db, Job.created_at, Job.completed_at))).where(Job.completed_at >= since).group_by(Job.mode, Job.status)).all()
     stages = db.execute(select(JobStage.name, JobStage.status, func.count()).join(Job, Job.id == JobStage.job_id).where(
@@ -259,5 +255,5 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
             "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
                 QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
                 .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))],
-            "queues": [{"mode": row.mode, "paused": row.paused} for row in db.scalars(
+            "reading_sessions": [{"mode": row.mode, "session_id": row.session_id, "expires_at": iso(row.session_expires_at)} for row in db.scalars(
                 select(UserModeQueue).where(UserModeQueue.owner_id == user.id))]}

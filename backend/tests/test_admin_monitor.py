@@ -60,12 +60,13 @@ def test_task_filter_pagination_and_no_duplicate_nodes(monitor):
     assert client.get("/v1/admin/monitor/tasks?q=000000000001",headers=auth).json()["total"] == 1
     assert client.get("/v1/admin/monitor/tasks?q=%25",headers=auth).json()["total"] == 0
     filtered = client.get("/v1/admin/monitor/tasks", params={"owner_id":data["readers"][1],"mode":"classic","status":"queued"}, headers=auth).json()
-    assert filtered["items"] and all(j["queue_paused"] for j in filtered["items"])
+    assert filtered["items"] and all(j["status"] == "queued" for j in filtered["items"])
+    assert all("queue_paused" not in j for j in filtered["items"])
     assert client.get("/v1/admin/monitor/tasks?limit=101", headers=auth).status_code == 422
     assert client.get("/v1/admin/monitor/tasks?status=made-up", headers=auth).status_code == 422
 
 
-def test_overview_counts_paused_and_nodes_without_storage(monitor, monkeypatch):
+def test_overview_counts_tasks_and_nodes_without_storage(monitor, monkeypatch):
     from app.storage import get_store
     def reject(*a, **kw): raise AssertionError("admin metadata must not read object storage")
     store = get_store("local")
@@ -76,7 +77,8 @@ def test_overview_counts_paused_and_nodes_without_storage(monitor, monkeypatch):
     assert overview["users"] == {"total":5,"plus":1,"submitted_24h":4}
     assert overview["nodes"] == {"total":5,"online_enabled":3}
     assert overview["leases"] == {"expired":1,"running":1}
-    assert any(q["paused"] and q["count"] > 0 for q in overview["queues"])
+    assert any(q["count"] > 0 for q in overview["queues"])
+    assert all("paused" not in q for q in overview["queues"])
     nodes = client.get("/v1/admin/monitor/nodes", headers=auth).json()["items"]
     gpu_b = next(n for n in nodes if n["id"] == "gpu-b")
     assert not gpu_b["online"] and gpu_b["occupied"] == gpu_b["expired_leases"] == 1

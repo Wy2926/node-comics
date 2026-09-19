@@ -22,13 +22,13 @@ export type Overview = {
   users: {total: number; plus: number; submitted_24h: number};
   nodes: {total: number; online_enabled: number};
   leases: {running?: number; expired?: number};
-  queues: {mode: Mode; status: string; priority: string; paused: boolean; count: number; oldest_seconds: number}[];
+  queues: {mode: Mode; status: string; priority: string; count: number; oldest_seconds: number}[];
   stages: {name: string; status: string; count: number}[];
   completed_24h: {mode: Mode; status: string; count: number; avg_elapsed_seconds: number}[];
 };
 export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
-  status: string; phase: string; priority: string | null; queue_paused: boolean; cache_hit: boolean;
+  status: string; phase: string; priority: string | null; cache_hit: boolean;
   page_index: number | null; created_at: string; completed_at: string | null; settlement: string;
   quota_pages: number; error_code: string | null; cancel_requested: boolean;
   elapsed_seconds: number; execution_seconds: number; non_execution_seconds: number;
@@ -62,8 +62,8 @@ export type Bucket = {id: string; mode: Mode; source: string; granted: number; u
 export type UserDetail = User & {
   operator_membership?: {active: boolean; expires_at: string | null};
   grants: (Bucket & {starts_at: string; note: string})[];
-  created_at: string; queues: {mode: Mode; paused: boolean}[];
-  entitlements: {plan: string; plus_expires_at: string | null; queue_capacity: number; realtime_slots: number;
+  created_at: string; reading_sessions: {mode: Mode; session_id: string | null; expires_at: string | null}[];
+  entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number};
     modes: Record<Mode, {unlimited: boolean; allowed: boolean; quota: null | {
       available: number; used: number; reserved: number; granted: number; resets_at: string | null; buckets: Bucket[]}}>
   };

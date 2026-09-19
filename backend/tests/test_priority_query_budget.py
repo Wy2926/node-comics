@@ -1,34 +1,24 @@
-"""Reading heartbeats only change the three images in the current window."""
+"""Unchanged lease renewal creates no job events and never re-admits pages."""
 from sqlalchemy import event
 from conftest import login_plus
 from test_cluster_submissions import cluster
-from test_cluster_priority import accepted, prioritize, delta
+from test_cluster_priority import accepted,prioritize,delta,lease
 
 
-def test_reading_heartbeat_only_changes_realtime_window(cluster):
+def test_reading_heartbeat_does_not_create_task_changes(cluster):
     from app.db import engine
-    client, _ = cluster
-    auth = login_plus(client)
-    ids = accepted(client, auth, 10)
-    response = prioritize(client, auth, ids[:3], ordered_job_ids=ids)
-    assert response.status_code == 200
-    cursor = "0"
-    while True:
-        changes = delta(client, auth, cursor)
-        cursor = changes["cursor"]
-        if not changes["has_more"]:
-            break
-    statements = []
-    def track(conn, query_cursor, sql, *args):
-        statements.append(sql)
-    event.listen(engine(), "before_cursor_execute", track)
+    client,_=cluster
+    auth=login_plus(client)
+    ids=accepted(client,auth,10)
+    response=prioritize(client,auth,ids[:3])
+    assert response.status_code==200
+    cursor=delta(client,auth)["cursor"]
+    statements=[]
+    def track(conn,cursor,sql,*args):statements.append(sql)
+    event.listen(engine(),"before_cursor_execute",track)
     try:
-        response = prioritize(client, auth, ids[:3], ordered_job_ids=ids, sequence=2,
-                              expected_version=response.json()["version"])
-    finally:
-        event.remove(engine(), "before_cursor_execute", track)
-    assert response.status_code == 200
-    assert len(statements) < 90
-    changes = delta(client, auth, cursor)
-    assert {j["id"] for j in changes["items"]} == set(ids[:3])
-    assert not changes["has_more"]
+        renewed=lease(client,auth,priority_epochs={"classic":response.json()["priority"]["classic"]["epoch"]})
+    finally:event.remove(engine(),"before_cursor_execute",track)
+    assert renewed.status_code==200,renewed.text
+    assert len(statements)<90
+    assert delta(client,auth,cursor)["items"]==[]

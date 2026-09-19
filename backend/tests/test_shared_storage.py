@@ -13,7 +13,6 @@ def test_second_account_skips_upload_and_translation_and_keeps_private_ids(clust
     from app.adapters.images import TranslationOutput
     from app.db import session_factory
     from app.models import Asset, Job, now
-    from app.scheduler import queue_for
     import app.workers as workers
 
     client, sdk = cluster
@@ -24,19 +23,14 @@ def test_second_account_skips_upload_and_translation_and_keeps_private_ids(clust
     alice_source = upload(client, alice, png)
     alice_job = create(client, alice, alice_source).json()
     run_job(alice_job["id"])
-    bob_id = client.get('/v1/me', headers=bob).json()['user']['id']
-    with session_factory()() as db:
-        queue = queue_for(db, bob_id, 'redraw')
-        queue.next_upload_session, queue.next_upload_until = 'reader-b', now() + timedelta(minutes=1)
-        db.commit()
     before = list(sdk.calls)
     bob_quota = client.get('/v1/me/usage', headers=bob).json()
     response = submit(client, bob, [descriptor(png, file_hash="c" * 64, page_index=4)],
-                      mode="redraw", max_pages=0, expected_kind='unavailable', reading_session_id='reader-b')
-    assert response.status_code == 202, response.text
+                      mode="redraw", max_pages=0)
+    assert response.status_code == 200, response.text
     item = response.json()["items"][0]
     job = item["job"]
-    assert item["upload"] is None and item["reused"]
+    assert item["upload"] is None and item["disposition"] == "ready"
     assert job["status"] == "succeeded" and job["cache_hit"] and job["quota_pages"] == 0
     assert job["id"] != alice_job["id"] and job["input_asset_id"] != alice_source
     assert len(calls) == 1 and len(sdk.objects) == 2 and sdk.calls == before
@@ -44,7 +38,6 @@ def test_second_account_skips_upload_and_translation_and_keeps_private_ids(clust
     assert after_quota['items'] == bob_quota['items'] == []
     assert after_quota['entitlements']['modes']['redraw']['quota'] == bob_quota['entitlements']['modes']['redraw']['quota']
     with session_factory()() as db:
-        assert queue_for(db, bob_id, 'redraw').next_upload_session == 'reader-b'
         original = db.get(Job, alice_job["id"])
         assert original.output_asset_id != job["output_asset_id"]
         assert db.get(Asset, original.output_asset_id).storage_key == db.get(Asset, job["output_asset_id"]).storage_key
@@ -74,7 +67,7 @@ def test_shared_original_checks_descriptor_metadata(cluster, png, field, value):
     upload(client, login(client), png)
     page = descriptor(png)
     page[field] = value
-    assert submit(client, login(client, "bob"), [page]).status_code == 422
+    assert submit(client, login(client, "bob"), [page]).json()["items"][0]["disposition"] == "blocked"
 
 
 @pytest.mark.parametrize("invalid", ["expired", "deleted", "config", "language"])

@@ -1,5 +1,6 @@
 """Public response contracts exported through OpenAPI for extension type generation."""
 from pydantic import BaseModel
+from typing import Literal
 
 
 class ErrorInfo(BaseModel):
@@ -48,8 +49,7 @@ class EntitlementsResponse(BaseModel):
     plus_started_at: str | None
     plus_expires_at: str | None
     timezone: str
-    queue_capacity: int
-    realtime_slots: int
+    image_rate_limit: dict
     scheduler_weight: float
     modes: dict[str, ModeEntitlement]
     generated_at: str
@@ -109,8 +109,6 @@ class JobResponse(BaseModel):
     version: int
     cache_hit: bool
     reused: bool = False
-    submission_id: str | None = None
-    ordinal: int
     cancel_requested: bool
     error: ErrorInfo | None
     quality_flags: list[str]
@@ -164,3 +162,81 @@ class CapabilitiesResponse(BaseModel):
     entitlements: EntitlementsResponse | None
     retention_days: int
     unknown_release_seconds: int
+
+
+class ImageRateLimit(BaseModel):
+    window_seconds: Literal[60]
+    limit: int
+    remaining: int
+    retry_after_seconds: int
+
+
+class UploadPlanResponse(BaseModel):
+    id: str
+    job_id: str
+    status: str
+    asset_id: str | None
+    url: str
+    method: Literal['PUT']
+    headers: dict[str, str]
+    authorization_required: bool
+    expires_at: str
+    error: ErrorInfo | None
+
+
+class OperationResponse(BaseModel):
+    operation_key: str
+    page_key: str | None = None
+    disposition: Literal['ready', 'pending', 'accepted', 'deferred', 'blocked', 'not_found']
+    job: JobResponse | None = None
+    upload: UploadPlanResponse | None = None
+    code: str | None = None
+    message: str | None = None
+    scope: str | None = None
+    retry_after_seconds: int | None = None
+    created_at: str | None = None
+
+
+class PriorityResponse(BaseModel):
+    owned: bool
+    epoch: int
+    expires_at: str | None
+
+
+class PlanSnapshotResponse(BaseModel):
+    policy_revision: str
+    server_time: str
+    image_rate_limit: ImageRateLimit
+    entitlements: EntitlementsResponse
+
+
+class TranslationPlanResponse(PlanSnapshotResponse):
+    session_id: str | None
+    applied_sequence: int | None
+    priority: dict[str, PriorityResponse]
+    items: list[OperationResponse]
+    error: dict | None = None
+
+
+class OperationResolutionResponse(BaseModel):
+    items: list[OperationResponse]
+    policy_revision: str
+
+
+class OperationPageResponse(BaseModel):
+    items: list[OperationResponse]
+    total: int
+    next_offset: int | None
+
+
+class ReadingLeaseResponse(BaseModel):
+    session_id: str
+    priority: dict[str, PriorityResponse]
+    policy_revision: str
+
+
+class TranslationChangesResponse(PlanSnapshotResponse):
+    items: list[JobResponse]
+    deleted_job_ids: list[str]
+    cursor: str
+    has_more: bool

@@ -107,15 +107,29 @@ def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans
         asset = db.get(Asset, asset_id)
         item = {"client_item_id": "page-1", "asset_id": asset.id, "image_sha256": asset.sha256,
                 "byte_size": asset.byte_size, "content_type": asset.mime, "name": "sample.png"}
-    body = {"mode": mode, "target_language": language, "max_quota_pages": 1, "items": [item], **fields}
-    return client.post("/v1/translation-submissions", headers={**headers, "Idempotency-Key": key}, json=body)
+    action = fields.pop("action", "regenerate" if fields.pop("regenerate", False) else "ensure")
+    source_job_id = fields.pop("source_job_id", fields.pop("rerun_job_id", None))
+    plan_item = {"page_key": "page-1", "operation_key": key, "role": "current", "mode": mode,
+                 "target_language": language, "max_quota_pages": 1, "image": item, "action": action, **fields}
+    if source_job_id is not None:
+        plan_item["source_job_id"] = source_job_id
+    return client.post("/v1/translation-plans", headers=headers,
+                       json={"trigger": "manual", "items": [plan_item]})
 
 
 def create(client, headers, asset_id, key="operation-1", language="zh-Hans"):
-    """Return a job view from the real submission response for low-level fixtures."""
+    """Extract the first job for worker fixtures, retaining the real HTTP status.
+
+    Admission contract tests use submit_asset directly and inspect dispositions.
+    This helper does not manufacture legacy status codes or accepted receipts.
+    """
     import httpx
     response = submit_asset(client, headers, asset_id, key, language)
-    return httpx.Response(response.status_code, json=response.json()["items"][0]["job"] if response.status_code == 202 else response.json())
+    data = response.json()
+    if data.get("items"):
+        item = data["items"][0]
+        data = item.get("job") or {"error": item}
+    return httpx.Response(response.status_code, json=data)
 
 
 def control_node(db, stage="redraw"):

@@ -20,6 +20,8 @@ class RequestLimits(RequestBody):
     """One immutable operation snapshot; PUT requires every supported field."""
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, allow_inf_nan=False)
 
+    free_images_per_minute: int = Field(ge=1, le=10000)
+    plus_images_per_minute: int = Field(ge=1, le=10000)
     upload_user_concurrency: int = Field(ge=1, le=32)
     upload_global_concurrency: int = Field(ge=1, le=128)
     upload_idle_timeout_seconds: float = Field(ge=0.1, le=120)
@@ -91,6 +93,8 @@ def get_system_settings(user: User = Depends(admin), db: Session = Depends(get_d
 
 @router.put("")
 def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin), db: Session = Depends(get_db)):
+    from .scheduler import lock_scheduler
+    lock_scheduler(db)
     initialize_system_settings(db)
     row = db.scalar(update(SystemSettings).where(SystemSettings.id == 1,
         SystemSettings.version == body.expected_version).values(
@@ -102,5 +106,7 @@ def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin),
         problem("SYSTEM_SETTINGS_CONFLICT", "系统设置已被其他管理员更新，请刷新后重试", 409,
                 current_version=current)
     result = settings_json(row)
+    from .notifications import publish
+    publish(db, 'policy')
     db.commit()
     return result

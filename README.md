@@ -10,9 +10,9 @@
 
 二次元风格的漫画阅读与翻译浏览器插件，Chrome / Edge Manifest V3。
 
-2026-09-18：插件改为随读随译，450ms 防抖后优先翻译当前图片与后两张，账户跨模式共用普通 3／PLUS 10 张在途容量。移除翻译队列、批量预存和常规额度展示；等待、翻译中和升级权益入口显示在图内左上角。服务端仍使用持久队列和集群阶段调度；实时与预存分级，同级会员权重默认 2 倍、可配置，空闲执行位可借用。原图和译图存私有 R2，默认无限期保留；客户端发送阅读顺序，服务器持续消费。见[实现说明](docs/TRANSLATION_CLUSTER_DESIGN.md)与[验证边界](docs/CLUSTER_VALIDATION.md)。代码完成不代表已切换现有服务或公开部署。
+2026-09-19：[阅读计划与 API 契约](docs/READING_TRANSLATION_CONTRACT.md)已实现。普通／PLUS 每滚动 60 秒最多新增 30／100 张翻译图片，后台可配置；取消账户在途数量限制。显式翻页立即申请当前页，滚动 80ms 合并（最长 200ms），后两页 150ms 后预取。阅读热路径不查询队列，直接消费长轮询增量，限流按 Retry-After 自动恢复。重传、重复请求和结果复用不计次数，已有原图的新翻译计数。数据库重建为 `reading_0001` 空库基线，直接删除旧接口与旧结构，无兼容层。本地验证与现有部署分开，未切换现有服务。
 
-会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `shared_0001` 数据库。
+会员规则保留普通每日 100 页常规、PLUS 常规不限量和每会员月 300 页重绘，支持限时赠送。无固定共享用户并发、旧 preview/batch 或 Celery 队列兼容；新部署使用独立 `reading_0001` 空库基线。
 
 2026-09-16：相同原图按内容跨账户免重复上传，已完成且模式 / 语言 / 配置相同的译图可免费复用；账户授权、任务和历史保持私有。已移除按一天期限扫描删除无引用对象的逻辑。生产身份、提交限流、健康监控与备份恢复说明见[生产身份](docs/PRODUCTION_IDENTITY.md)、[提交限制](docs/SUBMISSION_SCHEDULING.md)及[运维说明](docs/OPERATIONS.md)。
 
@@ -60,7 +60,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 | --- | --- |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 产品流程、范围与验收 |
 | [会员与翻译额度设计](docs/MEMBERSHIP_AND_QUOTAS.md) | 普通／PLUS 已实现规则、会员月额度、限时赠送与旧计费替换范围 |
-| [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) | 已实现：账户共用 3/10 在途、自动阅读窗口、可配置权重、公平借用、R2 长期保留与多机计算 |
+| [翻译集群与队列设计](docs/TRANSLATION_CLUSTER_DESIGN.md) | 已实现：30/100 滚动分钟准入、阅读计划、可配置权重、公平调度、R2 长期保留与多机计算 |
 | [通用漫画作品管理设计](docs/COMIC_LIBRARY_DESIGN.md) | 已确认；作品、章节、出版套系、卷册、收录关系与来源副本，首轮已实现 |
 | [MangaCopy 来源适配与导入设计](docs/MANGACOPY_LIBRARY_DESIGN.md) | 已实现详情页范围导入、JS 图片清单与有序采集，映射通用作品模型 |
 | [阅读目录与插件译本](docs/READER_DIRECTORY_AND_EDITIONS.md) | 整部作品目录、已有翻译的派生阅读视图与有序采集 |

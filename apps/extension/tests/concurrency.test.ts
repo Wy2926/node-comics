@@ -14,8 +14,9 @@ describe('front-end request concurrency', () => {
     const calls: string[] = [];
     vi.stubGlobal('createImageBitmap', async () => ({close: () => {}}));
     vi.stubGlobal('fetch', async (url: string | URL) => {
-      calls.push(String(url));active++;peak = Math.max(peak, active);await pause();active--;
-      if (String(url).endsWith('/access')) return Response.json({url: '/result', expires_at: ''});
+      calls.push(String(url));
+      if (String(url).endsWith('/access')) {await pause();return Response.json({url: '/result', expires_at: ''});}
+      active++;peak = Math.max(peak, active);await pause();active--;
       return String(url).endsWith('/result') ? new Response(new Blob(['image'])) : Response.json({id: 'asset'});
     });
     const api = new Api('https://api.example', 'token', new RequestPool(concurrency));

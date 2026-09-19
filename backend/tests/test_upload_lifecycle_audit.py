@@ -4,7 +4,7 @@ import pytest
 from app.db import session_factory
 from app.models import Asset, Job, User, now
 from app.upload_models import UploadReservation
-from app.submission_api import upload_complete
+from app.upload_api import upload_complete
 from conftest import login
 from test_cluster_submissions import cluster, descriptor, submit, validate_next  # noqa: F401
 
@@ -59,7 +59,7 @@ def test_cancel_during_put_cannot_publish_asset(cluster, png, monkeypatch):
     put = store.put
     def racing_put(*args, **kwargs):
         put(*args, **kwargs)
-        assert client.post(f"/v1/translation-submissions/{submission['id']}/cancel", headers=auth).status_code == 200
+        assert client.post(f"/v1/jobs/{item['job']['id']}/cancel", headers=auth).status_code == 200
     monkeypatch.setattr(store, 'put', racing_put)
     client.put(item['upload']['url'], headers=auth, content=png)
     with session_factory()() as db:

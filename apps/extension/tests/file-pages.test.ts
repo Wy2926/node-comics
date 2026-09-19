@@ -47,12 +47,12 @@ describe('file-page API contract', () => {
     const result=await matchFilePages(api,pages,'classic','zh-Hans');
     expect(result.errors.size).toBe(100);expect(result.matches.size).toBe(1);
   });
-  it('keeps transfer concurrency independent of read-only account queue limits', async () => {
+  it('keeps transfer concurrency independent of account policy', async () => {
     const calls: {url:string;init:RequestInit}[]=[];
     vi.stubGlobal('fetch',async(url:string,init:RequestInit)=>{calls.push({url,init});return Response.json({});});
     const api=new Api(origin);api.pool.setLimit(10);expect(calls).toHaveLength(0);
-    await api.queues();
-    expect(calls.map(c=>[c.url,c.init.method??'GET',c.init.body])).toEqual([[origin+'/v1/me/queues','GET',undefined]]);
+    await api.entitlements();
+    expect(calls.map(c=>[c.url,c.init.method??'GET',c.init.body])).toEqual([[origin+'/v1/me/entitlements','GET',undefined]]);
   });
 });
 

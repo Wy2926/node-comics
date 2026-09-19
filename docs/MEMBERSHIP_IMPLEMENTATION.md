@@ -11,7 +11,7 @@
 
 本次本地验证：后端相关 74 项、扩展 236 项、后台 5 项测试通过；扩展类型／模块检查、扩展与独立后台构建通过。Chrome 使用隔离 SQLite API 与模拟图片供应商完成 6 组交互检查并查看截图，覆盖跨用户免费复用、混合范围拒绝新增、阅读位置、赠送响应丢失恢复、预约生效、桌面与 390px 窄屏。未调用真实图片模型或 Paddle；未执行本轮 PostgreSQL 并发检查，未部署到公开服务。
 
-复现：先在 `backend/admin-ui` 执行 `npm run build`；在 `backend` 分别运行 `.venv/Scripts/python.exe tests/manual_admin_server.py`（18090）与 `.venv/Scripts/python.exe tests/manual_ui_server.py`（18089）。在 `apps/extension` 运行 `npm exec vite -- --host 127.0.0.1 --port 5174 --strictPort`。根目录设置 `UI_FIXTURE_DIRECTORY` 为 reader fixture 输出的临时目录，必要时用 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright，再运行 `node scripts/verify_membership_updates.mjs`。结果和截图保存到本地忽略目录 `artifacts/membership-updates/`。管理员赠送和查询无需真实存储／支付配置；测试入口禁用产品环境文件。
+历史赠送流程复现说明（当前参数与脚本范围见[阅读契约验收](READING_TRANSLATION_CONTRACT.md#10-实现与验证记录)）：先在 `backend/admin-ui` 执行 `npm run build`；在 `backend` 分别运行 `.venv/Scripts/python.exe tests/manual_admin_server.py`（18090）与 `.venv/Scripts/python.exe tests/manual_ui_server.py`（18089）。在 `apps/extension` 运行 `npm exec vite -- --host 127.0.0.1 --port 5174 --strictPort`。根目录设置 `UI_FIXTURE_DIRECTORY` 为 reader fixture 输出的临时目录，必要时用 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright，再运行 `node scripts/verify_membership_admin.mjs`。结果和截图保存到本地忽略目录 `artifacts/membership-updates/`。管理员赠送和查询无需真实存储／支付配置；测试入口禁用产品环境文件。
 
 ## 已实现
 
@@ -65,7 +65,7 @@ RETENTION_DAYS=0
 
 历史浏览器运行曾输出 `artifacts/membership-validation/results.json` 及账户、额度耗尽、重绘确认、用量和管理员截图；该忽略目录不随仓库提供，当前工作区未保留这份历史结果。旧场景曾预置测试账号当日已用 98 页，不属于本轮集群验收。现有同名脚本已迁移到提交清单和独立模式队列，运行后会生成本次结果。
 
-另一套[自动翻译恢复检查](../artifacts/auto-validation/results.json)覆盖临时网络失败、已知额度拒绝、未知提交原编号核实、权益变化暂停、跨书恢复、关闭选择记忆和连续滚动位置。两套脚本共 22 项检查通过，无浏览器异常；它们不覆盖网页采集或扩展弹出页。
+另一套自动翻译恢复检查（历史本地产物 `artifacts/auto-validation/results.json`）覆盖临时网络失败、已知额度拒绝、未知提交原编号核实、权益变化暂停、跨书恢复、关闭选择记忆和连续滚动位置。两套脚本共 22 项检查通过，无浏览器异常；它们不覆盖网页采集或扩展弹出页。
 
 ## 当前可重复命令
 
@@ -86,6 +86,6 @@ backend/.venv/Scripts/python.exe backend/tests/manual_ui_server.py
 node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5174 --strictPort
 ```
 
-在仓库根目录设置 `UI_FIXTURE_DIRECTORY` 为夹具打印的临时目录；`PLAYWRIGHT_MODULE` 指向已经安装的 Playwright 包，默认使用已安装的 Chrome。执行 `node scripts/verify_membership.mjs`，验证赠送额度、单页明确确认、每模式 10/500 容量与 2/10 实时名额、会员续期幂等。集群预存与关闭页面后的阅读恢复使用 `node scripts/verify_cluster_reader.mjs`。两者都只连接夹具的 `127.0.0.1:18089`，常规模式执行由集群测试覆盖。
+当前浏览器验收改用 `scripts/verify_reading_api.mjs`（真实 API／worker 与合成供应商）、`scripts/verify_reading_plans.mjs`（窗口、限流及丢回包恢复）与 `scripts/verify_membership_admin.mjs`（赠送和分钟配置）。旧 10/500、2/10、3/10 队列契约及对应脚本已删除；运行端口和环境要求见[阅读契约验收](READING_TRANSLATION_CONTRACT.md#10-实现与验证记录)。
 
 在 `apps/extension` 执行 `npm run check`、`npm test`、`npm run build`、`npm run build:web`。本次浏览器检查使用 Chrome；Edge 未单独运行。没有以模拟图片声称验证 OCR、重绘效果或真实供应商兼容性。

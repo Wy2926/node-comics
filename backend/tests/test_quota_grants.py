@@ -34,12 +34,12 @@ def test_ordinary_redraw_gift_is_temporary_and_exhaustion_creates_no_job(client,
     result = gift(client, auth, pages=1)
     assert result.status_code == 201, result.text
     rights = entitlement(client, auth)
-    assert rights['plan'] == 'free' and rights['realtime_slots'] == 3 and rights['queue_capacity'] == 3
+    assert rights['plan'] == 'free' and rights['image_rate_limit']['limit'] == 30
     assert rights['modes']['redraw']['allowed'] and rights['modes']['redraw']['quota']['available'] == 1
     job = submit(client, auth, upload(client, auth, png), 'redraw').json()
     assert job['quota_kind'] == 'redraw_grant' and job['quota_period_id'] == result.json()['grant']['id']
     denied = submit(client, auth, upload(client, auth, png_variant(png, 2)), 'redraw', 'extra')
-    assert denied.status_code == 409 and denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
+    assert denied.status_code == 200 and denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
     freeze(monkeypatch, AT + timedelta(hours=1))
     assert not entitlement(client, auth)['modes']['redraw']['allowed']
     assert submit(client, auth, job['input_asset_id'], 'redraw').json()['id'] == job['id']
@@ -126,5 +126,5 @@ def test_simultaneous_last_gift_and_daily_page_admissions(client, png):
         barrier.wait(timeout=10)
         return submit(client, auth, assets[n], key=str(n)).status_code
     with ThreadPoolExecutor(4) as pool:
-        assert sorted(pool.map(attempt, range(4))) == [202, 202, 409, 409]
+        assert sorted(pool.map(attempt, range(4))) == [200, 200, 202, 202]
     assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 2

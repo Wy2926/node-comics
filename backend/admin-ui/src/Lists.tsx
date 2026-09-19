@@ -7,7 +7,7 @@ export function Tasks({items, onTask}: {items: Task[]; onTask: (id: string) => v
     {items.map(j => <tr key={j.id}>
       <td><code title={j.id}>{j.id.slice(0, 8)}</code>{j.page_index != null && <span className="page-index">第 {j.page_index + 1} 页</span>}<small>{time(j.created_at)}</small></td>
       <td><Jump view="tasks" params={{owner_id: j.owner_id}}>{j.owner_name}</Jump></td>
-      <td>{label(j.mode)}<small>{j.cache_hit ? '缓存命中' : label(j.priority)}{j.queue_paused && ' · 队列暂停'}</small></td>
+      <td>{label(j.mode)}<small>{j.cache_hit ? '缓存命中' : label(j.priority)}</small></td>
       <td><Badge value={j.status}/><small>{label(j.phase)}{j.expired_leases > 0 && ' · 租约待回收'}</small></td>
       <td className="numeric">{duration(j.elapsed_seconds)}<small>执行 {duration(j.execution_seconds)}</small></td>
       <td>{j.completed_by?.name || j.running_nodes.join('、') || j.nodes.map(n => n.name).join('、') || '—'}

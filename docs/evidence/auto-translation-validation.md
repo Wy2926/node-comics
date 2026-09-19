@@ -41,7 +41,7 @@ npm run dev -- --port 5174
 ```powershell
 $env:UI_FIXTURE_DIRECTORY='<UI_FIXTURE_DIRECTORY>'
 $env:PLAYWRIGHT_MODULE='<playwright package path>'
-node scripts/verify_cluster_reader.mjs
+node scripts/verify_reading_api.mjs
 ```
 
 当前脚本检查独立模式队列、会员容量与实时名额、预存清单确认、暂停后上传、关闭页面后服务器持续消费、阅读位置与结果恢复、窄屏布局。输出 JSON 与截图写入 `artifacts/cluster-validation/`，不包含认证令牌。未知提交保留原请求与幂等键的恢复另由 `translation-queue.test.ts` 覆盖。

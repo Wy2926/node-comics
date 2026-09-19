@@ -11,13 +11,9 @@ class UserModeQueue(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     mode: Mapped[str] = mapped_column(String(20), primary_key=True)
     version: Mapped[int] = mapped_column(Integer, default=0)
-    paused: Mapped[bool] = mapped_column(Boolean, default=False)
     session_id: Mapped[str | None] = mapped_column(String(80))
-    session_sequence: Mapped[int] = mapped_column(Integer, default=-1)
+    session_epoch: Mapped[int] = mapped_column(Integer, default=0)
     session_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
-    priority_request_hash: Mapped[str | None] = mapped_column(String(64))
-    next_upload_session: Mapped[str | None] = mapped_column(String(80))
-    next_upload_until: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class ComputeNode(Base):
@@ -99,41 +95,3 @@ class SchedulerMutex(Base):
     __tablename__ = "scheduler_mutex"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     revision: Mapped[int] = mapped_column(BigInteger, default=0)
-
-
-class Submission(Base):
-    __tablename__ = "translation_submissions"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    idempotency_key: Mapped[str] = mapped_column(String(128))
-    request_hash: Mapped[str] = mapped_column(String(64))
-    mode: Mapped[str] = mapped_column(String(20))
-    target_language: Mapped[str] = mapped_column(String(20))
-    quota_pages: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    archived_at: Mapped[datetime | None] = mapped_column(DateTime)
-    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
-                      Index("ix_submissions_retention", "archived_at", "created_at"))
-
-
-class SubmissionAdmission(Base):
-    """One bounded, shared admission record per account, across API replicas."""
-    __tablename__ = "submission_admissions"
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
-    request_tokens: Mapped[float] = mapped_column(Float)
-    item_tokens: Mapped[float] = mapped_column(Float)
-    refilled_at: Mapped[datetime] = mapped_column(DateTime)
-    day_started_at: Mapped[datetime] = mapped_column(DateTime)
-    daily_submissions: Mapped[int] = mapped_column(Integer, default=0)
-    daily_items: Mapped[int] = mapped_column(Integer, default=0)
-    leases: Mapped[list] = mapped_column(JSON, default=list)
-
-
-class SubmissionItem(Base):
-    __tablename__ = "submission_items"
-    submission_id: Mapped[str] = mapped_column(ForeignKey("translation_submissions.id"), primary_key=True)
-    ordinal: Mapped[int] = mapped_column(Integer, primary_key=True)
-    client_item_id: Mapped[str] = mapped_column(String(100))
-    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
-    descriptor: Mapped[dict] = mapped_column(JSON)
-    reused: Mapped[bool] = mapped_column(Boolean, default=False)

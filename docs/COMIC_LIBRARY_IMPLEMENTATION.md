@@ -68,7 +68,7 @@
 
 脱敏结果与截图写入被 Git 忽略的 `artifacts/library-validation`、`artifacts/mangacopy-validation`、`artifacts/mangacopy-implementation`。来源测试不上传漫画到翻译服务；原图仅保存在隔离测试配置中。目录导入 100 条不表示已下载全部 100 个条目的图片。
 
-上述翻译回归属于旧流程的历史记录。当前使用原创测试图片及合成输出，启动 `backend/tests/manual_ui_server.py` 后，将其输出目录设为 `UI_FIXTURE_DIRECTORY`，运行 `scripts/verify_cluster_reader.mjs`，结果位于 `artifacts/cluster-validation/`；服务仅绑定本机 18089 端口、使用独立临时数据库。脚本验证集群队列与阅读恢复，不调用实际供应商，不代表模型翻译效果。
+上述翻译回归属于旧流程的历史记录。当前使用原创测试图片及合成输出（运行参数以[阅读契约验收](READING_TRANSLATION_CONTRACT.md#10-实现与验证记录)为准），启动 `backend/tests/manual_ui_server.py` 后，将其输出目录设为 `UI_FIXTURE_DIRECTORY`，运行 `scripts/verify_reading_api.mjs`，结果位于 `artifacts/cluster-validation/`；服务仅绑定本机 18089 端口、使用独立临时数据库。脚本验证集群队列与阅读恢复，不调用实际供应商，不代表模型翻译效果。
 
 ### 可重复命令
 

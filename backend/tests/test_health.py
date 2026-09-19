@@ -80,11 +80,11 @@ def test_oidc_probe_records_outage_and_readiness_does_not_call_remote_service(cl
         assert "secret" not in str(payload)
 
 
-def test_unknown_and_overdue_queue_alerts_are_safe_and_ignore_paused_queue(client, png):
+def test_unknown_and_overdue_task_alerts_are_safe_without_reading_session(client, png):
     from conftest import create, login_plus, upload
     from sqlalchemy import select
     from app.models import Job
-    from app.queue_models import JobStage, UserModeQueue
+    from app.queue_models import JobStage
     auth = login_plus(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
     mark_ready()
@@ -95,10 +95,6 @@ def test_unknown_and_overdue_queue_alerts_are_safe_and_ignore_paused_queue(clien
         db.commit()
         payload, ready = readiness()
         assert ready and payload["alerts"]["overdue_ready_stages"] == 1
-        queue = db.get(UserModeQueue, (job.owner_id, job.mode))
-        queue.paused = True
-        db.commit()
-        assert readiness()[0]["alerts"]["overdue_ready_stages"] == 0
         job.status = "outcome_unknown"
         db.commit()
         payload, ready = readiness()

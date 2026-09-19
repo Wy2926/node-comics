@@ -1,13 +1,13 @@
 """Content identities, idempotent jobs and settlement shared by all submissions."""
 from sqlalchemy import func, select, update
 from .assets import available, find_shared_original, grant_asset
-from .job_requests import JobRequest
+from .plan_models import TranslationOperation
 from .config import settings
 from .errors import problem
 from .models import Asset, Job, User, now, uid
 from .entitlements import UNLIMITED, locked_user, quota_kind, require_entitlement, reserve, settle
 from .providers import configuration, digest, validate_input
-from .scheduler import ACTIVE, active_count, ensure_stages, limits_for, lock_scheduler, touch_job
+from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
 
 TERMINAL = {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}
 
@@ -18,7 +18,7 @@ def idem_key(value):
     return value
 
 
-def job_json(db, job, *, requested_asset_id=None, submission_id=None, ordinal=None):
+def job_json(db, job, *, requested_asset_id=None):
     source = db.get(Asset, job.input_asset_id) if job.input_asset_id else None
     output = db.get(Asset, job.output_asset_id) if job.output_asset_id else None
     result_available = available(output) and available(source)
@@ -30,8 +30,7 @@ def job_json(db, job, *, requested_asset_id=None, submission_id=None, ordinal=No
             "priority": "realtime" if job.realtime_until and job.realtime_until > now() else "preload",
             "quota_pages": job.quota_pages, "quota_kind": job.quota_kind, "quota_period_id": job.quota_period_id,
             "settlement": job.settlement, "version": job.version, "cache_hit": job.cache_hit,
-            "submission_id": submission_id,
-            "ordinal": ordinal if ordinal is not None else job.ordinal, "cancel_requested": job.cancel_requested,
+            "cancel_requested": job.cancel_requested,
             "error": {"code": job.error_code, "message": job.error_message} if job.error_code else None,
             "quality_flags": job.quality_flags, "created_at": job.created_at.isoformat() + "Z",
             "completed_at": job.completed_at.isoformat() + "Z" if job.completed_at else None}
@@ -50,7 +49,7 @@ def owned_job(db, job_id, owner_id, *, lock=False):
 
 
 def job_for_request(db, owner_id, operation, key, request_hash):
-    receipt = db.get(JobRequest, (owner_id, operation, key))
+    receipt = db.get(TranslationOperation, (owner_id, key))
     if not receipt:
         return None
     if receipt.request_hash != request_hash:
@@ -59,7 +58,7 @@ def job_for_request(db, owner_id, operation, key, request_hash):
 
 
 def remember_request(db, owner_id, operation, key, request_hash, job):
-    db.add(JobRequest(owner_id=owner_id, operation=operation, idempotency_key=key, request_hash=request_hash, job_id=job.id))
+    db.add(TranslationOperation(owner_id=owner_id, operation_key=key, request_hash=request_hash, job_id=job.id))
     db.flush()
     return job
 
@@ -101,15 +100,15 @@ def find_reusable(db, user, asset, mode, language, config):
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
-               ordinal=0, max_quota_pages=None, expected_kind=None, accepted_at=None,
-               source_sha256=None, file_hash=None, page_index=None):
+               max_quota_pages=None, expected_kind=None, accepted_at=None,
+               source_sha256=None, file_hash=None, page_index=None, allow_new=True, request_hash_override=None):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
     sha = asset.sha256 if asset else source_sha256
     if not sha or (asset and asset.kind != "original"):
         problem("INVALID_INPUT_ASSET", "翻译需要有效原图身份", 422)
-    request_hash = digest([sha, mode, language, force, max_quota_pages, expected_kind])
+    request_hash = request_hash_override or digest([sha, mode, language, force, max_quota_pages, expected_kind])
     existing = job_for_request(db, user.id, operation, key, request_hash)
     if existing:
         return existing
@@ -134,25 +133,33 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
                 mode=mode, target_language=language, operation=operation, idempotency_key=key,
                 request_hash=request_hash, cache_key=ck, config=config, cache_hit=True,
                 quota_pages=0, quota_kind=shared.quota_kind, settlement="free", version=version,
-                ordinal=ordinal, status=shared.status, phase="completed", quality_flags=list(shared.quality_flags),
+                status=shared.status, phase="completed", quality_flags=list(shared.quality_flags),
                 created_at=at, completed_at=at)
             db.add(job)
             db.flush()
             touch_job(db, job)
             return remember_request(db, user.id, operation, key, request_hash, job)
+    if not force:
+        last = db.scalar(select(Job).where(Job.owner_id == user.id, Job.source_sha256 == sha,
+            Job.mode == mode, Job.target_language == language)
+            .order_by(Job.created_at.desc(), Job.id.desc()).limit(1))
+        if last and last.status in {'failed', 'cancelled', 'unknown_released'}:
+            problem('MANUAL_RETRY_REQUIRED', '该页需手动重试', 409, job=job_json(db, last))
+    if not allow_new:
+        problem("NEW_TRANSLATION_NOT_REQUESTED", "当前只匹配已有翻译", 409)
     kind = require_entitlement(user, mode, at, expected_kind, db)
     if max_quota_pages is not None and kind != UNLIMITED and max_quota_pages < 1:
         problem("QUOTA_BOUND_EXCEEDED", "新增页数超过已确认额度上限", 409)
-    if active_count(db, user.id) >= limits_for(user)["capacity"]:
-        problem("QUEUE_FULL", "同时翻译的图片已达上限，请等待任务完成", 409)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
         file_hash=file_hash, page_index=page_index, mode=mode, target_language=language,
         operation=operation, idempotency_key=key, request_hash=request_hash, cache_key=ck, config=config,
-        quota_pages=0, quota_kind=kind, settlement="free", version=version, ordinal=ordinal,
+        quota_pages=0, quota_kind=kind, settlement="free", version=version,
         status="queued" if asset else "awaiting_upload", phase="queued" if asset else "awaiting_upload", created_at=at)
     db.add(job)
     db.flush()
+    from .plan_limits import admit_image
+    admit_image(db, user, job.id)
     reserve(db, user, job, at)
     if asset:
         db.execute(update(Asset).where(Asset.id == asset.id).values(active_references=Asset.active_references + 1))
@@ -175,14 +182,3 @@ def cancel_job(db, job):
         job.status, job.phase, job.completed_at = "cancelled", "cancelled", now()
         settle(db, job, success=False)
     touch_job(db, job)
-
-
-def submission_status(jobs):
-    statuses = {job.status for job in jobs}
-    if not statuses:
-        return "queued"
-    if statuses & ACTIVE:
-        return "running" if "running" in statuses else "queued"
-    if statuses <= {"succeeded", "no_text"}:
-        return "succeeded"
-    return next(iter(statuses)) if len(statuses) == 1 else "partial"

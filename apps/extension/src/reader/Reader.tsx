@@ -16,10 +16,10 @@ import {ThumbnailDirectory} from './ThumbnailDirectory';
 import {ComicDirectory} from './ComicDirectory';
 import type {ReadingDirectory} from '../library/directory';
 import {PageTranslationBar} from './PageTranslationBar';
-type Props={directory?:ReadingDirectory;onCatalog?:()=>void;initialView?:PageView;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingCopy[];onActiveCopy:(id:string)=>void;onLoadCopy:(id:string)=>void;sourceStatus?:string;onAcquire:()=>void;onPauseAcquire:()=>void;onNavigate:(id:string,pageId?:string)=>void;copy:ReadingCopy;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingCopy)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,copyId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(copyId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[])=>void;caps?:Capabilities;userId?:string;apiOrigin:string;api:Api;busy:boolean;};
+type Props={directory?:ReadingDirectory;onCatalog?:()=>void;initialView?:PageView;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingCopy[];onActiveCopy:(id:string)=>void;onLoadCopy:(id:string)=>void;sourceStatus?:string;onAcquire:()=>void;onPauseAcquire:()=>void;onNavigate:(id:string,pageId?:string)=>void;copy:ReadingCopy;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingCopy)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,copyId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(copyId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[],immediate?:boolean)=>void;caps?:Capabilities;userId?:string;apiOrigin:string;api:Api;busy:boolean;};
 type Panel='directory'|'translation'|'settings';
 export function Reader({directory,onCatalog,initialView,onMarkRead,sourceStatus,onAcquire,onPauseAcquire,sequence,onActiveCopy,onLoadCopy,onNavigate,copy,settings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,userId,apiOrigin,api,busy}:Props){
-const {index,setIndex,indexRef,anchor,viewport,cells,ends,stream,next,nextOf,preserve,persist,restore,scroll,jump}=useChapterStream({copy,sequence,layout:settings.layout,update,onActiveCopy,onLoadCopy,onMarkRead,notify});
+const {index,setIndex,indexRef,anchor,viewport,cells,ends,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason}=useChapterStream({copy,sequence,layout:settings.layout,update,onActiveCopy,onLoadCopy,onMarkRead,notify});
 const [panel,setPanel]=useState<Panel>();const [zoom,setZoom]=useState(100);const [pageViews,setPageViews]=useState<Record<string,PageView>>({});const [compare,setCompare]=useState(false);
 const [manage,setManage]=useState(false);const [removePage,setRemovePage]=useState<Page>();const [shortcuts,setShortcuts]=useState(false);
 const [feedback,setFeedback]=useState<{job:Job;page:Page;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
@@ -53,7 +53,7 @@ useEffect(()=>{function key(e:KeyboardEvent){const t=e.target as HTMLElement;if(
 useEffect(()=>{
  const start=streamPages.findIndex(p=>p.key===pageKey(copy,page?.id??''));
  const targets=streamPages.slice(Math.max(0,start),Math.max(0,start)+3).filter(p=>resolvePageView(pageViews[p.key]??initialView,settings.translationMode).preference!=='original').map(p=>({...p,mode:resolvePageView(pageViews[p.key]??initialView,settings.translationMode).mode}));
- onReadingWindow(targets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page));
+ onReadingWindow(targets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page),navigationReason.current==='direct');
 },[index,copy.id,streamPages,decodedSet,pageViews,settings.translationMode,initialView,onReadingWindow]);
 useEffect(()=>()=>onReadingWindow([],[]),[onReadingWindow]);
 async function fullscreen(){if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen().catch(()=>notify('此浏览器暂时无法进入全屏。'));}

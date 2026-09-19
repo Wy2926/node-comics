@@ -21,6 +21,8 @@ pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1
 
 @pytest.fixture
 def text_database(tmp_path, monkeypatch):
+    # This fixture can run without importing the HTTP app or other test modules.
+    from app import plan_models, system_settings  # noqa: F401
     database = os.environ.get('TEST_PG_DATABASE', 'nodecomics_concurrency_test')
     if database != 'nodecomics_concurrency_test':
         pytest.fail('Refusing to use a product database')

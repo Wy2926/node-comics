@@ -26,6 +26,8 @@ def test_postgres_monitor_queries_and_schema(pg_scope):
         assert overview["users"]["plus"] == 1
         assert all(r["avg_elapsed_seconds"] == 120 for r in overview["completed_24h"])
         nodes = client.get("/v1/admin/monitor/nodes", headers=auth).json()["items"]
-        assert next(n for n in nodes if n["id"] == "gpu-a")["completed_24h"][0]["avg_seconds"] == 25
+        assert next(n for n in nodes if n["id"] == "gpu-a")["completed_24h"] == []
+        assert next(n for n in nodes if n["id"] == "gpu-b")["completed_24h"][0]["avg_seconds"] == 90
+        assert next(n for n in nodes if n["id"] == "control-text")["completed_24h"][0]["avg_seconds"] == 40
         with engine().connect() as connection:
             assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []

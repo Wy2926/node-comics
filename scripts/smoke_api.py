@@ -14,7 +14,7 @@ from pathlib import Path
 
 import httpx
 from PIL import Image
-from submission_client import submit_page, body_for, download
+from plan_client import submit_page, body_for, download
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -76,9 +76,9 @@ def main():
         replay = submit_page(client, sample, record["operation_id"], args.mode)
         assert replay["id"] == result["id"]
         passed("duplicate_click_returns_same_job")
-        conflict = client.post("/v1/translation-submissions", json=body_for(sample, record["operation_id"], args.mode, "en"),
-                               headers={"Idempotency-Key": record["operation_id"]})
-        assert conflict.status_code == 409
+        conflict = client.post("/v1/translation-plans", json=body_for(sample, record["operation_id"], args.mode, "en"))
+        assert conflict.status_code == 200
+        assert conflict.json()["items"][0]["code"] == "IDEMPOTENCY_CONFLICT"
         passed("idempotency_key_rejects_changed_payload")
         with httpx.Client(base_url=args.api, timeout=30, trust_env=False) as stranger:
             other = checked(stranger.post("/v1/auth/dev", json={"username": record["username"] + "-other"}))

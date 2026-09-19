@@ -33,7 +33,6 @@ def seed(db):
                                else NodeConfig(execution_slots=node.capacity).model_dump(exclude_none=True))
         db.merge(node)
     db.flush()
-    db.add(UserModeQueue(owner_id=readers[1].id, mode="classic", paused=True))
 
     def job(i, status, mode="classic", owner=0, age=600):
         row = Job(id=f"10000000-0000-4000-8000-{i:012}", owner_id=readers[owner].id, mode=mode,

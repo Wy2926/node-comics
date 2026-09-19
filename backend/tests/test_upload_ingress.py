@@ -62,7 +62,7 @@ async def until_async(predicate, timeout=5):
 async def call_handler(case, request, index=0):
     from app.db import session_factory
     from app.models import User
-    from app.submission_api import upload_content
+    from app.upload_api import upload_content
     owner = case['owners'][0]
     with session_factory()() as db:
         # Match the identity dependency's already checked-out connection.

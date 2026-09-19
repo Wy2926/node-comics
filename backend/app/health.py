@@ -96,12 +96,11 @@ def queue_alerts(db):
         return db.scalar(select(func.count()).select_from(statement.limit(1000).subquery()))
 
     # These are alert signals rather than proof that the whole API is unusable.
-    # Exclude intentionally paused queues. Count at most 1000 matches per query
+    # Count at most 1000 matches per query
     # without loading jobs into the ORM or acquiring the scheduler lock.
-    overdue = select(JobStage.id).join(Job, Job.id == JobStage.job_id).join(UserModeQueue,
-        and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode)).where(
+    overdue = select(JobStage.id).join(Job, Job.id == JobStage.job_id).where(
         JobStage.status == "ready", JobStage.available_at < cutoff, Job.status.in_(["queued", "running"]),
-        UserModeQueue.paused.is_(False), Job.cancel_requested.is_(False))
+        Job.cancel_requested.is_(False))
     return {"outcome_unknown": count(select(Job.id).where(Job.status == "outcome_unknown")),
             "unknown_released": count(select(Job.id).where(Job.status == "unknown_released")),
             "overdue_ready_stages": count(overdue),

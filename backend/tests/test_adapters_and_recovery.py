@@ -222,7 +222,7 @@ def test_chunked_body_rejected_before_unlimited_spool(client):
         yield b'--test-boundary\r\nContent-Disposition: form-data; name="image"; filename="x.png"\r\nContent-Type: image/png\r\n\r\n'
         yield b"x" * (1024 * 1024 + 200)
         yield b"\r\n--test-boundary--\r\n"
-    response = client.post("/v1/translation-submissions", headers=headers, content=chunks())
+    response = client.post("/v1/translation-plans", headers=headers, content=chunks())
     assert response.status_code == 413, response.text
 
 

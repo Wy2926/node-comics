@@ -19,10 +19,11 @@ from types import SimpleNamespace
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
 directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-"))
+port = int(os.environ.get("READER_FIXTURE_PORT", "18089"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
     APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="100", PLUS_MONTHLY_REDRAW_PAGES="300", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
     OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
-    CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174")
+    CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5176")
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app
@@ -73,7 +74,7 @@ with zipfile.ZipFile(directory/'cluster-eight.cbz', 'w') as archive:
     for i in range(1,9):
         archive.write(samples/f'page-{i:02}.png', f'page-{i:02}.png')
 print(f'UI_FIXTURE_DIRECTORY={directory}',flush=True)
-print('Synthetic supplier only; API http://127.0.0.1:18089',flush=True)
+print(f'Synthetic supplier only; API http://127.0.0.1:{port}',flush=True)
 if __name__=='__main__':
     import uvicorn
-    uvicorn.run(app,host='127.0.0.1',port=18089,log_level='warning',access_log=False)
+    uvicorn.run(app,host='127.0.0.1',port=port,log_level='warning',access_log=False)

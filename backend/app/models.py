@@ -68,7 +68,6 @@ class Job(Base):
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now, index=True)
     change_sequence: Mapped[int] = mapped_column(BigInteger, default=0, index=True)
     output_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
-    ordinal: Mapped[int] = mapped_column(Integer, default=0)
     mode: Mapped[str] = mapped_column(String(20))
     target_language: Mapped[str] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(24), default="queued", index=True)

@@ -3,7 +3,7 @@ import asyncio
 from contextlib import contextmanager
 from threading import Event, RLock, Thread
 
-from sqlalchemy import event, text
+from sqlalchemy import event, inspect, text
 from sqlalchemy.orm import Session
 from .db import engine
 
@@ -18,6 +18,8 @@ class Hub:
         self.thread = None
 
     def emit(self, topic=None):
+        if topic == 'policy':
+            topic = None
         with self.lock:
             for key, (loop, wake) in tuple(self.waiters.items()):
                 if topic is None or key[0] == topic:
@@ -31,7 +33,8 @@ class Hub:
         key = (topic, id(wake))
         with self.lock:
             if len(self.waiters) >= 2048 or sum(k[0] == topic for k in self.waiters) >= (256 if topic == 'compute' else 4):
-                problem('WAIT_BUSY', '等待连接已满，请稍后重试', 429)
+                from fastapi import HTTPException
+                raise HTTPException(429, detail={'code': 'WAIT_BUSY', 'message': '等待连接已满，请稍后重试', 'scope': 'waiting_connection', 'retry_after_seconds': 2}, headers={'Retry-After': '2'})
             self.waiters[key] = (loop, wake)
         try:
             yield wake
@@ -88,8 +91,34 @@ def publish(db, topic):
     db.info.setdefault('wake_topics', set()).add(topic)
 
 
+@event.listens_for(Session, 'before_flush')
+def policy_wakeups(db, flush_context, instances):
+    """Wake on entitlement mutations; snapshots compute their durable revision."""
+    from .models import User
+    from .entitlement_models import QuotaPeriod
+    topics = set()
+    for row in db.new | db.dirty:
+        if isinstance(row, User):
+            state = inspect(row)
+            if any(state.attrs[name].history.has_changes() for name in (
+                    'membership_id', 'plus_started_at', 'plus_expires_at', 'plus_monthly_pages',
+                    'billing_membership_id', 'billing_plus_started_at', 'billing_plus_expires_at') if name in state.attrs):
+                if row.id:
+                    topics.add('user:' + row.id)
+        elif isinstance(row, QuotaPeriod):
+            state = inspect(row)
+            if row in db.new or any(state.attrs[name].history.has_changes()
+                    for name in ('granted', 'starts_at', 'ends_at', 'grants_access')):
+                topics.add('user:' + row.owner_id)
+    for topic in topics:
+        publish(db, topic)
+
+
 @event.listens_for(Session, 'after_commit')
 def committed(db):
+    # Releasing a plan item's SAVEPOINT is not a committed public change.
+    if db.in_nested_transaction():
+        return
     topics = db.info.pop('wake_topics', ())
     with _lock:
         current = _hubs.get(db.get_bind())
@@ -100,7 +129,10 @@ def committed(db):
 
 @event.listens_for(Session, 'after_rollback')
 def rolled_back(db):
-    db.info.pop('wake_topics', None)
+    # A rejected plan item rolls back its SAVEPOINT, not successful siblings.
+    # Extra wakeups are harmless: consumers always reconcile committed DB state.
+    if not db.in_nested_transaction():
+        db.info.pop('wake_topics', None)
 
 
 def close_hub():

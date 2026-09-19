@@ -40,7 +40,7 @@ def initialize():
     from . import health_models  # noqa: F401
     from . import system_settings, feedback_models  # noqa: F401
     from . import queue_models  # noqa: F401
-    from . import job_requests  # noqa: F401
+    from . import plan_models  # noqa: F401
     from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
     from . import billing_models  # noqa: F401
     from alembic import command

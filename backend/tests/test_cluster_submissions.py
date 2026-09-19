@@ -1,4 +1,4 @@
-"""Public durable submissions through bounded upload and scheduled validation."""
+"""Public translation plans through bounded upload and scheduled validation."""
 from datetime import timedelta
 import hashlib
 import pytest
@@ -28,15 +28,45 @@ def descriptor(data, item_id="page-0", **extra):
 
 
 def manifest(count, prefix="page"):
-    # Admission reserves descriptors before any image is sent. Distinct opaque
-    # hashes suffice for this capacity test; decoder tests upload actual PNGs.
+    # Admission binds descriptors before any image is sent. Distinct opaque
+    # hashes suffice for admission tests; decoder tests upload actual PNGs.
     return [descriptor(f"{prefix}:{index}".encode(), f"{prefix}-{index}") for index in range(count)]
 
 
-def submit(client, auth, items, *, key="submission-1", mode="classic", max_pages=None, **extra):
-    return client.post("/v1/translation-submissions", headers={**auth, "Idempotency-Key": key},
-        json={"mode": mode, "target_language": "zh-Hans", "max_quota_pages": len(items) if max_pages is None else max_pages,
-              "items": items, **extra})
+def plan_item(image, key, *, mode="classic", role="current", max_pages=1, **fields):
+    return {"page_key": image["client_item_id"], "operation_key": key, "role": role,
+            "mode": mode, "target_language": "zh-Hans", "max_quota_pages": max_pages,
+            "image": image, **fields}
+
+
+def submit(client, auth, items, *, key="operation-1", mode="classic", max_pages=None, **extra):
+    """Real plan response; multi-page fixture windows use one stable reading session.
+
+    Each page has an independently persisted key and budget. max_pages is only
+    a fixture shorthand for assigning available confirmations in page order.
+    """
+    body = {"trigger": "manual" if len(items) == 1 else "reading",
+            "items": [plan_item(item, key if len(items) == 1 else f"{key}:{index}", mode=mode,
+                        role="current" if index == 0 else "prefetch",
+                        max_pages=1 if max_pages is None else int(index < max_pages))
+                      for index, item in enumerate(items)]}
+    if len(items) != 1:
+        body.update(session_id=f"fixture-{key}", sequence=1)
+    body.update(extra)
+    return client.post("/v1/translation-plans", headers=auth, json=body)
+
+
+def resolve(client, auth, keys):
+    return client.post("/v1/translation-operations/resolve", headers=auth, json={"operation_keys": keys})
+
+
+def active_jobs(client, auth):
+    from app.db import session_factory
+    from app.models import Job
+    owner = client.get("/v1/me", headers=auth).json()["user"]["id"]
+    with session_factory()() as db:
+        return list(db.scalars(select(Job.id).where(Job.owner_id == owner,
+            Job.status.in_(["awaiting_upload", "validating_upload", "queued", "running"]))))
 
 
 def validate_next():
@@ -56,10 +86,6 @@ def validate_next():
     return lease.id
 
 
-def queue_for(client, auth, mode="classic"):
-    response = client.get("/v1/me/queues", headers=auth)
-    assert response.status_code == 200, response.text
-    return next(q for q in response.json()["items"] if q["mode"] == mode)
 
 
 def grant_redraw(client, auth, pages):
@@ -106,79 +132,60 @@ def test_http_submission_upload_validation_recovers_without_client(cluster, png)
             "page": "ready", "text": "waiting"}
     repeated = client.post(f"/v1/uploads/{first['upload']['id']}/complete", headers=auth)
     assert repeated.status_code == 200 and repeated.json()["id"] == accepted["id"]
-    assert queue_for(client, auth)["in_flight"] == 1
+    assert len(active_jobs(client, auth)) == 1
 
 
-@pytest.mark.parametrize("plus,limit", [(False, 3), (True, 10)])
-def test_account_capacity_is_shared_across_modes_and_devices(cluster, plus, limit):
-    from app.db import session_factory
-    from app.models import Job, Ledger
-    from app.queue_models import Submission
+def test_more_than_three_unfinished_images_can_be_admitted(cluster):
     client, _ = cluster
-    from app.config import settings
-    # Older deployments may still provide 10/500; they cannot expand current product limits.
-    settings().free_queue_capacity = 10
-    settings().plus_queue_capacity = 500
-    auth = (login_plus if plus else login)(client)
-    if not plus:
-        grant_redraw(client, auth, 20)
-    rejected = submit(client, auth, manifest(limit + 1), key="oversized")
-    assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "QUEUE_FULL"
-    first = submit(client, auth, manifest(limit - 1), key="first")
-    assert first.status_code == 202, first.text
-    second = submit(client, auth, manifest(1, "redraw"), mode="redraw", key="second")
-    assert second.status_code == 202, second.text
-    for mode in ("classic", "redraw"):
-        assert queue_for(client, auth, mode)["available_slots"] == 0
-        rejected = submit(client, auth, manifest(1, "extra"), key="other-device-" + mode, mode=mode)
-        assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "QUEUE_FULL"
-    replay = submit(client, auth, manifest(limit - 1), key="first")
-    assert replay.json()["id"] == first.json()["id"]
-    with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Job)) == limit
-        assert db.scalar(select(func.count()).select_from(Submission)) == 2
-        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == "reserve")) == (1 if plus else limit)
-    cancelled = client.post(f"/v1/translation-submissions/{second.json()['id']}/cancel", headers=auth)
-    assert cancelled.status_code == 200
-    assert queue_for(client, auth)["available_slots"] == 1
-    assert submit(client, auth, manifest(1, "replacement"), key="replacement").status_code == 202
+    auth = login(client)
+    for index in range(5):
+        response = submit(client, auth, manifest(1, f"page-{index}"), key=f"op-{index}")
+        assert response.status_code == 202, response.text
+    assert len(active_jobs(client, auth)) == 5
 
 
 def test_replay_and_duplicate_content_only_reserve_once(cluster, png):
     from app.db import session_factory
     from app.models import Job, Ledger
+    from app.plan_models import TranslationOperation, ImageAdmission
     client, _ = cluster
     auth = login(client)
     items = [descriptor(png, "first"), descriptor(png, "same-content")]
     first = submit(client, auth, items)
     assert first.status_code == 202, first.text
+    assert [item["disposition"] for item in first.json()["items"]] == ["accepted", "pending"]
     again = submit(client, auth, items)
-    assert again.status_code == 202 and again.json()["id"] == first.json()["id"]
-    assert first.json()["quota_pages"] == 1
-    assert [item["reused"] for item in first.json()["items"]] == [False, True]
-    other = submit(client, auth, [descriptor(png)], key="another-batch", max_pages=0)
-    assert other.status_code == 202 and other.json()["quota_pages"] == 0
-    assert other.json()["items"][0]["job"]["id"] == first.json()["items"][0]["job"]["id"]
-    changed = submit(client, auth, [descriptor(b"changed")])
-    assert changed.status_code == 409 and changed.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert again.status_code == 200
+    assert {item["job"]["id"] for item in again.json()["items"]} == {first.json()["items"][0]["job"]["id"]}
+    other = submit(client, auth, [descriptor(png)], key="another-operation", max_pages=0)
+    assert other.status_code == 200 and other.json()["items"][0]["disposition"] == "pending"
+    changed = submit(client, auth, [descriptor(b"changed")], key="another-operation", max_pages=0)
+    assert changed.status_code == 200 and changed.json()["items"][0]["code"] == "IDEMPOTENCY_CONFLICT"
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Job)) == 1
-        assert db.scalar(select(func.count()).select_from(Ledger)) == 1
+        for model in (Job, Ledger, ImageAdmission):
+            assert db.scalar(select(func.count()).select_from(model)) == 1
+        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 3
 
 
-def test_quota_confirmation_bound_rolls_back_every_page(cluster):
+def test_page_budget_rejection_preserves_accepted_neighbor(cluster):
+    from app.db import session_factory
+    from app.plan_models import ImageAdmission, TranslationOperation
     client, _ = cluster
     auth = login(client)
     response = submit(client, auth, manifest(2), max_pages=1)
-    assert response.status_code == 409 and response.json()["error"]["code"] == "QUOTA_BOUND_EXCEEDED"
-    assert queue_for(client, auth)["in_flight"] == 0
-    assert client.get("/v1/translation-submissions", headers=auth).json()["total"] == 0
+    assert response.status_code == 202, response.text
+    assert [item["disposition"] for item in response.json()["items"]] == ["accepted", "blocked"]
+    assert response.json()["items"][1]["code"] == "QUOTA_BOUND_EXCEEDED"
+    assert len(active_jobs(client, auth)) == 1
     rights = client.get("/v1/me/entitlements", headers=auth).json()
-    assert rights["modes"]["classic"]["quota"]["reserved"] == 0
+    assert rights["modes"]["classic"]["quota"]["reserved"] == 1
+    with session_factory()() as db:
+        for model in (ImageAdmission, TranslationOperation):
+            assert db.scalar(select(func.count()).select_from(model)) == 1
 
 
 @pytest.mark.parametrize("phase", ["awaiting_upload", "validating_upload", "queued"])
-def test_cancel_at_each_preexecution_phase_releases_capacity_and_quota(cluster, png, phase):
+def test_cancel_at_each_preexecution_phase_releases_page_quota(cluster, png, phase):
     from app.db import session_factory
     from app.models import Asset, Job
     client, _ = cluster
@@ -187,12 +194,12 @@ def test_cancel_at_each_preexecution_phase_releases_capacity_and_quota(cluster, 
     item = response.json()["items"][0]
     if phase in {"validating_upload", "queued"}:
         upload_and_enqueue(client, auth, item, png)
-    cancel_url = f"/v1/translation-submissions/{response.json()['id']}/cancel"
+    cancel_url = f"/v1/jobs/{item['job']['id']}/cancel"
     cancelled = client.post(cancel_url, headers=auth)
     assert cancelled.status_code == 200, cancelled.text
-    assert cancelled.json()["items"][0]["job"]["status"] == "cancelled"
+    assert cancelled.json()["status"] == "cancelled"
     assert client.post(cancel_url, headers=auth).status_code == 200
-    assert queue_for(client, auth)["in_flight"] == 0
+    assert len(active_jobs(client, auth)) == 0
     assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 0
     with session_factory()() as db:
         job = db.get(Job, item["job"]["id"])
@@ -210,8 +217,8 @@ def test_upload_submissions_and_cancellation_are_owner_scoped(cluster, png):
     attempts = [
         client.put(receipt["url"], headers=bob, content=png),
         client.post(f"/v1/uploads/{receipt['id']}/complete", headers=bob),
-        client.get(f"/v1/translation-submissions/{response.json()['id']}", headers=bob),
-        client.post(f"/v1/translation-submissions/{response.json()['id']}/cancel", headers=bob)]
+        client.get(f"/v1/jobs/{response.json()['items'][0]['job']['id']}", headers=bob),
+        client.post(f"/v1/jobs/{response.json()['items'][0]['job']['id']}/cancel", headers=bob)]
     assert all(result.status_code == 404 for result in attempts)
     assert sdk.calls == before
     assert client.put(receipt["url"], content=png).status_code == 401
@@ -230,7 +237,7 @@ def test_expired_upload_cannot_escape_expiry_by_completing_late(cluster, png):
         db.commit()
     late = client.post(f"/v1/uploads/{receipt['id']}/complete", headers=auth)
     assert late.status_code == 410 and late.json()["error"]["code"] == "UPLOAD_EXPIRED"
-    assert queue_for(client, auth)["in_flight"] == 0
+    assert len(active_jobs(client, auth)) == 0
     assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 0
 
 
@@ -245,7 +252,7 @@ def test_invalid_upload_fails_only_its_page_and_releases_reservation(cluster, pn
     assert response.status_code in {413, 422}
     job = client.get(f"/v1/jobs/{item['job']['id']}", headers=auth).json()
     assert job["status"] == "failed", job
-    assert queue_for(client, auth)["in_flight"] == 0
+    assert len(active_jobs(client, auth)) == 0
 
 
 def test_all_reused_file_page_identities_bind_after_validation(cluster, png):
@@ -266,28 +273,10 @@ def test_all_reused_file_page_identities_bind_after_validation(cluster, png):
             "pages": [{"file_hash": file_hash, "page_index": page_index}]})
         assert result.status_code == 200 and result.json()["items"][0]["asset"] is not None, result.text
     conflict = submit(client, auth, [descriptor(b"different", file_hash="a" * 64, page_index=1)], key="conflicting-file")
-    assert conflict.status_code == 409 and conflict.json()["error"]["code"] == "FILE_PAGE_CONFLICT"
+    assert conflict.status_code == 200 and conflict.json()["items"][0]["code"] == "FILE_PAGE_CONFLICT"
 
 
-def test_reading_upload_reservation_blocks_other_sessions_and_survives_reuse(cluster):
-    client, _ = cluster
-    auth = login(client)
-    first = submit(client, auth, manifest(3)).json()
-    priority = client.post("/v1/me/queues/classic/priority", headers=auth, json={"session_id": "reader-A", "sequence": 1,
-        "expected_version": 0, "realtime_job_ids": [], "reserve_next_upload": True})
-    assert priority.status_code == 200, priority.text
-    assert client.post(f"/v1/jobs/{first['items'][-1]['job']['id']}/cancel", headers=auth).status_code == 200
-    queue = queue_for(client, auth)
-    assert queue["upload_reserved"] and queue["available_slots"] == 0
-    blocked = submit(client, auth, manifest(1, "reader-new"), key="wrong-session", reading_session_id="reader-B")
-    assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "READING_UPLOAD_RESERVED"
-    reused = submit(client, auth, manifest(1), key="reused-reader", reading_session_id="reader-A", max_pages=0)
-    assert reused.status_code == 202
-    assert queue_for(client, auth)["upload_reserved"]
-    accepted = submit(client, auth, manifest(1, "reader-new"), key="reader-page", reading_session_id="reader-A")
-    assert accepted.status_code == 202, accepted.text
-    assert not queue_for(client, auth)["upload_reserved"]
-    assert queue_for(client, auth)["in_flight"] == 3
+
 
 
 def test_idempotent_receipt_survives_provider_configuration_change(cluster, png):
@@ -300,11 +289,12 @@ def test_idempotent_receipt_survives_provider_configuration_change(cluster, png)
     settings().classic_enabled = False
     settings().classic_engine_version = "changed-after-admission"
     repeat = submit(client, auth, request)
-    assert repeat.status_code == 202 and repeat.json() == first.json()
-    assert queue_for(client, auth)["in_flight"] == 1
+    assert repeat.status_code == 200
+    assert repeat.json()["items"][0]["job"]["id"] == first.json()["items"][0]["job"]["id"]
+    assert len(active_jobs(client, auth)) == 1
 
 
-def test_simultaneous_devices_cannot_partially_admit_a_batch_over_capacity(cluster):
+def test_simultaneous_devices_share_work_without_an_account_queue_limit(cluster):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
     client, _ = cluster
@@ -315,13 +305,9 @@ def test_simultaneous_devices_cannot_partially_admit_a_batch_over_capacity(clust
         return submit(client, auth, manifest(2, f"device-{index}"), key=f"concurrent-{index}")
     with ThreadPoolExecutor(max_workers=3) as executor:
         results = list(executor.map(admission, range(3)))
-    assert sorted(result.status_code for result in results) == [202, 409, 409]
-    for result in results:
-        if result.status_code == 409:
-            assert result.json()["error"]["available_slots"] == 1
-    assert queue_for(client, auth)["in_flight"] == 2
-    assert client.get("/v1/translation-submissions", headers=auth).json()["total"] == 1
-    assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 2
+    assert all(result.status_code == 202 for result in results)
+    assert len(active_jobs(client, auth)) == 6
+    assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 6
 
 
 def test_concurrent_idempotent_replay_creates_one_receipt_and_reservation(cluster, png):
@@ -335,9 +321,9 @@ def test_concurrent_idempotent_replay_creates_one_receipt_and_reservation(cluste
         return submit(client, auth, [descriptor(png)])
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(executor.map(admission, range(4)))
-    assert all(result.status_code == 202 for result in results)
-    assert len({result.json()["id"] for result in results}) == 1
-    assert queue_for(client, auth)["in_flight"] == 1
+    assert sorted(result.status_code for result in results) == [200, 200, 200, 202]
+    assert len({result.json()["items"][0]["job"]["id"] for result in results}) == 1
+    assert len(active_jobs(client, auth)) == 1
     assert client.get("/v1/me/entitlements", headers=auth).json()["modes"]["classic"]["quota"]["reserved"] == 1
 
 
@@ -348,9 +334,10 @@ def test_pending_file_page_identity_cannot_be_bound_to_conflicting_bytes(cluster
     accepted = submit(client, auth, items)
     assert accepted.status_code == 202
     conflicting = submit(client, auth, [descriptor(b"other", file_hash="c" * 64, page_index=3)], key="conflict")
-    assert conflicting.status_code == 409 and conflicting.json()["error"]["code"] == "FILE_PAGE_CONFLICT"
-    assert queue_for(client, auth)["in_flight"] == 1
+    assert conflicting.status_code == 200 and conflicting.json()["items"][0]["code"] == "FILE_PAGE_CONFLICT"
+    assert len(active_jobs(client, auth)) == 1
     duplicate_conflict = submit(client, auth, [descriptor(png, "a", file_hash="d" * 64, page_index=1),
         descriptor(b"other", "b", file_hash="d" * 64, page_index=1)], key="same-request-conflict")
-    assert duplicate_conflict.status_code == 409
-    assert queue_for(client, auth)["in_flight"] == 1
+    assert duplicate_conflict.status_code == 200
+    assert [item["disposition"] for item in duplicate_conflict.json()["items"]] == ["pending", "blocked"]
+    assert len(active_jobs(client, auth)) == 1

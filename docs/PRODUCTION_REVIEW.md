@@ -38,7 +38,7 @@
 
 ### 4. P1：在途容量与页数额度不能限制提交记录膨胀（隔离复现）
 
-定位：[submission_api.py](../backend/app/submission_api.py) 第 103–199 行、[jobs.py](../backend/app/jobs.py) 的 `create_job()`；请求中间件仅限制单次 body 大小。
+定位：旧 `submission_api.py` 第 103–199 行（现已删除，由 [plan_api.py](../backend/app/plan_api.py) 替代）、[jobs.py](../backend/app/jobs.py) 的 `create_job()`；请求中间件仅限制单次 body 大小。
 
 每次使用新的 `Idempotency-Key`，都会创建新的 Submission／SubmissionItem。重复图片可以复用同一个活跃 Job，绕过新增任务容量和页数预占；重复使用同一幂等键的保护不能覆盖这种请求。
 
@@ -74,7 +74,7 @@
 
 ### 8. 运维验收缺口：备份恢复、入口配置与实际容量
 
-- PostgreSQL 目前是 Compose 持久卷，仓库未提供可验收的备份、恢复演练及数据库/R2 一致恢复流程。孤儿扫描会删除超过一天且在当前 DB 无引用的对象（[storage_cleanup.py](../backend/app/storage_cleanup.py) 第 41–65 行）；恢复较早数据库后，在核对对象引用之前不得启动清理。全新部署也需要未来灾难恢复方案，这不涉及旧数据迁移。
+- PostgreSQL 目前是 Compose 持久卷，仓库未提供可验收的备份、恢复演练及数据库/R2 一致恢复流程。孤儿扫描会删除超过一天且在当前 DB 无引用的对象（旧 `storage_cleanup.py` 第 41–65 行，现已删除）；恢复较早数据库后，在核对对象引用之前不得启动清理。全新部署也需要未来灾难恢复方案，这不涉及旧数据迁移。
 - 正式 HTTPS 反代、生产 API CORS、R2 下载 CORS 和真实 OIDC 登录仍需在目标部署验收；本轮没有操作线上反代／身份平台设置。
 - 上传经 API 缓冲后写 R2，计算节点经 API 获取原图，渲染结果使用 JSON/base64 回传。这是当前明确实现，不能等同于图片流量全部绕过控制服务。多并发大图的 API 内存、带宽和连接池需要容量测试。
 - 本轮没有执行新版本真实 GPU 推理、付费图片模型效果验收、跨物理机故障注入、依赖漏洞扫描或正式压力测试。已有其他任务的历史证据可以参考，但不能替代本次生产环境验收。

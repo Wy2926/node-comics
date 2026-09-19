@@ -1,6 +1,6 @@
 # 健康监控与隔离恢复
 
-适用当前 `shared_0001` 新空库基线。本文的实现是健康信号、数据库备份及隔离恢复工具；没有执行生产部署、切库或真实 R2 备份。
+适用当前 `reading_0001` 新空库基线。本文的实现是健康信号、数据库备份及隔离恢复工具；没有执行生产部署、切库或真实 R2 备份。
 
 ## 健康信号
 
@@ -81,7 +81,7 @@ backend/.venv/Scripts/python.exe scripts/database_backup.py restore `
 
 2026-09-16 在隔离 PostgreSQL 17.6 容器创建两个随机命名的新库完成真实 `pg_dump` / `pg_restore` 演练：2 个用户和 2 个图片授权恢复后对应 1 个共享对象引用；备份后的第三个用户未进入快照；第二次恢复拒绝覆盖。两个演练库已删除，未访问真实用户库、真实 R2 或模型。
 
-本地证据：`artifacts/production-fixes/restore-drill-final/report.json`，恢复后已验证 `shared_0001` 基线，备份摘要 `fe45e77eab14a7f251597365cfad64792a402dc6eea99348acb26cf0323076cb`。合成图片与备份仅保留于忽略的 artifacts 目录。
+历史版本恢复证据（不是当前基线）：`artifacts/production-fixes/restore-drill-final/report.json`，恢复后已验证 `shared_0001` 基线，备份摘要 `fe45e77eab14a7f251597365cfad64792a402dc6eea99348acb26cf0323076cb`。合成图片与备份仅保留于忽略的 artifacts 目录。
 
 重复演练使用与 PostgreSQL 并发套件相同的显式 `TEST_PG_*` 环境变量，且要求 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_DATABASE=nodecomics_concurrency_test`。可选 `TEST_PG_CONTAINER` 指向该隔离服务器的容器，输出目录必须不存在：
 

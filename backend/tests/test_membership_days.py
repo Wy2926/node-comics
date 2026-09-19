@@ -65,8 +65,8 @@ def test_zero_quota_reuse_cannot_create_work_after_membership_upgrade(client, pn
     asset = upload(client, auth, png)
     assert issue(client, auth, {'days': 30}).status_code == 200
     result = submit_asset(client, auth, asset, mode=mode, max_quota_pages=0, expected_kind=expected)
-    assert result.status_code == 409, result.text
-    assert result.json()['error']['code'] == 'ENTITLEMENT_CHANGED'
+    assert result.status_code == 200, result.text
+    assert result.json()['items'][0]['code'] == 'ENTITLEMENT_CHANGED'
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 0
 

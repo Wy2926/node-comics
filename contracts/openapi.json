@@ -6,269 +6,10 @@
     "version": "0.3.0"
   },
   "paths": {
-    "/v1/me/queues": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Queues",
-        "operationId": "queues_v1_me_queues_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/admin/users/{user_id}/queues": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "User Queues",
-        "operationId": "user_queues_v1_admin_users__user_id__queues_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/queues/{mode}/items": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Queue Items",
-        "operationId": "queue_items_v1_me_queues__mode__items_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "mode",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "enum": [
-                "classic",
-                "redraw"
-              ],
-              "type": "string",
-              "title": "Mode"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/queues/{mode}/priority": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Priority",
-        "operationId": "priority_v1_me_queues__mode__priority_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "mode",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "enum": [
-                "classic",
-                "redraw"
-              ],
-              "type": "string",
-              "title": "Mode"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriorityRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/queues/{mode}/pause": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Pause",
-        "operationId": "pause_v1_me_queues__mode__pause_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "mode",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "enum": [
-                "classic",
-                "redraw"
-              ],
-              "type": "string",
-              "title": "Mode"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PauseRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/me/translation-changes": {
       "get": {
         "tags": [
-          "queues"
+          "translation changes"
         ],
         "summary": "Changes",
         "operationId": "changes_v1_me_translation_changes_get",
@@ -300,6 +41,35 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "wait_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 20,
+              "minimum": 0,
+              "default": 0,
+              "title": "Wait Seconds"
+            }
+          },
+          {
+            "name": "policy_revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Policy Revision"
+            }
           }
         ],
         "responses": {
@@ -307,7 +77,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationChangesResponse"
+                }
               }
             }
           },
@@ -324,52 +96,51 @@
         }
       }
     },
-    "/v1/translation-submissions": {
+    "/v1/translation-plans": {
       "post": {
         "tags": [
-          "submissions"
+          "translation plans"
         ],
-        "summary": "Submit",
-        "operationId": "submit_v1_translation_submissions_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
+        "summary": "Translate",
+        "operationId": "translate_v1_translation_plans_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SubmissionRequest"
+                "$ref": "#/components/schemas/TranslationPlan"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
-          "202": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationPlanResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationPlanResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationPlanResponse"
+                }
               }
             }
           },
@@ -383,14 +154,67 @@
               }
             }
           }
-        }
-      },
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/translation-operations/resolve": {
+      "post": {
+        "tags": [
+          "translation plans"
+        ],
+        "summary": "Resolve",
+        "operationId": "resolve_v1_translation_operations_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResolutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/translation-operations": {
       "get": {
         "tags": [
-          "submissions"
+          "translation plans"
         ],
-        "summary": "Submissions",
-        "operationId": "submissions_v1_translation_submissions_get",
+        "summary": "Operations",
+        "operationId": "operations_v1_translation_operations_get",
         "security": [
           {
             "HTTPBearer": []
@@ -426,7 +250,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OperationPageResponse"
+                }
               }
             }
           },
@@ -443,13 +269,13 @@
         }
       }
     },
-    "/v1/translation-submissions/{submission_id}": {
-      "get": {
+    "/v1/reading-sessions/{session_id}/lease": {
+      "put": {
         "tags": [
-          "submissions"
+          "translation plans"
         ],
-        "summary": "Submission Get",
-        "operationId": "submission_get_v1_translation_submissions__submission_id__get",
+        "summary": "Lease",
+        "operationId": "lease_v1_reading_sessions__session_id__lease_put",
         "security": [
           {
             "HTTPBearer": []
@@ -457,66 +283,33 @@
         ],
         "parameters": [
           {
-            "name": "submission_id",
+            "name": "session_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Submission Id"
+              "title": "Session Id"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__plan_api__LeaseRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ReadingLeaseResponse"
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/translation-submissions/{submission_id}/cancel": {
-      "post": {
-        "tags": [
-          "submissions"
-        ],
-        "summary": "Submission Cancel",
-        "operationId": "submission_cancel_v1_translation_submissions__submission_id__cancel_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "submission_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Submission Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -536,7 +329,7 @@
     "/v1/uploads/{upload_id}/content": {
       "put": {
         "tags": [
-          "submissions"
+          "uploads"
         ],
         "summary": "Upload Content",
         "operationId": "upload_content_v1_uploads__upload_id__content_put",
@@ -581,7 +374,7 @@
     "/v1/uploads/{upload_id}/complete": {
       "post": {
         "tags": [
-          "submissions"
+          "uploads"
         ],
         "summary": "Upload Complete",
         "operationId": "upload_complete_v1_uploads__upload_id__complete_post",
@@ -623,13 +416,13 @@
         }
       }
     },
-    "/internal/nodes/register": {
+    "/internal/compute/v2/nodes/register": {
       "post": {
         "tags": [
-          "compute"
+          "compute v2"
         ],
         "summary": "Register",
-        "operationId": "register_internal_nodes_register_post",
+        "operationId": "register_internal_compute_v2_nodes_register_post",
         "parameters": [
           {
             "name": "authorization",
@@ -669,7 +462,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NodeRegistration"
+                "$ref": "#/components/schemas/Registration"
               }
             }
           }
@@ -696,167 +489,13 @@
         }
       }
     },
-    "/internal/nodes/{node_id}/config": {
-      "get": {
-        "tags": [
-          "compute"
-        ],
-        "summary": "Fetch Config",
-        "operationId": "fetch_config_internal_nodes__node_id__config_get",
-        "parameters": [
-          {
-            "name": "node_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Node Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "x-node-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Node-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/nodes/{node_id}/config/applied": {
+    "/internal/compute/v2/nodes/{node_id}/claim": {
       "post": {
         "tags": [
-          "compute"
-        ],
-        "summary": "Config Applied",
-        "operationId": "config_applied_internal_nodes__node_id__config_applied_post",
-        "parameters": [
-          {
-            "name": "node_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Node Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "x-node-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Node-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfigApplied"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/nodes/{node_id}/claim": {
-      "post": {
-        "tags": [
-          "compute"
+          "compute v2"
         ],
         "summary": "Claim",
-        "operationId": "claim_internal_nodes__node_id__claim_post",
+        "operationId": "claim_internal_compute_v2_nodes__node_id__claim_post",
         "parameters": [
           {
             "name": "node_id",
@@ -932,13 +571,177 @@
         }
       }
     },
-    "/internal/leases/{lease_id}/heartbeat": {
+    "/internal/compute/v2/nodes/{node_id}/updates": {
       "post": {
         "tags": [
-          "compute"
+          "compute v2"
+        ],
+        "summary": "Updates",
+        "operationId": "updates_internal_compute_v2_nodes__node_id__updates_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/compute/v2/nodes/{node_id}/heartbeat": {
+      "post": {
+        "tags": [
+          "compute v2"
         ],
         "summary": "Heartbeat",
-        "operationId": "heartbeat_internal_leases__lease_id__heartbeat_post",
+        "operationId": "heartbeat_internal_compute_v2_nodes__node_id__heartbeat_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/compute/v2/leases/{lease_id}/analysis": {
+      "post": {
+        "tags": [
+          "compute v2"
+        ],
+        "summary": "Analysis",
+        "operationId": "analysis_internal_compute_v2_leases__lease_id__analysis_post",
         "parameters": [
           {
             "name": "lease_id",
@@ -987,7 +790,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LeaseRequest"
+                "$ref": "#/components/schemas/AnalysisRequest"
               }
             }
           }
@@ -1014,175 +817,177 @@
         }
       }
     },
-    "/internal/leases/{lease_id}/input": {
-      "get": {
-        "tags": [
-          "compute"
-        ],
-        "summary": "Input Image",
-        "operationId": "input_image_internal_leases__lease_id__input_get",
-        "parameters": [
-          {
-            "name": "lease_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Lease Id"
-            }
-          },
-          {
-            "name": "x-lease-token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "X-Lease-Token"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "x-node-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Node-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/leases/{lease_id}/input/authorize": {
-      "get": {
-        "tags": [
-          "compute"
-        ],
-        "summary": "Authorize Cached Input",
-        "operationId": "authorize_cached_input_internal_leases__lease_id__input_authorize_get",
-        "parameters": [
-          {
-            "name": "lease_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Lease Id"
-            }
-          },
-          {
-            "name": "x-lease-token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "X-Lease-Token"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "x-node-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Node-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/leases/{lease_id}/complete": {
+    "/internal/compute/v2/leases/{lease_id}/input/authorize": {
       "post": {
         "tags": [
-          "compute"
+          "compute v2"
+        ],
+        "summary": "Authorize",
+        "operationId": "authorize_internal_compute_v2_leases__lease_id__input_authorize_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__compute_v2__LeaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/compute/v2/leases/{lease_id}/output/authorize": {
+      "post": {
+        "tags": [
+          "compute v2"
+        ],
+        "summary": "Authorize Output",
+        "operationId": "authorize_output_internal_compute_v2_leases__lease_id__output_authorize_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutputRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/compute/v2/leases/{lease_id}/complete": {
+      "post": {
+        "tags": [
+          "compute v2"
         ],
         "summary": "Complete",
-        "operationId": "complete_internal_leases__lease_id__complete_post",
+        "operationId": "complete_internal_compute_v2_leases__lease_id__complete_post",
         "parameters": [
           {
             "name": "lease_id",
@@ -1713,6 +1518,126 @@
         ]
       }
     },
+    "/v1/billing/status": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Status",
+        "operationId": "status_v1_billing_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/checkouts": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Checkout",
+        "operationId": "checkout_v1_billing_checkouts_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/sync": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_v1_billing_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/cancel": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_v1_billing_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Portal",
+        "operationId": "portal_v1_billing_portal_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/monitor/tasks": {
       "get": {
         "summary": "Tasks",
@@ -2097,10 +2022,327 @@
         }
       }
     },
+    "/v1/admin/system-settings": {
+      "get": {
+        "tags": [
+          "system settings"
+        ],
+        "summary": "Get System Settings",
+        "operationId": "get_system_settings_v1_admin_system_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "system settings"
+        ],
+        "summary": "Put System Settings",
+        "operationId": "put_system_settings_v1_admin_system_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/translation-providers": {
+      "get": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "List Providers",
+        "operationId": "list_providers_v1_admin_translation_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "Create Provider",
+        "operationId": "create_provider_v1_admin_translation_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/translation-providers/{provider_id}": {
+      "put": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "Update Provider",
+        "operationId": "update_provider_v1_admin_translation_providers__provider_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "Toggle Provider",
+        "operationId": "toggle_provider_v1_admin_translation_providers__provider_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderToggle"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/translation-providers/{provider_id}/default": {
+      "post": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "Default Provider",
+        "operationId": "default_provider_v1_admin_translation_providers__provider_id__default_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
         "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Health Ready",
+        "operationId": "health_ready_health_ready_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3323,6 +3565,30 @@
         ]
       }
     },
+    "/v1/admin/compute-nodes/config-schema": {
+      "get": {
+        "tags": [
+          "node administration"
+        ],
+        "summary": "Config Schema",
+        "operationId": "config_schema_v1_admin_compute_nodes_config_schema_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/compute-nodes/{node_id}/config": {
       "get": {
         "tags": [
@@ -3465,126 +3731,6 @@
           }
         }
       }
-    },
-    "/v1/billing/status": {
-      "get": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Status",
-        "operationId": "status_v1_billing_status_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/billing/checkouts": {
-      "post": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Checkout",
-        "operationId": "checkout_v1_billing_checkouts_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/billing/sync": {
-      "post": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Sync",
-        "operationId": "sync_v1_billing_sync_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/billing/cancel": {
-      "post": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Cancel",
-        "operationId": "cancel_v1_billing_cancel_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/billing/portal": {
-      "post": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Portal",
-        "operationId": "portal_v1_billing_portal_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
     }
   },
   "components": {
@@ -3618,6 +3764,34 @@
           "authorization_required"
         ],
         "title": "AccessResponse"
+      },
+      "AnalysisRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "analysis_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Analysis Hash"
+          },
+          "analysis": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Analysis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "analysis_hash",
+          "analysis"
+        ],
+        "title": "AnalysisRequest"
       },
       "AssetResponse": {
         "properties": {
@@ -3769,31 +3943,31 @@
       },
       "ClaimRequest": {
         "properties": {
-          "stages": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "analyze",
-                "inpaint",
-                "render"
-              ]
-            },
-            "type": "array",
-            "maxItems": 3,
-            "minItems": 1,
-            "title": "Stages"
+          "request_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Request Id"
           },
           "config_version": {
             "type": "integer",
             "minimum": 1.0,
             "title": "Config Version"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Count"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "stages",
-          "config_version"
+          "request_id",
+          "config_version",
+          "count"
         ],
         "title": "ClaimRequest"
       },
@@ -3840,24 +4014,60 @@
           "result": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Result"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StageError"
+                "$ref": "#/components/schemas/PageResult"
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etag"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "number",
+              "maximum": 86400.0,
+              "minimum": 0.0
+            },
+            "propertyNames": {
+              "enum": [
+                "download",
+                "download_queue",
+                "analyze",
+                "analyze_queue",
+                "inpaint",
+                "inpaint_queue",
+                "render",
+                "render_queue",
+                "analysis_submit",
+                "text_wait",
+                "local_total",
+                "upload_authorize",
+                "output_put"
+              ]
+            },
+            "type": "object",
+            "title": "Timings"
           }
         },
         "additionalProperties": false,
@@ -3866,51 +4076,6 @@
           "lease_token"
         ],
         "title": "CompletionRequest"
-      },
-      "ConfigApplied": {
-        "properties": {
-          "version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Version"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "ENGINE_CONFIG_FAILED"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "engine": {
-            "$ref": "#/components/schemas/EngineOverrides"
-          },
-          "supported_languages": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "zh-Hans",
-                "zh-Hant",
-                "ja",
-                "en",
-                "ko"
-              ]
-            },
-            "type": "array",
-            "maxItems": 5,
-            "title": "Supported Languages"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "version"
-        ],
-        "title": "ConfigApplied"
       },
       "DevLogin": {
         "properties": {
@@ -3928,88 +4093,6 @@
           "username"
         ],
         "title": "DevLogin"
-      },
-      "EngineOverrides": {
-        "properties": {
-          "languages": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "zh-Hans",
-                    "zh-Hant",
-                    "ja",
-                    "en",
-                    "ko"
-                  ]
-                },
-                "type": "array",
-                "maxItems": 5,
-                "minItems": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Languages"
-          },
-          "torch_threads": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 128.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Torch Threads"
-          },
-          "opencv_threads": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 128.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Opencv Threads"
-          },
-          "cache_bytes": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 8589934592.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cache Bytes"
-          },
-          "cache_ttl_seconds": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 86400.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cache Ttl Seconds"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "EngineOverrides"
       },
       "EntitlementsResponse": {
         "properties": {
@@ -4043,13 +4126,10 @@
             "type": "string",
             "title": "Timezone"
           },
-          "queue_capacity": {
-            "type": "integer",
-            "title": "Queue Capacity"
-          },
-          "realtime_slots": {
-            "type": "integer",
-            "title": "Realtime Slots"
+          "image_rate_limit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Image Rate Limit"
           },
           "scheduler_weight": {
             "type": "number",
@@ -4077,8 +4157,7 @@
           "plus_started_at",
           "plus_expires_at",
           "timezone",
-          "queue_capacity",
-          "realtime_slots",
+          "image_rate_limit",
           "scheduler_weight",
           "modes",
           "generated_at",
@@ -4350,6 +4429,24 @@
           },
           "target_language": {
             "type": "string",
+            "enum": [
+              "zh-Hans",
+              "zh-Hant",
+              "ja",
+              "en",
+              "ko",
+              "fr",
+              "es",
+              "pt-BR",
+              "de",
+              "it",
+              "ru",
+              "pl",
+              "uk",
+              "tr",
+              "vi",
+              "id"
+            ],
             "title": "Target Language"
           },
           "include_display": {
@@ -4446,7 +4543,81 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ItemRequest": {
+      "HeartbeatItem": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "lease_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Lease Id"
+          },
+          "translations_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translations Revision"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "download",
+              "analyze",
+              "inpaint",
+              "text",
+              "render",
+              "deliver",
+              "stopped"
+            ],
+            "title": "Phase",
+            "default": "queued"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "lease_id"
+        ],
+        "title": "HeartbeatItem"
+      },
+      "HeartbeatRequest": {
+        "properties": {
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
+          },
+          "leases": {
+            "items": {
+              "$ref": "#/components/schemas/HeartbeatItem"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Leases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config_version",
+          "leases"
+        ],
+        "title": "HeartbeatRequest"
+      },
+      "ImageDescriptor": {
         "properties": {
           "client_item_id": {
             "type": "string",
@@ -4520,7 +4691,36 @@
           "byte_size",
           "content_type"
         ],
-        "title": "ItemRequest"
+        "title": "ImageDescriptor"
+      },
+      "ImageRateLimit": {
+        "properties": {
+          "window_seconds": {
+            "type": "integer",
+            "const": 60,
+            "title": "Window Seconds"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          },
+          "retry_after_seconds": {
+            "type": "integer",
+            "title": "Retry After Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_seconds",
+          "limit",
+          "remaining",
+          "retry_after_seconds"
+        ],
+        "title": "ImageRateLimit"
       },
       "JobPageResponse": {
         "properties": {
@@ -4690,21 +4890,6 @@
             "title": "Reused",
             "default": false
           },
-          "submission_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submission Id"
-          },
-          "ordinal": {
-            "type": "integer",
-            "title": "Ordinal"
-          },
           "cancel_requested": {
             "type": "boolean",
             "title": "Cancel Requested"
@@ -4760,7 +4945,6 @@
           "settlement",
           "version",
           "cache_hit",
-          "ordinal",
           "cancel_requested",
           "error",
           "quality_flags",
@@ -4832,22 +5016,6 @@
           "result"
         ],
         "title": "LatestResult"
-      },
-      "LeaseRequest": {
-        "properties": {
-          "lease_token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Lease Token"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "lease_token"
-        ],
-        "title": "LeaseRequest"
       },
       "LoginResponse": {
         "properties": {
@@ -5028,9 +5196,9 @@
           "poll_seconds": {
             "type": "number",
             "maximum": 30.0,
-            "minimum": 0.05,
+            "minimum": 1.0,
             "title": "Poll Seconds",
-            "default": 1
+            "default": 20
           },
           "heartbeat_seconds": {
             "type": "number",
@@ -5039,13 +5207,6 @@
             "title": "Heartbeat Seconds",
             "default": 10
           },
-          "config_poll_seconds": {
-            "type": "number",
-            "maximum": 60.0,
-            "minimum": 1.0,
-            "title": "Config Poll Seconds",
-            "default": 15
-          },
           "request_seconds": {
             "type": "number",
             "maximum": 120.0,
@@ -5053,29 +5214,53 @@
             "title": "Request Seconds",
             "default": 30
           },
-          "stage_seconds": {
+          "page_seconds": {
             "type": "number",
             "maximum": 3600.0,
             "minimum": 10.0,
-            "title": "Stage Seconds",
+            "title": "Page Seconds",
             "default": 900
           },
-          "input_cache_bytes": {
-            "type": "integer",
-            "maximum": 8589934592.0,
-            "minimum": 0.0,
-            "title": "Input Cache Bytes",
-            "default": 134217728
+          "text_wait_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Text Wait Seconds",
+            "default": 600
           },
-          "input_cache_ttl_seconds": {
-            "type": "integer",
-            "maximum": 86400.0,
-            "minimum": 0.0,
-            "title": "Input Cache Ttl Seconds",
-            "default": 900
+          "delivery_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 10.0,
+            "title": "Delivery Seconds",
+            "default": 120
           },
-          "engine": {
-            "$ref": "#/components/schemas/EngineOverrides"
+          "allowed_languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh-Hans",
+                "zh-Hant",
+                "ja",
+                "en",
+                "ko",
+                "fr",
+                "es",
+                "pt-BR",
+                "de",
+                "it",
+                "ru",
+                "pl",
+                "uk",
+                "tr",
+                "vi",
+                "id"
+              ]
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Allowed Languages"
           }
         },
         "additionalProperties": false,
@@ -5109,50 +5294,35 @@
         ],
         "title": "NodeCreate"
       },
-      "NodeRegistration": {
+      "NodeError": {
         "properties": {
-          "capabilities": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "analyze",
-                "inpaint",
-                "render"
-              ]
-            },
-            "type": "array",
-            "maxItems": 3,
-            "minItems": 1,
-            "title": "Capabilities"
-          },
-          "engine_version": {
+          "code": {
             "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Engine Version"
-          },
-          "device": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 1,
-            "title": "Device"
-          },
-          "resource_id": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Resource Id"
+            "enum": [
+              "LEASE_STOPPED",
+              "ENGINE_UNAVAILABLE",
+              "CLASSIC_LOCAL_INTERRUPTED",
+              "INPUT_INVALID",
+              "INPUT_HASH_MISMATCH",
+              "STORAGE_AUTH_FAILED",
+              "STORAGE_UNAVAILABLE",
+              "CLASSIC_ANALYZE_FAILED",
+              "CLASSIC_INPAINT_FAILED",
+              "CLASSIC_RENDER_FAILED",
+              "ENGINE_VERSION_MISMATCH",
+              "TEXT_DEADLINE_EXCEEDED",
+              "DELIVERY_DEADLINE_EXCEEDED",
+              "PAGE_DEADLINE_EXCEEDED"
+            ],
+            "title": "Code"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "capabilities",
-          "engine_version",
-          "device",
-          "resource_id"
+          "code"
         ],
-        "title": "NodeRegistration"
+        "title": "NodeError"
       },
       "NodeUpdate": {
         "properties": {
@@ -5172,7 +5342,9 @@
             "title": "Enabled"
           },
           "config": {
-            "$ref": "#/components/schemas/NodeConfig"
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
           }
         },
         "additionalProperties": false,
@@ -5185,19 +5357,275 @@
         ],
         "title": "NodeUpdate"
       },
-      "PauseRequest": {
+      "OperationPageResponse": {
         "properties": {
-          "paused": {
-            "type": "boolean",
-            "title": "Paused"
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OperationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "next_offset"
+        ],
+        "title": "OperationPageResponse"
+      },
+      "OperationResolutionResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OperationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "policy_revision": {
+            "type": "string",
+            "title": "Policy Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "policy_revision"
+        ],
+        "title": "OperationResolutionResponse"
+      },
+      "OperationResponse": {
+        "properties": {
+          "operation_key": {
+            "type": "string",
+            "title": "Operation Key"
+          },
+          "page_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Key"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pending",
+              "accepted",
+              "deferred",
+              "blocked",
+              "not_found"
+            ],
+            "title": "Disposition"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UploadPlanResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "retry_after_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After Seconds"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation_key",
+          "disposition"
+        ],
+        "title": "OperationResponse"
+      },
+      "OutputInfo": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          },
+          "md5": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "title": "Md5"
+          },
+          "byte_size": {
+            "type": "integer",
+            "maximum": 25165824.0,
+            "minimum": 1.0,
+            "title": "Byte Size"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Height"
+          },
+          "mime": {
+            "type": "string",
+            "const": "image/png",
+            "title": "Mime"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "paused"
+          "sha256",
+          "md5",
+          "byte_size",
+          "width",
+          "height",
+          "mime"
         ],
-        "title": "PauseRequest"
+        "title": "OutputInfo"
+      },
+      "OutputRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "result": {
+            "$ref": "#/components/schemas/PageResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "result"
+        ],
+        "title": "OutputRequest"
+      },
+      "PageResult": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Version"
+          },
+          "input_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Input Hash"
+          },
+          "analysis_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Analysis Hash"
+          },
+          "translations_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Translations Revision"
+          },
+          "output": {
+            "$ref": "#/components/schemas/OutputInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "input_hash",
+          "analysis_hash",
+          "translations_revision",
+          "output"
+        ],
+        "title": "PageResult"
       },
       "PeriodResponse": {
         "properties": {
@@ -5267,67 +5695,158 @@
         ],
         "title": "PeriodResponse"
       },
-      "PriorityRequest": {
+      "PlanItem": {
         "properties": {
-          "session_id": {
+          "page_key": {
             "type": "string",
-            "maxLength": 80,
+            "maxLength": 100,
             "minLength": 1,
-            "title": "Session Id"
+            "title": "Page Key"
           },
-          "sequence": {
+          "operation_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operation Key"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "current",
+              "prefetch"
+            ],
+            "title": "Role",
+            "default": "current"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "redraw"
+            ],
+            "title": "Mode"
+          },
+          "target_language": {
+            "type": "string",
+            "enum": [
+              "zh-Hans",
+              "zh-Hant",
+              "ja",
+              "en",
+              "ko",
+              "fr",
+              "es",
+              "pt-BR",
+              "de",
+              "it",
+              "ru",
+              "pl",
+              "uk",
+              "tr",
+              "vi",
+              "id"
+            ],
+            "title": "Target Language"
+          },
+          "max_quota_pages": {
             "type": "integer",
-            "maximum": 2147483647.0,
+            "maximum": 1.0,
             "minimum": 0.0,
-            "title": "Sequence"
+            "title": "Max Quota Pages",
+            "default": 1
           },
-          "expected_version": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Expected Version"
+          "expected_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Kind"
           },
-          "realtime_job_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "title": "Realtime Job Ids"
+          "image": {
+            "$ref": "#/components/schemas/ImageDescriptor"
           },
-          "ordered_job_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 500,
-            "title": "Ordered Job Ids"
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
           },
-          "ttl_seconds": {
-            "type": "integer",
-            "maximum": 300.0,
-            "minimum": 1.0,
-            "title": "Ttl Seconds",
-            "default": 90
+          "action": {
+            "type": "string",
+            "enum": [
+              "ensure",
+              "retry",
+              "regenerate"
+            ],
+            "title": "Action",
+            "default": "ensure"
           },
-          "takeover": {
+          "source_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
+          },
+          "acknowledge_unknown_cost": {
             "type": "boolean",
-            "title": "Takeover",
-            "default": false
-          },
-          "reserve_next_upload": {
-            "type": "boolean",
-            "title": "Reserve Next Upload",
+            "title": "Acknowledge Unknown Cost",
             "default": false
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "session_id",
-          "sequence",
-          "expected_version"
+          "page_key",
+          "operation_key",
+          "mode",
+          "target_language",
+          "image"
         ],
-        "title": "PriorityRequest"
+        "title": "PlanItem"
+      },
+      "PriorityResponse": {
+        "properties": {
+          "owned": {
+            "type": "boolean",
+            "title": "Owned"
+          },
+          "epoch": {
+            "type": "integer",
+            "title": "Epoch"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "owned",
+          "epoch",
+          "expires_at"
+        ],
+        "title": "PriorityResponse"
       },
       "ProviderConfig": {
         "properties": {
@@ -5481,6 +6000,53 @@
         ],
         "title": "ProviderToggle"
       },
+      "ProviderWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "channel": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Channel"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "channel",
+          "config"
+        ],
+        "title": "ProviderWrite"
+      },
       "QuotaBucketResponse": {
         "properties": {
           "id": {
@@ -5549,6 +6115,32 @@
         ],
         "title": "QuotaBucketResponse"
       },
+      "ReadingLeaseResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "priority": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PriorityResponse"
+            },
+            "type": "object",
+            "title": "Priority"
+          },
+          "policy_revision": {
+            "type": "string",
+            "title": "Policy Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "priority",
+          "policy_revision"
+        ],
+        "title": "ReadingLeaseResponse"
+      },
       "ReconcileRequest": {
         "properties": {
           "resolution": {
@@ -5585,26 +6177,173 @@
         ],
         "title": "ReconcileRequest"
       },
-      "StageError": {
+      "Registration": {
         "properties": {
-          "code": {
+          "protocol_version": {
+            "type": "integer",
+            "const": 2,
+            "title": "Protocol Version"
+          },
+          "engine_version": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Engine Version"
+          },
+          "resource_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Resource Id"
+          },
+          "device": {
             "type": "string",
             "maxLength": 80,
-            "title": "Code"
+            "minLength": 1,
+            "title": "Device"
           },
-          "message": {
-            "type": "string",
-            "maxLength": 300,
-            "title": "Message"
+          "supported_languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh-Hans",
+                "zh-Hant",
+                "ja",
+                "en",
+                "ko",
+                "fr",
+                "es",
+                "pt-BR",
+                "de",
+                "it",
+                "ru",
+                "pl",
+                "uk",
+                "tr",
+                "vi",
+                "id"
+              ]
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Supported Languages"
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "code",
-          "message"
+          "protocol_version",
+          "engine_version",
+          "resource_id",
+          "device",
+          "supported_languages",
+          "ready"
         ],
-        "title": "StageError"
+        "title": "Registration"
+      },
+      "RequestLimits": {
+        "properties": {
+          "free_images_per_minute": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Free Images Per Minute"
+          },
+          "plus_images_per_minute": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Plus Images Per Minute"
+          },
+          "upload_user_concurrency": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Upload User Concurrency"
+          },
+          "upload_global_concurrency": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Upload Global Concurrency"
+          },
+          "upload_idle_timeout_seconds": {
+            "type": "number",
+            "maximum": 120.0,
+            "minimum": 0.1,
+            "title": "Upload Idle Timeout Seconds"
+          },
+          "upload_body_timeout_seconds": {
+            "type": "number",
+            "maximum": 900.0,
+            "minimum": 0.1,
+            "title": "Upload Body Timeout Seconds"
+          },
+          "upload_ingress_lease_seconds": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 15.0,
+            "title": "Upload Ingress Lease Seconds"
+          },
+          "feedback_requests_per_minute": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Feedback Requests Per Minute"
+          },
+          "feedback_request_burst": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Feedback Request Burst"
+          },
+          "feedback_receipts_per_day": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Feedback Receipts Per Day"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "free_images_per_minute",
+          "plus_images_per_minute",
+          "upload_user_concurrency",
+          "upload_global_concurrency",
+          "upload_idle_timeout_seconds",
+          "upload_body_timeout_seconds",
+          "upload_ingress_lease_seconds",
+          "feedback_requests_per_minute",
+          "feedback_request_burst",
+          "feedback_receipts_per_day"
+        ],
+        "title": "RequestLimits",
+        "description": "One immutable operation snapshot; PUT requires every supported field."
+      },
+      "ResolveRequest": {
+        "properties": {
+          "operation_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Operation Keys"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation_keys"
+        ],
+        "title": "ResolveRequest"
       },
       "StatusRequest": {
         "properties": {
@@ -5625,89 +6364,320 @@
         ],
         "title": "StatusRequest"
       },
-      "SubmissionRequest": {
+      "SystemSettingsUpdate": {
         "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "classic",
-              "redraw"
-            ],
-            "title": "Mode"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language"
-          },
-          "max_quota_pages": {
+          "expected_version": {
             "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Max Quota Pages"
+            "minimum": 1.0,
+            "title": "Expected Version"
           },
-          "expected_kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Kind"
+          "values": {
+            "$ref": "#/components/schemas/RequestLimits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "values"
+        ],
+        "title": "SystemSettingsUpdate"
+      },
+      "TranslationChangesResponse": {
+        "properties": {
+          "policy_revision": {
+            "type": "string",
+            "title": "Policy Revision"
           },
-          "regenerate": {
-            "type": "boolean",
-            "title": "Regenerate",
-            "default": false
+          "server_time": {
+            "type": "string",
+            "title": "Server Time"
           },
-          "rerun_job_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rerun Job Id"
+          "image_rate_limit": {
+            "$ref": "#/components/schemas/ImageRateLimit"
           },
-          "acknowledge_unknown_cost": {
-            "type": "boolean",
-            "title": "Acknowledge Unknown Cost",
-            "default": false
-          },
-          "reading_session_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 80
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reading Session Id"
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementsResponse"
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ItemRequest"
+              "$ref": "#/components/schemas/JobResponse"
             },
             "type": "array",
-            "maxItems": 500,
-            "minItems": 1,
+            "title": "Items"
+          },
+          "deleted_job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted Job Ids"
+          },
+          "cursor": {
+            "type": "string",
+            "title": "Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "policy_revision",
+          "server_time",
+          "image_rate_limit",
+          "entitlements",
+          "items",
+          "deleted_job_ids",
+          "cursor",
+          "has_more"
+        ],
+        "title": "TranslationChangesResponse"
+      },
+      "TranslationPlan": {
+        "properties": {
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "reading",
+              "manual"
+            ],
+            "title": "Trigger"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "priority_epochs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "classic",
+                "redraw"
+              ]
+            },
+            "type": "object",
+            "title": "Priority Epochs"
+          },
+          "allow_new": {
+            "type": "boolean",
+            "title": "Allow New",
+            "default": true
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlanItem"
+            },
+            "type": "array",
+            "maxItems": 3,
             "title": "Items"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "mode",
-          "target_language",
-          "max_quota_pages",
+          "trigger",
           "items"
         ],
-        "title": "SubmissionRequest"
+        "title": "TranslationPlan"
+      },
+      "TranslationPlanResponse": {
+        "properties": {
+          "policy_revision": {
+            "type": "string",
+            "title": "Policy Revision"
+          },
+          "server_time": {
+            "type": "string",
+            "title": "Server Time"
+          },
+          "image_rate_limit": {
+            "$ref": "#/components/schemas/ImageRateLimit"
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementsResponse"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "applied_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied Sequence"
+          },
+          "priority": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PriorityResponse"
+            },
+            "type": "object",
+            "title": "Priority"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OperationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "policy_revision",
+          "server_time",
+          "image_rate_limit",
+          "entitlements",
+          "session_id",
+          "applied_sequence",
+          "priority",
+          "items"
+        ],
+        "title": "TranslationPlanResponse"
+      },
+      "UpdatesRequest": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision",
+            "default": 0
+          },
+          "wait_seconds": {
+            "type": "number",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Wait Seconds",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "UpdatesRequest"
+      },
+      "UploadPlanResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "method": {
+            "type": "string",
+            "const": "PUT",
+            "title": "Method"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "authorization_required": {
+            "type": "boolean",
+            "title": "Authorization Required"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "status",
+          "asset_id",
+          "url",
+          "method",
+          "headers",
+          "authorization_required",
+          "expires_at",
+          "error"
+        ],
+        "title": "UploadPlanResponse"
       },
       "UsageDay": {
         "properties": {
@@ -5976,6 +6946,63 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "app__compute_v2__LeaseRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token"
+        ],
+        "title": "LeaseRequest"
+      },
+      "app__plan_api__LeaseRequest": {
+        "properties": {
+          "modes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "classic",
+                "redraw"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Modes"
+          },
+          "priority_epochs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "classic",
+                "redraw"
+              ]
+            },
+            "type": "object",
+            "title": "Priority Epochs"
+          },
+          "takeover": {
+            "type": "boolean",
+            "title": "Takeover",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "modes"
+        ],
+        "title": "LeaseRequest"
       }
     },
     "securitySchemes": {

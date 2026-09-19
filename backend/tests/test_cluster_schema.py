@@ -9,8 +9,8 @@ def test_clean_baseline_matches_models_and_removes_old_queue(client):
     with engine().connect() as connection:
         inspector = inspect(connection)
         tables = set(inspector.get_table_names())
-        assert not tables & {"outbox", "queue_admissions", "scheduler_states", "translation_previews", "batches", "batch_items"}
-        assert {"execution_leases", "job_stages", "upload_reservations", "translation_submissions", "submission_items"} <= tables
+        assert not tables & {"outbox", "queue_admissions", "scheduler_states", "translation_previews", "batches", "batch_items", "translation_submissions", "submission_items", "submission_admissions"}
+        assert {"execution_leases", "job_stages", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"} <= tables
         columns = {c["name"]: c for c in inspector.get_columns("assets")}
         assert columns["expires_at"]["nullable"]
         assert columns["last_accessed_at"]["nullable"]

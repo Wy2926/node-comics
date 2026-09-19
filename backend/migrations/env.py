@@ -3,7 +3,7 @@ from app.db import Base, engine
 from app import models, translation_models
 from app import file_pages
 from app import queue_models
-from app import job_requests
+from app import plan_models, system_settings, feedback_models
 from app import reader_api
 from app import health_models, upload_models, entitlement_models
 from app import billing_models

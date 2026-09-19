@@ -127,12 +127,14 @@ def run(env_file):
                         db.add(ComputeNode(id="smoke-" + name, name="smoke-" + name, capabilities=[name], capacity=1,
                             resource_id="smoke-" + name, engine_version="control", device="network"))
                     db.commit()
-                request = {"mode": "redraw", "target_language": "zh-Hans", "max_quota_pages": 1, "items": [
-                    {"client_item_id": "synthetic-page", "image_sha256": hashlib.sha256(original).hexdigest(),
-                     "byte_size": len(original), "content_type": "image/png"}]}
-                headers = {**auth, "Idempotency-Key": "isolated-r2-submission"}
-                report["phase"] = "submission"
-                submitted = client.post("/v1/translation-submissions", headers=headers, json=request)
+                request = {"trigger": "manual", "items": [{"page_key": "synthetic-page",
+                    "operation_key": "isolated-r2-plan", "mode": "redraw", "target_language": "zh-Hans",
+                    "max_quota_pages": 1, "image": {"client_item_id": "synthetic-page",
+                    "image_sha256": hashlib.sha256(original).hexdigest(),
+                    "byte_size": len(original), "content_type": "image/png"}}]}
+                headers = auth
+                report["phase"] = "plan"
+                submitted = client.post("/v1/translation-plans", headers=headers, json=request)
                 assert submitted.status_code == 202
                 item = submitted.json()["items"][0]
                 job_id, upload = item["job"]["id"], item["upload"]
@@ -164,9 +166,9 @@ def run(env_file):
                         with Image.open(BytesIO(response.content)) as image:
                             image.verify()
                         cors_missing += response.headers.get("access-control-allow-origin") not in (origin, "*")
-                replay = client.post("/v1/translation-submissions", headers=headers, json=request)
+                replay = client.post("/v1/translation-plans", headers=headers, json=request)
                 report["phase"] = "replay_and_settlement"
-                assert replay.status_code == 202 and replay.json()["id"] == submitted.json()["id"]
+                assert replay.status_code == 200 and replay.json()["items"][0]["job"]["id"] == job_id
                 with session_factory()() as db:
                     job = db.get(Job, job_id)
                     assert job.status == "succeeded" and job.settlement == "settled" and not job.input_pinned
@@ -179,14 +181,13 @@ def run(env_file):
                 report["phase"] = "cross_account_reuse"
                 second_login = client.post("/v1/auth/dev", json={"username": "isolated-shared-reader"})
                 assert second_login.status_code == 200
-                second_auth = {"Authorization": "Bearer " + second_login.json()["access_token"],
-                               "Idempotency-Key": "isolated-shared-submission"}
+                second_auth = {"Authorization": "Bearer " + second_login.json()["access_token"]}
                 io_before = counters.copy()
-                shared = client.post("/v1/translation-submissions", headers=second_auth,
-                    json={**request, "max_quota_pages": 0})
-                assert shared.status_code == 202
+                shared = client.post("/v1/translation-plans", headers=second_auth,
+                    json={**request, "items": [{**request["items"][0], "max_quota_pages": 0}]})
+                assert shared.status_code == 200
                 shared_item = shared.json()["items"][0]
-                assert shared_item["upload"] is None and shared_item["reused"]
+                assert shared_item["upload"] is None and shared_item["disposition"] == "ready"
                 assert shared_item["job"]["status"] == "succeeded" and shared_item["job"]["cache_hit"]
                 assert shared_item["job"]["quota_pages"] == 0 and counters == io_before and stub_calls == [1]
                 assert client.get(f"/v1/images/{output_id}/access", headers=second_auth).status_code == 404
@@ -197,7 +198,7 @@ def run(env_file):
                 report.update(shared_reuse_without_upload=True, shared_reuse_without_model=True,
                               shared_quota_pages=0, cross_account_asset_ids_private=True)
                 assert not any(path.is_file() for path in settings().storage_path.rglob("*"))
-                report.update(status="passed", phase="completed", submission_replay="same_receipt", source_storage="r2", result_storage="r2",
+                report.update(status="passed", phase="completed", operation_replay="same_job", source_storage="r2", result_storage="r2",
                     downloaded_result_decoded=True, persistent_local_image_files=0, quota_settlements=1, mocked_provider_calls=1,
                     retention="unlimited", user_access_recorded=True, cors_status="missing" if cors_missing else "configured",
                     cors_origins_configured=len(origins) - cors_missing, cors_origins_missing=cors_missing)

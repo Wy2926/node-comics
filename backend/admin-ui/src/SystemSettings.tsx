@@ -3,6 +3,10 @@ import {ApiError, authError, errorText, request} from './api';
 import {time} from './ui';
 
 const fields = [
+  {key: 'free_images_per_minute', group: 'translation', title: '普通用户新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
+    help: '同一账户在任意滚动 60 秒内受理的新翻译图片数。重复请求、重传和完成结果复用不计数。'},
+  {key: 'plus_images_per_minute', group: 'translation', title: 'PLUS 新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
+    help: '已有原图但需要新的翻译也计数；取消或失败不返还已消耗的分钟名额。'},
   {key: 'upload_user_concurrency', group: 'upload', title: '单用户同时上传数', unit: '个', min: 1, max: 32, integer: true,
     help: '每位用户最多同时进行的图片上传。'},
   {key: 'upload_global_concurrency', group: 'upload', title: '全站同时上传数', unit: '个', min: 1, max: 128, integer: true,
@@ -127,7 +131,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
 
   return <main id="main" tabIndex={-1} className="system-settings">
     <div className="page-heading"><div><p className="eyebrow">SYSTEM SETTINGS</p><h1>系统设置</h1>
-      <p className="muted">统一管理上传与反馈的服务保护设置。</p></div>
+      <p className="muted">统一管理翻译速率、上传与反馈的服务保护设置。</p></div>
       <button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</button>
     </div>
     <div className="sync-line"><span role="status">{operation === 'saving' ? '正在保存设置…' : operation === 'loading' ? '正在读取系统设置…' :
@@ -142,10 +146,10 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
       <p role="status">{busy ? '正在读取系统设置…' : '暂时无法读取设置，请点击“读取最新设置”重试。'}</p>
     </section> : <form className="settings-form" noValidate onSubmit={event => {event.preventDefault(); void save();}}>
       <fieldset disabled={busy} className="config-body">
-        {(['upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
+        {(['translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
           <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">{group === 'upload' ? '↥' : '≡'}</span>
-            <div><h2 id={`settings-${group}`}>{group === 'upload' ? '上传保护' : '反馈保护'}</h2>
-              <p className="muted">{group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
+            <div><h2 id={`settings-${group}`}>{group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
+              <p className="muted">{group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
           <div className="settings-fields">{fields.filter(field => field.group === group).map(field => {
             const fieldError = validation?.errors[field.key];
             const isChanged = changed(draft, snapshot.values, field.key);
@@ -161,7 +165,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
               {isChanged && <p className="settings-current-value">当前已保存：{snapshot.values[field.key]} {field.unit}</p>}
             </div>;
           })}</div>
-          <p className="settings-section-note">{group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
+          <p className="settings-section-note">{group === 'translation' ? '保存后即时用于新翻译准入，已消耗的分钟名额不会清零；每日与会员月页数权益独立计算。' : group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
             '修改设置不会清零已经使用的反馈预算，也不会改变用户的翻译页数额度。'}</p>
         </section>)}
       </fieldset>

@@ -142,14 +142,14 @@ def test_feedback_budget_is_independent_of_submission_and_page_quotas(feedback_c
     from app.config import settings
     from app.db import session_factory
     from app.models import Ledger
-    from app.queue_models import SubmissionAdmission
+    from app.plan_models import ControlAdmission
     client, auth, _, job_id, _ = feedback_case
-    settings().submission_request_burst = settings().submission_receipts_per_day = 1
+    settings().plan_request_burst = 1
     settings().free_daily_pages = 0
     for index in range(3):
         assert send_feedback(client, auth, job_id, str(index)).status_code == 201
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(SubmissionAdmission)) == 0
+        assert db.scalar(select(func.count()).select_from(ControlAdmission)) == 0
         assert db.scalar(select(func.count()).select_from(Ledger)) == 0
 
 

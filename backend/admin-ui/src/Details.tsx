@@ -44,13 +44,13 @@ export function UserDetail({user: u, onChanged}: {user: UserData; onChanged: () 
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
   return <><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : '普通'}</span></div>
     <dl className="detail-meta"><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
-      <dt>每模式在途容量</dt><dd>{e.queue_capacity} 页</dd><dt>每模式实时名额</dt><dd>{e.realtime_slots} 页</dd></dl>
+      <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>
     <div className="queue-grid">{(['classic', 'redraw'] as Mode[]).map(mode => {
       const m = e.modes[mode], q = m.quota;
       return <section className="panel" key={mode}><h3>{label(mode)}</h3><p>{m.unlimited ? '不限量' : !m.allowed ? '当前无使用权益' : `可用 ${number(q?.available)} 页`}</p>
         {q && <dl className="node-info"><dt>本期已用</dt><dd>{number(q.used)} 页</dd><dt>在途预占</dt><dd>{number(q.reserved)} 页</dd>
           <dt>额度合计</dt><dd>{number(q.granted)} 页</dd><dt>下次重置</dt><dd>{time(q.resets_at)}</dd></dl>}
-        <p className="panel-note">队列{u.queues.some(r => r.mode === mode && r.paused) ? '已暂停' : '正常'}</p></section>;
+        </section>;
     })}</div>
     <MembershipActions key={u.id} user={u} onChanged={onChanged}/>
     <h3 className="detail-heading">赠送额度（按生效时间，最多 50 笔）</h3>

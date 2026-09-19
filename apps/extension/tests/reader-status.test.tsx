@@ -8,13 +8,13 @@ import {ImageTranslationStatus} from '../src/reader/ImageTranslationStatus';
 import {useAutomaticTranslation} from '../src/translation/useAutomaticTranslation';
 import {translationNotice} from '../src/translation/notice';
 import {translationState} from '../src/translation/state';
-import type {UploadManifest} from '../src/translation/store';
+import type {LocalOperation} from '../src/translation/store';
 
 const origin='https://fixture.example';
 const noop=()=>{};
 function statusMarkup(page:Page){
  function Status(){
-  const {stateFor}=useAutomaticTranslation({api:new Api(origin),userId:'reader',origin,copies:[],updateCopy:noop,concurrency:1,language:'zh-Hans',refreshUsage:noop});
+  const {stateFor}=useAutomaticTranslation({api:new Api(origin),userId:'reader',origin,copies:[],updateCopy:noop,concurrency:1,language:'zh-Hans'});
   return <ImageTranslationStatus state={stateFor('copy',page,'classic')} onRetry={noop} onUpgrade={noop} onLogin={noop}/>;
  }
  return renderToStaticMarkup(<Status/>);
@@ -46,11 +46,11 @@ describe('in-image retry status',()=>{
   expect(html).toContain(`title="${detail}"`);expect(html.replace(/<[^>]*>/g,'')).toBe('连接失败重试');
  });
  it('shows a connection failure instead of silently waiting on a local retry plan',()=>{
-  const manifest:UploadManifest={id:'retry',scope:'reader',title:'page',mode:'classic',language:'zh-Hans',quotaKind:'classic_daily',maxQuotaPages:1,regenerate:true,continuous:true,paused:false,createdAt:0,items:[{id:'page',copyId:'copy',pageId:'page',state:'local',image:{client_item_id:'page',image_sha256:'a'.repeat(64),byte_size:1,content_type:'image/png',name:'page'}}]};
-  const state=translationState({page:fixture('failed'),mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',manifest});
+  const operation:LocalOperation={id:'retry',scope:'reader',copyId:'copy',pageId:'page',state:'local',createdAt:0,item:{page_key:'page',operation_key:'retry',role:'current',mode:'classic',target_language:'zh-Hans',max_quota_pages:1,image:{client_item_id:'page',image_sha256:'a'.repeat(64),byte_size:1,content_type:'image/png',name:'page'}}};
+  const state=translationState({page:fixture('failed'),mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',operation});
   // A cached previous image can remain visible while a new attempt waits.
   expect(state?.kind).toBe('waiting');
   const page=fixture('failed');page.outputBlobs={};
-  expect(translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',manifest})?.message).toBe('连接失败');
+  expect(translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',operation})?.message).toBe('连接失败');
  });
 });

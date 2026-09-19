@@ -16,7 +16,7 @@ from .queue_models import ExecutionLease, JobStage
 from .scheduler import lock_scheduler, release_lease, touch_job
 from .storage import get_store, StorageError
 from .uploads import expire_uploads
-from .submission_limits import archive_submission_receipts
+from .plan_limits import clean_admissions
 from .workers import fail_stage, finish_job
 
 def recover_lease(lease_id):
@@ -117,7 +117,7 @@ def recover_once():
             job.status, job.phase, job.completed_at = "unknown_released", "reconciliation_required", now()
             settle(db, job, success=False)
         expire_uploads(db)
-        archive_submission_receipts(db)
+        clean_admissions(db)
         for job in db.scalars(select(Job).outerjoin(Provider, provider_join).where(Job.id.in_(disabled_ids), *disabled_filter)):
             finish_job(db, job, "failed", error=ProcessingError("PROVIDER_DISABLED", "图片服务已停用"))
         db.commit()

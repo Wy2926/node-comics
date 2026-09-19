@@ -1,4 +1,4 @@
-"""Regeneration uses explicit per-submission budgets and bound source identity."""
+"""Regeneration uses per-image budgets and bound source identity."""
 from datetime import timedelta
 import hashlib
 import pytest
@@ -10,17 +10,13 @@ def rerun(client, auth, job_id, asset_id, key="rerun-confirmed", **fields):
     return submit_asset(client, auth, asset_id, key=key, regenerate=True, rerun_job_id=job_id, **fields)
 
 
-def test_rerun_requires_and_honors_explicit_maximum_budget(client, png):
+def test_rerun_honors_per_image_maximum_budget(client, png):
     auth = login(client)
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
-    body = {"mode": "redraw", "target_language": "zh-Hans", "regenerate": True, "rerun_job_id": job_id,
-            "items": [{"client_item_id": "page", "asset_id": asset, "image_sha256": hashlib.sha256(png).hexdigest(),
-                       "byte_size": len(png), "content_type": "image/png"}]}
-    missing = client.post("/v1/translation-submissions", headers={**auth, "Idempotency-Key": "missing-budget"}, json=body)
-    assert missing.status_code == 422
+    # Explicit zero confirmation may never be widened by the server.
     response = rerun(client, auth, job_id, asset, max_quota_pages=0)
-    assert response.status_code == 409 and response.json()["error"]["code"] == "QUOTA_BOUND_EXCEEDED"
+    assert response.status_code == 200 and response.json()["items"][0]["code"] == "QUOTA_BOUND_EXCEEDED"
     assert quota_usage(client, auth)["reserved"] == 1
 
 
@@ -29,7 +25,7 @@ def test_rerun_checks_current_entitlement_kind_before_reserving(client, png):
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
     response = rerun(client, auth, job_id, asset, expected_kind="redraw_grant")
-    assert response.status_code == 409 and response.json()["error"]["code"] == "ENTITLEMENT_CHANGED"
+    assert response.status_code == 200 and response.json()["items"][0]["code"] == "ENTITLEMENT_CHANGED"
     assert quota_usage(client, auth)["reserved"] == 1
 
 
@@ -40,7 +36,7 @@ def test_confirmed_rerun_replay_survives_later_membership_and_provider_change(cl
     asset = upload(client, auth, png)
     original = create(client, auth, asset).json()
     first = rerun(client, auth, original["id"], asset)
-    assert first.status_code == 202 and first.json()["quota_pages"] == 1
+    assert first.status_code == 202 and first.json()["items"][0]["disposition"] == "accepted"
     revised = first.json()["items"][0]["job"]
     assert revised["id"] != original["id"] and revised["version"] > original["version"]
     with session_factory()() as db:
@@ -48,9 +44,9 @@ def test_confirmed_rerun_replay_survives_later_membership_and_provider_change(cl
         db.get(Provider, "default").enabled = False
         db.commit()
     repeated = rerun(client, auth, original["id"], asset)
-    assert repeated.status_code == 202 and repeated.json()["id"] == first.json()["id"]
-    conflict = rerun(client, auth, original["id"], asset, max_quota_pages=80)
-    assert conflict.status_code == 409 and conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert repeated.status_code == 200 and repeated.json()["items"][0]["job"]["id"] == first.json()["items"][0]["job"]["id"]
+    conflict = rerun(client, auth, original["id"], asset, max_quota_pages=0)
+    assert conflict.status_code == 200 and conflict.json()["items"][0]["code"] == "IDEMPOTENCY_CONFLICT"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 2
         assert db.scalar(select(func.count()).select_from(Ledger)) == 2
@@ -72,7 +68,7 @@ def test_rerun_is_bound_to_owner_source_mode_and_language(client, png, scope):
     else:
         fields["mode"] = "classic"
     response = rerun(client, auth, job_id, asset, **fields)
-    assert response.status_code == (404 if scope == "other_user" else 409)
+    assert response.status_code == 200 and response.json()["items"][0]["disposition"] == "blocked"
 
 
 def test_rerun_accepts_reimported_identical_bytes(client, png):
@@ -81,7 +77,7 @@ def test_rerun_accepts_reimported_identical_bytes(client, png):
     job_id = create(client, auth, original).json()["id"]
     alias = upload(client, auth, png)
     response = rerun(client, auth, job_id, alias)
-    assert response.status_code == 202 and response.json()["quota_pages"] == 1
+    assert response.status_code == 202 and response.json()["items"][0]["disposition"] == "accepted"
 
 
 def test_unknown_rerun_requires_explicit_acknowledgement_and_budget(client, png):
@@ -95,7 +91,7 @@ def test_unknown_rerun_requires_explicit_acknowledgement_and_budget(client, png)
         job.status, job.unknown_since = "outcome_unknown", now()
         db.commit()
     refused = rerun(client, auth, job_id, asset)
-    assert refused.status_code == 409 and refused.json()["error"]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
+    assert refused.status_code == 200 and refused.json()["items"][0]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
     accepted = rerun(client, auth, job_id, asset, acknowledge_unknown_cost=True)
     assert accepted.status_code == 202 and accepted.json()["items"][0]["job"]["id"] != job_id
     assert quota_usage(client, auth)["reserved"] == 2

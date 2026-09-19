@@ -14,7 +14,8 @@ from .assets import access_json, asset_json, available, create_asset, delete_ass
 from .storage import StorageError
 from .errors import ProcessingError
 from .scheduler import lock_scheduler, touch_job
-from .submission_api import router as submission_router
+from .plan_api import router as plan_router
+from .upload_api import router as upload_router
 from .compute_v2 import router as compute_v2_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
@@ -61,7 +62,8 @@ async def lifespan(app):
 
 app = FastAPI(title="Node Comics API", version="0.3.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务、普通与 PLUS 会员权益及周期页数额度。")
 app.include_router(queue_router)
-app.include_router(submission_router)
+app.include_router(plan_router)
+app.include_router(upload_router)
 app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
@@ -75,7 +77,7 @@ origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
 origins.extend(f"chrome-extension://{value}" for value in extension_ids)
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=r"chrome-extension://[a-p]{32}" if cfg.dev_auth else None, allow_credentials=False,
-                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"], expose_headers=["Content-Disposition"])
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"], expose_headers=["Content-Disposition", "Retry-After"])
 app.add_middleware(BodyLimitMiddleware)
 
 
@@ -183,7 +185,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
-            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_batch": cfg.max_batch, "free_queue_capacity": min(cfg.free_queue_capacity, 3), "plus_queue_capacity": min(cfg.plus_queue_capacity, 10)},
+            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_plan_items": 3},
             "entitlements": entitlements_json(db, user) if user else None,
             "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds}
 

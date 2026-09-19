@@ -1,16 +1,10 @@
 # Node Comics 后端
 
-2026-09-16 部署记录：服务端在美国 VPS 的三个容器中运行，复用既有 PostgreSQL。2026-09-19 已将独立图像节点迁入 [classic-engine](../services/classic-engine/README.md)，当前迁移头为 `shared_0006_compute_v2`，并启动[本机真实服务](../docs/CLASSIC_LOCAL_RUNTIME.md)验证真实 R2 与在线文本翻译。VPS 尚未切换本次代码，线上入口见[部署说明](../docs/VPS_DEPLOYMENT.md)。
+2026-09-19 已实现[阅读计划契约](../docs/READING_TRANSLATION_CONTRACT.md)：普通／PLUS 分别最多新增 30／100 张翻译图片每滚动 60 秒，取消账户在途数量限制。统一逐页回执、断线核实、会话优先级与增量通知；后台持久任务、公平调度和私有 R2 保留。
 
-2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](../docs/PRODUCTION_FIXES.md)，未公开部署。
+数据库只保留最终初始基线 `reading_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已替换[现有服务](../docs/CLASSIC_LOCAL_RUNTIME.md)或公开部署。
 
-此前支付迁移为 `shared_0005_billing`，直接创建含交易处理回执与订阅对账进度的 Paddle 表结构，不支持此前支付库或旧字段格式。已使用旧 Paddle 结构的沙盒需新建隔离数据库；未运行过支付迁移的 `shared_0004_text_providers` 可直接创建当前支付表。首次完整分页核对交易，后续按更新时间增量拉取；按页原子结算、跳过已处理交易版本，全部分页成功后推进进度。支付默认关闭；沙盒与生产使用不同数据库，启动时拒绝混用已有支付账户环境。API 与维护服务读取相同 `PADDLE_*` 配置，维护服务独立线程处理回调重试和漏通知补查。隔离沙盒启动及验收见 [Paddle 接入](../docs/PADDLE_BILLING_DESIGN.md#11-业务权益接入与当前验收)，增量规则见[对账优化](../docs/PADDLE_BILLING_DESIGN.md#12-增量对账与公共实现)。本轮未部署生产支付功能。
-
-此前 `shared_0004_text_providers` 新增 DB 文本供应商及版本表和请求计量索引，无自动配置 seed，不导入旧配置，不兼容旧任务快照和旧文本供应商数据。后台 `/admin/#translation-providers` 创建供应商，首次创建自动设为默认，支持 OpenAI Chat Completions（默认）和 Responses。默认选择与版本配置仅影响新任务；独立 RPM、停用暂停及迁移边界见 [LLM 翻译供应商](../docs/TRANSLATION_PROVIDERS.md)。
-
-此前 `shared_0003_system_settings` 增加上传门禁、反馈预算和统一系统设置。后台 `/admin/#settings` 管理 8 项保护参数，保存后供所有 API 副本的新请求使用，见[系统设置与验证](../docs/SYSTEM_SETTINGS.md)。
-
-FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终译图，独立计算代理按阶段拉取常规翻译。前后端使用持久提交清单和双模式队列，已删除旧 preview/batch、Celery/Redis 与固定用户执行上限。产品规则见[集群说明](../docs/TRANSLATION_CLUSTER_DESIGN.md)。
+FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Paddle 默认关闭，沙盒与生产使用不同数据库，见[支付接入](../docs/PADDLE_BILLING_DESIGN.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
 
 ## 运行
 
@@ -23,7 +17,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终
 # 启动后在 /admin/#translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `shared_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `reading_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
 三个控制进程可独立运行。以下仅列进程入口；启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
@@ -35,14 +29,14 @@ cd backend
 .venv/Scripts/python.exe -m app.dispatcher
 ```
 
-API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../services/compute-agent/README.md)。`local` 存储仅供显式开发 / 测试环境、`DEV_AUTH=true` 且配置足够长度签名密钥的隔离验证，不能作为公开部署。
+API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../docs/NODE_CONFIGURATION.md)。`local` 存储仅供显式开发 / 测试环境、`DEV_AUTH=true` 且配置足够长度签名密钥的隔离验证，不能作为公开部署。
 
 ## 配置
 
 | 配置 | 默认／用途 |
 | --- | --- |
-| `FREE_QUEUE_CAPACITY` / `PLUS_QUEUE_CAPACITY` | 账户跨模式、语言和设备共用 3 / 10 页；旧配置不能放大产品上限 |
-| `FREE_REALTIME_SLOTS` / `PLUS_REALTIME_SLOTS` | 每模式实时上限 3 / 10 页，仍受账户共用在途容量限制 |
+| `FREE_IMAGES_PER_MINUTE` / `PLUS_IMAGES_PER_MINUTE` | 30 / 100，首次初始化种子；后续在后台配置，跨模式、语言和设备共用滚动 60 秒预算 |
+| `PLAN_REQUESTS_PER_MINUTE` / `PLAN_REQUEST_BURST` / `PLAN_REQUEST_CONCURRENCY` | 300 / 30 / 4，独立 HTTP 请求保护，与新增翻译图片数分开 |
 | `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
 | `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
 | `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
@@ -51,11 +45,10 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，仅首次创建资源池时使用，后续在后台配置，所有控制副本共享限额 |
 | `CLUSTER_UPLOAD_SLOTS` | 2，仅首次创建时使用，后续在后台配置 |
 | 后台文本供应商 `config.requests_per_minute` | 默认60，每供应商独立 RPM，跨副本与该供应商历史版本共享；与文本执行位分开 |
-| `CLUSTER_MAX_IMAGE_STAGES` | 64，预存已 OCR 待渲染水位 |
 | `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
 | `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
 | 上传并发、收流超时、反馈预算 | 后台“系统设置”统一维护；对应环境变量只作为首次初始化种子，见[参数表](../docs/SYSTEM_SETTINGS.md) |
-| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 100 / 300，独立于队列容量 |
+| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 100 / 300，独立于分钟速率 |
 | `RETENTION_DAYS` | 默认0表示无限期保留；当前部署为0 |
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
@@ -73,11 +66,11 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 交互文档 `/docs`，机器契约 `/openapi.json`。
 
-- `POST /v1/translation-submissions`：稳定 `Idempotency-Key`、模式、语言、`max_quota_pages`、有序图片摘要/大小/文件页身份；受理与预占原子提交。
-- `PUT /v1/uploads/{id}/content`、`POST /v1/uploads/{id}/complete`：上传原图后排入异步校验，复用图不重复上传。
-- `GET /v1/translation-submissions` 与 `GET .../{id}`：分页摘要／原回执；`POST .../{id}/cancel` 停止所属任务。
-- `GET /v1/me/queues`、`GET .../{mode}/items`、`POST .../{mode}/priority`、`POST .../{mode}/pause`：独立模式状态与实时意图。
-- `GET /v1/me/translation-changes`：游标增量同步；`GET /v1/jobs/{id}`、`POST /v1/jobs/status`：有界查询。
+- `POST /v1/translation-plans`：自动阅读至多当前页及后两页；手动重试一页。每项稳定 `operation_key`，逐页受理、拒绝或延后；新任务与分钟计数、额度预占同事务提交。
+- `POST /v1/translation-operations/resolve`：至多十个操作编号核实；`GET /v1/translation-operations` 分页历史。
+- `PUT /v1/reading-sessions/{id}/lease`：阅读优先级续租与条件接管，不重提生成请求。
+- `PUT /v1/uploads/{id}/content`、`POST /v1/uploads/{id}/complete`：有限字节上传与校验；已有原图无需重传。
+- `GET /v1/me/translation-changes`：最多 20 秒长轮询，直接返回任务增量及权益策略；不重复逐页查询。
 - `GET /v1/images/{id}/access`：所有权、元数据寿命核验后签名直链；状态查询不探测 R2。
 - `/internal/nodes/register`、`/internal/nodes/{id}/claim`、`/internal/leases/{id}/{input,heartbeat,complete}`：受认证阶段协议。
 - `GET/POST /v1/admin/compute-nodes`：查询／添加节点，`/{id}/config` 编辑配置、`/{id}/rotate-credential` 轮换凭据。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。

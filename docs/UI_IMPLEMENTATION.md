@@ -104,7 +104,7 @@ cd backend
 
 上面的历史截图不证明新集群已部署或真实供应商效果；现行实时名额是每种模式普通 2 页、PLUS 10 页，实际执行按公平权重与设备资源分配。
 
-当前浏览器复现使用 [集群阅读器脚本](../scripts/verify_cluster_reader.mjs)，验证边界见[集群验收](CLUSTER_VALIDATION.md)。旧开关检查仅保留为[历史证据](evidence/auto-translation-validation.md)。
+当前浏览器复现使用 [集群阅读器脚本](../scripts/verify_reading_api.mjs)，验证边界见[集群验收](CLUSTER_VALIDATION.md)。旧开关检查仅保留为[历史证据](evidence/auto-translation-validation.md)。
 
 
 ## 2026-09-15 连读与导入页数

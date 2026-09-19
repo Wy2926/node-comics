@@ -35,7 +35,7 @@ def test_large_queue_lock_duration(scheduler_case, monkeypatch):
                 "target_language": "zh-Hans", "status": "queued", "quota_pages": 0, "quota_kind": "unlimited",
                 "settlement": "free", "config": scheduler_case, "operation": "submission", "request_hash": "a" * 64,
                 "idempotency_key": str(i), "cache_key": f"{i:064x}", "created_at": at} for i in indexes])
-            db.execute(insert(JobStage), [{"id": f"scale-stage-{i}", "job_id": f"scale-job-{i}", "name": "analyze", "status": "ready"} for i in indexes])
+            db.execute(insert(JobStage), [{"id": f"scale-stage-{i}", "job_id": f"scale-job-{i}", "name": "page", "status": "ready"} for i in indexes])
         db.commit()
         db.execute(text("ANALYZE"))
         db.commit()

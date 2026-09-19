@@ -1,220 +1,82 @@
-import {translationState} from './state';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Api,ApiError} from '../api';
-import {supportsLanguage,type Capabilities,type Entitlements,type Job,type Mode,type ModeQueue,type Page,type ReadingCopy} from '../types';
+import {supportsLanguage,type Capabilities,type Entitlements,type Job,type Mode,type Page,type ReadingCopy} from '../types';
 import {mergeJobs} from '../reader/jobs';
 import {latestResults,pageTranslation} from '../reader/presentation';
 import {assertCurrent,mapConcurrent} from '../concurrency';
 import * as libraryStore from '../library/store';
-import {applyAccountJobs,readingPriority} from './sync';
-import {applyMatch,matchFilePages,pageSource,sourceKey} from '../reader/recovery';
-import {processManifest} from './processor';
-import {readManifests,readManifest,saveManifest,withManifestLock,readSync,saveSync,translationScope,type UploadManifest} from './store';
+import {applyAccountJobs} from './sync';
+import {TranslationCoordinator} from './coordinator';
+import {readOperations,translationScope,type LocalOperation} from './store';
+import {ReadingWindow,operationId,type ReadingTarget,type TranslationState} from './automatic';
+import {translationState} from './state';
 
-import {ReadingWindow,automaticManifest,exhausted,availableSlots,needsTranslation,targetKey,quotaErrors,type ReadingTarget,type TranslationState} from './automatic';
-
-export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,concurrency,language,currentId,caps,rights,refreshUsage,refreshConfiguration}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;concurrency:number;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;refreshUsage:()=>void;refreshConfiguration?:()=>Promise<Entitlements>}){
- const [,render]=useState(0);
- const [queues,setQueues]=useState<ModeQueue[]>([]),[jobs,setJobs]=useState<Job[]>([]),[manifests,setManifests]=useState<UploadManifest[]>([]),[error,setError]=useState('');
+function readingSessionSlot(scope:string){const key='nc-reading-session:'+scope;try{const saved=sessionStorage.getItem(key);if(saved)return saved;const id=crypto.randomUUID();sessionStorage.setItem(key,id);return id;}catch{return crypto.randomUUID();}}
+export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,concurrency,language,currentId,caps,rights,onPolicy,refreshConfiguration}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;concurrency:number;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;onPolicy?:(rights:Entitlements)=>void;refreshConfiguration?:()=>Promise<Entitlements>}){
+ const [,render]=useState(0),[operations,setOperations]=useState<LocalOperation[]>([]),[error,setError]=useState('');
  const scope=userId?translationScope(origin,userId):'',copyRef=useRef(copies);copyRef.current=copies;
- const commitCopy=useCallback((copy:ReadingCopy)=>{copyRef.current=copyRef.current.map(value=>value.id===copy.id?copy:value);updateCopy(copy);},[updateCopy]);
- const jobsRef=useRef(jobs);jobsRef.current=jobs;const queueRef=useRef(queues);queueRef.current=queues;
- const windowRef=useRef(new ReadingWindow()),config=useRef({caps,rights,refreshUsage});config.current={caps,rights,refreshUsage};
- const visible=useRef<Page[]>([]),readingSignature=useRef(''),generation=useRef(0),wake=useRef<(force?:boolean)=>void>(()=>{});
- const session=useRef(crypto.randomUUID()),sequence=useRef(0),lastPriority=useRef('');
- const reload=useCallback(async()=>{if(!scope)return;const records=await readManifests(scope);if(api.isCurrent())setManifests(records.sort((a,b)=>b.createdAt-a.createdAt));},[scope,api]);
- const attach=useCallback(async(incoming:Job[])=>{
-  if(!api.isCurrent()||!userId)return;
-  jobsRef.current=mergeJobs(jobsRef.current,incoming);setJobs(jobsRef.current);
-  for(const copy of copyRef.current){const updated=applyAccountJobs(copy,incoming,userId,origin);if(updated!==copy)commitCopy(updated);}
- },[api,userId,origin,commitCopy]);
- const refresh=useCallback(async()=>{if(!scope)return;const data=await api.queues();if(api.isCurrent()){queueRef.current=data.items;setQueues(data.items);}await reload();},[scope,api,reload]);
+ const config=useRef({caps,rights,onPolicy});config.current={caps,rights,onPolicy};
+ const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow()),visible=useRef<Page[]>([]);
+ const resultDownloads=useRef(new Map<string,Promise<Blob>>());
+ const coordinator=useRef<TranslationCoordinator|undefined>(undefined),wake=useRef<()=>void>(()=>{}),stamp=useRef(0);
+ const commit=useCallback((copy:ReadingCopy)=>{copyRef.current=copyRef.current.map(c=>c.id===copy.id?copy:c);updateCopy(copy);},[updateCopy]);
+ const attach=useCallback(async(incoming:Job[])=>{if(!api.isCurrent()||!userId)return;jobs.current=mergeJobs(jobs.current,incoming);for(const copy of copyRef.current){const changed=applyAccountJobs(copy,incoming,userId,origin);if(changed!==copy)commit(changed);}},[api,userId,origin,commit]);
  const downloadResult=useCallback(async(job:Job,current=api.isCurrent)=>{
-     assertCurrent(current);const key=`result:${origin}:${userId}:${job.id}`;
-     const blob=await libraryStore.getBlob(key)??await api.image(job.output_asset_id!);assertCurrent(current);
-     await libraryStore.putBlob(key,blob);assertCurrent(current);
-     for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{if(page.ownerId!==userId||page.apiOrigin!==origin||!page.jobs.some(j=>j.id===job.id))return page;changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};});if(changed)commitCopy({...copy,pages});}
- },[api,userId,origin,commitCopy]);
+   assertCurrent(current);const key='result:'+origin+':'+userId+':'+job.id;
+   let pending=resultDownloads.current.get(key);if(!pending){pending=(async()=>{const blob=await libraryStore.getBlob(key)??await api.image(job.output_asset_id!);assertCurrent(api.isCurrent);await libraryStore.putBlob(key,blob);return blob;})();resultDownloads.current.set(key,pending);void pending.finally(()=>resultDownloads.current.delete(key)).catch(()=>{});}
+   await pending;assertCurrent(current);
+   for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{if(page.ownerId!==userId||page.apiOrigin!==origin||!page.jobs.some(j=>j.id===job.id))return page;changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};});if(changed)commit({...copy,pages});}
+ },[api,userId,origin,commit]);
+ useEffect(()=>{stamp.current++;if(!currentId){windowRef.current.update([]);visible.current=[];wake.current();}},[currentId,language]);
  useEffect(()=>{
-  ++generation.current;lastPriority.current='';if(!currentId){windowRef.current.update([]);visible.current=[];}
- },[currentId,language]);
- useEffect(()=>{
-  if(!scope){setQueues([]);setJobs([]);jobsRef.current=[];setManifests([]);return;}
-  let stopped=false,timer:ReturnType<typeof setTimeout>,running=false,syncing=false,wakeRequested=false;let cursor:string|undefined;let retryAt=0;
-  const live=()=>!stopped&&api.isCurrent();
-  const updates=new AbortController();
-  const focus=()=>{lastPriority.current='';wake.current();};window.addEventListener('focus',focus);
-  const visibility=()=>{if(!document.hidden)focus();};document.addEventListener('visibilitychange',visibility);
-  async function sync(){
-   if(syncing)return;
-   syncing=true;
-   try{
-   for(let page=0;page<20;page++){
-    let changes;
-    try{changes=await api.translationChanges(cursor);}catch(e){if(e instanceof ApiError&&['CURSOR_EXPIRED','INVALID_CURSOR'].includes(e.code)){cursor=undefined;continue;}throw e;}
-    assertCurrent(live);
-    const deleted=new Set(changes.deleted_job_ids??[]);
-    const tombstones=jobsRef.current.filter(j=>deleted.has(j.id)).map(job=>({...job,status:'cancelled' as const,output_asset_id:null,result_available:false,result_expired:true,updated_at:new Date().toISOString()}));
-    await attach([...changes.items,...tombstones]);
-    cursor=changes.cursor;
-    // Cursor and matching records are committed together; a refresh cannot skip unseen records.
-    await saveSync({id:scope,cursor,jobs:jobsRef.current});
-    if(!changes.has_more)break;
+   if(!scope||!userId){jobs.current=[];setOperations([]);return;}
+   let stopped=false,running=false,wakePending=false,timer:ReturnType<typeof setTimeout>|undefined,watching=false;
+   let watchController=new AbortController(),retry=0;
+   const live=()=>!stopped&&api.isCurrent();
+   const reload=()=>{void readOperations(scope).then(records=>{if(live())setOperations(records);});};
+   const core=new TranslationCoordinator({api,userId,language,sessionId:readingSessionSlot(scope),concurrency,getBlob:libraryStore.getBlob,rights:()=>config.current.rights??undefined,onJobs:attach,onChange:()=>{reload();wake.current();},onPolicy:value=>{config.current.rights=value;config.current.onPolicy?.(value);}});
+   coordinator.current=core;
+   async function downloads(){
+     const generation=stamp.current,current=()=>live()&&generation===stamp.current;
+     const pages=visible.current.map(p=>copyRef.current.flatMap(c=>c.pages).find(v=>v.id===p.id)??p);
+     const needed=[...new Map(pages.flatMap(p=>p.ownerId===userId&&p.apiOrigin===origin?latestResults(p.jobs).filter(j=>j.target_language===language&&j.output_asset_id&&!p.outputBlobs[j.id]):[]).map(j=>[j.id,j])).values()];
+     await mapConcurrent(needed,concurrency,async job=>{try{await downloadResult(job,current);}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}});
+     await mapConcurrent(pages.filter(p=>!p.blobKey&&p.assetId&&p.ownerId===userId&&p.apiOrigin===origin),concurrency,async page=>{try{const blob=await api.image(page.assetId!);assertCurrent(current);const key='original:'+origin+':'+userId+':'+page.assetId;await libraryStore.putBlob(key,blob);assertCurrent(current);for(const copy of copyRef.current)if(copy.pages.some(p=>p.id===page.id))commit({...copy,pages:copy.pages.map(p=>p.id===page.id?{...p,blobKey:key,fetchError:undefined}:p)});}catch{/* Preserve the reader's original recovery action. */}});
    }
-   }finally{syncing=false;}
-  }
-  async function priorities(){
-   if(document.hidden||!windowRef.current.ready().length)return;
-   for(const queue of queueRef.current){
-    const pages=windowRef.current.targets.filter(t=>t.mode===queue.mode).map(t=>t.page);
-    const planned=readingPriority(pages,jobsRef.current,queue.mode,language,queue.realtime_limit);
-    if(!planned.ordered_job_ids.length&&!queue.realtime_count)continue;
-    const signature=JSON.stringify([queue.mode,planned,queue.version]);
-    if(lastPriority.current===signature)continue;
-    try{
-     const value=await api.priority(queue.mode,{...planned,session_id:session.current,sequence:++sequence.current,expected_version:queue.version,ttl_seconds:90,takeover:true});assertCurrent(live);
-     queue.version=value.version;lastPriority.current=JSON.stringify([queue.mode,planned,value.version]);
-    }catch(e){if(!(e instanceof ApiError&&['QUEUE_VERSION_CONFLICT','STALE_PRIORITY','READING_SESSION_ACTIVE'].includes(e.code)))throw e;}
+   const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>void tick(),Math.max(0,delay));};
+   async function tick(){
+     if(running){wakePending=true;return;}if(!live()||document.hidden||navigator.onLine===false)return;
+     running=true;wakePending=false;
+     try{
+       const now=performance.now(),window=windowRef.current;
+       if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
+       const targets=window.ready().map(t=>({...t,page:copyRef.current.find(c=>c.id===t.copyId)?.pages.find(p=>p.id===t.page.id)??t.page}));
+       if(targets.length&&(!config.current.caps||!config.current.rights))return;
+       const generation=stamp.current;await core.recover();await core.plan(targets.filter(t=>config.current.caps?.modes.find(m=>m.id===t.mode)?.enabled&&supportsLanguage(config.current.caps,t.mode,language)),false,()=>live()&&!document.hidden&&generation===stamp.current);
+       setError('');retry=0;void downloads();
+     }catch(e){if(live()){setError((e as Error).message);retry=Math.min(30000,Math.max(1000,retry*2));}}
+     finally{running=false;if(live()){const prefetch=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(prefetch>0)schedule(prefetch);else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
    }
-  }
-  const process=async(manifest:UploadManifest)=>{
-   await processManifest({api,manifest,available:1,readingPageIds:[],readingSessionId:session.current,concurrency,getBlob:libraryStore.getBlob,onJobs:attach,onChange:()=>{void reload();}});
-   assertCurrent(live);await refresh();config.current.refreshUsage();
-  };
-  async function translateWindow(){
-   // Recover exact submitted requests even after navigation. Never consume old local bulk plans.
-   const records=await readManifests(scope);
-   for(const manifest of records)if(manifest.pending&&!manifest.paused)await process(manifest);
-   const {rights,caps}=config.current;
-   if(document.hidden||!rights||!caps)return;
-   for(const target of windowRef.current.ready()){
-    if(!live()||document.hidden||!windowRef.current.ready().some(t=>targetKey(t.copyId,t.page,t.mode)===targetKey(target.copyId,target.page,target.mode)))break;
-    const {copyId,mode}=target;
-    if(!caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(caps,mode,language))continue;
-    let page=copyRef.current.find(c=>c.id===copyId)?.pages.find(p=>p.id===target.page.id);
-    if(!page)continue;
-    const id=JSON.stringify([scope,language,targetKey(copyId,page,mode)]);
-    let manifest=await readManifest(id);
-    if(manifest?.pending)continue;
-    if(manifest?.paused&&quotaErrors.has(manifest.errorCode??'')){
-     if(manifest.quotaKind===rights.modes[mode].quota_kind&&manifest.rightsVersion===JSON.stringify(rights.modes[mode]))continue;
-     manifest=undefined;
-    }
-    if(manifest?.paused||manifest&&manifest.items.every(i=>i.state!=='local'))continue;
-    if(!manifest&&!needsTranslation(page,mode,language,userId!,origin))continue;
-    const queue=queueRef.current.find(q=>q.mode===mode);
-    if(!queue)continue;
-    if(!manifest){
-     // Asset IDs belong to one account; content identity may be reused across accounts.
-     const owned=page.ownerId===userId&&page.apiOrigin===origin;
-     const source=pageSource(page);
-     if(source){
-      const found=await matchFilePages(api,[page],mode,language);assertCurrent(live);
-      const match=found.matches.get(sourceKey(source));
-      if(!match){continue;}
-      page=applyMatch(page,match,userId!,origin);
-      const copy=copyRef.current.find(c=>c.id===copyId);
-      if(copy)commitCopy({...copy,pages:copy.pages.map(p=>p.id===page!.id?page!:p)});
-      if(!needsTranslation(page,mode,language,userId!,origin))continue;
-     }
-     if(!page.blobKey&&!page.assetId)continue;
-     if(!exhausted(rights.modes[mode])&&(queue.available_slots<=0||availableSlots(queueRef.current,rights.plan==='plus')<=0))continue;
-     try{manifest=await automaticManifest({...target,page:owned||source?page:{...page,assetId:undefined}},scope,language,rights.modes[mode],libraryStore.getBlob);}
-     catch(e){const copy=copyRef.current.find(c=>c.id===copyId);if(copy)commitCopy({...copy,pages:copy.pages.map(p=>p.id===page!.id?{...p,translationError:(e as Error).message}:p)});continue;}
-    }
-    if(!live()||!windowRef.current.ready().some(t=>targetKey(t.copyId,t.page,t.mode)===targetKey(target.copyId,target.page,target.mode)))break;
-    if(!exhausted(rights.modes[mode])&&(queue.available_slots<=0||availableSlots(queueRef.current,rights.plan==='plus')<=0))continue;
-    if(queue.paused){await api.pauseQueue(mode,false);assertCurrent(live);}
-    manifest.rightsVersion=JSON.stringify(rights.modes[mode]);
-    await withManifestLock(id,async()=>{
-     const saved=await readManifest(id);
-     if(saved?.pending||saved&&!saved.paused&&saved.items.every(i=>i.state!=='local'))return;
-     assertCurrent(live);await saveManifest(manifest!);
-    });
-    await process(manifest);
+   async function watch(){
+     if(watching||document.hidden||!live()||!windowRef.current.targets.length||navigator.onLine===false)return;watching=true;const signal=watchController.signal;let failures=0;
+     try{while(live()&&!document.hidden&&windowRef.current.targets.length&&!signal.aborted){
+       try{const policy=core.state.policyRevision;const changes=await core.wait(signal);failures=0;if(!live()||signal.aborted)return;void downloads();if(policy!==core.state.policyRevision)schedule();if(changes?.has_more)continue;}
+       catch(e){if(!live()||signal.aborted)return;setError((e as Error).message);const delay=e instanceof ApiError&&e.retryAfterSeconds?e.retryAfterSeconds*1000:Math.min(30000,1000*2**failures++);await new Promise<void>(resolve=>{const t=setTimeout(resolve,delay+Math.random()*100);signal.addEventListener('abort',()=>{clearTimeout(t);resolve();},{once:true});});}
+     }}finally{watching=false;if(live()&&!document.hidden&&windowRef.current.targets.length&&signal!==watchController.signal)void watch();}
    }
-  }
-  async function downloadVisible(){
-   const stamp=generation.current;
-   const originals=visible.current.map(p=>copyRef.current.flatMap(c=>c.pages).find(item=>item.id===p.id)??p).filter(p=>!p.blobKey&&p.assetId&&p.ownerId===userId&&p.apiOrigin===origin);
-   await mapConcurrent(originals,concurrency,async page=>{
-    const current=()=>live()&&stamp===generation.current;
-    try{assertCurrent(current);const blob=await api.image(page.assetId!);assertCurrent(current);const key=`original:${origin}:${userId}:${page.assetId}`;await libraryStore.putBlob(key,blob);assertCurrent(current);
-     for(const copy of copyRef.current)if(copy.pages.some(p=>p.id===page.id))commitCopy({...copy,pages:copy.pages.map(p=>p.id===page.id?{...p,blobKey:key,fetchError:undefined}:p)});
-    }catch{/* The reader keeps the original recovery action and unaffected neighbouring pages. */}
-   });
-   const needed=[...new Map(visible.current.flatMap(page=>{
-    const livePage=copyRef.current.flatMap(c=>c.pages).find(p=>p.id===page.id)??page;
-    return livePage.ownerId===userId&&livePage.apiOrigin===origin?latestResults(livePage.jobs).filter(job=>job.target_language===language&&job.output_asset_id&&!livePage.outputBlobs[job.id]):[];
-   }).map(job=>[job.id,job])).values()];
-   await mapConcurrent(needed,concurrency,async job=>{
-    const current=()=>live()&&stamp===generation.current;
-    try{
-     await downloadResult(job,current);
-    }catch(e){if(!current())return;for(const copy of copyRef.current){const relevant=copy.pages.filter(p=>p.ownerId===userId&&p.apiOrigin===origin&&p.jobs.some(j=>j.id===job.id));if(relevant.length)commitCopy({...copy,pages:copy.pages.map(p=>relevant.includes(p)?{...p,translationError:(e as Error).message}:p)});}}
-   });
-  }
-  async function tick(){
-   clearTimeout(timer);if(running||!live())return;running=true;wakeRequested=false;
-   try{
-    if(Date.now()<retryAt)return;
-    await refresh();assertCurrent(live);
-    await priorities();
-    await downloadVisible();await translateWindow();await priorities();
-    await downloadVisible();retryAt=0;setError('');
-   }catch(e){if(live()){setError((e as Error).message);retryAt=Date.now()+8000;}}
-   finally{running=false;if(live())timer=setTimeout(()=>{lastPriority.current='';void tick();},wakeRequested?450:30000);}
-  }
-  wake.current=(force=false)=>{if(force)retryAt=0;wakeRequested=true;if(!running){clearTimeout(timer);timer=setTimeout(()=>void tick(),450);}};
-  async function watch(){
-   while(live()){
-    try{
-     const changed=await api.waitForTranslationChanges(cursor,updates.signal);
-     if(!live())return;
-     if(!changed.items.length&&!changed.deleted_job_ids?.length&&changed.cursor===(cursor??'0'))continue;
-     while(syncing&&live())await new Promise(resolve=>setTimeout(resolve,25));
-     if(!live())return;
-     // Use the existing serialized cursor transaction, including reconnect recovery.
-     await sync();await refresh();await downloadVisible();
-     wakeRequested=true;
-     if(!running){clearTimeout(timer);void tick();}
-    }catch{
-     if(!live())return;
-     await new Promise(resolve=>setTimeout(resolve,1000));
-    }
-   }
-  }
-  void readSync(scope).then(async saved=>{if(!live())return;jobsRef.current=[];cursor=saved?.cursor;await attach(saved?.jobs??[]);await reload();void tick();void watch();}).catch(e=>setError(e.message));
-  return()=>{stopped=true;updates.abort();clearTimeout(timer);wake.current=()=>{};window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
- },[scope,api,attach,refresh,reload,concurrency,language,downloadResult]);
- // A newly imported copy can bind account records even when no new server event is emitted.
- useEffect(()=>{if(!userId)return;for(const copy of copies){const updated=applyAccountJobs(copy,jobsRef.current,userId,origin);if(updated!==copy)commitCopy(updated);}},[copies,userId,origin,commitCopy]);
- const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[])=>{
-  const changed=windowRef.current.update(targets);visible.current=visiblePages;if(changed)render(n=>n+1);
-  const signature=JSON.stringify(visiblePages.map(p=>[p.id,p.blobKey]));
-  if(changed||signature!==readingSignature.current){readingSignature.current=signature;++generation.current;wake.current();}
- },[]);
- const retry=useCallback(async(copyId:string,page:Page,mode:Mode)=>{
-  if(!scope||!userId)throw Error('请先登录');
-  const latest=pageTranslation(page,mode,language,userId,origin);
-  if(latest.pending||latest.latest?.status==='unknown_released')throw Error('原请求结果待核实，暂不能重复翻译。');
-  const currentRights=await (refreshConfiguration?refreshConfiguration():api.entitlements());
-  assertCurrent(api.isCurrent);setError('');
-  if(latest.result?.output_asset_id&&!latest.ready&&!latest.expired&&latest.latest?.status==='succeeded'){await downloadResult(latest.result);wake.current(true);return;}
-  const owned=page.ownerId===userId&&page.apiOrigin===origin;
-  const manifest=await automaticManifest({copyId,page:owned?page:{...page,assetId:undefined},mode},scope,language,currentRights.modes[mode],libraryStore.getBlob,latest.latest?.id);
-  await withManifestLock(manifest.id,async()=>{
-   const previous=await readManifest(manifest.id);
-   if(previous?.pending)throw Error('正在恢复原提交，请稍后重试。');
-   if(previous&&!previous.paused&&(previous.items.some(i=>i.state==='local')||previous.regenerate&&previous.rerunJobId===latest.latest?.id))return;
-   assertCurrent(api.isCurrent);await saveManifest(manifest);
-  });
-  await reload();wake.current(true);
- },[scope,userId,language,origin,reload,api,refreshConfiguration,downloadResult]);
- function stateFor(copyId:string,page:Page,mode:Mode):TranslationState|undefined{
-  const active=windowRef.current.targets.some(target=>target.copyId===copyId&&target.page.id===page.id&&target.mode===mode);
-  const manifest=manifests.find(m=>m.automatic&&m.language===language&&m.mode===mode&&m.items.some(i=>i.copyId===copyId&&i.pageId===page.id));
-  return translationState({page,mode,language,userId,origin,active,caps,rights,error,manifest});
- }
+   async function foreground(){if(!live())return;if(document.hidden){watchController.abort();clearTimeout(timer);return;}if(watchController.signal.aborted)watchController=new AbortController();schedule();void watch();if(core.session.sequence)void core.renew([...new Set(windowRef.current.targets.map(t=>t.mode))]).catch(()=>{});}
+   const lease=setInterval(()=>{if(live()&&!document.hidden&&windowRef.current.targets.length)void core.renew([...new Set(windowRef.current.targets.map(t=>t.mode))]).catch(()=>{});},30000);
+   wake.current=()=>{schedule();if(!windowRef.current.targets.length){watchController.abort();return;}if(watchController.signal.aborted)watchController=new AbortController();void watch();};
+   document.addEventListener('visibilitychange',foreground);window.addEventListener('online',foreground);window.addEventListener('focus',foreground);
+   void core.init().then(async()=>{if(!live())return;await core.recover();reload();schedule();void watch();}).catch(e=>{if(live()){setError(e.message);schedule(1000);void watch();}});
+   return()=>{stopped=true;watchController.abort();clearTimeout(timer);clearInterval(lease);wake.current=()=>{};coordinator.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('focus',foreground);};
+ },[scope,api,userId,origin,language,concurrency,attach,commit,downloadResult]);
+ useEffect(()=>{if(!userId)return;for(const copy of copies){const changed=applyAccountJobs(copy,jobs.current,userId,origin);if(changed!==copy)commit(changed);}},[copies,userId,origin,commit]);
+ const previousRights=useRef<string|undefined>(undefined);
+ useEffect(()=>{if(!rights)return;const signature=JSON.stringify([rights.modes,rights.plan,rights.image_rate_limit]);if(previousRights.current&&signature!==previousRights.current)void coordinator.current?.refreshPolicy(rights).then(()=>wake.current());else if(!previousRights.current)wake.current();previousRights.current=signature;},[rights]);
+ useEffect(()=>{if(caps)wake.current();},[caps]);
+ const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[],immediate=false)=>{const changed=windowRef.current.update(targets,performance.now(),immediate);const imagesChanged=JSON.stringify(visible.current.map(p=>[p.id,p.blobKey]))!==JSON.stringify(visiblePages.map(p=>[p.id,p.blobKey]));visible.current=visiblePages;if(changed||imagesChanged){stamp.current++;render(n=>n+1);wake.current();}},[]);
+ const retry=useCallback(async(copyId:string,page:Page,mode:Mode)=>{if(!userId||!coordinator.current)throw Error('请先登录');const latest=pageTranslation(page,mode,language,userId,origin);if(latest.result?.output_asset_id&&!latest.ready&&!latest.expired&&latest.latest?.status==='succeeded'){await downloadResult(latest.result);return;}const rights=await (refreshConfiguration?refreshConfiguration():api.entitlements());await coordinator.current.refreshPolicy(rights);await coordinator.current.manual({copyId,page,mode});wake.current();},[api,userId,origin,language,refreshConfiguration,downloadResult]);
+ function stateFor(copyId:string,page:Page,mode:Mode):TranslationState|undefined {const target={copyId,page,mode};return translationState({page,mode,language,userId,origin,active:windowRef.current.targets.some(t=>t.copyId===copyId&&t.page.id===page.id&&t.mode===mode),caps,rights,error,operation:operations.find(o=>o.id===operationId(scope,language,target))});}
  return {onReadingWindow,stateFor,retry};
 }

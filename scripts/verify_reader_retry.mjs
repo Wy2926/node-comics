@@ -13,8 +13,9 @@ async function open(offline=false){
   page=await browser.newPage({viewport:{width:1280,height:900}});
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
-  await page.goto(web+'/tests/reader-fixture.html?auto=retry'+(offline?'&offline':''));
-  await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开作品 自动翻译 · retry',exact:true})}).getByRole('button',{name:'开始阅读',exact:true}).click();
+  const scenario=offline?'connection':'retry';
+  await page.goto(web+'/tests/reader-fixture.html?auto='+scenario+(offline?'&offline':''));
+  await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开作品 自动翻译 · '+scenario,exact:true})}).getByRole('button',{name:'开始阅读',exact:true}).click();
   await page.locator('.nc-page-image').waitFor();
 }
 async function geometry(){return page.locator('.nc-page-picture').first().evaluate(i=>({width:i.clientWidth,height:i.clientHeight,scroll:document.querySelector('.nc-reading-viewport').scrollTop}));}

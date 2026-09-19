@@ -4,7 +4,7 @@
  * TEST_CHROMIUM optionally points to Chromium supporting unpacked extensions.
  */
 import {completeLocalImport} from './local_import_helpers.mjs';
-import {submitImages} from './submission_helpers.mjs';
+import {submitImages} from './plan_helpers.mjs';
 import {createRequire} from 'node:module';
 import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
@@ -79,7 +79,7 @@ async function importAndRead(context,name,url,{cache=false,label=name}={}) {
   else assert(copy.pages.every(p=>p.width===640&&p.height===960&&p.imageSha256));
   if(cache) {
     for(const p of copy.pages)assert(p.jobs.some(j=>jobs.some(old=>old.id===j.id)),`${label} restored job`);
-    assert(!requests.some(r=>(r.method==='POST'&&r.url==='/v1/translation-submissions')||(r.method==='PUT'&&r.url.startsWith('/v1/uploads/'))),'Recovery must not upload or submit');
+    assert(!requests.some(r=>r.method==='PUT'&&r.url.startsWith('/v1/uploads/')),'Cached reading plans must not upload originals');
   }
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');

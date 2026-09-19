@@ -152,7 +152,7 @@ def test_trial_webhook_grants_once_and_reads_do_not_reset_usage(billing):
     data = rights(billing)
     assert data['plan'] == 'plus' and data['modes']['classic']['unlimited']
     assert data['modes']['redraw']['quota']['available'] == 30
-    assert data['queue_capacity'] == 10 and data['realtime_slots'] == 10
+    assert data['image_rate_limit'] == {'window_seconds': 60, 'limit': 100}
     from app.db import session_factory
     from app.entitlement_models import QuotaPeriod
     with session_factory()() as db:

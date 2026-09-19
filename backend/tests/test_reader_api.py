@@ -102,10 +102,10 @@ def test_rerun_after_original_reimport_checks_same_bytes_and_receipt(client, png
     assert created.status_code == 202, created.text
     assert created.json()['items'][0]['job']['input_asset_id'] == new_asset
     before = quota_usage(client, auth)
-    assert submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id']).json()['id'] == created.json()['id']
+    assert submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id']).json()['items'][0]['job']['id'] == created.json()['items'][0]['job']['id']
     assert quota_usage(client, auth) == before
     wrong_asset = upload(client, auth, png_variant(png, 23))
-    assert submit_asset(client,auth,wrong_asset,key='wrong-page',regenerate=True,rerun_job_id=first['id']).json()['error']['code'] == 'RERUN_SOURCE_MISMATCH'
+    assert submit_asset(client,auth,wrong_asset,key='wrong-page',regenerate=True,rerun_job_id=first['id']).json()['items'][0]['code'] == 'RERUN_SOURCE_MISMATCH'
 
 
 def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png, monkeypatch):
@@ -136,31 +136,3 @@ def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png
     assert client.get("/v1/me/usage/summary?timezone=bad-zone", headers=auth).status_code == 422
     assert client.get("/v1/me/usage/summary?days=0", headers=auth).status_code == 422
     assert client.get("/v1/me/usage/summary", headers=login(client,"empty")).json()["delivered"] == 0
-
-
-def test_history_counts_whole_submission_and_does_not_rebill_shared_jobs(client, png, monkeypatch):
-    from app.db import session_factory
-    from app.models import Asset, Job, User, now
-    from app.queue_models import Submission, SubmissionItem
-    auth = login(client)
-    completed = complete(client, auth, upload(client, auth, png), png, monkeypatch)
-    with session_factory()() as db:
-        first = db.get(Job,completed['id'])
-        submission=Submission(owner_id=first.owner_id,mode='redraw',target_language='zh-Hans',idempotency_key='test-full',request_hash='a'*64,quota_pages=35)
-        db.add(submission);db.flush();submission_id=submission.id
-        for i in range(35):
-            job=Job(owner_id=first.owner_id,input_asset_id=first.input_asset_id,source_sha256=first.source_sha256,output_asset_id=first.output_asset_id if i<32 else None,ordinal=i,mode='redraw',target_language='zh-Hans',idempotency_key=f'test-{i}',operation='fixture',request_hash='a'*64,cache_key='b'*64,config={},quota_kind='redraw_monthly',quota_pages=1,status='succeeded' if i<32 else 'queued',settlement='settled' if i<32 else 'reserved',completed_at=now() if i<32 else None)
-            db.add(job);db.flush();db.add(SubmissionItem(submission_id=submission.id,ordinal=i,client_item_id=str(i),job_id=job.id,descriptor={},reused=False))
-        shared=Submission(owner_id=first.owner_id,mode='redraw',target_language='zh-Hans',idempotency_key='test-shared',request_hash='c'*64,quota_pages=0)
-        db.add(shared);db.flush();shared_id=shared.id
-        db.add(SubmissionItem(submission_id=shared.id,ordinal=0,client_item_id='shared',job_id=first.id,descriptor={},reused=True));db.commit()
-    response=client.get('/v1/translation-submissions',headers=auth)
-    assert response.status_code==200,response.text
-    groups={g['id']:g for g in response.json()['items']}
-    assert groups[submission_id]['page_count']==35
-    assert groups[submission_id]['counts']=={'succeeded':32,'queued':3}
-    assert groups[submission_id]['settled']==32 and groups[submission_id]['reserved']==3
-    assert groups[shared_id]['reused']==1 and groups[shared_id]['settled']==0
-    assert client.get(f'/v1/translation-submissions/{shared_id}',headers=auth).json()['items'][0]['reused'] is True
-    assert client.get('/v1/translation-submissions?limit=1',headers=auth).json()['next_offset']==1
-    assert client.get('/v1/translation-submissions',headers=login(client,'unrelated')).json()['total']==0

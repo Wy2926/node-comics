@@ -1,4 +1,4 @@
-"""Cross-device submissions share durable work and preserve every receipt."""
+"""Cross-device plans share durable work and preserve every operation receipt."""
 from datetime import timedelta
 import pytest
 from sqlalchemy import func, select
@@ -7,16 +7,15 @@ from app.config import settings
 from app.db import session_factory
 from app.entitlement_models import QuotaPeriod
 from app.models import Asset, Job, Ledger, Provider, now
-from app.queue_models import Submission, SubmissionItem
+from app.plan_models import TranslationOperation, ImageAdmission
 from test_lifecycle import submit_pages
 
 
 @pytest.mark.parametrize("status", ["queued", "running", "outcome_unknown", "unknown_released"])
-def test_active_work_reused_before_quota_and_capacity_limits(client, png, status):
+def test_active_work_reused_before_quota_and_image_rate_limits(client, png, status):
     auth = login(client)
     source, alias = upload(client, auth, png), upload(client, auth, png)
     first = create(client, auth, source, key="device-one").json()
-    settings().plus_queue_capacity = 1
     with session_factory()() as db:
         job = db.get(Job, first["id"])
         job.status = status
@@ -24,13 +23,13 @@ def test_active_work_reused_before_quota_and_capacity_limits(client, png, status
         period.granted = period.used + period.reserved
         db.commit()
     reused = submit_asset(client, auth, alias, key="device-two", max_quota_pages=0)
-    assert reused.status_code == 202, reused.text
-    assert reused.json()["quota_pages"] == 0 and reused.json()["items"][0]["reused"]
+    assert reused.status_code == 200, reused.text
+    assert reused.json()["items"][0]["disposition"] in {"pending", "blocked"}
     assert reused.json()["items"][0]["job"]["id"] == first["id"]
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
         assert db.scalar(select(func.count()).select_from(Ledger)) == 1
-        assert db.scalar(select(func.count()).select_from(Submission)) == 2
+        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 2
 
 
 @pytest.mark.parametrize("terminal", ["succeeded", "failed", "cancelled"])
@@ -56,58 +55,57 @@ def test_reused_receipt_survives_terminal_status_and_config_changes(client, png,
         provider.config = {**provider.config, "model": "changed-model"}
         db.commit()
     repeat = create(client, auth, asset, key="alias")
-    assert repeat.status_code == 202 and repeat.json()["id"] == original["id"]
+    assert repeat.status_code == 200 and repeat.json()["id"] == original["id"]
     assert repeat.json()["status"] == terminal
-    assert create(client, auth, asset, key="alias", language="en").status_code == 409
-    assert create(client, auth, upload(client, auth, png_variant(png, 9)), key="alias").status_code == 409
+    assert create(client, auth, asset, key="alias", language="en").json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert create(client, auth, upload(client, auth, png_variant(png, 9)), key="alias").json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
-        assert db.scalar(select(func.count()).select_from(Submission)) == 2
+        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 2
 
 
-def test_submission_aliases_keep_page_order_and_share_cancellation(client, png):
+def test_operations_keep_page_order_and_share_cancellation(client, png):
+    from test_cluster_submissions import resolve
     alice, bob = login(client), login(client, "bob")
     assets = [upload(client, alice, png) for _ in range(3)]
     first = submit_pages(client, alice, assets, key="first").json()
     second = submit_pages(client, alice, list(reversed(assets)), key="second").json()
-    assert (first["quota_pages"], second["quota_pages"]) == (1, 0)
     assert len(first["items"]) == len(second["items"]) == 3
     assert len({item["job"]["id"] for item in first["items"] + second["items"]}) == 1
-    assert [item["client_item_id"] for item in second["items"]] == ["0", "1", "2"]
-    assert client.get(f"/v1/translation-submissions/{second['id']}", headers=bob).status_code == 404
-    assert client.post(f"/v1/translation-submissions/{second['id']}/cancel", headers=bob).status_code == 404
+    assert [item["page_key"] for item in second["items"]] == ["0", "1", "2"]
+    job_id = first["items"][0]["job"]["id"]
+    keys = [item["operation_key"] for item in second["items"]]
+    assert all(item["disposition"] == "not_found" for item in resolve(client,bob,keys).json()["items"])
+    assert client.post(f"/v1/jobs/{job_id}/cancel",headers=bob).status_code == 404
     for _ in range(2):
-        assert client.post(f"/v1/translation-submissions/{second['id']}/cancel", headers=alice).json()["status"] == "cancelled"
-    assert client.get(f"/v1/translation-submissions/{first['id']}", headers=alice).json()["status"] == "cancelled"
-    assert submit_pages(client, alice, list(reversed(assets)), key="second").json()["id"] == second["id"]
+        assert client.post(f"/v1/jobs/{job_id}/cancel",headers=alice).json()["status"] == "cancelled"
+    assert all(item["job"]["status"]=="cancelled" for item in resolve(client,alice,keys).json()["items"])
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(SubmissionItem)) == 6
+        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 6
         assert db.scalar(select(func.count()).select_from(Job)) == 1
         assert sorted(db.scalars(select(Ledger.kind))) == ["release", "reserve"]
-        descriptors = list(db.scalars(select(SubmissionItem.descriptor).where(SubmissionItem.submission_id == second["id"]).order_by(SubmissionItem.ordinal)))
-        assert [item["asset_id"] for item in descriptors] == list(reversed(assets))
 
 
-def test_mixed_submission_only_reserves_new_work_and_rolls_back_insufficient_quota(client, png):
-    auth = login(client)
-    assets = [upload(client, auth, png_variant(png, index)) for index in range(3)]
-    existing = create(client, auth, assets[0]).json()
+def test_mixed_plan_preserves_accepted_pages_when_another_exhausts_quota(client,png):
+    auth=login(client)
+    assets=[upload(client,auth,png_variant(png,index)) for index in range(3)]
+    existing=create(client,auth,assets[0]).json()
     with session_factory()() as db:
-        db.get(QuotaPeriod, existing["quota_period_id"]).granted = 2
+        db.get(QuotaPeriod,existing["quota_period_id"]).granted=2
         db.commit()
-    denied = submit_pages(client, auth, assets, key="insufficient")
-    assert denied.status_code == 409 and denied.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
+    response=submit_pages(client,auth,assets,key="mixed")
+    assert response.status_code==202,response.text
+    assert [item["disposition"] for item in response.json()["items"]]==["pending","accepted","blocked"]
+    assert response.json()["items"][2]["code"]=="REDRAW_QUOTA_EXHAUSTED"
+    assert response.json()["items"][0]["job"]["id"]==existing["id"]
+    assert quota_usage(client,auth)["reserved"]==2
     with session_factory()() as db:
-        for model in (Job, Ledger, Submission, SubmissionItem):
-            assert db.scalar(select(func.count()).select_from(model)) == 1
-        assert db.get(QuotaPeriod, existing["quota_period_id"]).reserved == 1
-    accepted = submit_pages(client, auth, assets[:2], key="mixed")
-    assert accepted.status_code == 202 and accepted.json()["quota_pages"] == 1
-    assert accepted.json()["items"][0]["job"]["id"] == existing["id"]
-    assert quota_usage(client, auth)["reserved"] == 2
+        assert db.scalar(select(func.count()).select_from(Job))==2
+        assert db.scalar(select(func.count()).select_from(ImageAdmission))==2
+        assert db.scalar(select(func.count()).select_from(TranslationOperation))==3
 
 
-def test_success_cache_remains_free_with_full_queue_and_zero_spare_quota(client, png, monkeypatch):
+def test_success_cache_remains_free_with_zero_spare_quota(client, png, monkeypatch):
     from app.adapters.images import TranslationOutput
     import app.workers as workers
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(png))
@@ -116,14 +114,13 @@ def test_success_cache_remains_free_with_full_queue_and_zero_spare_quota(client,
     first = create(client, auth, asset).json()
     run_job(first["id"])
     other = create(client, auth, upload(client, auth, png_variant(png, 1)), key="other").json()
-    settings().plus_queue_capacity = 1
     with session_factory()() as db:
         period = db.get(QuotaPeriod, other["quota_period_id"])
         period.granted = period.used + period.reserved
         db.commit()
     cached = submit_asset(client, auth, asset, key="free-cache", max_quota_pages=0)
-    assert cached.status_code == 202 and cached.json()["quota_pages"] == 0
-    assert cached.json()["items"][0]["reused"]
+    assert cached.status_code == 200 and cached.json()["items"][0]["disposition"] == "ready"
+    assert cached.json()["items"][0]["disposition"] == "ready"
     assert cached.json()["items"][0]["job"]["id"] == first["id"]
 
 
@@ -140,46 +137,38 @@ def test_no_text_result_is_reused_without_a_new_job_or_stage(client, png):
         finish_job(db, db.get(Job, first["id"]), "no_text")
         db.commit()
     reused = submit_asset(client, auth, alias, key="other-device", mode="classic", max_quota_pages=0)
-    assert reused.status_code == 202 and reused.json()["quota_pages"] == 0
+    assert reused.status_code == 200 and reused.json()["items"][0]["disposition"] == "ready"
     item = reused.json()["items"][0]
-    assert item["reused"] and item["job"]["id"] == first["id"] and item["job"]["status"] == "no_text"
+    assert item["disposition"] == "ready" and item["job"]["id"] == first["id"] and item["job"]["status"] == "no_text"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
         assert db.scalar(select(func.count()).select_from(JobStage)) == 2
 
 
-def test_reusing_verified_source_does_not_reload_historical_page_descriptors(client, png):
+def test_reusing_verified_source_does_not_reload_historical_page_descriptors(client,png):
     from sqlalchemy import event
     from sqlalchemy.orm import Session
     from app.file_pages import FilePage
-    from test_cluster_submissions import descriptor, submit
-
-    auth = login(client)
-    asset = upload(client, auth, png)
-    initial = submit(client, auth, [descriptor(png, str(index), asset_id=asset,
-        file_hash="a" * 64, page_index=index) for index in range(20)], key="many-old-pages", mode="redraw")
-    assert initial.status_code == 202, initial.text
-    previous = initial.json()
-    historical_loads = []
-
-    def loaded(db, value):
-        if isinstance(value, SubmissionItem) and value.submission_id == previous["id"]:
-            historical_loads.append(value.ordinal)
-
-    event.listen(Session, "loaded_as_persistent", loaded)
+    from test_cluster_submissions import descriptor,submit
+    auth=login(client)
+    asset=upload(client,auth,png)
+    historical=[]
+    for index in range(20):
+        response=submit(client,auth,[descriptor(png,str(index),asset_id=asset,
+            file_hash="a"*64,page_index=index)],key=f"old-{index}",mode="redraw")
+        assert response.status_code in {200,202},response.text
+    def loaded(db,value):
+        if isinstance(value,TranslationOperation) and value.operation_key.startswith("old-"):
+            historical.append(value.operation_key)
+    event.listen(Session,"loaded_as_persistent",loaded)
     try:
-        response = submit(client, auth, [descriptor(png, asset_id=asset,
-            file_hash="b" * 64, page_index=7)], key="new-file-page", mode="redraw")
-        assert response.status_code == 202, response.text
-        assert response.json()["items"][0]["job"]["id"] == previous["items"][0]["job"]["id"]
-        assert historical_loads == []
-    finally:
-        event.remove(Session, "loaded_as_persistent", loaded)
+        response=submit(client,auth,[descriptor(png,asset_id=asset,file_hash="b"*64,page_index=7)],
+                        key="new-file-page",mode="redraw")
+        assert response.status_code==200,response.text
+        assert historical==[]
+    finally:event.remove(Session,"loaded_as_persistent",loaded)
     with session_factory()() as db:
-        bindings = list(db.scalars(select(FilePage)))
-        assert len(bindings) == 21
-        assert {(row.file_hash, row.page_index) for row in bindings} == {
-            *(("a" * 64, index) for index in range(20)), ("b" * 64, 7)}
+        assert len(list(db.scalars(select(FilePage))))==21
 
 
 @pytest.mark.parametrize("invalid", ["cancel", "discard", "deleted", "missing"])
@@ -203,7 +192,7 @@ def test_cancelled_or_unavailable_active_source_is_not_reused(client, png, inval
     if invalid == "missing":
         # Both account-local assets refer to the same physical object; its loss
         # invalidates both grants, and must not start work with missing bytes.
-        assert second.status_code == 410
+        assert second.status_code == 200 and second.json()["error"]["code"] == "ASSET_EXPIRED"
         return
     assert second.status_code == 202 and second.json()["id"] != first["id"]
 
@@ -236,8 +225,33 @@ def test_changed_config_cannot_automatically_replay_unknown_redraw(client, png, 
             provider_id = db.get(Job, first["id"]).config['text']['provider_id']
             configure_text_provider(db, provider_id, model="changed-text-model")
     second = submit_asset(client, auth, alias, key="changed-config", mode=mode)
-    assert second.status_code == 202, second.text
+    assert second.status_code == (200 if mode == "redraw" else 202), second.text
     assert (second.json()["items"][0]["job"]["id"] == first["id"]) is (mode == "redraw")
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == (1 if mode == "redraw" else 2)
         assert db.scalar(select(func.count()).select_from(Ledger)) == (1 if mode == "redraw" else 0)
+
+
+def test_failed_new_version_does_not_hide_an_older_free_result(client,png,monkeypatch):
+    from app.adapters.images import TranslationOutput
+    from app.errors import ProcessingError
+    import app.workers as workers
+    auth=login(client)
+    source=upload(client,auth,png)
+    monkeypatch.setattr(workers,'redraw',lambda *args:TranslationOutput(png))
+    original=create(client,auth,source,key='delivered').json()
+    run_job(original['id'])
+    replacement=submit_asset(client,auth,source,key='explicit-new',regenerate=True,
+                             rerun_job_id=original['id']).json()['items'][0]['job']
+    def rejected(*args):raise ProcessingError('PROVIDER_REJECTED','isolated rejection')
+    monkeypatch.setattr(workers,'redraw',rejected)
+    run_job(replacement['id'])
+    before=quota_usage(client,auth)
+    restored=submit_asset(client,auth,source,key='new-device',max_quota_pages=0)
+    assert restored.status_code==200
+    assert restored.json()['items'][0]['disposition']=='ready'
+    assert restored.json()['items'][0]['job']['id']==original['id']
+    assert quota_usage(client,auth)==before
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(Job))==2
+        assert db.scalar(select(func.count()).select_from(ImageAdmission))==2

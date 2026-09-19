@@ -1,6 +1,6 @@
 # Node Comics 架构 v0.4
 
-2026-09-16：前后端翻译调度已改为持久提交清单、双模式加权阶段队列与独立计算节点。规则、算法、API 和故障边界见[集群设计与实现](TRANSLATION_CLUSTER_DESIGN.md)，启动见[后端说明](../backend/README.md)。新基线 `shared_0001`，无旧结构兼容。
+2026-09-19：[阅读计划契约](READING_TRANSLATION_CONTRACT.md)已实现：滚动 60 秒普通 30／PLUS 100 张新增翻译、逐页受理与幂等恢复，取消账户在途数量上限。最终新库基线 `reading_0001`，旧提交／用户队列契约、结构和迁移链直接删除。现有环境切换与公开部署单独处理。调度与启动见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)和[后端说明](../backend/README.md)。
 
 ## 结构
 
@@ -18,13 +18,13 @@ MangaCopy是来源适配器之一，具体入口、原始标签映射和图片�
 
 站点适配器随插件发布，图片发现、字节获取、后端翻译分别管理。通用模式不声称完整章节。activeTab/scripting/storage/contextMenus与登录identity按功能使用，网站权限按需申请。消息校验sender、标签页、导航版本和登记资源，禁止任意跨域代理。凭据仅在可信扩展上下文。
 
-清单、任务ID、原图与结果Blob存IndexedDB；Blob URL每次重建并撤销。连续阅读有限窗口解码，页面ID+相对位置恢复，原图尺寸占位。轮询在可见阅读器退避执行，重开查询服务端，不依赖MV3后台常驻。
+清单、任务ID、原图与结果Blob存IndexedDB；Blob URL每次重建并撤销。连续阅读有限窗口解码，页面ID+相对位置恢复，原图尺寸占位。结果增量由可见阅读器或网页内容脚本驱动长轮询，重开核实操作回执，不依赖MV3后台常驻。
 
 MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执行电子书HTML，不全量读200MB文件进ArrayBuffer，不在解析时解码全卷。检查DRM、压缩、越界、展开大小、页数与单页限制。
 
 ## AI 图片协议
 
-公开产品 API 统一为 `POST /v1/translation-submissions`，每项声明原图摘要、字节数、可选文件页身份；上传受理后走有限字节的上传会话。业务生成输入仍只有原图与目标语言，后端构造提示词，无重绘前置 OCR。
+公开产品 API 统一为 `POST /v1/translation-plans`，每项声明原图摘要、字节数、可选文件页身份；上传受理后走有限字节的上传会话。业务生成输入仍只有原图与目标语言，后端构造提示词，无重绘前置 OCR。
 
 图片供应商适配器调用兼容 `POST /v1/images/edits`，配置 endpoint、model、image/image[]、参数白名单、尺寸和超时。密钥仅引用后端环境变量。输出 URL 进行域名、DNS/IP 和重定向检查；可解码、归属正确、持久化成功后交付。聊天接口或模型列表不构成图片编辑验收。
 
@@ -32,8 +32,8 @@ MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执
 
 ## 任务、权益与数据
 
-- Job 保存内容/模式/语言/有效生成配置；Submission/SubmissionItem 保存有序用户意图和共享任务引用；UploadReservation 保存实际字节校验前的有限占位；JobRequest 保证操作幂等。
-- JobStage 保存依赖和代次，ExecutionLease 保存资源执行权，FairnessState 保存真实占用时间校正的加权服务量，UserModeQueue 保存阅读会话、暂停和下一个上传空位。
+- Job 保存内容/模式/语言/有效生成配置；TranslationOperation 保存逐页幂等回执；ReadingSession 保存至多三页窗口与序号；ImageAdmission 保存新增翻译的滚动分钟事件；UploadReservation 保存字节校验前的有限上传会话。
+- JobStage 保存依赖和代次，ExecutionLease 保存资源执行权，FairnessState 保存真实占用时间校正的加权服务量，UserModeQueue 仅保存模式阅读控制权与 epoch。
 - User、QuotaPeriod、MembershipOperation、Ledger 实现普通／PLUS、周期页数和限时赠送；供应商 Attempt/TextCall 成本独立计量。
 - 原图以内容 SHA-256 全局匹配，FilePage 按用户/文件哈希/原始页索引识别。无字结果与有效译图按模式、语言、有效配置版本跨账户复用，生成各自私有任务与资产授权；过期或删除记录不作为复用来源，进行中的跨账户任务独立调度。
 - 任务状态从 awaiting_upload/validating_upload 进入 queued/running，再到 succeeded/no_text/failed/cancelled/outcome_unknown。未知期限释放后仍保留 unknown_released 成本证据，不自动重发重绘。

@@ -80,13 +80,14 @@ def test_submission_reuses_one_source_and_preserves_each_page_identity(client, p
     items = [{'client_item_id':f'page-{index}','asset_id':asset,'image_sha256':sha256(png).hexdigest(),
               'byte_size':len(png),'content_type':'image/png','file_hash':FILE_HASH,'page_index':index}
              for index in (0,1)]
-    response = submit_asset(client,auth,asset,key='mapped-pages',items=items)
+    from test_cluster_submissions import submit
+    response = submit(client,auth,items,key='mapped-pages',mode='redraw')
     assert response.status_code == 202, response.text
     first,second = response.json()['items']
     assert first['job']['id'] == second['job']['id']
-    assert first['reused'] is False and second['reused'] is True
-    repeated = submit_asset(client,auth,asset,key='mapped-pages',items=items)
-    assert repeated.json() == response.json()
+    assert first['disposition'] == 'accepted' and second['disposition'] == 'pending'
+    repeated = submit(client,auth,items,key='mapped-pages',mode='redraw')
+    assert [i['job']['id'] for i in repeated.json()['items']] == [first['job']['id'],second['job']['id']]
     identities = [{"file_hash": FILE_HASH, "page_index": i} for i in [1, 9, 0]]
     result = match(client, auth, identities).json()["items"]
     assert [page["page_index"] for page in result] == [1, 9, 0]
@@ -128,9 +129,10 @@ def test_file_identity_cannot_be_rebound_to_different_page_bytes(client, png):
     with session_factory()() as db:
         asset = db.get(Asset,asset_id)
         item={'client_item_id':'rebound','asset_id':asset_id,'image_sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime,'file_hash':FILE_HASH,'page_index':0}
-    response = client.post('/v1/translation-submissions',headers={**auth,'Idempotency-Key':'rebind'},json={'mode':'redraw','target_language':'zh-Hans','max_quota_pages':1,'items':[item]})
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "FILE_PAGE_CONFLICT"
+    from test_cluster_submissions import submit
+    response = submit(client,auth,[item],key='rebind',mode='redraw')
+    assert response.status_code == 200
+    assert response.json()["items"][0]["code"] == "FILE_PAGE_CONFLICT"
     assert match(client, auth).json()["items"][0]["asset"]["id"] == first
 
 
@@ -162,7 +164,8 @@ def test_submission_identity_pair_and_match_size_validated(client, png):
     auth = login(client)
     for data in [{"file_hash": FILE_HASH}, {"page_index": 0}, {"file_hash": "bad", "page_index": 0}]:
         item = {'client_item_id':'page','image_sha256':sha256(png).hexdigest(),'byte_size':len(png),'content_type':'image/png',**data}
-        response = client.post('/v1/translation-submissions',headers={**auth,'Idempotency-Key':'bad-identity'},json={'mode':'redraw','target_language':'zh-Hans','max_quota_pages':1,'items':[item]})
+        from test_cluster_submissions import submit
+        response = submit(client,auth,[item],key='bad-identity',mode='redraw')
         assert response.status_code == 422, response.text
     assert match(client, auth, [{"file_hash": FILE_HASH, "page_index": 0}] * 101).status_code == 422
 

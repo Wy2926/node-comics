@@ -1,22 +1,22 @@
-import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, ModeQueue, SubmissionInput, SubmissionReceipt, UploadPlan, TranslationChanges, QueuePriority, PriorityReceipt, UsageSummary, SubmissionSummary, Paginated, FeedbackIssue, FeedbackRecord } from './types';
+import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool} from './concurrency';
-export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number) { super(message); } }
+export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
 function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
   return Number.isFinite(seconds)&&seconds>0?Math.ceil(seconds):undefined;
 }
-export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUEUE_FULL','READING_UPLOAD_RESERVED','INVALID_BATCH','RERUN_SOURCE_REQUIRED','RERUN_SOURCE_MISMATCH','UNKNOWN_COST_ACK_REQUIRED','IMAGE_TOO_LARGE','IMAGE_HASH_MISMATCH','INVALID_INPUT_ASSET','FILE_PAGE_CONFLICT','QUEUE_CAPACITY_EXCEEDED','INVALID_SUBMISSION','SUBMISSION_TOO_LARGE','DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','QUOTA_CONFLICT','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED','PLUS_REQUIRED','TOO_MANY_JOBS','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
 export class Api {
   private readonly updatesPool = new RequestPool(1);
+  private readonly controlPool = new RequestPool(2);
   constructor(public base: string, public token = '', public pool = new RequestPool(), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
-  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    return this.pool.run(async () => {
+  async request<T>(path: string, init: RequestInit = {}, allowPlanLimit=false): Promise<T> {
+    return this.controlPool.run(async () => {
     assertCurrent(this.isCurrent);
     let response: Response;
     try { response = await fetch(this.base + path, { ...init, headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers } }); }
-    catch { throw new ApiError('暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。'); }
-    if (!response.ok) { const raw = await response.json().catch(() => ({})); if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After'))); }
+    catch { init.signal?.throwIfAborted();throw new ApiError('暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。'); }
+    if (!response.ok) { const raw = await response.json().catch(() => ({})); if(allowPlanLimit&&response.status===429&&Array.isArray(raw.items)&&(raw.error?.code==='IMAGE_RATE_LIMITED'||raw.items.every((item:TranslationOperation)=>item.code==='IMAGE_RATE_LIMITED')))return raw as T; if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')),error.scope); }
     if (response.status === 204) return undefined as T;
     return response.json();
     });
@@ -32,9 +32,8 @@ export class Api {
   billingPortal() { return this.request<{url:string}>('/v1/billing/portal',{method:'POST'}); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}
-  history(offset=0) {return this.request<Paginated<SubmissionSummary>>(`/v1/translation-submissions?offset=${offset}&limit=12`);}
+  operations(offset=0) {return this.request<Paginated<TranslationOperation>>(`/v1/translation-operations?offset=${offset}&limit=12`);}
   latestResult(jobId:string) {return this.request<{latest:Job|null;result:Job|null}>(`/v1/jobs/${encodeURIComponent(jobId)}/latest-result`);}
-  async historyJobs(group:SubmissionSummary,offset=0) {const receipt=await this.submission(group.id);return {items:receipt.items.slice(offset,offset+30).map(item=>({...item.job,reused:!!item.reused})),total:receipt.items.length,next_offset:offset+30<receipt.items.length?offset+30:null};}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;output_asset_id?:string|null},key:string) {return this.request<FeedbackRecord>(`/v1/jobs/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(admin=false,offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/${admin?'admin':'me'}/feedback?offset=${offset}&limit=20`);}
   reviewFeedback(id:string,status:FeedbackRecord['status']) {return this.request<FeedbackRecord>(`/v1/admin/feedback/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status})});}
@@ -47,18 +46,16 @@ export class Api {
   }
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
-  queues() {return this.request<{items:ModeQueue[]}>('/v1/me/queues');}
-  submit(body:SubmissionInput,key:string) {return this.request<SubmissionReceipt>('/v1/translation-submissions',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
-  submission(id:string) {return this.request<SubmissionReceipt>(`/v1/translation-submissions/${encodeURIComponent(id)}`);}
+  plan(body:TranslationPlan) {return this.request<PlanReceipt>('/v1/translation-plans',{method:'POST',body:JSON.stringify(body)},true);}
+  resolveOperations(operation_keys:string[]) {return this.request<{items:TranslationOperation[];policy_revision?:string}>('/v1/translation-operations/resolve',{method:'POST',body:JSON.stringify({operation_keys})});}
+  lease(sessionId:string,modes:Mode[],priority_epochs:Partial<Record<Mode,number>>,takeover=false) {return this.request<{session_id:string;priority:Partial<Record<Mode,ReadingPriority>>;policy_revision:string}>(`/v1/reading-sessions/${encodeURIComponent(sessionId)}/lease`,{method:'PUT',body:JSON.stringify({modes,priority_epochs,takeover})});}
   completeUpload(id:string) {return this.request<Job>(`/v1/uploads/${encodeURIComponent(id)}/complete`,{method:'POST'});}
-  translationChanges(cursor?:string) {return this.request<TranslationChanges>(`/v1/me/translation-changes${cursor?'?cursor='+encodeURIComponent(cursor):''}`);}
-  waitForTranslationChanges(cursor:string|undefined,signal:AbortSignal) {
+  translationChanges(cursor?:string,policyRevision?:string) {const query=new URLSearchParams();if(cursor)query.set('cursor',cursor);if(policyRevision)query.set('policy_revision',policyRevision);return this.request<TranslationChanges>(`/v1/me/translation-changes?${query}`);}
+  waitForTranslationChanges(cursor:string|undefined,signal:AbortSignal,policyRevision?:string) {
     // A waiting connection must not consume upload/image request capacity.
     const listener=new Api(this.base,this.token,this.updatesPool,this.isCurrent);
-    return listener.request<TranslationChanges>(`/v1/me/translation-changes?cursor=${encodeURIComponent(cursor??'0')}&wait_seconds=20`,{signal});
+    return this.updatesPool.run(()=>listener.request<TranslationChanges>(`/v1/me/translation-changes?cursor=${encodeURIComponent(cursor??'0')}&wait_seconds=20${policyRevision?'&policy_revision='+encodeURIComponent(policyRevision):''}`,{signal}));
   }
-  priority(mode:Mode,body:QueuePriority) {return this.request<PriorityReceipt>(`/v1/me/queues/${mode}/priority`,{method:'POST',body:JSON.stringify(body)});}
-  pauseQueue(mode:Mode,paused:boolean) {return this.request<ModeQueue>(`/v1/me/queues/${mode}/pause`,{method:'POST',body:JSON.stringify({paused})});}
   async uploadOriginal(plan:UploadPlan,blob:Blob) {
     const url=new URL(plan.url,this.base),origin=new URL(this.base).origin,local=['127.0.0.1','localhost','[::1]'].includes(url.hostname);
     if(url.username||url.password||url.protocol!=='https:'&&!(local&&url.protocol==='http:')||plan.method!=='PUT'||plan.authorization_required&&url.origin!==origin)throw new ApiError('原图上传授权地址无效。','INVALID_UPLOAD_PLAN');

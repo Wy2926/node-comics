@@ -20,6 +20,7 @@ from app.system_settings import (RequestLimits, SystemSettings, SystemSettingsUp
 from test_classic import text_database
 
 DEFAULTS = {
+    "free_images_per_minute": 30, "plus_images_per_minute": 100,
     "upload_user_concurrency": 10, "upload_global_concurrency": 16,
     "upload_idle_timeout_seconds": 15, "upload_body_timeout_seconds": 120,
     "upload_ingress_lease_seconds": 45, "feedback_requests_per_minute": 30,
@@ -81,6 +82,7 @@ def test_only_administrators_can_read_and_change_settings(system_case):
 
 
 @pytest.mark.parametrize("change", [
+    {"free_images_per_minute": 0}, {"plus_images_per_minute": 10001}, {"free_images_per_minute": True},
     {"upload_user_concurrency": 0}, {"upload_user_concurrency": 33},
     {"upload_global_concurrency": 129}, {"upload_user_concurrency": True},
     {"upload_idle_timeout_seconds": "15"}, {"upload_idle_timeout_seconds": 0},

@@ -71,7 +71,7 @@ def main():
         assert result["table_rows"]["public.assets"] == 2
         assert result["object_references"] == 1
         with psycopg.connect(**params, dbname=target) as restored:
-            assert restored.execute("SELECT version_num FROM alembic_version").fetchone() == ("shared_0003_system_settings",)
+            assert restored.execute("SELECT version_num FROM alembic_version").fetchone() == ("reading_0001",)
         try:
             restore(output / "backup", database_env="RESTORE_DRILL_URL", pg_container=container)
         except BackupError as error:
@@ -81,7 +81,7 @@ def main():
         report = {"verified_at": datetime.now(timezone.utc).isoformat(), "database": "PostgreSQL 17 isolated synthetic drill",
                   "snapshot_sha256": manifest["sha256"], "snapshot_bytes": manifest["size"],
                   "restored_users": result["table_rows"]["public.users"], "restored_asset_grants": result["table_rows"]["public.assets"],
-                  "schema_revision": "shared_0003_system_settings",
+                  "schema_revision": "reading_0001",
                   "shared_object_references": result["object_references"], "overwrite_rejected": True,
                   "post_backup_write_excluded": True, "r2_accessed": False, "production_accessed": False}
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

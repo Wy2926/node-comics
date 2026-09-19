@@ -14,8 +14,8 @@ def submit_pages(client, auth, asset_ids, key="batch-1", max_pages=None):
         items = [{"client_item_id": str(index), "asset_id": asset.id, "image_sha256": asset.sha256,
                   "byte_size": asset.byte_size, "content_type": asset.mime}
                  for index, asset in enumerate(db.get(Asset, aid) for aid in asset_ids)]
-    return client.post("/v1/translation-submissions", headers={**auth, "Idempotency-Key": key},
-        json={"mode": "redraw", "target_language": "zh-Hans", "max_quota_pages": len(items) if max_pages is None else max_pages, "items": items})
+    from test_cluster_submissions import submit
+    return submit(client, auth, items, key=key, mode="redraw", max_pages=max_pages)
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -37,9 +37,9 @@ def test_idempotency_binds_input_and_parameters(client, png):
     asset = upload(client, auth, png)
     first = create(client, auth, asset)
     second = create(client, auth, asset)
-    assert first.status_code == second.status_code == 202
+    assert first.status_code == 202 and second.status_code == 200
     assert first.json()["id"] == second.json()["id"]
-    assert create(client, auth, asset, language="en").status_code == 409
+    assert create(client, auth, asset, language="en").json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
     assert quota_usage(client, auth)["reserved"] == 1
     with session_factory()() as db:
         for model in (Job, Ledger, JobStage):
@@ -67,10 +67,10 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     usage = quota_usage(client, auth)
     assert (usage["used"], usage["reserved"], usage["available"]) == (1, 0, 299)
     cached = submit_asset(client, auth, asset, key="cached").json()
-    assert cached["quota_pages"] == 0 and cached["items"][0]["reused"]
+    assert cached["items"][0]["disposition"] == "ready"
     assert cached["items"][0]["job"]["output_asset_id"] == job["output_asset_id"]
     rerun = submit_asset(client, auth, asset, key="explicit-rerun", regenerate=True, rerun_job_id=job_id)
-    assert rerun.status_code == 202 and not rerun.json()["items"][0]["reused"]
+    assert rerun.status_code == 202 and rerun.json()["items"][0]["disposition"] == "accepted"
     assert rerun.json()["items"][0]["job"]["version"] > job["version"]
     assert quota_usage(client, auth)["reserved"] == 1
 
@@ -92,7 +92,7 @@ def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypat
     assert calls == [1]
     assert client.get(f"/v1/jobs/{job_id}", headers=auth).json()["status"] == "outcome_unknown"
     assert quota_usage(client, auth)["reserved"] == 1
-    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).status_code == 409
+    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).json()["items"][0]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
     def rejected(*args):
         raise ProcessingError("PROVIDER_REJECTED", "请求被拒绝")
     monkeypatch.setattr(workers, "redraw", rejected)
@@ -167,40 +167,42 @@ def test_cross_user_jobs_are_private_and_completed_images_are_shared(client, png
     run_job(job_id)
     assert client.get(f"/v1/jobs/{job_id}", headers=bob).status_code == 404
     assert client.post("/v1/jobs/status", headers=bob, json={"ids": [job_id]}).json() == {"items": []}
-    assert create(client, bob, alice_asset).status_code == 404
+    assert create(client, bob, alice_asset).json()["error"]["code"] == "NOT_FOUND"
     bob_job = create(client, bob, upload(client, bob, png)).json()
     assert bob_job["cache_hit"] and bob_job["quota_pages"] == 0
     assert bob_job["id"] != job_id and bob_job["status"] == "succeeded"
 
 
-def test_batch_budget_atomicity_and_cancel(client, png):
-    auth = login(client)
-    assets = [upload(client, auth, png_variant(png, index)) for index in range(3)]
-    assert submit_pages(client, auth, assets, max_pages=2).status_code == 409
-    assert quota_usage(client, auth)["reserved"] == 0
-    response = submit_pages(client, auth, assets, max_pages=3)
-    assert response.status_code == 202, response.text
-    batch = response.json()
-    assert [item["job"]["input_asset_id"] for item in batch["items"]] == assets
-    repeated = submit_pages(client, auth, assets, max_pages=3).json()
-    assert repeated["id"] == batch["id"]
-    assert quota_usage(client, auth)["reserved"] == 3
-    assert client.post(f"/v1/translation-submissions/{batch['id']}/cancel", headers=auth).json()["status"] == "cancelled"
-    assert quota_usage(client, auth)["reserved"] == 0
+def test_per_page_budget_keeps_accepted_receipts_and_job_cancellation(client,png):
+    auth=login(client)
+    assets=[upload(client,auth,png_variant(png,index)) for index in range(3)]
+    response=submit_pages(client,auth,assets,max_pages=2)
+    assert response.status_code==202,response.text
+    items=response.json()["items"]
+    assert [item["disposition"] for item in items]==["accepted","accepted","blocked"]
+    assert items[2]["code"]=="QUOTA_BOUND_EXCEEDED"
+    assert quota_usage(client,auth)["reserved"]==2
+    replay=submit_pages(client,auth,assets,max_pages=2)
+    assert replay.status_code==200
+    assert [item["job"]["id"] for item in replay.json()["items"][:2]]==[item["job"]["id"] for item in items[:2]]
+    for item in items[:2]:
+        assert client.post(f"/v1/jobs/{item['job']['id']}/cancel",headers=auth).json()["status"]=="cancelled"
+    assert quota_usage(client,auth)["reserved"]==0
 
 
-def test_batch_bad_asset_rolls_back_all_jobs_and_reservations(client, png):
+def test_bad_asset_rejection_does_not_rollback_accepted_neighbor(client,png):
     from app.db import session_factory
-    from app.models import Asset, now
-    auth = login(client)
-    assets = [upload(client, auth, png) for _ in range(2)]
+    from app.models import Asset,now
+    auth=login(client)
+    assets=[upload(client,auth,png_variant(png,index)) for index in range(2)]
     with session_factory()() as db:
-        db.get(Asset, assets[1]).deleted_at = now()
+        db.get(Asset,assets[1]).deleted_at=now()
         db.commit()
-    response = submit_pages(client, auth, assets, key="bad-batch", max_pages=2)
-    assert response.status_code == 410
-    assert client.get("/v1/jobs", headers=auth).json()["total"] == 0
-    assert quota_usage(client, auth)["reserved"] == 0
+    response=submit_pages(client,auth,assets,key="bad-page")
+    assert response.status_code==202
+    assert [item["disposition"] for item in response.json()["items"]]==["accepted","blocked"]
+    assert client.get("/v1/jobs",headers=auth).json()["total"]==1
+    assert quota_usage(client,auth)["reserved"]==1
 
 
 def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, png, monkeypatch):
@@ -297,7 +299,7 @@ def test_insufficient_quota_creates_no_job(client, png):
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
     asset = upload(client, auth, png_variant(png, 2))
     rejected = create(client, auth, asset, key="no-credit")
-    assert rejected.status_code == 409 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
+    assert rejected.status_code == 200 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
     assert client.get("/v1/jobs", headers=auth).json()["total"] == 2
     assert quota_usage(client, auth)["reserved"] == 2
 
@@ -319,5 +321,5 @@ def test_upload_signature_limits_and_inputs(client, png):
     asset = upload(client, auth, png)
     assert create(client, auth, asset, language="unsupported").status_code == 422
     assert submit_asset(client, auth, asset, mode="standard").status_code == 422
-    assert client.post("/v1/translation-submissions", headers=auth, json={}).status_code == 422
+    assert client.post("/v1/translation-plans", headers=auth, json={}).status_code == 422
     assert client.post("/v1/images", headers=auth).status_code == 404

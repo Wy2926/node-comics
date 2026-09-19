@@ -37,9 +37,10 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
   void onMarkRead(c.id).catch(e=>{read.current.delete(key);notify('已读状态未保存：'+(e as Error).message);});
  }
  function activate(c:ReadingCopy,n:number){if(c.id!==copyRef.current.id){persist();copyRef.current=c;onActiveCopy(c.id);}indexRef.current=n;setIndex(n);}
+ const navigationReason=useRef<'scroll'|'direct'>('direct');
  function scroll(){
   const v=viewport.current;if(!v||suppressScroll.current)return;
-  const previousTop=lastScrollTop.current;
+   navigationReason.current='scroll';const previousTop=lastScrollTop.current;
   const forward=v.scrollTop>previousTop;lastScrollTop.current=v.scrollTop;
   const line=v.scrollTop+Math.min(80,v.clientHeight*.1);
   if(layout==='continuous'){
@@ -58,6 +59,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
   }
  }
  function jump(n:number){
+   navigationReason.current='direct';
   const c=copyRef.current;if(!c.pages.length||!Number.isFinite(n))return;
   if(n>=c.pages.length&&completeManifest(c)){
    const destination=nextOf(c);
@@ -99,5 +101,5 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
   const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))append(destination);},{root:viewport.current,rootMargin:'0px 0px 160px 0px'});observer.observe(end);return()=>observer.disconnect();
  },[layout,copy,sequence,loadedIds]);
  useEffect(()=>()=>clearTimeout(saveTimer.current),[]);
- return {index,setIndex,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stream:visible,next,nextOf,preserve,persist,restore,scroll,jump};
+ return {index,setIndex,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stream:visible,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason};
 }

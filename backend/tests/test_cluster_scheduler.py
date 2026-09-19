@@ -300,15 +300,15 @@ def test_ineligible_heads_do_not_hide_later_runnable_pages(scheduler_case):
             job.target_language = 'unavailable-language'
             db.commit()
     for _ in range(20):
-        add_job(scheduler_case, 'plus-user')
-    with session_factory()() as db:
-        db.add(UserModeQueue(owner_id='plus-user', mode='classic', paused=True))
-        db.commit()
+        job_id = add_job(scheduler_case, 'plus-user')
+        with session_factory()() as db:
+            db.get(Job, job_id).cancel_requested = True
+            db.commit()
     expected = add_job(scheduler_case, 'free-user')
     assert claim().job_id == expected
 
 
-@pytest.mark.parametrize('mutation', ['pause', 'delete_source', 'cancel', 'node_language', 'node_capacity'])
+@pytest.mark.parametrize('mutation', ['delete_source', 'cancel', 'node_language', 'node_capacity'])
 def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(scheduler_case, monkeypatch, mutation):
     from app.queue_models import UserModeQueue
     job_id = add_job(scheduler_case)
@@ -317,9 +317,7 @@ def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(schedul
         result = original(db, node, stages)
         assert result
         with session_factory()() as writer:
-            if mutation == 'pause':
-                writer.add(UserModeQueue(owner_id='free-user', mode='classic', paused=True, version=1))
-            elif mutation == 'delete_source':
+            if mutation == 'delete_source':
                 writer.get(Asset, 'free-user-image').deleted_at = now()
             elif mutation == 'cancel':
                 writer.get(Job, job_id).cancel_requested = True

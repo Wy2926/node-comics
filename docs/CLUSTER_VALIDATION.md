@@ -122,7 +122,7 @@ npm exec vite -- --host 127.0.0.1 --port 5174 --strictPort
 在仓库根目录设置 `UI_FIXTURE_DIRECTORY` 为上述实际输出目录，再运行：
 
 ```powershell
-node scripts/verify_cluster_reader.mjs
+node scripts/verify_reading_api.mjs
 ```
 
 此脚本需要已安装的 Chrome 和可解析的 Playwright。若 Playwright 不在默认模块路径，可通过 `PLAYWRIGHT_MODULE` 指向本机已安装模块。API 地址固定为 `http://127.0.0.1:18089`，Web 地址固定为 `http://127.0.0.1:5174`。
