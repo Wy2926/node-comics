@@ -12,7 +12,7 @@ from manhua_engine.engine import Engine, group
 from manhua_engine.quality import conservative_mask
 from manhua_engine.bubbles import lettering_areas
 from manhua_engine.layout import coverage, draw_region, font_paths, resolve_colors
-from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest, mask_image, png64
+from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest, mask_image, png64, pack_result
 
 LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫畫', 'ja': '日本語あいうアイウ',
                    'ko': '한국어가나다', 'en': 'English', 'fr': 'Françaiséèç', 'es': 'Españolñ',
@@ -91,7 +91,8 @@ class Runtime:
             if (image.size != (metadata['width'], metadata['height']) or image.width * image.height > MAX_PIXELS
                     or Image.MIME.get(image.format) != metadata['mime'] or getattr(image, 'n_frames', 1) != 1):
                 raise NodeFailure('INPUT_INVALID')
-            return np.array(image.convert('RGB'))
+            alpha = image.convert('RGBA').getchannel('A') if 'A' in image.getbands() or 'transparency' in image.info else None
+            return np.array(image.convert('RGB')), alpha
 
     def analyze(self, rgb, input_hash):
         quads, segmentation = self.engine.detect(rgb)
@@ -118,7 +119,7 @@ class Runtime:
         mask = np.array(mask_image(analysis['mask'], (rgb.shape[1], rgb.shape[0])))
         return self.engine.remove(rgb, mask)[0]
 
-    def render(self, cleaned, analysis, translated, language):
+    def render(self, cleaned, analysis, translated, language, alpha):
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}):
             raise NodeFailure('CLASSIC_RENDER_FAILED')
@@ -133,11 +134,8 @@ class Runtime:
                                  target=language, direction=self.engine.direction, area=area)
             if not layout['rendered']:
                 raise NodeFailure('CLASSIC_RENDER_FAILED')
-        # Exact changed lettering pixels, including antialias/strokes/bubble extension.
-        glyphs = np.any(np.array(image) != cleaned, axis=2).astype(np.uint8) * 255
-        if not glyphs.any():
+        if not np.any(np.array(image) != cleaned):
             raise NodeFailure('CLASSIC_RENDER_FAILED')
-        return {'version': self.version, 'input_hash': analysis['input_hash'],
-                'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision'],
-                'image': png64(image), 'mask': analysis['mask'],
-                'glyph_mask': png64(Image.fromarray(glyphs), MAX_CHECKPOINT_BYTES)}
+        if alpha is not None:
+            image.putalpha(alpha)
+        return pack_result(image, self.version, analysis, translated)

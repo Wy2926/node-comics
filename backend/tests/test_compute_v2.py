@@ -1,5 +1,6 @@
 """Whole-page control lifecycle against an isolated database/object-store adapter."""
 import base64
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import BytesIO
@@ -55,6 +56,12 @@ def v2(client, monkeypatch, png):
             assert response.status_code == 202, response.text
             jobs.append(response.json()['items'][0]['job']['id'])
         return jobs
+    def sign_upload(self, key, info, ttl):
+        return {'url': 'https://r2.example.test/' + key + '?signature=test', 'headers': {
+            'Content-Type': info['mime'], 'Content-Length': str(info['byte_size']),
+            'Content-MD5': base64.b64encode(bytes.fromhex(info['md5'])).decode(),
+            'Cache-Control': 'private, no-store', 'If-None-Match': '*'}}
+    monkeypatch.setattr(LocalStore, 'upload_url', sign_upload)
     state['create'] = create
     return state
 
@@ -108,13 +115,24 @@ def text(lease):
 
 def result_for(v2, lease, png):
     translated = heartbeat(v2, [lease]).json()['leases'][0]['translations']
-    mask = Image.new('L', (lease['input']['width'], lease['input']['height']))
-    mask.putpixel((10, 10), 255)
     image = Image.open(BytesIO(png)).convert('RGB')
     image.putpixel((10, 10), (1, 2, 3))
-    return {'version': 'test-v2', 'input_hash': lease['input']['sha256'],
+    data = base64.b64decode(encoded(image))
+    result = {'version': 'test-v2', 'input_hash': lease['input']['sha256'],
             'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision'],
-            'image': encoded(image), 'mask': encoded(mask), 'glyph_mask': encoded(mask)}
+            'output': {'sha256': hashlib.sha256(data).hexdigest(), 'md5': hashlib.md5(data).hexdigest(),
+                       'byte_size': len(data), 'width': image.width, 'height': image.height, 'mime': 'image/png'}}
+    return result, data
+
+
+def authorize_and_upload(v2, lease, result, data):
+    response = request(v2, f'/leases/{lease["lease_id"]}/output/authorize',
+                       {'lease_token': lease['lease_token'], 'result': result})
+    assert response.status_code == 200, response.text
+    from app.assets import content_storage_key
+    LocalStore().put(content_storage_key(result['output']['sha256']), data, 'image/png', kind='classic')
+    return response.json()
+
 
 
 def test_claim_receipt_capacity_fairness_shrink_and_restart(v2):
@@ -176,8 +194,9 @@ def test_analysis_text_revision_and_delivery_settle_once(v2, png):
     with session_factory()() as db:
         assert db.get(ExecutionLease, lease['lease_id']).completed_at is None
         assert db.scalar(select(func.count()).select_from(TextCall)) == 1
-    result = result_for(v2, lease, png_variant(png, 0))
-    body = {'lease_token': lease['lease_token'], 'result': result}
+    result, data = result_for(v2, lease, png_variant(png, 0))
+    authorize_and_upload(v2, lease, result, data)
+    body = {'lease_token': lease['lease_token'], 'result': result, 'etag': result['output']['md5']}
     path = f'/leases/{lease["lease_id"]}/complete'
     response = request(v2, path, body)
     assert response.status_code == 200, response.text
@@ -274,22 +293,93 @@ def test_version_languages_and_r2_authorization_do_not_probe_objects(v2, monkeyp
 
 
 def test_result_written_before_lost_commit_is_recovered(v2, png, monkeypatch):
-    from app import workers
+    from app import compute_v2
+    v2['create']()
+    lease = claim(v2).json()['leases'][0]
+    analyze(v2, lease)
+    text(lease)
+    result, data = result_for(v2, lease, png_variant(png, 0))
+    authorize_and_upload(v2, lease, result, data)
+    body = {'lease_token': lease['lease_token'], 'result': result, 'etag': result['output']['md5']}
+    original = compute_v2.create_asset
+    monkeypatch.setattr(compute_v2, 'create_asset', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('simulated crash')))
+    with pytest.raises(RuntimeError, match='simulated crash'):
+        request(v2, f'/leases/{lease["lease_id"]}/complete', body)
+    monkeypatch.setattr(compute_v2, 'create_asset', original)
+    # Restart/retry submits the same metadata; the center never rereads the object.
+    monkeypatch.setattr(LocalStore, 'read', lambda *a: pytest.fail('unexpected center GET'))
+    monkeypatch.setattr(LocalStore, 'put', lambda *a, **k: pytest.fail('unexpected center PUT'))
+    reply = request(v2, f'/leases/{lease["lease_id"]}/complete', body)
+    assert reply.status_code == 200, reply.text
+    assert reply.json()['job_status'] == 'succeeded'
+
+
+def test_upload_is_scoped_frozen_bounded_and_center_never_reads_images(v2, png, monkeypatch):
+    from app import compute_v2
+    from app.models import Asset, Attempt
+    v2['create']()
+    lease = claim(v2).json()['leases'][0]
+    analyze(v2, lease)
+    text(lease)
+    result, data = result_for(v2, lease, png_variant(png, 0))
+    route = f'/leases/{lease["lease_id"]}'
+    body = {'lease_token': lease['lease_token'], 'result': result}
+    assert request(v2, route+'/complete', {**body, 'etag': result['output']['md5']}).status_code == 409
+    assert request(v2, route+'/output/authorize', {**body, 'lease_token': 'wrong'}).status_code == 403
+    assert request(v2, route+'/output/authorize', {**body, 'result': {**result, 'image': 'bytes forbidden'}}).status_code == 422
+    assert request(v2, route+'/output/authorize', {**body, 'result': {**result, 'output': {**result['output'], 'width': 1}}}).status_code == 422
+    with session_factory()() as db:
+        job = db.get(Job, lease['job_id'])
+        db.get(Asset, job.input_asset_id).storage_backend = 'r2'
+        db.get(Attempt, job.attempt_id).output_storage_backend = 'r2'
+        db.commit()
+    class SignOnly:
+        def upload_url(self, key, info, ttl):
+            assert key.endswith(result['output']['sha256']) and 0 < ttl <= 60
+            assert info == result['output']
+            return {'url': 'https://r2.example.test/signed', 'headers': {}}
+        def read(self, *a): pytest.fail('center GET')
+        def exists(self, *a): pytest.fail('center HEAD')
+        def put(self, *a, **k): pytest.fail('center PUT')
+    monkeypatch.setattr(compute_v2, 'get_store', lambda _: SignOnly())
+    authorization = request(v2, route+'/output/authorize', body)
+    assert authorization.status_code == 200, authorization.text
+    assert request(v2, route+'/output/authorize', body).json()['result_hash'] == authorization.json()['result_hash']
+    changed = {**body, 'result': {**result, 'output': {**result['output'], 'sha256': 'a'*64}}}
+    assert request(v2, route+'/output/authorize', changed).status_code == 409
+    assert request(v2, route+'/complete', {**body, 'etag': '0'*32}).status_code == 409
+    response = request(v2, route+'/complete', {**body, 'etag': result['output']['md5']})
+    assert response.status_code == 200 and response.json()['job_status'] == 'succeeded'
+    assert request(v2, route+'/output/authorize', body).json()['receipt'] == response.json()
+
+
+def test_late_direct_upload_cannot_publish_after_cancel_or_new_generation(v2, png, monkeypatch):
     from app.dispatcher import recover_lease
     v2['create']()
     lease = claim(v2).json()['leases'][0]
     analyze(v2, lease)
     text(lease)
-    result = result_for(v2, lease, png_variant(png, 0))
-    original = workers.create_asset
-    monkeypatch.setattr(workers, 'create_asset', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('simulated crash')))
-    with pytest.raises(RuntimeError, match='simulated crash'):
-        request(v2, f'/leases/{lease["lease_id"]}/complete', {'lease_token': lease['lease_token'], 'result': result})
-    monkeypatch.setattr(workers, 'create_asset', original)
+    result, data = result_for(v2, lease, png_variant(png, 0))
+    authorize_and_upload(v2, lease, result, data)
     with session_factory()() as db:
         db.get(ExecutionLease, lease['lease_id']).expires_at = now() - timedelta(seconds=1)
         db.commit()
+    monkeypatch.setattr(LocalStore, 'read', lambda *a: pytest.fail('expired page recovery must not GET output'))
     recover_lease(lease['lease_id'])
-    reply = request(v2, f'/leases/{lease["lease_id"]}/complete', {'lease_token': lease['lease_token'], 'result': result})
-    assert reply.status_code == 200, reply.text
-    assert reply.json()['job_status'] == 'succeeded'
+    with session_factory()() as db:
+        db.get(JobStage, db.get(ExecutionLease, lease['lease_id']).stage_id).available_at = now()
+        db.commit()
+    replacement = claim(v2).json()['leases'][0]
+    assert replacement['generation'] == lease['generation'] + 1
+    assert replacement['translations']
+    # The old PUT can arrive late, but its acknowledgement cannot touch the new lease.
+    old = request(v2, f'/leases/{lease["lease_id"]}/complete',
+        {'lease_token': lease['lease_token'], 'result': result, 'etag': result['output']['md5']})
+    assert old.status_code == 200 and old.json()['outcome'] != 'succeeded'
+    with session_factory()() as db:
+        job = db.get(Job, lease['job_id'])
+        assert job.output_asset_id is None
+        job.cancel_requested = True
+        db.commit()
+    assert request(v2, f'/leases/{replacement["lease_id"]}/output/authorize',
+        {'lease_token': replacement['lease_token'], 'result': result}).status_code == 409

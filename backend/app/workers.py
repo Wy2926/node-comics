@@ -13,13 +13,13 @@ import time
 from sqlalchemy import select
 from .adapters.images import redraw
 from .assets import available, content_storage_key, create_asset, inspect_image, read_asset
-from .classic import run_text_stage, validate_render
+from .classic import run_text_stage
 from .config import settings
 from .db import initialize, session_factory
 from .errors import ProcessingError, problem
 from .health import log_failure, report_failure, report_progress
 from .jobs import settle
-from .models import Asset, Attempt, ClassicState, Job, Provider, now
+from .models import Asset, Attempt, Job, Provider, now
 from .providers import digest
 from .queue_models import ComputeNode, ExecutionLease, JobStage
 from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler, release_lease, touch_job
@@ -53,9 +53,7 @@ def finish_job(db, job, status, *, error=None):
     settle(db, job, success=status == "succeeded" and "unrecognized_regions" not in (job.quality_flags or []))
 
 
-def complete_stage(lease_id, result, *, token=None, node_id=None, timings=None):
-    delivery_started = time.monotonic()
-    measured = {}
+def complete_stage(lease_id, result, *, token=None, node_id=None):
     result_hash = digest(result)
     with session_factory()() as db:
         lock_scheduler(db)
@@ -70,28 +68,16 @@ def complete_stage(lease_id, result, *, token=None, node_id=None, timings=None):
         lease.result_hash = result_hash
         name, owner_id, input_id, attempt_id, mode = stage.name, job.owner_id, job.input_asset_id, job.attempt_id, job.mode
         source = db.get(Asset, input_id) if input_id else None
-        config = job.config
         backend = db.get(Attempt, attempt_id).output_storage_backend
         db.commit()
-    # Image decoding, object reads and PUTs hold neither row nor scheduler locks.
-    if name == "page":
-        if result.get("input_hash") != source.sha256 or result.get("version") != config["engine"]["version"]:
-            raise ProcessingError("ENGINE_RESULT_MISMATCH", "图像结果与输入或引擎版本不一致")
-    image, info = None, None
-    if name == "page":
-        started = time.monotonic()
-        original = read_asset(source)
-        measured['source_get'] = time.monotonic() - started
-        started = time.monotonic()
-        image, info = validate_render(original, result)
-        measured['validate'] = time.monotonic() - started
-    elif name == "redraw":
-        image = base64.b64decode(result["image"], validate=True)
+    # Only center-owned redraw results carry image bytes. Page results are
+    # committed directly by compute_v2 after the node's R2 upload acknowledgement.
+    image = base64.b64decode(result["image"], validate=True) if name == "redraw" else None
+    info = None
     if image is not None:
-        if info is None:
-            info = inspect_image(image, output=True)
+        info = inspect_image(image, output=True)
         ratio = (info["width"] / info["height"]) / (source.width / source.height)
-        if (mode == "classic" and (info["width"], info["height"]) != (source.width, source.height)) or not .8 <= ratio <= 1.25:
+        if not .8 <= ratio <= 1.25:
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")
         # Persist the immutable content key before PUT so a crashed worker can
         # recover its exact bytes. A late generation cannot overwrite a result.
@@ -101,31 +87,25 @@ def complete_stage(lease_id, result, *, token=None, node_id=None, timings=None):
             lease, _, _ = current_lease(db, lease_id, token)
             lease.output_key = output_key
             db.commit()
-        started = time.monotonic()
         get_store(backend).put(output_key, image, info["mime"], kind=mode)
-        measured['output_put'] = time.monotonic() - started
     with session_factory()() as db:
         lock_scheduler(db)
         if _finished(db, lease_id, token, node_id, result_hash):
             return
         lease, stage, job = current_lease(db, lease_id, token)
-        state = db.get(ClassicState, job.id) if mode == "classic" else None
-        if name in {"redraw", "page"}:
+        if name == "redraw":
             if not available(db.get(Asset, input_id)):
                 raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
             output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
                 stable_id=lease_id, storage_backend=backend, prewritten=True, verified_info=info)
             job.output_asset_id = output.id
-            job.quality_flags = (state.analysis or {}).get("quality_flags", []) if state else result.get("quality_flags", [])
+            job.quality_flags = result.get("quality_flags", [])
             if abs(ratio - 1) > .03:
                 job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]
-            if state:
-                state.timings = {'node': timings or {}, 'delivery': {**measured, 'total': time.monotonic() - delivery_started}}
             finish_job(db, job, "succeeded")
-            if name == "redraw":
-                provider = db.get(Provider, job.config["provider"]["id"])
-                if provider and provider.config == job.config["provider"]:
-                    provider.validated_at, provider.validation_job_id = now(), job.id
+            provider = db.get(Provider, job.config["provider"]["id"])
+            if provider and provider.config == job.config["provider"]:
+                provider.validated_at, provider.validation_job_id = now(), job.id
         stage.status, stage.completed_at = "succeeded", now()
         lease.result_hash = result_hash
         release_lease(db, lease, "succeeded")

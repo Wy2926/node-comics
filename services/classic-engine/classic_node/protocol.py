@@ -31,6 +31,16 @@ def png64(image, limit=MAX_IMAGE_BYTES):
     return base64.b64encode(out.getvalue()).decode('ascii')
 
 
+def pack_result(image, version, analysis, translated):
+    encoded = png64(image)
+    data = base64.b64decode(encoded)
+    return {'image': encoded, 'result': {
+        'version': version, 'input_hash': analysis['input_hash'],
+        'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision'],
+        'output': {'sha256': hashlib.sha256(data).hexdigest(), 'md5': hashlib.md5(data, usedforsecurity=False).hexdigest(),
+                   'byte_size': len(data), 'width': image.width, 'height': image.height, 'mime': 'image/png'}}}
+
+
 def mask_image(value, size):
     if not isinstance(value, str) or len(value) > ((MAX_CHECKPOINT_BYTES + 2) // 3) * 4:
         raise NodeFailure('INPUT_INVALID')

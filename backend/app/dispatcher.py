@@ -27,7 +27,7 @@ def recover_lease(lease_id):
         job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
         attempt = db.get(Attempt, job.attempt_id)
         image = None
-        if stage.name in {"redraw", "page"}:
+        if stage.name == "redraw":
             store = get_store(attempt.output_storage_backend)
             key = lease.output_key
             try:
@@ -72,7 +72,7 @@ def recover_lease(lease_id):
             release_lease(db, lease, "cancelled")
         else:
             ratio = (info["width"] / info["height"]) / (source.width / source.height)
-            if not .8 <= ratio <= 1.25 or (job.mode == "classic" and (info["width"], info["height"]) != (source.width, source.height)):
+            if not .8 <= ratio <= 1.25:
                 finish_job(db, job, "failed", error=ProcessingError("INVALID_PROVIDER_OUTPUT", "已存结果尺寸不合格"))
                 release_lease(db, lease, "failed")
             else:

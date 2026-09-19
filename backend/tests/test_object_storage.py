@@ -148,3 +148,21 @@ def test_r2_configuration_rejects_invalid_targets(changes):
                   r2_bucket='test-bucket', r2_access_key_id='isolated-access', r2_secret_access_key='isolated-secret')
     with pytest.raises(ValidationError):
         Settings(**{**params, **changes})
+
+
+def test_result_put_authorization_signs_exact_payload_and_does_not_contact_r2(storage_db, png):
+    import base64
+    import hashlib
+    from app.storage import S3Store
+    sdk = sdk_client()
+    store = S3Store(sdk, 'test-bucket', 'isolated/')
+    info = {'mime': 'image/png', 'byte_size': len(png), 'md5': hashlib.md5(png).hexdigest()}
+    with Stubber(sdk):  # Any network operation fails; signing is entirely local.
+        upload = store.upload_url('objects/sha256/aa/' + 'a'*64, info, 45)
+    query = parse_qs(urlsplit(upload['url']).query)
+    assert query['X-Amz-Expires'] == ['45']
+    assert set(query['X-Amz-SignedHeaders'][0].split(';')) == {
+        'host', 'content-type', 'content-length', 'content-md5', 'cache-control', 'if-none-match'}
+    assert upload['headers'] == {'Content-Type': 'image/png', 'Content-Length': str(len(png)),
+        'Content-MD5': base64.b64encode(hashlib.md5(png).digest()).decode(),
+        'Cache-Control': 'private, no-store', 'If-None-Match': '*'}

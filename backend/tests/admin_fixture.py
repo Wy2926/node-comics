@@ -63,7 +63,7 @@ def seed(db):
         db.add(lease); db.flush(); return lease
 
     completed = job(1, "succeeded")
-    db.add(ClassicState(job_id=completed.id, timings={"node": {"download": .28, "analyze": .19, "inpaint": .09, "render": .05, "text_wait": 6.4}, "delivery": {"source_get": .31, "validate": .04, "output_put": .27}}))
+    db.add(ClassicState(job_id=completed.id, timings={"node": {"download": .28, "analyze": .19, "inpaint": .09, "render": .05, "text_wait": 6.4, "upload_authorize": .03, "output_put": .27}, "delivery": {"total": .01}}))
     execution(completed, "text", "control-text", 40, 80)
     execution(completed, "page", "gpu-b", 10, 100)
     attempt = Attempt(job_id=completed.id, provider_id="fixture-text", lease_expires_at=at+timedelta(seconds=600), cost_state="reported")

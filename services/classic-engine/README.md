@@ -2,7 +2,7 @@
 
 2026-09-19：从 `D:\Project\Github\manhua-engine` 的当前工作区迁入图像流水线、模型清单、原测试和构建工具；该源仓库当时没有可引用的 HEAD。源文件未删除或修改，迁入文件的原始摘要见 [IMPORT.json](IMPORT.json)。原引擎说明保留在 [ENGINE.md](ENGINE.md)，上游版本和许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。不复制漫画、翻译缓存、凭据、旧虚拟环境或生成产物到版本控制。
 
-生产入口是单进程的 `classic_node`：主动向中心领取整页租约，直接读取受限 R2 URL，执行检测／OCR、AOT-GAN 抹字和嵌字。LLM 由中心调用，节点无需文本供应商、数据库或 R2 长期凭据。抹字算法是迁入引擎的 AOT-GAN，并非旧引擎的 LaMa。节点不监听 HTTP 端口，也不需要旧 `compute-agent`。
+生产入口是单进程的 `classic_node`：主动向中心领取整页租约，直接读取受限 R2 URL，执行检测／OCR、AOT-GAN 抹字和嵌字，通过中心提供的临时 PUT URL 并发直传最终 PNG 到 R2，再提交元数据回执。LLM 由中心调用，节点无需文本供应商、数据库或 R2 长期凭据。抹字算法是迁入引擎的 AOT-GAN，并非旧引擎的 LaMa。节点不监听 HTTP 端口，也不需要旧 `compute-agent`。
 
 外部协议见 [COMPUTE_PROTOCOL.md](../../docs/COMPUTE_PROTOCOL.md)，具体消息与中心迁移见 [v2 实施说明](../../docs/COMPUTE_V2_IMPLEMENTATION.md)。
 
@@ -60,4 +60,4 @@ $env:CLASSIC_TEST_MODELS = (Resolve-Path services/classic-engine/models).Path
 services/classic-engine/.venv-ncnn/Scripts/python.exe -m pytest backend/tests/test_compute_node_v2.py -k real_vulkan -q
 ```
 
-最后一项在 Windows 生成英文／日文标准字体样张，执行真实检测、OCR、Vulkan 抹字和嵌字，经中心校验并持久交付。文本采用固定测试回复，R2 为隔离适配器；结果在 `artifacts/v2-smoke/`。这不是自然漫画翻译准确率、线上 LLM／R2、Linux／NVIDIA 或生产部署验收。历史吞吐只保留在 ENGINE.md，不当作迁入节点的新性能结论。
+最后一项在 Windows 生成英文／日文标准字体样张，执行真实检测、OCR、Vulkan 抹字和嵌字，经节点直传并由中心登记终态。文本采用固定测试回复，R2 为隔离适配器；测试端下载解码核对最终图，结果在 `artifacts/v2-smoke/`。这不是自然漫画翻译准确率、线上 LLM／R2、Linux／NVIDIA 或生产部署验收。历史吞吐只保留在 ENGINE.md，不当作迁入节点的新性能结论。

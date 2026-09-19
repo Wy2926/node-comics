@@ -1,4 +1,6 @@
 """Run the actual node client against the controller, with isolated image/text fixtures."""
+import base64
+import hashlib
 from io import BytesIO
 from pathlib import Path
 import os
@@ -16,7 +18,7 @@ SERVICE = Path(__file__).resolve().parents[2] / 'services/classic-engine'
 sys.path.insert(0, str(SERVICE))
 from classic_node.agent import Agent
 from classic_node.journal import Journal
-from classic_node.protocol import ControlFailure
+from classic_node.protocol import ControlFailure, pack_result
 from classic_node.transport import Transport
 from app.db import session_factory
 from app.models import Asset, Job
@@ -36,7 +38,7 @@ class FixtureRuntime:
         self.rendered = 0
 
     def decode(self, data, metadata):
-        return data, metadata
+        return (data, metadata), None
 
     def analyze(self, source, input_hash):
         self.analyzed += 1
@@ -45,16 +47,15 @@ class FixtureRuntime:
     def inpaint(self, source, analysis):
         return source
 
-    def render(self, source, analysis, translated, language):
+    def render(self, source, analysis, translated, language, alpha):
         self.rendered += 1
         image = Image.open(BytesIO(source[0])).convert('RGB')
         image.putpixel((10, 10), (1, 2, 3))
-        return {'version': self.version, 'input_hash': analysis['input_hash'],
-            'image': encoded(image), 'mask': analysis['mask'], 'glyph_mask': analysis['mask'],
-            'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision']}
+        return pack_result(image, self.version, analysis, translated)
 
 
-def node_for(v2, tmp_path, pages, runtime, lose_replies=False):
+
+def node_for(v2, tmp_path, pages, runtime, lose_replies=False, lose_upload=False):
     config = {'node_id': v2['node']['node_id'], 'node_token': v2['node']['token'],
         'resource_id': 'test:vulkan:0', 'control_url': 'https://control.example.test',
         'r2_origin': 'https://r2.example.test', 'engine': {'gpu': -1}, 'local_pages': pages, 'max_leases': 4}
@@ -68,8 +69,21 @@ def node_for(v2, tmp_path, pages, runtime, lose_replies=False):
         return httpx.Response(response.status_code, content=response.content, headers=dict(response.headers))
     def storage(request):
         assert 'authorization' not in request.headers and 'x-node-id' not in request.headers
+        key = request.url.path.lstrip('/')
+        if request.method == 'PUT':
+            from app.storage import LocalStore
+            store = LocalStore()
+            assert request.headers['if-none-match'] == '*'
+            assert request.headers['content-md5'] == base64.b64encode(hashlib.md5(request.content).digest()).decode()
+            if store.exists(key):
+                return httpx.Response(412)
+            store.put(key, request.content, request.headers['content-type'], kind='classic')
+            if lose_upload and 'upload' not in lost:
+                lost.add('upload')
+                raise httpx.ReadError('lost after R2 committed')
+            return httpx.Response(200, headers={'ETag': '"' + hashlib.md5(request.content).hexdigest() + '"'})
         with session_factory()() as db:
-            asset = db.scalar(select(Asset).where(Asset.storage_key == request.url.path.lstrip('/')))
+            asset = db.scalar(select(Asset).where(Asset.storage_key == key))
             return httpx.Response(200, content=get_store(asset.storage_backend).read(asset.storage_key))
     transport = Transport(config, control_transport=httpx.MockTransport(control), storage_transport=httpx.MockTransport(storage))
     journal = Journal(tmp_path, 512 * 1024 * 1024)
@@ -117,7 +131,8 @@ def test_text_wait_does_not_hold_compute_and_buffers_are_released(v2, tmp_path):
         with session_factory()() as db:
             timings = db.get(ClassicState, jobs[0]).timings
             assert timings['node']['analyze'] >= 0
-            assert timings['delivery']['source_get'] >= 0
+            assert timings['node']['output_put'] >= 0
+            assert set(timings['delivery']) == {'total'}
     finally:
         agent.close()
         transport.close()
@@ -200,9 +215,9 @@ def test_restart_resubmits_frozen_result_without_recomputing(v2, tmp_path):
     with session_factory()() as db:
         asset = db.get(Asset, db.get(Job, jobs[0]).input_asset_id)
         data = get_store(asset.storage_backend).read(asset.storage_key)
-    result = result_for(v2, lease, data)
+    result, data = result_for(v2, lease, data)
     journal = Journal(tmp_path, 512 * 1024 * 1024)
-    journal.put('lease:' + lease['lease_id'], {'completion': {'lease_token': lease['lease_token'], 'result': result}})
+    journal.put('lease:' + lease['lease_id'], {'completion': {'lease_token': lease['lease_token'], 'result': result, 'image': base64.b64encode(data).decode(), 'timings': {}}})
     journal.close()
     runtime = FixtureRuntime()
     agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
@@ -221,7 +236,7 @@ def test_restart_resubmits_frozen_result_without_recomputing(v2, tmp_path):
     ('en', 'WHERE ARE YOU GOING?', 'arial.ttf'),
     ('ja', '明日はきっと晴れる。', 'YuGothR.ttc'),
 ])
-def test_real_vulkan_node_delivers_validated_page(v2, tmp_path, ocr_language, source_text, font_name):
+def test_real_vulkan_node_uploads_final_page(v2, tmp_path, ocr_language, source_text, font_name):
     from classic_node.runtime import Runtime
     from app.config import settings
     from conftest import login, submit_asset, upload
@@ -266,7 +281,7 @@ def test_real_vulkan_node_delivers_validated_page(v2, tmp_path, ocr_language, so
         (destination / f'{ocr_language}-report.json').write_text(json.dumps({
             'engine_version': runtime.version, 'protocol_version': 2, 'ocr_language': ocr_language,
             'ocr_exact': True, 'regions': len(analysis['segments']), 'width': image.width, 'height': image.height,
-            'controller_validated_pixels': True, 'wall_seconds': time.monotonic() - started,
+            'node_uploaded_result': True, 'wall_seconds': time.monotonic() - started,
             'text_provider': 'fixed fixture, no paid calls', 'storage': 'isolated adapter'}, indent=2), encoding='utf-8')
     finally:
         for page in agent.pages.values():
@@ -355,6 +370,69 @@ def test_restart_acknowledges_stopped_lease_without_input_or_config(v2, tmp_path
             time.sleep(.01)
         assert not agent.pages and runtime.analyzed == 0
         assert journal.leases() == {} and agent.pipeline.used == 0
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_parallel_r2_uploads_never_hold_the_single_compute_slot(v2, tmp_path):
+    from threading import Event, Lock
+    jobs = v2['create'](4)
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
+    release, lock = Event(), Lock()
+    active = peak = 0
+    upload = transport.upload
+    def blocked(*args, **kwargs):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        try:
+            assert release.wait(15)
+            return upload(*args, **kwargs)
+        finally:
+            with lock:
+                active -= 1
+    transport.upload = blocked
+    try:
+        agent.register()
+        agent.claim()
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            agent.reap()
+            agent.heartbeat()
+            with session_factory()() as db:
+                lease = claim_stage(db, 'control-text', ['text'])
+                db.commit()
+            if lease:
+                run_control_stage(lease.id)
+            if runtime.rendered == 4 and peak == 4:
+                break
+            time.sleep(.02)
+        assert runtime.rendered == 4 and peak == 4
+        assert all(page.step == 'deliver' for page in agent.pages.values())
+        assert all(page.cleaned is None for page in agent.pages.values())
+        release.set()
+        drive(agent, jobs)
+    finally:
+        release.set()
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_lost_r2_put_reply_retries_immutable_object_and_settles_once(v2, tmp_path):
+    jobs = v2['create']()
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 1, runtime, lose_upload=True)
+    try:
+        agent.register()
+        agent.claim()
+        drive(agent, jobs)
+        assert runtime.rendered == 1
+        assert not journal.leases()
     finally:
         agent.close()
         transport.close()

@@ -24,8 +24,6 @@ from test_cluster_scheduler import (
     test_wrong_engine_or_disabled_device_does_not_take_work,
     test_expired_image_lease_recovers_once_and_fences_old_generation,
     test_actual_work_correction_preserves_fair_resource_time,
-    test_late_render_upload_cannot_overwrite_new_generation_output,
-    test_conflicting_completion_of_one_lease_cannot_replace_delivered_bytes,
     test_stale_recovery_observation_cannot_end_renewed_lease,
     test_saved_late_output_recovery_preserves_existing_terminal_failure,
 )

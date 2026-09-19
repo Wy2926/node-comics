@@ -37,12 +37,12 @@ class Pipeline:
         page.future.add_done_callback(lambda _: self.agent.wake.set())
 
     def prepare(self, page):
-        rgb = self.agent.runtime.decode(page.data, page.metadata)
+        rgb, alpha = self.agent.runtime.decode(page.data, page.metadata)
         page.data = None
         analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'])
         if analysis['input_hash'] != page.metadata['sha256'] or analysis['version'] != self.agent.runtime.version:
             raise NodeFailure('ENGINE_VERSION_MISMATCH')
-        return rgb, analysis
+        return rgb, alpha, analysis
 
     def accepted(self, page):
         started = time.monotonic()
@@ -57,19 +57,19 @@ class Pipeline:
     def freeze(self, page, result):
         key = page.lease['lease_id']
         # Timings are transport metadata, outside the immutable image identity.
-        body = {'lease_token': page.lease['lease_token'], 'result': result,
+        body = {'lease_token': page.lease['lease_token'], **result,
                 'timings': {**page.timings, 'local_total': time.monotonic() - page.received_at}}
         saved = self.agent.journal.get('lease:' + key)
         saved.pop('analysis', None)
         self.agent.journal.put('lease:' + key, {**saved, 'completion': body})
         page.completion = body
-        page.rgb = page.cleaned = page.analysis = None
+        page.rgb = page.cleaned = page.analysis = page.alpha = None
         page.step = 'deliver'
 
     def release(self, page):
         self.used -= page.reserved
         page.reserved = 0
-        page.data = page.rgb = page.cleaned = page.analysis = page.completion = None
+        page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.completion = None
 
     def error(self, page, error):
         if page.terminal or page.stopped:
@@ -105,7 +105,7 @@ class Pipeline:
                     page.data, page.metadata = value
                     page.step = 'analyze'
                 elif page.step == 'analyze':
-                    page.rgb, page.analysis = value
+                    page.rgb, page.alpha, page.analysis = value
                     page.analysis_future = self.control.submit(self.accepted, page)
                     page.analysis_future.add_done_callback(lambda _: self.agent.wake.set())
                     page.step = 'inpaint' if page.analysis['segments'] else 'text'
@@ -164,6 +164,6 @@ class Pipeline:
             elif page.step == 'inpaint':
                 operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
             else:
-                operation = lambda p=page: self.agent.runtime.render(p.cleaned, p.analysis, p.translations, p.lease['language'])
+                operation = lambda p=page: self.agent.runtime.render(p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
             self.submit(page, self.compute, page.step, operation)
             running += 1

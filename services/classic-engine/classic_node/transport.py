@@ -73,3 +73,31 @@ class Transport:
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         return bytes(data)
+
+    def upload(self, authorization, data, info, check=lambda: None):
+        url, expected = httpx.URL(authorization['url']), httpx.URL(self.r2_origin)
+        if (url.scheme != 'https' or url.host != expected.host or url.port != expected.port
+                or url.username or url.password or url.fragment):
+            raise NodeFailure('STORAGE_AUTH_FAILED')
+        if (not 0 < len(data) <= MAX_IMAGE_BYTES or len(data) != info['byte_size']
+                or hashlib.sha256(data).hexdigest() != info['sha256']
+                or hashlib.md5(data, usedforsecurity=False).hexdigest() != info['md5']):
+            raise NodeFailure('INPUT_INVALID')
+        headers = authorization['headers']
+        if {key.lower() for key in headers} != {'content-type', 'content-length', 'content-md5', 'cache-control', 'if-none-match'}:
+            raise NodeFailure('STORAGE_AUTH_FAILED')
+        try:
+            check()
+            response = self.storage.put(url, headers=headers, content=data)
+        except httpx.HTTPError:
+            raise NodeFailure('STORAGE_UNAVAILABLE') from None
+        check()
+        if response.status_code == 412:
+            # A prior identical PUT may have committed before its reply was lost.
+            # The signed content-addressed key can never be overwritten.
+            return info['md5']
+        if response.status_code in (401, 403):
+            raise NodeFailure('STORAGE_AUTH_FAILED')
+        if response.status_code != 200 or response.headers.get('etag', '').strip('"') != info['md5']:
+            raise NodeFailure('STORAGE_UNAVAILABLE')
+        return info['md5']

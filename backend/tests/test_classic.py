@@ -206,27 +206,3 @@ def test_strict_ocr_checkpoint_validation():
     bad['regions'][0]['lines'][0][0][0] = float('nan')
     with pytest.raises(classic.ProcessingError, match='CLASSIC_OCR_INVALID'):
         classic.validate_analysis(bad, 80, 64)
-
-
-def test_render_rejects_changes_outside_both_masks():
-    original = Image.new('RGB', (80, 64), (255, 255, 255))
-    final = original.copy()
-    final.putpixel((0, 0), (0, 0, 0))
-    mask = analysis()['mask']
-    with pytest.raises(classic.ProcessingError, match='CLASSIC_RENDER_INVALID'):
-        classic.validate_render(base64.b64decode(encoded(original)), {'image': encoded(final), 'mask': mask, 'glyph_mask': mask})
-
-
-@pytest.mark.parametrize('alpha', [False, True])
-def test_render_returns_metadata_for_final_bytes_and_preserves_alpha(alpha):
-    from app.assets import inspect_image
-    original = Image.new('RGBA' if alpha else 'RGB', (80, 64), (255, 255, 255, 90) if alpha else 'white')
-    final = original.convert('RGB')
-    final.putpixel((10, 10), (0, 0, 0))
-    output, info = classic.validate_render(base64.b64decode(encoded(original)),
-        {'image': encoded(final), 'mask': analysis()['mask'], 'glyph_mask': analysis()['mask']})
-    assert info == inspect_image(output, output=True)
-    with Image.open(BytesIO(output)) as result:
-        assert result.getpixel((10, 10))[:3] == (0, 0, 0)
-        if alpha:
-            assert result.getchannel('A').getextrema() == (90, 90)

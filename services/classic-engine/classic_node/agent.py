@@ -1,5 +1,6 @@
 """One page lease from claim through acknowledged delivery, with batch heartbeats."""
 from .pipeline import Pipeline
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from threading import Condition, Event
@@ -26,7 +27,7 @@ class Page:
         self.analysis_accepted = False
         self.reserved = 0
         self.next_stop = 0
-        self.data = self.metadata = self.rgb = self.cleaned = self.analysis = self.completion = None
+        self.data = self.metadata = self.rgb = self.cleaned = self.analysis = self.alpha = self.completion = None
         self.received_at = sent_at
         self.translations = lease.get('translations')
         self.update(lease, server_time, sent_at)
@@ -198,7 +199,37 @@ class Agent:
 
     def deliver(self, page, body):
         page.phase = 'deliver'
-        reply = self.retry(page, lambda: self.transport.post(f'/leases/{page.lease["lease_id"]}/complete', body))
+        key = page.lease['lease_id']
+        if 'result' in body and not body.get('etag'):
+            data = base64.b64decode(body['image'], validate=True)
+            for attempt in range(3):
+                started = time.monotonic()
+                upload = self.retry(page, lambda: self.transport.post(f'/leases/{key}/output/authorize',
+                    {'lease_token': body['lease_token'], 'result': body['result']}))
+                body['timings']['upload_authorize'] = body['timings'].get('upload_authorize', 0) + time.monotonic() - started
+                if upload.get('receipt'):
+                    return upload['receipt']
+                if upload['result_hash'] != digest(body['result']):
+                    raise ControlFailure('CONTROL_INVALID_RESPONSE')
+                started = time.monotonic()
+                try:
+                    etag = self.transport.upload(upload, data, body['result']['output'], page.check)
+                    break
+                except NodeFailure as error:
+                    if error.code not in {'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE'} or attempt == 2:
+                        raise
+                    with page.condition:
+                        page.condition.wait(.5)
+                finally:
+                    body['timings']['output_put'] = body['timings'].get('output_put', 0) + time.monotonic() - started
+            # Persist successful upload before acknowledging the center. A lost
+            # center reply now retries metadata only; signed URLs are never saved.
+            body = {k: v for k, v in body.items() if k != 'image'}
+            body['etag'] = etag
+            saved = self.journal.get('lease:' + key)
+            self.journal.put('lease:' + key, {**saved, 'completion': body})
+            page.completion = body
+        reply = self.retry(page, lambda: self.transport.post(f'/leases/{key}/complete', body))
         if reply.get('status') != 'terminal':
             raise ControlFailure('CONTROL_INVALID_RESPONSE')
         return reply

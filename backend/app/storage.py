@@ -5,6 +5,7 @@ checkpoints only; an execution node must be able to rebuild them from R2.
 Never log SDK requests or presigned URLs.
 """
 from functools import lru_cache
+import base64
 import os
 from typing import Protocol
 from uuid import uuid4
@@ -25,6 +26,7 @@ class ObjectStore(Protocol):
     def exists(self, key: str) -> bool: ...
     def delete(self, key: str) -> None: ...
     def download_url(self, key: str, expires: int) -> str | None: ...
+    def upload_url(self, key: str, info: dict, expires: int) -> dict | None: ...
 
 
 def validate_key(key):
@@ -72,6 +74,9 @@ class LocalStore:
         self.path(key).unlink(missing_ok=True)
 
     def download_url(self, key, expires):
+        return None
+
+    def upload_url(self, key, info, expires):
         return None
 
 
@@ -136,6 +141,20 @@ class S3Store:
     def download_url(self, key, expires):
         try:
             return self.client.generate_presigned_url("get_object", Params=self._params(key), ExpiresIn=expires, HttpMethod="GET")
+        except (BotoCoreError, ClientError, OSError):
+            raise StorageError() from None
+
+    def upload_url(self, key, info, expires):
+        # The URL signs one immutable object, exact length, type and checksum.
+        # No remote request is made while the controller holds a lease lock.
+        headers = {'Content-Type': info['mime'], 'Content-Length': str(info['byte_size']),
+                   'Content-MD5': base64.b64encode(bytes.fromhex(info['md5'])).decode(),
+                   'Cache-Control': 'private, no-store', 'If-None-Match': '*'}
+        params = {**self._params(key), 'ContentType': info['mime'], 'ContentLength': info['byte_size'],
+                  'ContentMD5': headers['Content-MD5'], 'CacheControl': headers['Cache-Control'], 'IfNoneMatch': '*'}
+        try:
+            url = self.client.generate_presigned_url('put_object', Params=params, ExpiresIn=expires, HttpMethod='PUT')
+            return {'url': url, 'headers': headers}
         except (BotoCoreError, ClientError, OSError):
             raise StorageError() from None
 

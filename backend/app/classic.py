@@ -1,14 +1,13 @@
-"""Control-plane text stages, fenced checkpoints and strict image validation."""
+"""Control-plane text stages and fenced OCR checkpoints."""
 import base64
-import hashlib
 from io import BytesIO
 import json
 import math
 import time
-from PIL import Image, ImageChops
+from PIL import Image
 from sqlalchemy import func, or_, select
 from .adapters.text import TextError, call_text, groups, input_bound, parse_translations
-from .assets import available, decoded_image
+from .assets import available
 from .db import session_factory
 from .errors import ProcessingError
 from .models import Asset, ClassicState, Job, TextCall, now, uid
@@ -199,42 +198,6 @@ def wait_for_retry(job_id, lease_id, delay, before_call=None):
         time.sleep(max(0, min(1, end - time.monotonic())))
         with session_factory()() as db:
             current(db, job_id, lease_id)
-
-
-def validate_render(data, result):
-    try:
-        output = decode_bounded(result['image'])
-        with Image.open(BytesIO(data)) as source, decoded_image(output, output=True) as (target, info):
-            original, final = source.convert('RGB'), target.convert('RGB')
-            if target.format != 'PNG' or original.size != final.size:
-                raise ValueError()
-            masks = []
-            for field in ('mask', 'glyph_mask'):
-                with Image.open(BytesIO(decode_bounded(result[field], MAX_CHECKPOINT_BYTES))) as mask:
-                    if mask.format != 'PNG' or mask.size != original.size:
-                        raise ValueError()
-                    masks.append(mask.convert('L').point(lambda p: 255 if p else 0))
-            permitted = ImageChops.lighter(*masks)
-            if not masks[1].getbbox():
-                raise ValueError()
-            difference = ImageChops.difference(original, final)
-            if ImageChops.multiply(difference, ImageChops.invert(permitted).convert('RGB')).getbbox():
-                raise ValueError()
-            # Preserve the source alpha channel as well as RGB pixels outside the masks.
-            if 'A' in source.getbands() or 'transparency' in source.info:
-                final.putalpha(source.convert('RGBA').getchannel('A'))
-                buffer = BytesIO()
-                final.save(buffer, 'PNG')
-                output = buffer.getvalue()
-                # The encoder only restores source alpha; dimensions and format
-                # are unchanged. Validate final byte size and hash these exact bytes.
-                from .config import settings
-                if len(output) > settings().max_upload_bytes:
-                    raise ValueError()
-                info = {**info, 'byte_size': len(output), 'sha256': hashlib.sha256(output).hexdigest()}
-        return output, info
-    except (ValueError, KeyError, TypeError, OSError, Image.DecompressionBombError):
-        raise ProcessingError('CLASSIC_RENDER_INVALID', '译图尺寸、字形或掩膜外像素验证失败，未交付') from None
 
 
 def run_text_stage(job_id, lease_id):

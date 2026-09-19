@@ -13,6 +13,8 @@ from test_compute_v2 import (
     test_deadline_cannot_be_extended_by_heartbeats,
     test_version_languages_and_r2_authorization_do_not_probe_objects,
     test_result_written_before_lost_commit_is_recovered,
+    test_upload_is_scoped_frozen_bounded_and_center_never_reads_images,
+    test_late_direct_upload_cannot_publish_after_cancel_or_new_generation,
 )
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',

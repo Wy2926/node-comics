@@ -10,21 +10,21 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .assets import available
+from .assets import available, content_storage_key, create_asset
 from .classic import validate_analysis
 from .node_auth import node_auth
 from .config import settings
 from .db import get_db, session_factory
 from .errors import ProcessingError, problem
 from .languages import Language, LANGUAGES
-from .models import Asset, ClassicState, Job, now
+from .models import Asset, Attempt, ClassicState, Job, now
 from .node_config import NodeConfig
 from .providers import digest
 from .queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from .request_models import RequestBody
 from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler, release_lease, touch_job
 from .storage import get_store
-from .workers import complete_stage, fail_stage, finish_job
+from .workers import fail_stage, finish_job
 
 
 def no_store(response: Response):
@@ -346,19 +346,84 @@ class NodeError(RequestBody):
     code: ErrorCode
 
 
+class OutputInfo(RequestBody):
+    sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    md5: str = Field(pattern=r'^[a-f0-9]{32}$')
+    byte_size: int = Field(ge=1, le=24 * 1024 * 1024, strict=True)
+    width: int = Field(ge=1, strict=True)
+    height: int = Field(ge=1, strict=True)
+    mime: Literal['image/png']
+
+
+class PageResult(RequestBody):
+    version: str = Field(min_length=1, max_length=120)
+    input_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+    analysis_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+    translations_revision: str = Field(pattern=r'^[a-f0-9]{64}$')
+    output: OutputInfo
+
+
+class OutputRequest(LeaseRequest):
+    result: PageResult
+
+
+@router.post('/leases/{lease_id}/output/authorize')
+def authorize_output(lease_id: str, body: OutputRequest, identity=Depends(node_auth), db: Session = Depends(get_db)):
+    result = body.result.model_dump()
+    result_hash = digest(result)
+    lock_scheduler(db)
+    lease = scoped_lease(db, lease_id, body.lease_token, identity)
+    if lease.completed_at:
+        if lease.result_hash == result_hash:
+            return {'receipt': receipt(lease)}
+        problem('COMPLETION_CONFLICT', '租约已交付另一份结果', 409)
+    lease, _, job = live_lease(db, lease_id, body.lease_token, identity)
+    if lease.result_hash is not None and lease.result_hash != result_hash:
+        problem('COMPLETION_CONFLICT', '交付摘要已冻结', 409)
+    source = db.get(Asset, job.input_asset_id)
+    info, cfg = result['output'], settings()
+    if result['input_hash'] != source.sha256 or result['version'] != job.config['engine']['version']:
+        problem('ENGINE_RESULT_MISMATCH', '结果与输入或引擎版本不一致', 409)
+    if ((info['width'], info['height']) != (source.width, source.height)
+            or info['width'] * info['height'] > cfg.max_pixels or max(info['width'], info['height']) > cfg.max_dimension
+            or info['byte_size'] > cfg.max_upload_bytes):
+        problem('INVALID_PROVIDER_OUTPUT', '结果元数据超出图片限制', 422)
+    translated = translations_payload(db, job.id)
+    if (not translated or result['analysis_hash'] != translated['analysis_hash']
+            or result['translations_revision'] != translated['revision']):
+        problem('TRANSLATIONS_MISMATCH', '结果未绑定当前分析与译文版本', 409)
+    if 'delivery_deadline_at' not in lease.limits:
+        lease.limits = {**lease.limits, 'delivery_deadline_at': stamp(now() + timedelta(seconds=lease.limits['delivery_seconds']))}
+    ttl = min(60, int((min(lease.expires_at, lease_deadline(db, lease)) - now()).total_seconds()) - 2)
+    if ttl < 1:
+        raise ProcessingError('LEASE_EXPIRED', '上传窗口不足，请先续租')
+    key = content_storage_key(info['sha256'])
+    backend = db.get(Attempt, job.attempt_id).output_storage_backend
+    upload = get_store(backend).upload_url(key, info, ttl)
+    if not upload:
+        raise ProcessingError('COMPUTE_STORAGE_UNSUPPORTED', '计算节点需要 R2 上传授权')
+    lease.result_hash, lease.output_key = result_hash, key
+    db.commit()
+    return {'receipt': None, 'result_hash': result_hash,
+            **upload, 'server_time': stamp(now()), 'url_expires_at': stamp(now() + timedelta(seconds=ttl))}
+
+
 class CompletionRequest(LeaseRequest):
-    result: dict | None = None
+    result: PageResult | None = None
+    etag: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     error: NodeError | None = None
     timings: dict[Literal['download', 'download_queue', 'analyze', 'analyze_queue', 'inpaint',
-        'inpaint_queue', 'render', 'render_queue', 'analysis_submit', 'text_wait', 'local_total'],
+        'inpaint_queue', 'render', 'render_queue', 'analysis_submit', 'text_wait', 'local_total', 'upload_authorize', 'output_put'],
         Annotated[float, Field(ge=0, le=86400, allow_inf_nan=False)]] = Field(default_factory=dict)
 
 
 @router.post('/leases/{lease_id}/complete')
 def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)):
+    started = time.monotonic()
     if (body.result is None) == (body.error is None):
         problem('INVALID_COMPLETION', '结果与固定错误码必须二选一', 422)
-    result_hash = digest(body.result if body.result is not None else {'error': body.error.model_dump()})
+    result = body.result.model_dump() if body.result is not None else None
+    result_hash = digest(result if result is not None else {'error': body.error.model_dump()})
     with session_factory()() as db:
         lock_scheduler(db)
         lease = scoped_lease(db, lease_id, body.lease_token, identity)
@@ -380,31 +445,38 @@ def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)
             lease.expires_at = min(lease.expires_at, now())
             db.commit()
         else:
-            live_lease(db, lease_id, body.lease_token, identity)
-            if lease.result_hash is not None and lease.result_hash != result_hash:
-                problem('COMPLETION_CONFLICT', '交付摘要已冻结', 409)
-            if body.result is not None:
+            lease, stage, job = live_lease(db, lease_id, body.lease_token, identity)
+            if result is not None:
+                if lease.result_hash != result_hash or lease.output_key != content_storage_key(result['output']['sha256']):
+                    problem('COMPLETION_CONFLICT', '请先取得此结果的上传授权', 409)
+                if body.etag != result['output']['md5']:
+                    problem('UPLOAD_RECEIPT_MISMATCH', '上传回执与授权内容不一致', 409)
                 translated = translations_payload(db, lease.job_id)
-                if (not translated or body.result.get('analysis_hash') != translated['analysis_hash']
-                        or body.result.get('translations_revision') != translated['revision']):
+                if (not translated or result['analysis_hash'] != translated['analysis_hash']
+                        or result['translations_revision'] != translated['revision']):
                     problem('TRANSLATIONS_MISMATCH', '结果未绑定当前分析与译文版本', 409)
-                if 'delivery_deadline_at' not in lease.limits:
-                    lease.limits = {**lease.limits, 'delivery_deadline_at': stamp(now() + timedelta(seconds=lease.limits['delivery_seconds']))}
+                # Trusted compute nodes attest upload success. Only metadata is
+                # committed here: no image bytes, object probe, decode or PUT.
+                backend = db.get(Attempt, job.attempt_id).output_storage_backend
+                info = {key: value for key, value in result['output'].items() if key != 'md5'}
+                output = create_asset(db, job.owner_id, b'', kind='classic', parent_id=job.input_asset_id,
+                    stable_id=lease_id, storage_backend=backend, prewritten=True, verified_info=info)
+                job.output_asset_id = output.id
+                state = db.get(ClassicState, job.id)
+                job.quality_flags = (state.analysis or {}).get('quality_flags', [])
+                stage.status, stage.completed_at = 'succeeded', now()
+                finish_job(db, job, 'succeeded')
+                release_lease(db, lease, 'succeeded')
+                touch_job(db, job)
+                state.timings = {'node': body.timings, 'delivery': {'total': time.monotonic() - started}}
             lease.result_hash = result_hash
             db.commit()
     if body.error and body.error.code == 'LEASE_STOPPED':
-        # Recovery handles a validated, possibly already uploaded immutable result.
+        # An expired page is retried with its existing analysis and text.
         from .dispatcher import recover_lease
         recover_lease(lease_id)
     elif body.error:
         fail_stage(lease_id, ProcessingError(body.error.code, '计算节点未能完成此页'), token=body.lease_token, node_id=identity)
-    else:
-        try:
-            complete_stage(lease_id, body.result, token=body.lease_token, node_id=identity, timings=body.timings)
-        except ProcessingError as error:
-            if error.code in {'LEASE_EXPIRED', 'COMPLETION_CONFLICT'}:
-                raise
-            fail_stage(lease_id, error, token=body.lease_token, node_id=identity)
     with session_factory()() as db:
         lease = scoped_lease(db, lease_id, body.lease_token, identity)
         if not lease.completed_at:

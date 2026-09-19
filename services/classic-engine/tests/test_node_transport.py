@@ -1,3 +1,4 @@
+import base64
 import hashlib
 from datetime import datetime, timedelta, timezone
 import time
@@ -90,3 +91,57 @@ def test_late_heartbeat_cannot_resurrect_local_deadline():
     page.update(reply, now.isoformat(), time.monotonic())
     with pytest.raises(NodeFailure, match='LEASE_STOPPED'):
         page.check()
+
+
+def upload_fixture():
+    data = b'png result'
+    info = {'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data), 'md5': hashlib.md5(data).hexdigest()}
+    authorization = {'url': 'https://r2.example.test/bucket/result?signature=private', 'headers': {
+        'Content-Type': 'image/png', 'Content-Length': str(len(data)),
+        'Content-MD5': base64.b64encode(hashlib.md5(data).digest()).decode(),
+        'Cache-Control': 'private, no-store', 'If-None-Match': '*'}}
+    return data, info, authorization
+
+
+@pytest.mark.parametrize('status', [200, 412])
+def test_direct_upload_is_credential_free_and_immutable(status):
+    data, info, authorization = upload_fixture()
+    def storage(request):
+        assert request.method == 'PUT' and request.content == data
+        assert 'authorization' not in request.headers and 'x-node-id' not in request.headers
+        assert request.headers['content-md5'] == authorization['headers']['Content-MD5']
+        assert request.headers['if-none-match'] == '*'
+        return httpx.Response(status, headers={'ETag': '"' + info['md5'] + '"'})
+    client = Transport(config(), storage_transport=httpx.MockTransport(storage))
+    try:
+        assert client.upload(authorization, data, info) == info['md5']
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('change', ['origin', 'length', 'sha256', 'md5', 'credentials'])
+def test_upload_rejects_wrong_destination_or_payload_before_network(change):
+    data, info, authorization = upload_fixture()
+    if change == 'origin': authorization['url'] = 'https://other.example.test/result'
+    elif change == 'credentials': authorization['headers']['Authorization'] = 'must-not-forward'
+    else: info[{'length': 'byte_size'}.get(change, change)] = 1 if change == 'length' else '0'*64
+    client = Transport(config(), storage_transport=httpx.MockTransport(lambda _: pytest.fail('unexpected PUT')))
+    try:
+        with pytest.raises(NodeFailure):
+            client.upload(authorization, data, info)
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('status,etag,code', [(302, '', 'STORAGE_UNAVAILABLE'),
+    (403, '', 'STORAGE_AUTH_FAILED'), (503, '', 'STORAGE_UNAVAILABLE'), (200, 'wrong', 'STORAGE_UNAVAILABLE')])
+def test_upload_checks_receipt_and_never_follows_redirects(status, etag, code):
+    data, info, authorization = upload_fixture()
+    client = Transport(config(), storage_transport=httpx.MockTransport(lambda _: httpx.Response(
+        status, headers={'ETag': etag, 'Location': 'https://evil.test/result'})))
+    try:
+        with pytest.raises(NodeFailure, match=code) as error:
+            client.upload(authorization, data, info)
+        assert 'private' not in str(error.value)
+    finally:
+        client.close()
