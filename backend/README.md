@@ -1,6 +1,6 @@
 # Node Comics 后端
 
-2026-09-16 部署更新：当前服务端已在美国 VPS 的三个容器中运行，复用既有 PostgreSQL，本机承担图像计算。线上入口与独立生产 Compose 见[部署说明](../docs/VPS_DEPLOYMENT.md)；下文“未公开部署”为此前实现阶段记录。
+2026-09-16 部署更新：当前服务端已在美国 VPS 的三个容器中运行，复用既有 PostgreSQL，图像计算由独立节点承担；仓库当前不附带图像引擎。线上入口与独立生产 Compose 见[部署说明](../docs/VPS_DEPLOYMENT.md)；下文“未公开部署”为此前实现阶段记录。
 
 2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](../docs/PRODUCTION_FIXES.md)，未公开部署。
 
@@ -19,7 +19,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务，私有 R2 保存原图与最终
 ```powershell
 ./scripts/bootstrap.ps1
 # 填写 R2、图片供应商后启动本地开发集群：
-./scripts/bootstrap.ps1 -Start -Classic
+./scripts/bootstrap.ps1 -Start
 # 启动后在 /admin/#translation-providers 创建文本供应商。
 ```
 
@@ -41,8 +41,8 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 | 配置 | 默认／用途 |
 | --- | --- |
-| `FREE_QUEUE_CAPACITY` / `PLUS_QUEUE_CAPACITY` | 每模式 10 / 500 页 |
-| `FREE_REALTIME_SLOTS` / `PLUS_REALTIME_SLOTS` | 每模式 2 / 10 页 |
+| `FREE_QUEUE_CAPACITY` / `PLUS_QUEUE_CAPACITY` | 账户跨模式、语言和设备共用 3 / 10 页；旧配置不能放大产品上限 |
+| `FREE_REALTIME_SLOTS` / `PLUS_REALTIME_SLOTS` | 每模式实时上限 3 / 10 页，仍受账户共用在途容量限制 |
 | `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
 | `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
 | `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
@@ -60,7 +60,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
 | `R2_KEY_PREFIX` | 独立部署专用前缀 |
-| `CLASSIC_ENABLED` | 常规引擎总开关；文本模型、协议、密钥、计量和重试在后台供应商中配置，见[常规说明](../docs/CLASSIC_IMPLEMENTATION.md) |
+| `CLASSIC_ENABLED` | 常规引擎总开关；文本模型、协议、密钥、计量和重试在后台供应商中配置，默认关闭；接入要求见[计算协议](../docs/COMPUTE_PROTOCOL.md) |
 | `OPENAI_*` / `PROVIDERS_JSON` | 初始化图片供应商，后续管理员维护 |
 
 文本供应商密钥保存在后端 DB revision 中，调用前严格校验完整配置快照并加载对应版本密钥，不读取环境变量或借用图片供应商配置。密钥不进入 API 响应、任务快照或计算节点；数据库及备份包含敏感密钥，必须限制访问权限。有效供应商及版本进入内容缓存身份；会员页数和权重不改变图片缓存身份。

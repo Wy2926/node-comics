@@ -1,4 +1,0 @@
--r requirements.txt
-torch-directml==0.2.5.dev240914
-torch==2.4.1
-torchvision==0.19.1

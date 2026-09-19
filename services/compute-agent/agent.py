@@ -143,7 +143,7 @@ class Config:
                        engine_token=document['engine_token'], allow_http=document['allow_http'])
         return cls(control_url=os.environ['CONTROL_URL'].rstrip('/'), token=os.environ['NODE_TOKEN'],
                    node_id=os.environ['NODE_ID'],
-                   engine_url=os.environ.get('ENGINE_URL', 'http://classic-engine:8000').rstrip('/'),
+                   engine_url=os.environ['ENGINE_URL'].rstrip('/'),
                    engine_token=os.environ['ENGINE_TOKEN'],
                    allow_http=os.environ.get('CONTROL_ALLOW_HTTP', 'false').lower() == 'true')
 

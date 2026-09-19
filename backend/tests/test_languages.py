@@ -37,12 +37,12 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     with session_factory()() as db:
         for language in LANGUAGES:
             config = configuration(db, 'classic', language)
-            assert config['engine']['render_version'] == 'masked-png-v6-roi-mtu-f0307a0-qt611-noto-b85c38ec'
+            assert config['engine'] == {'version': settings().classic_engine_version}
         with pytest.raises(HTTPException):
             configuration(db, 'classic', 'xx')
         with pytest.raises(HTTPException):
             configuration(db, 'redraw', 'pl')
-        old = {**config, 'engine': {**config['engine'], 'render_version': 'masked-png-v2-hyphen-32b006a2'}}
+        old = {**config, 'engine': {'version': 'different-engine-version'}}
         assert digest(old) != digest(config)
 
 

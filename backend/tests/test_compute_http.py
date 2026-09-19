@@ -50,7 +50,7 @@ def image(index):
 @contextmanager
 def cluster(tmp_path, *, text_gate=None):
     database = tmp_path / 'http-cluster.db'
-    version = 'mit-95227a2-classic-v5-cluster'
+    version = 'fixture-engine-v1'
     environment = {**os.environ, 'PYTHONPATH': str(ROOT), 'PYTHONUNBUFFERED': '1',
         'DATABASE_URL': 'sqlite:///' + database.as_posix(), 'STORAGE_PATH': str(tmp_path / 'objects'),
         'DEV_AUTH': 'true', 'DEV_AUTH_SECRET': 'isolated-http-auth-key-no-product-access',

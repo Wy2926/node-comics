@@ -1,6 +1,5 @@
 .env
 deploy/engine.json
-services/classic-engine/engine.local.json
 services/compute-agent/node.local.json
 .env.*
 !.env.example

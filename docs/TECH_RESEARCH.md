@@ -1,6 +1,6 @@
 # AI图片翻译与格式验证
 
-本文保留 2026-09-13 的 AI 图片翻译与文件格式验证记录。2026-09-14 新增的常规翻译需求、开源方案比较和接入设计见[常规翻译调研](CLASSIC_TRANSLATION_RESEARCH.md)；当前实现及实测记录见[常规翻译运行说明](CLASSIC_IMPLEMENTATION.md)。
+本文保留 2026-09-13 的 AI 图片翻译与文件格式验证记录。2026-09-14 新增的常规翻译需求、开源方案比较和接入设计见[常规翻译调研](CLASSIC_TRANSLATION_RESEARCH.md)；当前中心侧交互与接入边界见[计算节点协议](COMPUTE_PROTOCOL.md)。
 
 ## 协议依据
 

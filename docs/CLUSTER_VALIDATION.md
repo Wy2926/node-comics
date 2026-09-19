@@ -1,6 +1,6 @@
 # 翻译集群重构验收记录
 
-当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)；下述旧基线记录为历史验证证据。
 
 日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当时前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[计算代理说明](../services/compute-agent/README.md)。
 
@@ -14,12 +14,11 @@
 | 前端检查与构建 | 类型检查、87 个模块的边界检查通过；Chrome MV3 与 Web 构建通过 | 构建成功不代表商店发布或线上部署 |
 | 后端 SQLite 与 PostgreSQL 全量 | 306 项通过，2 条依赖弃用警告，用时 154.86 秒 | PostgreSQL 用例全部启用，没有跳过项；结果记录于 `artifacts/cluster-validation/backend-tests.xml` |
 | 存储与相关后端回归 | 两组分别 98、81 项通过 | 覆盖永久保留、访问时间、上传竞态、权限、历史、缓存、取消、恢复和结算；属于全量测试的子集 |
-| 常规图像引擎 | 新镜像内 20 项测试通过 | 运行时、阶段契约与局部抹字边界；未运行真实 GPU 推理 |
 | 计算代理 | 8 项测试通过 | 领取、心跳、结果上报及错误处理协议 |
 | 真实 HTTP 多进程 | 1 项端到端集成通过 | 真实 API、控制执行池、维护进程与两个独立代理进程；引擎和文本供应商使用模拟响应 |
 | 真实 Chrome 阅读器 | 8 个场景通过，使用无限期保留的新夹具复验 | 使用真实浏览器和隔离 API；图片供应商使用模拟响应；已查看桌面与窄屏截图 |
-| Docker 构建 | backend、compute-agent、classic-engine 的 `cluster` 镜像已构建；最新后端镜像已重建 | 后端在 `--network none` 下完成封装内 schema 与导入检查，输出 `PACKAGED_SCHEMA_IMPORT_OK`；未启动生产集群 |
-| 配置与提交内容检查 | Compose 启用 `classic` profile 的配置检查通过；凭据扫描输出 `CREDENTIAL_SCAN_OK`；`git diff --check` 通过 | 凭据扫描覆盖已跟踪及未跟踪文件，排除 Git 忽略内容；私有环境文件未纳入交付 |
+| Docker 构建 | backend、compute-agent 的 `cluster` 镜像已构建；最新后端镜像已重建 | 后端在 `--network none` 下完成封装内 schema 与导入检查，输出 `PACKAGED_SCHEMA_IMPORT_OK`；未启动生产集群 |
+| 配置与提交内容检查 | 控制服务 Compose 配置检查通过；凭据扫描输出 `CREDENTIAL_SCAN_OK`；`git diff --check` 通过 | 凭据扫描覆盖已跟踪及未跟踪文件，排除 Git 忽略内容；私有环境文件未纳入交付 |
 | 真实 R2 | 完整隔离链路通过 | 真实原图与译图存储、授权下载解码、两个开发来源 CORS 与清理均通过；图片供应商仍为模拟实现 |
 
 ## 已覆盖的关键行为
@@ -90,18 +89,15 @@ $env:RUN_POSTGRES_CONCURRENCY = "1"
 .venv/Scripts/python.exe -m pytest -q --tb=short
 ```
 
-### 镜像与引擎：仓库根目录
-
-这些命令只构建镜像或启动一次性测试容器，不启动生产服务。引擎检查只挂载三个测试文件，使用镜像内封装的实现并禁用网络。
+### 控制服务与代理镜像：仓库根目录
 
 ```powershell
 docker build -t node-comics-backend:cluster backend
 docker build -t node-comics-compute-agent:cluster services/compute-agent
-docker build -t node-comics-classic-engine:cluster services/classic-engine
-docker compose --env-file .env --env-file deploy/.env.local --profile classic config --quiet
-$clusterEngineSource = (Resolve-Path services/classic-engine).Path
-docker run --rm --network none --entrypoint python --mount "type=bind,source=$clusterEngineSource/test_runtime.py,target=/opt/engine/test_runtime.py,readonly" --mount "type=bind,source=$clusterEngineSource/test_stage_contract.py,target=/opt/engine/test_stage_contract.py,readonly" --mount "type=bind,source=$clusterEngineSource/test_local_inpainting.py,target=/opt/engine/test_local_inpainting.py,readonly" node-comics-classic-engine:cluster -m unittest -v test_runtime.py test_stage_contract.py test_local_inpainting.py
+docker compose --env-file .env --env-file deploy/.env.local config --quiet
 ```
+
+仓库不提供图像引擎镜像；这些构建和模拟协议检查不验证真实图像处理。
 
 代理检查在 `services/compute-agent` 目录运行，Python 环境需安装该目录的 `requirements.txt`：
 

@@ -20,7 +20,6 @@
 | 容器网络 | 复用 `1panel-network` |
 | 反向代理 | 现有 OpenResty，经 `127.0.0.1:18088` 访问 API；公网仅使用 HTTPS |
 | 图片存储 | 私有 R2，独立前缀 `node-comics-production/`，原图和译图无限期保留 |
-| 本机节点 | `DESKTOP-29CQPLR:cuda:0`，1 个执行位，16 种目标语言，`mit-95227a2-classic-v8-qt` |
 
 镜像基于提交 `75cca73`，额外包含本次 OIDC User-Agent 和进程停止信号修复；这些工作区改动尚未提交。服务端队列使用 PostgreSQL，不连接现有 Redis，不改动其数据或配置。新数据库账号不是 PostgreSQL 超级用户。
 
@@ -57,19 +56,9 @@ docker push 127.0.0.1:7101/nodelane/node-comics:$VERSION
 
 反向代理配置见 [openresty.comics.conf](../deploy/openresty.comics.conf)，实际安装为 `/opt/1panel/www/conf.d/comics.conf`。当前复用现有通配符源站证书，Cloudflare 公网 HTTPS 验证通过。代理关闭请求/响应磁盘缓冲和此站点访问日志，避免图片字节落盘及记录登录授权码；API 同样关闭访问日志，容器日志限制为每份 10 MiB、保留 3 份。不要用会展开全部密钥的 `docker compose config` 输出做普通日志。
 
-## 本机计算节点
+## 计算节点接入
 
-私有配置在 `private-test-data/production-node/`；`node.json` 仅含该节点凭据和本机引擎凭据，`engine.json` 指向本机已有模型、字体和设备锁目录。服务端不接收本机登录 Cookie，节点不持有数据库、R2 或模型供应商密钥。
-
-本次已在后台启动；后续在仓库根目录运行：
-
-```powershell
-./scripts/start-remote-node.ps1
-# 另一终端请求停止；先停止新领取，当前阶段完成后退出。
-./scripts/start-remote-node.ps1 -Stop
-```
-
-这组脚本只启动图像引擎和计算代理，不启动本地 API、数据库或控制任务进程。`processes.json` 记录当前 PID，日志保留于同一个私有目录。本次没有安装开机自启或计划任务；本机关机、睡眠或节点停止时，常规图像阶段会等待节点恢复，`/health/ready` 会反映计算节点不可用。
+仓库当前保留计算代理，图像引擎须独立部署并满足[交互协议](COMPUTE_PROTOCOL.md)。节点只持有自身凭据及本机引擎凭据，不持有数据库、R2 或供应商密钥。仓库删除不代表已修改 VPS 或其他机器的运行状态；原有服务状态需另行核实。
 
 ## 管理员身份
 
@@ -81,7 +70,7 @@ docker push 127.0.0.1:7101/nodelane/node-comics:$VERSION
 
 ## 验证与边界
 
-- 生产配置预检及 PostgreSQL 18.6 的实际迁移成功；三个服务与计算节点健康，公网 `/health/ready` 返回 200，全部依赖 ready。
+- 生产配置预检及 PostgreSQL 18.6 的实际迁移成功；三个控制服务完成部署检查；本文为当时记录，不代表当前运行状态。
 - R2 使用独立临时合成图片验证写入、读取、签名下载和精确网页 CORS，字节一致；临时对象随后删除。原有 CORS 规则保留，增加生产域名。未签名读取未返回图片。
 - 管理后台页面与静态资源正常，浏览器可跳转到真实 Logto 登录页。已有插件回调保留，新增 `/admin/` 回调和精确 CORS 来源；改动前元数据备份在 VPS 私有服务目录。
 - 身份服务拒绝 Python 默认 User-Agent，现用明确的 `NodeComics/0.3` 获取公钥，保留原有签名、issuer、audience、过期及公钥撤销校验。

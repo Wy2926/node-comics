@@ -49,16 +49,16 @@
 | `input_cache_bytes` / `input_cache_ttl_seconds` | 代理原图缓存 128 MiB／900 秒，0 可禁用 |
 | `engine` | 默认 `{}`，字段省略时使用节点本地文件值；显式字段覆盖本地值 |
 
-服务端验证所有字段与范围，拒绝未知字段和不支持的 schema。`engine.languages` 允许当前 16 项目标语言：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`。支持语言是目标语言能力，检测／OCR 继续使用既有 48px 模型，不表示已通过相同源语言的 OCR 验收。完整列表和资源限制见[嵌字与 OCR 语言清单](LANGUAGE_SUPPORT.md)。
+服务端验证所有字段与范围，拒绝未知字段和不支持的 schema。`engine.languages` 允许当前 16 项目标语言：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`。支持语言是节点声明的目标语言能力，不代表源语言 OCR 质量。产品语言与能力边界见[语言清单](LANGUAGE_SUPPORT.md)。
 
-执行位表示在途阶段，并非模型副本数：代理并发处理网络取图、请求和交付；当前单物理设备图像引擎保留串行模型锁，默认一个执行位。引擎已支持[CPU/GPU 流水重叠](ENGINE_PIPELINE.md)：设备调用、CPU 后处理、独立 Qt 排版可跨页重叠，最多同时接纳 3 个阶段；需要至少 2 个代理执行位才能利用跨请求重叠。增加位数不增加模型副本，也不保证吞吐同比增长；已保存的节点配置不会自动修改。文本、重绘和上传校验池在后台分别配置执行位，文本／重绘 1–100，上传校验 1–32。`CLUSTER_TEXT_SLOTS`、`CLUSTER_REDRAW_SLOTS`、`CLUSTER_UPLOAD_SLOTS` 仅提供首次创建默认值；数据库设置为后续唯一依据，进程重启不覆盖容量或启停状态。修改对下一次领取生效，缩容不会中止已有租约。
+执行位表示节点同时持有的阶段租约数；代理并发处理取图、请求和交付。引擎如何执行计算由独立实现决定。文本、重绘和上传校验池在后台分别配置执行位，文本／重绘 1–100，上传校验 1–32。`CLUSTER_TEXT_SLOTS`、`CLUSTER_REDRAW_SLOTS`、`CLUSTER_UPLOAD_SLOTS` 仅提供首次创建默认值；数据库设置为后续唯一依据，进程重启不覆盖容量或启停状态。修改对下一次领取生效，缩容不会中止已有租约。
 
 ## 拉取与应用顺序
 
-1. 引擎启动读取本地配置、补全并校验所声明语言资源、加载模型和预热；全部成功才报告 ready。
+1. 独立图像引擎完成自身初始化，通过健康接口报告 ready、版本、能力、资源 ID 与实际配置。
 2. 代理用预建身份报告设备，拉取当前完整配置。注册不会改变后台启用状态或执行位。
 3. 代理周期拉取配置，即使阶段仍在执行也继续拉取。版本变更后停止新领取，等待所有当前线程完成阶段与结果交付。
-4. 代理向本机引擎发送配置覆盖。引擎先准备语言资源，再暂停入场、排空推理及所有 CPU/排版工作，在设备锁内同步主进程、执行线程和排版子进程的配置。准备失败保留原配置；应用失败回滚，回滚失败则撤销 ready，等待重启修复。
+4. 代理向本机引擎发送配置覆盖；引擎应用成功后返回实际配置与支持语言，失败时代理向中心报告固定错误码并停止新领取。
 5. 引擎返回实际配置与语言，代理上报服务端；服务端核对当前版本和覆盖值，确认后才允许按新执行位继续领取。
 6. 缩容不撤销运行中租约；配置未应用、失败、陈旧或节点停用时不派新工作。失败只记录固定错误码，周期重试，不记录异常中的私有内容。
 
@@ -68,18 +68,11 @@
 
 控制池的执行位与供应商限制相互独立：扩大重绘池不会绕过供应商并发上限，扩大文本池不会绕过 RPM、重试次数或处理时限。
 
-## 本地文件与性能参数
+## 代理与外部引擎
 
-- 代理：复制 [node.example.json](../services/compute-agent/node.example.json) 为私有文件，通过 `NODE_CONFIG_FILE` 指定。文件只含控制地址、节点身份和本机引擎连接；执行位与公共轮询参数来自服务端。
-- NVIDIA：[engine.cuda.example.json](../services/classic-engine/engine.cuda.example.json)。AMD：[engine.directml.example.json](../services/classic-engine/engine.directml.example.json)。通过 `ENGINE_CONFIG_FILE` 指定。相对路径按配置文件目录解析，移动示例后须调整路径。
-- `runtime.languages` 声明启动支持列表；缺失／损坏的所需字典及许可证文件自动下载并按固定长度、SHA-256 校验，原子写入模型缓存；完整文件复用。中日韩不需断词字典；土耳其语、越南语、印尼语采用按词换行。新增语言的 Noto Sans 字体和许可证也在接单前准备并校验。下载失败不接单，翻译过程中不下载。来源与许可见[字典说明](HYPHENATION_DICTIONARIES.md)。
-- `runtime.torch_threads`、`runtime.opencv_threads`、缓存大小和 TTL 可由服务端覆盖并热更新。AMD LaMa 子进程在后续裁剪调用中使用更新后的线程值；CPU／CUDA／优化 DirectML 的分格子进程在下一页使用更新后的 OpenCV 线程值。
-- CPU 与 CUDA 均支持独立 CPU 进程执行分格，与本页检测／OCR 重叠。CUDA 模式由 GPU 执行模型、CPU 处理几何；CPU 模式模型和几何均在 CPU 执行。每引擎仅一个分格子进程，完成或失败均排空当前页。CPU／CUDA OCR 位置编码使用最多 32 MiB／2048 项的有界缓存，按设备、dtype、scale、长度、偏移等隔离；不缓存图片或对白。配置与实测见[分析阶段优化](CUDA_ANALYSIS_DIAGNOSIS.md)。
-- 本机启动项 `neural_acceleration` 可选 `eager`（省略时的默认值）／`portable-v1`（CUDA 示例已启用）。后者保持 FP32，启用 OCR 单批次有界投影缓存／完成结果回传和 LaMa PyTorch 计算图，不引入 TensorRT 或自定义 CUDA 算子。修改后需重启；实际引擎版本自动追加 `-torch-portable-v1`，控制服务应配置匹配版本，避免不同执行方式共用译图缓存。`/health.neural_acceleration` 返回实际执行器、设备、图调用次数和缓存容量／命中；启动图构建或校验失败直接失败，不切 CPU。
-- `portable-v1` 的通用张量代码为后续 PyTorch ROCm 接入保留空间；ROCm 沿用 PyTorch 的 `cuda:0` 设备命名，健康信息按 `torch.version.hip` 报告运行时。AMD 硬件、驱动与 ROCm 软件包仍需单独验收，不能把 NVIDIA 结果视为 AMD 验证。当前 Windows DirectML 保持现有路径，显式拒绝该选项。
-- 本机 CUDA 单进程实测将 OpenCV 从 2 增至 8 线程可缩短检测前滤波；这属于现有 `runtime.opencv_threads` 配置，不改变全局默认。多模型进程、其他 CPU 和 DirectML 节点应按总线程预算另测，不能机械套用 8 线程。
-- `torch_interop_threads`、`inpaint_workers`、设备、路径属于本机启动参数，修改文件后重启引擎。DirectML 支持 1／2 个 LaMa 裁剪进程，CUDA／CPU 当前为 1。修改 DirectML 裁剪进程数会改变引擎版本，控制服务必须配置匹配版本。
-- 一个物理设备共用锁目录；不要通过多个代理复制同一设备容量。配置文件必须只交给部署该节点的操作者，私有文件不提交到仓库。
+复制 [node.example.json](../services/compute-agent/node.example.json) 为私有文件，通过 `NODE_CONFIG_FILE` 指定。文件只含控制地址、节点身份和引擎连接；执行位与公共轮询参数来自服务端。使用环境变量时必须显式提供 `ENGINE_URL` 与 `ENGINE_TOKEN`。
+
+仓库不提供图像引擎、模型下载、设备启动或图像效果测试。现有 `engine` 覆盖字段仍是节点协议的一部分，接入实现须正确应用并报告。完整任务流转、请求和交付边界见[计算节点交互](COMPUTE_PROTOCOL.md)。
 
 ## 接口
 

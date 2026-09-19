@@ -85,7 +85,6 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_MODEL", "contract-image-model")
     monkeypatch.setenv("PROVIDERS_JSON", "")
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-    monkeypatch.setenv('CLASSIC_ENGINE_TOKEN', 'isolated-pg-engine-token')
     from app.config import settings
     from app.db import engine
     if engine.cache_info().currsize:

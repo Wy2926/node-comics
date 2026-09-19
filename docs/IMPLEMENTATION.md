@@ -1,6 +1,6 @@
 # 本地实现与验证
 
-当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)与[NVIDIA 验收](NVIDIA_GPU_VALIDATION.md)；下述旧基线记录为历史验证证据。
+当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)；下述旧基线记录为历史验证证据。仓库当前不附带图像引擎，接入边界见[计算协议](COMPUTE_PROTOCOL.md)。
 
 2026-09-15：翻译已采用全新集群基线 `cluster_0001`。现行任务与队列规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，最新代码、测试与浏览器验收边界见[集群验收](CLUSTER_VALIDATION.md)。以下早期样本和截图保留为历史证据，不代表当前部署状态。
 
@@ -131,6 +131,5 @@ npm test -- src/auth/oidc.test.ts
 - `.env` 的默认图片网关在使用常规 Python User-Agent 时曾返回 403；本地通过供应商可配置 `user_agent=Mozilla/5.0` 接通。该配置不代表任意兼容网关都需要它。
 - 真实 OIDC 账号登录验收、HTTPS 部署、正式价格、支付、站点覆盖和发布仍未完成，尚未公开部署。
 - MOBI 首版支持未加密 MOBI6 / MOBI6+KF8 漫画，本次已新增 CBZ/ZIP、CBR/RAR、PDF；独立 KF8、EPUB、长图切片与整卷打包导出属于后续范围。
-- 自动审批拒绝了 `engines/` 下载缓存的递归删除（返回 `blocked by policy`）。源码和运行组件已移除，残余缓存已忽略且不参与构建；没有绕过删除限制。
 
 原创发布样例的来源与生成提示见 [samples/README.md](../samples/README.md)。私有漫画、提取图片和凭据不包含在插件产物中。

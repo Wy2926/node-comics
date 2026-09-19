@@ -1,4 +1,4 @@
-param([switch]$Start, [switch]$Classic, [switch]$Production)
+param([switch]$Start, [switch]$Production)
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
@@ -12,9 +12,6 @@ if ($Production -and -not (Test-Path -LiteralPath $localConfig)) {
     throw '请从 deploy/.env.production.example 创建 deploy/.env.production 并填写真实 OIDC API audience、数据库密码及服务密钥；生产启动不使用本地免密码登录。'
 }
 New-Item -ItemType Directory -Path (Split-Path -Parent $localConfig) -Force | Out-Null
-if (-not (Test-Path -LiteralPath 'deploy/engine.json')) {
-    Copy-Item -LiteralPath 'deploy/engine.example.json' -Destination 'deploy/engine.json'
-}
 if (-not (Test-Path -LiteralPath $localConfig)) {
     $pgBytes = New-Object byte[] 24
     $authBytes = New-Object byte[] 48
@@ -37,13 +34,6 @@ if (-not $Production -and -not (Select-String -LiteralPath $localConfig -Pattern
     [IO.File]::AppendAllText($localConfig, "`nADMIN_WEB_PATH=/console-$([Convert]::ToHexString($entryBytes).ToLowerInvariant())/`n", [Text.UTF8Encoding]::new($false))
     Write-Host "已在 $environmentFile 生成固定后台入口 ADMIN_WEB_PATH。"
 }
-foreach ($tokenName in $(if ($Production) { @() } else { @('CLASSIC_ENGINE_TOKEN') })) {
-    if (-not (Select-String -LiteralPath $localConfig -Pattern "^$tokenName=" -Quiet)) {
-        $tokenBytes = New-Object byte[] 32
-        [Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
-        [IO.File]::AppendAllText($localConfig, "$tokenName=$([Convert]::ToHexString($tokenBytes))`n", [Text.UTF8Encoding]::new($false))
-    }
-}
 if ($Production) {
     foreach ($required in @('APP_ENV=production', 'DEV_AUTH=false')) {
         if (-not (Select-String -LiteralPath $localConfig -Pattern "^$required\s*$" -Quiet)) {
@@ -56,7 +46,6 @@ try {
     $env:COMICS_ENV_FILE = $environmentFile
     $composeArgs = @('compose', '--env-file', '.env', '--env-file', $environmentFile)
     if ($Production) { $composeArgs += @('--project-name', 'node-comics-production') }
-    if ($Classic) { $composeArgs += @('--profile', 'classic') }
     & docker @composeArgs config --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Docker Compose 配置验证失败' }
     if ($Start) {
@@ -67,10 +56,6 @@ try {
             if ($LASTEXITCODE -ne 0) { throw '生产身份或存储配置未通过启动校验；未启动服务' }
         }
         $startArgs = $composeArgs + @('up', '-d', '--build')
-        if ($Classic -and (-not (Select-String -LiteralPath $localConfig -Pattern '^NODE_TOKEN=.+$' -Quiet) -or -not (Select-String -LiteralPath $localConfig -Pattern '^NODE_ID=.+$' -Quiet))) {
-            $startArgs += @('api', 'control-worker', 'maintenance', 'classic-engine')
-            Write-Host "后台添加翻译节点后，将 NODE_ID 与独立 NODE_TOKEN 写入 $environmentFile，再运行 -Start -Classic 启动代理。"
-        }
         & docker @startArgs
         if ($LASTEXITCODE -ne 0) { throw 'Docker 启动失败' }
     }

@@ -1,6 +1,6 @@
 # Node Comics
 
-2026-09-16 部署更新：服务端已容器化部署至现有美国 VPS，复用线上 PostgreSQL；本机 RTX 4060 作为独立计算节点。入口、镜像、运行命令与验证边界见[美国 VPS 部署](docs/VPS_DEPLOYMENT.md)。以下“未公开部署”描述属于此前实现阶段记录。
+2026-09-16 服务端部署记录：服务端容器部署至美国 VPS，复用线上 PostgreSQL。入口、镜像、运行命令与验证边界见[美国 VPS 部署](docs/VPS_DEPLOYMENT.md)。以下“未公开部署”描述属于此前实现阶段记录。
 
 2026-09-16：已加入生产身份校验、公钥撤销、提交反滥用、共享原图/已完成译图复用、监控与隔离恢复；移除一天后无引用对象删除。新空库基线 `shared_0001`，不兼容旧数据。状态和验证见[本轮修复](docs/PRODUCTION_FIXES.md)，未公开部署。
 
@@ -16,7 +16,7 @@
 
 2026-09-16：相同原图按内容跨账户免重复上传，已完成且模式 / 语言 / 配置相同的译图可免费复用；账户授权、任务和历史保持私有。已移除按一天期限扫描删除无引用对象的逻辑。生产身份、提交限流、健康监控与备份恢复说明见[生产身份](docs/PRODUCTION_IDENTITY.md)、[提交限制](docs/SUBMISSION_SCHEDULING.md)及[运维说明](docs/OPERATIONS.md)。
 
-2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在次数和处理时限内自动重试（成本仅计量，不设页成本上限）。常规模式已基于[开源方案与成本调研](docs/CLASSIC_TRANSLATION_RESEARCH.md)实现，启动与验证见[常规翻译运行说明](docs/CLASSIC_IMPLEMENTATION.md)。
+2026-09-14 范围更新：保留 AI 图片重绘翻译，新增常规翻译需求（文字检测／OCR、LLM 文本翻译、LaMa 局部抹字与嵌字）。用户同意 LaMa，以及低成本 LLM 在次数和处理时限内自动重试（成本仅计量，不设页成本上限）。常规模式保留中心调度与文本处理；图像引擎需独立接入，见[交互协议](docs/COMPUTE_PROTOCOL.md)。
 
 阅读器支持“常规翻译”和“AI 重绘翻译”。前者使用独立 OCR／LaMa 引擎与文本 LLM，后者保留 OpenAI 兼容 `POST /v1/images/edits` 多供应商接口；Key 留在后端。
 
@@ -26,19 +26,9 @@
 
 本地支持图片、未加密 MOBI、CBZ/ZIP、CBR/RAR 和 PDF，边界见[格式与缓存说明](docs/IMPORT_FORMATS_AND_CACHE.md)。本地导入建立文件 SHA-256 与原始页索引，同一账户在另一台电脑重新导入相同文件，可恢复保留期内的译图和进行中任务；重新打包的相同原图也可按页 SHA-256 免上传恢复。前端上传／下载并发默认 2、可设 1–10；后台按账户总容量、阅读优先级和用户权重调度。
 
-2026-09-16：后台可添加独立身份节点，服务端执行位与版本化配置自动同步；语言资源启动补全、线程与缓存参数可声明。见[节点配置](docs/NODE_CONFIGURATION.md)与[NVIDIA 实测](docs/NVIDIA_GPU_VALIDATION.md)。
-
-同日更新：后台配置支持表单／JSON 和 16 语言多选，三个控制池执行位可修改；文本成本仅计量。常规嵌字已整体接入固定版本 Manga Translator UI 的 Qt 自动排版，支持气泡内重排、中日横竖排与西文断词，保留 BallonsTranslator 气泡提取和未识别文字保护。新引擎已完成本地与容器验证，现有运行集群尚未切换；版本、图片对照和历史部署记录见[气泡与嵌字说明](docs/LETTERING_LAYOUT.md)。
-
 ## 本地运行
 
-英文嵌字字典重复下载已修复；指定语言预下载、离线校验及执行位说明见[嵌字字典准备](docs/HYPHENATION_DICTIONARIES.md)。
-
-Windows AMD RX 6900 XT 可运行 `./scripts/start-local-amd.ps1`；首次安装加 `-Setup`，一页完整翻译验证加 `-Smoke`。此原模型 DirectML 路径使用本地进程，配置与同图验收见 [AMD GPU 说明](docs/AMD_GPU_VALIDATION.md)。
-
-本机 NVIDIA RTX 4060 Laptop GPU 已跑通 `./scripts/start-local-nvidia.ps1 -Smoke`，首次安装加 `-Setup`。
-
-启用常规翻译使用 `./scripts/bootstrap.ps1 -Start -Classic`，启动后在 `<ADMIN_WEB_PATH>#translation-providers` 配置文本供应商。本机 `-Smoke` 在缺少启用的默认供应商时保持服务运行，等待后台配置后继续。
+2026-09-19：仓库已移除自带图像引擎源码、专用启动及测试入口。Compose 只启动控制服务；常规翻译默认关闭，接入独立图像引擎后才能执行图像阶段。协议与状态流转见[计算节点交互](docs/COMPUTE_PROTOCOL.md)。
 
 环境：Docker Desktop、Node.js 22、npm；在 `.env` 填私有 R2 与图片模型配置，模板见 [.env.example](.env.example)。文本供应商由管理员在服务启动后保存到数据库。
 
@@ -62,7 +52,7 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 
 ## 文档
 
-常规翻译的全部语言候选、当前开放范围、字体缺字与 OCR 能力边界见[嵌字与 OCR 语言清单](docs/LANGUAGE_SUPPORT.md)。
+产品目标语言与节点能力边界见[语言清单](docs/LANGUAGE_SUPPORT.md)。
 
 | 文档 | 内容 |
 | --- | --- |
