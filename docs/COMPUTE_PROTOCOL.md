@@ -121,7 +121,7 @@ sequenceDiagram
 
 空闲节点也发送不含租约的心跳，更新在线状态与配置。心跳返回中心时间；每个租约独立核对任务状态、代次与原图访问有效性：一个已结束租约不能使整批其他任务续期失败，遗漏的租约不会自动续期。只在节点报告的译文版本落后时返回译文正文，避免每次心跳重复发送。
 
-正常通信下，文本结果在下一次心跳响应交付，因此若使用现有 10 秒间隔，会增加至多约一个心跳周期的等待。首版可在有页面等待译文时采用建议 1–2 秒的节点级批量心跳，其余时间恢复常规间隔；以真实延迟和中心负载验证。暂不增加独立译文轮询与推送连接。
+节点保持变更长轮询，文本状态提交后即唤醒批量心跳以接收译文，续租心跳独立运行；阅读器也通过长轮询同步完成状态。通知不是持久消息，重连后使用数据库状态与游标恢复。具体约束见[实施说明](COMPUTE_V2_IMPLEMENTATION.md)。
 
 保留的数据合约：分析包含与原图一致的 `width/height`、具有唯一 `id` 和非空 `source` 的 `segments`、等量且按项对应的 `regions`（`lines` 为四点文字多边形），有文字时带同尺寸非空 PNG `mask`；无文字时两个列表为空且 `mask=null`。译文按 segment ID 对应，并绑定分析摘要和目标语言。最终结果包含 Base64 PNG `image`、`mask`、`glyph_mask`；分析与最终结果均带 `version` 和 `input_hash`。现有校验细节见 [classic.py](../backend/app/classic.py)，不再要求节点对外提交 inpaint 缓存键。
 
@@ -159,28 +159,8 @@ sequenceDiagram
 
 若实际结果传输成为瓶颈，再设计“节点上传候选产物 → 中心验收 → 发布不可变最终对象”：上传权限只能对应中心指定的候选对象，禁止直接覆盖已发布内容键；候选上传本身不代表成功。验收必须针对固定字节并防止上传 URL 重用替换已验收内容，掩膜、字节上限、校验失败和中途崩溃也要覆盖。新增候选对象的保留规则需要单独明确，不能顺手启用按年龄删除 R2 对象。
 
-## 8. 改造前的 v1 实现对照与验收要求
+## 8. 当前实现与验收
 
-下列保留改造前的 v1 路径对照；v2 由新增 `compute_v2.py`、整页 `JobStage`、持久领取回执和 `classic_node` 实现，实际状态见 [v2 实施说明](COMPUTE_V2_IMPLEMENTATION.md)。
+中心实现为 [compute_v2.py](../backend/app/compute_v2.py)，节点实现为 [agent.py](../services/classic-engine/classic_node/agent.py) 与 [pipeline.py](../services/classic-engine/classic_node/pipeline.py)。旧阶段 API 和代理已删除；运行时不兼容旧任务、旧上传收据或旧节点配置。
 
-| 位置 | 当前行为 | 所需改造 |
-| --- | --- | --- |
-| [cluster_api.py](../backend/app/cluster_api.py) | `/claim` 返回单阶段；`/input` 由中心读原图；`/input/authorize` 仅返回摘要 | 整页领取、领取回执、分析检查点、批量续期与译文交付、R2 下载授权 |
-| [scheduler.py](../backend/app/scheduler.py)、[queue_models.py](../backend/app/queue_models.py) | `ExecutionLease` 绑定 `JobStage`；容量与公平估时按阶段计算 | 独立表达整页图像租约和内部 text 租约；整页容量与公平计量，保留事务竞争保护 |
-| [workers.py](../backend/app/workers.py)、[dispatcher.py](../backend/app/dispatcher.py) | 分阶段完成、依赖开放与阶段恢复；中心验收写 R2 | 分析持久化不释放整页租约；最终交付 / 无文字 / 失败释放；整页恢复复用文本工作 |
-| [node_config.py](../backend/app/node_config.py)、[node_admin.py](../backend/app/node_admin.py) | 包含引擎线程 / 缓存覆盖，所有配置确认后才派发 | 调度配置与节点实现参数分开，容量变更不要求排空，协议版本显式匹配 |
-| [agent.py](../services/compute-agent/agent.py) | 按执行位启动阶段线程，只允许控制服务同源输入；逐租约心跳 | 整页生命周期、启动对账、独立 R2 下载客户端、批量心跳；内部计算策略留给新节点 |
-
-现有中心仍使用 `/internal/nodes/register`、节点 `/config`、`/config/applied`、`/claim`，以及租约 `/input`、`/input/authorize`、`/heartbeat`、`/complete`。现有代理与独立引擎通过 `/health`、`/internal/config`、`/v1/analyze`、`/v1/inpaint`、`/v1/render` 通信；这些是现有适配器约定，不是新中心协议要求。
-
-建议实施顺序：先落实整页租约、任务恢复和节点生命周期，再接入 R2 直读与批量心跳，最后收缩旧阶段领取接口和强制引擎配置。R2 直读也能在现有阶段协议上单独验证，但不能据此宣称已实现整页接单。切换前排空旧图像租约，不让新旧图像协议同时领取同一任务；数据库变更单独制定，不自动删除现有数据。
-
-实施验收至少覆盖：
-
-- `execution_slots=4` 时本地串行与并行都可工作；已接 4 页后第 5 页不派发；文本等待占位，缩容不强杀，节点重启和并发 claim 不突破名额。
-- claim 响应丢失不多领；分析 / 完成通知重复不重复调用文本或结算；同租约冲突结果拒绝；批量心跳逐项处理，混入过期租约不影响其他有效租约。
-- R2 直读、URL 到期后续签、缓存命中、摘要错误和下载失败；R2 请求不包含中心凭据，签发授权不访问远端对象；取消后拒绝续签并拒绝结果。
-- 节点在 OCR 后、文本处理中、抹字后和最终对象已写入但回执丢失时退出，其他节点可复用持久结果恢复；旧代次不能覆盖或复活任务，用户取消与原图失效同样生效。
-- 整页公平分配与新计量口径、文本结果交付等待、节点本地积压对实时阅读的影响；记录单页延迟与多页吞吐，不能把接单名额当作设备性能保证。
-
-本次已完成中心与新节点本地接通、协议恢复测试及生成样张 Vulkan 验收，并另行启动[本机真实服务](CLASSIC_LOCAL_RUNTIME.md)，完成真实 R2 与在线 `gpt-5.6-luna` 的整页交付；公开部署未切换。配置与运行入口见 [classic-engine](../services/classic-engine/README.md)，旧阶段说明保留在[节点配置](NODE_CONFIGURATION.md)和[集群设计](TRANSLATION_CLUSTER_DESIGN.md)中供切换对照。
+验收覆盖容量、公平调度、取消、截止时间、通知重连、丢回执重试、冻结结果恢复和跨代次隔离；具体结果见[流水线验收](PIPELINE_VALIDATION.md)。单页端到端延迟、多页吞吐与纯计算耗时分别报告。

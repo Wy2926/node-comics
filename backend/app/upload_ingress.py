@@ -6,7 +6,7 @@ import hashlib
 from fastapi import HTTPException
 from sqlalchemy import delete, select, update
 from starlette.concurrency import run_in_threadpool
-from .assets import owned_asset
+from .assets import owned_asset, inspect_image, content_storage_key
 from .db import session_factory
 from .errors import problem
 from .models import now, uid
@@ -14,7 +14,7 @@ from .scheduler import lock_scheduler
 from .storage import get_store
 from .system_settings import RequestLimits, get_request_limits
 from .upload_models import UploadIngressLease, UploadIngressMutex
-from .uploads import _active_locked, _lock_current, fail_upload, owned_upload, read_upload_stream, receive_upload, upload_json
+from .uploads import _active_locked, _lock_current, fail_upload, owned_upload, read_upload_stream, accept_verified_upload, upload_json
 
 
 @dataclass(frozen=True)
@@ -120,18 +120,37 @@ def persist_received_upload(lease, data):
             db.commit()
             return response_for(receipt)
         expected_hash = receipt.expected_sha256
-        backend, key, mime = receipt.storage_backend, receipt.storage_key, receipt.mime
+        backend, mime = receipt.storage_backend, receipt.mime
         db.commit()
     if len(data) != lease.expected_size or hashlib.sha256(data).hexdigest() != expected_hash:
         error = HTTPException(422, detail={"code": "UPLOAD_HASH_MISMATCH", "message": "实际图片摘要与提交清单不一致"})
         record_body_failure(lease, error)
         raise error
-    # Only immutable scalar metadata survives into network I/O. No pooled
-    # connection remains checked out while Boto3 uploads the received bytes.
-    get_store(backend).put(key, data, mime, kind="upload")
+    try:
+        info = inspect_image(data)
+        if mime not in {'application/octet-stream', info['mime']}:
+            problem('UPLOAD_MIME_MISMATCH', '实际图片格式与提交清单不一致', 422)
+    except HTTPException as error:
+        record_body_failure(lease, error)
+        raise
     with session_factory()() as db:
         receipt = current_receipt(db, lease)
-        receive_upload(db, receipt, lease.owner_id, data, prewritten=True)
+        if not _active_locked(db, receipt) or receipt.status != 'awaiting_upload':
+            db.commit()
+            return response_for(receipt)
+        receipt.verified_info = info
+        db.commit()  # Recover an uncertain PUT using this validated immutable identity.
+    # Only immutable scalar metadata survives into network I/O. No pooled
+    # connection remains checked out while Boto3 uploads the received bytes.
+    get_store(backend).put(content_storage_key(info['sha256']), data, info['mime'], kind="original")
+    with session_factory()() as db:
+        receipt = current_receipt(db, lease)
+        if receipt.status == 'awaiting_upload':
+            accept_verified_upload(db, receipt, data, info)
+        from .submission_api import bind_file_page
+        from .models import Job
+        if receipt.asset_id:
+            bind_file_page(db, db.get(Job, receipt.job_id))
         db.commit()
         return response_for(receipt)
 

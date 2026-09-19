@@ -8,6 +8,7 @@ function retryDelay(body:unknown,header:string|null){
 }
 export function submissionRejected(error:unknown){return error instanceof ApiError&&['QUEUE_FULL','READING_UPLOAD_RESERVED','INVALID_BATCH','RERUN_SOURCE_REQUIRED','RERUN_SOURCE_MISMATCH','UNKNOWN_COST_ACK_REQUIRED','IMAGE_TOO_LARGE','IMAGE_HASH_MISMATCH','INVALID_INPUT_ASSET','FILE_PAGE_CONFLICT','QUEUE_CAPACITY_EXCEEDED','INVALID_SUBMISSION','SUBMISSION_TOO_LARGE','DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','QUOTA_CONFLICT','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED','PLUS_REQUIRED','TOO_MANY_JOBS','ASSET_EXPIRED','ASSET_DELETED','LANGUAGE_UNSUPPORTED','PROVIDER_CAPABILITY_UNSUPPORTED','CLASSIC_NOT_CONFIGURED','CLASSIC_CONFIG_INVALID'].includes(error.code);}
 export class Api {
+  private readonly updatesPool = new RequestPool(1);
   constructor(public base: string, public token = '', public pool = new RequestPool(), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     return this.pool.run(async () => {
@@ -51,6 +52,11 @@ export class Api {
   submission(id:string) {return this.request<SubmissionReceipt>(`/v1/translation-submissions/${encodeURIComponent(id)}`);}
   completeUpload(id:string) {return this.request<Job>(`/v1/uploads/${encodeURIComponent(id)}/complete`,{method:'POST'});}
   translationChanges(cursor?:string) {return this.request<TranslationChanges>(`/v1/me/translation-changes${cursor?'?cursor='+encodeURIComponent(cursor):''}`);}
+  waitForTranslationChanges(cursor:string|undefined,signal:AbortSignal) {
+    // A waiting connection must not consume upload/image request capacity.
+    const listener=new Api(this.base,this.token,this.updatesPool,this.isCurrent);
+    return listener.request<TranslationChanges>(`/v1/me/translation-changes?cursor=${encodeURIComponent(cursor??'0')}&wait_seconds=20`,{signal});
+  }
   priority(mode:Mode,body:QueuePriority) {return this.request<PriorityReceipt>(`/v1/me/queues/${mode}/priority`,{method:'POST',body:JSON.stringify(body)});}
   pauseQueue(mode:Mode,paused:boolean) {return this.request<ModeQueue>(`/v1/me/queues/${mode}/pause`,{method:'POST',body:JSON.stringify({paused})});}
   async uploadOriginal(plan:UploadPlan,blob:Blob) {

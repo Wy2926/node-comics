@@ -90,7 +90,6 @@ class Settings(BaseSettings):
     cluster_upload_slots: int = Field(default=2, ge=1, le=32)
     cluster_redraw_slots: int = Field(default=4, ge=1, le=100)
     cluster_max_result_bytes: int = Field(default=88 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
-    cluster_max_image_stages: int = Field(default=64, ge=1, le=1000)
     unknown_release_seconds: int = 3600
     dispatch_interval_seconds: int = 2
     openai_base_url: str = "https://api.openai.com/v1"

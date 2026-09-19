@@ -13,7 +13,7 @@ from .db import get_db
 from .entitlements import entitlements_json, is_plus, is_operator_plus, iso, period_json
 from .entitlement_models import QuotaPeriod
 from .errors import problem
-from .models import Attempt, Job, TextCall, User, now
+from .models import Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
 from .scheduler import ACTIVE, priority_of
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
 Mode = Literal["classic", "redraw"]
 Status = Literal["active", "attention", "awaiting_upload", "validating_upload", "queued", "running",
                  "outcome_unknown", "unknown_released", "succeeded", "no_text", "failed", "cancelled"]
-STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "analyze", "text", "inpaint", "render", "redraw"])}
+STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "text", "redraw"])}
 
 
 def seconds(start, end):
@@ -76,8 +76,8 @@ def timing(job, leases, at):
 def task_json(job, owner_name, leases, at, paused=False):
     live = [r for r in leases if not r.completed_at and r.expires_at > at]
     final = [r for r in leases if r.outcome == "succeeded" and (
-        r.stage in {"render", "redraw"} if job.status == "succeeded" else
-        job.status == "no_text" and r.stage in {"analyze", "redraw"})]
+        r.stage in {"redraw", "page"} if job.status == "succeeded" else
+        job.status == "no_text" and r.stage in {"page", "redraw"})]
     completed_by = final[-1] if final else None
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
@@ -148,6 +148,7 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
         TextCall.accounted_micros, TextCall.error_code).where(TextCall.job_id == job.id).order_by(TextCall.started_at)).all()
     provider = db.execute(select(Attempt.provider_id, Attempt.cost_state).where(Attempt.id == job.attempt_id)).first() if job.attempt_id else None
     return {**task_json(job, name, leases, at, paused), "generated_at": iso(at), "error_message": job.error_message,
+        "timings": db.scalar(select(ClassicState.timings).where(ClassicState.job_id == job.id)) or {},
         "provider": {"id": provider.provider_id, "cost_state": provider.cost_state} if provider else None,
         "stages": [{"name": s.name, "status": s.status, "attempts": s.attempts,
                     "available_at": iso(s.available_at), "completed_at": iso(s.completed_at)}

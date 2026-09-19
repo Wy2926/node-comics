@@ -91,9 +91,9 @@ def test_http_submission_upload_validation_recovers_without_client(cluster, png)
     first = response.json()["items"][0]
     assert first["job"]["status"] == "awaiting_upload" and first["job"]["input_asset_id"] is None
     accepted = upload_and_enqueue(client, auth, first, png)
-    assert accepted["status"] == "validating_upload"
+    assert accepted["status"] == "queued"
     assert not any(method == "GET" for method, _ in sdk.calls)
-    lease_id = validate_next()
+    assert len(sdk.calls) == 1 and sdk.calls[0][0] == "PUT"
     # No further reader request is needed for the server to make the page ready.
     result = client.get(f"/v1/jobs/{accepted['id']}", headers=auth)
     assert result.status_code == 200, result.text
@@ -102,9 +102,8 @@ def test_http_submission_upload_validation_recovers_without_client(cluster, png)
         job = db.get(Job, accepted["id"])
         source = db.get(Asset, job.input_asset_id)
         assert source.storage_backend == "r2" and source.active_references == 1
-        assert db.get(ExecutionLease, lease_id).completed_at is not None
         assert {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))} == {
-            "validate_upload": "succeeded", "page": "ready", "text": "waiting"}
+            "page": "ready", "text": "waiting"}
     repeated = client.post(f"/v1/uploads/{first['upload']['id']}/complete", headers=auth)
     assert repeated.status_code == 200 and repeated.json()["id"] == accepted["id"]
     assert queue_for(client, auth)["in_flight"] == 1
@@ -188,8 +187,6 @@ def test_cancel_at_each_preexecution_phase_releases_capacity_and_quota(cluster, 
     item = response.json()["items"][0]
     if phase in {"validating_upload", "queued"}:
         upload_and_enqueue(client, auth, item, png)
-    if phase == "queued":
-        validate_next()
     cancel_url = f"/v1/translation-submissions/{response.json()['id']}/cancel"
     cancelled = client.post(cancel_url, headers=auth)
     assert cancelled.status_code == 200, cancelled.text
@@ -228,7 +225,6 @@ def test_expired_upload_cannot_escape_expiry_by_completing_late(cluster, png):
     auth = login(client)
     item = submit(client, auth, [descriptor(png)]).json()["items"][0]
     receipt = item["upload"]
-    assert client.put(receipt["url"], headers=auth, content=png).status_code == 200
     with session_factory()() as db:
         db.get(UploadReservation, receipt["id"]).expires_at = now() - timedelta(seconds=1)
         db.commit()
@@ -246,12 +242,7 @@ def test_invalid_upload_fails_only_its_page_and_releases_reservation(cluster, pn
     item = submit(client, auth, [descriptor(data)]).json()["items"][0]
     sent = data + b"extra" if failure == "actual_size" else (b"x" * len(data) if failure == "hash" else data)
     response = client.put(item["upload"]["url"], headers=auth, content=sent)
-    if failure == "decode":
-        assert response.status_code == 200
-        assert client.post(f"/v1/uploads/{item['upload']['id']}/complete", headers=auth).status_code == 200
-        validate_next()
-    else:
-        assert response.status_code in {413, 422}
+    assert response.status_code in {413, 422}
     job = client.get(f"/v1/jobs/{item['job']['id']}", headers=auth).json()
     assert job["status"] == "failed", job
     assert queue_for(client, auth)["in_flight"] == 0
@@ -266,7 +257,6 @@ def test_all_reused_file_page_identities_bind_after_validation(cluster, png):
     second = submit(client, auth, [descriptor(png, file_hash="b" * 64, page_index=7)], key="other-file").json()
     assert first["items"][0]["job"]["id"] == second["items"][0]["job"]["id"]
     upload_and_enqueue(client, auth, first["items"][0], png)
-    validate_next()
     user_id = client.get("/v1/me", headers=auth).json()["user"]["id"]
     with session_factory()() as db:
         one, two = db.get(FilePage, (user_id, "a" * 64, 1)), db.get(FilePage, (user_id, "b" * 64, 7))

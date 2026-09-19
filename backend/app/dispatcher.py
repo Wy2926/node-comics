@@ -27,7 +27,7 @@ def recover_lease(lease_id):
         job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
         attempt = db.get(Attempt, job.attempt_id)
         image = None
-        if stage.name in {"render", "redraw", "page"}:
+        if stage.name in {"redraw", "page"}:
             store = get_store(attempt.output_storage_backend)
             key = lease.output_key
             try:

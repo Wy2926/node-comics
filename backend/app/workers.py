@@ -6,7 +6,6 @@ from fastapi import HTTPException
 import hmac
 import logging
 import os
-import re
 import signal
 import socket
 from threading import Event, Thread
@@ -14,7 +13,7 @@ import time
 from sqlalchemy import select
 from .adapters.images import redraw
 from .assets import available, content_storage_key, create_asset, inspect_image, read_asset
-from .classic import run_text_stage, validate_analysis, validate_render
+from .classic import run_text_stage, validate_render
 from .config import settings
 from .db import initialize, session_factory
 from .errors import ProcessingError, problem
@@ -54,7 +53,9 @@ def finish_job(db, job, status, *, error=None):
     settle(db, job, success=status == "succeeded" and "unrecognized_regions" not in (job.quality_flags or []))
 
 
-def complete_stage(lease_id, result, *, token=None, node_id=None):
+def complete_stage(lease_id, result, *, token=None, node_id=None, timings=None):
+    delivery_started = time.monotonic()
+    measured = {}
     result_hash = digest(result)
     with session_factory()() as db:
         lock_scheduler(db)
@@ -73,17 +74,17 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         backend = db.get(Attempt, attempt_id).output_storage_backend
         db.commit()
     # Image decoding, object reads and PUTs hold neither row nor scheduler locks.
-    if name in {"analyze", "inpaint", "render", "page"}:
+    if name == "page":
         if result.get("input_hash") != source.sha256 or result.get("version") != config["engine"]["version"]:
             raise ProcessingError("ENGINE_RESULT_MISMATCH", "图像结果与输入或引擎版本不一致")
     image, info = None, None
-    if name == "analyze":
-        validate_analysis(result, source.width, source.height)
-    elif name == "inpaint":
-        if not isinstance(result.get("cache_key"), str) or not re.fullmatch(r"[a-f0-9]{64}", result["cache_key"]):
-            raise ProcessingError("INVALID_ENGINE_RESULT", "抹字缓存标识无效")
-    elif name in {"render", "page"}:
-        image, info = validate_render(read_asset(source), result)
+    if name == "page":
+        started = time.monotonic()
+        original = read_asset(source)
+        measured['source_get'] = time.monotonic() - started
+        started = time.monotonic()
+        image, info = validate_render(original, result)
+        measured['validate'] = time.monotonic() - started
     elif name == "redraw":
         image = base64.b64decode(result["image"], validate=True)
     if image is not None:
@@ -100,24 +101,16 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
             lease, _, _ = current_lease(db, lease_id, token)
             lease.output_key = output_key
             db.commit()
+        started = time.monotonic()
         get_store(backend).put(output_key, image, info["mime"], kind=mode)
+        measured['output_put'] = time.monotonic() - started
     with session_factory()() as db:
         lock_scheduler(db)
         if _finished(db, lease_id, token, node_id, result_hash):
             return
         lease, stage, job = current_lease(db, lease_id, token)
         state = db.get(ClassicState, job.id) if mode == "classic" else None
-        if name == "analyze":
-            state.analysis, state.timings = result, result.get("timings", {})
-            if not result["segments"]:
-                finish_job(db, job, "no_text")
-            else:
-                for nxt in db.scalars(select(JobStage).where(JobStage.job_id == job.id, JobStage.name.in_(["text", "inpaint"]))):
-                    nxt.status = "ready"
-        elif name == "inpaint":
-            state.artifacts = {"cache_key": result["cache_key"], "node_id": lease.node_id}
-            state.timings = {**state.timings, **result.get("timings", {})}
-        elif name in {"render", "redraw", "page"}:
+        if name in {"redraw", "page"}:
             if not available(db.get(Asset, input_id)):
                 raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
             output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
@@ -127,7 +120,7 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
             if abs(ratio - 1) > .03:
                 job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]
             if state:
-                state.timings = {**state.timings, **result.get("timings", {})}
+                state.timings = {'node': timings or {}, 'delivery': {**measured, 'total': time.monotonic() - delivery_started}}
             finish_job(db, job, "succeeded")
             if name == "redraw":
                 provider = db.get(Provider, job.config["provider"]["id"])
@@ -136,15 +129,8 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         stage.status, stage.completed_at = "succeeded", now()
         lease.result_hash = result_hash
         release_lease(db, lease, "succeeded")
-        if name in {"text", "inpaint"} and job.status == "running":
-            statuses = {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
-            if "page" in statuses:
-                job.phase = "render"
-            elif statuses.get("text") == statuses.get("inpaint") == "succeeded":
-                db.scalar(select(JobStage).where(JobStage.job_id == job.id, JobStage.name == "render")).status = "ready"
-                job.phase = "render"
-            else:
-                job.phase = "text" if statuses.get("text") != "succeeded" else "inpaint"
+        if name == "text" and job.status == "running":
+            job.phase = "render"
         touch_job(db, job)
         db.commit()
 
@@ -172,7 +158,7 @@ def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
             # Re-read the call intent under the scheduler lock; a maintenance
             # snapshot taken before its commit cannot authorize another request.
             error = ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "图片调用已开始，等待核实供应商结果", unknown=True)
-        retryable = stage.name in {"page", "analyze", "inpaint", "render", "validate_upload", "text"} and error.code in {
+        retryable = stage.name in {"page", "validate_upload", "text"} and error.code in {
             "CLASSIC_ENGINE_UNAVAILABLE", "CLASSIC_ANALYZE_FAILED", "CLASSIC_INPAINT_FAILED", "CLASSIC_RENDER_FAILED",
             "STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED", "ENGINE_UNAVAILABLE"}
         if stage.name == "redraw" and attempt.call_started_at is None:

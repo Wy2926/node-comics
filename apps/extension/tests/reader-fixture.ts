@@ -4,7 +4,7 @@ import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,edi
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 
-if(location.hostname!=='127.0.0.1'||!['5174','5176'].includes(location.port))throw Error('Use the isolated 127.0.0.1:5174 or :5176 origin.');
+if(location.hostname!=='127.0.0.1'||!['5174','5176','5179'].includes(location.port))throw Error('Use the isolated 127.0.0.1:5174, :5176 or :5179 origin.');
 const existing=await readCopies();
 if(existing.some(c=>!c.id.startsWith('reader-fixture-')))throw Error('This origin contains non-fixture data. Use another browser profile.');
 const origin=location.origin;
@@ -75,7 +75,8 @@ const queues:ModeQueue[]=(['classic','redraw'] as const).map(mode=>({mode,capaci
 const summaries=()=>queues.map(queue=>{const active=[...jobs.values()].filter(j=>j.mode===queue.mode&&['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status));return {...queue,in_flight:active.length,available_slots:Math.max(0,queue.capacity-[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length),realtime_count:active.filter(j=>j.priority==='realtime').length,queued:active.filter(j=>j.status==='queued').length,running:active.filter(j=>j.status==='running').length,awaiting_upload:active.filter(j=>['awaiting_upload','validating_upload'].includes(j.status)).length};});
 for(const copy of stored)for(const page of copy.pages){for(const job of page.jobs)Object.assign(job,{file_hash:page.fileHash,page_index:page.pageIndex,image_sha256:page.imageSha256});}
 
-const state={submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
+let changeRevision=0, previousJobs='[]';
+const state={completedAt:0,downloadedAt:0,finishNext(){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status='succeeded';next.output_asset_id='output-'+next.id;state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 // Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
 const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
 const redrawEnabled=new URLSearchParams(location.search).get('redrawEnabled')!=='false';
@@ -128,10 +129,13 @@ window.fetch=async(input,init={})=>{
         if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟处理失败，已有译图仍可阅读。'};
       }
     }
-    return json({items:[...jobs.values()],deleted_job_ids:[],cursor:String(state.requests.length),has_more:false});
+    const revision=()=>{const snapshot=JSON.stringify([...jobs.values()]);if(snapshot!==previousJobs){previousJobs=snapshot;changeRevision++;}return changeRevision;};
+    const cursor=Number(url.searchParams.get('cursor')??0),end=performance.now()+Number(url.searchParams.get('wait_seconds')??0)*1000;
+    while(revision()===cursor&&performance.now()<end){if(init.signal?.aborted)throw new DOMException('Aborted','AbortError');await new Promise(r=>setTimeout(r,25));}
+    return json({items:revision()>cursor?[...jobs.values()]:[],deleted_job_ids:[],cursor:String(changeRevision),has_more:false});
   }
   if(url.pathname.endsWith('/access'))return json({url:`${origin}/v1/fixture-output`,expires_at:'2099-01-01T00:00:00Z'});
-  if(url.pathname==='/v1/fixture-output')return new Response(blob);
+  if(url.pathname==='/v1/fixture-output'){state.downloadedAt=performance.now();return new Response(blob);}
   if(url.pathname.endsWith('/cancel')){const id=url.pathname.split('/')[3];const j=jobs.get(id)!;j.status='cancelled';return json(j);}
   if(url.pathname==='/v1/me/feedback')return json({items:[],total:0});
   return json({error:{code:'FIXTURE_ROUTE_MISSING',message:`Unimplemented fixture route: ${url.pathname}`}},404);
@@ -148,4 +152,12 @@ if(autoScenario||new URLSearchParams(location.search).has('controls')){
  const upgrade=document.createElement('button');upgrade.textContent='模拟权益恢复';upgrade.onclick=()=>{rights.modes.classic.quota!.available=100;window.dispatchEvent(new Event('focus'));};panel.append(upgrade);
  document.body.append(panel);
  setInterval(()=>{output.textContent=`新提交 ${state.submitted.length} 张 [${state.submitted.map(n=>n+1).join(',')}] · 在途 ${summaries().reduce((s,q)=>s+q.in_flight,0)} · `;},200);
+}
+
+if(autoScenario==='pipeline'){
+ const tools=document.createElement('div');tools.style.cssText='position:fixed;bottom:0;right:0;z-index:1000;background:white;color:#222;padding:8px';
+ const finish=document.createElement('button');finish.textContent='完成下一页（隔离验收）';finish.onclick=()=>state.finishNext();
+ const output=document.createElement('output');output.id='pipeline-metrics';
+ tools.append(finish,output);document.body.append(tools);
+ setInterval(()=>{output.textContent=` 提交 ${state.submitted.length} 页 · 更新请求 ${state.requests.filter(p=>p==='/v1/me/translation-changes').length} · 完成到下载 ${state.completedAt&&state.downloadedAt>=state.completedAt?(state.downloadedAt-state.completedAt).toFixed(0)+' ms':'等待'}`;},100);
 }

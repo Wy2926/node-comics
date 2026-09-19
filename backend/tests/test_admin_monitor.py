@@ -27,12 +27,12 @@ def test_parallel_timings_and_final_delivery_node(monitor):
     assert result.status_code == 200, result.text
     data = result.json()
     assert data["elapsed_seconds"] == 120
-    assert data["execution_seconds"] == 70
-    assert data["worker_seconds"] == 100
-    assert data["non_execution_seconds"] == 50
+    assert data["execution_seconds"] == 90
+    assert data["worker_seconds"] == 130
+    assert data["non_execution_seconds"] == 30
     assert data["initial_wait_seconds"] == 10
     assert data["completed_by"]["node_id"] == "gpu-b"
-    assert len(data["nodes"]) == 3
+    assert len(data["nodes"]) == 2
     assert next(e for e in data["executions"] if e["stage"] == "text")["executor_id"] == "control-host:1234"
     assert data["text_cost_micros"] == 2000
     assert data["text_calls"][0]["seconds"] == 30
@@ -55,8 +55,8 @@ def test_task_filter_pagination_and_no_duplicate_nodes(monitor):
     second = client.get("/v1/admin/monitor/tasks?limit=10&offset=10", headers=auth).json()
     assert first["total"] == 45 and first["next_offset"] == 10
     assert not {j["id"] for j in first["items"]} & {j["id"] for j in second["items"]}
-    nodes = client.get("/v1/admin/monitor/tasks?node_id=gpu-a", headers=auth).json()
-    assert nodes["total"] == 1 and nodes["items"][0]["id"] == DONE_ID
+    nodes = client.get("/v1/admin/monitor/tasks?node_id=gpu-b", headers=auth).json()
+    assert nodes["total"] == 2 and DONE_ID in {item["id"] for item in nodes["items"]}
     assert client.get("/v1/admin/monitor/tasks?q=000000000001",headers=auth).json()["total"] == 1
     assert client.get("/v1/admin/monitor/tasks?q=%25",headers=auth).json()["total"] == 0
     filtered = client.get("/v1/admin/monitor/tasks", params={"owner_id":data["readers"][1],"mode":"classic","status":"queued"}, headers=auth).json()

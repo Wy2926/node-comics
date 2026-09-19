@@ -2,8 +2,8 @@
 
 The control API accepts an actual bounded byte stream, rather than relying on a
 client Content-Length or a presigned PUT that could store an oversized object.
-Temporary keys never become worker inputs. The validator reads and validates
-one bounded byte buffer and writes those exact bytes to a server-only asset key.
+Ingress validates one bounded buffer and writes the immutable original once.
+Recovery rereads only that validated original after an uncertain write/commit.
 All functions leave transaction ownership to the API/scheduler.
 """
 from datetime import timedelta
@@ -19,7 +19,7 @@ from .models import Asset, Job, now, uid
 from .storage import get_store, StorageError
 from .upload_models import UploadReservation
 
-UPLOAD_ACTIVE = {"awaiting_upload", "uploaded", "validating"}
+UPLOAD_ACTIVE = {"awaiting_upload", "validating"}
 
 
 def _validating(job):
@@ -54,7 +54,7 @@ def create_upload(db, job, descriptor):
     reservation = UploadReservation(
         id=reservation_id, job_id=job.id, owner_id=job.owner_id, mode=job.mode,
         expected_sha256=expected_hash, expected_size=expected_size, mime=mime,
-        storage_key=f"{job.owner_id}/uploads/{reservation_id}", storage_backend=backend,
+        storage_backend=backend,
         status="awaiting_upload", created_at=stamp,
         expires_at=stamp + timedelta(seconds=min(settings().upload_session_ttl_seconds,
                                                 settings().upload_session_max_lifetime_seconds)),
@@ -181,37 +181,6 @@ def _active_locked(db, reservation):
     return True
 
 
-def receive_upload(db, reservation, owner, data, *, prewritten=False):
-    """Persist bounded staging bytes. API reads the stream before entering a DB lock."""
-    _owned(reservation, owner)
-    if reservation.status == "verified":
-        return reservation
-    if reservation.status in {"uploaded", "validating"} and _validating(db.get(Job, reservation.job_id)):
-        # A retry cannot reset the priority, lifetime or state of validation work.
-        return reservation
-    if reservation.status not in UPLOAD_ACTIVE or reservation.expires_at <= now():
-        _active_locked(db, _lock_current(db, reservation))
-        return reservation
-    if len(data) > settings().max_upload_bytes or len(data) != reservation.expected_size:
-        fail_upload(db, reservation, "UPLOAD_SIZE_MISMATCH", "实际图片大小与提交清单不一致", awaiting_only=True)
-        return reservation
-    if hashlib.sha256(data).hexdigest() != reservation.expected_sha256:
-        fail_upload(db, reservation, "UPLOAD_HASH_MISMATCH", "实际图片摘要与提交清单不一致", awaiting_only=True)
-        return reservation
-    if not prewritten:
-        get_store(reservation.storage_backend).put(reservation.storage_key, data, reservation.mime, kind="upload")
-    reservation = _lock_current(db, reservation)
-    if not _active_locked(db, reservation):
-        return reservation
-    if reservation.status != "awaiting_upload":
-        # A concurrent PUT/complete may have accepted these same bytes while
-        # this request was in storage I/O. Preserve its state and lifetime.
-        return reservation
-    reservation.status = "uploaded"
-    reservation.expires_at = min(reservation.max_expires_at, now() + timedelta(seconds=settings().upload_session_ttl_seconds))
-    return reservation
-
-
 def _check_validation_lease(db, reservation, lease_id, lease_token, *, refresh=False):
     if lease_id is None:
         return
@@ -235,8 +204,8 @@ def _verified_asset(db, reservation):
 def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
     """Return the validated asset, or None with a durable per-page failure receipt.
 
-    Storage outages propagate as StorageError and leave the task retryable. An
-    uncertain staging PUT is safe to repeat because bytes must match its digest.
+    Storage outages propagate as StorageError and leave the task retryable.
+    Recovery reads the immutable original; it never writes a second copy.
     """
     _owned(reservation, owner)
     _check_validation_lease(db, reservation, lease_id, lease_token)
@@ -246,10 +215,12 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
                                                   and not _validating(db.get(Job, reservation.job_id))):
         _active_locked(db, _lock_current(db, reservation))
         return None
-    if reservation.status not in {"uploaded", "validating"}:
+    if reservation.status != "validating" or not reservation.verified_info:
         problem("UPLOAD_INCOMPLETE", "请先完成图片上传", 409)
     store = get_store(reservation.storage_backend)
-    data = store.read(reservation.storage_key)
+    key = content_storage_key(reservation.expected_sha256)
+    db.commit()  # Release the pooled connection during object I/O.
+    data = store.read(key)
     if len(data) != reservation.expected_size or hashlib.sha256(data).hexdigest() != reservation.expected_sha256:
         return fail_upload(db, reservation, "UPLOAD_HASH_MISMATCH", "实际图片与提交清单不一致",
                            lease_id=lease_id, lease_token=lease_token)
@@ -261,9 +232,11 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
     if reservation.mime not in {"application/octet-stream", info["mime"]}:
         return fail_upload(db, reservation, "UPLOAD_MIME_MISMATCH", "实际图片格式与提交清单不一致",
                            lease_id=lease_id, lease_token=lease_token)
-    # The stable server-only key survives uncertain PUTs/transaction rollbacks.
-    # Never COPY from the temporary key after validation: it may have changed.
-    store.put(content_storage_key(info["sha256"]), data, info["mime"], kind="original")
+    return accept_verified_upload(db, reservation, data, info, lease_id=lease_id, lease_token=lease_token)
+
+
+def accept_verified_upload(db, reservation, data, info, *, lease_id=None, lease_token=None):
+    """Publish only after exact validated bytes have been durably written."""
     reservation = _lock_current(db, reservation)
     _check_validation_lease(db, reservation, lease_id, lease_token, refresh=True)
     if reservation.status == "verified":
@@ -280,7 +253,6 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
     from .scheduler import ensure_stages
     ensure_stages(db, job)
     reservation.asset_id, reservation.status, reservation.completed_at = asset.id, "verified", now()
-    # Retain staging bytes through commit. No age-based orphan sweep is used.
     return asset
 
 
@@ -288,7 +260,7 @@ def expire_uploads(db, *, limit=100):
     from .scheduler import lock_scheduler
     lock_scheduler(db)
     reservations = db.scalars(select(UploadReservation).join(Job, Job.id == UploadReservation.job_id).where(
-        UploadReservation.status.in_({"awaiting_upload", "uploaded"}), UploadReservation.expires_at <= now(),
+        UploadReservation.status == "awaiting_upload", UploadReservation.expires_at <= now(),
         Job.status == "awaiting_upload")
         .order_by(UploadReservation.expires_at, UploadReservation.id).limit(limit)
         .with_for_update(skip_locked=True)).all()

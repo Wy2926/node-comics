@@ -40,8 +40,9 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
  },[currentId,language]);
  useEffect(()=>{
   if(!scope){setQueues([]);setJobs([]);jobsRef.current=[];setManifests([]);return;}
-  let stopped=false,timer:ReturnType<typeof setTimeout>,running=false,syncing=false,backgroundState=false,wakeRequested=false;let cursor:string|undefined;let retryAt=0;
+  let stopped=false,timer:ReturnType<typeof setTimeout>,running=false,syncing=false,wakeRequested=false;let cursor:string|undefined;let retryAt=0;
   const live=()=>!stopped&&api.isCurrent();
+  const updates=new AbortController();
   const focus=()=>{lastPriority.current='';wake.current();};window.addEventListener('focus',focus);
   const visibility=()=>{if(!document.hidden)focus();};document.addEventListener('visibilitychange',visibility);
   async function sync(){
@@ -157,18 +158,34 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
    clearTimeout(timer);if(running||!live())return;running=true;wakeRequested=false;
    try{
     if(Date.now()<retryAt)return;
-    await sync();await refresh();assertCurrent(live);
+    await refresh();assertCurrent(live);
     await priorities();
     await downloadVisible();await translateWindow();await priorities();
     await downloadVisible();retryAt=0;setError('');
    }catch(e){if(live()){setError((e as Error).message);retryAt=Date.now()+8000;}}
-   finally{running=false;if(live())timer=setTimeout(()=>{lastPriority.current='';void tick();},document.hidden?12000:wakeRequested?450:4000);}
+   finally{running=false;if(live())timer=setTimeout(()=>{lastPriority.current='';void tick();},wakeRequested?450:30000);}
   }
   wake.current=(force=false)=>{if(force)retryAt=0;wakeRequested=true;if(!running){clearTimeout(timer);timer=setTimeout(()=>void tick(),450);}};
-  // A large upload manifest must not prevent already-finished current pages from appearing.
-  const stateTimer=setInterval(()=>{if(!running||backgroundState||!live())return;backgroundState=true;void(async()=>{try{await sync();await refresh();await priorities();await downloadVisible();}catch(e){if(live())setError((e as Error).message);}finally{backgroundState=false;}})();},4000);
-  void readSync(scope).then(async saved=>{if(!live())return;jobsRef.current=[];cursor=saved?.cursor;await attach(saved?.jobs??[]);await reload();void tick();}).catch(e=>setError(e.message));
-  return()=>{stopped=true;clearTimeout(timer);clearInterval(stateTimer);wake.current=()=>{};window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
+  async function watch(){
+   while(live()){
+    try{
+     const changed=await api.waitForTranslationChanges(cursor,updates.signal);
+     if(!live())return;
+     if(!changed.items.length&&!changed.deleted_job_ids?.length&&changed.cursor===(cursor??'0'))continue;
+     while(syncing&&live())await new Promise(resolve=>setTimeout(resolve,25));
+     if(!live())return;
+     // Use the existing serialized cursor transaction, including reconnect recovery.
+     await sync();await refresh();await downloadVisible();
+     wakeRequested=true;
+     if(!running){clearTimeout(timer);void tick();}
+    }catch{
+     if(!live())return;
+     await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+   }
+  }
+  void readSync(scope).then(async saved=>{if(!live())return;jobsRef.current=[];cursor=saved?.cursor;await attach(saved?.jobs??[]);await reload();void tick();void watch();}).catch(e=>setError(e.message));
+  return()=>{stopped=true;updates.abort();clearTimeout(timer);wake.current=()=>{};window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
  },[scope,api,attach,refresh,reload,concurrency,language,downloadResult]);
  // A newly imported copy can bind account records even when no new server event is emitted.
  useEffect(()=>{if(!userId)return;for(const copy of copies){const updated=applyAccountJobs(copy,jobsRef.current,userId,origin);if(updated!==copy)commitCopy(updated);}},[copies,userId,origin,commitCopy]);

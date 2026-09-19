@@ -1,8 +1,8 @@
 # 翻译集群重构验收记录
 
-当前节点管理已改为 `shared_0001`，见[节点配置](NODE_CONFIGURATION.md)；下述旧基线记录为历史验证证据。
+当前实现与可重复命令见[流水线验收](PIPELINE_VALIDATION.md)和[节点配置](NODE_CONFIGURATION.md)。下述基线、规则、命令与代理目录仅为历史证据，部分入口已删除，不用于当前验收。
 
-日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当时前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[计算代理说明](../services/compute-agent/README.md)。
+日期：2026-09-15。适用于全新数据库基线 `cluster_0001` 与当时前后端集群协议。产品规则见[翻译集群设计](TRANSLATION_CLUSTER_DESIGN.md)，独立节点运行方式见[当前计算节点](../services/classic-engine/README.md)。
 
 本记录区分代码检查、隔离运行、真实浏览器、真实对象存储和生产部署。测试中的模拟供应商结果只验证协议与交互，不作为翻译效果证据。各组测试存在重叠，数量不相加。
 

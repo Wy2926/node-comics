@@ -12,7 +12,7 @@ from .queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage, 
 from .translation_models import TranslationProvider
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
-IMAGE_STAGES = {"analyze", "inpaint", "render", "page"}
+IMAGE_STAGES = {"page"}
 
 
 def lock_scheduler(db):
@@ -21,7 +21,7 @@ def lock_scheduler(db):
     if db.get_bind().dialect.name == "postgresql":
         db.execute(text("SELECT pg_advisory_xact_lock(761349211)"))
     else:
-        db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1).values(revision=SchedulerMutex.revision + 1))
+        db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1).values(revision=SchedulerMutex.revision))
 
 
 def limits_for(user):
@@ -52,14 +52,15 @@ def touch_job(db, job):
     job.changed_at = now()
     job.change_sequence = db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1)
         .values(revision=SchedulerMutex.revision + 1).returning(SchedulerMutex.revision)).scalar_one()
+    from .notifications import publish
+    publish(db, 'user:' + job.owner_id)
+    publish(db, 'compute')
 
 
 def ensure_stages(db, job):
     if not job.input_asset_id or job.status not in {"queued", "running"}:
         return
-    names = ["analyze", "text", "inpaint", "render"] if job.mode == "classic" else ["redraw"]
-    if job.mode == "classic" and job.config.get("engine", {}).get("protocol_version") == 2:
-        names = ["page", "text"]
+    names = ["page", "text"] if job.mode == "classic" else ["redraw"]
     existing = {s.name for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
     for name in names:
         if name not in existing:
@@ -104,7 +105,7 @@ def priority_of(job, at):
 def _estimate(db, pool, stage, records=None):
     key = "estimate:" + pool + ":" + stage.name
     record = records.get(key) if records is not None else db.get(FairnessState, key)
-    return max(0.05, min(120, record.service if record else {"validate_upload": 1, "page": 30, "analyze": 10, "inpaint": 15, "render": 5, "text": 10, "redraw": 60}[stage.name]))
+    return max(0.05, min(120, record.service if record else {"validate_upload": 1, "page": 30, "text": 10, "redraw": 60}[stage.name]))
 
 
 def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
@@ -122,7 +123,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
     cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
     page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
         case((UserModeQueue.session_expires_at > at, Job.priority_rank), else_=1000000),
-        case((JobStage.name == "render", 0), else_=1), Job.created_at, Job.ordinal, JobStage.id]
+        Job.created_at, Job.ordinal, JobStage.id]
     eligible = select(JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
         pool.label("pool"), cls.label("priority_class"),
         func.row_number().over(partition_by=[pool, cls, Job.owner_id], order_by=page_order).label("page_rank"))
@@ -139,16 +140,6 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
                 func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version) == node.engine_version))))
     if stage_ids is not None:
         eligible = eligible.where(JobStage.id.in_(stage_ids))
-    if "analyze" in stages:
-        analyzed = aliased(JobStage)
-        pending_rows = select(JobStage.id).join(analyzed, analyzed.job_id == JobStage.job_id)
-        pending_rows = (pending_rows
-            .join(Job, Job.id == JobStage.job_id).where(JobStage.name == "inpaint", JobStage.status.in_(["waiting", "ready", "running"]),
-                Job.status.in_(["queued", "running"]), analyzed.name == "analyze", analyzed.status == "succeeded")
-            .limit(cfg.cluster_max_image_stages).subquery())
-        pending = db.scalar(select(func.count()).select_from(pending_rows))
-        if pending >= cfg.cluster_max_image_stages:
-            eligible = eligible.where(or_(JobStage.name != "analyze", cls == "realtime"))
     if "text" in stages:
         recent = (select(TextCall.provider_id, func.count().label('calls'))
             .where(TextCall.started_at > at - timedelta(minutes=1),
@@ -218,8 +209,6 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         return None
     if config_version is not None and config_version != node.config_version:
         raise ProcessingError('NODE_CONFIG_CONFLICT', '领取前需要同步配置')
-    if node.engine_version != 'control' and 'page' not in node.capabilities and node.applied_config_version != node.config_version:
-        return None
     node.heartbeat_at = at
     busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
     if busy >= node.capacity:
@@ -306,7 +295,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         stage, job = min(by_user[owner], key=lambda pair: (
             0 if pair[1].created_at < at - timedelta(minutes=30) and chosen_class == "preload" else 1,
             pair[1].priority_rank if snapshot["queues"][(owner, pair[1].mode)].session_expires_at and snapshot["queues"][(owner, pair[1].mode)].session_expires_at > at else 1000000,
-            0 if pair[0].name == "render" else 1, pair[1].created_at, pair[1].ordinal, pair[0].id))
+            pair[1].created_at, pair[1].ordinal, pair[0].id))
         choices.append((0 if chosen_class == "realtime" else 1, cls_states[chosen_class].updated_at,
                         stage, job, pool, chosen_class, accounts[owner], cls_states[chosen_class], floor, accounts))
     _, _, stage, job, pool, cls, user_state, class_state, floor, accounts = min(choices, key=lambda v: (v[0], v[1]))
@@ -327,6 +316,13 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         executor_id=executor_id or (node.id if node.engine_version != "control" else None),
         generation=stage.generation, resource_pool=pool, mode=job.mode, priority_class=cls,
         weight=weight, estimated_seconds=estimate, expires_at=at + timedelta(seconds=cfg.cluster_lease_seconds))
+    if stage.name == 'page':
+        from .node_config import NodeConfig
+        config = NodeConfig.model_validate(node.desired_config)
+        lease.limits = {'deadline_at': (at + timedelta(seconds=config.page_seconds)).isoformat() + 'Z',
+                        'text_wait_seconds': config.text_wait_seconds, 'delivery_seconds': config.delivery_seconds,
+                        'max_attempts': job.config.get('stage_attempts', cfg.cluster_stage_attempts)}
+        lease.expires_at = min(lease.expires_at, at + timedelta(seconds=config.page_seconds))
     db.add(lease)
     touch_job(db, job)
     db.flush()

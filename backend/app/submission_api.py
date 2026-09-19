@@ -76,7 +76,7 @@ def submission_json(db, row):
         "status": submission_status([j for _, j in items]), "page_count": len(items),
         "items": [{"client_item_id": item.client_item_id, "reused": item.reused,
             "job": job_json(db, job, submission_id=row.id, ordinal=item.ordinal),
-            "upload": upload_json(uploads[job.id]) if job.id in uploads and uploads[job.id].status in {"awaiting_upload", "uploaded"} else None}
+            "upload": upload_json(uploads[job.id]) if job.id in uploads and uploads[job.id].status == "awaiting_upload" else None}
             for item, job in items]}
 
 
@@ -317,11 +317,14 @@ def upload_complete(upload_id: str, user: User = Depends(identity), db: Session 
     lock_scheduler(db)
     reservation = owned_upload(db, upload_id, user.id)
     job = db.get(Job, reservation.job_id)
-    if reservation.status in {"awaiting_upload", "uploaded"} and reservation.expires_at <= now() and job.status == "awaiting_upload":
+    if reservation.status == 'verified':
+        from .assets import owned_asset
+        owned_asset(db, reservation.asset_id, user.id)
+    if reservation.status == "awaiting_upload" and reservation.expires_at <= now() and job.status == "awaiting_upload":
         fail_upload(db, reservation, "UPLOAD_EXPIRED", "上传会话已过期，请重新提交", status="expired")
         db.commit()
         problem("UPLOAD_EXPIRED", "上传会话已过期，请重新提交", 410)
-    if reservation.status == "uploaded" and job.status == "awaiting_upload":
+    if (reservation.status == 'awaiting_upload' and reservation.verified_info) and job.status == "awaiting_upload":
         reservation.status = "validating"
         job.status, job.phase = "validating_upload", "validating_upload"
         db.add(JobStage(job_id=job.id, name="validate_upload", status="ready"))

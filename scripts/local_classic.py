@@ -70,7 +70,7 @@ def prepare():
         raise RuntimeError('Run scripts/bootstrap.ps1 to prepare local credentials')
     ca = certificates()
     node = json.loads((NODE if NODE.is_file() else SERVICE / 'node.example.json').read_text(encoding='utf-8-sig'))
-    node.update(control_url='https://localhost:18443', control_ca=str(ca), r2_origin=cfg['R2_ENDPOINT_URL'])
+    node.update(control_url='https://127.0.0.1:18443', control_ca=str(ca), r2_origin=cfg['R2_ENDPOINT_URL'])
     if not NODE.is_file():
         node.update(node_id='pending-provisioning', node_token='pending-provisioning',
                     resource_id=os.environ.get('COMPUTERNAME', 'local').lower() + ':classic:vulkan:0')
@@ -85,6 +85,7 @@ def prepare():
     # Separate local metadata and object namespace from publicly deployed data.
     prefix = cfg.get('R2_KEY_PREFIX', 'node-comics/').rstrip('/') + '/classic-local/'
     ENV.write_text('APP_ENV=development\nDEV_AUTH=true\nCLASSIC_ENABLED=true\n'
+        + 'POSTGRES_DB=nodecomics_pipeline_20260919\n'
         + 'CLASSIC_ENGINE_VERSION=' + report['version'] + '\n'
         + 'R2_KEY_PREFIX=' + prefix + '\nADMIN_WEB_PATH=' + admin + '\n', encoding='utf-8')
     save_json(STATE / 'runtime.json', report)
@@ -92,7 +93,7 @@ def prepare():
 
 
 def api_client():
-    return httpx.Client(base_url='https://localhost:18443', trust_env=False, timeout=120,
+    return httpx.Client(base_url='https://127.0.0.1:18443', trust_env=False, timeout=120,
         verify=ssl.create_default_context(cafile=str(STATE / 'tls/ca.pem')))
 
 

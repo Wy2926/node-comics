@@ -12,7 +12,7 @@ from .config import settings
 from .db import get_db
 from .errors import problem
 from .models import User
-from .node_config import NodeConfig, EngineOverrides
+from .node_config import NodeConfig
 from .control_pools import POOL_LIMITS
 from .languages import LANGUAGES
 from .queue_models import ComputeNode
@@ -51,8 +51,6 @@ def configuration(node):
 def validate_config(config):
     if config.heartbeat_seconds * 3 > settings().cluster_lease_seconds:
         problem('NODE_CONFIG_INVALID', '心跳间隔不能超过租约时长的三分之一', 422)
-    if config.config_poll_seconds >= settings().cluster_node_timeout_seconds:
-        problem('NODE_CONFIG_INVALID', '配置拉取间隔必须小于节点离线时限', 422)
 
 
 def compute_node(db, node_id, *, image_only=False):
@@ -64,7 +62,7 @@ def compute_node(db, node_id, *, image_only=False):
 
 @router.get('/config-schema')
 def config_schema(user: User = Depends(admin)):
-    return {'node': NodeConfig.model_json_schema(), 'engine': EngineOverrides.model_json_schema(),
+    return {'node': NodeConfig.model_json_schema(),
             'defaults': NodeConfig().model_dump(exclude_none=True), 'pool_limits': POOL_LIMITS,
             'languages': [{'id': code, 'label': label} for code, label in LANGUAGES.items()]}
 
@@ -115,8 +113,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
     node.capacity = config.execution_slots
     node.config_version += 1
     node.config_error = None
-    if pool or node.runtime_report.get('protocol_version') == 2:
-        node.applied_config_version = node.config_version
+    node.applied_config_version = node.config_version
     db.commit()
     return configuration(node)
 

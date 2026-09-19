@@ -7,7 +7,7 @@ from app.languages import LANGUAGES, REDRAW_LANGUAGES
 from app.models import Job
 from app.providers import configuration, digest
 from app.queue_models import ComputeNode
-from test_node_management import provision, register, report
+from test_node_management import provision, register
 from test_cluster_scheduler import scheduler_case, add_job, claim
 from test_classic import text_database
 from conftest import login
@@ -23,7 +23,7 @@ def test_unknown_language_has_specific_code_before_admission(client):
                            json={**body,'mode':'redraw','target_language':'pl'})
     assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
     response = client.post('/v1/admin/compute-nodes', headers=login(client,'admin'),
-        json={'name':'invalid language','resource_id':'invalid:language','config':{'engine':{'languages':['xx']}}})
+        json={'name':'invalid language','resource_id':'invalid:language','config':{'allowed_languages':['xx']}})
     assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
 
 
@@ -47,16 +47,17 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
 
 
 def test_node_can_report_all_sixteen_languages(client):
-    node, auth, _ = provision(client)
-    assert register(client, auth).status_code == 200
-    result = report(client, node, auth, supported_languages=list(LANGUAGES), engine={'languages': list(LANGUAGES)})
+    node, auth, admin = provision(client)
+    from app.node_config import NodeConfig
+    client.put(f"/v1/admin/compute-nodes/{node['node_id']}/config", headers=admin, json={'name': 'all', 'enabled': True, 'expected_version': 1, 'config': NodeConfig(allowed_languages=list(LANGUAGES)).model_dump()}).raise_for_status()
+    result = register(client, auth, supported_languages=list(LANGUAGES))
     assert result.status_code == 200, result.text
     with session_factory()() as db:
         assert set(db.get(ComputeNode, node['node_id']).supported_languages) == set(LANGUAGES)
 
 
 def test_extended_job_waits_for_matching_node_then_is_claimable(scheduler_case):
-    job_id = add_job(scheduler_case, stage='render')
+    job_id = add_job(scheduler_case, stage='page')
     with session_factory()() as db:
         db.get(Job, job_id).target_language = 'uk'
         db.commit()

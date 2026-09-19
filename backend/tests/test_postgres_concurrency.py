@@ -331,7 +331,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
         locker.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK_ID})
         try:
             for _ in range(2):
-                processes.append(subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ.copy()))
+                processes.append(subprocess.Popen([sys.executable, "-c", script], cwd=Path(__file__).resolve().parents[1], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ.copy()))
 
             def both_waiting():
                 with pg_scope["administration"].connect() as observer:
@@ -352,7 +352,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['shared_0004_text_providers']
+            assert revisions == ['shared_0007_upload_verified_info']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0
@@ -399,3 +399,37 @@ def test_postgres_classic_metering_has_no_cost_cap(pg):
         calls = db.scalars(select(TextCall).where(TextCall.job_id == job_id)).all()
         assert len(calls) == 6
         assert sum(call.accounted_micros for call in calls) > 50_000
+
+
+def test_cross_process_committed_notification_wakes_listener(pg):
+    """The sender is a different process, so local after_commit cannot pass this."""
+    import asyncio
+    from app.db import engine
+    from app.notifications import Hub
+    listener = Hub(engine())
+    listener.start()
+    assert listener.ready.wait(5)
+    sender = """
+import os, sys, psycopg
+with psycopg.connect(os.environ['DATABASE_URL'].replace('postgresql+psycopg:', 'postgresql:')) as db:
+    db.execute("SELECT pg_notify('comics_changes', 'isolated-notification')")
+    if sys.argv[1] == 'rollback':
+        db.rollback()
+"""
+    async def run():
+        with listener.subscribe('isolated-notification') as wake:
+            result = await asyncio.to_thread(subprocess.run, [sys.executable, '-c', sender, 'rollback'],
+                                             capture_output=True, timeout=10)
+            assert result.returncode == 0
+            await asyncio.sleep(.1)
+            assert not wake.is_set()
+            started = time.monotonic()
+            result = await asyncio.to_thread(subprocess.run, [sys.executable, '-c', sender, 'commit'],
+                                             capture_output=True, timeout=10)
+            assert result.returncode == 0
+            await asyncio.wait_for(wake.wait(), 2)
+            assert time.monotonic() - started < 2
+    try:
+        asyncio.run(run())
+    finally:
+        listener.close()

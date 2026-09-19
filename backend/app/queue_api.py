@@ -1,13 +1,15 @@
 """Account mode queues and bounded, versioned realtime reading intent."""
 from datetime import timedelta
+import time
 from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from .auth import admin, identity
 from .config import settings
-from .db import get_db
+from .db import get_db, session_factory
 from .entitlements import locked_user
 from .errors import problem
 from .jobs import job_json
@@ -143,12 +145,32 @@ def pause(mode: Mode, body: PauseRequest, user: User = Depends(identity), db: Se
 
 
 @router.get("/v1/me/translation-changes")
-def changes(cursor: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100),
+async def changes(cursor: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100),
+            wait_seconds: float = Query(0, ge=0, le=20, allow_inf_nan=False),
             user: User = Depends(identity), db: Session = Depends(get_db)):
+    owner_id = user.id
+    await run_in_threadpool(db.close)
+    from .notifications import hub, changed
+    end = time.monotonic() + wait_seconds
+    with hub().subscribe('user:' + owner_id) as wake:
+        while True:
+            wake.clear()
+            result = await run_in_threadpool(change_snapshot, owner_id, cursor, limit)
+            if result['items'] or time.monotonic() >= end:
+                return result
+            await changed(wake, end - time.monotonic())
+
+
+def change_snapshot(owner_id, cursor, limit):
+    with session_factory()() as db:
+        return _changes(db, owner_id, cursor, limit)
+
+
+def _changes(db, owner_id, cursor, limit):
     # All job visibility revisions are assigned under the scheduler transaction lock;
     # a smaller uncommitted revision can never appear behind an acknowledged cursor.
     lock_scheduler(db)
-    rows = list(db.scalars(select(Job).where(Job.owner_id == user.id, Job.change_sequence > cursor)
+    rows = list(db.scalars(select(Job).where(Job.owner_id == owner_id, Job.change_sequence > cursor)
         .order_by(Job.change_sequence, Job.id).limit(limit + 1)))
     selected = rows[:limit]
     result = {"items": [job_json(db, j) for j in selected], "deleted_job_ids": [],

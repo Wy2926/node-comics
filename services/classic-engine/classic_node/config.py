@@ -35,7 +35,10 @@ def load(path):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
     value.setdefault('local_pages', 2)
-    value.setdefault('max_leases', 4)
+    value.setdefault('max_leases', 8)
+    value.setdefault('download_workers', 4)
+    value.setdefault('delivery_workers', 4)
+    value.setdefault('resident_bytes', 1024 * 1024 * 1024)
     value.setdefault('journal_bytes', 512 * 1024 * 1024)
     value.setdefault('languages', ['zh-Hans', 'zh-Hant', 'en', 'ja', 'ko'])
     value['state_dir'] = str((path.parent / value.get('state_dir', 'state')).resolve())
@@ -45,6 +48,10 @@ def load(path):
         raise ValueError('Require 1 <= local_pages <= max_leases <= 32')
     if value['journal_bytes'] < value['max_leases'] * 64 * 1024 * 1024:
         raise ValueError('Reserve at least 64 MiB of journal space per accepted page')
+    if not all(type(value[k]) is int and 1 <= value[k] <= 16 for k in ('download_workers', 'delivery_workers')):
+        raise ValueError('Network worker counts must be between 1 and 16')
+    if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
+        raise ValueError('Reserve at least 512 MiB for page buffers')
     if min(value['engine']['threads'], value['engine']['ocr_workers']) < 1:
         raise ValueError('Thread counts must be positive')
     if value['engine']['tile'] < 256 or value['engine']['tile'] % 128:

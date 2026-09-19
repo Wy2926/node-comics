@@ -1,4 +1,5 @@
 """One page lease from claim through acknowledged delivery, with batch heartbeats."""
+from .pipeline import Pipeline
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from threading import Condition, Event
@@ -18,6 +19,14 @@ class Page:
         self.terminal = None
         self.stopped = False
         self.phase = 'queued'
+        self.step = 'download'
+        self.ready_at = time.monotonic()
+        self.timings = {}
+        self.future = self.analysis_future = self.pending_error = None
+        self.analysis_accepted = False
+        self.reserved = 0
+        self.next_stop = 0
+        self.data = self.metadata = self.rgb = self.cleaned = self.analysis = self.completion = None
         self.received_at = sent_at
         self.translations = lease.get('translations')
         self.update(lease, server_time, sent_at)
@@ -53,8 +62,14 @@ class Agent:
         self.local, self.runtime, self.transport, self.journal = config, runtime, transport, journal
         self.config = None
         self.pages = {}
-        self.futures = {}
-        self.pool = ThreadPoolExecutor(config['local_pages'], thread_name_prefix='page')
+        self.wake = Event()
+        self.pipeline = Pipeline(self)
+        self.next_claim = 0
+        self.control_pool = ThreadPoolExecutor(1, thread_name_prefix='heartbeat-claim')
+        self.notice_pool = ThreadPoolExecutor(1, thread_name_prefix='updates')
+        self.control_future = self.notice_future = None
+        self.revision = 0
+        self.next_notice = 0
         self.stop = Event()
         self.last_heartbeat = 0
 
@@ -65,19 +80,25 @@ class Agent:
 
     def adopt(self, lease, server_time, sent_at):
         key = lease['lease_id']
-        if lease['status'] == 'terminal':
-            self.journal.remove('lease:' + key)
-            return
         if key in self.pages:
             self.pages[key].update(lease, server_time, sent_at)
+            return
+        if lease['status'] == 'terminal':
+            self.journal.remove('lease:' + key)
             return
         saved = self.journal.get('lease:' + key, {})
         # Never persist signed URLs. Restart always obtains fresh authorization.
         public_lease = {k: v for k, v in lease.items() if k != 'input'}
         self.journal.put('lease:' + key, {**saved, 'lease': public_lease})
         page = Page(lease, server_time, sent_at)
+        page.analysis = lease.get('analysis') or saved.get('analysis')
+        page.completion = saved.get('completion')
+        if page.stopped or page.completion:
+            page.step = 'deliver'
+        elif lease['config']['engine']['version'] != self.runtime.version:
+            self.pipeline.error(page, NodeFailure('ENGINE_VERSION_MISMATCH'))
         self.pages[key] = page
-        self.futures[key] = self.pool.submit(self.execute, page)
+        self.wake.set()
 
     def register(self):
         sent_at = time.monotonic()
@@ -99,7 +120,7 @@ class Agent:
 
     def heartbeat(self):
         entries = []
-        for key, page in self.pages.items():
+        for key, page in list(self.pages.items()):
             with page.condition:
                 if page.stopped or page.terminal:
                     continue
@@ -111,8 +132,9 @@ class Agent:
             {'config_version': self.config['version'], 'leases': entries})
         self.apply_config(response.get('config'))
         for item in response['leases']:
-            if item['lease_id'] in self.pages:
-                self.pages[item['lease_id']].update(item, response['server_time'], sent_at)
+            page = self.pages.get(item['lease_id'])
+            if page:
+                page.update(item, response['server_time'], sent_at)
         self.last_heartbeat = sent_at
 
     def claim(self):
@@ -174,107 +196,76 @@ class Agent:
                     metadata = None
         raise NodeFailure('STORAGE_UNAVAILABLE')
 
-    def execute(self, page):
-        key = page.lease['lease_id']
-        saved = self.journal.get('lease:' + key)
-        try:
-            page.check()
-            if page.lease['config']['engine']['version'] != self.runtime.version:
-                raise NodeFailure('ENGINE_VERSION_MISMATCH')
-            if saved.get('completion'):
-                self.deliver(page, saved['completion'])
-                return
-            page.phase = 'download'
-            data, metadata = self.input_bytes(page)
-            page.check()
-            rgb = self.runtime.decode(data, metadata)
-            analysis = page.lease.get('analysis') or saved.get('analysis')
-            if analysis is None:
-                page.phase = 'analyze'
-                analysis = self.runtime.analyze(rgb, metadata['sha256'])
-                saved['analysis'] = analysis
-                self.journal.put('lease:' + key, saved)
-            if analysis['input_hash'] != metadata['sha256'] or analysis['version'] != self.runtime.version:
-                raise NodeFailure('ENGINE_VERSION_MISMATCH')
-            page.check()
-            reply = self.retry(page, lambda: self.transport.post(f'/leases/{key}/analysis',
-                {'lease_token': page.lease['lease_token'], 'analysis': analysis, 'analysis_hash': digest(analysis)}))
-            if reply['receipt']:
-                page.terminal = reply['receipt']
-                return
-            page.check()
-            page.phase = 'inpaint'
-            cleaned = self.runtime.inpaint(rgb, analysis)
-            page.check()
-            page.phase = 'text'
-            with page.condition:
-                while not page.translations:
-                    page.check()
-                    page.condition.wait(.25)
-            page.check()
-            page.phase = 'render'
-            result = self.runtime.render(cleaned, analysis, page.translations, page.lease['language'])
-            page.check()
-            body = {'lease_token': page.lease['lease_token'], 'result': result}
-            saved['completion'] = body
-            saved.pop('analysis', None)
-            self.journal.put('lease:' + key, saved)
-            self.deliver(page, body)
-        except NodeFailure as error:
-            if page.terminal:
-                return
-            if error.code == 'LEASE_STOPPED':
-                page.phase = 'stopped'
-                page.stopped = True
-                return
-            # Fixed, content-free diagnostics; no OCR, URL or exception text.
-            code = error.code if error.code in {'ENGINE_VERSION_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH',
-                'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED',
-                'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED'} else 'CLASSIC_LOCAL_INTERRUPTED'
-            self.report_failure(page, code)
-        except Exception:
-            self.report_failure(page, 'CLASSIC_LOCAL_INTERRUPTED')
-
-    def report_failure(self, page, code):
-        key = page.lease['lease_id']
-        saved = self.journal.get('lease:' + key, {})
-        # An uncertain successful result must never be replaced with an error.
-        body = saved.get('completion') or {'lease_token': page.lease['lease_token'], 'error': {'code': code}}
-        self.journal.put('lease:' + key, {**saved, 'completion': body})
-        try:
-            self.deliver(page, body)
-        except NodeFailure:
-            page.stopped = True
-        LOG.warning('page %s: %s', key, code)
-
     def deliver(self, page, body):
         page.phase = 'deliver'
         reply = self.retry(page, lambda: self.transport.post(f'/leases/{page.lease["lease_id"]}/complete', body))
         if reply.get('status') != 'terminal':
             raise ControlFailure('CONTROL_INVALID_RESPONSE')
-        page.terminal = reply
+        return reply
 
     def reap(self):
-        for key, future in list(self.futures.items()):
-            page = self.pages[key]
-            if not future.done():
+        self.pipeline.tick()
+        for key, page in list(self.pages.items()):
+            if page.future or page.analysis_future:
                 continue
             try:
-                future.result()
-            except Exception:
-                page.stopped = True
-                LOG.error('page %s: LOCAL_WORKER_FAILED', key)
+                page.check()
+            except NodeFailure:
+                pass
             if not page.terminal and page.stopped:
-                # Acknowledge only after uninterruptible model work has drained.
-                try:
-                    page.terminal = self.transport.post(f'/leases/{key}/complete',
+                if time.monotonic() >= page.next_stop:
+                    page.next_stop = time.monotonic() + 1
+                    page.step = 'deliver'
+                    page.future = self.pipeline.delivery.submit(self.transport.post, f'/leases/{key}/complete',
                         {'lease_token': page.lease['lease_token'], 'error': {'code': 'LEASE_STOPPED'}})
-                except ControlFailure:
-                    continue
+                    page.future.add_done_callback(lambda _: self.wake.set())
+                continue
             if page.terminal:
+                self.pipeline.release(page)
                 self.journal.remove('lease:' + key)
                 del self.pages[key]
-                del self.futures[key]
+                self.next_claim = 0
+
+    def close(self):
+        self.stop.set()
+        self.control_pool.shutdown(wait=True)
+        for page in list(self.pages.values()):
+            page.stopped = True
+        self.wake.set()
+        self.notice_pool.shutdown(wait=True)
+        self.pipeline.close()
+
+    def poll_control(self):
+        if self.notice_future and self.notice_future.done():
+            try:
+                self.revision = self.notice_future.result()['revision']
+                self.last_heartbeat = 0
+                self.next_claim = 0
+            except NodeFailure as error:
+                LOG.warning('updates: %s', error.code)
+                self.next_notice = time.monotonic() + 1
+            self.notice_future = None
+        if not self.notice_future and not self.stop.is_set() and time.monotonic() >= self.next_notice:
+            self.next_notice = time.monotonic() + .05
+            self.notice_future = self.notice_pool.submit(self.transport.post,
+                f'/nodes/{self.local["node_id"]}/updates', {'revision': self.revision,
+                    'wait_seconds': min(20, max(0, self.config['request_seconds'] - 2))})
+            self.notice_future.add_done_callback(lambda _: self.wake.set())
+        if self.control_future and self.control_future.done():
+            try:
+                self.control_future.result()
+            except NodeFailure as error:
+                LOG.warning('control: %s', error.code)
+            self.control_future = None
+        if not self.control_future:
+            if time.monotonic() - self.last_heartbeat >= self.config['heartbeat_seconds']:
+                self.last_heartbeat = time.monotonic()
+                self.control_future = self.control_pool.submit(self.heartbeat)
+            elif not self.stop.is_set() and time.monotonic() >= self.next_claim:
+                self.next_claim = time.monotonic() + self.config['poll_seconds']
+                self.control_future = self.control_pool.submit(self.claim)
+            if self.control_future:
+                self.control_future.add_done_callback(lambda _: self.wake.set())
 
     def run(self):
         try:
@@ -287,21 +278,16 @@ class Agent:
                         raise
                     LOG.warning('registration: %s', error.code)
                     self.stop.wait(1)
-            next_claim = 0
+            self.next_claim = 0
             while not self.stop.is_set() or self.pages:
                 try:
-                    interval = self.config['waiting_heartbeat_seconds'] if any(
-                        page.phase == 'text' for page in self.pages.values()) else self.config['heartbeat_seconds']
-                    if time.monotonic() - self.last_heartbeat >= interval:
-                        self.heartbeat()
+                    self.poll_control()
                     self.reap()
-                    if self.stop.is_set() and all(future.done() for future in self.futures.values()):
+                    if self.stop.is_set() and all(not p.future and not p.analysis_future for p in self.pages.values()):
                         break  # Keep uncertain deliveries in the journal for startup reconciliation.
-                    if not self.stop.is_set() and time.monotonic() >= next_claim:
-                        self.claim()
-                        next_claim = time.monotonic() + self.config['poll_seconds']
                 except NodeFailure as error:
                     LOG.warning('control: %s', error.code)
-                time.sleep(min(.25, self.config['poll_seconds']))
+                self.wake.wait(.02)
+                self.wake.clear()
         finally:
-            self.pool.shutdown(wait=True)
+            self.close()

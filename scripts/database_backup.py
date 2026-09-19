@@ -164,7 +164,8 @@ def object_references(execute, tables):
         for backend, key in execute("SELECT DISTINCT a.output_storage_backend, l.output_key FROM execution_leases l JOIN jobs j ON j.id = l.job_id JOIN attempts a ON a.id = j.attempt_id WHERE l.output_key IS NOT NULL AND l.completed_at IS NULL"):
             references.append({"backend": backend, "key": key, "kind": "pending-output"})
     if "upload_reservations" in tables:
-        for backend, key, sha256, mime in execute("SELECT DISTINCT storage_backend, storage_key, expected_sha256, mime FROM upload_reservations WHERE completed_at IS NULL"):
+        for backend, sha256, mime in execute("SELECT DISTINCT storage_backend, expected_sha256, mime FROM upload_reservations WHERE completed_at IS NULL AND verified_info IS NOT NULL"):
+            key = f"objects/sha256/{sha256[:2]}/{sha256}"
             references.append({"backend": backend, "key": key, "sha256": sha256, "mime": mime, "kind": "pending-upload"})
     return references
 

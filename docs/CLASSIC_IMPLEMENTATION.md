@@ -6,6 +6,6 @@
 
 任务流为 `analyze → text / inpaint 并行 → render`。中心保留逐阶段检查点，负责结果验证、R2 持久化和页数结算。图像节点不访问数据库、R2 凭据或文本供应商密钥。完整交互及失败恢复见[计算节点协议](COMPUTE_PROTOCOL.md)。
 
-控制服务通过 `./scripts/bootstrap.ps1 -Start` 启动；该命令不启动图像引擎或代理。代理的独立运行方式见[计算代理说明](../services/compute-agent/README.md)，后台配置见[节点配置](NODE_CONFIGURATION.md)。
+控制服务通过 `./scripts/bootstrap.ps1 -Start` 启动；该命令不启动图像引擎或代理。代理的独立运行方式见[当前计算节点](../services/classic-engine/README.md)，后台配置见[节点配置](NODE_CONFIGURATION.md)。
 
 控制与代理的模拟测试仅验证接口、调度、恢复和结算。独立引擎的真实图像效果、硬件吞吐和生产运行须分别验证。

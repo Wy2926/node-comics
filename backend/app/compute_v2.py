@@ -1,16 +1,18 @@
 """Whole-page compute leases. Image work stays on the node; text stays here."""
 from datetime import datetime, timedelta
 import hmac
-from typing import Literal
+from typing import Annotated, Literal
+import time
 
 from fastapi import APIRouter, Depends, Response
+from starlette.concurrency import run_in_threadpool
 from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .assets import available
 from .classic import validate_analysis
-from .cluster_api import node_auth
+from .node_auth import node_auth
 from .config import settings
 from .db import get_db, session_factory
 from .errors import ProcessingError, problem
@@ -42,7 +44,7 @@ def parsed(value):
 
 def config_payload(node):
     config = NodeConfig.model_validate(node.desired_config)
-    keys = ('execution_slots', 'poll_seconds', 'heartbeat_seconds', 'waiting_heartbeat_seconds',
+    keys = ('execution_slots', 'poll_seconds', 'heartbeat_seconds',
             'request_seconds', 'page_seconds', 'text_wait_seconds', 'delivery_seconds', 'allowed_languages')
     return {'version': node.config_version, 'enabled': node.enabled,
             **{key: getattr(config, key) for key in keys}}
@@ -154,8 +156,6 @@ def register(body: Registration, identity=Depends(node_auth), db: Session = Depe
         problem('NODE_RESOURCE_MISMATCH', '节点资源或引擎身份不匹配', 409)
     leases = list(db.scalars(select(ExecutionLease).where(
         ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None))))
-    if any(db.get(JobStage, lease.stage_id).name != 'page' for lease in leases):
-        problem('PROTOCOL_DRAIN_REQUIRED', '切换协议前请排空旧图像租约', 409)
     node.engine_version, node.device = body.engine_version, body.device
     node.capabilities = ['page'] if body.ready else []
     allowed = config_payload(node)['allowed_languages']
@@ -197,11 +197,6 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
             lease = claim_stage(db, identity, ['page'], config_version=body.config_version)
             if not lease:
                 break
-            lease.limits = {'deadline_at': stamp(lease.started_at + timedelta(seconds=config['page_seconds'])),
-                            'text_wait_seconds': config['text_wait_seconds'],
-                            'delivery_seconds': config['delivery_seconds'],
-                            'max_attempts': db.get(Job, lease.job_id).config.get('stage_attempts', settings().cluster_stage_attempts)}
-            lease.expires_at = min(lease.expires_at, parsed(lease.limits['deadline_at']))
             leases.append(lease)
             db.flush()  # Every page runs a fresh fairness election in this transaction.
         db.add(ComputeClaim(node_id=identity, request_id=body.request_id,
@@ -214,6 +209,31 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
 
 class LeaseRequest(RequestBody):
     lease_token: str = Field(min_length=1, max_length=64)
+
+
+class UpdatesRequest(RequestBody):
+    revision: int = Field(default=0, ge=0, strict=True)
+    wait_seconds: float = Field(default=20, ge=0, le=20, allow_inf_nan=False)
+
+
+@router.post('/nodes/{node_id}/updates')
+async def updates(node_id: str, body: UpdatesRequest, identity=Depends(node_auth), db: Session = Depends(get_db)):
+    scoped_node(db, identity, node_id)
+    await run_in_threadpool(db.close)
+    from .notifications import hub, changed
+    from .queue_models import SchedulerMutex
+    def snapshot():
+        with session_factory()() as session:
+            scoped_node(session, identity, node_id)
+            return session.get(SchedulerMutex, 1).revision
+    end = time.monotonic() + body.wait_seconds
+    with hub().subscribe('compute') as wake:
+        while True:
+            wake.clear()
+            revision = await run_in_threadpool(snapshot)
+            if revision != body.revision or time.monotonic() >= end:
+                return {'revision': revision}
+            await changed(wake, end - time.monotonic())
 
 
 class HeartbeatItem(LeaseRequest):
@@ -329,6 +349,9 @@ class NodeError(RequestBody):
 class CompletionRequest(LeaseRequest):
     result: dict | None = None
     error: NodeError | None = None
+    timings: dict[Literal['download', 'download_queue', 'analyze', 'analyze_queue', 'inpaint',
+        'inpaint_queue', 'render', 'render_queue', 'analysis_submit', 'text_wait', 'local_total'],
+        Annotated[float, Field(ge=0, le=86400, allow_inf_nan=False)]] = Field(default_factory=dict)
 
 
 @router.post('/leases/{lease_id}/complete')
@@ -377,7 +400,7 @@ def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)
         fail_stage(lease_id, ProcessingError(body.error.code, '计算节点未能完成此页'), token=body.lease_token, node_id=identity)
     else:
         try:
-            complete_stage(lease_id, body.result, token=body.lease_token, node_id=identity)
+            complete_stage(lease_id, body.result, token=body.lease_token, node_id=identity, timings=body.timings)
         except ProcessingError as error:
             if error.code in {'LEASE_EXPIRED', 'COMPLETION_CONFLICT'}:
                 raise

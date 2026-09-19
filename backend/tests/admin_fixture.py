@@ -1,7 +1,7 @@
 """Synthetic metadata for admin API and browser checks; no private images or model calls."""
 from datetime import timedelta
 from app.node_config import NodeConfig
-from app.models import Attempt, Job, TextCall, User, now
+from app.models import Attempt, ClassicState, Job, TextCall, User, now
 from app.queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
 
 DONE_ID = "10000000-0000-4000-8000-000000000001"
@@ -21,9 +21,9 @@ def seed(db):
     readers[0].membership_id = "fixture-membership"
     db.add_all(readers)
     nodes = [ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="gpu-a", name="绘图节点 A", resource_id="gpu-a-device", device="CUDA / GPU 0",
-        engine_version="fixture-engine-v1", capabilities=["analyze", "inpaint", "render"], capacity=2, heartbeat_at=at),
+        engine_version="fixture-engine-v1", capabilities=["page"], capacity=2, heartbeat_at=at),
         ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="gpu-b", name="绘图节点 B", resource_id="gpu-b-device", device="DirectML / GPU 0",
-        engine_version="fixture-engine-v1", capabilities=["analyze", "inpaint", "render"], capacity=1, heartbeat_at=at-timedelta(minutes=8)),
+        engine_version="fixture-engine-v1", capabilities=["page"], capacity=1, heartbeat_at=at-timedelta(minutes=8)),
         ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-text", name="control-text", resource_id="control-text", device="network",
         engine_version="control", capabilities=["text"], capacity=4, heartbeat_at=at),
         ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-redraw", name="control-redraw", resource_id="control-redraw", device="network",
@@ -63,10 +63,9 @@ def seed(db):
         db.add(lease); db.flush(); return lease
 
     completed = job(1, "succeeded")
-    execution(completed, "analyze", "gpu-a", 10, 30)
+    db.add(ClassicState(job_id=completed.id, timings={"node": {"download": .28, "analyze": .19, "inpaint": .09, "render": .05, "text_wait": 6.4}, "delivery": {"source_get": .31, "validate": .04, "output_put": .27}}))
     execution(completed, "text", "control-text", 40, 80)
-    execution(completed, "inpaint", "gpu-a", 40, 70)
-    execution(completed, "render", "gpu-b", 90, 100)
+    execution(completed, "page", "gpu-b", 10, 100)
     attempt = Attempt(job_id=completed.id, provider_id="fixture-text", lease_expires_at=at+timedelta(seconds=600), cost_state="reported")
     db.add(attempt); db.flush(); completed.attempt_id=attempt.id
     db.add(TextCall(job_id=completed.id, attempt_id=attempt.id, group_index=0, sequence=1, provider_id="fixture-text",
@@ -76,10 +75,10 @@ def seed(db):
     execution(running,"text","control-text",10,None)
     cache=job(3,"succeeded",age=400); cache.cache_hit=True
     expired=job(4,"running",age=300); expired.phase="analyze"
-    execution(expired,"analyze","gpu-b",10,None,expiry=expired.created_at+timedelta(seconds=50))
+    execution(expired,"page","gpu-b",10,None,expiry=expired.created_at+timedelta(seconds=50))
     for i in range(5,46):
         status=["queued","queued","queued","awaiting_upload","validating_upload","failed","no_text","outcome_unknown"][i%8]
         row=job(i,status,mode="classic" if i%2 else "redraw",owner=i%4,age=800+i*10)
-        if status=="queued": db.add(JobStage(job_id=row.id,name="analyze" if row.mode=="classic" else "redraw",status="ready"))
+        if status=="queued": db.add(JobStage(job_id=row.id,name="page" if row.mode=="classic" else "redraw",status="ready"))
     db.commit()
     return {"at": at, "readers": [r.id for r in readers]}

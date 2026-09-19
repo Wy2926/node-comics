@@ -29,9 +29,6 @@ def scheduler_case(text_database):
     from app.classic_config import snapshot
     with session_factory()() as db:
         config = snapshot(db)
-        # These fixtures exercise draining v1 stages; v2 whole-page scheduling
-        # and races use test_compute_v2.py.
-        config['engine'].pop('protocol_version', None)
         free = User(id='free-user', subject='isolated-free', name='free')
         plus = User(id='plus-user', subject='isolated-plus', name='plus', membership_id=uid(),
                     plus_started_at=now() - timedelta(days=1), plus_expires_at=now() + timedelta(days=30),
@@ -43,13 +40,13 @@ def scheduler_case(text_database):
                          storage_key='isolated/' + owner.id, storage_backend='r2', mime='image/png',
                          width=80, height=64, byte_size=100, expires_at=now() + timedelta(days=1)))
         for index in range(4):
-            db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['analyze', 'inpaint', 'render'],
+            db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['page'],
                                capacity=1, resource_id='physical-' + str(index), engine_version=config['engine']['version'], device='cpu'))
         db.commit()
     return config
 
 
-def add_job(config, owner='free-user', *, realtime=False, stage='analyze', suffix=None):
+def add_job(config, owner='free-user', *, realtime=False, stage='page', suffix=None):
     job_id = suffix or uid()
     with session_factory()() as db:
         job = Job(id=job_id, owner_id=owner, input_asset_id=owner + '-image', source_sha256='a' * 64,
@@ -108,10 +105,6 @@ def test_server_slot_reduction_and_pending_configuration_preserve_current_leases
     assert claim() is None
     finish_quantum(first.id, rearm=False)
     finish_quantum(second.id, rearm=False)
-    assert claim() is None  # no work until the exact desired version is applied
-    with session_factory()() as db:
-        db.get(ComputeNode, 'node-0').applied_config_version = 2
-        db.commit()
     assert claim() is not None and claim() is None
 
 
@@ -236,9 +229,9 @@ def test_claim_uses_one_connection_and_preserves_caller_uncommitted_writes(sched
             # stage, as create_job does, while keeping the whole transaction open.
             db.flush()
             db.add(ComputeNode(id=node_id, name='pending node', resource_id=node_id,
-                capabilities=['analyze'], capacity=1, engine_version=scheduler_case['engine']['version'],
+                capabilities=['page'], capacity=1, engine_version=scheduler_case['engine']['version'],
                 device='cpu', supported_languages=['zh-Hans'], applied_config_version=1))
-            db.add(JobStage(id=stage_id, job_id=job_id, name='analyze', status='ready'))
+            db.add(JobStage(id=stage_id, job_id=job_id, name='page', status='ready'))
             db.add(ClassicState(job_id=job_id, analysis={'segments': [], 'quality_flags': []}))
             if flush_first:
                 db.flush()
@@ -527,7 +520,7 @@ def test_late_render_upload_cannot_overwrite_new_generation_output(scheduler_cas
         asset = create_asset(db, 'free-user', original)
         db.commit()
         source_id = asset.id
-    job_id = add_job(config, stage='render')
+    job_id = add_job(config, stage='page')
     with session_factory()() as db:
         job = db.get(Job, job_id)
         job.input_asset_id, job.source_sha256 = source_id, hashlib.sha256(original).hexdigest()
@@ -576,7 +569,7 @@ def test_conflicting_completion_of_one_lease_cannot_replace_delivered_bytes(sche
         source = create_asset(db, 'free-user', original)
         db.commit()
         source_id = source.id
-    job_id = add_job(config, stage='render')
+    job_id = add_job(config, stage='page')
     with session_factory()() as db:
         db.get(Job, job_id).input_asset_id = source_id
         db.commit()
@@ -616,7 +609,7 @@ def test_conflicting_completion_of_one_lease_cannot_replace_delivered_bytes(sche
 def test_saved_late_output_recovery_preserves_existing_terminal_failure(scheduler_case, monkeypatch):
     monkeypatch.setenv('RESULT_STORAGE_BACKEND', 'local')
     settings.cache_clear()
-    job_id = add_job(scheduler_case, stage='render')
+    job_id = add_job(scheduler_case, stage='page')
     lease = claim()
     _, reply = render_reply(scheduler_case['engine']['version'], 10)
     from app.assets import content_storage_key

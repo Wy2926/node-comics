@@ -15,7 +15,6 @@ from .storage import StorageError
 from .errors import ProcessingError
 from .scheduler import lock_scheduler, touch_job
 from .submission_api import router as submission_router
-from .cluster_api import router as cluster_router
 from .compute_v2 import router as compute_v2_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
@@ -52,13 +51,17 @@ async def lifespan(app):
         initialize_pools(db)
         initialize_system_settings(db)
         db.commit()
-    yield
+    from .notifications import hub, close_hub
+    hub().start()
+    try:
+        yield
+    finally:
+        close_hub()
 
 
 app = FastAPI(title="Node Comics API", version="0.3.0", lifespan=lifespan, description="私有漫画图片、持久化翻译任务、普通与 PLUS 会员权益及周期页数额度。")
 app.include_router(queue_router)
 app.include_router(submission_router)
-app.include_router(cluster_router)
 app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(grants_router)

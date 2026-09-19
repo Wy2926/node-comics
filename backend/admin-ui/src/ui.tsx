@@ -4,7 +4,7 @@ export const labels: Record<string, string> = {
   classic: '常规翻译', redraw: 'AI 重绘', awaiting_upload: '待上传', validating_upload: '校验上传',
   queued: '排队中', running: '执行中', outcome_unknown: '结果待核实', unknown_released: '未知结果已释放',
   succeeded: '已完成', no_text: '无文字', failed: '失败', cancelled: '已取消', ready: '待执行', waiting: '等待依赖',
-  expired: '租约已过期', realtime: '实时', preload: '预存', page: '整页图像计算', analyze: '文字检测 / OCR', text: '文本翻译',
+  expired: '租约已过期', realtime: '实时', preload: '预存', page: '整页执行与交付', analyze: '文字检测 / OCR', text: '文本翻译',
   inpaint: '背景修复', render: '嵌字与交付', validate_upload: '上传校验', reserved: '已预占', charged: '已结算',
   released: '已释放', reported: '已报告', unknown: '待核实', estimated: '估算', active: '全部在途', attention: '需要关注',
 };

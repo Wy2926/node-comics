@@ -26,6 +26,12 @@ export function TaskDetail({job: j}: {job: TaskData}) {
         <td className="numeric">{duration(e.seconds)}</td><td><Badge value={e.outcome}/></td></tr>)}
     </Table> : <Empty>{j.cache_hit ? '此任务复用已有结果' : '尚无执行记录'}</Empty>}
     <p className="panel-note">阶段占用来自持久化租约，包含执行期间的网络与存储操作。多阶段并行时，各阶段之和 {duration(j.worker_seconds)} 可大于合并后的执行占用。</p>
+    {(j.timings?.node || j.timings?.delivery) && <><h3 className="detail-heading">计算与交付耗时</h3>
+      <Table heads={['环节', '耗时', '来源']}>{[
+        ...Object.entries(j.timings.node ?? {}).map(([key, seconds]) => ({key, seconds, source: '节点'})),
+        ...Object.entries(j.timings.delivery ?? {}).map(([key, seconds]) => ({key, seconds, source: '中心'}))
+      ].map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{({download: '原图下载', download_queue: '下载等待', analyze: '检测 / OCR', analyze_queue: '分析等待', inpaint: '抹字', inpaint_queue: '抹字等待', render: '嵌字与编码', render_queue: '嵌字等待', analysis_submit: '分析提交', text_wait: '等待译文', local_total: '领取至结果冻结', source_get: '验收原图下载', validate: '图片验收', output_put: '结果写入 R2', total: '中心交付处理'} as Record<string, string>)[key] ?? key}</td><td className="numeric">{duration(seconds)}</td><td>{source}</td></tr>)}</Table>
+      <p className="panel-note">节点耗时用于观测；抹字、文本和网络可并行，分项不能直接相加。整页租约占用不代表 GPU 计算时间。</p></>}
     {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ¥{(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。成本仅计量，不限制文本调用；次数、时限与限流仍生效。</p>
       <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>
         <tr key={c.id}><td>{c.model}<small>{c.provider_id}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>

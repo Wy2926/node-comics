@@ -94,6 +94,78 @@ def drive(agent, jobs, timeout=15):
     pytest.fail('node/controller did not complete: ' + str(states))
 
 
+def test_text_wait_does_not_hold_compute_and_buffers_are_released(v2, tmp_path):
+    jobs = v2['create'](4)
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
+    try:
+        agent.register()
+        agent.claim()
+        end = time.monotonic() + 4
+        # Deliberately never run text: all four pages must still finish preparation.
+        while time.monotonic() < end:
+            agent.reap()
+            if all(p.step == 'text' and p.analysis_accepted for p in agent.pages.values()):
+                break
+            time.sleep(.01)
+        assert runtime.analyzed == 4
+        assert all(p.cleaned is not None and not p.future for p in agent.pages.values())
+        assert 0 < agent.pipeline.used <= agent.pipeline.limit
+        drive(agent, jobs)
+        assert agent.pipeline.used == 0
+        from app.models import ClassicState
+        with session_factory()() as db:
+            timings = db.get(ClassicState, jobs[0]).timings
+            assert timings['node']['analyze'] >= 0
+            assert timings['delivery']['source_get'] >= 0
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_one_blocked_delivery_does_not_block_other_pages(v2, tmp_path):
+    from threading import Event
+    jobs = v2['create'](4)
+    agent, transport, journal = node_for(v2, tmp_path, 1, FixtureRuntime())
+    entered, release = Event(), Event()
+    post = transport.post
+    blocked = None
+    def slow(path, body):
+        nonlocal blocked
+        if path.endswith('/complete') and 'result' in body and (blocked is None or path == blocked):
+            blocked = path
+            entered.set()
+            assert release.wait(10)
+        return post(path, body)
+    transport.post = slow
+    try:
+        agent.register()
+        agent.claim()
+        end = time.monotonic() + 6
+        while time.monotonic() < end:
+            agent.reap()
+            agent.heartbeat()
+            with session_factory()() as db:
+                lease = claim_stage(db, 'control-text', ['text'])
+                db.commit()
+            if lease:
+                run_control_stage(lease.id)
+            with session_factory()() as db:
+                done = sum(db.get(Job, job).status == 'succeeded' for job in jobs)
+            if done == 3:
+                break
+            time.sleep(.02)
+        assert entered.is_set() and done == 3
+        release.set()
+        drive(agent, jobs)
+    finally:
+        release.set()
+        agent.close()
+        transport.close()
+        journal.close()
+
+
 @pytest.mark.parametrize('pages', [1, 2])
 def test_four_page_leases_work_with_serial_or_parallel_local_execution_and_lost_replies(v2, tmp_path, pages):
     jobs = v2['create'](4)
@@ -113,7 +185,7 @@ def test_four_page_leases_work_with_serial_or_parallel_local_execution_and_lost_
     finally:
         for page in agent.pages.values():
             page.stopped = True
-        agent.pool.shutdown(wait=True)
+        agent.close()
         transport.close()
         journal.close()
 
@@ -139,7 +211,7 @@ def test_restart_resubmits_frozen_result_without_recomputing(v2, tmp_path):
         drive(agent, jobs)
         assert runtime.analyzed == runtime.rendered == 0
     finally:
-        agent.pool.shutdown(wait=True)
+        agent.close()
         transport.close()
         journal.close()
 
@@ -199,7 +271,91 @@ def test_real_vulkan_node_delivers_validated_page(v2, tmp_path, ocr_language, so
     finally:
         for page in agent.pages.values():
             page.stopped = True
-        agent.pool.shutdown(wait=True)
+        agent.close()
         transport.close()
         journal.close()
         runtime.close()
+
+
+def test_notice_delivers_text_without_waiting_for_periodic_heartbeat(v2, tmp_path):
+    jobs = v2['create']()
+    agent, transport, journal = node_for(v2, tmp_path, 1, FixtureRuntime())
+    try:
+        agent.register()
+        # Keep the renewal period at 10s; short long-poll only bounds test shutdown.
+        agent.config['request_seconds'] = 3
+        agent.claim()
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            agent.poll_control()
+            agent.reap()
+            if all(p.step == 'text' and p.analysis_accepted for p in agent.pages.values()):
+                break
+            time.sleep(.01)
+        assert all(p.step == 'text' for p in agent.pages.values())
+        with session_factory()() as db:
+            lease = claim_stage(db, 'control-text', ['text'])
+            db.commit()
+        started = time.monotonic()
+        run_control_stage(lease.id)
+        while agent.pages and time.monotonic() - started < 2:
+            agent.poll_control()
+            agent.reap()
+            time.sleep(.01)
+        assert not agent.pages
+        assert time.monotonic() - started < 2
+        assert agent.config['heartbeat_seconds'] == 10
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_resident_budget_applies_backpressure_and_all_pages_eventually_finish(v2, tmp_path):
+    jobs = v2['create'](4)
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
+    try:
+        agent.register()
+        agent.claim()
+        first = next(iter(agent.pages.values())).lease['input']
+        from classic_node.protocol import MAX_IMAGE_BYTES, MAX_CHECKPOINT_BYTES
+        agent.pipeline.limit = first['width'] * first['height'] * 16 + MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            agent.reap()
+            if any(p.step == 'text' and p.analysis_accepted for p in agent.pages.values()):
+                break
+            time.sleep(.01)
+        assert runtime.analyzed == 1
+        assert sum(p.reserved > 0 for p in agent.pages.values()) == 1
+        assert agent.pipeline.used <= agent.pipeline.limit
+        drive(agent, jobs)
+        assert runtime.rendered == 4 and agent.pipeline.used == 0
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_restart_acknowledges_stopped_lease_without_input_or_config(v2, tmp_path):
+    from test_compute_v2 import claim
+    from conftest import login
+    jobs = v2['create']()
+    lease = claim(v2).json()['leases'][0]
+    auth = login(v2['client'], 'reader0')
+    v2['client'].post('/v1/jobs/' + jobs[0] + '/cancel', headers=auth).raise_for_status()
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
+    try:
+        agent.register()
+        deadline = time.monotonic() + 2
+        while agent.pages and time.monotonic() < deadline:
+            agent.reap()
+            time.sleep(.01)
+        assert not agent.pages and runtime.analyzed == 0
+        assert journal.leases() == {} and agent.pipeline.used == 0
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()

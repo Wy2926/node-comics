@@ -292,7 +292,7 @@ def test_accepted_replay_does_not_read_body_or_allocate_slot(ingress_case, monke
     upload_id = ingress_case['uploads'][owner][0]
     with session_factory()() as db:
         receipt = db.get(UploadReservation, upload_id)
-        receipt.status = 'uploaded'
+        receipt.status = 'validating'
         expires = receipt.expires_at
         db.commit()
     monkeypatch.setattr(upload_ingress, 'get_store', lambda *args: pytest.fail('replay must not access storage'))
@@ -302,7 +302,7 @@ def test_accepted_replay_does_not_read_body_or_allocate_slot(ingress_case, monke
             pytest.fail('accepted replay must not read its request body')
             yield b''
     result = asyncio.run(call_handler(ingress_case, Request()))
-    assert result['status'] == 'uploaded'
+    assert result['status'] == 'validating'
     assert active_leases() == []
     with session_factory()() as db:
         assert db.get(UploadReservation, upload_id).expires_at == expires
