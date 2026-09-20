@@ -29,3 +29,7 @@ export function checkoutUrl(value: string, portal = false) {
   if (url.protocol !== 'https:' || url.hostname !== (portal ? 'billing.stripe.com' : 'checkout.stripe.com') || url.port || url.username || url.password) throw Error('结账地址无效，请联系支持。');
   return url.href;
 }
+
+export function accountReturnPath(value: string) {
+  return /^\/(?:zh-tw\/|en\/|ja\/|ko\/)?account\/(?:\?price=[a-zA-Z0-9_-]{1,36})?$/.test(value) ? value : '/account/';
+}

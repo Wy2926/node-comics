@@ -59,4 +59,7 @@ def initialize():
                 billing_models.BillingAccount.environment != settings().stripe_environment).limit(1))
             if mismatch:
                 raise RuntimeError('Stripe environment does not match this database; use an isolated database')
+            if connection.scalar(select(billing_models.BillingPrice.id).where(
+                    billing_models.BillingPrice.environment != settings().stripe_environment).limit(1)):
+                raise RuntimeError('Stripe catalog environment does not match this database; use an isolated database')
     settings().storage_path.mkdir(parents=True, exist_ok=True)

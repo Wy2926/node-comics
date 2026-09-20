@@ -1,105 +1,14 @@
 """Signed notifications trigger reads of current Stripe resources, never trust event order."""
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from sqlalchemy import or_, select, update
 from . import stripe_client as stripe
-from .billing_models import BillingAccount, BillingCheckout, BillingEvent, BillingSubscription, BillingInvoice
+from .billing_models import BillingAccount, BillingCheckout, BillingEvent, BillingSubscription, BillingPlanRevision, BillingPrice
 from .config import settings
 from .db import session_factory
-from .entitlement_models import QuotaPeriod
-from .entitlements import locked_user, MONTHLY
+from .billing_grants import timestamp, grant_term, apply_invoice, invoice_subscription
+from .entitlements import locked_user
 from .models import now
-from .providers import digest
 
-
-def timestamp(value):
-    if value is None:
-        return None
-    stripe.require(type(value) in (int, float) and value > 0, 'STRIPE_INVALID_TIMESTAMP')
-    try:
-        return datetime.fromtimestamp(value, timezone.utc).replace(tzinfo=None)
-    except (ValueError, OverflowError, OSError):
-        raise stripe.BillingError('STRIPE_INVALID_TIMESTAMP') from None
-
-
-def project_access(db, user):
-    periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
-        QuotaPeriod.source_key.startswith('stripe:'), QuotaPeriod.ends_at > now())
-        .order_by(QuotaPeriod.starts_at, QuotaPeriod.ends_at)))
-    if not periods:
-        user.billing_plus_started_at = user.billing_plus_expires_at = user.billing_membership_id = None
-        return
-    start, end, ids = periods[0].starts_at, periods[0].ends_at, [periods[0].id]
-    for period in periods[1:]:
-        if period.starts_at > end:
-            break
-        end = max(end, period.ends_at)
-        ids.append(period.id)
-    user.billing_plus_started_at, user.billing_plus_expires_at = start, end
-    user.billing_membership_id = digest(ids)
-
-
-def grant_period(db, user, key, start, end, pages, note):
-    stripe.require(start and end and start < end, 'STRIPE_PERIOD_MISSING')
-    period_id = digest([user.id, key])
-    if db.get(QuotaPeriod, period_id) is None:
-        db.add(QuotaPeriod(id=period_id, owner_id=user.id, kind=MONTHLY, mode='redraw',
-            source='membership', source_key=key, starts_at=start, ends_at=end, granted=pages,
-            used=0, reserved=0, grants_access=True, note=note))
-        db.flush()
-
-
-def invoice_subscription(invoice):
-    return ((invoice.get('parent') or {}).get('subscription_details') or {}).get('subscription')
-
-
-def apply_invoice(db, user, sub, invoice):
-    stripe.environment(invoice)
-    stripe.require(invoice_subscription(invoice) == sub.id and invoice.get('customer') == sub.customer_id)
-    receipt = db.get(BillingInvoice, invoice['id'])
-    if receipt:
-        stripe.require(receipt.subscription_id == sub.id)
-        return
-    if invoice.get('status') != 'paid':
-        return
-    stripe.require(invoice.get('amount_remaining') == 0 and invoice.get('currency') == 'usd', 'STRIPE_INVOICE_INVALID')
-    if invoice.get('billing_reason') not in ('subscription_create', 'subscription_cycle'):
-        return  # Adjustments/prorations are not another monthly entitlement.
-    lines = invoice.get('lines') or {}
-    if lines.get('has_more'):
-        rows = [line for page in stripe.pages('invoices.line_items', invoice['id']) for line in page]
-    else:
-        rows = lines.get('data', [])
-    candidates = []
-    for line in rows:
-        details = ((line.get('parent') or {}).get('subscription_item_details') or {})
-        price = ((line.get('pricing') or {}).get('price_details') or {})
-        if details.get('subscription') != sub.id or details.get('proration') is not False:
-            continue
-        if price.get('price') != settings().stripe_price_id:
-            continue
-        stripe.require(price.get('product') == settings().stripe_product_id and line.get('quantity') == 1,
-            'STRIPE_PLAN_MISMATCH')
-        period = line.get('period') or {}
-        start, end = timestamp(period.get('start')), timestamp(period.get('end'))
-        stripe.require(start and end and start < end, 'STRIPE_PERIOD_MISSING')
-        if timedelta(days=27) <= end-start <= timedelta(days=32):
-            candidates.append((start, end))
-    stripe.require(len(candidates) <= 1, 'STRIPE_INVOICE_INVALID')
-    if candidates:
-        start, end = candidates[0]
-        # Fully settled credit/discount invoices still purchase a real monthly term.
-        grant_period(db, user, f'stripe:paid:{sub.id}:{start.isoformat()}:{end.isoformat()}',
-            start, end, 300, 'PLUS 月账期 · 300 页重绘')
-        if sub.paid_ends_at is None or end > sub.paid_ends_at:
-            sub.paid_starts_at, sub.paid_ends_at = start, end
-        trial = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
-            QuotaPeriod.source_key == 'stripe:trial:' + sub.id))
-        if trial and start < trial.ends_at:
-            trial.ends_at = max(trial.starts_at + timedelta(microseconds=1), start)
-    elif not (sub.trial_starts_at and invoice.get('billing_reason') == 'subscription_create'):
-        raise stripe.BillingError('STRIPE_INVOICE_PERIOD_INVALID')
-    db.add(BillingInvoice(id=invoice['id'], subscription_id=sub.id))
-    db.flush()
 
 
 def sync_subscription(subscription_id, invoice_id=None):
@@ -130,7 +39,9 @@ def sync_subscription(subscription_id, invoice_id=None):
         stripe.require(not items.get('has_more') and len(items.get('data', [])) == 1, 'STRIPE_PLAN_MISMATCH')
         item = items['data'][0]
         stripe.require(item.get('quantity') == 1, 'STRIPE_PLAN_MISMATCH')
-        stripe.approved_price(item.get('price') or {}, row.price_id)
+        price = db.get(BillingPrice, row.price_id)
+        stripe.approved_price(item.get('price') or {}, price)
+        revision = db.get(BillingPlanRevision, price.plan_revision_id)
         account = db.get(BillingAccount, row.owner_id)
         stripe.require(account and account.environment == cfg.stripe_environment
             and account.customer_id in (None, subscription['customer']))
@@ -138,7 +49,7 @@ def sync_subscription(subscription_id, invoice_id=None):
         sub = db.get(BillingSubscription, subscription_id)
         if sub is None:
             sub = BillingSubscription(id=subscription_id, owner_id=user.id, checkout_id=row.id,
-                environment=cfg.stripe_environment, customer_id=account.customer_id, status=subscription['status'])
+                environment=cfg.stripe_environment, customer_id=account.customer_id, price_id=price.id, status=subscription['status'])
             db.add(sub)
             db.flush()
         stripe.require(sub.owner_id == user.id and sub.customer_id == account.customer_id)
@@ -150,8 +61,8 @@ def sync_subscription(subscription_id, invoice_id=None):
         start, trial_end = timestamp(subscription.get('trial_start')), timestamp(subscription.get('trial_end'))
         if start and trial_end and sub.trial_starts_at is None:
             stripe.require(row.trial and account.trial_used_at is None, 'STRIPE_TRIAL_ALREADY_USED')
-            stripe.require(timedelta(0) < trial_end-start <= timedelta(days=7, minutes=1), 'STRIPE_TRIAL_PERIOD_INVALID')
-            grant_period(db, user, 'stripe:trial:' + sub.id, start, trial_end, 30, 'PLUS 7 天试用 · 30 页重绘')
+            stripe.require(timedelta(0) < trial_end-start <= timedelta(days=revision.trial_days, minutes=1), 'STRIPE_TRIAL_PERIOD_INVALID')
+            grant_term(db, user, sub, price, 'trial', start, trial_end)
             sub.trial_starts_at, sub.trial_ends_at = start, trial_end
         if row.trial:
             account.trial_used_at = account.trial_used_at or now()
@@ -164,7 +75,6 @@ def sync_subscription(subscription_id, invoice_id=None):
                 for invoice in invoices:
                     apply_invoice(db, user, sub, invoice)
         row.status, row.error_code, row.last_checked_at = 'completed', None, now()
-        project_access(db, user)
         db.commit()
 
 

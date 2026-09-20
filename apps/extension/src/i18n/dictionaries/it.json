@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Prova gratis per 7 giorni",
   "通过 Stripe 升级": "Passa a PLUS con Stripe",
   "刷新权益": "Aggiorna vantaggi",
-  "订阅暂未开放": "Abbonamenti non ancora disponibili"
+  "订阅暂未开放": "Abbonamenti non ancora disponibili",
+  "订阅套餐": "Piano di abbonamento",
+  "每年": "Ogni anno",
+  "每月 {0} 页 AI 重绘": "{0} pagine di ridisegno IA al mese",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Prima prova: {0} giorni con {1} pagine di ridisegno.",
+  "按年自动续费，重绘额度逐月生效。": "Rinnovo annuale. Le pagine di ridisegno sono disponibili ogni mese.",
+  "按月自动续费。": "Rinnovo mensile."
 }

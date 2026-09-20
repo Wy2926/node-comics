@@ -83,13 +83,13 @@ export default {
     ],
     "plusBenefits": [
       "No daily or monthly total limit for classic translation",
-      "300 AI redraw pages per paid monthly period",
+      "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility.",
       "All Free reading features",
       "Valid existing results remain accessible after expiry",
       "Up to 100 new translation images per rolling 60 seconds"
     ],
     "freeNote": "AI redraw on Free requires a valid promotional grant. Daily pages reset in Asia/Shanghai time and do not roll over.",
-    "trialNote": "Eligible first-time subscribers can start a 7-day card-required trial with unlimited classic translation and 30 redraw pages. It automatically renews at US$9.99/month after the trial. Cancel before renewal. Taxes and the final total are shown at checkout.",
+    "trialNote": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
     "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Unlimited totals remain subject to short-term rate, image and service-capacity limits; no completion speed is guaranteed.",
     "viewPlus": "Sign in to explore PLUS",
     "downloadTitle": "Your browser. Your next story.",
@@ -127,7 +127,7 @@ export default {
       "Into the story."
     ],
     "seoFeaturesTitle": "Manga translation & reader features",
-    "seoPricingTitle": "PLUS pricing — US$9.99/month",
+    "seoPricingTitle": "Subscription plans and pricing",
     "seoDownloadTitle": "Download the manga translator — Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "One page too far.",
@@ -189,7 +189,7 @@ export default {
           {
             "title": "Try redraw deliberately",
             "paragraphs": [
-              "AI redraw requires PLUS or a valid promotional allowance. Paid monthly periods include 300 redraw pages; an eligible first 7-day trial includes 30. A deliberately generated new version uses the current allowance.",
+              "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility.",
               "Different modes and languages have separate results. You can keep a valid classic result while a redraw waits or fails, and return to the original whenever details matter."
             ]
           }
@@ -388,7 +388,7 @@ export default {
             "title": "Benefits and subscriptions",
             "paragraphs": [
               "Free, PLUS, trial and promotional benefits have their respective validity and page rules shown on pricing and account pages. Unlimited classic totals still have short-term rate, image and service-capacity limits.",
-              "PLUS is US$9.99/month. Eligible first-time subscribers can take a 7-day card-required trial, followed by automatic monthly billing. Cancel before renewal. Taxes, periods and the payable total are shown at checkout and in account records. Explicit new translations use the relevant allowance. See Subscriptions & refunds for billing requests."
+              "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
             ]
           },
           {
@@ -402,13 +402,13 @@ export default {
       },
       "refund": {
         "title": "Subscriptions, cancellation and refunds",
-        "description": "Understand the 7-day card-required trial, US$9.99 monthly renewal and billing support.",
+        "description": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
         "sections": [
           {
             "title": "Trial and billing",
             "paragraphs": [
-              "PLUS is US$9.99/month. Eligible first-time subscribers can try 7 days with a card, unlimited classic totals and 30 redraw pages. Re-subscribing does not automatically grant another trial.",
-              "After the trial, monthly renewal is automatic. Paid monthly periods include 300 redraw pages, which do not roll over. Stripe handles checkout; taxes and final charges are shown there."
+              "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
+              "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility."
             ]
           },
           {
@@ -441,7 +441,7 @@ export default {
       },
       {
         "question": "What does Free include?",
-        "answer": "100 classic translation pages per day. PLUS costs US$9.99/month with no daily/monthly classic total limit and 300 redraw pages per paid monthly period. Eligible first subscribers can take a 7-day card-required trial with 30 redraw pages, followed by automatic paid renewal."
+        "answer": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
       },
       {
         "question": "Which files can I import?",
@@ -549,9 +549,6 @@ export default {
     "保持订阅": "Keep subscription",
     "在 Stripe 管理订阅": "Manage subscription in Stripe",
     "取消自动续费": "Cancel auto-renewal",
-    "US$9.99／月，常规翻译不限累计页数，每个付费月账期 300 页 AI 重绘。": "US$9.99/month: unlimited classic total pages and 300 AI redraw pages per paid monthly period.",
-    "你可申请首次 7 天绑卡试用，含 30 页重绘；试用结束自动按月续费。": "You can apply for a first 7-day card-required trial with 30 redraw pages, then automatic monthly renewal.",
-    "当前账户不享受首次试用，订阅后按月付费。": "This account is not eligible for a first trial. Monthly billing starts with the subscription.",
     "可在下次续费前取消，税费及应付金额以结账页为准。": "Cancel before the next renewal. Taxes and the final total are shown at checkout.",
     "我已阅读": "I have read ",
     "订阅与退款说明": "Subscriptions & refunds",

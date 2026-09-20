@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "7 gün ücretsiz deneyin",
   "通过 Stripe 升级": "Stripe ile yükseltin",
   "刷新权益": "Hakları güncelleyin",
-  "订阅暂未开放": "Abonelikler henüz kullanılamıyor"
+  "订阅暂未开放": "Abonelikler henüz kullanılamıyor",
+  "订阅套餐": "Abonelik planı",
+  "每年": "Yıllık",
+  "每月 {0} 页 AI 重绘": "Ayda {0} yapay zekâ yeniden çizim sayfası",
+  "首次试用 {0} 天，含 {1} 页重绘。": "İlk deneme: {0} gün ve {1} yeniden çizim sayfası.",
+  "按年自动续费，重绘额度逐月生效。": "Yıllık yenilenir. Yeniden çizim kotası her ay açılır.",
+  "按月自动续费。": "Aylık yenilenir."
 }

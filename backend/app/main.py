@@ -40,6 +40,7 @@ from .queue_api import router as queue_router
 from .reader_api import router as reader_router
 from .quota_grants import router as grants_router
 from .billing_api import router as billing_router
+from .billing_catalog import router as billing_catalog_router, initialize_catalog
 from .schemas import AccessResponse, CapabilitiesResponse, EntitlementsResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, UsageResponse
 
 
@@ -51,6 +52,7 @@ async def lifespan(app):
         from .control_pools import initialize_pools
         initialize_pools(db)
         initialize_system_settings(db)
+        initialize_catalog(db)
         db.commit()
     from .notifications import hub, close_hub
     hub().start()
@@ -68,6 +70,7 @@ app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
 app.include_router(billing_router)
+app.include_router(billing_catalog_router)
 app.include_router(admin_monitor_router)
 app.include_router(create_admin_web_router(settings().admin_web_path))
 app.include_router(system_settings_router)

@@ -6,6 +6,7 @@ import {Overview} from './Overview';
 import {NodeConfigDialog} from './NodeConfig';
 import {SystemSettingsPage} from './SystemSettings';
 import {TranslationProvidersPage} from './TranslationProviders';
+import {BillingCatalogPage} from './BillingCatalog';
 import type {Node} from './types';
 import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
@@ -16,6 +17,7 @@ const views = {
   nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
   'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
+  billing: ['订阅套餐', 'SUBSCRIPTION CATALOG', '管理套餐版本、月付／年付与新订阅报价。', '◇'],
   settings: ['系统设置', 'SYSTEM SETTINGS', '统一管理上传与反馈的服务保护设置。', '⚙'],
 } as const;
 type View = keyof typeof views;
@@ -88,7 +90,7 @@ function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClos
   </dialog>;
 }
 
-function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: Exclude<View, 'settings' | 'translation-providers'>; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
+function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: Exclude<View, 'settings' | 'translation-providers' | 'billing'>; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
   const [detail, setDetail] = useState<Target>();
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
@@ -174,6 +176,7 @@ export function App() {
   </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><span className="top-brand">NODE COMICS <span className="dot"/></span></header>
     {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
+      view === 'billing' ? <BillingCatalogPage onUnauthorized={logout}/> :
       <WorkspacePage key={hash} view={view} params={params} auto={auto} setAuto={setAuto} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/>}
     <footer>Node Comics · Operations <span>用户与任务数据仅供管理使用</span></footer>
   </div></div>}</>;

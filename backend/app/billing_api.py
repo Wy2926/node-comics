@@ -9,7 +9,11 @@ from . import stripe_client as stripe
 from .auth import identity
 from .billing_checkout import billing_status, start_checkout, sync_owner
 from .billing_models import BillingAccount, BillingEvent
-from .billing_sync import process_event, timestamp
+from .billing_sync import process_event
+from .billing_grants import timestamp
+from .request_models import RequestBody
+from pydantic import Field
+from .billing_catalog import offers
 from .config import settings
 from .db import get_db
 from .entitlements import entitlements_json
@@ -17,6 +21,10 @@ from .errors import problem
 from .models import User
 
 router = APIRouter(tags=['billing'])
+
+
+class CheckoutRequest(RequestBody):
+    price_id: str = Field(min_length=1, max_length=36)
 EVENTS = {'checkout.session.completed', 'checkout.session.expired', 'checkout.session.async_payment_succeeded',
     'checkout.session.async_payment_failed', 'customer.subscription.created', 'customer.subscription.updated',
     'customer.subscription.deleted', 'customer.subscription.paused', 'customer.subscription.resumed',
@@ -27,6 +35,8 @@ def billing_error(exc):
     messages = {'STRIPE_SUBSCRIPTION_EXISTS': '已有订阅，请通过 Stripe 管理当前订阅',
         'STRIPE_CHECKOUT_UNCERTAIN': '正在核实原结账结果，请稍后刷新',
         'STRIPE_CHECKOUT_COMPLETED': '结账已完成，请刷新会员权益',
+        'STRIPE_CHECKOUT_PRICE_CONFLICT': '已有待核实结账，请继续原报价或等待原会话到期后重新选择',
+        'STRIPE_PLAN_UNAVAILABLE': '此报价尚未发布或已停售，请刷新套餐列表',
         'STRIPE_CHECKOUT_EXPIRED': '结账链接已过期，请重新打开', 'BILLING_DISABLED': '订阅暂未开放'}
     problem(exc.code, messages.get(exc.code, '支付服务暂时不可用，请稍后重试'), 503 if exc.uncertain else 409)
 
@@ -36,10 +46,16 @@ def status(user: User = Depends(identity), db: Session = Depends(get_db)):
     return billing_status(db, user)
 
 
+@router.get('/v1/billing/catalog')
+def public_catalog(db: Session = Depends(get_db)):
+    enabled = settings().stripe_enabled
+    return {'enabled': enabled, 'offers': offers(db) if enabled else []}
+
+
 @router.post('/v1/billing/checkouts')
-def checkout(user: User = Depends(identity)):
+def checkout(body: CheckoutRequest, user: User = Depends(identity)):
     try:
-        return start_checkout(user.id)
+        return start_checkout(user.id, body.price_id)
     except stripe.BillingError as exc:
         billing_error(exc)
 
@@ -62,7 +78,9 @@ def portal(user: User = Depends(identity), db: Session = Depends(get_db)):
     try:
         stripe.require(account.environment == settings().stripe_environment, 'STRIPE_ENVIRONMENT_MISMATCH')
         result = stripe.call('billing_portal.sessions', 'create', params={
-            'customer': account.customer_id, 'return_url': settings().stripe_return_url})
+            'customer': account.customer_id, 'return_url': settings().stripe_return_url,
+            **({'configuration': settings().stripe_portal_configuration_id}
+               if settings().stripe_portal_configuration_id else {})})
         return {'url': stripe.hosted_url(result['url'], portal=True)}
     except stripe.BillingError as exc:
         billing_error(exc)

@@ -60,13 +60,12 @@ def environment(resource):
     require(resource.get('livemode') is (settings().stripe_environment == 'live'), 'STRIPE_ENVIRONMENT_MISMATCH')
 
 
-def approved_price(price, expected=None):
-    cfg = settings()
+def approved_price(price, expected):
     environment(price)
     recurring = price.get('recurring') or {}
-    require(price.get('id') == (expected or cfg.stripe_price_id)
-        and price.get('product') == cfg.stripe_product_id and price.get('currency') == 'usd'
-        and price.get('unit_amount') == 999 and recurring.get('interval') == 'month'
+    require(expected.environment == settings().stripe_environment and price.get('id') == expected.stripe_price_id
+        and price.get('product') == expected.stripe_product_id and price.get('currency') == expected.currency
+        and price.get('unit_amount') == expected.unit_amount and recurring.get('interval') == expected.interval
         and recurring.get('interval_count') == 1 and recurring.get('usage_type') == 'licensed', 'STRIPE_PLAN_MISMATCH')
 
 

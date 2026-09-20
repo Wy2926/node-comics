@@ -3,7 +3,9 @@ from datetime import timedelta, timezone
 from urllib.parse import urljoin
 from sqlalchemy import select
 from . import stripe_client as stripe
-from .billing_models import BillingAccount, BillingCheckout, BillingSubscription
+from .billing_models import BillingAccount, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision
+from .billing_access import active_terms, access_dates
+from .billing_catalog import offers, price_json
 from .config import settings
 from .db import session_factory
 from .entitlements import locked_user, iso
@@ -22,12 +24,13 @@ def billing_status(db, user):
     pending = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == user.id,
         BillingCheckout.status.in_(PENDING)).limit(1))
     return {'enabled': cfg.stripe_enabled, 'provider': 'stripe', 'environment': cfg.stripe_environment,
+        'offers': offers(db), 'checkout_price': price_json(db, db.get(BillingPrice, pending.price_id)) if pending else None,
         'trial_eligible': not account or account.trial_used_at is None,
         'checkout_pending': bool(pending), 'checkout_error': pending.error_code if pending else None,
-        'subscription': None if not sub else {'status': sub.status,
+        'subscription': None if not sub else {'status': sub.status, 'price': price_json(db, db.get(BillingPrice, sub.price_id)),
             'next_billed_at': iso(sub.next_billed_at), 'cancel_at': iso(sub.cancel_at),
             'trial_ends_at': iso(sub.trial_ends_at), 'paid_ends_at': iso(sub.paid_ends_at)},
-        'entitlement_expires_at': iso(user.billing_plus_expires_at)}
+        'entitlement_expires_at': iso(access_dates(db, user.id)[1])}
 
 
 def bind_session(checkout_id, session):
@@ -53,16 +56,19 @@ def bind_session(checkout_id, session):
 def recover_checkout(checkout_id):
     with session_factory()() as db:
         row = db.get(BillingCheckout, checkout_id)
+        price = db.get(BillingPrice, row.price_id)
+        revision = db.get(BillingPlanRevision, price.plan_revision_id)
     if row.session_id:
         return bind_session(row.id, stripe.call('checkout.sessions', 'retrieve', row.session_id))
     # Freeze every request field in the durable intent so retries have identical parameters.
     metadata = {'app': 'node_comics', 'checkout_intent_id': row.id}
     params = {'mode': 'subscription', 'client_reference_id': row.id, 'metadata': metadata,
-        'line_items': [{'price': row.price_id, 'quantity': 1}], 'payment_method_types': ['card'],
+        'line_items': [{'price': price.stripe_price_id, 'quantity': 1}], 'payment_method_types': ['card'],
+        'currency': price.currency, 'adaptive_pricing': {'enabled': False},
         'payment_method_collection': 'always',
         'success_url': urljoin(row.return_url, '/payment/success/'), 'cancel_url': row.return_url,
         'expires_at': int(row.expires_at.replace(tzinfo=timezone.utc).timestamp()),
-        'subscription_data': {'metadata': metadata, **({'trial_period_days': 7} if row.trial else {})}}
+        'subscription_data': {'metadata': metadata, **({'trial_period_days': revision.trial_days} if row.trial else {})}}
     if row.customer_id:
         params['customer'] = row.customer_id
     try:
@@ -74,9 +80,9 @@ def recover_checkout(checkout_id):
             stripe.require(len(matches) == 1, 'STRIPE_CHECKOUT_UNCERTAIN')
             session = matches[0]
         else:
-            price = stripe.call('prices', 'retrieve', row.price_id)
-            stripe.approved_price(price, row.price_id)
-            stripe.require(price.get('active'), 'STRIPE_PLAN_UNAVAILABLE')
+            remote_price = stripe.call('prices', 'retrieve', price.stripe_price_id)
+            stripe.approved_price(remote_price, price)
+            stripe.require(remote_price.get('active'), 'STRIPE_PLAN_UNAVAILABLE')
             session = stripe.call('checkout.sessions', 'create', params=params,
                 options={'idempotency_key': 'checkout:' + row.id})
         return bind_session(row.id, session)
@@ -91,14 +97,14 @@ def recover_checkout(checkout_id):
         raise
 
 
-def start_checkout(owner_id):
+def start_checkout(owner_id, price_id):
     cfg = settings()
     stripe.require(cfg.stripe_enabled, 'BILLING_DISABLED')
     with session_factory()() as db:
         user = locked_user(db, owner_id)
         active = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == owner_id,
             BillingSubscription.status.in_(LIVE_SUBSCRIPTIONS)).limit(1))
-        stripe.require(active is None and not (user.billing_plus_expires_at and user.billing_plus_expires_at > now()),
+        stripe.require(active is None and not active_terms(db, user.id),
             'STRIPE_SUBSCRIPTION_EXISTS')
         account = db.get(BillingAccount, owner_id)
         if account is None:
@@ -108,10 +114,15 @@ def start_checkout(owner_id):
         row = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == owner_id,
             BillingCheckout.status.in_(PENDING)).limit(1))
         if row is None:
+            price = db.get(BillingPrice, price_id)
+            stripe.require(price and price.environment == cfg.stripe_environment and price.status == 'active', 'STRIPE_PLAN_UNAVAILABLE')
+            revision = db.get(BillingPlanRevision, price.plan_revision_id)
             row = BillingCheckout(id=uid(), owner_id=owner_id, environment=cfg.stripe_environment,
-                price_id=cfg.stripe_price_id, customer_id=account.customer_id, return_url=cfg.stripe_return_url,
-                trial=account.trial_used_at is None, created_at=now(), expires_at=now()+timedelta(hours=23))
+                price_id=price.id, customer_id=account.customer_id, return_url=cfg.stripe_return_url,
+                trial=account.trial_used_at is None and revision.trial_days > 0, created_at=now(), expires_at=now()+timedelta(hours=23))
             db.add(row)
+        else:
+            stripe.require(row.price_id == price_id, 'STRIPE_CHECKOUT_PRICE_CONFLICT')
         checkout_id, trial = row.id, row.trial
         db.commit()
     session = recover_checkout(checkout_id)

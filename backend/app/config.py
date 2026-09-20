@@ -42,9 +42,8 @@ class Settings(BaseSettings):
     stripe_environment: Literal['test', 'live'] = 'test'
     stripe_secret_key: SecretStr = SecretStr('')
     stripe_webhook_secret: SecretStr = SecretStr('')
-    stripe_product_id: str = ''
-    stripe_price_id: str = ''
     stripe_return_url: str = ''
+    stripe_portal_configuration_id: str = Field(default='', pattern=r'^(bpc_[A-Za-z0-9]+)?$')
     quota_timezone: str = "Asia/Shanghai"
     retention_days: int = Field(default=0, ge=0)
     max_upload_bytes: int = 20 * 1024 * 1024
@@ -102,8 +101,6 @@ class Settings(BaseSettings):
                 raise ValueError('Stripe secret key does not match the environment')
             if not self.stripe_webhook_secret.get_secret_value().startswith('whsec_'):
                 raise ValueError('Stripe webhook secret is required')
-            if not self.stripe_product_id.startswith('prod_') or not self.stripe_price_id.startswith('price_'):
-                raise ValueError('Stripe product and monthly price are required')
             url = urlsplit(self.stripe_return_url)
             if (url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment):
                 raise ValueError('Stripe return URL must be an HTTPS page without credentials or query')

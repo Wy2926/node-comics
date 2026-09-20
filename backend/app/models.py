@@ -24,9 +24,6 @@ class User(Base):
     plus_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     plus_timezone: Mapped[str | None] = mapped_column(String(80))
     plus_monthly_pages: Mapped[int | None] = mapped_column(Integer)
-    billing_plus_started_at: Mapped[datetime | None] = mapped_column(DateTime)
-    billing_plus_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
-    billing_membership_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (CheckConstraint("plus_monthly_pages >= 0"),)
 

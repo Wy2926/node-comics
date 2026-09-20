@@ -31,6 +31,13 @@ def actual_identity(user=Depends(identity)):
     return {'id': user.id}
 
 
+# The production website catch-all precedes dynamically appended fixture routes.
+# Keep it last, as it is in the normal application entry point.
+website_mount = next(route for route in app.router.routes if getattr(route, 'name', None) == 'website')
+app.router.routes.remove(website_mount)
+app.router.routes.append(website_mount)
+
+
 if __name__ == '__main__':
     ready = Path(sys.argv[1])
     with socket.socket() as listener:

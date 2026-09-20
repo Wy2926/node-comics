@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Coba gratis 7 hari",
   "通过 Stripe 升级": "Tingkatkan melalui Stripe",
   "刷新权益": "Perbarui manfaat",
-  "订阅暂未开放": "Langganan belum tersedia"
+  "订阅暂未开放": "Langganan belum tersedia",
+  "订阅套餐": "Paket langganan",
+  "每年": "Per tahun",
+  "每月 {0} 页 AI 重绘": "{0} halaman gambar ulang AI per bulan",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Uji coba pertama: {0} hari dengan {1} halaman gambar ulang.",
+  "按年自动续费，重绘额度逐月生效。": "Diperpanjang setiap tahun. Kuota gambar ulang tersedia setiap bulan.",
+  "按月自动续费。": "Diperpanjang setiap bulan."
 }

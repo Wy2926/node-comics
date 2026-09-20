@@ -1,3 +1,4 @@
+import {billingOffer} from './billing-fixture-data';
 import {saveSession} from '../src/auth/storage';
 import {API_ORIGIN} from '../src/service';
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
@@ -106,7 +107,7 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_plan_items:3,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
-  const billing={enabled:!!billingScenario&&billingScenario!=='disabled',provider:'stripe',environment:'test',trial_eligible:billingScenario!=='paid',checkout_pending:false,subscription:billingScenario==='paid'?{status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
+  const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',provider:'stripe',environment:'test',trial_eligible:billingScenario!=='paid',checkout_pending:false,subscription:billingScenario==='paid'?{price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
   if(url.pathname==='/v1/billing/status')return billingScenario==='error'?json({error:{message:'Isolated billing failure'}},503):json(billing);
   if(url.pathname==='/v1/billing/sync')return json({billing,entitlements:rights});
   if(url.pathname==='/v1/billing/checkouts')return billingScenario==='checkout-error'?json({error:{message:'Isolated checkout failure'}},503):json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});

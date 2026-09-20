@@ -8,6 +8,7 @@ from .entitlement_models import MembershipOperation, QuotaPeriod
 from .errors import problem
 from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
+from .billing_access import active_terms, access_dates
 
 DAILY = "classic_daily"
 MONTHLY = "redraw_monthly"
@@ -39,16 +40,15 @@ def is_operator_plus(user, at=None):
                 and user.plus_started_at <= at < user.plus_expires_at)
 
 
-def is_plus(user, at=None):
+def is_plus(db, user, at=None):
     at = at or now()
-    return is_operator_plus(user, at) or bool(user.billing_plus_started_at and user.billing_plus_expires_at
-                and user.billing_plus_started_at <= at < user.billing_plus_expires_at)
+    return is_operator_plus(user, at) or bool(active_terms(db, user.id, at))
 
 
-def plus_dates(user, at=None):
+def plus_dates(db, user, at=None):
     at = at or now()
     ranges = [(start, end) for start, end in ((user.plus_started_at, user.plus_expires_at),
-              (user.billing_plus_started_at, user.billing_plus_expires_at)) if start and end]
+              access_dates(db, user.id, at)) if start and end]
     active = [(start, end) for start, end in ranges if start <= at < end]
     values = active or ranges
     return (min(start for start, _ in values), max(end for _, end in values)) if values else (None, None)
@@ -89,7 +89,7 @@ def period_spec(user, kind, at=None):
 
 
 def quota_kind(user, mode, at=None, db=None):
-    plus = is_plus(user, at)
+    plus = is_plus(db, user, at)
     if mode == "classic":
         return UNLIMITED if plus else DAILY
     if plus:
@@ -102,15 +102,15 @@ def quota_kind(user, mode, at=None, db=None):
     return "unavailable"
 
 
-def entitlement_version(user, kind):
+def entitlement_version(db, user, kind, at=None):
     return digest({"policy": "membership-pages-v1", "kind": kind,
-                   "membership": [user.membership_id, user.billing_membership_id] if kind in (MONTHLY, UNLIMITED) else None})
+                   "membership": [user.membership_id, [t.id for t in active_terms(db, user.id, at)]] if kind in (MONTHLY, UNLIMITED) else None})
 
 
 def available_periods(db, user, mode, kind, at):
     periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
         QuotaPeriod.mode == mode, or_(QuotaPeriod.source == "grant",
-            QuotaPeriod.source_key.startswith("stripe:")), QuotaPeriod.starts_at <= at,
+            QuotaPeriod.source == 'subscription'), QuotaPeriod.starts_at <= at,
         QuotaPeriod.ends_at > at)))
     spec = period_spec(user, kind, at)
     if spec:
@@ -141,22 +141,22 @@ def allowance_json(db, user, kind, at=None):
             "available": totals["granted"] - totals["used"] - totals["reserved"],
             "starts_at": iso(min(row.starts_at for row in periods)),
             "resets_at": iso(spec["ends_at"]) if spec else
-                (iso(min(row.ends_at for row in periods if row.source == 'membership'))
-                 if any(row.source == 'membership' for row in periods) else None),
+                (iso(min(row.ends_at for row in periods if row.source in ('membership', 'subscription')))
+                 if any(row.source in ('membership', 'subscription') for row in periods) else None),
             "next_expiry_at": iso(periods[0].ends_at), "buckets": [period_json(row) for row in periods]}
 
 
 def entitlements_json(db, user, at=None):
     at = at or now()
-    plus = is_plus(user, at)
+    plus = is_plus(db, user, at)
     from .plan_limits import image_limit
     modes = {}
     for mode in ("classic", "redraw"):
         kind = quota_kind(user, mode, at, db)
         modes[mode] = {"allowed": kind != "unavailable", "unlimited": kind == UNLIMITED,
-                       "quota_kind": kind, "consent_version": entitlement_version(user, kind),
+                       "quota_kind": kind, "consent_version": entitlement_version(db, user, kind, at),
                        "quota": allowance_json(db, user, kind, at)}
-    starts_at, expires_at = plus_dates(user, at)
+    starts_at, expires_at = plus_dates(db, user, at)
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "timezone": settings().quota_timezone,
             "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
@@ -180,9 +180,10 @@ def reserve(db, user, job, at=None):
     at = at or now()
     kind = require_entitlement(user, job.mode, at, db=db)
     job.quota_kind = kind
-    job.entitlement = {"plan": "plus" if is_plus(user, at) else "free", "accepted_at": iso(at),
-                       "membership_id": (user.billing_membership_id or user.membership_id) if is_plus(user, at) else None,
-                       "version": entitlement_version(user, kind)}
+    job.entitlement = {"plan": "plus" if is_plus(db, user, at) else "free", "accepted_at": iso(at),
+                       "membership_id": user.membership_id,
+                       "billing_term_ids": [term.id for term in active_terms(db, user.id, at)],
+                       "version": entitlement_version(db, user, kind, at)}
     if kind == UNLIMITED:
         job.quota_pages, job.settlement = 0, "included"
         return
@@ -275,7 +276,7 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
         else:
             # Revoking and re-enabling an unexpired paid month must not grant again.
             last = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id, QuotaPeriod.kind == MONTHLY,
-                             ~QuotaPeriod.source_key.startswith('stripe:'),
+                             QuotaPeriod.source == 'membership',
                              QuotaPeriod.ends_at > at).order_by(QuotaPeriod.starts_at.desc()))
             if last is not None:
                 problem("MEMBERSHIP_PERIOD_ACTIVE", "已有尚未结束的重绘额度周期，请在周期结束后重新开通", 409)
@@ -309,9 +310,9 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
         return previous.result
     spec = period_spec(user, kind)
     period = db.get(QuotaPeriod, spec['id']) if spec else None
-    if spec is None and kind == MONTHLY and is_plus(user):
+    if spec is None and kind == MONTHLY and is_plus(db, user):
         period = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == owner_id,
-            QuotaPeriod.source_key.startswith('stripe:'), QuotaPeriod.starts_at <= now(),
+            QuotaPeriod.source == 'subscription', QuotaPeriod.starts_at <= now(),
             QuotaPeriod.ends_at > now()).order_by(QuotaPeriod.ends_at).limit(1))
     if spec is None and period is None:
         problem("PLUS_REQUIRED", "补偿重绘额度需要有效 PLUS 会员", 403)

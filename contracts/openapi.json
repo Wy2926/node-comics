@@ -1542,6 +1542,25 @@
         ]
       }
     },
+    "/v1/billing/catalog": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Public Catalog",
+        "operationId": "public_catalog_v1_billing_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/billing/checkouts": {
       "post": {
         "tags": [
@@ -1549,12 +1568,32 @@
         ],
         "summary": "Checkout",
         "operationId": "checkout_v1_billing_checkouts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1612,6 +1651,172 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/v1/admin/billing/catalog": {
+      "get": {
+        "summary": "Catalog",
+        "operationId": "catalog_v1_admin_billing_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/billing/plans/{plan_id}/revisions": {
+      "post": {
+        "summary": "Create Revision",
+        "operationId": "create_revision_v1_admin_billing_plans__plan_id__revisions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/billing/prices": {
+      "post": {
+        "summary": "Create Price",
+        "operationId": "create_price_v1_admin_billing_prices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/billing/prices/{price_id}/status": {
+      "put": {
+        "summary": "Publish Price",
+        "operationId": "publish_price_v1_admin_billing_prices__price_id__status_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "price_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Price Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceState"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/admin/monitor/tasks": {
@@ -3917,6 +4122,22 @@
         ],
         "title": "CapabilitiesResponse"
       },
+      "CheckoutRequest": {
+        "properties": {
+          "price_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Price Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "price_id"
+        ],
+        "title": "CheckoutRequest"
+      },
       "ClaimRequest": {
         "properties": {
           "request_id": {
@@ -5794,6 +6015,96 @@
         ],
         "title": "PlanItem"
       },
+      "PriceRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id"
+          },
+          "plan_revision_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Plan Revision Id"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[a-z]{3}$",
+            "title": "Currency"
+          },
+          "unit_amount": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Unit Amount"
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "month",
+              "year"
+            ],
+            "title": "Interval"
+          },
+          "stripe_product_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "pattern": "^prod_[a-zA-Z0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Product Id"
+          },
+          "stripe_price_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "pattern": "^price_[a-zA-Z0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Price Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "plan_revision_id",
+          "currency",
+          "unit_amount",
+          "interval"
+        ],
+        "title": "PriceRequest"
+      },
+      "PriceState": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PriceState"
+      },
       "PriorityResponse": {
         "properties": {
           "owned": {
@@ -6320,6 +6631,51 @@
           "operation_keys"
         ],
         "title": "ResolveRequest"
+      },
+      "RevisionRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "monthly_redraw_pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Monthly Redraw Pages"
+          },
+          "trial_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Trial Days"
+          },
+          "trial_redraw_pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Trial Redraw Pages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "monthly_redraw_pages",
+          "trial_days",
+          "trial_redraw_pages"
+        ],
+        "title": "RevisionRequest"
       },
       "StatusRequest": {
         "properties": {

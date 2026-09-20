@@ -1,5 +1,5 @@
 import { UserManager, WebStorageStateStore, ErrorResponse, type User } from 'oidc-client-ts';
-import { oidcSettings, type AuthConfig } from './auth-config';
+import { accountReturnPath, oidcSettings, type AuthConfig } from './auth-config';
 let managerPromise: Promise<UserManager> | undefined;
 let renewal: Promise<User | null> | undefined;
 let generation = 0;
@@ -22,14 +22,14 @@ export async function manager() {
 
 export async function signIn(returnPath = '/account/') {
   const auth = await manager();
-  sessionStorage.setItem('nc-site-return', /^\/(?:zh-tw\/|en\/|ja\/|ko\/)?account\/$/.test(returnPath) ? returnPath : '/account/');
+  sessionStorage.setItem('nc-site-return', accountReturnPath(returnPath));
   await auth.signinRedirect({ prompt: 'login consent' });
 }
 
 export function loginReturnPath() {
   const path = sessionStorage.getItem('nc-site-return') || '/account/';
   sessionStorage.removeItem('nc-site-return');
-  return /^\/(?:zh-tw\/|en\/|ja\/|ko\/)?account\/$/.test(path) ? path : '/account/';
+  return accountReturnPath(path);
 }
 
 export async function signOut() {
@@ -81,12 +81,12 @@ export async function finishLogin() {
   }
 }
 
-export async function api<T>(path: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
+export async function api<T>(path: string, method: 'GET' | 'POST' = 'GET', body?:unknown): Promise<T> {
   if (!path.startsWith('/v1/')) throw Error('无效的账户请求');
   const started = generation;
   let user = await session();
   if (!user) throw new ApiError('请登录后查看账户。', 401);
-  const send = (token: string) => fetch(path, { method, credentials: 'omit', cache: 'no-store', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+  const send = (token: string) => fetch(path, { method, credentials: 'omit', cache: 'no-store', headers: { Authorization: `Bearer ${token}`, ...(body?{'Content-Type':'application/json'}:{}) }, body:body?JSON.stringify(body):undefined, signal: AbortSignal.timeout(20000) });
   let response = await send(user.access_token);
   // Only read requests are replayed automatically; checkout mutations are explicit.
   if (response.status === 401 && method === 'GET' && user.refresh_token && generation === started) {

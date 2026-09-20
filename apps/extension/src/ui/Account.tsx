@@ -9,6 +9,9 @@ import {AccountUsage} from './Usage';
 import {FeedbackInbox} from './Feedback';
 import './account.css';
 
+// Temporarily hide the subscription offer; keep the billing component ready to reopen.
+const SHOW_PLUS_CARD=false;
+
 export function AccountPage({api,account,rights,testing,onLogin,onLogout,onEntitlements,notify}:{api:Api;account:Session|null;rights?:Entitlements;testing:boolean;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void;notify:(message:string)=>void}) {
   const plus=!!account&&rights?.plan==='plus';
   return <div className="nc-account-page">
@@ -20,10 +23,10 @@ export function AccountPage({api,account,rights,testing,onLogin,onLogout,onEntit
         <button className="button quiet small" onClick={account?onLogout:onLogin}><Icon name={account?'logout':'arrow'} size={16}/>{account?msg("退出登录"):msg("登录账户")}</button>
       </div>
     </header>
-    <div className={'nc-account-overview'+(!account?' is-guest':'')}>
+    {(account||SHOW_PLUS_CARD)&&<div className={'nc-account-overview'+(SHOW_PLUS_CARD&&account?' has-membership-card':'')}>
       {account&&<EntitlementCards data={rights}/>}
-      <MembershipCard api={api} loggedIn={!!account} rights={rights} onLogin={onLogin} onEntitlements={onEntitlements} notify={notify}/>
-    </div>
+      {SHOW_PLUS_CARD&&<MembershipCard api={api} loggedIn={!!account} rights={rights} onLogin={onLogin} onEntitlements={onEntitlements} notify={notify}/>}
+    </div>}
     {account?<><section className="nc-account-activity" aria-label={msg("翻译用量")}><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/></section><FeedbackInbox api={api}/></>:<section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg("你的阅读足迹，即将在这里展开")}</h2><p>{msg("登录后查看重绘额度、每日交付和反馈进展。")}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}<Icon name="arrow" size={17}/></button></section>}
   </div>;
 }

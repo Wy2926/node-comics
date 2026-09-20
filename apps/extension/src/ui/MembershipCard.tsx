@@ -2,11 +2,13 @@ import {useEffect,useRef,useState} from 'react';
 import {msg,getLocale} from '../i18n/runtime';
 import type {Api} from '../api';
 import type {Entitlements} from '../types';
-import {type BillingStatus,stripeUrl} from '../billing';
+import {type BillingStatus,stripeUrl,offerAmount} from '../billing';
 import {Icon} from '../icons';
 
 export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notify}:{api:Api;loggedIn:boolean;rights?:Entitlements;onLogin:()=>void;onEntitlements:(value:Entitlements)=>void;notify:(message:string)=>void}) {
   const [billing,setBilling]=useState<BillingStatus>();
+  const [selectedPrice,setSelectedPrice]=useState('');
+  const [preferredCycle,setPreferredCycle]=useState<'month'|'year'>('month');
   const [opening,setOpening]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState('');
@@ -19,7 +21,12 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notif
   const plus=loggedIn&&rights?.plan==='plus';
   const subscription=billing?.subscription;
   const managed=!!subscription&&(!['canceled','incomplete_expired'].includes(subscription.status)||[subscription.paid_ends_at,subscription.trial_ends_at].some(date=>!!date&&Date.parse(date)>Date.now()));
-  const trial=billing?.trial_eligible;
+  const available=billing?.offers??[];
+  const preferred=available.find(p=>p.id===selectedPrice)?.interval??preferredCycle;
+  const cycle=available.some(p=>p.interval===preferred)?preferred:available[0]?.interval??preferred;
+  const visibleOffers=available.filter(p=>p.interval===cycle);
+  const offer=(managed?subscription.price:billing?.checkout_price)??visibleOffers.find(p=>p.id===selectedPrice)??visibleOffers[0];
+  const trial=billing?.trial_eligible&&!!offer?.trial_days;
   useEffect(()=>{
     const current=++generation.current;
     setBilling(undefined);setError('');setRefreshError('');setOpening(false);setRefreshing(false);
@@ -58,14 +65,14 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notif
   async function openPayment(){
     if(!loggedIn){onLogin();return;}
     // Background membership reads never consume the user's click or disable this action.
-    if(openingRef.current||!billing?.enabled)return;
+    if(openingRef.current||!billing?.enabled||(!managed&&!offer))return;
     const current=generation.current;openingRef.current=true;setOpening(true);setError('');
     const extension=typeof chrome!=='undefined'&&!!chrome.runtime?.id;
     let popup:Window|null=null;
     try{
       // Reserve the tab during the click so browsers do not block the async handoff.
       if(!extension){popup=window.open('about:blank','_blank');if(!popup)throw Error('popup blocked');popup.opener=null;}
-      const result=managed?await api.billingPortal():await api.startCheckout();
+      const result=managed?await api.billingPortal():await api.startCheckout(offer!.id);
       if(current!==generation.current){popup?.close();return;}
       const url=stripeUrl('url' in result?result.url:result.checkout_url,managed);
       if(extension)await chrome.tabs.create({url});
@@ -76,13 +83,14 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notif
   }
   return <section className="nc-membership-card" aria-label="NodeLane Comics PLUS" aria-busy={opening}>
     <div className="nc-membership-heading"><span className="nc-icon-tile"><Icon name="crown" size={26}/></span><span className="nc-eyebrow">NODELANE COMICS PLUS</span>{plus&&<span className="nc-plan-badge">{msg('已开通')}</span>}</div>
-    <div className="nc-membership-price"><strong>US$9.99</strong><span>{msg('每月')}</span></div>
-    <ul className="nc-membership-benefits"><li><Icon name="check"/><span>{msg('常规翻译不限页数')}</span></li><li><Icon name="spark"/><span>{msg('每个付费月 300 页 AI 重绘')}</span></li><li><Icon name="bolt"/><span>{msg('每滚动 60 秒最多新增 100 张翻译图片')}</span></li></ul>
-    <p className="nc-membership-terms">{(!loggedIn||trial)&&msg('首次绑卡试用 7 天，含 30 页重绘；随后自动按月续费。')}{msg('可随时取消续费，剩余重绘页数不累积。税费与最终金额以 Stripe 为准。')}</p>
+    {!managed&&!billing?.checkout_pending&&available.length>0&&<><div className="nc-billing-cycle" role="group" aria-label={msg('订阅套餐')}>{(['month','year'] as const).map(value=><button type="button" key={value} aria-pressed={cycle===value} disabled={opening||!available.some(p=>p.interval===value)} onClick={()=>{setPreferredCycle(value);setSelectedPrice('');}}>{value==='year'?msg('每年'):msg('每月')}</button>)}</div><div className="nc-billing-plans">{visibleOffers.map(p=><button type="button" key={p.id} aria-pressed={offer?.id===p.id} disabled={opening} onClick={()=>setSelectedPrice(p.id)}><strong>{p.name}</strong><span>{offerAmount(p,getLocale())} / {p.interval==='year'?msg('每年'):msg('每月')}</span></button>)}</div></>}
+    {offer&&<><div className="nc-membership-price"><strong>{offerAmount(offer,getLocale())}</strong><span>{offer.interval==='year'?msg('每年'):msg('每月')}</span></div>
+    <ul className="nc-membership-benefits"><li><Icon name="check"/><span>{msg('常规翻译不限页数')}</span></li><li><Icon name="spark"/><span>{msg('每月 {0} 页 AI 重绘',{'0':offer.monthly_redraw_pages})}</span></li></ul>
+    <p className="nc-membership-terms">{trial&&msg('首次试用 {0} 天，含 {1} 页重绘。',{'0':offer.trial_days,'1':offer.trial_redraw_pages})}{offer.interval==='year'?msg('按年自动续费，重绘额度逐月生效。'):msg('按月自动续费。')}{msg('可随时取消续费，剩余重绘页数不累积。税费与最终金额以 Stripe 为准。')}</p></>}
     {plus&&rights?.plus_expires_at&&<p>{msg('有效至 {0}',{'0':new Date(rights.plus_expires_at).toLocaleDateString(getLocale())})}</p>}
     {billing?.subscription?.cancel_at&&<p>{msg('已取消续费，当前权益保留至到期。')}</p>}
-    <div className="nc-membership-footer"><button className="button primary" disabled={opening||(loggedIn&&!billing?.enabled)} onClick={()=>void openPayment()}>{opening?msg('处理中…'):!loggedIn?msg('登录后升级'):managed?msg('在 Stripe 管理订阅'):billing?.checkout_pending?msg('继续 Stripe 结账'):trial?msg('免费试用 7 天'):msg('通过 Stripe 升级')}<Icon name="external" size={16}/></button>{loggedIn&&<button className="button quiet small" disabled={opening||refreshing} onClick={()=>void refresh()}>{msg('刷新权益')}</button>}</div>
-    {loggedIn&&billing&&!billing.enabled&&<p role="status">{msg('订阅暂未开放')}</p>}
+    <div className="nc-membership-footer"><button className="button primary" disabled={opening||(loggedIn&&(!billing?.enabled||(!managed&&!offer)))} onClick={()=>void openPayment()}>{opening?msg('处理中…'):!loggedIn?msg('登录后升级'):managed?msg('在 Stripe 管理订阅'):billing?.checkout_pending?msg('继续 Stripe 结账'):msg('通过 Stripe 升级')}<Icon name="external" size={16}/></button>{loggedIn&&<button className="button quiet small" disabled={opening||refreshing} onClick={()=>void refresh()}>{msg('刷新权益')}</button>}</div>
+    {loggedIn&&billing&&(!billing.enabled||(!managed&&!offer))&&<p role="status">{msg('订阅暂未开放')}</p>}
     {(error||refreshError)&&<p className="nc-billing-error" role="alert">{error||refreshError}</p>}
   </section>;
 }

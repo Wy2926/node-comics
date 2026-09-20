@@ -57,7 +57,7 @@ export class Api {
     return result;
   }
   billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
-  startCheckout(){return this.request<{checkout_url:string;trial:boolean}>('/v1/billing/checkouts',{method:'POST'});}
+  startCheckout(priceId:string){return this.request<{checkout_url:string;trial:boolean}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId})});}
   billingPortal(){return this.request<{url:string}>('/v1/billing/portal',{method:'POST'});}
   syncBilling(){return this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});}
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }

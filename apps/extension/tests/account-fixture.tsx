@@ -1,3 +1,4 @@
+import {billingOffer} from './billing-fixture-data';
 import {saveSession,readAuth} from '../src/auth/storage';
 import {initializeUiLanguage} from '../src/i18n/load';
 import type {Session} from '../src/auth/model';
@@ -29,7 +30,7 @@ window.fetch=async(input)=>{
  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
  if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
  if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights(),retention_days:0});
- const billing={enabled:true,provider:'stripe',environment:'test',trial_eligible:['free','exhausted'].includes(scenario),checkout_pending:false,subscription:['free','exhausted'].includes(scenario)?null:{status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,cancel_at:null}};
+ const billing={offers:[billingOffer],checkout_price:null,enabled:true,provider:'stripe',environment:'test',trial_eligible:['free','exhausted'].includes(scenario),checkout_pending:false,subscription:['free','exhausted'].includes(scenario)?null:{price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,cancel_at:null}};
  if(path==='/v1/billing/status')return Response.json(billing);
  if(path==='/v1/billing/sync')return failSync?Response.json({error:{message:'模拟刷新失败'}},{status:503}):Response.json({billing,entitlements:rights()});
  if(path==='/v1/billing/checkouts')return Response.json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});

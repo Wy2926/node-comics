@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { oidcSettings, checkoutUrl, type AuthConfig } from '../src/lib/auth-config';
+import { accountReturnPath, oidcSettings, checkoutUrl, type AuthConfig } from '../src/lib/auth-config';
 const config: AuthConfig = { mode:'oidc', dev_auth:false, issuer:'https://identity.example/oidc', client_id:'same-extension-client', audience:'https://comics.nodelane.net/api', authorization_endpoint:'https://identity.example/oidc/auth', token_endpoint:'https://identity.example/oidc/token', scopes:'openid profile offline_access' };
+test('login preserves the selected quote without accepting arbitrary redirects', () => {
+  for (const path of ['/account/','/en/account/?price=plus-annual','/zh-tw/account/?price=quote_123']) assert.equal(accountReturnPath(path),path);
+  for (const path of ['//evil.example/account/','https://evil.example/account/','/account/?price=x&redirect=evil','/account/?price=../x','/account/?price='+ 'a'.repeat(37)]) assert.equal(accountReturnPath(path),'/account/');
+});
 test('uses the existing public OIDC client, exact callback and API resource', () => {
   const settings = oidcSettings(config, 'https://comics.nodelane.net');
   assert.equal(settings.client_id,config.client_id);

@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Dùng thử miễn phí 7 ngày",
   "通过 Stripe 升级": "Nâng cấp qua Stripe",
   "刷新权益": "Cập nhật quyền lợi",
-  "订阅暂未开放": "Chưa mở đăng ký"
+  "订阅暂未开放": "Chưa mở đăng ký",
+  "订阅套餐": "Gói đăng ký",
+  "每年": "Hằng năm",
+  "每月 {0} 页 AI 重绘": "{0} trang vẽ lại bằng AI mỗi tháng",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Dùng thử lần đầu: {0} ngày và {1} trang vẽ lại.",
+  "按年自动续费，重绘额度逐月生效。": "Tự động gia hạn hằng năm. Hạn mức vẽ lại được cấp từng tháng.",
+  "按月自动续费。": "Tự động gia hạn hằng tháng."
 }

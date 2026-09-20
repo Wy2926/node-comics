@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Teste grátis por 7 dias",
   "通过 Stripe 升级": "Assinar pelo Stripe",
   "刷新权益": "Atualizar benefícios",
-  "订阅暂未开放": "Assinaturas ainda não disponíveis"
+  "订阅暂未开放": "Assinaturas ainda não disponíveis",
+  "订阅套餐": "Plano de assinatura",
+  "每年": "Por ano",
+  "每月 {0} 页 AI 重绘": "{0} páginas de redesenho com IA por mês",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Primeiro teste: {0} dias com {1} páginas de redesenho.",
+  "按年自动续费，重绘额度逐月生效。": "Renovação anual. A cota de redesenho é liberada a cada mês.",
+  "按月自动续费。": "Renovação mensal."
 }

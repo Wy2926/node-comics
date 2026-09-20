@@ -24,8 +24,8 @@ def lock_scheduler(db):
         db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1).values(revision=SchedulerMutex.revision))
 
 
-def limits_for(user):
-    cfg, plus = settings(), is_plus(user)
+def limits_for(db, user):
+    cfg, plus = settings(), is_plus(db, user)
     return {"weight": cfg.plus_scheduler_weight if plus else cfg.free_scheduler_weight}
 
 
@@ -289,7 +289,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         choices.append((0 if chosen_class == "realtime" else 1, cls_states[chosen_class].updated_at,
                         stage, job, pool, chosen_class, accounts[owner], cls_states[chosen_class], floor, accounts))
     _, _, stage, job, pool, cls, user_state, class_state, floor, accounts = min(choices, key=lambda v: (v[0], v[1]))
-    weight = limits_for(snapshot["users"][job.owner_id])["weight"]
+    weight = limits_for(db, snapshot["users"][job.owner_id])["weight"]
     estimate = _estimate(db, pool, stage, records)
     share = cfg.realtime_share if cls == "realtime" else 1 - cfg.realtime_share
     user_state.service += estimate / weight

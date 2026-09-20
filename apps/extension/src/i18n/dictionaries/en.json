@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Try free for 7 days",
   "通过 Stripe 升级": "Upgrade with Stripe",
   "刷新权益": "Refresh benefits",
-  "订阅暂未开放": "Subscriptions are not available yet"
+  "订阅暂未开放": "Subscriptions are not available yet",
+  "订阅套餐": "Subscription plan",
+  "每年": "Yearly",
+  "每月 {0} 页 AI 重绘": "{0} AI redraw pages each month",
+  "首次试用 {0} 天，含 {1} 页重绘。": "First trial: {0} days with {1} redraw pages.",
+  "按年自动续费，重绘额度逐月生效。": "Renews annually. Redraw quotas become available monthly.",
+  "按月自动续费。": "Renews monthly."
 }

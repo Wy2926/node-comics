@@ -96,15 +96,17 @@ def policy_wakeups(db, flush_context, instances):
     """Wake on entitlement mutations; snapshots compute their durable revision."""
     from .models import User
     from .entitlement_models import QuotaPeriod
+    from .billing_models import BillingTerm
     topics = set()
     for row in db.new | db.dirty:
         if isinstance(row, User):
             state = inspect(row)
             if any(state.attrs[name].history.has_changes() for name in (
-                    'membership_id', 'plus_started_at', 'plus_expires_at', 'plus_monthly_pages',
-                    'billing_membership_id', 'billing_plus_started_at', 'billing_plus_expires_at') if name in state.attrs):
+                    'membership_id', 'plus_started_at', 'plus_expires_at', 'plus_monthly_pages') if name in state.attrs):
                 if row.id:
                     topics.add('user:' + row.id)
+        elif isinstance(row, BillingTerm):
+            topics.add('user:' + row.owner_id)
         elif isinstance(row, QuotaPeriod):
             state = inspect(row)
             if row in db.new or any(state.attrs[name].history.has_changes()
@@ -120,6 +122,10 @@ def committed(db):
     if db.in_nested_transaction():
         return
     topics = db.info.pop('wake_topics', ())
+    # PostgreSQL already delivers these via LISTEN after commit. Emitting here
+    # as well produces a delayed duplicate that can wake the next transaction.
+    if db.get_bind().dialect.name == 'postgresql':
+        return
     with _lock:
         current = _hubs.get(db.get_bind())
     if current:

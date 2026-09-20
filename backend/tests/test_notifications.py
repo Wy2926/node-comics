@@ -91,6 +91,8 @@ def test_policy_only_change_wakes_long_poll_with_no_duplicate_job_fetch(client):
 
 
 def test_nested_page_savepoints_notify_only_after_outer_commit(client):
+    if engine().dialect.name == 'postgresql':
+        assert hub().ready.wait(3), 'Wait for initial LISTEN reconnect wakeup before testing transactions'
     async def run():
         with hub().subscribe('savepoints') as wake:
             with session_factory()() as db:

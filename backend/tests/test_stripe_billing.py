@@ -19,8 +19,6 @@ def test_real_sdk_client_can_make_sync_requests(monkeypatch, client):
     monkeypatch.setenv('STRIPE_ENABLED', 'true')
     monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_fixture')
     monkeypatch.setenv('STRIPE_WEBHOOK_SECRET', 'whsec_fixture')
-    monkeypatch.setenv('STRIPE_PRODUCT_ID', 'prod_plus')
-    monkeypatch.setenv('STRIPE_PRICE_ID', 'price_plus')
     monkeypatch.setenv('STRIPE_RETURN_URL', 'https://comics.example/account/')
     settings.cache_clear()
     calls = []
@@ -45,7 +43,6 @@ def test_real_sdk_client_can_make_sync_requests(monkeypatch, client):
 def billing(monkeypatch, request):
     for key, value in {'STRIPE_ENABLED':'true', 'STRIPE_ENVIRONMENT':'test',
         'STRIPE_SECRET_KEY':'sk_test_fixture', 'STRIPE_WEBHOOK_SECRET':'whsec_fixture',
-        'STRIPE_PRODUCT_ID':'prod_plus', 'STRIPE_PRICE_ID':'price_plus',
         'STRIPE_RETURN_URL':'https://comics.example/account/'}.items():
         monkeypatch.setenv(key, value)
     client = request.getfixturevalue('client')
@@ -56,6 +53,15 @@ def billing(monkeypatch, request):
     price = {'id':'price_plus', 'object':'price', 'active':True, 'livemode':False, 'product':'prod_plus',
         'currency':'usd', 'unit_amount':999, 'recurring':{'interval':'month','interval_count':1,'usage_type':'licensed'}}
     state['price'] = price
+    state['prices'] = {price['id']: price}
+    state['price_id'] = 'fixture-price'
+    from app.db import session_factory
+    from app.billing_models import BillingPrice
+    with session_factory()() as db:
+        db.add(BillingPrice(id=state['price_id'], plan_id='plus', plan_revision_id='plus-v1',
+            environment='test', currency='usd', unit_amount=999, interval='month',
+            stripe_product_id='prod_plus', stripe_price_id='price_plus', status='active'))
+        db.commit()
 
     class Transport(sdk.HTTPClient):
         name = 'isolated-stripe-fixture'
@@ -64,13 +70,13 @@ def billing(monkeypatch, request):
             params = {k:v[0] for k,v in parse_qs(post_data if method == 'post' else urlsplit(url).query).items()}
             state['requests'].append((method, path, params, headers))
             assert urlsplit(url).hostname == 'api.stripe.com'
-            if path == '/v1/prices/price_plus':
-                data = state['price']
+            if path.startswith('/v1/prices/'):
+                data = state['prices'][path.split('/')[-1]]
             elif path == '/v1/checkout/sessions' and method == 'post':
                 key = headers['Idempotency-Key']
                 state['posts'].append((key, params))
                 # Stripe replays the original response for the same idempotency key.
-                data = state['sessions'].setdefault(key, {'object':'checkout.session', 'id':'cs_test_fixture',
+                data = state['sessions'].setdefault(key, {'object':'checkout.session', 'id':'cs_test_fixture'+str(len(state['sessions'])),
                     'livemode':False, 'mode':'subscription', 'status':'open', 'subscription':None,
                     'customer':params.get('customer'), 'client_reference_id':params['client_reference_id'],
                     'metadata':{'app':'node_comics','checkout_intent_id':params['metadata[checkout_intent_id]']},
@@ -95,6 +101,7 @@ def billing(monkeypatch, request):
                 data = state['invoices'][path.split('/')[-1]]
             elif path == '/v1/billing_portal/sessions':
                 state['portal_customer'] = params['customer']
+                state['portal_configuration'] = params.get('configuration')
                 data = {'object':'billing_portal.session','id':'bps_fixture','url':'https://billing.stripe.com/p/session/fixture'}
             else:
                 raise AssertionError((method, path, params))
@@ -108,7 +115,7 @@ def billing(monkeypatch, request):
 
 
 def checkout(state):
-    response = state['client'].post('/v1/billing/checkouts', headers=state['auth'])
+    response = state['client'].post('/v1/billing/checkouts', headers=state['auth'], json={'price_id':state['price_id']})
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -127,15 +134,15 @@ def complete_trial(state, synchronize=True):
         sync_session(session['id'])
 
 
-def invoice(state, index=1, start=None, status='paid', total=999, reason='subscription_cycle'):
+def invoice(state, index=1, start=None, status='paid', total=999, reason='subscription_cycle', end=None):
     start = start or state['at']
     value = {'id':f'in_{index:04d}', 'object':'invoice', 'livemode':False, 'customer':'cus_fixture',
-        'status':status, 'amount_remaining':0 if status=='paid' else total, 'total':total, 'currency':'usd',
+        'status':status, 'amount_remaining':0 if status=='paid' else total, 'total':total, 'currency':state['price']['currency'],
         'billing_reason':reason, 'parent':{'subscription_details':{'subscription':'sub_fixture'}},
         'lines':{'has_more':False,'data':[{'id':f'il_{index}', 'quantity':1,
-            'pricing':{'price_details':{'price':'price_plus','product':'prod_plus'}},
+            'pricing':{'price_details':{'price':state['price']['id'],'product':state['price']['product']}},
             'parent':{'subscription_item_details':{'subscription':'sub_fixture','proration':False}},
-            'period':{'start':start,'end':start+30*86400}}]}}
+            'period':{'start':start,'end':end or start+30*86400}}]}}
     state['invoices'][value['id']] = value
     return value
 
@@ -148,7 +155,7 @@ def periods():
     from app.db import session_factory
     from app.entitlement_models import QuotaPeriod
     with session_factory()() as db:
-        return list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.source_key.startswith('stripe:'))))
+        return list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.source == 'subscription')))
 
 
 def test_hosted_checkout_is_account_bound_and_reuses_session(billing):
@@ -158,6 +165,7 @@ def test_hosted_checkout_is_account_bound_and_reuses_session(billing):
     params = billing['posts'][0][1]
     assert params['subscription_data[trial_period_days]'] == '7'
     assert params['payment_method_collection'] == 'always'
+    assert params['currency'] == 'usd' and params['adaptive_pricing[enabled]'] == 'false'
     assert params['success_url'] == 'https://comics.example/payment/success/'
     assert params['cancel_url'] == 'https://comics.example/account/'
     assert params['subscription_data[metadata][checkout_intent_id]'] == params['client_reference_id']
@@ -166,7 +174,7 @@ def test_hosted_checkout_is_account_bound_and_reuses_session(billing):
 
 def test_lost_create_response_retries_same_key_and_parameters(billing):
     billing['lost'] = True
-    response = billing['client'].post('/v1/billing/checkouts', headers=billing['auth'])
+    response = billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']})
     assert response.status_code == 503
     checkout(billing)
     assert len(billing['sessions']) == 1 and billing['posts'][0] == billing['posts'][1]
@@ -177,7 +185,7 @@ def test_unknown_create_past_retention_only_looks_up_original(billing):
     from app.billing_models import BillingCheckout
     from app.billing_checkout import recover_checkout
     billing['lost'] = True
-    billing['client'].post('/v1/billing/checkouts', headers=billing['auth'])
+    billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']})
     with session_factory()() as db:
         row = db.scalar(select(BillingCheckout))
         row.created_at -= timedelta(days=3)
@@ -198,7 +206,7 @@ def test_trial_conversion_and_replay_never_double_grant(billing):
     sync_subscription('sub_fixture')
     assert sorted(p.granted for p in periods()) == [30,300]
     assert rights(billing)['modes']['redraw']['quota']['available'] == 300
-    assert billing['client'].post('/v1/billing/checkouts', headers=billing['auth']).status_code == 409
+    assert billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']}).status_code == 409
 
 
 @pytest.mark.parametrize('total',[0,999])
@@ -241,13 +249,16 @@ def test_cancel_and_payment_failure_retain_only_granted_term(billing):
     assert [p.granted for p in periods()]==[30]
 
 
-def test_portal_is_scoped_to_authenticated_customer(billing):
+def test_portal_is_scoped_to_authenticated_customer(billing, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings(), 'stripe_portal_configuration_id', 'bpc_fixture')
     complete_trial(billing)
     other=login(billing['client'],'other')
     assert billing['client'].post('/v1/billing/portal',headers=other).status_code==404
     result=billing['client'].post('/v1/billing/portal',headers=billing['auth'])
     assert result.status_code==200 and result.json()['url'].startswith('https://billing.stripe.com/')
     assert billing['portal_customer']=='cus_fixture'
+    assert billing['portal_configuration']=='bpc_fixture'
 
 
 def test_trial_cannot_be_repeated(billing):
@@ -359,7 +370,7 @@ def test_completed_unbound_checkout_is_reconciled_without_webhook(billing):
 def test_concurrent_checkout_uses_one_intent(billing):
     from app.billing_checkout import start_checkout
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results=list(pool.map(lambda _:start_checkout(billing['owner']),range(2)))
+        results=list(pool.map(lambda _:start_checkout(billing['owner'], billing['price_id']),range(2)))
     assert results[0]['checkout_url']==results[1]['checkout_url']
     assert len({key for key,_ in billing['posts']})==1
     assert len(billing['sessions'])==1

@@ -2,7 +2,7 @@
 
 2026-09-19 已实现[阅读计划契约](../docs/READING_TRANSLATION_CONTRACT.md)：普通／PLUS 分别最多新增 30／100 张翻译图片每滚动 60 秒，取消账户在途数量限制。统一逐页回执、断线核实、会话优先级与增量通知；后台持久任务、公平调度和私有 R2 保留。
 
-数据库只保留最终初始基线 `stripe_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
+数据库只保留最终初始基线 `subscription_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
 
 FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Stripe 默认关闭，沙盒与生产使用不同数据库，见[支付接入](../docs/STRIPE_BILLING.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
 
@@ -17,7 +17,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-eng
 # 配置 ADMIN_WEB_PATH 后，在该后台入口的 #translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `stripe_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `subscription_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
 三个控制进程可独立运行。以下仅列进程入口；本机运行需先安装 `backend/requirements.txt`，启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
@@ -59,6 +59,8 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 文本供应商密钥保存在后端 DB revision 中，调用前严格校验完整配置快照并加载对应版本密钥，不读取环境变量或借用图片供应商配置。密钥不进入 API 响应、任务快照或计算节点；数据库及备份包含敏感密钥，必须限制访问权限。有效供应商及版本进入内容缓存身份；会员页数和权重不改变图片缓存身份。
 
 ## 管理后台
+
+“订阅套餐”（`#billing`）维护不可变权益版本与月付／年付报价，默认草稿，发布后仅影响新订阅。初始 PLUS 草稿不自动售卖；年付及新套餐价格由运营配置。旧订阅保留原价和权益，见[订阅设计](../docs/STRIPE_BILLING.md)。`PLUS_MONTHLY_REDRAW_PAGES` 仅作为运营会员默认值，付费订阅使用其绑定版本。
 
 公开官网位于 [website](website/README.md)，与 API 共用 `https://comics.nodelane.net`；Astro 静态输出、React 账户岛、五语独立字典，并复用相同 OIDC。Docker 构建自动打包，商店 URL 配置及身份回调要求见官网说明。
 

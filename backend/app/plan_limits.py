@@ -19,7 +19,7 @@ def image_limit(db, user):
     from .entitlements import is_plus
     from .system_settings import get_request_limits
     cfg = get_request_limits(db)
-    return cfg.plus_images_per_minute if is_plus(user) else cfg.free_images_per_minute
+    return cfg.plus_images_per_minute if is_plus(db, user) else cfg.free_images_per_minute
 
 
 def image_budget(db, user, at=None):

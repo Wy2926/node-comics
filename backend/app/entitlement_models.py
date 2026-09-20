@@ -10,6 +10,7 @@ class QuotaPeriod(Base):
     __tablename__ = "quota_periods"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    billing_term_id: Mapped[str | None] = mapped_column(ForeignKey('billing_terms.id'), index=True)
     kind: Mapped[str] = mapped_column(String(30))
     mode: Mapped[str] = mapped_column(String(20))
     source: Mapped[str] = mapped_column(String(20))
@@ -24,7 +25,8 @@ class QuotaPeriod(Base):
     __table_args__ = (UniqueConstraint("owner_id", "source_key"),
                      Index("ix_quota_periods_owner_mode_end", "owner_id", "mode", "ends_at"),
                      CheckConstraint("mode IN ('classic', 'redraw')"),
-                     CheckConstraint("source IN ('daily', 'membership', 'grant')"),
+                     CheckConstraint("source IN ('daily', 'membership', 'grant', 'subscription')"),
+                     CheckConstraint("(source = 'subscription' AND billing_term_id IS NOT NULL) OR (source != 'subscription' AND billing_term_id IS NULL)"),
                      CheckConstraint("used >= 0"), CheckConstraint("reserved >= 0"),
                      CheckConstraint("granted >= used + reserved"), CheckConstraint("ends_at > starts_at"))
 

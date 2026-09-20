@@ -10,3 +10,20 @@
 @media(max-width:760px){.header-inner{gap:12px}.language-menu{font-size:.7rem}.mobile-nav nav{top:74px}.brand small{font-size:.5rem;letter-spacing:0;max-width:155px;white-space:normal}.hero h1{max-width:430px}.hero-copy>p{max-width:100%}html[lang=en] .hero h1{font-size:3.15rem}html[lang=ja] .hero h1,html[lang=ko] .hero h1{font-size:2.7rem}.speech-note{max-width:310px!important}.hero-actions{flex-wrap:wrap}.cta-section .button{max-width:100%;white-space:normal}.feature-ribbon .ribbon-inner{font-size:.71rem}.header-inner .brand{gap:7px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}}
 .brand>img{width:220px;height:44px;object-fit:contain}.brand{flex-shrink:0}@media(max-width:760px){.brand>img{width:185px;height:37px}}
+
+.billing-offer + .billing-offer { margin-top: 32px; padding-top: 28px; border-top: 1px solid #b7c7d7; }
+.billing-cycle {padding:0;margin:24px 0;border:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
+.billing-cycle legend {font-size:.78rem;color:var(--muted);margin-bottom:10px}
+.billing-cycle .billing-cycle-card {position:relative;display:flex;flex-direction:column;gap:7px;align-items:flex-start;cursor:pointer;padding:18px 36px 18px 16px;margin:0;border:2px solid #c4ccd8;border-radius:12px;background:white;min-width:0;transition:border-color .15s,box-shadow .15s}
+.billing-cycle-card strong {font-size:1.1rem;color:var(--ink)}
+.billing-cycle-card small {font-size:.73rem;line-height:1.5;color:var(--muted)}
+.billing-cycle .billing-cycle-card input {position:absolute;right:12px;top:19px;width:16px;height:16px;margin:0;accent-color:var(--accent)}
+.billing-cycle-card[data-selected=true] {border-color:var(--accent);background:var(--accent-soft);box-shadow:3px 3px 0 var(--ink)}
+.billing-cycle-card:focus-within {outline:3px solid var(--accent);outline-offset:3px}
+.billing-cycle-card[data-disabled=true],.billing-cycle:disabled {opacity:.55;cursor:default}
+.billing-plan-picker {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;margin-bottom:20px}
+.billing-plan-card {display:flex;flex-direction:column;text-align:left;gap:8px;padding:18px;border:2px solid #c4ccd8;border-radius:12px;background:white;cursor:pointer;line-height:1.5;color:var(--ink);font:inherit}
+.billing-plan-card span {font-size:.82rem;color:var(--muted)}
+.billing-plan-card[aria-pressed=true] {border-color:var(--accent);background:var(--accent-soft)}
+.billing-plan-card:focus-visible {outline:3px solid var(--accent);outline-offset:3px}
+.billing-plan-card:disabled {cursor:default;opacity:.65}

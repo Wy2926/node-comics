@@ -8,7 +8,7 @@
 
 ## 开发与验证
 
-当前后端只支持 `stripe_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
+当前后端只支持 `subscription_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
 
 - [后端运行与 Docker 隔离测试](backend/README.md)：根 `.env` 配置、`scripts/bootstrap.ps1 -Start`、控制进程与数据库。
 - [五语官网与账户](backend/website/README.md)：静态 SEO 页面、独立语言字典、同域 API 与 OIDC 登录、商店链接配置。

@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "Essai gratuit de 7 jours",
   "通过 Stripe 升级": "Passer à PLUS avec Stripe",
   "刷新权益": "Actualiser les avantages",
-  "订阅暂未开放": "Abonnements pas encore disponibles"
+  "订阅暂未开放": "Abonnements pas encore disponibles",
+  "订阅套餐": "Abonnement",
+  "每年": "Chaque année",
+  "每月 {0} 页 AI 重绘": "{0} pages de redessin IA par mois",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Premier essai : {0} jours et {1} pages de redessin.",
+  "按年自动续费，重绘额度逐月生效。": "Renouvellement annuel. Le quota de redessin est disponible chaque mois.",
+  "按月自动续费。": "Renouvellement mensuel."
 }

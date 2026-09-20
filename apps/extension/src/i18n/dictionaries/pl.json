@@ -1460,5 +1460,11 @@
   "免费试用 7 天": "7 dni bezpłatnie",
   "通过 Stripe 升级": "Wybierz PLUS przez Stripe",
   "刷新权益": "Odśwież uprawnienia",
-  "订阅暂未开放": "Subskrypcje jeszcze niedostępne"
+  "订阅暂未开放": "Subskrypcje jeszcze niedostępne",
+  "订阅套餐": "Plan subskrypcji",
+  "每年": "Rocznie",
+  "每月 {0} 页 AI 重绘": "{0} stron przerysowania AI miesięcznie",
+  "首次试用 {0} 天，含 {1} 页重绘。": "Pierwszy okres próbny: {0} dni i {1} stron przerysowania.",
+  "按年自动续费，重绘额度逐月生效。": "Odnowienie co rok. Limit przerysowania jest dostępny co miesiąc.",
+  "按月自动续费。": "Odnowienie co miesiąc."
 }
