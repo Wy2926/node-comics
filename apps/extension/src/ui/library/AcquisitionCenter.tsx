@@ -1,3 +1,4 @@
+import {Select} from '../Select';
 import {msg,messageSource} from '../../i18n/runtime';
 import {useState} from 'react';
 import type {LibraryState} from '../../library/types';
@@ -39,7 +40,7 @@ export function AcquisitionCenter({library:s,copies,initialWorkId,onlyIds,busy,f
    {feedback&&<div className={'nc-action-feedback '+feedback.tone} role={feedback.tone==='error'?'alert':'status'}>{feedback.tone==='busy'&&<span className="spinner"/>}{feedback.message}</div>}
    {permissions.preparing&&<p role="status">{msg("正在提前读取图片域名，完成后即可授权并开始采集…")}</p>}
    {permissions.error&&<p role="alert">{permissions.error} <button className="text-link" onClick={permissions.retry}>{msg("重新检查图片域名")}</button></p>}
-   <div className="nc-library-tools"><label className="nc-sort-label">{msg("范围")}<select aria-label={msg("采集作品范围")} value={scope} onChange={e=>{setScope(e.target.value);setRestricted(false);}}><option value="">{msg("全部作品")}</option>{s.works.map(w=><option value={w.id} key={w.id}>{w.title}</option>)}</select></label>{restricted&&<button className="text-link" onClick={()=>setRestricted(false)}>{msg("已限定所选 {0} 份 · 查看全部", {"0": onlyIds?.length})}</button>}</div>
+   <div className="nc-library-tools"><label className="nc-sort-label">{msg("范围")}<Select aria-label={msg("采集作品范围")} value={scope} onChange={e=>{setScope(e.target.value);setRestricted(false);}}><option value="">{msg("全部作品")}</option>{s.works.map(w=><option value={w.id} key={w.id}>{w.title}</option>)}</Select></label>{restricted&&<button className="text-link" onClick={()=>setRestricted(false)}>{msg("已限定所选 {0} 份 · 查看全部", {"0": onlyIds?.length})}</button>}</div>
    <div className="nc-filter-chips" aria-label={msg("采集状态筛选")}>{[['all',msg("全部"),sourceCopies.length],['active',msg("进行中"),active.length],['pending',msg("待处理"),pending.length],['complete',msg("已完成"),complete.length]].map(([key,label,count])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(String(key))}>{label}<span>{count}</span></button>)}</div>
    <div className="nc-acquisition-toolbar"><span className="nc-muted">{extension?msg("开始前授权图片域名；发现链接后立即逐页下载。"):msg("当前是网页预览，仅保存队列；请在扩展中执行采集。")}</span><div className="nc-inline"><button className="button secondary small" disabled={!!busy||!active.length} onClick={()=>void run('pause-all',msg("正在暂停采集"),()=>pauseCopies(active.map(c=>c.id)),msg("已暂停 {0} 份采集", {"0": active.length})) }>{msg("暂停全部")}</button><button className="button primary small" disabled={!!busy||permissionBusy||!pending.length} onClick={()=>void run('queue-all',msg("正在确认图片权限"),()=>grant(pending.map(c=>c.id)),queuedMessage(msg("{0} 份副本", {"0": pending.length}))) }>{busy==='queue-all'?msg("加入中…"):msg("补齐待处理")}</button></div></div>
    <div className="nc-capture-grid">{visible.map(copy=>{

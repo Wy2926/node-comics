@@ -1,9 +1,9 @@
 import {connectContentLocale} from '../src/i18n/content';
-import {subscribeLocale} from '../src/i18n/runtime';
 import {msg} from '../src/i18n/runtime';
 import {defineContentScript} from 'wxt/utils/define-content-script';
 import {discoverMangaCopyCatalog,mangaCopyLocation,MANGACOPY_MATCHES} from '../src/sources/mangacopy';
 import {readMangaCopyData} from '../src/sources/mangacopy-data';
+import {mountSourceImportButton} from '../src/sources/import-button';
 export default defineContentScript({matches:MANGACOPY_MATCHES,runAt:'document_idle',main(){
  const state=globalThis as typeof globalThis & {__nodeComics?:boolean};if(state.__nodeComics)return;state.__nodeComics=true;
  connectContentLocale();
@@ -12,7 +12,7 @@ export default defineContentScript({matches:MANGACOPY_MATCHES,runAt:'document_id
  const loc=mangaCopyLocation(location.href);
  if(loc&&!loc.chapterId){
   const host=document.querySelector('.comicParticulars-title-right');
-  if(host){const button=document.createElement('button');button.textContent=msg("NodeLane Comics · 导入／管理漫画");subscribeLocale(()=>{button.textContent=msg('NodeLane Comics · 导入／管理漫画');});button.type='button';button.style.cssText='background:#fb7299;color:#fff;border:0;border-radius:8px;padding:10px 16px;margin:12px 0;cursor:pointer;font-weight:600';button.onclick=()=>{button.disabled=true;void chrome.runtime.sendMessage({type:'NC_IMPORT_CURRENT'}).then(r=>{if(!r?.ok)button.textContent=r?.error??msg("请通过插件弹窗重试");}).finally(()=>button.disabled=false);};host.append(button);}
+  if(host)mountSourceImportButton(host);
  }
  chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(sender.id!==chrome.runtime.id)return;

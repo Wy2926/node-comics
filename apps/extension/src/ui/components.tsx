@@ -24,7 +24,7 @@ export function PageTitle({ eyebrow, title, description }: {
   title: string;
   description: string;
 }) {
-  return <div className="page-title"><span className="eyebrow muted">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>;
+  return <div className="page-title"><span className="eyebrow muted">{eyebrow}</span><h1>{title}</h1><p>{description}</p><span className="nc-heading-star" aria-hidden="true">✦</span></div>;
 }
 export function Stat({ label, value, suffix }: {
   label: string;

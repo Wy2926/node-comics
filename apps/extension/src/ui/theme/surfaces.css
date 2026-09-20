@@ -1,0 +1,161 @@
+/* Full-page surfaces load after their layout styles. Popup keeps comic.css only. */
+.nc-app .button,
+.nc-app button.button.nc-comic-action {
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  box-shadow: var(--comic-shadow-small);
+  font-weight: 700;
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+.nc-app .button.primary, .nc-app button.button.nc-comic-action { box-shadow: var(--comic-shadow); border: var(--comic-border); }
+.nc-app .button.secondary, .nc-app .button.tinted { border: var(--comic-border); }
+.nc-app .button.danger { border-width: 2px; box-shadow: 2px 2px 0 var(--danger); }
+.nc-app .button.quiet { background: var(--surface); }
+.nc-app .button:hover:not(:disabled), .nc-app button.button.nc-comic-action:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: var(--comic-shadow-hover); }
+.nc-app .button:active:not(:disabled), .nc-app button.button.nc-comic-action:active:not(:disabled) { transform: translate(2px,2px); box-shadow: var(--comic-shadow-active); }
+.nc-app .button:disabled, .nc-app button.button.nc-comic-action:disabled { opacity: 1; background: var(--surface-soft); color: var(--muted); box-shadow: var(--comic-shadow-disabled); border-color: var(--line); }
+.nc-app .icon-button { border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface); }
+.nc-app .icon-button:hover { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
+.nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])),
+.nc-app textarea, .nc-app .field :is(input, textarea) { border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line)); border-radius: var(--comic-control-radius); box-shadow: none; }
+.nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])):focus,
+.nc-app textarea:focus, .nc-app .field :is(input, textarea):focus { outline: none; border-color: var(--accent); box-shadow: none; }
+.nc-app input::placeholder, .nc-app textarea::placeholder { color: var(--muted); opacity: .8; }
+.nc-app .nc-search { border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line)); border-radius: var(--comic-control-radius); background: var(--surface); padding: 0 12px; }
+.nc-app .nc-search:focus-within { border-color: var(--accent); }
+.nc-app .nc-search input, .nc-app .nc-search input:focus { border: 0; min-width: 0; box-shadow: none; outline: none; }
+.nc-app .segmented { border: var(--comic-border); border-radius: var(--comic-control-radius); gap: 5px; padding: 4px; }
+.nc-app .segmented button { border-radius: 2px; }
+.nc-app .segmented button.active { border-radius: 2px; box-shadow: var(--comic-shadow-small); color: var(--accent-on); background: var(--accent); }
+.nc-app :is(.nc-filter-chips>button, .nc-theme-options button, .nc-issue-options label, .nc-choice-card, .nc-version-filter, .nc-catalog-group-tabs>button) { border-width: 2px; border-radius: var(--comic-control-radius); }
+.nc-app :is(.nc-filter-chips>button[aria-pressed=true], .nc-theme-options button.selected, .nc-issue-options label.selected, .nc-choice-card[aria-pressed=true], .nc-version-filter[aria-pressed=true], .nc-catalog-group-tabs>button[aria-pressed=true]) { border-color: var(--ink); box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--ink); }
+.nc-app .nc-catalog-check { border: var(--comic-border); border-radius: var(--comic-control-radius); }
+.nc-app .switch { border: var(--comic-border); border-radius: var(--comic-control-radius); height: 28px; }
+.nc-app .switch i { border-radius: 2px; top: 3px; left: 3px; }
+.nc-app .switch.on { border-color: var(--ink); }
+
+/* The app masthead uses the same bookmark and stamped navigation as the passport. */
+.nc-app-header { height: 80px; border-bottom: var(--comic-border); gap: 30px; }
+.nc-brand>span { display: grid; place-items: center; width: 38px; height: 44px; background: var(--accent); color: var(--accent-on); font-size: 26px; padding-bottom: 6px; clip-path: polygon(0 0,100% 0,100% 100%,50% 86%,0 100%); }
+.nc-brand b { font-weight: 850; letter-spacing: -.04em; }
+.nc-app-header nav { gap: 12px; }
+.nc-app-header nav>button { height: 42px; border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 0 14px; }
+.nc-app-header nav>button[aria-current=page] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
+.nc-app-header nav>button[aria-current=page]::after { display: none; }
+.nc-account-button { padding: 4px 10px 4px 4px; border: 0; border-radius: var(--comic-control-radius); font-size: .8125rem; font-weight: 650; color: var(--muted); }
+.nc-account-button:hover, .nc-account-button[aria-current=page] { box-shadow: none; background: var(--accent-soft); color: var(--accent); }
+.nc-avatar { border-radius: var(--comic-control-radius); }
+.nc-main { max-width: 1380px; padding-top: 32px; }
+
+/* A page opens like a comic cover: masthead, large title, perforated edge. */
+.nc-page-heading, .nc-app .page-title { position: relative; padding: var(--comic-panel-padding); border: var(--comic-border); border-radius: var(--comic-panel-radius); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); box-shadow: var(--comic-shadow); margin-bottom: 30px; }
+.nc-page-heading>div:first-child { min-width: 0; }
+.nc-page-heading h1, .nc-app .page-title h1 { font-size: var(--comic-heading-size); font-weight: 900; letter-spacing: -.05em; line-height: 1.3; margin-top: 8px; }
+.nc-page-heading p, .nc-app .page-title p { font-size: .875rem; margin: 12px 0 0; color: var(--muted); max-width: 50em; }
+.nc-eyebrow, .nc-app .page-title .eyebrow { color: var(--accent); font-size: .625rem; font-weight: 800; letter-spacing: .14em; }
+.nc-app .page-title { padding-right: 95px; }
+.nc-heading-star { position: absolute; right: 32px; top: 28px; font-size: 3.25rem; color: var(--accent); transform: rotate(12deg); }
+.nc-title-count { align-self: center; color: var(--ink); background: var(--surface); border: var(--comic-border); border-radius: 2px; transform: rotate(-5deg); padding: 4px 10px; font-size: .875rem; }
+.nc-section-heading h2, .nc-shelf-heading h2 { font-weight: 800; letter-spacing: -.02em; }
+.nc-shelf-heading, .nc-recent-reading>.nc-section-heading { padding-bottom: 14px; border-bottom: var(--comic-perforation); }
+
+/* Panels and covers retain their existing image geometry and reading metadata. */
+.nc-app :is(.nc-book, .nc-content-card, .nc-copy-card, .nc-related-card, .nc-recent-card, .nc-capture-card, .nc-translation-card, .nc-catalog-card, .nc-stat, .nc-chart-card, .nc-rights-card) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background-color: var(--surface); }
+.nc-app :is(.nc-book, .nc-content-card, .nc-copy-card, .nc-related-card):hover { border-color: var(--ink); box-shadow: var(--comic-shadow); }
+.nc-app :is(.nc-book.is-selected, .nc-content-card.is-selected, .nc-catalog-card.is-selected) { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+.nc-book-cover { border-radius: var(--comic-cover-radius); border-bottom: var(--comic-border); }
+.nc-app :is(.nc-content-cover, .nc-copy-cover) { border-bottom: var(--comic-border); }
+.nc-recent-cover { border-right: var(--comic-border); }
+.nc-recent-body { padding: 20px; gap: 8px; }
+.nc-recent-footer { border-top: var(--comic-perforation); margin-top: 10px; padding-top: 12px; }
+.nc-app .nc-work-hero { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
+.nc-work-cover { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow); transform: rotate(-3deg); }
+.nc-work-tabs { gap: 10px; padding: 4px 4px 12px; border-bottom: var(--comic-perforation); }
+.nc-work-tabs button { border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 10px 14px; }
+.nc-work-tabs button[aria-selected=true] { border: var(--comic-border); box-shadow: var(--comic-shadow-small); color: var(--ink); background: var(--accent-soft); }
+.nc-work-tabs button span { border-radius: 2px; }
+.nc-app :is(.nc-translation-copies, .nc-catalog-overview, .nc-catalog-destination, .nc-catalog-actionbar) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-translation-card { background: var(--surface); }
+.nc-app :is(.nc-batch-toolbar, .nc-import-overview) { border: var(--comic-border); border-radius: var(--comic-control-radius); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
+.nc-app :is(.nc-empty, .nc-account-empty, .nc-catalog-empty) { border: var(--comic-border); border-radius: var(--comic-panel-radius); background: var(--surface) var(--comic-dot-pattern); background-size: var(--comic-dot-size); box-shadow: var(--comic-shadow); }
+.nc-app .nc-import-empty { min-height: 340px; }
+.nc-app .nc-empty-symbol { transform: rotate(10deg); }
+.nc-app :is(.nc-more-menu>div, .nc-catalog-work-options) { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow); }
+.nc-app .nc-detail-more { padding-top: 22px; border-top: var(--comic-perforation); }
+.nc-app .nc-detail-more>summary { display: flex; align-items: center; gap: 10px; list-style: none; color: var(--ink); font-weight: 750; padding: 10px 0; }
+.nc-app .nc-detail-more>summary::-webkit-details-marker { display: none; }
+.nc-app .nc-detail-more>summary::before { content: '+'; display: grid; place-items: center; width: 24px; height: 24px; border: var(--comic-border); border-radius: 3px; color: var(--accent); background: var(--accent-soft); }
+.nc-app .nc-detail-more[open]>summary::before { content: '−'; }
+.nc-app .nc-detail-action-list { gap: 14px; padding: 2px 4px 4px 0; }
+.nc-app .nc-detail-action-list>button { position: relative; border: var(--comic-border); border-radius: var(--comic-card-radius); background: var(--surface); padding: 18px 38px 18px 18px; box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-detail-action-list>button::after { content: '↗'; position: absolute; right: 16px; top: 16px; color: var(--accent); }
+.nc-app .nc-detail-action-list>button:hover:not(:disabled) { background: var(--accent-soft); box-shadow: var(--comic-shadow); }
+.nc-app .nc-detail-action-list>button.nc-danger-text { border-color: var(--danger); box-shadow: 2px 2px 0 var(--danger); }
+.nc-app .nc-detail-action-list>button.nc-danger-text::after { color: var(--danger); }
+.nc-app .nc-detail-action-list>button.nc-danger-text:hover:not(:disabled) { background: var(--danger-soft); }
+.nc-app .nc-detail-action-list>button:disabled { box-shadow: none; opacity: .5; }
+.nc-app :is(.nc-more-menu>summary, .nc-catalog-work-option, .nc-catalog-save-options>button, .nc-import-item, .nc-image-choice, .nc-web-import details, .nc-web-import .nc-insert-summary) { border-radius: var(--comic-control-radius); }
+.nc-app .nc-image-choice { border-width: 2px; }
+.nc-app .nc-image-choice.is-selected { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
+.nc-app :is(.nc-count-pill, .nc-status-badge, .nc-plan-badge) { border: 1px solid var(--ink); border-radius: 2px; }
+
+/* Settings and account use the passport's paper panels and perforated sections. */
+.nc-preferences { max-width: 1120px; margin: 0 auto; counter-reset: preference; }
+.nc-app .settings-card { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow); padding: var(--comic-panel-padding); margin-bottom: 24px; background: var(--surface); }
+.nc-preferences>.settings-card { counter-increment: preference; }
+.nc-preferences>.settings-card>h3 { padding-bottom: 18px; border-bottom: var(--comic-perforation); font-size: 1.0625rem; font-weight: 800; }
+.nc-preferences>.settings-card>h3::after { content: '0' counter(preference); margin-left: auto; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; border: 1px solid var(--ink); padding: 3px 7px; transform: rotate(4deg); }
+.nc-app .setting-row { gap: 24px; }
+.nc-app .setting-row>div:first-child { min-width: 0; }
+.nc-app .setting-row p { max-width: 42em; }
+.nc-app .privacy-note { border: var(--comic-perforation); border-radius: var(--comic-control-radius); background: var(--accent-soft); }
+.nc-app :is(.nc-profile-card, .nc-membership-card) { border: var(--comic-border); border-radius: var(--comic-panel-radius); padding: var(--comic-panel-padding); box-shadow: var(--comic-shadow); }
+.nc-app .nc-membership-card { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
+.nc-app .nc-profile-avatar { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow); transform: rotate(-4deg); }
+.nc-app .nc-profile-identity h2, .nc-app .nc-membership-card h2 { font-size: 1.5rem; font-weight: 850; letter-spacing: -.04em; }
+.nc-app .nc-profile-footer { border-top: var(--comic-perforation); flex-wrap: wrap; }
+.nc-app .nc-profile-footer>span { font-size: .75rem; }
+.nc-app .nc-icon-tile { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); transform: rotate(-5deg); flex-shrink: 0; }
+.nc-app .nc-account-activity { border-top: var(--comic-perforation); }
+.nc-app .nc-rights-card strong { font-variant-numeric: tabular-nums; }
+.nc-app .nc-chart-bar { border: 1px solid var(--ink); border-bottom: 0; border-radius: 3px 3px 0 0; opacity: 1; }
+.nc-app .nc-coming-soon { border: var(--comic-border); border-radius: var(--comic-control-radius); }
+
+/* All dialogs share the login shell. Its two-page cover keeps its own layout. */
+.nc-app .modal { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-dialog-shadow); }
+.nc-app .modal:not(.nc-login)>.modal-spark { display: inline-grid; place-items: center; width: 36px; height: 36px; border: var(--comic-border); background: var(--accent-soft); border-radius: var(--comic-control-radius); transform: rotate(-6deg); font-size: 23px; }
+.nc-app .modal h2 { font-weight: 850; letter-spacing: -.03em; }
+.nc-app .modal:not(.nc-login)>.modal-subtitle { padding-bottom: 18px; border-bottom: var(--comic-perforation); }
+.nc-app :is(.nc-modal-footer, .nc-import-footer, .nc-import-assignment) { border-top: var(--comic-perforation); }
+.nc-app .nc-import-steps li>span { border: var(--comic-border); border-radius: var(--comic-control-radius); }
+.nc-app .nc-import-steps [aria-current=step]>span { color: var(--accent-on); box-shadow: var(--comic-shadow-small); }
+.nc-app :is(.nc-import-dock, .toast, .busy-pill) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
+.nc-app .modal.nc-local-import-modal>.modal-spark { display: none; }
+.nc-app :is(.nc-export-copy, .nc-export-book, .nc-export-progress, .nc-export-result, .nc-publication-contents, .nc-publication-context, .nc-publication-relation) { border: var(--comic-border); border-radius: var(--comic-control-radius); }
+.nc-app :is(.nc-export-steps span, .nc-publication-icon) { border: var(--comic-border); border-radius: var(--comic-control-radius); }
+.nc-app .nc-export-steps [aria-current=step] span { color: var(--accent-on); box-shadow: var(--comic-shadow-small); }
+.nc-app :is(.nc-export-preview, .nc-publication-sections) { border-top: var(--comic-perforation); }
+.nc-app :is(.notice, .nc-error, .nc-action-feedback, .nc-undo-notice) { border-width: 2px; border-radius: var(--comic-control-radius); }
+.nc-app .nc-action-feedback.error { color: var(--danger); background: var(--danger-soft); border-color: var(--danger); }
+.nc-app .nc-danger-text { color: var(--danger)!important; }
+
+/* Reader chrome adopts the tokens without changing the image canvas or gutters. */
+.nc-app .nc-reader-rail { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-reader-rail button { border-radius: var(--comic-control-radius); }
+.nc-app .nc-reader-rail :is(button[aria-expanded=true], button[aria-pressed=true]) { background: var(--accent-soft); outline: 1px solid var(--ink); outline-offset: -1px; color: var(--accent); }
+.nc-app .nc-reader-drawer, .nc-app .nc-translation-popover { z-index: 35; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
+.nc-app .nc-drawer-title, .nc-app .nc-comic-directory-heading { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); border-bottom: var(--comic-perforation); }
+.nc-app .nc-translation-popover .nc-drawer-title { margin-bottom: 14px; }
+.nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }
+.nc-app .nc-chapter-entry { border-radius: var(--comic-control-radius); }
+.nc-app .nc-chapter-entry[aria-current=true] { border: var(--comic-border); }
+.nc-app .nc-chapter-error { color: var(--danger); }
+.nc-app .nc-image-translation { background: var(--surface); color: var(--ink); border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-image-translation.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); box-shadow: 2px 2px 0 var(--danger); }
+.nc-app .nc-image-translation.upgrade { background: var(--comic-warning-paper); color: var(--comic-warning-ink); border-color: var(--comic-warning-ink); }
+.nc-app .nc-image-failure { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nc-app .button, .nc-app button.button.nc-comic-action { transition: none; }
+  .nc-app .button:hover:not(:disabled), .nc-app .button:active:not(:disabled) { transform: none; }
+}

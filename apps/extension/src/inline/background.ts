@@ -13,6 +13,7 @@ import {sourceImage} from '../sources/image-fetch';
 import {defaults,supportsLanguage,type Page,type Settings,type Job,type Capabilities,type Entitlements} from '../types';
 import {comicSize,type InlineRequest,type InlineResponse,type InlineResult} from './protocol';
 import {settingsKey} from './settings';
+import {registerInlineThemeBackground} from './theme';
 import {automaticTabsAllowed,registerAutomaticTabs} from './auto-tabs';
 import {imageDataUrl,maxInlineBytes} from './bytes';
 import {TranslationCoordinator} from '../translation/coordinator';
@@ -134,6 +135,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
   return response(ctx,request);
 }
 export function registerInlineBackground(){
+  registerInlineThemeBackground();
   registerAutomaticTabs(activateInline,stopAutomaticInline);
   chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;const settingChange=changes[settingsKey],before=settingChange?.oldValue as Partial<Settings>|undefined,after=settingChange?.newValue as Partial<Settings>|undefined;const translationChanged=settingChange&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode);if(area==='local'&&(translationChanged||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});

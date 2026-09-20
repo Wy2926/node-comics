@@ -440,65 +440,6 @@ a {
 .nc-error button {
   margin-left: auto;
 }
-.nc-history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-.nc-history-card {
-  border: 1px solid var(--line);
-  border-radius: 17px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.nc-history-summary {
-  display: flex;
-  gap: 24px;
-  padding: 26px;
-}
-.nc-history-summary>.nc-thumbnail {
-  width: 94px;
-  height: 126px;
-  border-radius: 9px;
-  flex: none;
-}
-.nc-history-copy {
-  flex: 1;
-  min-width: 0;
-}
-.nc-history-copy h2 {
-  font-size: 1.25rem;
-}
-.nc-history-copy p {
-  margin-top: 7px;
-}
-.nc-history-counts {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  font-size: .875rem;
-  color: var(--muted);
-}
-.nc-history-counts b {
-  color: var(--ink);
-  margin-left: 3px;
-}
-.nc-history-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-.nc-history-bottom>span {
-  font-size: .875rem;
-  color: var(--muted);
-}
-.nc-history-bottom b {
-  color: var(--ink);
-}
 .nc-state {
   display: inline-flex;
   align-items: center;
@@ -513,27 +454,6 @@ a {
 .nc-state.attention {
   color: var(--warning);
   background: var(--surface-soft);
-}
-.nc-history-detail {
-  background: var(--surface-soft);
-  padding: 4px 26px 22px;
-  border-top: 1px solid var(--line);
-}
-.nc-history-page {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--line);
-}
-.nc-history-page>div:first-child {
-  min-width: 0;
-}
-.nc-history-page p {
-  font-size: .875rem;
-  color: var(--muted);
-  margin-top: 7px;
 }
 .nc-technical {
   font-size: .875rem;
@@ -1569,26 +1489,6 @@ a {
     width: 100%;
     justify-content: space-between;
   }
-  .nc-history-summary {
-    padding: 20px;
-    gap: 16px;
-  }
-  .nc-history-summary>.nc-thumbnail {
-    width: 62px;
-    height: 85px;
-  }
-  .nc-history-bottom {
-    gap: 14px;
-  }
-  .nc-history-counts {
-    gap: 10px;
-  }
-  .nc-history-detail {
-    padding: 0 20px 20px;
-  }
-  .nc-history-page {
-    flex-wrap: wrap;
-  }
   .nc-stat-grid {
     grid-template-columns: 1fr;
     gap: 14px;
@@ -1697,9 +1597,6 @@ a {
   .nc-eyebrow {
     font-size: .6875rem;
     letter-spacing: 1.4px;
-  }
-  .nc-history-summary>.nc-thumbnail {
-    display: none;
   }
   .nc-app-header nav>button>svg {
     display: none;

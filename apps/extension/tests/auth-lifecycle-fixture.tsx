@@ -14,6 +14,7 @@ import type {Entitlements} from '../src/types';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
+import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5187')throw Error('Use isolated http://127.0.0.1:5187.');
 const existing=await readCopies(),saved=(await readAuth()).session;

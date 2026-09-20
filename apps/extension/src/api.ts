@@ -46,8 +46,6 @@ export class Api {
   entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}
-  operations(offset=0) {return this.request<Paginated<TranslationOperation>>(`/v1/translation-operations?offset=${offset}&limit=12`);}
-  latestResult(jobId:string) {return this.request<{latest:Job|null;result:Job|null}>(`/v1/jobs/${encodeURIComponent(jobId)}/latest-result`);}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;output_asset_id?:string|null},key:string) {return this.request<FeedbackRecord>(`/v1/jobs/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/me/feedback?offset=${offset}&limit=20`);}
   async matchPages(pages: FilePageSource[], mode: Mode, target_language: string) {
@@ -58,7 +56,6 @@ export class Api {
     return result;
   }
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
-  cancel(id: string) { return this.request<Job>(`/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); }
   plan(body:TranslationPlan) {return this.request<PlanReceipt>('/v1/translation-plans',{method:'POST',body:JSON.stringify(body)},true);}
   resolveOperations(operation_keys:string[]) {return this.request<{items:TranslationOperation[];policy_revision?:string}>('/v1/translation-operations/resolve',{method:'POST',body:JSON.stringify({operation_keys})});}
   lease(sessionId:string,modes:Mode[],priority_epochs:Partial<Record<Mode,number>>,takeover=false) {return this.request<{session_id:string;priority:Partial<Record<Mode,ReadingPriority>>;policy_revision:string}>(`/v1/reading-sessions/${encodeURIComponent(sessionId)}/lease`,{method:'PUT',body:JSON.stringify({modes,priority_epochs,takeover})});}
@@ -122,7 +119,6 @@ export class Api {
     }
     throw new ApiError(msg("图片访问链接已过期，请重试。"), 'ASSET_EXPIRED');
   }
-  deleteImage(id: string) { return this.request<void>(`/v1/images/${encodeURIComponent(id)}`,{method:'DELETE'}); }
 }
 function validateSource(source: FilePageSource) {
   if (!/^[a-f0-9]{64}$/.test(source.file_hash) || !Number.isSafeInteger(source.page_index) || source.page_index < 0) throw new ApiError(msg("文件 SHA-256 与原始页索引必须成对提供。"), 'INVALID_PAGE_SOURCE');

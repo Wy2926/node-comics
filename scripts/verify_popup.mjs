@@ -1,5 +1,6 @@
 // Run against a built MV3 extension in an isolated Chromium profile, never a personal browser.
 import assert from 'node:assert/strict';
+import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {randomUUID} from 'node:crypto';
@@ -55,13 +56,13 @@ try{
  await source.goto(site);await source.locator('img').first().evaluate(image=>image.decode());await source.evaluate(()=>scrollTo(0,80));
  await openPopup();assert.equal((await messages()).length,0);assert.equal(await popup.locator('.nc-image-picker').count(),0);await screenshot('popup-light');check('打开 Popup 不发现图片、不启动翻译、不加载缩略图');
  // Reader and popup use real shared extension storage in both directions.
- const reader=await context.newPage();await reader.goto(origin+'/reader.html#settings');await reader.getByRole('combobox',{name:'默认目标语言'}).selectOption('ja');
- await popup.waitForFunction(()=>document.querySelector('select').value==='ja');assert.equal((await preferences()).language,'ja');
- await popup.getByRole('combobox',{name:'默认目标语言'}).selectOption('en');await reader.waitForFunction(()=>document.querySelector('[aria-label="默认目标语言"]').value==='en');assert.equal((await preferences()).language,'en');check('Popup 与已打开的设置页面双向同步同一默认语言');
+ const reader=await context.newPage();await reader.goto(origin+'/reader.html#settings');await selectOption(reader.getByRole('combobox',{name:'默认目标语言'}),'ja');
+ await popup.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='ja');assert.equal((await preferences()).language,'ja');
+ await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'en');await reader.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='en');assert.equal((await preferences()).language,'en');check('Popup 与已打开的设置页面双向同步同一默认语言');
  await reader.evaluate(()=>{const value=JSON.parse(localStorage.getItem('nc-settings'));value.translationMode='redraw';value.direction='ltr';value.cacheLimitMb=512;localStorage.setItem('nc-settings',JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key:'nc-settings'}));});
- await popup.waitForFunction(()=>JSON.parse(localStorage.getItem('nc-settings')).translationMode==='redraw');await popup.getByRole('combobox',{name:'默认目标语言'}).selectOption('fr');
- await popup.waitForFunction(()=>!document.querySelector('select').disabled);const saved=await preferences();assert.equal(saved.translationMode,'classic');assert.equal(saved.direction,'ltr');assert.equal(saved.cacheLimitMb,512);check('新增语言回退常规模式，保留其他设置');
- await popup.close();await openPopup();assert.equal(await popup.getByRole('combobox').inputValue(),'fr');assert.equal((await messages()).length,0);check('重新打开保留语言且仍不自动发现');
+ await popup.waitForFunction(()=>JSON.parse(localStorage.getItem('nc-settings')).translationMode==='redraw');await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'fr');
+ await popup.waitForFunction(()=>{const trigger=document.querySelector('[role="combobox"][aria-label="默认目标语言"]');return trigger&&!trigger.matches(':disabled,[aria-disabled="true"]');});const saved=await preferences();assert.equal(saved.translationMode,'classic');assert.equal(saved.direction,'ltr');assert.equal(saved.cacheLimitMb,512);check('新增语言回退常规模式，保留其他设置');
+ await popup.close();await openPopup();assert.equal(await popup.getByRole('combobox').getAttribute('data-value'),'fr');assert.equal((await messages()).length,0);check('重新打开保留语言且仍不自动发现');
  await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'未获得'}).waitFor();assert.equal((await messages()).length,0);await screenshot('popup-permission-denied');check('权限拒绝保留 Popup 和可重试提示');
  await popup.evaluate(()=>{globalThis.fixtureDenyPermission=false;globalThis.fixtureTranslateFailure=true;});await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'不允许注入'}).waitFor();check('启动失败保留语言和重试入口');
  await popup.evaluate(()=>globalThis.fixtureTranslateFailure=false);const scrollBefore=await source.evaluate(()=>scrollY);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');

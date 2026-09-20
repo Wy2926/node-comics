@@ -201,7 +201,7 @@ sequence 与窗口摘要必须在任何新任务准入前校验；窗口更新�
 
 - 为每项保存 operation → request hash → Job/上传/实际配置的映射；同内容自动请求仍可通过既有去重映射到同一 Job，不重复计算分钟消耗或页数权益。相同操作回放不新增回执，拒绝计划不无限创建持久失败回执；已受理操作的精简幂等回执永久保留。
 - 最新窗口元数据只保存有界会话和至多三项，租约过期后不自动受理，也不产生额度。活动会话数量要有账户上限；历史窗口不作为新队列累计保存。失效 session/epoch 的晚到请求只能核实回执，不能恢复控制权或创建旧页。
-- 新增只读语义的 `POST /v1/translation-operations/resolve`，一次最多查询十个本人 operation key，返回已受理、未找到或回执已归档/访问已撤销。用于新环境内响应丢失、刷新或上一阅读窗口已被替换后的恢复；不创建任务、不扣额度、不调用供应商，不探测 R2。历史页面若继续提供，则从新的 `GET /v1/translation-operations` 分页查询本账户新操作，不读取旧 Submission 数据。
+- 新增只读语义的 `POST /v1/translation-operations/resolve`，一次最多查询十个本人 operation key，返回已受理、未找到或回执已归档/访问已撤销。用于新环境内响应丢失、刷新或上一阅读窗口已被替换后的恢复；不创建任务、不扣额度、不调用供应商，不探测 R2。插件已移除独立翻译记录页及其分页查询和轮询；服务端 `GET /v1/translation-operations` 保留，阅读器继续通过 resolve 和账户增量接口恢复状态。
 - `not_found` 只表示本次快照尚未见到回执，不证明原请求永不会提交。原请求与恢复受同一键及锁约束：仍属最新窗口时可以用原键重试；已离开窗口则只核实，不补发旧生成请求。原请求最终受理的信息从响应、核实接口或账户 feed 合并。
 - 成功回执和上传状态先落 IndexedDB，再继续有限并发上传；中断后重取有效授权，不能因为新窗口生成了新序号就抛弃旧任务。已受理但尚未上传的占位按既有 TTL 处理。
 - 账户切换以 API origin + user ID 隔离本地游标、操作、图片与结果。feed、resolve、job 引用及所有下载继续验证所有权；旧响应不能写入新账户。
@@ -262,7 +262,7 @@ node scripts/verify_reading_api.mjs
 # 模拟 API 的真实阅读器，仍使用 5176
 node scripts/verify_reading_plans.mjs
 node scripts/verify_reader_retry.mjs
-node scripts/verify_history.mjs
+node scripts/verify_history_removal.mjs
 
 # 真实 MV3：先在 apps/extension 运行 npm run build
 node scripts/verify_inline_translation.mjs

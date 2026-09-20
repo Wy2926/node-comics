@@ -1,5 +1,6 @@
 // Isolated Chromium + built MV3 extension + synthetic API/images. No live provider or credentials.
 import assert from 'node:assert/strict';
+import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {createHash,randomUUID} from 'node:crypto';
@@ -121,10 +122,10 @@ try{
   await page.goto(site);await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
   await page.evaluate(()=>{history.pushState({},'','/next-chapter');document.querySelector('#first').src+='?new';});
   await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('same-document navigation stops the old session and can be activated again');
-  const reader=await browser.newPage();reader.on('pageerror',e=>errors.push(e.message));await reader.goto(`chrome-extension://${extensionId}/reader.html#settings`);await reader.getByLabel('默认目标语言').waitFor();
-  assert.equal(await reader.getByLabel('默认目标语言').inputValue(),'zh-Hans');
+  const reader=await browser.newPage();reader.on('pageerror',e=>errors.push(e.message));await reader.goto(`chrome-extension://${extensionId}/reader.html#settings`);await reader.getByRole('combobox',{name:'默认目标语言'}).waitFor();
+  assert.equal(await reader.getByRole('combobox',{name:'默认目标语言'}).getAttribute('data-value'),'zh-Hans');
   jobs.set('seed-en',{...jobs.get('seed-1'),id:'seed-en',target_language:'en',change_sequence:++changeSequence});
-  await reader.getByLabel('默认目标语言').selectOption('en');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.bringToFront();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('reader UI shares language and login settings with in-page translation');
+  await selectOption(reader.getByLabel('默认目标语言'),'en');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.bringToFront();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('reader UI shares language and login settings with in-page translation');
   // Content scripts may not access the mirrored login session.
   const security=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(t=>t.url===url);return chrome.scripting.executeScript({target:{tabId:tab.id},func:async()=>{try{await chrome.storage.local.get('nc-reader-session');return false;}catch{return true;}}});},page.url());assert.equal(security[0].result,true);check('credential storage is restricted to trusted extension contexts');
   assert.equal(requests.filter(r=>r.path.includes('/queues')||r.path.includes('/translation-submissions')||r.path.endsWith('/priority')).length,0,'normal reading must not use removed queue/submission contracts');check('new plans and long-poll run with zero queue, priority or old submission requests');

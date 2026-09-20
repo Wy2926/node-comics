@@ -1,5 +1,6 @@
 // Isolated real APIs + Chrome. Synthetic image provider; no payment or production data.
 import assert from 'node:assert/strict';
+import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
 import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -44,7 +45,7 @@ try {
   assert.equal(detail.entitlements.plus_expires_at,originalExpiry);assert.equal(detail.entitlements.modes.redraw.quota.granted,30);
   check('Custom seven-day PLUS gift recovers a lost response after reopening, without duplicate extension or quota');
   await adminPage.getByRole('button',{name:'创建另一笔赠送'}).click();
-  await adminPage.getByLabel('赠送类型',{exact:true}).selectOption('quota');
+  await selectOption(adminPage.getByLabel('赠送类型',{exact:true}),'quota');
   await adminPage.getByLabel('赠送页数',{exact:true}).fill('12');
   const localDate=delta=>{const d=new Date(Date.now()+delta);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
   await adminPage.getByLabel('生效时间（留空立即生效）').fill(localDate(86400000));

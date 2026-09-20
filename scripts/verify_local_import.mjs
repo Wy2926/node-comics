@@ -8,6 +8,7 @@ import {mkdir,readFile,writeFile,mkdtemp} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {selectOption} from './select_helpers.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=path.join(root,'artifacts/local-import');await mkdir(output,{recursive:true});
@@ -41,7 +42,7 @@ try{
  await choose([await fixture('pages.cbz','01-重复但改名.cbz'),long,await fixture('broken-image.cbz','03-损坏章节.cbz'),await fixture('pages.pdf','04-新卷册.pdf'),await fixture('repacked.cbz','05-可移除.cbz'),{name:'06-说明.txt',mimeType:'text/plain',buffer:Buffer.from('unsupported')}]);
  assert.equal(await rows.count(),6);assert.equal(await rows.filter({hasText:'已存在 · 跳过'}).count(),1);assert.equal(await page.evaluate(()=>window.__decoded),0);
  await panel.getByRole('button',{name:'从导入清单移除 05-可移除.cbz'}).click();await panel.getByRole('button',{name:'从导入清单移除 06-说明.txt'}).click();
- await panel.getByLabel('作品名称',{exact:true}).fill('新章节批量验收');await panel.getByLabel('内容归属',{exact:true}).selectOption('chapter');await screenshot('preflight');
+ await panel.getByLabel('作品名称',{exact:true}).fill('新章节批量验收');await selectOption(panel.getByLabel('内容归属',{exact:true}),'chapter');await screenshot('preflight');
  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
  await start();await panel.locator('.nc-import-item.importing progress').waitFor();
  await panel.getByRole('button',{name:'完成当前后暂停'}).click();await screenshot('progress');

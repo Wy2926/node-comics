@@ -9,6 +9,7 @@ import * as store from '../src/library/store';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
+import '../src/ui/theme/surfaces.css';
 
 if (location.hostname !== '127.0.0.1' || location.port !== '5176') throw Error('导出验收仅允许独立的 127.0.0.1:5176 来源。');
 const previous = await store.readLibrary();

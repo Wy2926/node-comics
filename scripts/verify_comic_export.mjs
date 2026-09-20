@@ -6,6 +6,7 @@ import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {selectOption} from './select_helpers.mjs';
 import {createHash} from 'node:crypto';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -79,13 +80,13 @@ try {
   }
   checks.push({cbz: true, separateEditions: true, originalBytesPreserved: true, fallbackAndNoText: true, orderedPages: 3});
   await dialog.getByRole('button', {name: '返回选择', exact: true}).click();
-  await dialog.getByLabel('导出格式', {exact: true}).selectOption('zip'); await inspect();
+  await selectOption(dialog.getByLabel('导出格式', {exact: true}),'zip'); await inspect();
   const imagesZip = await unzip(await generate('images.zip'));
   assert.equal([...imagesZip.keys()].filter(n => /\.(png|webp)$/.test(n)).length, 6);
   assert(![...imagesZip.keys()].some(n => n.endsWith('.cbz'))); checks.push({imageZip: true});
   await dialog.getByRole('button', {name: '返回选择', exact: true}).click();
-  await dialog.getByLabel('导出格式', {exact: true}).selectOption('pdf');
-  await dialog.getByLabel('导出图片', {exact: true}).selectOption('translation'); await inspect();
+  await selectOption(dialog.getByLabel('导出格式', {exact: true}),'pdf');
+  await selectOption(dialog.getByLabel('导出图片', {exact: true}),'translation'); await inspect();
   const pdfBlob = await generate('translated.pdf');
   const pdf = await PDFDocument.load(await pdfBlob.arrayBuffer()); assert.equal(pdf.getPageCount(), 3); assert.deepEqual(pdf.getPage(0).getSize(), {width: 270, height: 405});
   const rendered = await page.evaluate(async base64 => {
@@ -119,7 +120,7 @@ try {
   await dialog.getByRole('button', {name: '返回选择', exact: true}).click();
   await dialog.getByRole('button', {name: '清空选择', exact: true}).click();
   await dialog.locator('.nc-export-copy').filter({hasText: '第 02 话'}).getByRole('checkbox').check();
-  await dialog.getByLabel('导出格式', {exact: true}).selectOption('zip'); await inspect();
+  await selectOption(dialog.getByLabel('导出格式', {exact: true}),'zip'); await inspect();
   assert(await dialog.getByRole('button', {name: '开始导出', exact: true}).isDisabled());
   await dialog.getByRole('checkbox', {name: /允许导出不完整内容/}).check();
   await dialog.getByRole('button', {name: '开始导出', exact: true}).click();
@@ -140,7 +141,7 @@ try {
   await dialog.getByRole('button', {name: '开始导出', exact: true}).waitFor();
   assert.equal(await dialog.getByRole('link', {name: '下载文件', exact: true}).count(), 0); checks.push({cancelled: true});
   await dialog.getByRole('button', {name: '返回选择', exact: true}).click();
-  await dialog.getByLabel('导出图片', {exact: true}).selectOption('original'); await inspect();
+  await selectOption(dialog.getByLabel('导出图片', {exact: true}),'original'); await inspect();
   await dialog.getByRole('checkbox', {name: /允许导出不完整内容/}).check();
   const partial = await unzip(await generate('partial.zip'));
   assert.equal([...partial.keys()].filter(n => n.endsWith('.png')).length, 1);

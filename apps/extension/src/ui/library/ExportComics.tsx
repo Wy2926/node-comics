@@ -1,3 +1,4 @@
+import {Select} from '../Select';
 import {msg} from '../../i18n/runtime';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {Api} from '../../api';
@@ -74,10 +75,10 @@ export function ExportComics({work, library, copies, settings, api, userId, apiO
       <ol className="nc-export-steps"><li aria-current={!plan ? 'step' : undefined}><span>1</span>{msg("选择内容")}</li><li aria-current={plan ? 'step' : undefined}><span>2</span>{msg("检查与导出")}</li></ol>
       <fieldset disabled={!!busy} className="nc-export-options" hidden={!!plan}>
         <div className="nc-form-grid">
-          <label className="field">{msg("导出格式")}<select aria-label={msg("导出格式")} value={options.format} onChange={e => updateOptions({format: e.target.value as ExportOptions['format']})}><option value="cbz">{msg("CBZ · 漫画阅读器")}</option><option value="zip">{msg("图片 ZIP · 原始图片目录")}</option><option value="pdf">{msg("PDF · 通用阅读")}</option></select></label>
-          <label className="field">{msg("导出图片")}<select aria-label={msg("导出图片")} value={options.images} onChange={e => updateOptions({images: e.target.value as ExportOptions['images']})}><option value="original">{msg("仅原图")}</option><option value="translation" disabled={!userId}>{msg("仅译图")}</option><option value="both" disabled={!userId}>{msg("原图与译图 · 分开成册")}</option></select></label>
-          {options.images !== 'original' && <><label className="field">{msg("翻译模式")}<select aria-label={msg("翻译模式")} value={options.mode} onChange={e => updateOptions({mode: e.target.value as ExportOptions['mode']})}>{Object.entries(modeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className="field">{msg("译图语言")}<select aria-label={msg("译图语言")} value={options.language} onChange={e => updateOptions({language: e.target.value})}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</select></label></>}
+          <label className="field">{msg("导出格式")}<Select aria-label={msg("导出格式")} value={options.format} onChange={e => updateOptions({format: e.target.value as ExportOptions['format']})}><option value="cbz">{msg("CBZ · 漫画阅读器")}</option><option value="zip">{msg("图片 ZIP · 原始图片目录")}</option><option value="pdf">{msg("PDF · 通用阅读")}</option></Select></label>
+          <label className="field">{msg("导出图片")}<Select aria-label={msg("导出图片")} value={options.images} onChange={e => updateOptions({images: e.target.value as ExportOptions['images']})}><option value="original">{msg("仅原图")}</option><option value="translation" disabled={!userId}>{msg("仅译图")}</option><option value="both" disabled={!userId}>{msg("原图与译图 · 分开成册")}</option></Select></label>
+          {options.images !== 'original' && <><label className="field">{msg("翻译模式")}<Select aria-label={msg("翻译模式")} value={options.mode} onChange={e => updateOptions({mode: e.target.value as ExportOptions['mode']})}>{Object.entries(modeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
+            <label className="field">{msg("译图语言")}<Select aria-label={msg("译图语言")} value={options.language} onChange={e => updateOptions({language: e.target.value})}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</Select></label></>}
         </div>
         <p className="nc-export-hint">{options.images !== 'original' ? msg("每页使用最新成功译图；缺少译图时用原图补齐，已有服务端译图会下载。") : msg("导出已保存在本机的原图。登录后可选择当前账户的译图。")}</p>
         <p className="nc-export-hint">{msg("{0} 每次导出上限 512 MiB，大部作品请分批选择。", {"0": options.format === 'pdf' ? msg("PDF 保持图片比例，一页一图，以 95% 质量 JPEG 编码；单份 PDF 图片上限 128 MiB。") : msg("CBZ / ZIP 保留 JPEG、PNG、WebP 原始图片字节；其他图片转为 PNG。")})}</p>

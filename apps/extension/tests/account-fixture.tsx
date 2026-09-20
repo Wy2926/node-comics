@@ -1,4 +1,5 @@
 import {saveSession,readAuth} from '../src/auth/storage';
+import {initializeUiLanguage} from '../src/i18n/load';
 import type {Session} from '../src/auth/model';
 /** Isolated UI fixture: synthetic account and responses; no external requests. */
 import {createRoot} from 'react-dom/client';
@@ -9,7 +10,9 @@ import type {Entitlements} from '../src/types';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
+import '../src/ui/theme/surfaces.css';
 if(location.port!=='5186')throw Error('Use isolated port 5186 for this fixture.');
+await initializeUiLanguage();
 let scenario='plus';
 const session:Session={id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'synthetic-fixture',apiOrigin:API_ORIGIN,user:{id:'fixture-reader',name:'星野 · 漫画爱好者',role:'reader'}};
 if((await readAuth()).session&&!localStorage.getItem('nc-account-fixture'))throw Error('Existing session: refusing to seed.');

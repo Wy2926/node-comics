@@ -78,11 +78,14 @@
   --accent-on: #31204e;
 }
 
-/* Comic vocabulary shared by the login passport and popup. New surfaces opt in. */
+/* Login-passport vocabulary shared by every extension surface. */
 :root {
   --comic-border: 2px solid var(--ink);
   --comic-control-radius: 5px;
   --comic-panel-radius: 8px 24px 24px 24px;
+  --comic-card-radius: 5px 16px 16px 16px;
+  --comic-cover-radius: 3px 14px 0 0;
+  --comic-shadow-small: 2px 2px 0 var(--ink);
   --comic-shadow: 4px 4px 0 var(--ink);
   --comic-shadow-hover: 5px 5px 0 var(--ink);
   --comic-shadow-active: 1px 1px 0 var(--ink);
@@ -91,4 +94,8 @@
   --comic-perforation: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent);
   --comic-dot-pattern: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) .7px, transparent .7px);
   --comic-dot-size: 7px 7px;
+  --comic-heading-size: clamp(1.8rem, 3vw, 2.6rem);
+  --comic-panel-padding: clamp(18px, 2.5vw, 30px);
+  --comic-warning-paper: #ffe48a;
+  --comic-warning-ink: #263147;
 }

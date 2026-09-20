@@ -13,6 +13,7 @@ import {seedCardLayout,TranslationCardFixture} from './library-card-fixture';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
+import '../src/ui/theme/surfaces.css';
 
 if(location.port!=='5175')throw Error('请在独立的 5175 端口打开验收页，避免改动日常漫画库。');
 const localFetch=window.fetch.bind(window);

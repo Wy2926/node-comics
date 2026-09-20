@@ -3,6 +3,7 @@
  * PLAYWRIGHT_MODULE and TEST_CHROMIUM select an installed browser runtime.
  */
 import {completeLocalImport} from './local_import_helpers.mjs';
+import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -19,7 +20,7 @@ try{
   await page.route('http://127.0.0.1:18088/**',r=>r.fulfill({status:503,body:'No backend used in this test'}));
   await page.goto(process.env.TEST_READER_URL||'http://127.0.0.1:5174');
   await page.locator('input[type=file]').setInputFiles(path.join(root,'artifacts/import-validation',name));
-  await page.getByLabel('内容归属',{exact:true}).selectOption('publication');await completeLocalImport(page);await page.getByRole('dialog').waitFor({state:'hidden'});
+  await selectOption(page.getByLabel('内容归属',{exact:true}),'publication');await completeLocalImport(page);await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.nc-shelf-detail').click();await page.getByRole('tab',{name:'卷册',exact:true}).click();
   await page.getByRole('button',{name:'阅读',exact:true}).click();await page.getByLabel('跳转页码').waitFor();await page.locator('.nc-page-image').first().waitFor();
   const jump=page.getByLabel('跳转页码');await jump.fill('2');await jump.press('Enter');await jump.blur();

@@ -1,3 +1,4 @@
+import {Select} from './Select';
 import {msg} from '../i18n/runtime';
 import {useEffect,useState} from 'react';
 import type {Api} from '../api';
@@ -22,7 +23,7 @@ export function AccountUsage({api,onLogin,onEntitlements}:{api:Api;onLogin:()=>v
   const max=Math.max(1,...(data?.days.map(d=>d.delivered)??[]));
   return <div>
     <div className="nc-section-heading"><div><h2><Icon name="chart"/>{msg("用量统计")}</h2><p className="nc-muted">{msg("查看所选时段的翻译交付与使用情况。")}</p></div>
-      {api.token&&<div className="nc-inline"><select aria-label={msg("统计时间范围")} value={days} onChange={e=>setDays(Number(e.target.value))}><option value={7}>{msg("最近 7 天")}</option><option value={30}>{msg("最近 30 天")}</option><option value={90}>{msg("最近 90 天")}</option></select><button className="icon-button" aria-label={msg("刷新用量")} onClick={()=>setRefresh(v=>v+1)}><Icon name="refresh"/></button></div>}
+      {api.token&&<div className="nc-inline"><Select aria-label={msg("统计时间范围")} value={days} onChange={e=>setDays(Number(e.target.value))}><option value={7}>{msg("最近 7 天")}</option><option value={30}>{msg("最近 30 天")}</option><option value={90}>{msg("最近 90 天")}</option></Select><button className="icon-button" aria-label={msg("刷新用量")} onClick={()=>setRefresh(v=>v+1)}><Icon name="refresh"/></button></div>}
     </div>
     {!api.token?<div className="nc-empty"><Icon name="book" size={36}/><h2>{msg("登录后查看用量")}</h2><p>{msg("常规与重绘分别计量，成功交付后扣减有限额度。")}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}</button></div>:<>
       {error&&<p className="nc-error" role="alert">{error}<button className="text-link" onClick={()=>setRefresh(v=>v+1)}>{msg("重试")}</button></p>}

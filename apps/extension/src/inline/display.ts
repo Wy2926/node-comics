@@ -1,4 +1,9 @@
 import {msg} from '../i18n/runtime';
+import styles from './display.css?inline';
+import {shadowThemeStyles} from './shadow';
+
+export const inlineStyles=shadowThemeStyles(styles);
+
 /** Keep src, srcset, picture sources, links and event listeners owned by the site. */
 export class ImageDisplay {
   private undo:Array<()=>void>=[];

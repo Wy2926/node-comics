@@ -1,7 +1,8 @@
 import {msg,subscribeLocale} from '../i18n/runtime';
 import {readingImages,type InlineResponse,type InlineResult} from './protocol';
 import {comicImageRect,MAX_COMIC_IMAGES} from '../sources/comic-images';
-import {ImageDisplay} from './display';
+import {ImageDisplay,inlineStyles} from './display';
+import {connectInlineTheme} from './theme';
 import {safeImageUrl} from '../sources/adapters';
 import {languageLabel,modeLabels} from '../types';
 import {sourceImage} from '../sources/image-fetch';
@@ -20,13 +21,9 @@ export function installInline(){
   const host=document.createElement('div');
   host.style.cssText='all:initial!important;position:fixed!important;inset:0!important;z-index:2147483646!important;pointer-events:none!important';
   const shadow=host.attachShadow({mode:'closed'});
-  const style=document.createElement('style');style.textContent=`
-    :host{font:13px/1.5 system-ui,sans-serif;color:#23344d;color-scheme:light}
-    *{box-sizing:border-box}button{font:inherit;border:0;border-radius:6px;background:#edf3fb;color:#23344d;padding:5px 9px;cursor:pointer;pointer-events:auto}button:hover{background:#dce9fa}button:focus-visible{outline:2px solid #fb7299}
-    .bar{position:fixed;bottom:16px;right:16px;max-width:calc(100vw - 32px);display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border:1px solid #dce3ed;border-radius:12px;background:#fffffff5;box-shadow:0 3px 16px #22334425;pointer-events:auto}
-    .label{max-width:260px;margin-right:3px}.status{position:fixed;max-width:260px;padding:5px 9px;border-radius:8px;background:#fffffff2;box-shadow:0 2px 10px #22334420;pointer-events:none;overflow:hidden;text-overflow:ellipsis}.status[data-kind=error]{color:#a33147}.status[data-kind=upgrade]{color:#8d4d00}
-    .status button{background:transparent;padding:0;color:inherit;text-align:left}`;
+  const style=document.createElement('style');style.textContent=inlineStyles;
   shadow.append(style);
+  const surface=document.createElement('div');surface.className='theme';shadow.append(surface);connectInlineTheme(surface);
   const bar=document.createElement('div');bar.className='bar';bar.setAttribute('role','region');bar.setAttribute('aria-label',msg("NodeLane Comics 网页翻译"));
   const label=document.createElement('span');label.className='label';bar.append(label);
   const button=(text:string,action:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=action;bar.append(b);return b;};
@@ -34,23 +31,35 @@ export function installInline(){
   const invalidate=()=>{generation++;void send('NC_INLINE_INVALIDATE').catch(()=>{});};
   const pause=button(msg("暂停"),()=>{paused=!paused;pause.textContent=paused?msg("继续"):msg("暂停");invalidate();if(!paused)schedule();paint();});
   const originals=button(msg("恢复原图"),()=>{original=!original;originals.textContent=original?msg("显示译图"):msg("恢复原图");invalidate();if(original)for(const item of tracked.values())item.display.restore();schedule();paint();});
+  pause.className='pause';originals.className='originals';
   const settingsButton=button(msg("设置"),()=>{void send('NC_INLINE_OPEN',{view:'settings'});});
   const closeButton=button(msg("关闭"),()=>{dismissedUrl=location.href;stop();});
   subscribeLocale(()=>{settingsButton.textContent=msg('设置');closeButton.textContent=msg('关闭');pause.textContent=paused?msg('继续'):msg('暂停');originals.textContent=original?msg('显示译图'):msg('恢复原图');bar.setAttribute('aria-label',msg('NodeLane Comics 网页翻译'));if(translatedView)label.textContent=msg('漫译 · {0} · {1}',{'0':modeLabels[translatedView.mode],'1':languageLabel(translatedView.language)});scan();});
-  shadow.append(bar);
-  const badges=document.createElement('div');shadow.append(badges);
+  surface.append(bar);
+  const badges=document.createElement('div');surface.append(badges);
+  const visibleBadges=new Map<string,{element:HTMLDivElement;signature:string}>();
+  function removeBadge(id:string){const badge=visibleBadges.get(id)?.element;if(badge?.contains(shadow.activeElement))pause.focus({preventScroll:true});badge?.remove();visibleBadges.delete(id);}
   function paint(){
-    badges.replaceChildren();if(!enabled||paused||original)return;
+    bar.dataset.paused=String(paused);bar.dataset.original=String(original);
+    if(!enabled||paused||original){for(const id of visibleBadges.keys())removeBadge(id);return;}
+    const visible=new Set<string>();
     for(const item of windowImages){
       const rect=item.image.getBoundingClientRect(),state=item.state;
       if(!state||rect.bottom<=0||rect.top>=innerHeight||rect.right<=0||rect.left>=innerWidth)continue;
-      const badge=document.createElement('div');badge.className='status';badge.dataset.kind=state.kind;
+      visible.add(item.id);
+      let entry=visibleBadges.get(item.id);
+      if(!entry){const element=document.createElement('div');element.className='status';element.tabIndex=-1;element.setAttribute('role','status');element.setAttribute('aria-live','polite');element.setAttribute('aria-atomic','true');entry={element,signature:''};visibleBadges.set(item.id,entry);badges.append(element);}
+      const badge=entry.element;badge.dataset.kind=state.kind;
       badge.style.cssText=`top:${Math.max(4,rect.top+8)}px;left:${Math.max(4,Math.min(innerWidth-270,rect.left+8))}px;max-width:${Math.min(260,rect.width-16)}px`;
       const actionable=state.kind==='login'||state.kind==='upgrade'||state.kind==='error'&&state.retryable!==false;
       const notice=translationNotice(state);badge.title=notice.detail;
-      if(actionable){const b=document.createElement('button');b.type='button';b.textContent=notice.label;b.onclick=()=>{if(state.kind==='login'||state.kind==='upgrade'){void send('NC_INLINE_OPEN',{view:'account'});return;}retryId=item.id;invalidate();item.state={kind:'translating',message:msg("重试中…")};schedule(0);paint();};badge.append(b);}else badge.textContent=notice.message;
-      badges.append(badge);
+      const contentSignature=JSON.stringify([state.kind,actionable,notice]);
+      if(entry.signature===contentSignature)continue;
+      entry.signature=contentSignature;
+      const focused=badge.contains(shadow.activeElement);badge.replaceChildren();badge.removeAttribute('aria-description');
+      if(actionable){const b=document.createElement('button');b.type='button';b.textContent=notice.label;const detail=document.createElement('span');detail.className='sr-only';detail.id='detail-'+item.id;detail.textContent=notice.detail;b.setAttribute('aria-describedby',detail.id);b.onclick=()=>{if(state.kind==='login'||state.kind==='upgrade'){void send('NC_INLINE_OPEN',{view:'account'});return;}retryId=item.id;invalidate();item.state={kind:'translating',message:msg("重试中…")};schedule(0);paint();};badge.append(b,detail);if(focused)b.focus({preventScroll:true});}else{badge.textContent=notice.message;badge.setAttribute('aria-description',notice.detail);if(focused)badge.focus({preventScroll:true});}
     }
+    for(const id of visibleBadges.keys())if(!visible.has(id))removeBadge(id);
   }
   function source(image:HTMLImageElement){
     const url=image.currentSrc||image.src;
@@ -115,7 +124,7 @@ export function installInline(){
   const hasImage=(node:Node)=>node instanceof Element&&(node instanceof HTMLImageElement||node instanceof HTMLSourceElement||!!node.querySelector('img'));
   const observer=new MutationObserver(records=>{if(records.some(r=>r.type==='attributes'?hasImage(r.target):[...r.addedNodes,...r.removedNodes].some(hasImage)))queueScan();});
   function start(){
-    if(enabled){paused=false;original=false;pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");schedule();return;}
+    if(enabled){paused=false;original=false;pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");schedule();paint();return;}
     initialUrl=location.href;enabled=true;paused=false;original=false;scope='';signature='';pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");
     document.documentElement.append(host);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','sizes','style','class','hidden','width','height']});
     document.addEventListener('scroll',queueScan,{passive:true,capture:true});window.addEventListener('resize',queueScan);document.addEventListener('load',queueScan,true);document.addEventListener('visibilitychange',visibility);window.addEventListener('online',visibility);window.addEventListener('pagehide',stop);scan();schedule();
@@ -125,6 +134,7 @@ export function installInline(){
     if(!enabled)return;enabled=false;invalidate();clearTimeout(timer);clearTimeout(scanTimer);clearInterval(leaseTimer);scanTimer=undefined;cancelAnimationFrame(raf);raf=0;observer.disconnect();
     document.removeEventListener('scroll',queueScan,true);window.removeEventListener('resize',queueScan);document.removeEventListener('load',queueScan,true);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('online',visibility);window.removeEventListener('pagehide',stop);
     for(const item of tracked.values())item.display.restore();tracked.clear();candidates=[];windowImages=[];host.remove();
+    badges.replaceChildren();visibleBadges.clear();
   }
   function visibility(){invalidate();scan();schedule();}
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{

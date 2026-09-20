@@ -1,0 +1,87 @@
+/* Kept inside the shadow root; all colors and comic geometry come from tokens.css. */
+.theme {
+  font: calc(13px * var(--text-scale)) / 1.5 "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: transparent;
+  text-align: start;
+  direction: ltr;
+  pointer-events: none;
+}
+*, *::before, *::after { box-sizing: border-box; }
+button {
+  font: inherit;
+  font-weight: 600;
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 3px 7px;
+  box-shadow: var(--comic-shadow);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+button:hover { background: var(--accent-soft); color: var(--accent-hover); }
+button:active { box-shadow: var(--comic-shadow-active); }
+button:focus-visible, .status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.bar {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: var(--comic-border);
+  border-radius: var(--comic-panel-radius);
+  background-color: var(--surface);
+  background-image: var(--comic-dot-pattern);
+  background-size: var(--comic-dot-size);
+  box-shadow: var(--comic-shadow);
+  pointer-events: auto;
+  z-index: 1;
+}
+.bar[data-paused=true] .pause, .bar[data-original=true] .originals {
+  background: var(--accent);
+  color: var(--accent-on);
+}
+.label { max-width: 260px; margin-right: 3px; font-weight: 700; overflow-wrap: anywhere; }
+.status {
+  position: fixed;
+  max-width: 260px;
+  padding: 3px 7px;
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--comic-shadow);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.status[data-kind=translating], .status[data-kind=login] { color: var(--accent); background: var(--accent-soft); }
+.status[data-kind=error] { color: var(--danger); background: var(--danger-soft); }
+.status[data-kind=upgrade] { color: var(--warning); }
+.status:has(button) { padding: 0; }
+.status button {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: var(--comic-control-radius);
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.status button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (forced-colors: active) {
+  .bar, .status, button { border-color: CanvasText; box-shadow: none; }
+  button:focus-visible, .status:focus-visible { outline-color: Highlight; }
+}

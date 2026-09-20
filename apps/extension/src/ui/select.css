@@ -1,0 +1,80 @@
+button.nc-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line));
+  border-radius: var(--comic-control-radius);
+  box-shadow: none;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  line-height: 1.4;
+  text-align: start;
+  cursor: pointer;
+}
+.nc-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-select-chevron { flex: none; transform: rotate(90deg); }
+.nc-select[aria-expanded=true] .nc-select-chevron { transform: rotate(270deg); }
+button.nc-select:hover:not(:disabled), button.nc-select[aria-expanded=true] { background: var(--accent-soft); }
+button.nc-select:hover:not(:disabled):not(:focus):not([aria-expanded=true]) { border-color: var(--ink); }
+button.nc-select:focus, button.nc-select[aria-expanded=true] {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: none;
+}
+button.nc-select:disabled {
+  opacity: 1;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-color: var(--line);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.setting-row .nc-select { min-width: 190px; font-size: .9375rem; }
+.field > .nc-select { width: 100%; font-size: 1rem; }
+.nc-library .nc-select { min-height: 40px; font-size: .875rem; }
+
+.nc-select-list {
+  position: fixed;
+  inset: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  box-shadow: var(--comic-shadow-small);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: .9375rem;
+  line-height: 1.4;
+  text-align: start;
+}
+.nc-select-list::backdrop { background: transparent; }
+.nc-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.nc-select-option > span { min-width: 0; overflow-wrap: anywhere; }
+.nc-select-option[data-active=true] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.nc-select-option[aria-selected=true] { color: var(--accent); font-weight: 700; }
+.nc-select-check { visibility: hidden; flex: none; }
+.nc-select-option[aria-selected=true] .nc-select-check { visibility: visible; }
+.nc-select-option[aria-disabled=true] { color: var(--muted); opacity: .6; cursor: not-allowed; }
+
+/* Preserve the popup's existing compact language control without changing its layout. */
+.nc-popup-language .nc-select { width: 148px; min-width: 0; min-height: 40px; padding: 8px; font-size: .75rem; }
+.nc-popup-language .nc-select-list { font-size: .75rem; }
