@@ -1,6 +1,7 @@
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
+import type {Authorization} from './auth/session';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
 function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
@@ -9,21 +10,37 @@ function retryDelay(body:unknown,header:string|null){
 export class Api {
   private readonly updatesPool = new RequestPool(1);
   private readonly controlPool = new RequestPool(2);
-  constructor(public base: string, public token = '', public pool = new RequestPool(UPLOAD_CONCURRENCY), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
+  constructor(public base: string, public token = '', public pool = new RequestPool(UPLOAD_CONCURRENCY), public isCurrent = () => true, private authorization?:Authorization) { this.base = base.replace(/\/+$/, ''); }
+  private async assertAuthorized(){assertCurrent(this.isCurrent);if(this.authorization)await this.authorization.current();assertCurrent(this.isCurrent);}
+  private async authorizedFetch(url:string|URL,init:RequestInit):Promise<Response>{
+    for(let attempt=0;attempt<2;attempt++){
+      assertCurrent(this.isCurrent);init.signal?.throwIfAborted();
+      const token=this.authorization?await this.authorization.token():this.token;
+      assertCurrent(this.isCurrent);init.signal?.throwIfAborted();
+      const headers=new Headers(init.headers);if(token)headers.set('Authorization',`Bearer ${token}`);
+      let response:Response;
+      try{response=await fetch(url,{...init,headers,credentials:'omit'});}
+      catch{init.signal?.throwIfAborted();throw new ApiError('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。');}
+      await this.assertAuthorized();
+      if(response.status!==401||!this.authorization)return response;
+      if(attempt===1)await this.authorization.reject(token);
+      else await this.authorization.token(token);
+    }
+    throw new ApiError('登录已过期，请重新登录。','AUTH_REQUIRED',401);
+  }
   async request<T>(path: string, init: RequestInit = {}, allowPlanLimit=false): Promise<T> {
     return this.controlPool.run(() => this.fetchRequest<T>(path, init, allowPlanLimit));
   }
   private async fetchRequest<T>(path: string, init: RequestInit = {}, allowPlanLimit=false): Promise<T> {
     assertCurrent(this.isCurrent);
-    let response: Response;
-    try { response = await fetch(this.base + path, { ...init, headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers } }); }
-    catch { init.signal?.throwIfAborted();throw new ApiError('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。'); }
+    const headers=new Headers(init.headers);if(init.body&&!(init.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
+    const response=await this.authorizedFetch(this.base+path,{...init,headers});
     if (!response.ok) { const raw = await response.json().catch(() => ({})); if(allowPlanLimit&&response.status===429&&Array.isArray(raw.items)&&(raw.error?.code==='IMAGE_RATE_LIMITED'||raw.items.every((item:TranslationOperation)=>item.code==='IMAGE_RATE_LIMITED')))return raw as T; if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')),error.scope); }
     if (response.status === 204) return undefined as T;
-    return response.json();
+    const result=await response.json();await this.assertAuthorized();return result;
   }
   authConfig() { return this.request<AuthConfig>('/v1/auth/config'); }
-  login(username: string) { return this.request<{access_token: string; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
+  login(username: string) { return this.request<{access_token: string; expires_in:number; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
   capabilities() { return this.request<Capabilities>('/v1/capabilities'); }
   entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
@@ -48,7 +65,7 @@ export class Api {
   translationChanges(cursor?:string,policyRevision?:string) {const query=new URLSearchParams();if(cursor)query.set('cursor',cursor);if(policyRevision)query.set('policy_revision',policyRevision);return this.request<TranslationChanges>(`/v1/me/translation-changes?${query}`);}
   waitForTranslationChanges(cursor:string|undefined,signal:AbortSignal,policyRevision?:string) {
     // A waiting connection must not consume upload/image request capacity.
-    const listener=new Api(this.base,this.token,this.updatesPool,this.isCurrent);
+    const listener=new Api(this.base,this.token,this.updatesPool,this.isCurrent,this.authorization);
     return this.updatesPool.run(()=>listener.request<TranslationChanges>(`/v1/me/translation-changes?cursor=${encodeURIComponent(cursor??'0')}&wait_seconds=20${policyRevision?'&policy_revision='+encodeURIComponent(policyRevision):''}`,{signal}));
   }
   async uploadOriginal(plan:UploadPlan,blob:Blob) {
@@ -56,12 +73,14 @@ export class Api {
     if(url.username||url.password||url.protocol!=='https:'&&!(local&&url.protocol==='http:')||plan.method!=='PUT'||plan.authorization_required&&url.origin!==origin)throw new ApiError('原图上传授权地址无效。','INVALID_UPLOAD_PLAN');
     if(Date.parse(plan.expires_at)<=Date.now())throw new ApiError('上传授权已到期，请刷新后继续。','UPLOAD_URL_EXPIRED');
     return this.pool.run(async()=>{
-      assertCurrent(this.isCurrent);
+      await this.assertAuthorized();
       let response:Response;
-      try {response=await fetch(url,{method:'PUT',body:blob,headers:{...plan.headers,...(plan.authorization_required?{Authorization:`Bearer ${this.token}`}:{})},credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});}
+      const init:RequestInit={method:'PUT',body:blob,headers:plan.headers,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'};
+      if(plan.authorization_required)response=await this.authorizedFetch(url,init);
+      else try {response=await fetch(url,init);}
       catch {throw new ApiError('原图上传暂未完成，请检查网络和对象存储跨域配置。','UPLOAD_FAILED');}
       if(!response.ok)throw new ApiError('原图上传未完成，将刷新上传授权后重试。','UPLOAD_FAILED',response.status);
-      assertCurrent(this.isCurrent);
+      await this.assertAuthorized();
     });
   }
   async image(id: string, signal?: AbortSignal): Promise<Blob> {
@@ -75,18 +94,17 @@ export class Api {
         throw new ApiError('图片访问地址无效。', 'INVALID_ASSET_ORIGIN');
       }
       const blob = await (async () => {
-        assertCurrent(this.isCurrent);
+        await this.assertAuthorized();
         signal?.throwIfAborted();
         // Refresh an expired signature before starting the download.
         if (signed && attempt === 0 && access.expires_at && Date.parse(access.expires_at) <= Date.now()) return null;
         let response: Response;
         try {
-          response = await fetch(url, {
-            headers: signed ? {} : {Authorization: `Bearer ${this.token}`},
-            credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'error', signal,
-          });
-        } catch {
+          const init:RequestInit={credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',redirect:'error',signal};
+          response=signed?await fetch(url,{...init,headers:{}}):await this.authorizedFetch(url,init);
+        } catch (error) {
           signal?.throwIfAborted();
+          if(!signed)throw error;
           // R2 omits CORS headers for expired signatures, so fetch may reject.
           if (signed && attempt === 0) return null;
           throw new ApiError('暂时无法下载图片，请检查网络或对象存储的跨域配置。', 'ASSET_DOWNLOAD_FAILED');
@@ -96,7 +114,7 @@ export class Api {
         const result = await response.blob();
         const bitmap = await createImageBitmap(result);
         bitmap.close();
-        assertCurrent(this.isCurrent);
+        await this.assertAuthorized();
         return result;
       })();
       if (blob) return blob;

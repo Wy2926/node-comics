@@ -3,7 +3,8 @@ import {imageIdentity,hashFile} from '../importers/hash';
 import {emptyPage,naturalSort} from '../reader/model';
 import {mergeJobs} from '../reader/jobs';
 import {makeCopy} from './model';
-import {putBlob,getBlob,cacheSize,collectUnusedBlobs,readCopies,session} from './store';
+import {putBlob,getBlob,cacheSize,collectUnusedBlobs,readCopies} from './store';
+import {readAuth} from '../auth/storage';
 import type {Page,ReadingCopy} from '../types';
 export interface LocalImportProgress {label:string;done?:number;total?:number;}
 export async function readLocalFiles(files:File[],limitMb:number,progress:(text:string)=>void,onProgress?:(value:LocalImportProgress)=>void,fileHashes?:WeakMap<File,string>):Promise<ReadingCopy[]>{
@@ -12,7 +13,7 @@ export async function readLocalFiles(files:File[],limitMb:number,progress:(text:
  const comics=files.filter(f=>isComicFile(f.name)),images=naturalSort(files.filter(f=>['image/png','image/jpeg','image/webp'].includes(f.type)));
  if(comics.length+images.length!==files.length)throw Error('包含不支持的文件。请选择图片、MOBI、CBZ/ZIP、CBR/RAR 或 PDF。');
  const saved:string[]=[];
- const cachedPages=(await readCopies()).flatMap(copy=>copy.pages),account=session();
+ const cachedPages=(await readCopies()).flatMap(copy=>copy.pages),account=(await readAuth()).session;
  const originals=new Map(cachedPages.filter(page=>page.imageSha256&&page.blobKey).map(page=>[page.imageSha256!,page]));
  const translations=new Map<string,Page>();
  for(const page of cachedPages){if(!page.imageSha256||!account||page.ownerId!==account.user.id||page.apiOrigin!==account.apiOrigin)continue;const previous=translations.get(page.imageSha256);translations.set(page.imageSha256,previous?{...page,jobs:mergeJobs(previous.jobs,page.jobs),outputBlobs:{...previous.outputBlobs,...page.outputBlobs}}:page);}

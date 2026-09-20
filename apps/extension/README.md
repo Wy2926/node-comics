@@ -48,6 +48,7 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 - 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/LOCAL_IMPORT_FLOW.md)。
 - 网页图片发现与字节采集分离；MangaCopy 按懒加载与总页数核对完整性，失败页有重试原因。参见[采集与漫画管理](../../docs/COMIC_LIBRARY_IMPLEMENTATION.md)、[网页图片导入](../../docs/WEB_IMAGE_IMPORT.md)。
 - 身份、图片、任务归服务 origin 与账户 ID；来源 Cookie 与登录令牌不上传。登录前可读本地原图。
+- 会话统一在 `src/auth` 管理，扩展的访问令牌和续期凭据仅存于受限的 `chrome.storage.local`。到期前自动续期，认证 401 最多续期重试一次，失效后同步退出并显示重新登录入口；断网保留会话，原图和阅读位置不受影响。旧会话结构已删除，不迁移或兼容。配置、边界与隔离验收见[生产身份说明](../../docs/PRODUCTION_IDENTITY.md#客户端会话与续期2026-09-20)。
 - 本机请求并发 `requestConcurrency` 默认 2，可设 1–10；仅控制上传、匹配、状态和图片下载，不改变服务端执行分配。
 
 ## 浏览器隔离验收入口

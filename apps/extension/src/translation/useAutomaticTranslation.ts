@@ -29,6 +29,7 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
  },[api,userId,origin,commit]);
  useEffect(()=>{stamp.current++;if(!currentId){windowRef.current.update([]);visible.current=[];wake.current();}},[currentId,language]);
  useEffect(()=>{
+   setError('');
    if(!scope||!userId){jobs.current=[];setOperations([]);return;}
    let stopped=false,running=false,wakePending=false,timer:ReturnType<typeof setTimeout>|undefined,watching=false;
    let watchController=new AbortController(),retry=0;

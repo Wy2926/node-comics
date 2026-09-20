@@ -24,6 +24,11 @@ function fixture(status:Job['status']):Page{
  return {...emptyPage('page',800,1200),ownerId:'reader',apiOrigin:origin,blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',output_asset_id:null,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
 describe('in-image retry status',()=>{
+ it('replaces stale errors and pending tasks with the login action after sign-out',()=>{
+  const page=fixture('running');page.translationError='旧账户下载失败';
+  expect(translationState({page,mode:'classic',language:'zh-Hans',origin,active:true,error:'登录已过期'})).toEqual({kind:'login',message:'登录后自动翻译'});
+  expect(translationState({page,mode:'classic',language:'zh-Hans',origin,active:false,error:'登录已过期'})).toBeUndefined();
+ });
  it('exposes a failed rerun even while the previous translation remains readable',()=>{
   const page=fixture('failed');
   expect(readingImage(page,'classic',true,'zh-Hans','reader',origin).key).toBe('translated');

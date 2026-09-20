@@ -1,12 +1,14 @@
+import {testSession,stubAuthLocks} from './auth-fixture';
+import {saveSession,readAuth} from '../src/auth/storage';
 import {API_ORIGIN} from '../src/service';
 import 'fake-indexeddb/auto';
 import {describe,it,expect,vi,beforeAll} from 'vitest';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
-import {saveCopy,commitCopies,putBlob,getBlob,readCopies,enforceCacheBudget,saveSession,session,saveSettings,savePosition,settings,clearLocalImages,clearTranslations,readLibrary} from '../src/library/store';
+import {saveCopy,commitCopies,putBlob,getBlob,readCopies,enforceCacheBudget,saveSettings,savePosition,settings,clearLocalImages,clearTranslations,readLibrary} from '../src/library/store';
 import {defaults} from '../src/types';
 import type {Job} from '../src/types';
-beforeAll(()=>{const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>data.set(key,value),removeItem:(key:string)=>data.delete(key)});});
+beforeAll(()=>{stubAuthLocks();const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>data.set(key,value),removeItem:(key:string)=>data.delete(key)});});
 describe('local resource lifecycle',()=>{
 it('persists file identities independently of visible ordering and deletion',async()=>{
   const pages=[0,1,2].map(pageIndex=>({...emptyPage(`${pageIndex}.png`,10,10),fileHash:'a'.repeat(64),pageIndex}));
@@ -65,13 +67,13 @@ it('evicts only translated blobs and preserves original files even above the bud
   const restored=await readCopies();const evicted=restored.find(c=>c.id===old.id)!.pages[0];
   expect(evicted.blobKey).toBe(p.blobKey);expect(await getBlob(p.blobKey!)).toBeInstanceOf(Blob);expect(evicted.outputBlobs).toEqual({});expect(await getBlob(keep.blobKey)).toBeInstanceOf(Blob);
 });
-it('only restores access tokens for their original service origin',()=>{
+it('only restores access tokens for their original service origin',async()=>{
   saveSettings(defaults);
-  saveSession({token:'isolated-unit-test-value',user:{id:'a',name:'a',role:'reader'},apiOrigin:API_ORIGIN});
-  expect(session()?.user.id).toBe('a');
-  saveSession({token:'other',user:{id:'b',name:'b',role:'reader'},apiOrigin:'https://other-service.example'});
-  expect(session()).toBeNull();
-  saveSession(null);
+  await saveSession(testSession({token:'isolated-unit-test-value',user:{id:'a',name:'a',role:'reader'},apiOrigin:API_ORIGIN}));
+  expect((await readAuth()).session?.user.id).toBe('a');
+  await expect(saveSession(testSession({apiOrigin:'https://other-service.example'}))).rejects.toThrow('登录会话或服务地址无效');
+  expect((await readAuth()).session?.user.id).toBe('a');
+  await saveSession(null);
 });
 });
 

@@ -4,5 +4,5 @@ import './styles.css';
 import './redesign.css';
 import './library.css';
 import {connectReaderSettings} from './inline/settings';
-import {settings,session} from './library/store';
-void connectReaderSettings(settings(),session()).catch(()=>{}).then(()=>createRoot(document.getElementById('root')!).render(<App/>));
+import {settings} from './library/store';
+void connectReaderSettings(settings()).catch(()=>{}).then(()=>createRoot(document.getElementById('root')!).render(<App/>));

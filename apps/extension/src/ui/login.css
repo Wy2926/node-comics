@@ -1,0 +1,43 @@
+.nc-app .modal.nc-login {
+  width: 480px;
+  padding: 36px;
+  background: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 55%), var(--surface);
+}
+.nc-login .modal-spark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 22px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.nc-app .nc-login h2 { margin: 0; text-align: center; font-size: 1.4rem; letter-spacing: -.03em; }
+.nc-app .nc-login .modal-subtitle { text-align: center; margin: 10px 0 18px; }
+.nc-login-benefits { display: flex; align-items: center; justify-content: center; gap: 9px; flex-wrap: wrap; color: var(--muted); font-size: .8125rem; margin-bottom: 28px; }
+.nc-login-benefits svg { color: var(--accent); }
+.nc-login .nc-login-field { margin-bottom: 18px; }
+.nc-login-status { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.nc-login-status > div { display: flex; gap: 12px; align-items: flex-start; }
+.nc-login-status > div > svg, .nc-login-status .spinner { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
+.nc-login-status strong { display: block; font-size: .9375rem; line-height: 1.6; }
+.nc-login-status p { margin-top: 5px; font-size: .8125rem; color: var(--muted); overflow-wrap: anywhere; }
+.nc-login-status small { display: block; margin-top: 10px; color: var(--muted); font-size: .75rem; line-height: 1.7; }
+.nc-login-status.error, .nc-login-status.unavailable { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, var(--surface)); }
+.nc-login-status.error strong, .nc-login-status.error svg, .nc-login-status.unavailable strong, .nc-login-status.unavailable svg { color: var(--danger); }
+.nc-login-status.pending { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.nc-app .nc-login-submit { margin-top: 22px; min-height: 48px; }
+.nc-app .nc-login-submit:disabled { opacity: 1; background: var(--surface-soft); border-color: var(--line); color: var(--muted); }
+.nc-app .nc-login-later { margin-top: 8px; font-size: .875rem; }
+.nc-login-footnote { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
+.nc-login-footnote svg { flex-shrink: 0; color: var(--accent); }
+.nc-login-resume { position: fixed; right: 24px; bottom: 28px; z-index: 65; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 13px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); text-align: left; }
+.nc-login-resume small { display: block; color: var(--muted); margin-top: 3px; }
+.nc-login-resume.error > svg:first-child { color: var(--danger); }
+@media (max-width: 520px) {
+  .nc-app .modal.nc-login { padding: 30px 22px 22px; }
+  .nc-app .nc-login h2 { font-size: 1.25rem; }
+  .nc-login-resume { right: 16px; bottom: 20px; }
+}

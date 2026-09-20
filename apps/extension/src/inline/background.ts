@@ -2,13 +2,16 @@ import {API_BASE,API_ORIGIN} from '../service';
 import {Api} from '../api';
 import {RequestPool,assertCurrent,UPLOAD_CONCURRENCY} from '../concurrency';
 import {imageIdentity} from '../importers/hash';
-import {getBlob,putBlob,removeBlob,type Session} from '../library/store';
+import {getBlob,putBlob,removeBlob} from '../library/store';
+import {readAuth,authKey} from '../auth/storage';
+import {sessionAuthorization} from '../auth/session';
+import type {AuthState,Session} from '../auth/model';
 import {emptyPage} from '../reader/model';
 import {safeImageUrl} from '../sources/adapters';
 import {sourceImage} from '../sources/image-fetch';
 import {defaults,supportsLanguage,type Page,type Settings,type Job,type Capabilities,type Entitlements} from '../types';
 import {comicSize,type InlineRequest,type InlineResponse,type InlineResult} from './protocol';
-import {settingsKey,sessionKey} from './settings';
+import {settingsKey} from './settings';
 import {imageDataUrl,maxInlineBytes} from './bytes';
 import {TranslationCoordinator} from '../translation/coordinator';
 import {operationId,type ReadingTarget} from '../translation/automatic';
@@ -31,13 +34,13 @@ export async function activateInline(tabId:number){
   await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START'},{frameId:0});
 }
 async function context(tabId:number,navigationId:string):Promise<Context|undefined>{
-  const saved=await chrome.storage.local.get([settingsKey,sessionKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>},session=saved[sessionKey] as Session|null;
+  const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>},session=(await readAuth()).session;
   const origin=API_ORIGIN;if(!session||session.apiOrigin!==origin)return;
-  const key=JSON.stringify([origin,session.user.id,settings.translationMode,settings.language,navigationId,configGeneration]);
+  const key=JSON.stringify([origin,session.id,settings.translationMode,settings.language,navigationId,configGeneration]);
   const previous=contexts.get(tabId);if(previous?.key===key)return previous;
   if(previous){previous.active=false;previous.waiting?.abort();}
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
-  const api=new Api(API_BASE,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active));
+  const api=new Api(API_BASE,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active),sessionAuthorization(session.id));
   const [caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);
   const attach=async(jobs:Job[])=>{assertCurrent(api.isCurrent);for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,ownerId:session.user.id,apiOrigin:origin,assetId:incoming.find(j=>j.input_asset_id)?.input_asset_id??page.assetId,jobs:mergeJobs(page.jobs,incoming)});}};
   const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob,rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
@@ -106,7 +109,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
   return response(ctx,request);
 }
 export function registerInlineBackground(){
-  chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes[settingsKey]||changes[sessionKey])){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
+  chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;if(area==='local'&&(changes[settingsKey]||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_LEASE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;

@@ -25,7 +25,7 @@ it('downloads signed HTTPS objects without account tokens, cookies or referrers'
 it('keeps Bearer authentication for local same-origin images', async () => {
   const fetch = setup({url: '/content',expires_at:null, authorization_required: true});
   await new Api('https://api.example', 'token').image('page');
-  expect(fetch).toHaveBeenLastCalledWith(new URL('https://api.example/content'), expect.objectContaining({headers: {Authorization: 'Bearer token'}}));
+  expect(new Headers((fetch.mock.calls.at(-1) as unknown as [URL,RequestInit])[1].headers).get('Authorization')).toBe('Bearer token');
 });
 
 it.each([

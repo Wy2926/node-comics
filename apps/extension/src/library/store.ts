@@ -1,5 +1,4 @@
-import {API_ORIGIN} from '../service';
-import { defaults, type ReadingCopy, type Settings, type User } from '../types';
+import { defaults, type ReadingCopy, type Settings } from '../types';
 import {mergeJobs} from '../reader/jobs';
 import {attachCopy,emptyLibrary,validateLibrary} from './model';
 import type {ImportAssignment,LibraryState,SourceCatalog} from './types';
@@ -83,9 +82,6 @@ function knownSettings(value:Partial<Settings>):Settings {
   return Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,value?.[key as keyof Settings]??fallback])) as unknown as Settings;
 }
 export function saveSettings(value: Settings) { localStorage.setItem('nc-settings',JSON.stringify(knownSettings(value))); void mirrorReader({settings:knownSettings(value)}); if (typeof chrome!=='undefined' && chrome.storage?.local) void chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}}); }
-export interface Session {token:string;user:User;apiOrigin:string;}
-export function session(): Session|null { try {const value=JSON.parse(localStorage.getItem('nc-session')??'null');return value?.apiOrigin===API_ORIGIN?value:null;} catch{return null;} }
-export function saveSession(value: Session|null) { if(value)localStorage.setItem('nc-session',JSON.stringify(value));else localStorage.removeItem('nc-session'); void mirrorReader({session:value}); }
 export async function enforceCacheBudget(copies: ReadingCopy[], limitMb: number, protectedCopyId?: string) {
   if(limitMb===-1||limitMb===Infinity)return;
   const all=await transaction<{id:string;blob:Blob;usedAt:number}[]>('blobs','readonly',s=>s.getAll());let total=all.reduce((n,b)=>n+b.blob.size,0);const limit=limitMb*1024*1024;if(total<=limit)return;

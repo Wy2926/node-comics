@@ -1,5 +1,5 @@
 import type {Api} from '../api';
-import type {Session} from '../library/store';
+import type {Session} from '../auth/model';
 import type {Entitlements} from '../types';
 import {Icon} from '../icons';
 import {WEBSITE_UPGRADE_URL} from '../service';

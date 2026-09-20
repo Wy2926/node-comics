@@ -63,7 +63,7 @@ function callback(pending: Pending, base = pending.redirect) {
   return url;
 }
 function successfulResponses() {
-  request.mockResolvedValueOnce(Response.json({ access_token: TOKEN }));
+  request.mockResolvedValueOnce(Response.json({ access_token: TOKEN, token_type: 'Bearer', expires_in: 3600, refresh_token: 'test-refresh' }));
   request.mockResolvedValueOnce(Response.json({ user }));
 }
 
@@ -79,9 +79,11 @@ describe('OIDC public-client boundaries', () => {
     expect(authorization.searchParams.get('state')).toBe(pending.state);
     expect(authorization.searchParams.get('redirect_uri')).toBe(READER);
     expect(authorization.searchParams.get('resource')).toBe(API);
+    expect(authorization.searchParams.get('prompt')).toBe('login consent');
+    expect(authorization.searchParams.get('scope')?.split(' ')).toContain('offline_access');
     successfulResponses();
     current = callback(pending);
-    expect(await finishOidc()).toEqual({ token: TOKEN, user, apiOrigin: API });
+    expect(await finishOidc()).toMatchObject({ token: TOKEN, user, apiOrigin: API });
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[0][0]).toBe(config.token_endpoint);
     const exchange = request.mock.calls[0][1] as RequestInit;
@@ -95,9 +97,26 @@ describe('OIDC public-client boundaries', () => {
     expect(body.get('grant_type')).toBe('authorization_code');
     expect(body.get('code')).toBe('test-code');
     expect(request.mock.calls[1][0]).toBe(API + '/v1/me');
-    expect(request.mock.calls[1][1]).toMatchObject({ headers: { Authorization: `Bearer ${TOKEN}` } });
+    expect(new Headers(request.mock.calls[1][1].headers).get('Authorization')).toBe(`Bearer ${TOKEN}`);
     expect(entries.has(KEY)).toBe(false);
     expect(current.search).toBe('');
+  });
+
+  it.each([
+    {access_token:TOKEN,token_type:'Bearer',expires_in:3600},
+    {access_token:TOKEN,token_type:'Bearer',refresh_token:'refresh'},
+    {access_token:TOKEN,token_type:'Bearer',refresh_token:'refresh',expires_in:0},
+  ])('rejects incomplete renewable credentials before trusting an identity',async tokens=>{
+    const pending=await begin();request.mockResolvedValueOnce(Response.json(tokens));current=callback(pending);
+    await expect(finishOidc()).rejects.toThrow();expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('captures expiry and refresh credentials from the same authorization exchange',async()=>{
+    const pending=await begin();successfulResponses();current=callback(pending);
+    const before=Date.now(),session=await finishOidc();
+    expect(session).toMatchObject({id:expect.any(String),credential:{kind:'oidc',refreshToken:'test-refresh',clientId:config.client_id,tokenEndpoint:config.token_endpoint,resource:API}});
+    expect(session!.expiresAt).toBeGreaterThanOrEqual(before+3600000);
+    expect(session!.refreshAt).toBe(session!.expiresAt-60000);
   });
 
   it.each(['state', 'origin', 'path', 'expiry'] as const)(
@@ -129,7 +148,7 @@ describe('OIDC public-client boundaries', () => {
 
   it('does not establish an identity from a token response rejected by the product API', async () => {
     const pending = await begin();
-    request.mockResolvedValueOnce(Response.json({ access_token: TOKEN }));
+    request.mockResolvedValueOnce(Response.json({ access_token: TOKEN, token_type: 'Bearer', expires_in: 3600, refresh_token: 'test-refresh' }));
     request.mockResolvedValueOnce(Response.json({ error: { code: 'INVALID_TOKEN', message: 'Invalid token' } }, { status: 401 }));
     current = callback(pending);
     await expect(finishOidc()).rejects.toThrow('Invalid token');
@@ -168,22 +187,57 @@ describe('OIDC public-client boundaries', () => {
     expect(entries.has(KEY)).toBe(false);
   });
 
+  it.each(['web', 'extension'] as const)('allows a different account on a subsequent %s sign-in', async (platform) => {
+    const authorizations: URL[] = [];
+    if (platform === 'extension') {
+      vi.stubGlobal('chrome', {
+        permissions: { contains: vi.fn(async () => true) },
+        identity: {
+          getRedirectURL: () => 'https://test-extension.chromiumapp.org/oidc',
+          launchWebAuthFlow: vi.fn(async ({ url }: { url: string }) => {
+            authorizations.push(new URL(url));
+            return callback(JSON.parse(entries.get(KEY)!) as Pending).href;
+          }),
+        },
+      });
+    }
+    const otherUser = { ...user, id: 'other-user', name: 'Other reader' };
+    for (const [index, selectedUser] of [user, otherUser].entries()) {
+      const token = `selected-account-token-${index}`;
+      request.mockResolvedValueOnce(Response.json({ access_token: token, token_type: 'Bearer', expires_in: 3600, refresh_token: 'test-refresh' }));
+      request.mockResolvedValueOnce(Response.json({ user: selectedUser }));
+      let session = await startOidc(config, API);
+      if (platform === 'web') {
+        authorizations.push(new URL(assigned.mock.calls[index][0]));
+        current = callback(JSON.parse(entries.get(KEY)!) as Pending);
+        session = await finishOidc();
+      }
+      expect(session).toMatchObject({ token, user: selectedUser, apiOrigin: API });
+      expect(authorizations[index].searchParams.get('prompt')).toBe('login consent');
+      expect(entries.has(KEY)).toBe(false);
+    }
+    expect(authorizations[0].searchParams.get('state')).not.toBe(authorizations[1].searchParams.get('state'));
+    expect(authorizations[0].searchParams.get('code_challenge')).not.toBe(authorizations[1].searchParams.get('code_challenge'));
+    expect(request).toHaveBeenCalledTimes(4);
+  });
+
   it('runs the extension redirect through the same PKCE exchange and identity verification', async () => {
     const redirect = 'https://test-extension.chromiumapp.org/oidc';
     const launch = vi.fn(async ({ url }: { url: string }) => {
       const authorization = new URL(url);
       const pending = JSON.parse(entries.get(KEY)!) as Pending;
       expect(authorization.searchParams.get('redirect_uri')).toBe(redirect);
+      expect(authorization.searchParams.get('prompt')).toBe('login consent');
       expect(pending.redirect).toBe(redirect);
       return callback(pending).href;
     });
     const permissions = vi.fn(async () => true);
     vi.stubGlobal('chrome', {
-      permissions: { request: permissions },
+      permissions: { contains: vi.fn(async () => false), request: permissions },
       identity: { getRedirectURL: () => redirect, launchWebAuthFlow: launch },
     });
     successfulResponses();
-    expect(await startOidc(config, API)).toEqual({ token: TOKEN, user, apiOrigin: API });
+    expect(await startOidc(config, API)).toMatchObject({ token: TOKEN, user, apiOrigin: API });
     expect(permissions).toHaveBeenCalledWith({ origins: ['https://identity.example.test/*'] });
     expect(launch).toHaveBeenCalledOnce();
     expect(assigned).not.toHaveBeenCalled();

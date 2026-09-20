@@ -143,7 +143,7 @@ def auth_config():
     return {"mode": "development" if cfg.dev_auth else "oidc", "dev_auth": cfg.dev_auth,
             "issuer": cfg.oidc_issuer, "client_id": cfg.oidc_client_id, "audience": cfg.oidc_audience,
             "authorization_endpoint": cfg.oidc_authorization_endpoint, "token_endpoint": cfg.oidc_token_endpoint,
-            "scopes": "openid profile"}
+            "scopes": "openid profile offline_access"}
 
 
 @app.post("/v1/auth/dev", response_model=LoginResponse)

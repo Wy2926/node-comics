@@ -1,7 +1,8 @@
+import {saveSession} from '../src/auth/storage';
 import {API_ORIGIN} from '../src/service';
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
 import {defaults,type Job,type Page,type Entitlements,type TranslationPlan,type TranslationOperation} from '../src/types';
-import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
+import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,editLibrary} from '../src/library/store';
 import {emptyPage} from '../src/reader/model';
 import {makeCopy} from '../src/library/model';
 
@@ -14,7 +15,7 @@ const blob=await (await originalFetch('/samples/starlight-bookshop.png')).blob()
 const bitmap=await createImageBitmap(blob);const width=bitmap.width,height=bitmap.height;bitmap.close();
 const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,input_asset_id:`asset-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',output_asset_id:status==='succeeded'?`output-${index}`:null,quota_pages:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
 if(!existing.length){
-  saveSettings(defaults);saveSession({token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
+  saveSettings(defaults);await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
   await putBlob('reader-fixture-original',blob);await putBlob('reader-fixture-output',blob);
   const states:Job['status'][]=['queued','running','failed','succeeded','no_text','outcome_unknown'];
   const pages:Page[]=Array.from({length:120},(_,i):Page=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`fixture-page-${i}`,fileHash:'a'.repeat(64),pageIndex:i,blobKey:i===6?undefined:'reader-fixture-original',ownerId:'fixture-reader',apiOrigin:origin,jobs:i<states.length?[job(i,states[i])]:[],outputBlobs:i===3?{'fixture-job-3':'reader-fixture-output'}:{}}));
@@ -58,7 +59,7 @@ if(flow&&['complete','backward','incomplete','missing','empty','gap','snapshot']
 const autoScenario=new URLSearchParams(location.search).get('auto');
 if(autoScenario){
  saveSettings(defaults);
- saveSession({token:'isolated-fixture-token',user:{id:'fixture-'+autoScenario,name:'自动翻译验收',role:'reader'},apiOrigin:origin});
+ await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:'fixture-'+autoScenario,name:'自动翻译验收',role:'reader'},apiOrigin:origin});
  const copyId='reader-fixture-auto-'+autoScenario;
  if(!(await readCopies()).some(c=>c.id===copyId)){
   const pages=Array.from({length:['retry','connection'].includes(autoScenario)?1:30},(_,n)=>({...emptyPage(`自动第 ${n+1} 页`,width,height),id:copyId+'-'+n,fileHash:autoScenario==='plus'?'b'.repeat(64):autoScenario==='quota'?'c'.repeat(64):'d'.repeat(64),pageIndex:n,imageSha256:(n+1).toString(16).padStart(64,'0'),imageByteSize:blob.size,imageMime:blob.type,blobKey:'reader-fixture-original',ownerId:'fixture-'+autoScenario,apiOrigin:origin,...(autoScenario==='retry'?{assetId:`asset-${n}`,jobs:[job(n,'failed')]}:{})}));
