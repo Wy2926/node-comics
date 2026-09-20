@@ -64,6 +64,10 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 
 账户读取实际权益与订阅状态，支持继续结账、跳转 Stripe Customer Portal 管理订阅与取消续费。价格展示与 Stripe 商品配置须保持 US$9.99/月一致，实际税费及金额以结账页为准。真实身份平台的回调登记与真实支付未在隔离夹具中验证。
 
+`/payment/success/` 是完成 Checkout 后的独立展示页，含五语版本，无登录要求、不发放权益、不请求支付详情；引导用户切回插件，必要时刷新账户。该页不进入 sitemap，返回 `private, no-store` 和 `noindex, nofollow`，不会把取消结账或客户门户返回显示为成功。
+
+当前语言由 URL 决定，未存储用户语言偏好。首次匹配浏览器、手动选择记忆、中立入口与固定语言 URL 的方案见[官网语言设计](../../docs/WEBSITE_LANGUAGE_DESIGN.md)；设计已完成，路由和偏好机制尚未实施。
+
 ## SEO、缓存和视觉
 
 - 90 个可索引地址（18 页 × 5 语言），每页完整正文、唯一标题、描述、canonical、互相对应的 hreflang、x-default、Open Graph / Twitter。账户、回调和错误页 noindex，不进入 sitemap。

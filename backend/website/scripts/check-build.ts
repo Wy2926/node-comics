@@ -39,7 +39,7 @@ for (const file of htmlFiles) {
 }
 const sitemap = await readFile(join(root,'sitemap.xml'),'utf8');
 for(const path of publicPaths) for(const locale of locales) if(!sitemap.includes(`<loc>${site.url}${localPath(path,locale)}</loc>`)) errors.push(`sitemap missing ${localPath(path,locale)}`);
-for (const forbidden of ['/account/','/auth/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
-for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
+for (const forbidden of ['/account/','/auth/','/payment/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
+for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/','/payment/success/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
 if (errors.length) throw Error(errors.join('\n'));
 console.log(`Validated ${htmlFiles.length} static pages: metadata, JSON-LD, local links, images, index boundaries.`);

@@ -42,6 +42,6 @@ const library = await store.readLibrary(), copies = await store.readCopies();
 function Fixture() {
   const [userId, setUserId] = useState('fixture-owner');
   const api = useMemo(() => new Api('http://127.0.0.1:18098', 'fixture-only'), [userId]);
-  return <div className="nc-app"><main className="nc-main"><button className="text-link" onClick={() => setUserId('other-account')}>切换验收账户</button><Library api={api} library={library} copies={copies} settings={defaults} setSettings={() => {}} userId={userId} apiOrigin={api.base} onOpen={() => {}} onOpenTranslation={() => {}} onImport={() => {}} onDemo={() => {}} onSource={() => {}} notify={() => {}} onChanged={() => {}}/></main></div>;
+  return <div className="nc-app"><main className="nc-main"><button className="text-link" onClick={() => setUserId('other-account')}>切换验收账户</button><Library api={api} library={library} copies={copies} settings={defaults} setSettings={() => {}} userId={userId} apiOrigin={api.base} onOpen={() => {}} onOpenTranslation={() => {}} onImport={() => {}} onSource={() => {}} notify={() => {}} onChanged={() => {}}/></main></div>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

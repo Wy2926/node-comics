@@ -8,6 +8,10 @@
 
 插件账户页使用简洁会员卡展示价格、权益、试用与自动续费规则。点击“免费试用 7 天”或“通过 Stripe 升级”后直接打开 Stripe 链接，无官网中转结账页。已订阅用户打开 Stripe 管理订阅；返回插件时核对权益，也可手动刷新。未登录、读取失败、支付未配置及链接打开失败均有对应状态。
 
+完成 Checkout 后进入独立 `/payment/success/` 页面，使用该结账意图已冻结返回地址的 origin；取消结账和客户门户仍使用 `STRIPE_RETURN_URL`。成功页无需登录，提示切回插件继续阅读及必要时刷新权益，提供五语切换；不包含支付标识、金额或个人信息，不因为访问页面就发放会员权益。页面禁止缓存及搜索索引，权益仍由验签回调与服务端对账确认。已经创建的 Stripe 会话继续使用其原有成功地址。
+
+当前成功页默认中文、按 URL 切换语言，尚无偏好记忆。浏览器语言、手动偏好与搜索引擎的后续规则见[官网语言设计](WEBSITE_LANGUAGE_DESIGN.md)，该语言方案尚未实施。
+
 采用服务端创建的 Checkout Session URL，而非所有人共用一个可修改用户编号的静态链接。账号来自现有登录身份，客户端不能提交价格、客户 ID、试用资格或订阅所有者。支付会话的 `client_reference_id` 与两处 metadata 绑定随机结账意图；银行卡信息只进入 Stripe。
 
 ## 配置
@@ -34,7 +38,7 @@ Webhook 地址：`https://<API 域名>/webhooks/stripe`。API 版本固定为 SD
 - `customer.subscription.created`、`customer.subscription.updated`、`customer.subscription.deleted`、`customer.subscription.paused`、`customer.subscription.resumed`
 - `invoice.paid`、`invoice.payment_failed`、`invoice.payment_action_required`、`invoice.voided`、`invoice.marked_uncollectible`
 
-测试配置使用独立 test/development 服务与数据库；本地转发可使用官方 Stripe CLI：`stripe listen --forward-to localhost:18088/webhooks/stripe`，签名密钥取该监听实例。真实开通验收需要在上述环境中配置实际测试产品、密钥、回调和 Portal，再完成测试卡付款、试用转正式、续费失败、取消以及回到插件刷新。本次未配置商户账户、未执行真实测试卡或生产付款、未部署。
+测试配置使用独立 test/development 服务与数据库；本地转发可使用官方 Stripe CLI：`stripe listen --forward-to localhost:18088/webhooks/stripe`，签名密钥取该监听实例。真实开通验收需要在上述环境中配置实际测试产品、密钥、回调和 Portal，再完成测试卡付款、试用转正式、续费失败、取消以及回到插件刷新。当前沙盒已配置产品、回调和 Portal，验证范围见下方接入记录；未执行测试卡或生产付款，未部署生产环境。
 
 ## 持久化与幂等
 
@@ -80,6 +84,14 @@ npm --prefix backend/website run build
 支付测试通过官方 SDK 的 HTTP transport 模拟 Stripe，覆盖响应丢失、重复请求、试用转付费、取消／欠费、跨账户门户、签名、重放、分页失败恢复及并发发放。PostgreSQL 用例位于 `test_billing_postgres.py`，按[后端并发验证说明](../backend/README.md)显式启用；未运行的 PostgreSQL 场景不算通过。
 
 ## 本地验收记录
+
+2026-09-20 插件焦点刷新修复：背景状态读取与打开 Stripe 使用独立状态，普通 focus/visibilitychange 在 30 秒内合并，只读持久状态；手动刷新或实际打开 Stripe 后返回才对账。沙盒插件通过类型、模块检查与构建。`tests/billing-focus-fixture.html` 在 5192 端口使用模拟 API 和模拟窗口交接，Chrome 验证重复焦点、慢刷新期间打开、双击合并、返回对账、失败重试八个断言；不访问真实账户或 Stripe。原本模拟套件没有覆盖的 UI 状态竞争由此补齐。
+
+2026-09-20 真实沙盒接入：使用独立 PostgreSQL 空库、R2 前缀、现有 OIDC 和临时 Cloudflare Tunnel，已创建测试产品、USD 999 美分月付价格、Customer Portal 和同版 Webhook。通过真实后端创建绑卡 7 天试用 Checkout，再主动使该验收会话过期；Stripe 的 `checkout.session.expired` 已经隧道验签入库并处理。未提交测试卡付款；订阅开通、试用转正式和取消续费留给手动验收。未发布生产服务。
+
+真实接入发现 `UrllibClient(timeout=20)` 不受当前 SDK 支持，改为 `RequestsClient(timeout=20)`；新增使用实际 SDK 初始化与同步请求的离线回归，支付套件共 29 项通过。插件支持构建时 `VITE_API_BASE`，沙盒构建通过类型、模块检查和 Chrome MV3 打包。浏览器自动化策略禁止访问扩展页面，本轮插件交互由用户手动检查。
+
+同环境的 RTX 4060 Vulkan 节点已完成原创日文样张到简体中文的真实 OCR、文本供应商调用、抹字、嵌字与 R2 存取；最终 PNG 为 900×1200，摘要、解码与固定扩展 origin 的 CORS 响应已核对。这是单张链路验收，不代表自然漫画总体质量；未配置图片重绘供应商密钥。
 
 - 相关后端回归 60 项通过，2 项 PostgreSQL 并发用例因未启用专用数据库跳过。完整后端首次运行 525 项通过、108 项按环境条件跳过，发现的 2 个旧路由 405 问题已修复，并在上述相关回归中通过；没有把首次完整运行记为全绿。
 - 插件 317 项单元测试、类型／模块检查及 Chrome MV3 构建通过；官网 5 项测试、类型检查及 105 页静态构建通过。

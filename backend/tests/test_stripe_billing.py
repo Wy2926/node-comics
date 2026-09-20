@@ -13,6 +13,34 @@ from sqlalchemy import func, select
 from conftest import login
 
 
+def test_real_sdk_client_can_make_sync_requests(monkeypatch, client):
+    from app import stripe_client
+    from app.config import settings
+    monkeypatch.setenv('STRIPE_ENABLED', 'true')
+    monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_fixture')
+    monkeypatch.setenv('STRIPE_WEBHOOK_SECRET', 'whsec_fixture')
+    monkeypatch.setenv('STRIPE_PRODUCT_ID', 'prod_plus')
+    monkeypatch.setenv('STRIPE_PRICE_ID', 'price_plus')
+    monkeypatch.setenv('STRIPE_RETURN_URL', 'https://comics.example/account/')
+    settings.cache_clear()
+    calls = []
+
+    def request(self, method, url, **kwargs):
+        from requests import Response
+        calls.append((method, url, kwargs['timeout']))
+        response = Response()
+        response.status_code = 200
+        response._content = b'{"id":"price_plus","object":"price"}'
+        return response
+
+    monkeypatch.setattr('requests.Session.request', request)
+    try:
+        assert stripe_client.call('prices', 'retrieve', 'price_plus')['id'] == 'price_plus'
+        assert calls == [('get', 'https://api.stripe.com/v1/prices/price_plus', 20)]
+    finally:
+        settings.cache_clear()
+
+
 @pytest.fixture
 def billing(monkeypatch, request):
     for key, value in {'STRIPE_ENABLED':'true', 'STRIPE_ENVIRONMENT':'test',
@@ -130,6 +158,8 @@ def test_hosted_checkout_is_account_bound_and_reuses_session(billing):
     params = billing['posts'][0][1]
     assert params['subscription_data[trial_period_days]'] == '7'
     assert params['payment_method_collection'] == 'always'
+    assert params['success_url'] == 'https://comics.example/payment/success/'
+    assert params['cancel_url'] == 'https://comics.example/account/'
     assert params['subscription_data[metadata][checkout_intent_id]'] == params['client_reference_id']
     assert not periods()
 

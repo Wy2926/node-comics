@@ -1,5 +1,6 @@
 """One durable intent per account; Stripe idempotency recovers a lost POST response."""
 from datetime import timedelta, timezone
+from urllib.parse import urljoin
 from sqlalchemy import select
 from . import stripe_client as stripe
 from .billing_models import BillingAccount, BillingCheckout, BillingSubscription
@@ -58,7 +59,8 @@ def recover_checkout(checkout_id):
     metadata = {'app': 'node_comics', 'checkout_intent_id': row.id}
     params = {'mode': 'subscription', 'client_reference_id': row.id, 'metadata': metadata,
         'line_items': [{'price': row.price_id, 'quantity': 1}], 'payment_method_types': ['card'],
-        'payment_method_collection': 'always', 'success_url': row.return_url, 'cancel_url': row.return_url,
+        'payment_method_collection': 'always',
+        'success_url': urljoin(row.return_url, '/payment/success/'), 'cancel_url': row.return_url,
         'expires_at': int(row.expires_at.replace(tzinfo=timezone.utc).timestamp()),
         'subscription_data': {'metadata': metadata, **({'trial_period_days': 7} if row.trial else {})}}
     if row.customer_id:

@@ -7,7 +7,6 @@ import {Modal} from './ui/components';
 import {Api} from './api';
 import {type Capabilities,type ReadingCopy,type Settings,type Entitlements} from './types';
 import * as store from './library/store';
-import {emptyPage} from './reader/model';
 import {Reader} from './reader/Reader';
 import {Preferences} from './ui/Preferences';
 import {Library} from './ui/Library';
@@ -16,7 +15,7 @@ import {useAppearance} from './ui/Appearance';
 import type {PageManifest} from './sources/adapters';
 import {COMIC_ACCEPT} from './importers/comic';
 import {LocalImportQueue} from './library/import-queue';
-import {makeCopy,emptyLibrary} from './library/model';
+import {emptyLibrary} from './library/model';
 import type {SourceCatalog} from './library/types';
 import {readingSequence} from './library/reading';
 import {readingDirectory} from './library/directory';
@@ -27,7 +26,6 @@ import {LocalImport} from './ui/LocalImport';
 import {SourceImport} from './ui/SourceImport';
 import {acquireWebImages,insertWebCopy,type WebDestination} from './library/web-import';
 import {discoverCatalog} from './sources/client';
-import {imageIdentity} from './importers/hash';
 import {RequestPool,UPLOAD_CONCURRENCY} from './concurrency';
 import {API_BASE,API_ORIGIN} from './service';
 import {useLogin} from './auth/useLogin';
@@ -110,7 +108,6 @@ const sequence=current?readingSequence(library,copies,current):[];
 const sourceTask=library.tasks.find(t=>t.copyId===currentId&&t.status!=='complete');
 useEffect(()=>{const manifestId=new URLSearchParams(location.search).get('manifest');if(!manifestId||typeof chrome==='undefined'||!chrome.storage?.local)return;chrome.storage.local.get([`manifest:${manifestId}`,'pendingLanguage']).then(data=>{if(data.pendingLanguage)setSettings(s=>({...s,language:String(data.pendingLanguage)}));const m=data[`manifest:${manifestId}`] as PageManifest;if(m)setSourceManifest(m);});},[]);
 useEffect(()=>{const catalogId=new URLSearchParams(location.search).get('catalog');if(!catalogId||typeof chrome==='undefined'||!chrome.storage?.local)return;chrome.storage.local.get('nc-import:'+catalogId).then(data=>{const draft=data['nc-import:'+catalogId] as {catalog:SourceCatalog}|undefined;if(draft?.catalog)setCatalog(draft.catalog);});},[]);
-async function openDemo(){const existing=copiesRef.current.find(c=>c.demo);if(existing){setCurrentId(existing.id);return;}setBusy(msg("正在打开原创阅读示例…"));try{const blob=await(await fetch('/samples/starlight-bookshop.png')).blob();const bitmap=await createImageBitmap(blob);const p=emptyPage(msg("星光书店 · 原创示例.png"),bitmap.width,bitmap.height);bitmap.close();Object.assign(p,await imageIdentity(blob));p.blobKey=`original:${p.id}`;await store.putBlob(p.blobKey,blob);const c={...makeCopy(msg("星光书店"), [p],msg("原创阅读示例"),'demo:starlight'),demo:true};const result=await store.commitCopies([c],[{title:msg("星光书店"),kind:'work'}]);await reloadLibrary();setCurrentId(result.copyIds[0]);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
 async function acquireManifest(manifest:PageManifest,destination:WebDestination){
  if(importLock.current)return;
  importLock.current=true;setBusy(msg("正在获取已发现的原图…"));setImportError('');
@@ -143,7 +140,7 @@ return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e
 {error&&<div className="global-error" role="alert"><Icon name="info" size={18}/><span>{error}</span><button aria-label={msg("关闭错误提示")} onClick={()=>setError('')}><Icon name="close" size={16}/></button></div>}
 {current?<Reader directory={directory} onCatalog={directory?.catalogUrl?()=>{exitReader();void openSource(directory.catalogUrl!);}:undefined} initialView={readingEdition?{mode:readingEdition.mode,preference:'translation'}:undefined} onMarkRead={store.markCopyRead} sequence={sequence} onActiveCopy={setCurrentId} onLoadCopy={id=>{const c=copiesRef.current.find(c=>c.id===id);const task=library.tasks.find(t=>t.copyId===id);if(c?.sourceEntryId&&(!c.discoveryComplete||c.pages.some(p=>!p.blobKey))&&task?.status!=='paused'&&task?.status!=='failed')void queueCopies([id],false).catch(e=>setError(msg("原图采集未启动：{0}", {"0": e.message})));}} sourceStatus={sourceTask?(sourceTask.error??(sourceTask.phase==='discover'?msg("正在发现图片清单"):msg("正在获取原图")))+' · '+sourceTask.completed+' / '+(sourceTask.total??msg("未知")):undefined} onAcquire={()=>void grantImagePermissions([current.id],copiesRef.current).then(()=>notify(msg("已提交采集，原图进度将在阅读页更新"))).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseCopies([current.id]).then(()=>notify(msg("已暂停原图采集，已保存的页面仍可阅读"))).catch(e=>setError(e.message))} onNavigate={(id,pageId)=>void openCopy(id,readingEdition,pageId)} key={`${account?.user.id}:${apiOrigin}:${readingEdition?.mode??''}:${readingEdition?.language??''}:${navigationKey}`} api={api} busy={!!busy} copy={current} settings={settings} setSettings={setSettings} update={updateCopy} onBack={exitReader} onRetry={(page,mode,copyId)=>translation.retry(copyId??current.id,page,mode)} onUpgrade={()=>{exitReader();nav('account');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={()=>input.current?.click()} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps?{...caps,entitlements:usage??caps.entitlements}:undefined} userId={account?.user.id} apiOrigin={apiOrigin}/>:
 <main className="nc-main">
-{view==='library'&&(catalog?<CatalogImport key={catalog.id+':'+catalog.observedAt} catalog={catalog} library={library} copies={copies} onClose={()=>{setCatalog(undefined);history.replaceState(null,'',location.pathname);}} onDone={()=>void reloadLibrary()} onNotice={notify} onRefresh={()=>openSource(catalog.url,true)}/>:<Library api={api} userId={account?.user.id} apiOrigin={apiOrigin} onOpenTranslation={(id,edition)=>void openCopy(id,edition)} library={library} copies={copies} settings={settings} setSettings={setSettings} onOpen={id=>void openCopy(id)} onImport={()=>input.current?.click()} onDemo={()=>void openDemo()} notify={notify} onChanged={()=>void reloadLibrary()} onSource={url=>void openSource(url)}/>)}
+{view==='library'&&(catalog?<CatalogImport key={catalog.id+':'+catalog.observedAt} catalog={catalog} library={library} copies={copies} onClose={()=>{setCatalog(undefined);history.replaceState(null,'',location.pathname);}} onDone={()=>void reloadLibrary()} onNotice={notify} onRefresh={()=>openSource(catalog.url,true)}/>:<Library api={api} userId={account?.user.id} apiOrigin={apiOrigin} onOpenTranslation={(id,edition)=>void openCopy(id,edition)} library={library} copies={copies} settings={settings} setSettings={setSettings} onOpen={id=>void openCopy(id)} onImport={()=>input.current?.click()} notify={notify} onChanged={()=>void reloadLibrary()} onSource={url=>void openSource(url)}/>)}
 
 {view==='settings'&&<Preferences key={`${apiOrigin}:${account?.user.id??''}`} settings={settings} setSettings={setSettings} caps={caps} cacheBytes={cacheBytes} notify={notify} onClearCache={()=>setConfirmAction({title:msg("清理本地译图缓存？"),body:msg("只清理本地译图，原图、书架和阅读进度保留。需要时可重新下载服务器译图。"),action:async()=>{await store.clearTranslations();setCopies(await store.readCopies());setCacheBytes(await store.cacheSize());notify(msg("本地译图已清理，原图与阅读进度已保留"));}})}/>}
 {view==='account'&&<AccountPage key={`${apiOrigin}:${account?.user.id??''}`} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={receiveTranslationPolicy} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).then(()=>notify(msg("已退出账户，原图仍可继续阅读"))).catch(e=>setError(e.message));}}/>}

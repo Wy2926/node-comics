@@ -19,6 +19,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_reading_api.mjs` | 临时 API、worker、合成供应商与浏览器的完整阅读链路 |
 | `verify_reading_plans.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | 模拟接口下的阅读窗口、限流、恢复，以及旧历史页地址回退和无历史轮询；Vite 端口 5176 |
 | `verify_membership_admin.mjs` | 隔离后台的赠送与分钟配置 |
+| 插件 `tests/billing-focus-fixture.html` | Vite 指定 5192 端口后打开，点击“运行回归检查”；模拟订阅接口与窗口交接，验证焦点刷新、并发打开、返回对账和失败重试，不读取真实账户 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` / `verify_web_import.mjs` / `verify_acquisition_order.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译、弹窗、发现及采集顺序 |
 | `verify_local_import.mjs` / `verify_comic_import.mjs` / `verify_library.mjs` / `verify_comic_export.mjs` | 本地导入、作品管理与导出；先生成夹具，端口和模式见各脚本头部 |
 | `verify_extension_theme.mjs` | 插件桌面页面视觉与交互、亮暗主题、表单和副本操作；Vite 端口 5176、5175、5186，见[共享视觉令牌](../docs/POPUP_AND_THEME.md#本地验证) |

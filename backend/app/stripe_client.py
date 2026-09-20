@@ -21,7 +21,7 @@ def client():
     cfg = settings()
     require(cfg.stripe_enabled, 'BILLING_DISABLED')
     return stripe.StripeClient(cfg.stripe_secret_key.get_secret_value(),
-        http_client=stripe.UrllibClient(timeout=20), max_network_retries=1)
+        http_client=stripe.RequestsClient(timeout=20), max_network_retries=1)
 
 
 def call(resource, action, *args, **kwargs):

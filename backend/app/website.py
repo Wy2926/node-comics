@@ -75,7 +75,7 @@ class WebsiteFiles(StaticFiles):
         if normalized == '404.html' or '404' in segments:
             response.status_code = 404
         scope.setdefault('state', {})['public_website'] = True
-        private_page = any(segment in {'account', 'auth'} for segment in segments)
+        private_page = any(segment in {'account', 'auth', 'payment'} for segment in segments)
         response.headers['Cache-Control'] = ('private, no-store' if private_page or response.status_code >= 400 else
             'public, max-age=31536000, immutable' if normalized.startswith('_astro/') else 'public, max-age=0, must-revalidate')
         response.headers['X-Content-Type-Options'] = 'nosniff'

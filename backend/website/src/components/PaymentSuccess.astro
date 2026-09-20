@@ -1,0 +1,65 @@
+---
+import {Image} from 'astro:assets';
+import logoZh from '../assets/logo-zh.webp';
+import logoEn from '../assets/logo-en.webp';
+import {dictionaries,localPath,locales,languageNames,type Locale} from '../i18n';
+import {paymentSuccess} from '../i18n/payment-success';
+import {absolute} from '../data/site';
+import '../styles/global.css';
+interface Props {locale:Locale}
+const {locale}=Astro.props;
+const t=paymentSuccess[locale];
+const brand=dictionaries[locale].ui.brandName;
+---
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={t.description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>{t.title} · {brand} · {languageNames[locale]}</title>
+    <link rel="canonical" href={absolute(localPath('/payment/success/',locale))} />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <header class="receipt-header">
+      <a class="brand" href={localPath('/',locale)} aria-label={brand}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={brand} width={240} loading="eager" /></a>
+      <details class="language-menu"><summary>{languageNames[locale]}</summary><nav aria-label={dictionaries[locale].ui.language}>{locales.map(language=><a href={localPath('/payment/success/',language)} lang={language} aria-current={locale===language?'true':undefined}>{languageNames[language]}</a>)}</nav></details>
+    </header>
+    <main>
+      <section class="receipt" aria-labelledby="success-title">
+        <div class="receipt-top">
+          <span class="plus-label">NODELANE PLUS</span>
+          <div class="success-mark" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="m12 24 8 8 16-17" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+          <h1 id="success-title">{t.title}</h1>
+          <p class="next-chapter">{t.heading}</p>
+        </div>
+        <div class="receipt-body">
+          <p class="thank-you">{t.body}</p>
+          <p class="sync-hint">{t.hint}</p>
+          <a class="button" href={localPath('/',locale)}>{t.home}<span aria-hidden="true">↗</span></a>
+          <p class="close-hint">{t.footer}</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+<style>
+  body{min-height:100svh;background:radial-gradient(ellipse at 50% 36%,#e8f3ff 0,transparent 65%),var(--canvas)}
+  .receipt-header{max-width:1120px;margin:auto;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+  main{padding:34px 24px 72px;display:grid;place-items:center}
+  .receipt{width:min(100%,560px);background:white;border:var(--comic-border);border-radius:12px 32px 32px 32px;box-shadow:7px 7px 0 var(--ink);text-align:center;overflow:hidden}
+  .receipt-top{padding:32px 28px 28px;background-color:var(--accent-soft);background-image:var(--comic-dot-pattern);background-size:var(--comic-dot-size);border-bottom:var(--comic-perforation)}
+  .plus-label{display:inline-block;padding:4px 12px;border:1px solid var(--accent);border-radius:4px;background:white;color:var(--accent);font-size:11px;font-weight:800;letter-spacing:2px}
+  .success-mark{margin:24px auto 20px;width:72px;height:72px;display:grid;place-items:center;background:var(--accent);color:white;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);border-radius:50%}
+  .success-mark svg{width:42px;height:42px}
+  h1{font-size:clamp(1.7rem,5vw,2.5rem);line-height:1.35;margin:0 0 12px;letter-spacing:-.03em}
+  .next-chapter{margin:0;color:var(--muted);font-size:15px}
+  .receipt-body{padding:28px 40px 30px}
+  .thank-you{margin:0 0 18px;font-size:16px;line-height:1.9}
+  .sync-hint{margin:0 0 24px;padding:14px 16px;background:var(--surface-soft);border-radius:8px;color:var(--muted);font-size:13px;text-align:left;line-height:1.8}
+  .close-hint{margin:18px 0 0;color:var(--muted);font-size:12px}
+  @media(max-width:480px){.receipt-header{padding:22px 20px;gap:10px}.receipt-header .brand img{width:170px;height:34px}main{padding:20px 20px 44px}.receipt-top{padding:28px 20px}.receipt-body{padding:24px}.receipt{box-shadow:4px 4px 0 var(--ink)}.language-menu{font-size:12px}}
+</style>

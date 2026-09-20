@@ -1,0 +1,171 @@
+{
+  "model": "gpt-image-2",
+  "endpoint": "https://sub2api.nodelane.net/v1/images/generations",
+  "requestedSize": "1536x1536",
+  "receivedSize": "1254x1254",
+  "quality": "high",
+  "generationMode": "imagegen skill bundled CLI",
+  "sourceAlpha": "Provider returned RGBA; no chroma-key removal was needed.",
+  "postProcessing": "Remove alpha <= 8 noise, make alpha >= 248 opaque, crop, pad, resize, typeset website lockups.",
+  "fonts": "Locally installed Windows Segoe UI Bold / Segoe UI and Microsoft YaHei; rasterized text only, no font files distributed.",
+  "sharpVersion": "0.35.4",
+  "artifacts": [
+    {
+      "file": "logo-mark-1024.png",
+      "bytes": 593083,
+      "sha256": "3f220d04f766443abb7be26db011926cf56544c20a737a183e4721e1f8edea2e",
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "file": "icon-16.png",
+      "bytes": 792,
+      "sha256": "26c7dad90190fbddcebbc56faae1ab2840ecf5ef84f9e534c345a6c3d76a1587",
+      "width": 16,
+      "height": 16,
+      "alpha": true
+    },
+    {
+      "file": "icon-24.png",
+      "bytes": 1355,
+      "sha256": "7274b10831eec513adced7b17349306d7d4f00733a4b9c4ffe2ae81db21daa26",
+      "width": 24,
+      "height": 24,
+      "alpha": true
+    },
+    {
+      "file": "icon-32.png",
+      "bytes": 1970,
+      "sha256": "fb72577cc5b74500308c644a87b1cd7f4e40342d4b44c863a5428ef45494d6b0",
+      "width": 32,
+      "height": 32,
+      "alpha": true
+    },
+    {
+      "file": "icon-48.png",
+      "bytes": 3248,
+      "sha256": "e5e34c7cd46071263294fbee85a0f1a42462289f31e4933377781aea5de617ef",
+      "width": 48,
+      "height": 48,
+      "alpha": true
+    },
+    {
+      "file": "icon-64.png",
+      "bytes": 4749,
+      "sha256": "64c2c1e5292cd3d23c0e73dfa079a4ba328a5c4fb997a5b52e0d550eab5054c6",
+      "width": 64,
+      "height": 64,
+      "alpha": true
+    },
+    {
+      "file": "icon-128.png",
+      "bytes": 13678,
+      "sha256": "a83fe892bb1599baaba3c8c11f2a19ce10cff2560956c3072cde57f20f52da53",
+      "width": 128,
+      "height": 128,
+      "alpha": true
+    },
+    {
+      "file": "icon-256.png",
+      "bytes": 45142,
+      "sha256": "131528355dcfe3d7fee084f00662c9c59d1e31c0e208205ad112df52b8c8bd1c",
+      "width": 256,
+      "height": 256,
+      "alpha": true
+    },
+    {
+      "file": "icon-512.png",
+      "bytes": 181483,
+      "sha256": "dce89a469d12bbfaacb3e67d7176ca20bd46a57e362f089d8c2985f637ff6406",
+      "width": 512,
+      "height": 512,
+      "alpha": true
+    },
+    {
+      "file": "logo-mark-1024.webp",
+      "bytes": 353920,
+      "sha256": "17d828877482d83bed861f4cfeaf808263d05563786ac2f44cb9622b8b8c5c3a",
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-zh-light.png",
+      "bytes": 82916,
+      "sha256": "5fb6e09a394b1dca2941a9f29bcc9c28fcfd3996975dbdb08455b2d0139c5547",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-zh-light.webp",
+      "bytes": 49808,
+      "sha256": "3bab8e6227e9a68de9d2cc2f34a1cb0d60ad1de15e937294e87d602ece0add7a",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-zh-dark.png",
+      "bytes": 82254,
+      "sha256": "8ca1fc0ccb12fcbca8ca95106ff4f030a06ecf82373a8ec29aec33cab827ba3a",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-zh-dark.webp",
+      "bytes": 48690,
+      "sha256": "13f4247055ce0ffe62e8e71d3839b7a945b8decc97b08ea1493b51877aa165a4",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-en-light.png",
+      "bytes": 83300,
+      "sha256": "fd7dbada73e615438f0eb5ddd13bfd255945e9c6a743d945adf45cd40a185ee1",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-en-light.webp",
+      "bytes": 50438,
+      "sha256": "abac28ef1514504dfcfee05374a85d230987809ce906cd08d864f19d79801023",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-en-dark.png",
+      "bytes": 82719,
+      "sha256": "041cae66db08f6804e8b636088da66b1e7da138287e791aea41697fbfa409dd6",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "logo-horizontal-en-dark.webp",
+      "bytes": 49312,
+      "sha256": "8839d406415ea21d39a6cf90f34b257a11cd73a978c46df7bda45afe6ffb4143",
+      "width": 1600,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "file": "brand-preview.png",
+      "bytes": 321219,
+      "sha256": "9aa5cc58130f27fe7dd1004b7ef781cbbcbe8ab1041b0bf64d604bb858cc2eb8",
+      "width": 1600,
+      "height": 1080,
+      "alpha": true
+    },
+    {
+      "file": "favicon.ico",
+      "bytes": 64916,
+      "sha256": "6ec5ace09c14e6a3865397956490a92488059b8ac07fee995907670b529017c2"
+    }
+  ]
+}

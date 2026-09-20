@@ -1,9 +1,10 @@
 ---
 import LocalizedPage from '../components/LocalizedPage.astro';
+import PaymentSuccess from '../components/PaymentSuccess.astro';
 import {locales,localPath,publicPaths} from '../i18n';
 export function getStaticPaths() {
-  return locales.flatMap(locale => [...publicPaths,'/account/','/auth/callback/'].map(path => ({params:{page:localPath(path,locale).replace(/^\/|\/$/g,'') || undefined},props:{locale,path}})));
+  return locales.flatMap(locale => [...publicPaths,'/account/','/auth/callback/','/payment/success/'].map(path => ({params:{page:localPath(path,locale).replace(/^\/|\/$/g,'') || undefined},props:{locale,path}})));
 }
 const {locale,path}=Astro.props;
 ---
-<LocalizedPage locale={locale} path={path} />
+{path === '/payment/success/' ? <PaymentSuccess locale={locale} /> : <LocalizedPage locale={locale} path={path} />}

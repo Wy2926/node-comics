@@ -18,6 +18,8 @@ npm run build:web    # dist-web
 
 Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`。产品服务固定为 `https://comics.nodelane.net`（`src/service.ts`），插件不提供运营管理页面或服务地址设置。供应商密钥只在后端。
 
+独立沙盒可在构建前设置 `$env:VITE_API_BASE='https://<沙盒域名>'`，再执行 `npm run check` 与 `npm run build`。该地址同时写入客户端与扩展的精确 host permission，仍不能由用户在运行时修改。正式构建前执行 `Remove-Item Env:VITE_API_BASE -ErrorAction SilentlyContinue`，恢复默认服务。固定扩展 ID 不变，沿用已登记的 OIDC 扩展回调；沙盒需要独立后端数据库和支付配置。
+
 插件图标和左上角品牌使用 `output/imagegen/nodelane-logo-v1` 素材：发布所需图标复制到 `public/brand`，横版 WebP 复制到 `src/assets/brand`，构建不依赖输出目录。漫画管理页与弹窗共用 `BrandLogo`，中文界面显示中文图片文字，其他语言显示英文，并跟随亮暗外观切换对应素材。横版图片保持 5:1 比例；浏览器工具栏、扩展管理页和插件标签页使用同版图标。
 
 ## 阅读翻译

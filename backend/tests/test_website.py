@@ -11,7 +11,7 @@ from app.website import WebsiteFiles
 def website(tmp_path, monkeypatch):
     from app import website as module
     monkeypatch.setattr(module, 'settings', lambda: SimpleNamespace(oidc_token_endpoint='https://identity.example/token'))
-    for name in ['index.html', 'pricing/index.html', 'en/pricing/index.html', 'account/index.html', 'auth/callback/index.html', '404.html']:
+    for name in ['index.html', 'pricing/index.html', 'en/pricing/index.html', 'account/index.html', 'auth/callback/index.html', 'payment/success/index.html', 'en/payment/success/index.html', '404.html']:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('<!doctype html><h1>Public website</h1><script>window.site=true;</script>', encoding='utf-8')
@@ -49,8 +49,9 @@ def test_public_pages_and_existing_api_precedence(website):
 
 
 def test_private_pages_and_hashed_assets(website):
-    for path in ['/account/', '/auth/callback/?code=private-code&state=private-state']:
+    for path in ['/account/', '/auth/callback/?code=private-code&state=private-state', '/payment/success/', '/en/payment/success/']:
         result = website.get(path)
+        assert result.status_code == 200
         assert result.headers['cache-control'] == 'private, no-store'
         assert result.headers['x-robots-tag'] == 'noindex, nofollow'
         assert result.headers['referrer-policy'] == 'no-referrer'
