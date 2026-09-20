@@ -28,13 +28,13 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
     if(callbackStarted.current||!isOidcCallback())return;
     callbackStarted.current=true;pending.current=true;setOpen(true);
     setState({kind:'pending',message:'正在确认登录结果'});
+    const copyId=sessionStorage.getItem('nc-login-copy');
+    if(copyId)restoreCopy(copyId);
+    sessionStorage.removeItem('nc-login-copy');
     void finishOidc().then(async value=>{
       if(!value)throw Error('未收到登录结果，请重新登录。');
       if(value.apiOrigin!==API_ORIGIN)throw Error('登录期间服务地址已切换，请回到原服务或重新登录。');
       await saveSession(value);
-      const copyId=sessionStorage.getItem('nc-login-copy');
-      if(copyId)restoreCopy(copyId);
-      sessionStorage.removeItem('nc-login-copy');
       setState({kind:'idle'});setOpen(false);notify('登录成功，已返回原来的阅读位置');
     }).catch(e=>setState({kind:'error',message:loginError(e)}))
       .finally(()=>{pending.current=false;});

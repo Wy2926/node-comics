@@ -1,43 +1,79 @@
 .nc-app .modal.nc-login {
-  width: 480px;
-  padding: 36px;
-  background: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 55%), var(--surface);
-}
-.nc-login .modal-spark {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  margin: 0 auto 22px;
-  border: 1px solid var(--line);
-  border-radius: 19px;
+  width: 800px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 8px 24px 24px 24px;
   background: var(--surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: 8px 8px 0 color-mix(in srgb, var(--ink) 24%, transparent), 0 24px 90px #0004;
 }
-.nc-app .nc-login h2 { margin: 0; text-align: center; font-size: 1.4rem; letter-spacing: -.03em; }
-.nc-app .nc-login .modal-subtitle { text-align: center; margin: 10px 0 18px; }
-.nc-login-benefits { display: flex; align-items: center; justify-content: center; gap: 9px; flex-wrap: wrap; color: var(--muted); font-size: .8125rem; margin-bottom: 28px; }
-.nc-login-benefits svg { color: var(--accent); }
+.nc-login-spread { display: grid; grid-template-columns: .94fr 1fr; }
+.nc-login-close { position: absolute; right: 12px; top: 12px; z-index: 2; }
+.nc-login-cover { padding: 28px; display: flex; flex-direction: column; border-right: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent); background-color: var(--accent-soft); background-image: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) .7px, transparent .7px); background-size: 7px 7px; }
+.nc-login-masthead { display: flex; gap: 8px; align-items: center; font-size: .625rem; font-weight: 800; letter-spacing: .09em; }
+.nc-login-masthead svg { color: var(--accent); }
+.nc-login-masthead > span:last-child { margin-left: auto; border: 1px solid var(--ink); padding: 3px 5px; background: var(--surface); letter-spacing: .03em; transform: rotate(-4deg); }
+.nc-login-cover-title { position: relative; margin-top: 30px; font-size: 2.75rem; font-weight: 900; line-height: 1.22; letter-spacing: -.06em; }
+.nc-login-cover-title em { position: relative; display: inline-block; white-space: nowrap; font-style: normal; color: var(--accent); }
+.nc-login-cover-title em::after { content: ''; position: absolute; height: 7px; background: var(--accent); opacity: .2; left: 0; right: 0; bottom: 2px; transform: rotate(-3deg); }
+.nc-login-star { position: absolute; right: 4px; bottom: 8px; font-size: 3.3rem; color: var(--accent); transform: rotate(12deg); }
+.nc-login-panels { position: relative; height: 198px; margin: 22px 0; }
+.nc-login-panel { position: absolute; width: 57%; height: 154px; border: 2px solid var(--ink); background: var(--surface); overflow: visible; box-shadow: 4px 4px 0 var(--ink); }
+.nc-login-panel.original { top: 4px; left: 0; transform: rotate(-8deg); }
+.nc-login-panel.translated { right: 0; bottom: 0; transform: rotate(7deg); background: var(--accent); color: var(--accent-on); }
+.nc-login-panel-label { position: absolute; top: 9px; left: 10px; font-size: .625rem; font-weight: 700; letter-spacing: .07em; }
+.nc-login-letter { display: block; text-align: center; font-size: 5.4rem; font-weight: 900; line-height: 1; margin-top: 36px; opacity: .16; }
+.nc-login-bubble { position: absolute; top: 64px; left: 18px; padding: 10px 14px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 1.0625rem; font-weight: 800; white-space: nowrap; border-radius: 50%; }
+.nc-login-bubble::after { content: ''; position: absolute; bottom: -9px; left: 19px; width: 10px; height: 12px; background: var(--surface); border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: skewY(-30deg); }
+.nc-login-panel-arrow { position: absolute; left: 37%; top: 22px; display: grid; place-items: center; width: 42px; height: 34px; background: #ffe48a; color: #263147; border: 2px solid #263147; transform: rotate(9deg); }
+.nc-login-cover-bottom { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); font-size: .75rem; }
+.nc-login-cover-bottom > span:last-child { font-size: .5rem; line-height: 1.4; font-weight: 800; letter-spacing: .08em; text-align: right; }
+.nc-login-content { display: flex; flex-direction: column; padding: 48px 30px 28px; min-width: 0; }
+.nc-login-kicker { display: flex; align-items: center; gap: 7px; font-size: .5625rem; letter-spacing: .15em; color: var(--muted); font-weight: 700; }
+.nc-login-kicker > span { width: 6px; height: 6px; background: var(--accent); }
+.nc-app .nc-login-content h2 { margin: 16px 0 8px; font-size: 1.75rem; font-weight: 850; letter-spacing: -.05em; }
+.nc-login-intro { font-size: .8125rem; color: var(--muted); }
+.nc-login-content form { margin-top: 26px; }
 .nc-login .nc-login-field { margin-bottom: 18px; }
-.nc-login-status { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.nc-login-status > div { display: flex; gap: 12px; align-items: flex-start; }
+.nc-login-status { padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.nc-login-status > div { display: flex; gap: 10px; align-items: flex-start; }
 .nc-login-status > div > svg, .nc-login-status .spinner { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
-.nc-login-status strong { display: block; font-size: .9375rem; line-height: 1.6; }
-.nc-login-status p { margin-top: 5px; font-size: .8125rem; color: var(--muted); overflow-wrap: anywhere; }
-.nc-login-status small { display: block; margin-top: 10px; color: var(--muted); font-size: .75rem; line-height: 1.7; }
-.nc-login-status.error, .nc-login-status.unavailable { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, var(--surface)); }
+.nc-login-status strong { display: block; font-size: .875rem; line-height: 1.6; }
+.nc-login-status p { margin-top: 5px; font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; }
+.nc-login-status small { display: block; margin-top: 8px; color: var(--muted); font-size: .6875rem; line-height: 1.7; }
+.nc-login-status.error, .nc-login-status.unavailable { padding: 14px; background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--surface)); border-left: 3px solid var(--danger); }
 .nc-login-status.error strong, .nc-login-status.error svg, .nc-login-status.unavailable strong, .nc-login-status.unavailable svg { color: var(--danger); }
-.nc-login-status.pending { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
-.nc-app .nc-login-submit { margin-top: 22px; min-height: 48px; }
-.nc-app .nc-login-submit:disabled { opacity: 1; background: var(--surface-soft); border-color: var(--line); color: var(--muted); }
-.nc-app .nc-login-later { margin-top: 8px; font-size: .875rem; }
-.nc-login-footnote { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
-.nc-login-footnote svg { flex-shrink: 0; color: var(--accent); }
-.nc-login-resume { position: fixed; right: 24px; bottom: 28px; z-index: 65; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 13px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); text-align: left; }
-.nc-login-resume small { display: block; color: var(--muted); margin-top: 3px; }
-.nc-login-resume.error > svg:first-child { color: var(--danger); }
-@media (max-width: 520px) {
-  .nc-app .modal.nc-login { padding: 30px 22px 22px; }
-  .nc-app .nc-login h2 { font-size: 1.25rem; }
+.nc-app .nc-login .nc-login-submit { margin-top: 22px; min-height: 50px; border: 2px solid var(--ink); border-radius: 5px; box-shadow: 4px 4px 0 var(--ink); font-size: .9375rem; }
+.nc-app .nc-login .nc-login-submit:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+.nc-app .nc-login .nc-login-submit:active:not(:disabled) { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--ink); }
+.nc-app .nc-login button.nc-login-submit:disabled { opacity: 1; background: var(--surface-soft); color: var(--muted); box-shadow: 2px 2px 0 var(--line); border-color: var(--line); }
+.nc-app .nc-login .nc-login-later { margin-top: 10px; font-size: .75rem; font-weight: 500; color: var(--muted); }
+.nc-login-footnote { display: flex; align-items: flex-start; gap: 8px; margin-top: auto; padding-top: 20px; font-size: .6875rem; color: var(--muted); }
+.nc-login-footnote svg { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
+.nc-login-footnote p { line-height: 1.8; }
+.nc-login-footnote span { font-size: .625rem; }
+.nc-login.is-connecting .translated { animation: nc-login-page-turn 2.4s ease-in-out infinite; transform-origin: left bottom; }
+.nc-login.is-connecting .nc-login-star { animation: spin 8s linear infinite; }
+.nc-login.has-error .translated { background: var(--danger-soft); color: var(--danger); }
+.nc-login-resume { position: fixed; right: 24px; bottom: 28px; z-index: 65; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 12px 16px 12px 12px; border: 2px solid var(--ink); border-radius: 5px 15px 15px 5px; background: var(--surface); color: var(--ink); box-shadow: 4px 4px 0 color-mix(in srgb,var(--ink) 25%,transparent); text-align: left; }
+.nc-login-bookmark { display: grid; place-items: center; width: 34px; height: 42px; align-self: stretch; background: var(--accent-soft); color: var(--accent); clip-path: polygon(0 0,100% 0,100% 100%,50% 86%,0 100%); padding-bottom: 5px; }
+.nc-login-resume small { display: block; color: var(--muted); margin-top: 3px; font-size: .6875rem; }
+.nc-login-resume.error .nc-login-bookmark { color: var(--danger); background: var(--danger-soft); }
+@keyframes nc-login-page-turn { 0%,100% { transform: rotate(7deg); } 50% { transform: perspective(600px) rotateY(-15deg) rotate(3deg) translateY(-5px); } }
+@media (max-width: 640px) {
+  .nc-login-spread { grid-template-columns: 1fr; }
+  .nc-login-cover { padding: 18px 24px; border-right: 0; border-bottom: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent); }
+  .nc-login-masthead { padding-right: 26px; }
+  .nc-login-masthead > span:last-child { display: none; }
+  .nc-login-cover-title { margin-top: 16px; font-size: 2rem; }
+  .nc-login-cover-title br { display: none; }
+  .nc-login-star, .nc-login-panels, .nc-login-cover-bottom { display: none; }
+  .nc-login-content { padding: 24px; }
+  .nc-app .nc-login-content h2 { font-size: 1.5rem; margin-top: 10px; }
+  .nc-login-content form { margin-top: 18px; }
+  .nc-login-footnote { padding-top: 14px; }
   .nc-login-resume { right: 16px; bottom: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nc-login.is-connecting .translated, .nc-login.is-connecting .nc-login-star { animation: none; }
+  .nc-app .nc-login .nc-login-submit { transition: none; }
 }
