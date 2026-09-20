@@ -2,6 +2,7 @@ import {msg} from './i18n/runtime';
 import {useAutomaticTranslation} from './translation/useAutomaticTranslation';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Icon} from './icons';
+import {BrandLogo} from './ui/BrandLogo';
 import {Modal} from './ui/components';
 import {Api} from './api';
 import {type Capabilities,type ReadingCopy,type Settings,type Entitlements} from './types';
@@ -136,7 +137,7 @@ const rights=usage??caps?.entitlements;
 const nav=(value:View)=>{exitReader();setView(value);location.hash=value;setError('');};
 return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=current?'none':'copy';setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current)chooseFiles(Array.from(e.dataTransfer.files));}}>
 <input aria-label={msg("选择漫画图片")} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
-{!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg("返回我的漫画")} onClick={()=>nav('library')}><span>✦</span><b>{msg("brand.name")}</b></button><nav aria-label={msg("主导航")}>{([['library',msg("我的漫画"),'book']] as const).map(([value,label,icon])=><button key={value} aria-current={view===value?'page':undefined} onClick={()=>nav(value)}><Icon name={icon} size={19}/>{label}</button>)}</nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg("外观与设置")} onClick={()=>nav('settings')}><Icon name="settings"/></button><button className="nc-account-button" aria-label={msg("我的账户")} aria-current={view==='account'?'page':undefined} onClick={()=>nav('account')}><span className="nc-avatar">{account?account.user.name[0].toUpperCase():<Icon name="user" size={18}/>}</span><span>{account?(rights?.plan==='plus'?'PLUS':msg("普通用户")):msg("登录")}</span></button></div></header>}
+{!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg("返回我的漫画")} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg("主导航")}>{([['library',msg("我的漫画"),'book']] as const).map(([value,label,icon])=><button key={value} aria-current={view===value?'page':undefined} onClick={()=>nav(value)}><Icon name={icon} size={19}/>{label}</button>)}</nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg("外观与设置")} onClick={()=>nav('settings')}><Icon name="settings"/></button><button className="nc-account-button" aria-label={msg("我的账户")} aria-current={view==='account'?'page':undefined} onClick={()=>nav('account')}><span className="nc-avatar">{account?account.user.name[0].toUpperCase():<Icon name="user" size={18}/>}</span><span>{account?(rights?.plan==='plus'?'PLUS':msg("普通用户")):msg("登录")}</span></button></div></header>}
 <div className="nc-workspace">
 {auth.reason==='expired'&&<div className="global-error" role="alert"><Icon name="info" size={18}/><span>{expiredMessage()}</span><button className="button small" onClick={()=>login.setOpen(true)}>{msg("重新登录")}</button></div>}
 {error&&<div className="global-error" role="alert"><Icon name="info" size={18}/><span>{error}</span><button aria-label={msg("关闭错误提示")} onClick={()=>setError('')}><Icon name="close" size={16}/></button></div>}

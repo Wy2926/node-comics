@@ -18,6 +18,8 @@ npm run build:web    # dist-web
 
 Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`。产品服务固定为 `https://comics.nodelane.net`（`src/service.ts`），插件不提供运营管理页面或服务地址设置。供应商密钥只在后端。
 
+插件图标和左上角品牌使用 `output/imagegen/nodelane-logo-v1` 素材：发布所需图标复制到 `public/brand`，横版 WebP 复制到 `src/assets/brand`，构建不依赖输出目录。漫画管理页与弹窗共用 `BrandLogo`，中文界面显示中文图片文字，其他语言显示英文，并跟随亮暗外观切换对应素材。横版图片保持 5:1 比例；浏览器工具栏、扩展管理页和插件标签页使用同版图标。
+
 ## 阅读翻译
 
 自动翻译当前页与后两页，逐页保存稳定操作编号并调用 `POST /v1/translation-plans`；响应丢失时按原编号核实。已有原图无需重传，缺失原图按回执上传。已受理任务在关闭客户端后继续由后端执行。

@@ -1,0 +1,5 @@
+.nc-brand-logo { display: block; width: 220px; max-width: 100%; aspect-ratio: 5; }
+.nc-brand-logo img { display: block; width: 100%; height: auto; }
+.nc-brand-logo .nc-brand-logo-dark { display: none; }
+:root[data-appearance=dark] .nc-brand-logo-light { display: none; }
+:root[data-appearance=dark] .nc-brand-logo-dark { display: block; }

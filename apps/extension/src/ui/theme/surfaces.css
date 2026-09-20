@@ -34,10 +34,8 @@
 .nc-app .switch i { border-radius: 2px; top: 3px; left: 3px; }
 .nc-app .switch.on { border-color: var(--ink); }
 
-/* The app masthead uses the same bookmark and stamped navigation as the passport. */
+/* The app masthead pairs the brand artwork with stamped navigation. */
 .nc-app-header { height: 80px; border-bottom: var(--comic-border); gap: 30px; }
-.nc-brand>span { display: grid; place-items: center; width: 38px; height: 44px; background: var(--accent); color: var(--accent-on); font-size: 26px; padding-bottom: 6px; clip-path: polygon(0 0,100% 0,100% 100%,50% 86%,0 100%); }
-.nc-brand b { font-weight: 850; letter-spacing: -.04em; }
 .nc-app-header nav { gap: 12px; }
 .nc-app-header nav>button { height: 42px; border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 0 14px; }
 .nc-app-header nav>button[aria-current=page] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }

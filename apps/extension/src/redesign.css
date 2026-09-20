@@ -148,17 +148,9 @@ a {
 .nc-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
-.nc-brand>span {
-  font-size: 36px;
-  line-height: 1;
-  color: var(--accent);
-}
-.nc-brand b {
-  font-size: 1.1875rem;
-  letter-spacing: -.6px;
+  padding: 0;
+  min-width: 0;
+  flex-shrink: 0;
 }
 .nc-app-header nav {
   height: 100%;
@@ -1424,9 +1416,6 @@ a {
   }
   .nc-app-header nav>button {
     padding: 0 10px;
-  }
-  .nc-brand b {
-    font-size: 1rem;
   }
   .nc-header-actions {
     gap: 8px;
