@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Classic translation quota",
   "身份服务未返回有效的访问令牌。": "The identity service did not return a valid access token.",
   "身份服务未授予自动续期权限，请重新登录并授权离线访问；若仍失败，请联系管理员检查应用配置。": "The identity service has not granted automatic renewal permission. Please log in again and authorize offline access; if it still fails, please contact the administrator to check the application configuration.",
   "缺少本次登录上下文，请重新登录。": "The login context is missing, please log in again.",

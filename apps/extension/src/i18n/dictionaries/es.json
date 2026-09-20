@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Cuota de traducción clásica",
   "身份服务未返回有效的访问令牌。": "El servicio de identidad no devolvió un token de acceso válido.",
   "身份服务未授予自动续期权限，请重新登录并授权离线访问；若仍失败，请联系管理员检查应用配置。": "El servicio de identidad no ha concedido el permiso de renovación automática. Inicie sesión nuevamente y autorice el acceso sin conexión; Si aún falla, comuníquese con el administrador para verificar la configuración de la aplicación.",
   "缺少本次登录上下文，请重新登录。": "Falta el contexto de inicio de sesión, inicie sesión nuevamente.",

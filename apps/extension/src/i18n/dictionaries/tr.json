@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Standart çeviri kotası",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Hizmete geçici olarak bağlanılamıyor. Lütfen ağ bağlantısını kontrol edin, orijinal resim hala okunabilir.",
   "登录已过期，请重新登录。": "Oturum açma süresi doldu, lütfen tekrar oturum açın.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Mevcut API hizmeti henüz bu arayüzü içermiyor. Lütfen API hizmetini güncelleyip yeniden başlatın ve tekrar deneyin.",

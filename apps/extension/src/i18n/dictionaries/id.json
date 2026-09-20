@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Kuota terjemahan reguler",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Layanan tidak dapat dihubungkan untuk sementara. Silakan periksa koneksi jaringan, gambar asli masih dapat terbaca.",
   "登录已过期，请重新登录。": "Login sudah kadaluarsa, silahkan login kembali.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Layanan API saat ini belum menyertakan antarmuka ini. Harap perbarui dan mulai ulang layanan API dan coba lagi.",

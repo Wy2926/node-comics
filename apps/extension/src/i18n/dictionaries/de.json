@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Kontingent für klassische Übersetzung",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Der Dienst kann vorübergehend nicht verbunden werden. Bitte überprüfen Sie die Netzwerkverbindung, das Originalbild ist weiterhin lesbar.",
   "登录已过期，请重新登录。": "Die Anmeldung ist abgelaufen. Bitte melden Sie sich erneut an.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Der aktuelle API-Dienst enthält diese Schnittstelle noch nicht. Bitte aktualisieren und starten Sie den API-Dienst neu und versuchen Sie es erneut.",

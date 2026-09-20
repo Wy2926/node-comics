@@ -5,26 +5,25 @@ import type {Entitlements} from '../types';
 import {type BillingStatus,stripeUrl} from '../billing';
 import {Icon} from '../icons';
 
-export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements}:{api:Api;loggedIn:boolean;rights?:Entitlements;onLogin:()=>void;onEntitlements:(value:Entitlements)=>void}) {
+export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notify}:{api:Api;loggedIn:boolean;rights?:Entitlements;onLogin:()=>void;onEntitlements:(value:Entitlements)=>void;notify:(message:string)=>void}) {
   const [billing,setBilling]=useState<BillingStatus>();
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
-  const [notice,setNotice]=useState('');
   const generation=useRef(0);
   const working=useRef(false);
-  const plus=rights?.plan==='plus';
+  const plus=loggedIn&&rights?.plan==='plus';
   const subscription=billing?.subscription;
   const managed=!!subscription&&(!['canceled','incomplete_expired'].includes(subscription.status)||[subscription.paid_ends_at,subscription.trial_ends_at].some(date=>!!date&&Date.parse(date)>Date.now()));
   const trial=billing?.trial_eligible;
   useEffect(()=>{
     const current=++generation.current;
-    setBilling(undefined);setError('');setNotice('');setBusy(false);working.current=false;
+    setBilling(undefined);setError('');setBusy(false);working.current=false;
     if(loggedIn)void api.billingStatus().then(value=>{if(current===generation.current)setBilling(value);}).catch(()=>{if(current===generation.current)setError(msg('暂时无法读取订阅，请重试。'));});
     return()=>{generation.current++;};
   },[api,loggedIn]);
-  async function refresh(){
+  async function refresh(showNotice=true){
     if(working.current||!loggedIn)return;
-    const current=generation.current;working.current=true;setBusy(true);setError('');setNotice('');
+    const current=generation.current;working.current=true;setBusy(true);setError('');
     try{
       const status=await api.billingStatus();
       if(current!==generation.current)return;
@@ -36,19 +35,19 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements}:{api
       }else{
         const value=await api.entitlements();if(current===generation.current)onEntitlements(value);
       }
-      if(current===generation.current)setNotice(msg('权益已刷新'));
+      if(current===generation.current&&showNotice)notify(msg('权益已刷新'));
     }catch{if(current===generation.current)setError(msg('暂时无法读取订阅，请重试。'));}
     finally{if(current===generation.current){working.current=false;setBusy(false);}}
   }
   useEffect(()=>{
-    const focus=()=>{if(loggedIn&&!document.hidden)void refresh();};
+    const focus=()=>{if(loggedIn&&!document.hidden)void refresh(false);};
     window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);
     return()=>{window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);};
   },[api,loggedIn]);
   async function openPayment(){
     if(!loggedIn){onLogin();return;}
     if(working.current||!billing?.enabled)return;
-    const current=generation.current;working.current=true;setBusy(true);setError('');setNotice('');
+    const current=generation.current;working.current=true;setBusy(true);setError('');
     // Reserve the tab during the click so browsers do not block the async handoff.
     const extension=typeof chrome!=='undefined'&&!!chrome.runtime?.id;
     const popup=extension?null:window.open('about:blank','_blank');
@@ -73,6 +72,5 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements}:{api
     <div className="nc-membership-footer"><button className="button primary" disabled={busy||(loggedIn&&!billing?.enabled)} onClick={()=>void openPayment()}>{busy?msg('处理中…'):!loggedIn?msg('登录后升级'):managed?msg('在 Stripe 管理订阅'):billing?.checkout_pending?msg('继续 Stripe 结账'):trial?msg('免费试用 7 天'):msg('通过 Stripe 升级')}<Icon name="external" size={16}/></button>{loggedIn&&<button className="button quiet small" disabled={busy} onClick={()=>void refresh()}>{msg('刷新权益')}</button>}</div>
     {loggedIn&&billing&&!billing.enabled&&<p role="status">{msg('订阅暂未开放')}</p>}
     {error&&<p className="nc-billing-error" role="alert">{error}</p>}
-    {notice&&<span className="nc-muted" role="status">{notice}</span>}
   </section>;
 }

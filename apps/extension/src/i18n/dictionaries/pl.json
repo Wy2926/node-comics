@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Limit standardowego tłumaczenia",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Usługa nie może zostać tymczasowo połączona. Sprawdź połączenie sieciowe, oryginalny obraz jest nadal czytelny.",
   "登录已过期，请重新登录。": "Login wygasł, zaloguj się ponownie.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Bieżąca usługa API nie obejmuje jeszcze tego interfejsu. Zaktualizuj i uruchom ponownie usługę API, a następnie spróbuj ponownie.",

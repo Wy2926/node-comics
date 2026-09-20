@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Cota de tradução clássica",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "O serviço não pode ser conectado temporariamente. Verifique a conexão de rede, a imagem original ainda pode ser lida.",
   "登录已过期，请重新登录。": "O login expirou, faça login novamente.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "O serviço API atual ainda não inclui esta interface. Atualize e reinicie o serviço API e tente novamente.",

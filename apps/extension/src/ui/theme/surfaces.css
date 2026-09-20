@@ -107,12 +107,10 @@
 .nc-app .setting-row>div:first-child { min-width: 0; }
 .nc-app .setting-row p { max-width: 42em; }
 .nc-app .privacy-note { border: var(--comic-perforation); border-radius: var(--comic-control-radius); background: var(--accent-soft); }
-.nc-app :is(.nc-profile-card, .nc-membership-card) { border: var(--comic-border); border-radius: var(--comic-panel-radius); padding: var(--comic-panel-padding); box-shadow: var(--comic-shadow); }
+.nc-app .nc-membership-card { border: var(--comic-border); border-radius: var(--comic-panel-radius); padding: var(--comic-panel-padding); box-shadow: var(--comic-shadow); }
 .nc-app .nc-membership-card { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
 .nc-app .nc-profile-avatar { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow); transform: rotate(-4deg); }
-.nc-app .nc-profile-identity h2, .nc-app .nc-membership-card h2 { font-size: 1.5rem; font-weight: 850; letter-spacing: -.04em; }
-.nc-app .nc-profile-footer { border-top: var(--comic-perforation); flex-wrap: wrap; }
-.nc-app .nc-profile-footer>span { font-size: .75rem; }
+.nc-app .nc-membership-card h2 { font-size: 1.5rem; font-weight: 850; letter-spacing: -.04em; }
 .nc-app .nc-icon-tile { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); transform: rotate(-5deg); flex-shrink: 0; }
 .nc-app .nc-account-activity { border-top: var(--comic-perforation); }
 .nc-app .nc-rights-card strong { font-variant-numeric: tabular-nums; }

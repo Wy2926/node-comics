@@ -1,4 +1,5 @@
 {
+  "常规翻译额度": "Hạn mức dịch thông thường",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Dịch vụ không thể kết nối tạm thời. Vui lòng kiểm tra kết nối mạng, hình ảnh gốc vẫn có thể đọc được.",
   "登录已过期，请重新登录。": "Đăng nhập đã hết hạn, vui lòng đăng nhập lại.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Dịch vụ API hiện tại chưa có giao diện này. Vui lòng cập nhật và khởi động lại dịch vụ API rồi thử lại.",
