@@ -1,6 +1,6 @@
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
-import {assertCurrent, RequestPool} from './concurrency';
+import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
 function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
@@ -9,9 +9,11 @@ function retryDelay(body:unknown,header:string|null){
 export class Api {
   private readonly updatesPool = new RequestPool(1);
   private readonly controlPool = new RequestPool(2);
-  constructor(public base: string, public token = '', public pool = new RequestPool(), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
+  constructor(public base: string, public token = '', public pool = new RequestPool(UPLOAD_CONCURRENCY), public isCurrent = () => true) { this.base = base.replace(/\/+$/, ''); }
   async request<T>(path: string, init: RequestInit = {}, allowPlanLimit=false): Promise<T> {
-    return this.controlPool.run(async () => {
+    return this.controlPool.run(() => this.fetchRequest<T>(path, init, allowPlanLimit));
+  }
+  private async fetchRequest<T>(path: string, init: RequestInit = {}, allowPlanLimit=false): Promise<T> {
     assertCurrent(this.isCurrent);
     let response: Response;
     try { response = await fetch(this.base + path, { ...init, headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers } }); }
@@ -19,7 +21,6 @@ export class Api {
     if (!response.ok) { const raw = await response.json().catch(() => ({})); if(allowPlanLimit&&response.status===429&&Array.isArray(raw.items)&&(raw.error?.code==='IMAGE_RATE_LIMITED'||raw.items.every((item:TranslationOperation)=>item.code==='IMAGE_RATE_LIMITED')))return raw as T; if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')),error.scope); }
     if (response.status === 204) return undefined as T;
     return response.json();
-    });
   }
   authConfig() { return this.request<AuthConfig>('/v1/auth/config'); }
   login(username: string) { return this.request<{access_token: string; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
@@ -70,18 +71,19 @@ export class Api {
     });
   }
   async image(id: string, signal?: AbortSignal): Promise<Blob> {
+    // Image access and bytes bypass both pools so recovery never waits for uploads.
     for (let attempt = 0; attempt < 2; attempt++) {
       signal?.throwIfAborted();
-      const access = await this.request<{url: string; expires_at: string|null; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`, {signal});
+      const access = await this.fetchRequest<{url: string; expires_at: string|null; authorization_required?: boolean}>(`/v1/images/${encodeURIComponent(id)}/access`, {signal});
       const url = new URL(access.url, this.base);
       const signed = access.authorization_required === false;
       if (url.username || url.password || (signed ? url.protocol !== 'https:' : url.origin !== new URL(this.base).origin)) {
         throw new ApiError('图片访问地址无效。', 'INVALID_ASSET_ORIGIN');
       }
-      const blob = await this.pool.run(async () => {
+      const blob = await (async () => {
         assertCurrent(this.isCurrent);
         signal?.throwIfAborted();
-        // Refresh after waiting in the request pool, without nesting pool slots.
+        // Refresh an expired signature before starting the download.
         if (signed && attempt === 0 && access.expires_at && Date.parse(access.expires_at) <= Date.now()) return null;
         let response: Response;
         try {
@@ -102,7 +104,7 @@ export class Api {
         bitmap.close();
         assertCurrent(this.isCurrent);
         return result;
-      });
+      })();
       if (blob) return blob;
     }
     throw new ApiError('图片访问链接已过期，请重试。', 'ASSET_EXPIRED');

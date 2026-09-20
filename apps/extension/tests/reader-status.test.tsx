@@ -14,7 +14,7 @@ const origin='https://fixture.example';
 const noop=()=>{};
 function statusMarkup(page:Page){
  function Status(){
-  const {stateFor}=useAutomaticTranslation({api:new Api(origin),userId:'reader',origin,copies:[],updateCopy:noop,concurrency:1,language:'zh-Hans'});
+  const {stateFor}=useAutomaticTranslation({api:new Api(origin),userId:'reader',origin,copies:[],updateCopy:noop,language:'zh-Hans'});
   return <ImageTranslationStatus state={stateFor('copy',page,'classic')} onRetry={noop} onUpgrade={noop} onLogin={noop}/>;
  }
  return renderToStaticMarkup(<Status/>);

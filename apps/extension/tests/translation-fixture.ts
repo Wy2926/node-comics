@@ -10,7 +10,7 @@ export const job=(n:number,extra:Partial<Job>={}):Job=>({id:'job-'+n,input_asset
 export const receipt=(body:TranslationPlan):PlanReceipt=>({policy_revision:'1',image_rate_limit:{window_seconds:60,limit:30,remaining:29},items:body.items.map(item=>({operation_key:item.operation_key,page_key:item.page_key,disposition:'accepted',job:job(item.image.page_index??0)}))});
 export function fixture(){
  const api=new Api(origin),userId=crypto.randomUUID(),rights=entitlement(),onJobs=vi.fn(async(_jobs:Job[])=>{});
- const core=new TranslationCoordinator({api,userId,language:'zh-Hans',sessionId:crypto.randomUUID(),concurrency:2,getBlob:async()=>new Blob(['png']),rights:()=>rights,onJobs,onChange:()=>{}});
+ const core=new TranslationCoordinator({api,userId,language:'zh-Hans',sessionId:crypto.randomUUID(),getBlob:async()=>new Blob(['png']),rights:()=>rights,onJobs,onChange:()=>{}});
  const plan=vi.spyOn(api,'plan').mockImplementation(async body=>receipt(body));
  vi.spyOn(api,'resolveOperations').mockImplementation(async keys=>({items:keys.map(operation_key=>({operation_key,disposition:'not_found' as const}))}));
  return {api,userId,rights,onJobs,core,plan};

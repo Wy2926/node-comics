@@ -1,19 +1,19 @@
 import {Api,ApiError} from '../api';
-import {assertCurrent,RequestPool} from '../concurrency';
+import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../concurrency';
 import {mergeJobs} from '../reader/jobs';
 import {pageTranslation} from '../reader/presentation';
 import type {Entitlements,Job,Mode,TranslationChanges,TranslationOperation,TranslationPlan} from '../types';
 import {makeOperation,operationId,quotaErrors,type ReadingTarget} from './automatic';
 import {readOperation,readOperations,readSession,readSync,saveOperation,saveSession,saveSync,translationScope,withTranslationLock,type LocalOperation,type ReadingSession,type SyncState} from './store';
 
-interface Options {api:Api;userId:string;language:string;sessionId:string;concurrency:number;getBlob:(key:string)=>Promise<Blob|undefined>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;onPolicy?:(rights:Entitlements)=>void;}
+interface Options {api:Api;userId:string;language:string;sessionId:string;getBlob:(key:string)=>Promise<Blob|undefined>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;onPolicy?:(rights:Entitlements)=>void;}
 const revisionNewer=(a:string|undefined,b:string|undefined)=>!b||a===b||!!a&&(/^\d+$/.test(a)&&/^\d+$/.test(b)?BigInt(a)>BigInt(b):a>b);
 /** One shared protocol for reader and content-script driven background steps. No queue preflight. */
 export class TranslationCoordinator {
   readonly scope:string;state:SyncState;records:LocalOperation[]=[];session:ReadingSession;
   private initializing?:Promise<void>;private sending=false;private manualPending=false;private sendWaiters:(()=>void)[]=[];private uploads=new Map<string,Promise<void>>();private failures=0;private uploadPool:RequestPool;
   private monotonic=new Map<string,{wall:number;until:number}>();private lastSignature='';private leaseAt=0;
-  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.session={id:this.scope+':'+options.sessionId,sessionId:options.sessionId,sequence:0,priority:{}};this.uploadPool=new RequestPool(options.concurrency);}
+  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.session={id:this.scope+':'+options.sessionId,sessionId:options.sessionId,sequence:0,priority:{}};this.uploadPool=new RequestPool(UPLOAD_CONCURRENCY);}
   async init(){return this.initializing??= (async()=>{this.state=await readSync(this.scope)??this.state;this.session=await readSession(this.session.id)??this.session;this.options.sessionId=this.session.sessionId;this.records=await readOperations(this.scope);await this.options.onJobs(this.state.jobs);})();}
   private async resetSession(){this.options.sessionId=crypto.randomUUID();this.session={id:this.session.id,sessionId:this.options.sessionId,sequence:0,priority:{}};this.lastSignature='';this.leaseAt=0;await saveSession(this.session);this.options.onChange();}
   private current(){assertCurrent(this.options.api.isCurrent);}

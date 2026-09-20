@@ -14,11 +14,11 @@ it('persists file identities independently of visible ordering and deletion',asy
   const restored=(await readCopies()).find(c=>c.id===copy.id)!;
   expect(restored.pages.map(p=>[p.fileHash,p.pageIndex])).toEqual([['a'.repeat(64),2],['a'.repeat(64),0]]);
 });
-it('persists only the local request concurrency, clamping malformed saved settings',()=>{
-  saveSettings({...defaults,requestConcurrency:10});expect(settings().requestConcurrency).toBe(10);
-  localStorage.setItem('nc-settings',JSON.stringify({requestConcurrency:100}));expect(settings().requestConcurrency).toBe(10);
-  localStorage.setItem('nc-settings',JSON.stringify({requestConcurrency:null}));expect(settings().requestConcurrency).toBe(2);
-  saveSettings(defaults);
+it('ignores and stops saving the removed transfer concurrency preference',()=>{
+  localStorage.setItem('nc-settings',JSON.stringify({requestConcurrency:1}));
+  expect(settings()).not.toHaveProperty('requestConcurrency');
+  saveSettings(settings());
+  expect(JSON.parse(localStorage.getItem('nc-settings')!)).not.toHaveProperty('requestConcurrency');
 });
 it('keeps newly submitted jobs when an older tab saves its copy snapshot',async()=>{
   const page=emptyPage('job.png',10,10);page.ownerId='reader';page.apiOrigin='http://127.0.0.1:18088';

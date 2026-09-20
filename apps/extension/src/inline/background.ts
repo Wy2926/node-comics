@@ -1,5 +1,5 @@
 import {Api} from '../api';
-import {RequestPool,assertCurrent} from '../concurrency';
+import {RequestPool,assertCurrent,UPLOAD_CONCURRENCY} from '../concurrency';
 import {imageIdentity} from '../importers/hash';
 import {getBlob,putBlob,removeBlob,type Session} from '../library/store';
 import {emptyPage} from '../reader/model';
@@ -36,10 +36,10 @@ async function context(tabId:number,navigationId:string):Promise<Context|undefin
   const previous=contexts.get(tabId);if(previous?.key===key)return previous;
   if(previous){previous.active=false;previous.waiting?.abort();}
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
-  const api=new Api(settings.apiBase,session.token,new RequestPool(settings.requestConcurrency),()=>generation===configGeneration&&(!ctx||ctx.active));
+  const api=new Api(settings.apiBase,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active));
   const [caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);
   const attach=async(jobs:Job[])=>{assertCurrent(api.isCurrent);for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,ownerId:session.user.id,apiOrigin:origin,assetId:incoming.find(j=>j.input_asset_id)?.input_asset_id??page.assetId,jobs:mergeJobs(page.jobs,incoming)});}};
-  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,concurrency:settings.requestConcurrency,getBlob,rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
+  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob,rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
   ctx={key,api,core,settings,session,caps,rights,pages,sourceErrors:new Map(),active:true};contexts.set(tabId,ctx);await core.init();await core.recover();return ctx;
 }
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);

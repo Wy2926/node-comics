@@ -3,7 +3,7 @@ import {Api,ApiError} from '../api';
 import {supportsLanguage,type Capabilities,type Entitlements,type Job,type Mode,type Page,type ReadingCopy} from '../types';
 import {mergeJobs} from '../reader/jobs';
 import {latestResults,pageTranslation} from '../reader/presentation';
-import {assertCurrent,mapConcurrent} from '../concurrency';
+import {assertCurrent} from '../concurrency';
 import * as libraryStore from '../library/store';
 import {applyAccountJobs} from './sync';
 import {TranslationCoordinator} from './coordinator';
@@ -12,7 +12,7 @@ import {ReadingWindow,operationId,type ReadingTarget,type TranslationState} from
 import {translationState} from './state';
 
 function readingSessionSlot(scope:string){const key='nc-reading-session:'+scope;try{const saved=sessionStorage.getItem(key);if(saved)return saved;const id=crypto.randomUUID();sessionStorage.setItem(key,id);return id;}catch{return crypto.randomUUID();}}
-export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,concurrency,language,currentId,caps,rights,onPolicy,refreshConfiguration}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;concurrency:number;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;onPolicy?:(rights:Entitlements)=>void;refreshConfiguration?:()=>Promise<Entitlements>}){
+export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,language,currentId,caps,rights,onPolicy,refreshConfiguration}:{api:Api;userId?:string;origin:string;copies:ReadingCopy[];updateCopy:(copy:ReadingCopy)=>void;language:string;currentId?:string;caps?:Capabilities;rights?:Entitlements|null;onPolicy?:(rights:Entitlements)=>void;refreshConfiguration?:()=>Promise<Entitlements>}){
  const [,render]=useState(0),[operations,setOperations]=useState<LocalOperation[]>([]),[error,setError]=useState('');
  const scope=userId?translationScope(origin,userId):'',copyRef=useRef(copies);copyRef.current=copies;
  const config=useRef({caps,rights,onPolicy});config.current={caps,rights,onPolicy};
@@ -34,14 +34,16 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
    let watchController=new AbortController(),retry=0;
    const live=()=>!stopped&&api.isCurrent();
    const reload=()=>{void readOperations(scope).then(records=>{if(live())setOperations(records);});};
-   const core=new TranslationCoordinator({api,userId,language,sessionId:readingSessionSlot(scope),concurrency,getBlob:libraryStore.getBlob,rights:()=>config.current.rights??undefined,onJobs:attach,onChange:()=>{reload();wake.current();},onPolicy:value=>{config.current.rights=value;config.current.onPolicy?.(value);}});
+   const core=new TranslationCoordinator({api,userId,language,sessionId:readingSessionSlot(scope),getBlob:libraryStore.getBlob,rights:()=>config.current.rights??undefined,onJobs:attach,onChange:()=>{reload();wake.current();},onPolicy:value=>{config.current.rights=value;config.current.onPolicy?.(value);}});
    coordinator.current=core;
    async function downloads(){
      const generation=stamp.current,current=()=>live()&&generation===stamp.current;
      const pages=visible.current.map(p=>copyRef.current.flatMap(c=>c.pages).find(v=>v.id===p.id)??p);
      const needed=[...new Map(pages.flatMap(p=>p.ownerId===userId&&p.apiOrigin===origin?latestResults(p.jobs).filter(j=>j.target_language===language&&j.output_asset_id&&!p.outputBlobs[j.id]):[]).map(j=>[j.id,j])).values()];
-     await mapConcurrent(needed,concurrency,async job=>{try{await downloadResult(job,current);}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}});
-     await mapConcurrent(pages.filter(p=>!p.blobKey&&p.assetId&&p.ownerId===userId&&p.apiOrigin===origin),concurrency,async page=>{try{const blob=await api.image(page.assetId!);assertCurrent(current);const key='original:'+origin+':'+userId+':'+page.assetId;await libraryStore.putBlob(key,blob);assertCurrent(current);for(const copy of copyRef.current)if(copy.pages.some(p=>p.id===page.id))commit({...copy,pages:copy.pages.map(p=>p.id===page.id?{...p,blobKey:key,fetchError:undefined}:p)});}catch{/* Preserve the reader's original recovery action. */}});
+     await Promise.allSettled([
+       ...needed.map(async job=>{try{await downloadResult(job,current);}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}}),
+       ...pages.filter(p=>!p.blobKey&&p.assetId&&p.ownerId===userId&&p.apiOrigin===origin).map(async page=>{try{const blob=await api.image(page.assetId!);assertCurrent(current);const key='original:'+origin+':'+userId+':'+page.assetId;await libraryStore.putBlob(key,blob);assertCurrent(current);for(const copy of copyRef.current)if(copy.pages.some(p=>p.id===page.id))commit({...copy,pages:copy.pages.map(p=>p.id===page.id?{...p,blobKey:key,fetchError:undefined}:p)});}catch{/* Preserve the reader's original recovery action. */}}),
+     ]);
    }
    const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>void tick(),Math.max(0,delay));};
    async function tick(){
@@ -70,7 +72,7 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,con
    document.addEventListener('visibilitychange',foreground);window.addEventListener('online',foreground);window.addEventListener('focus',foreground);
    void core.init().then(async()=>{if(!live())return;await core.recover();reload();schedule();void watch();}).catch(e=>{if(live()){setError(e.message);schedule(1000);void watch();}});
    return()=>{stopped=true;watchController.abort();clearTimeout(timer);clearInterval(lease);wake.current=()=>{};coordinator.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('focus',foreground);};
- },[scope,api,userId,origin,language,concurrency,attach,commit,downloadResult]);
+ },[scope,api,userId,origin,language,attach,commit,downloadResult]);
  useEffect(()=>{if(!userId)return;for(const copy of copies){const changed=applyAccountJobs(copy,jobs.current,userId,origin);if(changed!==copy)commit(changed);}},[copies,userId,origin,commit]);
  const previousRights=useRef<string|undefined>(undefined);
  useEffect(()=>{if(!rights)return;const signature=JSON.stringify([rights.modes,rights.plan,rights.image_rate_limit]);if(previousRights.current&&signature!==previousRights.current)void coordinator.current?.refreshPolicy(rights).then(()=>wake.current());else if(!previousRights.current)wake.current();previousRights.current=signature;},[rights]);

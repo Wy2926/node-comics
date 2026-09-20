@@ -30,7 +30,7 @@ import {SourceImport} from './ui/SourceImport';
 import {acquireWebImages,insertWebCopy,type WebDestination} from './library/web-import';
 import {discoverCatalog} from './sources/client';
 import {imageIdentity} from './importers/hash';
-import {RequestPool} from './concurrency';
+import {RequestPool,UPLOAD_CONCURRENCY} from './concurrency';
 import {AdminPanel} from './admin/AdminPanel';
 import {finishOidc,startOidc,isOidcCallback,type AuthConfig} from './auth/oidc';
 type View='library'|'history'|'usage'|'settings'|'account'|'admin';
@@ -53,8 +53,7 @@ useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'
 useAppearance(settings);
 useEffect(()=>{const coordinator=new AcquisitionCoordinator();const tick=()=>void coordinator.run(settings.cacheLimitMb).catch(e=>setError(e.message));tick();const timer=setInterval(tick,2000);return()=>{clearInterval(timer);coordinator.stop();};},[settings.cacheLimitMb]);
 const apiOrigin=useMemo(()=>{try{return new URL(settings.apiBase).origin;}catch{return '';}},[settings.apiBase]);
-const requestPool=useRef(new RequestPool(settings.requestConcurrency));
-useEffect(()=>{requestPool.current.setLimit(settings.requestConcurrency);},[settings.requestConcurrency]);
+const requestPool=useRef(new RequestPool(UPLOAD_CONCURRENCY));
 const api=useMemo(()=>new Api(settings.apiBase,account?.apiOrigin===apiOrigin?account.token:'',requestPool.current),[settings.apiBase,account,apiOrigin]);
 const apiRef=useRef(api);apiRef.current=api;api.isCurrent=()=>apiRef.current===api;
 const [caps,setCaps]=useState<Capabilities>();const [usage,setUsage]=useState<Entitlements>();
@@ -101,7 +100,7 @@ const updateCopy=useCallback((copy:ReadingCopy)=>{const previous=copiesRef.curre
 const refreshUsage=useCallback(()=>{if(accountRef.current)void api.entitlements().then(value=>{if(api.isCurrent()){setUsage(value);setCaps(current=>current?{...current,entitlements:value}:current);}}).catch(()=>{});},[api]);
 const refreshTranslationConfiguration=useCallback(async()=>{const [capabilities,entitlements]=await Promise.all([api.capabilities(),api.entitlements()]);if(!api.isCurrent())throw Error('账户已切换');setCaps(capabilities);setUsage(entitlements);return entitlements;},[api]);
 const receiveTranslationPolicy=useCallback((value:Entitlements)=>{setUsage(value);setCaps(current=>current?{...current,entitlements:value}:current);},[]);
-const translation=useAutomaticTranslation({api,userId:account?.user.id,origin:apiOrigin,copies,updateCopy,concurrency:settings.requestConcurrency,language:settings.language,currentId,caps,rights:usage??caps?.entitlements,onPolicy:receiveTranslationPolicy,refreshConfiguration:refreshTranslationConfiguration});
+const translation=useAutomaticTranslation({api,userId:account?.user.id,origin:apiOrigin,copies,updateCopy,language:settings.language,currentId,caps,rights:usage??caps?.entitlements,onPolicy:receiveTranslationPolicy,refreshConfiguration:refreshTranslationConfiguration});
 useEffect(()=>{
   if(!account)return;
   const refresh=()=>{if(document.visibilityState==='visible')refreshUsage();};

@@ -1,6 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { fallbackLanguages, supportsLanguage, type Capabilities, type Settings } from '../types';
-import { normalizeConcurrency } from '../concurrency';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
@@ -60,10 +59,7 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
     <section className="settings-card">
       <h3>
         <Icon name="globe" />翻译服务</h3>
-      <SettingRow title="本机图片传输并发" description="默认 2，可设 1–10。控制本阅读器的图片上传与下载；翻译计划和结果通知独立处理。">
-        <label className="unit-input">
-          <input aria-label="本机请求并发" type="number" min="1" max="10" step="1" value={settings.requestConcurrency} onChange={e => setSettings(s => ({ ...s, requestConcurrency: normalizeConcurrency(Number(e.target.value)) }))} /> 个</label>
-      </SettingRow><SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
+      <SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
         <input aria-label="后端服务地址" className="api-input" type="url" value={apiDraft} onChange={e => setApiDraft(e.target.value)} />
         <button className="button secondary small" onClick={() => void onSaveApiAddress(apiDraft)}>保存并连接</button>
       </SettingRow>
