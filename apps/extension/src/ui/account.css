@@ -6,8 +6,10 @@
 .nc-account-user>strong {display:block;font-size:16px;overflow-wrap:anywhere}
 .nc-account-meta {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:9px;font-size:12px}
 .nc-account-identity>.button {flex-shrink:0;margin-left:8px}
-.nc-account-overview {display:grid;grid-template-columns:1fr;gap:22px;align-items:stretch}
-.nc-account-overview.has-membership-card {grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr)}
+.nc-account-panel {display:grid;gap:28px;min-width:0}
+.nc-account-page>.nc-account-tabs {margin:0}
+.nc-account-tabs button:focus-visible,.nc-account-panel:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+.nc-account-panel>.nc-membership-card {width:100%;max-width:680px;box-sizing:border-box}
 .nc-membership-card {border:1px solid var(--line);border-radius:22px;padding:28px;background:var(--surface);min-width:0;display:flex;flex-direction:column;gap:20px}
 .nc-profile-avatar {width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;background:var(--surface);color:var(--accent);font-size:22px;font-weight:750}
 .nc-plan-badge {display:inline-flex;align-items:center;gap:5px;background:var(--surface-soft);padding:4px 9px;border-radius:7px;font-size:12px}
@@ -45,7 +47,7 @@
 .nc-account-empty {text-align:center;padding:45px 20px;background:var(--surface);border:1px dashed var(--line);border-radius:20px}
 .nc-account-empty>svg {color:var(--accent)}
 .nc-account-empty h2 {font-size:19px}.nc-account-empty p {color:var(--muted);font-size:14px;margin:14px 0 22px}
-@media(max-width:1050px){.nc-app .nc-account-page>.nc-account-heading{align-items:flex-start;flex-direction:column;gap:24px}.nc-account-identity{max-width:100%;width:100%;border-top:var(--comic-perforation);padding-top:20px}.nc-account-identity>.button{margin-left:auto}.nc-account-overview.has-membership-card{grid-template-columns:1fr}.nc-quota-card{min-height:220px}}
+@media(max-width:1050px){.nc-app .nc-account-page>.nc-account-heading{align-items:flex-start;flex-direction:column;gap:24px}.nc-account-identity{max-width:100%;width:100%;border-top:var(--comic-perforation);padding-top:20px}.nc-account-identity>.button{margin-left:auto}.nc-quota-card{min-height:220px}}
 @media(max-width:600px){.nc-rights-grid{grid-template-columns:1fr}.nc-quota-card{min-height:0}.nc-account-identity{display:grid;grid-template-columns:46px minmax(0,1fr)}.nc-account-identity>.button{grid-column:2;justify-self:start;margin-left:0}.nc-rate-card{align-items:flex-start;flex-direction:column;gap:14px}.nc-account-activity .nc-section-heading{align-items:flex-start;flex-wrap:wrap;gap:14px}}
 
 .nc-account-page .nc-stat>span,.nc-account-page .nc-feedback-inbox h2 {display:flex;align-items:center;gap:8px}

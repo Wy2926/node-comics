@@ -1,4 +1,8 @@
 {
+  "漫画查看方式": "Comic viewing mode",
+  "选择常规或 AI 后，随读翻译当前页与后两页；查看方式仅对此漫画生效。": "Choose Standard or AI to translate the current page and the next two as you read. This choice applies only to this comic.",
+  "账户概览": "Account overview",
+  "订阅": "Subscription",
   "常规翻译额度": "Classic translation quota",
   "身份服务未返回有效的访问令牌。": "The identity service did not return a valid access token.",
   "身份服务未授予自动续期权限，请重新登录并授权离线访问；若仍失败，请联系管理员检查应用配置。": "The identity service has not granted automatic renewal permission. Please log in again and authorize offline access; if it still fails, please contact the administrator to check the application configuration.",

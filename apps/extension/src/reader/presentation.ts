@@ -2,9 +2,9 @@ import {msg} from '../i18n/runtime';
 import type {Job,Mode,Page} from '../types';
 import {newestFirst,pendingStatuses} from './jobs';
 
-export type PageView={mode:Mode;preference:'auto'|'original'|'translation'};
+export type PageView={mode:Mode;preference:'original'|'translation'};
 export function resolvePageView(view:PageView|undefined,defaultMode:Mode):PageView{
-  return view??{mode:defaultMode,preference:'auto'};
+  return view??{mode:defaultMode,preference:'original'};
 }
 /** Redraw may take a while: keep the valid classic result until redraw is available. */
 export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,ownerId?:string,origin?:string,fallbackClassic=true){

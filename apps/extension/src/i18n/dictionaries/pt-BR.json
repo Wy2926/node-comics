@@ -1,4 +1,8 @@
 {
+  "漫画查看方式": "Modo de exibição do quadrinho",
+  "选择常规或 AI 后，随读翻译当前页与后两页；查看方式仅对此漫画生效。": "Escolha Padrão ou IA para traduzir a página atual e as duas seguintes durante a leitura. A escolha vale apenas para este quadrinho.",
+  "账户概览": "Visão geral da conta",
+  "订阅": "Assinatura",
   "常规翻译额度": "Cota de tradução clássica",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "O serviço não pode ser conectado temporariamente. Verifique a conexão de rede, a imagem original ainda pode ser lida.",
   "登录已过期，请重新登录。": "O login expirou, faça login novamente.",

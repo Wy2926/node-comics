@@ -1,4 +1,8 @@
 {
+  "漫画查看方式": "Chế độ xem truyện",
+  "选择常规或 AI 后，随读翻译当前页与后两页；查看方式仅对此漫画生效。": "Chọn Thông thường hoặc AI để dịch trang hiện tại và hai trang tiếp theo khi đọc. Lựa chọn này chỉ áp dụng cho truyện này.",
+  "账户概览": "Tổng quan tài khoản",
+  "订阅": "Gói đăng ký",
   "常规翻译额度": "Hạn mức dịch thông thường",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Dịch vụ không thể kết nối tạm thời. Vui lòng kiểm tra kết nối mạng, hình ảnh gốc vẫn có thể đọc được.",
   "登录已过期，请重新登录。": "Đăng nhập đã hết hạn, vui lòng đăng nhập lại.",

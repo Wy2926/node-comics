@@ -1,4 +1,8 @@
 {
+  "漫画查看方式": "Mode d’affichage du manga",
+  "选择常规或 AI 后，随读翻译当前页与后两页；查看方式仅对此漫画生效。": "Choisissez Standard ou IA pour traduire la page actuelle et les deux suivantes pendant la lecture. Ce choix s’applique uniquement à ce manga.",
+  "账户概览": "Aperçu du compte",
+  "订阅": "Abonnement",
   "常规翻译额度": "Quota de traduction classique",
   "暂时连接不到服务。请检查网络连接，原图仍可继续阅读。": "Le service ne peut pas être connecté temporairement. Veuillez vérifier la connexion réseau, l'image originale est toujours lisible.",
   "登录已过期，请重新登录。": "La connexion a expiré, veuillez vous reconnecter.",

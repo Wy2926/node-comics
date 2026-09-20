@@ -49,7 +49,7 @@ window.fetch=async(input)=>{
  if(path==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
  throw Error('Unexpected fixture request: '+path);
 };
-location.hash='account';
+if(!location.hash)location.hash='account';
 function Fixture(){
  const [version,setVersion]=useState(0),[syncError,setSyncError]=useState(false),[narrow,setNarrow]=useState(false);
  return <>
