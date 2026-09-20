@@ -20,17 +20,28 @@ def quote(state, *, key='annual', plan='plus', pages=300, amount=9990, interval=
     client, auth = state['client'], administrator(state)
     revision = {'id':key+'-revision', 'name':plan.upper(), 'monthly_redraw_pages':pages,
         'trial_days':trial_days, 'trial_redraw_pages':30 if trial_days else 0}
-    response = client.post(f'/v1/admin/billing/plans/{plan}/revisions', headers=auth, json=revision)
+    products = client.get('/v1/admin/billing/catalog', headers=auth).json()['products']
+    if any(p['id'] == plan for p in products):
+        response = client.post(f'/v1/admin/billing/products/{plan}/revisions', headers=auth, json=revision)
+    else:
+        response = client.post('/v1/admin/billing/products', headers=auth,
+            json={**revision, 'id': plan, 'revision_id': revision['id']})
     assert response.status_code == 200, response.text
     remote = {**copy.deepcopy(state['price']), 'id':'price_'+key, 'product':'prod_'+plan,
         'unit_amount':amount, 'active':True,
         'recurring':{'interval':interval,'interval_count':1,'usage_type':'licensed'}}
     state['prices'][remote['id']] = remote
     payload = {'id':key, 'plan_revision_id':revision['id'], 'currency':remote['currency'],
-        'unit_amount':amount, 'interval':interval, 'stripe_product_id':remote['product'], 'stripe_price_id':remote['id']}
+        'unit_amount':amount, 'interval':interval, 'environment':'test'}
     response=client.post('/v1/admin/billing/prices', headers=auth, json=payload)
     assert response.status_code == 200, response.text
+    response=client.post(f'/v1/admin/billing/prices/{key}/bindings', headers=auth, json={
+        'id':key+'-stripe', 'provider':'stripe', 'environment':'test',
+        'product_id':remote['product'], 'provider_price_id':remote['id']})
+    assert response.status_code == 200, response.text
     if publish:
+        response=client.put(f'/v1/admin/billing/bindings/{key}-stripe/status', headers=auth, json={'status':'active'})
+        assert response.status_code == 200, response.text
         response=client.put(f'/v1/admin/billing/prices/{key}/status', headers=auth, json={'status':'active'})
         assert response.status_code == 200, response.text
     return remote, payload
@@ -55,7 +66,7 @@ def test_catalog_is_private_for_admin_and_drafts_cannot_be_purchased(billing):
     _,payload=quote(billing,publish=False)
     public=c.get('/v1/billing/catalog').json()['offers']
     assert {p['id'] for p in public}=={'fixture-price'}
-    assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'price_id':payload['id']}).status_code==409
+    assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':payload['id']}).status_code==409
     assert not billing['posts']
     assert c.post('/v1/billing/checkouts',headers=billing['auth']).status_code==422
 
@@ -66,6 +77,7 @@ def test_quote_immutable_replay_and_explicit_publication(billing):
     assert c.post('/v1/admin/billing/prices',headers=auth,json=payload).status_code==200
     assert c.post('/v1/admin/billing/prices',headers=auth,json={**payload,'unit_amount':1}).status_code==409
     assert c.patch('/v1/admin/billing/prices/annual',headers=auth,json={'unit_amount':1}).status_code in (404,405)
+    assert c.put('/v1/admin/billing/bindings/annual-stripe/status',headers=auth,json={'status':'active'}).status_code==200
     assert c.put('/v1/admin/billing/prices/annual/status',headers=auth,json={'status':'active'}).status_code==200
     assert {p['interval'] for p in c.get('/v1/billing/catalog').json()['offers']}=={'month','year'}
 
@@ -75,7 +87,7 @@ def test_publish_validates_remote_quote(billing,field,value):
     remote,_=quote(billing,publish=False)
     remote[field]=value
     c=billing['client']
-    assert c.put('/v1/admin/billing/prices/annual/status',headers=billing['auth'],json={'status':'active'}).status_code==409
+    assert c.put('/v1/admin/billing/bindings/annual-stripe/status',headers=billing['auth'],json={'status':'active'}).status_code==409
     assert len(c.get('/v1/billing/catalog').json()['offers'])==1
 
 
@@ -146,8 +158,8 @@ def test_new_price_and_benefits_do_not_change_existing_subscription(billing):
     assert status['subscription']['price']['unit_amount']==999
     assert status['subscription']['price']['monthly_redraw_pages']==300
     other=login(c,'new-customer')
-    assert c.post('/v1/billing/checkouts',headers=other,json={'price_id':'fixture-price'}).status_code==409
-    assert c.post('/v1/billing/checkouts',headers=other,json={'price_id':'newmonthly'}).status_code==200
+    assert c.post('/v1/billing/checkouts',headers=other,json={'provider':'stripe', 'price_id':'fixture-price'}).status_code==409
+    assert c.post('/v1/billing/checkouts',headers=other,json={'provider':'stripe', 'price_id':'newmonthly'}).status_code==200
     assert billing['posts'][-1][1]['line_items[0][price]']=='price_newmonthly'
 
 
@@ -155,7 +167,7 @@ def test_pending_checkout_keeps_quote_and_rejects_switch(billing):
     checkout(billing)
     quote(billing,key='newmonthly',interval='month',amount=1499)
     c=billing['client']
-    assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'price_id':'newmonthly'}).status_code==409
+    assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':'newmonthly'}).status_code==409
     checkout(billing)
     assert len(billing['posts'])==1
     assert c.get('/v1/billing/status',headers=billing['auth']).json()['checkout_price']['unit_amount']==999

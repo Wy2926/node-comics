@@ -2,10 +2,12 @@
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from . import stripe_client as stripe
-from .billing_models import BillingInvoice, BillingPlanRevision, BillingPrice, BillingTerm
+from .billing_models import BillingInvoice, BillingPlanRevision, BillingPrice, BillingTerm, BillingPriceBinding
 from .entitlement_models import QuotaPeriod
 from .entitlements import MONTHLY, month_boundary
 from .providers import digest
+from .billing_providers import resource_key, remote_id
+from .billing_orders import payment_order
 
 
 def timestamp(value):
@@ -52,14 +54,22 @@ def invoice_subscription(invoice):
 
 def apply_invoice(db, user, sub, invoice):
     stripe.environment(invoice)
-    stripe.require(invoice_subscription(invoice) == sub.id and invoice.get('customer') == sub.customer_id)
-    receipt = db.get(BillingInvoice, invoice['id'])
+    stripe.require(invoice_subscription(invoice) == remote_id(sub.id) and invoice.get('customer') == sub.customer_id)
+    invoice_key = resource_key('stripe', invoice['id'])
+    state = {'paid': 'paid', 'open': 'pending', 'void': 'canceled', 'uncollectible': 'failed',
+        'draft': 'pending'}.get(invoice.get('status'), 'unknown')
+    if (invoice.get('status') == 'open' and invoice.get('attempted') is True
+            and type(invoice.get('attempt_count')) is int and invoice['attempt_count'] > 0):
+        state = 'failed'
+    order = payment_order(db, sub, invoice['id'], invoice.get('total', 0), state, 'invoice_sync')
+    receipt = db.get(BillingInvoice, invoice_key)
     if receipt:
         stripe.require(receipt.subscription_id == sub.id)
         return
     if invoice.get('status') != 'paid' or invoice.get('billing_reason') not in ('subscription_create', 'subscription_cycle'):
         return
     price = db.get(BillingPrice, sub.price_id)
+    binding = db.get(BillingPriceBinding, sub.binding_id)
     stripe.require(invoice.get('amount_remaining') == 0 and invoice.get('currency') == price.currency
         and type(invoice.get('total')) is int, 'STRIPE_INVOICE_INVALID')
     lines = invoice.get('lines') or {}
@@ -69,10 +79,10 @@ def apply_invoice(db, user, sub, invoice):
     for line in rows:
         details = ((line.get('parent') or {}).get('subscription_item_details') or {})
         remote_price = ((line.get('pricing') or {}).get('price_details') or {})
-        if details.get('subscription') != sub.id or details.get('proration') is not False:
+        if details.get('subscription') != remote_id(sub.id) or details.get('proration') is not False:
             continue
-        stripe.require(remote_price.get('price') == price.stripe_price_id
-            and remote_price.get('product') == price.stripe_product_id and line.get('quantity') == 1, 'STRIPE_PLAN_MISMATCH')
+        stripe.require(remote_price.get('price') == binding.provider_price_id
+            and remote_price.get('product') == binding.product_id and line.get('quantity') == 1, 'STRIPE_PLAN_MISMATCH')
         period = line.get('period') or {}
         start, end = timestamp(period.get('start')), timestamp(period.get('end'))
         stripe.require(start and end and start < end, 'STRIPE_PERIOD_MISSING')
@@ -90,11 +100,11 @@ def apply_invoice(db, user, sub, invoice):
     if not candidates:
         stripe.require(sub.trial_starts_at and invoice.get('billing_reason') == 'subscription_create'
             and invoice['total'] == 0, 'STRIPE_INVOICE_PERIOD_INVALID')
-    db.add(BillingInvoice(id=invoice['id'], subscription_id=sub.id, currency=price.currency, total=invoice['total']))
+    db.add(BillingInvoice(id=invoice_key, subscription_id=sub.id, currency=price.currency, total=invoice['total']))
     db.flush()
     if candidates:
         start, end = candidates[0]
-        grant_term(db, user, sub, price, 'paid', start, end, invoice['id'])
+        grant_term(db, user, sub, price, 'paid', start, end, invoice_key)
         if sub.paid_ends_at is None or end > sub.paid_ends_at:
             sub.paid_starts_at, sub.paid_ends_at = start, end
         trial = db.scalar(select(BillingTerm).where(BillingTerm.subscription_id == sub.id, BillingTerm.kind == 'trial'))

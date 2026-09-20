@@ -7,13 +7,13 @@ from .models import now
 def active_terms(db, owner_id, at=None):
     at = at or now()
     return list(db.scalars(select(BillingTerm).where(BillingTerm.owner_id == owner_id,
-        BillingTerm.starts_at <= at, BillingTerm.ends_at > at).order_by(BillingTerm.starts_at)))
+        BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at).order_by(BillingTerm.starts_at)))
 
 
 def access_exists(at):
     from .models import User
     return select(BillingTerm.id).where(BillingTerm.owner_id == User.id,
-        BillingTerm.starts_at <= at, BillingTerm.ends_at > at).exists()
+        BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at).exists()
 
 
 def access_dates(db, owner_id, at=None):

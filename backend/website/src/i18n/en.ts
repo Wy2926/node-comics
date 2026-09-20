@@ -331,7 +331,7 @@ export default {
             "title": "Information and purposes",
             "paragraphs": [
               "OIDC sign-in provides an identity identifier, display name and role for accounts, benefits and tasks. The product API validates access tokens. The website does not collect the password you enter at the identity provider.",
-              "Translation processes selected page images, content hashes, file/page identifiers, mode, target language, status, results and usage records. These support delivery, matching, recovery and valid result reuse. Stripe handles checkout and full payment-card details; we retain the customer, transaction and subscription records needed for benefits, reconciliation and support.",
+              "Translation processes selected page images, content hashes, file/page identifiers, mode, target language, status, results and usage records. These support delivery, matching, recovery and valid result reuse. Stripe or Creem handles checkout and full payment-card details; we retain the customer, transaction and subscription records needed for benefits, reconciliation and support.",
               "Feedback, email and necessary attachments help investigate problems. Operations involve necessary request metadata, security and error records. Default logs exclude credentials, private images, full image text and signed download URLs."
             ]
           },
@@ -346,7 +346,7 @@ export default {
             "title": "Service providers and transfers",
             "paragraphs": [
               "Classic processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation; redraw providers process the page image and language. Actual providers are configured on the server for the task.",
-              "Original and final images use private Cloudflare R2 storage. Identity, infrastructure, translation and Stripe services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
+              "Original and final images use private Cloudflare R2 storage. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
             ]
           },
           {

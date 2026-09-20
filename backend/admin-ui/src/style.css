@@ -1415,3 +1415,105 @@ dialog::backdrop {
 @media (max-width: 600px) {
   nav {grid-template-columns: repeat(3, minmax(0, 1fr));}
 }
+
+.billing-catalog .page-heading, .billing-orders .page-heading {gap: 20px;}
+.billing-channels {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px;}
+.billing-channel {padding: 18px 22px; display: grid; gap: 5px;}
+.billing-channel .provider-name {justify-content: space-between;}
+.billing-workspace {display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; align-items: start;}
+.billing-product-nav {padding: 16px 12px;}
+.billing-product-nav h2 {font-size: 13px; padding: 0 10px 14px;}
+.billing-product-nav h2 span {font-weight: 400; color: var(--muted); margin-left: 8px;}
+.billing-product-nav > button {display: grid; gap: 4px; padding: 13px 12px; width: 100%; border-radius: 8px; text-align: left; background: transparent; color: inherit; margin-bottom: 4px;}
+.billing-product-nav > button[aria-pressed=true] {background: #f0ecff; color: #5842a7;}
+.billing-product-nav > button:hover {background: #f5f3fd;}
+.billing-product-detail {min-width: 0;}
+.billing-product-summary {padding: 24px;}
+.billing-product-title, .billing-prices-title, .billing-price-heading, .billing-binding-heading {display: flex; align-items: center; justify-content: space-between; gap: 16px;}
+.billing-product-title h2 {font-size: 23px; margin-top: 3px;}
+.billing-benefits {display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 20px 0 14px; font-size: 12px; color: var(--muted);}
+.billing-benefits strong {font-size: 18px; color: #393451; margin-right: 4px;}
+.billing-prices-title {margin: 26px 0 16px;}
+.billing-prices-title h2 {font-size: 16px;}
+.billing-prices {display: grid; gap: 20px;}
+.billing-price {border: 1px solid var(--border); border-radius: 12px; background: white; overflow: hidden;}
+.billing-price-heading {padding: 22px 24px; align-items: flex-start;}
+.billing-price-heading > .provider-actions {justify-content: flex-end; flex-shrink: 0;}
+.billing-price-heading .secondary {font-size: 11px; padding: 7px 10px;}
+.billing-price-amount {font-size: 26px; font-weight: 700; margin: 12px 0 5px; line-height: 1.3;}
+.billing-price-amount small {font-weight: 400;}
+.billing-environment {font-size: 10px; color: var(--muted);}
+.billing-binding-heading {padding: 12px 24px; background: #fafafe; border-top: 1px solid var(--border);}
+.billing-binding-heading h4 {font-size: 12px; margin: 0;}
+.billing-binding-heading .text-link {font-size: 11px;}
+.billing-price table {min-width: 570px;}
+.billing-price td, .billing-price th {padding: 12px 20px;}
+.billing-no-bindings {padding: 20px 24px; color: var(--muted); font-size: 12px;}
+.billing-price-meta {border-top: 1px solid var(--border); padding: 12px 24px; color: var(--muted); font-size: 11px;}
+.billing-price-meta summary {cursor: pointer;}
+.billing-price-meta p {margin-top: 8px; overflow-wrap: anywhere;}
+.billing-footnote {margin-top: 20px;}
+.billing-dialog {width: min(900px, calc(100vw - 48px));}
+.billing-form, .billing-form > .config-body {display: grid; gap: 22px;}
+.billing-form-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;}
+.billing-form-grid label {display: grid; gap: 8px; align-content: start; font-size: 12px; font-weight: 600;}
+.billing-form-grid input, .billing-form-grid select {width: 100%; min-width: 0;}
+.billing-form-grid small {font-weight: 400; font-size: 11px;}
+.billing-form-wide {grid-column: 1 / -1;}
+.billing-form-context {padding: 16px; background: #f6f4fc; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 6px;}
+.billing-form .provider-warning {margin: 0;}
+.billing-catalog button:disabled, .billing-orders button:disabled, .billing-dialog button:disabled {cursor: not-allowed;}
+.billing-order-link {max-width: 180px; overflow: hidden; text-overflow: ellipsis; display: block; white-space: nowrap; font-family: monospace; font-size: 11px;}
+.billing-error-code {color: #ad3c50; max-width: 150px; overflow-wrap: anywhere;}
+.billing-orders .filter-form label {min-width: 120px;}
+.billing-orders .filter-form label:has(input[type=datetime-local]) {min-width: 190px;}
+.billing-detail-toolbar {display: flex; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 20px;}
+.billing-detail-toolbar > code {overflow-wrap: anywhere; min-width: 0; font-size: 12px;}
+.billing-detail-toolbar > button {flex-shrink: 0;}
+.billing-detail-toolbar > .provider-actions {flex-shrink: 0;}
+.billing-reconcile {display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin: 16px 0;}
+.billing-reconcile label {display: grid; gap: 8px; font-size: 12px;}
+.billing-order-detail .detail-meta dd {overflow-wrap: anywhere; min-width: 0;}
+.billing-block {display: block;}
+.billing-order-amount {display: flex; align-items: baseline; gap: 16px; margin: 18px 0;}
+.billing-order-amount strong {font-size: 28px;}
+.billing-order-amount span {color: var(--muted); font-size: 12px;}
+.billing-timeline {list-style: none; padding: 0; margin: 18px 0 0 7px; border-left: 2px solid #e3ddf3;}
+.billing-timeline li {position: relative; padding: 0 0 22px 22px; overflow-wrap: anywhere;}
+.billing-timeline li:last-child {padding-bottom: 2px;}
+.billing-timeline li::before {content: ''; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #a596d8; box-shadow: 0 0 0 4px white;}
+.billing-timeline-heading {display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px;}
+.billing-timeline-heading strong {font-size: 13px;}
+.billing-timeline-heading time {font-size: 11px; color: var(--muted); white-space: nowrap;}
+.billing-timeline p {font-size: 12px;}
+.billing-timeline small {font-size: 10px;}
+.billing-detail-benefits {margin-top: 20px; padding: 16px; border-radius: 8px; background: #f6f4fc; font-size: 12px;}
+@media (max-width: 1100px) {
+  .billing-workspace {grid-template-columns: 165px minmax(0, 1fr); gap: 16px;}
+  .billing-price-heading {flex-wrap: wrap;}
+}
+@media (max-width: 760px) {
+  .billing-workspace {grid-template-columns: 1fr;}
+  .billing-product-nav {display: flex; gap: 8px; overflow-x: auto; align-items: center;}
+  .billing-product-nav h2 {padding: 0 8px; flex-shrink: 0;}
+  .billing-product-nav > button {width: auto; min-width: 145px; margin: 0; flex-shrink: 0;}
+  .billing-channels {gap: 10px;}
+  .billing-channel {padding: 14px;}
+  .billing-channel .provider-name {gap: 4px;}
+}
+@media (max-width: 540px) {
+  .billing-catalog .page-heading > .provider-actions, .billing-orders .page-heading > button {margin-top: 16px;}
+  .billing-dialog {width: calc(100vw - 20px);}
+  .billing-form-grid {grid-template-columns: 1fr;}
+  .billing-product-summary, .billing-price-heading {padding: 18px;}
+  .billing-binding-heading, .billing-price-meta {padding: 12px 18px;}
+  .billing-benefits {gap: 10px 16px;}
+  .billing-benefits strong {font-size: 16px;}
+  .billing-channel .badge {font-size: 9px;}
+  .billing-timeline-heading {display: grid; gap: 2px;}
+  .billing-detail-toolbar {align-items: flex-start; flex-direction: column;}
+  .billing-orders .filter-form {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));}
+  .billing-orders .filter-form label {min-width: 0;}
+  .billing-orders .filter-form .search-label, .billing-orders .filter-form label:has(input[type=datetime-local]) {grid-column: 1 / -1; min-width: 0;}
+  .billing-orders .filter-form input {width: 100%;}
+}

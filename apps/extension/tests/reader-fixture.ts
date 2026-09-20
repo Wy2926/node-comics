@@ -107,11 +107,11 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_plan_items:3,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
-  const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',provider:'stripe',environment:'test',trial_eligible:billingScenario!=='paid',checkout_pending:false,subscription:billingScenario==='paid'?{price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
+  const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:billingScenario!=='paid',entitlement_expires_at:null,checkout_pending:false,subscription:billingScenario==='paid'?{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
   if(url.pathname==='/v1/billing/status')return billingScenario==='error'?json({error:{message:'Isolated billing failure'}},503):json(billing);
   if(url.pathname==='/v1/billing/sync')return json({billing,entitlements:rights});
-  if(url.pathname==='/v1/billing/checkouts')return billingScenario==='checkout-error'?json({error:{message:'Isolated checkout failure'}},503):json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});
-  if(url.pathname==='/v1/billing/portal')return json({url:'https://billing.stripe.com/p/session/fixture'});
+  if(url.pathname==='/v1/billing/checkouts')return billingScenario==='checkout-error'?json({error:{message:'Isolated checkout failure'}},503):json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true,environment:'test',provider:'stripe'});
+  if(url.pathname==='/v1/billing/portal')return json({url:'https://billing.stripe.com/p/session/fixture',provider:'stripe'});
   if(url.pathname==='/v1/me/entitlements')return json(rights);
   if(url.pathname==='/v1/me/usage/summary')return json({entitlements:rights,timezone:'Asia/Shanghai',start_date:'2026-09-14',end_date:'2026-09-20',generated_at:new Date().toISOString(),delivered:0,free_delivered:0,included_delivered:0,by_mode:{},quota_used:{},days:[]});
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});

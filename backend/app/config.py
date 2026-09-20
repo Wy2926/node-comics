@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     stripe_webhook_secret: SecretStr = SecretStr('')
     stripe_return_url: str = ''
     stripe_portal_configuration_id: str = Field(default='', pattern=r'^(bpc_[A-Za-z0-9]+)?$')
+    creem_enabled: bool = False
+    creem_environment: Literal['test', 'live'] = 'test'
+    creem_api_key: SecretStr = SecretStr('')
+    creem_webhook_secret: SecretStr = SecretStr('')
+    creem_return_url: str = ''
     quota_timezone: str = "Asia/Shanghai"
     retention_days: int = Field(default=0, ge=0)
     max_upload_bytes: int = 20 * 1024 * 1024
@@ -93,6 +98,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_billing(self):
+        if self.creem_enabled:
+            if self.app_env == 'production' and self.creem_environment != 'live':
+                raise ValueError('Test billing requires an isolated development/test service')
+            key = self.creem_api_key.get_secret_value()
+            if not key.startswith('creem_') or key.startswith('creem_test_') != (self.creem_environment == 'test'):
+                raise ValueError('Creem API key does not match the environment')
+            if not self.creem_webhook_secret.get_secret_value():
+                raise ValueError('Creem webhook secret is required')
+            url = urlsplit(self.creem_return_url)
+            if url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment:
+                raise ValueError('Creem return URL must be an HTTPS page without credentials or query')
+        if self.creem_enabled and self.stripe_enabled and self.creem_environment != self.stripe_environment:
+            raise ValueError('Payment channels must use the same environment and isolated database')
         if self.stripe_enabled:
             if self.app_env == 'production' and self.stripe_environment != 'live':
                 raise ValueError('Test billing requires an isolated development/test service')

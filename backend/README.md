@@ -2,9 +2,9 @@
 
 2026-09-19 已实现[阅读计划契约](../docs/READING_TRANSLATION_CONTRACT.md)：普通／PLUS 分别最多新增 30／100 张翻译图片每滚动 60 秒，取消账户在途数量限制。统一逐页回执、断线核实、会话优先级与增量通知；后台持久任务、公平调度和私有 R2 保留。
 
-数据库只保留最终初始基线 `subscription_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
+数据库只保留最终初始基线 `payments_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
 
-FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Stripe 默认关闭，沙盒与生产使用不同数据库，见[支付接入](../docs/STRIPE_BILLING.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
+FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Stripe／Creem 默认均关闭，测试与生产使用不同数据库，见[多渠道支付接入](../docs/STRIPE_BILLING.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
 
 ## 运行
 
@@ -17,7 +17,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-eng
 # 配置 ADMIN_WEB_PATH 后，在该后台入口的 #translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `subscription_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `payments_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
 三个控制进程可独立运行。以下仅列进程入口；本机运行需先安装 `backend/requirements.txt`，启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
@@ -60,7 +60,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 ## 管理后台
 
-“订阅套餐”（`#billing`）维护不可变权益版本与月付／年付报价，默认草稿，发布后仅影响新订阅。初始 PLUS 草稿不自动售卖；年付及新套餐价格由运营配置。旧订阅保留原价和权益，见[订阅设计](../docs/STRIPE_BILLING.md)。`PLUS_MONTHLY_REDRAW_PAGES` 仅作为运营会员默认值，付费订阅使用其绑定版本。
+“产品与价格”（`#billing`）按产品管理月付／年付价格及 Stripe／Creem 渠道绑定，验证渠道后才能发布价格。初始 PLUS 月付 US$9.99、年付 US$99.99 均为草稿，每月 300 页重绘、首次试用 7 天／30 页；已购订阅保留原价和权益。“订单管理”（`#orders`）查看各渠道全部订单、流转、支付通知与核实结果，见[多渠道订阅设计及浏览器验证](../docs/STRIPE_BILLING.md)。`PLUS_MONTHLY_REDRAW_PAGES` 仅作为运营会员默认值，付费订阅使用其绑定版本。
 
 公开官网位于 [website](website/README.md)，与 API 共用 `https://comics.nodelane.net`；Astro 静态输出、React 账户岛、五语独立字典，并复用相同 OIDC。Docker 构建自动打包，商店 URL 配置及身份回调要求见官网说明。
 
@@ -88,12 +88,14 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 ## 验证
 
-2026-09-20 已移除项目的非 Docker 虚拟环境、依赖目录与运行缓存；使用隔离测试容器，不需要宿主机 Python/npm 环境。以下命令从仓库根目录执行：
+推荐使用隔离 Docker 测试容器，不依赖宿主机 Python/npm 环境；本地接入和浏览器验证也可使用已安装的虚拟环境及前端依赖。以下 Docker 命令从仓库根目录执行：
 
 ```powershell
 docker compose -p node-comics-tests -f deploy/compose.tests.yaml up --build --abort-on-container-exit --exit-code-from tests
 docker compose -p node-comics-tests -f deploy/compose.tests.yaml down
 ```
+
+若本机已有 `backend/.venv` 且安装了 `backend/requirements.txt`，可在 `backend` 目录运行 `./.venv/Scripts/python.exe -m pytest -q tests`。测试使用隔离数据；此命令不会自动启用 PostgreSQL 并发套件，仍需按下文显式配置专用测试数据库。
 
 PostgreSQL 并发套件必须显式设置 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`；只接受 `nodecomics_concurrency_test`，每例随机 schema。未启用的用例显示 skipped。节点与引擎单元检查见节点说明。
 

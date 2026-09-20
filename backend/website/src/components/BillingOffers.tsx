@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {billingCopy,offerLabel,type BillingOffer} from '../lib/billing';
+import {billingCopy,offerLabel,channelLabel,providerLabel,type BillingOffer} from '../lib/billing';
 import BillingCycle,{selectedInterval,type BillingInterval} from './BillingCycle';
 
 export default function BillingOffers({locale,accountHref}:{locale:string;accountHref:string}){
@@ -11,5 +11,5 @@ export default function BillingOffers({locale,accountHref}:{locale:string;accoun
   if(!offers)return <p role="status">{copy.loading}</p>;
   if(!offers.length)return <p role="status">{copy.unavailable}</p>;
   const interval=selectedInterval(offers,preferred);
-  return <><BillingCycle offers={offers} value={interval} onChange={setPreferred} locale={locale}/><div className="billing-offers" aria-live="polite">{offers.filter(p=>p.interval===interval).map(p=><div className="billing-offer" key={p.id}><h3>{offerLabel(p,locale)}</h3><ul className="check-list"><li>{copy.classic}</li><li>{copy.quota(p.monthly_redraw_pages)}</li></ul><p>{p.trial_days>0&&copy.trial(p.trial_days,p.trial_redraw_pages)} {copy.renew(p.interval==='year')}</p><a className="button" href={`${accountHref}?price=${encodeURIComponent(p.id)}`}>{copy.plan} ↗</a></div>)}</div></>;
+  return <><BillingCycle offers={offers} value={interval} onChange={setPreferred} locale={locale}/><div className="billing-offers" aria-live="polite">{offers.filter(p=>p.interval===interval).map(p=><div className="billing-offer" key={p.id}><h3>{offerLabel(p,locale)}</h3><ul className="check-list"><li>{copy.classic}</li><li>{copy.quota(p.monthly_redraw_pages)}</li></ul><p>{p.trial_days>0&&copy.trial(p.trial_days,p.trial_redraw_pages)} {copy.renew(p.interval==='year')}</p><p>{channelLabel(locale)}：{p.channels.map(channel=>providerLabel(channel.provider)).join(" / ")}</p><a className="button" href={`${accountHref}?price=${encodeURIComponent(p.id)}`}>{copy.plan} ↗</a></div>)}</div></>;
 }

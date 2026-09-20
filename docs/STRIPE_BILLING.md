@@ -1,115 +1,131 @@
-# Stripe 订阅、套餐与额度
+# 多渠道订阅、产品价格与订单
 
-2026-09-20：已实现多套餐、月付／年付、不可变报价及权益版本。已有订阅保留原价和原权益，新订阅使用新发布报价。插件 PLUS 卡片暂时隐藏（`Account.tsx` 的 `SHOW_PLUS_CARD=false`）；官网和后台使用同一服务端目录。生产发布与本地／沙盒验收分别记录。
+2026-09-20：支付目录按“产品 → 月付／年付价格 → 渠道绑定”组织，支持 Stripe 和 Creem。产品权益与价格不可变，调价新建价格，原订阅继续使用原价与权益。本文件沿用原路径，内容已替换为多渠道契约。公开部署、真实支付与本地模拟验证分别记录。
 
-## 产品规则
+## 已确认的产品规则
 
-- 初始目录仅提供 PLUS v1（每月 300 页重绘、首次绑卡试用 7 天／30 页）及 US$9.99 月付**草稿**。没有虚构或启用商业年付价格。草稿未绑定 Stripe，不能结账；配置后由管理员显式发布。
-- 套餐可配置名称、每月重绘页数、首次试用天数及试用页数。目前付费套餐共用常规翻译不限累计页数、PLUS 分钟准入与调度档位；每套餐独立的常规额度、速率和权重尚未实现。
-- 年付一次收费，以该付费账期原始 UTC 日／时刻拆分 12 个会员月。未来月额度预先持久化，到该月才可用，剩余不累积。1 月 31 日的边界为 2 月末、3 月 31 日，不永久漂移到 28 日。
-- 试用资格按账户记录，跨套餐不能重复领取。试用完成且账单结清后发放正式权益；余额抵扣后的零现金已结清账单也可履约。
-- 新价仅影响新结账；已发出的结账固定原报价直到会话到期。已有订阅始终按原报价和权益版本续费。
-- 官网定价页与账户页通过月付／年付卡片切换，再选择该周期的套餐报价；未开放的周期不可选。登录保留已选报价，在途结账锁定原报价。
-- 运营赠送与订阅独立生效，不顺延 Stripe 扣款日期。任务继续结算受理时的额度周期。
+- 初始产品 PLUS：月付 US$9.99，年付 US$99.99；每月 300 页 AI 重绘，首次绑卡试用 7 天／30 页。空库中的月付和年付价格默认草稿，核验渠道商品后才能发布。
+- 年付一次收费，以实际账期原始 UTC 日／时刻拆成 12 个会员月。未来月额度预先持久化，到该月才可用，剩余不累积。1 月 31 日的后续月界为 2 月末、3 月 31 日，不漂移到 28 日。
+- 试用资格按 Node Comics 账户记录，跨产品、跨 Stripe／Creem 不能重复领取。正式额度必须来自已结清账期，不能仅凭 active 状态或成功返回页发放。
+- 付费产品共用 PLUS 常规翻译不限累计页数、滚动分钟准入及调度档位；每产品的重绘和试用配置来自不可变权益版本。每产品独立常规额度、速率和调度权重仍不在当前范围。
+- 运营赠送与订阅独立生效，不顺延支付渠道的扣款日期。任务继续结算受理时的额度周期。
+- 官网按月付／年付选择报价，再选择该报价可用的支付渠道。登录保留已选报价，待核实结账锁定原报价和原渠道；已有订阅通过其所属渠道的客户门户管理。插件支付组件使用相同契约，账户内 PLUS 卡片保持现有暂时隐藏策略。
 
 ## 数据模型
 
-最终空库基线为 `subscription_0001`。旧迁移链、用户表上的支付权益投影和全局产品／价格配置已删除，不提供旧库升级、回填、双写或兼容分支。旧库启动失败，需另建空数据库；程序不会自动删除已有数据库、漫画或 R2 对象。
+最终空库基线为 `payments_0001`。旧支付表结构、旧接口和旧支付逻辑不提供升级、回填、双写或兼容分支；使用新空库建立最终模型。程序不会自动删除原数据库、漫画或 R2 对象。
 
-| 表 | 职责与约束 |
+| 表 | 职责 |
 | --- | --- |
-| `billing_plans` | 稳定套餐标识，不承载可变计费条款 |
-| `billing_plan_revisions` | 不可变权益版本：名称、每月额度、试用配置；套餐内版本号唯一 |
-| `billing_prices` | 不可变报价：权益版本、环境、币种、最小单位金额、month/year、Stripe Product/Price；只有发布状态可变。同套餐／环境／币种／周期最多一个在售报价 |
-| `billing_accounts` | 用户与 Stripe Customer 唯一绑定、环境、试用使用记录 |
-| `billing_checkouts` | 持久意图：原报价、返回地址、客户、试用选择、Session ID、过期及核实状态；不保存可直接使用的 Checkout URL |
-| `billing_subscriptions` | 可信 Checkout 建立的订阅，引用原报价，记录渠道生命周期与日期 |
-| `billing_invoices` | 已处理账单回执，含币种与金额；与权益发放在同一事务提交 |
-| `billing_terms` | 试用／已付款的访问授权期，关联订阅、报价和账单；同订阅／类型／起点唯一 |
-| `quota_periods` | 独立可消耗额度，订阅来源必须关联 term。月付一个桶、年付十二个桶，用量和预占独立保存 |
-| `billing_events` | 验签通知的持久收据与重试状态；不保存完整报文或客户资料 |
+| `billing_plans` | 稳定产品标识和产品名称 |
+| `billing_plan_revisions` | 不可变权益版本：名称、每月重绘页数、试用天数和页数 |
+| `billing_prices` | 渠道无关的不可变价格：产品与权益版本、环境、币种、金额、month/year；同产品／环境／币种／周期最多一个在售价格 |
+| `billing_price_bindings` | 每个价格对应的 Stripe 或 Creem 商品，独立草稿／发布／停售状态；同价格、渠道和环境最多一个在售绑定 |
+| `billing_accounts` | Node Comics 账户级试用记录，防止换渠道再次领取 |
+| `billing_customers` | 用户、渠道、环境与远端 Customer 的唯一绑定 |
+| `billing_checkouts` | 原价格、渠道绑定、试用选择、远端会话、过期与核实状态；私有保存已校验的 Creem 结账地址用于原会话恢复，不在管理详情或日志返回 |
+| `billing_subscriptions` | 可信结账建立的订阅、原价格与渠道绑定、生命周期日期 |
+| `billing_invoices` | 幂等账单回执，与权益发放同事务提交 |
+| `billing_terms` | 已授予的试用／付款访问期，关联订阅、价格和账单 |
+| `quota_periods` | 可消耗月额度，订阅来源必须关联 term；年付 12 个桶，用量和预占独立 |
+| `billing_orders` | 首次购买和每次续费的独立订单，记录渠道、环境、金额、状态及关联资源 |
+| `billing_order_transitions` | 追加的订单流转历史，含来源、前后状态、事件编号和脱敏详情 |
+| `billing_events` | 验签通知的持久收据、处理重试状态及对账所需最小字段 |
 
-关系：套餐 → 权益版本 → 报价 → 结账／订阅 → 账单 → 授权期 → 月额度。新版本不会追溯改写旧价格和权限。
+关系：产品 → 权益版本 → 价格 → 渠道绑定 → 结账／订阅 → 订单与账单 → 授权期 → 月额度。
 
-## 状态流转
+Stripe 的一个 Product 可关联多个 recurring Price。Creem 的周期和金额属于 Product，本地一个产品的月付／年付分别绑定对应的远端 Product，不让渠道的数据结构决定本站产品结构。
+
+Creem 试用属于远端商品且结账不能覆盖，因此含试用的价格绑定两个远端商品：`product_id` 为无试用的正式商品，`trial_product_id` 为同价同周期的 7 天试用商品。首次合资格结账使用后者，用过试用的账户使用前者。两者都须在发布时核验；Stripe 仍使用同一 Price，由服务端选择试用。
+
+## 订单和状态
+
+后台“订单管理”覆盖两渠道的首次购买和续费订单，支持渠道、状态、环境、时间范围、用户与订单编号搜索，以及分页。详情关联原产品价格、Checkout、订阅、按时间排列的完整流转记录，以及最近 100 条关联支付通知的接收、处理、重试和异常状态。订单历史留在本地，即使渠道暂时不可用也可查看。
 
 ```mermaid
 flowchart LR
-  D[报价 draft] -->|核对 Stripe 后发布| A[active]
-  A -->|停售或同档新价发布| R[archived]
-  C[结账 creating] --> O[open]
+  C[creating] --> P[pending]
   C --> U[unknown]
-  U -->|核实原会话| O
-  O --> E[expired]
-  O --> F[completed]
-  F --> T[trialing + 试用授权]
-  F --> P[账单 paid]
-  T --> P
-  P --> G[付费授权期 + 月额度]
-  G --> K[取消续费保留当期]
-  T --> X[未付款则不发下一期]
+  U -->|核实原会话| P
+  P --> E[expired]
+  P --> R[processing]
+  R --> T[trialing]
+  R --> A[paid]
+  T --> N[下一次续费订单]
+  N --> A
+  N --> F[failed]
+  A --> G[访问授权期和月额度]
 ```
 
-Stripe 的 active、past_due、unpaid、paused、canceled 等是支付渠道状态，**不能独立授予访问**。服务端读取当前有效授权期；未付款不预发下一期，取消保留已授当期，试用转正式时关闭重叠试用额度。未来 term 也只能从其起点开始生效。
+支付状态、订阅状态与权益分别建模。取消续费保留已授予的当期权益；欠费、暂停和取消不授予下一期。成功页只展示结果提示，不发放额度。退款／争议等结果通过订单记录和对账处理，不把“结账 HTTP 成功”当作付款成功。
 
-报价可以重新发布，内容不可编辑；重新发布同档旧价会停售当前价。调价新建 Stripe Price 和本地报价；调整权益先新建权益版本，再建立新 Price 与报价。不会自动修改已有 Stripe Subscription。
+全额退款或争议撤销对应付费授权期及其当前／未来额度，部分退款保留授权；所有历史额度桶均保留供审计。
 
 ## 幂等与恢复
 
-每账户加锁创建在途意图，Stripe 请求使用 `checkout:<意图ID>` 幂等键。参数来自持久意图和不可变报价。未知响应沿原意图恢复；超过幂等保证期限或接近到期时只分页查询原会话，不重新购买。
+- 创建结账时锁定用户，在两渠道之间共同限制一个待核实购买意图。前端 POST 必须明确价格和渠道；pending 期间选择另一价格或渠道会被拒绝。
+- Stripe 使用固定原意图的幂等键。结果未知时核实原会话；超过保证期限不重复发起购买。
+- Creem `request_id` 用于关联本地意图，不当作未经平台保证的幂等键。创建 POST 结果未知时不盲目重发；依赖已知会话和可信 webhook 恢复，前端继续显示原意图。
+- Creem 免费试用交易可能保留常规 `amount`（例如 999 美分），而 `amount_paid=0`。只有试用资格、远端试用状态及有界试用账期均已验证，且交易起止与该试用期一致时，才按试用记账；不能把常规金额字段当作实际收款。
+- Creem GET 结账响应可能不含地址。优先复用首次 POST 后私有保存的已校验地址；若创建响应丢失，使用已验证归属的产品与结账 ID 恢复官方规范地址，不再次创建结账。
+- 管理员可在订单详情核实平台状态。未知的首次结账若缺少远端编号，可填写对应平台结账编号；服务端验证原意图、用户、渠道、环境及唯一关联后恢复，不重新发送创建结账请求。
+- Webhook 必须先验签再持久化；按渠道和环境命名空间隔离外部 ID，重复和乱序通知不得重复发放。对账校验环境、用户绑定、原价格／商品、币种、数量及完整账期。
+- maintenance 重试持久事件、待核实结账和订阅；真实已付款账单与授权发放同事务提交，失败不留下半份权益。
+- 已确认的全额退款或争议状态不能被迟到的已支付、试用或部分退款结果覆盖；已撤销的授权不能因旧账单再次核实而恢复。
 
-原始 webhook 经官方 SDK 验签后入库。通知触发读取 Stripe 当前资源，校验环境、客户、可信会话、metadata、原报价、产品、币种、数量和完整账期，不信任通知顺序。账户锁、账单回执和 term 唯一键阻止重复发放。未付款、按比例调整或非套餐账单不授予新权益。
+## 配置与发布
 
-maintenance 重试持久事件、在途结账和有效订阅，含已完成但尚未绑定订阅的 Checkout。账单按已付款记录完整分页补查，不按创建时间漏掉迟付账单；中途失败回滚本次事务。结果未知时前端继续原报价，禁止另起不同报价购买。
-
-## 配置与接入
-
-后端使用 `stripe-python==15.6.1`，API 版本 `2026-08-26.dahlia`，`RequestsClient(timeout=20)`。前端跳转托管 Checkout，不加载客户端支付 SDK，不收集银行卡，无需注入 Stripe 公钥或密钥。
+两个渠道独立开启，默认均关闭；开启渠道必须配置其环境匹配的 API 密钥、Webhook 验签密钥和 HTTPS 返回页。仅配置 API 密钥不足以启用结账。同一运行环境中启用的渠道必须同为 test 或同为 live，生产只接受 live。API 与 maintenance 使用一致配置，测试与正式使用独立数据库。凭据仅保存在服务端环境配置，不能写进前端、日志或仓库。
 
 | 配置 | 用途 |
 | --- | --- |
-| `STRIPE_ENABLED` | 默认 false |
-| `STRIPE_ENVIRONMENT` | test/live；生产只接受 live；不同环境独立数据库 |
-| `STRIPE_SECRET_KEY` | 后端对应环境密钥 |
-| `STRIPE_WEBHOOK_SECRET` | 专用 webhook 签名密钥 |
-| `STRIPE_RETURN_URL` | HTTPS 账户返回页，不含查询参数或片段 |
-| `STRIPE_PORTAL_CONFIGURATION_ID` | 可选专用 `bpc_` 配置，留空使用 Stripe 默认配置 |
+| `STRIPE_ENABLED` / `CREEM_ENABLED` | 独立启用开关 |
+| `STRIPE_ENVIRONMENT` / `CREEM_ENVIRONMENT` | test/live；启用的渠道必须一致 |
+| `STRIPE_SECRET_KEY` | Stripe 服务端密钥 |
+| `CREEM_API_KEY` | Creem 对应环境 API 密钥 |
+| `STRIPE_WEBHOOK_SECRET` / `CREEM_WEBHOOK_SECRET` | 各渠道专用 webhook 验签密钥 |
+| `STRIPE_RETURN_URL` / `CREEM_RETURN_URL` | HTTPS 账户返回页，不含查询参数或片段 |
+| `STRIPE_PORTAL_CONFIGURATION_ID` | 可选专用 Stripe 客户门户配置 |
 
-产品和价格在后台“订阅套餐”维护。发布向 Stripe 核验金额、币种、周期、产品、licensed recurring Price；Checkout 固定 quantity=1。金额使用 Stripe 最小货币单位；结账固定报价币种、禁用 Adaptive Pricing，避免账户级自动换汇与本地报价不一致，仅开放 card。
+Creem 测试 API 为 `https://test-api.creem.io/v1`，正式 API 为 `https://api.creem.io/v1`。两渠道均跳转官方托管页面，不加载客户端支付 SDK、不收集银行卡。前端只接受所选渠道的官方 HTTPS 主机；Creem Checkout 路径为 `/checkout/` 或 `/test/checkout/`，Portal 为 `/my-orders/login/` 或 `/test/my-orders/login/`。
 
-Portal 允许付款方式更新、账单历史和**期末取消**；关闭套餐切换、数量调整和即时取消。专用配置避免修改共享默认 Portal。退款仍人工处理；退款／争议自动撤销、换套餐补差、优惠促销、用量计费和并行多订阅尚未实施，未来需独立定义契约。
+Creem 返回页可能携带签名收据参数。成功页只展示提示，不根据这些参数发放权益，并在页面头部立即清除 URL 查询和片段，设置 `no-referrer`。后端 Docker 和文档启动命令均关闭 Uvicorn 访问日志；部署代理也需避免记录支付返回页完整查询串。真实验收记录仅保留脱敏状态，不能保存带签名返回地址。
 
-Webhook：`https://<API origin>/webhooks/stripe`，建议使用同版 API，事件：
+发布流程：先建立产品及权益版本，再建立月付／年付价格，为每个价格添加渠道绑定并核验发布，最后发布价格。发布校验远端环境、金额、币种、周期、商品及试用天数。停售价格或绑定只影响新购买，不改变已有订阅。
 
-- `checkout.session.completed`、`checkout.session.expired`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`
-- `customer.subscription.created`、`customer.subscription.updated`、`customer.subscription.deleted`、`customer.subscription.paused`、`customer.subscription.resumed`
-- `invoice.paid`、`invoice.payment_failed`、`invoice.payment_action_required`、`invoice.voided`、`invoice.marked_uncollectible`
-
-成功返回 `/payment/success/`，取消及 Portal 返回账户页。成功页不携带支付身份、不授予权益；只由验签回调／对账的可信账单授权。
+Stripe Portal 应开放付款方式、账单历史和期末取消，关闭套餐切换、数量调整和即时取消。多订阅并行、换套餐补差、促销和用量计费不在本次范围。
 
 ## 接口
 
 | 接口 | 行为 |
 | --- | --- |
-| `GET /v1/billing/catalog` | 公开在售报价；关闭时为空 |
-| `GET /v1/billing/status` | 在售报价、试用资格、在途原报价、订阅原价和状态 |
-| `POST /v1/billing/checkouts` | 必须提交 `{price_id}`；用户、金额和试用资格由后端确定 |
-| `POST /v1/billing/portal` | 当前用户专属 Portal URL |
-| `POST /v1/billing/sync` | 核对 Stripe，返回最新订阅和权益 |
-| `POST /webhooks/stripe` | 验签、持久收据、后台处理 |
-| `GET /v1/admin/billing/catalog` | 管理员目录及 Stripe 绑定 |
-| `POST /v1/admin/billing/plans/{plan_id}/revisions` | 新建套餐／不可变权益版本，稳定 id 支持同内容重试 |
-| `POST /v1/admin/billing/prices` | 创建草稿；同 id 不同内容报冲突 |
-| `PUT /v1/admin/billing/prices/{price_id}/status` | active/archived；不迁移已有订阅 |
+| `GET /v1/billing/catalog` | 公开在售价格与 `channels`，以及产品分组 |
+| `GET /v1/billing/status` | 可用渠道、在售价格、试用资格、`checkout_price`／`checkout_provider`、订阅原价和渠道 |
+| `POST /v1/billing/checkouts` | 必填 `{price_id, provider}`；返回 `checkout_url`、`provider`、`environment`、`trial` |
+| `POST /v1/billing/portal` | 必填订阅所属 `{provider}`；返回当前用户该渠道专属 `url` 和 `provider` |
+| `POST /v1/billing/sync` | 核对原渠道，返回最新订阅和权益 |
+| `POST /webhooks/stripe` / `POST /webhooks/creem` | 各自验签、持久收据和后台处理 |
+| `GET /v1/admin/billing/catalog` | 产品及其权益版本、价格、渠道绑定和配置状态 |
+| `POST /v1/admin/billing/products` | 新建产品及初始权益版本 |
+| `POST /v1/admin/billing/products/{product_id}/revisions` | 新建不可变权益版本 |
+| `POST /v1/admin/billing/prices` | 新建月付或年付草稿价格 |
+| `POST /v1/admin/billing/prices/{price_id}/bindings` | 添加 Stripe／Creem 渠道绑定 |
+| `PUT /v1/admin/billing/bindings/{binding_id}/status` | 核验发布或停售渠道绑定 |
+| `PUT /v1/admin/billing/prices/{price_id}/status` | 发布或停售价格 |
+| `GET /v1/admin/billing/orders` | 全部渠道订单筛选和分页 |
+| `GET /v1/admin/billing/orders/{order_id}` | 订单详情、完整流转历史及最近关联支付通知；通知含总数与展示上限 |
+| `POST /v1/admin/billing/orders/{order_id}/reconcile` | `{session_id?: string}`；核实已有平台状态，缺少远端结账编号时可填入对应编号恢复原订单 |
 
-## 验证
+公开价格和用户状态响应内的报价 `channels` 每项包括 `provider`、`binding_id`、`trial_days`、`trial_redraw_pages`；管理目录顶层 `channels` 则表示各渠道的环境、启用和密钥／Webhook 配置状态。消费者不能自行提交金额、试用资格或远端商品编号。待核实订单返回其原绑定，即使该价格已停售；订阅价格可以没有在售渠道。
 
-Docker 全量和 PostgreSQL 命令见[后端说明](../backend/README.md#验证)。重点用例：`test_stripe_billing.py`、`test_billing_catalog.py`、`test_billing_postgres.py`、`test_request_limits_migration.py`、`test_membership.py`、`test_membership_days.py`。
+## 验证边界
 
-覆盖月底／闰年拆月、未来额度不可用、取消保留期限、欠费／迟付、旧价旧权益续费、新客新价、在途冻结、试用去重、零额度套餐访问权、分页重放和 PostgreSQL 并发。模拟 transport 不能替代真实结账。
+后端与 PostgreSQL 命令见[后端说明](../backend/README.md#验证)，真实测试环境证据单独记录于[订阅验收](SUBSCRIPTION_ACCEPTANCE.md)。应覆盖跨渠道试用去重、并发／重复通知、在途固定渠道、月底拆月、迟付恢复、原价格续费、退款和订单状态历史。
 
-前端运行各项目现有命令：插件 `npm run check`、`npm test`、`npm run build`；官网 `npm test`、`npm run build`；后台 `npm run build`。
+前端：插件 `npm run check`、`npm test`、`npm run build`；官网 `npm test`、`npm run build`。2026-09-20 本地官网 11 项测试、110 页静态构建通过；插件类型／模块检查、完整单元测试 31 文件／321 项及 MV3 构建通过。浏览器模拟验收覆盖月付／年付、Creem 选择、请求携带原价格与渠道、待付款恢复固定渠道、390px 移动布局。模拟夹具不创建真实支付，不能替代 Creem 沙盒付款、真实 webhook 和生产收费验收。
 
-`backend/tests/manual_billing_server.py` 使用临时 SQLite 和模拟 Price 校验，18091 端口提供目录 UI 验证，拒绝支付操作且不读取真实密钥。真实沙盒与临时隧道证据见[订阅验收](SUBSCRIPTION_ACCEPTANCE.md)。
+后台独立验证：在 `backend/admin-ui` 执行 `npm ci`、`npm run check`、`npm test`、`npm run build`；随后在 `backend` 执行 `.venv/Scripts/python.exe tests/manual_billing_server.py`（已安装 `requirements.txt` 的 Python 3.11 环境）。浏览器打开 `http://127.0.0.1:18091/console-test/#billing`，用开发用户名 `admin` 登录。夹具创建独立临时 SQLite 和模拟渠道，不读取项目 `.env`；每次启动有 34 笔跨渠道订单，并打印 `controls.json` 路径。修改该文件的 `fail`、`empty_orders` 或 `delay` 可复现失败、空列表和加载状态。结束时在服务终端按 Ctrl+C。
 
-官方参考：[不可变价格与停售](https://docs.stripe.com/products-prices/manage-prices)、[计费锚点](https://docs.stripe.com/billing/subscriptions/billing-cycle)、[测试卡](https://docs.stripe.com/testing)、[Test Clock](https://docs.stripe.com/billing/testing/test-clocks)。
+2026-09-20 后台类型检查、构建及 9 项测试通过。真实浏览器在隔离夹具验证：创建产品、年付默认 99.99、Creem 试用产品必填、保存关联／验证启用／发布、34 笔订单的两页边界、渠道与状态筛选、完整流转、支付通知重试信息、订单核实成功与错误提示、空列表及失败恢复、390px 布局。核实成功分支使用模拟只读平台同步，平台通知也是夹具数据，不构成真实收款或 Webhook 接入验收。
+
+官方参考：[Stripe 价格管理](https://docs.stripe.com/products-prices/manage-prices)、[Creem 产品](https://docs.creem.io/api-reference/endpoint/create-product)、[Creem 客户门户](https://docs.creem.io/features/customer-portal)、[Creem API](https://docs.creem.io/api-reference/introduction)。

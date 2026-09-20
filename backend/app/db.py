@@ -54,12 +54,14 @@ def initialize():
             connection.execute(text("SELECT pg_advisory_xact_lock(761349210)"))
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
-        if settings().stripe_enabled:
-            mismatch = connection.scalar(select(billing_models.BillingAccount.owner_id).where(
-                billing_models.BillingAccount.environment != settings().stripe_environment).limit(1))
-            if mismatch:
-                raise RuntimeError('Stripe environment does not match this database; use an isolated database')
-            if connection.scalar(select(billing_models.BillingPrice.id).where(
-                    billing_models.BillingPrice.environment != settings().stripe_environment).limit(1)):
-                raise RuntimeError('Stripe catalog environment does not match this database; use an isolated database')
+        from .billing_providers import provider_enabled, provider_environment
+        for provider in ('stripe', 'creem'):
+            if provider_enabled(provider):
+                for model in (billing_models.BillingCustomer, billing_models.BillingCheckout):
+                    if connection.scalar(select(model.id).where(model.provider == provider,
+                            model.environment != provider_environment(provider)).limit(1)):
+                        raise RuntimeError('Payment environment does not match this database; use an isolated database')
+                if connection.scalar(select(billing_models.BillingPrice.id).where(
+                        billing_models.BillingPrice.environment != provider_environment(provider)).limit(1)):
+                    raise RuntimeError('Payment catalog environment does not match this database; use an isolated database')
     settings().storage_path.mkdir(parents=True, exist_ok=True)

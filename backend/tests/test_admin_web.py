@@ -18,7 +18,13 @@ def test_configured_entry_and_callback(client):
     response = client.get('/console-test?code=test-code&state=test-state', follow_redirects=False)
     assert response.status_code == 307
     assert response.headers['location'] == '/console-test/?code=test-code&state=test-state'
-    for path in ['/', '/admin', '/admin/', '/admin/?code=test&state=test', '/admin/assets/app.js', '/console-other/']:
+    # The public homepage may be built locally; it must not reveal or redirect
+    # to the private console. Missing admin aliases still return a real 404.
+    homepage = client.get('/', follow_redirects=False)
+    assert homepage.status_code in (200, 404)
+    assert 'location' not in homepage.headers
+    assert '/console-test/' not in homepage.text
+    for path in ['/admin', '/admin/', '/admin/?code=test&state=test', '/admin/assets/app.js', '/console-other/']:
         response = client.get(path, follow_redirects=False)
         assert response.status_code == 404
         assert 'location' not in response.headers

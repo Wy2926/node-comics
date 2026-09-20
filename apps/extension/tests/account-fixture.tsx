@@ -30,11 +30,11 @@ window.fetch=async(input)=>{
  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
  if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
  if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights(),retention_days:0});
- const billing={offers:[billingOffer],checkout_price:null,enabled:true,provider:'stripe',environment:'test',trial_eligible:['free','exhausted'].includes(scenario),checkout_pending:false,subscription:['free','exhausted'].includes(scenario)?null:{price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,cancel_at:null}};
+ const billing={offers:[billingOffer],checkout_price:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:['free','exhausted'].includes(scenario),entitlement_expires_at:null,checkout_pending:false,subscription:['free','exhausted'].includes(scenario)?null:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,cancel_at:null}};
  if(path==='/v1/billing/status')return Response.json(billing);
  if(path==='/v1/billing/sync')return failSync?Response.json({error:{message:'模拟刷新失败'}},{status:503}):Response.json({billing,entitlements:rights()});
- if(path==='/v1/billing/checkouts')return Response.json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});
- if(path==='/v1/billing/portal')return Response.json({url:'https://billing.stripe.com/p/session/fixture'});
+ if(path==='/v1/billing/checkouts')return Response.json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true,environment:'test',provider:'stripe'});
+ if(path==='/v1/billing/portal')return Response.json({url:'https://billing.stripe.com/p/session/fixture',provider:'stripe'});
  if(path==='/v1/me/entitlements')return Response.json(rights());
  if(path==='/v1/me/usage/summary'){
   if(scenario==='error')return Response.json({error:{message:'模拟网络失败，请重试'}},{status:503});

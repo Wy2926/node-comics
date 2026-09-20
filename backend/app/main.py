@@ -40,6 +40,7 @@ from .queue_api import router as queue_router
 from .reader_api import router as reader_router
 from .quota_grants import router as grants_router
 from .billing_api import router as billing_router
+from .billing_admin import router as billing_admin_router
 from .billing_catalog import router as billing_catalog_router, initialize_catalog
 from .schemas import AccessResponse, CapabilitiesResponse, EntitlementsResponse, JobPageResponse, JobResponse, JobsResponse, LoginResponse, UsageResponse
 
@@ -70,6 +71,7 @@ app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(grants_router)
 app.include_router(billing_router)
+app.include_router(billing_admin_router)
 app.include_router(billing_catalog_router)
 app.include_router(admin_monitor_router)
 app.include_router(create_admin_web_router(settings().admin_web_path))

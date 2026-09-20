@@ -2,19 +2,9 @@
 from urllib.parse import urlsplit
 import stripe
 from .config import settings
+from .billing_providers import BillingError, require
 
 stripe.enable_telemetry = False
-
-
-class BillingError(Exception):
-    def __init__(self, code='STRIPE_UNAVAILABLE', uncertain=False):
-        self.code, self.uncertain = code, uncertain
-        super().__init__(code)
-
-
-def require(condition, code='STRIPE_BINDING_MISMATCH'):
-    if not condition:
-        raise BillingError(code)
 
 
 def client():

@@ -1,6 +1,6 @@
 # 阅读请求保护与调度
 
-当前接口为 `POST /v1/translation-plans`，只支持新环境和 `subscription_0001` 空库基线。
+当前接口为 `POST /v1/translation-plans`，只支持新环境和 `payments_0001` 空库基线。
 
 ## 独立的请求保护
 

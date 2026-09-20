@@ -11,7 +11,7 @@ import '../src/redesign.css';
 import '../src/ui/account.css';
 if(location.port!=='5192')throw Error('Use isolated port 5192.');
 window.fetch=async()=>{throw Error('No network allowed in billing fixture');};
-const status:BillingStatus={offers:[billingOffer],checkout_price:null,enabled:true,provider:'stripe',environment:'test',trial_eligible:false,checkout_pending:false,subscription:{price:billingOffer,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,paid_ends_at:'2099-01-01T00:00:00Z'}};
+const status:BillingStatus={offers:[billingOffer],checkout_price:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:false,entitlement_expires_at:null,checkout_pending:false,subscription:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,paid_ends_at:'2099-01-01T00:00:00Z'}};
 const rights={plan:'plus',plus_expires_at:'2099-01-01T00:00:00Z'} as Entitlements;
 const counts={reads:0,syncs:0,portals:0,opened:0};
 let failPortal=false;
@@ -19,7 +19,7 @@ let releaseSync:()=>void=()=>{};
 const fakeApi={
   billingStatus:async()=>{counts.reads++;return status;},
   syncBilling:async()=>{counts.syncs++;await new Promise<void>(resolve=>{releaseSync=resolve;});return {billing:status,entitlements:rights};},
-  billingPortal:async()=>{counts.portals++;if(failPortal)throw Error('simulated portal failure');return {url:'https://billing.stripe.com/p/session/fixture'};},
+  billingPortal:async()=>{counts.portals++;if(failPortal)throw Error('simulated portal failure');return {url:'https://billing.stripe.com/p/session/fixture',provider:'stripe'};},
 } as unknown as Api;
 window.open=(()=>({opener:null,close:()=>{},location:{replace:()=>{counts.opened++;}}})) as unknown as typeof window.open;
 const flush=()=>new Promise(resolve=>setTimeout(resolve,50));

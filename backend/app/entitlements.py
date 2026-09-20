@@ -108,9 +108,11 @@ def entitlement_version(db, user, kind, at=None):
 
 
 def available_periods(db, user, mode, kind, at):
+    from .billing_models import BillingTerm
     periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
         QuotaPeriod.mode == mode, or_(QuotaPeriod.source == "grant",
-            QuotaPeriod.source == 'subscription'), QuotaPeriod.starts_at <= at,
+            (QuotaPeriod.source == 'subscription') & QuotaPeriod.billing_term_id.in_(
+                select(BillingTerm.id).where(BillingTerm.revoked_at.is_(None)))), QuotaPeriod.starts_at <= at,
         QuotaPeriod.ends_at > at)))
     spec = period_spec(user, kind, at)
     if spec:
@@ -311,8 +313,10 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
     spec = period_spec(user, kind)
     period = db.get(QuotaPeriod, spec['id']) if spec else None
     if spec is None and kind == MONTHLY and is_plus(db, user):
+        from .billing_models import BillingTerm
         period = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == owner_id,
-            QuotaPeriod.source == 'subscription', QuotaPeriod.starts_at <= now(),
+            QuotaPeriod.source == 'subscription', QuotaPeriod.billing_term_id.in_(
+                select(BillingTerm.id).where(BillingTerm.revoked_at.is_(None))), QuotaPeriod.starts_at <= now(),
             QuotaPeriod.ends_at > now()).order_by(QuotaPeriod.ends_at).limit(1))
     if spec is None and period is None:
         problem("PLUS_REQUIRED", "补偿重绘额度需要有效 PLUS 会员", 403)

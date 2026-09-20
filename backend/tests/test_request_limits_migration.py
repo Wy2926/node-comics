@@ -6,10 +6,10 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "subscription_0001"
+HEAD = "payments_0001"
 NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
-              "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
+              "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def isolated_migration_database(tmp_path, monkeypatch):
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
     monkeypatch.setattr(db, "engine", lambda: private_engine)
-    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", stripe_enabled=False))
+    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", stripe_enabled=False, creem_enabled=False))
     try:
         yield private_engine
     finally:

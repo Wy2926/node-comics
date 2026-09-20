@@ -1,4 +1,4 @@
-import type {BillingStatus} from './billing';
+import type {BillingStatus,BillingProvider} from './billing';
 import {msg} from './i18n/runtime';
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
@@ -57,8 +57,8 @@ export class Api {
     return result;
   }
   billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
-  startCheckout(priceId:string){return this.request<{checkout_url:string;trial:boolean}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId})});}
-  billingPortal(){return this.request<{url:string}>('/v1/billing/portal',{method:'POST'});}
+  startCheckout(priceId:string,provider:BillingProvider){return this.request<{checkout_url:string;trial:boolean;environment:'test'|'live';provider:BillingProvider}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId,provider})});}
+  billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}
   syncBilling(){return this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});}
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   plan(body:TranslationPlan) {return this.request<PlanReceipt>('/v1/translation-plans',{method:'POST',body:JSON.stringify(body)},true);}

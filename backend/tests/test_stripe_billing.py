@@ -48,7 +48,7 @@ def billing(monkeypatch, request):
     client = request.getfixturevalue('client')
     from app import stripe_client
     from app.models import now
-    state = {'client':client, 'sessions':{}, 'invoices':{}, 'sub':None, 'posts':[], 'requests':[],
+    state = {'client':client, 'sessions':{}, 'invoices':{}, 'charges': {}, 'invoice_payments': [], 'sub':None, 'posts':[], 'requests':[],
         'at':int(now().replace(tzinfo=timezone.utc).timestamp())-60, 'lost':False, 'fail_page':False}
     price = {'id':'price_plus', 'object':'price', 'active':True, 'livemode':False, 'product':'prod_plus',
         'currency':'usd', 'unit_amount':999, 'recurring':{'interval':'month','interval_count':1,'usage_type':'licensed'}}
@@ -56,11 +56,14 @@ def billing(monkeypatch, request):
     state['prices'] = {price['id']: price}
     state['price_id'] = 'fixture-price'
     from app.db import session_factory
-    from app.billing_models import BillingPrice
+    from app.billing_models import BillingPrice, BillingPriceBinding
     with session_factory()() as db:
         db.add(BillingPrice(id=state['price_id'], plan_id='plus', plan_revision_id='plus-v1',
             environment='test', currency='usd', unit_amount=999, interval='month',
-            stripe_product_id='prod_plus', stripe_price_id='price_plus', status='active'))
+            status='active'))
+        db.flush()
+        db.add(BillingPriceBinding(id='fixture-stripe-binding', price_id=state['price_id'], provider='stripe',
+            environment='test', product_id='prod_plus', provider_price_id='price_plus', status='active'))
         db.commit()
 
     class Transport(sdk.HTTPClient):
@@ -91,7 +94,8 @@ def billing(monkeypatch, request):
             elif path == '/v1/subscriptions/sub_fixture':
                 data = state['sub']
             elif path == '/v1/invoices':
-                rows = sorted((i for i in state['invoices'].values() if i['status']=='paid'), key=lambda x:x['id'])
+                rows = sorted((i for i in state['invoices'].values()
+                    if not params.get('status') or i['status'] == params['status']), key=lambda x:x['id'])
                 if params.get('starting_after'):
                     if state['fail_page']:
                         raise sdk.APIConnectionError('isolated page failure')
@@ -99,6 +103,13 @@ def billing(monkeypatch, request):
                 data = {'object':'list','data':rows[:2],'has_more':len(rows)>2}
             elif path.startswith('/v1/invoices/'):
                 data = state['invoices'][path.split('/')[-1]]
+            elif path.startswith('/v1/charges/'):
+                data = state['charges'][path.split('/')[-1]]
+            elif path == '/v1/invoice_payments':
+                assert params['payment[type]'] == 'payment_intent'
+                rows = [p for p in state['invoice_payments']
+                    if p['payment']['payment_intent'] == params['payment[payment_intent]']]
+                data = {'object': 'list', 'data': rows, 'has_more': False}
             elif path == '/v1/billing_portal/sessions':
                 state['portal_customer'] = params['customer']
                 state['portal_configuration'] = params.get('configuration')
@@ -115,7 +126,7 @@ def billing(monkeypatch, request):
 
 
 def checkout(state):
-    response = state['client'].post('/v1/billing/checkouts', headers=state['auth'], json={'price_id':state['price_id']})
+    response = state['client'].post('/v1/billing/checkouts', headers=state['auth'], json={'provider':'stripe', 'price_id':state['price_id']})
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -174,10 +185,15 @@ def test_hosted_checkout_is_account_bound_and_reuses_session(billing):
 
 def test_lost_create_response_retries_same_key_and_parameters(billing):
     billing['lost'] = True
-    response = billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']})
+    response = billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'provider':'stripe', 'price_id':billing['price_id']})
     assert response.status_code == 503
     checkout(billing)
     assert len(billing['sessions']) == 1 and billing['posts'][0] == billing['posts'][1]
+    from app.db import session_factory
+    from app.billing_models import BillingOrder
+    with session_factory()() as db:
+        order = db.scalar(select(BillingOrder))
+        assert order.status == 'pending' and order.error_code is None
 
 
 def test_unknown_create_past_retention_only_looks_up_original(billing):
@@ -185,7 +201,7 @@ def test_unknown_create_past_retention_only_looks_up_original(billing):
     from app.billing_models import BillingCheckout
     from app.billing_checkout import recover_checkout
     billing['lost'] = True
-    billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']})
+    billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'provider':'stripe', 'price_id':billing['price_id']})
     with session_factory()() as db:
         row = db.scalar(select(BillingCheckout))
         row.created_at -= timedelta(days=3)
@@ -206,7 +222,7 @@ def test_trial_conversion_and_replay_never_double_grant(billing):
     sync_subscription('sub_fixture')
     assert sorted(p.granted for p in periods()) == [30,300]
     assert rights(billing)['modes']['redraw']['quota']['available'] == 300
-    assert billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'price_id':billing['price_id']}).status_code == 409
+    assert billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'provider':'stripe', 'price_id':billing['price_id']}).status_code == 409
 
 
 @pytest.mark.parametrize('total',[0,999])
@@ -254,8 +270,8 @@ def test_portal_is_scoped_to_authenticated_customer(billing, monkeypatch):
     monkeypatch.setattr(settings(), 'stripe_portal_configuration_id', 'bpc_fixture')
     complete_trial(billing)
     other=login(billing['client'],'other')
-    assert billing['client'].post('/v1/billing/portal',headers=other).status_code==404
-    result=billing['client'].post('/v1/billing/portal',headers=billing['auth'])
+    assert billing['client'].post('/v1/billing/portal',headers=other,json={'provider':'stripe'}).status_code==404
+    result=billing['client'].post('/v1/billing/portal',headers=billing['auth'],json={'provider':'stripe'})
     assert result.status_code==200 and result.json()['url'].startswith('https://billing.stripe.com/')
     assert billing['portal_customer']=='cus_fixture'
     assert billing['portal_configuration']=='bpc_fixture'
@@ -266,7 +282,7 @@ def test_trial_cannot_be_repeated(billing):
     from app.billing_models import BillingAccount
     from app.models import now
     with session_factory()() as db:
-        db.add(BillingAccount(owner_id=billing['owner'],environment='test',trial_used_at=now()))
+        db.add(BillingAccount(owner_id=billing['owner'],trial_used_at=now()))
         db.commit()
     assert checkout(billing)['trial'] is False
     assert 'subscription_data[trial_period_days]' not in billing['posts'][0][1]
@@ -326,7 +342,7 @@ def test_signed_webhook_durable_replay_and_environment(billing):
     assert len(periods())==1
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(BillingEvent))==1
-        assert db.get(BillingEvent,'evt_fixture').status=='processed'
+        assert db.get(BillingEvent,'stripe:test:evt_fixture').status=='processed'
     assert billing['client'].post('/webhooks/stripe',content=body+b' ',headers=headers).status_code==401
     stale,headers=signed_event(value,int(time.time())-600)
     assert billing['client'].post('/webhooks/stripe',content=stale,headers=headers).status_code==401
@@ -370,7 +386,7 @@ def test_completed_unbound_checkout_is_reconciled_without_webhook(billing):
 def test_concurrent_checkout_uses_one_intent(billing):
     from app.billing_checkout import start_checkout
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results=list(pool.map(lambda _:start_checkout(billing['owner'], billing['price_id']),range(2)))
+        results=list(pool.map(lambda _:start_checkout(billing['owner'], billing['price_id'], 'stripe'),range(2)))
     assert results[0]['checkout_url']==results[1]['checkout_url']
     assert len({key for key,_ in billing['posts']})==1
     assert len(billing['sessions'])==1
@@ -393,3 +409,35 @@ def test_subscription_for_another_product_is_ignored(billing):
     billing['sub']['metadata']={}
     sync_subscription('sub_fixture')
     assert not periods()
+
+
+def test_completed_checkout_blocks_new_purchase_until_subscription_is_bound(billing):
+    from app.billing_checkout import bind_session
+    complete_trial(billing, synchronize=False)
+    session = next(iter(billing['sessions'].values()))
+    bind_session(session['client_reference_id'], session)
+    response = billing['client'].post('/v1/billing/checkouts', headers=billing['auth'],
+        json={'provider': 'stripe', 'price_id': billing['price_id']})
+    assert response.status_code == 409, response.text
+    assert len(billing['sessions']) == 1
+
+
+@pytest.mark.parametrize('refund_status', ['refunded', 'disputed', 'partially_refunded'])
+def test_invoice_replay_preserves_refund_state(billing, refund_status):
+    from app.billing_sync import sync_subscription
+    from app.billing_models import BillingOrder
+    from app.billing_orders import transition, revoke_invoice
+    from app.db import session_factory
+    complete_trial(billing)
+    invoice(billing)
+    sync_subscription('sub_fixture')
+    with session_factory()() as db:
+        order = db.scalar(select(BillingOrder).where(BillingOrder.external_id == 'in_0001'))
+        transition(db, order, refund_status, 'refund_sync')
+        if refund_status in ('refunded', 'disputed'):
+            revoke_invoice(db, 'stripe:test:in_0001')
+        db.commit()
+    sync_subscription('sub_fixture')
+    with session_factory()() as db:
+        order = db.scalar(select(BillingOrder).where(BillingOrder.external_id == 'in_0001'))
+        assert order.status == refund_status

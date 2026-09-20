@@ -27,3 +27,8 @@
 .billing-plan-card[aria-pressed=true] {border-color:var(--accent);background:var(--accent-soft)}
 .billing-plan-card:focus-visible {outline:3px solid var(--accent);outline-offset:3px}
 .billing-plan-card:disabled {cursor:default;opacity:.65}
+.billing-provider-picker {display:flex;flex-wrap:wrap;gap:12px;border:0;padding:0;margin:20px 0}
+.billing-provider-picker legend {font-weight:700;margin-bottom:10px}
+.billing-provider-picker label {display:flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid #c4ccd8;border-radius:10px;background:white;cursor:pointer}
+.billing-provider-picker label:has(input:checked) {border-color:var(--accent);background:var(--accent-soft)}
+.billing-provider-picker:disabled label {cursor:default}

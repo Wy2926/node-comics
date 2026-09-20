@@ -24,9 +24,11 @@ export function oidcSettings(config: AuthConfig, origin: string): UserManagerSet
   };
 }
 
-export function checkoutUrl(value: string, portal = false) {
+export function checkoutUrl(value: string, provider:'stripe'|'creem', portal = false) {
   const url = new URL(value);
-  if (url.protocol !== 'https:' || url.hostname !== (portal ? 'billing.stripe.com' : 'checkout.stripe.com') || url.port || url.username || url.password) throw Error('结账地址无效，请联系支持。');
+  const allowed=provider==='stripe'?url.hostname===(portal?'billing.stripe.com':'checkout.stripe.com'):
+    provider==='creem'&&['creem.io','www.creem.io'].includes(url.hostname)&&(portal?/^\/(?:test\/)?my-orders\/login\/[^/]+/.test(url.pathname):/^\/(?:test\/)?checkout\/[^/]+/.test(url.pathname));
+  if (url.protocol !== 'https:' || !allowed || url.port || url.username || url.password) throw Error('结账地址无效，请联系支持。');
   return url.href;
 }
 
