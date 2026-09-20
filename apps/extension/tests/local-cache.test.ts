@@ -1,0 +1,22 @@
+import 'fake-indexeddb/auto';
+import {beforeAll,expect,it,vi} from 'vitest';
+import {readLocalFiles} from '../src/library/local-import';
+import {commitCopies,putBlob,saveSession,cacheSize} from '../src/library/store';
+import {emptyPage} from '../src/reader/model';
+import {makeCopy} from '../src/library/model';
+import {imageIdentity} from '../src/importers/hash';
+import {API_ORIGIN} from '../src/service';
+import type {Job} from '../src/types';
+beforeAll(()=>{const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>data.set(key,value),removeItem:(key:string)=>data.delete(key)});vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:10,height:20,close(){}})));});
+it('reuses originals and same-account translations across different imported files, even at a full budget',async()=>{
+ const file=new File(['cached-image'],'page.png',{type:'image/png'}),identity=await imageIdentity(file);
+ const job:Job={id:'cached-job',input_asset_id:'asset',output_asset_id:'output',mode:'classic',target_language:'en',status:'succeeded',phase:'completed',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+ const page={...emptyPage('old.png',10,20),...identity,blobKey:'old-original-key',ownerId:'cache-user',apiOrigin:API_ORIGIN,assetId:'asset',jobs:[job],outputBlobs:{[job.id]:'old-output-key'}};
+ await putBlob(page.blobKey,file);await putBlob('old-output-key',new Blob(['translation']));
+ await commitCopies([makeCopy('old archive',[page],'ZIP','old-archive')],[{title:'old',kind:'work'}]);
+ saveSession({token:'test',user:{id:'cache-user',name:'reader',role:'reader'},apiOrigin:API_ORIGIN});
+ const bytes=await cacheSize(),[copy]=await readLocalFiles([file],0,()=>{});
+ expect(copy.pages[0]).toMatchObject({blobKey:page.blobKey,jobs:[job],outputBlobs:page.outputBlobs,ownerId:'cache-user'});expect(await cacheSize()).toBe(bytes);
+ saveSession({token:'other',user:{id:'other-user',name:'reader',role:'reader'},apiOrigin:API_ORIGIN});
+ const [other]=await readLocalFiles([file],0,()=>{});expect(other.pages[0].blobKey).toBe(page.blobKey);expect(other.pages[0].jobs).toEqual([]);expect(other.pages[0].outputBlobs).toEqual({});
+});

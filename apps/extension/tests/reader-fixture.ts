@@ -1,3 +1,4 @@
+import {API_ORIGIN} from '../src/service';
 // Manual browser acceptance harness. Only run on the dedicated local test origin.
 import {defaults,type Job,type Page,type Entitlements,type TranslationPlan,type TranslationOperation} from '../src/types';
 import {readCopies,readLibrary,commitCopies,putBlob,saveSettings,saveSession,editLibrary} from '../src/library/store';
@@ -7,13 +8,13 @@ import {makeCopy} from '../src/library/model';
 if(location.hostname!=='127.0.0.1'||!['5174','5176','5179'].includes(location.port))throw Error('Use the isolated 127.0.0.1:5174, :5176 or :5179 origin.');
 const existing=await readCopies();
 if(existing.some(c=>!c.id.startsWith('reader-fixture-')))throw Error('This origin contains non-fixture data. Use another browser profile.');
-const origin=location.origin;
+const origin=API_ORIGIN;
 const originalFetch=window.fetch.bind(window);
 const blob=await (await originalFetch('/samples/starlight-bookshop.png')).blob();
 const bitmap=await createImageBitmap(blob);const width=bitmap.width,height=bitmap.height;bitmap.close();
 const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,input_asset_id:`asset-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',output_asset_id:status==='succeeded'?`output-${index}`:null,quota_pages:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
 if(!existing.length){
-  saveSettings({...defaults,apiBase:origin});saveSession({token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
+  saveSettings(defaults);saveSession({token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
   await putBlob('reader-fixture-original',blob);await putBlob('reader-fixture-output',blob);
   const states:Job['status'][]=['queued','running','failed','succeeded','no_text','outcome_unknown'];
   const pages:Page[]=Array.from({length:120},(_,i):Page=>({...emptyPage(`第 ${i+1} 页`,width,height),id:`fixture-page-${i}`,fileHash:'a'.repeat(64),pageIndex:i,blobKey:i===6?undefined:'reader-fixture-original',ownerId:'fixture-reader',apiOrigin:origin,jobs:i<states.length?[job(i,states[i])]:[],outputBlobs:i===3?{'fixture-job-3':'reader-fixture-output'}:{}}));
@@ -56,7 +57,7 @@ if(flow&&['complete','backward','incomplete','missing','empty','gap','snapshot']
 }
 const autoScenario=new URLSearchParams(location.search).get('auto');
 if(autoScenario){
- saveSettings({...defaults,apiBase:origin});
+ saveSettings(defaults);
  saveSession({token:'isolated-fixture-token',user:{id:'fixture-'+autoScenario,name:'自动翻译验收',role:'reader'},apiOrigin:origin});
  const copyId='reader-fixture-auto-'+autoScenario;
  if(!(await readCopies()).some(c=>c.id===copyId)){
@@ -83,7 +84,7 @@ const redrawPolls=new Map<string,number>();
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
-  const url=new URL(String(input),origin);if(url.origin!==origin)throw Error('External requests disabled in this fixture.');
+  const url=new URL(String(input),origin);if(url.origin!==origin&&url.origin!==location.origin)throw Error('External requests disabled in this fixture.');
   if(!url.pathname.startsWith('/v1/'))return originalFetch(input,init);
   state.requests.push(url.pathname);
   if(state.delay)await new Promise(r=>setTimeout(r,state.delay));

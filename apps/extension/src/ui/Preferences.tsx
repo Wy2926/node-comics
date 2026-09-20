@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
 import { fallbackLanguages, supportsLanguage, type Capabilities, type Settings } from '../types';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
@@ -10,11 +10,8 @@ type Props = {
   cacheBytes: number;
   notify: (message: string) => void;
   onClearCache: () => void;
-  onSaveApiAddress: (draft: string) => Promise<void>;
 };
-export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCache, onSaveApiAddress }: Props) {
-  const [apiDraft, setApiDraft] = useState(settings.apiBase);
-  useEffect(() => setApiDraft(settings.apiBase), [settings.apiBase]);
+export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCache }: Props) {
   return <>
     <PageTitle eyebrow="MAKE IT YOURS" title="外观与偏好" description="调成你喜欢的阅读节奏，偏好保存在本机。" />
     <AppearanceSettings settings={settings} onChange={setSettings} />
@@ -48,24 +45,12 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
           <option value="1024">1 GB</option>
         </select>
       </SettingRow>
-      <SettingRow title="清理本地图片" description="保留书架与阅读位置；清理后离线无法显示原图。">
-        <button className="button danger small" onClick={onClearCache}>清理缓存</button>
+      <SettingRow title="清理本地译图" description="保留原图、书架与阅读位置；译图需要时重新下载。">
+        <button className="button danger small" onClick={onClearCache}>清理译图缓存</button>
       </SettingRow>
       <div className="privacy-note">
         <Icon name="shield" />
         <p>原图与译图保存在私有对象存储；{caps?.retention_days?`当前服务设置 ${caps.retention_days} 天保留期`:'当前长期保留，未设自动清理'}。图片归你的账户私有，不接收源网站 Cookie，也不会公开分享；用户主动删除或未来清理策略仍可能使资源不可用。</p>
-      </div>
-    </section>
-    <section className="settings-card">
-      <h3>
-        <Icon name="globe" />翻译服务</h3>
-      <SettingRow title="后端服务地址" description="只填写你的可信产品服务地址。模型与密钥由后端统一管理。">
-        <input aria-label="后端服务地址" className="api-input" type="url" value={apiDraft} onChange={e => setApiDraft(e.target.value)} />
-        <button className="button secondary small" onClick={() => void onSaveApiAddress(apiDraft)}>保存并连接</button>
-      </SettingRow>
-      <div className="privacy-note">
-        <Icon name="info" />
-        <p>当前为本地测试版本。插件如需连接新服务域名，会在使用时申请对应访问权限。</p>
       </div>
     </section>
   </>;

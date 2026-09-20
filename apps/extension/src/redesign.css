@@ -1195,7 +1195,7 @@ a {
   border-radius: 50%;
   opacity: .85;
 }
-/* Existing settings/admin controls share the same type scale and semantic surfaces. */
+/* Existing settings controls share the same type scale and semantic surfaces. */
 .nc-app .page-title {
   margin: 0 0 30px;
 }

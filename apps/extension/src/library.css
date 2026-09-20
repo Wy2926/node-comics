@@ -277,3 +277,25 @@ html:has(.nc-library) {scrollbar-gutter:stable}
 @media(max-width:359px) {
   .nc-library .nc-books.grid,.nc-content-grid,.nc-copy-grid,.nc-related-grid,.nc-version-filter-grid {grid-template-columns:minmax(0,1fr)}
 }
+
+/* Shelf controls keep sorting and mode changes together at every viewport size. */
+.nc-shelf-tools>.nc-search{flex:1 1 240px;min-width:0;max-width:380px}
+.nc-shelf-tools-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-left:auto;flex-wrap:wrap}
+.nc-shelf-tools-actions .nc-sort-label{white-space:nowrap}
+.nc-shelf-tools-actions>.button{min-width:104px}
+.nc-shelf-batch>.nc-shelf-selection-info{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;min-width:0}
+.nc-shelf-selection-info strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.nc-shelf-batch-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;flex-wrap:wrap;margin-left:auto}
+.nc-shelf-batch-actions>button{white-space:nowrap}
+.nc-library .nc-batch-toolbar .button.danger{margin-top:0}
+.nc-shelf-grid .nc-book.is-selecting .nc-cover-topline{padding-right:34px}
+.nc-shelf-grid .nc-selection-check{z-index:2}
+.nc-shelf-grid .nc-book.is-selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+@media(max-width:640px){
+ .nc-shelf-tools>.nc-search{flex-basis:100%;max-width:none}
+ .nc-shelf-tools-actions{width:100%;justify-content:space-between;gap:10px}
+ .nc-shelf-batch>.nc-shelf-selection-info{justify-content:flex-start;gap:6px;width:100%}
+ .nc-shelf-selection-info>span{flex-basis:100%}
+ .nc-shelf-batch-actions{width:100%;gap:12px}
+ .nc-shelf-batch-actions>.button{margin-left:auto}
+}

@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {beforeAll,describe,expect,it,vi} from 'vitest';
 import {emptyPage} from '../src/reader/model';
 import {emptyLibrary,makeCopy,attachCopy,selectRange,validateLibrary,suggestedKind} from '../src/library/model';
-import {commitCopies,deleteCopy,readCopies,readLibrary,putBlob,getBlob,saveCopy,editLibrary,savePosition,readPosition,forkSourceRevision,enforceCacheBudget} from '../src/library/store';
+import {commitCopies,deleteCopy,readCopies,readLibrary,putBlob,getBlob,saveCopy,editLibrary,savePosition,readPosition,forkSourceRevision,enforceCacheBudget,removeWorks} from '../src/library/store';
 import type {SourceCatalog,SourceEntry} from '../src/library/types';
 beforeAll(()=>{const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>data.set(k,v),removeItem:(k:string)=>data.delete(k)});});
 const evidence={status:'user' as const,source:'测试用户确认'};
@@ -27,4 +27,17 @@ describe('new library transactions and resource lifecycle',()=>{
  it('keeps offline copies outside cache eviction',async()=>{await putBlob('offline-byte',new Blob(['important']));const c=makeCopy('离线',[{...emptyPage('1',10,10),blobKey:'offline-byte'}]);await commitCopies([c],[{title:'离线',kind:'work'}]);await enforceCacheBudget(await readCopies(),0);expect(await getBlob('offline-byte')).toBeInstanceOf(Blob);});
  it('creates source revisions without borrowing old exact positions or pages',async()=>{const c={...makeCopy('修订',[emptyPage('old',10,10)]),sourceEntryId:'entry'};await commitCopies([c],[{title:'修订',kind:'chapter'}]);savePosition(c.id,1,{pageId:c.pages[0].id,relativeOffset:.6});const id=await forkSourceRevision(c.id);const next=(await readCopies()).find(c=>c.id===id)!;expect(next.pages).toHaveLength(0);expect(next.manifestRevision).toBe(2);expect(readPosition(id,2)).toBeNull();expect((await readCopies()).find(copy=>copy.id===c.id)!.pages).toHaveLength(1);});
  it('remembers explicit source exclusions across re-discovery',async()=>{const c={...makeCopy('删除的条目',[],'source','excluded-entry'),sourceEntryId:'excluded-entry'};const catalog:SourceCatalog={id:'catalog',sourceId:'test',url:'https://example.test',title:'来源',observedAt:1,complete:true,note:'',groups:[],entries:[{id:'excluded-entry',catalogId:'catalog',remoteId:'remote',url:'https://example.test/1',title:'a',groupIds:[],rawTypes:[],order:0,related:false}],excludedEntryIds:[]};await commitCopies([c],[{title:'排除',kind:'chapter'}],catalog);await deleteCopy(c);expect((await readLibrary()).catalogs.find(x=>x.id==='catalog')!.excludedEntryIds).toContain('excluded-entry');});
+});
+
+it('removes selected works and both image kinds while preserving other works and shared bytes',async()=>{
+ const page={...emptyPage('bulk',10,10),blobKey:'bulk-work-original',outputBlobs:{job:'bulk-work-result'}};
+ await putBlob(page.blobKey,new Blob(['original']));await putBlob(page.outputBlobs.job,new Blob(['translation']));
+ const a=makeCopy('selected a',[page]),b=makeCopy('selected b',[{...page,id:'b'}]),keep=makeCopy('keep',[{...page,id:'keep'}]);
+ const workIds=[];for(const copy of [a,b,keep]){const result=await commitCopies([copy],[{title:copy.title,kind:'chapter'}]);workIds.push(result.workIds[0]);}
+ await removeWorks(workIds.slice(0,2));await saveCopy(a);
+ const state=await readLibrary(),copies=await readCopies();
+ for(const id of workIds.slice(0,2)){expect(state.works.some(w=>w.id===id)).toBe(false);expect(state.chapters.some(c=>c.workId===id)).toBe(false);expect(state.coverage.some(c=>c.workId===id)).toBe(false);}
+ expect(copies.some(c=>c.id===a.id||c.id===b.id)).toBe(false);expect(copies.some(c=>c.id===keep.id)).toBe(true);
+ expect(await getBlob(page.blobKey)).toBeInstanceOf(Blob);expect(await getBlob(page.outputBlobs.job)).toBeInstanceOf(Blob);
+ await removeWorks([workIds[2]]);expect(await getBlob(page.blobKey)).toBeUndefined();expect(await getBlob(page.outputBlobs.job)).toBeUndefined();
 });

@@ -1,3 +1,4 @@
+import {API_BASE,API_ORIGIN} from '../service';
 import {Api} from '../api';
 import {RequestPool,assertCurrent,UPLOAD_CONCURRENCY} from '../concurrency';
 import {imageIdentity} from '../importers/hash';
@@ -31,12 +32,12 @@ export async function activateInline(tabId:number){
 }
 async function context(tabId:number,navigationId:string):Promise<Context|undefined>{
   const saved=await chrome.storage.local.get([settingsKey,sessionKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>},session=saved[sessionKey] as Session|null;
-  const origin=new URL(settings.apiBase).origin;if(!session||session.apiOrigin!==origin)return;
+  const origin=API_ORIGIN;if(!session||session.apiOrigin!==origin)return;
   const key=JSON.stringify([origin,session.user.id,settings.translationMode,settings.language,navigationId,configGeneration]);
   const previous=contexts.get(tabId);if(previous?.key===key)return previous;
   if(previous){previous.active=false;previous.waiting?.abort();}
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
-  const api=new Api(settings.apiBase,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active));
+  const api=new Api(API_BASE,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active));
   const [caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);
   const attach=async(jobs:Job[])=>{assertCurrent(api.isCurrent);for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,ownerId:session.user.id,apiOrigin:origin,assetId:incoming.find(j=>j.input_asset_id)?.input_asset_id??page.assetId,jobs:mergeJobs(page.jobs,incoming)});}};
   const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob,rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});

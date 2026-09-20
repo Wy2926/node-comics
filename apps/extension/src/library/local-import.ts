@@ -1,8 +1,9 @@
 import {openComic,prepareComicPage,isComicFile,importedFileHash} from '../importers/comic';
 import {imageIdentity,hashFile} from '../importers/hash';
 import {emptyPage,naturalSort} from '../reader/model';
+import {mergeJobs} from '../reader/jobs';
 import {makeCopy} from './model';
-import {putBlob,getBlob,cacheSize,collectUnusedBlobs} from './store';
+import {putBlob,getBlob,cacheSize,collectUnusedBlobs,readCopies,session} from './store';
 import type {Page,ReadingCopy} from '../types';
 export interface LocalImportProgress {label:string;done?:number;total?:number;}
 export async function readLocalFiles(files:File[],limitMb:number,progress:(text:string)=>void,onProgress?:(value:LocalImportProgress)=>void,fileHashes?:WeakMap<File,string>):Promise<ReadingCopy[]>{
@@ -10,7 +11,11 @@ export async function readLocalFiles(files:File[],limitMb:number,progress:(text:
  const comics=files.filter(f=>isComicFile(f.name)),images=naturalSort(files.filter(f=>['image/png','image/jpeg','image/webp'].includes(f.type)));
  if(comics.length+images.length!==files.length)throw Error('包含不支持的文件。请选择图片、MOBI、CBZ/ZIP、CBR/RAR 或 PDF。');
  const saved:string[]=[];
- const save=async(blob:Blob,page:Page)=>{const key='original:'+page.imageSha256;if(!await getBlob(key)){if(await cacheSize()+blob.size>limitMb*1024*1024)throw Error('本地空间预算不足，请提高缓存上限后重试。');await putBlob(key,blob);saved.push(key);}page.blobKey=key;};
+ const cachedPages=(await readCopies()).flatMap(copy=>copy.pages),account=session();
+ const originals=new Map(cachedPages.filter(page=>page.imageSha256&&page.blobKey).map(page=>[page.imageSha256!,page]));
+ const translations=new Map<string,Page>();
+ for(const page of cachedPages){if(!page.imageSha256||!account||page.ownerId!==account.user.id||page.apiOrigin!==account.apiOrigin)continue;const previous=translations.get(page.imageSha256);translations.set(page.imageSha256,previous?{...page,jobs:mergeJobs(previous.jobs,page.jobs),outputBlobs:{...previous.outputBlobs,...page.outputBlobs}}:page);}
+ const save=async(blob:Blob,page:Page)=>{const cached=originals.get(page.imageSha256!);const key=cached?.blobKey??'original:'+page.imageSha256;if(!await getBlob(key)){if(await cacheSize()+blob.size>limitMb*1024*1024)throw Error('本地空间预算不足，请提高缓存上限后重试。');await putBlob(key,blob);saved.push(key);}page.blobKey=key;const translated=translations.get(page.imageSha256!);if(translated)Object.assign(page,{ownerId:translated.ownerId,apiOrigin:translated.apiOrigin,assetId:translated.assetId,assetExpiresAt:translated.assetExpiresAt,jobs:translated.jobs,outputBlobs:{...translated.outputBlobs}});};
  const copies:ReadingCopy[]=[];
  try{
  for(const file of naturalSort(comics)){

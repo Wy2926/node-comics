@@ -40,7 +40,7 @@ describe('in-image retry status',()=>{
   expect(html).toContain('加载失败 · 重试');expect(html).not.toContain('点击重新生成');
  });
  it('keeps long diagnostic text out of the visible label',()=>{
-  const detail='暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。';
+  const detail='暂时连接不到服务。请检查网络连接，原图仍可继续阅读。';
   expect(translationNotice({kind:'error',message:detail})).toEqual({message:'连接失败',action:'重试',label:'连接失败 · 重试',detail});
   const html=renderToStaticMarkup(<ImageTranslationStatus state={{kind:'error',message:detail}} onRetry={noop} onUpgrade={noop} onLogin={noop}/>);
   expect(html).toContain(`title="${detail}"`);expect(html.replace(/<[^>]*>/g,'')).toBe('连接失败重试');

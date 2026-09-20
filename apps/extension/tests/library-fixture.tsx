@@ -15,6 +15,8 @@ import '../src/redesign.css';
 import '../src/library.css';
 
 if(location.port!=='5175')throw Error('请在独立的 5175 端口打开验收页，避免改动日常漫画库。');
+const localFetch=window.fetch.bind(window);
+window.fetch=(input,init)=>{const url=new URL(String(input),location.href);if(url.origin!==location.origin)throw Error('External requests disabled in this fixture.');return localFetch(input,init);};
 const previous=await store.readLibrary();
 if(!localStorage.getItem('nc-library-fixture')&&previous.works.some(w=>w.evidence.source!=='漫画管理隔离验收'&&w.evidence.source!=='用户管理'))throw Error('验收来源已有其他漫画，停止写入。');
 const source:SourceCatalog={id:'fixture-catalog',sourceId:'mangacopy',url:'https://www.mangacopy.com/comic/fixture',title:'星光书店',observedAt:Date.now(),complete:true,note:'隔离样本目录 · 不访问漫画站点',groups:[{id:'main',title:'连载章节',entryIds:Array.from({length:48},(_,n)=>'fixture-entry-'+n),complete:true},{id:'books',title:'单行本',entryIds:['fixture-volume-1','fixture-volume-2'],complete:true}],entries:[...Array.from({length:48},(_,n)=>({id:'fixture-entry-'+n,catalogId:'fixture-catalog',remoteId:'fixture-'+n,url:'https://www.mangacopy.com/comic/fixture/chapter/'+n,title:'第 '+(n+1)+' 话 · '+['雨后的来信','夜间营业','旅行的猫','未寄出的明信片'][n%4],groupIds:['main'],rawTypes:['話'],order:n,related:false})),...[1,2].map(n=>({id:'fixture-volume-'+n,catalogId:'fixture-catalog',remoteId:'fixture-volume-'+n,url:'https://www.mangacopy.com/comic/fixture/chapter/volume-'+n,title:'第 '+n+' 卷',groupIds:['books'],rawTypes:['卷'],order:48+n,related:false}))],excludedEntryIds:[]};
@@ -46,7 +48,7 @@ if(!previous.works.length){
   for(const title of ['海风日记','小镇放映室']){const copy=makeCopy(title,pages(),'原创验收样本','fixture-work-'+title);attachCopy(state,copy,{title,kind:'work'});copies.push(copy);}
   state.works.forEach((w,n)=>{w.evidence=evidence;w.updatedAt=1700000000000+n*1000;w.createdAt=w.updatedAt;});
  });
- store.saveSettings({...store.settings(),apiBase:'http://127.0.0.1:18099',appearance:'light'});
+ store.saveSettings({...store.settings(),appearance:'light'});
 }
 localStorage.setItem('nc-library-fixture','v1');
 if(new URLSearchParams(location.search).has('recent'))await store.editLibrary((state,copies)=>{

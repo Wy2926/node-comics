@@ -17,7 +17,7 @@ export class Api {
     assertCurrent(this.isCurrent);
     let response: Response;
     try { response = await fetch(this.base + path, { ...init, headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers } }); }
-    catch { init.signal?.throwIfAborted();throw new ApiError('暂时连接不到服务。请检查后端地址与网络，原图仍可继续阅读。'); }
+    catch { init.signal?.throwIfAborted();throw new ApiError('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。'); }
     if (!response.ok) { const raw = await response.json().catch(() => ({})); if(allowPlanLimit&&response.status===429&&Array.isArray(raw.items)&&(raw.error?.code==='IMAGE_RATE_LIMITED'||raw.items.every((item:TranslationOperation)=>item.code==='IMAGE_RATE_LIMITED')))return raw as T; if(response.status===404&&raw.detail==='Not Found')throw new ApiError('当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。','API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? `请求未完成（${response.status}）`, error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')),error.scope); }
     if (response.status === 204) return undefined as T;
     return response.json();
@@ -36,8 +36,7 @@ export class Api {
   operations(offset=0) {return this.request<Paginated<TranslationOperation>>(`/v1/translation-operations?offset=${offset}&limit=12`);}
   latestResult(jobId:string) {return this.request<{latest:Job|null;result:Job|null}>(`/v1/jobs/${encodeURIComponent(jobId)}/latest-result`);}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;output_asset_id?:string|null},key:string) {return this.request<FeedbackRecord>(`/v1/jobs/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
-  feedbackList(admin=false,offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/${admin?'admin':'me'}/feedback?offset=${offset}&limit=20`);}
-  reviewFeedback(id:string,status:FeedbackRecord['status']) {return this.request<FeedbackRecord>(`/v1/admin/feedback/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status})});}
+  feedbackList(offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/me/feedback?offset=${offset}&limit=20`);}
   async matchPages(pages: FilePageSource[], mode: Mode, target_language: string) {
     if (!pages.length || pages.length > 100) throw new ApiError('每次匹配需提供 1–100 页。', 'INVALID_PAGE_COUNT');
     pages.forEach(validateSource);
