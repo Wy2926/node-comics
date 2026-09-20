@@ -35,7 +35,7 @@ export function SourceImport({manifest,library,copies,busy,error,onClose,onImpor
  return <Modal title="加入漫画" subtitle={`${manifest.title} · 已选 ${selected.length} 张`} onClose={()=>{if(!busy)onClose();}}>
   {error&&<p role="alert" className="error-message">{error}</p>}
   <fieldset className="nc-web-import" disabled={busy}>
-   <details open={manifest.selectionConfirmed?undefined:true}><summary>查看图片与阅读顺序 · {selected.length} 张</summary><SourceImagePicker choices={choices} onChange={setChoices} generic={manifest.adapter==='generic'} disabled={busy}/></details>
+   <details open={manifest.selectionConfirmed?undefined:true}><summary>查看图片与阅读顺序 · {selected.length} 张</summary><SourceImagePicker choices={choices} onChange={setChoices} disabled={busy}/></details>
    <div className="segmented" role="group" aria-label="加入方式"><button type="button" className={mode==='new'?'active':''} aria-pressed={mode==='new'} onClick={()=>setMode('new')}>新增阅读副本</button><button type="button" className={mode==='insert'?'active':''} aria-pressed={mode==='insert'} onClick={()=>{setMode('insert');if(!assignment.workId&&library.works[0])changeAssignment({...assignment,workId:library.works[0].id});}}>插入已有副本</button></div>
    {mode==='new'?<>
     <ImportAssignmentFields value={assignment} onChange={changeAssignment} library={library}/>

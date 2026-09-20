@@ -1,9 +1,9 @@
 /** Isolated MV3 browser acceptance. Uses fixture source pages and original/synthetic images,
- * the production extension manifest, and a fresh profile. No account/provider requests.
+ * a copied extension with fixture-origin permission, and a fresh profile. No account/provider requests.
  * Run npm run build in apps/extension first. Set PLAYWRIGHT_MODULE and TEST_CHROMIUM as needed.
  */
 import {createRequire} from 'node:module';
-import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {deflateSync} from 'node:zlib';
 import path from 'node:path';
@@ -12,12 +12,16 @@ import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=path.join(root,'artifacts/web-import');await mkdir(output,{recursive:true});
-const profile=await mkdtemp(path.join(output,'profile-')),extension=path.join(root,'apps/extension/.output/chrome-mv3');
+const profile=await mkdtemp(path.join(output,'profile-')),extension=await mkdtemp(path.join(output,'extension-'));
+await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
 const config=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 for(const domain of ['copy4000.com','mangacopy.com']){
  assert(config.host_permissions.includes(`https://*.${domain}/*`));
  assert(config.content_scripts.some(script=>script.matches.includes(`https://*.${domain}/comic/*`)));
 }
+// Opening popup.html in a tab does not confer the toolbar action's activeTab grant.
+config.host_permissions.push('http://127.0.0.1/*');
+await writeFile(path.join(extension,'manifest.json'),JSON.stringify(config));
 const context=await chromium.launchPersistentContext(profile,{headless:true,...(process.env.TEST_CHROMIUM?{executablePath:process.env.TEST_CHROMIUM}:{channel:'chromium'}),args:['--disable-extensions-except='+extension,'--load-extension='+extension],viewport:{width:1440,height:1000}});
 const errors=[],checks=[];context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 const origin='http://127.0.0.1:18088',original=await readFile(path.join(root,'samples/starlight-bookshop.png'));
@@ -29,12 +33,12 @@ function png(width,height){
  const rows=Buffer.alloc((width*3+1)*height);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const at=y*(width*3+1)+1+x*3;rows[at]=190;rows[at+1]=215;rows[at+2]=240;}
  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(rows)),chunk('IEND',Buffer.alloc(0))]);
 }
-const icon=png(64,64),banner=png(2000,400);let failImage=false;
-const genericHtml=`<!doctype html><meta charset="utf-8"><title>原创漫画 · 来源样本</title><h1>网页采集验收</h1><img src="${origin}/fixtures/1.png"><img src="${origin}/fixtures/icon.png"><img data-src="${origin}/fixtures/2.png" src="${origin}/fixtures/icon.png"><img src="${origin}/fixtures/3.png"><img src="${origin}/fixtures/banner.png">`;
+const icon=png(64,64),banner=png(2000,400),small=png(320,400);let failImage=false;
+const genericHtml=`<!doctype html><meta charset="utf-8"><title>原创漫画 · 来源样本</title><h1>网页采集验收</h1><img src="${origin}/fixtures/1.png"><img src="${origin}/fixtures/icon.png"><img data-src="${origin}/fixtures/unused.png" src="${origin}/fixtures/2.png" width="400" height="500"><img src="${origin}/fixtures/3.png"><img src="${origin}/fixtures/banner.png">`;
 await context.route(origin+'/**',route=>{
  const url=new URL(route.request().url());
  if(url.pathname==='/fixtures/page')return route.fulfill({contentType:'text/html',body:genericHtml});
- if(url.pathname.startsWith('/fixtures/')&&url.pathname.endsWith('.png'))return route.fulfill({status:failImage&&url.pathname.endsWith('failed.png')?503:200,contentType:'image/png',body:url.pathname.endsWith('icon.png')?icon:url.pathname.endsWith('banner.png')?banner:original});
+ if(url.pathname.startsWith('/fixtures/')&&url.pathname.endsWith('.png'))return route.fulfill({status:failImage&&url.pathname.endsWith('failed.png')?503:200,contentType:'image/png',body:url.pathname.endsWith('icon.png')?icon:url.pathname.endsWith('banner.png')?banner:url.pathname.endsWith('2.png')?small:original});
  return route.fulfill({status:503,body:'Isolated acceptance: backend unavailable'});
 });
 const uuid='724f819b-5306-11ea-b7ea-024352452ce0';
@@ -57,16 +61,16 @@ try{
  async function setSourceImages(names){await source.evaluate(({origin,names})=>{document.querySelectorAll('img').forEach(img=>img.remove());for(const name of names){const img=document.createElement('img');img.src=origin+'/fixtures/'+name+'.png';img.width=800;img.height=1200;document.body.append(img);}}, {origin,names});await source.waitForFunction(()=>[...document.images].every(img=>img.complete));}
  let p=await popup();assert.equal(await p.locator('.nc-image-choice').count(),3);assert.equal(await p.locator('.is-selected').count(),3);
  assert(await p.locator('.nc-image-choice').evaluateAll(cards=>cards.every(card=>card.querySelector('.nc-image-caption').getBoundingClientRect().bottom<=card.getBoundingClientRect().bottom)),'Image dimensions and reorder controls must fit inside every card');
- await p.locator('.nc-popup').screenshot({path:path.join(output,'popup-light.png')});
+ await p.locator('.nc-popup-scroll').evaluate(el=>el.scrollTop=el.scrollHeight);await p.locator('.nc-popup').screenshot({path:path.join(output,'popup-light.png')});
  assert(await p.evaluate(()=>document.documentElement.scrollWidth<=420&&document.querySelector('.nc-popup').getBoundingClientRect().height<=600));
  const orderedIds=await p.locator('.is-selected').evaluateAll(cards=>cards.map(card=>card.dataset.imageId));await p.locator('.is-selected img').first().dragTo(p.locator('.is-selected img').nth(1));assert.deepEqual(await p.locator('.is-selected').evaluateAll(cards=>cards.map(card=>card.dataset.imageId)),[orderedIds[1],orderedIds[0],orderedIds[2]]);await p.getByRole('button',{name:'恢复网页顺序',exact:true}).click();
- await p.getByLabel('选择网页图片 1',{exact:true}).uncheck();await p.getByRole('button',{name:'上移网页图片 4',exact:true}).click();
- await p.getByLabel('显示已过滤图片（2）').check();assert.equal(await p.locator('.nc-image-choice').count(),5);await p.getByLabel('选择网页图片 2',{exact:true}).check();await p.getByLabel('选择网页图片 2',{exact:true}).uncheck();await p.getByLabel('显示已过滤图片（2）').uncheck();
+ await p.getByLabel('选择网页图片 1',{exact:true}).uncheck();await p.getByRole('button',{name:'上移网页图片 3',exact:true}).click();
+ assert.equal(await p.getByText('显示已过滤图片',{exact:false}).count(),0);assert.equal(await p.locator('.nc-image-choice').count(),3);
  await source.evaluate(origin=>{const img=document.createElement('img');img.src=origin+'/fixtures/4.png';document.body.append(img);},origin);await source.waitForFunction(()=>document.images[5].complete);
  await p.getByRole('button',{name:'刷新网页图片'}).click();await p.waitForFunction(()=>!document.querySelector('.nc-popup-discover').disabled);
  assert.deepEqual(await p.locator('.is-selected img').evaluateAll(images=>images.map(img=>new URL(img.src).pathname.split('/').at(-1))),['3.png','2.png','4.png']);
  await p.close();p=await popup();assert.deepEqual(await p.locator('.is-selected img').evaluateAll(images=>images.map(img=>new URL(img.src).pathname.split('/').at(-1))),['3.png','2.png','4.png']);
- checks.push('Automatic discovery, reversible resolution filtering, selection/order and refresh/reopen persistence');
+ checks.push('Manual discovery using inline candidate rules, no secondary filtering, selection/order and refresh/reopen persistence');
  let reader=await openImport(p);await reader.getByLabel('作品名称',{exact:true}).fill('网页漫画验收');await reader.getByLabel('内容归属',{exact:true}).selectOption('chapter');await reader.getByLabel('副本／新条目名称',{exact:true}).fill('第 1 话');
  await reader.getByRole('dialog').screenshot({path:path.join(output,'assign-new.png')});await reader.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await reader.getByLabel('跳转页码').waitFor();
  let state=await data(reader);assert.equal(state.library.works.length,1);assert.equal(state.library.chapters.length,1);assert.deepEqual(state.copies[0].pages.map(page=>page.sourceUrl.split('/').at(-1)),['3.png','2.png','4.png']);assert(state.copies[0].pages.every(page=>page.blobKey));
@@ -79,10 +83,10 @@ try{
  await insert.getByRole('button',{name:'返回我的漫画',exact:true}).click();await insert.reload();await insert.getByRole('dialog').waitFor();await insert.getByRole('button',{name:'插入已有副本',exact:true}).click();await insert.getByLabel('目标作品',{exact:true}).selectOption(workId);await insert.getByLabel('插入位置',{exact:true}).selectOption('after');await insert.getByLabel('接在哪一页后',{exact:true}).selectOption(originalPageIds[0]);await insert.getByRole('button',{name:'插入图片并继续阅读',exact:true}).click();await insert.getByLabel('跳转页码').waitFor();state=await data(insert);assert.equal(state.copies[0].pages.length,4);assert.equal(await insert.getByLabel('跳转页码').inputValue(),'3');
  checks.push('New chapter import; insertion inside an existing copy; page IDs, work count, position and duplicate retry preserved');
  await setSourceImages(['6']);p=await popup();const chapter=await openImport(p);await chapter.getByLabel('归入作品',{exact:true}).selectOption(workId);await chapter.getByLabel('内容归属',{exact:true}).selectOption('publication');await chapter.getByLabel('副本／新条目名称',{exact:true}).fill('第 1 卷');await chapter.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await chapter.getByLabel('跳转页码').waitFor();state=await data(chapter);assert.equal(state.library.works.length,1);assert.equal(state.library.publications.length,1);assert.equal(state.copies.length,2);checks.push('New volume assigned to the same work');
- await setSourceImages(['failed']);failImage=true;p=await popup();const failed=await openImport(p);await failed.getByLabel('归入作品',{exact:true}).selectOption(workId);await failed.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await failed.getByLabel('跳转页码').waitFor();state=await data(failed);assert(state.copies.some(copy=>copy.pages.some(page=>page.fetchError?.includes('503'))));await failed.screenshot({path:path.join(output,'failed-image.png')});failImage=false;await failed.reload();await failed.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await failed.getByLabel('跳转页码').waitFor();state=await data(failed);assert(state.copies.every(copy=>copy.pages.every(page=>page.blobKey)));checks.push('Per-image HTTP failure saved with actionable reason and restored by retry without another work/copy');
+ await setSourceImages(['failed']);p=await popup();failImage=true;const failed=await openImport(p);await failed.getByLabel('归入作品',{exact:true}).selectOption(workId);await failed.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await failed.getByLabel('跳转页码').waitFor();state=await data(failed);assert(state.copies.some(copy=>copy.pages.some(page=>page.fetchError?.includes('503'))));await failed.screenshot({path:path.join(output,'failed-image.png')});failImage=false;await failed.reload();await failed.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await failed.getByLabel('跳转页码').waitFor();state=await data(failed);assert(state.copies.every(copy=>copy.pages.every(page=>page.blobKey)));checks.push('Per-image HTTP failure saved with actionable reason and restored by retry without another work/copy');
  await worker.evaluate(async url=>{const tab=await chrome.tabs.create({url,active:false});return tab.id;},extensionUrl);const settingsPage=context.pages().find(page=>page.url()===extensionUrl)??reader;
  await settingsPage.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')||'{}'),appearance:'dark',accentTheme:'rose'})));
- p=await popup();await p.locator('.nc-popup').screenshot({path:path.join(output,'popup-dark.png')});assert.equal(await p.evaluate(()=>document.documentElement.dataset.appearance),'dark');assert.equal(await p.evaluate(()=>document.documentElement.dataset.accent),'rose');await p.close();checks.push('Popup uses the existing appearance and accent settings');
+ p=await popup();await p.locator('.nc-popup-scroll').evaluate(el=>el.scrollTop=el.scrollHeight);await p.locator('.nc-popup').screenshot({path:path.join(output,'popup-dark.png')});assert.equal(await p.evaluate(()=>document.documentElement.dataset.appearance),'dark');assert.equal(await p.evaluate(()=>document.documentElement.dataset.accent),'rose');await p.close();checks.push('Popup uses the existing appearance and accent settings');
  for(const domain of ['copy4000.com','www.copy4000.com','mangacopy.com','www.mangacopy.com']){
   const page=await context.newPage();await page.goto(`https://${domain}/comic/sample`);await page.getByRole('button',{name:'Node Comics · 导入／管理漫画',exact:true}).waitFor();
   const tabId=await worker.evaluate(async url=>(await chrome.tabs.query({url}))[0].id,page.url());
@@ -97,6 +101,11 @@ try{
  const managedPage=await createdManaged;await managedPage.goto(catalog.entries[0].url.replace('www.mangacopy.com','www.copy4000.com'));
  let redirected;for(let i=0;i<30;i++){redirected=await send({type:'NC_POLL_SOURCE',tabId:managed.data.tabId});assert(redirected.ok,redirected.error);if(redirected.data)break;await new Promise(resolve=>setTimeout(resolve,100));}
  assert.equal(new URL(redirected.data.url).hostname,'www.copy4000.com');assert.equal(redirected.data.items.length,2);assert((await send({type:'NC_CLOSE_SOURCE',tabId:managed.data.tabId})).ok);checks.push('Managed acquisition continues after a same-chapter mirror navigation');
+ p=await popup();await setSourceImages([]);await p.getByRole('button',{name:'刷新网页图片'}).click();await p.getByText('暂未发现图片。滚动原网页让图片加载，再刷新发现。',{exact:true}).waitFor();
+ assert(await p.getByRole('button',{name:'加入漫画',exact:true}).isDisabled());
+ await p.locator('.nc-popup-scroll').evaluate(el=>el.scrollTop=el.scrollHeight);await p.screenshot({path:path.join(output,'popup-empty.png')});
+ await setSourceImages(['1']);await p.getByRole('button',{name:'刷新网页图片'}).click();await p.getByRole('button',{name:'加入漫画 · 1 张',exact:false}).waitFor();assert.equal(await p.locator('.nc-image-choice').count(),1);await p.close();
+ checks.push('Empty discovery disables import; refreshing loaded images restores selection');
  assert.deepEqual(errors,[]);
  await writeFile(path.join(output,'results.json'),JSON.stringify({checkedAt:new Date().toISOString(),browser:context.browser()?.version(),checks,errors,fixtureOnly:true},null,2));console.log('Passed '+checks.length+' browser scenarios. Evidence: '+output);
 }catch(error){await writeFile(path.join(output,'failure.txt'),String(error.stack));for(const [index,page] of context.pages().entries())await page.screenshot({path:path.join(output,`failure-${index}.png`)}).catch(()=>{});throw error;}

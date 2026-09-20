@@ -104,7 +104,7 @@ function Popup({initialError=''}:{initialError?:string}){
     <button className="nc-popup-discover" disabled={!source||disabled} onClick={()=>source&&void discover(source)}><Icon name={discovery?'refresh':'layers'} size={18}/><span><b>{busy?'正在发现网页图片…':discovery?'刷新网页图片':'发现网页图片'}</b><small>选择图片，加入漫画管理器</small></span><Icon name="arrow" size={17}/></button>
     {busy&&<p className="nc-popup-loading" role="status">{discovery?'正在刷新，保留已有选择与顺序…':'正在读取网页图片…'}</p>}
     {discoveryError&&<div className="nc-popup-error" role="alert"><p>{discoveryError}</p>{source&&<button disabled={disabled} onClick={()=>void grant()}>授权本站并重试</button>}</div>}
-    {discovery?.kind==='pages'&&<div className="nc-popup-results"><SourceImagePicker choices={choices} generic={discovery.manifest.adapter==='generic'} disabled={disabled} onChange={items=>{selection.current=items;setChoices(items);}}/><p className="nc-popup-note">{discovery.manifest.note}</p></div>}
+    {discovery?.kind==='pages'&&<div className="nc-popup-results"><SourceImagePicker choices={choices} disabled={disabled} onChange={items=>{selection.current=items;setChoices(items);}}/><p className="nc-popup-note">{discovery.manifest.note}</p></div>}
     {discovery?.kind==='catalog'&&<div className="nc-popup-catalog"><Icon name="layers" size={24}/><h2>{discovery.catalog.title}</h2><p>{discovery.catalog.entries.length} 个来源条目 · {discovery.catalog.groups.length} 个分组</p><small>{discovery.catalog.note}</small></div>}
     {discovery&&<button className="button secondary full nc-popup-add" disabled={disabled||discovery.kind==='pages'&&!count} onClick={()=>void open(true)}>{opening?'正在打开…':discovery.kind==='catalog'?'选择目录导入范围':`加入漫画${count?' · '+count+' 张':''}`}<Icon name="arrow" size={16}/></button>}
    </section>

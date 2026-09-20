@@ -1,4 +1,5 @@
-import {comicSize,readingImages,type InlineResponse,type InlineResult} from './protocol';
+import {readingImages,type InlineResponse,type InlineResult} from './protocol';
+import {comicImageRect,MAX_COMIC_IMAGES} from '../sources/comic-images';
 import {ImageDisplay} from './display';
 import {safeImageUrl} from '../sources/adapters';
 import {languageLabel,modeLabels} from '../types';
@@ -58,10 +59,8 @@ export function installInline(){
     if(location.href!==initialUrl){stop();return;}
     const next:Candidate[]=[];
     for(const image of document.images){
-      if(next.length>=1500)break;
-      const rect=image.getBoundingClientRect();
-      if(!comicSize(rect.width,rect.height)||!image.complete||image.naturalWidth<80||image.naturalHeight<80)continue;
-      const css=getComputedStyle(image);if(css.visibility!=='visible'||Number(css.opacity)===0||!image.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}))continue;
+      if(next.length>=MAX_COMIC_IMAGES)break;
+      const rect=comicImageRect(image);if(!rect)continue;
       const url=source(image);if(!url)continue;
       let item=tracked.get(image);
       if(item&&item.url!==url){item.display.restore();tracked.delete(image);item=undefined;}

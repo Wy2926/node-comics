@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import {beforeAll,describe,expect,it,vi} from 'vitest';
-import {initialChoices,refreshChoices,moveChoice,selectManifest,imageFilterReason} from '../src/sources/selection';
+import {initialChoices,refreshChoices,moveChoice,selectManifest} from '../src/sources/selection';
 import type {PageManifest,SourceItem} from '../src/sources/adapters';
 import {discoverDocument} from '../src/sources/adapters';
 import {isMangaCopyUrl,mangaCopyLocation,sourcePageIdentity,sameMangaCopyPage,discoverMangaCopyCatalog} from '../src/sources/mangacopy';
@@ -35,13 +35,12 @@ describe('shared MangaCopy domains',()=>{
 });
 
 describe('generic selection and refresh',()=>{
- it('filters small images and banners, retaining wide spreads, long strips and unknown dimensions',()=>{
+ it('selects the discovered manifest without another source-resolution filter',()=>{
   const items=[image('avatar',128,128),image('low',320,400),image('banner',2000,400),image('spread',1800,1000),image('webtoon',800,16000),image('lazy',0,0)];
-  expect(initialChoices(manifest(items)).filter(item=>item.selected).map(item=>item.id)).toEqual(['spread','webtoon','lazy']);
-  expect(imageFilterReason(items[2])).toBe('疑似横幅');
+  expect(initialChoices(manifest(items)).every(item=>item.selected)).toBe(true);
   expect(initialChoices({...manifest(items),adapter:'xkcd'}).every(item=>item.selected)).toBe(true);
  });
- it('keeps explicit filtered overrides, deselection and order while appending new images',()=>{
+ it('keeps explicit deselection and order while appending new images',()=>{
   const a=image('a',800,1200,0),b=image('b',800,1200,1),small=image('small',64,64,2);
   let chosen=initialChoices(manifest([a,b,small]));chosen=moveChoice(chosen,'b','a');chosen=chosen.map(item=>({...item,selected:item.id!=='a'}));
   const refreshed=refreshChoices(chosen,manifest([{...small,order:0},{...a,order:1},{...b,order:2},image('new',800,1200,3)]));
@@ -54,11 +53,11 @@ describe('generic selection and refresh',()=>{
   const picked=selectManifest(m,['tiny','a']);expect(picked.items.map(item=>item.id)).toEqual(['tiny','a']);expect(picked.discoveryComplete).toBe(false);expect(picked.knownTotal).toBeUndefined();
   expect(initialChoices(picked).every(item=>item.selected)).toBe(true);
  });
- it('discovers lazy original URLs without mistaking placeholder dimensions for original dimensions',()=>{
+ it('keeps dedicated adapters lazy original URLs without mistaking placeholder dimensions for original dimensions',()=>{
   const imgs=[{dataset:{src:'https://images.example/full'},src:'https://images.example/pixel',currentSrc:'https://images.example/pixel',naturalWidth:1,naturalHeight:1,width:1,height:1},{dataset:{},src:'https://images.example/icon',naturalWidth:64,naturalHeight:64},{dataset:{},src:'javascript:alert(1)'}];
   const doc={title:'网页',querySelectorAll:()=>imgs} as unknown as Document;
-  const result=discoverDocument(doc,'https://example.test/page');expect(result.items).toHaveLength(2);expect(result.items[0]).toMatchObject({url:'https://images.example/full',width:0,height:0});
-  const second=discoverDocument({...doc,querySelectorAll:()=>imgs.slice(1)} as unknown as Document,'https://example.test/page');expect(second.items[0].id).toBe(result.items[1].id);
+  const result=discoverDocument(doc,'https://xkcd.com/1');expect(result.items).toHaveLength(2);expect(result.items[0]).toMatchObject({url:'https://images.example/full',width:0,height:0});
+  const second=discoverDocument({...doc,querySelectorAll:()=>imgs.slice(1)} as unknown as Document,'https://xkcd.com/1');expect(second.items[0].id).toBe(result.items[1].id);
  });
 });
 

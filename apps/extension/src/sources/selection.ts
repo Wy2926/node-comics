@@ -1,15 +1,8 @@
 import type {PageManifest,SourceItem} from './adapters';
 
 export type ImageChoice=SourceItem&{selected:boolean};
-export function imageFilterReason(item:SourceItem):string|undefined{
- const {width,height}=item;
- if(!width||!height)return;
- if(width<300||height<300)return '尺寸较小';
- if(width*height<180000)return '分辨率较低';
- if(width/height>2.8)return '疑似横幅';
-}
 export function initialChoices(manifest:PageManifest):ImageChoice[]{
- return manifest.items.map(item=>({...item,selected:!!manifest.selectionConfirmed||manifest.adapter!=='generic'||!imageFilterReason(item)}));
+ return manifest.items.map(item=>({...item,selected:true}));
 }
 /** Keep explicit choices and reading order; drop removed URLs and append new images. */
 export function refreshChoices(previous:ImageChoice[],manifest:PageManifest):ImageChoice[]{
