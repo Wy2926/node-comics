@@ -40,6 +40,13 @@ export default defineBackground(()=>{
   if(message?.type==='NC_IMPORT_CURRENT'&&fromDetail){void discover(sender.tab!.id!).then(result=>chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?catalog='+result.id)})).then(()=>respond({ok:true})).catch(()=>respond({ok:false,error:'目录读取失败，请通过插件弹窗重试。'}));return true;}
   if(!trusted(sender))return;
   (async()=>{
+   if(message?.type==='NC_TRANSLATE_TAB'){
+    if(!Number.isInteger(message.tabId)||message.tabId<0)throw Error('当前标签页不可用，请重新打开插件。');
+    const tab=await chrome.tabs.get(message.tabId);
+    if(!tab.url||!safeImageUrl(tab.url,tab.url))throw Error('请在普通网页中使用翻译。');
+    if(tab.url!==message.url)throw Error('当前网页已变化，请重新打开插件后翻译。');
+    await activateInline(message.tabId);return true;
+   }
    if(message?.type==='NC_DISCOVER_TAB')return discover(Number(message.tabId));
    if(message?.type==='NC_SELECT_MANIFEST'){
     const data=await chrome.storage.local.get('manifest:'+message.manifestId),original=data['manifest:'+message.manifestId] as PageManifest|undefined;

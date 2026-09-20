@@ -28,7 +28,7 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
   return <dialog ref={ref} className={`modal nc-login ${pending?'is-connecting':''} ${failed?'has-error':''}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();setOpen(false);}}>
     <button className="nc-login-close icon-button" aria-label={pending?'收起登录进度':'关闭登录'} onClick={()=>setOpen(false)}><Icon name="close"/></button>
     <div className="nc-login-spread">
-      <div className="nc-login-cover" aria-hidden="true">
+      <div className="nc-login-cover nc-comic-paper" aria-hidden="true">
         <div className="nc-login-masthead"><Icon name="spark" size={18}/><span>NODE COMICS</span><span>漫游通行证</span></div>
         <div className="nc-login-cover-title">翻过语言<br/><em>这一页。</em><span className="nc-login-star">✳</span></div>
         <div className="nc-login-panels">
@@ -51,8 +51,8 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
               :unavailable?<div role="alert"><Icon name="info"/><div><strong>登录服务暂不可用</strong><p>{configError||'身份服务尚未配置完整，请稍后重试或联系运营方。'}</p></div></div>
               :<div><Icon name="shield"/><div><strong>{development?'开发环境 · 测试登录':'你的下一页，已准备好'}</strong><p>{development?'此入口仅用于本地开发验证。':'前往安全登录页面，完成后回到这里。'}</p></div></div>}
           </div>
-          {unavailable&&!pending?<button type="button" className="button primary full nc-login-submit" onClick={()=>void reloadConfig()}>重新连接登录服务<Icon name="refresh" size={18}/></button>
-            :<button type="submit" className="button primary full nc-login-submit" disabled={pending||configLoading||!configured||development&&!username.trim()}>{pending?<><span className="spinner"/>等待登录完成</>:configLoading?'准备登录中…':<>{state.kind==='error'?'重新登录':development?'连接测试账户':'登录，开启漫游'}<Icon name="arrow" size={18}/></>}</button>}
+          {unavailable&&!pending?<button type="button" className="button primary full nc-login-submit nc-comic-action" onClick={()=>void reloadConfig()}>重新连接登录服务<Icon name="refresh" size={18}/></button>
+            :<button type="submit" className="button primary full nc-login-submit nc-comic-action" disabled={pending||configLoading||!configured||development&&!username.trim()}>{pending?<><span className="spinner"/>等待登录完成</>:configLoading?'准备登录中…':<>{state.kind==='error'?'重新登录':development?'连接测试账户':'登录，开启漫游'}<Icon name="arrow" size={18}/></>}</button>}
           <button type="button" className="button quiet full nc-login-later" onClick={()=>setOpen(false)}>{pending?'收起进度，继续阅读':'先阅读原图'}</button>
         </form>
         <div className="nc-login-footnote"><Icon name="book" size={17}/><p>当前页与后两页，随读随译。<br/><span>原图与阅读位置，始终为你保留。</span></p></div>

@@ -50,7 +50,7 @@ try{
   await worker.evaluate(async url=>{const [tab]=await chrome.tabs.query({url});await chrome.tabs.update(tab.id,{active:true});},source.url());
   const created=context.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),popupUrl);const page=await created;
   await page.waitForURL(popupUrl);await page.setViewportSize({width:420,height:600});
-  await page.getByRole('button',{name:'刷新',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('.nc-popup-source button')?.disabled);await page.bringToFront();return page;
+  await page.getByRole('button',{name:'发现网页图片'}).waitFor();assert.equal(await page.locator('.nc-image-choice').count(),0);await page.getByRole('button',{name:'发现网页图片'}).click();await page.waitForFunction(()=>!!document.querySelector('.nc-popup-results')&&!document.querySelector('.nc-popup-discover').disabled);await page.bringToFront();return page;
  }
  async function openImport(page){const created=context.waitForEvent('page');await page.getByRole('button',{name:/^加入漫画/}).click();const reader=await created;await reader.getByRole('dialog').waitFor();return reader;}
  async function data(page){return page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-library');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction(['copies','library'],'readonly'),copies=tx.objectStore('copies').getAll(),library=tx.objectStore('library').get('library');tx.oncomplete=()=>{resolve({copies:copies.result,library:library.result});db.close();};};}));}
@@ -63,7 +63,7 @@ try{
  await p.getByLabel('选择网页图片 1',{exact:true}).uncheck();await p.getByRole('button',{name:'上移网页图片 4',exact:true}).click();
  await p.getByLabel('显示已过滤图片（2）').check();assert.equal(await p.locator('.nc-image-choice').count(),5);await p.getByLabel('选择网页图片 2',{exact:true}).check();await p.getByLabel('选择网页图片 2',{exact:true}).uncheck();await p.getByLabel('显示已过滤图片（2）').uncheck();
  await source.evaluate(origin=>{const img=document.createElement('img');img.src=origin+'/fixtures/4.png';document.body.append(img);},origin);await source.waitForFunction(()=>document.images[5].complete);
- await p.getByRole('button',{name:'刷新',exact:true}).click();await p.waitForFunction(()=>!document.querySelector('.nc-popup-source button').disabled);
+ await p.getByRole('button',{name:'刷新网页图片'}).click();await p.waitForFunction(()=>!document.querySelector('.nc-popup-discover').disabled);
  assert.deepEqual(await p.locator('.is-selected img').evaluateAll(images=>images.map(img=>new URL(img.src).pathname.split('/').at(-1))),['3.png','2.png','4.png']);
  await p.close();p=await popup();assert.deepEqual(await p.locator('.is-selected img').evaluateAll(images=>images.map(img=>new URL(img.src).pathname.split('/').at(-1))),['3.png','2.png','4.png']);
  checks.push('Automatic discovery, reversible resolution filtering, selection/order and refresh/reopen persistence');

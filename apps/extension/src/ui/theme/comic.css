@@ -1,0 +1,14 @@
+.nc-comic-paper {
+  background-color: var(--accent-soft);
+  background-image: var(--comic-dot-pattern);
+  background-size: var(--comic-dot-size);
+}
+.nc-app button.button.nc-comic-action {
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  box-shadow: var(--comic-shadow);
+}
+.nc-app button.button.nc-comic-action:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: var(--comic-shadow-hover); }
+.nc-app button.button.nc-comic-action:active:not(:disabled) { transform: translate(3px,3px); box-shadow: var(--comic-shadow-active); }
+.nc-app button.button.nc-comic-action:disabled { opacity: 1; background: var(--surface-soft); color: var(--muted); box-shadow: var(--comic-shadow-disabled); border-color: var(--line); }
+@media (prefers-reduced-motion: reduce) { .nc-app button.button.nc-comic-action { transition: none; } }

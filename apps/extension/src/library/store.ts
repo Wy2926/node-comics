@@ -81,7 +81,15 @@ export function settings(): Settings {
 function knownSettings(value:Partial<Settings>):Settings {
   return Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,value?.[key as keyof Settings]??fallback])) as unknown as Settings;
 }
-export function saveSettings(value: Settings) { localStorage.setItem('nc-settings',JSON.stringify(knownSettings(value))); void mirrorReader({settings:knownSettings(value)}); if (typeof chrome!=='undefined' && chrome.storage?.local) void chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}}); }
+export function saveSettings(value: Settings) {
+  localStorage.setItem('nc-settings',JSON.stringify(knownSettings(value)));
+  return Promise.all([
+    mirrorReader({settings:knownSettings(value)}),
+    typeof chrome!=='undefined' && chrome.storage?.local
+      ? chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}})
+      : Promise.resolve(),
+  ]).then(()=>{});
+}
 export async function enforceCacheBudget(copies: ReadingCopy[], limitMb: number, protectedCopyId?: string) {
   if(limitMb===-1||limitMb===Infinity)return;
   const all=await transaction<{id:string;blob:Blob;usedAt:number}[]>('blobs','readonly',s=>s.getAll());let total=all.reduce((n,b)=>n+b.blob.size,0);const limit=limitMb*1024*1024;if(total<=limit)return;

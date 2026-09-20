@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction } from 'react';
-import { fallbackLanguages, supportsLanguage, type Capabilities, type Settings } from '../types';
+import { type Capabilities, type Settings } from '../types';
+import {TargetLanguage,withTargetLanguage} from './TargetLanguage';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
@@ -19,7 +20,7 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
       <h3>
         <Icon name="book" />阅读偏好</h3>
       <SettingRow title="默认目标语言" description="常规翻译支持 16 个语言选项；新增语言会采用常规翻译，已有译图版本保留。">
-        <select aria-label="默认目标语言" value={settings.language} onChange={e => setSettings(s => ({ ...s, language: e.target.value, translationMode: supportsLanguage(caps,s.translationMode,e.target.value)?s.translationMode:'classic' }))}>{(caps?.languages ?? fallbackLanguages).map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+        <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>withTargetLanguage(s,language,caps))}/>
       </SettingRow>
       <SettingRow title="翻页方向" description="单页模式中的方向键遵循此设置。">
         <select value={settings.direction} onChange={e => setSettings(s => ({ ...s, direction: e.target.value as Settings['direction'] }))}>
