@@ -1,6 +1,6 @@
 """Isolated sandbox API (loopback 18766), public checkout/webhook only (18764).
 
-Run with backend/.venv/Scripts/python.exe scripts/paddle_sandbox_server.py.
+Run with python scripts/paddle_sandbox_server.py.
 The Cloudflare tunnel must target 18764, never the development-auth API.
 Credentials are read from the ignored .env.paddle.sandbox; no AI workers run.
 """

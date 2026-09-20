@@ -29,7 +29,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 2026-09-16 已重新读取 [Logto 公开 discovery](https://auth.nodelane.net/oidc/.well-known/openid-configuration) 和对应 JWKS：issuer 为 `https://auth.nodelane.net/oidc`，端点为 `/oidc/auth`、`/oidc/token`、`/oidc/jwks`，支持 PKCE S256，公钥为 EC / P-384 / ES384。用户确认应用 ID 为 `dept2iz42nzidf5pao6fo`，与现有本地配置一致。
 
-2026-09-16 用户确认已创建 API 资源，Identifier 为 `https://comics.nodelane.net/api`，线上域名为 `https://comics.nodelane.net`。根 `.env` 已补齐相同 audience；独立 `deploy/.env.production` 使用生产模式、关闭开发登录、精确来源和专用新数据库密码，`COMPOSE_PROJECT_NAME=node-comics-production` 隔离生产卷，`R2_KEY_PREFIX=node-comics-production/` 隔离生产对象。`deploy/.env.local` 已显式标记 `APP_ENV=development`，仍作为本地开发入口。未切换本机运行服务，未公开部署。真实登录验收仍需核实该应用的资源授权、网页 / 扩展回调和允许来源。固定扩展回调为 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc`；更多已有接入信息见 [实施说明](IMPLEMENTATION.md#logto-接入配置)。
+2026-09-16 用户确认已创建 API 资源，Identifier 为 `https://comics.nodelane.net/api`，线上域名为 `https://comics.nodelane.net`。根 `.env` 已补齐相同 audience；独立 `deploy/.env.production` 使用生产模式、关闭开发登录、精确来源和专用新数据库密码，`COMPOSE_PROJECT_NAME=node-comics-production` 隔离生产卷，`R2_KEY_PREFIX=node-comics-production/` 隔离生产对象。`deploy/.env.local` 已显式标记 `APP_ENV=development`，仍作为本地开发入口。未切换本机运行服务，未公开部署。真实登录验收仍需核实该应用的资源授权、网页 / 扩展回调和允许来源。固定扩展回调为 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc`。网页回调为 `location.origin + location.pathname`，在 Logto 登记实际完整路径及其 CORS origin；插件回调以 `chrome.identity.getRedirectURL('oidc')` 为准。商店公钥在 `apps/extension/wxt.config.ts`，更换扩展 ID 后须同步身份平台登记及 `EXTENSION_IDS`。
 
 ## 撤销与并发行为
 

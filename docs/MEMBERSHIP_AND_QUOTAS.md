@@ -141,4 +141,4 @@ User、MembershipOperation 保存会员段与审计；QuotaPeriod 保存周期�
 
 按最终 schema 重建初始基线，并在空数据库、新环境中验证从零初始化。API、dispatcher、worker 和客户端使用同一套新契约及匹配版本；不要求旧库升级，不保留历史迁移链、旧提交恢复入口或双版本运行安排。初始化验收需验证完整表结构、约束和新契约内的幂等恢复，不运行旧数据迁移用例。本轮已建立 `results_0001` 并完成隔离空库初始化验证。
 
-验证命令、证据与剩余边界见[会员额度实现与验收](MEMBERSHIP_IMPLEMENTATION.md)。价格、试用与支付渠道设计已确认，运营赠送前端已实现；Paddle 支付订阅、活动系统和公开部署仍在后续范围。
+验证入口见[后端说明](../backend/README.md#验证)与[阅读契约验收](READING_TRANSLATION_CONTRACT.md#10-实现与验证记录)。运营赠送与 Paddle 支付后端已实现；支付默认关闭，真实沙盒验收边界见[Paddle 接入](PADDLE_BILLING_DESIGN.md)。活动系统和公开部署仍属后续范围。

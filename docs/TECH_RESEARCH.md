@@ -13,7 +13,6 @@
 | [MV3远程代码](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code) | 适配器随插件发布 |
 | [WXT入口](https://wxt.dev/guide/essentials/entrypoints.html) | popup/background/reader共享工程 |
 | [KindleUnpack格式字段](https://github.com/kevinhendricks/KindleUnpack/blob/master/lib/mobi_header.py) | 参考格式字段，独立实现有界MOBI图片提取，不执行HTML |
-| [Celery任务](https://docs.celeryq.dev/en/stable/userguide/tasks.html) | 数据库状态与账本提供业务幂等 |
 
 ## 样本与证据
 

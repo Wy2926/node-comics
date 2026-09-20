@@ -1,6 +1,6 @@
 # 翻译集群、预上传与阅读优先队列
 
-2026-09-19 已实现[阅读计划契约](READING_TRANSLATION_CONTRACT.md)，全新空库基线 `reading_0001`。客户端采用逐页操作回执与至多三页阅读窗口，服务端保留持久任务、公平执行与私有 R2。旧提交／用户队列接口、在途容量和历史迁移链已删除，不支持旧环境升级。本次未替换现有运行服务。
+2026-09-19 已实现[阅读计划契约](READING_TRANSLATION_CONTRACT.md)，全新空库基线 `results_0001`。客户端采用逐页操作回执与至多三页阅读窗口，服务端保留持久任务、公平执行与私有 R2。旧提交／用户队列接口、在途容量和历史迁移链已删除，不支持旧环境升级。本次未替换现有运行服务。
 
 计算节点使用[整页协议](COMPUTE_PROTOCOL.md)：整页租约、有限接单名额、R2 短期授权直读、独立文本池与有界流水线。验收边界见[流水线验证](PIPELINE_VALIDATION.md)。
 
@@ -113,7 +113,7 @@ flowchart LR
 | `PUT /v1/reading-sessions/{id}/lease` | 优先级续租与条件接管 |
 | `PUT /v1/uploads/{id}/content`、`POST .../complete` | 有界上传与验证 |
 | `GET /v1/me/translation-changes` | 账户增量结果同步，持久单调游标 |
-| `/internal/nodes/*`、`/internal/leases/*` | 注册、领取、输入、心跳、交付 |
+| `/internal/compute/v2/nodes/*`、`/internal/compute/v2/leases/*` | 注册、领取、输入、心跳、交付 |
 | `GET /v1/admin/compute-nodes` | 设备能力、在线状态和占用 |
 | `app/scheduler.py`、`workers.py`、`dispatcher.py` | 调度、执行与恢复 |
 | `src/translation/`、`src/inline/` | 客户端逐页回执、自动阅读调度、增量同步与原网页翻译；队列界面已移除 |
@@ -126,4 +126,4 @@ flowchart LR
 
 ## 10. 节点配置与独立身份（2026-09-16）
 
-后台添加、版本化配置与热更新协议见[节点配置说明](NODE_CONFIGURATION.md)。节点不能自注册创建身份、修改执行位或自行解除停用。未应用当前配置的节点不领取新阶段；更新时排空当前阶段再应用，失败报告可见且停止新领取。新安装基线为 `reading_0001`，已合并旧迁移，不兼容旧数据库和共享注册 Token。
+后台添加、版本化配置与热更新协议见[节点配置说明](NODE_CONFIGURATION.md)。节点不能自注册创建身份、修改执行位或自行解除停用。未应用当前配置的节点不领取新阶段；更新时排空当前阶段再应用，失败报告可见且停止新领取。新安装基线为 `results_0001`，已合并旧迁移，不兼容旧数据库和共享注册 Token。

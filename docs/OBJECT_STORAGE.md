@@ -1,6 +1,6 @@
 # 原图与译图对象存储（R2）
 
-2026-09-16：原图与最终 `classic` / `redraw` 结果统一使用私有 R2，并按内容跨账户共享物理对象。公开部署不允许本地持久原图；隔离环境需显式设置 `APP_ENV=test` / `development`、`DEV_AUTH=true`、至少 32 字符签名密钥及 `RESULT_STORAGE_BACKEND=local`。真实 R2 新链路与模拟 S3／SDK 检查分别记录于[集群验收](CLUSTER_VALIDATION.md)。
+2026-09-16：原图与最终 `classic` / `redraw` 结果统一使用私有 R2，并按内容跨账户共享物理对象。公开部署不允许本地持久原图；隔离环境需显式设置 `APP_ENV=test` / `development`、`DEV_AUTH=true`、至少 32 字符签名密钥及 `RESULT_STORAGE_BACKEND=local`。真实 R2 新链路与模拟 S3／SDK 检查分别记录于[阅读契约与验收](READING_TRANSLATION_CONTRACT.md)。
 
 ## 数据路径
 
@@ -60,7 +60,7 @@ STORAGE_TIMEOUT_SECONDS=30
 
 本地 Web 验证时单独加入实际 `http://127.0.0.1:端口`。插件从自己的页面发起跨域下载，不需要新增覆盖全部 R2 的主机权限。R2 过期签名响应可能没有 CORS 头，因此客户端也对首次网络/CORS 失败刷新一次链接。
 
-5. 配置后使用新集群启动入口，见[后端说明](../backend/README.md)。原图不挂载持久图片卷；模型权重卷独立保留。新 `shared_0001` 基线需要空数据库，不迁移旧资产位置。
+5. 配置后使用新集群启动入口，见[后端说明](../backend/README.md)。原图不挂载持久图片卷；模型权重卷独立保留。新 `results_0001` 基线需要空数据库，不迁移旧资产位置。
 
 ## 删除、保留与恢复
 

@@ -1,7 +1,7 @@
 """Isolated real-R2 cluster smoke; no paid provider call or product database.
 
 Run from the repository root:
-  backend/.venv/Scripts/python.exe scripts/verify_cluster_r2.py --env-file .env
+  python scripts/verify_cluster_r2.py --env-file .env
 
 Only R2 settings are read from that file. The script creates synthetic PNGs and
 a temporary SQLite database, restricts every S3 operation to a fresh nested

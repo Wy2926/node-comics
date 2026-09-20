@@ -1,6 +1,6 @@
 """Check download of an existing final R2 result; never upload probe images.
 
-Run from the repository root with backend/.venv/Scripts/python.exe.
+Run from the repository root with python (with backend/requirements.txt installed).
 Only --configure-cors changes bucket CORS; existing rules are preserved.
 Never print SDK diagnostics, credentials, object keys or signed URLs.
 """

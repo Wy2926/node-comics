@@ -6,7 +6,7 @@
 
 WXT + React + TypeScript 客户端；FastAPI + SQLAlchemy/Alembic 控制服务；PostgreSQL 保存任务、阶段、排序、租约、权益、调用成本与检查点；私有 R2 保存原图和最终译图。
 
-API、control-worker 和 maintenance 独立运行。图像 compute-agent 在设备空闲时经认证 API 领取阶段，调用本机常驻引擎；不连接数据库，不持有 R2/LLM 密钥，不依赖共享图片目录。常规阶段 analyze → text/inpaint 并行 → render；重绘使用单独执行池和供应商限制。
+API、control-worker 和 maintenance 独立运行。图像节点 classic_node 经认证 API 领取整页租约，在节点内编排检测、OCR、抹字和嵌字；中心独立处理 text 工作。节点不连接数据库，不持有 R2/LLM 长期密钥，不依赖共享图片目录。详见[计算协议](COMPUTE_PROTOCOL.md)；重绘使用单独执行池和供应商限制。
 
 ## 漫画管理领域模型
 

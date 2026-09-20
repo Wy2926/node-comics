@@ -1,6 +1,6 @@
 # 非 LLM 流水线改造验收
 
-2026-09-19，前次流水线改造记录。其中心像素验收与结果 PUT 已被后续[节点直传](DIRECT_UPLOAD_VALIDATION.md)替换，以下耗时与计数是当时证据。公开 VPS 未部署。图像执行使用 RX 6900 XT Vulkan；此次性能检查用生成样张与固定文本回复，没有调用外部 LLM。此前在线文本接入证据见[本机运行记录](CLASSIC_LOCAL_RUNTIME.md)。
+2026-09-19，前次流水线改造记录。其中心像素验收与结果 PUT 已被后续[节点直传](DIRECT_UPLOAD_VALIDATION.md)替换，以下耗时与计数是当时证据。公开 VPS 未部署。图像执行使用 RX 6900 XT Vulkan；此次性能检查用生成样张与固定文本回复，没有调用外部 LLM。此前在线文本接入证据见下方在线文本验证记录。
 
 ## 已实施
 
@@ -51,24 +51,24 @@
 
 浏览器使用隔离夹具与应用内 Chromium；没有验收已安装 Chrome 扩展的真实源站采集，也没有验收公开 VPS、自然漫画质量或持续多页吞吐。
 
-## 可重复命令
 
-使用既有 Python／Node 环境，在仓库根目录执行后端与真实硬件检查：
+## 改造前的在线文本验证记录
 
-```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests -q --tb=short
-services/classic-engine/.venv-ncnn/Scripts/python.exe -m pytest services/classic-engine/tests -q
-$env:CLASSIC_TEST_MODELS = (Resolve-Path services/classic-engine/models).Path
-services/classic-engine/.venv-ncnn/Scripts/python.exe -m pytest backend/tests/test_compute_node_v2.py -k real_vulkan -q
-backend/.venv/Scripts/python.exe scripts/local_classic.py ready
-git diff --check
-```
+使用生成的 720×600 日文对白样张，目标简体中文；通过正式提交、上传校验、节点 R2 直读、OCR、在线翻译、AOT 抹字、嵌字、中心像素验收、R2 写入及授权下载完整执行。
 
-PostgreSQL 用例只允许隔离库 `nodecomics_concurrency_test`。准备此库后，在当前进程配置 `TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`，然后运行：
+| 记录 | 结果 |
+| --- | --- |
+| 数据库迁移 | `shared_0006_compute_v2` |
+| GPU | AMD Radeon RX 6900 XT，Vulkan |
+| 文本调用 | `gpt-5.6-luna`，1 次，约 3.03 秒 |
+| 上游返回用量 | 输入 4476、输出 23 tokens |
+| 提交至成功终态 | 约 10.19 秒，包含上传校验、排队、文本等待与持久交付 |
+| 存储与下载 | 原图／译图均为真实 R2，译图重新 GET 并解码成功 |
+| 输出 | 720×600 PNG、31538 字节，排版与译文检查通过 |
+| 用户隔离 | 其他用户无法签发此译图访问 URL |
 
-```powershell
-$env:RUN_POSTGRES_CONCURRENCY = '1'
-backend/.venv/Scripts/python.exe -m pytest backend/tests/test_postgres_concurrency.py backend/tests/test_compute_v2_postgres.py backend/tests/test_cluster_scheduler_postgres.py backend/tests/test_upload_ingress_postgres.py -q --tb=short
-```
+单张样张耗时不是多页吞吐基准，也不代表自然漫画 OCR 准确率。脱敏记录及译图在本机 `artifacts/classic-live/`；凭据、签名 URL 和图片文字不进入默认日志或版本控制。
 
-在 `apps/extension` 执行 `npm test`、`npm run check`、`npm run build`；在 `backend/admin-ui` 执行 `npm test`、`npm run build`。浏览器夹具入口为 `backend/tests/manual_admin_server.py` 与插件 Vite 服务的 `/tests/reader-fixture.html?auto=pipeline`。四页真实 R2 检查曾临时关闭本机文本池，仅适合无其他活跃任务的隔离本机环境。
+## 当前验证入口
+
+上述记录保留发生日期，不代表当前服务状态。宿主机环境已移除；当前隔离验证见[后端说明](../backend/README.md#验证)，模型准备与硬件检查见[节点说明](../services/classic-engine/README.md#验证)。

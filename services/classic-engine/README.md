@@ -20,11 +20,11 @@ uv sync --locked --extra test
 
 日文 MIT OCR 的 FP32 构建命令见 [原引擎安装说明](ENGINE.md#安装与模型)。也可复制已验证的 `models/ocr-fp32/backbone.ncnn.param`、`backbone.ncnn.bin`、`decoder.onnx` 和 `build.json`；节点启动时核对构建来源、原始检查点与三个运行文件的 SHA-256。检测、AOT、其他 OCR 权重按包内 `models.json` 验证。`models/`、`build-models/` 均不提交。
 
-本次本机验收所需权重已复制到此服务的被忽略 `models/`，不依赖源仓库目录。Windows 使用系统 Arial／微软雅黑／游ゴシック／Malgun Gothic；Linux 安装 Noto Sans CJK，或在 `engine.font` 显式填写有授权的字体路径。字体不随仓库分发，实际内容摘要与模型、算法、依赖、OCR 语言、排版参数一起生成引擎版本。多机需要相同版本才能领取同一配置的任务。
+模型需按上述命令或清单另行准备；仓库不提供已安装环境或本机运行权重。Windows 使用系统 Arial／微软雅黑／游ゴシック／Malgun Gothic；Linux 安装 Noto Sans CJK，或在 `engine.font` 显式填写有授权的字体路径。字体不随仓库分发，实际内容摘要与模型、算法、依赖、OCR 语言、排版参数一起生成引擎版本。多机需要相同版本才能领取同一配置的任务。
 
 ## 配置与运行
 
-1. 中心使用当前 `shared_0007_upload_verified_info` 空数据库，不保留旧协议或旧上传数据适配。
+1. 中心使用当前 `results_0001` 空数据库，不保留旧协议或旧上传数据适配。
 2. 在后台创建节点，保存其独立身份和凭据；填写稳定 `resource_id`，执行位表示承接的整页数量。
 3. 复制 [node.example.json](node.example.json) 为 `node.local.json`，填写中心 HTTPS origin、R2 **精确端点 origin**、节点身份、资源 ID。密钥也可用 `NODE_TOKEN` 环境变量提供。
 4. 运行 `check` 取得实际 `version`，设置中心 `CLASSIC_ENGINE_VERSION` 为该值；中心配置文本供应商后启用 `CLASSIC_ENABLED=true`。
@@ -37,7 +37,7 @@ uv sync --locked --extra test
 
 `check` 只校验本地模型、字体并预热，不注册或连接中心；`run` 才进行真实注册。不能把 `check` 成功视为已接入集群。生产连接强制 HTTPS，禁止凭据 URL、任意 R2 主机和重定向；本地测试使用显式适配器，不提供生产明文／中心转发回退。
 
-私有中心可用 `control_ca` 指定 PEM 信任文件（相对配置文件解析），保留证书和主机名校验；R2 客户端不使用这个信任文件。本机使用真实 `.env`、Docker 中心和 Windows AMD 节点的启动入口为 `scripts/start-local-classic.ps1`，实际调用与运行记录见[本机真实服务](../../docs/CLASSIC_LOCAL_RUNTIME.md)。
+私有中心可用 `control_ca` 指定 PEM 信任文件（相对配置文件解析），保留证书和主机名校验；R2 客户端不使用这个信任文件。历史在线文本与 R2 验收见[实测记录](../../docs/PIPELINE_VALIDATION.md)，不代表当前已准备模型或启动节点。
 
 `max_leases` 是节点愿意承接的本地上限，中心仍按数据库中的 `execution_slots` 限额；`local_pages` 是同时运行的有限图像计算步骤数，默认 2，可设为 1。默认最多 8 个整页租约，下载、分析提交与交付使用独立网络池，等待文本不占计算线程。等待文本和等待完成回执持续占接单名额；本地线程、NCNN 内部线程和 OCR 池不由中心修改。默认每个配置只加载一种来源 OCR；需另一种来源模型时，修改 `engine.ocr_language` 并使用新引擎版本，不能把目标语言当作 OCR 来源。
 

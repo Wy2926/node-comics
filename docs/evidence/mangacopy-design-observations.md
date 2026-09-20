@@ -30,7 +30,7 @@
 
 单行本组从第1卷到第13卷；同人漫画组的“官方创作集”条目在“卷”筛选中。说明未知分组名和非标准编号标题都需要原样承载。
 
-本地调研截图（存于Git忽略的artifacts目录）：[类型筛选](../../artifacts/mangacopy-design-20260914/laizishenyuan-type-filter.png)、[默认目录第2页](../../artifacts/mangacopy-design-20260914/laizishenyuan-page-2.png)。本地[目录统计](../../artifacts/mangacopy-design-20260914/catalog-observations.json)只含公开目录元数据，不含图片地址、Cookie或令牌。这些本机附件不会随仓库克隆分发；复查时使用上方源站链接。
+本地调研截图（存于Git忽略的artifacts目录）：类型筛选（历史附件未保留）、默认目录第2页（历史附件未保留）。本地目录统计（历史附件未保留）只含公开目录元数据，不含图片地址、Cookie或令牌。这些本机附件不会随仓库克隆分发；复查时使用上方源站链接。
 
 ## 作品B：碧蓝之海
 
@@ -40,7 +40,7 @@
 - 第一页先显示1—18卷，随后是第42话起的条目，途中插入番外。此观察不能证明每一卷和后续话之间的内容对应或重叠。
 - 其它汉化版有2个试看条目；其他系列有10个标题为番外的条目，却归在其“话”筛选中。
 
-本地[混排目录截图](../../artifacts/mangacopy-design-20260914/grandblue-mixed-directory.png)和[补充统计](../../artifacts/mangacopy-design-20260914/supplemental-observations.json)记录当时状态。未逐项打开该作品目录，不将其DOM总数视为图片采集完成。
+本地混排目录截图（历史附件未保留）和补充统计（历史附件未保留）记录当时状态。未逐项打开该作品目录，不将其DOM总数视为图片采集完成。
 
 ## 章节阅读页抽查与data-src复核
 
@@ -67,18 +67,4 @@
 
 新开这两个页面时，本次工具最初分别观察到3个`data-src`，第1卷滚动后观察到4个，尚未与总页数匹配。没有继续枚举全卷，也没有确定其加载机制；不能从单次部分DOM观察推断全站是否总会一次性呈现全部链接。设计使用“容器就绪＋data-src条目数与可信总页数核对”的完整性条件，未匹配时只报告部分发现。
 
-本地[data-src复核统计](../../artifacts/mangacopy-design-20260914/data-src-verification.json)保存计数与占位差异，不保存原图地址。扩展中的请求来源、CDN权限、地址时效、首末页实际顺序与整章下载仍未验证。
-
-## 当前仓库事实
-
-| 代码 | 已核实内容 |
-| --- | --- |
-| [types.ts](../../apps/extension/src/types.ts) | `Chapter`直接保存`pages[]`，没有作品ID、分组ID或话／卷／番外类型；页对象已有原图、摘要、任务和译图引用 |
-| [Library.tsx](../../apps/extension/src/ui/Library.tsx) | `Chapter[]`直接绘制书架卡片；点击封面打开阅读器，管理为名称／封面编辑与本地移除 |
-| [adapters.ts](../../apps/extension/src/sources/adapters.ts) | 专用分支仅xkcd和gunnerkrigg，其余用通用`img`扫描；最多300项；通用模式不声明完整 |
-| [background.ts](../../apps/extension/entrypoints/background.ts) | 来源图片清单绑定原标签页、URL和导航版本；导航／关闭／刷新后要求重新发现 |
-| [App.tsx](../../apps/extension/src/App.tsx) | `acquireManifest`获取当前清单中的图片，建立一个`Chapter`；不遍历作品分组或多个章节 |
-| 原 `src/reader/store.ts`（已删除） | 调研时 IndexedDB 为chapters与blobs；位置按Chapter ID保存；现由[新存储](../../apps/extension/src/library/store.ts)替换 |
-| [model.ts](../../apps/extension/src/reader/model.ts) | 本地文件重新导入通过文件摘要与页索引恢复旧Chapter，保留整理和阅读位置 |
-
-本记录支持来源映射和导入交互。整本导入的可用性，必须按来源设计第6节及通用设计第7节完成真实插件采集、恢复与通用对象管理验收后才能声明。
+本地data-src复核统计（历史附件未保留）保存计数与占位差异，不保存原图地址。扩展中的请求来源、CDN权限、地址时效、首末页实际顺序与整章下载仍未验证。

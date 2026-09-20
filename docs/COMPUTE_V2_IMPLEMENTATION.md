@@ -1,14 +1,14 @@
 # 整页计算 v2 实施与切换
 
-2026-09-19 本地实现。计算端为 [classic-engine](../services/classic-engine/README.md)，中心路由为 [compute_v2.py](../backend/app/compute_v2.py)。已启动[本机真实服务](CLASSIC_LOCAL_RUNTIME.md)，使用真实 R2 和在线文本模型；没有修改 VPS 数据库或切换公开生产服务。
+2026-09-19 本地实现。计算端为 [classic-engine](../services/classic-engine/README.md)，中心路由为 [compute_v2.py](../backend/app/compute_v2.py)。历史本机验收使用真实 R2 和在线文本模型，见[实测记录](PIPELINE_VALIDATION.md)；该宿主机环境已移除，没有据此切换 VPS 或公开生产服务。
 
 ## 持久化与切换
 
-当前数据库头为 `shared_0007_upload_verified_info`。常规任务只创建 `page` 和 `text` 工作；旧三阶段 API、compute-agent、旧节点配置覆盖及旧上传收据分支已删除。此版本按新数据库部署，不迁就旧任务或旧节点 JSON；节点使用新的私有日志目录。R2 已有原图与最终译图不删除。
+当前数据库头为 `results_0001`。常规任务只创建 `page` 和 `text` 工作；旧三阶段 API、compute-agent、旧节点配置覆盖及旧上传收据分支已删除。此版本按新数据库部署，不迁就旧任务或旧节点 JSON；节点使用新的私有日志目录。R2 已有原图与最终译图不删除。
 
 上传在接收缓冲中校验大小、摘要和解码信息，保存已校验写入意图，再直接 PUT 正式内容对象并发布原图。正常路径一次 PUT、无回读、无上传校验队列；仅在写入或提交结果不确定时，`validate_upload` 回读同一不可变对象恢复发布，不进行第二次 PUT。
 
-中心复用既有调度事务锁和公平选择，每批每分配一页都重新选举；同节点多个并发 claim 仍按全部未释放租约计数，过期但未回收的租约继续占位。`page` 公平计量包括领取、等待文本、交付及回收前的名额占用时间，不能理解为 GPU 用时。普通／PLUS 在途上限、文本供应商限流及一次结算逻辑保持独立。
+中心复用既有调度事务锁和公平选择，每批每分配一页都重新选举；同节点多个并发 claim 仍按全部未释放租约计数，过期但未回收的租约继续占位。`page` 公平计量包括领取、等待文本、交付及回收前的名额占用时间，不能理解为 GPU 用时。账户滚动分钟准入、文本供应商限流及一次结算逻辑保持独立。
 
 ## 具体消息
 
@@ -57,6 +57,6 @@ PostgreSQL 提交事务发送 `NOTIFY`，API 进程用独立 `LISTEN` 连接唤�
 
 测试入口：[中心协议](../backend/tests/test_compute_v2.py)、[实际节点客户端联调](../backend/tests/test_compute_node_v2.py)、[PostgreSQL 对照](../backend/tests/test_compute_v2_postgres.py)、[节点安全与恢复](../services/classic-engine/tests/test_node_transport.py)。覆盖并发容量、公平逐页分配、领取／分析／交付丢响应、串行与双页本地执行、缩容停用、空白页、取消、截止时间、重启冻结结果、文本复用、已写对象恢复、R2 origin 与凭据隔离。
 
-隔离 Vulkan 测试使用英文／日文生成样张；检测、OCR、AOT 与嵌字真实执行，节点直接上传最终图，测试端重新下载解码核对。该组测试的 LLM 为固定回复、对象存储为测试适配器。后台完成真实浏览器创建节点、4 执行位及表单／JSON 切换检查。后续已另行通过真实 R2 与在线 `gpt-5.6-luna` 完整交付，见[本机运行记录](CLASSIC_LOCAL_RUNTIME.md)；Linux／NVIDIA 和公开部署未验收。
+隔离 Vulkan 测试使用英文／日文生成样张；检测、OCR、AOT 与嵌字真实执行，节点直接上传最终图，测试端重新下载解码核对。该组测试的 LLM 为固定回复、对象存储为测试适配器。后台完成真实浏览器创建节点、4 执行位及表单／JSON 切换检查。后续已另行通过真实 R2 与在线 `gpt-5.6-luna` 完整交付，见[历史实测记录](PIPELINE_VALIDATION.md)；Linux／NVIDIA 和公开部署未验收。
 
 本次节点直传验证见 [直传验收](DIRECT_UPLOAD_VALIDATION.md)，前次流水线记录见 [流水线改造验收](PIPELINE_VALIDATION.md)。测试生成的图片与报告保存在被忽略的本机 artifacts 目录；不含新的付费文本请求。
