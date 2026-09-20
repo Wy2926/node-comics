@@ -1,4 +1,4 @@
-import type {BillingStatus,BillingProvider} from './billing';
+import type {BillingStatus,BillingProvider,BillingCatalog} from './billing';
 import {msg} from './i18n/runtime';
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
@@ -56,6 +56,7 @@ export class Api {
     if (!Array.isArray(result.items) || result.items.length !== pages.length || result.items.some((item, index) => item.file_hash !== pages[index].file_hash || item.page_index !== pages[index].page_index || !Array.isArray(item.jobs))) throw new ApiError(msg("服务器匹配结果与请求页标识不一致。"), 'INVALID_MATCH_RESPONSE');
     return result;
   }
+  billingCatalog(){return this.request<BillingCatalog>('/v1/billing/catalog');}
   billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
   startCheckout(priceId:string,provider:BillingProvider){return this.request<{checkout_url:string;trial:boolean;environment:'test'|'live';provider:BillingProvider}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId,provider})});}
   billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}

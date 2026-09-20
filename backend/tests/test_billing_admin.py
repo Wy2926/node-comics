@@ -20,7 +20,8 @@ def administrator(client):
 
 def test_seed_products_have_monthly_and_annual_prices(client, administrator):
     value = client.get('/v1/admin/billing/catalog', headers=administrator).json()
-    assert set(value) == {'products', 'channels'}
+    assert set(value) == {'products', 'channels', 'default_provider'}
+    assert value['default_provider'] is None
     plus = next(p for p in value['products'] if p['id'] == 'plus')
     assert {(p['interval'], p['unit_amount']) for p in plus['prices']} == {('month', 999), ('year', 9999)}
     assert all(p['status'] == 'draft' and p['bindings'] == [] for p in plus['prices'])
@@ -68,7 +69,7 @@ def test_binding_environment_ids_and_creem_trial_products_are_not_reused(client,
         json={**stripe, 'id': 'stripe-year'}).status_code == 409
 
 
-def test_two_channels_publish_and_disabled_channel_disappears(client, administrator, monkeypatch):
+def test_two_channels_publish_but_only_global_default_is_offered(client, administrator, monkeypatch):
     from app import billing_providers
     calls = []
     monkeypatch.setattr(billing_providers, 'approved_binding', lambda b, p, r: calls.append((b.provider, p.id)))
@@ -85,9 +86,15 @@ def test_two_channels_publish_and_disabled_channel_disappears(client, administra
         json={'status': 'active'}).status_code == 200
     from app.billing_catalog import offers
     from app.db import session_factory
+    assert client.put('/v1/admin/billing/default-provider', headers=administrator,
+        json={'provider': 'stripe'}).status_code == 200
     with session_factory()() as db:
-        assert {c['provider'] for c in offers(db)[0]['channels']} == {'stripe', 'creem'}
+        assert [c['provider'] for c in offers(db)[0]['channels']] == ['stripe']
     monkeypatch.setattr(billing_providers, 'provider_enabled', lambda p: p == 'creem')
+    with session_factory()() as db:
+        assert offers(db) == []  # Never silently switch a purchase to another channel.
+    assert client.put('/v1/admin/billing/default-provider', headers=administrator,
+        json={'provider': 'creem'}).status_code == 200
     with session_factory()() as db:
         assert [c['provider'] for c in offers(db)[0]['channels']] == ['creem']
     assert len(calls) == 4

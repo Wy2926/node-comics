@@ -5,7 +5,7 @@ from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 from .auth import admin
-from .billing_models import BillingPlan, BillingPlanRevision, BillingPrice, BillingPriceBinding
+from .billing_models import BillingPlan, BillingPlanRevision, BillingPrice, BillingPriceBinding, BillingSettings
 from .db import get_db
 from .entitlements import lock_operation
 from .errors import problem
@@ -25,6 +25,8 @@ def lock_catalog(db):
 def initialize_catalog(db):
     from .billing_providers import provider_enabled, provider_environment
     lock_catalog(db)
+    if db.get(BillingSettings, 1) is None:
+        db.add(BillingSettings(id=1, default_provider=next((p for p in PROVIDERS if provider_enabled(p)), None)))
     if db.get(BillingPlan, 'plus') is None:
         db.add(BillingPlan(id='plus', name='PLUS'))
         db.flush()
@@ -91,6 +93,15 @@ class PriceState(RequestBody):
     status: Literal['active', 'archived']
 
 
+class DefaultProviderRequest(RequestBody):
+    provider: Literal['stripe', 'creem']
+
+
+def default_provider(db):
+    row = db.get(BillingSettings, 1)
+    return row.default_provider if row else None
+
+
 def revision_json(revision):
     return {field: getattr(revision, field) for field in ('id', 'plan_id', 'version', 'name',
         'monthly_redraw_pages', 'trial_days', 'trial_redraw_pages')}
@@ -112,7 +123,9 @@ def price_json(db, price):
 
 def offers(db):
     from .billing_providers import provider_enabled, provider_environment
-    bindings = list(db.scalars(select(BillingPriceBinding).where(BillingPriceBinding.status == 'active')
+    selected = default_provider(db)
+    bindings = list(db.scalars(select(BillingPriceBinding).where(BillingPriceBinding.status == 'active',
+        BillingPriceBinding.provider == selected)
         .order_by(BillingPriceBinding.provider, BillingPriceBinding.id)))
     available = {}
     for binding in bindings:
@@ -150,7 +163,20 @@ def products_json(db, *, public=False):
 @router.get('/catalog')
 def catalog(db: Session = Depends(get_db)):
     from .billing_providers import provider_config_json
-    return {'products': products_json(db), 'channels': [provider_config_json(p) for p in PROVIDERS]}
+    return {'products': products_json(db), 'channels': [provider_config_json(p) for p in PROVIDERS],
+        'default_provider': default_provider(db)}
+
+
+@router.put('/default-provider')
+def set_default_provider(body: DefaultProviderRequest, db: Session = Depends(get_db)):
+    from .billing_providers import provider_enabled
+    lock_catalog(db)
+    if not provider_enabled(body.provider):
+        problem('BILLING_DISABLED', '请先在服务端配置并启用此支付渠道', 409)
+    row = db.get(BillingSettings, 1)
+    row.default_provider = body.provider
+    db.commit()
+    return {'default_provider': row.default_provider}
 
 
 @router.post('/products')

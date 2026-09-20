@@ -1,6 +1,27 @@
-import {describe,it,expect} from 'vitest';
+import {afterEach,describe,it,expect,vi} from 'vitest';
+import {Api} from '../src/api';
 import {paymentUrl,offerAmount,selectedChannel,hasManagedSubscription} from '../src/billing';
 import {billingOffer} from './billing-fixture-data';
+
+afterEach(()=>vi.unstubAllGlobals());
+
+it('loads public quotes without authentication and submits the selected price and channel',async()=>{
+  const fetch=vi.fn().mockResolvedValue(Response.json({enabled:true,offers:[billingOffer]}));
+  vi.stubGlobal('fetch',fetch);
+  const catalog=await new Api('https://billing.test').billingCatalog();
+  expect(catalog.offers).toEqual([billingOffer]);
+  expect(fetch.mock.calls[0][0]).toBe('https://billing.test/v1/billing/catalog');
+  expect(fetch.mock.calls[0][1].headers.has('Authorization')).toBe(false);
+  for(const priceId of ['plus-month-v1','plus-year-v1']){
+    fetch.mockResolvedValueOnce(Response.json({provider:'creem',environment:'test',trial:true,checkout_url:'https://creem.io/test/checkout/fixture'}));
+    await new Api('https://billing.test','fixture-token').startCheckout(priceId,'creem');
+    const [url,init]=fetch.mock.calls.at(-1)!;
+    expect(url).toBe('https://billing.test/v1/billing/checkouts');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({price_id:priceId,provider:'creem'});
+    expect(init.headers.get('Authorization')).toBe('Bearer fixture-token');
+  }
+});
 
 it('formats Stripe minor units, including zero-decimal display currencies',()=>{
   for(const [currency,unit_amount,value] of [['usd',999,9.99],['jpy',500,500],['isk',500,5],['ugx',500,5]] as const){

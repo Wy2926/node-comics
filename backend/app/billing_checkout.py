@@ -6,7 +6,7 @@ from . import stripe_client as stripe, creem_client as creem
 from .billing_providers import BillingError, require, provider_enabled, provider_environment, provider_config_json, resource_key, remote_id, stripe_quote
 from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding
 from .billing_access import active_terms, access_dates
-from .billing_catalog import offers, price_json
+from .billing_catalog import offers, price_json, default_provider
 from .billing_orders import checkout_order, transition
 from .config import settings
 from .db import session_factory
@@ -183,6 +183,7 @@ def start_checkout(owner_id, price_id, provider):
         row = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == owner_id,
             pending_checkout_condition()).limit(1))
         if row is None:
+            require(provider == default_provider(db), 'BILLING_CHANNEL_UNAVAILABLE')
             price = db.get(BillingPrice, price_id)
             require(price and price.environment == provider_environment(provider) and price.status == 'active', 'BILLING_PLAN_UNAVAILABLE')
             binding = db.scalar(select(BillingPriceBinding).where(BillingPriceBinding.price_id == price_id,

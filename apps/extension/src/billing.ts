@@ -5,6 +5,7 @@ export interface BillingPrice {
   currency:string;unit_amount:number;interval:'month'|'year';monthly_redraw_pages:number;trial_days:number;trial_redraw_pages:number;
 }
 export interface BillingOffer extends BillingPrice {channels:BillingChannel[]}
+export interface BillingCatalog {enabled:boolean;offers:BillingOffer[]}
 export type BillingProvider='stripe'|'creem';
 export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number;trial_redraw_pages:number}
 export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';

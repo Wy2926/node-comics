@@ -6,6 +6,15 @@ from .db import Base
 from .models import now, uid
 
 
+class BillingSettings(Base):
+    """Exactly one site-wide provider for new purchases; existing intents stay bound."""
+    __tablename__ = 'billing_settings'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    default_provider: Mapped[str | None] = mapped_column(String(16))
+    __table_args__ = (CheckConstraint('id = 1'),
+        CheckConstraint("default_provider IN ('stripe', 'creem')"))
+
+
 class BillingPlan(Base):
     __tablename__ = 'billing_plans'
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

@@ -19,6 +19,17 @@ export function BillingCatalogPage({onUnauthorized}: {onUnauthorized: (message: 
   useEffect(() => {document.title = '产品与价格 · Node Comics 管理后台';}, []);
 
   async function refresh() {setActionError(''); setNotice(''); await reload();}
+  async function setDefault(provider: 'stripe' | 'creem') {
+    if (blocked || actionPending.current) return;
+    actionPending.current = true; setPending(provider); setActionError(''); setNotice('');
+    try {
+      await request(`${billingEndpoint}/default-provider`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider})});
+      setNotice(`全站新开通统一使用 ${providerName(provider)}。已有订阅与待付款订单继续使用原渠道。`);
+      await reload();
+    } catch (failure) {
+      if (authError(failure)) onUnauthorized(errorText(failure)); else setActionError(errorText(failure));
+    } finally {actionPending.current = false; setPending('');}
+  }
   async function changeStatus(kind: 'prices' | 'bindings', id: string, active: boolean) {
     if (blocked || actionPending.current) return;
     actionPending.current = true; setPending(id); setActionError(''); setNotice('');
@@ -53,7 +64,8 @@ export function BillingCatalogPage({onUnauthorized}: {onUnauthorized: (message: 
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {(error || actionError) && <div className="error" role="alert">{error || actionError} {data && '当前列表可能已过时。'}请刷新核实最新状态后继续操作。</div>}
     {data && <section className="billing-channels" aria-label="支付渠道状态">{data.channels.map(channel => <article key={channel.provider} className="panel billing-channel"><div className="provider-name"><b>{providerName(channel.provider)}</b><span className={`badge ${channel.checkout_enabled ? 'good' : ''}`}>{channel.checkout_enabled ? '可结账' : '待配置'}</span></div><small>{environmentName(channel.environment)} · {channel.enabled ? '已启用' : '未启用'}</small>
-      <p className="muted">API 密钥{channel.credential_configured ? '已配置' : '未配置'} · Webhook {channel.webhook_configured ? '已配置' : '未配置'}</p></article>)}</section>}
+      <p className="muted">API 密钥{channel.credential_configured ? '已配置' : '未配置'} · Webhook {channel.webhook_configured ? '已配置' : '未配置'}</p><button className="secondary" disabled={blocked || !channel.checkout_enabled || data.default_provider === channel.provider} onClick={() => void setDefault(channel.provider)}>{data.default_provider === channel.provider ? '全站默认渠道' : pending === channel.provider ? '正在保存…' : '设为全站默认'}</button></article>)}</section>}
+    {data && <p className="muted">全站只能设置一个默认支付渠道，读者无需选择。仅展示默认渠道已启用的报价；切换默认不会改变已有订阅或待付款订单。</p>}
     {!data ? <section className="panel"><div className="loading" role="status">{loading ? '正在读取产品…' : '暂时无法读取产品，请刷新重试。'}</div></section> : !data.products.length ? <section className="panel"><Empty>尚未创建套餐产品</Empty></section> : <div className="billing-workspace" aria-busy={loading}>
       <aside className="panel billing-product-nav" aria-label="套餐产品"><h2>产品 <span>{data.products.length}</span></h2>{data.products.map(product => <button key={product.id} aria-pressed={selected?.id === product.id} onClick={() => setSelectedId(product.id)}><b>{product.name}</b><small>{product.prices.length} 个价格 · {product.prices.filter(price => price.status === 'active').length} 个在售</small></button>)}</aside>
       {selected && <section className="billing-product-detail" aria-label={`${selected.name} 产品详情`}><div className="panel billing-product-summary"><div className="billing-product-title"><div><p className="eyebrow">SUBSCRIPTION PRODUCT</p><h2>{selected.name}</h2><small>产品编号 {selected.id}</small></div><button className="secondary" disabled={blocked || !latest} onClick={() => edit({kind: 'benefits', product: selected})}>更新权益</button></div>
