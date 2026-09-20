@@ -331,7 +331,7 @@ export default {
             "title": "Information and purposes",
             "paragraphs": [
               "OIDC sign-in provides an identity identifier, display name and role for accounts, benefits and tasks. The product API validates access tokens. The website does not collect the password you enter at the identity provider.",
-              "Translation processes selected page images, content hashes, file/page identifiers, mode, target language, status, results and usage records. These support delivery, matching, recovery and valid result reuse. Paddle handles checkout and full payment-card details; we retain the customer, transaction and subscription records needed for benefits, reconciliation and support.",
+              "Translation processes selected page images, content hashes, file/page identifiers, mode, target language, status, results and usage records. These support delivery, matching, recovery and valid result reuse. Stripe handles checkout and full payment-card details; we retain the customer, transaction and subscription records needed for benefits, reconciliation and support.",
               "Feedback, email and necessary attachments help investigate problems. Operations involve necessary request metadata, security and error records. Default logs exclude credentials, private images, full image text and signed download URLs."
             ]
           },
@@ -346,7 +346,7 @@ export default {
             "title": "Service providers and transfers",
             "paragraphs": [
               "Classic processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation; redraw providers process the page image and language. Actual providers are configured on the server for the task.",
-              "Original and final images use private Cloudflare R2 storage. Identity, infrastructure, translation and Paddle services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
+              "Original and final images use private Cloudflare R2 storage. Identity, infrastructure, translation and Stripe services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
             ]
           },
           {
@@ -408,7 +408,7 @@ export default {
             "title": "Trial and billing",
             "paragraphs": [
               "PLUS is US$9.99/month. Eligible first-time subscribers can try 7 days with a card, unlimited classic totals and 30 redraw pages. Re-subscribing does not automatically grant another trial.",
-              "After the trial, monthly renewal is automatic. Paid monthly periods include 300 redraw pages, which do not roll over. Paddle handles checkout; taxes and final charges are shown there."
+              "After the trial, monthly renewal is automatic. Paid monthly periods include 300 redraw pages, which do not roll over. Stripe handles checkout; taxes and final charges are shown there."
             ]
           },
           {
@@ -547,6 +547,7 @@ export default {
     "确认停止下一次自动续费？现有权益保留至账户显示的到期时间。": "Stop the next automatic renewal? Existing benefits remain until the expiry shown in your account.",
     "确认取消续费": "Confirm cancellation",
     "保持订阅": "Keep subscription",
+    "在 Stripe 管理订阅": "Manage subscription in Stripe",
     "取消自动续费": "Cancel auto-renewal",
     "US$9.99／月，常规翻译不限累计页数，每个付费月账期 300 页 AI 重绘。": "US$9.99/month: unlimited classic total pages and 300 AI redraw pages per paid monthly period.",
     "你可申请首次 7 天绑卡试用，含 30 页重绘；试用结束自动按月续费。": "You can apply for a first 7-day card-required trial with 30 redraw pages, then automatic monthly renewal.",

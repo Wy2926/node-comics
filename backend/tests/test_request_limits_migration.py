@@ -6,10 +6,10 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "results_0001"
+HEAD = "stripe_0001"
 NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
-              "billing_checkouts", "billing_subscriptions", "billing_events", "billing_transactions", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
+              "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def isolated_migration_database(tmp_path, monkeypatch):
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
     monkeypatch.setattr(db, "engine", lambda: private_engine)
-    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", paddle_enabled=False))
+    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", stripe_enabled=False))
     try:
         yield private_engine
     finally:
@@ -64,3 +64,14 @@ def test_fresh_startup_creates_current_request_limit_schema(isolated_migration_d
     assert_current_schema_matches_models(isolated_migration_database)
     db.initialize()
     assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_old_database_is_rejected_without_mutation(isolated_migration_database):
+    from app import db
+    with isolated_migration_database.begin() as connection:
+        connection.execute(text('CREATE TABLE users (id TEXT PRIMARY KEY)'))
+        connection.execute(text("INSERT INTO users VALUES ('preserve-existing-data')"))
+    with pytest.raises(RuntimeError, match='requires an empty database'):
+        db.initialize()
+    with isolated_migration_database.connect() as connection:
+        assert connection.scalar(text('SELECT id FROM users')) == 'preserve-existing-data'

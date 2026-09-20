@@ -16,7 +16,6 @@
 .nc-membership-card h2 {font-size:25px;margin:4px 0 0}
 .nc-membership-footer {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:auto;padding-top:8px}
 .nc-membership-footer>span:last-child {font-size:12px;color:var(--muted)}
-.nc-coming-soon {display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:10px 14px;border-radius:10px;background:var(--surface);color:var(--muted);font-size:13px}
 .nc-rights-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .nc-rights-card {padding:23px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
 .nc-rights-label {display:flex;gap:9px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:20px}
@@ -37,3 +36,12 @@
 
 .nc-account-page .nc-stat>span,.nc-account-page .nc-feedback-inbox h2 {display:flex;align-items:center;gap:8px}
 .nc-account-page .nc-stat>span svg,.nc-account-page .nc-feedback-inbox h2 svg {color:var(--accent)}
+
+.nc-membership-price {display:flex;align-items:baseline;gap:9px}
+.nc-membership-price strong {font-size:34px;letter-spacing:-1px}
+.nc-membership-price>span {color:var(--muted);font-size:13px}
+.nc-membership-benefits {list-style:none;padding:0;margin:4px 0;display:grid;gap:12px}
+.nc-membership-benefits li {display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.5}
+.nc-membership-benefits svg {flex-shrink:0;color:var(--accent)}
+.nc-membership-card .nc-membership-terms {font-size:12px;line-height:1.8}
+.nc-membership-card .nc-billing-error {color:var(--danger,#b42318)}

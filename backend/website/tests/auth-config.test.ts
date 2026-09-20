@@ -13,7 +13,9 @@ test('uses the existing public OIDC client, exact callback and API resource', ()
 test('refuses development auth, unsafe endpoints, embedded credentials and missing resource', () => {
   for (const patch of [{dev_auth:true},{mode:'development'},{audience:''},{token_endpoint:'http://identity.example/token'},{authorization_endpoint:'https://secret@identity.example/auth'},{issuer:'javascript:alert(1)'}]) assert.throws(() => oidcSettings({...config,...patch},'https://comics.nodelane.net'));
 });
-test('checkout only navigates to the existing same-origin handoff', () => {
-  assert.equal(checkoutUrl('/billing/checkout#token=opaque','https://comics.nodelane.net'),'https://comics.nodelane.net/billing/checkout#token=opaque');
-  for (const value of ['https://evil.example/billing/checkout','//evil.example/','javascript:alert(1)','/account/','https://x@comics.nodelane.net/billing/checkout']) assert.throws(() => checkoutUrl(value,'https://comics.nodelane.net'));
+test('checkout only navigates to official Stripe hosts', () => {
+  assert.equal(checkoutUrl('https://checkout.stripe.com/c/pay/test'),'https://checkout.stripe.com/c/pay/test');
+  assert.equal(checkoutUrl('https://billing.stripe.com/p/session/test',true),'https://billing.stripe.com/p/session/test');
+  for (const value of ['https://evil.example/','//evil.example/','javascript:alert(1)','/billing/checkout','https://x@checkout.stripe.com/test','https://checkout.stripe.com.evil.example/','https://checkout.stripe.com:444/test']) assert.throws(() => checkoutUrl(value));
+  assert.throws(()=>checkoutUrl('https://checkout.stripe.com/c/pay/test',true));
 });

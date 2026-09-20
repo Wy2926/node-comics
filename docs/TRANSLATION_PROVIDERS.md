@@ -48,7 +48,7 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 | `PATCH /v1/admin/translation-providers/{id}` | 更新 `enabled` |
 | `POST /v1/admin/translation-providers/{id}/default` | 设为默认，要求已启用 |
 
-数据库迁移 `results_0001` 创建独立表与请求计量索引，不导入任何旧配置或转换旧任务。API 与 control-worker 应一起更新；新机制需管理员重新创建供应商。旧版本在途任务不属于新实现支持范围。本次代码改动不等于已更新运行实例或公开部署。
+数据库迁移 `stripe_0001` 创建独立表与请求计量索引，不导入任何旧配置或转换旧任务。API 与 control-worker 应一起更新；新机制需管理员重新创建供应商。旧版本在途任务不属于新实现支持范围。本次代码改动不等于已更新运行实例或公开部署。
 
 验证入口：`backend/.venv/Scripts/python.exe -m pytest backend/tests/test_translation_providers.py backend/tests/test_text_adapter.py backend/tests/test_classic.py backend/tests/test_classic_parallel.py backend/tests/test_cluster_scheduler.py -q`；管理后台在 `backend/admin-ui` 执行 `npm run build`。测试使用隔离数据库和模拟供应商，无真实付费模型调用。
 

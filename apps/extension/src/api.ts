@@ -1,3 +1,4 @@
+import type {BillingStatus} from './billing';
 import {msg} from './i18n/runtime';
 import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Job, Mode, Usage, User, UploadPlan, TranslationChanges, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationPlan, PlanReceipt, TranslationOperation, ReadingPriority } from './types';
 import type { AuthConfig } from './auth/oidc';
@@ -55,6 +56,10 @@ export class Api {
     if (!Array.isArray(result.items) || result.items.length !== pages.length || result.items.some((item, index) => item.file_hash !== pages[index].file_hash || item.page_index !== pages[index].page_index || !Array.isArray(item.jobs))) throw new ApiError(msg("服务器匹配结果与请求页标识不一致。"), 'INVALID_MATCH_RESPONSE');
     return result;
   }
+  billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
+  startCheckout(){return this.request<{checkout_url:string;trial:boolean}>('/v1/billing/checkouts',{method:'POST'});}
+  billingPortal(){return this.request<{url:string}>('/v1/billing/portal',{method:'POST'});}
+  syncBilling(){return this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});}
   status(ids: string[]) { return this.request<{items: Job[]}>('/v1/jobs/status', {method:'POST',body:JSON.stringify({ids})}); }
   plan(body:TranslationPlan) {return this.request<PlanReceipt>('/v1/translation-plans',{method:'POST',body:JSON.stringify(body)},true);}
   resolveOperations(operation_keys:string[]) {return this.request<{items:TranslationOperation[];policy_revision?:string}>('/v1/translation-operations/resolve',{method:'POST',body:JSON.stringify({operation_keys})});}

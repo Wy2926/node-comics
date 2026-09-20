@@ -52,7 +52,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 
-容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库仅保留 `results_0001` 全新空库基线，包含执行机字段、任务索引、节点身份和系统设置，不升级旧库。控制工作进程需使用同版本代码以记录执行机。
+容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库仅保留 `stripe_0001` 全新空库基线，包含执行机字段、任务索引、节点身份和系统设置，不升级旧库。控制工作进程需使用同版本代码以记录执行机。
 
 ### 登录
 

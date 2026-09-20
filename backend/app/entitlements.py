@@ -110,7 +110,7 @@ def entitlement_version(user, kind):
 def available_periods(db, user, mode, kind, at):
     periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
         QuotaPeriod.mode == mode, or_(QuotaPeriod.source == "grant",
-            QuotaPeriod.source_key.startswith("paddle:")), QuotaPeriod.starts_at <= at,
+            QuotaPeriod.source_key.startswith("stripe:")), QuotaPeriod.starts_at <= at,
         QuotaPeriod.ends_at > at)))
     spec = period_spec(user, kind, at)
     if spec:
@@ -275,7 +275,7 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
         else:
             # Revoking and re-enabling an unexpired paid month must not grant again.
             last = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id, QuotaPeriod.kind == MONTHLY,
-                             ~QuotaPeriod.source_key.startswith('paddle:'),
+                             ~QuotaPeriod.source_key.startswith('stripe:'),
                              QuotaPeriod.ends_at > at).order_by(QuotaPeriod.starts_at.desc()))
             if last is not None:
                 problem("MEMBERSHIP_PERIOD_ACTIVE", "已有尚未结束的重绘额度周期，请在周期结束后重新开通", 409)
@@ -311,7 +311,7 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
     period = db.get(QuotaPeriod, spec['id']) if spec else None
     if spec is None and kind == MONTHLY and is_plus(user):
         period = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == owner_id,
-            QuotaPeriod.source_key.startswith('paddle:'), QuotaPeriod.starts_at <= now(),
+            QuotaPeriod.source_key.startswith('stripe:'), QuotaPeriod.starts_at <= now(),
             QuotaPeriod.ends_at > now()).order_by(QuotaPeriod.ends_at).limit(1))
     if spec is None and period is None:
         problem("PLUS_REQUIRED", "补偿重绘额度需要有效 PLUS 会员", 403)

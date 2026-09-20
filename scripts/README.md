@@ -9,7 +9,6 @@
 | `bootstrap.ps1` | 生成本地控制服务配置；`-Start` 启动 Docker，`-Production` 使用独立生产配置。见[后端说明](../backend/README.md) |
 | `database_backup.py` / `verify_database_restore.py` | 数据库备份与新库恢复演练。连接、隔离校验、PostgreSQL 客户端要求见[运维说明](../docs/OPERATIONS.md) |
 | `export_openapi.py` | 从当前后端导出机器契约，见[契约说明](../contracts/README.md) |
-| `paddle_sandbox_server.py` | 隔离支付沙盒；只允许 checkout/webhook 入口通过隧道公开，见[Paddle 接入](../docs/PADDLE_BILLING_DESIGN.md) |
 
 Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带已安装的虚拟环境。默认后端回归使用[测试 Compose](../deploy/compose.tests.yaml)，不读取产品环境文件。单独运行运维工具前，按对应文档准备其配置。
 

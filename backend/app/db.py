@@ -54,9 +54,9 @@ def initialize():
             connection.execute(text("SELECT pg_advisory_xact_lock(761349210)"))
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
-        if settings().paddle_enabled:
+        if settings().stripe_enabled:
             mismatch = connection.scalar(select(billing_models.BillingAccount.owner_id).where(
-                billing_models.BillingAccount.environment != settings().paddle_environment).limit(1))
+                billing_models.BillingAccount.environment != settings().stripe_environment).limit(1))
             if mismatch:
-                raise RuntimeError('Paddle environment does not match this database; use an isolated database')
+                raise RuntimeError('Stripe environment does not match this database; use an isolated database')
     settings().storage_path.mkdir(parents=True, exist_ok=True)

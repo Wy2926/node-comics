@@ -10,6 +10,10 @@ if(location.hostname!=='127.0.0.1'||!['5174','5176','5179'].includes(location.po
 const existing=await readCopies();
 if(existing.some(c=>!c.id.startsWith('reader-fixture-')))throw Error('This origin contains non-fixture data. Use another browser profile.');
 const origin=API_ORIGIN;
+if(new URLSearchParams(location.search).has('billing')){
+ await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:'fixture-reader',name:'验收账户',role:'reader'},apiOrigin:origin});
+ await saveSettings({...defaults,uiLanguage:'zh-CN',appearance:new URLSearchParams(location.search).get('theme')==='dark'?'dark':'light'});
+}
 const originalFetch=window.fetch.bind(window);
 const blob=await (await originalFetch('/samples/starlight-bookshop.png')).blob();
 const bitmap=await createImageBitmap(blob);const width=bitmap.width,height=bitmap.height;bitmap.close();
@@ -69,8 +73,14 @@ if(autoScenario){
 const stored=(await readCopies()).filter(c=>!autoScenario||c.id==='reader-fixture-auto-'+autoScenario);
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
 const operations=new Map<string,TranslationOperation>();
-const plus=new URLSearchParams(location.search).has('plus')||autoScenario==='plus';
+const plus=new URLSearchParams(location.search).get('billing')==='paid'||new URLSearchParams(location.search).has('plus')||autoScenario==='plus';
 const rights:Entitlements={plan:plus?'plus':'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{window_seconds:60,limit:plus?100:30},scheduler_weight:plus?2:1,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'fixture-v3',quota:{id:'daily',kind:'classic_daily',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}},redraw:{allowed:true,unlimited:false,quota_kind:'redraw_grant',consent_version:'fixture-v3',quota:{id:'redraw',kind:'redraw_grant',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}}}};
+if(new URLSearchParams(location.search).has('billing')){
+ rights.plus_expires_at=plus?'2026-10-20T00:00:00Z':null;
+ rights.modes.classic.unlimited=plus;
+ rights.modes.redraw.allowed=plus;
+ if(rights.modes.redraw.quota){rights.modes.redraw.quota.available=plus?287:0;rights.modes.redraw.quota.granted=plus?300:0;rights.modes.redraw.quota.used=plus?13:0;}
+}
 if(autoScenario==='quota')rights.modes.classic.quota!.available=0;
 if(autoScenario==='plus')rights.modes.classic={...rights.modes.classic,unlimited:true,quota_kind:'classic_unlimited'};
 const activeCount=()=>[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length;
@@ -95,8 +105,14 @@ window.fetch=async(input,init={})=>{
   const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:null});
   if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_plan_items:3,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
-  if(url.pathname==='/v1/billing/status')return json({enabled:false,environment:'sandbox',trial_eligible:true,checkout_pending:false,subscription:null,entitlement_expires_at:null});
+  const billingScenario=new URLSearchParams(location.search).get('billing');
+  const billing={enabled:!!billingScenario&&billingScenario!=='disabled',provider:'stripe',environment:'test',trial_eligible:billingScenario!=='paid',checkout_pending:false,subscription:billingScenario==='paid'?{status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
+  if(url.pathname==='/v1/billing/status')return billingScenario==='error'?json({error:{message:'Isolated billing failure'}},503):json(billing);
+  if(url.pathname==='/v1/billing/sync')return json({billing,entitlements:rights});
+  if(url.pathname==='/v1/billing/checkouts')return billingScenario==='checkout-error'?json({error:{message:'Isolated checkout failure'}},503):json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});
+  if(url.pathname==='/v1/billing/portal')return json({url:'https://billing.stripe.com/p/session/fixture'});
   if(url.pathname==='/v1/me/entitlements')return json(rights);
+  if(url.pathname==='/v1/me/usage/summary')return json({entitlements:rights,timezone:'Asia/Shanghai',start_date:'2026-09-14',end_date:'2026-09-20',generated_at:new Date().toISOString(),delivered:0,free_delivered:0,included_delivered:0,by_mode:{},quota_used:{},days:[]});
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map((p:{file_hash:string;page_index:number})=>({...p,asset:p.page_index===6?null:asset(p.page_index),jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language),display_jobs:[...jobs.values()].filter(j=>j.input_asset_id===`asset-${p.page_index}`&&j.mode===body.mode&&j.target_language===body.target_language)}))});
   const policy=()=>{if(previousRights!==JSON.stringify(rights)){previousRights=JSON.stringify(rights);policyRevision++;}return String(policyRevision);};

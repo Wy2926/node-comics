@@ -53,6 +53,9 @@ class WebsiteFiles(StaticFiles):
     async def get_response(self, path, scope):
         normalized = path.replace('\\', '/').lstrip('/')
         segments = normalized.split('/')
+        # Removed API/payment routes must not fall through to static-site routing.
+        if segments[0] in {'v1', 'internal', 'webhooks', 'billing'}:
+            raise HTTPException(404)
         if any(segment.startswith('.') and segment != '.' for segment in segments):
             raise HTTPException(404)
         suffix = Path(path).suffix.lower()

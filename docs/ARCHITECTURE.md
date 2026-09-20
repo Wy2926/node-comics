@@ -1,6 +1,6 @@
 # Node Comics 架构 v0.4
 
-2026-09-19：[阅读计划契约](READING_TRANSLATION_CONTRACT.md)已实现：滚动 60 秒普通 30／PLUS 100 张新增翻译、逐页受理与幂等恢复，取消账户在途数量上限。最终新库基线 `results_0001`，旧提交／用户队列契约、结构和迁移链直接删除。现有环境切换与公开部署单独处理。调度与启动见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)和[后端说明](../backend/README.md)。
+2026-09-19：[阅读计划契约](READING_TRANSLATION_CONTRACT.md)已实现：滚动 60 秒普通 30／PLUS 100 张新增翻译、逐页受理与幂等恢复，取消账户在途数量上限。最终新库基线 `stripe_0001`，旧提交／用户队列契约、结构和迁移链直接删除。现有环境切换与公开部署单独处理。调度与启动见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)和[后端说明](../backend/README.md)。
 
 ## 结构
 

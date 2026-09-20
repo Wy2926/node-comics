@@ -114,20 +114,21 @@ def checkout(request: Request):
     if not authorized(request):
         return JSONResponse({},status_code=401)
     state['checkout_count'] += 1
-    return {'checkout_url':ORIGIN+'/billing/checkout#fixture-only-no-payment'}
+    return {'checkout_url':'https://checkout.stripe.com/c/pay/cs_test_fixture'}
 
 
-@app.get('/billing/checkout')
-def checkout_page():
-    return HTMLResponse('<!doctype html><html lang="en"><title>Isolated checkout fixture</title><h1>Checkout handoff verified</h1><p>No payment is collected by this fixture.</p><a href="/en/account/">Return to account</a></html>')
-
-
-@app.post('/v1/billing/cancel')
-def cancel(request: Request):
+@app.post('/v1/billing/portal')
+def portal(request: Request):
     if not authorized(request):
         return JSONResponse({},status_code=401)
-    state['cancel_at'] = '2026-10-20T00:00:00Z'
-    return billing(request)
+    return {'url':'https://billing.stripe.com/p/session/fixture'}
+
+
+@app.post('/v1/billing/sync')
+def sync_billing(request: Request):
+    if not authorized(request):
+        return JSONResponse({},status_code=401)
+    return {'billing':billing(request),'entitlements':me(request)['entitlements']}
 
 
 app.mount('/',website.WebsiteFiles(Path(__file__).resolve().parents[1]/'website'/'dist'))

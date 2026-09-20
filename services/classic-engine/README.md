@@ -24,7 +24,7 @@ uv sync --locked --extra test
 
 ## 配置与运行
 
-1. 中心使用当前 `results_0001` 空数据库，不保留旧协议或旧上传数据适配。
+1. 中心使用当前 `stripe_0001` 空数据库，不保留旧协议或旧上传数据适配。
 2. 在后台创建节点，保存其独立身份和凭据；填写稳定 `resource_id`，执行位表示承接的整页数量。
 3. 复制 [node.example.json](node.example.json) 为 `node.local.json`，填写中心 HTTPS origin、R2 **精确端点 origin**、节点身份、资源 ID。密钥也可用 `NODE_TOKEN` 环境变量提供。
 4. 运行 `check` 取得实际 `version`，设置中心 `CLASSIC_ENGINE_VERSION` 为该值；中心配置文本供应商后启用 `CLASSIC_ENABLED=true`。

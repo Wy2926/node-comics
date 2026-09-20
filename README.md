@@ -8,7 +8,7 @@
 
 ## 开发与验证
 
-当前后端只支持 `results_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
+当前后端只支持 `stripe_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
 
 - [后端运行与 Docker 隔离测试](backend/README.md)：根 `.env` 配置、`scripts/bootstrap.ps1 -Start`、控制进程与数据库。
 - [五语官网与账户](backend/website/README.md)：静态 SEO 页面、独立语言字典、同域 API 与 OIDC 登录、商店链接配置。
@@ -29,6 +29,6 @@
 | 管理与运营 | [管理后台](docs/ADMIN_CONSOLE.md)、[系统设置](docs/SYSTEM_SETTINGS.md)、[文本供应商](docs/TRANSLATION_PROVIDERS.md)、[会员与额度](docs/MEMBERSHIP_AND_QUOTAS.md) |
 | 身份与部署 | [生产身份](docs/PRODUCTION_IDENTITY.md)、[对象存储](docs/OBJECT_STORAGE.md)、[运维与恢复](docs/OPERATIONS.md)、[VPS 部署记录](docs/VPS_DEPLOYMENT.md) |
 | 研发依据 | [AI 图片与格式验证](docs/TECH_RESEARCH.md)、[常规翻译选型](docs/CLASSIC_TRANSLATION_RESEARCH.md)、[代码维护](docs/CODE_QUALITY.md)、[API 契约](contracts/README.md) |
-| 支付 | [已实现的 Paddle 接入](docs/PADDLE_BILLING_DESIGN.md)、[待评审的商品重构方案](docs/BILLING_CATALOG_REFACTOR_PROPOSAL.md) |
+| 支付 | [Stripe 支付与会员](docs/STRIPE_BILLING.md) |
 
 用户漫画、凭据及运行产物不入库；公开示例仅使用项目生成的原创图片。长期云书架、长图分段和其他电子书格式仍属后续范围。

@@ -38,15 +38,13 @@ class Settings(BaseSettings):
     extension_ids: str = ""
     free_daily_pages: int = Field(default=100, ge=0, le=1_000_000)
     plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
-    paddle_enabled: bool = False
-    paddle_environment: Literal['sandbox', 'production'] = 'sandbox'
-    paddle_api_key: SecretStr = SecretStr('')
-    paddle_client_token: str = ''
-    paddle_webhook_secret: SecretStr = SecretStr('')
-    paddle_product_id: str = ''
-    paddle_trial_price_id: str = ''
-    paddle_standard_price_id: str = ''
-    paddle_checkout_url: str = ''
+    stripe_enabled: bool = False
+    stripe_environment: Literal['test', 'live'] = 'test'
+    stripe_secret_key: SecretStr = SecretStr('')
+    stripe_webhook_secret: SecretStr = SecretStr('')
+    stripe_product_id: str = ''
+    stripe_price_id: str = ''
+    stripe_return_url: str = ''
     quota_timezone: str = "Asia/Shanghai"
     retention_days: int = Field(default=0, ge=0)
     max_upload_bytes: int = 20 * 1024 * 1024
@@ -96,21 +94,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_billing(self):
-        if self.paddle_enabled:
-            if self.app_env == 'production' and self.paddle_environment != 'production':
-                raise ValueError('Sandbox billing requires an isolated development/test service')
-            if not all((self.paddle_api_key.get_secret_value(), self.paddle_client_token,
-                        self.paddle_webhook_secret.get_secret_value(), self.paddle_product_id,
-                        self.paddle_trial_price_id, self.paddle_standard_price_id, self.paddle_checkout_url)):
-                raise ValueError('Paddle billing configuration is incomplete')
-            sandbox = self.paddle_environment == 'sandbox'
-            if self.paddle_client_token.startswith('test_') != sandbox:
-                raise ValueError('Paddle client token does not match the environment')
-            if ('_sdbx_' in self.paddle_api_key.get_secret_value()) != sandbox:
-                raise ValueError('Paddle API key does not match the environment')
-            url = urlsplit(self.paddle_checkout_url)
+        if self.stripe_enabled:
+            if self.app_env == 'production' and self.stripe_environment != 'live':
+                raise ValueError('Test billing requires an isolated development/test service')
+            prefix = 'sk_live_' if self.stripe_environment == 'live' else 'sk_test_'
+            if not self.stripe_secret_key.get_secret_value().startswith(prefix):
+                raise ValueError('Stripe secret key does not match the environment')
+            if not self.stripe_webhook_secret.get_secret_value().startswith('whsec_'):
+                raise ValueError('Stripe webhook secret is required')
+            if not self.stripe_product_id.startswith('prod_') or not self.stripe_price_id.startswith('price_'):
+                raise ValueError('Stripe product and monthly price are required')
+            url = urlsplit(self.stripe_return_url)
             if (url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment):
-                raise ValueError('Paddle checkout URL must be an HTTPS page without credentials or query')
+                raise ValueError('Stripe return URL must be an HTTPS page without credentials or query')
         return self
 
     @model_validator(mode="after")

@@ -24,8 +24,8 @@ export function oidcSettings(config: AuthConfig, origin: string): UserManagerSet
   };
 }
 
-export function checkoutUrl(value: string, origin: string) {
-  const url = new URL(value, origin);
-  if (url.origin !== origin || url.pathname !== '/billing/checkout' || url.username || url.password) throw Error('结账地址无效，请联系支持。');
+export function checkoutUrl(value: string, portal = false) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || url.hostname !== (portal ? 'billing.stripe.com' : 'checkout.stripe.com') || url.port || url.username || url.password) throw Error('结账地址无效，请联系支持。');
   return url.href;
 }

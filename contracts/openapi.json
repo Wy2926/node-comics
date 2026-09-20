@@ -1590,30 +1590,6 @@
         ]
       }
     },
-    "/v1/billing/cancel": {
-      "post": {
-        "tags": [
-          "billing"
-        ],
-        "summary": "Cancel",
-        "operationId": "cancel_v1_billing_cancel_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/v1/billing/portal": {
       "post": {
         "tags": [

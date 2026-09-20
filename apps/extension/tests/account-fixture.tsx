@@ -27,6 +27,11 @@ window.fetch=async(input)=>{
  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
  if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
  if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights(),retention_days:0});
+ const billing={enabled:true,provider:'stripe',environment:'test',trial_eligible:scenario==='free',checkout_pending:false,subscription:scenario==='free'?null:{status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,cancel_at:null}};
+ if(path==='/v1/billing/status')return Response.json(billing);
+ if(path==='/v1/billing/sync')return Response.json({billing,entitlements:rights()});
+ if(path==='/v1/billing/checkouts')return Response.json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true});
+ if(path==='/v1/billing/portal')return Response.json({url:'https://billing.stripe.com/p/session/fixture'});
  if(path==='/v1/me/entitlements')return Response.json(rights());
  if(path==='/v1/me/usage/summary'){
   if(scenario==='error')return Response.json({error:{message:'模拟网络失败，请重试'}},{status:503});

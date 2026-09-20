@@ -52,7 +52,7 @@ export function MembershipActions({user, onChanged}: {user: UserDetail; onChange
   }
   return <section className="panel membership-actions" aria-labelledby="benefit-title">
     <h3 id="benefit-title">赠送 PLUS 或翻译额度</h3>
-    <p className="muted">赠送由平台承担费用，记录操作人和备注。已有赠送 PLUS 续期保留原重绘月额度；Paddle 订阅与赠送独立生效，不改变扣款日期。</p>
+    <p className="muted">赠送由平台承担费用，记录操作人和备注。已有赠送 PLUS 续期保留原重绘月额度；Stripe 订阅与赠送独立生效，不改变扣款日期。</p>
     {operation ? <>
       <p>{operation.summary}</p><p className="muted">备注：{String(operation.body.note)}</p>
       <p role="status">{operation.done ? '赠送成功，权益已更新。' : busy ? '正在提交赠送，请稍候…' : '提交结果尚未确认，请恢复原操作，避免重复赠送。'}</p>
