@@ -90,3 +90,9 @@ MOBI、CBZ/ZIP、CBR/RAR 的 `file_hash` 是整个原文件 SHA-256。PDF 因为
 RAR 的 Emscripten 动态命名和 Embind 参数转换函数由 [unrar-csp.ts](../apps/extension/unrar-csp.ts)替换为静态闭包，保留参数转换、析构顺序和原 WASM。升级时构建检查会要求重新审阅。MV3 只增加本地 WASM 所需的 `wasm-unsafe-eval`，未允许 JavaScript `unsafe-eval`。Worker、字体、WASM 均随扩展发布，无运行时 CDN 依赖。
 
 验证命令与截图见[本次验收记录](evidence/import-cache-validation.md)。浏览器使用原创合成页，译图由隔离测试供应商产生，验证恢复及计费行为，不代表真实模型翻译效果。
+
+## 本地图片缓存预算（2026-09-20）
+
+新设置默认 10 GB（10240 MiB），选项为 128 MB、512 MB、1 GB、10 GB、无限制；已有明确设置保留。无限制以 `cacheLimitMb: -1` 持久化，导入和源图采集时转换为无限预算，缓存清理不自动淘汰译图。有限预算为零的内部检查仍表示没有新增空间，不表示无限制。
+
+无限制只取消插件预算，仍受设备可用空间与浏览器存储配额约束；单文件大小、解压资源和解码限制继续生效。手动清理译图始终保留原图、书架及阅读位置。

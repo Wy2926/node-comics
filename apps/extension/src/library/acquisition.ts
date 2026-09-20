@@ -19,6 +19,7 @@ export class AcquisitionCoordinator{
  private stopped=false;private controller=new AbortController();
  stop(){this.stopped=true;this.controller.abort();}
  async run(limitMb:number){
+  limitMb=limitMb===-1?Infinity:limitMb;
   if(!inExtension()||this.stopped)return;
   if(!(await readLibrary()).tasks.some(t=>t.status==='queued'||t.status==='running'))return;
   await navigator.locks.request('nc-library-acquisition',{ifAvailable:true},async lock=>{

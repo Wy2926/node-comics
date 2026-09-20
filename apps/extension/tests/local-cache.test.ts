@@ -20,3 +20,10 @@ it('reuses originals and same-account translations across different imported fil
  saveSession({token:'other',user:{id:'other-user',name:'reader',role:'reader'},apiOrigin:API_ORIGIN});
  const [other]=await readLocalFiles([file],0,()=>{});expect(other.pages[0].blobKey).toBe(page.blobKey);expect(other.pages[0].jobs).toEqual([]);expect(other.pages[0].outputBlobs).toEqual({});
 });
+
+it('imports new original bytes under an unlimited budget but rejects a full finite budget',async()=>{
+ const file=new File(['unlimited-image'],'new-page.png',{type:'image/png'});
+ await expect(readLocalFiles([file],0,()=>{})).rejects.toThrow('本地空间预算不足');
+ const [copy]=await readLocalFiles([file],-1,()=>{});
+ expect(copy.pages[0].blobKey).toBeTruthy();
+});

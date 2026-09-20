@@ -1,7 +1,7 @@
 import {useAutomaticTranslation} from './translation/useAutomaticTranslation';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Icon} from './icons';
-import {Modal,PageTitle} from './ui/components';
+import {Modal} from './ui/components';
 import {Api} from './api';
 import {type Capabilities,type ReadingCopy,type Settings,type Entitlements} from './types';
 import * as store from './library/store';
@@ -10,10 +10,7 @@ import {Reader} from './reader/Reader';
 import {Preferences} from './ui/Preferences';
 import {Library} from './ui/Library';
 import {TranslationHistory} from './ui/History';
-import {UsagePage} from './ui/Usage';
-import {EntitlementCards} from './ui/Entitlements';
-import {PlusOffer} from './ui/PlusOffer';
-import {FeedbackInbox} from './ui/Feedback';
+import {AccountPage} from './ui/Account';
 import {useAppearance} from './ui/Appearance';
 import type {PageManifest} from './sources/adapters';
 import {COMIC_ACCEPT} from './importers/comic';
@@ -31,9 +28,9 @@ import {acquireWebImages,insertWebCopy,type WebDestination} from './library/web-
 import {discoverCatalog} from './sources/client';
 import {imageIdentity} from './importers/hash';
 import {RequestPool,UPLOAD_CONCURRENCY} from './concurrency';
-import {API_BASE,API_ORIGIN} from './service';
+import {API_BASE,API_ORIGIN,WEBSITE_UPGRADE_URL} from './service';
 import {finishOidc,startOidc,isOidcCallback,type AuthConfig} from './auth/oidc';
-type View='library'|'history'|'usage'|'settings'|'account';
+type View='library'|'history'|'settings'|'account';
 export function App(){
 const [copies,setCopies]=useState<ReadingCopy[]>([]);const copiesRef=useRef(copies);copiesRef.current=copies;
 const [library,setLibrary]=useState(emptyLibrary);const [catalog,setCatalog]=useState<SourceCatalog>();
@@ -47,7 +44,7 @@ async function openSource(url:string,propagateError=false){if(sourceLock.current
 function chooseFiles(files:File[]){if(input.current)input.current.value='';if(!files.length)return;setImportExpanded(true);void localImport.add(files).then(added=>{if(!added)notify('请在当前检查或导入结束后添加文件；当前清单已保留。');});}
 const [readingEdition,setReadingEdition]=useState<TranslationEdition>();const [navigationKey,setNavigationKey]=useState(0);
 const [currentId,setCurrentId]=useState<string>();const current=copies.find(c=>c.id===currentId);
-const [view,setView]=useState<View>((['library','history','usage','settings','account'].includes(location.hash.slice(1))?location.hash.slice(1) as View:'library'));
+const [view,setView]=useState<View>((['library','history','settings','account'].includes(location.hash.slice(1))?location.hash.slice(1) as View:'library'));
 const [settings,setSettings]=useState<Settings>(store.settings);const [account,setAccount]=useState(store.session);const accountRef=useRef(account);accountRef.current=account;
 useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings')setSettings(store.settings());if(event.key==='nc-session')setAccount(store.session());};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
 useAppearance(settings);
@@ -62,7 +59,7 @@ const setError=useCallback((message:string)=>setErrorMessage(message),[]);
 const [loginOpen,setLoginOpen]=useState(false);const [username,setUsername]=useState('reader');const [authAllowed,setAuthAllowed]=useState(false);
 const [authConfig,setAuthConfig]=useState<AuthConfig>();
 const [confirmAction,setConfirmAction]=useState<{title:string;body:string;action:()=>Promise<void>}>();
-const [cacheBytes,setCacheBytes]=useState(0);const [upgradeOpen,setUpgradeOpen]=useState(false);
+const [cacheBytes,setCacheBytes]=useState(0);
 const input=useRef<HTMLInputElement>(null);const [sourceManifest,setSourceManifest]=useState<PageManifest>();
 const noticeId=useRef(0);
 const notify=useCallback((message:string)=>setToast({message,id:++noticeId.current}),[]);
@@ -131,17 +128,16 @@ const rights=usage??caps?.entitlements;
 const nav=(value:View)=>{exitReader();setView(value);location.hash=value;setError('');};
 return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=current?'none':'copy';setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current)chooseFiles(Array.from(e.dataTransfer.files));}}>
 <input aria-label="选择漫画图片" type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
-{!current&&<header className="nc-app-header"><button className="nc-brand" aria-label="返回我的漫画" onClick={()=>nav('library')}><span>✦</span><b>Node Comics</b></button><nav aria-label="主导航">{([['library','我的漫画','book'],['history','翻译记录','clock'],['usage','用量统计','coin']] as const).map(([value,label,icon])=><button key={value} aria-current={view===value?'page':undefined} onClick={()=>nav(value)}><Icon name={icon} size={19}/>{label}</button>)}</nav><div className="nc-header-actions"><button className="icon-button" aria-label="外观与设置" onClick={()=>nav('settings')}><Icon name="settings"/></button><button className="nc-account-button" onClick={()=>account?nav('account'):setLoginOpen(true)}><span className="nc-avatar">{account?account.user.name[0].toUpperCase():<Icon name="user" size={18}/>}</span><span>{account?(rights?.plan==='plus'?'PLUS':'普通用户'):'登录'}</span></button></div></header>}
+{!current&&<header className="nc-app-header"><button className="nc-brand" aria-label="返回我的漫画" onClick={()=>nav('library')}><span>✦</span><b>Node Comics</b></button><nav aria-label="主导航">{([['library','我的漫画','book'],['history','翻译记录','clock']] as const).map(([value,label,icon])=><button key={value} aria-current={view===value?'page':undefined} onClick={()=>nav(value)}><Icon name={icon} size={19}/>{label}</button>)}</nav><div className="nc-header-actions"><button className="icon-button" aria-label="外观与设置" onClick={()=>nav('settings')}><Icon name="settings"/></button><button className="nc-account-button" aria-label="我的账户" aria-current={view==='account'?'page':undefined} onClick={()=>nav('account')}><span className="nc-avatar">{account?account.user.name[0].toUpperCase():<Icon name="user" size={18}/>}</span><span>{account?(rights?.plan==='plus'?'PLUS':'普通用户'):'登录'}</span></button></div></header>}
 <div className="nc-workspace">
 {error&&<div className="global-error" role="alert"><Icon name="info" size={18}/><span>{error}</span><button aria-label="关闭错误提示" onClick={()=>setError('')}><Icon name="close" size={16}/></button></div>}
-{current?<Reader directory={directory} onCatalog={directory?.catalogUrl?()=>{exitReader();void openSource(directory.catalogUrl!);}:undefined} initialView={readingEdition?{mode:readingEdition.mode,preference:'translation'}:undefined} onMarkRead={store.markCopyRead} sequence={sequence} onActiveCopy={setCurrentId} onLoadCopy={id=>{const c=copiesRef.current.find(c=>c.id===id);const task=library.tasks.find(t=>t.copyId===id);if(c?.sourceEntryId&&(!c.discoveryComplete||c.pages.some(p=>!p.blobKey))&&task?.status!=='paused'&&task?.status!=='failed')void queueCopies([id],false).catch(e=>setError('原图采集未启动：'+e.message));}} sourceStatus={sourceTask?(sourceTask.error??(sourceTask.phase==='discover'?'正在发现图片清单':'正在获取原图'))+' · '+sourceTask.completed+' / '+(sourceTask.total??'未知'):undefined} onAcquire={()=>void grantImagePermissions([current.id],copiesRef.current).then(()=>notify('已提交采集，原图进度将在阅读页更新')).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseCopies([current.id]).then(()=>notify('已暂停原图采集，已保存的页面仍可阅读')).catch(e=>setError(e.message))} onNavigate={(id,pageId)=>void openCopy(id,readingEdition,pageId)} key={`${account?.user.id}:${apiOrigin}:${readingEdition?.mode??''}:${readingEdition?.language??''}:${navigationKey}`} api={api} busy={!!busy} copy={current} settings={settings} setSettings={setSettings} update={updateCopy} onBack={exitReader} onRetry={(page,mode,copyId)=>translation.retry(copyId??current.id,page,mode)} onUpgrade={()=>setUpgradeOpen(true)} onLogin={()=>setLoginOpen(true)} translationState={translation.stateFor} onImport={()=>input.current?.click()} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps?{...caps,entitlements:usage??caps.entitlements}:undefined} userId={account?.user.id} apiOrigin={apiOrigin}/>:
+{current?<Reader directory={directory} onCatalog={directory?.catalogUrl?()=>{exitReader();void openSource(directory.catalogUrl!);}:undefined} initialView={readingEdition?{mode:readingEdition.mode,preference:'translation'}:undefined} onMarkRead={store.markCopyRead} sequence={sequence} onActiveCopy={setCurrentId} onLoadCopy={id=>{const c=copiesRef.current.find(c=>c.id===id);const task=library.tasks.find(t=>t.copyId===id);if(c?.sourceEntryId&&(!c.discoveryComplete||c.pages.some(p=>!p.blobKey))&&task?.status!=='paused'&&task?.status!=='failed')void queueCopies([id],false).catch(e=>setError('原图采集未启动：'+e.message));}} sourceStatus={sourceTask?(sourceTask.error??(sourceTask.phase==='discover'?'正在发现图片清单':'正在获取原图'))+' · '+sourceTask.completed+' / '+(sourceTask.total??'未知'):undefined} onAcquire={()=>void grantImagePermissions([current.id],copiesRef.current).then(()=>notify('已提交采集，原图进度将在阅读页更新')).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseCopies([current.id]).then(()=>notify('已暂停原图采集，已保存的页面仍可阅读')).catch(e=>setError(e.message))} onNavigate={(id,pageId)=>void openCopy(id,readingEdition,pageId)} key={`${account?.user.id}:${apiOrigin}:${readingEdition?.mode??''}:${readingEdition?.language??''}:${navigationKey}`} api={api} busy={!!busy} copy={current} settings={settings} setSettings={setSettings} update={updateCopy} onBack={exitReader} onRetry={(page,mode,copyId)=>translation.retry(copyId??current.id,page,mode)} onUpgrade={()=>{if(WEBSITE_UPGRADE_URL)window.open(WEBSITE_UPGRADE_URL,'_blank','noopener,noreferrer');else notify('官网升级即将开放，届时可前往官网管理 PLUS。');}} onLogin={()=>setLoginOpen(true)} translationState={translation.stateFor} onImport={()=>input.current?.click()} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps?{...caps,entitlements:usage??caps.entitlements}:undefined} userId={account?.user.id} apiOrigin={apiOrigin}/>:
 <main className="nc-main">
 {view==='library'&&(catalog?<CatalogImport key={catalog.id+':'+catalog.observedAt} catalog={catalog} library={library} copies={copies} onClose={()=>{setCatalog(undefined);history.replaceState(null,'',location.pathname);}} onDone={()=>void reloadLibrary()} onNotice={notify} onRefresh={()=>openSource(catalog.url,true)}/>:<Library api={api} userId={account?.user.id} apiOrigin={apiOrigin} onOpenTranslation={(id,edition)=>void openCopy(id,edition)} library={library} copies={copies} settings={settings} setSettings={setSettings} onOpen={id=>void openCopy(id)} onImport={()=>input.current?.click()} onDemo={()=>void openDemo()} notify={notify} onChanged={()=>void reloadLibrary()} onSource={url=>void openSource(url)}/>)}
 
 {view==='history'&&<TranslationHistory key={`${apiOrigin}:${account?.user.id??''}`} api={api} copies={copies} userId={account?.user.id} onLogin={()=>setLoginOpen(true)} onOpen={(copy,job)=>{const mode=job?.mode;const language=job?.target_language;if(mode&&language)setSettings(s=>({...s,translationMode:mode,language}));const page=job?copy.pages.find(p=>p.jobs.some(j=>j.id===job.id)||p.assetId===(job.requested_asset_id??job.input_asset_id)):undefined;if(page){store.savePosition(copy.id,copy.manifestRevision,{pageId:page.id,relativeOffset:0});updateCopy({...copy,pageId:page.id,relativeOffset:0});}setCurrentId(copy.id);}} onDelete={(job,onDeleted)=>setConfirmAction({title:'删除服务器译图？',body:'删除后撤销服务器访问，已保存的本地副本仍可阅读。重新翻译需要新的翻译任务。',action:async()=>{await api.deleteImage(job.output_asset_id!);if(!api.isCurrent())return;for(const c of copiesRef.current)updateCopy({...c,pages:c.pages.map(p=>p.ownerId===account?.user.id&&p.apiOrigin===apiOrigin?{...p,jobs:p.jobs.map(j=>j.output_asset_id===job.output_asset_id?{...j,output_asset_id:null,result_available:false,result_expired:true}:j)}:p)});notify('服务器译图已删除');onDeleted();}})}/>}
-{view==='usage'&&<UsagePage key={`${apiOrigin}:${account?.user.id??''}`} api={api} onLogin={()=>setLoginOpen(true)}/>}
 {view==='settings'&&<Preferences key={`${apiOrigin}:${account?.user.id??''}`} settings={settings} setSettings={setSettings} caps={caps} cacheBytes={cacheBytes} notify={notify} onClearCache={()=>setConfirmAction({title:'清理本地译图缓存？',body:'只清理本地译图，原图、书架和阅读进度保留。需要时可重新下载服务器译图。',action:async()=>{await store.clearTranslations();setCopies(await store.readCopies());setCacheBytes(await store.cacheSize());notify('本地译图已清理，原图与阅读进度已保留');}})}/>}
-{view==='account'&&<><PageTitle eyebrow="A LITTLE MAGIC FOR EVERY PAGE" title="我的账户" description="查看会员权益与有效期。"/>{account?<><div className="account-summary"><span className="avatar large">{account.user.name[0].toUpperCase()}</span><div><h2>{account.user.name}</h2><p>{authAllowed?'本地测试账户':'已登录账户'}</p></div><button className="button secondary small" onClick={()=>{api.isCurrent=()=>false;store.saveSession(null);setAccount(null);setUsage(undefined);notify('已退出账户，原图仍可继续阅读');}}>退出登录</button></div><EntitlementCards data={rights??undefined}/><PlusOffer api={api} onChanged={refreshUsage}/><section className="settings-card"><div className="nc-section-heading"><div><h2>用量与反馈</h2><p className="nc-muted">查看实际消耗、逐笔记录和反馈处理进展。</p></div><button className="button primary" onClick={()=>nav('usage')}>查看用量统计</button></div></section><FeedbackInbox api={api}/></>:<div className="login-prompt"><span className="feature-icon pink"><Icon name="user" size={28}/></span><h2>准备好，一起漫游了吗？</h2><p>无需登录即可阅读原图。登录账户，阅读时自动翻译。</p><button className="button primary" onClick={()=>setLoginOpen(true)}>登录账户 <Icon name="arrow" size={18}/></button></div>}<div className="privacy-note standalone"><Icon name="info"/><p>订阅权益由付款状态自动同步；管理员赠送权益与页数按各自期限独立生效。</p></div></>}
+{view==='account'&&<AccountPage key={`${apiOrigin}:${account?.user.id??''}`} api={api} account={account} rights={rights??undefined} testing={authAllowed} onEntitlements={receiveTranslationPolicy} onLogin={()=>setLoginOpen(true)} onLogout={()=>{api.isCurrent=()=>false;store.saveSession(null);setAccount(null);setUsage(undefined);notify('已退出账户，原图仍可继续阅读');}}/>}
 </main>}
 </div>
 {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>把故事放在这里</h2><p>支持图片、MOBI、CBZ/ZIP、CBR/RAR、PDF（未加密）</p></div>}
@@ -151,7 +147,6 @@ return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e
   <button className="button primary full" style={{marginTop:20}} disabled={!!busy||(authAllowed?!username.trim():authConfig?.mode!=='oidc'||!authConfig?.authorization_endpoint||!authConfig?.token_endpoint||!authConfig?.client_id)} onClick={()=>void authenticate()}>{authAllowed?'连接测试账户':'继续登录'} <Icon name="arrow" size={18}/></button>
 </Modal>}
 
-{upgradeOpen&&<Modal title="升级权益" onClose={()=>setUpgradeOpen(false)}><PlusOffer api={api} onChanged={refreshUsage}/></Modal>}
 <LocalImport queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onAdd={()=>input.current?.click()} onOpen={id=>{void reloadLibrary().then(()=>openCopy(id)).catch(e=>setError(e.message));}} library={library} limitMb={settings.cacheLimitMb}/>
 {sourceManifest&&<SourceImport key={sourceManifest.id} manifest={sourceManifest} library={library} copies={copies} busy={!!busy} error={importError} onClose={()=>{setSourceManifest(undefined);setImportError('');}} onImport={acquireManifest}/>}
 {confirmAction&&<Modal title={confirmAction.title} subtitle={confirmAction.body} onClose={()=>setConfirmAction(undefined)}><button className="button primary full" onClick={async()=>{const action=confirmAction;setConfirmAction(undefined);try{await action.action();}catch(e){setError((e as Error).message);}}}>确认</button></Modal>}

@@ -1,19 +1,13 @@
 import type {Entitlements} from '../types';
-import {modeLabels} from '../types';
+import {Icon} from '../icons';
 
 export function EntitlementCards({data}:{data?:Entitlements}) {
-  if(!data)return <p className="nc-loading">正在读取会员权益…</p>;
-  return <section aria-label="会员权益">
-    <div className="nc-section-heading"><h2>{data.plan==='plus'?'PLUS 会员':'普通用户'}</h2><span>最多同时翻译 {data.plan==='plus'?10:3} 张</span></div>
-    {data.plan==='plus'&&data.plus_expires_at&&<p className="nc-muted">会员有效至 {new Date(data.plus_expires_at).toLocaleString()} · 重绘额度按会员月刷新，剩余不累积</p>}
-    <div className="nc-stat-grid nc-entitlements-grid">{(['redraw'] as const).map(mode=>{
-      const rights=data.modes[mode],quota=rights.quota;
-      return <article className="nc-stat" key={mode}><span>{modeLabels[mode]}</span>
-        <b>{rights.unlimited?'不限量':!rights.allowed?'PLUS 专享':quota?.available??0}{rights.allowed&&!rights.unlimited&&<small>页可用</small>}</b>
-        <p>{rights.unlimited?'不消耗重绘与赠送额度':!rights.allowed?'有效重绘赠送额度也可提供临时权限':`已用 ${quota?.used??0} 页 · 预占 ${quota?.reserved??0} 页`}</p>
-        {quota?.resets_at&&<p>基础额度恢复：{new Date(quota.resets_at).toLocaleString()}</p>}
-        {!!quota?.buckets.some(b=>b.source==='grant')&&<details><summary>查看赠送额度与到期时间</summary><ul>{quota.buckets.filter(b=>b.source==='grant').map(b=><li key={b.id}>剩余 {b.available} / {b.granted} 页 · {new Date(b.expires_at).toLocaleString()} 到期</li>)}</ul></details>}
-      </article>;
-    })}</div>
+  if(!data)return <p className="nc-loading" role="status">正在读取会员权益…</p>;
+  const rights=data.modes.redraw,quota=rights.quota;
+  const grants=quota?.buckets.filter(b=>b.source==='grant')??[];
+  return <section className="nc-rights-grid" aria-label="当前会员权益">
+    <article className="nc-rights-card"><div className="nc-rights-label"><Icon name="spark"/>AI 重绘额度</div><strong>{rights.unlimited?'不限量':!rights.allowed?'未开通':quota?.available??0}{rights.allowed&&!rights.unlimited&&<small>页可用</small>}</strong><p>{rights.unlimited?'当前权益内不限量使用':!rights.allowed?'升级 PLUS 或领取有效赠送额度后使用':`已用 ${quota?.used??0} 页 · 处理中 ${quota?.reserved??0} 页`}</p>{quota?.resets_at&&<span className="nc-muted">下次恢复 {new Date(quota.resets_at).toLocaleDateString()}</span>}{grants.length>0&&<details><summary>赠送额度与有效期</summary><ul>{grants.map(b=><li key={b.id}>剩余 {b.available} / {b.granted} 页 · {new Date(b.expires_at).toLocaleString()} 到期</li>)}</ul></details>}</article>
+    <article className="nc-rights-card"><div className="nc-rights-label"><Icon name="bolt"/>翻译请求频率</div><strong>{data.image_rate_limit.limit}<small>张 / {data.image_rate_limit.window_seconds} 秒</small></strong><p>按滚动时间窗口计算新增翻译图片</p><span className="nc-muted">跨设备合计，重复请求与结果复用不计入</span></article>
+    <article className="nc-rights-card"><div className="nc-rights-label"><Icon name="calendar"/>会员有效期</div><strong className="nc-date-value">{data.plan==='plus'?(data.plus_expires_at?new Date(data.plus_expires_at).toLocaleDateString():'以账户权益为准'):'长期有效'}</strong><p>{data.plan==='plus'?'PLUS 会员权益有效至上述日期':'当前为普通账户'}</p><span className="nc-muted">赠送权益按各自有效期独立生效</span></article>
   </section>;
 }

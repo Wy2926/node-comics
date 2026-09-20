@@ -7,6 +7,7 @@ import {putBlob,getBlob,cacheSize,collectUnusedBlobs,readCopies,session} from '.
 import type {Page,ReadingCopy} from '../types';
 export interface LocalImportProgress {label:string;done?:number;total?:number;}
 export async function readLocalFiles(files:File[],limitMb:number,progress:(text:string)=>void,onProgress?:(value:LocalImportProgress)=>void,fileHashes?:WeakMap<File,string>):Promise<ReadingCopy[]>{
+ limitMb=limitMb===-1?Infinity:limitMb;
  const report=(label:string,done?:number,total?:number)=>{progress(label);onProgress?.({label,done,total});};
  const comics=files.filter(f=>isComicFile(f.name)),images=naturalSort(files.filter(f=>['image/png','image/jpeg','image/webp'].includes(f.type)));
  if(comics.length+images.length!==files.length)throw Error('包含不支持的文件。请选择图片、MOBI、CBZ/ZIP、CBR/RAR 或 PDF。');

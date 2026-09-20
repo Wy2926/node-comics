@@ -106,3 +106,9 @@ describe('ordered acquisition and recovery',()=>{
   expect(sourceImage).not.toHaveBeenCalled();
  });
 });
+
+it('acquires a complete chapter with the unlimited cache preference',async()=>{
+ const copies=await setup();await queueCopies([copies[0].id]);
+ await new AcquisitionCoordinator().run(-1);
+ expect((await readLibrary()).tasks.find(t=>t.copyId===copies[0].id)?.status).toBe('complete');
+});

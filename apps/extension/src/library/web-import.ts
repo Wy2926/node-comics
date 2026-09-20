@@ -19,6 +19,7 @@ export function insertionBlocked(copy:ReadingCopy,library:LibraryState):string|u
 
 /** Download only the selected, trusted snapshot. Permission request retains the click's user activation. */
 export async function acquireWebImages(manifest:PageManifest,limitMb:number,progress:(text:string)=>void,protectedCopyId?:string):Promise<ReadingCopy>{
+ limitMb=limitMb===-1?Infinity:limitMb;
  const origins=[...new Set(manifest.items.map(item=>new URL(item.url).origin+'/*'))];
  if(!manifest.items.length)throw Error('请至少选择一张图片。');
  if(origins.length&&!await chrome.permissions.request({origins}))throw Error('未取得图片域名权限，请重试授权或导入本地图片。');

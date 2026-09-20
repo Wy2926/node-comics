@@ -37,12 +37,14 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
     </section>
     <section className="settings-card">
       <h3>
-        <Icon name="folder" />图片与隐私</h3>
-      <SettingRow title="本地图片缓存" description={`当前约 ${(cacheBytes / 1024 / 1024).toFixed(1)} MB；登录后只发送文件标识查找已有翻译；开始翻译时才上传缺失的选定原图。`}>
-        <select value={settings.cacheLimitMb} onChange={e => setSettings(s => ({ ...s, cacheLimitMb: Number(e.target.value) }))}>
+        <Icon name="storage" />图片与隐私</h3>
+      <SettingRow title="本地图片缓存" description={`当前约 ${(cacheBytes / 1024 / 1024).toFixed(1)} MB。无限制仍受设备空间和浏览器存储配额限制；登录后只发送文件标识查找已有翻译；开始翻译时才上传缺失的选定原图。`}>
+        <select aria-label="本地图片缓存" value={settings.cacheLimitMb} onChange={e => setSettings(s => ({ ...s, cacheLimitMb: Number(e.target.value) }))}>
           <option value="128">128 MB</option>
           <option value="512">512 MB</option>
           <option value="1024">1 GB</option>
+          <option value="10240">10 GB（默认）</option>
+          <option value="-1">无限制</option>
         </select>
       </SettingRow>
       <SettingRow title="清理本地译图" description="保留原图、书架与阅读位置；译图需要时重新下载。">

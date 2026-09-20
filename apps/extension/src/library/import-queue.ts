@@ -27,7 +27,7 @@ export class LocalImportQueue {
  private assignment?:ImportAssignment;
  private assignmentKey='';
  private separateWorks=false;
- private limitMb=512;
+ private limitMb=10240;
  private disposed=false;
  private fileHashes=new WeakMap<File,string>();
  subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>{this.listeners.delete(listener);};};

@@ -1,0 +1,39 @@
+.nc-account-page {display:grid;gap:28px;padding-bottom:30px}
+.nc-account-page>.page-title {margin-bottom:0}
+.nc-account-overview {display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.nc-profile-card,.nc-membership-card {border:1px solid var(--line);border-radius:22px;padding:28px;background:var(--surface);min-width:0;display:flex;flex-direction:column;gap:20px}
+.nc-profile-identity {display:flex;align-items:center;gap:18px;min-width:0}
+.nc-profile-identity h2 {margin:5px 0 10px;font-size:25px;overflow-wrap:anywhere}
+.nc-profile-avatar {width:74px;height:74px;flex-shrink:0;display:grid;place-items:center;border-radius:25px;background:var(--accent-soft);color:var(--accent);font-size:32px;font-weight:750;border:1px solid var(--line)}
+.nc-plan-badge {display:inline-flex;align-items:center;gap:5px;background:var(--surface-soft);padding:4px 9px;border-radius:7px;font-size:12px}
+.nc-profile-card>p,.nc-membership-card>p {margin:0;color:var(--muted);font-size:14px;line-height:1.8}
+.nc-profile-footer {border-top:1px solid var(--line);padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto}
+.nc-profile-footer>span {display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.nc-membership-card {background:linear-gradient(125deg,var(--accent-soft),var(--surface) 90%);border-color:color-mix(in srgb,var(--accent) 30%,var(--line));gap:12px}
+.nc-membership-heading {display:flex;align-items:center;gap:12px;color:var(--accent)}
+.nc-membership-heading>.nc-eyebrow {flex:1;font-size:11px;letter-spacing:2px}
+.nc-icon-tile {display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--surface)}
+.nc-membership-card h2 {font-size:25px;margin:4px 0 0}
+.nc-membership-footer {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:auto;padding-top:8px}
+.nc-membership-footer>span:last-child {font-size:12px;color:var(--muted)}
+.nc-coming-soon {display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:10px 14px;border-radius:10px;background:var(--surface);color:var(--muted);font-size:13px}
+.nc-rights-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.nc-rights-card {padding:23px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.nc-rights-label {display:flex;gap:9px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:20px}
+.nc-rights-label svg {color:var(--accent)}
+.nc-rights-card strong {display:block;font-size:32px;line-height:1.2;letter-spacing:-.5px}
+.nc-rights-card strong small {font-size:12px;font-weight:400;margin-left:8px;color:var(--muted);letter-spacing:0}
+.nc-rights-card strong.nc-date-value {font-size:26px;min-height:38px}
+.nc-rights-card p {font-size:13px;color:var(--muted);margin:14px 0 7px}
+.nc-rights-card .nc-muted,.nc-rights-card details {font-size:12px;line-height:1.8}
+.nc-rights-card details {margin-top:12px}.nc-rights-card summary {cursor:pointer;color:var(--accent)}
+.nc-account-activity {border-top:1px solid var(--line);padding-top:28px}
+.nc-account-activity h2 {display:flex;align-items:center;gap:8px}
+.nc-account-activity .nc-section-heading {margin-bottom:20px}
+.nc-account-empty {text-align:center;padding:45px 20px;background:var(--surface);border:1px dashed var(--line);border-radius:20px}
+.nc-account-empty>svg {color:var(--accent)}
+.nc-account-empty h2 {font-size:19px}.nc-account-empty p {color:var(--muted);font-size:14px;margin:14px 0 22px}
+@media(max-width:850px){.nc-account-overview{grid-template-columns:1fr}.nc-rights-grid{grid-template-columns:1fr}.nc-profile-card,.nc-membership-card{padding:22px}.nc-account-activity .nc-section-heading{align-items:flex-start;flex-wrap:wrap;gap:14px}}
+
+.nc-account-page .nc-stat>span,.nc-account-page .nc-feedback-inbox h2 {display:flex;align-items:center;gap:8px}
+.nc-account-page .nc-stat>span svg,.nc-account-page .nc-feedback-inbox h2 svg {color:var(--accent)}

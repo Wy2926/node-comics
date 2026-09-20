@@ -76,7 +76,7 @@ export function settings(): Settings {
     const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged=knownSettings(value);
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
+    return {...merged,cacheLimitMb:[128,512,1024,10240,-1].includes(merged.cacheLimitMb)?merged.cacheLimitMb:defaults.cacheLimitMb,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
   } catch {return {...defaults};}
 }
 function knownSettings(value:Partial<Settings>):Settings {
@@ -87,6 +87,7 @@ export interface Session {token:string;user:User;apiOrigin:string;}
 export function session(): Session|null { try {const value=JSON.parse(localStorage.getItem('nc-session')??'null');return value?.apiOrigin===API_ORIGIN?value:null;} catch{return null;} }
 export function saveSession(value: Session|null) { if(value)localStorage.setItem('nc-session',JSON.stringify(value));else localStorage.removeItem('nc-session'); void mirrorReader({session:value}); }
 export async function enforceCacheBudget(copies: ReadingCopy[], limitMb: number, protectedCopyId?: string) {
+  if(limitMb===-1||limitMb===Infinity)return;
   const all=await transaction<{id:string;blob:Blob;usedAt:number}[]>('blobs','readonly',s=>s.getAll());let total=all.reduce((n,b)=>n+b.blob.size,0);const limit=limitMb*1024*1024;if(total<=limit)return;
   const originalKeys=new Set(copies.flatMap(c=>c.pages.flatMap(p=>p.blobKey?[p.blobKey]:[])));
   const protectedKeys=new Set(copies.filter(c=>c.id===protectedCopyId||c.retention==='offline').flatMap(c=>c.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)])));const removed=new Set<string>();

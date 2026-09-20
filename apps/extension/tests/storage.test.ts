@@ -103,3 +103,14 @@ it('bulk deletion preserves shared files until the last selected reference is re
  expect(await getBlob(page.blobKey)).toBeUndefined();expect(await getBlob(page.outputBlobs.job)).toBeUndefined();
  expect((await readLibrary()).coverage.some(c=>c.copyId===a.id)).toBe(true);
 });
+
+it('defaults to 10 GB and persists unlimited without turning it into zero',async()=>{
+ localStorage.removeItem('nc-settings');expect(settings().cacheLimitMb).toBe(10240);
+ saveSettings({...defaults,cacheLimitMb:-1});expect(settings().cacheLimitMb).toBe(-1);
+ await putBlob('result:unlimited-test',new Blob(['retained']));
+ await enforceCacheBudget([],settings().cacheLimitMb);
+ expect(await getBlob('result:unlimited-test')).toBeTruthy();
+ await enforceCacheBudget([],0);expect(await getBlob('result:unlimited-test')).toBeUndefined();
+ saveSettings({...defaults,cacheLimitMb:512});expect(settings().cacheLimitMb).toBe(512);
+ localStorage.setItem('nc-settings',JSON.stringify({cacheLimitMb:-999}));expect(settings().cacheLimitMb).toBe(10240);
+});
