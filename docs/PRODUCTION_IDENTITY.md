@@ -15,6 +15,8 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 ## OIDC 必需项
 
+官网也使用同域名和现有客户端，新增精确回调 `https://comics.nodelane.net/auth/callback/`（含尾斜线）；五语页面共用此回调，登录后返回原语言账户页。保留已有插件和私有后台回调，身份端点允许官网 origin。官网使用 public client 的 PKCE 流程，不配置 client secret，运行与会话边界见[官网说明](../backend/website/README.md#oidc-与账户)。此记录是配置要求，尚未代为修改 Logto。
+
 管理后台入口改为私有 `ADMIN_WEB_PATH`，为空时关闭页面。部署前须在 Logto 新增 `https://<服务域名><ADMIN_WEB_PATH>` 精确回调（含尾斜线）；保留插件及其他客户端回调，不改变现有身份端点、Client ID 或 Audience。新入口不会通过公开身份配置返回。迁移顺序见[后台入口与登录](ADMIN_CONSOLE.md#登录)。
 
 | 配置 | 要求 |

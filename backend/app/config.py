@@ -117,7 +117,9 @@ class Settings(BaseSettings):
     def validate_admin_web_path(self):
         if self.admin_web_path and (not re.fullmatch(r"/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/", self.admin_web_path)
                 or self.admin_web_path.strip("/").lower() in {
-                    "admin", "v1", "internal", "health", "docs", "redoc", "api", "openapi"}):
+                    "admin", "v1", "internal", "health", "docs", "redoc", "api", "openapi",
+                    "account", "auth", "features", "pricing", "download", "guides", "faq", "help",
+                    "about", "changelog", "privacy", "terms", "refund", "zh-tw", "en", "ja", "ko"}):
             raise ValueError("ADMIN_WEB_PATH must be empty (disabled) or a non-reserved /name/ path using letters, digits, hyphens or underscores")
         return self
 

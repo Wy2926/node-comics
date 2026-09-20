@@ -60,6 +60,8 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 ## 管理后台
 
+公开官网位于 [website](website/README.md)，与 API 共用 `https://comics.nodelane.net`；Astro 静态输出、React 账户岛、五语独立字典，并复用相同 OIDC。Docker 构建自动打包，商店 URL 配置及身份回调要求见官网说明。
+
 服务端由 `ADMIN_WEB_PATH` 配置私有入口，提供独立 **React + TypeScript + Vite** 后台，可查看用户与权益、节点心跳与容量、双模式积压，以及逐页翻译的等待／执行耗时、交付节点和执行机。构建、登录、统计口径和验收见[后台说明](../docs/ADMIN_CONSOLE.md)。Docker 构建自动打包页面；本机启动 API 前先在 `backend/admin-ui` 执行 `npm ci` 和 `npm run build`。
 
 ## API

@@ -11,6 +11,7 @@
 当前后端只支持 `results_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
 
 - [后端运行与 Docker 隔离测试](backend/README.md)：根 `.env` 配置、`scripts/bootstrap.ps1 -Start`、控制进程与数据库。
+- [五语官网与账户](backend/website/README.md)：静态 SEO 页面、独立语言字典、同域 API 与 OIDC 登录、商店链接配置。
 - [插件运行与构建](apps/extension/README.md)：Node.js 22.23+、npm、浏览器夹具和扩展加载。
 - [计算节点安装](services/classic-engine/README.md)：独立模型、字体、Vulkan 与节点身份。根 Compose 只启动控制服务，常规翻译默认关闭。
 - [脚本入口](scripts/README.md)：运维、验证与样本工具的依赖及用途。

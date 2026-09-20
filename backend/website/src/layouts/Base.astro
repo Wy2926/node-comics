@@ -1,0 +1,83 @@
+---
+import {Image} from 'astro:assets';
+import logoZh from '../assets/logo-zh.webp';
+import logoEn from '../assets/logo-en.webp';
+import { site, absolute } from '../data/site';
+import { dictionaries, localeFromPath, basePath, localPath, locales, languageNames } from '../i18n';
+import '../styles/global.css';
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+  schema?: Record<string, unknown>[];
+  image?: string;
+}
+const { title, description, noindex = false, schema = [], image = '/social-cover.webp' } = Astro.props;
+const path = Astro.url.pathname;
+const locale=localeFromPath(path);
+const route=basePath(path);
+const t=dictionaries[locale].ui;
+const href=(target:string)=>localPath(target,locale);
+const navigation=[{href:href('/features/'),label:t.features},{href:href('/pricing/'),label:t.pricing},{href:href('/guides/'),label:t.guides},{href:href('/help/'),label:t.help}];
+const canonical = absolute(path);
+const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
+const graph = [
+  { '@type': 'Organization', '@id': absolute('/#organization'), name: site.name, url: site.url, email: site.email, logo: absolute('/icon-128.png'), contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: site.email } },
+  { '@type': 'WebSite', '@id': absolute('/#website'), url: site.url, name: site.name, inLanguage: locale, publisher: { '@id': absolute('/#organization') } },
+  { '@type': 'WebPage', '@id': canonical, url: canonical, name: pageTitle, description, inLanguage: locale, isPartOf: { '@id': absolute('/#website') } },
+  ...(route !== '/' ? [{ '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: t.home, item: absolute(href('/')) }, ...(route.startsWith('/guides/') && route !== '/guides/' ? [{ '@type': 'ListItem', position: 2, name: t.guides, item: absolute(href('/guides/')) }] : []), { '@type': 'ListItem', position: route.startsWith('/guides/') && route !== '/guides/' ? 3 : 2, name: title, item: canonical }] }] : []),
+  ...schema,
+];
+---
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1769b3" />
+    <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'} />
+    <meta name="referrer" content="no-referrer" />
+    <title>{pageTitle}</title>
+    <link rel="canonical" href={canonical} />
+    {!noindex && <>{locales.map(language => <link rel="alternate" hreflang={language} href={absolute(localPath(route,language))} />)}<link rel="alternate" hreflang="x-default" href={absolute(route)} /></>}
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="sitemap" href="/sitemap.xml" />
+    <link rel="alternate" type="application/rss+xml" title={`${t.brandName} ${t.changelog}`} href={href("/feed.xml")} />
+    <meta property="og:type" content={route.startsWith('/guides/') && route !== '/guides/' ? 'article' : 'website'} />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={{'zh-CN':'zh_CN','zh-TW':'zh_TW',en:'en_US',ja:'ja_JP',ko:'ko_KR'}[locale]} />
+    <meta property="og:image" content={absolute(image)} />
+    <meta property="og:image:alt" content={t.ogAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={absolute(image)} />
+    <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{t.skip}</a>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href={href('/')} aria-label={t.brandName}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={240} format="webp" loading="eager" /></a>
+        <nav class="desktop-nav" aria-label={t.navigation}>{navigation.map(item => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}</nav>
+        <details class="language-menu"><summary aria-label={t.language}><span aria-hidden="true">◎</span> {languageNames[locale]}</summary><nav aria-label={t.language}>{locales.map(language=><a href={localPath(route.startsWith('/404') ? '/' : route,language)} lang={language} hreflang={language} aria-current={locale===language ? "true" : undefined}>{languageNames[language]}</a>)}</nav></details>
+        <div class="header-actions"><a class="account-link" href={href('/account/')}>{t.account}</a><a class="button compact" href={href('/download/')}>{t.download} <span aria-hidden="true">↗</span></a></div>
+        <details class="mobile-nav"><summary aria-label={t.menu}>☰</summary><nav aria-label={t.mobileNavigation}>{navigation.map(item => <a href={item.href}>{item.label}</a>)}<a href={href('/account/')}>{t.account}</a><a href={href('/download/')}>{t.download}</a></nav></details>
+      </div>
+    </header>
+    <main id="main"><slot /></main>
+    <footer class="site-footer">
+      <div class="container footer-top">
+        <div><a class="brand" href={href('/')}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={220} format="webp" loading="lazy" /></a><p>{t.footerStory}</p><a class="email" href={`mailto:${site.email}`}>{site.email} ↗</a></div>
+        <div><strong>{t.startReading}</strong><a href={href('/features/')}>{t.features}</a><a href={href('/download/')}>{t.download}</a><a href={href('/pricing/')}>{t.pricing}</a><a href={href('/account/')}>{t.account}</a></div>
+        <div><strong>{t.support}</strong><a href={href('/guides/')}>{t.guides}</a><a href={href('/faq/')}>{t.faq}</a><a href={href('/help/')}>{t.help}</a><a href={href('/changelog/')}>{t.changelog}</a></div>
+        <div><strong>{t.company}</strong><a href={href('/about/')}>{t.about}</a><a href={href('/privacy/')}>{t.privacy}</a><a href={href('/terms/')}>{t.terms}</a><a href={href('/refund/')}>{t.refund}</a></div>
+      </div>
+      <div class="container footer-bottom"><span>© {new Date().getFullYear()} {t.brandName}. {t.copyright}</span><span>{t.artNote}</span><a href={href('/feed.xml')}>RSS ↗</a></div>
+    </footer>
+  </body>
+</html>

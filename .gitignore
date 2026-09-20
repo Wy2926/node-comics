@@ -13,7 +13,11 @@ __pycache__/
 .output/
 dist/
 dist-web/
+.astro/
+backend/app/website_dist/
 data/
+!backend/website/src/data/
+!backend/website/src/data/*.ts
 artifacts/
 test-results/
 playwright-report/

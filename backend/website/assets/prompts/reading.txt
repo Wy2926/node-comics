@@ -1,0 +1,6 @@
+Use case: illustration-story
+Asset type: wide original editorial illustration for a comic reader product website and reading guides
+Primary request: a quiet sunlit reading corner beside a window overlooking a seaside city. A pair of hands holds an open illustrated comic book above a wooden desk, with a tidy stack of comic books and a blue mug nearby; no face needed. A soft breeze gently lifts a page. Warm, inviting and composed.
+Style: polished hand-inked manga illustration, deep navy ink outlines, fine print halftone, clean off-white paper, primary blue #1769b3, soft sky blue and pale butter yellow. Rich perspective and lovely detail without visual clutter.
+Composition: landscape 3:2, diagonal open book central foreground, coastal scenery upper background, full bleed image, no user interface, no frames or labels.
+Constraints: no legible text, no watermark, no logo, no existing copyrighted characters.

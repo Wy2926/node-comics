@@ -1,0 +1,5 @@
+Use case: text-localization
+Asset type: Chinese version of an AI-generated original manga demonstration for a browser extension website
+Input image 1: edit target, original manga page
+Primary request: replace the Japanese text in the main panel speech balloon with the exact simplified Chinese phrase "下一站，会是怎样的世界？". Render it naturally within the same balloon using clean readable Chinese comic lettering.
+Constraints: change only the speech balloon text. Keep the character identity, face, pose, colors, panel layout, train, scenery, ticket, paper texture and all linework unchanged. No new text, no watermark, no logos.

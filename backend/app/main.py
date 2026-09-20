@@ -89,7 +89,8 @@ async def request_guards(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Cache-Control"] = "private, no-store"
+    if not getattr(request.state, 'public_website', False):
+        response.headers["Cache-Control"] = "private, no-store"
     return response
 
 
@@ -319,3 +320,8 @@ app.include_router(node_admin_router)
 async def processing_error(request, exc):
     status = 503 if exc.code == 'STORAGE_UNAVAILABLE' else 409 if exc.code in {"LEASE_EXPIRED", "NODE_CONFIG_CONFLICT"} else 422
     return JSONResponse(status_code=status, content={"error": {"code": exc.code, "message": exc.message}})
+
+
+# Keep this mount last: /v1, /internal, billing and the private admin entry win.
+from .website import WebsiteFiles
+app.mount('/', WebsiteFiles(), name='website')

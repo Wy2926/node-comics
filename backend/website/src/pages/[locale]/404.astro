@@ -1,0 +1,7 @@
+---
+import NotFound from '../../components/NotFound.astro';
+import {locales,prefixes} from '../../i18n';
+export function getStaticPaths() {return locales.filter(locale=>locale!=='zh-CN').map(locale=>({params:{locale:prefixes[locale]},props:{locale}}));}
+const {locale}=Astro.props;
+---
+<NotFound locale={locale}/>

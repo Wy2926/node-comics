@@ -7,3 +7,7 @@ __pycache__/
 *.db
 admin-ui/node_modules/
 app/admin_web/dist/
+website/node_modules/
+website/dist/
+website/.astro/
+app/website_dist/
