@@ -81,5 +81,32 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await worker.evaluate(async()=>{const key='nc-reader-settings',data=await chrome.storage.local.get(key);await chrome.storage.local.set({[key]:{...data[key],textScale:1.25}});});await popup.waitForFunction(()=>getComputedStyle(document.documentElement).fontSize==='20px');assert.equal(await popup.evaluate(()=>document.documentElement.scrollWidth),420);await screenshot('popup-large-text');check('四种主题亮暗外观及大字体无横向溢出');
  const popupButton=await popup.locator('.nc-comic-action').evaluate(el=>({border:getComputedStyle(el).borderWidth,radius:getComputedStyle(el).borderRadius,shadow:getComputedStyle(el).boxShadow}));assert.equal(popupButton.border,'2px');assert.equal(popupButton.radius,'5px');
  await reader.getByRole('button',{name:'我的账户',exact:true}).click();await reader.getByRole('button',{name:'登录账户',exact:true}).first().click();await reader.getByRole('dialog').waitFor();const loginButton=await reader.locator('.nc-login-submit').evaluate(el=>({border:getComputedStyle(el).borderWidth,radius:getComputedStyle(el).borderRadius,shadow:getComputedStyle(el).boxShadow}));assert.deepEqual(loginButton,popupButton);await reader.screenshot({path:path.join(out,'login-shared-tokens.png')});check('登录模态框与 Popup 共用描边、圆角和硬阴影令牌');
+
+ // Automatic translation stays opt-in, shares the reader preference, and respects page controls.
+ await reader.getByRole('button',{name:'关闭登录',exact:true}).click();await reader.getByRole('button',{name:'外观与设置',exact:true}).click();
+ await popup.close();await source.goto(site+'/automatic');await openPopup();
+ const autoSwitch=page=>page.getByRole('switch',{name:'标签页自动翻译',exact:true});
+ assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');
+ await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await autoSwitch(popup).click();await popup.getByRole('alert').filter({hasText:'自动翻译未开启'}).waitFor();assert.equal((await preferences()).autoTranslateTabs,false);check('自动翻译拒绝授权后保持关闭');
+ await popup.evaluate(()=>globalThis.fixtureDenyPermission=false);await autoSwitch(popup).click();await reader.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="标签页自动翻译"]').getAttribute('aria-checked')==='true');await source.bringToFront();
+ const hostVisible=()=>source.waitForFunction(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
+ const hostHidden=()=>source.waitForFunction(()=>![...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
+ await hostVisible();assert.equal((await preferences()).autoTranslateTabs,true);await popup.locator('.nc-auto-tabs').scrollIntoViewIfNeeded();await screenshot('popup-auto-enabled');await reader.locator('.nc-auto-tabs').scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'settings-auto-enabled.png')});check('Popup 开启自动翻译同步设置，并自动启动当前网页');
+ const sourceCDP=await context.newCDPSession(source);
+ async function inlineButton(name,click=false){
+  const {nodes}=await sourceCDP.send('Accessibility.getFullAXTree');const node=nodes.find(node=>node.role?.value==='button'&&node.name?.value===name);assert(node,'Missing inline button '+name);
+  if(click){const {model}=await sourceCDP.send('DOM.getBoxModel',{backendNodeId:node.backendDOMNodeId}),q=model.content;await source.mouse.click((q[0]+q[2]+q[4]+q[6])/4,(q[1]+q[3]+q[5]+q[7])/4);}
+ }
+ await inlineButton('暂停',true);await reader.bringToFront();await source.bringToFront();await inlineButton('继续');
+ await inlineButton('关闭',true);await hostHidden();await reader.bringToFront();await source.bringToFront();
+ const identity=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);return chrome.tabs.sendMessage(tab.id,{type:'NC_INLINE_IDENTITY'});},source.url());assert.equal(identity.enabled,false);assert.equal(identity.dismissedUrl,source.url());check('自动启动不覆盖同页的暂停和关闭选择');
+ await source.reload();await hostVisible();check('刷新网页自动恢复候选图片识别');
+ await source.evaluate(()=>history.pushState({},'', '/automatic-next'));await source.waitForFunction(()=>location.pathname==='/automatic-next');
+ // Observe the durable activation rather than assuming a SPA navigation has completed.
+ for(let attempts=0;attempts<100;attempts++){const active=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);return (await chrome.storage.session.get('nc-inline:'+tab.id))['nc-inline:'+tab.id];},source.url());if(active?.url===source.url())break;if(attempts===99)throw Error('SPA activation did not follow navigation');await new Promise(resolve=>setTimeout(resolve,30));}
+ await hostVisible();check('同文档跳转后按新网页范围继续自动翻译');
+ await autoSwitch(reader).click();await popup.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="标签页自动翻译"]').getAttribute('aria-checked')==='false');await hostHidden();check('设置关闭同步 Popup，并停止已自动启动的网页');
+ await source.reload();assert.equal(await source.evaluate(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646')),false);
+ await popup.close();await openPopup();assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');await hostVisible();check('关闭自动翻译后，手动翻译按钮仍可使用');
  assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,scope:'Built MV3 in isolated Chromium; permission pregrant and no live translation provider'},null,2));console.log('Artifacts: '+out);
 }finally{await context.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}

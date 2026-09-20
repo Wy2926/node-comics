@@ -12,6 +12,7 @@ import {sourceImage} from '../sources/image-fetch';
 import {defaults,supportsLanguage,type Page,type Settings,type Job,type Capabilities,type Entitlements} from '../types';
 import {comicSize,type InlineRequest,type InlineResponse,type InlineResult} from './protocol';
 import {settingsKey} from './settings';
+import {automaticTabsAllowed,registerAutomaticTabs} from './auto-tabs';
 import {imageDataUrl,maxInlineBytes} from './bytes';
 import {TranslationCoordinator} from '../translation/coordinator';
 import {operationId,type ReadingTarget} from '../translation/automatic';
@@ -20,18 +21,41 @@ import {translationState} from '../translation/state';
 import {matchesPage} from '../translation/sync';
 import {mergeJobs} from '../reader/jobs';
 
-interface Activation {url:string;navigationId:string;documentId?:string;}
+interface Activation {url:string;navigationId:string;documentId?:string;automatic?:boolean;}
 interface Context {key:string;api:Api;core:TranslationCoordinator;settings:Settings;session:Session;caps:Capabilities;rights:Entitlements;pages:Map<string,Page>;sourceErrors:Map<string,string>;currentKey?:string;waiting?:AbortController;active:boolean;}
 const activationKey=(tabId:number)=>'nc-inline:'+tabId;
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
-export async function activateInline(tabId:number){
-  windowGenerations.delete(tabId);
-  const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();contexts.delete(tabId);}
-  const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
-  const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},{frameId:0});
-  if(!identity||!safeImageUrl(identity.url,identity.url))throw Error('请在普通网页中使用翻译。');
-  await chrome.storage.session.set({[activationKey(tabId)]:{...identity,documentId:injected[0]?.documentId}});
-  await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START'},{frameId:0});
+export async function activateInline(tabId:number,automatic=false){
+  await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
+    const tab=await chrome.tabs.get(tabId);
+    if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
+    if(automatic){
+      if(!tab.active||!await automaticTabsAllowed())return;
+      const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},{frameId:0}).catch(()=>null);
+      // Do not reset a manual pause, original-view choice, or dismissal on tab activation.
+      if(existing?.url===tab.url&&(existing.dismissedUrl===tab.url||existing.enabled&&existing.activeUrl===tab.url))return;
+    }
+    const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
+    const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target);
+    if(!identity||identity.url!==tab.url)throw Error('网页已变化，请重新启动翻译。');
+    if(automatic&&!await automaticTabsAllowed())return;
+    windowGenerations.delete(tabId);
+    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();contexts.delete(tabId);}
+    await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic} satisfies Activation});
+    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic},target);
+  });
+}
+async function stopAutomaticInline(tabId:number){
+  await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
+    // Recheck after waiting for any activation; a newer enable wins over an old stop.
+    if(await automaticTabsAllowed())return;
+    const key=activationKey(tabId),saved=await chrome.storage.session.get(key),activation=saved[key] as Activation|undefined;
+    if(!activation?.automatic)return;
+    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();contexts.delete(tabId);}
+    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP_AUTO'},{frameId:0,...(activation.documentId?{documentId:activation.documentId}:{})}).catch(()=>{});
+    await chrome.storage.session.remove(key);windowGenerations.delete(tabId);
+  });
 }
 async function context(tabId:number,navigationId:string):Promise<Context|undefined>{
   const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>},session=(await readAuth()).session;
@@ -109,6 +133,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
   return response(ctx,request);
 }
 export function registerInlineBackground(){
+  registerAutomaticTabs(activateInline,stopAutomaticInline);
   chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;if(area==='local'&&(changes[settingsKey]||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
@@ -116,6 +141,7 @@ export function registerInlineBackground(){
     void(async()=>{
       const tabId=sender.tab!.id!,saved=await chrome.storage.session.get(activationKey(tabId)),activation=saved[activationKey(tabId)] as Activation|undefined;
       if(!activation||activation.navigationId!==message.navigationId||activation.documentId&&activation.documentId!==sender.documentId)throw Error('网页已变化，请重新右键翻译当前页面。');
+      if(activation.automatic&&!await automaticTabsAllowed())throw Error('标签页自动翻译已关闭。');
       if(!Number.isSafeInteger(message.generation)||message.generation<0)throw Error('阅读窗口无效。');
       windowGenerations.set(tabId,Math.max(windowGenerations.get(tabId)??0,message.generation));
       if(message.type==='NC_INLINE_INVALIDATE'){contexts.get(tabId)?.waiting?.abort();return;}

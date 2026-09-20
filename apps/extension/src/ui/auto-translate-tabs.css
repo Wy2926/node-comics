@@ -1,0 +1,10 @@
+.nc-auto-tabs{width:100%;padding:16px 0;border-top:1px solid var(--line)}
+.nc-auto-tabs-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.nc-auto-tabs-row>div{min-width:0}
+.nc-auto-tabs-row b{font-size:.875rem}
+.nc-auto-tabs p{margin:4px 0 0;color:var(--muted);font-size:.75rem;line-height:1.6}
+.nc-auto-tabs .switch{flex-shrink:0}
+.nc-auto-tabs .nc-auto-tabs-error{color:var(--danger)}
+.nc-popup .nc-auto-tabs{margin:0 0 18px;padding:12px 0 0}
+.nc-popup .nc-auto-tabs-row b{font-size:.75rem}
+.nc-popup .nc-auto-tabs p{font-size:.625rem}

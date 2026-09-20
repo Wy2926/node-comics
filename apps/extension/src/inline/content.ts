@@ -9,6 +9,7 @@ import {translationNotice} from '../translation/notice';
 interface Candidate {id:string;image:HTMLImageElement;url:string;rect:DOMRect;display:ImageDisplay;state?:InlineResult['state'];}
 export function installInline(){
   const navigationId=crypto.randomUUID();let initialUrl=location.href;
+  let automatic=false,dismissedUrl='';
   let enabled=false,paused=false,original=false,running=false,watching=false,generation=0,sequence=0,scope='',signature='',retryId:string|undefined;
   let prefetchAt=0,burstAt=0,scheduledAt=0,policyRevision='',failures=0,leaseTimer:ReturnType<typeof setInterval>|undefined;
   let candidates:Candidate[]=[],windowImages:Candidate[]=[],timer:ReturnType<typeof setTimeout>|undefined,scanTimer:ReturnType<typeof setTimeout>|undefined,raf=0;
@@ -31,7 +32,7 @@ export function installInline(){
   const pause=button('暂停',()=>{paused=!paused;pause.textContent=paused?'继续':'暂停';invalidate();if(!paused)schedule();paint();});
   const originals=button('恢复原图',()=>{original=!original;originals.textContent=original?'显示译图':'恢复原图';invalidate();if(original)for(const item of tracked.values())item.display.restore();schedule();paint();});
   button('设置',()=>{void send('NC_INLINE_OPEN',{view:'settings'});});
-  button('关闭',()=>stop());
+  button('关闭',()=>{dismissedUrl=location.href;stop();});
   shadow.append(bar);
   const badges=document.createElement('div');shadow.append(badges);
   function paint(){
@@ -126,8 +127,12 @@ export function installInline(){
   function visibility(){invalidate();scan();schedule();}
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(sender.id!==chrome.runtime.id)return;
-    if(message?.type==='NC_INLINE_IDENTITY'){respond({url:location.href,navigationId});return;}
-    if(message?.type==='NC_INLINE_START'){start();respond({ok:true});return;}
+    if(message?.type==='NC_INLINE_IDENTITY'){respond({url:location.href,navigationId,enabled,activeUrl:initialUrl,dismissedUrl});return;}
+    if(message?.type==='NC_INLINE_START'){
+      if(enabled&&initialUrl!==location.href)stop();
+      automatic=message.automatic===true;dismissedUrl='';start();respond({ok:true});return;
+    }
+    if(message?.type==='NC_INLINE_STOP_AUTO'){if(automatic){stop();automatic=false;}respond({ok:true});return;}
     if(message?.type==='NC_INLINE_CONFIG_CHANGED'&&enabled){scope='';invalidate();for(const item of tracked.values()){item.display.restore();item.state=undefined;}schedule();}
     if(message?.type==='NC_INLINE_SOURCE'&&message.navigationId===navigationId&&enabled){
       const item=windowImages.find(i=>i.id===message.id);

@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction } from 'react';
 import { type Capabilities, type Settings } from '../types';
+import {AutoTranslateTabs} from './AutoTranslateTabs';
 import {TargetLanguage,withTargetLanguage} from './TargetLanguage';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
@@ -22,6 +23,7 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
       <SettingRow title="默认目标语言" description="常规翻译支持 16 个语言选项；新增语言会采用常规翻译，已有译图版本保留。">
         <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>withTargetLanguage(s,language,caps))}/>
       </SettingRow>
+      <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <SettingRow title="翻页方向" description="单页模式中的方向键遵循此设置。">
         <select value={settings.direction} onChange={e => setSettings(s => ({ ...s, direction: e.target.value as Settings['direction'] }))}>
           <option value="rtl">从右向左 · 日漫习惯</option>

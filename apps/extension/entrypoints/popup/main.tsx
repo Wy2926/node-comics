@@ -6,6 +6,7 @@ import type {SourceCatalog} from '../../src/library/types';
 import {initialChoices,refreshChoices,type ImageChoice} from '../../src/sources/selection';
 import {sourceMessage} from '../../src/sources/client';
 import {SourceImagePicker} from '../../src/ui/SourceImagePicker';
+import {AutoTranslateTabs} from '../../src/ui/AutoTranslateTabs';
 import {TargetLanguage,withTargetLanguage} from '../../src/ui/TargetLanguage';
 import {useAppearance} from '../../src/ui/Appearance';
 import {settings,saveSettings} from '../../src/library/store';
@@ -94,6 +95,7 @@ function Popup({initialError=''}:{initialError?:string}){
    </section>
    <section className="nc-popup-translation" aria-label="网页翻译">
     <div className="nc-popup-language"><div><b>翻译成</b><p id="popup-language-hint">与设置中的默认目标语言同步</p></div><TargetLanguage value={preferences.language} onChange={language=>void changeLanguage(language)} disabled={disabled} describedBy="popup-language-hint"/></div>
+    <AutoTranslateTabs enabled={preferences.autoTranslateTabs} onSaved={setPreferences} disabled={disabled}/>
     <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}>{translating?<><span className="spinner"/>正在启动翻译…</>:<><Icon name="spark" size={18}/>翻译当前标签页<Icon name="arrow" size={18}/></>}</button>
     <p className="nc-popup-hint">留在原网页，当前图片与后两张随读随译。</p>
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
