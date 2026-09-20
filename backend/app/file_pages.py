@@ -13,7 +13,8 @@ from .request_models import RequestBody
 from .languages import Language
 from .errors import problem
 from .jobs import job_json, locked_user
-from .models import Asset, Job
+from .models import Asset
+from .results import ReaderEntry as Job
 from .providers import configuration, digest
 from .schemas import AssetResponse, JobResponse
 

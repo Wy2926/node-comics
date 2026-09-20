@@ -7,7 +7,8 @@ from starlette.concurrency import run_in_threadpool
 from .auth import identity
 from .db import get_db, session_factory
 from .jobs import job_json
-from .models import Job, User
+from .models import User
+from .results import ReaderEntry as Job
 from .scheduler import lock_scheduler
 from .plan_api import plan_snapshot
 from .schemas import TranslationChangesResponse

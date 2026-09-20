@@ -1,6 +1,6 @@
 """Durable per-image operations and bounded reading coordination."""
 from datetime import datetime
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 from .models import now
@@ -11,10 +11,16 @@ class TranslationOperation(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
     operation_key: Mapped[str] = mapped_column(String(128), primary_key=True)
     request_hash: Mapped[str] = mapped_column(String(64))
-    job_id: Mapped[str] = mapped_column(ForeignKey('jobs.id'), index=True)
+    job_id: Mapped[str | None] = mapped_column(ForeignKey('jobs.id'), index=True)
+    access_id: Mapped[str | None] = mapped_column(ForeignKey('result_accesses.id'), index=True)
     descriptor: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (Index('ix_translation_operations_owner_created', 'owner_id', 'created_at'),)
+    __table_args__ = (Index('ix_translation_operations_owner_created', 'owner_id', 'created_at'),
+        CheckConstraint('(job_id IS NOT NULL AND access_id IS NULL) OR (job_id IS NULL AND access_id IS NOT NULL)'),)
+
+    @property
+    def entry_id(self):
+        return self.job_id or self.access_id
 
 
 class ImageAdmission(Base):

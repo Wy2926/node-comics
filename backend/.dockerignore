@@ -4,7 +4,6 @@
 __pycache__/
 **/__pycache__/
 .pytest_cache/
-tests/
 *.db
 admin-ui/node_modules/
 app/admin_web/dist/

@@ -171,6 +171,8 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         job.status, job.phase = "failed", "failed"
         settle(db, job, success=False)
     job.completed_at, job.error_code, job.error_message = now(), None, None
+    from .results import publish_result
+    publish_result(db, job)
     db.add(Ledger(owner_id=job.owner_id, job_id=job.id, transaction_key=f"{job.id}:reconcile", kind="reconcile", amount=0, note=body.note))
     db.commit()
     return job_json(db, job)

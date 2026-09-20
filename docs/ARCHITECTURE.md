@@ -1,6 +1,6 @@
 # Node Comics 架构 v0.4
 
-2026-09-19：[阅读计划契约](READING_TRANSLATION_CONTRACT.md)已实现：滚动 60 秒普通 30／PLUS 100 张新增翻译、逐页受理与幂等恢复，取消账户在途数量上限。最终新库基线 `reading_0001`，旧提交／用户队列契约、结构和迁移链直接删除。现有环境切换与公开部署单独处理。调度与启动见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)和[后端说明](../backend/README.md)。
+2026-09-19：[阅读计划契约](READING_TRANSLATION_CONTRACT.md)已实现：滚动 60 秒普通 30／PLUS 100 张新增翻译、逐页受理与幂等恢复，取消账户在途数量上限。最终新库基线 `results_0001`，旧提交／用户队列契约、结构和迁移链直接删除。现有环境切换与公开部署单独处理。调度与启动见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)和[后端说明](../backend/README.md)。
 
 ## 结构
 
@@ -35,7 +35,7 @@ MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执
 - Job 保存内容/模式/语言/有效生成配置；TranslationOperation 保存逐页幂等回执；ReadingSession 保存至多三页窗口与序号；ImageAdmission 保存新增翻译的滚动分钟事件；UploadReservation 保存字节校验前的有限上传会话。
 - JobStage 保存依赖和代次，ExecutionLease 保存资源执行权，FairnessState 保存真实占用时间校正的加权服务量，UserModeQueue 仅保存模式阅读控制权与 epoch。
 - User、QuotaPeriod、MembershipOperation、Ledger 实现普通／PLUS、周期页数和限时赠送；供应商 Attempt/TextCall 成本独立计量。
-- 原图以内容 SHA-256 全局匹配，FilePage 按用户/文件哈希/原始页索引识别。无字结果与有效译图按模式、语言、有效配置版本跨账户复用，生成各自私有任务与资产授权；过期或删除记录不作为复用来源，进行中的跨账户任务独立调度。
+- 原图以内容 SHA-256 全局匹配，FilePage 按用户/文件哈希/原始页索引识别。无字结果与有效译图按模式、语言、有效配置版本跨账户复用；`translation_results` 只登记真实生成的版本，`result_accesses` 每用户／版本最多一条授权，缓存命中不创建 Job，也不进入任务历史。过期或删除授权不作为复用来源；进行中的跨账户任务独立调度。候选匹配在全局锁外执行，锁内按主键复核，详见[译图共享与匹配](RESULT_SHARING.md)。
 - 任务状态从 awaiting_upload/validating_upload 进入 queued/running，再到 succeeded/no_text/failed/cancelled/outcome_unknown。未知期限释放后仍保留 unknown_released 成本证据，不自动重发重绘。
 - 受理、排序、租约、终态和结算在一致锁顺序下事务提交。首次交付冻结结果摘要，在租约记录最终字节 SHA-256 对应的不可变共享对象键；晚到计算和重复网络通知不能覆盖已交付版本或重复扣量。
 - 账户增量游标由事务锁下的单调序列赋值，避免先分配序列、后提交造成客户端漏读。历史分页用固定查询数的数据库投影，不读整份供应商配置，不探测 R2。

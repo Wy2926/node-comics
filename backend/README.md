@@ -2,7 +2,7 @@
 
 2026-09-19 已实现[阅读计划契约](../docs/READING_TRANSLATION_CONTRACT.md)：普通／PLUS 分别最多新增 30／100 张翻译图片每滚动 60 秒，取消账户在途数量限制。统一逐页回执、断线核实、会话优先级与增量通知；后台持久任务、公平调度和私有 R2 保留。
 
-数据库只保留最终初始基线 `reading_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已替换[现有服务](../docs/CLASSIC_LOCAL_RUNTIME.md)或公开部署。
+数据库只保留最终初始基线 `results_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已替换[现有服务](../docs/CLASSIC_LOCAL_RUNTIME.md)或公开部署。
 
 FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Paddle 默认关闭，沙盒与生产使用不同数据库，见[支付接入](../docs/PADDLE_BILLING_DESIGN.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
 
@@ -17,7 +17,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-eng
 # 启动后在 /admin/#translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `reading_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `results_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
 三个控制进程可独立运行。以下仅列进程入口；启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
@@ -84,14 +84,16 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 ## 验证
 
+2026-09-20 已移除项目的非 Docker 虚拟环境、依赖目录与运行缓存；使用隔离测试容器，不需要宿主机 Python/npm 环境。以下命令从仓库根目录执行：
+
 ```powershell
-cd backend
-.venv/Scripts/python.exe -m pytest tests -q
+docker compose -p node-comics-tests -f deploy/compose.tests.yaml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -p node-comics-tests -f deploy/compose.tests.yaml down
 ```
 
 PostgreSQL 并发套件必须显式设置 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`；只接受 `nodecomics_concurrency_test`，每例随机 schema。未启用的用例显示 skipped。节点与引擎单元检查见节点说明。
 
-在独立测试库配置完成后，从 `backend` 执行 `.venv/Scripts/python.exe -m pytest tests -k postgres -q`。调度负载基准另需 `RUN_SCHEDULER_SCALE=1`，常规回归无需启用。DB 供应商 fixture 的本轮结果与真实接入边界见[常规翻译验证](../docs/CLASSIC_IMPLEMENTATION.md#验证与交付边界)。
+运行前设置 `$env:RUN_POSTGRES_CONCURRENCY='1'` 可启用真实 PostgreSQL 套件。上述 Compose 自带只在容器网络访问、使用 tmpfs 的专用测试库，不读产品数据库或环境文件；每个测试仍使用随机 schema。调度负载基准另需 `RUN_SCHEDULER_SCALE=1`，常规回归无需启用。DB 供应商 fixture 的真实接入边界见[常规翻译验证](../docs/CLASSIC_IMPLEMENTATION.md#验证与交付边界)。
 
 `tests/translation_fixtures.py` 为 SQLite、PostgreSQL、HTTP 子进程及手工 UI 显式创建隔离 DB 文本供应商，使用假密钥；修改协议或模型先写新 revision 再获取快照。测试 fixture 的创建不属于应用启动 seed。
 

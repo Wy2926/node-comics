@@ -15,9 +15,10 @@ from .file_pages import FilePage
 from .jobs import create_job, idem_key, job_json, owned_job
 from .languages import Language
 from .models import Asset, Job, User, now
+from .results import ReaderEntry, get_entry, shared_candidate
 from .plan_limits import acquire_control, image_budget, policy_snapshot, release_control, server_now
 from .plan_models import ReadingSession, TranslationOperation
-from .providers import digest
+from .providers import configuration, digest
 from .reading_sessions import apply_priority, claim_priority, reading_window
 from .request_models import RequestBody
 from .scheduler import ACTIVE, lock_scheduler
@@ -95,8 +96,8 @@ def operation_hash(item):
         'acknowledge_unknown_cost': item.acknowledge_unknown_cost})
 
 
-def receipt_json(db, operation, *, page_key=None, accepted=False, uploads=None):
-    job = db.get(Job, operation.job_id)
+def receipt_json(db, operation, *, page_key=None, accepted=False, uploads=None, entries=None):
+    job = entries[operation.entry_id] if entries is not None else get_entry(db, operation.entry_id)
     payload = job_json(db, job)
     source = db.get(Asset, job.input_asset_id) if job.input_asset_id else None
     if job.status in {'succeeded', 'no_text'} and available(source) and (job.status == 'no_text' or payload['result_available']):
@@ -117,17 +118,18 @@ def receipt_json(db, operation, *, page_key=None, accepted=False, uploads=None):
 
 
 def receipt_page(db, operations):
-    """Materialize bounded page dependencies once, including cache aliases."""
+    """Materialize bounded page dependencies once, including result grants."""
     operations = list(operations)
     if not operations:
         return []
-    jobs = list(db.scalars(select(Job).where(Job.id.in_({row.job_id for row in operations}))))
+    jobs = list(db.scalars(select(ReaderEntry).where(ReaderEntry.id.in_({row.entry_id for row in operations}))))
     assets = list(db.scalars(select(Asset).where(Asset.id.in_({asset_id for job in jobs
         for asset_id in (job.input_asset_id, job.output_asset_id) if asset_id}))))
     uploads = {row.job_id: row for row in db.scalars(select(UploadReservation).where(
         UploadReservation.job_id.in_({job.id for job in jobs})))}
     # jobs/assets stay strongly referenced while job_json uses the identity map.
-    result = [receipt_json(db, row, uploads=uploads) for row in operations]
+    indexed = {job.id: job for job in jobs}
+    result = [receipt_json(db, row, uploads=uploads, entries=indexed) for row in operations]
     return result
 
 
@@ -152,7 +154,7 @@ def bind_file_page(db, job, *, descriptor=None):
             db.add(FilePage(owner_id=job.owner_id, file_hash=file_hash, page_index=index, asset_id=job.input_asset_id))
 
 
-def accept_item(db, user, item, allow_new):
+def accept_item(db, user, item, allow_new, *, shared_hint=None):
     key, signature = idem_key(item.operation_key), operation_hash(item)
     old = db.get(TranslationOperation, (user.id, key))
     if old:
@@ -196,14 +198,14 @@ def accept_item(db, user, item, allow_new):
     job = create_job(db, user, asset, item.mode, item.target_language, key, operation='plan',
         force=item.action != 'ensure', max_quota_pages=item.max_quota_pages, expected_kind=item.expected_kind,
         source_sha256=image.image_sha256, file_hash=image.file_hash, page_index=image.page_index,
-        allow_new=allow_new, request_hash_override=signature)
+        allow_new=allow_new, request_hash_override=signature, shared_hint=shared_hint)
     operation = db.get(TranslationOperation, (user.id, key))
     operation.descriptor = {'page_key': item.page_key, 'image': image.model_dump()}
     if not job.input_asset_id and job.status == 'awaiting_upload':
         create_upload(db, job, {'sha256': image.image_sha256, 'byte_size': image.byte_size, 'mime': image.content_type})
     bind_file_page(db, job, descriptor=image.model_dump())
     db.flush()
-    created = job.operation == 'plan' and job.idempotency_key == key and not job.cache_hit
+    created = isinstance(job, Job) and job.operation == 'plan' and job.idempotency_key == key
     return receipt_json(db, operation, page_key=item.page_key, accepted=created)
 
 
@@ -219,6 +221,24 @@ def translate(body: TranslationPlan, user: User = Depends(identity), db: Session
     db.rollback()
     token = acquire_control(owner_id)
     try:
+        # Candidate discovery can sort/filter versions and grants without
+        # holding the admission/scheduler mutex. These are hints only: create_job
+        # checks current configuration and revalidates assets after taking it.
+        hints = {}
+        discovered = {}
+        for item in body.items:
+            if item.action != 'ensure' or db.get(TranslationOperation, (owner_id, item.operation_key)):
+                continue
+            try:
+                config = configuration(db, item.mode, item.target_language)
+                cache_key = digest({'hash': item.image.image_sha256, 'mode': item.mode,
+                    'language': item.target_language, 'config_version': config['version']})
+                if cache_key not in discovered:
+                    discovered[cache_key] = shared_candidate(db, cache_key)
+                hints[item.page_key] = discovered[cache_key]
+            except HTTPException:
+                pass  # Per-page validation below remains authoritative.
+        db.rollback()
         lock_scheduler(db)
         user = locked_user(db, owner_id)
         session = reading_window(db, owner_id, body)
@@ -227,7 +247,7 @@ def translate(body: TranslationPlan, user: User = Depends(identity), db: Session
         for item in body.items:
             try:
                 with db.begin_nested():
-                    result = accept_item(db, user, item, body.allow_new)
+                    result = accept_item(db, user, item, body.allow_new, shared_hint=hints.get(item.page_key))
             except HTTPException as error:
                 detail = error.detail if isinstance(error.detail, dict) else {'code': 'ITEM_REJECTED', 'message': str(error.detail)}
                 result = {'page_key': item.page_key, 'operation_key': item.operation_key,
@@ -240,7 +260,7 @@ def translate(body: TranslationPlan, user: User = Depends(identity), db: Session
         # Refresh the payload after atomic priority changes, without moving feed cursor.
         for item in items:
             if 'job' in item:
-                item['job'] = job_json(db, db.get(Job, item['job']['id']))
+                item['job'] = job_json(db, get_entry(db, item['job']['id']))
         status = 202 if any(item['disposition'] == 'accepted' for item in items) else 200
         headers = {}
         if items and all(item.get('code') == 'IMAGE_RATE_LIMITED' for item in items):

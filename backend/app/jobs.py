@@ -5,6 +5,9 @@ from .plan_models import TranslationOperation
 from .config import settings
 from .errors import problem
 from .models import Asset, Job, User, now, uid
+from .results import ReaderEntry, ResultAccess, get_entry, resolve_candidate, shared_candidate, valid_asset_sql
+from sqlalchemy.orm import aliased
+from sqlalchemy import or_
 from .entitlements import UNLIMITED, locked_user, quota_kind, require_entitlement, reserve, settle
 from .providers import configuration, digest, validate_input
 from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
@@ -44,6 +47,8 @@ def owned_job(db, job_id, owner_id, *, lock=False):
         query = query.with_for_update(key_share=True).execution_options(populate_existing=True)
     job = db.scalar(query)
     if not job:
+        job = db.scalar(select(ReaderEntry).where(ReaderEntry.id == job_id, ReaderEntry.owner_id == owner_id))
+    if not job:
         problem("NOT_FOUND", "找不到此任务", 404)
     return job
 
@@ -54,11 +59,12 @@ def job_for_request(db, owner_id, operation, key, request_hash):
         return None
     if receipt.request_hash != request_hash:
         problem("IDEMPOTENCY_CONFLICT", "此操作编号已用于其他图片或参数", 409)
-    return db.get(Job, receipt.job_id)
+    return get_entry(db, receipt.entry_id)
 
 
 def remember_request(db, owner_id, operation, key, request_hash, job):
-    db.add(TranslationOperation(owner_id=owner_id, operation_key=key, request_hash=request_hash, job_id=job.id))
+    db.add(TranslationOperation(owner_id=owner_id, operation_key=key, request_hash=request_hash,
+        job_id=job.id if isinstance(job, Job) else None, access_id=None if isinstance(job, Job) else job.id))
     db.flush()
     return job
 
@@ -68,15 +74,8 @@ def content_key(user, asset, mode, language, config):
     return digest({"hash": sha, "mode": mode, "language": language, "config_version": config["version"]})
 
 
-def find_shared_result(db, cache_key):
-    rows = db.scalars(select(Job).where(Job.cache_key == cache_key,
-        Job.status.in_({"succeeded", "no_text"}), Job.cancel_requested.is_(False), Job.discard_output.is_(False))
-        .order_by(Job.completed_at.desc(), Job.id))
-    for job in rows:
-        if available(db.get(Asset, job.input_asset_id)) and (job.status == "no_text"
-                or available(db.get(Asset, job.output_asset_id))):
-            return job
-    return None
+def find_shared_result(db, cache_key, hint=None):
+    return resolve_candidate(db, cache_key, hint) or resolve_candidate(db, cache_key, shared_candidate(db, cache_key))
 
 
 def find_reusable(db, user, asset, mode, language, config):
@@ -87,21 +86,26 @@ def find_reusable(db, user, asset, mode, language, config):
             Job.status.in_(["outcome_unknown", "unknown_released"])).order_by(Job.created_at).limit(1))
         if unresolved:
             return unresolved
-    rows = db.scalars(select(Job).where(Job.owner_id == user.id, Job.cache_key == content_key(user, sha, mode, language, config),
-        Job.status.in_(ACTIVE | {"succeeded", "no_text"}), Job.cancel_requested.is_(False), Job.discard_output.is_(False))
-        .order_by(Job.created_at.desc(), Job.id))
-    for candidate in rows:
-        if candidate.status in {"awaiting_upload", "validating_upload"}:
-            return candidate
-        if available(db.get(Asset, candidate.input_asset_id)) and (candidate.status in ACTIVE or candidate.status == "no_text"
-                or available(db.get(Asset, candidate.output_asset_id))):
-            return candidate
-    return None
+    entry, source, output = ReaderEntry, aliased(Asset), aliased(Asset)
+    candidate = db.scalar(select(entry).outerjoin(source, source.id == entry.input_asset_id).outerjoin(
+        output, output.id == entry.output_asset_id).where(
+        entry.owner_id == user.id, entry.cache_key == content_key(user, sha, mode, language, config),
+        entry.status.in_(ACTIVE | {'succeeded', 'no_text'}), entry.cancel_requested.is_(False), entry.discard_output.is_(False),
+        or_(entry.status.in_({'awaiting_upload', 'validating_upload'}),
+            valid_asset_sql(source) & or_(entry.status.in_(ACTIVE | {'no_text'}), valid_asset_sql(output))))
+        .order_by(entry.created_at.desc(), entry.id).limit(1))
+    if not candidate:
+        return None
+    if candidate.status not in {'awaiting_upload', 'validating_upload'}:
+        if not available(db.get(Asset, candidate.input_asset_id)) or (candidate.status == 'succeeded'
+                and not available(db.get(Asset, candidate.output_asset_id))):
+            return None
+    return get_entry(db, candidate.id)
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
                max_quota_pages=None, expected_kind=None, accepted_at=None,
-               source_sha256=None, file_hash=None, page_index=None, allow_new=True, request_hash_override=None):
+               source_sha256=None, file_hash=None, page_index=None, allow_new=True, request_hash_override=None, shared_hint=None):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
@@ -120,25 +124,25 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         return remember_request(db, user.id, operation, key, request_hash, cached)
     at = accepted_at or now()
     ck = content_key(user, sha, mode, language, config)
-    shared = None if force else find_shared_result(db, ck)
+    shared = None if force else find_shared_result(db, ck, shared_hint)
     if shared:
-        # Completed work is shared, not the other account's job or asset IDs.
-        # No supplier call, reservation or quota debit occurs for cache hits.
-        asset = asset or find_shared_original(db, user.id, sha)
-        if asset:
-            output = grant_asset(db, user.id, db.get(Asset, shared.output_asset_id), parent_id=asset.id) if shared.output_asset_id else None
-            version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
-            job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id, source_sha256=sha,
-                output_asset_id=output.id if output else None, file_hash=file_hash, page_index=page_index,
-                mode=mode, target_language=language, operation=operation, idempotency_key=key,
-                request_hash=request_hash, cache_key=ck, config=config, cache_hit=True,
-                quota_pages=0, quota_kind=shared.quota_kind, settlement="free", version=version,
-                status=shared.status, phase="completed", quality_flags=list(shared.quality_flags),
-                created_at=at, completed_at=at)
-            db.add(job)
-            db.flush()
-            touch_job(db, job)
-            return remember_request(db, user.id, operation, key, request_hash, job)
+        result, source, translated = shared
+        asset = asset or grant_asset(db, user.id, source)
+        output = grant_asset(db, user.id, translated, parent_id=asset.id) if translated else None
+        access = db.scalar(select(ResultAccess).where(ResultAccess.owner_id == user.id, ResultAccess.result_id == result.id))
+        if access is None:
+            version = (db.scalar(select(func.max(ReaderEntry.version)).where(ReaderEntry.owner_id == user.id, ReaderEntry.cache_key == ck)) or 0) + 1
+            access = ResultAccess(owner_id=user.id, result_id=result.id, input_asset_id=asset.id,
+                output_asset_id=output.id if output else None, version=version, created_at=at)
+            db.add(access)
+        else:
+            # A fresh authorized request can renew a revoked grant without
+            # allocating another record for the same user/generated version.
+            access.input_asset_id, access.output_asset_id = asset.id, output.id if output else None
+        db.flush()
+        touch_job(db, access)
+        entry = db.get(ReaderEntry, access.id, populate_existing=True)
+        return remember_request(db, user.id, operation, key, request_hash, entry)
     if not force:
         last = db.scalar(select(Job).where(Job.owner_id == user.id, Job.source_sha256 == sha,
             Job.mode == mode, Job.target_language == language)
@@ -150,7 +154,7 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     kind = require_entitlement(user, mode, at, expected_kind, db)
     if max_quota_pages is not None and kind != UNLIMITED and max_quota_pages < 1:
         problem("QUOTA_BOUND_EXCEEDED", "新增页数超过已确认额度上限", 409)
-    version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
+    version = (db.scalar(select(func.max(ReaderEntry.version)).where(ReaderEntry.owner_id == user.id, ReaderEntry.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
         file_hash=file_hash, page_index=page_index, mode=mode, target_language=language,
         operation=operation, idempotency_key=key, request_hash=request_hash, cache_key=ck, config=config,

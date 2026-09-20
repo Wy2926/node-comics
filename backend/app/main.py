@@ -220,6 +220,7 @@ def image_content(asset_id: str, user: User = Depends(identity), db: Session = D
 
 @app.delete("/v1/images/{asset_id}")
 def delete_image(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
+    from .results import ResultAccess
     lock_scheduler(db)
     asset = db.get(Asset, asset_id)
     if not asset or asset.owner_id != user.id:
@@ -244,6 +245,9 @@ def delete_image(asset_id: str, user: User = Depends(identity), db: Session = De
             state = db.get(ClassicState, job.id)
             if state:
                 db.delete(state)
+    for access in db.scalars(select(ResultAccess).where(ResultAccess.owner_id == user.id,
+            or_(ResultAccess.input_asset_id.in_(ids), ResultAccess.output_asset_id.in_(ids)))):
+        touch_job(db, access)
     db.commit()
     for item in assets:
         delete_asset_object(item)
@@ -271,6 +275,7 @@ def classic_details(job_id: str, user: User = Depends(identity), db: Session = D
 
 @app.post("/v1/jobs/status", response_model=JobsResponse)
 def jobs_status(body: StatusRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
+    from .results import ReaderEntry as Job
     jobs = db.scalars(select(Job).where(Job.id.in_(body.ids), Job.owner_id == user.id)).all()
     indexed = {job.id: job for job in jobs}
     return {"items": [job_json(db, indexed[key]) for key in dict.fromkeys(body.ids) if key in indexed]}

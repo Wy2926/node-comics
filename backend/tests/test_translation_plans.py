@@ -170,10 +170,10 @@ def test_internal_error_rolls_back_entire_plan_and_no_receipt_escapes(cluster,mo
     client,_=cluster
     auth=login(client)
     actual=plan_api.accept_item
-    def fail_second(db,user,item,allow_new):
+    def fail_second(db,user,item,allow_new,**kwargs):
         if item.role=='prefetch':
             raise RuntimeError('isolated transaction failure')
-        return actual(db,user,item,allow_new)
+        return actual(db,user,item,allow_new,**kwargs)
     monkeypatch.setattr(plan_api,'accept_item',fail_second)
     with pytest.raises(RuntimeError,match='isolated transaction failure'):
         submit(client,auth,manifest(2))

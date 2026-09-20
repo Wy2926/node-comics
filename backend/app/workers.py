@@ -51,6 +51,8 @@ def finish_job(db, job, status, *, error=None):
     if job.attempt_id:
         db.get(Attempt, job.attempt_id).completed_at = now()
     settle(db, job, success=status == "succeeded" and "unrecognized_regions" not in (job.quality_flags or []))
+    from .results import publish_result
+    publish_result(db, job)
 
 
 def complete_stage(lease_id, result, *, token=None, node_id=None):

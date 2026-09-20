@@ -40,7 +40,7 @@ def test_parallel_timings_and_final_delivery_node(monitor):
     assert not any(k in result.text for k in ['"config"', '"translations"', '"analysis"', '"storage_key"'])
 
 
-def test_cached_and_expired_timings(monitor):
+def test_uninstrumented_and_expired_timings(monitor):
     client, auth, _ = monitor
     cache = client.get("/v1/admin/monitor/tasks/"+CACHE_ID, headers=auth).json()
     assert cache["execution_seconds"] == 0 and cache["completed_by"] is None

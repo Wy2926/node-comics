@@ -72,7 +72,7 @@ def seed(db):
         started_at=completed.created_at+timedelta(seconds=45), completed_at=completed.created_at+timedelta(seconds=75)))
     running=job(2,"running",age=50); running.phase="text"
     execution(running,"text","control-text",10,None)
-    cache=job(3,"succeeded",age=400); cache.cache_hit=True
+    job(3, "succeeded", age=400)  # Real delivered job without execution timing data.
     expired=job(4,"running",age=300); expired.phase="analyze"
     execution(expired,"page","gpu-b",10,None,expiry=expired.created_at+timedelta(seconds=50))
     for i in range(5,46):

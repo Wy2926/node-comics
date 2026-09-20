@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import ForeignKey, Index, JSON, String, UniqueConstraint, and_, exists, func, literal, or_, select, union_all
+from sqlalchemy import CheckConstraint, ForeignKey, Index, JSON, String, UniqueConstraint, and_, exists, func, literal, or_, select, union_all
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
@@ -16,6 +16,7 @@ from .jobs import idem_key, job_json, owned_job
 from .entitlements import entitlements_json
 from .schemas import EntitlementsResponse
 from .models import Asset, Job, Ledger, User, now, uid
+from .results import ReaderEntry
 from .system_settings import get_request_limits
 from .schemas import JobResponse
 from .providers import digest
@@ -32,6 +33,7 @@ class LatestResult(BaseModel):
 @router.get("/v1/jobs/{job_id}/latest-result", response_model=LatestResult)
 def latest_result(job_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
     reference = owned_job(db, job_id, user.id)
+    Job = ReaderEntry
     query = select(Job).where(
         Job.owner_id == user.id, Job.source_sha256 == reference.source_sha256,
         Job.mode == reference.mode, Job.target_language == reference.target_language
@@ -45,7 +47,8 @@ class Feedback(Base):
     __tablename__ = "translation_feedback"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"))
+    job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"))
+    access_id: Mapped[str | None] = mapped_column(ForeignKey("result_accesses.id"))
     output_asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"))
     issues: Mapped[list] = mapped_column(JSON)
     comment: Mapped[str] = mapped_column(String(500), default="")
@@ -55,6 +58,7 @@ class Feedback(Base):
     created_at: Mapped[datetime] = mapped_column(default=now)
     updated_at: Mapped[datetime] = mapped_column(default=now)
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
+                     CheckConstraint('(job_id IS NOT NULL AND access_id IS NULL) OR (job_id IS NULL AND access_id IS NOT NULL)'),
                      Index("ix_feedback_owner_created", "owner_id", "created_at"),
                      Index("ix_feedback_job", "job_id"))
 
@@ -103,7 +107,8 @@ class FeedbackUpdate(RequestBody):
 
 
 def feedback_json(row):
-    return {name: getattr(row, name) for name in ("id", "job_id", "output_asset_id", "issues", "comment", "status")} | {
+    return {name: getattr(row, name) for name in ("id", "output_asset_id", "issues", "comment", "status")} | {
+        "job_id": row.job_id or row.access_id,
         "created_at": row.created_at.isoformat() + "Z", "updated_at": row.updated_at.isoformat() + "Z"}
 
 
@@ -135,7 +140,8 @@ def submit_feedback(job_id: str, body: FeedbackRequest,
         db.commit()
         return result
     reserve_feedback_receipt(db, admission, limits=limits)
-    row = Feedback(owner_id=owner_id, job_id=job_id, output_asset_id=job.output_asset_id,
+    row = Feedback(owner_id=owner_id, job_id=job_id if isinstance(job, Job) else None,
+                   access_id=None if isinstance(job, Job) else job_id, output_asset_id=job.output_asset_id,
                    issues=body.issues, comment=body.comment, idempotency_key=key, request_hash=request_hash)
     db.add(row)
     db.commit()
@@ -216,7 +222,7 @@ def usage_summary(days: int = Query(7, ge=1, le=90), timezone_name: str = Query(
     for created_at, amount, mode in db.execute(entries).yield_per(1000):
         if mode in consumed:
             consumed[mode] += amount
-    delivered = select(Job.completed_at, Job.mode, Job.settlement).where(Job.owner_id == user.id, Job.status == "succeeded", Job.cache_hit.is_(False),
+    delivered = select(Job.completed_at, Job.mode, Job.settlement).where(Job.owner_id == user.id, Job.status == "succeeded",
                                  Job.output_asset_id.is_not(None), Job.completed_at >= start, Job.completed_at < end)
     count = free = included = 0
     for completed_at, mode, settlement in db.execute(delivered).yield_per(1000):

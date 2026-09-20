@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: nodecomics
+      POSTGRES_PASSWORD: isolated-test-only
+      POSTGRES_DB: nodecomics_concurrency_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nodecomics -d nodecomics_concurrency_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+  tests:
+    image: node-comics-backend:test
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.test
+    environment:
+      RUN_POSTGRES_CONCURRENCY: "${RUN_POSTGRES_CONCURRENCY:-0}"
+      TEST_PG_HOST: postgres
+      TEST_PG_USER: nodecomics
+      TEST_PG_PASSWORD: isolated-test-only
+      TEST_PG_DATABASE: nodecomics_concurrency_test
+    volumes:
+      - ../scripts:/scripts:ro
+      - ../services/classic-engine:/services/classic-engine:ro
+    depends_on:
+      postgres:
+        condition: service_healthy

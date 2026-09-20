@@ -6,8 +6,8 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "reading_0001"
-NEW_TABLES = {"upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
+HEAD = "results_0001"
+NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_checkouts", "billing_subscriptions", "billing_events", "billing_transactions", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
 

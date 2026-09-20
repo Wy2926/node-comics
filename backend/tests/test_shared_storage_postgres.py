@@ -57,6 +57,7 @@ def test_postgres_concurrent_accounts_reuse_completed_result_without_new_charge(
     from app.db import session_factory
     from app.jobs import create_job
     from app.models import Asset, Job, Ledger, User, uid
+    from app.results import ReaderEntry, ResultAccess, TranslationResult
     from app.queue_models import JobStage
     output = png_variant(pg["png"], 76)
     calls = []
@@ -88,7 +89,10 @@ def test_postgres_concurrent_accounts_reuse_completed_result_without_new_charge(
         job_ids = list(pool.map(reuse, owners))
     assert len(set(job_ids)) == 6 and calls == [True]
     with session_factory()() as db:
-        jobs = list(db.scalars(select(Job).where(Job.id.in_(job_ids))))
+        jobs = list(db.scalars(select(ReaderEntry).where(ReaderEntry.id.in_(job_ids))))
+        assert db.scalar(select(func.count()).select_from(Job)) == 1
+        assert db.scalar(select(func.count()).select_from(TranslationResult)) == 1
+        assert db.scalar(select(func.count()).select_from(ResultAccess)) == 6
         assert {job.owner_id for job in jobs} == set(owners)
         assert all(job.status == "succeeded" and job.cache_hit and job.quota_pages == 0 and job.settlement == "free" for job in jobs)
         assert len({job.input_asset_id for job in jobs}) == 6
@@ -101,7 +105,7 @@ def test_postgres_concurrent_accounts_reuse_completed_result_without_new_charge(
         delete_image(pg["asset_id"], user=db.get(User, pg["owner_id"]), db=db)
     with session_factory()() as db:
         for job_id in job_ids:
-            job = db.get(Job, job_id)
+            job = db.get(ReaderEntry, job_id)
             assert available(db.get(Asset, job.input_asset_id))
             assert available(db.get(Asset, job.output_asset_id))
     assert object_path(output_key).read_bytes() == output

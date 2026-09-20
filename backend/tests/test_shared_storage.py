@@ -94,6 +94,8 @@ def test_invalid_or_different_results_are_not_shared(cluster, png, monkeypatch, 
         else:
             job.cache_key = "a" * 64
             job.target_language = "en"
+            from app.results import TranslationResult
+            db.get(TranslationResult, job.id).cache_key = job.cache_key
         db.commit()
     response = submit(client, bob, [descriptor(png)], mode="redraw")
     assert response.status_code == 202, response.text

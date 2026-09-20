@@ -51,6 +51,7 @@ class Asset(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (Index("ix_assets_content_lookup", "kind", "sha256"),
+                     Index("ix_assets_owner_content", "owner_id", "kind", "sha256"),
                      Index("ix_assets_storage_key", "storage_backend", "storage_key"))
 
 
@@ -76,7 +77,6 @@ class Job(Base):
     operation: Mapped[str] = mapped_column(String(100))
     request_hash: Mapped[str] = mapped_column(String(64))
     cache_key: Mapped[str] = mapped_column(String(64), index=True)
-    cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
     config: Mapped[dict] = mapped_column(JSON)
     quota_pages: Mapped[int] = mapped_column(Integer)
     quota_kind: Mapped[str] = mapped_column(String(30))
@@ -95,7 +95,11 @@ class Job(Base):
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
-                     Index("ix_jobs_content_result", "cache_key", "status", "completed_at"))
+                     Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"))
+
+    @property
+    def cache_hit(self):
+        return False  # Cache grants never enter this table.
 
 
 class Attempt(Base):

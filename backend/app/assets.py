@@ -81,6 +81,13 @@ def grant_asset(db, owner_id, source, *, parent_id=None):
     """Create an account-local reference without copying shared image bytes."""
     if source.owner_id == owner_id and source.parent_id == parent_id:
         return source
+    from .results import valid_asset_sql
+    existing = db.scalar(select(Asset).where(Asset.owner_id == owner_id,
+        Asset.kind == source.kind, Asset.storage_backend == source.storage_backend,
+        Asset.storage_key == source.storage_key, Asset.parent_id == parent_id,
+        valid_asset_sql(Asset)).limit(1))
+    if existing:
+        return existing
     asset = Asset(owner_id=owner_id, kind=source.kind, parent_id=parent_id,
         storage_key=source.storage_key, storage_backend=source.storage_backend,
         sha256=source.sha256, mime=source.mime, width=source.width, height=source.height,
@@ -98,13 +105,12 @@ def find_shared_original(db, owner_id, sha256, *, byte_size=None, mime=None):
     Object sharing is explicit product behavior. Asset IDs, jobs and file names
     remain private to each account; no remote I/O is needed for this lookup.
     """
-    rows = db.scalars(select(Asset).where(Asset.kind == "original", Asset.sha256 == sha256,
+    query = select(Asset).where(Asset.kind == "original", Asset.sha256 == sha256,
         Asset.deleted_at.is_(None), Asset.purged_at.is_(None),
         or_(Asset.expires_at.is_(None), Asset.expires_at > now(), Asset.active_references > 0))
-        .order_by((Asset.owner_id == owner_id).desc(), Asset.created_at.desc(), Asset.id))
-    for source in rows:
-        if not available(source):
-            continue
+    # Separate indexed probes avoid sorting every user's grant of a popular page.
+    source = db.scalar(query.where(Asset.owner_id == owner_id).limit(1)) or db.scalar(query.limit(1))
+    if available(source):
         if byte_size is not None and source.byte_size != byte_size:
             problem("UPLOAD_SIZE_MISMATCH", "图片大小与已验证内容不一致", 422)
         if mime not in (None, "application/octet-stream", source.mime):
