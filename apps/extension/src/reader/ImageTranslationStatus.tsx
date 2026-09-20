@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import type {TranslationState} from '../translation/automatic';
 import {TaskActivity} from './TaskActivity';
 import {Icon} from '../icons';
@@ -10,10 +11,10 @@ export function ImageTranslationStatus({state,onUpgrade,onLogin,onRetry}:{state?
   useEffect(()=>setFailure(undefined),[state?.kind,state?.message]);
   async function retry(){
     if(locked.current)return;locked.current=true;setFailure(undefined);setRetrying(true);
-    try{await onRetry();}catch(error){setFailure({kind:'error',message:error instanceof Error?error.message:'重试失败'});}
+    try{await onRetry();}catch(error){setFailure({kind:'error',message:error instanceof Error?error.message:msg("重试失败")});}
     finally{locked.current=false;setRetrying(false);}
   }
-  if(retrying)return <button className="nc-image-translation translating" disabled aria-busy="true" aria-label="重试中"><TaskActivity/><span>重试中…</span></button>;
+  if(retrying)return <button className="nc-image-translation translating" disabled aria-busy="true" aria-label={msg("重试中")}><TaskActivity/><span>{msg("重试中…")}</span></button>;
   state=failure??state;
   if(!state)return null;
   const action=state.kind==='upgrade'?onUpgrade:state.kind==='login'?onLogin:state.kind==='error'&&state.retryable!==false?retry:undefined;

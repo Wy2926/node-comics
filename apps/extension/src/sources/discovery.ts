@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import type {PageManifest} from './adapters';
 
 export const discoveryDelay=(ms:number,signal?:AbortSignal)=>new Promise<void>((resolve,reject)=>{
@@ -23,8 +24,8 @@ export async function pollSourceDiscovery<T extends Pick<PageManifest,'items'|'k
    if(manifest.items.length>count){count=manifest.items.length;lastGrowth=Date.now();await options.onProgress?.(manifest);}
    if(options.isComplete?options.isComplete(manifest):manifest.discoveryComplete)return manifest;
   }
-  if(Date.now()-lastGrowth>40_000)throw Error((latest?.note??'来源页面尚未就绪。')+' 40 秒未发现新图片；请打开来源处理登录／验证后继续，已有进度已保留。');
+  if(Date.now()-lastGrowth>40_000)throw Error(msg("{0} 40 秒未发现新图片；请打开来源处理登录／验证后继续，已有进度已保留。", {"0": (latest?.note??msg("来源页面尚未就绪。"))}));
   await discoveryDelay(120,options.signal);
  }
- throw Error((latest?.note??'来源清单读取超时。')+' 已保留已发现页面，可打开来源后继续补齐。');
+ throw Error(msg("{0} 已保留已发现页面，可打开来源后继续补齐。", {"0": (latest?.note??msg("来源清单读取超时。"))}));
 }

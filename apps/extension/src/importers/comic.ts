@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {hashFile,Sha256} from './hash';
 
 export * from './comic-shared';
@@ -10,7 +11,7 @@ export function importedFileHash(book:Pick<ComicImport,'format'|'fileHash'>,imag
 }
 
 export async function openComic(file:File, progress?:(done:number,total:number)=>void,knownHash?:string):Promise<ComicImport> {
-  if(!file.size||file.size>MAX_FILE)throw Error('漫画文件为空或超过 512 MB，请拆分为章节后导入。');
+  if(!file.size||file.size>MAX_FILE)throw Error(msg("漫画文件为空或超过 512 MB，请拆分为章节后导入。"));
   const extension=file.name.split('.').at(-1)!.toLowerCase();
   if(extension==='mobi') {
     const {importMobi}=await import('./mobi');
@@ -20,9 +21,9 @@ export async function openComic(file:File, progress?:(done:number,total:number)=
   const prefix=new Uint8Array(await file.slice(0,8).arrayBuffer());
   const signature=String.fromCharCode(...prefix);
   const format=['cbz','zip'].includes(extension)?'ZIP':['cbr','rar'].includes(extension)?'RAR':extension==='pdf'?'PDF':undefined;
-  if(!format)throw Error('不支持此漫画文件格式。');
-  if(format==='ZIP'&&!signature.startsWith('PK') || format==='RAR'&&!signature.startsWith('Rar!\x1a\x07') || format==='PDF'&&!signature.startsWith('%PDF-'))throw Error('文件内容与扩展名不符，或文件已损坏。');
-  if(format==='RAR'&&file.size>128*MiB)throw Error('CBR/RAR 最大支持 128 MB，请拆分或转换为 CBZ/ZIP。');
+  if(!format)throw Error(msg("不支持此漫画文件格式。"));
+  if(format==='ZIP'&&!signature.startsWith('PK') || format==='RAR'&&!signature.startsWith('Rar!\x1a\x07') || format==='PDF'&&!signature.startsWith('%PDF-'))throw Error(msg("文件内容与扩展名不符，或文件已损坏。"));
+  if(format==='RAR'&&file.size>128*MiB)throw Error(msg("CBR/RAR 最大支持 128 MB，请拆分或转换为 CBZ/ZIP。"));
   const fileHash=knownHash??await hashFile(file,progress);
   const result=format==='ZIP'?await (await import('./zip')).openZip(file):format==='RAR'?await (await import('./rar')).openRar(file):await (await import('./pdf')).openPdf(file,fileHash);
   return {title:file.name.replace(/\.[^.]+$/,''),fileHash,format,warnings:[],...result};
@@ -30,11 +31,11 @@ export async function openComic(file:File, progress?:(done:number,total:number)=
 
 /** Decode one page at a time; GIF normalization is also the upload identity. */
 export async function prepareComicPage(item:ComicPage) {
-  if(item.blob.size>MAX_PAGE)throw Error(`${item.name} 超过单页 32 MB 限制。`);
+  if(item.blob.size>MAX_PAGE)throw Error(msg("{0} 超过单页 32 MB 限制。", {"0": item.name}));
   if(item.width&&item.height)checkDimensions(item.width,item.height);
   let bitmap:ImageBitmap;
   try { bitmap=await createImageBitmap(item.blob); }
-  catch { throw Error(`${item.name} 无法解码，请检查图片是否损坏。`); }
+  catch { throw Error(msg("{0} 无法解码，请检查图片是否损坏。", {"0": item.name})); }
   try {
     const {width,height}=bitmap;
     checkDimensions(width,height);
@@ -45,10 +46,10 @@ export async function prepareComicPage(item:ComicPage) {
       blob=await canvas.convertToBlob({type:'image/png'});
       canvas.width=canvas.height=1;
     }
-    if(blob.size>MAX_PAGE)throw Error(`${item.name} 转换后超过单页 32 MB 限制。`);
+    if(blob.size>MAX_PAGE)throw Error(msg("{0} 转换后超过单页 32 MB 限制。", {"0": item.name}));
     return {blob,width,height,imageSha256:await hashFile(blob)};
   } finally { bitmap.close(); }
 }
 function checkDimensions(width:number,height:number) {
-  if(width<1||height<1||width*height>40_000_000||Math.max(width,height)>30000)throw Error('漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。');
+  if(width<1||height<1||width*height>40_000_000||Math.max(width,height)>30000)throw Error(msg("漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。"));
 }

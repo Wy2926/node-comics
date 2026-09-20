@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Mode, Page } from '../types';
 import { Icon } from '../icons';
@@ -39,17 +40,17 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
       return <div className={`nc-thumb-row ${n === index ? 'current' : ''}`} style={{ position: 'absolute', top, height: height - 12 }} key={p.id}>
         <button className="nc-thumb-main" aria-current={n === index ? 'page' : undefined} onClick={() => onJump(n)}>
           <span className="nc-thumb-picture" style={{ height: pictureHeight }}>
-            <Thumbnail blobKey={p.blobKey} alt={`第 ${n + 1} 页缩略图`} />
+            <Thumbnail blobKey={p.blobKey} alt={msg("第 {0} 页缩略图", {"0": n + 1})} />
           </span>
           <span className="nc-thumb-info">
-            <b>第 {n + 1} 页{n === index && <i>阅读中</i>}</b>
-            <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? '译图已过期' : t.ready || t.result?.output_asset_id ? '已有译图' : t.latest ? taskText(t.latest) : p.blobKey ? '原图' : '原图待导入'}</small>
+            <b>{msg("第 {0} 页", {"0": n + 1})}{n === index && <i>{msg("阅读中")}</i>}</b>
+            <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.output_asset_id ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入")}</small>
           </span>
         </button>{manage && <div className="nc-thumb-management">
           <div className="nc-page-order">
-            <button aria-label={`上移第 ${n + 1} 页`} disabled={n === 0} onClick={() => onMove(p.id, -1)}>↑</button>
-            <button aria-label={`下移第 ${n + 1} 页`} disabled={n === pages.length - 1} onClick={() => onMove(p.id, 1)}>↓</button>
-            <button aria-label={`移除第 ${n + 1} 页`} onClick={() => onRemove(p)}>
+            <button aria-label={msg("上移第 {0} 页", {"0": n + 1})} disabled={n === 0} onClick={() => onMove(p.id, -1)}>↑</button>
+            <button aria-label={msg("下移第 {0} 页", {"0": n + 1})} disabled={n === pages.length - 1} onClick={() => onMove(p.id, 1)}>↓</button>
+            <button aria-label={msg("移除第 {0} 页", {"0": n + 1})} onClick={() => onRemove(p)}>
               <Icon name="close" size={15} />
             </button>
           </div>

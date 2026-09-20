@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 // SHA-256 (FIPS 180-4), implemented locally to keep large MOBI imports bounded.
 // State: 64-byte tail + 64 words; file reads are capped at 1 MiB.
 const K = new Uint32Array([
@@ -35,7 +36,7 @@ export class Sha256 {
     this.state[4]+=e;this.state[5]+=f;this.state[6]+=g;this.state[7]+=h;
   }
   update(bytes: Uint8Array) {
-    if (this.finished) throw new Error('SHA-256 已结束。');
+    if (this.finished) throw new Error(msg("SHA-256 已结束。"));
     this.length += bytes.length;
     let offset = 0;
     if (this.used) {
@@ -48,7 +49,7 @@ export class Sha256 {
     return this;
   }
   digest(): string {
-    if (this.finished) throw new Error('SHA-256 已结束。');
+    if (this.finished) throw new Error(msg("SHA-256 已结束。"));
     this.finished = true;
     this.tail[this.used++] = 0x80;
     this.tail.fill(0, this.used);

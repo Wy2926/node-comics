@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import type {PageManifest,SourceItem} from './adapters';
 
 export type ImageChoice=SourceItem&{selected:boolean};
@@ -20,11 +21,11 @@ export function moveChoice(choices:ImageChoice[],id:string,targetId:string):Imag
 }
 /** Resolve selection against the trusted snapshot; never accept caller-provided URLs. */
 export function selectManifest(manifest:PageManifest,itemIds:unknown):PageManifest{
- if(!Array.isArray(itemIds)||!itemIds.length||itemIds.length>manifest.items.length||itemIds.some(id=>typeof id!=='string')||new Set(itemIds).size!==itemIds.length)throw Error('请选择有效且不重复的图片。');
+ if(!Array.isArray(itemIds)||!itemIds.length||itemIds.length>manifest.items.length||itemIds.some(id=>typeof id!=='string')||new Set(itemIds).size!==itemIds.length)throw Error(msg("请选择有效且不重复的图片。"));
  const items=itemIds.map((id,order)=>{
-  const item=manifest.items.find(item=>item.id===id);if(!item)throw Error('图片已不在当前来源清单中，请刷新。');
+  const item=manifest.items.find(item=>item.id===id);if(!item)throw Error(msg("图片已不在当前来源清单中，请刷新。"));
   return {...item,order};
  });
  const whole=items.length===manifest.items.length;
- return {...manifest,items,selectionConfirmed:true,discoveryComplete:whole&&manifest.discoveryComplete,knownTotal:whole?manifest.knownTotal:undefined,note:whole?manifest.note:`已选 ${items.length} / ${manifest.items.length} 张图片，保留所选顺序；不代表完整章节。`};
+ return {...manifest,items,selectionConfirmed:true,discoveryComplete:whole&&manifest.discoveryComplete,knownTotal:whole?manifest.knownTotal:undefined,note:whole?manifest.note:msg("已选 {0} / {1} 张图片，保留所选顺序；不代表完整章节。", {"0": items.length, "1": manifest.items.length})};
 }

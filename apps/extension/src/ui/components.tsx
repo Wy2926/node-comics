@@ -1,6 +1,7 @@
+import {msg} from '../i18n/runtime';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '../icons';
-export function Modal({ title, subtitle, children, onClose, className='', closeLabel='关闭弹窗' }: {
+export function Modal({ title, subtitle, children, onClose, className='', closeLabel=msg("关闭弹窗") }: {
   title: string;
   subtitle?: string;
   children: ReactNode;

@@ -1,3 +1,4 @@
+import {msg} from './i18n/runtime';
 export const UPLOAD_CONCURRENCY = 5;
 
 export function normalizeConcurrency(value: unknown): number {
@@ -5,7 +6,7 @@ export function normalizeConcurrency(value: unknown): number {
 }
 
 export class StaleOperation extends Error {
-  constructor() { super('账户或服务已切换，本次操作已停止。'); }
+  constructor() { super(msg("账户或服务已切换，本次操作已停止。")); }
 }
 export function assertCurrent(current: () => boolean) { if (!current()) throw new StaleOperation(); }
 

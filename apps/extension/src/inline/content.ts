@@ -1,3 +1,4 @@
+import {msg,subscribeLocale} from '../i18n/runtime';
 import {readingImages,type InlineResponse,type InlineResult} from './protocol';
 import {comicImageRect,MAX_COMIC_IMAGES} from '../sources/comic-images';
 import {ImageDisplay} from './display';
@@ -11,6 +12,7 @@ interface Candidate {id:string;image:HTMLImageElement;url:string;rect:DOMRect;di
 export function installInline(){
   const navigationId=crypto.randomUUID();let initialUrl=location.href;
   let automatic=false,dismissedUrl='';
+  let translatedView:Pick<InlineResponse,'mode'|'language'>|undefined;
   let enabled=false,paused=false,original=false,running=false,watching=false,generation=0,sequence=0,scope='',signature='',retryId:string|undefined;
   let prefetchAt=0,burstAt=0,scheduledAt=0,policyRevision='',failures=0,leaseTimer:ReturnType<typeof setInterval>|undefined;
   let candidates:Candidate[]=[],windowImages:Candidate[]=[],timer:ReturnType<typeof setTimeout>|undefined,scanTimer:ReturnType<typeof setTimeout>|undefined,raf=0;
@@ -25,15 +27,16 @@ export function installInline(){
     .label{max-width:260px;margin-right:3px}.status{position:fixed;max-width:260px;padding:5px 9px;border-radius:8px;background:#fffffff2;box-shadow:0 2px 10px #22334420;pointer-events:none;overflow:hidden;text-overflow:ellipsis}.status[data-kind=error]{color:#a33147}.status[data-kind=upgrade]{color:#8d4d00}
     .status button{background:transparent;padding:0;color:inherit;text-align:left}`;
   shadow.append(style);
-  const bar=document.createElement('div');bar.className='bar';bar.setAttribute('role','region');bar.setAttribute('aria-label','Node Comics 网页翻译');
+  const bar=document.createElement('div');bar.className='bar';bar.setAttribute('role','region');bar.setAttribute('aria-label',msg("NodeLane Comics 网页翻译"));
   const label=document.createElement('span');label.className='label';bar.append(label);
   const button=(text:string,action:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=action;bar.append(b);return b;};
   const send=(type:string,extra:Record<string,unknown>={})=>chrome.runtime.sendMessage({type,navigationId,generation,...extra});
   const invalidate=()=>{generation++;void send('NC_INLINE_INVALIDATE').catch(()=>{});};
-  const pause=button('暂停',()=>{paused=!paused;pause.textContent=paused?'继续':'暂停';invalidate();if(!paused)schedule();paint();});
-  const originals=button('恢复原图',()=>{original=!original;originals.textContent=original?'显示译图':'恢复原图';invalidate();if(original)for(const item of tracked.values())item.display.restore();schedule();paint();});
-  button('设置',()=>{void send('NC_INLINE_OPEN',{view:'settings'});});
-  button('关闭',()=>{dismissedUrl=location.href;stop();});
+  const pause=button(msg("暂停"),()=>{paused=!paused;pause.textContent=paused?msg("继续"):msg("暂停");invalidate();if(!paused)schedule();paint();});
+  const originals=button(msg("恢复原图"),()=>{original=!original;originals.textContent=original?msg("显示译图"):msg("恢复原图");invalidate();if(original)for(const item of tracked.values())item.display.restore();schedule();paint();});
+  const settingsButton=button(msg("设置"),()=>{void send('NC_INLINE_OPEN',{view:'settings'});});
+  const closeButton=button(msg("关闭"),()=>{dismissedUrl=location.href;stop();});
+  subscribeLocale(()=>{settingsButton.textContent=msg('设置');closeButton.textContent=msg('关闭');pause.textContent=paused?msg('继续'):msg('暂停');originals.textContent=original?msg('显示译图'):msg('恢复原图');bar.setAttribute('aria-label',msg('NodeLane Comics 网页翻译'));if(translatedView)label.textContent=msg('漫译 · {0} · {1}',{'0':modeLabels[translatedView.mode],'1':languageLabel(translatedView.language)});scan();});
   shadow.append(bar);
   const badges=document.createElement('div');shadow.append(badges);
   function paint(){
@@ -45,7 +48,7 @@ export function installInline(){
       badge.style.cssText=`top:${Math.max(4,rect.top+8)}px;left:${Math.max(4,Math.min(innerWidth-270,rect.left+8))}px;max-width:${Math.min(260,rect.width-16)}px`;
       const actionable=state.kind==='login'||state.kind==='upgrade'||state.kind==='error'&&state.retryable!==false;
       const notice=translationNotice(state);badge.title=notice.detail;
-      if(actionable){const b=document.createElement('button');b.type='button';b.textContent=notice.label;b.onclick=()=>{if(state.kind==='login'||state.kind==='upgrade'){void send('NC_INLINE_OPEN',{view:'account'});return;}retryId=item.id;invalidate();item.state={kind:'translating',message:'重试中…'};schedule(0);paint();};badge.append(b);}else badge.textContent=notice.message;
+      if(actionable){const b=document.createElement('button');b.type='button';b.textContent=notice.label;b.onclick=()=>{if(state.kind==='login'||state.kind==='upgrade'){void send('NC_INLINE_OPEN',{view:'account'});return;}retryId=item.id;invalidate();item.state={kind:'translating',message:msg("重试中…")};schedule(0);paint();};badge.append(b);}else badge.textContent=notice.message;
       badges.append(badge);
     }
   }
@@ -76,7 +79,7 @@ export function installInline(){
     for(const item of candidates)if(!retained.has(item))item.display.restore();
     const nextSignature=JSON.stringify(windowImages.map(i=>i.id));
     if(signature!==nextSignature){const first=!signature;signature=nextSignature;prefetchAt=performance.now()+150;invalidate();schedule(first?0:80);}
-    if(!scope)label.textContent=candidates.length?`漫游 · 发现 ${candidates.length} 张大图`:'漫游 · 未发现漫画大图，滚动页面继续识别';
+    if(!scope)label.textContent=candidates.length?msg("漫译 · 发现 {0} 张大图", {"0": candidates.length}):msg("漫译 · 未发现漫画大图，滚动页面继续识别");
     paint();
   }
   function queueScan(){if(!scanTimer)scanTimer=setTimeout(scan,20);if(!raf)raf=requestAnimationFrame(()=>{raf=0;paint();});}
@@ -85,8 +88,8 @@ export function installInline(){
   async function apply(data:InlineResponse,targets:Candidate[],stamp:number){
     if(stamp!==generation||!enabled)return;
     if(scope&&scope!==data.scope)for(const item of tracked.values())item.display.restore();scope=data.scope;
-    label.textContent=`漫游 · ${modeLabels[data.mode]} · ${languageLabel(data.language)}`;
-    for(const result of data.items){const item=targets.find(t=>t.id===result.id);if(!item||!item.image.isConnected||source(item.image)!==item.url)continue;item.state=result.state;if(!result.resultKey)item.display.restore();if(result.data&&result.resultKey&&!original){try{await item.display.show(result.data,result.resultKey,()=>enabled&&!original&&stamp===generation&&source(item.image)===item.url);}catch(error){item.state={kind:'error',message:(error as Error).message,retryLabel:'点击重新加载'};}}}
+    translatedView=data;label.textContent=msg("漫译 · {0} · {1}", {"0": modeLabels[data.mode], "1": languageLabel(data.language)});
+    for(const result of data.items){const item=targets.find(t=>t.id===result.id);if(!item||!item.image.isConnected||source(item.image)!==item.url)continue;item.state=result.state;if(!result.resultKey)item.display.restore();if(result.data&&result.resultKey&&!original){try{await item.display.show(result.data,result.resultKey,()=>enabled&&!original&&stamp===generation&&source(item.image)===item.url);}catch(error){item.state={kind:'error',message:(error as Error).message,retryLabel:msg("点击重新加载")};}}}
     if(data.retryAfterMs)schedule(data.retryAfterMs);
     if(data.needsPlan)schedule();
     if(policyRevision&&data.policyRevision&&policyRevision!==data.policyRevision)schedule();policyRevision=data.policyRevision??policyRevision;paint();
@@ -103,7 +106,7 @@ export function installInline(){
     try{
       const response=await send('NC_INLINE_TICK',{...payload(targets),retryId:retry});
       if(stamp!==generation||!enabled)return;
-      if(!response?.ok){schedule(response?.retryAfterMs??Math.min(30000,1000*2**failures++));throw Error(response?.error??'翻译服务暂不可用');}
+      if(!response?.ok){schedule(response?.retryAfterMs??Math.min(30000,1000*2**failures++));throw Error(response?.error??msg("翻译服务暂不可用"));}
       const data=response.data as InlineResponse|undefined;if(!data)return;
       await apply(data,targets,stamp);failures=0;
     }catch(error){if(stamp===generation)for(const item of targets)item.state={kind:'error',message:(error as Error).message};}
@@ -112,8 +115,8 @@ export function installInline(){
   const hasImage=(node:Node)=>node instanceof Element&&(node instanceof HTMLImageElement||node instanceof HTMLSourceElement||!!node.querySelector('img'));
   const observer=new MutationObserver(records=>{if(records.some(r=>r.type==='attributes'?hasImage(r.target):[...r.addedNodes,...r.removedNodes].some(hasImage)))queueScan();});
   function start(){
-    if(enabled){paused=false;original=false;pause.textContent='暂停';originals.textContent='恢复原图';schedule();return;}
-    initialUrl=location.href;enabled=true;paused=false;original=false;scope='';signature='';pause.textContent='暂停';originals.textContent='恢复原图';
+    if(enabled){paused=false;original=false;pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");schedule();return;}
+    initialUrl=location.href;enabled=true;paused=false;original=false;scope='';signature='';pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");
     document.documentElement.append(host);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','sizes','style','class','hidden','width','height']});
     document.addEventListener('scroll',queueScan,{passive:true,capture:true});window.addEventListener('resize',queueScan);document.addEventListener('load',queueScan,true);document.addEventListener('visibilitychange',visibility);window.addEventListener('online',visibility);window.addEventListener('pagehide',stop);scan();schedule();
     leaseTimer=setInterval(()=>{if(enabled&&!paused&&!original&&!document.hidden&&windowImages.length){const stamp=generation,targets=[...windowImages];void send('NC_INLINE_LEASE',payload(targets)).then(value=>{if(value?.ok&&value.data)return apply(value.data,targets,stamp);if(value?.retryAfterMs)schedule(value.retryAfterMs);}).catch(()=>{});}},30000);
@@ -135,7 +138,7 @@ export function installInline(){
     if(message?.type==='NC_INLINE_CONFIG_CHANGED'&&enabled){scope='';invalidate();for(const item of tracked.values()){item.display.restore();item.state=undefined;}schedule();}
     if(message?.type==='NC_INLINE_SOURCE'&&message.navigationId===navigationId&&enabled){
       const item=windowImages.find(i=>i.id===message.id);
-      if(!item||source(item.image)!==item.url||!/^(blob:|data:)/.test(item.url)){respond({error:'图片已离开当前阅读范围。'});return;}
+      if(!item||source(item.image)!==item.url||!/^(blob:|data:)/.test(item.url)){respond({error:msg("图片已离开当前阅读范围。")});return;}
       void sourceImage(item.url).then(imageDataUrl).then(data=>respond({data})).catch(error=>respond({error:error.message}));return true;
     }
   });

@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {Api,ApiError} from '../api';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../concurrency';
 import {mergeJobs} from '../reader/jobs';
@@ -48,7 +49,7 @@ export class TranslationCoordinator {
     });
   }
   private async receive(record:LocalOperation,result:TranslationOperation){
-    if(result.operation_key!==record.item.operation_key)throw new ApiError('翻译回执与操作编号不符','INVALID_RECEIPT');
+    if(result.operation_key!==record.item.operation_key)throw new ApiError(msg("翻译回执与操作编号不符"),'INVALID_RECEIPT');
     if(result.disposition==='not_found'){record.state='local';record.error=undefined;record.retryAt=undefined;await this.save(record);return;}
     record.result=result;record.error=result.message;record.retryAt=undefined;
     record.state=result.job?'accepted':result.disposition==='deferred'?'deferred':'blocked';
@@ -60,7 +61,7 @@ export class TranslationCoordinator {
     if(this.uploads.has(record.item.operation_key))return;
     const work=this.uploadPool.run(async()=>{try{
       const plan=record.result?.upload;if(!plan)return;this.current();
-      const blob=record.blobKey?await this.options.getBlob(record.blobKey):undefined;if(!blob)throw new ApiError('本地原图尚未就绪，请重新采集。','LOCAL_IMAGE_MISSING');
+      const blob=record.blobKey?await this.options.getBlob(record.blobKey):undefined;if(!blob)throw new ApiError(msg("本地原图尚未就绪，请重新采集。"),'LOCAL_IMAGE_MISSING');
       await this.options.api.uploadOriginal(plan,blob);const job=await this.options.api.completeUpload(plan.id);this.current();record.result={...record.result!,job,upload:null};record.error=undefined;record.retryAt=undefined;await this.save(record);await this.options.onJobs([job]);
     }catch(error){if(!this.options.api.isCurrent())return;record.error=(error as Error).message;record.retryAt=Date.now()+15000;await this.save(record);}finally{this.uploads.delete(record.item.operation_key);}});
     this.uploads.set(record.item.operation_key,work);
@@ -111,7 +112,7 @@ export class TranslationCoordinator {
       if(!requestCurrent()){for(const record of chosen)if(record.state==='uncertain'){record.state='local';await this.save(record);}return;}
       try{
         const response=await this.options.api.plan(request);this.current();
-        if(response.items.length!==items.length||items.some(i=>!response.items.some(r=>r.operation_key===i.operation_key)))throw new ApiError('翻译回执缺少请求页','INVALID_RECEIPT');
+        if(response.items.length!==items.length||items.some(i=>!response.items.some(r=>r.operation_key===i.operation_key)))throw new ApiError(msg("翻译回执缺少请求页"),'INVALID_RECEIPT');
         await this.policy(response.policy_revision,response.entitlements,response.image_rate_limit?.limit);
         const stalePolicy=!!this.state.policyRevision&&!revisionNewer(response.policy_revision,this.state.policyRevision);
         if(response.priority){this.session.priority=response.priority;await saveSession(this.session);}this.leaseAt=performance.now()+30000;
@@ -136,8 +137,8 @@ export class TranslationCoordinator {
     while(this.sending)await new Promise<void>(resolve=>this.sendWaiters.push(resolve));
     const id=operationId(this.scope,this.options.language,target),origin=new URL(this.options.api.base).origin;
     const latest=pageTranslation(target.page,target.mode,this.options.language,this.options.userId,origin);
-    if(latest.pending||latest.latest?.status==='unknown_released')throw Error('原请求结果待核实，暂不能重复翻译。');
-    await withTranslationLock(id,async()=>{const previous=await readOperation(id);if(previous?.state==='uncertain')throw Error('正在恢复原操作，请稍后重试。');const previousJob=this.state.jobs.find(job=>job.id===previous?.result?.job?.id)??previous?.result?.job;if(previousJob&&['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(previousJob.status))throw Error('此页正在翻译，请等待现有任务完成。');const record=await makeOperation(target,this.scope,this.options.language,(this.state.entitlements??this.options.rights())?.modes[target.mode],this.options.getBlob,{action:!latest.latest?'ensure':latest.latest.status==='failed'?'retry':'regenerate',sourceJobId:latest.latest?.id});await saveOperation(record);this.records=this.records.filter(r=>r.id!==record.id).concat(record);this.options.onChange();});
+    if(latest.pending||latest.latest?.status==='unknown_released')throw Error(msg("原请求结果待核实，暂不能重复翻译。"));
+    await withTranslationLock(id,async()=>{const previous=await readOperation(id);if(previous?.state==='uncertain')throw Error(msg("正在恢复原操作，请稍后重试。"));const previousJob=this.state.jobs.find(job=>job.id===previous?.result?.job?.id)??previous?.result?.job;if(previousJob&&['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(previousJob.status))throw Error(msg("此页正在翻译，请等待现有任务完成。"));const record=await makeOperation(target,this.scope,this.options.language,(this.state.entitlements??this.options.rights())?.modes[target.mode],this.options.getBlob,{action:!latest.latest?'ensure':latest.latest.status==='failed'?'retry':'regenerate',sourceJobId:latest.latest?.id});await saveOperation(record);this.records=this.records.filter(r=>r.id!==record.id).concat(record);this.options.onChange();});
     this.lastSignature='';await this.plan([target],true,requestCurrent);
     }finally{this.manualPending=false;}
   }

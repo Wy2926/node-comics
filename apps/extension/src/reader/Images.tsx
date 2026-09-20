@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Icon} from '../icons';
 import {getBlob} from '../library/store';
@@ -28,13 +29,13 @@ export function BlobPicture({scope,blobKey,job,alt,onShown,onImport,error,source
   const [loaded,setLoaded]=useState<(ShownImage&{url:string})>();const [failure,setFailure]=useState('');const urls=useRef(new Set<string>());
   const callback=useRef(onShown);callback.current=onShown;
   const shown=loaded?.scope===scope?loaded:undefined;
-  useEffect(()=>{let active=true;setFailure('');if(!blobKey){setLoaded(undefined);setFailure(error||'本地图片已清理，请重新导入原图。');return;}
-    let url='';void getBlob(blobKey).then(async blob=>{if(!active)return;if(!blob)throw Error('本地图片已清理，请恢复图片后重试。');url=URL.createObjectURL(blob);urls.current.add(url);const image=new Image();image.src=url;await image.decode();if(active)setLoaded({scope,key:blobKey,job,url});else{URL.revokeObjectURL(url);urls.current.delete(url);}}).catch(e=>{if(active)setFailure((e as Error).message);if(url){URL.revokeObjectURL(url);urls.current.delete(url);}});
+  useEffect(()=>{let active=true;setFailure('');if(!blobKey){setLoaded(undefined);setFailure(error||msg("本地图片已清理，请重新导入原图。"));return;}
+    let url='';void getBlob(blobKey).then(async blob=>{if(!active)return;if(!blob)throw Error(msg("本地图片已清理，请恢复图片后重试。"));url=URL.createObjectURL(blob);urls.current.add(url);const image=new Image();image.src=url;await image.decode();if(active)setLoaded({scope,key:blobKey,job,url});else{URL.revokeObjectURL(url);urls.current.delete(url);}}).catch(e=>{if(active)setFailure((e as Error).message);if(url){URL.revokeObjectURL(url);urls.current.delete(url);}});
     return()=>{active=false;};
   },[scope,blobKey]);
   useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url){URL.revokeObjectURL(url);urls.current.delete(url);}},[loaded]);
   useEffect(()=>()=>{for(const url of urls.current)URL.revokeObjectURL(url);urls.current.clear();},[]);
   // The identity follows the decoded image actually on screen, never a pending network result.
   useLayoutEffect(()=>{callback.current?.(shown);return()=>callback.current?.(undefined);},[shown?.scope,shown?.key]);
-  return <>{shown?<img className="nc-page-image" src={shown.url} alt={`${alt}${shown.job?'译图':'原图'}`} data-result-job={shown.job?.id??'original'}/>:!failure?<div className="nc-image-placeholder"><span className="spinner"/>正在读取这一页</div>:null}{failure&&<div className={`nc-image-failure ${shown?'over-image':''}`} role="status"><Icon name="image"/><b>{shown?'新图片暂未显示':'图片暂不可用'}</b><p>{failure}</p><button className="button secondary" onClick={onImport}>重新导入</button>{sourceUrl&&<a href={sourceUrl} target="_blank" rel="noopener noreferrer">返回来源网页</a>}</div>}</>;
+  return <>{shown?<img className="nc-page-image" src={shown.url} alt={`${alt}${shown.job?msg("译图"):msg("原图")}`} data-result-job={shown.job?.id??'original'}/>:!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&<div className={`nc-image-failure ${shown?'over-image':''}`} role="status"><Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>{sourceUrl&&<a href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div>}</>;
 }

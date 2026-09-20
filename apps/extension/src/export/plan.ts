@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import type {Mode, Page, ReadingCopy} from '../types';
 import type {LibraryState} from '../library/types';
 import {completePageList, copyPageTotal} from '../library/model';
@@ -60,11 +61,11 @@ export function exportCopies(state: LibraryState, copies: ReadingCopy[], workId:
     if (!coverage.length) return [];
     const targets = coverage.map(c => {
       const chapter = c.target.kind === 'chapter' && state.chapters.find(x => x.id === c.target.id);
-      if (chapter) return {rank: chapter.role === 'extra' ? 1 : 0, group: chapter.role === 'extra' ? '番外' : '章节', groupKey: 'chapter:' + chapter.role, order: chapter.order, title: chapter.title};
+      if (chapter) return {rank: chapter.role === 'extra' ? 1 : 0, group: chapter.role === 'extra' ? msg("番外") : msg("章节"), groupKey: 'chapter:' + chapter.role, order: chapter.order, title: chapter.title};
       const book = c.target.kind === 'publication' && state.publications.find(x => x.id === c.target.id);
       const series = book ? state.series.find(x => x.id === book.seriesId) : undefined;
-      if (book) return {rank: 2, group: series?.title ?? '卷册', groupKey: 'publication:' + (series?.id ?? ''), order: book.order, title: book.title};
-      return {rank: 3, group: '整部与未分类', groupKey: 'copies', order: 0, title: c.target.kind === 'work' ? '整部作品' : '未分类'};
+      if (book) return {rank: 2, group: series?.title ?? msg("卷册"), groupKey: 'publication:' + (series?.id ?? ''), order: book.order, title: book.title};
+      return {rank: 3, group: msg("整部与未分类"), groupKey: 'copies', order: 0, title: c.target.kind === 'work' ? msg("整部作品") : msg("未分类")};
     }).sort((a, b) => a.rank - b.rank || a.order - b.order);
     const otherIds = new Set(state.coverage.filter(c => c.copyId === copy.id && c.workId !== workId).map(c => c.workId));
     for (const item of coverage.filter(c => c.target.kind === 'publication')) {
@@ -80,14 +81,14 @@ export function exportCopies(state: LibraryState, copies: ReadingCopy[], workId:
 }
 
 export function safeName(value: string): string {
-  const name = value.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').slice(0, 70).replace(/[. ]+$/g, '') || '未命名';
+  const name = value.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').slice(0, 70).replace(/[. ]+$/g, '') || msg("未命名");
   return /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(name) ? '_' + name : name;
 }
 
 export async function planExport(title: string, entries: ExportCopy[], options: ExportOptions,
   getBlob: (key: string) => Promise<Blob | undefined>, ownerId?: string, origin?: string, signal?: AbortSignal): Promise<ExportPlan> {
-  if (!entries.length) throw Error('请先选择要导出的副本。');
-  if (options.images !== 'original' && !ownerId) throw Error('请先登录已有译图所属的账户，或选择仅导出原图。');
+  if (!entries.length) throw Error(msg("请先选择要导出的副本。"));
+  if (options.images !== 'original' && !ownerId) throw Error(msg("请先登录已有译图所属的账户，或选择仅导出原图。"));
   // Do not retain all the source Blobs while inspecting a large library.
   const sizes = new Map<string, number | undefined>();
   const sizeOf = async (key?: string) => {
@@ -106,7 +107,7 @@ export async function planExport(title: string, entries: ExportCopy[], options: 
         const original = originalSize ? {blobKey: page.blobKey, bytes: originalSize} : undefined;
         const base = {id: page.id, ordinal: ordinal + 1, bytes: 0};
         if (!translated) {
-          pages.push(original ? {...base, ...original, kind: 'original'} : {...base, kind: 'missing', reason: '原图未保存或已清理'});
+          pages.push(original ? {...base, ...original, kind: 'original'} : {...base, kind: 'missing', reason: msg("原图未保存或已清理")});
           continue;
         }
         const t = pageTranslation(page, options.mode, options.language, ownerId, origin);
@@ -118,14 +119,14 @@ export async function planExport(title: string, entries: ExportCopy[], options: 
           pages.push({...base, ...identity, kind: 'translation', assetId: result.output_asset_id});
         } else {
           const noText = !result && t.latest?.status === 'no_text';
-          const reason = noText ? '未检测到文字' : missingTranslation(page, options, ownerId, origin);
+          const reason = noText ? msg("未检测到文字") : missingTranslation(page, options, ownerId, origin);
           pages.push(original ? {...base, ...original, kind: noText ? 'no_text' : 'fallback', reason}
-            : {...base, kind: 'missing', reason: reason + '，且原图未保存'});
+            : {...base, kind: 'missing', reason: msg("{0}，且原图未保存", {"0": reason})});
         }
       }
-      const edition = translated ? languageLabel(options.language) + '-' + modeLabels[options.mode] : '原图';
+      const edition = translated ? languageLabel(options.language) + '-' + modeLabels[options.mode] : msg("原图");
       const incomplete = !completePageList(entry.copy) || pages.some(p => p.kind === 'missing');
-      const name = String(index + 1).padStart(4, '0') + '-' + safeName(entry.copy.title) + '-修订' + entry.copy.manifestRevision + (incomplete ? '-不完整' : '');
+      const name = msg("{0}-{1}-修订{2}{3}", {"0": String(index + 1).padStart(4, '0'), "1": safeName(entry.copy.title), "2": entry.copy.manifestRevision, "3": (incomplete ? msg("-不完整") : '')});
       books.push({copyId: entry.copy.id, title: entry.copy.title, revision: entry.copy.manifestRevision, group: entry.group, coverage: entry.coverage,
         otherWorks: entry.otherWorks, edition, path: safeName(edition) + '/' + name, pages, incomplete, total: copyPageTotal(entry.copy)});
     }
@@ -136,10 +137,10 @@ export async function planExport(title: string, entries: ExportCopy[], options: 
 
 function missingTranslation(page: Page, options: ExportOptions, ownerId?: string, origin?: string) {
   const t = pageTranslation(page, options.mode, options.language, ownerId, origin);
-  if (t.result) return '最新成功译图已失效';
-  if (t.pending) return '翻译处理中或待核实';
-  if (t.latest?.status === 'failed') return '翻译失败';
-  return '尚无此语言与模式的译图';
+  if (t.result) return msg("最新成功译图已失效");
+  if (t.pending) return msg("翻译处理中或待核实");
+  if (t.latest?.status === 'failed') return msg("翻译失败");
+  return msg("尚无此语言与模式的译图");
 }
 
 /** Allowlist: never serialize raw pages, credentials, asset URLs or the database. */

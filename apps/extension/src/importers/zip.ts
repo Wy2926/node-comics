@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {BlobReader,ZipReader} from '@zip.js/zip.js/index-native.js';
 import {imageMime,MAX_ENTRIES,MAX_PAGE,validateEntries,type ComicPage} from './comic-shared';
 
@@ -7,7 +8,7 @@ export async function openZip(file:Blob) {
   try {
     const entries=[];
     for await(const entry of reader.getEntriesGenerator()) {
-      if(entries.length>=MAX_ENTRIES)throw Error('压缩包目录超过 10000 项。');
+      if(entries.length>=MAX_ENTRIES)throw Error(msg("压缩包目录超过 10000 项。"));
       entries.push({name:entry.filename,size:entry.uncompressedSize,encrypted:entry.encrypted,entry});
     }
     const images=validateEntries(entries.filter(e=>!e.entry.directory));
@@ -17,15 +18,15 @@ export async function openZip(file:Blob) {
         const chunks:Uint8Array<ArrayBuffer>[]=[];let written=0;
         const stream=new WritableStream<Uint8Array>({write(chunk){
           written+=chunk.byteLength;
-          if(written>MAX_PAGE||written>size)throw Error('压缩包实际展开大小超过声明或安全限制。');
+          if(written>MAX_PAGE||written>size)throw Error(msg("压缩包实际展开大小超过声明或安全限制。"));
           chunks.push(new Uint8Array(chunk));
         }});
         try {
-          if(entry.directory)throw Error('无效的图片目录项。');
+          if(entry.directory)throw Error(msg("无效的图片目录项。"));
           await entry.getData(stream,{signal:AbortSignal.timeout(60000)});
-          if(written!==size)throw Error('展开后的图片大小与记录不符。');
+          if(written!==size)throw Error(msg("展开后的图片大小与记录不符。"));
           yield {name,pageIndex,blob:new Blob(chunks,{type:imageMime(name)})};
-        } catch(error) { throw Error(`无法读取 ${name}：${(error as Error).message}`); }
+        } catch(error) { throw Error(msg("无法读取 {0}：{1}", {"0": name, "1": (error as Error).message})); }
       }
     })()};
   } catch(error) {await reader.close();throw error;}

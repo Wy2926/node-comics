@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {API_ORIGIN} from '../service';
 import {validSession,type AuthState,type Session} from './model';
 
@@ -22,7 +23,7 @@ async function writeAuth(value:AuthState){
   localChanges.dispatchEvent(new Event('change'));
 }
 export async function saveSession(session:Session|null){
-  if(session&&(!validSession(session)||session.apiOrigin!==API_ORIGIN))throw Error('登录会话或服务地址无效。');
+  if(session&&(!validSession(session)||session.apiOrigin!==API_ORIGIN))throw Error(msg("登录会话或服务地址无效。"));
   await navigator.locks.request('nc-auth-write',()=>writeAuth({session}));
 }
 // A late refresh or 401 from an old login must never replace the new account.

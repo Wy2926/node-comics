@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {hashFile} from '../importers/hash';
 import {pageSource} from '../reader/recovery';
 import {pageTranslation} from '../reader/presentation';
@@ -28,7 +29,7 @@ export async function makeOperation(target:ReadingTarget,scope:string,language:s
   const {page,copyId,mode}=target;
   const blob=(!page.imageSha256||!page.imageByteSize)&&page.blobKey?await getBlob(page.blobKey):undefined;
   const sha=page.imageSha256??(blob?await hashFile(blob):undefined),size=page.imageByteSize??blob?.size;
-  if(!sha||!size)throw Error('原图尚未就绪，请完成采集或重新导入。');
+  if(!sha||!size)throw Error(msg("原图尚未就绪，请完成采集或重新导入。"));
   const item:PlanItem={page_key:targetKey(copyId,page,mode),operation_key:crypto.randomUUID(),role:'current',mode,target_language:language,max_quota_pages:rights&&exhausted(rights)?0:1,...(rights?{expected_kind:rights.quota_kind}:{}),image:{client_item_id:page.id,...pageSource(page),image_sha256:sha,byte_size:size,content_type:page.imageMime||blob?.type||'image/png',name:page.name,...(page.assetId?{asset_id:page.assetId}:{})},...(manual?{action:manual.action,source_job_id:manual.sourceJobId}:{})};
   return {id:operationId(scope,language,target),scope,copyId,pageId:page.id,blobKey:page.blobKey,item,state:'local',createdAt:Date.now()};
 }

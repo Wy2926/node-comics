@@ -1,3 +1,5 @@
+import {validUiLanguage} from '../i18n/locales';
+import {msg} from '../i18n/runtime';
 import { defaults, type ReadingCopy, type Settings } from '../types';
 import {mergeJobs} from '../reader/jobs';
 import {attachCopy,emptyLibrary,validateLibrary} from './model';
@@ -16,7 +18,7 @@ export const readCopies = async () => {
   for(const c of copies){const position=readPosition(c.id,c.manifestRevision);if(position&&c.pages.some(p=>p.id===position.pageId))Object.assign(c,position);let changed=false;c.pages=c.pages.map(p=>{
     const blobKey=p.blobKey&&available.has(p.blobKey)?p.blobKey:undefined;
     const outputBlobs=Object.fromEntries(Object.entries(p.outputBlobs).filter(([,key])=>available.has(key)));
-    if(blobKey!==p.blobKey||Object.keys(outputBlobs).length!==Object.keys(p.outputBlobs).length){changed=true;return {...p,blobKey,outputBlobs,...(!blobKey?{fetchError:'本地图片已清理，请重新导入或返回来源获取。'}:{})};}return p;
+    if(blobKey!==p.blobKey||Object.keys(outputBlobs).length!==Object.keys(p.outputBlobs).length){changed=true;return {...p,blobKey,outputBlobs,...(!blobKey?{fetchError:msg("本地图片已清理，请重新导入或返回来源获取。")}:{})};}return p;
   });if(changed)await saveCopy(c);}
   return copies;
 };
@@ -59,13 +61,13 @@ export async function clearLocalImages(copyIds:string[]|undefined,kind:'original
     copy.pages=copy.pages.map(page=>{
      if(kind!=='translations'&&page.blobKey)candidates.add(page.blobKey);
      if(kind!=='originals')for(const key of Object.values(page.outputBlobs))candidates.add(key);
-     return {...page,...(kind!=='translations'?{blobKey:undefined,fetchError:'本地原图已删除，可重新导入或从来源恢复。'}:{}),...(kind!=='originals'?{outputBlobs:{}}:{})};
+     return {...page,...(kind!=='translations'?{blobKey:undefined,fetchError:msg("本地原图已删除，可重新导入或从来源恢复。")}:{}),...(kind!=='originals'?{outputBlobs:{}}:{})};
     });records.put(copy);
    }
    if(!copyIds&&kind==='translations')for(const key of cachedKeys.result)if(typeof key==='string'&&/^(result|output):/.test(key))candidates.add(key);
    const used=new Set(copies.flatMap(copyBlobKeys));for(const key of candidates)if(!used.has(key))blobs.delete(key);
    const state=library.result as LibraryState|undefined;
-   if(state&&kind!=='translations'){for(const task of state.tasks)if(selected.has(task.copyId)){task.status='paused';task.error='本地原图已删除，可手动补齐。';task.updatedAt=Date.now();}state.revision++;meta.put(state);}
+   if(state&&kind!=='translations'){for(const task of state.tasks)if(selected.has(task.copyId)){task.status='paused';task.error=msg("本地原图已删除，可手动补齐。");task.updatedAt=Date.now();}state.revision++;meta.put(state);}
   };
   tx.oncomplete=()=>{windowDispatch();resolve();};tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
  });
@@ -75,7 +77,7 @@ export function settings(): Settings {
     const value=JSON.parse(localStorage.getItem('nc-settings')??'{}');const merged=knownSettings(value);
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris'],libraryLayout:['grid','list'],readerBackground:['gray','paper','night'],translationMode:['classic','redraw'],direction:['ltr','rtl'],layout:['continuous','single'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[])if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,autoTranslateTabs:merged.autoTranslateTabs===true,cacheLimitMb:[128,512,1024,10240,-1].includes(merged.cacheLimitMb)?merged.cacheLimitMb:defaults.cacheLimitMb,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
+    return {...merged,uiLanguage:validUiLanguage(merged.uiLanguage)?merged.uiLanguage:'auto',autoTranslateTabs:merged.autoTranslateTabs===true,cacheLimitMb:[128,512,1024,10240,-1].includes(merged.cacheLimitMb)?merged.cacheLimitMb:defaults.cacheLimitMb,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
   } catch {return {...defaults};}
 }
 function knownSettings(value:Partial<Settings>):Settings {
@@ -96,7 +98,7 @@ export async function enforceCacheBudget(copies: ReadingCopy[], limitMb: number,
   const originalKeys=new Set(copies.flatMap(c=>c.pages.flatMap(p=>p.blobKey?[p.blobKey]:[])));
   const protectedKeys=new Set(copies.filter(c=>c.id===protectedCopyId||c.retention==='offline').flatMap(c=>c.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)])));const removed=new Set<string>();
   for(const b of all.sort((a,b)=>a.usedAt-b.usedAt)){if(total<=limit)break;if(!originalKeys.has(b.id)&&!b.id.startsWith('original:')&&!protectedKeys.has(b.id)){await removeBlob(b.id);removed.add(b.id);total-=b.blob.size;}}
-  for(const copy of copies){let changed=false;copy.pages=copy.pages.map(page=>{const outputBlobs=Object.fromEntries(Object.entries(page.outputBlobs).filter(([,key])=>!removed.has(key)));const lostOriginal=!!page.blobKey&&removed.has(page.blobKey);if(lostOriginal||Object.keys(outputBlobs).length!==Object.keys(page.outputBlobs).length){changed=true;return {...page,blobKey:lostOriginal?undefined:page.blobKey,outputBlobs,...(lostOriginal?{fetchError:'本地缓存达到上限，原图已清理，请重新导入。'}:{})};}return page;});if(changed)await saveCopy(copy);}
+  for(const copy of copies){let changed=false;copy.pages=copy.pages.map(page=>{const outputBlobs=Object.fromEntries(Object.entries(page.outputBlobs).filter(([,key])=>!removed.has(key)));const lostOriginal=!!page.blobKey&&removed.has(page.blobKey);if(lostOriginal||Object.keys(outputBlobs).length!==Object.keys(page.outputBlobs).length){changed=true;return {...page,blobKey:lostOriginal?undefined:page.blobKey,outputBlobs,...(lostOriginal?{fetchError:msg("本地缓存达到上限，原图已清理，请重新导入。")}:{})};}return page;});if(changed)await saveCopy(copy);}
 }
 export async function cacheSize() {return (await transaction<{blob:Blob}[]>('blobs','readonly',s=>s.getAll())).reduce((n,b)=>n+b.blob.size,0);}
 
@@ -113,7 +115,7 @@ export async function editLibrary<T>(change:(s:LibraryState,copies:ReadingCopy[]
 function windowDispatch(){if(typeof window!=='undefined')window.dispatchEvent(new Event('nc-library-change'));}
 export async function commitCopies(incoming:ReadingCopy[],assignments:ImportAssignment[],catalog?:SourceCatalog){
  return editLibrary((s,copies)=>{
-  if(incoming.length!==assignments.length)throw Error('导入归属数量不一致。');
+  if(incoming.length!==assignments.length)throw Error(msg("导入归属数量不一致。"));
   const workIds:string[]=[],copyIds:string[]=[];let created=0;
   let commonWork=assignments[0]?.workId??s.catalogs.find(c=>c.id===catalog?.id)?.workId;
   for(const [i,copy] of incoming.entries()){
@@ -153,5 +155,5 @@ export async function removeWorks(workIds:string[]){
 export async function collectUnusedBlobs(candidates:string[]){const database=await db();await new Promise<void>((resolve,reject)=>{const tx=database.transaction(['copies','blobs'],'readwrite');const req=tx.objectStore('copies').getAll();req.onsuccess=()=>{const used=new Set((req.result as ReadingCopy[]).flatMap(c=>c.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)])));for(const key of new Set(candidates))if(!used.has(key))tx.objectStore('blobs').delete(key);};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
 export const copyBlobKeys=(copy:ReadingCopy)=>copy.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)]).filter((key):key is string=>!!key);
 export async function clearCopyImages(copyId:string){await clearLocalImages([copyId],'all');}
-export async function forkSourceRevision(copyId:string){return editLibrary((s,copies)=>{const copy=copies.find(c=>c.id===copyId);if(!copy?.sourceEntryId)throw Error('此副本没有可重新解析的来源。');const revised={...copy,id:crypto.randomUUID(),sourceKey:copy.sourceEntryId+':revision:'+crypto.randomUUID(),manifestRevision:copy.manifestRevision+1,pages:[],pageId:'',relativeOffset:0,sourcePagesEdited:undefined,webImports:undefined,discoveryComplete:false,lastReadAt:undefined,createdAt:Date.now(),updatedAt:Date.now()};copies.push(revised);s.coverage.push(...s.coverage.filter(c=>c.copyId===copyId).map(c=>({...c,id:crypto.randomUUID(),copyId:revised.id})));return revised.id;});}
+export async function forkSourceRevision(copyId:string){return editLibrary((s,copies)=>{const copy=copies.find(c=>c.id===copyId);if(!copy?.sourceEntryId)throw Error(msg("此副本没有可重新解析的来源。"));const revised={...copy,id:crypto.randomUUID(),sourceKey:copy.sourceEntryId+':revision:'+crypto.randomUUID(),manifestRevision:copy.manifestRevision+1,pages:[],pageId:'',relativeOffset:0,sourcePagesEdited:undefined,webImports:undefined,discoveryComplete:false,lastReadAt:undefined,createdAt:Date.now(),updatedAt:Date.now()};copies.push(revised);s.coverage.push(...s.coverage.filter(c=>c.copyId===copyId).map(c=>({...c,id:crypto.randomUUID(),copyId:revised.id})));return revised.id;});}
 export async function markCopyRead(copyId:string){await editLibrary(s=>{for(const c of s.coverage.filter(c=>c.copyId===copyId&&!c.startPageId&&!c.endPageId)){const target=c.target.kind==='chapter'?s.chapters.find(x=>x.id===c.target.id):c.target.kind==='publication'?s.publications.find(x=>x.id===c.target.id):c.target.kind==='work'?s.works.find(x=>x.id===c.workId):undefined;if(target&&!target.readAt)target.readAt=Date.now();}});}

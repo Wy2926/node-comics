@@ -1,3 +1,4 @@
+import {msg,getLocale,getDictionary} from '../i18n/runtime';
 import type {ComicPage} from './comic-shared';
 import RarWorker from './rar.worker?worker';
 export async function openRar(file:File) {
@@ -5,13 +6,13 @@ export async function openRar(file:File) {
   function request<T>(value:object):Promise<T> {
     return new Promise((resolve,reject)=>{
       const fail=(message:string)=>{clearTimeout(timer);worker.terminate();reject(Error(message));};
-      const timer=setTimeout(()=>fail('RAR 解析超过 60 秒，请拆分或转换为 ZIP 后重试。'),60000);
-      worker.onerror=()=>fail('RAR 解码器无法运行，请重新打开阅读器或转换为 ZIP。');
+      const timer=setTimeout(()=>fail(msg("RAR 解析超过 60 秒，请拆分或转换为 ZIP 后重试。")),60000);
+      worker.onerror=()=>fail(msg("RAR 解码器无法运行，请重新打开阅读器或转换为 ZIP。"));
       worker.onmessage=(event:MessageEvent<T&{error?:string}>)=>{
         clearTimeout(timer);
         if(event.data.error)fail(event.data.error);else resolve(event.data);
       };
-      worker.postMessage(value);
+      worker.postMessage({...value,uiLocale:getLocale(),dictionary:getDictionary()});
     });
   }
   try {

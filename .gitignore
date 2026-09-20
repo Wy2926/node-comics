@@ -24,3 +24,5 @@ engines/
 .DS_Store
 临时资源/
 private-test-data/
+/apps/extension/public/_locales/
+/apps/extension/public/i18n/

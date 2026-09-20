@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import type {SourceCatalog,SourceEntry} from '../library/types';
 export const MANGACOPY_DOMAINS=['mangacopy.com','copy4000.com'];
 export const MANGACOPY_PERMISSIONS=MANGACOPY_DOMAINS.map(host=>`https://*.${host}/*`);
@@ -11,7 +12,7 @@ export function mangaCopyLocation(value:string):{slug:string;chapterId?:string}|
 export function sourcePageIdentity(url:string){const loc=mangaCopyLocation(url);return loc?`mangacopy:${loc.slug}${loc.chapterId?':'+loc.chapterId:''}`:url;}
 export function sameMangaCopyPage(a:string,b:string){return !!mangaCopyLocation(a)&&!!mangaCopyLocation(b)&&sourcePageIdentity(a)===sourcePageIdentity(b);}
 export function discoverMangaCopyCatalog(doc:Document,url:string):SourceCatalog{
- const location=mangaCopyLocation(url);if(!location||location.chapterId)throw Error('请从 MangaCopy 漫画详情页导入作品。');
+ const location=mangaCopyLocation(url);if(!location||location.chapterId)throw Error(msg("请从 MangaCopy 漫画详情页导入作品。"));
  const id=`mangacopy:${location.slug}`,entries=new Map<string,SourceEntry>();
  const tables=[...doc.querySelectorAll('.upLoop > .table-default')];
  let complete=tables.length>0&&!doc.querySelector('.upLoop .wargin');
@@ -28,7 +29,7 @@ export function discoverMangaCopyCatalog(doc:Document,url:string):SourceCatalog{
    const entryId=`${id}:${loc.chapterId}`;
    const rawTypes=[...table.querySelectorAll('.tab-pane')].filter(p=>p!==panel&&[...p.querySelectorAll('a[href*="/chapter/"]')].some(link=>link.getAttribute('href')===a.getAttribute('href'))).map(p=>p.id.slice(groupId.length));
    const existing=entries.get(entryId);
-   if(existing){existing.groupIds=[...new Set([...existing.groupIds,groupId])];existing.rawTypes=[...new Set([...existing.rawTypes,...rawTypes])];}else entries.set(entryId,{id:entryId,catalogId:id,remoteId:loc.chapterId,url:href,title:(a.getAttribute('title')||a.textContent||'未命名条目').trim().slice(0,180),groupIds:[groupId],rawTypes,order,related:/同人|其他系列|其它系列/.test(title)});
+   if(existing){existing.groupIds=[...new Set([...existing.groupIds,groupId])];existing.rawTypes=[...new Set([...existing.rawTypes,...rawTypes])];}else entries.set(entryId,{id:entryId,catalogId:id,remoteId:loc.chapterId,url:href,title:(a.getAttribute('title')||a.textContent||msg("未命名条目")).trim().slice(0,180),groupIds:[groupId],rawTypes,order,related:/同人|其他系列|其它系列/.test(title)});
    if(!entryIds.includes(entryId))entryIds.push(entryId);
   }
   // The site's current renderer inserts every item; pagination only changes display.
@@ -36,5 +37,5 @@ export function discoverMangaCopyCatalog(doc:Document,url:string):SourceCatalog{
   if(!valid)complete=false;
   return {id:groupId,title,entryIds,complete:valid};
  });
- return {id,sourceId:'mangacopy',url:new URL('/comic/'+location.slug,url).href,title:doc.querySelector('.comicParticulars-title-right h6')?.textContent?.trim()||doc.querySelector('h6')?.textContent?.trim()||doc.title.split(' - ')[0],observedAt:Date.now(),complete,note:complete?'已读取所有分组及隐藏分页条目。':'目录尚未就绪或结构发生变化；只能选择已发现条目。',groups,entries:[...entries.values()],excludedEntryIds:[]};
+ return {id,sourceId:'mangacopy',url:new URL('/comic/'+location.slug,url).href,title:doc.querySelector('.comicParticulars-title-right h6')?.textContent?.trim()||doc.querySelector('h6')?.textContent?.trim()||doc.title.split(' - ')[0],observedAt:Date.now(),complete,note:complete?msg("已读取所有分组及隐藏分页条目。"):msg("目录尚未就绪或结构发生变化；只能选择已发现条目。"),groups,entries:[...entries.values()],excludedEntryIds:[]};
 }

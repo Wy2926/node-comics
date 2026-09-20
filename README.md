@@ -54,6 +54,8 @@ Chrome／Edge 扩展管理页加载 `apps/extension/.output/chrome-mv3`。浏览
 
 ## 文档
 
+产品中英文名称与商店文案见[品牌与商店文案](docs/BRAND_AND_STORE_LISTING.md)（已采纳并接入客户端，尚未发布商店）。界面支持 15 种语言，每个语种一个字典，维护与验证见[界面国际化](docs/UI_INTERNATIONALIZATION.md)。
+
 产品目标语言与节点能力边界见[语言清单](docs/LANGUAGE_SUPPORT.md)。
 
 | 文档 | 内容 |

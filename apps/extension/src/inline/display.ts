@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 /** Keep src, srcset, picture sources, links and event listeners owned by the site. */
 export class ImageDisplay {
   private undo:Array<()=>void>=[];
@@ -7,7 +8,7 @@ export class ImageDisplay {
   async show(data:string,key:string,current:()=>boolean){
     const response=await fetch(data),blob=await response.blob(),url=URL.createObjectURL(blob);
     const preview=new Image();preview.src=url;
-    try{await preview.decode();}catch{URL.revokeObjectURL(url);throw Error('当前网站阻止显示译图，原图已保留。');}
+    try{await preview.decode();}catch{URL.revokeObjectURL(url);throw Error(msg("当前网站阻止显示译图，原图已保留。"));}
     if(!current()){URL.revokeObjectURL(url);return;}
     this.restore();
     const image=this.image;

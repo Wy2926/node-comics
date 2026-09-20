@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {ReadingCopy,Settings} from '../types';
 import {readPosition,savePosition} from '../library/store';
@@ -34,7 +35,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveCopy,onLoa
   // An unfinished manifest or missing original must remain actionable in the library.
   if(!completeManifest(c)||c.pages.some(p=>!p.blobKey))return;
   const key=`${c.id}:${c.manifestRevision}`;if(read.current.has(key))return;read.current.add(key);
-  void onMarkRead(c.id).catch(e=>{read.current.delete(key);notify('已读状态未保存：'+(e as Error).message);});
+  void onMarkRead(c.id).catch(e=>{read.current.delete(key);notify(msg("已读状态未保存：{0}", {"0": (e as Error).message}));});
  }
  function activate(c:ReadingCopy,n:number){if(c.id!==copyRef.current.id){persist();copyRef.current=c;onActiveCopy(c.id);}indexRef.current=n;setIndex(n);}
  const navigationReason=useRef<'scroll'|'direct'>('direct');

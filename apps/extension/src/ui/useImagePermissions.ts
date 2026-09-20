@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {useEffect,useState} from 'react';
 import type {SourceCatalog} from '../library/types';
 import {inExtension} from '../sources/client';
@@ -15,7 +16,7 @@ export function useImagePermissions(targets:{catalog:SourceCatalog;entryId:strin
    const origins:string[]=[];
    for(const target of targets)origins.push(...await prepareImageOrigins(target.catalog,target.entryId,controller.signal));
    if(!controller.signal.aborted)setResult({key,origins:[...new Set(origins)]});
-  })().catch(e=>{if(!controller.signal.aborted)setResult({key,origins:[],error:e instanceof Error?e.message:'图片域名读取失败，请重试。'});});
+  })().catch(e=>{if(!controller.signal.aborted)setResult({key,origins:[],error:e instanceof Error?e.message:msg("图片域名读取失败，请重试。")});});
   return()=>controller.abort();
  },[key,retry]);
  return {origins:result.key===key?result.origins:[],preparing:inExtension()&&result.key!==key,error:result.key===key?result.error:undefined,retry:()=>{setResult({key:'',origins:[]});setRetry(n=>n+1);}};

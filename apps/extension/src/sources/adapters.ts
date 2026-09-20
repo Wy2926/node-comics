@@ -1,3 +1,4 @@
+import {msg} from '../i18n/runtime';
 import {isMangaCopyUrl} from './mangacopy';
 import {comicImageRect,MAX_COMIC_IMAGES} from './comic-images';
 export interface SourceItem { id: string; url: string; width: number; height: number; order: number; }
@@ -21,7 +22,7 @@ export function discoverDocument(doc: Document, pageUrl: string): Omit<PageManif
       items.push({id:`slot-${order}`,url,width:loaded?img.naturalWidth||800:800,height:loaded?img.naturalHeight||1200:1200,order});
     }
     const discoveryComplete=!!knownTotal&&items.length===knownTotal&&images.length===knownTotal;
-    return {title:doc.title.split(' - ')[0],url:pageUrl,adapter:'mangacopy',direction:'rtl',knownTotal,discoveryComplete,note:discoveryComplete?'漫画容器原图清单与总页数一致。':`已发现 ${items.length} / ${knownTotal??'未知'} 页，清单尚未完整。`,items};
+    return {title:doc.title.split(' - ')[0],url:pageUrl,adapter:'mangacopy',direction:'rtl',knownTotal,discoveryComplete,note:discoveryComplete?msg("漫画容器原图清单与总页数一致。"):msg("已发现 {0} / {1} 页，清单尚未完整。", {"0": items.length, "1": knownTotal??msg("未知")}),items};
   }
   const selector=isXkcd?'#comic img':isGunner?'img.comic_image, #comic img':'img';
   const generic=!isXkcd&&!isGunner;
@@ -34,6 +35,6 @@ export function discoverDocument(doc: Document, pageUrl: string): Omit<PageManif
     const width=loaded?img.naturalWidth||Number(img.width)||0:0,height=loaded?img.naturalHeight||Number(img.height)||0:0;
     seen.add(url);items.push({id:`page-${hash(url)}`,url,width,height,order:items.length});if(items.length>=MAX_COMIC_IMAGES)break;
   }
-  return {title:doc.title.slice(0,160)||'未命名漫画',url:pageUrl,adapter:isXkcd?'xkcd':isGunner?'gunnerkrigg':'generic',direction:isXkcd||isGunner?'ltr':'rtl',discoveryComplete:(isXkcd||isGunner)&&items.length===1,knownTotal:(isXkcd||isGunner)&&items.length===1?1:undefined,note:isXkcd||isGunner?'仅当前一期／当前漫画页，不包括前后章节。':`按标签页翻译规则发现已加载的网页大图；滚动原网页后可刷新补充，仅支持 HTTP(S) 原图导入。${items.length>=MAX_COMIC_IMAGES?'已达到单次 1500 张上限。':''}`,items};
+  return {title:doc.title.slice(0,160)||msg("未命名漫画"),url:pageUrl,adapter:isXkcd?'xkcd':isGunner?'gunnerkrigg':'generic',direction:isXkcd||isGunner?'ltr':'rtl',discoveryComplete:(isXkcd||isGunner)&&items.length===1,knownTotal:(isXkcd||isGunner)&&items.length===1?1:undefined,note:isXkcd||isGunner?msg("仅当前一期／当前漫画页，不包括前后章节。"):msg("按标签页翻译规则发现已加载的网页大图；滚动原网页后可刷新补充，仅支持 HTTP(S) 原图导入。{0}", {"0": items.length>=MAX_COMIC_IMAGES?msg("已达到单次 1500 张上限。"):''}),items};
 }
 function hash(text:string){let n=0;for(let i=0;i<text.length;i++)n=Math.imul(31,n)+text.charCodeAt(i)|0;return(n>>>0).toString(36);}
