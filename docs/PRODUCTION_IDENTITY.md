@@ -39,7 +39,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 ### 客户端会话与续期（2026-09-20）
 
-- `src/auth` 统一管理新会话模型：每次登录独立的会话 ID、服务 origin、用户、访问令牌、到期时间、提前刷新时间和 OIDC 续期凭据。扩展只在 `chrome.storage.local` 的 `nc-auth` 中保存一份，限制为 `TRUSTED_CONTEXTS`；网页阅读器在自身 origin 的同名 localStorage 记录保存。凭据不再在阅读器与后台间镜像。旧会话读写已删除，没有旧账户或旧数据迁移、双写与兼容回退；更新后需重新登录。
+- `src/auth` 统一管理新会话模型：每次登录独立的会话 ID、服务 origin、用户、访问令牌、到期时间、提前刷新时间和 OIDC 续期凭据。Chrome / Edge 在 `chrome.storage.local` 的 `nc-auth` 中保存一份，限制为 `TRUSTED_CONTEXTS`；Firefox 缺少 `setAccessLevel`，使用扩展 origin 的 `node-comics-auth` IndexedDB，网页内容脚本不能读取该库，`storage.local` 的 `nc-auth` 仅保存会话 ID 和随机变更标记，用于通知其他扩展上下文。网页阅读器在自身 origin 的同名 localStorage 记录保存。凭据不在阅读器与后台间镜像。旧会话读写已删除，没有旧账户或旧数据迁移、双写与兼容回退；更新后需重新登录。
 - 活跃阅读器在令牌到期前最多 60 秒自动续期（短令牌取有效期的 10%）；恢复前台和发起带账户认证的请求时同样检查。关闭页面后不依赖常驻定时器，扩展后台下次工作时按需续期。开发测试会话依照后端 `expires_in=43200` 到期，不能自动重新签发开发身份。
 - 通过同 origin 的 Web Locks 合并多页面／后台的续期。刷新请求携带原 client ID 与 API resource；先持久保存轮换后的凭据，再发送业务请求。独立写锁允许用户在续期期间退出或切换账户，迟到结果按会话 ID 和已使用令牌核对，不恢复旧账户。
 - 产品 API、需认证的原图上传、同源图片下载与状态长轮询统一处理 401：最多续期一次并以原请求体、原幂等键重试一次；仍为 401，或身份服务明确拒绝续期，清除会话和续期凭据，通知所有阅读器及网页翻译上下文停止旧账户请求。页面显示重新登录入口，图内显示登录操作；保留原图、阅读位置和服务端持久任务。

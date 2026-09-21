@@ -5,6 +5,7 @@ import {RefreshUnavailable,SessionExpired} from '../src/auth/model';
 import {sessionAuthorization} from '../src/auth/session';
 import {authKey,readAuth,saveSession,signOut,subscribeAuth} from '../src/auth/storage';
 import {stubAuthLocks,testSession} from './auth-fixture';
+import 'fake-indexeddb/auto';
 
 const endpoint='https://identity.example.test/token';
 const renewable=()=>testSession({credential:{kind:'oidc',refreshToken:'refresh-one',tokenEndpoint:endpoint,clientId:'public-client',resource:'https://comics.nodelane.net/api'}});
@@ -34,6 +35,18 @@ describe('shared renewable sessions',()=>{
     expect((await readAuth()).session?.credential).toMatchObject({refreshToken:'refresh-one'});
     expect(access).toHaveBeenCalledWith({accessLevel:'TRUSTED_CONTEXTS'});
     expect(entries.size).toBe(0);
+  });
+  it('persists Firefox credentials privately and broadcasts only a session marker',async()=>{
+    const saved:Record<string,unknown>={};
+    vi.stubGlobal('chrome',{storage:{local:{get:async(key:string)=>({[key]:saved[key]}),set:async(value:object)=>Object.assign(saved,value)}}});
+    await saveSession(renewable());
+    expect((await readAuth()).session?.credential).toMatchObject({refreshToken:'refresh-one'});
+    expect(saved[authKey]).toMatchObject({session:{id:'test-session'}});
+    expect(JSON.stringify(saved)).not.toMatch(/refresh-one|test-token|public-client/);
+    expect(entries.size).toBe(0);
+    await signOut('test-session');
+    expect(await readAuth()).toEqual({session:null});
+    expect(saved[authKey]).toMatchObject({session:null});
   });
   it('refreshes once for concurrent consumers and persists rotation before using the token',async()=>{
     await saveSession({...renewable(),refreshAt:Date.now()-1});

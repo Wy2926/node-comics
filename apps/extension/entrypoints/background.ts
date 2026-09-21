@@ -19,9 +19,7 @@ async function discover(tabId:number){
 export default defineBackground(()=>{
  const localeReady=registerLocaleBackground();
  registerInlineBackground();
- void chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
- // Both mirror domains now use manifest content scripts. Remove the older dynamic registration on upgrade.
- void chrome.scripting.unregisterContentScripts({ids:['nc-mangacopy']}).catch(()=>{});
+ void chrome.storage.local.setAccessLevel?.({accessLevel:'TRUSTED_CONTEXTS'});
  chrome.runtime.onInstalled.addListener(()=>{void localeReady().then(()=>chrome.contextMenus.removeAll(()=>{
   chrome.contextMenus.create({id:'nc-translate-page',title:msg("翻译当前页面"),contexts:['page','image','link','selection'],documentUrlPatterns:['http://*/*','https://*/*']});
   chrome.contextMenus.create({id:'nc-read-image',title:msg("在 NodeLane Comics 中阅读 / 翻译"),contexts:['image']});

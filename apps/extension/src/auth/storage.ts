@@ -1,16 +1,21 @@
 import {msg} from '../i18n/runtime';
 import {API_ORIGIN} from '../service';
 import {validSession,type AuthState,type Session} from './model';
+import {readPrivateAuth,writePrivateAuth} from './private-store';
 
 export const authKey='nc-auth';
 const localChanges=new EventTarget();
 const extensionStorage=()=>typeof chrome!=='undefined'?chrome.storage?.local:undefined;
-// Extension pages and the service worker use one trusted-context store. Web
-// reader tabs use one origin-local store; tokens are never mirrored between them.
+// Use restricted extension storage where supported, otherwise extension-origin
+// IndexedDB. Web reader tabs keep their separate origin-local store.
 export async function readAuth():Promise<AuthState>{
   const storage=extensionStorage();
-  let value:AuthState;
-  try{value=storage?(await storage.get(authKey))[authKey]:JSON.parse(localStorage.getItem(authKey)??'null');}catch{return {session:null};}
+  let value:AuthState|undefined;
+  try{
+    if(!storage)value=JSON.parse(localStorage.getItem(authKey)??'null');
+    else if(typeof storage.setAccessLevel==='function')value=(await storage.get(authKey))[authKey] as AuthState|undefined;
+    else value=await readPrivateAuth();
+  }catch{return {session:null};}
   if(!value)return {session:null};
   if(value.session===null)return {session:null,...(value.reason==='expired'?{reason:'expired' as const}:{})};
   if(!validSession(value.session)||value.session.apiOrigin!==API_ORIGIN)return {session:null,reason:'expired'};
@@ -18,7 +23,16 @@ export async function readAuth():Promise<AuthState>{
 }
 async function writeAuth(value:AuthState){
   const storage=extensionStorage();
-  if(storage){await storage.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});await storage.set({[authKey]:value});}
+  if(storage){
+    if(typeof storage.setAccessLevel==='function'){
+      await storage.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});await storage.set({[authKey]:value});
+    }else{
+      await writePrivateAuth(value);
+      // Wake other extension contexts and preserve account-change detection,
+      // without putting credentials or profile data in content-readable storage.
+      await storage.set({[authKey]:{session:value.session?{id:value.session.id}:null,revision:crypto.randomUUID()}});
+    }
+  }
   else localStorage.setItem(authKey,JSON.stringify(value));
   localChanges.dispatchEvent(new Event('change'));
 }

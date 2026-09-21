@@ -4,7 +4,7 @@ export const settingsKey='nc-reader-settings';
 const extensionStorage=()=>typeof chrome!=='undefined'&&chrome.storage?.local;
 export async function mirrorReader(values:{settings?:Settings}){
   const storage=extensionStorage();if(!storage)return;
-  await storage.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
+  await storage.setAccessLevel?.({accessLevel:'TRUSTED_CONTEXTS'});
   const data:Record<string,unknown>={};
   if(values.settings)data[settingsKey]=values.settings;
   const previous=await storage.get(Object.keys(data));
@@ -13,7 +13,6 @@ export async function mirrorReader(values:{settings?:Settings}){
 }
 export async function connectReaderSettings(settings:Settings){
   const storage=extensionStorage();if(!storage)return;
-  await storage.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
   const saved=await storage.get([settingsKey]);
   if(saved[settingsKey])localStorage.setItem('nc-settings',JSON.stringify(saved[settingsKey]));
   await mirrorReader({settings:saved[settingsKey] as Settings??settings});

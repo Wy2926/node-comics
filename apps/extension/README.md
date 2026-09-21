@@ -20,6 +20,8 @@ npm run build:web    # dist-web
 
 Firefox MV3 打包：`npm run zip -- --browser firefox --mv3`，产物位于 `.output/node-comicsextension-0.1.0-firefox.zip`；本地清单检查：`npx --no-install web-ext lint --source-dir .output/firefox-mv3`。固定 Firefox ID 为 `comics@nodelane.net`。最低版本为桌面 140、Android 142，以使用内置数据同意提示；清单声明账户认证、个人身份信息和用户选择的漫画图片内容传输。该声明不代表签名或商店审核已完成。要求见 [Firefox 数据同意文档](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/)。
 
+2026-09-21 Firefox 修复：后台与设置初始化仅在 API 存在时调用 `setAccessLevel`，避免后台提前退出、网页导入消息无人处理。回归命令：`npm run check`、`npm test`；332 项测试通过，包括缺失 API 时的后台导入处理、设置初始化和私有凭据存取。Firefox 156 隔离配置实测加载临时扩展，阅读器正常显示；在 `www.copy4000.com/comic/laizishenyuan` 点击导入按钮，打开目录页并读取到 100 个条目、4 个分组。本轮未验证真实 OIDC 登录、章节图片下载或翻译。`web-ext lint` 为 0 错误、7 条现有构建代码警告（动态 import、innerHTML、Function 构造器）；尚未签名或提交商店。
+
 Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`。产品服务固定为 `https://comics.nodelane.net`（`src/service.ts`），插件不提供运营管理页面或服务地址设置。供应商密钥只在后端。
 
 “我的账户”已开放 PLUS 卡片，右上角切换月付／年付；结账自动使用后台唯一的全站默认渠道，不显示支付渠道选择。商店公钥固定扩展 ID 为 `aiajdjliifeeaogpalejpggkiccjbneo`；沙盒 API 的 `EXTENSION_IDS` 也须包含该 ID。使用新构建后，在扩展管理页重新加载插件。
@@ -51,7 +53,7 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 - 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/LOCAL_IMPORT_FLOW.md)。
 - 网页图片发现与字节采集分离；MangaCopy 按懒加载与总页数核对完整性，失败页有重试原因。参见[采集与漫画管理](../../docs/COMIC_LIBRARY_IMPLEMENTATION.md)、[网页图片导入](../../docs/WEB_IMAGE_IMPORT.md)。
 - 身份、图片、任务归服务 origin 与账户 ID；来源 Cookie 与登录令牌不上传。登录前可读本地原图。
-- 会话统一在 `src/auth` 管理，扩展的访问令牌和续期凭据仅存于受限的 `chrome.storage.local`。到期前自动续期，认证 401 最多续期重试一次，失效后同步退出并显示重新登录入口；断网保留会话，原图和阅读位置不受影响。旧会话结构已删除，不迁移或兼容。配置、边界与隔离验收见[生产身份说明](../../docs/PRODUCTION_IDENTITY.md#客户端会话与续期2026-09-20)。
+- 会话统一在 `src/auth` 管理。Chrome / Edge 的访问令牌和续期凭据存于限制为 `TRUSTED_CONTEXTS` 的 `chrome.storage.local`；Firefox 不支持该访问级别 API，改存扩展 origin 的 IndexedDB，`storage.local` 仅广播无凭据的会话 ID 与变更标记。到期前自动续期，认证 401 最多续期重试一次，失效后同步退出并显示重新登录入口；断网保留会话，原图和阅读位置不受影响。旧会话结构已删除，不迁移或兼容。配置、边界与隔离验收见[生产身份说明](../../docs/PRODUCTION_IDENTITY.md#客户端会话与续期2026-09-20)。
 
 ## 浏览器隔离验收入口
 
