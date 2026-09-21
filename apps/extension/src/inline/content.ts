@@ -72,6 +72,10 @@ export function installInline(){
     const next:Candidate[]=[];
     for(const image of document.images){
       if(next.length>=MAX_COMIC_IMAGES)break;
+      // Repair presentation before measuring: a site style rewrite can also change
+      // the translated bitmap's aspect ratio. Never repair a different source.
+      const previous=tracked.get(image);
+      if(previous&&previous.url===source(image))previous.display.sync();
       const rect=comicImageRect(image);if(!rect)continue;
       const url=source(image);if(!url)continue;
       let item=tracked.get(image);

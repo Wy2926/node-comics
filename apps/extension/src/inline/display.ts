@@ -7,6 +7,7 @@ export const inlineStyles=shadowThemeStyles(styles);
 /** Keep src, srcset, picture sources, links and event listeners owned by the site. */
 export class ImageDisplay {
   private undo:Array<()=>void>=[];
+  private repairs:Array<()=>void>=[];
   private objectUrl?:string;
   key?:string;
   constructor(readonly image:HTMLImageElement){}
@@ -28,11 +29,19 @@ export class ImageDisplay {
       this.undo.push(()=>{if(image.getAttribute(name)===applied)image.removeAttribute(name);});
     }
     for(const [property,value] of properties){
-      const old=image.style.getPropertyValue(property),priority=image.style.getPropertyPriority(property);
+      let old=image.style.getPropertyValue(property),priority=image.style.getPropertyPriority(property);
       image.style.setProperty(property,value,'important');const applied=image.style.getPropertyValue(property);
-      this.undo.push(()=>{if(image.style.getPropertyValue(property)!==applied)return;if(old)image.style.setProperty(property,old,priority);else image.style.removeProperty(property);});
+      this.repairs.push(()=>{
+        if(image.style.getPropertyValue(property)===applied&&image.style.getPropertyPriority(property)==='important')return;
+        // Framework renders may replace the entire style attribute. Remember the site's
+        // latest value so restoring originals does not roll back its subsequent edits.
+        old=image.style.getPropertyValue(property);priority=image.style.getPropertyPriority(property);
+        image.style.setProperty(property,value,'important');
+      });
+      this.undo.push(()=>{if(image.style.getPropertyValue(property)!==applied||image.style.getPropertyPriority(property)!=='important')return;if(old)image.style.setProperty(property,old,priority);else image.style.removeProperty(property);});
     }
     this.objectUrl=url;this.key=key;
   }
-  restore(){for(const undo of this.undo.reverse())undo();this.undo=[];if(this.objectUrl)URL.revokeObjectURL(this.objectUrl);this.objectUrl=undefined;this.key=undefined;}
+  sync(){for(const repair of this.repairs)repair();}
+  restore(){for(const undo of this.undo.reverse())undo();this.undo=[];this.repairs=[];if(this.objectUrl)URL.revokeObjectURL(this.objectUrl);this.objectUrl=undefined;this.key=undefined;}
 }
