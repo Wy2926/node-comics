@@ -77,3 +77,15 @@
 .account-upgrade>label input {margin-top:5px;accent-color:var(--accent)}
 .account-session-note {margin-top:18px;font-size:.72rem;color:var(--muted);line-height:1.8}
 @media(max-width:600px){.account-summary,.account-subscription{padding:20px}.account-identity{gap:10px}.account-avatar{width:40px;height:40px}.account-reading-note{align-items:flex-start;flex-direction:column;gap:10px}.subscription-facts>div{flex-direction:column;gap:4px}.subscription-facts dd{text-align:left}.account-identity h2{font-size:1.1rem}}
+
+/* Keep the whole example visible and reserve its layout during image decoding. */
+.compare-toolbar{flex-direction:column;align-items:flex-start;gap:10px}
+.compare-toolbar .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+.compare-toolbar .segmented button{padding:8px 4px;line-height:1.4;min-height:40px}
+.compare-art{position:relative;height:auto;aspect-ratio:2/3;background:var(--surface-soft)}
+.compare-art img{width:100%;height:100%;object-fit:contain}
+.compare-feedback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-size:.85rem;color:var(--muted)}
+.compare-spinner{width:32px;height:32px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:compare-spin .8s linear infinite}
+@keyframes compare-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.compare-spinner{animation:none}}
+@media(max-width:480px){.compare-toolbar .segmented{grid-template-columns:repeat(2,minmax(0,1fr))}}

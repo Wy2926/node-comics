@@ -7,6 +7,8 @@ import Account from './Account';
 import BillingOffers from './BillingOffers';
 import hero from '../assets/journey-original.webp';
 import translated from '../assets/journey-translated.webp';
+import english from '../assets/journey-en.webp';
+import korean from '../assets/journey-ko.webp';
 import reading from '../assets/reading-corner.webp';
 import {dictionaries,localPath,type Locale} from '../i18n';
 import {site,absolute} from '../data/site';
@@ -26,8 +28,12 @@ const schema:Record<string,unknown>[]=[];
 if(path==='/')schema.push({'@type':'SoftwareApplication',name:'NodeLane Comics',applicationCategory:'BrowserApplication',operatingSystem:'Windows, macOS, Linux',description:t.heroDescription,url:absolute(href('/')),inLanguage:locale,offers:{'@type':'Offer',price:'0',priceCurrency:'USD',description:t.freeBenefits[0],url:absolute(href('/pricing/'))}});
 if(key==='faq')schema.push({'@type':'FAQPage',inLanguage:locale,mainEntity:d.faqs.map(item=>({'@type':'Question',name:item.question,acceptedAnswer:{'@type':'Answer',text:item.answer}}))});
 if(guide)schema.push({'@type':'Article',headline:guide.title,description:guide.description,datePublished:`${site.updated}T00:00:00+08:00`,dateModified:`${site.updated}T00:00:00+08:00`,author:{'@type':'Organization',name:'NodeLane Comics',url:absolute(href('/about/'))},publisher:{'@id':absolute('/#organization')},mainEntityOfPage:absolute(href(path)),image:absolute('/social-cover.webp'),inLanguage:locale});
-const originalView=path==='/'?await getImage({src:hero,width:760,format:'webp',quality:82}):null;
-const translatedView=path==='/'?await getImage({src:translated,width:760,format:'webp',quality:82}):null;
+const examples=path==='/'?await Promise.all([
+  {id:'original',image:hero,label:'日文原图'},
+  {id:'zh',image:translated,label:'中文示意'},
+  {id:'en',image:english,label:'英文示意'},
+  {id:'ko',image:korean,label:'韩文示意'},
+].map(async ({id,image,label})=>({id,label,width:image.width,height:image.height,src:(await getImage({src:image,width:760,format:'webp',quality:88})).src}))):[];
 const stores=[{name:'Google Chrome',label:'Chrome Web Store',icon:'◉',url:site.stores.chrome},{name:'Microsoft Edge',label:'Edge Add-ons',icon:'◔',url:site.stores.edge},{name:'Mozilla Firefox',label:'Firefox Add-ons',icon:'◈',url:site.stores.firefox}];
 ---
 <Base title={title} description={description} schema={schema} noindex={['account','auth'].includes(key)}>
@@ -35,7 +41,7 @@ const stores=[{name:'Google Chrome',label:'Chrome Web Store',icon:'◉',url:site
     <section class="container hero"><div class="hero-copy"><p class="eyebrow"><span></span>{t.heroEyebrow}</p><h1>{t.heroLines[0]}<br/><em>{t.heroLines[1]}</em></h1><p>{t.heroDescription}</p><div class="hero-actions"><a class="button" href={href('/download/')}>{t.freeStart} <span aria-hidden="true">↗</span></a><a class="text-link" href="#see-it">{t.seeHow} ↓</a></div><div class="browser-strip"><span>{t.desktop}</span><span>Chrome</span><span>Edge</span><span>Firefox</span></div></div><figure class="hero-art"><div class="hero-frame"><Image src={hero} alt={t.heroAlt} widths={[480,760,1024]} sizes="(max-width:760px) 90vw, 480px" loading="eager" fetchpriority="high" format="webp" quality={85}/></div><span class="hero-stamp">READ BEYOND WORDS</span><div class="speech-note"><small>{t.nextStop}</small>{t.tagline} ✦</div><figcaption class="art-caption">{t.heroCaption}</figcaption></figure></section>
     <div class="feature-ribbon"><div class="container ribbon-inner">{t.ribbon.map((item,i)=><span><b aria-hidden="true">{['✦','▤','↔','⌖'][i]}</b>{item}</span>)}</div></div>
     <section class="container section"><div class="section-title"><div><p class="eyebrow">BUILT FOR YOUR NEXT PAGE</p><h2>{t.featureHeading}</h2></div><p>{t.featureDescription}</p></div><div class="feature-grid">{t.featureTitles.map((item,i)=><article class:list={['feature-card',{tint:i===1}]}><span class="number">0{i+1} / NODELANE COMICS</span><h3>{item}</h3><p>{t.featureBodies[i]}</p><a class="text-link" href={href(`/guides/${d.guides[i].slug}/`)}>{t.readGuide} ↗</a></article>)}</div></section>
-    <section class="container section split" id="see-it"><div class="split-copy"><p class="eyebrow">SAME PAGE, NEW CONNECTION</p><h2>{t.compareTitle}</h2><p>{t.compareDescription}</p><ul class="check-list">{t.ribbon.map(item=><li>{item}</li>)}</ul><a class="text-link" href={href('/features/')}>{t.features} ↗</a></div><Compare client:visible original={originalView!.src} translated={translatedView!.src} locale={locale} copy={account??{}}/></section>
+    <section class="container section split" id="see-it"><div class="split-copy"><p class="eyebrow">SAME PAGE, NEW CONNECTION</p><h2>{t.compareTitle}</h2><p>{t.compareDescription}</p><ul class="check-list">{t.ribbon.map(item=><li>{item}</li>)}</ul><a class="text-link" href={href('/features/')}>{t.features} ↗</a></div><Compare client:visible examples={examples} locale={locale} copy={account??{}}/></section>
     <section class="reading-band"><div class="container section split"><div class="reading-art"><Image src={reading} alt={t.readingAlt} widths={[480,800,1100]} sizes="(max-width:760px) 90vw, 550px" loading="lazy" format="webp" quality={82}/></div><div class="split-copy"><p class="eyebrow">MAKE ROOM FOR YOUR FAVORITES</p><h2>{t.readingTitle}</h2><p>{t.readingDescription}</p><a class="text-link" href={href('/guides/local-comics/')}>{t.readGuide} ↗</a><div class="format-tags">{['CBZ / ZIP','CBR / RAR','PDF','DRM-free MOBI','PNG / JPEG / WebP'].map(item=><span>{item}</span>)}</div></div></div></section>
     <section class="container section"><div class="section-title"><div><p class="eyebrow">THE READER’S NOTEBOOK</p><h2>{t.guideHeading}</h2></div><a class="text-link" href={href('/guides/')}>{t.allGuides} ↗</a></div><div class="guide-grid">{d.guides.slice(0,3).map(item=><a class="guide-card" href={href(`/guides/${item.slug}/`)}><span class="tag">{item.category} / {item.minutes} {t.minutes}</span><h3>{item.title}</h3><p>{item.description}</p><span class="read-more">{t.readGuide} ↗</span></a>)}</div></section>
   </> : <PageIntro eyebrow={guide?.category??'NODELANE COMICS / '+key.toUpperCase()} title={article?.title??intros[key]?.[0]??title} description={description}>{article&&<div class="meta"><span>{t.editor}</span><time datetime={site.updated}>{t.updated}: {site.updated}</time>{guide&&<span>{guide.minutes} {t.minutes}</span>}</div>}</PageIntro>}

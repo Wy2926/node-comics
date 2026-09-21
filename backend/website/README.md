@@ -98,3 +98,5 @@ uv run --with-requirements backend/requirements.txt python -m pytest backend/tes
 定价页浏览器验收（使用本机已安装的 Chrome 和 Playwright，报价完全模拟，不调用支付）：先启动上面的开发／预览服务，再从仓库根目录运行 `node scripts/verify_website_pricing.mjs`。可用 `WEBSITE_PREVIEW_URL` 指定预览地址、`PLAYWRIGHT_MODULE` 指定 Playwright 模块绝对路径。覆盖五种语言、320–1440px 布局、语言与月年付切换、加载／失败／空目录／仅年付状态；截图保存到 `artifacts/website-pricing/`。若开发环境提示 `_jsxDEV is not a function`，停止开发服务并以 `NODE_ENV=development` 重启；生产验收使用 `npm run build` 的静态产物。
 
 账户详情浏览器验收：在 `backend/website` 运行 `npx vite --config tests/account-fixture.config.ts`（开发模式、固定端口 5193），再从仓库根目录运行 `node scripts/verify_website_account.mjs`。需要本机 Chrome 和 Playwright，可使用 `PLAYWRIGHT_MODULE` 指定模块路径。夹具使用模拟账户，不访问真实身份、数据库或支付服务；覆盖普通／PLUS、取消／过期、错误、退出、多语言窄屏，以及报价选择和继续结账，截图位于 `artifacts/website-account/`。
+
+2026-09-21 示意图更新：日文原图保留，中文替换为用户提供版本，并新增英文、韩文效果图；四种语言可切换，英文／韩文首页默认展示对应示意图。完整显示漫画，加载及解码期间显示动画，失败可重试，快速切换忽略过期加载结果；窄屏按钮分两列。浏览器验收命令为 `node scripts/verify_website_compare.mjs`（仓库根目录、先启动官网预览，使用本机 Chrome；可通过 PLAYWRIGHT_MODULE、WEBSITE_PREVIEW_URL 指定模块及地址），覆盖五语、四图、320／390／1440px、加载、失败重试、快速切换和位置保持，截图保存于 artifacts/website-compare/。
