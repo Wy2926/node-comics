@@ -59,12 +59,13 @@ class Monitor:
 
 
 def main():
-    p=argparse.ArgumentParser(description='Yakuyomi PC: Vulkan detection, OCR backbone and inpainting')
+    p=argparse.ArgumentParser(description='Vulkan detection/OCR backbone and LaMa DirectML GPU inpainting')
     p.add_argument('command',choices=['devices','download','run'])
     p.add_argument('input',nargs='?',type=Path)
     p.add_argument('--output',type=Path,default=Path('artifacts/translated'))
     p.add_argument('--models',default='models')
     p.add_argument('--gpu',type=int,default=0,help='Vulkan index; -1 explicitly selects CPU')
+    p.add_argument('--inpaint-gpu',type=int,default=0,help='DirectML DXGI adapter index; independent of Vulkan index')
     p.add_argument('--ocr-workers',type=int,default=8)
     p.add_argument('--threads',type=int,default=2)
     p.add_argument('--pages',type=int,default=2,help='Bounded pages in flight')
@@ -98,7 +99,7 @@ def main():
     glossary=json.loads(a.glossary.read_text(encoding='utf-8-sig')) if a.glossary else None
     translator=Translator(a.cache,a.base_url,a.model,a.translation,a.source,a.target,glossary)
     started=time.perf_counter()
-    engine=Engine(a.models,a.gpu,a.ocr_workers,a.threads,a.tile,a.font,a.png_compression,a.detect_size,ocr_language,a.direction)
+    engine=Engine(a.models,a.gpu,a.ocr_workers,a.threads,a.tile,a.font,a.png_compression,a.detect_size,ocr_language,a.direction,a.inpaint_gpu)
     try:
         engine.warmup();startup=time.perf_counter()-started
         records=[];errors=[];start=time.perf_counter()

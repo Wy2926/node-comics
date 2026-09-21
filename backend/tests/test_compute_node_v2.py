@@ -55,10 +55,10 @@ class FixtureRuntime:
 
 
 
-def node_for(v2, tmp_path, pages, runtime, lose_replies=False, lose_upload=False):
+def node_for(v2, tmp_path, pages, runtime, lose_replies=False, lose_upload=False, max_leases=4):
     config = {'node_id': v2['node']['node_id'], 'node_token': v2['node']['token'],
         'resource_id': 'test:vulkan:0', 'control_url': 'https://control.example.test',
-        'r2_origin': 'https://r2.example.test', 'engine': {'gpu': -1}, 'local_pages': pages, 'max_leases': 4}
+        'r2_origin': 'https://r2.example.test', 'engine': {'gpu': -1}, 'local_pages': pages, 'max_leases': max_leases}
     lost = set()
     def control(request):
         response = v2['client'].request('POST', request.url.path, headers=dict(request.headers), content=request.content)
@@ -273,14 +273,25 @@ def test_real_vulkan_node_uploads_final_page(v2, tmp_path, ocr_language, source_
             analysis = db.get(ClassicState, job_id).analysis
         assert len(analysis['segments']) == 1
         assert analysis['segments'][0]['source'] == source_text
+        # Check actual removal, not merely a successfully encoded final image.
+        import numpy as np
+        cleaned = runtime.inpaint(np.array(image), analysis)
+        bounds = draw.textbbox((360, 300), source_text, font=font, anchor='mm')
+        x0, y0, x1, y1 = bounds
+        dark_before = np.count_nonzero(np.array(image)[y0:y1, x0:x1].mean(axis=2) < 180)
+        dark_after = np.count_nonzero(cleaned[y0:y1, x0:x1].mean(axis=2) < 180)
+        assert dark_before > 100 and dark_after < dark_before * .05
         assert Image.open(BytesIO(output)).size == image.size
         destination = SERVICE / 'artifacts/v2-smoke'
         destination.mkdir(parents=True, exist_ok=True)
         (destination / f'{ocr_language}-source.png').write_bytes(buffer.getvalue())
         (destination / f'{ocr_language}-result.png').write_bytes(output)
+        Image.fromarray(cleaned).save(destination / f'{ocr_language}-cleaned.png')
         (destination / f'{ocr_language}-report.json').write_text(json.dumps({
             'engine_version': runtime.version, 'protocol_version': 2, 'ocr_language': ocr_language,
             'ocr_exact': True, 'regions': len(analysis['segments']), 'width': image.width, 'height': image.height,
+            'inpainting_backend': runtime.engine.inpainter.backend,
+            'dark_text_pixels_before': int(dark_before), 'dark_text_pixels_after': int(dark_after),
             'node_uploaded_result': True, 'wall_seconds': time.monotonic() - started,
             'text_provider': 'fixed fixture, no paid calls', 'storage': 'isolated adapter'}, indent=2), encoding='utf-8')
     finally:
@@ -434,6 +445,78 @@ def test_lost_r2_put_reply_retries_immutable_object_and_settles_once(v2, tmp_pat
         assert runtime.rendered == 1
         assert not journal.leases()
     finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_eight_slots_four_blocked_uploads_then_next_admission_window(v2, tmp_path):
+    from threading import Event, Lock
+    from app.queue_models import ComputeNode
+    jobs = v2['create'](16)
+    with session_factory()() as db:
+        node = db.get(ComputeNode, v2['node']['node_id'])
+        node.capacity = 8
+        node.desired_config = {**node.desired_config, 'execution_slots': 8}
+        db.commit()
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v2, tmp_path, 8, runtime, max_leases=8)
+    release, lock = Event(), Lock()
+    active = peak = 0
+    upload = transport.upload
+    def blocked(*args, **kwargs):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        try:
+            assert release.wait(20)
+            return upload(*args, **kwargs)
+        finally:
+            with lock:
+                active -= 1
+    transport.upload = blocked
+    try:
+        agent.register()
+        agent.claim()
+        assert len(agent.pages) == 8
+        first_jobs = [page.lease['job_id'] for page in agent.pages.values()]
+        end = time.monotonic() + 8
+        while time.monotonic() < end:
+            agent.heartbeat()
+            agent.reap()
+            if all(p.step == 'text' and p.cleaned is not None and p.analysis_accepted
+                   for p in agent.pages.values()):
+                break
+            time.sleep(.01)
+        assert runtime.analyzed == 8 and runtime.rendered == 0
+        assert all(p.cleaned is not None and not p.future for p in agent.pages.values())
+        end = time.monotonic() + 8
+        while time.monotonic() < end:
+            agent.heartbeat()
+            agent.reap()
+            with session_factory()() as db:
+                lease = claim_stage(db, 'control-text', ['text'])
+                db.commit()
+            if lease:
+                run_control_stage(lease.id)
+            if runtime.rendered == 8 and active == 4 and all(
+                    p.step == 'deliver' and p.cleaned is None for p in agent.pages.values()):
+                break
+            time.sleep(.01)
+        assert runtime.rendered == 8 and active == peak == 4
+        assert all(p.step == 'deliver' and p.cleaned is None for p in agent.pages.values())
+        agent.claim()
+        assert len(agent.pages) == 8  # Delivery still occupies a whole-page lease.
+        release.set()
+        drive(agent, first_jobs)
+        agent.claim()
+        assert len(agent.pages) == 8
+        drive(agent, jobs)
+        assert runtime.analyzed == runtime.rendered == 16
+        assert not journal.leases() and agent.pipeline.used == 0
+    finally:
+        release.set()
         agent.close()
         transport.close()
         journal.close()

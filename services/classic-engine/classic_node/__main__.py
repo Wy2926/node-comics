@@ -22,7 +22,8 @@ def main():
         runtime.warmup()
         if args.command == 'check':
             print(json.dumps({'protocol_version': 2, 'version': runtime.version,
-                'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu']}))
+                'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
+                'inpainting_backend': runtime.engine.inpainter.backend}))
             return
         transport = Transport(config)
         journal = Journal(config['state_dir'], config['journal_bytes'])

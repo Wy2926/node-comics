@@ -1,5 +1,7 @@
 # 质量与性能验收 · 2026-09-19
 
+这是替换前的 AOT 历史记录。2026-09-21 已改用 CPU LaMa Large；当前性能、图像和队列阻塞证据见 [LaMa 验证](LAMA_VALIDATION.md)。
+
 实机：Windows、RX 6900 XT、Ryzen 7 5800X、32 GB。检测与去字继续 NCNN Vulkan，FP16 packed / storage / arithmetic 均关闭。日文 MIT OCR 保留 Vulkan 特征提取 + CPU FP32 解码；其他语言直接使用 RapidOCR PP-OCRv5 mobile ONNX CPU FP32。NVIDIA / Linux 未实机验收。
 
 ## 本轮多语言验收

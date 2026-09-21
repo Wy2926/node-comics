@@ -5,6 +5,7 @@ from importlib.metadata import version as package_version
 from io import BytesIO
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 from PIL import Image
@@ -31,7 +32,9 @@ def model_identity(models, language):
     root = Path(models)
     manifest = json.loads((Path(package_file).parent / 'models.json').read_text(encoding='utf-8'))
     expected = {item['name']: item['sha256'] for item in manifest['models']
-                if not item.get('language') or item['language'] == language}
+                if not item.get('build_only') and (not item.get('language') or item['language'] == language)}
+    from manhua_engine.inpainting import model_identity as inpaint_identity
+    expected.update(inpaint_identity(models))
     if language == 'ja':
         build = json.loads((root / 'ocr-fp32/build.json').read_text(encoding='utf-8'))
         if (build['source_revision'] != 'd5a3eee4a7b7b7754b71baa2ee82309dfff468bc'
@@ -68,12 +71,14 @@ class Runtime:
         code['adapter'] = file_hash(Path(__file__))
         code['contract'] = file_hash(Path(__file__).with_name('protocol.py'))
         code['alphabet'] = file_hash(source / 'manhua_engine/alphabet.txt')
-        dependencies = {name: package_version(name) for name in ('ncnn', 'onnxruntime', 'numpy',
+        dependencies = {name: package_version(name) for name in ('ncnn',
+            'onnxruntime-directml' if sys.platform == 'win32' else 'onnxruntime', 'numpy',
             'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr', 'uniseg', 'pyphen', 'fonttools')}
         self.version = 'manhua-ncnn-v1-' + digest({'code': code, 'models': model_hashes,
             'fonts': font_hashes, 'dependencies': dependencies,
             'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'ocr_workers', 'threads', 'gpu'}},
-            'device_backend': 'cpu' if options['gpu'] < 0 else 'vulkan'})[:32]
+            'device_backend': 'cpu' if options['gpu'] < 0 else 'vulkan',
+            'inpainting_backend': 'cpu' if options['gpu'] < 0 or options.get('inpaint_gpu', 0) < 0 else 'directml'})[:32]
         self.engine = Engine(**options)
 
     def close(self):

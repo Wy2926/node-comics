@@ -43,10 +43,11 @@ def test_repair_is_local_and_preserves_aspect_ratio():
     rgb=np.full((100,300,3),127,np.uint8)
     mask=np.zeros((100,300),np.uint8);mask[40:60,140:160]=255
     class FakeNet:
-        def run(self,inputs,outputs):
-            ys,xs=np.where(inputs['in1'][0]>0)
+        def predict(self,rgb,mask):
+            ys,xs=np.where(mask>0)
             assert abs((xs.max()-xs.min())/(ys.max()-ys.min())-1)<.1
-            return [np.ones_like(inputs['in0'])]
+            assert rgb.shape[0]%8==rgb.shape[1]%8==0
+            return np.full_like(rgb,255,dtype=np.float32)
     result=repair_region(FakeNet(),rgb,mask,768)
     assert np.array_equal(result[mask==0],rgb[mask==0])
     assert np.all(result[mask>0]==255)

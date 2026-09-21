@@ -30,7 +30,7 @@ def load(path):
     if not value['node_token'] or not value['node_id'] or not value['resource_id']:
         raise ValueError('Node identity and credential are required')
     defaults = {'models': 'models', 'gpu': 0, 'ocr_workers': 8, 'threads': 2, 'tile': 768,
-                'font': [], 'png_compression': 1, 'detect_size': 1280, 'ocr_language': 'ja', 'direction': 'auto'}
+                'font': [], 'png_compression': 1, 'detect_size': 1280, 'ocr_language': 'ja', 'direction': 'auto', 'inpaint_gpu': 0}
     if set(value.get('engine', {})) - set(defaults):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
@@ -54,6 +54,8 @@ def load(path):
         raise ValueError('Reserve at least 512 MiB for page buffers')
     if min(value['engine']['threads'], value['engine']['ocr_workers']) < 1:
         raise ValueError('Thread counts must be positive')
+    if type(value['engine']['inpaint_gpu']) is not int or value['engine']['inpaint_gpu'] < -1:
+        raise ValueError('inpaint_gpu must be a DirectML adapter index or -1 for explicit CPU')
     if value['engine']['tile'] < 256 or value['engine']['tile'] % 128:
         raise ValueError('tile must be a multiple of 128 and at least 256')
     return value

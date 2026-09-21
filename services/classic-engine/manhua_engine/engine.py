@@ -5,7 +5,8 @@ import time
 import cv2
 import numpy as np
 from PIL import Image
-from .backend import Network, detector_input, detector_output, aot_input
+from .backend import Network, detector_input, detector_output
+from .inpainting import Lama
 from .vendor.grouping import Quadrilateral, merge_bboxes_text_region
 from .translation import atomic_json
 from .ocr import Recognizer
@@ -36,7 +37,7 @@ def group(lines,w,h,language='ja'):
 
 
 class Engine:
-    def __init__(self,models='models',gpu=0,ocr_workers=8,threads=2,tile=768,font=None,png_compression=1,detect_size=1280,ocr_language='ja',direction='auto'):
+    def __init__(self,models='models',gpu=0,ocr_workers=8,threads=2,tile=768,font=None,png_compression=1,detect_size=1280,ocr_language='ja',direction='auto',inpaint_gpu=0):
         self.tile=tile
         self.detect_size=detect_size
         self.font=(str(font),) if isinstance(font,(str,Path)) else tuple(font or ())
@@ -46,7 +47,7 @@ class Engine:
         cv2.setNumThreads(1)
         models=Path(models)
         self.detector=Network(models/'dbnet_detect.ncnn.param',gpu,threads)
-        self.inpainter=Network(models/'mit_aot_fixed512.ncnn.param',gpu,threads)
+        self.inpainter=Lama(models,threads,-1 if gpu<0 else inpaint_gpu)
         self.ocr=Recognizer(models,gpu,threads,ocr_language)
         self.alphabet=self.ocr.alphabet
         self.ocr_pool=ThreadPoolExecutor(ocr_workers,thread_name_prefix='ocr')
@@ -59,7 +60,7 @@ class Engine:
         for path in font_paths(self.font): coverage(path)
         rgb=np.full((1024,720,3),255,np.uint8)
         self.detect(rgb)
-        self.inpainter.run(aot_input(rgb,np.zeros(rgb.shape[:2],np.uint8),self.tile),['out0'])
+        self.inpainter.warmup()
         self.ocr.warmup()
 
     def detect(self,rgb):

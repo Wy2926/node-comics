@@ -1,18 +1,17 @@
-"""Check real-page edit bounds and adaptive AOT CPU/Vulkan agreement."""
+"""Check real-page edit bounds and deterministic LaMa replay."""
 import argparse
 import json
 from pathlib import Path
 import numpy as np
 from PIL import Image
 from manhua_engine.engine import Engine
-from manhua_engine.backend import Network
 from manhua_engine.quality import conservative_mask, repair_page
 
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('input',type=Path);p.add_argument('output',type=Path)
     p.add_argument('--reference-pages',nargs='*',default=['00015','00025'])
-    a=p.parse_args();engine=Engine();cpu=Network('models/mit_aot_fixed512.ncnn.param',-1,4);rows=[]
+    a=p.parse_args();engine=Engine();rows=[]
     for path in sorted(a.input.glob('*.webp')):
         record=json.loads((a.output/(path.stem+'.json')).read_text(encoding='utf-8'))
         rgb=np.array(Image.open(path).convert('RGB'));_,seg=engine.detect(rgb)
@@ -25,15 +24,15 @@ def main():
         output=np.array(Image.open(a.output/(path.stem+'.png')).convert('RGB'))
         row={'page':path.name,'outside_changed_pixels':int(np.count_nonzero(np.any(rgb!=output,axis=-1)&~allowed))}
         if path.stem in a.reference_pages:
-            gpu_image,n=repair_page(engine.inpainter,rgb,mask)
-            cpu_image,_=repair_page(cpu,rgb,mask)
-            error=np.abs(gpu_image.astype(np.int16)-cpu_image.astype(np.int16))
-            row.update({'repair_windows':n,'aot_pixel_max_abs':int(error.max()),'aot_pixel_mean_abs':float(error.mean()),
-                        'inpaint_outside_changed_pixels':int(np.count_nonzero(np.any(gpu_image!=rgb,axis=-1)&(mask==0)))})
+            first,n=repair_page(engine.inpainter,rgb,mask)
+            replay,_=repair_page(engine.inpainter,rgb,mask)
+            error=np.abs(first.astype(np.int16)-replay.astype(np.int16))
+            row.update({'repair_windows':n,'lama_replay_max_abs':int(error.max()),
+                        'inpaint_outside_changed_pixels':int(np.count_nonzero(np.any(first!=rgb,axis=-1)&(mask==0)))})
         rows.append(row)
     engine.close()
     passed=all(r['outside_changed_pixels']==0 and r.get('inpaint_outside_changed_pixels',0)==0
-               and r.get('aot_pixel_max_abs',0)<=1 for r in rows)
+               and r.get('lama_replay_max_abs',0)==0 for r in rows)
     report={'passed':passed,'pages':len(rows),'rows':rows}
     (a.output/'integrity.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps(report,indent=2))

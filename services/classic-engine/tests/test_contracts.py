@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 from manhua_engine.translation import Translator, parse_translation
-from manhua_engine.backend import detector_input, composite
+from manhua_engine.backend import detector_input
 from manhua_engine.cli import validate_outputs
 
 
@@ -51,14 +51,6 @@ def test_glossary_is_validated_and_isolates_translation_cache(tmp_path):
     assert original.prompt!=terms.prompt and 'Asuka' in terms.prompt
     with pytest.raises(ValueError,match='Glossary'):
         Translator(tmp_path,glossary={'name':''})
-
-
-def test_inpaint_preserves_unmasked_pixels():
-    rgb=np.arange(90,dtype=np.uint8).reshape(5,6,3)
-    mask=np.zeros((5,6),np.uint8);mask[2,2]=255
-    result=composite(rgb,mask,np.ones((3,4,4),np.float32))
-    assert np.array_equal(result[mask==0],rgb[mask==0])
-    assert np.all(result[2,2]==255)
 
 
 def test_reject_overwrites_and_collisions(tmp_path):

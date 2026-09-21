@@ -86,20 +86,17 @@ def repair_windows(mask,context=48):
 
 def repair_region(net,rgb,mask,tile):
     h,w=rgb.shape[:2]
-    tile=min(tile,max(256,((2*max(h,w)+127)//128)*128))
-    scale=min(tile/max(h,w),2.)
+    tile=min(tile,getattr(net,'input_size',tile))
+    scale=min(tile/max(h,w),1.)
     nh,nw=max(1,round(h*scale)),max(1,round(w*scale))
     small=cv2.resize(rgb,(nw,nh),interpolation=cv2.INTER_CUBIC if scale>1 else cv2.INTER_AREA)
     m=cv2.resize(mask,(nw,nh),interpolation=cv2.INTER_NEAREST)
-    # Fixed square model shape, original aspect ratio, symmetric context padding.
-    top,left=(tile-nh)//2,(tile-nw)//2
-    canvas=cv2.copyMakeBorder(small,top,tile-nh-top,left,tile-nw-left,cv2.BORDER_REFLECT_101)
-    padded=cv2.copyMakeBorder(m,top,tile-nh-top,left,tile-nw-left,cv2.BORDER_CONSTANT,value=0)
-    binary=(padded>0).astype(np.float32)
-    image=(canvas.astype(np.float32)/127.5-1)*(1-binary[...,None])
-    raw=net.run({'in0':image.transpose(2,0,1),'in1':binary[None]},['out0'])[0]
-    restored=np.clip((raw.transpose(1,2,0)+1)*127.5,0,255)
-    restored=cv2.resize(restored[top:top+nh,left:left+nw],(w,h),interpolation=cv2.INTER_CUBIC)
+    # Preserve geometry; mirror the mask with the image at padding boundaries.
+    bottom,right=(-nh)%8,(-nw)%8
+    canvas=cv2.copyMakeBorder(small,0,bottom,0,right,cv2.BORDER_REFLECT_101)
+    padded=cv2.copyMakeBorder(m,0,bottom,0,right,cv2.BORDER_REFLECT_101)
+    restored=net.predict(canvas,padded)
+    restored=cv2.resize(restored[:nh,:nw],(w,h),interpolation=cv2.INTER_CUBIC)
     return np.where((mask>0)[...,None],np.clip(restored,0,255).astype(np.uint8),rgb)
 
 

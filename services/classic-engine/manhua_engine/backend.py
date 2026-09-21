@@ -81,15 +81,3 @@ def detector_output(db, seg, rgb_shape, input_shape, ratio):
     valid = seg[:max(1, round(h*ratio*sh/ih)), :max(1, round(w*ratio*sw/iw))]
     mask = (cv2.resize(valid, (w, h)) > .12).astype(np.uint8)*255
     return quads, mask
-
-
-def aot_input(rgb, mask, size=768):
-    small = cv2.resize(rgb, (size, size)).astype(np.float32)/127.5-1
-    m = (cv2.resize(mask, (size,size), interpolation=cv2.INTER_NEAREST)>127).astype(np.float32)
-    return {'in0': (small*(1-m[...,None])).transpose(2,0,1), 'in1': m[None]}
-
-
-def composite(rgb, mask, output):
-    image = np.clip((output.transpose(1,2,0)+1)*127.5,0,255).astype(np.uint8)
-    image = cv2.resize(image, (rgb.shape[1],rgb.shape[0]))
-    return np.where((mask>0)[...,None],image,rgb)

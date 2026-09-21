@@ -1,5 +1,5 @@
 {
-  "version": "desktop-multilingual-v1",
+  "version": "desktop-lama-large-v1",
   "note": "Explicit downloads only. SHA-256 verified before use; no runtime model downloads.",
   "models": [
     {
@@ -25,24 +25,14 @@
     },
     {
       "role": "inpainter",
-      "backend": "ncnn",
-      "name": "mit_aot_fixed512.ncnn.param",
-      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v2/mit_aot_fixed512.ncnn.param",
-      "size": 33810,
-      "sha256": "f21ef860d21a6cdf60dfb1742c08d1c0d98837bceeb2ee3fe9c2dbbeee7d32b5",
-      "license": "GPL-3.0",
-      "source": "https://github.com/zyddnys/manga-image-translator",
-      "note": "AOT-GAN manga inpaint (m-i-t). Fully-convolutional; run at whole-page tile 768 by default."
-    },
-    {
-      "role": "inpainter",
-      "backend": "ncnn",
-      "name": "mit_aot_fixed512.ncnn.bin",
-      "url": "https://github.com/joyeli/yakuyomi-engine/releases/download/models-v2/mit_aot_fixed512.ncnn.bin",
-      "size": 11366088,
-      "sha256": "a52db45eafc1dd2aa4ce9a339c711917fa98fefb31ce4506d4c95e8b5e3560b6",
-      "license": "GPL-3.0",
-      "source": "https://github.com/zyddnys/manga-image-translator"
+      "backend": "onnx-directml-fp32",
+      "name": "lama_large_512px.ckpt",
+      "url": "https://huggingface.co/dreMaz/AnimeMangaInpainting/resolve/main/lama_large_512px.ckpt",
+      "sha256": "11d30fbb3000fb2eceae318b75d9ced9229d99ae990a7f8b3ac35c8d31f2c935",
+      "license": "MIT (model card)",
+      "source": "https://huggingface.co/dreMaz/AnimeMangaInpainting",
+      "note": "Manga LaMa Large checkpoint for explicit ONNX export with tools.build_lama; 18 FFC blocks, no MPE. Runtime uses fixed 512px FP32 real-valued DFT matrices on DirectML GPU.",
+      "build_only": true
     },
     {
       "role": "ocr",

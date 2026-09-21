@@ -1,6 +1,6 @@
 # Manhua Engine
 
-轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测与局部去字使用 NCNN Vulkan FP32；按来源语言选择 OCR，按目标语言嵌字。运行时无需 PyTorch、CUDA 或 Android SDK。
+轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime DirectML GPU FP32 LaMa Large；按来源语言选择 OCR，按目标语言嵌字。安装方式优先见 [节点说明](README.md)，无需 CUDA 或 Android SDK。
 
 ## 支持范围
 
@@ -21,10 +21,11 @@
 ## 安装与模型
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python -m pip install -e '.[test]'
-.\.venv\Scripts\python -m manhua_engine.cli download --ocr-language all
-.\.venv\Scripts\python -m manhua_engine.cli devices
+$env:UV_PROJECT_ENVIRONMENT = '.venv-lama'
+uv sync --locked --extra test --extra build
+.\.venv-lama\Scripts\python -m manhua_engine.cli download --ocr-language all
+.\.venv-lama\Scripts\python -m tools.build_lama --models models
+.\.venv-lama\Scripts\python -m manhua_engine.cli devices
 ```
 
 也可只下载所需模型，如 `download --ocr-language ko`。模型清单随包分发，支持从其他工作目录调用；下载时校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
@@ -70,11 +71,11 @@ git -C build-models/mit checkout d5a3eee4a7b7b7754b71baa2ee82309dfff468bc
 
 - `--pages 1` 优先单页延迟，默认 `2` 重叠页间工作；更高并发不保证更快。
 - `--ocr-workers 8` 是全局 OCR 池，ORT 每次只用一个内部线程。日文 Vulkan 特征串行、CPU 解码并行；其他语言仅加载所选 PP-OCR 模型。
-- `--threads 2` 控制 NCNN CPU 算子；`--detect-size 1280` 可选 1024 / 1536 / 2048。
-- `--tile 768` 是局部去字画布上限；`--png-compression 1` 默认快速无损输出。
+- `--threads 2` 控制 CPU 算子线程数；LaMa 同一 DirectML session 的 Run 串行，网络和其他阶段可以并发；`--detect-size 1280` 可选 1024 / 1536 / 2048。
+- `--tile 768` 是局部去字上限，当前 LaMa ONNX 进一步限制为 512，并保持裁剪比例；`--png-compression 1` 默认快速无损输出。
 - `--gpu -1` 显式使用 CPU。模型只加载一次，字体覆盖与网络预热在计时前完成。
 
-本机 Windows / RX 6900 XT / Ryzen 7 5800X：40 页最终双页测量约 131.2 页/分钟，单页平均约 0.522 秒；后续排版对照中新版约 134.8 页/分钟。改造前为 138.1 页/分钟；同机后台负载变化明显，尚不能保证完全无回退。NVIDIA / Linux 未实机验收。准确率、性能口径和限制见 [质量验证](docs/QUALITY.md)。
+以下是 **2026-09-19 的 AOT 历史测量，不适用于当前 LaMa**。当前性能见 [LaMa 验证](docs/LAMA_VALIDATION.md)。本机 Windows / RX 6900 XT / Ryzen 7 5800X：40 页最终双页测量约 131.2 页/分钟，单页平均约 0.522 秒；后续排版对照中新版约 134.8 页/分钟。改造前为 138.1 页/分钟；同机后台负载变化明显，尚不能保证完全无回退。NVIDIA / Linux 未实机验收。准确率、性能口径和限制见 [质量验证](docs/QUALITY.md)。
 
 ```powershell
 .\.venv\Scripts\python -m pytest -q
