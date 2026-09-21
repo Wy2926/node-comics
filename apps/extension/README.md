@@ -4,6 +4,8 @@ React / TypeScript / WXT Manifest V3 漫画阅读器。原图、译图和阅读�
 
 ## 运行与检查
 
+界面现支持 16 种语言，包括韩语（한국어）。界面语言可在“外观与偏好”中选择；跟随浏览器时 `ko` / `ko-KR` 自动使用韩语，界面语言与漫画翻译目标语言独立保存。完整词典位于 `src/i18n/dictionaries/ko.json`；构建时同时生成包内 UI 词典与 Chrome `_locales/ko/messages.json` 商店元数据。`npm test -- tests/i18n.test.ts` 检查词典键、占位符、语言匹配与设置隔离，`npm run zip` 生成 Chrome MV3 安装包。
+
 要求 Node.js 22.23+、npm 10+。开发预览默认位于 `http://127.0.0.1:5173`；产品 API 由 `src/service.ts` 固定。
 
 ```powershell
@@ -15,6 +17,8 @@ npm test
 npm run build        # .output/chrome-mv3
 npm run build:web    # dist-web
 ```
+
+Firefox MV3 打包：`npm run zip -- --browser firefox --mv3`，产物位于 `.output/node-comicsextension-0.1.0-firefox.zip`；本地清单检查：`npx --no-install web-ext lint --source-dir .output/firefox-mv3`。固定 Firefox ID 为 `comics@nodelane.net`。最低版本为桌面 140、Android 142，以使用内置数据同意提示；清单声明账户认证、个人身份信息和用户选择的漫画图片内容传输。该声明不代表签名或商店审核已完成。要求见 [Firefox 数据同意文档](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/)。
 
 Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`。产品服务固定为 `https://comics.nodelane.net`（`src/service.ts`），插件不提供运营管理页面或服务地址设置。供应商密钥只在后端。
 

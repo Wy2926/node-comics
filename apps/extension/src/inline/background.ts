@@ -123,7 +123,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
     const {translationMode:mode,language}=ctx.settings;
     if(!ctx.caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(ctx.caps,mode,language))return {mode,language,scope:ctx.key,items:request.images.map(i=>({id:i.id,state:{kind:'error',message:msg("此翻译方式暂不可用"),retryable:false}}))};
     const currentKey=request.images[0]&&pageKey(request,request.images[0]);
-    if(!request.retryId&&currentKey!==ctx.currentKey&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);await ctx.core.plan(targets,false,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
+    if(!request.retryId&&currentKey!==ctx.currentKey&&!ctx.pages.has(currentKey)&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);await ctx.core.plan(targets,false,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
     const targets=await prepare(ctx,request,sender);
     if(!current())return response(ctx,request);
     if(request.retryId){const image=request.images.find(i=>i.id===request.retryId),page=image&&ctx.pages.get(pageKey(request,image));const target=targets.find(t=>t.page.id===page?.id);if(target)await ctx.core.manual(target,current);}
@@ -151,7 +151,7 @@ export function registerInlineBackground(){
       const tab=await chrome.tabs.get(tabId);if(tab.url!==activation.url)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
       if(!activation.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
       if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
-      if(!Array.isArray(message.images)||message.images.length>3||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||!comicSize(v.width,v.height);})||!message.known||typeof message.known!=='object')throw Error(msg("图片范围无效。"));
+      if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||!comicSize(v.width,v.height);})||!message.known||typeof message.known!=='object')throw Error(msg("图片范围无效。"));
       if(message.type==='NC_INLINE_WAIT')return step(message,sender);
       return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,sender));
     })().then(data=>respond({ok:true,data})).catch(error=>respond({ok:false,error:error.message,retryAfterMs:error.retryAfterSeconds?error.retryAfterSeconds*1000:undefined}));return true;

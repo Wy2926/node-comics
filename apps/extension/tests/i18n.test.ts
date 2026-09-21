@@ -14,7 +14,7 @@ const placeholders=(text:string)=>[...text.matchAll(/\{\w+\}/g)].map(m=>m[0]).so
 afterEach(()=>{installDictionary('zh-CN',dictionaries['zh-CN']);vi.unstubAllGlobals();});
 
 describe('interface dictionaries',()=>{
-  it('ships exactly the requested 15 languages with identical keys and interpolation tokens',()=>{
+  it('ships all supported languages with identical keys and interpolation tokens',()=>{
     expect(Object.keys(dictionaries).sort()).toEqual(uiLanguages.map(l=>l.id).sort());
     const base=dictionaries['zh-CN'];
     for(const [locale,dict] of Object.entries(dictionaries)){
@@ -32,16 +32,18 @@ describe('interface dictionaries',()=>{
   it('matches script/region variants and falls back without changing translation languages',()=>{
     expect(matchLocale('zh-Hant-HK')).toBe('zh-TW');expect(matchLocale('zh_SG')).toBe('zh-CN');
     expect(matchLocale('pt-PT')).toBe('pt-BR');expect(matchLocale('fr-CA')).toBe('fr');
-    expect(resolveLocale('auto',['ko-KR','uk-UA'])).toBe('uk');expect(resolveLocale('auto',['ko-KR'])).toBe('en');
+    expect(matchLocale('ko_KR')).toBe('ko');
+    expect(resolveLocale('auto',['ko-KR','uk-UA'])).toBe('ko');expect(resolveLocale('auto',['ko-KR'])).toBe('ko');
+    expect(resolveLocale('auto',['ar-SA','uk-UA'])).toBe('uk');expect(resolveLocale('auto',['ar-SA'])).toBe('en');
     expect(resolveLocale('ja',['en-US'])).toBe('ja');
   });
   it('persists UI language independently and rejects invalid saved preferences',async()=>{
     const saved=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
-    const input={...defaults,language:'ko',uiLanguage:'fr' as const};await saveSettings(input);
-    expect(settings()).toMatchObject({uiLanguage:'fr',language:'ko',translationMode:defaults.translationMode});
+    const input={...defaults,language:'en',uiLanguage:'ko' as const};await saveSettings(input);
+    expect(settings()).toMatchObject({uiLanguage:'ko',language:'en',translationMode:defaults.translationMode});
     localStorage.setItem('nc-settings',JSON.stringify({...input,uiLanguage:'../outside'}));
-    expect(settings()).toMatchObject({uiLanguage:'auto',language:'ko'});
+    expect(settings()).toMatchObject({uiLanguage:'auto',language:'en'});
   });
   it('refreshes module-level labels and keeps diagnostics and source parsing language-independent',()=>{
     for(const language of uiLanguages){

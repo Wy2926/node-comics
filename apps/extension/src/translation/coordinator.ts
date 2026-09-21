@@ -82,7 +82,7 @@ export class TranslationCoordinator {
     await this.init();this.state=await readSync(this.scope)??this.state;if(this.sending||this.manualPending&&!manual||this.controlDelay||!targets.length&&!this.session.sequence)return;this.sending=true;
     try{
       this.current();const chosen:LocalOperation[]=[];
-      for(const [index,target] of targets.slice(0,manual?1:3).entries()){
+      for(const [index,target] of targets.slice(0,manual?1:4).entries()){
         try{
           const id=operationId(this.scope,this.options.language,target);
           const record=await withTranslationLock(id,async()=>{

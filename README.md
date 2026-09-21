@@ -4,7 +4,7 @@
 
 常规翻译由 [classic-engine](services/classic-engine/README.md) 完成检测、OCR、AOT-GAN 抹字和嵌字，文本 LLM 由中心调用；AI 重绘使用兼容 `POST /v1/images/edits` 的图片供应商。原图与译图保存在私有 R2，任务由后端持久化管理，供应商密钥不进入插件。
 
-自动翻译当前页与后两页。普通／PLUS 每滚动 60 秒最多新增 30／100 张翻译图片；会员页数与赠送规则见[会员设计](docs/MEMBERSHIP_AND_QUOTAS.md)。客户端不显示翻译队列或批量预存。
+自动翻译当前页与后三页。普通／PLUS 每滚动 60 秒最多新增 30／100 张翻译图片；会员页数与赠送规则见[会员设计](docs/MEMBERSHIP_AND_QUOTAS.md)。客户端不显示翻译队列或批量预存。
 
 ## 开发与验证
 

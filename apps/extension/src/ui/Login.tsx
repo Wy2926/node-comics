@@ -56,7 +56,7 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
             :<button type="submit" className="button primary full nc-login-submit nc-comic-action" disabled={pending||configLoading||!configured||development&&!username.trim()}>{pending?<><span className="spinner"/>{msg("等待登录完成")}</>:configLoading?msg("准备登录中…"):<>{state.kind==='error'?msg("重新登录"):development?msg("连接测试账户"):msg("登录，开启漫译")}<Icon name="arrow" size={18}/></>}</button>}
           <button type="button" className="button quiet full nc-login-later" onClick={()=>setOpen(false)}>{pending?msg("收起进度，继续阅读"):msg("先阅读原图")}</button>
         </form>
-        <div className="nc-login-footnote"><Icon name="book" size={17}/><p>{msg("当前页与后两页，随读随译。")}<br/><span>{msg("原图与阅读位置，始终为你保留。")}</span></p></div>
+        <div className="nc-login-footnote"><Icon name="book" size={17}/><p>{msg("当前页与后三页，随读随译。")}<br/><span>{msg("原图与阅读位置，始终为你保留。")}</span></p></div>
       </div>
     </div>
   </dialog>;

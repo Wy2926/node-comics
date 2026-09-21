@@ -6826,7 +6826,7 @@
               "$ref": "#/components/schemas/PlanItem"
             },
             "type": "array",
-            "maxItems": 3,
+            "maxItems": 4,
             "title": "Items"
           }
         },

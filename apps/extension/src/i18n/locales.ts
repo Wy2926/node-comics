@@ -1,6 +1,6 @@
 export const uiLanguages = [
   {id:'zh-CN',label:'简体中文'}, {id:'zh-TW',label:'繁體中文'},
-  {id:'en',label:'English'}, {id:'ja',label:'日本語'},
+  {id:'en',label:'English'}, {id:'ja',label:'日本語'}, {id:'ko',label:'한국어'},
   {id:'fr',label:'Français'}, {id:'es',label:'Español'},
   {id:'pt-BR',label:'Português (Brasil)'}, {id:'de',label:'Deutsch'},
   {id:'it',label:'Italiano'}, {id:'ru',label:'Русский'},

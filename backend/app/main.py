@@ -191,7 +191,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
-            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_plan_items": 3},
+            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_plan_items": 4},
             "entitlements": entitlements_json(db, user) if user else None,
             "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds}
 

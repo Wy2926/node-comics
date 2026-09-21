@@ -25,6 +25,23 @@ def high_control_budget():
     settings().plan_requests_per_minute = 1000
 
 
+def test_reading_window_accepts_four_pages_and_rejects_five(cluster):
+    client, _ = cluster
+    auth = login(client)
+    images = manifest(4, 'lookahead')
+    accepted = submit(client, auth, images, key='four-pages')
+    assert accepted.status_code == 202, accepted.text
+    assert len(accepted.json()['items']) == 4
+    before = counts()
+    replay = submit(client, auth, images, key='four-pages')
+    assert replay.status_code == 200, replay.text
+    assert counts() == before
+    rejected = submit(client, auth, manifest(5, 'too-many'), key='five-pages')
+    assert rejected.status_code == 422, rejected.text
+    assert counts() == before
+    assert client.get('/v1/capabilities', headers=auth).json()['limits']['max_plan_items'] == 4
+
+
 @pytest.mark.parametrize('plus,limit', [(False,10), (True,100)])
 def test_exact_rolling_limit_combines_devices_modes_and_languages(cluster, plus, limit, monkeypatch):
     from app import plan_limits

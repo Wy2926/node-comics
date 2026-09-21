@@ -8,6 +8,17 @@ import {fixture,target,receipt,entitlement,job,origin} from './translation-fixtu
 import type {PlanReceipt} from '../src/types';
 afterEach(()=>vi.restoreAllMocks());
 describe('translation plan coordination',()=>{
+ it('adds one page per forward step while earlier translations are still queued, preserving operation keys',async()=>{
+  const f=fixture(),keys=new Map<number,string>();
+  for(let current=0;current<4;current++){
+   await f.core.plan([current,current+1,current+2,current+3].map(target));
+   const body=f.plan.mock.calls.at(-1)![0];
+   expect(body.items.map(i=>i.image.page_index)).toEqual([current,current+1,current+2,current+3]);
+   expect(body.items.map(i=>i.role)).toEqual(['current','prefetch','prefetch','prefetch']);
+   for(const item of body.items){const page=item.image.page_index!;if(keys.has(page))expect(item.operation_key).toBe(keys.get(page));else keys.set(page,item.operation_key);}
+  }
+  expect(keys.size).toBe(7);expect(f.plan).toHaveBeenCalledTimes(4);
+ });
  it('admits new windows beyond the former in-flight cap without queue or matching reads',async()=>{
   const f=fixture(),match=vi.spyOn(f.api,'matchPages');
   for(let n=0;n<6;n++)await f.core.plan([target(n)]);

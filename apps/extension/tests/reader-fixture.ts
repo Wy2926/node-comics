@@ -104,7 +104,7 @@ window.fetch=async(input,init={})=>{
   if(state.failNext){state.failNext=false;throw Error('网络连接失败（隔离验收）');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
   const asset=(i:number)=>({id:`asset-${i}`,width,height,expires_at:null});
-  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_plan_items:3,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
+  if(url.pathname==='/v1/capabilities')return json({modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_plan_items:4,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights,retention_days:0});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
   const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:billingScenario!=='paid',entitlement_expires_at:null,checkout_pending:false,subscription:billingScenario==='paid'?{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};

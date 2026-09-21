@@ -8,6 +8,17 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
   manifest: {
+    browser_specific_settings: {
+      gecko: {
+        id: 'comics@nodelane.net',
+        strict_min_version: '140.0',
+        // Account sign-in/profile and user-selected images sent for translation.
+        data_collection_permissions: {
+          required: ['authenticationInfo', 'personallyIdentifyingInfo', 'websiteContent'],
+        },
+      },
+      gecko_android: { strict_min_version: '142.0' },
+    },
     // Chrome Web Store public key: keeps unpacked builds on the store item's ID.
     key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArcK9rWRp4mvqZn4F4bn6yAB2QZJxq9GqjnziRbP/TUOgxO/ieQeya6Q+ul6Oa84ww4P9hxXUYcMMRHnebQRfpV4d7Fuhmp5rToRjc9y0raaphioLbuUOIIY6hXBDfdL9yFxJsLhlleRvaFhUEh1ilNpEPzXrIF5kYgo94HbCZQKpiy/9tSgXpXT0a61d+rWa5ZJbDROnVOB+463qU8i3Cjs5gxakLrdtmILpzU4bglO8klexaNnHT0fa+U6MgBnu/XXhdyWC2t1ZLgjIkkCMDC3EKdI4RR4CH2E/2St2PFWGzdpdH+kxjbczGJAsHjMZsqSS0h5sFFK/mGCBK4qowwIDAQAB',
     name: '__MSG_extensionName__', description: '__MSG_extensionDescription__',

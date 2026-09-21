@@ -8,6 +8,7 @@ import {languageLabel,modeLabels} from '../types';
 import {sourceImage} from '../sources/image-fetch';
 import {imageDataUrl} from './bytes';
 import {translationNotice} from '../translation/notice';
+import {advancesReadingWindow} from '../translation/automatic';
 
 interface Candidate {id:string;image:HTMLImageElement;url:string;rect:DOMRect;display:ImageDisplay;state?:InlineResult['state'];}
 export function installInline(){
@@ -86,12 +87,13 @@ export function installInline(){
     const present=new Set(next);
     for(const [image,item] of tracked)if(!present.has(item)){item.display.restore();tracked.delete(image);}
     candidates=next;
+    const previousWindow=windowImages.map(i=>i.id);
     windowImages=document.hidden?[]:readingImages(candidates,innerWidth,innerHeight);
     // As in the reader, keep only a small decoded window on long chapters.
     const current=candidates.indexOf(windowImages[0]),retained=new Set(current<0?[]:candidates.slice(Math.max(0,current-1),current+4));
     for(const item of candidates)if(!retained.has(item))item.display.restore();
     const nextSignature=JSON.stringify(windowImages.map(i=>i.id));
-    if(signature!==nextSignature){const first=!signature;signature=nextSignature;prefetchAt=performance.now()+150;invalidate();schedule(first?0:80);}
+    if(signature!==nextSignature){const first=!signature;signature=nextSignature;prefetchAt=performance.now()+(advancesReadingWindow(previousWindow,windowImages[0]?.id)?0:150);invalidate();schedule(first?0:80);}
     if(!scope)label.textContent=candidates.length?msg("漫译 · 发现 {0} 张大图", {"0": candidates.length}):msg("漫译 · 未发现漫画大图，滚动页面继续识别");
     paint();
   }
@@ -114,7 +116,7 @@ export function installInline(){
   async function tick(){
     if(running||!enabled||paused||original||document.hidden)return;
     scan();if(!windowImages.length)return;
-    const stamp=generation,targets=windowImages.slice(0,performance.now()<prefetchAt?1:3);running=true;
+    const stamp=generation,targets=windowImages.slice(0,performance.now()<prefetchAt?1:4);running=true;
     const retry=retryId;retryId=undefined;
     try{
       const response=await send('NC_INLINE_TICK',{...payload(targets),retryId:retry});

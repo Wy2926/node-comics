@@ -32,7 +32,7 @@ MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执
 
 ## 任务、权益与数据
 
-- Job 保存内容/模式/语言/有效生成配置；TranslationOperation 保存逐页幂等回执；ReadingSession 保存至多三页窗口与序号；ImageAdmission 保存新增翻译的滚动分钟事件；UploadReservation 保存字节校验前的有限上传会话。
+- Job 保存内容/模式/语言/有效生成配置；TranslationOperation 保存逐页幂等回执；ReadingSession 保存至多四页窗口与序号；ImageAdmission 保存新增翻译的滚动分钟事件；UploadReservation 保存字节校验前的有限上传会话。
 - JobStage 保存依赖和代次，ExecutionLease 保存资源执行权，FairnessState 保存真实占用时间校正的加权服务量，UserModeQueue 仅保存模式阅读控制权与 epoch。
 - User、QuotaPeriod、MembershipOperation、Ledger 实现普通／PLUS、周期页数和限时赠送；供应商 Attempt/TextCall 成本独立计量。
 - 原图以内容 SHA-256 全局匹配，FilePage 按用户/文件哈希/原始页索引识别。无字结果与有效译图按模式、语言、有效配置版本跨账户复用；`translation_results` 只登记真实生成的版本，`result_accesses` 每用户／版本最多一条授权，缓存命中不创建 Job，也不进入任务历史。过期或删除授权不作为复用来源；进行中的跨账户任务独立调度。候选匹配在全局锁外执行，锁内按主键复核，详见[译图共享与匹配](RESULT_SHARING.md)。
@@ -44,6 +44,8 @@ MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执
 ## 身份与运维
 
 生产 OIDC 验证 JWT 签名、issuer、audience、到期，浏览器授权码 + PKCE 并校验 state。后端默认生产模式，身份配置不完整时拒绝启动；JWKS 仅保留最长 300 秒的集合缓存。DEV_AUTH 仅显式开发 / 测试环境、随机签名密钥、127.0.0.1 绑定，不能用于公开部署。配置与验证边界见[生产身份说明](PRODUCTION_IDENTITY.md)。
+
+公开用户首次通过 OIDC 创建本地账户时，昵称生成为 `NodeLane_` 加 8 位随机十六进制字符并持久化；不使用身份服务的姓名字段作为默认昵称，重复登录不重置已有昵称。本地开发登录仍使用显式输入的测试用户名。
 
 每个图片／任务／提交回执检查归属。用户删除先提交本人授权墓碑，并丢弃尚未交付的输出；不删除其他账户授权或共享持久对象。原图 / 译图默认无限期保留，不扫描删除一天前或无数据库引用的对象，数据库恢复不会触发此类误删。数据库备份与独立恢复流程见[运维说明](OPERATIONS.md)。日志只记录任务 ID、错误、阶段、耗时和脱敏计量。
 

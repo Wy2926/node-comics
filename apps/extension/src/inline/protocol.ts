@@ -15,5 +15,5 @@ export function readingImages<T extends {rect:{top:number;bottom:number;left:num
   if(!visible.length)return [];
   const focus=Math.min(height*.3,240);
   const current=[...visible].sort((a,b)=>Math.max(0,a.rect.top-focus,focus-a.rect.bottom)-Math.max(0,b.rect.top-focus,focus-b.rect.bottom)||a.rect.top-b.rect.top||a.rect.left-b.rect.left)[0];
-  return items.slice(items.indexOf(current),items.indexOf(current)+3);
+  return items.slice(items.indexOf(current),items.indexOf(current)+4);
 }

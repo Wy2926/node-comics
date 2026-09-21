@@ -40,7 +40,9 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
    coordinator.current=core;
    async function downloads(){
      const generation=stamp.current,current=()=>live()&&generation===stamp.current;
-     const pages=visible.current.map(p=>copyRef.current.flatMap(c=>c.pages).find(v=>v.id===p.id)??p);
+     // Download ahead even in single-page mode; decoding remains viewport bounded.
+     const wanted=[...visible.current,...windowRef.current.targets.map(t=>t.page)];
+     const pages=[...new Map(wanted.map(p=>[p.id,copyRef.current.flatMap(c=>c.pages).find(v=>v.id===p.id)??p])).values()];
      const needed=[...new Map(pages.flatMap(p=>p.ownerId===userId&&p.apiOrigin===origin?latestResults(p.jobs).filter(j=>j.target_language===language&&j.output_asset_id&&!p.outputBlobs[j.id]):[]).map(j=>[j.id,j])).values()];
      await Promise.allSettled([
        ...needed.map(async job=>{try{await downloadResult(job,current);}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}}),
@@ -50,16 +52,17 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
    const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>void tick(),Math.max(0,delay));};
    async function tick(){
      if(running){wakePending=true;return;}if(!live()||document.hidden||navigator.onLine===false)return;
-     running=true;wakePending=false;
+     running=true;wakePending=false;let pendingPrefetch=false;
      try{
        const now=performance.now(),window=windowRef.current;
        if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
        const targets=window.ready().map(t=>({...t,page:copyRef.current.find(c=>c.id===t.copyId)?.pages.find(p=>p.id===t.page.id)??t.page}));
        if(targets.length&&(!config.current.caps||!config.current.rights))return;
        const generation=stamp.current;await core.recover();await core.plan(targets.filter(t=>config.current.caps?.modes.find(m=>m.id===t.mode)?.enabled&&supportsLanguage(config.current.caps,t.mode,language)),false,()=>live()&&!document.hidden&&generation===stamp.current);
+       pendingPrefetch=targets.length<window.targets.length;
        setError('');retry=0;void downloads();
      }catch(e){if(live()){setError((e as Error).message);retry=Math.min(30000,Math.max(1000,retry*2));}}
-     finally{running=false;if(live()){const prefetch=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(prefetch>0)schedule(prefetch);else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
+     finally{running=false;if(live()){const prefetch=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(pendingPrefetch||prefetch>0)schedule(Math.max(0,prefetch));else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
    }
    async function watch(){
      if(watching||document.hidden||!live()||!windowRef.current.targets.length||navigator.onLine===false)return;watching=true;const signal=watchController.signal;let failures=0;

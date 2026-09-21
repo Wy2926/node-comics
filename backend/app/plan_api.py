@@ -68,7 +68,7 @@ class TranslationPlan(RequestBody):
     sequence: int | None = Field(default=None, ge=0, le=2147483647)
     priority_epochs: dict[Mode, int] = Field(default_factory=dict)
     allow_new: bool = True
-    items: list[PlanItem] = Field(max_length=3)
+    items: list[PlanItem] = Field(max_length=4)
 
     @model_validator(mode='after')
     def shape(self):

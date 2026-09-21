@@ -3,10 +3,20 @@ import {describe,it,expect} from 'vitest';
 import {ReadingWindow,makeOperation,needsTranslation} from '../src/translation/automatic';
 import {entitlement,job,origin,target} from './translation-fixture';
 describe('local reading timing',()=>{
- it('starts immediately, prepares the next two at 150 ms, and ignores snapshot changes',()=>{
+ it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
-  expect(window.ready(0).map(t=>t.page.id)).toEqual(['page-0']);expect(window.ready(149)).toHaveLength(1);expect(window.ready(150)).toHaveLength(3);
-  expect(window.update([0,1,2].map(target),160)).toBe(false);expect(window.ready(160)).toHaveLength(3);
+  expect(window.ready(150).map(t=>t.page.pageIndex)).toEqual([0,1,2,3]);
+  for(let current=1;current<=5;current++){
+   const now=current*1000;window.update([current,current+1,current+2,current+3].map(target),now);
+   expect(window.ready(now+80).map(t=>t.page.pageIndex)).toEqual([current,current+1,current+2,current+3]);
+  }
+  window.update([20,21,22].map(target),7000,true);
+  expect(window.ready(7000).map(t=>t.page.pageIndex)).toEqual([20]);
+ });
+ it('starts immediately, prepares the next three at 150 ms, and ignores snapshot changes',()=>{
+  const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
+  expect(window.ready(0).map(t=>t.page.id)).toEqual(['page-0']);expect(window.ready(149)).toHaveLength(1);expect(window.ready(150)).toHaveLength(4);
+  expect(window.update([0,1,2,3].map(target),160)).toBe(false);expect(window.ready(160)).toHaveLength(4);
  });
  it('coalesces scrolling at 80 ms with a 200 ms maximum and immediate explicit jumps',()=>{
   const window=new ReadingWindow();window.update([target(0)],0);

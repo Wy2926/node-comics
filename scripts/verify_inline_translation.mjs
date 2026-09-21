@@ -20,7 +20,7 @@ await writeFile(background,`chrome.permissions.request=permissions=>chrome.permi
 const requests=[],operations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0,changeSequence=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
-const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000,max_plan_items:3},entitlements:rights,retention_days:0};
+const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000,max_plan_items:4},entitlements:rights,retention_days:0};
 let output,api,site,complete=true,version=0;
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+job.id,completed_at:new Date().toISOString(),change_sequence:++changeSequence});};
@@ -47,7 +47,7 @@ const server=createServer(async(req,res)=>{
     if(url.pathname.startsWith('/v1/reading-sessions/')&&url.pathname.endsWith('/lease'))return json({session_id:url.pathname.split('/')[3],priority:priority(body.modes),policy_revision:'1'});
     if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,jobs:[],display_jobs:[]}))});
     if(url.pathname==='/v1/translation-plans'&&req.method==='POST'){
-      assert(['reading','manual'].includes(body.trigger));assert(body.items.length<=3);
+      assert(['reading','manual'].includes(body.trigger));assert(body.items.length<=4);
       if(body.trigger==='reading')assert(Number.isSafeInteger(body.sequence)&&body.sequence>=0&&body.sequence<=2147483647,'reading sequence must fit backend integer');
       const items=body.items.map(item=>{
         const key=item.operation_key;if(operations.has(key))return operationResult(key,item.page_key);
@@ -74,6 +74,9 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));api=`http://127
 // Redirect the build-time service only inside the isolated fixture copy.
 for(const file of await readdir(extension,{recursive:true}))if(file.endsWith('.js')){const target=path.join(extension,file),source=await readFile(target,'utf8');await writeFile(target,source.replaceAll(process.env.INLINE_BUILD_API||'https://comics.nodelane.net',api));}
 const web=createServer((req,res)=>{
+  if(req.url==='/rolling'){
+    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>滚动预翻译验收</title><style>body{margin:0;background:#edf2f8}img{display:block;width:600px;height:825px;margin:24px auto}</style>${Array.from({length:7},(_,n)=>`<img id="rolling-${n+1}" src="${api}/source/${n+7}.png">`).join('')}`);return;
+  }
   if(req.url==='/strict')res.setHeader('Content-Security-Policy',`default-src 'self'; img-src ${api}; style-src 'unsafe-inline'; script-src 'none'; connect-src 'self';`);
   res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><html><head><title>网页漫画翻译验收</title><style>body{margin:0;background:#edf2f8;font:16px system-ui;color:#20304b}header{padding:16px 28px;background:white}main{width:min(600px,90vw);margin:auto}img.comic{display:block;width:100%;height:auto;margin:24px 0}button{padding:10px}footer{height:800px}#thumb{width:80px;height:110px}#banner{width:900px;height:120px}#hidden{display:none}#third{aspect-ratio:1/1;object-fit:cover}</style></head><body><header><b>原网站 · 漫画阅读页</b>　<button id=site-button>网站按钮</button><a id=site-link href=#bottom>原有链接</a></header><main><img id=thumb src=${api}/source/1.png><p>下方漫画完成后原位显示，链接和滚动应保持正常。</p><picture><source srcset="${api}/source/1.png"><img id=first class=comic src=${api}/source/1.png></picture><img id=second class=comic src=${api}/source/2.png><img id=third class=comic src=${api}/source/3.png><img id=lazy class=comic><img id=hidden class=comic src=${api}/source/4.png></main><footer id=bottom>原网站页尾</footer></body></html>`);
 });await new Promise(resolve=>web.listen(0,'127.0.0.1',resolve));site=`http://127.0.0.1:${web.address().port}`;
@@ -94,7 +97,7 @@ try{
   // Generate public synthetic test panels, deliberately changing output aspect ratio.
   await page.setContent('<body style="margin:0;width:800px;height:1100px;background:#fff5df;font:42px system-ui"><div style="margin:50px;border:6px solid #20304b;height:880px;padding:35px">Original comic panel<br><br>HELLO!<br><br>READ THE STORY</div></body>');
   const source=await page.screenshot({clip:{x:0,y:0,width:800,height:1100},captureBeyondViewport:true});
-  for(let n=1;n<=6;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
+  for(let n=1;n<=13;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
   await page.setContent('<body style="margin:0;width:900px;height:900px;background:#e3f3ff;font:42px system-ui"><div style="margin:50px;border:6px solid #224560;height:650px;padding:35px">译文效果示例<br><br>你好！<br><br>继续阅读故事</div></body>');
   output=await page.screenshot({clip:{x:0,y:0,width:900,height:900},captureBeyondViewport:true});
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,change_sequence:++changeSequence,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
@@ -153,6 +156,17 @@ try{
   await selectOption(reader.getByLabel('默认目标语言'),'en');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.bringToFront();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('reader UI shares language and login settings with in-page translation');
   // Content scripts may not access the mirrored login session.
   const security=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(t=>t.url===url);return chrome.scripting.executeScript({target:{tabId:tab.id},func:async()=>{try{await chrome.storage.local.get('nc-auth');return false;}catch{return true;}}});},page.url());assert.equal(security[0].result,true);check('credential storage is restricted to trusted extension contexts');
+  complete=false;await page.goto(site+'/rolling');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();
+  const hasJob=n=>[...jobs.values()].some(j=>j.image_sha256===sha(images.get(n)));
+  const waitJob=async n=>{const until=Date.now()+15000;while(!hasJob(n)&&Date.now()<until)await page.waitForTimeout(50);assert(hasJob(n),'missing rolling page '+(n-6));};
+  await waitJob(10);assert(!hasJob(11));
+  for(const current of [2,3]){
+    await page.locator('#rolling-'+current).evaluate(i=>window.scrollTo(0,i.offsetTop));
+    await waitJob(current+9);assert(!hasJob(current+10),'must not exceed three lookahead pages');
+  }
+  assert([...jobs.values()].filter(j=>[7,8,9,10,11,12].some(n=>j.image_sha256===sha(images.get(n)))).every(j=>j.status!=='succeeded'));
+  await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
+  check('scrolling to page 2 admits page 5 and page 3 admits page 6 while previous translations remain unfinished');
   assert.equal(requests.filter(r=>r.path.includes('/queues')||r.path.includes('/translation-submissions')||r.path.endsWith('/priority')).length,0,'normal reading must not use removed queue/submission contracts');check('new plans and long-poll run with zero queue, priority or old submission requests');
   assert.equal(errors.length,0,errors.join('\n'));
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));

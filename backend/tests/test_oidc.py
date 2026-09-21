@@ -48,6 +48,26 @@ def test_es384_login_is_stable_and_users_are_separate(oidc):
     assert client.post("/v1/auth/dev", json={"username": "admin"}).status_code == 404
 
 
+def test_new_users_get_persisted_brand_random_names(oidc, monkeypatch):
+    from app import auth
+    from app.db import session_factory
+    from app.models import User
+
+    client, key, claims = oidc
+    suffixes = iter(['7a2c9f10', '8b3d0e21'])
+    monkeypatch.setattr(auth.secrets, 'token_hex', lambda size: next(suffixes) if size == 4 else None)
+    first = client.get('/v1/me', headers=headers(key, {**claims, 'name': 'Identity provider name'})).json()['user']
+    assert first['name'] == 'NodeLane_7a2c9f10'
+    repeated = client.get('/v1/me', headers=headers(key, {**claims, 'name': 'Changed provider name'})).json()['user']
+    assert repeated['name'] == first['name']
+    other = client.get('/v1/me', headers=headers(key, {**claims, 'sub': 'reader-two'})).json()['user']
+    assert other['name'] == 'NodeLane_8b3d0e21'
+    with session_factory()() as db:
+        db.get(User, first['id']).name = 'Existing reader'
+        db.commit()
+    assert client.get('/v1/me', headers=headers(key, claims)).json()['user']['name'] == 'Existing reader'
+
+
 @pytest.mark.parametrize("changes", [
     {"iss": "https://other.example.test/oidc"},
     {"aud": "another-application"},
