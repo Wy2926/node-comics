@@ -1,7 +1,7 @@
 export type BillingProvider='stripe'|'creem';
 export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number;trial_redraw_pages:number}
 export interface BillingPrice {id:string;name:string;currency:string;unit_amount:number;interval:'month'|'year';monthly_redraw_pages:number;trial_days:number;trial_redraw_pages:number}
-export interface BillingOffer extends BillingPrice {channels:BillingChannel[]}
+export interface BillingOffer extends BillingPrice {plan_id:string;plan_revision_id:string;channels:BillingChannel[]}
 export interface Billing {enabled:boolean;providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];provider:BillingProvider|null;environment:'test'|'live';trial_eligible:boolean;checkout_pending:boolean;checkout_provider:BillingProvider|null;checkout_price:BillingOffer|null;offers:BillingOffer[];entitlement_expires_at:string|null;subscription:{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;paid_ends_at:string|null;trial_ends_at:string|null}|null}
 export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';
 export const channelLabel=(locale:string)=>({'zh-CN':'支付渠道','zh-TW':'付款渠道',en:'Payment provider',ja:'決済サービス',ko:'결제 서비스'}[locale]??'Payment provider');
@@ -33,3 +33,13 @@ const labels:Record<string,{plan:string;month:string;year:string;unavailable:str
 export const billingCopy=(locale:string)=>labels[locale]??labels.en;
 export function amount(offer:BillingPrice,locale:string){const f=new Intl.NumberFormat(locale,{style:'currency',currency:offer.currency});const digits=['isk','ugx'].includes(offer.currency)?2:f.resolvedOptions().maximumFractionDigits??2;return f.format(offer.unit_amount/10**digits);}
 export const offerLabel=(offer:BillingPrice,locale:string)=>`${offer.name} · ${amount(offer,locale)} / ${offer.interval==='year'?billingCopy(locale).year:billingCopy(locale).month}`;
+
+// Compare published quotes only when they buy the same benefits in the same currency.
+export function annualSavings(offer:BillingOffer,offers:BillingOffer[]){
+  if(offer.interval!=='year')return null;
+  const monthly=offers.filter(p=>p.interval==='month'&&p.plan_id===offer.plan_id&&p.plan_revision_id===offer.plan_revision_id&&p.currency===offer.currency&&p.unit_amount>0);
+  if(!monthly.length)return null;
+  const regular=Math.min(...monthly.map(p=>p.unit_amount))*12;
+  const saved=regular-offer.unit_amount;
+  return saved>0?{regular,saved,percent:Math.round(saved/regular*1000)/10}:null;
+}

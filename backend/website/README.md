@@ -62,7 +62,7 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 
 只使用 public client，不需要也不允许把 client secret 或图片 API 密钥放入前端。账户会话存在当前标签页的 sessionStorage；授权返回先清除 URL 中的 code，再用 `/v1/me` 校验真实 API 身份。访问令牌按需续期，GET 遇到 401 最多续期重放一次；结账和取消等 POST 不自动重放。明确撤销的续期凭据会清除，临时网络错误保留以供重试，退出期间迟到的续期结果不能恢复会话。退出只清除官网标签页会话，不退出插件或身份平台中的其他应用。
 
-账户读取实际权益与订阅状态，支持选择月付／年付并自动使用全站默认渠道、继续原渠道结账、通过原渠道 Customer Portal 管理订阅与取消续费。初始 PLUS 产品价格为 US$9.99/月及 US$99.99/年，年付每月发放 300 页，实际税费及金额以结账页为准。真实身份平台的回调登记与真实支付未在隔离夹具中验证。
+账户页仅展示身份、会员状态与有效期、订阅状态及管理入口；阅读、翻译和详细用量在插件内查看。未订阅时默认收起套餐选择，从定价页带入报价或存在未完成结账时自动展开。支持选择月付／年付并自动使用全站默认渠道、继续原渠道结账、通过原渠道 Customer Portal 管理订阅与取消续费。初始 PLUS 产品价格为 US$9.99/月及 US$99.99/年，年付每月发放 300 页，实际税费及金额以结账页为准。真实身份平台的回调登记与真实支付未在隔离夹具中验证。
 
 `/payment/success/` 是完成 Checkout 后的独立展示页，含五语版本，无登录要求、不发放权益、不请求支付详情；引导用户切回插件，必要时刷新账户。该页不进入 sitemap，返回 `private, no-store` 和 `noindex, nofollow`，不会把取消结账或客户门户返回显示为成功。
 
@@ -92,3 +92,9 @@ uv run --with-requirements backend/requirements.txt python -m pytest backend/tes
 本次完成代码、原创插画和本地验证，未提交、推送或公开部署。上线前填写三个商店地址、登记 OIDC 回调，并由运营方核对实际主体名称、付款商品和政策联系方式；当前政策署名为产品团队，未编造公司登记信息。Search Console / Bing 站长平台验证及 sitemap 提交需要对应账户，未代为提交。
 
 2026-09-20 多渠道支付更新：官网支持后台指定的唯一 Stripe／Creem 默认渠道、月付／年付、在途订单固定原报价及渠道、按订阅所属渠道进入客户门户。11 项测试、类型检查与 110 页构建通过；隔离浏览器验证月／年切换、Creem 参数、在途恢复、到期及退款撤权后重新订阅和 390px 布局。真实支付由[订阅验收](../../docs/SUBSCRIPTION_ACCEPTANCE.md)单独记录，配置见[多渠道支付](../../docs/STRIPE_BILLING.md)。
+
+定价页的年付优惠仅比较公开目录中同产品、同权益版本、同币种的月付与年付报价：以月付金额 × 12 为基准，展示年付总额、折合月价和节省金额；节省比例四舍五入保留一位小数并标注约数。缺少可比月价或年付没有优惠时不显示折扣。当前默认报价年付省 US$19.89（16.6%），折合 US$8.33/月，实际按 US$99.99/年扣款。定价页不创建优惠券或修改结账金额。
+
+定价页浏览器验收（使用本机已安装的 Chrome 和 Playwright，报价完全模拟，不调用支付）：先启动上面的开发／预览服务，再从仓库根目录运行 `node scripts/verify_website_pricing.mjs`。可用 `WEBSITE_PREVIEW_URL` 指定预览地址、`PLAYWRIGHT_MODULE` 指定 Playwright 模块绝对路径。覆盖五种语言、320–1440px 布局、语言与月年付切换、加载／失败／空目录／仅年付状态；截图保存到 `artifacts/website-pricing/`。若开发环境提示 `_jsxDEV is not a function`，停止开发服务并以 `NODE_ENV=development` 重启；生产验收使用 `npm run build` 的静态产物。
+
+账户详情浏览器验收：在 `backend/website` 运行 `npx vite --config tests/account-fixture.config.ts`（开发模式、固定端口 5193），再从仓库根目录运行 `node scripts/verify_website_account.mjs`。需要本机 Chrome 和 Playwright，可使用 `PLAYWRIGHT_MODULE` 指定模块路径。夹具使用模拟账户，不访问真实身份、数据库或支付服务；覆盖普通／PLUS、取消／过期、错误、退出、多语言窄屏，以及报价选择和继续结账，截图位于 `artifacts/website-account/`。

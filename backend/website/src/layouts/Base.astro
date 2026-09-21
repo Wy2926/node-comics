@@ -64,9 +64,9 @@ const graph = [
       <div class="container header-inner">
         <a class="brand" href={href('/')} aria-label={t.brandName}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={240} format="webp" loading="eager" /></a>
         <nav class="desktop-nav" aria-label={t.navigation}>{navigation.map(item => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}</nav>
-        <details class="language-menu"><summary aria-label={t.language}><span aria-hidden="true">◎</span> {languageNames[locale]}</summary><nav aria-label={t.language}>{locales.map(language=><a href={localPath(route.startsWith('/404') ? '/' : route,language)} lang={language} hreflang={language} aria-current={locale===language ? "true" : undefined}>{languageNames[language]}</a>)}</nav></details>
+        <div class="header-tools"><details class="language-menu"><summary aria-label={t.language}><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg> <span>{languageNames[locale]}</span><span class="language-chevron" aria-hidden="true">⌄</span></summary><nav aria-label={t.language}>{locales.map(language=><a href={localPath(route.startsWith('/404') ? '/' : route,language)} lang={language} hreflang={language} aria-current={locale===language ? "true" : undefined}>{languageNames[language]}</a>)}</nav></details>
         <div class="header-actions"><a class="account-link" href={href('/account/')}>{t.account}</a><a class="button compact" href={href('/download/')}>{t.download} <span aria-hidden="true">↗</span></a></div>
-        <details class="mobile-nav"><summary aria-label={t.menu}>☰</summary><nav aria-label={t.mobileNavigation}>{navigation.map(item => <a href={item.href}>{item.label}</a>)}<a href={href('/account/')}>{t.account}</a><a href={href('/download/')}>{t.download}</a></nav></details>
+        <details class="mobile-nav"><summary aria-label={t.menu}>☰</summary><nav aria-label={t.mobileNavigation}>{navigation.map(item => <a href={item.href}>{item.label}</a>)}<a href={href('/account/')}>{t.account}</a><a href={href('/download/')}>{t.download}</a></nav></details></div>
       </div>
     </header>
     <main id="main"><slot /></main>
