@@ -86,7 +86,7 @@ def text_case(text_database, monkeypatch):
                               weight=1, estimated_seconds=10, expires_at=now() + timedelta(minutes=5)))
         db.commit()
     def text(*args):
-        return TextResponse('{"translations":[{"id":"b001","text":"你好！"}]}',
+        return TextResponse('translations[1]{id,text}:\n  b001,你好！',
                             {'input_tokens': 100, 'output_tokens': 20}, 'isolated-request')
     monkeypatch.setattr(classic, 'call_text', text)
     return job_id, lease_id
@@ -111,7 +111,7 @@ def test_text_stage_checkpoint_replay_never_repeats_paid_call(text_case):
         assert (call.accounted_micros, call.cost_state) == (1100, 'estimated')
 
 
-def test_json_repair_records_cost_for_every_subcall(text_case, monkeypatch):
+def test_format_repair_records_cost_for_every_subcall(text_case, monkeypatch):
     original = classic.call_text
     replies = iter([TextResponse('invalid', {'input_tokens': 100, 'output_tokens': 5}, 'invalid'), original()])
     monkeypatch.setattr(classic, 'call_text', lambda *args: next(replies))

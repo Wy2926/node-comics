@@ -33,7 +33,7 @@ def v2(client, monkeypatch, png):
     # An explicit test storage adapter. Production local storage cannot sign URLs.
     monkeypatch.setattr(LocalStore, 'download_url', lambda self, key, ttl: 'https://r2.example.test/' + key + '?signature=test')
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        '{"translations":[{"id":"0","text":"Hello"}]}', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
+        'translations[1]{id,text}:\n  "0",Hello', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
     node, auth, admin = provision(client, 'test:vulkan:0')
     with session_factory()() as db:
         record = db.get(ComputeNode, node['node_id'])

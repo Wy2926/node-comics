@@ -142,7 +142,7 @@ def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_cas
     seen = []
     def translate(segments, language, profile, api_key):
         seen.append((segments, language, profile['channel'], api_key))
-        return TextResponse('{"translations":[]}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
+        return TextResponse('translations[0]{id,text}:', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
     monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', TranslationConfig, (), translate))
     provider = create(admin_case, {'name': 'Second source', 'channel': 'synthetic',
                                   'config': {'model': 'test'}, 'api_key': 'isolated-new-key'})
