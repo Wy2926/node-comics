@@ -32,14 +32,14 @@ describe('translation plan coordination',()=>{
  });
  it('does not clear image backpressure when a job finishes, but permits cache-only new windows',async()=>{
   const f=fixture();f.plan.mockImplementation(async body=>({...receipt(body),items:body.items.map(i=>({operation_key:i.operation_key,disposition:'deferred',code:body.allow_new?'IMAGE_RATE_LIMITED':'NEW_TRANSLATION_NOT_REQUESTED',retry_after_seconds:20}))}));
-  await f.core.plan([target(0)]);await f.core.consume({items:[job(8,{status:'succeeded'})],deleted_job_ids:[],cursor:'1',has_more:false,policy_revision:'1',image_rate_limit:{window_seconds:60,limit:30}});
+  await f.core.plan([target(0)]);await f.core.consume({items:[job(8,{status:'succeeded'})],deleted_job_ids:[],cursor:'1',has_more:false,policy_revision:'1',image_rate_limit:{window_seconds:60,limit:10}});
   expect(f.core.retryDelay).toBeGreaterThan(19000);await f.core.plan([target(1)]);expect(f.plan.mock.calls[1][0].allow_new).toBe(false);
  });
  it('ignores an old limited response arriving after a higher-rate policy update',async()=>{
   const f=fixture();let resolve!:(v:PlanReceipt)=>void;f.plan.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
   const pending=f.core.plan([target(0)]);await vi.waitFor(()=>expect(resolve).toBeDefined());
   await f.core.consume({items:[],deleted_job_ids:[],cursor:'0',has_more:false,policy_revision:'2',entitlements:entitlement(true),image_rate_limit:{window_seconds:60,limit:100}});
-  const body=f.plan.mock.calls[0][0];resolve({policy_revision:'1',image_rate_limit:{window_seconds:60,limit:30},items:body.items.map(i=>({operation_key:i.operation_key,disposition:'deferred',code:'IMAGE_RATE_LIMITED',retry_after_seconds:30}))});await pending;
+  const body=f.plan.mock.calls[0][0];resolve({policy_revision:'1',image_rate_limit:{window_seconds:60,limit:10},items:body.items.map(i=>({operation_key:i.operation_key,disposition:'deferred',code:'IMAGE_RATE_LIMITED',retry_after_seconds:30}))});await pending;
   expect(f.core.state.imageLimit).toBe(100);expect(f.core.retryDelay).toBe(0);await f.core.plan([target(0)]);expect(f.plan).toHaveBeenCalledTimes(2);
  });
  it('honors account control throttling across new windows and job notifications',async()=>{

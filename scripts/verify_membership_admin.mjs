@@ -66,7 +66,7 @@ try {
   await adminPage.setViewportSize({width:1440,height:1000});
   await adminPage.getByRole('link',{name:'系统设置',exact:true}).click();
   await adminPage.locator('#free_images_per_minute').waitFor();
-  assert.equal(await adminPage.locator('#free_images_per_minute').inputValue(),'30');
+  assert.equal(await adminPage.locator('#free_images_per_minute').inputValue(),'10');
   assert.equal(await adminPage.locator('#plus_images_per_minute').inputValue(),'100');
   await adminPage.locator('#free_images_per_minute').fill('31');
   await adminPage.locator('#plus_images_per_minute').fill('101');

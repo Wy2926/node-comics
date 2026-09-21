@@ -75,11 +75,11 @@ export default {
     "free": "free",
     "month": "month",
     "freeBenefits": [
-      "100 classic translation pages per day",
+      "30 classic translation pages per day",
       "Web and local comic reading",
       "Original comparison and reading position",
       "Access to your valid existing results",
-      "Up to 30 new translation images per rolling 60 seconds"
+      "Up to 10 new translation images per rolling 60 seconds"
     ],
     "plusBenefits": [
       "No daily or monthly total limit for classic translation",
@@ -183,7 +183,7 @@ export default {
             "title": "Start with classic for everyday reading",
             "paragraphs": [
               "Clear dialogue and regular bubbles are a useful starting point. Handwriting, perspective, small text and sound effects may still be missed. Check partial-result messages and compare with the original.",
-              "Free includes 100 classic pages per day. PLUS has no daily or monthly total limit for classic, while short-term rate and service-capacity limits still apply."
+              "Free includes 30 classic pages per day. PLUS has no daily or monthly total limit for classic, while short-term rate and service-capacity limits still apply."
             ]
           },
           {
@@ -457,7 +457,7 @@ export default {
       },
       {
         "question": "Does unlimited mean there are no restrictions?",
-        "answer": "PLUS classic has no daily/monthly total page cap. Image, capacity and short-term rate limits still apply: up to 100 new translation images per rolling 60 seconds across a PLUS account, or 30 for Free. This is not a completion-speed guarantee."
+        "answer": "PLUS classic has no daily/monthly total page cap. Image, capacity and short-term rate limits still apply: up to 100 new translation images per rolling 60 seconds across a PLUS account, or 10 for Free. This is not a completion-speed guarantee."
       },
       {
         "question": "How do I cancel?",

@@ -34,7 +34,7 @@ def test_ordinary_redraw_gift_is_temporary_and_exhaustion_creates_no_job(client,
     result = gift(client, auth, pages=1)
     assert result.status_code == 201, result.text
     rights = entitlement(client, auth)
-    assert rights['plan'] == 'free' and rights['image_rate_limit']['limit'] == 30
+    assert rights['plan'] == 'free' and rights['image_rate_limit']['limit'] == 10
     assert rights['modes']['redraw']['allowed'] and rights['modes']['redraw']['quota']['available'] == 1
     job = submit(client, auth, upload(client, auth, png), 'redraw').json()
     assert job['quota_kind'] == 'redraw_grant' and job['quota_period_id'] == result.json()['grant']['id']
@@ -54,10 +54,10 @@ def test_scheduled_grant_starts_at_inclusive_boundary(client, monkeypatch, mode)
     response = gift(client, auth, mode=mode, start=start)
     assert response.status_code == 201, response.text
     benefit = entitlement(client, auth)['modes'][mode]
-    assert (benefit['quota']['available'] if benefit['quota'] else 0) == (100 if mode == 'classic' else 0)
+    assert (benefit['quota']['available'] if benefit['quota'] else 0) == (30 if mode == 'classic' else 0)
     assert len(client.get('/v1/me/quota-grants', headers=auth).json()['items']) == 1
     freeze(monkeypatch, start)
-    assert entitlement(client, auth)['modes'][mode]['quota']['available'] == (102 if mode == 'classic' else 2)
+    assert entitlement(client, auth)['modes'][mode]['quota']['available'] == (32 if mode == 'classic' else 2)
 
 
 @pytest.mark.parametrize('success', [True, False])

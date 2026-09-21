@@ -3,7 +3,7 @@ export class ApiError extends Error {constructor(message:string,public status:nu
 const month:BillingOffer={id:'fixture-month',name:'PLUS 示例',plan_id:'plus',plan_revision_id:'plus-v1',currency:'usd',unit_amount:999,interval:'month',monthly_redraw_pages:300,trial_days:0,trial_redraw_pages:0,channels:[{provider:'stripe',binding_id:'stripe-fixture',trial_days:7,trial_redraw_pages:30},{provider:'creem',binding_id:'creem-fixture',trial_days:7,trial_redraw_pages:30}]};
 const annual:BillingOffer={...month,id:'fixture-year',unit_amount:9999,interval:'year'};
 const other:BillingOffer={...month,id:'fixture-light',plan_id:'light',plan_revision_id:'light-v1',name:'Light 示例',unit_amount:499,monthly_redraw_pages:100};
-const entitlements={plan:'free',plus_expires_at:null,image_rate_limit:{limit:30},modes:{classic:{unlimited:false,allowed:true,quota:{available:100,granted:100,reserved:0}},redraw:{unlimited:false,allowed:false,quota:null}}};
+const entitlements={plan:'free',plus_expires_at:null,image_rate_limit:{limit:10},modes:{classic:{unlimited:false,allowed:true,quota:{available:30,granted:30,reserved:0}},redraw:{unlimited:false,allowed:false,quota:null}}};
 const pending=new URLSearchParams(location.search).has('pending');
 const billing:Billing={enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:pending?'creem':null,environment:'test',trial_eligible:true,entitlement_expires_at:null,checkout_pending:pending,checkout_provider:pending?'creem':null,checkout_price:pending?annual:null,offers:[month,annual,other],subscription:null};
 const scenario=new URLSearchParams(location.search).get('scenario');

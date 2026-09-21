@@ -65,9 +65,9 @@ def test_defaults_and_admin_role_do_not_grant_plus(client):
     for name in ('alice', 'admin'):
         rights = entitlement(client, login(client, name))
         assert rights['plan'] == 'free'
-        assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 30}
+        assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 10}
         assert 'queue_capacity' not in rights and 'realtime_slots' not in rights
-        assert rights['modes']['classic']['quota']['available'] == 100
+        assert rights['modes']['classic']['quota']['available'] == 30
         assert rights['modes']['redraw']['allowed'] is False
         assert rights['modes']['redraw']['quota'] is None
 
@@ -145,7 +145,7 @@ def test_old_day_settlement_never_changes_new_day(client, png, monkeypatch, succ
     assert rights['modes']['classic']['quota']['id'] != old_period
     assert rights['pending_previous_period_pages'] == 1
     finish(first['id'], success)
-    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 100
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 30
     from app.db import session_factory
     from app.entitlement_models import QuotaPeriod
     with session_factory()() as db:
@@ -181,7 +181,7 @@ def test_expiry_honors_accepted_job_and_rejects_new_work(client, png, monkeypatc
     # Replaying an accepted operation remains legal after expiration.
     assert submit(client, auth, asset, 'redraw').json()['id'] == job['id']
     finish(job['id'])
-    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 100
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 30
 
 
 def test_plan_keeps_current_page_when_later_page_exceeds_period_allowance(client, png):

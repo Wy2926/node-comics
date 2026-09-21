@@ -35,7 +35,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 | 配置 | 默认／用途 |
 | --- | --- |
-| `FREE_IMAGES_PER_MINUTE` / `PLUS_IMAGES_PER_MINUTE` | 30 / 100，首次初始化种子；后续在后台配置，跨模式、语言和设备共用滚动 60 秒预算 |
+| `FREE_IMAGES_PER_MINUTE` / `PLUS_IMAGES_PER_MINUTE` | 10 / 100，首次初始化种子；后续在后台配置，跨模式、语言和设备共用滚动 60 秒预算 |
 | `PLAN_REQUESTS_PER_MINUTE` / `PLAN_REQUEST_BURST` / `PLAN_REQUEST_CONCURRENCY` | 300 / 30 / 4，独立 HTTP 请求保护，与新增翻译图片数分开 |
 | `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
 | `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
@@ -48,7 +48,7 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
 | `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
 | 上传并发、收流超时、反馈预算 | 后台“系统设置”统一维护；对应环境变量只作为首次初始化种子，见[参数表](../docs/SYSTEM_SETTINGS.md) |
-| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 100 / 300，独立于分钟速率 |
+| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 30 / 300，独立于分钟速率 |
 | `RETENTION_DAYS` | 默认0表示无限期保留；当前部署为0 |
 | `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
 | `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |

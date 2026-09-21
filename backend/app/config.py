@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
-    free_daily_pages: int = Field(default=100, ge=0, le=1_000_000)
+    free_daily_pages: int = Field(default=30, ge=0, le=1_000_000)
     plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
     stripe_enabled: bool = False
     stripe_environment: Literal['test', 'live'] = 'test'
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     plan_request_lease_seconds: int = Field(default=60, ge=10, le=300)
     plan_max_body_bytes: int = Field(default=65536, ge=1024, le=1048576)
     reading_session_limit: int = Field(default=8, ge=1, le=32)
-    free_images_per_minute: int = Field(default=30, ge=1, le=10000)
+    free_images_per_minute: int = Field(default=10, ge=1, le=10000)
     plus_images_per_minute: int = Field(default=100, ge=1, le=10000)
     feedback_requests_per_minute: int = Field(default=30, ge=1, le=1000)
     feedback_request_burst: int = Field(default=10, ge=1, le=100)

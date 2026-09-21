@@ -44,7 +44,7 @@ if(loginFixture){
 }
 let mode:'ok'|'offline'|'revoked'|'401'|'403'='ok',refreshes=0,requests=0,status='就绪';
 const changed=()=>window.dispatchEvent(new Event('auth-fixture-metrics'));
-const rights=():Entitlements=>({plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{limit:30,window_seconds:60},scheduler_weight:1,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:true,quota_kind:'classic_daily',consent_version:'fixture',quota:null},redraw:{allowed:false,unlimited:false,quota_kind:'redraw_monthly',consent_version:'fixture',quota:null}}});
+const rights=():Entitlements=>({plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{limit:10,window_seconds:60},scheduler_weight:1,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:true,quota_kind:'classic_daily',consent_version:'fixture',quota:null},redraw:{allowed:false,unlimited:false,quota_kind:'redraw_monthly',consent_version:'fixture',quota:null}}});
 window.fetch=async(input,init)=>{
   const url=new URL(String(input),location.href);
   if(url.href===endpoint){refreshes++;changed();if(mode==='offline')throw TypeError('Fixture offline');if(mode==='revoked')return Response.json({error:'invalid_grant'},{status:400});return Response.json({access_token:'fixture-access-'+refreshes,refresh_token:'fixture-refresh-'+refreshes,token_type:'Bearer',expires_in:3600});}
