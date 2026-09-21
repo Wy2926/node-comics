@@ -96,7 +96,17 @@ export default {
     "downloadDescription": "選擇正在使用的桌面瀏覽器。安裝插件，把翻譯和閱讀器一起放進工具欄。",
     "storeDescription": "在熟悉的瀏覽器裡，打開下一段故事。",
     "storeUnavailable": "下載鏈接尚未配置",
-    "storeNote": "請通過官方商店安裝並核對擴展名稱與發佈者。商店入口無法打開時，請聯繫我們獲取幫助。",
+    "directDownloadTitle": "直接下載安裝包",
+    "directDownloadDescription": "適用於桌面版 Chrome 和 Microsoft Edge。下載 ZIP 後解壓縮，依照下方步驟安裝，即可開始使用。",
+    "downloadZip": "下載 ZIP 安裝包",
+    "installTitle": "手動安裝只需三步",
+    "installStepDownload": "下載並解壓縮 ZIP，保留解壓縮後的資料夾。",
+    "installStepBrowser": "在網址列開啟 chrome://extensions（Chrome）或 edge://extensions（Edge），啟用「開發人員模式」。",
+    "installStepLoad": "點選「載入未封裝項目」，選取包含 manifest.json 的資料夾，再將擴充功能固定到工具列。",
+    "manualUpdateNote": "手動安裝版本不會自動更新。更新時下載新版，覆蓋原資料夾中的檔案，再到擴充功能管理頁點選「重新載入」；請勿刪除安裝資料夾。",
+    "firefoxDownloadNote": "Firefox 暫不提供 ZIP 安裝；請使用 Chrome 或 Edge，或透過可用的 Firefox 商店入口安裝。",
+    "storeHeading": "也可透過瀏覽器商店安裝",
+    "storeNote": "商店入口尚未開放時，可使用上方 Chrome / Edge ZIP 安裝包。",
     "guidesTitle": "讀漫畫，也可以更順手。",
     "guidesDescription": "一些具體、有用的小指南。幫你選對翻譯方式，打開本地藏書，也理解自己的數據會去哪裡。",
     "contents": "本頁目錄",
@@ -689,6 +699,6 @@ export default {
     "中文示意": "中文示意",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "原創漫畫：海邊站臺上的旅人，氣泡文字為日文",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "相同漫畫的中文示意：下一站，會是怎樣的世界？",
-    "· AI 生成的功能插画，非产品实测效果承诺": "· AI 生成的功能插畫，非產品實測效果承諾"
+    "产品常规翻译实测效果": "產品一般翻譯實測效果"
   }
 } satisfies Dictionary;

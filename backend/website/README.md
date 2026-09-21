@@ -22,7 +22,13 @@
 
 ## 配置与运行
 
-只在 [src/data/site.ts](src/data/site.ts) 维护公开域名、邮件和三个商店 URL。商店链接暂留空；页面保留正式商店入口，空地址按钮不可点击，没有“即将上线”文案。填入真实上架地址并重新构建即可启用，不使用 `#` 或伪造链接。
+在 [src/data/site.ts](src/data/site.ts) 维护公开域名、邮件和三个商店 URL。下载页优先提供 Chrome / Edge 通用 ZIP 与手动安装、更新说明；三张商店卡片使用本地官方浏览器 Logo，空地址按钮不可点击。Firefox 不提供未签名 ZIP 安装入口。
+
+安装包版本目录由 [extension-release.json](../extension-release.json) 维护，`current` 选择官网展示版本，`releases` 保留历史版本。每个版本拥有独立、长期有效的 `/downloads/node-comics-<version>-chromium.zip` 地址；后台仅为目录中精确匹配的安装包生成 600 秒 R2 GET 签名并返回不缓存的 302，前端不保存签名 URL。R2 保持私有，安装包位于既有业务前缀下的 `releases/extensions/<version>/<sha256>/<filename>`，与漫画对象目录分离。未知包返回 404，存储配置不可用时返回可重试的 503。
+
+发布新版时先在 `apps/extension` 用正式 `VITE_API_BASE=https://comics.nodelane.net` 执行 `npm run check` 与 `npm run zip`，递增插件版本；计算 ZIP 字节数和 SHA-256，向版本目录追加条目，保留旧条目，再更新 `current`。使用后端依赖与生产 R2 环境运行 `python scripts/upload_extension_release.py --zip <zip> --manifest backend/extension-release.json`：校验包和正式 API 地址，按不可覆盖方式上传并重新读取核对哈希。验证成功后构建并部署官网及后端；仅发布静态页面不能启用下载端点。
+
+`node scripts/verify_website_download.mjs` 从仓库根目录检查五语下载页、安装步骤和浏览器 Logo；设置 `WEBSITE_PREVIEW_URL=https://comics.nodelane.net` 后会真实点击下载，并核对文件名、大小、SHA-256。Playwright 模块可通过 `PLAYWRIGHT_MODULE` 指定。
 
 Node.js 22.12+（建议使用 Docker 中的 Node 22），本机开发命令：
 
@@ -89,7 +95,7 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 uv run --with-requirements backend/requirements.txt python -m pytest backend/tests/test_website.py backend/tests/test_admin_web.py backend/tests/test_identity_config.py -q -p no:cacheprovider
 ```
 
-本次完成代码、原创插画和本地验证，未提交、推送或公开部署。上线前填写三个商店地址、登记 OIDC 回调，并由运营方核对实际主体名称、付款商品和政策联系方式；当前政策署名为产品团队，未编造公司登记信息。Search Console / Bing 站长平台验证及 sitemap 提交需要对应账户，未代为提交。
+本次完成代码、原创插画和本地验证，未提交、推送或公开部署。商店上架后填写对应地址；正式登录需登记 OIDC 回调，并由运营方核对实际主体名称、付款商品和政策联系方式；当前政策署名为产品团队，未编造公司登记信息。Search Console / Bing 站长平台验证及 sitemap 提交需要对应账户，未代为提交。
 
 2026-09-20 多渠道支付更新：官网支持后台指定的唯一 Stripe／Creem 默认渠道、月付／年付、在途订单固定原报价及渠道、按订阅所属渠道进入客户门户。11 项测试、类型检查与 110 页构建通过；隔离浏览器验证月／年切换、Creem 参数、在途恢复、到期及退款撤权后重新订阅和 390px 布局。真实支付由[订阅验收](../../docs/SUBSCRIPTION_ACCEPTANCE.md)单独记录，配置见[多渠道支付](../../docs/STRIPE_BILLING.md)。
 

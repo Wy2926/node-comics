@@ -1,5 +1,14 @@
 # 美国 VPS 服务端部署
 
+## 2026-09-21 官网版本化 ZIP 下载
+
+- 官网新增 Chrome / Edge 通用 ZIP 下载、版本与大小、五语解压安装和手动更新说明。三个商店卡片使用对应浏览器的官方彩色 Logo；商店未配置时继续禁用。首页文案更新为“产品常规翻译实测效果”。
+- `0.1.0` 包使用正式 API 构建，大小 6,970,698 字节，SHA-256 为 `5f43b8a3bdb029df8466f70c146aeb5f1fe8dc1563cfc1d48621c05f0725c5de`。R2 对象放在既有私有前缀下独立的 `releases/extensions/0.1.0/<sha256>/node-comics-0.1.0-chromium.zip`，上传后回读哈希一致。
+- 长期下载入口为 `https://comics.nodelane.net/downloads/node-comics-0.1.0-chromium.zip`，按受控版本目录生成短期 R2 签名；网站不写死签名地址。新版本追加目录条目，保留旧版本 URL。
+- 发布使用原生产镜像 `docker.nodelane.net/nodelane/node-comics:20260921-f362460` 为基底，仅替换官网静态产物、`app/website.py` 和公开版本目录。VPS 本地发布镜像为 `node-comics:20260921-extension-download-v010-final`；仅重新创建 API 容器，工作进程与维护进程保持原镜像，数据库与原有图片对象未变。回退配置及发布上下文位于服务器 `releases/extension-download-20260921/`，配置备份为私有文件。
+- 验证：插件类型与模块检查通过；网站 12 项单测、110 页构建检查及后端 9 项网站测试通过。隔离 Chromium 已加载解压包，MV3 service worker 与弹窗正常，插件 ID 为 `aiajdjliifeeaogpalejpggkiccjbneo`；未代用户登录或调用翻译。候选镜像五语页面及实际 R2 下载哈希通过，公网五语页面和 Logo 已检查截图；Chrome 从官网点击下载完整 ZIP，文件名、字节数及 SHA-256 均一致，另经公网固定版本 URL 回读完整包核对通过。
+- 发布前生产 readiness 已是 503：数据库、控制进程、维护进程、OIDC、控制资源池正常，计算节点 unavailable。此状态影响常规翻译可用性，不影响官网和安装包下载。
+
 ## 2026-09-21 四页阅读窗口与随机昵称发布、清库重建
 
 - 源码提交 `f362460` 已部署美国 VPS。镜像 `docker.nodelane.net/nodelane/node-comics:20260921-f362460`，摘要 `sha256:bf9bb0fa8afe5d4babad122ab77f9727a987c7ba023d605b0031f134021bbf96`；由该提交的源码在 VPS 构建、推送，三个控制服务均运行新镜像。

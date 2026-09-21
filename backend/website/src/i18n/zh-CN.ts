@@ -96,7 +96,17 @@ export default {
     "downloadDescription": "选择正在使用的桌面浏览器。安装插件，把翻译和阅读器一起放进工具栏。",
     "storeDescription": "在熟悉的浏览器里，打开下一段故事。",
     "storeUnavailable": "下载链接尚未配置",
-    "storeNote": "请通过官方商店安装并核对扩展名称与发布者。商店入口无法打开时，请联系我们获取帮助。",
+    "directDownloadTitle": "直接下载安装包",
+    "directDownloadDescription": "适用于桌面版 Chrome 和 Microsoft Edge。下载 ZIP 后解压，按下方步骤安装，即可开始使用。",
+    "downloadZip": "下载 ZIP 安装包",
+    "installTitle": "手动安装只需三步",
+    "installStepDownload": "下载并解压 ZIP，保留解压后的文件夹。",
+    "installStepBrowser": "在地址栏打开 chrome://extensions（Chrome）或 edge://extensions（Edge），开启“开发者模式”。",
+    "installStepLoad": "点击“加载已解压的扩展程序”，选择包含 manifest.json 的文件夹，再将插件固定到工具栏。",
+    "manualUpdateNote": "手动安装版本不会自动更新。更新时下载新版，覆盖原文件夹中的文件，再到扩展管理页点击“重新加载”；请勿删除安装文件夹。",
+    "firefoxDownloadNote": "Firefox 暂不提供 ZIP 安装；请使用 Chrome 或 Edge，或通过可用的 Firefox 商店入口安装。",
+    "storeHeading": "也可通过浏览器商店安装",
+    "storeNote": "商店入口尚未开放时，可使用上方 Chrome / Edge ZIP 安装包。",
     "guidesTitle": "读漫画，也可以更顺手。",
     "guidesDescription": "一些具体、有用的小指南。帮你选对翻译方式，打开本地藏书，也理解自己的数据会去哪里。",
     "contents": "本页目录",
@@ -689,6 +699,6 @@ export default {
     "中文示意": "中文示意",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "原创漫画：海边站台上的旅人，气泡文字为日文",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "相同漫画的中文示意：下一站，会是怎样的世界？",
-    "· AI 生成的功能插画，非产品实测效果承诺": "· AI 生成的功能插画，非产品实测效果承诺"
+    "产品常规翻译实测效果": "产品常规翻译实测效果"
   }
 } satisfies Dictionary;

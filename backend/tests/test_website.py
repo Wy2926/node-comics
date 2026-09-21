@@ -85,6 +85,54 @@ def test_unbuilt_website_does_not_break_api(tmp_path):
         assert client.get('/').status_code == 404
 
 
+def test_extension_download_only_signs_the_published_package(website, monkeypatch):
+    from app import website as module
+    calls = []
+    def sign(key, expires):
+        calls.append((key, expires))
+        return 'https://storage.example/package.zip?signed=test'
+    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
+    release = module.RELEASES[0]
+    response = website.get(release['path'] + '?key=private-image&expires=99999', follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers['location'] == 'https://storage.example/package.zip?signed=test'
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert response.headers['referrer-policy'] == 'no-referrer'
+    assert calls == [(f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}', 600)]
+    assert website.get('/downloads/private-image.zip').status_code == 404
+    assert website.post(release['path']).status_code == 405
+    head = website.head(release['path'])
+    assert head.status_code == 200 and head.content == b''
+    assert head.headers['content-length'] == str(release['bytes'])
+    assert len(calls) == 1
+
+
+def test_extension_download_failure_is_retryable_and_not_cached(website, monkeypatch):
+    from app import website as module
+    def unavailable(backend):
+        raise module.StorageError()
+    monkeypatch.setattr(module, 'get_store', unavailable)
+    response = website.get(module.RELEASES[0]['path'])
+    assert response.status_code == 503
+    assert response.headers['retry-after'] == '60'
+    assert response.headers['cache-control'] == 'private, no-store'
+
+
+def test_prior_versions_remain_downloadable(website, monkeypatch):
+    from app import website as module
+    prior = dict(module.RELEASES[0], version='0.0.9', filename='node-comics-0.0.9-chromium.zip',
+                 path='/downloads/node-comics-0.0.9-chromium.zip')
+    monkeypatch.setattr(module, 'RELEASES', [*module.RELEASES, prior])
+    calls = []
+    def sign(key, expires):
+        calls.append(key)
+        return 'https://storage.example/package.zip'
+    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
+    for release in module.RELEASES:
+        assert website.get(release['path'], follow_redirects=False).status_code == 302
+    assert '/0.0.9/' in calls[-1]
+
+
 def test_real_api_guard_does_not_make_private_routes_public(client, tmp_path, monkeypatch):
     from conftest import login
     from app.main import app

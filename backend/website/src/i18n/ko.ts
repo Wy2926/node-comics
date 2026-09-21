@@ -96,7 +96,17 @@ export default {
     "downloadDescription": "사용 중인 데스크톱 브라우저를 선택하고 도구 모음에 만화 번역과 리더를 추가하세요.",
     "storeDescription": "즐겨 쓰는 브라우저에서 새로운 이야기를 열어 보세요.",
     "storeUnavailable": "다운로드 링크가 설정되지 않았습니다",
-    "storeNote": "공식 스토어에서 확장 프로그램 이름과 게시자를 확인하고 설치하세요. 스토어 링크를 열 수 없다면 문의해 주세요.",
+    "directDownloadTitle": "확장 프로그램 직접 다운로드",
+    "directDownloadDescription": "데스크톱 Chrome과 Microsoft Edge용입니다. ZIP을 다운로드하고 압축을 푼 다음 아래 단계에 따라 설치하세요.",
+    "downloadZip": "ZIP 다운로드",
+    "installTitle": "세 단계로 수동 설치",
+    "installStepDownload": "ZIP을 다운로드하고 압축을 푼 뒤 해당 폴더를 보관하세요.",
+    "installStepBrowser": "주소 표시줄에서 chrome://extensions(Chrome) 또는 edge://extensions(Edge)를 열고 개발자 모드를 켜세요.",
+    "installStepLoad": "압축해제된 확장 프로그램을 로드합니다를 누르고 manifest.json이 있는 폴더를 선택한 다음 도구 모음에 확장 프로그램을 고정하세요.",
+    "manualUpdateNote": "수동 설치 버전은 자동 업데이트되지 않습니다. 새 버전을 다운로드하여 기존 폴더의 파일을 교체하고 확장 프로그램 관리 페이지에서 새로고침하세요. 설치 폴더를 삭제하지 마세요.",
+    "firefoxDownloadNote": "Firefox ZIP 설치는 제공하지 않습니다. Chrome이나 Edge를 사용하거나 Firefox 스토어 링크가 활성화되면 스토어에서 설치하세요.",
+    "storeHeading": "브라우저 스토어에서도 설치할 수 있어요",
+    "storeNote": "스토어 링크를 사용할 수 없으면 위의 Chrome / Edge ZIP을 이용하세요.",
     "guidesTitle": "만화 읽기를 조금 더 편하게.",
     "guidesDescription": "번역 모드, 로컬 파일, 문제 해결, 데이터 처리에 관한 실용적인 가이드입니다.",
     "contents": "이 페이지의 내용",
@@ -588,6 +598,6 @@ export default {
     "中文示意": "중국어 예시",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "해변 여행자와 일본어 말풍선이 있는 오리지널 만화",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "같은 오리지널 만화의 중국어 예시",
-    "· AI 生成的功能插画，非产品实测效果承诺": "· AI 기능 일러스트이며 실제 제품 성능을 보장하지 않습니다"
+    "产品常规翻译实测效果": "제품의 일반 번역으로 얻은 실제 결과"
   }
 } satisfies Dictionary;

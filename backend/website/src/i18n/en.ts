@@ -96,7 +96,17 @@ export default {
     "downloadDescription": "Choose your desktop browser and keep a manga reader and translator in your toolbar.",
     "storeDescription": "Open your next story in the browser you already enjoy.",
     "storeUnavailable": "Download link has not been configured",
-    "storeNote": "Install through the official store and check the extension name and publisher. Contact us if a store link is unavailable.",
+    "directDownloadTitle": "Download the extension directly",
+    "directDownloadDescription": "For desktop Chrome and Microsoft Edge. Download and extract the ZIP, then follow the steps below to start using the extension.",
+    "downloadZip": "Download ZIP",
+    "installTitle": "Install manually in three steps",
+    "installStepDownload": "Download and extract the ZIP. Keep the extracted folder.",
+    "installStepBrowser": "Open chrome://extensions (Chrome) or edge://extensions (Edge) in the address bar and turn on Developer mode.",
+    "installStepLoad": "Click Load unpacked, select the folder containing manifest.json, then pin the extension to your toolbar.",
+    "manualUpdateNote": "Manual installations do not update automatically. Download the new version, replace the files in the original folder, then click Reload on the extensions page. Keep the installation folder in place.",
+    "firefoxDownloadNote": "A Firefox ZIP installation is not available. Use Chrome or Edge, or install from the Firefox store when its link is available.",
+    "storeHeading": "Or install from your browser’s store",
+    "storeNote": "If a store link is unavailable, use the Chrome / Edge ZIP above.",
     "guidesTitle": "Make reading a little easier.",
     "guidesDescription": "Practical guides to translation modes, local formats, troubleshooting and where your data goes.",
     "contents": "On this page",
@@ -588,6 +598,6 @@ export default {
     "中文示意": "Chinese illustration",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Original manga: a seaside traveler with Japanese dialogue",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Chinese version of the same original manga illustration",
-    "· AI 生成的功能插画，非产品实测效果承诺": "· AI-generated illustration, not a measured product result or guarantee"
+    "产品常规翻译实测效果": "Actual results from the product’s standard translation"
   }
 } satisfies Dictionary;

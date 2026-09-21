@@ -80,6 +80,16 @@ export interface UI {
   downloadDescription: string;
   storeDescription: string;
   storeUnavailable: string;
+  directDownloadTitle: string;
+  directDownloadDescription: string;
+  downloadZip: string;
+  installTitle: string;
+  installStepDownload: string;
+  installStepBrowser: string;
+  installStepLoad: string;
+  manualUpdateNote: string;
+  firefoxDownloadNote: string;
+  storeHeading: string;
   storeNote: string;
   guidesTitle: string;
   guidesDescription: string;

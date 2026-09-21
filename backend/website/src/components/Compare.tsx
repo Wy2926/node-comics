@@ -27,6 +27,6 @@ export default function Compare({ examples, locale, copy = {} }: { examples: Exa
       <img key={`${selected}-${attempt}`} ref={imgRef} src={current.src} width={current.width} height={current.height} loading="lazy" decoding="async" alt={t(current.label)} style={{ visibility: status === 'ready' ? 'visible' : 'hidden' }} />
       {status !== 'ready' && <div className="compare-feedback" role={status === 'error' ? 'alert' : 'status'}>{status === 'loading' ? <><span className="compare-spinner" aria-hidden="true"/><span>{t('正在加载图片…')}</span></> : <><span>{t('图片加载失败')}</span><button type="button" className="button compact secondary" onClick={() => { setStatus('loading'); setAttempt(value => value + 1); }}>{t('重新加载')}</button></>}</div>}
     </div>
-    <p className="image-note" aria-live="polite">{t(current.label)}{t('· AI 生成的功能插画，非产品实测效果承诺')}</p>
+    <p className="image-note" aria-live="polite">{t('产品常规翻译实测效果')}</p>
   </div>;
 }

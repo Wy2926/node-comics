@@ -89,3 +89,10 @@
 @keyframes compare-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.compare-spinner{animation:none}}
 @media(max-width:480px){.compare-toolbar .segmented{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.direct-download{display:grid;grid-template-columns:1fr 1.2fr;gap:40px;margin-bottom:20px}
+.direct-download h2{margin:12px 0 18px}.direct-download .button{margin-top:24px}
+.install-steps{padding-left:24px;margin:18px 0}.install-steps li{padding-left:6px;margin-bottom:14px;line-height:1.8}
+.store-heading{margin:48px 0 24px}
+@media(max-width:760px){.direct-download{grid-template-columns:1fr;gap:28px}}
+
+.store-icon{width:48px;height:48px;object-fit:contain}

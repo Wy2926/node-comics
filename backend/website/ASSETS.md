@@ -7,7 +7,7 @@
 - journey-translated.webp、journey-en.webp、journey-ko.webp：2026-09-21 用户提供的中文、英文、韩文效果图，原文件分别为「中文效果.png」「英文效果.png」「韩文效果.png」，760 × 1140；转换为 WebP quality 92，中文图替换先前生成版本。本次未调用图片模型。
 - social-cover.webp：阅读角图片裁切为 1200 × 630、WebP quality 85，用于分享卡片。构建时 Astro/Sharp 另外生成响应式尺寸与压缩版本。
 
-这些是原创 AI 插画和功能示意，不是某部商业漫画、真实用户作品或已测量的产品翻译效果；对照组件明确标注示意用途。AI 图片不以第三方开源许可证重新授权，不假定其具备排他版权。生成模型由指定 API 提供，不分发模型权重。
+日文原图与阅读角为原创 AI 插画；中文、英文、韩文对照图由用户确认为产品常规翻译实测产物，对照组件标注“产品常规翻译实测效果”。AI 图片不以第三方开源许可证重新授权，不假定其具备排他版权。生成模型由指定 API 提供，不分发模型权重。
 
 品牌 Logo 与 favicon 复用插件已确认的 `apps/extension/src/assets/brand/*-light.webp`、`apps/extension/public/brand`，未重新生成；品牌命名依据 [品牌文档](../../docs/BRAND_AND_STORE_LISTING.md)。SVG/CSS UI 元素不属于介绍插画。
 
@@ -23,3 +23,14 @@
 | [src/assets/logo-en.webp](src/assets/logo-en.webp) | `abac28ef1514504dfcfee05374a85d230987809ce906cd08d864f19d79801023` |
 | [public/icon-128.png](public/icon-128.png) | `a83fe892bb1599baaba3c8c11f2a19ce10cff2560956c3072cde57f20f52da53` |
 | [public/favicon.ico](public/favicon.ico) | `6ec5ace09c14e6a3865397956490a92488059b8ac07fee995907670b529017c2` |
+
+
+## 浏览器商店标识
+
+2026-09-21：下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
+
+| 文件 | 来源 | SHA-256 |
+| --- | --- | --- |
+| [public/browsers/chrome.svg](public/browsers/chrome.svg) | [官方来源](https://www.google.com/chrome/static/images/chrome-logo.svg) | `2bb1a2c9b9ae4d36f62ea53811554636cf3c5b74d9845e1dbacca0ce62dc7880` |
+| [public/browsers/firefox.svg](public/browsers/firefox.svg) | [官方来源](https://raw.githubusercontent.com/mozilla/protocol-assets/master/logos/firefox/browser/logo.svg) | `f8301ac5f5dd3ca962db4283c1148e9a90ffcebe690ec83cedad88107d449f79` |
+| [public/browsers/edge.png](public/browsers/edge.png) | [官方来源](https://edgecdn-embza6g8cacagcbn.z01.azurefd.net/welcome/static/favicon.png) | `4d755ac02a070a1b4bb1b6f1c88ab493440109a8ac1e314aaced92f94cdc98e9` |

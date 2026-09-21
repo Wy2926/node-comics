@@ -96,7 +96,17 @@ export default {
     "downloadDescription": "デスクトップブラウザーを選び、翻訳と漫画リーダーをツールバーに追加しましょう。",
     "storeDescription": "使い慣れたブラウザーで、新しい物語を開きましょう。",
     "storeUnavailable": "ダウンロードリンクは未設定です",
-    "storeNote": "公式ストアで拡張機能名と公開元を確認してインストールしてください。リンクを利用できない場合はお問い合わせください。",
+    "directDownloadTitle": "拡張機能を直接ダウンロード",
+    "directDownloadDescription": "デスクトップ版 Chrome と Microsoft Edge に対応。ZIP をダウンロードして展開し、以下の手順でインストールしてください。",
+    "downloadZip": "ZIP をダウンロード",
+    "installTitle": "3 ステップで手動インストール",
+    "installStepDownload": "ZIP をダウンロードして展開し、展開したフォルダーを保存します。",
+    "installStepBrowser": "アドレスバーで chrome://extensions（Chrome）または edge://extensions（Edge）を開き、デベロッパーモードをオンにします。",
+    "installStepLoad": "「パッケージ化されていない拡張機能を読み込む」を選び、manifest.json を含むフォルダーを指定して、拡張機能をツールバーに固定します。",
+    "manualUpdateNote": "手動インストール版は自動更新されません。新版をダウンロードして元のフォルダー内のファイルを置き換え、拡張機能の管理画面で再読み込みしてください。インストール先フォルダーは削除しないでください。",
+    "firefoxDownloadNote": "Firefox の ZIP インストールには対応していません。Chrome または Edge を使うか、Firefox ストアのリンクが利用可能な場合はそちらからインストールしてください。",
+    "storeHeading": "ブラウザーのストアからもインストールできます",
+    "storeNote": "ストアのリンクが利用できない場合は、上の Chrome / Edge 用 ZIP をご利用ください。",
     "guidesTitle": "漫画を、もっと読みやすく。",
     "guidesDescription": "翻訳モード、ローカルファイル、トラブル解決、データの扱いについての実用ガイドです。",
     "contents": "このページの内容",
@@ -588,6 +598,6 @@ export default {
     "中文示意": "中国語の例",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "海辺の旅人と日本語の吹き出しを描いたオリジナル漫画",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "同じオリジナル漫画の中国語の例",
-    "· AI 生成的功能插画，非产品实测效果承诺": "· AI 生成の機能イラストであり、製品実測結果の保証ではありません"
+    "产品常规翻译实测效果": "製品の通常翻訳による実際の結果"
   }
 } satisfies Dictionary;

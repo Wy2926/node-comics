@@ -7,6 +7,7 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS website-build
 WORKDIR /website
+COPY extension-release.json /extension-release.json
 COPY website/package*.json ./
 RUN npm ci
 COPY website ./
@@ -18,6 +19,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home comics && mkdir -p /data/images && chown -R comics:comics /data
 COPY app ./app
+COPY extension-release.json ./extension-release.json
 COPY --from=admin-build /app/admin_web/dist ./app/admin_web/dist
 COPY --from=website-build /website/dist ./app/website_dist
 COPY alembic.ini ./

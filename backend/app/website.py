@@ -2,15 +2,18 @@
 import base64
 from functools import lru_cache
 import hashlib
+import json
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 from starlette.exceptions import HTTPException
 from starlette.staticfiles import StaticFiles
-from starlette.responses import FileResponse, RedirectResponse
+from starlette.responses import FileResponse, RedirectResponse, Response
 from .config import settings
+from .storage import get_store, StorageError
 
 ROOT = Path(__file__).parent / 'website_dist'
+RELEASES = json.loads((Path(__file__).parent.parent / 'extension-release.json').read_text(encoding='utf-8'))['releases']
 
 
 class _Scripts(HTMLParser):
@@ -53,6 +56,28 @@ class WebsiteFiles(StaticFiles):
     async def get_response(self, path, scope):
         normalized = path.replace('\\', '/').lstrip('/')
         segments = normalized.split('/')
+        if segments[0] == 'downloads':
+            release = next((item for item in RELEASES if item['path'] == '/' + normalized), None)
+            if release is None:
+                raise HTTPException(404)
+            headers = {'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer',
+                       'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex, nofollow'}
+            scope.setdefault('state', {})['public_website'] = True
+            if scope['method'] == 'HEAD':
+                return Response(headers={**headers, 'Content-Type': 'application/zip',
+                    'Content-Length': str(release['bytes']),
+                    'Content-Disposition': f'attachment; filename="{release["filename"]}"'})
+            if scope['method'] != 'GET':
+                return Response(status_code=405, headers={**headers, 'Allow': 'GET, HEAD'})
+            key = f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}'
+            try:
+                url = get_store('r2').download_url(key, 600)
+                if not url:
+                    raise StorageError()
+            except StorageError:
+                return Response('Download temporarily unavailable. Please try again later.', status_code=503,
+                                headers={**headers, 'Retry-After': '60'}, media_type='text/plain')
+            return RedirectResponse(url, status_code=302, headers=headers)
         # Removed API/payment routes must not fall through to static-site routing.
         if segments[0] in {'v1', 'internal', 'webhooks', 'billing'}:
             raise HTTPException(404)
