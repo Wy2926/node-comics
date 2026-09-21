@@ -9,6 +9,8 @@ from .errors import problem
 from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
 from .billing_access import active_terms, access_dates
+from .system_settings import get_request_limits
+from .admin_audit import record_audit
 
 DAILY = "classic_daily"
 MONTHLY = "redraw_monthly"
@@ -61,14 +63,14 @@ def month_boundary(anchor, offset, timezone_name):
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def period_spec(user, kind, at=None):
+def period_spec(user, kind, at=None, *, db):
     at = at or now()
     if kind == DAILY:
         zone = ZoneInfo(settings().quota_timezone)
         day = at.replace(tzinfo=timezone.utc).astimezone(zone).date()
         start = datetime.combine(day, time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
         end = datetime.combine(day + timedelta(days=1), time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
-        granted = settings().free_daily_pages
+        granted = get_request_limits(db).free_daily_pages
     elif kind == MONTHLY and is_operator_plus(user, at):
         anchor = user.plus_started_at
         zone = ZoneInfo(user.plus_timezone)
@@ -114,7 +116,7 @@ def available_periods(db, user, mode, kind, at):
             (QuotaPeriod.source == 'subscription') & QuotaPeriod.billing_term_id.in_(
                 select(BillingTerm.id).where(BillingTerm.revoked_at.is_(None)))), QuotaPeriod.starts_at <= at,
         QuotaPeriod.ends_at > at)))
-    spec = period_spec(user, kind, at)
+    spec = period_spec(user, kind, at, db=db)
     if spec:
         # Virtual automatic periods allow side-effect-free reads before first use.
         periods.append(db.get(QuotaPeriod, spec["id"]) or QuotaPeriod(**spec, used=0, reserved=0))
@@ -135,7 +137,7 @@ def allowance_json(db, user, kind, at=None):
         return None
     mode = "classic" if kind == DAILY else "redraw"
     periods = available_periods(db, user, mode, kind, at)
-    spec = period_spec(user, kind, at)
+    spec = period_spec(user, kind, at, db=db)
     if not periods:
         return None
     totals = {field: sum(getattr(row, field) for row in periods) for field in ("granted", "used", "reserved")}
@@ -162,7 +164,7 @@ def entitlements_json(db, user, at=None):
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "timezone": settings().quota_timezone,
             "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
-            "scheduler_weight": settings().plus_scheduler_weight if plus else settings().free_scheduler_weight,
+            "scheduler_weight": get_request_limits(db).plus_scheduler_weight if plus else get_request_limits(db).free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}
@@ -192,7 +194,7 @@ def reserve(db, user, job, at=None):
     periods = available_periods(db, user, job.mode, kind, at)
     period = next((row for row in periods if row.granted - row.used - row.reserved >= 1), None)
     if period is None:
-        spec = period_spec(user, kind, at)
+        spec = period_spec(user, kind, at, db=db)
         problem("DAILY_QUOTA_EXHAUSTED" if job.mode == "classic" else "REDRAW_QUOTA_EXHAUSTED",
                 "可用常规翻译页数已用完" if job.mode == "classic" else "可用 AI 重绘页数已用完", 409,
                 resets_at=iso(spec["ends_at"]) if spec else None)
@@ -235,6 +237,9 @@ def settle(db, job, *, success):
 
 
 def change_membership(db, owner_id, operator_id, key, *, action, months=None, days=None, monthly_pages=None, note):
+    note = note.strip()
+    if not note:
+        problem("INVALID_NOTE", "请填写操作原因", 422)
     if months is not None and days is not None:
         problem("INVALID_MEMBERSHIP_DURATION", "会员天数与月数只能指定一种", 422)
     if months is None and days is None:
@@ -251,9 +256,11 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
             problem("IDEMPOTENCY_CONFLICT", "此会员操作编号已用于其他参数", 409)
         return previous.result
     at = now()
+    before = {"membership_id": user.membership_id, "starts_at": iso(user.plus_started_at),
+              "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages}
     if action == "expire":
         if is_operator_plus(user, at):
-            spec = period_spec(user, MONTHLY, at)
+            spec = period_spec(user, MONTHLY, at, db=db)
             if db.get(QuotaPeriod, spec["id"]) is None:
                 db.add(QuotaPeriod(**spec))
         if user.plus_expires_at:
@@ -271,7 +278,7 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
                 user.plus_expires_at = month_boundary(user.plus_started_at, offset + months, user.plus_timezone)
             # A short gift can end mid-cycle. Extending it must reopen the same
             # bucket with its original used/reserved values, never mint another.
-            spec = period_spec(user, MONTHLY, at)
+            spec = period_spec(user, MONTHLY, at, db=db)
             period = db.get(QuotaPeriod, spec["id"])
             if period is not None:
                 period.ends_at = spec["ends_at"]
@@ -284,21 +291,28 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
                 problem("MEMBERSHIP_PERIOD_ACTIVE", "已有尚未结束的重绘额度周期，请在周期结束后重新开通", 409)
             user.membership_id, user.plus_started_at = uid(), at
             user.plus_timezone = settings().quota_timezone
-            user.plus_monthly_pages = monthly_pages if monthly_pages is not None else settings().plus_monthly_redraw_pages
+            user.plus_monthly_pages = monthly_pages if monthly_pages is not None else get_request_limits(db).plus_monthly_redraw_pages
             user.plus_expires_at = at + timedelta(days=days) if days is not None else month_boundary(at, months, user.plus_timezone)
             # Persist the initial period even when no translation is submitted.
-            spec = period_spec(user, MONTHLY, at)
+            spec = period_spec(user, MONTHLY, at, db=db)
             db.add(QuotaPeriod(**spec))
     db.flush()
     result = {"user_id": user.id, "entitlements": entitlements_json(db, user, at)}
     db.add(MembershipOperation(transaction_key=transaction_key, owner_id=user.id, operator_id=operator_id,
                                request_hash=request_hash, result=result,
                                details={"action": action, "months": months, "days": days, "monthly_pages": monthly_pages, "note": note}))
+    record_audit(db, operator_id, f"membership.{action}", "user", user.id, before=before,
+                 after={"membership_id": user.membership_id, "starts_at": iso(user.plus_started_at),
+                        "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages},
+                 note=note, operation_key=transaction_key)
     db.commit()
     return result
 
 
 def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
+    note = note.strip()
+    if not note:
+        problem("INVALID_NOTE", "请填写补偿原因", 422)
     transaction_key = f"compensate:{operator_id}:{key}"
     lock_operation(db, transaction_key)
     user = locked_user(db, owner_id)
@@ -310,7 +324,7 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
         if previous.request_hash != request_hash:
             problem("IDEMPOTENCY_CONFLICT", "此补偿编号已用于其他参数", 409)
         return previous.result
-    spec = period_spec(user, kind)
+    spec = period_spec(user, kind, db=db)
     period = db.get(QuotaPeriod, spec['id']) if spec else None
     if spec is None and kind == MONTHLY and is_plus(db, user):
         from .billing_models import BillingTerm
@@ -324,6 +338,7 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
         period = QuotaPeriod(**spec)
         db.add(period)
         db.flush()
+    before = period.granted
     db.execute(update(QuotaPeriod).where(QuotaPeriod.id == period.id).values(granted=QuotaPeriod.granted + pages))
     db.add(Ledger(owner_id=user.id, period_id=period.id, quota_kind=kind, transaction_key=transaction_key,
                   kind="compensation", amount=pages, note=note))
@@ -331,6 +346,9 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
     result = {"user_id": user.id, "entitlements": entitlements_json(db, user)}
     db.add(MembershipOperation(transaction_key=transaction_key, owner_id=user.id, operator_id=operator_id,
                                request_hash=request_hash, result=result,
-                               details={"kind": kind, "pages": pages, "note": note}))
+                               details={"kind": kind, "pages": pages, "note": note, "period_id": period.id}))
+    record_audit(db, operator_id, "quota.compensate", "quota_period", period.id,
+                 before={"granted": before}, after={"granted": before + pages},
+                 details={"owner_id": owner_id, "kind": kind, "pages": pages}, note=note, operation_key=transaction_key)
     db.commit()
     return result

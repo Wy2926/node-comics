@@ -27,13 +27,13 @@ export function useBillingResource<T>(url: string, onUnauthorized: (message: str
   return {data, loading, error, reload};
 }
 
-export function BillingDialog({title, onClose, busy = false, children}: {title: string; onClose: () => void; busy?: boolean; children: ReactNode}) {
+export function BillingDialog({title, onClose, busy = false, children, className = ''}: {title: string; onClose: () => void; busy?: boolean; children: ReactNode; className?: string}) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null, element = dialog.current!;
     element.showModal(); return () => {element.close(); if (opener?.isConnected) opener.focus();};
   }, []);
-  return <dialog className="billing-dialog" ref={dialog} onCancel={event => {event.preventDefault(); if (!busy) onClose();}} aria-labelledby="billing-dialog-title">
+  return <dialog className={`billing-dialog ${className}`} ref={dialog} onCancel={event => {event.preventDefault(); if (!busy) onClose();}} aria-labelledby="billing-dialog-title">
     <div className="dialog-top"><h2 id="billing-dialog-title">{title}</h2><button type="button" className="secondary" disabled={busy} onClick={onClose}>关闭 ×</button></div>
     <div className="dialog-content">{children}</div>
   </dialog>;

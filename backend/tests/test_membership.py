@@ -1,3 +1,4 @@
+from conftest import configure_system_limits
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -111,7 +112,7 @@ def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
 @pytest.mark.parametrize('mode', ['classic', 'redraw'])
 def test_period_quota_limit_reservations_and_release(client, png, mode):
     from app.config import settings
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     if mode == 'redraw':
         assert grant(client, auth, pages=1).status_code == 200
@@ -186,7 +187,7 @@ def test_expiry_honors_accepted_job_and_rejects_new_work(client, png, monkeypatc
 
 def test_plan_keeps_current_page_when_later_page_exceeds_period_allowance(client, png):
     from app.config import settings
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, i)) for i in (1, 2)]
     response = submit_many(client, auth, assets, maximum=2)
@@ -216,7 +217,7 @@ def test_membership_and_compensation_are_private_and_idempotent(client):
 
 def test_simultaneous_last_page_admission(client, png):
     from app.config import settings
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     assets = [upload(client, auth, png_variant(png, n)) for n in (3, 4)]
     barrier = Barrier(2)

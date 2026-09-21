@@ -13,6 +13,7 @@ from .db import get_db
 from .entitlements import entitlements_json, is_plus, is_operator_plus, iso, period_json, plus_dates
 from .billing_access import access_exists
 from .entitlement_models import QuotaPeriod
+from .plan_models import ReadingSession
 from .errors import problem
 from .models import Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
@@ -86,7 +87,7 @@ def task_json(job, owner_name, leases, at):
             "cache_hit": job.cache_hit, "page_index": job.page_index,
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
-            "cancel_requested": job.cancel_requested, **timing(job, leases, at),
+            "cancel_requested": job.cancel_requested, "discard_output": job.discard_output, **timing(job, leases, at),
             "nodes": list({r.node_id: {"id": r.node_id, "name": r.node_name} for r in leases}.values()),
             "running_nodes": list(dict.fromkeys(r.node_id for r in live)),
             "expired_leases": sum(not r.completed_at and r.expires_at <= at for r in leases),
@@ -256,5 +257,7 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
             "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
                 QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
                 .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))],
-            "reading_sessions": [{"mode": row.mode, "session_id": row.session_id, "expires_at": iso(row.session_expires_at)} for row in db.scalars(
-                select(UserModeQueue).where(UserModeQueue.owner_id == user.id))]}
+            "reading_sessions": [{"session_id": row.session_id, "sequence": row.sequence,
+                "page_count": len(row.window), "fenced": row.fenced, "expires_at": iso(row.expires_at)} for row in db.scalars(
+                select(ReadingSession).where(ReadingSession.owner_id == user.id)
+                .order_by(ReadingSession.expires_at.desc()).limit(50))]}

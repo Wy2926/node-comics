@@ -14,6 +14,7 @@ from .jobs import idem_key
 from .models import Ledger, User, now
 from .providers import digest
 from .request_models import RequestBody
+from .admin_audit import record_audit
 
 router = APIRouter(tags=["quota grants"])
 
@@ -27,6 +28,9 @@ class GrantRequest(RequestBody):
 
     @model_validator(mode="after")
     def valid_window(self):
+        self.note = self.note.strip()
+        if not self.note:
+            raise ValueError("请填写赠送原因")
         if self.starts_at and self.expires_at <= self.starts_at:
             raise ValueError("Expiration must follow the start")
         return self
@@ -61,6 +65,9 @@ def grant_pages(db, owner_id, operator_id, key, request):
     result = {"grant": period_json(period), "entitlements": entitlements_json(db, user, at)}
     db.add(MembershipOperation(transaction_key=transaction_key, owner_id=user.id, operator_id=operator_id,
         request_hash=request_hash, details=parameters, result=result))
+    record_audit(db, operator_id, "quota.grant", "quota_period", period.id,
+                 after=period_json(period), details={"owner_id": user.id}, note=request.note,
+                 operation_key=transaction_key)
     db.commit()
     return result
 

@@ -42,7 +42,8 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
     assert client.get("/v1/me/feedback", headers=other).json()["total"] == 0
     assert client.get("/v1/admin/feedback", headers=auth).status_code == 403
     feedback_id = first.json()["id"]
-    assert client.patch(f"/v1/admin/feedback/{feedback_id}", headers=admin, json={"status": "reviewing"}).json()["status"] == "reviewing"
+    assert client.patch(f"/v1/admin/feedback/{feedback_id}", headers={**admin, "Idempotency-Key": "review"},
+        json={"status": "reviewing", "expected_status": "received", "expected_updated_at": first.json()["updated_at"], "note": "checked exact output"}).json()["status"] == "reviewing"
     assert client.get("/v1/me/feedback", headers=auth).json()["items"][0]["status"] == "reviewing"
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Feedback)) == 1

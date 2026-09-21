@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .auth import admin
+from .admin_audit import record_audit
 from .config import settings
 from .db import get_db
 from .errors import problem
@@ -79,6 +80,8 @@ def create(body: NodeCreate, user: User = Depends(admin), db: Session = Depends(
         heartbeat_at=None, credential_hash=token_hash(token),
         desired_config=body.config.model_dump(exclude_none=True))
     db.add(node)
+    db.flush()
+    record_audit(db, user.id, 'node.create', 'compute_node', node.id, after=configuration(node))
     db.commit()
     return {**configuration(node), 'token': token}
 
@@ -96,6 +99,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
     node = compute_node(db, node_id)
     if node.config_version != body.expected_version:
         problem('NODE_CONFIG_CONFLICT', '配置已更新，请刷新后重新保存', 409)
+    before = configuration(node)
     pool = node.engine_version == 'control'
     try:
         config = (PoolConfig if pool else NodeConfig).model_validate(body.config)
@@ -114,6 +118,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
     node.config_version += 1
     node.config_error = None
     node.applied_config_version = node.config_version
+    record_audit(db, user.id, 'node.configure', 'compute_node', node.id, before=before, after=configuration(node))
     db.commit()
     return configuration(node)
 
@@ -125,5 +130,7 @@ def rotate(node_id: str, user: User = Depends(admin), db: Session = Depends(get_
     token = secrets.token_urlsafe(48)
     node.credential_hash = token_hash(token)
     node.applied_config_version = 0
+    record_audit(db, user.id, 'node.rotate_credential', 'compute_node', node.id,
+                 details={'previous_credential_revoked': True})
     db.commit()
     return {'node_id': node.id, 'token': token}

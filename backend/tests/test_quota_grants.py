@@ -1,3 +1,4 @@
+from conftest import configure_system_limits
 """Temporary grants use the same atomic admission and original-bucket settlement."""
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
@@ -81,7 +82,7 @@ def test_expired_gift_settles_only_original_bucket(client, png, monkeypatch, suc
 
 def test_finite_allowances_use_earliest_expiry_and_plus_classic_uses_no_gift(client, png):
     from app.config import settings
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     late = gift(client, auth, mode='classic', pages=1, key='late', end=AT + timedelta(days=2)).json()['grant']
     early = gift(client, auth, mode='classic', pages=1, key='early').json()['grant']
@@ -117,7 +118,7 @@ def test_grants_are_private_idempotent_and_audited_even_after_expiry(client, mon
 
 def test_simultaneous_last_gift_and_daily_page_admissions(client, png):
     from app.config import settings
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     gift(client, auth, mode='classic', pages=1)
     assets = [upload(client, auth, png_variant(png, n)) for n in range(4)]

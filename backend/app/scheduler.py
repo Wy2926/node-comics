@@ -25,7 +25,8 @@ def lock_scheduler(db):
 
 
 def limits_for(db, user):
-    cfg, plus = settings(), is_plus(db, user)
+    from .system_settings import get_request_limits
+    cfg, plus = get_request_limits(db), is_plus(db, user)
     return {"weight": cfg.plus_scheduler_weight if plus else cfg.free_scheduler_weight}
 
 

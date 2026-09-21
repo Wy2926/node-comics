@@ -1501,6 +1501,14 @@ dialog::backdrop {
   .billing-channel {padding: 14px;}
   .billing-channel .provider-name {gap: 4px;}
 }
+.admin-tabs {display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;}
+.admin-json {white-space: pre-wrap; overflow-wrap: anywhere; max-height: 380px; overflow: auto; padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px;}
+.sidebar {overflow-y: auto;}
+main > .panel + .panel {margin-top: 18px;}
+main > .panel h2, main > .panel h3 {padding: 16px 18px 8px;}
+main > .panel > details {padding: 14px 18px; border-bottom: 1px solid var(--border);}
+.filter-form input {max-width: 100%;}
+.filter-form > label {min-width: 120px;}
 @media (max-width: 540px) {
   .billing-catalog .page-heading > .provider-actions, .billing-orders .page-heading > button {margin-top: 16px;}
   .billing-dialog {width: calc(100vw - 20px);}

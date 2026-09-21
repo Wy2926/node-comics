@@ -24,13 +24,19 @@ def settled_invoice(state):
 
 def refundable_charge(state, *, modern, disputed=False, partial=False):
     value = {'id': 'ch_fixture', 'object': 'charge', 'livemode': False, 'customer': 'cus_fixture',
-        'payment_intent': 'pi_fixture', 'amount': 999, 'amount_refunded': 499 if partial else 0 if disputed else 999,
+        'payment_intent': 'pi_fixture', 'currency': 'usd', 'amount': 999, 'amount_refunded': 499 if partial else 0 if disputed else 999,
         'refunded': not partial and not disputed, 'disputed': disputed}
     if not modern:
         value['invoice'] = 'in_0001'
     state['charges']['ch_fixture'] = value
     state['invoice_payments'] = [{'id': 'inpay_fixture', 'object': 'invoice_payment', 'livemode': False,
         'invoice': 'in_0001', 'status': 'paid', 'payment': {'type': 'payment_intent', 'payment_intent': 'pi_fixture'}}]
+    if disputed:
+        state['disputes']['dp_fixture'] = {'id': 'dp_fixture', 'object': 'dispute', 'livemode': False,
+            'charge': value['id'], 'amount': 999, 'currency': 'usd', 'status': 'needs_response', 'created': state['at']}
+    else:
+        state['refunds']['re_fixture'] = {'id': 're_fixture', 'object': 'refund', 'charge': value['id'],
+            'amount': value['amount_refunded'], 'currency': 'usd', 'status': 'succeeded', 'created': state['at']}
     return value
 
 
@@ -100,7 +106,8 @@ def test_signed_refunds_map_invoice_and_keep_access_rules_on_replay(billing, mod
         assert (term.revoked_at is not None) is (refund_kind != 'partial')
         assert db.scalar(select(func.count()).select_from(BillingInvoice)) == 1
         assert db.scalar(select(func.count()).select_from(BillingOrderTransition).where(
-            BillingOrderTransition.order_id == order.id, BillingOrderTransition.to_status == expected)) == 1
+            BillingOrderTransition.order_id == order.id, BillingOrderTransition.to_status == expected,
+            BillingOrderTransition.from_status != BillingOrderTransition.to_status)) == 1
     assert rights(billing)['plan'] == ('plus' if refund_kind == 'partial' else 'free')
     assert any(path == '/v1/charges/ch_fixture' for _, path, _, _ in billing['requests'])
     mappings = [params for _, path, params, _ in billing['requests'] if path == '/v1/invoice_payments']
@@ -159,6 +166,7 @@ def test_delayed_partial_refund_cannot_overwrite_newer_full_refund(billing, monk
         try:
             assert before_lock.wait(10)
             charge.update(refunded=True, amount_refunded=999)
+            billing['refunds']['re_remaining'] = {**billing['refunds']['re_fixture'], 'id': 're_remaining', 'amount': 500}
             stripe_refunds.sync_refund_event({'charge_id': 'ch_fixture'}, 'evt_newfull')
         finally:
             resume.set()

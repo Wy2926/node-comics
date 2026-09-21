@@ -1,7 +1,7 @@
 """Durable verified event inbox and independent payment channel reconciliation."""
 from datetime import timedelta
 from sqlalchemy import or_, select, update
-from .billing_providers import BillingError, provider_enabled, remote_id
+from .billing_providers import BillingError, provider_enabled, provider_environment, remote_id, require
 from .billing_models import BillingCheckout, BillingEvent, BillingSubscription
 from .db import session_factory
 from .models import now
@@ -31,10 +31,11 @@ def process_event(event_id):
         if not claimed.rowcount:
             return
         event = db.get(BillingEvent, event_id)
-        kind, resource_id, attempts, provider, payload = event.event_type, event.resource_id, event.attempts, event.provider, event.payload
+        kind, resource_id, attempts, provider, payload, environment = event.event_type, event.resource_id, event.attempts, event.provider, event.payload, event.environment
         db.commit()
     error = None
     try:
+        require(environment == provider_environment(provider), 'BILLING_ENVIRONMENT_MISMATCH')
         if provider == 'stripe':
             from . import stripe_client as stripe
             from .billing_grants import invoice_subscription
@@ -57,20 +58,22 @@ def process_event(event_id):
             elif kind in ('refund.created', 'dispute.created'):
                 from . import creem_client as creem
                 transaction_id = payload.get('transaction_id')
-                if transaction_id:
-                    transaction = creem.call('GET', '/transactions', params={'transaction_id': transaction_id})
-                    subscription_id = creem.object_id(transaction.get('subscription'))
-                    if subscription_id:
-                        sync_subscription(subscription_id, transaction_id, provider='creem', event_id=event_id)
+                require(transaction_id, 'CREEM_REFUND_UNBOUND')
+                transaction = creem.call('GET', '/transactions', params={'transaction_id': transaction_id})
+                creem.environment(transaction)
+                subscription_id = creem.object_id(transaction.get('subscription'))
+                require(subscription_id, 'CREEM_REFUND_UNBOUND')
+                sync_subscription(subscription_id, transaction_id, provider='creem', event_id=event_id)
     except BillingError as exc:
         error = exc.code
     except Exception:
         error = 'BILLING_PROCESSING_FAILED'
     with session_factory()() as db:
-        event = db.get(BillingEvent, event_id)
-        event.error_code, event.status = error, 'pending' if error else 'processed'
-        event.processed_at = None if error else now()
-        event.next_attempt_at = now() + timedelta(seconds=min(3600, 10 * 2 ** min(attempts, 8)))
+        db.execute(update(BillingEvent).where(BillingEvent.id == event_id,
+            BillingEvent.status == 'processing', BillingEvent.attempts == attempts).values(
+                error_code=error, status='pending' if error else 'processed',
+                processed_at=None if error else now(),
+                next_attempt_at=now() + timedelta(seconds=min(3600, 10 * 2 ** min(attempts, 8)))))
         db.commit()
 
 

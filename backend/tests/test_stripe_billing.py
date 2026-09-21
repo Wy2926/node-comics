@@ -48,7 +48,7 @@ def billing(monkeypatch, request):
     client = request.getfixturevalue('client')
     from app import stripe_client
     from app.models import now
-    state = {'client':client, 'sessions':{}, 'invoices':{}, 'charges': {}, 'invoice_payments': [], 'sub':None, 'posts':[], 'requests':[],
+    state = {'client':client, 'sessions':{}, 'invoices':{}, 'charges': {}, 'refunds': {}, 'disputes': {}, 'invoice_payments': [], 'sub':None, 'posts':[], 'requests':[],
         'at':int(now().replace(tzinfo=timezone.utc).timestamp())-60, 'lost':False, 'fail_page':False}
     price = {'id':'price_plus', 'object':'price', 'active':True, 'livemode':False, 'product':'prod_plus',
         'currency':'usd', 'unit_amount':999, 'recurring':{'interval':'month','interval_count':1,'usage_type':'licensed'}}
@@ -105,10 +105,19 @@ def billing(monkeypatch, request):
                 data = state['invoices'][path.split('/')[-1]]
             elif path.startswith('/v1/charges/'):
                 data = state['charges'][path.split('/')[-1]]
+            elif path in ('/v1/refunds', '/v1/disputes'):
+                rows = sorted((row for row in state[path.split('/')[-1]].values()
+                    if row['charge'] == params['charge']), key=lambda row: row['id'])
+                if params.get('starting_after'):
+                    rows = [row for row in rows if row['id'] > params['starting_after']]
+                data = {'object': 'list', 'data': rows[:2], 'has_more': len(rows) > 2}
             elif path == '/v1/invoice_payments':
-                assert params['payment[type]'] == 'payment_intent'
-                rows = [p for p in state['invoice_payments']
-                    if p['payment']['payment_intent'] == params['payment[payment_intent]']]
+                if params.get('invoice'):
+                    rows = [p for p in state['invoice_payments'] if p['invoice'] == params['invoice']]
+                else:
+                    assert params['payment[type]'] == 'payment_intent'
+                    rows = [p for p in state['invoice_payments']
+                        if p['payment']['payment_intent'] == params['payment[payment_intent]']]
                 data = {'object': 'list', 'data': rows, 'has_more': False}
             elif path == '/v1/billing_portal/sessions':
                 state['portal_customer'] = params['customer']

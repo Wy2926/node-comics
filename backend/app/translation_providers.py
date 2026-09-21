@@ -1,13 +1,14 @@
 """Database-owned translation suppliers. No environment seeding or legacy fallback."""
 from contextlib import contextmanager
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import Field, SecretStr, field_validator, model_validator
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .adapters.text import TextError
 from .auth import admin
+from .admin_audit import record_audit, sanitize
 from .db import get_db, session_factory
 from .errors import problem
 from .models import User, now, uid
@@ -157,13 +158,19 @@ def list_providers(user: User = Depends(admin), db: Session = Depends(get_db)):
 def create_provider(body: ProviderWrite, user: User = Depends(admin), db: Session = Depends(get_db)):
     with provider_transaction(db):
         provider = write_provider(db, body)
+        record_audit(db, user.id, 'text_provider.create', 'translation_provider', provider.id,
+                     after=provider_json(db, provider), details={'key_changed': True})
     return provider_json(db, provider)
 
 
 @router.put('/{provider_id}')
 def update_provider(provider_id: str, body: ProviderWrite, user: User = Depends(admin), db: Session = Depends(get_db)):
     with provider_transaction(db):
-        provider = write_provider(db, body, get_provider(db, provider_id))
+        previous = get_provider(db, provider_id)
+        before = provider_json(db, previous)
+        provider = write_provider(db, body, previous)
+        record_audit(db, user.id, 'text_provider.update', 'translation_provider', provider.id,
+                     before=before, after=provider_json(db, provider), details={'key_changed': body.api_key is not None})
     return provider_json(db, provider)
 
 
@@ -171,7 +178,10 @@ def update_provider(provider_id: str, body: ProviderWrite, user: User = Depends(
 def toggle_provider(provider_id: str, body: ProviderToggle, user: User = Depends(admin), db: Session = Depends(get_db)):
     with provider_transaction(db):
         provider = get_provider(db, provider_id)
+        before = {'enabled': provider.enabled}
         provider.enabled, provider.updated_at = body.enabled, now()
+        record_audit(db, user.id, 'text_provider.toggle', 'translation_provider', provider.id,
+                     before=before, after={'enabled': provider.enabled})
     return provider_json(db, provider)
 
 
@@ -181,6 +191,24 @@ def default_provider(provider_id: str, user: User = Depends(admin), db: Session 
         provider = get_provider(db, provider_id)
         if not provider.enabled:
             problem('TRANSLATION_PROVIDER_DISABLED', '请先启用此供应商', 409)
+        previous = db.scalar(select(TranslationProvider.id).where(TranslationProvider.is_default.is_(True)))
         db.execute(update(TranslationProvider).where(TranslationProvider.is_default.is_(True)).values(is_default=False, updated_at=now()))
         provider.is_default, provider.updated_at = True, now()
+        record_audit(db, user.id, 'text_provider.default', 'translation_provider', provider.id,
+                     before={'default_provider': previous}, after={'default_provider': provider.id})
     return provider_json(db, provider)
+
+
+@router.get('/{provider_id}/revisions')
+def revisions(provider_id: str, offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
+              user: User = Depends(admin), db: Session = Depends(get_db)):
+    provider = get_provider(db, provider_id)
+    query = select(TranslationProviderRevision.id, TranslationProviderRevision.channel,
+        TranslationProviderRevision.config, TranslationProviderRevision.created_at).where(
+        TranslationProviderRevision.provider_id == provider_id)
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = db.execute(query.order_by(TranslationProviderRevision.created_at.desc(), TranslationProviderRevision.id.desc())
+                      .offset(offset).limit(limit))
+    return {'items': [{'id': row.id, 'channel': row.channel, 'config': sanitize(row.config),
+            'current': row.id == provider.revision_id, 'created_at': row.created_at} for row in rows],
+            'total': total, 'next_offset': offset + limit if offset + limit < total else None}

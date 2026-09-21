@@ -139,6 +139,8 @@ def event_references(obj):
     values = {'checkout_id': metadata.get('checkout_intent_id') if metadata.get('app') == 'node_comics' else None,
         'subscription_id': obj.get('subscription') or details.get('subscription'),
         'invoice_id': obj.get('invoice'), 'transaction_id': obj.get('transaction'),
+        'refund_id': obj.get('id') if obj.get('object') == 'refund' else None,
+        'dispute_id': obj.get('id') if obj.get('object') == 'dispute' else None,
         'charge_id': obj.get('charge') or (obj.get('id') if obj.get('object') == 'charge' else None)}
     references = {}
     for key, value in values.items():
@@ -147,6 +149,17 @@ def event_references(obj):
         if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,254}', value):
             references[key] = value
     return references
+
+
+def creem_reversal_snapshot(obj, kind):
+    """Only signed, typed financial fields; never persist customer data or evidence."""
+    amount = obj.get('refund_amount' if kind == 'refund.created' else 'amount')
+    currency = obj.get('refund_currency' if kind == 'refund.created' else 'currency')
+    status = obj.get('status')
+    require(amount is None or type(amount) is int and amount >= 0, 'CREEM_REVERSAL_INVALID')
+    require(currency is None or isinstance(currency, str) and re.fullmatch(r'[A-Za-z]{3}', currency), 'CREEM_REVERSAL_INVALID')
+    require(status is None or isinstance(status, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,40}', status), 'CREEM_REVERSAL_INVALID')
+    return {'amount': amount, 'currency': currency.lower() if currency else None, 'status': status or 'unknown'}
 
 
 @router.post('/webhooks/stripe', include_in_schema=False)
@@ -203,6 +216,8 @@ async def creem_webhook(request: Request, tasks: BackgroundTasks, db: Session = 
         occurred = creem.timestamp(value['created_at'])
         require(occurred)
         payload = event_references(obj)
+        if kind in ('refund.created', 'dispute.created'):
+            payload['reversal'] = creem_reversal_snapshot(obj, kind)
     except (KeyError, TypeError, ValueError, BillingError):
         return JSONResponse({'error': 'invalid_event'}, status_code=400)
     return store_event(db, tasks, 'creem', event_id, kind, resource_id, occurred, payload)

@@ -7,6 +7,7 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, sel
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from .auth import admin
+from .admin_audit import record_audit
 from .config import settings
 from .db import Base, get_db
 from .errors import problem
@@ -19,6 +20,11 @@ router = APIRouter(prefix="/v1/admin/system-settings", tags=["system settings"])
 class RequestLimits(RequestBody):
     """One immutable operation snapshot; PUT requires every supported field."""
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, allow_inf_nan=False)
+
+    free_daily_pages: int = Field(ge=0, le=1000000)
+    plus_monthly_redraw_pages: int = Field(ge=0, le=1000000)
+    free_scheduler_weight: float = Field(ge=0.1, le=100)
+    plus_scheduler_weight: float = Field(ge=0.1, le=100)
 
     free_images_per_minute: int = Field(ge=1, le=10000)
     plus_images_per_minute: int = Field(ge=1, le=10000)
@@ -95,7 +101,8 @@ def get_system_settings(user: User = Depends(admin), db: Session = Depends(get_d
 def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin), db: Session = Depends(get_db)):
     from .scheduler import lock_scheduler
     lock_scheduler(db)
-    initialize_system_settings(db)
+    previous = initialize_system_settings(db)
+    before = settings_json(previous)
     row = db.scalar(update(SystemSettings).where(SystemSettings.id == 1,
         SystemSettings.version == body.expected_version).values(
             version=SystemSettings.version + 1, values=body.values.model_dump(),
@@ -106,6 +113,7 @@ def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin),
         problem("SYSTEM_SETTINGS_CONFLICT", "系统设置已被其他管理员更新，请刷新后重试", 409,
                 current_version=current)
     result = settings_json(row)
+    record_audit(db, user.id, 'system_settings.update', 'system_settings', '1', before=before, after=result)
     from .notifications import publish
     publish(db, 'policy')
     db.commit()

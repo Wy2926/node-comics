@@ -1,8 +1,11 @@
 import type {Mode, TaskDetail as TaskData, UserDetail as UserData} from './types';
 import {Badge, duration, Empty, Jump, label, number, Stat, Table, time} from './ui';
 import {MembershipActions} from './MembershipActions';
+import {TaskActions} from './TaskActions';
+import {TaskAttempts} from './TaskAttempts';
+import {UserHistory} from './UserHistory';
 
-export function TaskDetail({job: j}: {job: TaskData}) {
+export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
   return <>
     <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {j.target_language}{j.cache_hit && ' · 缓存命中'}</p></div><Badge value={j.status}/></div>
@@ -15,6 +18,7 @@ export function TaskDetail({job: j}: {job: TaskData}) {
       <dt>交付执行机 / 进程</dt><dd>{final ? final.executor_id || '未记录' : '—'}</dd>
       <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.id || '—'}</dd></dl>
     {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
+    <TaskActions job={j} onChanged={onChanged} onUnauthorized={onUnauthorized}/>
     {j.expired_leases > 0 && <p className="attention">{j.expired_leases} 个租约已过期，等待回收。</p>}
     <h3 className="detail-heading">阶段进度</h3><div className="stage-flow">{j.stages.length ? j.stages.map(s =>
       <div key={s.name}><b>{label(s.name)}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
@@ -36,13 +40,14 @@ export function TaskDetail({job: j}: {job: TaskData}) {
       <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>
         <tr key={c.id}><td>{c.model}<small>{c.provider_id}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>
           <td>¥{(c.accounted_micros / 1000000).toFixed(6)}<small>{label(c.cost_state)}</small></td><td>{c.error_code || '—'}</td></tr>)}</Table></>}
+    <TaskAttempts jobId={j.id} refreshKey={j.generated_at} onUnauthorized={onUnauthorized}/>
     <p className="footnote">快照时间 {time(j.generated_at)} · 详情打开时暂停列表自动刷新</p>
   </>;
 }
-export function UserDetail({user: u, onChanged}: {user: UserData; onChanged: () => void}) {
+export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const e = u.entitlements;
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
-  return <><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : '普通'}</span></div>
+  return <div className="care-user-detail"><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : '普通'}</span></div>
     <dl className="detail-meta"><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
       <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>
     <div className="queue-grid">{(['classic', 'redraw'] as Mode[]).map(mode => {
@@ -59,8 +64,9 @@ export function UserDetail({user: u, onChanged}: {user: UserData; onChanged: () 
       <td>{time(b.starts_at)}<small>{time(b.expires_at)}</small></td></tr>)}</Table> : <Empty>暂无赠送额度</Empty>}
     <h3 className="detail-heading">当前有效额度明细</h3>
     {buckets.length ? <Table heads={['类型', '授予 / 已用 / 预占', '到期']}>{buckets.map(b => <tr key={b.id}>
-      <td>{label(b.mode)} · {({daily: '每日额度', membership: '会员额度', grant: '赠送额度'} as Record<string, string>)[b.source] || b.source}</td>
+      <td>{label(b.mode)} · {label(b.source)}</td>
       <td>{b.granted} / {b.used} / {b.reserved}</td><td>{time(b.expires_at)}</td></tr>)}</Table> : <Empty>暂无有限页数额度</Empty>}
-    <p><Jump view="tasks" params={{owner_id: u.id}}>查看该用户全部任务 ↗</Jump></p>
-  </>;
+    <div className="care-user-links"><Jump view="tasks" params={{owner_id: u.id}}>查看该用户全部任务 ↗</Jump><Jump view="subscriptions" params={{owner_id: u.id}}>查看该用户订阅与授权期 ↗</Jump></div>
+    <UserHistory userId={u.id} revision={JSON.stringify(u)} onUnauthorized={onUnauthorized}/>
+  </div>;
 }

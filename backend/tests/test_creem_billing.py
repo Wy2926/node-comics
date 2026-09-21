@@ -349,7 +349,8 @@ def test_refund_or_dispute_revokes_access_and_records_transition(creem_billing, 
         order = db.scalar(select(BillingOrder))
         assert order.status == ('refunded' if status == 'refunded' else 'disputed')
         assert db.scalar(select(func.count()).select_from(BillingOrderTransition).where(
-            BillingOrderTransition.order_id == order.id, BillingOrderTransition.to_status == order.status)) == 1
+            BillingOrderTransition.order_id == order.id, BillingOrderTransition.to_status == order.status,
+            BillingOrderTransition.from_status != BillingOrderTransition.to_status)) == 1
     future = sorted(periods(), key=lambda item: item.starts_at)[-1]
     assert rights(state, future.starts_at)['plan'] == 'free'
 

@@ -30,7 +30,7 @@ export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
   status: string; phase: string; priority: string | null; cache_hit: boolean;
   page_index: number | null; created_at: string; completed_at: string | null; settlement: string;
-  quota_pages: number; error_code: string | null; cancel_requested: boolean;
+  quota_pages: number; error_code: string | null; cancel_requested: boolean; discard_output: boolean;
   elapsed_seconds: number; execution_seconds: number; non_execution_seconds: number;
   initial_wait_seconds: number; worker_seconds: number; started_at: string | null;
   nodes: {id: string; name: string}[]; running_nodes: string[]; expired_leases: number;
@@ -62,7 +62,7 @@ export type Bucket = {id: string; mode: Mode; source: string; granted: number; u
 export type UserDetail = User & {
   operator_membership?: {active: boolean; expires_at: string | null};
   grants: (Bucket & {starts_at: string; note: string})[];
-  created_at: string; reading_sessions: {mode: Mode; session_id: string | null; expires_at: string | null}[];
+  created_at: string; reading_sessions: {session_id: string; sequence: number; page_count: number; fenced: boolean; expires_at: string}[];
   entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number};
     modes: Record<Mode, {unlimited: boolean; allowed: boolean; quota: null | {
       available: number; used: number; reserved: number; granted: number; resets_at: string | null; buckets: Bucket[]}}>

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from . import creem_client as creem
 from .billing_providers import require, resource_key, remote_id
-from .billing_models import BillingAccount, BillingCheckout, BillingCustomer, BillingSubscription, BillingPrice, BillingPriceBinding, BillingPlanRevision, BillingInvoice, BillingTerm
+from .billing_models import BillingAccount, BillingCheckout, BillingCustomer, BillingSubscription, BillingPrice, BillingPriceBinding, BillingPlanRevision, BillingInvoice, BillingTerm, BillingEvent
 from .billing_checkout import bind_session, customer_for
 from .billing_grants import grant_term
 from .billing_orders import checkout_order, payment_order, transition, revoke_invoice, record_subscription_state
@@ -36,7 +36,7 @@ def transaction_details(sub, price, value):
         total = value['amount']
     require(type(total) is int and total >= 0, 'CREEM_TRANSACTION_INVALID')
     state = {'paid': 'paid', 'pending': 'pending', 'declined': 'failed', 'uncollectible': 'failed',
-        'canceled': 'canceled', 'void': 'canceled', 'refunded': 'refunded', 'partialRefund': 'partially_refunded',
+        'canceled': 'canceled', 'void': 'canceled', 'refunded': 'refunded', 'partialRefund': 'partially_refunded', 'partially_refunded': 'partially_refunded',
         'chargedBack': 'disputed', 'chargeback': 'disputed'}.get(value.get('status'), 'unknown')
     return total, state
 
@@ -84,6 +84,19 @@ def apply_transaction(db, user, sub, value, event_id=None):
                 and start == sub.trial_starts_at and end == sub.trial_ends_at):
             state = 'trialing'
     order = payment_order(db, sub, value['id'], total, state, 'transaction_sync', event_id=event_id, subtotal=value['amount'])
+    reported = value.get('refunded_amount')
+    require(reported is None or type(reported) is int and reported >= 0, 'CREEM_TRANSACTION_INVALID')
+    if reported is not None:
+        order.refunded_total = max(order.refunded_total or 0, reported)
+    event = db.get(BillingEvent, event_id) if event_id else None
+    if event and event.event_type in ('refund.created', 'dispute.created'):
+        require(event.provider == order.provider and event.environment == order.environment
+            and event.payload.get('transaction_id') == order.external_id, 'BILLING_REVERSAL_CONFLICT')
+        from .billing_reversals import record_reversal
+        snapshot = event.payload.get('reversal') or {}
+        record_reversal(db, order, event.event_type.split('.')[0], event.resource_id,
+            amount=snapshot.get('amount'), currency=snapshot.get('currency'), status=snapshot.get('status') or 'unknown',
+            occurred_at=event.occurred_at, observed_at=event.occurred_at, event_id=event.id)
     key = resource_key('creem', value['id'])
     receipt = db.get(BillingInvoice, key)
     # A reversal can be observed before its paid receipt. The order retains

@@ -4,8 +4,8 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
-from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import CheckConstraint, ForeignKey, Index, JSON, String, UniqueConstraint, and_, exists, func, literal, or_, select, union_all
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
+from sqlalchemy import CheckConstraint, ForeignKey, Index, JSON, String, UniqueConstraint, and_, cast, exists, func, literal, or_, select, union_all, update
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
@@ -21,6 +21,7 @@ from .system_settings import get_request_limits
 from .schemas import JobResponse
 from .providers import digest
 from .feedback_limits import lock_feedback_admission, reserve_feedback_receipt
+from .feedback_review_models import FeedbackReview
 
 router = APIRouter(tags=["Reader"])
 
@@ -104,6 +105,16 @@ class FeedbackPage(BaseModel):
 
 class FeedbackUpdate(RequestBody):
     status: Literal["received", "reviewing", "resolved"]
+    expected_status: Literal["received", "reviewing", "resolved"]
+    expected_updated_at: AwareDatetime
+    note: str = Field(min_length=1, max_length=500)
+
+    @field_validator("note")
+    @classmethod
+    def clean_note(cls, value):
+        if not value.strip():
+            raise ValueError("请填写处理备注")
+        return value.strip()
 
 
 def feedback_json(row):
@@ -164,20 +175,102 @@ def my_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=10
     return feedback_page(db, offset, limit, user.id)
 
 
-@router.get("/v1/admin/feedback", response_model=FeedbackPage)
+def admin_feedback_json(db, row):
+    from .results import ResultAccess
+    access = db.get(ResultAccess, row.access_id) if row.access_id else None
+    actual_job_id = row.job_id or (access.result_id if access else None)
+    job = db.get(Job, actual_job_id) if actual_job_id else None
+    owner = db.get(User, row.owner_id)
+    review = db.scalar(select(FeedbackReview).where(FeedbackReview.feedback_id == row.id).order_by(
+        FeedbackReview.created_at.desc(), FeedbackReview.id.desc()).limit(1))
+    actor = db.get(User, review.actor_id) if review else None
+    return {**feedback_json(row), "owner_id": row.owner_id, "owner_name": owner.name if owner else row.owner_id,
+            "actual_job_id": actual_job_id, "access_id": row.access_id,
+            "result_version": access.version if access else job.version if job else None,
+            "mode": job.mode if job else None, "target_language": job.target_language if job else None,
+            "reviewer_id": review.actor_id if review else None, "reviewer_name": actor.name if actor else None,
+            "review_note": review.note if review else None, "reviewed_at": review.created_at.isoformat() + "Z" if review else None}
+
+
+@router.get("/v1/admin/feedback")
 def admin_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100),
+                   status: Literal["received", "reviewing", "resolved"] | None = None,
+                   issue: Literal["missing_text", "meaning", "typesetting", "art_changed", "other"] | None = None,
+                   owner_id: str | None = Query(None, max_length=36), job_id: str | None = Query(None, max_length=36),
                    user: User = Depends(admin), db: Session = Depends(get_db)):
-    return feedback_page(db, offset, limit)
+    from .results import ResultAccess
+    query = select(Feedback)
+    if status:
+        query = query.where(Feedback.status == status)
+    if issue:
+        query = query.where(cast(Feedback.issues, String).contains('"' + issue + '"'))
+    if owner_id:
+        query = query.where(Feedback.owner_id == owner_id)
+    if job_id:
+        query = query.where(or_(Feedback.job_id == job_id, Feedback.access_id == job_id,
+            Feedback.access_id.in_(select(ResultAccess.id).where(ResultAccess.result_id == job_id))))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(query.order_by(Feedback.created_at.desc(), Feedback.id.desc()).offset(offset).limit(limit))
+    return {"items": [admin_feedback_json(db, row) for row in rows], "total": total,
+            "next_offset": offset + limit if offset + limit < total else None}
 
 
-@router.patch("/v1/admin/feedback/{feedback_id}", response_model=FeedbackResponse)
-def review_feedback(feedback_id: str, body: FeedbackUpdate, user: User = Depends(admin), db: Session = Depends(get_db)):
+@router.get("/v1/admin/feedback/{feedback_id}")
+def feedback_detail(feedback_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
     row = db.get(Feedback, feedback_id)
     if not row:
         problem("NOT_FOUND", "找不到此反馈", 404)
+    return admin_feedback_json(db, row)
+
+
+@router.get("/v1/admin/feedback/{feedback_id}/reviews")
+def feedback_reviews(feedback_id: str, offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
+                     user: User = Depends(admin), db: Session = Depends(get_db)):
+    if db.get(Feedback, feedback_id) is None:
+        problem("NOT_FOUND", "找不到此反馈", 404)
+    query = select(FeedbackReview, User.name).join(User, User.id == FeedbackReview.actor_id).where(
+        FeedbackReview.feedback_id == feedback_id)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.execute(query.order_by(FeedbackReview.created_at.desc(), FeedbackReview.id.desc()).offset(offset).limit(limit))
+    return {"items": [{"id": row.id, "actor_id": row.actor_id, "actor_name": name,
+                       "from_status": row.from_status, "to_status": row.to_status, "note": row.note,
+                       "created_at": row.created_at.isoformat() + "Z"} for row, name in rows],
+            "total": total, "next_offset": offset + limit if offset + limit < total else None}
+
+
+@router.patch("/v1/admin/feedback/{feedback_id}")
+def review_feedback(feedback_id: str, body: FeedbackUpdate, idempotency_key: Annotated[str | None, Header()] = None,
+                    user: User = Depends(admin), db: Session = Depends(get_db)):
+    from .admin_audit import record_audit
+    from .entitlements import lock_operation
+    key, actor_id = idem_key(idempotency_key), user.id
+    db.rollback()
+    lock_operation(db, f"feedback:{actor_id}:{key}")
+    if db.get_bind().dialect.name == "sqlite":
+        db.execute(update(Feedback).where(Feedback.id == feedback_id).values(updated_at=Feedback.updated_at))
+    row = db.scalar(select(Feedback).where(Feedback.id == feedback_id).with_for_update())
+    if not row:
+        problem("NOT_FOUND", "找不到此反馈", 404)
+    request_hash = digest({"feedback_id": feedback_id, **body.model_dump(mode="json")})
+    previous = db.scalar(select(FeedbackReview).where(FeedbackReview.actor_id == actor_id, FeedbackReview.operation_key == key))
+    if previous:
+        if previous.request_hash != request_hash:
+            problem("IDEMPOTENCY_CONFLICT", "此处理编号已用于其他操作", 409)
+        return previous.result
+    expected_at = body.expected_updated_at.astimezone(timezone.utc).replace(tzinfo=None)
+    if row.status != body.expected_status or row.updated_at != expected_at:
+        problem("FEEDBACK_CHANGED", "反馈已由其他管理员处理，请刷新后重新核实", 409)
+    before = row.status
     row.status, row.updated_at = body.status, now()
+    db.flush()
+    result = {**admin_feedback_json(db, row), "reviewer_id": actor_id, "reviewer_name": db.get(User, actor_id).name,
+              "review_note": body.note, "reviewed_at": row.updated_at.isoformat() + "Z"}
+    db.add(FeedbackReview(feedback_id=row.id, actor_id=actor_id, operation_key=key, request_hash=request_hash,
+        from_status=before, to_status=body.status, note=body.note, result=result, created_at=row.updated_at))
+    record_audit(db, actor_id, "feedback.review", "feedback", row.id, before={"status": before},
+                 after={"status": row.status}, note=body.note, operation_key=key)
     db.commit()
-    return feedback_json(row)
+    return result
 
 
 class UsageDay(BaseModel):

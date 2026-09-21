@@ -30,6 +30,9 @@ from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
 from .node_admin import router as node_admin_router
 from .admin_monitor import router as admin_monitor_router
+from .admin_audit import router as admin_audit_router
+from .admin_operations import router as admin_operations_router
+from .user_admin import router as user_admin_router
 from .admin_web import create_router as create_admin_web_router
 from .request_models import RequestBody
 from .health import readiness
@@ -74,6 +77,9 @@ app.include_router(billing_router)
 app.include_router(billing_admin_router)
 app.include_router(billing_catalog_router)
 app.include_router(admin_monitor_router)
+app.include_router(admin_audit_router)
+app.include_router(admin_operations_router)
+app.include_router(user_admin_router)
 app.include_router(create_admin_web_router(settings().admin_web_path))
 app.include_router(system_settings_router)
 app.include_router(translation_providers_router)

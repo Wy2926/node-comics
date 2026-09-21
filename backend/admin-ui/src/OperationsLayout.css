@@ -1,0 +1,103 @@
+/* Desktop operations: shared spacing and readable forms within existing tokens. */
+.sidebar {padding: 24px 16px 16px; overflow: hidden;}
+.sidebar .brand {flex-shrink: 0; margin-bottom: 20px;}
+.sidebar nav {display: block; overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: #55516c transparent; padding-right: 3px;}
+.nav-group {display: grid; gap: 2px; margin-bottom: 15px;}
+.nav-group-label {color: #a9a8c2; font-size: 11px; letter-spacing: .6px; padding: 0 12px 6px;}
+.sidebar nav a {min-height: 36px; padding: 7px 12px; gap: 12px;}
+.sidebar nav a span {font-size: 18px;}
+.sidebar-bottom {flex-shrink: 0; padding: 12px 12px 0; margin-top: 12px; gap: 2px;}
+.sidebar-bottom .tiny-label {display: none;}
+.sidebar-bottom b {font-size: 13px;}
+textarea {font: inherit; border: 1px solid #dcdfea; border-radius: 7px; color: inherit; padding: 10px 12px; resize: vertical; max-width: 100%;}
+textarea:focus-visible, summary:focus-visible {outline: 3px solid #8a78dd; outline-offset: 3px;}
+button:disabled {cursor: not-allowed;}
+.admin-surface .page-heading {margin-bottom: 24px;}
+.admin-surface .filters {background: white; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px;}
+.admin-surface .filter-form {display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; align-items: end;}
+.admin-surface .filter-form > label {min-width: 0;}
+.payment-events .filter-form, .audit-page .filter-form {grid-template-columns: repeat(3, minmax(0, 1fr));}
+.admin-surface .filter-form input, .admin-surface .filter-form select {width: 100%; min-width: 0;}
+.filter-actions {display: flex; gap: 8px; align-items: center; align-self: end; white-space: nowrap;}
+.admin-surface .filter-form > .filter-actions {grid-column: 1 / -1; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 14px;}
+.admin-surface td {vertical-align: top; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65;}
+.admin-surface td small {font-size: 11px; margin-top: 4px;}
+.admin-surface td code {font-size: 11px; color: var(--muted);}
+.admin-surface .table-scroll {max-width: 100%;}
+.admin-surface .pagination {padding: 14px 18px;}
+.admin-surface .empty {padding: 35px 20px;}
+.admin-surface .empty > span {font-size: 25px; margin-bottom: 8px;}
+.admin-surface .footnote {margin-top: 18px;}
+.section-bar {display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border);}
+.section-bar h2, .section-bar h3 {padding: 0!important;}
+.section-bar p {font-size: 12px; color: var(--muted); margin-top: 3px;}
+.section-count {font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 10px;}
+.surface-toolbar {display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px;}
+.surface-toolbar p {color: var(--muted); font-size: 12px;}
+.status-tabs {display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px;}
+.status-tabs button {background: transparent; color: var(--muted); border-radius: 7px; padding: 8px 14px; border: 1px solid transparent;}
+.status-tabs button[aria-pressed=true] {background: #ede8fb; color: #5941ad; border-color: #dcd1f9; font-weight: 600;}
+.status-tabs button:hover {background: #f0edf7;}
+.admin-surface .admin-tabs {padding: 6px; background: #fff; border: 1px solid var(--border); border-radius: 10px; gap: 4px; margin-bottom: 20px;}
+.admin-surface .admin-tabs button {border: 0; padding: 8px 12px;}
+.admin-surface .stats-grid {margin: 18px 0; gap: 16px;}
+.admin-surface > .panel {overflow: hidden;}
+.admin-surface > .panel > h2 {padding: 18px 20px 8px;}
+.admin-surface > .panel > .panel-note {padding: 0 20px 16px; margin: 0;}
+.admin-surface > .panel + .panel {margin-top: 20px;}
+.operations-table td .badge {white-space: nowrap;}
+.id-value {font-family: ui-monospace, Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; color: var(--muted);}
+.event-dialog .dialog-content, .subscription-dialog .dialog-content {display: grid; gap: 20px;}
+.event-dialog .billing-detail-toolbar, .subscription-dialog .billing-detail-toolbar {margin: 0;}
+.event-content {display: grid; gap: 20px;}
+.event-content > details > summary {font-size: 13px; color: var(--purple); cursor: pointer;}
+.event-content > details[open] > summary {margin-bottom: 12px;}
+.event-dialog .detail-meta, .subscription-dialog .detail-meta {margin: 0; gap: 12px 18px; font-size: 13px;}
+.event-dialog .detail-heading, .subscription-dialog .detail-heading {margin: 0 0 12px;}
+.event-summary {border: 1px solid var(--border); background: #f7f5fd; border-radius: 10px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;}
+.event-summary h3 {font-size: 16px;}
+.event-summary p {color: var(--muted); font-size: 12px; margin-top: 4px;}
+.event-summary code {font-size: 11px;}
+.event-error {padding: 12px 16px; background: #fff6ea; border: 1px solid #f3ddbd; border-radius: 8px; font-size: 12px; overflow-wrap: anywhere;}
+.event-error strong {display: block; margin-bottom: 3px;}
+.event-section {border-bottom: 1px solid var(--border); padding-bottom: 20px;}
+.event-section:last-child {border: 0; padding-bottom: 0;}
+.event-action {padding: 20px; background: #faf9fd; border: 1px solid #ddd6f1; border-radius: 10px; display: grid; gap: 12px;}
+.event-action h3 {margin: 0;}
+.event-action label {display: grid; gap: 7px; font-weight: 600; font-size: 13px;}
+.event-action textarea {width: 100%; font-weight: 400; min-height: 84px; background: #fff;}
+.event-action .primary, .event-action .secondary {justify-self: start;}
+.event-references {display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px 24px; margin: 0;}
+.event-references dt {font-size: 12px; color: var(--muted);}
+.event-references dd {margin: 3px 0 0; overflow-wrap: anywhere;}
+.subscription-term {padding: 18px; margin-top: 12px;}
+.subscription-term h4 {margin: 0 0 5px;}
+.subscription-term .table-scroll {margin-top: 16px;}
+.audit-expanded td {padding: 0 18px 18px; background: #faf9fe;}
+.audit-expanded .audit-changes {border: 1px solid var(--border); border-radius: 8px; overflow: hidden;}
+.audit-changes th {background: #f0edf8;}
+.audit-changes td, .audit-changes th {padding: 10px 14px;}
+.audit-changes table {min-width: 0; width: 100%; table-layout: fixed;}
+.audit-changes td {font-size: 12px;}
+.audit-expanded details {margin-top: 12px; font-size: 12px;}
+.audit-expanded summary {cursor: pointer; color: var(--purple);}
+.audit-expanded .admin-json {margin: 10px 0 0; max-height: 240px;}
+.audit-expanded .audit-empty {padding: 14px; color: var(--muted); font-size: 12px;}
+.image-test-dialog .dialog-content {padding: 24px;}
+.image-test-dialog .membership-actions {border: 0; padding: 0; margin: 0; box-shadow: none;}
+.image-test-dialog .membership-actions h2 {padding: 0; margin-bottom: 14px;}
+.image-test-dialog .attention {margin: 14px 0;}
+.image-test-dialog .benefit-fields {margin-top: 20px;}
+.image-test-dialog .settings-notice {margin-top: 18px;}
+.image-test-receipt {display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; font-size: 12px;}
+.image-test-receipt small {margin: 0; color: var(--muted);}
+.image-test-receipt .error {flex-basis: 100%;}
+.image-test-dialog .image-test-receipt + button {margin-top: 14px;}
+.image-test-dialog .image-config-section {margin-top: 20px;}
+.image-config-section {padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: #fbfaff;}
+.image-config-section h3 {margin-bottom: 14px; font-size: 14px;}
+.image-config-advanced {border: 1px solid var(--border); padding: 16px 18px; border-radius: 10px;}
+.image-config-advanced summary {cursor: pointer; font-weight: 600; font-size: 13px;}
+.image-config-advanced[open] summary {margin-bottom: 16px;}
+.image-config-advanced textarea {width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 12px;}
+.provider-dialog .config-body > .primary {justify-self: start;}

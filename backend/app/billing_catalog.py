@@ -9,7 +9,8 @@ from .billing_models import BillingPlan, BillingPlanRevision, BillingPrice, Bill
 from .db import get_db
 from .entitlements import lock_operation
 from .errors import problem
-from .models import uid
+from .models import User, uid
+from .admin_audit import record_audit
 from .request_models import RequestBody
 
 router = APIRouter(prefix='/v1/admin/billing', dependencies=[Depends(admin)])
@@ -168,19 +169,22 @@ def catalog(db: Session = Depends(get_db)):
 
 
 @router.put('/default-provider')
-def set_default_provider(body: DefaultProviderRequest, db: Session = Depends(get_db)):
+def set_default_provider(body: DefaultProviderRequest, db: Session = Depends(get_db), actor: User = Depends(admin)):
     from .billing_providers import provider_enabled
     lock_catalog(db)
     if not provider_enabled(body.provider):
         problem('BILLING_DISABLED', '请先在服务端配置并启用此支付渠道', 409)
     row = db.get(BillingSettings, 1)
+    before = {'default_provider': row.default_provider}
     row.default_provider = body.provider
+    record_audit(db, actor.id, 'billing.default_provider.update', 'billing_settings', '1',
+        before=before, after={'default_provider': row.default_provider})
     db.commit()
     return {'default_provider': row.default_provider}
 
 
 @router.post('/products')
-def create_product(body: ProductRequest, db: Session = Depends(get_db)):
+def create_product(body: ProductRequest, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     existing = db.get(BillingPlan, body.id)
     revision = db.get(BillingPlanRevision, body.revision_id)
@@ -193,12 +197,13 @@ def create_product(body: ProductRequest, db: Session = Depends(get_db)):
     db.add(BillingPlan(id=body.id, name=body.name))
     db.flush()
     db.add(BillingPlanRevision(id=body.revision_id, plan_id=body.id, version=1, **benefits))
+    record_audit(db, actor.id, 'billing.product.create', 'billing_plan', body.id, after=body.model_dump())
     db.commit()
     return {'id': body.id, 'revision_id': body.revision_id}
 
 
 @router.post('/products/{product_id}/revisions')
-def create_revision(product_id: str, body: RevisionRequest, db: Session = Depends(get_db)):
+def create_revision(product_id: str, body: RevisionRequest, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     if not db.get(BillingPlan, product_id):
         problem('NOT_FOUND', '产品不存在', 404)
@@ -210,12 +215,14 @@ def create_revision(product_id: str, body: RevisionRequest, db: Session = Depend
     version = (db.scalar(select(func.max(BillingPlanRevision.version)).where(
         BillingPlanRevision.plan_id == product_id)) or 0) + 1
     db.add(BillingPlanRevision(**body.model_dump(), plan_id=product_id, version=version))
+    record_audit(db, actor.id, 'billing.revision.create', 'billing_plan_revision', body.id,
+        after={**body.model_dump(), 'plan_id': product_id, 'version': version})
     db.commit()
     return {'id': body.id}
 
 
 @router.post('/prices')
-def create_price(body: PriceRequest, db: Session = Depends(get_db)):
+def create_price(body: PriceRequest, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     existing = db.get(BillingPrice, body.id)
     if existing:
@@ -226,12 +233,13 @@ def create_price(body: PriceRequest, db: Session = Depends(get_db)):
     if not revision:
         problem('NOT_FOUND', '产品权益版本不存在', 404)
     db.add(BillingPrice(**body.model_dump(), plan_id=revision.plan_id))
+    record_audit(db, actor.id, 'billing.price.create', 'billing_price', body.id, after=body.model_dump())
     db.commit()
     return {'id': body.id}
 
 
 @router.post('/prices/{price_id}/bindings')
-def create_binding(price_id: str, body: BindingRequest, db: Session = Depends(get_db)):
+def create_binding(price_id: str, body: BindingRequest, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     price = db.get(BillingPrice, price_id)
     if not price:
@@ -255,6 +263,8 @@ def create_binding(price_id: str, body: BindingRequest, db: Session = Depends(ge
     if db.scalar(select(BillingPriceBinding.id).where(*clauses)):
         problem('CATALOG_CONFLICT', '此支付平台产品或价格已绑定；调价或改变权益须使用新的支付平台价格', 409)
     db.add(BillingPriceBinding(**body.model_dump(), price_id=price_id))
+    record_audit(db, actor.id, 'billing.binding.create', 'billing_price_binding', body.id,
+        after={**body.model_dump(), 'price_id': price_id})
     db.commit()
     return {'id': body.id}
 
@@ -268,28 +278,37 @@ def validate_binding(binding, price, revision):
 
 
 @router.put('/bindings/{binding_id}/status')
-def publish_binding(binding_id: str, body: PriceState, db: Session = Depends(get_db)):
+def publish_binding(binding_id: str, body: PriceState, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     binding = db.get(BillingPriceBinding, binding_id)
     if not binding:
         problem('NOT_FOUND', '支付渠道绑定不存在', 404)
     price = db.get(BillingPrice, binding.price_id)
+    before = {'status': binding.status}
+    archived_ids = []
     if body.status == 'active':
         validate_binding(binding, price, db.get(BillingPlanRevision, price.plan_revision_id))
+        archived_ids = list(db.scalars(select(BillingPriceBinding.id).where(BillingPriceBinding.price_id == binding.price_id,
+            BillingPriceBinding.provider == binding.provider, BillingPriceBinding.environment == binding.environment,
+            BillingPriceBinding.status == 'active', BillingPriceBinding.id != binding.id)))
         db.execute(update(BillingPriceBinding).where(BillingPriceBinding.price_id == binding.price_id,
             BillingPriceBinding.provider == binding.provider, BillingPriceBinding.environment == binding.environment,
             BillingPriceBinding.status == 'active').values(status='archived'))
     binding.status = body.status
+    record_audit(db, actor.id, 'billing.binding.status', 'billing_price_binding', binding.id,
+        before=before, after={'status': binding.status}, details={'automatically_archived_ids': archived_ids})
     db.commit()
     return {'id': binding.id, 'status': binding.status}
 
 
 @router.put('/prices/{price_id}/status')
-def publish_price(price_id: str, body: PriceState, db: Session = Depends(get_db)):
+def publish_price(price_id: str, body: PriceState, db: Session = Depends(get_db), actor: User = Depends(admin)):
     lock_catalog(db)
     price = db.get(BillingPrice, price_id)
     if not price:
         problem('NOT_FOUND', '价格不存在', 404)
+    before = {'status': price.status}
+    archived_ids = []
     if body.status == 'active':
         bindings = list(db.scalars(select(BillingPriceBinding).where(
             BillingPriceBinding.price_id == price.id, BillingPriceBinding.status == 'active')))
@@ -298,9 +317,14 @@ def publish_price(price_id: str, body: PriceState, db: Session = Depends(get_db)
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
         for binding in bindings:
             validate_binding(binding, price, revision)
+        archived_ids = list(db.scalars(select(BillingPrice.id).where(BillingPrice.plan_id == price.plan_id,
+            BillingPrice.environment == price.environment, BillingPrice.currency == price.currency,
+            BillingPrice.interval == price.interval, BillingPrice.status == 'active', BillingPrice.id != price.id)))
         db.execute(update(BillingPrice).where(BillingPrice.plan_id == price.plan_id,
             BillingPrice.environment == price.environment, BillingPrice.currency == price.currency,
             BillingPrice.interval == price.interval, BillingPrice.status == 'active').values(status='archived'))
     price.status = body.status
+    record_audit(db, actor.id, 'billing.price.status', 'billing_price', price.id,
+        before=before, after={'status': price.status}, details={'automatically_archived_ids': archived_ids})
     db.commit()
     return {'id': price.id, 'status': price.status}

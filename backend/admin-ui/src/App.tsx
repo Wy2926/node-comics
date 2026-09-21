@@ -8,6 +8,13 @@ import {SystemSettingsPage} from './SystemSettings';
 import {TranslationProvidersPage} from './TranslationProviders';
 import {BillingCatalogPage} from './BillingCatalog';
 import {BillingOrdersPage} from './BillingOrders';
+import {ImageProvidersPage} from './ImageProviders';
+import {FeedbackPage} from './FeedbackPage';
+import {BillingEventsPage} from './BillingEvents';
+import {BillingSubscriptionsPage} from './BillingSubscriptions';
+import {AuditLogPage} from './AuditLog';
+import {OperationsPage} from './Operations';
+import {StatisticsPage} from './Statistics';
 import type {Node} from './types';
 import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
@@ -17,12 +24,24 @@ const views = {
   tasks: ['翻译任务', 'TRANSLATION TASKS', '逐页查看执行状态、等待时间与节点履历。', '≡'],
   nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
   'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
+  'image-providers': ['图片供应商', 'IMAGE PROVIDERS', '管理 AI 重绘供应商与图片测试。', '▧'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
   billing: ['产品与价格', 'PRODUCTS & PRICES', '管理套餐产品、月付／年付价格与支付渠道。', '◇'],
   orders: ['订单管理', 'PAYMENTS & ORDERS', '查看支付订单、订阅状态和流转记录。', '▤'],
+  subscriptions: ['订阅与权益', 'SUBSCRIPTIONS', '追溯客户、订阅、账单与授权周期。', '◇'],
+  'billing-events': ['支付事件', 'PAYMENT EVENTS', '排查支付通知、处理失败与积压。', '↻'],
+  feedback: ['翻译反馈', 'READER FEEDBACK', '处理读者反馈并记录处理过程。', '✎'],
+  operations: ['运行诊断', 'DIAGNOSTICS', '查看服务健康、图片授权与受理记录。', '⌕'],
+  statistics: ['用量与成本', 'USAGE & COST', '查看调用计量与业务统计。', '▥'],
+  audit: ['操作审计', 'AUDIT LOG', '查询管理员操作和变更记录。', '≡'],
   settings: ['系统设置', 'SYSTEM SETTINGS', '统一管理上传与反馈的服务保护设置。', '⚙'],
 } as const;
 type View = keyof typeof views;
+const navigationGroups: {name: string; pages: View[]}[] = [
+  {name: '翻译与运行', pages: ['overview', 'tasks', 'nodes', 'operations', 'statistics']},
+  {name: '用户与交易', pages: ['users', 'feedback', 'billing', 'orders', 'subscriptions', 'billing-events']},
+  {name: '配置与审计', pages: ['translation-providers', 'image-providers', 'settings', 'audit']},
+];
 type Target = {kind: 'tasks' | 'users'; id: string};
 
 function useResource<T>(url: string, onUnauthorized: (message: string) => void, auto = false) {
@@ -87,12 +106,12 @@ function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClos
     <div className="dialog-content" aria-busy={busy}>
       {error && <p className="error" role="alert">{error} 请点击“刷新详情”重试。{data && ' 当前详情可能已过时。'}</p>}
       {!data && busy && <p className="loading" role="status">正在读取详情…</p>}
-      {data && (target.kind === 'tasks' ? <TaskDetail job={data as TaskData}/> : <UserDetail user={data as UserData} onChanged={reload}/>)}
+      {data && (target.kind === 'tasks' ? <TaskDetail job={data as TaskData} onChanged={reload} onUnauthorized={onUnauthorized}/> : <UserDetail user={data as UserData} onChanged={reload} onUnauthorized={onUnauthorized}/>)}
     </div>
   </dialog>;
 }
 
-function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: Exclude<View, 'settings' | 'translation-providers' | 'billing' | 'orders'>; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
+function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: 'overview' | 'tasks' | 'users' | 'nodes'; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
   const [detail, setDetail] = useState<Target>();
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
@@ -173,11 +192,18 @@ export function App() {
     {authMessage && <p className="error" role="alert">{authMessage}</p>}{!config && !authBusy && <button className="secondary" onClick={() => setBoot(n => n + 1)}>重新连接</button>}
     <p className="footnote">仅管理员可访问业务数据</p>
   </div></section> : <div className="workspace"><aside className="sidebar"><a href="#overview" className="brand"><span className="brand-mark" aria-hidden="true">N<span>✦</span></span><span>Node Comics<small>管理后台</small></span></a>
-    <p className="nav-label">工作空间</p><nav aria-label="后台导航">{Object.entries(views).map(([key, values]) => <a href={href(key)} key={key} aria-current={view === key ? 'page' : undefined}><span aria-hidden="true">{values[3]}</span>{values[0]}</a>)}</nav>
+    <nav aria-label="后台导航">{navigationGroups.map(group => <div className="nav-group" key={group.name}><p className="nav-group-label">{group.name}</p>{group.pages.map(key => <a href={href(key)} key={key} aria-current={view === key ? 'page' : undefined}><span aria-hidden="true">{views[key][3]}</span>{views[key][0]}</a>)}</div>)}</nav>
     <div className="sidebar-bottom"><span className="tiny-label">ADMINISTRATOR</span><b>{user.name}</b><button onClick={() => logout()}>退出登录 ↗</button></div>
   </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><span className="top-brand">NODE COMICS <span className="dot"/></span></header>
     {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
+      view === 'image-providers' ? <ImageProvidersPage onUnauthorized={logout}/> :
+      view === 'feedback' ? <FeedbackPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
+      view === 'billing-events' ? <BillingEventsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
+      view === 'subscriptions' ? <BillingSubscriptionsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
+      view === 'audit' ? <AuditLogPage onUnauthorized={logout}/> :
+      view === 'operations' ? <OperationsPage onUnauthorized={logout}/> :
+      view === 'statistics' ? <StatisticsPage onUnauthorized={logout}/> :
       view === 'billing' ? <BillingCatalogPage onUnauthorized={logout}/> :
       view === 'orders' ? <BillingOrdersPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       <WorkspacePage key={hash} view={view} params={params} auto={auto} setAuto={setAuto} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/>}

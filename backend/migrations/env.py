@@ -7,6 +7,8 @@ from app import plan_models, system_settings, feedback_models
 from app import reader_api
 from app import health_models, upload_models, entitlement_models
 from app import billing_models
+from app import admin_audit
+from app import feedback_review_models
 
 if context.is_offline_mode():
     from app.config import settings

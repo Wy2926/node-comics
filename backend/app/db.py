@@ -43,6 +43,8 @@ def initialize():
     from . import plan_models  # noqa: F401
     from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
     from . import billing_models  # noqa: F401
+    from . import admin_audit  # noqa: F401
+    from . import feedback_review_models  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

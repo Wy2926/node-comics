@@ -45,13 +45,14 @@ def delta(client,auth,cursor="0",limit=100,**params):
     return response.json()
 
 
-def test_plan_is_limited_to_three_pages_not_three_unfinished_jobs(cluster):
+def test_plan_is_limited_to_four_pages_not_four_unfinished_jobs(cluster):
     client,_=cluster
     auth=login(client)
-    ids=accepted(client,auth,4)
+    ids=accepted(client,auth,5)
     assert prioritize(client,auth,ids).status_code==422
-    assert prioritize(client,auth,ids[:3]).status_code==200
-    assert client.get(f"/v1/jobs/{ids[3]}",headers=auth).json()["status"]=="awaiting_upload"
+    assert prioritize(client,auth,ids[:4]).status_code==200
+    assert client.get(f"/v1/jobs/{ids[4]}",headers=auth).json()["status"]=="awaiting_upload"
+    assert client.get("/v1/jobs",headers=auth).json()["total"]==5
 
 
 def test_same_sequence_replay_and_conflict_never_reorder_window(cluster):

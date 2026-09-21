@@ -190,6 +190,8 @@ class BillingEvent(Base):
     error_code: Mapped[str | None] = mapped_column(String(80))
     received_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_retry_key: Mapped[str | None] = mapped_column(String(64))
+    last_retry_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class BillingOrder(Base):
@@ -209,6 +211,7 @@ class BillingOrder(Base):
     currency: Mapped[str] = mapped_column(String(3))
     subtotal: Mapped[int | None] = mapped_column(Integer)
     total: Mapped[int] = mapped_column(Integer)
+    refunded_total: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -217,7 +220,7 @@ class BillingOrder(Base):
         CheckConstraint("provider IN ('stripe', 'creem')"),
         CheckConstraint("environment IN ('test', 'live')"),
         CheckConstraint("kind IN ('initial', 'renewal')"),
-        CheckConstraint('total >= 0'), CheckConstraint('subtotal >= 0'),
+        CheckConstraint('total >= 0'), CheckConstraint('subtotal >= 0'), CheckConstraint('refunded_total >= 0'),
         Index('uq_billing_initial_order', 'checkout_id', unique=True,
             sqlite_where=text("kind = 'initial'"), postgresql_where=text("kind = 'initial'")),
         Index('ix_billing_orders_created', 'created_at', 'id'),
@@ -235,3 +238,34 @@ class BillingOrderTransition(Base):
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (Index('ix_billing_order_timeline', 'order_id', 'created_at', 'id'),)
+
+
+class ReversalFields:
+    """A verified provider record, never a fabricated allocation of an order total."""
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    order_id: Mapped[str] = mapped_column(ForeignKey('billing_orders.id'), index=True)
+    provider: Mapped[str] = mapped_column(String(16))
+    environment: Mapped[str] = mapped_column(String(16))
+    external_id: Mapped[str] = mapped_column(String(255))
+    transaction_id: Mapped[str] = mapped_column(String(255))
+    amount: Mapped[int | None] = mapped_column(Integer)
+    currency: Mapped[str | None] = mapped_column(String(3))
+    status: Mapped[str] = mapped_column(String(40))
+    event_id: Mapped[str | None] = mapped_column(String(320))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime)
+    observed_at: Mapped[datetime] = mapped_column(DateTime)
+    synced_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class BillingRefund(ReversalFields, Base):
+    __tablename__ = 'billing_refunds'
+    __table_args__ = (UniqueConstraint('provider', 'environment', 'external_id'),
+        CheckConstraint("provider IN ('stripe', 'creem')"), CheckConstraint("environment IN ('test', 'live')"),
+        CheckConstraint('amount >= 0'))
+
+
+class BillingDispute(ReversalFields, Base):
+    __tablename__ = 'billing_disputes'
+    __table_args__ = (UniqueConstraint('provider', 'environment', 'external_id'),
+        CheckConstraint("provider IN ('stripe', 'creem')"), CheckConstraint("environment IN ('test', 'live')"),
+        CheckConstraint('amount >= 0'))
