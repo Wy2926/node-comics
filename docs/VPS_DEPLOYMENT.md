@@ -1,5 +1,14 @@
 # 美国 VPS 服务端部署
 
+## 2026-09-21 官网示意图更新
+
+- 源码提交：`2d01c59123aac9e1ecd0e1d47249af8dd99a2387`，已推送 `origin/main`。
+- 镜像：`docker.nodelane.net/nodelane/node-comics:20260921-2d01c59`，摘要 `sha256:05b680686a3daaedc026db4e917d9d05b1d45108ab01802b71969dd8065e68cb`；服务器从该提交的源码构建并推送镜像仓库，三个服务已切换。
+- 官网替换中文示意图并添加英文、韩文，与日文原图组成四种切换；完整展示漫画，加载与解码期间显示动画，失败可重试，窄屏双列按钮。
+- 12 项单测、类型检查、110 页静态构建通过；本地和公网 Chrome 均验证五语页面、四张图片、320／390／1440px 示意图布局、延迟加载、失败重试、快速切换和滚动位置保持。执行入口为 `scripts/verify_website_compare.mjs`。
+- 发布后 `api`、`control-worker`、`maintenance` 均 healthy，源站首页和 `/health/ready` 返回 200；此为本次实际状态，取代下方上一轮缺少节点的就绪记录。未改动数据库、供应商及节点配置，未调用翻译或支付。
+- 前一镜像 `20260921-6047349` 保留；服务器保存 `.env.before-2d01c59`、`release-before-2d01c59.json`，最新发布信息写入 `release.json`。
+
 ## 2026-09-21 发布
 
 - 源码提交：`6047349e5128b767ddad0fcaa7e127aa22000b23`，已推送 `origin/main`。
