@@ -30,10 +30,12 @@ def load(path):
     if not value['node_token'] or not value['node_id'] or not value['resource_id']:
         raise ValueError('Node identity and credential are required')
     defaults = {'models': 'models', 'gpu': 0, 'ocr_workers': 8, 'threads': 2, 'tile': 768,
-                'font': [], 'png_compression': 1, 'detect_size': 1280, 'ocr_language': 'ja', 'direction': 'auto', 'inpaint_gpu': 0}
+                'font': [], 'png_compression': 1, 'detect_size': 1280, 'ocr_language': 'auto', 'direction': 'auto', 'inpaint_gpu': 0}
     if set(value.get('engine', {})) - set(defaults):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
+    if value['engine']['ocr_language'] not in ('auto', 'ja', 'zh', 'en', 'ko', 'latin'):
+        raise ValueError('Unsupported ocr_language')
     value.setdefault('local_pages', 2)
     value.setdefault('max_leases', 8)
     value.setdefault('download_workers', 4)

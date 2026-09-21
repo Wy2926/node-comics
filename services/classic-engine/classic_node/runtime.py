@@ -35,7 +35,7 @@ def model_identity(models, language):
                 if not item.get('build_only') and (not item.get('language') or item['language'] == language)}
     from manhua_engine.inpainting import model_identity as inpaint_identity
     expected.update(inpaint_identity(models))
-    if language == 'ja':
+    if language in ('ja', 'auto'):
         build = json.loads((root / 'ocr-fp32/build.json').read_text(encoding='utf-8'))
         if (build['source_revision'] != 'd5a3eee4a7b7b7754b71baa2ee82309dfff468bc'
                 or build['checkpoint_sha256'] != 'fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101'

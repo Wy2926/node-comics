@@ -1,22 +1,26 @@
 # Manhua Engine
 
-轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime DirectML GPU FP32 LaMa Large；按来源语言选择 OCR，按目标语言嵌字。安装方式优先见 [节点说明](README.md)，无需 CUDA 或 Android SDK。
+轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime DirectML GPU FP32 LaMa Large；默认多语言 OCR，按目标语言嵌字。安装方式优先见 [节点说明](README.md)，无需 CUDA 或 Android SDK。
 
 ## 支持范围
 
 | 来源 / `--ocr-language` | 识别方案 | 默认嵌字方向 |
 |---|---|---|
-| 日文 `ja` | MIT 48px CTC：Vulkan 特征 + ONNX CPU 解码；保留中英混合识别 | 日文目标沿用原区域横 / 竖排 |
+| 自动 `auto`（默认）／`ja` | MIT 多语言 48px CTC：Vulkan 特征 + ONNX CPU 解码；使用上游原字表，`ja` 并非日文专用权重 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
 | 韩文 `ko` | RapidOCR PP-OCRv5 Korean mobile，ONNX CPU FP32 | 韩文目标横排 |
 | 英文 `en` | RapidOCR PP-OCRv5 English mobile，ONNX CPU FP32 | 英文目标横排、单词换行、离线断词 |
 | 中文 `zh` | RapidOCR PP-OCRv5 Chinese mobile，中英日混合字表 | 中文目标沿用原区域横 / 竖排 |
 | 拉丁文字 `latin` | RapidOCR PP-OCRv5 Latin mobile | 横排；带重音字符不拆散 |
 
-`--ocr-language auto` 根据 `--source` 选择，默认来源是 Japanese。识别模型一次只加载一种，不逐行盲跑所有语言模型。混合漫画应指定主要语言；韩英混合选 `ko`，中英日横排混合可选 `zh`。日韩竖排漫画优先 `ja`。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
+`--ocr-language auto` 直接使用上游多语言 `48px_ctc`，无需输入来源语言；`--source` 仅作为 CLI 文本翻译提示，默认 Auto。识别模型一次只加载一种，不根据目标语言选择 OCR，也不逐行轮跑语言模型。自动模式按区域文字类型拼接英文、韩文和 CJK 行，不修改漫画默认从右到左的区域顺序。显式 `ja/zh/en/ko/latin` 仍可用于模型对照与专项处理。
+
+本地权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。识别范围对齐这个 `48px_ctc`，不等同于上游默认 `48px` 或所有可选模型能力的合集。模型字表支持不等于所有艺术字、手写字或语言组合均准确。清晰文字样本验证了日文、简繁中文、英文、韩文；俄文和越南文样本存在误识别，不能承诺任意语言都可靠。
 
 采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。无字体覆盖时明确报错，避免静默嵌入方框。`--direction horizontal/vertical` 可覆盖默认方向。
 
 长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每条 OCR 最多进行一次低置信度重裁剪；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
+
+LaMa 推理掩膜与最终回填掩膜独立：给模型的未知区域额外扩展 5 个原图像素，减轻紧贴文字形状导致的笔画残影；实际写入仍限于原去字掩膜。[上游对照、定位证据与回归](docs/INPAINTING_DIAGNOSIS.md)。
 
 ## 安装与模型
 

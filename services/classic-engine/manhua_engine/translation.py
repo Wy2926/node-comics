@@ -47,7 +47,7 @@ class Translator:
         self.endpoint=base if base.endswith('/chat/completions') else base+('/chat/completions' if base.endswith('/v1') else '/v1/chat/completions')
         self.model,self.mode=model,mode
         self.source,self.target=source,target
-        self.prompt=PROMPT.format(source=source,target=target)
+        self.prompt=PROMPT.format(source='the automatically detected source language(s)' if source.lower()=='auto' else source,target=target)
         if glossary is not None:
             if not isinstance(glossary,dict) or not all(isinstance(k,str) and k.strip() and isinstance(v,str) and v.strip() for k,v in glossary.items()):
                 raise ValueError('Glossary must map nonempty source terms to nonempty target terms')

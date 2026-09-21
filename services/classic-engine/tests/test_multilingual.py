@@ -5,7 +5,7 @@ import unicodedata
 import numpy as np
 from PIL import Image
 import pytest
-from manhua_engine.languages import language_code, join_lines
+from manhua_engine.languages import language_code, join_lines, text_language
 from manhua_engine.layout import draw_region, horizontal_lines, font_paths, font_runs, break_units, measure
 from manhua_engine.ocr import Recognizer
 from manhua_engine.quality import detection_windows, unique_quads
@@ -37,6 +37,36 @@ def test_panel_reading_order_follows_source_language():
            for x,text in [(20,'Left'),(400,'Right')]]
     assert [r['text'] for r in group(lines,600,200,'en')]==['Left','Right']
     assert [r['text'] for r in group(lines,600,200,'ja')]==['Right','Left']
+
+
+@pytest.mark.parametrize('text,expected', [('Hello world','en'), ('안녕하세요 세계','ko'),
+    ('明日は晴れる','ja'), ('今天晴天','zh'), ('Привет мир','en'), ('123!?','en')])
+def test_automatic_joining_uses_script_not_a_required_source_language(text,expected):
+    assert text_language(text)==expected
+
+
+def test_auto_mixed_regions_keep_spaces_and_original_manga_panel_order():
+    def region(x,texts):
+        return [{'quad':[[x,y],[x+180,y],[x+180,y+20],[x,y+20]],
+                 'text':text,'prob':.99,'fg':[0,0,0],'bg':[255,255,255]}
+                for y,text in zip((20,48),texts)]
+    lines=region(20,['Where are','you going?'])+region(500,['明日は','晴れる。'])
+    def run(_):
+        return [r['text'] for r in group(lines,800,200,'auto')]
+    with ThreadPoolExecutor(4) as pool:
+        results=list(pool.map(run,range(12)))
+    assert results==[['明日は晴れる。','Where are you going?']]*12
+
+
+def test_auto_ocr_uses_the_existing_multilingual_ctc_path():
+    # No live weights needed: auto must use exactly the same CTC branch as ja,
+    # never instantiate a specialist or require a source-language selection.
+    model=Recognizer.__new__(Recognizer)
+    model.language='auto'
+    model.alphabet=['','A','<SP>','B']
+    logits=np.array([[0,12,0,0],[12,0,0,0],[0,0,12,0],[0,0,0,12]],np.float32)
+    model.infer=lambda crop:(logits,np.zeros((4,6),np.float32))
+    assert model.forward(np.full((48,128,3),255,np.uint8))[0]=='A B'
 
 
 def test_unicode_breaks_keep_punctuation_and_combining_sequences():

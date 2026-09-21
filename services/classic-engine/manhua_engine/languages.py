@@ -1,5 +1,6 @@
 """Shared recognition, reading-order and typesetting language aliases."""
 import re
+import unicodedata
 
 ALIASES = {
     'ja': ('ja', 'jp', 'jpn', 'japanese', '日语', '日文', '日本語'),
@@ -8,6 +9,23 @@ ALIASES = {
     'zh': ('zh', 'zho', 'chi', 'chinese', 'simplified chinese', 'traditional chinese', '中文', '简体中文', '繁體中文'),
     'latin': ('latin',),
 }
+
+
+def text_language(text):
+    """Script hint for line joining, not a language ID or an OCR model router.
+
+    English and other Latin languages share spacing. Han-only Japanese is
+    ambiguous but shares Chinese's joining behavior, so no language guess is
+    sent to the translator. Mixed lines are classified per region, not per page.
+    """
+    names = [unicodedata.name(char, '') for char in text if char.isalpha()]
+    if any('HANGUL' in name for name in names):
+        return 'ko'
+    if any('HIRAGANA' in name or 'KATAKANA' in name for name in names):
+        return 'ja'
+    if any('CJK' in name or 'IDEOGRAPH' in name for name in names):
+        return 'zh'
+    return 'en'
 
 
 def language_code(value):

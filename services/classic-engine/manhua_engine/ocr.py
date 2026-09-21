@@ -1,4 +1,4 @@
-"""MIT manga OCR and RapidOCR PP-OCRv5 language-specific recognition."""
+"""MIT multilingual manga OCR and optional PP-OCRv5 specialist recognition."""
 import hashlib
 import json
 from pathlib import Path
@@ -12,12 +12,12 @@ from .vendor.ocr import ctc_decode
 
 class Recognizer:
     def __init__(self,models,gpu,threads,language='ja'):
-        if language not in ('ja','zh','en','ko','latin'):
+        if language not in ('auto','ja','zh','en','ko','latin'):
             raise ValueError(f'Unsupported OCR language: {language}')
         self.language=language
         opts=ort.SessionOptions();opts.intra_op_num_threads=1;opts.inter_op_num_threads=1
         opts.add_session_config_entry('session.intra_op.allow_spinning','0')
-        if language=='ja':
+        if language in ('auto','ja'):
             self.alphabet=(Path(__file__).parent/'alphabet.txt').read_text(encoding='utf-8').splitlines()
             path=Path(models)/'ocr-fp32/backbone.ncnn.param'
             if not path.is_file(): raise FileNotFoundError('Build FP32 OCR with tools/build_ocr.py first (see README)')
@@ -48,11 +48,11 @@ class Recognizer:
             self.provider=f'RapidOCR-3.9.2-PP-OCRv5-{language}-ORT-CPU-FP32'
 
     def infer(self,crop):
-        if self.language=='ja':
+        if self.language in ('auto','ja'):
             # Match MIT CTC inference: black right context is essential for final characters.
             crop=cv2.copyMakeBorder(crop,0,0,0,135,cv2.BORDER_CONSTANT,value=0)
         x=np.ascontiguousarray((crop.astype(np.float32)/127.5-1).transpose(2,0,1))
-        if self.language=='ja':
+        if self.language in ('auto','ja'):
             if x.shape[-1]>8192: raise ValueError('OCR strip exceeds the model positional encoding limit')
             features=self.net.run({'in0':x},['out0'])[0]
             logits,colors=self.session.run(None,{'features':np.ascontiguousarray(features[:,0,:].T[None])})
@@ -60,7 +60,7 @@ class Recognizer:
         return logits[0],colors[0]
 
     def forward(self,crop):
-        if self.language!='ja':
+        if self.language not in ('auto','ja'):
             from rapidocr.ch_ppocr_rec.typings import TextRecInput
             result=self.recognizer(TextRecInput(img=np.ascontiguousarray(crop[...,::-1])))
             return result.txts[0],float(result.scores[0]),(0,0,0),(255,255,255)

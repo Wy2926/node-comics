@@ -12,11 +12,16 @@ from .translation import atomic_json
 from .ocr import Recognizer
 from .quality import conservative_mask, repair_page, detection_windows, unique_quads
 from .layout import draw_region, resolve_colors, font_paths, coverage
-from .languages import join_lines
+from .languages import join_lines, text_language
 from .bubbles import lettering_areas
 
 
 def group(lines,w,h,language='ja'):
+    automatic = language == 'auto'
+    if automatic:
+        # OCR source text does not determine manga panel direction (an English
+        # scanlation can still read right-to-left). Preserve the manga default.
+        language = 'ja'
     quads=[Quadrilateral(np.array(r['quad']),r['text'],r['prob'],tuple(r['fg']),tuple(r['bg'])) for r in lines]
     regions=[]
     for members,fg,bg in merge_bboxes_text_region(quads,w,h):
@@ -27,7 +32,8 @@ def group(lines,w,h,language='ja'):
         cx,cy=pts.mean(0);rad=np.radians(angle)
         dx,dy=pts[:,0]-cx,pts[:,1]-cy
         rx,ry=np.cos(rad)*dx+np.sin(rad)*dy,-np.sin(rad)*dx+np.cos(rad)*dy
-        regions.append({'text':join_lines([t.text for t in members],language),'dir':direction,
+        region_language = (text_language(''.join(t.text for t in members)) or language) if automatic else language
+        regions.append({'text':join_lines([t.text for t in members],region_language),'dir':direction,
             'bbox':[int(pts[:,0].min()),int(pts[:,1].min()),int(pts[:,0].max()),int(pts[:,1].max())],
             'quads':[t.pts.tolist() for t in members],'fg':list(map(int,fg)),'bg':list(map(int,bg)),
             'angle':angle,'cx':float(cx),'cy':float(cy),'boxW':float(np.ptp(rx)),'boxH':float(np.ptp(ry))})
@@ -37,7 +43,7 @@ def group(lines,w,h,language='ja'):
 
 
 class Engine:
-    def __init__(self,models='models',gpu=0,ocr_workers=8,threads=2,tile=768,font=None,png_compression=1,detect_size=1280,ocr_language='ja',direction='auto',inpaint_gpu=0):
+    def __init__(self,models='models',gpu=0,ocr_workers=8,threads=2,tile=768,font=None,png_compression=1,detect_size=1280,ocr_language='auto',direction='auto',inpaint_gpu=0):
         self.tile=tile
         self.detect_size=detect_size
         self.font=(str(font),) if isinstance(font,(str,Path)) else tuple(font or ())

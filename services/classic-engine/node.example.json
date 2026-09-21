@@ -17,7 +17,7 @@
     "models": "models",
     "gpu": 0,
     "inpaint_gpu": 0,
-    "ocr_language": "ja",
+    "ocr_language": "auto",
     "ocr_workers": 8,
     "threads": 2,
     "detect_size": 1280,

@@ -12,7 +12,6 @@ from .backend import devices
 from .engine import Engine
 from .translation import Translator, atomic_json
 from .telemetry import GpuCounters
-from .languages import language_code
 
 
 def validate_outputs(paths, output):
@@ -72,21 +71,20 @@ def main():
     p.add_argument('--tile',type=int,default=768)
     p.add_argument('--detect-size',type=int,choices=[1024,1280,1536,2048],default=1280)
     p.add_argument('--font',action='append',help='Font path; repeat to add fallback fonts')
-    p.add_argument('--ocr-language',choices=['auto','ja','zh','en','ko','latin','all'],default='auto',help='auto uses --source; all is for download only')
+    p.add_argument('--ocr-language',choices=['auto','ja','zh','en','ko','latin','all'],default='auto',help='auto uses MIT multilingual 48px CTC without requiring source language; all is for download only')
     p.add_argument('--direction',choices=['auto','horizontal','vertical'],default='auto',help='Target direction; auto keeps CJK direction and uses horizontal English/Korean')
     p.add_argument('--png-compression',type=int,choices=range(10),default=1)
     p.add_argument('--translation',choices=['online','offline'],default='offline')
     p.add_argument('--base-url',default='https://sub2api.nodelane.net')
     p.add_argument('--model',default='gpt-5.6-luna')
-    p.add_argument('--source',default='Japanese')
+    p.add_argument('--source',default='Auto')
     p.add_argument('--target',default='Simplified Chinese')
     p.add_argument('--cache',default='cache/translations')
     p.add_argument('--glossary',type=Path,help='JSON source-to-target terminology map; included in cache key')
     p.add_argument('--limit',type=int)
     a=p.parse_args()
     if a.command=='devices': print(json.dumps(devices(),indent=2));return
-    ocr_language=language_code(a.source) if a.ocr_language=='auto' else a.ocr_language
-    if ocr_language is None: p.error('Cannot select OCR from --source; specify --ocr-language')
+    ocr_language=a.ocr_language
     if a.command=='download': download(a.models,ocr_language);return
     if ocr_language=='all': p.error('--ocr-language all is for download only')
     if not a.input: p.error('run requires an input image or directory')

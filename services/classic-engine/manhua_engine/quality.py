@@ -84,13 +84,16 @@ def repair_windows(mask,context=48):
     return merged
 
 
-def repair_region(net,rgb,mask,tile):
+def repair_region(net,rgb,mask,tile,inference_mask=None):
     h,w=rgb.shape[:2]
     tile=min(tile,getattr(net,'input_size',tile))
     scale=min(tile/max(h,w),1.)
     nh,nw=max(1,round(h*scale)),max(1,round(w*scale))
     small=cv2.resize(rgb,(nw,nh),interpolation=cv2.INTER_CUBIC if scale>1 else cv2.INTER_AREA)
-    m=cv2.resize(mask,(nw,nh),interpolation=cv2.INTER_NEAREST)
+    # The model needs a wider unknown area than the pixels we finally replace.
+    # Tight glyph-shaped masks can make LaMa regenerate text-shaped artifacts,
+    # even when every original stroke was masked. Keep compositing independent.
+    m=cv2.resize(mask if inference_mask is None else inference_mask,(nw,nh),interpolation=cv2.INTER_NEAREST)
     # Preserve geometry; mirror the mask with the image at padding boundaries.
     bottom,right=(-nh)%8,(-nw)%8
     canvas=cv2.copyMakeBorder(small,0,bottom,0,right,cv2.BORDER_REFLECT_101)
@@ -103,6 +106,11 @@ def repair_region(net,rgb,mask,tile):
 def repair_page(net,rgb,mask,tile=768):
     result=rgb.copy()
     windows=repair_windows(mask)
+    if not windows: return result,0
+    # Five source-image pixels, before any resizing or reflected padding. The
+    # original mask still owns both crop selection and the final pixel writes.
+    inference_mask=cv2.dilate(mask,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(11,11)))
     for x0,y0,x1,y1 in windows:
-        result[y0:y1,x0:x1]=repair_region(net,rgb[y0:y1,x0:x1],mask[y0:y1,x0:x1],tile)
+        result[y0:y1,x0:x1]=repair_region(net,rgb[y0:y1,x0:x1],mask[y0:y1,x0:x1],tile,
+                                         inference_mask[y0:y1,x0:x1])
     return result,len(windows)

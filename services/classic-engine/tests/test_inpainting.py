@@ -87,3 +87,23 @@ def test_empty_mask_does_not_run_model():
     image = np.full((20, 30, 3), 100, np.uint8)
     result, windows = repair_page(Net(), image, np.zeros((20, 30), np.uint8))
     assert windows == 0 and np.array_equal(result, image)
+
+
+@pytest.mark.parametrize('position',[(0,0),(65,80),(151,181)])
+def test_model_gets_context_margin_but_output_preserves_every_unmasked_pixel(position):
+    image=np.random.default_rng(7).integers(0,256,(160,190,3),dtype=np.uint8)
+    mask=np.zeros(image.shape[:2],np.uint8)
+    y,x=position
+    mask[y:y+9,x:x+9]=255
+    calls=[]
+    class Net:
+        input_size=512
+        def predict(self,rgb,inference_mask):
+            # Expanded inference mask contains more pixels than the write mask,
+            # including boundary cases; the model may modify the entire crop.
+            calls.append(int((inference_mask>0).sum()))
+            return np.full_like(rgb,213,dtype=np.float32)
+    result,windows=repair_page(Net(),image,mask)
+    assert windows==1 and calls[0]>int((mask>0).sum())
+    assert np.array_equal(result[mask==0],image[mask==0])
+    assert np.all(result[mask>0]==213)
