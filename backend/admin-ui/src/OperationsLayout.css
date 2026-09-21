@@ -45,7 +45,6 @@ button:disabled {cursor: not-allowed;}
 .admin-surface > .panel > h2 {padding: 18px 20px 8px;}
 .admin-surface > .panel > .panel-note {padding: 0 20px 16px; margin: 0;}
 .admin-surface > .panel + .panel {margin-top: 20px;}
-.operations-table td .badge {white-space: nowrap;}
 .id-value {font-family: ui-monospace, Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; color: var(--muted);}
 .event-dialog .dialog-content, .subscription-dialog .dialog-content {display: grid; gap: 20px;}
 .event-dialog .billing-detail-toolbar, .subscription-dialog .billing-detail-toolbar {margin: 0;}
@@ -57,7 +56,6 @@ button:disabled {cursor: not-allowed;}
 .event-summary {border: 1px solid var(--border); background: #f7f5fd; border-radius: 10px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;}
 .event-summary h3 {font-size: 16px;}
 .event-summary p {color: var(--muted); font-size: 12px; margin-top: 4px;}
-.event-summary code {font-size: 11px;}
 .event-error {padding: 12px 16px; background: #fff6ea; border: 1px solid #f3ddbd; border-radius: 8px; font-size: 12px; overflow-wrap: anywhere;}
 .event-error strong {display: block; margin-bottom: 3px;}
 .event-section {border-bottom: 1px solid var(--border); padding-bottom: 20px;}
@@ -85,7 +83,6 @@ button:disabled {cursor: not-allowed;}
 .audit-expanded .audit-empty {padding: 14px; color: var(--muted); font-size: 12px;}
 .image-test-dialog .dialog-content {padding: 24px;}
 .image-test-dialog .membership-actions {border: 0; padding: 0; margin: 0; box-shadow: none;}
-.image-test-dialog .membership-actions h2 {padding: 0; margin-bottom: 14px;}
 .image-test-dialog .attention {margin: 14px 0;}
 .image-test-dialog .benefit-fields {margin-top: 20px;}
 .image-test-dialog .settings-notice {margin-top: 18px;}

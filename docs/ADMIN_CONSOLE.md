@@ -171,26 +171,7 @@ PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG
 
 ### 历史验证记录
 
-2026-09-16 隐匿入口验证：后端入口／后台／身份相关 **70 passed**，后台前端 OIDC 模拟 **5 passed**，客户端既有 OIDC **11 passed**，后台类型检查与生产构建通过。在隔离浏览器中确认新入口登录、页面资源、导航、刷新恢复、数据请求失败与重试恢复，并检查截图。OIDC 授权和换令牌使用模拟响应验证精确回调、PKCE、state、时效及拒绝后重试；当次未修改线上 Logto、未公开部署、未完成真实 OIDC 登录。
-
-```powershell
-cd backend
-.venv/Scripts/python.exe -m pytest tests -q
-# 只检查后台：
-.venv/Scripts/python.exe -m pytest tests/test_admin_monitor.py tests/test_cluster_schema.py -q
-# 隐匿入口与身份回归；后台前端另在 backend/admin-ui 运行 npm test 和 npm run build：
-.venv/Scripts/python.exe -m pytest tests/test_admin_web.py tests/test_admin_monitor.py tests/test_identity_config.py tests/test_oidc.py -q
-# 独立浏览器验收服务，使用一次性 SQLite、合成元数据，不读取生产环境文件：
-.venv/Scripts/python.exe tests/manual_admin_server.py
-```
-
-验收地址 `http://127.0.0.1:18090/console-test/`，开发用户名 `admin`。夹具会输出临时 `controls.json` 路径，将其中 `delay` 设置为 0–10 秒、`fail` 设置为 true/false，可复现加载、失败与恢复。夹具中节点心跳固定，会按真实超时规则自然离线。
-
-PostgreSQL 检查使用现有隔离 `pg_scope`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD` 后运行 `tests/test_admin_monitor_postgres.py`。它只使用 `nodecomics_concurrency_test` 内随机 schema，覆盖 PostgreSQL 统计表达式和最终迁移结构。
-
-早期后台实现的历史证据：后端全套 **297 passed / 30 skipped**（当次尚未加入独立 PostgreSQL 后台测试）；随后在独立 PostgreSQL 17.6 容器中通过后台查询／迁移检查与 **14 项集群调度并发检查**。React 类型检查和生产构建通过，Docker 多阶段构建通过。浏览器完成管理员／普通用户访问、当时四个页面、分页、筛选、任务跨节点履历、权益详情、390px 窄屏、刷新暂停、慢请求、服务失败与重试恢复检查。该记录不扩展当前产品的桌面端范围。
-
-这是代码、本地运行和隔离数据验证；未验证生产 OIDC、生产负载或真实线上运行数据，未部署公开服务。
+2026-09-16 曾完成隐匿入口、模拟 OIDC、节点配置和旧版后台的浏览器／PostgreSQL 验证。其通过数量、旧入口、临时端口和窄屏检查不代表当前验收范围；详细历史可查 Git。当前复验使用上方完整后台夹具，OIDC／生产部署的未验证边界仍保留。
 
 ## 前端依赖
 

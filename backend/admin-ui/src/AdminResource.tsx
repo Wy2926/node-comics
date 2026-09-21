@@ -5,7 +5,7 @@ import {billingStatus, money} from './billing';
 
 export type Row = Record<string, unknown>;
 export type DataPage = {items: Row[]; total: number; next_offset: number | null};
-export type Column = {key: string; title: string; format?: 'time' | 'money' | 'bool' | 'currency'; formatter?: (value: unknown, row: Row) => string};
+export type Column = {key: string; title: string; format?: 'time' | 'money' | 'currency'; formatter?: (value: unknown, row: Row) => string};
 const vocabulary: Record<string, string> = {...labels, pending: '待处理', processing: '处理中', processed: '已处理',
   test: '测试环境', live: '正式环境', creem: 'Creem', stripe: 'Stripe',
   'control-worker': '控制工作进程', maintenance: '维护进程', oidc: '身份服务',
