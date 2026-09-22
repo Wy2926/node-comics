@@ -1,16 +1,17 @@
 import {msg,subscribeLocale} from '../i18n/runtime';
 import {readingImages,type InlineResponse,type InlineResult} from './protocol';
 import {comicImageRect,MAX_COMIC_IMAGES} from '../sources/comic-images';
-import {ImageDisplay,inlineStyles} from './display';
+import {imageDisplay,inlineStyles} from './display';
 import {connectInlineTheme} from './theme';
-import {safeImageUrl} from '../sources/adapters';
+import {sourcePageImages,sourceAdapter} from '../sources/adapters';
+import type {ComicElement,PageImage} from '../sources/model';
 import {languageLabel,modeLabels} from '../types';
 import {sourceImage} from '../sources/image-fetch';
 import {imageDataUrl} from './bytes';
 import {translationNotice} from '../translation/notice';
 import {advancesReadingWindow} from '../translation/automatic';
 
-interface Candidate {id:string;image:HTMLImageElement;url:string;rect:DOMRect;display:ImageDisplay;state?:InlineResult['state'];}
+interface Candidate {id:string;image:ComicElement;url:string;sourceKey:string;read?:PageImage['read'];rect:DOMRect;display:ReturnType<typeof imageDisplay>;state?:InlineResult['state'];}
 export function installInline(){
   const navigationId=crypto.randomUUID();let initialUrl=location.href;
   let automatic=false,dismissedUrl='';
@@ -18,7 +19,7 @@ export function installInline(){
   let enabled=false,paused=false,original=false,running=false,watching=false,generation=0,sequence=0,scope='',signature='',retryId:string|undefined;
   let prefetchAt=0,burstAt=0,scheduledAt=0,policyRevision='',failures=0,leaseTimer:ReturnType<typeof setInterval>|undefined;
   let candidates:Candidate[]=[],windowImages:Candidate[]=[],timer:ReturnType<typeof setTimeout>|undefined,scanTimer:ReturnType<typeof setTimeout>|undefined,raf=0;
-  const tracked=new Map<HTMLImageElement,Candidate>();
+  const tracked=new Map<ComicElement,Candidate>();
   const host=document.createElement('div');
   host.style.cssText='all:initial!important;position:fixed!important;inset:0!important;z-index:2147483646!important;pointer-events:none!important';
   const shadow=host.attachShadow({mode:'closed'});
@@ -62,33 +63,31 @@ export function installInline(){
     }
     for(const id of visibleBadges.keys())if(!visible.has(id))removeBadge(id);
   }
-  function source(image:HTMLImageElement){
-    const url=image.currentSrc||image.src;
-    if(url.startsWith('blob:')&&new URL(url).origin===location.origin||/^data:image\/(?:png|jpeg|webp|gif|avif);/i.test(url))return url;
-    return safeImageUrl(url,location.href);
-  }
+  function source(image:ComicElement){return sourcePageImages(document,location.href).find(target=>target.element===image);}
+  function current(item:Candidate){const target=source(item.image);return target?.url===item.url&&target.key===item.sourceKey;}
   function scan(){
     scanTimer=undefined;if(!enabled)return;
     if(location.href!==initialUrl){stop();return;}
     const next:Candidate[]=[];
-    for(const image of document.images){
+    for(const target of sourcePageImages(document,location.href)){
+      const image=target.element;
       if(next.length>=MAX_COMIC_IMAGES)break;
       // Repair presentation before measuring: a site style rewrite can also change
       // the translated bitmap's aspect ratio. Never repair a different source.
       const previous=tracked.get(image);
-      if(previous&&previous.url===source(image))previous.display.sync();
+      if(previous&&previous.url===target.url&&previous.sourceKey===target.key)previous.display.sync();
       const rect=comicImageRect(image);if(!rect)continue;
-      const url=source(image);if(!url)continue;
+      const url=target.url;
       let item=tracked.get(image);
-      if(item&&item.url!==url){item.display.restore();tracked.delete(image);item=undefined;}
-      if(!item){item={id:'image-'+(++sequence),image,url,rect,display:new ImageDisplay(image)};tracked.set(image,item);}
+      if(item&&(item.url!==url||item.sourceKey!==target.key)){item.display.restore();tracked.delete(image);item=undefined;}
+      if(!item){item={id:'image-'+(++sequence),image,url,sourceKey:target.key,read:target.read,rect,display:imageDisplay(image)};tracked.set(image,item);}
       item.rect=rect;next.push(item);
     }
     const present=new Set(next);
     for(const [image,item] of tracked)if(!present.has(item)){item.display.restore();tracked.delete(image);}
     candidates=next;
     const previousWindow=windowImages.map(i=>i.id);
-    windowImages=document.hidden?[]:readingImages(candidates,innerWidth,innerHeight);
+    windowImages=document.hidden?[]:readingImages(candidates,innerWidth,innerHeight,sourceAdapter(location.href).direction);
     // As in the reader, keep only a small decoded window on long chapters.
     const current=candidates.indexOf(windowImages[0]),retained=new Set(current<0?[]:candidates.slice(Math.max(0,current-1),current+4));
     for(const item of candidates)if(!retained.has(item))item.display.restore();
@@ -99,12 +98,12 @@ export function installInline(){
   }
   function queueScan(){if(!scanTimer)scanTimer=setTimeout(scan,20);if(!raf)raf=requestAnimationFrame(()=>{raf=0;paint();});}
   function schedule(delay=0){const now=performance.now();if(!scheduledAt||now>=scheduledAt)burstAt=now;const due=delay===80?Math.min(now+80,burstAt+200):now+delay;clearTimeout(timer);scheduledAt=due;if(enabled&&!paused&&!original&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>{scheduledAt=0;void tick();},Math.max(0,due-now));}
-  const payload=(targets:Candidate[])=>({images:targets.map(i=>({id:i.id,url:/^(blob:|data:)/.test(i.url)?'page-image:'+i.id:i.url,width:i.rect.width,height:i.rect.height})),known:Object.fromEntries(targets.map(i=>[i.id,i.display.key??'']))});
+  const payload=(targets:Candidate[])=>({images:targets.map(i=>({id:i.id,url:/^(blob:|data:|page-image:)/.test(i.url)?'page-image:'+i.id:i.url,width:i.rect.width,height:i.rect.height})),known:Object.fromEntries(targets.map(i=>[i.id,i.display.key??'']))});
   async function apply(data:InlineResponse,targets:Candidate[],stamp:number){
     if(stamp!==generation||!enabled)return;
     if(scope&&scope!==data.scope)for(const item of tracked.values())item.display.restore();scope=data.scope;
     translatedView=data;label.textContent=msg("漫译 · {0} · {1}", {"0": modeLabels[data.mode], "1": languageLabel(data.language)});
-    for(const result of data.items){const item=targets.find(t=>t.id===result.id);if(!item||!item.image.isConnected||source(item.image)!==item.url)continue;item.state=result.state;if(!result.resultKey)item.display.restore();if(result.data&&result.resultKey&&!original){try{await item.display.show(result.data,result.resultKey,()=>enabled&&!original&&stamp===generation&&source(item.image)===item.url);}catch(error){item.state={kind:'error',message:(error as Error).message,retryLabel:msg("点击重新加载")};}}}
+    for(const result of data.items){const item=targets.find(t=>t.id===result.id);if(!item||!item.image.isConnected||!current(item))continue;item.state=result.state;if(!result.resultKey)item.display.restore();if(result.data&&result.resultKey&&!original){try{await item.display.show(result.data,result.resultKey,()=>enabled&&!original&&stamp===generation&&current(item));}catch(error){item.state={kind:'error',message:(error as Error).message,retryLabel:msg("点击重新加载")};}}}
     if(data.retryAfterMs)schedule(data.retryAfterMs);
     if(data.needsPlan)schedule();
     if(policyRevision&&data.policyRevision&&policyRevision!==data.policyRevision)schedule();policyRevision=data.policyRevision??policyRevision;paint();
@@ -127,12 +126,12 @@ export function installInline(){
     }catch(error){if(stamp===generation)for(const item of targets)item.state={kind:'error',message:(error as Error).message};}
     finally{running=false;paint();if(stamp!==generation)schedule();else if(targets.length<windowImages.length)schedule(Math.max(0,prefetchAt-performance.now()));void watch();}
   }
-  const hasImage=(node:Node)=>node instanceof Element&&(node instanceof HTMLImageElement||node instanceof HTMLSourceElement||!!node.querySelector('img'));
+  const hasImage=(node:Node)=>node instanceof Element&&(node instanceof HTMLImageElement||node instanceof HTMLSourceElement||node instanceof HTMLCanvasElement||!!node.querySelector('img,canvas'));
   const observer=new MutationObserver(records=>{if(records.some(r=>r.type==='attributes'?hasImage(r.target):[...r.addedNodes,...r.removedNodes].some(hasImage)))queueScan();});
   function start(){
     if(enabled){paused=false;original=false;pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");schedule();paint();return;}
     initialUrl=location.href;enabled=true;paused=false;original=false;scope='';signature='';pause.textContent=msg("暂停");originals.textContent=msg("恢复原图");
-    document.documentElement.append(host);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','sizes','style','class','hidden','width','height']});
+    document.documentElement.append(host);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','sizes','style','class','hidden','width','height','data-comici-viewer-id']});
     document.addEventListener('scroll',queueScan,{passive:true,capture:true});window.addEventListener('resize',queueScan);document.addEventListener('load',queueScan,true);document.addEventListener('visibilitychange',visibility);window.addEventListener('online',visibility);window.addEventListener('pagehide',stop);scan();schedule();
     leaseTimer=setInterval(()=>{if(enabled&&!paused&&!original&&!document.hidden&&windowImages.length){const stamp=generation,targets=[...windowImages];void send('NC_INLINE_LEASE',payload(targets)).then(value=>{if(value?.ok&&value.data)return apply(value.data,targets,stamp);if(value?.retryAfterMs)schedule(value.retryAfterMs);}).catch(()=>{});}},30000);
   }
@@ -154,8 +153,8 @@ export function installInline(){
     if(message?.type==='NC_INLINE_CONFIG_CHANGED'&&enabled){scope='';invalidate();for(const item of tracked.values()){item.display.restore();item.state=undefined;}schedule();}
     if(message?.type==='NC_INLINE_SOURCE'&&message.navigationId===navigationId&&enabled){
       const item=windowImages.find(i=>i.id===message.id);
-      if(!item||source(item.image)!==item.url||!/^(blob:|data:)/.test(item.url)){respond({error:msg("图片已离开当前阅读范围。")});return;}
-      void sourceImage(item.url).then(imageDataUrl).then(data=>respond({data})).catch(error=>respond({error:error.message}));return true;
+      if(!item||!current(item)||!/^(blob:|data:|page-image:)/.test(item.url)){respond({error:msg("图片已离开当前阅读范围。")});return;}
+      void (item.read?item.read():sourceImage(item.url)).then(blob=>{if(!current(item))throw Error(msg("图片已离开当前阅读范围。"));return imageDataUrl(blob);}).then(data=>respond({data})).catch(error=>respond({error:error.message}));return true;
     }
   });
 }

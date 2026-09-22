@@ -1471,5 +1471,6 @@
   "管理订阅": "Gerenciar assinatura",
   "继续原结账": "Retomar pagamento",
   "前往安全结账": "Ir ao pagamento seguro",
-  "支付渠道": "Serviço de pagamento"
+  "支付渠道": "Serviço de pagamento",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Encontradas {0} / {1} páginas carregadas. Vire as páginas e atualize a busca. Mantenha a origem aberta até concluir a importação; a qualidade corresponde à renderização do site."
 }

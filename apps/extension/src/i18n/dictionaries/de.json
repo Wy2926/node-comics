@@ -1471,5 +1471,6 @@
   "管理订阅": "Abo verwalten",
   "继续原结账": "Zahlung fortsetzen",
   "前往安全结账": "Sicher bezahlen",
-  "支付渠道": "Zahlungsanbieter"
+  "支付渠道": "Zahlungsanbieter",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "{0} / {1} geladene Seiten erkannt. Weiterblättern und Suche aktualisieren. Quellseite bis zum Importende offen lassen; die Qualität entspricht der Website-Darstellung."
 }

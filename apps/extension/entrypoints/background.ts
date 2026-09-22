@@ -1,6 +1,8 @@
 import {registerLocaleBackground} from '../src/i18n/background';
 import {msg} from '../src/i18n/runtime';
 import {defineBackground} from 'wxt/utils/define-background';
+import {isPageImageUrl} from '../src/sources/urls';
+import {maxInlineBytes} from '../src/inline/bytes';
 import {safeImageUrl,type PageManifest} from '../src/sources/adapters';
 import {mangaCopyLocation,sameMangaCopyPage} from '../src/sources/mangacopy';
 import {pollSourceDiscovery} from '../src/sources/discovery';
@@ -14,7 +16,7 @@ async function discover(tabId:number){
  const loc=mangaCopyLocation(tab.url);
  if(loc&&!loc.chapterId){const catalog=await chrome.tabs.sendMessage(tabId,{type:'NC_CATALOG_SNAPSHOT'});if(!catalog||catalog.url!==new URL('/comic/'+loc.slug,tab.url).href)throw Error(msg("来源详情页已变化。"));const id=crypto.randomUUID();await chrome.storage.local.set({['nc-import:'+id]:{catalog,sourceTabId:tabId}});return {kind:'catalog',id,catalog};}
  const read=async()=>{const snapshot=await chrome.tabs.sendMessage(tabId,{type:'NC_DISCOVER'});if(snapshot?.error)throw Error(snapshot.error);if(!snapshot||snapshot.url!==tab.url||!Array.isArray(snapshot.items))throw Error(msg("来源页面已变化，请重新发现。"));return snapshot as PageManifest;};
- const result=loc?.chapterId?await pollSourceDiscovery(read):await read();const id=crypto.randomUUID();const manifest={...result,id,sourceTabId:tabId} as PageManifest;manifest.items=manifest.items.filter(i=>safeImageUrl(i.url,tab.url!)===i.url);await chrome.storage.local.set({['manifest:'+id]:manifest});return {kind:'pages',id,manifest};
+ const result=loc?.chapterId?await pollSourceDiscovery(read):await read();const id=crypto.randomUUID();const manifest={...result,id,sourceTabId:tabId} as PageManifest;manifest.items=manifest.items.filter(i=>i.kind==='page'?isPageImageUrl(i.url):safeImageUrl(i.url,tab.url!)===i.url);await chrome.storage.local.set({['manifest:'+id]:manifest});return {kind:'pages',id,manifest};
 }
 export default defineBackground(()=>{
  const localeReady=registerLocaleBackground();
@@ -75,8 +77,13 @@ export default defineBackground(()=>{
    }
    if(message?.type==='NC_SOURCE_IMAGE'){
     const data=await chrome.storage.local.get('manifest:'+message.manifestId),manifest=data['manifest:'+message.manifestId] as PageManifest|undefined;
-    const item=manifest?.items.find(i=>i.id===message.pageId);if(!manifest||!item||!safeImageUrl(item.url,manifest.url))throw Error(msg("图片不在来源清单内。"));
-    const current=await chrome.tabs.sendMessage(manifest.sourceTabId,{type:'NC_NAVIGATION'}).catch(()=>null);if(current?.url!==manifest.url||current.navigationId!==manifest.navigationId)throw Error(msg("来源页已改变，请重新发现。"));return {url:item.url};
+    const item=manifest?.items.find(i=>i.id===message.pageId);if(!manifest||!item||!(item.kind==='page'?isPageImageUrl(item.url):safeImageUrl(item.url,manifest.url)))throw Error(msg("图片不在来源清单内。"));
+    const current=await chrome.tabs.sendMessage(manifest.sourceTabId,{type:'NC_NAVIGATION'}).catch(()=>null);if(current?.url!==manifest.url||current.navigationId!==manifest.navigationId)throw Error(msg("来源页已改变，请重新发现。"));if(item.kind==='page'){
+     const source=await chrome.tabs.sendMessage(manifest.sourceTabId,{type:'NC_PAGE_IMAGE',navigationId:manifest.navigationId,url:manifest.url,imageUrl:item.url,pageId:item.id},{frameId:0});
+     if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:image\/png;base64,/.test(source.data))throw Error(source?.error??msg('网页原图读取失败。'));
+     return {url:item.url,data:source.data};
+    }
+    return {url:item.url};
    }
    throw Error(msg("不支持的操作。"));
   })().then(data=>respond({ok:true,data})).catch(error=>respond({ok:false,error:error.message}));return true;

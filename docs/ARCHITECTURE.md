@@ -18,6 +18,10 @@ MangaCopy是来源适配器之一，具体入口、原始标签映射和图片�
 
 站点适配器随插件发布，图片发现、字节获取、后端翻译分别管理。通用模式不声称完整章节。activeTab/scripting/storage/contextMenus与登录identity按功能使用，网站权限按需申请。消息校验sender、标签页、导航版本和登记资源，禁止任意跨域代理。凭据仅在可信扩展上下文。
 
+图片站点通过统一注册表接入，支持 HTTP(S) 图片和源站已渲染画布；Comic PASH 的画布发现、导入、网页翻译及目录能力边界见[网站图片适配](SITE_ADAPTERS.md)。
+
+通用适配与各站点独立目录的目标结构、目录／身份解耦和依赖检查见[适配架构设计](SOURCE_ADAPTER_ARCHITECTURE.md)。该文档为设计状态，尚未执行源码重构。
+
 清单、任务ID、原图与结果Blob存IndexedDB；Blob URL每次重建并撤销。连续阅读有限窗口解码，页面ID+相对位置恢复，原图尺寸占位。结果增量由可见阅读器或网页内容脚本驱动长轮询，重开核实操作回执，不依赖MV3后台常驻。
 
 MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执行电子书HTML，不全量读200MB文件进ArrayBuffer，不在解析时解码全卷。检查DRM、压缩、越界、展开大小、页数与单页限制。

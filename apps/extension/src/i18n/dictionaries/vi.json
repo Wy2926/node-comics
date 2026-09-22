@@ -1471,5 +1471,6 @@
   "管理订阅": "Quản lý đăng ký",
   "继续原结账": "Tiếp tục thanh toán",
   "前往安全结账": "Đến trang thanh toán an toàn",
-  "支付渠道": "Dịch vụ thanh toán"
+  "支付渠道": "Dịch vụ thanh toán",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Tìm thấy {0} / {1} trang đã tải. Lật trang rồi tìm lại. Giữ nguồn mở đến khi nhập xong; chất lượng theo cách trang web hiển thị."
 }

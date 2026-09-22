@@ -1,5 +1,5 @@
 import {msg} from '../i18n/runtime';
-import type {PageManifest} from '../sources/adapters';
+import {sourceName,type PageManifest} from '../sources/adapters';
 import {sourcePageIdentity} from '../sources/mangacopy';
 import {sourceMessage} from '../sources/client';
 import {sourceImage} from '../sources/image-fetch';
@@ -21,19 +21,19 @@ export function insertionBlocked(copy:ReadingCopy,library:LibraryState):string|u
 /** Download only the selected, trusted snapshot. Permission request retains the click's user activation. */
 export async function acquireWebImages(manifest:PageManifest,limitMb:number,progress:(text:string)=>void,protectedCopyId?:string):Promise<ReadingCopy>{
  limitMb=limitMb===-1?Infinity:limitMb;
- const origins=[...new Set(manifest.items.map(item=>new URL(item.url).origin+'/*'))];
+ const origins=[...new Set(manifest.items.filter(item=>item.kind!=='page').map(item=>new URL(item.url).origin+'/*'))];
  if(!manifest.items.length)throw Error(msg("请至少选择一张图片。"));
  if(origins.length&&!await chrome.permissions.request({origins}))throw Error(msg("未取得图片域名权限，请重试授权或导入本地图片。"));
- const digest=await hashFile(new Blob([JSON.stringify(manifest.items.map(item=>item.url))]));
- const source=({generic:msg("网页图片"),'context-menu':msg("网页图片"),mangacopy:'MangaCopy',xkcd:'xkcd',gunnerkrigg:'Gunnerkrigg'} as Record<string,string>)[manifest.adapter]??msg("网页图片");
+ const digest=await hashFile(new Blob([JSON.stringify(manifest.items.map(item=>item.kind==='page'?item.id:item.url))]));
+ const source=sourceName(manifest.adapter);
  const copy={...makeCopy(manifest.title,[],source,'web:'+sourcePageIdentity(manifest.url)+':'+digest),sourceUrl:manifest.url,discoveryComplete:manifest.discoveryComplete,knownTotal:manifest.items.length};
  try{
   for(const item of manifest.items){
-   const page={...emptyPage(msg("第 {0} 页", {"0": copy.pages.length+1}),item.width||800,item.height||1200),sourceUrl:item.url};copy.pages.push(page);
+   const page={...emptyPage(msg("第 {0} 页", {"0": copy.pages.length+1}),item.width||800,item.height||1200),sourceUrl:item.kind==='page'?undefined:item.url};copy.pages.push(page);
    try{
-    const valid=await sourceMessage<{url:string}>({type:'NC_SOURCE_IMAGE',manifestId:manifest.id,pageId:item.id});
+    const valid=await sourceMessage<{url:string;data?:string}>({type:'NC_SOURCE_IMAGE',manifestId:manifest.id,pageId:item.id});
     if(valid.url!==item.url)throw Error(msg("图片来源已变化，请重新发现。"));
-    const blob=await sourceImage(valid.url),bitmap=await createImageBitmap(blob);page.width=bitmap.width;page.height=bitmap.height;bitmap.close();
+    const blob=await sourceImage(valid.data??valid.url),bitmap=await createImageBitmap(blob);page.width=bitmap.width;page.height=bitmap.height;bitmap.close();
     if(!page.width||!page.height||page.width*page.height>100000000)throw Error(msg("原图尺寸不可用。"));
     Object.assign(page,await imageIdentity(blob));const key='original:'+page.imageSha256;
     if(!await getBlob(key)){

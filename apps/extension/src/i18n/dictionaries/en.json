@@ -1471,5 +1471,6 @@
   "管理订阅": "Manage subscription",
   "继续原结账": "Resume checkout",
   "前往安全结账": "Go to secure checkout",
-  "支付渠道": "Payment provider"
+  "支付渠道": "Payment provider",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Found {0} / {1} loaded pages. Turn pages and refresh discovery. Keep the source open until import finishes; quality matches the website rendering."
 }

@@ -168,8 +168,53 @@ try{
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('scrolling to page 2 admits page 5 and page 3 admits page 6 while previous translations remain unfinished');
   assert.equal(requests.filter(r=>r.path.includes('/queues')||r.path.includes('/translation-submissions')||r.path.endsWith('/priority')).length,0,'normal reading must not use removed queue/submission contracts');check('new plans and long-poll run with zero queue, priority or old submission requests');
+  // Match the real Comic PASH canvas structure with synthetic pixels and the same API fixture.
+  complete=true;
+  await browser.route('https://comicpash.jp/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><title>Canvas RTL fixture</title><style>body{margin:0}#xCVPages{display:flex;flex-direction:row-reverse;width:1200px}.-cv-page{width:600px;height:800px;flex:none}.-cv-page-canvas{position:relative;width:600px;height:800px}canvas{width:600px;height:800px}#xCVPages canvas{position:absolute;top:50%;left:0;transform:translateY(-50%)}</style><div id="comici-viewer" data-comici-viewer-id="fixture"><div id="xCVPages">${[1,2].map(n=>`<div class="-cv-page mode-rendered"><div class="-cv-page-canvas"><canvas id="canvas-${n}" width="600" height="800"></canvas></div></div>`).join('')}</div></div><canvas id="canvas-ad" width="600" height="800"></canvas><script>for(const [n,canvas] of [...document.querySelectorAll('canvas')].entries()){const ctx=canvas.getContext('2d');ctx.fillStyle=['#ffe0b0','#d0e0ff','#f00'][n];ctx.fillRect(0,0,600,800);ctx.fillStyle='#123';ctx.font='40px sans-serif';ctx.fillText('Original '+n,60,180);}document.querySelector('#canvas-1').onclick=()=>document.body.dataset.clicked='yes';</script>`}))
+  await page.goto('https://comicpash.jp/episodes/fixture');
+  const aligned=()=>page.waitForFunction(()=>[...document.querySelectorAll('[data-nc-canvas-translation]')].length>0&&[...document.querySelectorAll('[data-nc-canvas-translation]')].every(image=>{const a=image.getBoundingClientRect(),b=image.previousElementSibling.getBoundingClientRect();return ['x','y','width','height'].every(key=>Math.abs(a[key]-b[key])<=1);}));
+  const canvasOriginal=await page.locator('#canvas-1').evaluate(c=>c.toDataURL());
+  const canvasPixels=await page.locator('#canvas-1').screenshot();
+  const canvasGeometry=await page.locator('#canvas-1').boundingBox(),canvasJobs=createdJobs;
+  await activate();
+  await page.waitForFunction(()=>[...document.querySelectorAll('#xCVPages canvas')].every(c=>c.nextElementSibling?.hasAttribute('data-nc-canvas-translation')),null,{timeout:20000});
+  assert.equal(createdJobs,canvasJobs+2);assert.equal(await page.locator('#canvas-ad').evaluate(c=>c.style.content),'');
+  assert.deepEqual(await page.locator('#canvas-1').boundingBox(),canvasGeometry);assert.equal(await page.locator('#canvas-1').evaluate(c=>c.toDataURL()),canvasOriginal);
+  await page.locator('#canvas-1').click({position:{x:300,y:500}});assert.equal(await page.locator('body').getAttribute('data-clicked'),'yes');
+  await aligned();
+  assert.notDeepEqual(await page.locator('#canvas-1').screenshot(),canvasPixels,'translated pixels must actually be visible');
+  await page.screenshot({path:path.join(out,'canvas-translated.png')});
+  await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('#canvas-1').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
+  assert.equal(await page.locator('#canvas-1').evaluate(c=>c.toDataURL()),canvasOriginal);assert.deepEqual(await page.locator('#canvas-1').boundingBox(),canvasGeometry);
+  assert.deepEqual(await page.locator('#canvas-1').screenshot(),canvasPixels,'restoring the original must restore visible pixels');
+  await page.screenshot({path:path.join(out,'canvas-restored.png')});
+  await button('显示译图');await page.waitForFunction(()=>document.querySelector('#canvas-1').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
+  const replacedResult=await page.locator('#canvas-1').evaluate(c=>c.nextElementSibling.src);
+  await page.locator('#canvas-1').evaluate(c=>{const next=c.cloneNode();next.removeAttribute('style');next.getContext('2d').fillRect(0,0,600,800);c.replaceWith(next);});
+  await page.waitForFunction(previous=>{const overlay=document.querySelector('#canvas-1').nextElementSibling;return overlay?.hasAttribute('data-nc-canvas-translation')&&overlay.src!==previous;},replacedResult,{timeout:20000});
+  assert.equal(createdJobs,canvasJobs+3);check('Comic PASH RTL canvases upload decoded pixels, translate both pages, preserve clicks/geometry/originals, exclude ads and refresh recycled canvases');
+  if(process.env.RUN_LIVE_COMICPASH==='1'){
+    // Only source rendering is live. Actual source pixels go solely to the local fixture API.
+    await browser.unroute('https://comicpash.jp/**');
+    await page.goto('https://comicpash.jp/episodes/60cfe4785e2af');
+    await page.locator('#comici-viewer .mode-rendered canvas').first().waitFor({timeout:45000});
+    const closeHint=page.getByText('閉じる',{exact:true});if(await closeHint.count())await closeHint.first().click();
+    await activate();
+    await page.locator('[data-nc-canvas-translation]').first().waitFor({timeout:20000});
+    await aligned();
+    await page.screenshot({path:path.join(out,'comicpash-live-translated.png')});
+    const beforeTurn=await page.locator('#xCVPages').getAttribute('style');
+    await page.locator('#xCVLeftNav').click();
+    await page.waitForFunction(before=>document.querySelector('#xCVPages').getAttribute('style')!==before,beforeTurn);
+    await page.waitForFunction(()=>document.querySelectorAll('#comici-viewer [data-nc-canvas-translation]').length>=2,null,{timeout:20000});
+    await aligned();
+    await page.screenshot({path:path.join(out,'comicpash-live-next-spread.png')});
+    await button('恢复原图');await page.locator('[data-nc-canvas-translation]').first().waitFor({state:'detached'});
+    await page.screenshot({path:path.join(out,'comicpash-live-restored.png')});
+    check('Live Comic PASH source recognizes canvases, displays fixture translations, turns pages and restores originals; no live provider used');
+  }
   assert.equal(errors.length,0,errors.join('\n'));
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));console.error('Artifacts: '+out);throw error;}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

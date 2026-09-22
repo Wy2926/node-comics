@@ -1,5 +1,7 @@
 import {msg} from '../i18n/runtime';
-import {discoverDocument,safeImageUrl,type SourceItem} from './adapters';
+import {discoverMangaCopyDocument as discoverDocument} from './builtin';
+import {safeImageUrl} from './urls';
+import type {SourceItem} from './model';
 
 /** The site's reader decrypts contentKey with cct, then appends that ordered
  * array to the DOM. Read the same inline data without running page-provided code.

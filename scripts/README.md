@@ -24,6 +24,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_local_import.mjs` / `verify_comic_import.mjs` / `verify_library.mjs` / `verify_comic_export.mjs` | 本地导入、作品管理与导出；先生成夹具，端口和模式见各脚本头部 |
 | `verify_extension_theme.mjs` | 插件桌面页面视觉与交互、亮暗主题、表单和副本操作；Vite 端口 5176、5175、5186，见[共享视觉令牌](../docs/POPUP_AND_THEME.md#本地验证) |
 | `verify_mangacopy.mjs` | MangaCopy 适配检查，详见[来源设计](../docs/MANGACOPY_LIBRARY_DESIGN.md) |
+| `verify_comicpash.mjs` | Comic PASH 画布发现与导入，隔离样本／真实来源开关见[网站图片适配](../docs/SITE_ADAPTERS.md) |
 | `verify_r2_download.mjs` | 模拟 R2 响应下的浏览器下载与权限处理，不访问 Cloudflare |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2 接入；运行前阅读脚本中的对象范围与清理规则，不作为普通离线回归 |
 | `smoke_api.py` | 默认检查 API；`--translate` 会发起真实付费图片请求，保存操作编号以便核实与恢复，不自动重建未知请求 |

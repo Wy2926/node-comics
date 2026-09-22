@@ -1471,5 +1471,6 @@
   "管理订阅": "Kelola langganan",
   "继续原结账": "Lanjutkan pembayaran",
   "前往安全结账": "Buka pembayaran aman",
-  "支付渠道": "Penyedia pembayaran"
+  "支付渠道": "Penyedia pembayaran",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Ditemukan {0} / {1} halaman dimuat. Balik halaman lalu cari lagi. Biarkan sumber terbuka hingga impor selesai; kualitas mengikuti tampilan situs."
 }

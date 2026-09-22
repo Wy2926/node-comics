@@ -1471,5 +1471,6 @@
   "管理订阅": "Gestionar suscripción",
   "继续原结账": "Continuar el pago",
   "前往安全结账": "Ir al pago seguro",
-  "支付渠道": "Proveedor de pagos"
+  "支付渠道": "Proveedor de pagos",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Se encontraron {0} / {1} páginas cargadas. Avanza y actualiza la búsqueda. Mantén el origen abierto hasta completar la importación; la calidad corresponde a la visualización del sitio."
 }

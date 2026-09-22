@@ -1,8 +1,11 @@
+import type {ComicElement} from '../sources/model';
+import {CanvasDisplay} from './canvas-display';
 import {msg} from '../i18n/runtime';
 import styles from './display.css?inline';
 import {shadowThemeStyles} from './shadow';
 
 export const inlineStyles=shadowThemeStyles(styles);
+export const imageDisplay=(image:ComicElement)=>image instanceof HTMLCanvasElement?new CanvasDisplay(image):new ImageDisplay(image);
 
 /** Keep src, srcset, picture sources, links and event listeners owned by the site. */
 export class ImageDisplay {
@@ -18,12 +21,13 @@ export class ImageDisplay {
     if(!current()){URL.revokeObjectURL(url);return;}
     this.restore();
     const image=this.image;
+    const width=image.naturalWidth,height=image.naturalHeight;
     const authoredRatio=getComputedStyle(image).aspectRatio;
     const properties=[['content',`url("${url}")`]];
-    if(authoredRatio==='auto'||authoredRatio.startsWith('auto '))properties.push(['aspect-ratio',`${image.naturalWidth} / ${image.naturalHeight}`]);
+    if(authoredRatio==='auto'||authoredRatio.startsWith('auto '))properties.push(['aspect-ratio',`${width} / ${height}`]);
     if(!image.hasAttribute('style'))this.undo.push(()=>{if(!image.style.length)image.removeAttribute('style');});
     // Intrinsic geometry comes from the original even if the translated bitmap differs.
-    for(const [name,value] of [['width',image.naturalWidth],['height',image.naturalHeight]] as const){
+    for(const [name,value] of [['width',width],['height',height]] as const){
       if(image.hasAttribute(name))continue;
       const applied=String(value);image.setAttribute(name,applied);
       this.undo.push(()=>{if(image.getAttribute(name)===applied)image.removeAttribute(name);});

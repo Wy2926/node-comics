@@ -1471,5 +1471,6 @@
   "管理订阅": "Zarządzaj subskrypcją",
   "继续原结账": "Wznów płatność",
   "前往安全结账": "Przejdź do bezpiecznej płatności",
-  "支付渠道": "Dostawca płatności"
+  "支付渠道": "Dostawca płatności",
+  "已识别阅读器加载的 {0} / {1} 页；翻页后可刷新发现。导入前请保持来源页打开，图片清晰度以网站当前渲染为准。": "Wykryto {0} / {1} wczytanych stron. Przewróć strony i odśwież wyszukiwanie. Nie zamykaj źródła do końca importu; jakość odpowiada wyświetlaniu witryny."
 }
