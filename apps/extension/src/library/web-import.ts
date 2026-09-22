@@ -1,14 +1,11 @@
-import {msg} from '../i18n/runtime';
-import {sourceName,type PageManifest} from '../sources/adapters';
-import {sourcePageIdentity} from '../sources/mangacopy';
-import {sourceMessage} from '../sources/client';
-import {sourceImage} from '../sources/image-fetch';
-import {hashFile,imageIdentity} from '../importers/hash';
-import {emptyPage} from '../reader/model';
-import type {ReadingCopy} from '../types';
-import type {ImportAssignment,LibraryState} from './types';
-import {makeCopy} from './model';
-import {cacheSize,collectUnusedBlobs,copyBlobKeys,editLibrary,enforceCacheBudget,getBlob,putBlob,readCopies,readPosition,savePosition} from './store';
+import { msg } from '../i18n/runtime';
+import { hashFile, imageIdentity } from '../importers/hash';
+import { emptyPage } from '../reader/model';
+import { sourceImage, sourceMessage, sourceName, sourcePageIdentity, type PageManifest } from '../sources';
+import type { ReadingCopy } from '../types';
+import { makeCopy } from './model';
+import { cacheSize, collectUnusedBlobs, copyBlobKeys, editLibrary, enforceCacheBudget, getBlob, putBlob, readCopies, readPosition, savePosition } from './store';
+import type { ImportAssignment, LibraryState } from './types';
 
 export type InsertPosition={kind:'start'|'end'}|{kind:'after';pageId:string};
 export type WebDestination={mode:'new';assignment:ImportAssignment;title:string}|{mode:'insert';copyId:string;revision:number;position:InsertPosition};

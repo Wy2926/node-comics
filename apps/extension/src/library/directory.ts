@@ -1,8 +1,8 @@
-import {msg} from '../i18n/runtime';
-import type {ReadingCopy} from '../types';
-import type {LibraryState} from './types';
-import {mangaCopyLocation} from '../sources/mangacopy';
-import {copyPageTotal,completePageList} from './model';
+import { msg } from '../i18n/runtime';
+import { sourceCatalogReference } from '../sources';
+import type { ReadingCopy } from '../types';
+import { completePageList, copyPageTotal } from './model';
+import type { LibraryState } from './types';
 
 export interface DirectoryEntry {
  id:string;title:string;number?:string;kind:'chapter'|'publication'|'copy';group:string;
@@ -33,6 +33,6 @@ export function readingDirectory(state:LibraryState,copies:ReadingCopy[],current
   entries.push({id:item.id,title:item.title,number:item.number,kind,group,copyId:chosen?.id,pageId:match?.startPageId,current:chosen?.id===current.id&&coverage?.target.id===item.id,read:!!item.readAt,available,total,status,error:task?.error});
  }
  if(!entries.some(e=>e.current))entries.unshift({id:current.id,title:current.title,kind:'copy',group:msg("当前副本"),copyId:current.id,current:true,read:false,available:current.pages.filter(p=>p.blobKey).length,total:copyPageTotal(current),status:msg("阅读中")});
- const location=current.sourceUrl?mangaCopyLocation(current.sourceUrl):null;
- return {title:work?.title??current.title,entries,catalogUrl:catalogs[0]?.url??(location?new URL('/comic/'+location.slug,current.sourceUrl).href:undefined),catalogCount:catalogs.reduce((n,c)=>n+c.entries.length,0)};
+ const location=current.sourceUrl?sourceCatalogReference(current.sourceUrl):null;
+ return {title:work?.title??current.title,entries,catalogUrl:catalogs[0]?.url??location?.url,catalogCount:catalogs.reduce((n,c)=>n+c.entries.length,0)};
 }

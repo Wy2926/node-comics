@@ -1,15 +1,14 @@
-import {Select} from './Select';
-import {msg} from '../i18n/runtime';
-import {useEffect,useRef,useState} from 'react';
-import type {ReadingCopy} from '../types';
-import type {ImportAssignment,LibraryState} from '../library/types';
-import type {PageManifest} from '../sources/adapters';
-import {sourcePageIdentity} from '../sources/mangacopy';
-import {initialChoices,selectManifest} from '../sources/selection';
-import {insertionBlocked,type InsertPosition,type WebDestination} from '../library/web-import';
-import {Modal} from './components';
-import {ImportAssignmentFields} from './ImportAssignment';
-import {SourceImagePicker} from './SourceImagePicker';
+import { useEffect, useRef, useState } from 'react';
+import { msg } from '../i18n/runtime';
+import type { ImportAssignment, LibraryState } from '../library/types';
+import { insertionBlocked, type InsertPosition, type WebDestination } from '../library/web-import';
+import type { PageManifest } from '../sources';
+import { initialChoices, selectManifest, sourcePageIdentity } from '../sources';
+import type { ReadingCopy } from '../types';
+import { Modal } from './components';
+import { ImportAssignmentFields } from './ImportAssignment';
+import { Select } from './Select';
+import { SourceImagePicker } from './SourceImagePicker';
 
 export function SourceImport({manifest,library,copies,busy,error,onClose,onImport}:{manifest:PageManifest;library:LibraryState;copies:ReadingCopy[];busy:boolean;error:string;onClose:()=>void;onImport:(manifest:PageManifest,destination:WebDestination)=>Promise<void>}){
  const [choices,setChoices]=useState(()=>initialChoices(manifest));

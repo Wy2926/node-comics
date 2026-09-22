@@ -1,6 +1,6 @@
-import {msg} from '../i18n/runtime';
-import type {Page,ReadingCopy} from '../types';
-import type {LibraryState,ImportAssignment,SourceEntry} from './types';
+import { msg } from '../i18n/runtime';
+import type { Page, ReadingCopy } from '../types';
+import type { ImportAssignment, LibraryState, SourceEntry } from './types';
 export const emptyLibrary=():LibraryState=>({id:'library',revision:0,works:[],chapters:[],versions:[],series:[],publications:[],inclusions:[],publicationRelations:[],coverage:[],relations:[],catalogs:[],tasks:[]});
 export const makeCopy=(title:string,pages:Page[],source=msg("本地导入"),sourceKey:string=crypto.randomUUID()):ReadingCopy=>({id:crypto.randomUUID(),title,source,sourceKey,manifestRevision:1,retention:'offline',createdAt:Date.now(),updatedAt:Date.now(),pages,pageId:pages[0]?.id??'',relativeOffset:0,discoveryComplete:true});
 // A manually imported selection is a fixed reading copy, even if the source page can discover more images.
@@ -31,11 +31,7 @@ export function attachCopy(state:LibraryState,copy:ReadingCopy,assignment:Import
  return work.id;
 }
 export function suggestedKind(entry:SourceEntry):ImportAssignment['kind']{
- if(entry.related)return 'unclassified';
- if(entry.rawTypes.includes('卷'))return 'publication';
- if(entry.rawTypes.includes('番外'))return 'extra';
- if(entry.rawTypes.some(t=>t==='話'||t==='话'))return 'chapter';
- return 'unclassified';
+ return entry.related?'unclassified':entry.suggestedKind??'unclassified';
 }
 export function selectRange<T extends {id:string}>(items:T[],first:string,last:string):string[]{
  const a=items.findIndex(i=>i.id===first),b=items.findIndex(i=>i.id===last);

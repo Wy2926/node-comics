@@ -1,16 +1,16 @@
 import 'fake-indexeddb/auto';
-import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {AcquisitionCoordinator,grantImagePermissions,pauseCopies,queueCopies} from '../src/library/acquisition';
-import {acquisitionCopies} from '../src/library/acquisition-order';
-import {emptyLibrary,makeCopy} from '../src/library/model';
-import {commitCopies,editLibrary,readCopies,readLibrary} from '../src/library/store';
-import type {SourceCatalog} from '../src/library/types';
-import {discoverEntry} from '../src/sources/client';
-import {sourceImage} from '../src/sources/image-fetch';
-import {prepareImageOrigins} from '../src/sources/permissions';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AcquisitionCoordinator, grantImagePermissions, pauseCopies, queueCopies } from '../src/library/acquisition';
+import { acquisitionCopies } from '../src/library/acquisition-order';
+import { emptyLibrary, makeCopy } from '../src/library/model';
+import { commitCopies, editLibrary, readCopies, readLibrary } from '../src/library/store';
+import type { SourceCatalog } from '../src/library/types';
+import { discoverEntry } from '../src/sources/runtime/client';
+import { sourceImage } from '../src/sources/runtime/image-fetch';
+import { prepareImageOrigins } from '../src/sources/runtime/permissions';
 
-vi.mock('../src/sources/client',()=>({inExtension:()=>true,discoverEntry:vi.fn()}));
-vi.mock('../src/sources/image-fetch',()=>({sourceImage:vi.fn()}));
+vi.mock('../src/sources/runtime/client',()=>({inExtension:()=>true,discoverEntry:vi.fn()}));
+vi.mock('../src/sources/runtime/image-fetch',()=>({sourceImage:vi.fn()}));
 beforeEach(async()=>{
  vi.clearAllMocks();
  vi.stubGlobal('localStorage',{getItem:()=>null});

@@ -5,7 +5,7 @@
 import {completeLocalImport} from './local_import_helpers.mjs';
 import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
@@ -35,11 +35,11 @@ try{
   const context=await browser.newContext(),page=await context.newPage();await page.goto(process.env.TEST_READER_URL||'http://127.0.0.1:5174');await page.locator('input[type=file]').setInputFiles(path.join(root,'artifacts/import-validation',name));await completeLocalImport(page,{close:false});await page.locator('.nc-import-item.failed [role=alert]').waitFor();assert.equal(await page.locator('.nc-book').count(),0);checks.push({name,errorVisible:true});await context.close();
  }
  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();await page.goto(process.env.TEST_READER_URL||'http://127.0.0.1:5174');
- const raw=await readFile(path.join(root,'apps/extension/tests/fixtures/mangacopy-catalog.html'),'utf8');
- const parsed=await page.evaluate(async html=>{const {discoverMangaCopyCatalog}=await import('/src/sources/mangacopy.ts');const doc=new DOMParser().parseFromString('<h6>来自深渊</h6>'+html,'text/html');return discoverMangaCopyCatalog(doc,'https://www.mangacopy.com/comic/laizishenyuan');},raw);
+ const raw=await readFile(path.join(root,'apps/extension/src/sources/sites/mangacopy/tests/catalog.html'),'utf8');
+ const parsed=await page.evaluate(async html=>{const {discoverMangaCopyCatalog}=await import('/src/sources/sites/mangacopy/catalog.ts');const doc=new DOMParser().parseFromString('<h6>来自深渊</h6>'+html,'text/html');return discoverMangaCopyCatalog(doc,'https://www.mangacopy.com/comic/laizishenyuan');},raw);
  assert(parsed.complete);assert.equal(parsed.entries.length,100);assert.equal(parsed.groups[0].entryIds.length,82);
- const manifests=await page.evaluate(async()=>{const {discoverDocument}=await import('/src/sources/adapters.ts');const parse=html=>discoverDocument(new DOMParser().parseFromString(html,'text/html'),'https://www.mangacopy.com/comic/sample/chapter/00000000-0000-0000-0000-000000000000');return [parse('<span class="comicCount">3</span><ul class="comicContent-list comic-size-3"><li><img data-src="https://images.example/1" src="https://images.example/placeholder"></li><li><img data-src="https://images.example/1" src="https://images.example/placeholder"></li><li><img data-src="https://images.example/3" src="https://images.example/placeholder"></li></ul><img src="https://ads.example/ad">'),parse('<span class="comicCount">3</span><ul class="comicContent-list"><li><img src="https://images.example/placeholder"></li></ul>')];});
- assert.equal(manifests[0].items.length,3);assert(manifests[0].discoveryComplete);assert.equal(manifests[0].items[0].url,manifests[0].items[1].url);assert.notEqual(manifests[0].items[0].id,manifests[0].items[1].id);assert.equal(manifests[1].items.length,0);assert.equal(manifests[1].discoveryComplete,false);checks.push({sourceDom:true,duplicateSlots:true,missingDataSrc:true});
+ const manifests=await page.evaluate(async()=>{const {discoverDocument}=await import('/src/sources/page.ts');const parse=html=>discoverDocument(new DOMParser().parseFromString(html,'text/html'),'https://www.mangacopy.com/comic/sample/chapter/00000000-0000-0000-0000-000000000000');return [parse('<span class="comicCount">3</span><ul class="comicContent-list comic-size-3"><li><img data-src="https://images.example/1" src="https://images.example/placeholder"></li><li><img data-src="https://images.example/1" src="https://images.example/placeholder"></li><li><img data-src="https://images.example/3" src="https://images.example/placeholder"></li></ul><img src="https://ads.example/ad">'),parse('<span class="comicCount">3</span><ul class="comicContent-list"><li><img src="https://images.example/placeholder"></li></ul>')];});
+ assert.equal(manifests[0].items.length,3);assert(manifests[0].discoveryComplete);assert.equal(manifests[0].items[0].resource.url,manifests[0].items[1].resource.url);assert.notEqual(manifests[0].items[0].id,manifests[0].items[1].id);assert.equal(manifests[1].items.length,0);assert.equal(manifests[1].discoveryComplete,false);checks.push({sourceDom:true,duplicateSlots:true,missingDataSrc:true});
  await page.evaluate(async()=>{
   const {editLibrary}=await import('/src/library/store.ts'),{makeCopy,attachCopy}=await import('/src/library/model.ts');
   await editLibrary((state,copies)=>{

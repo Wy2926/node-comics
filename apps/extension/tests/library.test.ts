@@ -1,9 +1,9 @@
 import 'fake-indexeddb/auto';
-import {beforeAll,describe,expect,it,vi} from 'vitest';
-import {emptyPage} from '../src/reader/model';
-import {emptyLibrary,makeCopy,attachCopy,selectRange,validateLibrary,suggestedKind} from '../src/library/model';
-import {commitCopies,deleteCopy,readCopies,readLibrary,putBlob,getBlob,saveCopy,editLibrary,savePosition,readPosition,forkSourceRevision,enforceCacheBudget,removeWorks} from '../src/library/store';
-import type {SourceCatalog,SourceEntry} from '../src/library/types';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { attachCopy, emptyLibrary, makeCopy, selectRange, suggestedKind, validateLibrary } from '../src/library/model';
+import { commitCopies, deleteCopy, editLibrary, enforceCacheBudget, forkSourceRevision, getBlob, putBlob, readCopies, readLibrary, readPosition, removeWorks, saveCopy, savePosition } from '../src/library/store';
+import type { SourceCatalog, SourceEntry } from '../src/library/types';
+import { emptyPage } from '../src/reader/model';
 beforeAll(()=>{const data=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>data.set(k,v),removeItem:(k:string)=>data.delete(k)});});
 const evidence={status:'user' as const,source:'测试用户确认'};
 describe('comic content and publication identity',()=>{
@@ -16,7 +16,7 @@ describe('comic content and publication identity',()=>{
  it('allows a book with unknown chapter contents and a standalone work without a fake first chapter',()=>{const s=emptyLibrary();attachCopy(s,makeCopy('全一册',[]),{title:'短篇',kind:'work'});attachCopy(s,makeCopy('某本CBZ',[]),{title:'未知目录',kind:'publication'});expect(s.chapters).toHaveLength(0);expect(s.inclusions).toHaveLength(0);validateLibrary(s);});
  it('rejects a cyclic omnibus/reprint relation',()=>{const s=emptyLibrary();const id=attachCopy(s,makeCopy('卷1',[]),{title:'作品',kind:'publication'});attachCopy(s,makeCopy('卷2',[]),{title:'作品',kind:'publication',workId:id});const [a,b]=s.publications;s.publicationRelations=[{id:'r1',fromId:a.id,toId:b.id,kind:'collects',evidence},{id:'r2',fromId:b.id,toId:a.id,kind:'reprint',evidence}];expect(()=>validateLibrary(s)).toThrow('循环');});
  it('selects actual endpoints including decimals across display pages',()=>{const values=['第1卷','番外','第12.5话','前篇','第71话'].map((title,n)=>({id:String(n),title}));expect(selectRange(values,'1','3')).toEqual(['1','2','3']);expect(()=>selectRange(values,'x','3')).toThrow();});
- it('retains ambiguous extra titles and separates related works',()=>{const entry={related:false,rawTypes:['話'],title:'番外篇01'} as SourceEntry;expect(suggestedKind(entry)).toBe('chapter');expect(suggestedKind({...entry,related:true})).toBe('unclassified');});
+ it('retains ambiguous extra titles and separates related works',()=>{const entry={related:false,rawTypes:['話'],suggestedKind:'chapter',title:'番外篇01'} as SourceEntry;expect(suggestedKind(entry)).toBe('chapter');expect(suggestedKind({...entry,related:true})).toBe('unclassified');});
 });
 describe('new library transactions and resource lifecycle',()=>{
  it('serializes duplicate imports from two tabs without duplicate work or copy records',async()=>{const key=crypto.randomUUID(),a=makeCopy('同一来源',[],'test',key),b=makeCopy('另一个标签页标题',[],'test',key);const results=await Promise.all([commitCopies([a],[{title:'并发作品',kind:'chapter'}]),commitCopies([b],[{title:'并发作品',kind:'chapter'}])]);expect(results.map(r=>r.created).sort()).toEqual([0,1]);expect(results[0].copyIds).toEqual(results[1].copyIds);});

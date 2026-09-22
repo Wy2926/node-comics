@@ -24,8 +24,8 @@
 | [types.ts](../apps/extension/src/types.ts) | `ReadingCopy` 保存实际页面清单、修订、原图与译图引用和阅读位置 |
 | [library/store.ts](../apps/extension/src/library/store.ts) | 原子更新、精确来源去重、资源引用清理、修订及阅读状态 |
 | [local-import.ts](../apps/extension/src/library/local-import.ts)、[reading.ts](../apps/extension/src/library/reading.ts) | 本地格式接入、按作品／出版套系／版本限定阅读序列 |
-| [sources/mangacopy.ts](../apps/extension/src/sources/mangacopy.ts)、[adapters.ts](../apps/extension/src/sources/adapters.ts) | 来源目录、原始分组／类型与页面清单发现 |
-| [sources/client.ts](../apps/extension/src/sources/client.ts)、[acquisition.ts](../apps/extension/src/library/acquisition.ts) | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
+| [来源公共接口](../apps/extension/src/sources/index.ts)、[页面接口](../apps/extension/src/sources/page.ts)、[MangaCopy 目录](../apps/extension/src/sources/sites/mangacopy/catalog.ts) | 来源目录、原始分组／类型与页面清单发现 |
+| [来源消息客户端](../apps/extension/src/sources/runtime/client.ts)、[acquisition.ts](../apps/extension/src/library/acquisition.ts) | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
 | [background.ts](../apps/extension/entrypoints/background.ts)、[content.ts](../apps/extension/entrypoints/content.ts) | 消息与导航校验、安装时注册的站点脚本、详情入口和受管理的来源标签页 |
 | [Library.tsx](../apps/extension/src/ui/Library.tsx)、[CatalogImport.tsx](../apps/extension/src/ui/CatalogImport.tsx) | 作品管理、选择与归属预览 |
 

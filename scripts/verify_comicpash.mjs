@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=path.resolve('artifacts/comicpash-validation');await mkdir(output,{recursive:true});
@@ -25,7 +25,7 @@ try{
  const send=message=>ui.evaluate(message=>chrome.runtime.sendMessage(message),message);
  const first=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(first.ok,first.error);
  const snapshot=first.data.manifest;assert.equal(snapshot.adapter,'comicpash');assert(snapshot.items.length>0);assert(snapshot.items.every(item=>item.kind==='page'&&item.preview?.startsWith('data:image/png;')));
- assert(snapshot.knownTotal>=snapshot.items.length);assert.equal(snapshot.discoveryComplete,snapshot.knownTotal===snapshot.items.length);
+ assert(snapshot.knownTotal>=snapshot.items.length);assert.equal(snapshot.discoveryComplete,false);
  if(!live){assert.equal(snapshot.items.length,1);assert.equal(snapshot.knownTotal,2);assert.equal(snapshot.items[0].order,0);}
  checks.push('Canvas discovery excludes ads, preserves page slots and reports completeness');
  const selected=await send({type:'NC_SELECT_MANIFEST',manifestId:snapshot.id,itemIds:[snapshot.items[0].id]});assert(selected.ok);
@@ -41,7 +41,15 @@ try{
  await source.screenshot({path:path.join(run,'source.png')});
  if(!live){
   await source.evaluate(()=>{const page=document.querySelector('#xCVPages > .-cv-page:last-child');page.classList.add('mode-rendered');const canvas=document.createElement('canvas');canvas.width=600;canvas.height=800;canvas.getContext('2d').fillRect(0,0,600,800);page.querySelector('.-cv-page-canvas').replaceChildren(canvas);});
-  const refresh=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(refresh.ok);assert.equal(refresh.data.manifest.items.length,2);assert(refresh.data.manifest.discoveryComplete);checks.push('Later canvas rendering is found on refresh');
+  const refresh=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(refresh.ok);assert.equal(refresh.data.manifest.items.length,2);assert.equal(refresh.data.manifest.discoveryComplete,false);checks.push('Later canvas rendering is found on refresh');
+  await source.evaluate(()=>{const page=document.querySelector('#comici-viewer .mode-rendered');page.classList.remove('mode-rendered');page.querySelector('canvas').getContext('2d').fillRect(0,0,100,100);page.classList.add('mode-rendered');});
+  assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:snapshot.items[0].id})).ok);checks.push('Re-rendering the same canvas revokes its previous version');
+  const fresh=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(fresh.ok,fresh.error);
+  await source.evaluate(()=>history.pushState({},'',location.pathname+'?chapter=next'));
+  const navigated=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(navigated.ok,navigated.error);assert.notEqual(navigated.data.manifest.navigationId,fresh.data.manifest.navigationId);
+  assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:fresh.data.id,pageId:fresh.data.manifest.items[0].id})).ok);
+  await source.evaluate(url=>history.replaceState({},'',url),url);
+  assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:fresh.data.id,pageId:fresh.data.manifest.items[0].id})).ok);checks.push('SPA navigation and return to the same URL reject old navigation handles');
   await source.evaluate(()=>document.querySelector('#comici-viewer .mode-rendered canvas').remove());
   const expired=await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:snapshot.items[0].id});assert(!expired.ok);checks.push('Detached canvas fails with an actionable error');
  }

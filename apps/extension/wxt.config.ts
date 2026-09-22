@@ -1,8 +1,8 @@
 import { defineConfig } from 'wxt';
-import {importAssets} from './import-assets';
-import {unrarCsp} from './unrar-csp';
-import {MANGACOPY_PERMISSIONS} from './src/sources/mangacopy';
-import {writeStoreLocales} from './store-locales';
+import { importAssets } from './import-assets';
+import { sourceInstallation } from './src/sources';
+import { writeStoreLocales } from './store-locales';
+import { unrarCsp } from './unrar-csp';
 writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -26,7 +26,7 @@ export default defineConfig({
     icons: {16:'brand/icon-16.png',32:'brand/icon-32.png',48:'brand/icon-48.png',128:'brand/icon-128.png'},
     permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
-    host_permissions: ['https://*.nodelane.net/*',...MANGACOPY_PERMISSIONS,
+    host_permissions: ['https://*.nodelane.net/*',...sourceInstallation.requiredOrigins,
       ...(process.env.VITE_API_BASE ? [new URL(process.env.VITE_API_BASE).origin+'/*'] : [])],
     action: { default_title: '__MSG_actionTitle__', default_icon: {16:'brand/icon-16.png',24:'brand/icon-24.png',32:'brand/icon-32.png'} },
     content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';" },

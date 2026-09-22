@@ -1,7 +1,7 @@
-import {msg} from '../i18n/runtime';
-import {useState} from 'react';
-import {Icon} from '../icons';
-import {moveChoice,type ImageChoice} from '../sources/selection';
+import { useState } from 'react';
+import { msg } from '../i18n/runtime';
+import { Icon } from '../icons';
+import { moveChoice, type ImageChoice } from '../sources';
 import './source-images.css';
 
 export function SourceImagePicker({choices,onChange,disabled=false}:{choices:ImageChoice[];onChange:(items:ImageChoice[])=>void;disabled?:boolean}){

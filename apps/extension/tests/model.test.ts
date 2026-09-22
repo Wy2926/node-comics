@@ -1,6 +1,6 @@
-import {describe,it,expect} from 'vitest';
-import {anchorFor,naturalSort} from '../src/reader/model';
-import {safeImageUrl} from '../src/sources/adapters';
+import { describe, expect, it } from 'vitest';
+import { anchorFor, naturalSort } from '../src/reader/model';
+import { safeImageUrl } from '../src/sources';
 describe('bounded reader and source boundary',()=>{
 it('restores relative position across changed image heights',()=>{expect(anchorFor(100,2000,600)).toBe(.25);expect(100+4000*anchorFor(100,2000,600)).toBe(1100);expect(anchorFor(100,0,50)).toBe(0);});
 it('orders locally imported pages naturally',()=>{expect(naturalSort([{name:'10.png'},{name:'2.png'},{name:'1.png'}]).map(p=>p.name)).toEqual(['1.png','2.png','10.png']);});

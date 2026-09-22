@@ -1,13 +1,11 @@
-import {msg} from '../i18n/runtime';
-import {emptyPage} from '../reader/model';
-import {imageIdentity} from '../importers/hash';
-import {discoverEntry,inExtension} from '../sources/client';
-import type {PageManifest} from '../sources/adapters';
-import {sourceImage} from '../sources/image-fetch';
-import {editLibrary,readLibrary,readCopies,getBlob,putBlob,enforceCacheBudget,cacheSize} from './store';
-import type {Page,ReadingCopy} from '../types';
-import {orderAcquisitionTasks} from './acquisition-order';
-import {copyOrigins,ImagePermissionsRequired,requestImagePermissions,requireImagePermissions} from '../sources/permissions';
+import { msg } from '../i18n/runtime';
+import { imageIdentity } from '../importers/hash';
+import { emptyPage } from '../reader/model';
+import type { PageManifest } from '../sources';
+import { copyOrigins, discoverEntry, ImagePermissionsRequired, inExtension, requestImagePermissions, requireImagePermissions, sourceImage } from '../sources';
+import type { Page, ReadingCopy } from '../types';
+import { orderAcquisitionTasks } from './acquisition-order';
+import { cacheSize, editLibrary, enforceCacheBudget, getBlob, putBlob, readCopies, readLibrary } from './store';
 export async function queueCopies(ids:string[],offline=true){await editLibrary((s,copies)=>{for(const id of new Set(ids)){const c=copies.find(c=>c.id===id);if(!c?.sourceEntryId)continue;if(offline)c.retention='offline';let t=s.tasks.find(t=>t.copyId===id);if(t?.status==='running'||c.discoveryComplete&&c.pages.length&&c.pages.every(p=>p.blobKey))continue;if(!t){t={id:crypto.randomUUID(),copyId:id,status:'queued',phase:'discover',completed:0,updatedAt:Date.now()};s.tasks.push(t);}t.status='queued';t.error=undefined;t.updatedAt=Date.now();}orderAcquisitionTasks(s,copies);});}
 export async function pauseCopies(ids:string[]){await editLibrary(s=>{for(const t of s.tasks)if(ids.includes(t.copyId)&&t.status!=='complete'){t.status='paused';t.error=msg("已暂停，重新打开后可继续。");t.updatedAt=Date.now();}});}
 export async function grantImagePermissions(ids:string[],copies:ReadingCopy[],preparedOrigins:string[]=[]){

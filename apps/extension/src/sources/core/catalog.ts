@@ -1,0 +1,99 @@
+import type { SourceDefinition } from '../contracts/definition';
+import type { SourceCatalogSnapshot } from '../contracts/source';
+import { resolveSource } from './resolve';
+/** Validate observations, never accept library bindings as source authority. */
+export function validateCatalog(
+  input: unknown,
+  definitions: readonly SourceDefinition[],
+): SourceCatalogSnapshot {
+  const c = input as SourceCatalogSnapshot;
+  const invalid = () => {
+    throw Error('INVALID_SOURCE_CATALOG');
+  };
+  const text = (s: unknown, max = 2048): s is string =>
+    typeof s === 'string' && s.length > 0 && s.length <= max;
+  if (
+    !c ||
+    !text(c.url) ||
+    !text(c.id) ||
+    !text(c.sourceId) ||
+    !text(c.title) ||
+    !Array.isArray(c.entries) ||
+    !Array.isArray(c.groups) ||
+    c.entries.length > 10000 ||
+    c.groups.length > 1000 ||
+    typeof c.complete !== 'boolean' ||
+    !Number.isFinite(c.observedAt) ||
+    typeof c.note !== 'string' ||
+    c.note.length > 2048
+  )
+    return invalid();
+  const { definition, location } = resolveSource(c.url, definitions);
+  if (
+    !definition.capabilities.catalog ||
+    location.kind !== 'catalog' ||
+    definition.id !== c.sourceId ||
+    location.catalog?.key !== c.id
+  )
+    return invalid();
+  const entries = new Map(c.entries.map((e) => [e?.id, e])),
+    groups = new Map(c.groups.map((g) => [g?.id, g]));
+  if (entries.size !== c.entries.length || groups.size !== c.groups.length) return invalid();
+  for (const e of c.entries) {
+    if (
+      !e ||
+      !text(e.id) ||
+      !text(e.url) ||
+      !text(e.title) ||
+      !text(e.remoteId) ||
+      e.catalogId !== c.id ||
+      !Number.isInteger(e.order) ||
+      e.order < 0 ||
+      e.order > 10000 ||
+      !Array.isArray(e.groupIds) ||
+      !Array.isArray(e.rawTypes) ||
+      e.groupIds.length > 1000 ||
+      e.rawTypes.length > 100 ||
+      e.rawTypes.some((t) => !text(t, 180)) ||
+      typeof e.related !== 'boolean' ||
+      (e.suggestedKind !== undefined &&
+        !['chapter', 'extra', 'publication', 'work', 'unclassified'].includes(e.suggestedKind))
+    )
+      return invalid();
+    const target = resolveSource(e.url, definitions).location;
+    if (
+      target.sourceId !== c.sourceId ||
+      target.kind !== 'reader' ||
+      target.catalog?.key !== c.id ||
+      new Set(e.groupIds).size !== e.groupIds.length ||
+      e.groupIds.some((id) => !groups.get(id)?.entryIds?.includes(e.id))
+    )
+      return invalid();
+  }
+  for (const g of c.groups) {
+    if (
+      !g ||
+      !text(g.id) ||
+      !text(g.title) ||
+      typeof g.complete !== 'boolean' ||
+      !Array.isArray(g.entryIds) ||
+      g.entryIds.length > 10000 ||
+      new Set(g.entryIds).size !== g.entryIds.length ||
+      g.entryIds.some((id) => !entries.get(id)?.groupIds.includes(g.id))
+    )
+      return invalid();
+    const orders = g.entryIds.map((id) => entries.get(id)!.order);
+    if (orders.some((order, i) => i > 0 && order < orders[i - 1])) return invalid();
+  }
+  return {
+    id: c.id,
+    sourceId: c.sourceId,
+    url: c.url,
+    title: c.title,
+    observedAt: c.observedAt,
+    complete: c.complete,
+    note: c.note,
+    groups: c.groups,
+    entries: c.entries,
+  };
+}

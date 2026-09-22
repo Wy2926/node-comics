@@ -1,6 +1,6 @@
-import {settingsKey} from './settings';
-import {safeImageUrl} from '../sources/adapters';
-import type {Settings} from '../types';
+import { safeImageUrl } from '../sources';
+import type { Settings } from '../types';
+import { settingsKey } from './settings';
 
 export const inlineOrigins=['https://*/*','http://*/*'] as const;
 export async function automaticTabsAllowed(){

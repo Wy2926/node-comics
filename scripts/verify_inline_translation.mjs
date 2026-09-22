@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
-import {createHash,randomUUID} from 'node:crypto';
-import {cp,mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
+import {createHash, randomUUID} from 'node:crypto';
+import {cp, mkdir, readFile, writeFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
@@ -108,6 +108,14 @@ try{
   await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:20000});
   assert.deepEqual(await geometry(),before);assert.equal(await page.locator('#thumb').evaluate(i=>i.style.content),'');assert.equal(await page.locator('#hidden').evaluate(i=>i.style.content),'');
   check('existing result replaces picture visually with unchanged geometry, src, srcset and scroll; thumbnail/hidden image excluded');
+  const sharedIdentity=await worker.evaluate(async url=>{
+    const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);
+    await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content-scripts/content.js']});
+    const discovery=await chrome.tabs.sendMessage(tab.id,{type:'NC_NAVIGATION'},{frameId:0});
+    const inline=await chrome.tabs.sendMessage(tab.id,{type:'NC_INLINE_IDENTITY'},{frameId:0});
+    return discovery.navigationId===inline.navigationId;
+  },page.url());
+  assert(sharedIdentity);check('Discovery and inline bundles share the same document navigation and session');
   await page.locator('#site-button').click();assert.equal((await geometry()).clicks,1);check('original website button remains clickable');
   await page.screenshot({path:path.join(out,'translated-desktop.png')});
   await page.waitForFunction(()=>document.querySelector('#second').style.content.includes('blob:'),{},{timeout:15000});assert.equal(createdJobs,1);assert.equal(uploads.size,1);check('next page submits, uploads verified bytes and displays completion; failed page does not loop');
@@ -153,7 +161,12 @@ try{
   const reader=await browser.newPage();reader.on('pageerror',e=>errors.push(e.message));await reader.goto(`chrome-extension://${extensionId}/reader.html#settings`);await reader.getByRole('combobox',{name:'默认目标语言'}).waitFor();
   assert.equal(await reader.getByRole('combobox',{name:'默认目标语言'}).getAttribute('data-value'),'zh-Hans');
   jobs.set('seed-en',{...jobs.get('seed-1'),id:'seed-en',target_language:'en',change_sequence:++changeSequence});
-  await selectOption(reader.getByLabel('默认目标语言'),'en');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.bringToFront();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('reader UI shares language and login settings with in-page translation');
+  const beforeLanguage=await page.locator('#first').evaluate(image=>image.style.content);
+  await selectOption(reader.getByLabel('默认目标语言'),'en');await page.bringToFront();
+  // Cached results can replace the restored original before the next Playwright poll.
+  // Assert the durable new rendering instead of waiting for a transient empty style.
+  await page.waitForFunction(previous=>{const content=document.querySelector('#first').style.content;return content.includes('blob:')&&content!==previous;},beforeLanguage,{timeout:15000});
+  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'].language),'en');check('reader UI shares language and login settings with in-page translation');
   // Content scripts may not access the mirrored login session.
   const security=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(t=>t.url===url);return chrome.scripting.executeScript({target:{tabId:tab.id},func:async()=>{try{await chrome.storage.local.get('nc-auth');return false;}catch{return true;}}});},page.url());assert.equal(security[0].result,true);check('credential storage is restricted to trusted extension contexts');
   complete=false;await page.goto(site+'/rolling');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();

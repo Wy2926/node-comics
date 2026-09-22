@@ -1,3 +1,5 @@
+import type { SourceCatalogSnapshot } from '../sources';
+export type { SourceEntry,SourceGroup } from '../sources';
 export type Evidence = {status:'observed'|'confirmed'|'user'; source:string};
 export interface ComicWork {id:string;title:string;aliases:string[];creators:string[];createdAt:number;updatedAt:number;evidence:Evidence;preferredCopyId?:string;coverCopyId?:string;readAt?:number;}
 export interface Chapter {id:string;workId:string;title:string;number?:string;numbering:string;order:number;role:'main'|'extra'|'unknown';evidence:Evidence;readAt?:number;}
@@ -8,9 +10,7 @@ export interface ContentInclusion {id:string;publicationId:string;target:{kind:'
 export interface PublicationRelation {id:string;fromId:string;toId:string;kind:'collects'|'reprint';evidence:Evidence;}
 export interface CopyCoverage {id:string;copyId:string;workId:string;target:{kind:'chapter'|'publication'|'work'|'unclassified';id:string};startPageId?:string;endPageId?:string;evidence:Evidence;}
 export interface WorkRelation {id:string;fromId:string;toId:string;kind:'sequel'|'prequel'|'spinoff'|'adaptation'|'fanwork'|'related';evidence:Evidence;}
-export interface SourceEntry {id:string;catalogId:string;remoteId:string;url:string;title:string;groupIds:string[];rawTypes:string[];order:number;related:boolean;}
-export interface SourceGroup {id:string;title:string;entryIds:string[];complete:boolean;}
-export interface SourceCatalog {id:string;sourceId:string;url:string;title:string;observedAt:number;complete:boolean;note:string;groups:SourceGroup[];entries:SourceEntry[];workId?:string;excludedEntryIds:string[];}
+export interface SourceCatalog extends SourceCatalogSnapshot {workId?:string;excludedEntryIds:string[];}
 export interface AcquisitionTask {id:string;copyId:string;status:'queued'|'running'|'paused'|'failed'|'complete';phase:'discover'|'images';completed:number;total?:number;error?:string;updatedAt:number;}
 export interface LibraryState {id:'library';revision:number;works:ComicWork[];chapters:Chapter[];versions:ContentVersion[];series:PublicationSeries[];publications:Publication[];inclusions:ContentInclusion[];publicationRelations:PublicationRelation[];coverage:CopyCoverage[];relations:WorkRelation[];catalogs:SourceCatalog[];tasks:AcquisitionTask[];}
 export type ImportKind='chapter'|'extra'|'publication'|'work'|'unclassified';

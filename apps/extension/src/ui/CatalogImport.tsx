@@ -1,14 +1,14 @@
-import {Select} from './Select';
-import {msg} from '../i18n/runtime';
-import {useEffect,useMemo,useRef,useState} from 'react';
-import type {ImportAssignment,LibraryState,SourceCatalog,SourceEntry} from '../library/types';
-import type {ReadingCopy} from '../types';
-import {makeCopy,selectRange,suggestedKind} from '../library/model';
-import {commitCopies} from '../library/store';
-import {queueCopies} from '../library/acquisition';
-import {requestImagePermissions} from '../sources/permissions';
-import {useImagePermissions} from './useImagePermissions';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { msg } from '../i18n/runtime';
+import { queueCopies } from '../library/acquisition';
+import { makeCopy, selectRange, suggestedKind } from '../library/model';
+import { commitCopies } from '../library/store';
+import type { ImportAssignment, LibraryState, SourceCatalog, SourceEntry } from '../library/types';
+import { requestImagePermissions, sourceName } from '../sources';
+import type { ReadingCopy } from '../types';
 import './catalog.css';
+import { Select } from './Select';
+import { useImagePermissions } from './useImagePermissions';
 
 const PAGE_SIZE=40;
 const kinds:Record<ImportAssignment['kind'],string>={get chapter(){return msg("章节");},get extra(){return msg("番外");},get publication(){return msg("卷册");},get unclassified(){return msg("待整理");},get work(){return msg("独立作品");}};
@@ -65,7 +65,7 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
   saving.current=true;setBusy(true);setError('');setFeedback(msg("正在保存 {0} 个来源条目…", {"0": chosen.length}));
   try{
    if(offline)await requestImagePermissions([new URL(catalog.url).origin+'/*',...permissions.origins]);
-   const incoming=chosen.map(entry=>({...makeCopy(entry.title,[],'MangaCopy',entry.id),sourceEntryId:entry.id,sourceUrl:entry.url,retention:offline?'offline' as const:'cache' as const,discoveryComplete:false}));
+   const incoming=chosen.map(entry=>({...makeCopy(entry.title,[],sourceName(catalog.sourceId),entry.id),sourceEntryId:entry.id,sourceUrl:entry.url,retention:offline?'offline' as const:'cache' as const,discoveryComplete:false}));
    const mappings=chosen.map(entry=>entry.related?{title:entry.title,kind:'unclassified' as const}:{...assignment,kind:overrides[entry.id]??suggestedKind(entry)});
    const result=await commitCopies(incoming,mappings,catalog);
    let message=msg("已导入 {0} 个新条目{1}。", {"0": result.created, "1": (chosen.length>result.created?msg("，保留 {0} 个已有条目", {"0": (chosen.length-result.created)}):'')});

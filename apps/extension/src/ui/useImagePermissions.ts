@@ -1,8 +1,7 @@
-import {msg} from '../i18n/runtime';
-import {useEffect,useState} from 'react';
-import type {SourceCatalog} from '../library/types';
-import {inExtension} from '../sources/client';
-import {prepareImageOrigins} from '../sources/permissions';
+import { useEffect, useState } from 'react';
+import { msg } from '../i18n/runtime';
+import type { SourceCatalog } from '../library/types';
+import { inExtension, prepareImageOrigins } from '../sources';
 
 /** Resolve the first CDN before enabling the click that opens Chrome's prompt. */
 export function useImagePermissions(targets:{catalog:SourceCatalog;entryId:string}[]){

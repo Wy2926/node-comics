@@ -1,11 +1,11 @@
-import {validUiLanguage} from '../i18n/locales';
-import {msg} from '../i18n/runtime';
+import { validUiLanguage } from '../i18n/locales';
+import { msg } from '../i18n/runtime';
+import { mirrorReader } from '../inline/settings';
+import { mergeJobs } from '../reader/jobs';
+import { sourcePageIdentity } from '../sources';
 import { defaults, type ReadingCopy, type Settings } from '../types';
-import {mergeJobs} from '../reader/jobs';
-import {attachCopy,emptyLibrary,validateLibrary} from './model';
-import type {ImportAssignment,LibraryState,SourceCatalog} from './types';
-import {sourcePageIdentity} from '../sources/mangacopy';
-import {mirrorReader} from '../inline/settings';
+import { attachCopy, emptyLibrary, validateLibrary } from './model';
+import type { ImportAssignment, LibraryState, SourceCatalog } from './types';
 const DB = 'node-comics-library';
 export function readPosition(copyId:string,revision:number):{pageId:string;relativeOffset:number}|null {try{const value=JSON.parse(localStorage.getItem(`nc-copy-position:${copyId}:${revision}`)??'null');return typeof value?.pageId==='string'&&Number.isFinite(value.relativeOffset)?value:null;}catch{return null;}}
 export function savePosition(copyId:string,revision:number,position:{pageId:string;relativeOffset:number}){localStorage.setItem(`nc-copy-position:${copyId}:${revision}`,JSON.stringify({...position,relativeOffset:Math.max(0,Math.min(1,position.relativeOffset)),updatedAt:Date.now()}));}

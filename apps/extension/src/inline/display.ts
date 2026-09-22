@@ -1,8 +1,8 @@
-import type {ComicElement} from '../sources/model';
-import {CanvasDisplay} from './canvas-display';
-import {msg} from '../i18n/runtime';
+import { msg } from '../i18n/runtime';
+import type { ComicElement } from '../sources/page';
+import { CanvasDisplay } from './canvas-display';
 import styles from './display.css?inline';
-import {shadowThemeStyles} from './shadow';
+import { shadowThemeStyles } from './shadow';
 
 export const inlineStyles=shadowThemeStyles(styles);
 export const imageDisplay=(image:ComicElement)=>image instanceof HTMLCanvasElement?new CanvasDisplay(image):new ImageDisplay(image);

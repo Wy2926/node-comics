@@ -1,17 +1,16 @@
-import {Select} from '../Select';
-import {msg,messageSource} from '../../i18n/runtime';
-import {useState} from 'react';
-import type {LibraryState} from '../../library/types';
-import type {ReadingCopy} from '../../types';
-import {grantImagePermissions,pauseCopies} from '../../library/acquisition';
-import {acquisitionCopies} from '../../library/acquisition-order';
-import {copyPageTotal} from '../../library/model';
-import {inExtension} from '../../sources/client';
-import {Thumbnail} from '../../reader/Images';
-import {Modal} from '../components';
-import {copyComplete,copyCover,savedPages,type LibraryRun} from './shared';
-import {useImagePermissions} from '../useImagePermissions';
-import {copyOrigins} from '../../sources/permissions';
+import { useState } from 'react';
+import { messageSource, msg } from '../../i18n/runtime';
+import { grantImagePermissions, pauseCopies } from '../../library/acquisition';
+import { acquisitionCopies } from '../../library/acquisition-order';
+import { copyPageTotal } from '../../library/model';
+import type { LibraryState } from '../../library/types';
+import { Thumbnail } from '../../reader/Images';
+import { copyOrigins, inExtension } from '../../sources';
+import type { ReadingCopy } from '../../types';
+import { Modal } from '../components';
+import { Select } from '../Select';
+import { useImagePermissions } from '../useImagePermissions';
+import { copyComplete, copyCover, savedPages, type LibraryRun } from './shared';
 
 export function AcquisitionCenter({library:s,copies,initialWorkId,onlyIds,busy,feedback,run,onOpen,onSource,onClose}:{library:LibraryState;copies:ReadingCopy[];initialWorkId?:string;onlyIds?:string[];busy:string;feedback?:{tone:string;message:string};run:LibraryRun;onOpen:(id:string)=>void;onSource:(url:string)=>void;onClose:()=>void}){
  const [scope,setScope]=useState(initialWorkId??''),[filter,setFilter]=useState('all'),[restricted,setRestricted]=useState(!!onlyIds?.length);

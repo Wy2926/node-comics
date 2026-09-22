@@ -1,5 +1,5 @@
-import type {Settings} from '../types';
-import {settingsKey} from './settings';
+import type { Settings } from '../types';
+import { settingsKey } from './settings';
 
 type InlineTheme=Pick<Settings,'appearance'|'accentTheme'|'textScale'>;
 /** Only presentation preferences cross into a source tab; storage remains trusted-only. */
@@ -19,12 +19,15 @@ export function connectInlineTheme(surface:HTMLElement){
     surface.style.setProperty('--text-scale',String(theme.textScale));
   };
   apply();media.addEventListener('change',apply);
-  chrome.runtime.onMessage.addListener((message,sender)=>{
-    if(sender.id!==chrome.runtime.id||message?.type!=='NC_INLINE_THEME_CHANGED')return;
-    revision++;theme=inlineTheme(message.data);apply();
-  });
+  const listener=(message:unknown,sender:chrome.runtime.MessageSender)=>{
+    const value=message as {type?:string;data?:unknown};
+    if(sender.id!==chrome.runtime.id||value?.type!=='NC_INLINE_THEME_CHANGED')return;
+    revision++;theme=inlineTheme(value.data);apply();
+  };
+  chrome.runtime.onMessage.addListener(listener);
   const requested=revision;
   void chrome.runtime.sendMessage({type:'NC_INLINE_THEME'}).then(value=>{if(revision!==requested)return;theme=inlineTheme(value);apply();}).catch(()=>{});
+  return ()=>{revision++;media.removeEventListener('change',apply);chrome.runtime.onMessage.removeListener(listener);};
 }
 export function registerInlineThemeBackground(){
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{

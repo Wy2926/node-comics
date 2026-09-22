@@ -1,38 +1,17 @@
 import 'fake-indexeddb/auto';
-import {beforeAll,describe,expect,it,vi} from 'vitest';
-import {initialChoices,refreshChoices,moveChoice,selectManifest} from '../src/sources/selection';
-import type {PageManifest,SourceItem} from '../src/sources/adapters';
-import {discoverDocument} from '../src/sources/adapters';
-import {isMangaCopyUrl,mangaCopyLocation,sourcePageIdentity,sameMangaCopyPage,discoverMangaCopyCatalog} from '../src/sources/mangacopy';
-import {makeCopy} from '../src/library/model';
-import {commitCopies,readCopies,readLibrary,putBlob,savePosition,editLibrary,saveCopy} from '../src/library/store';
-import {insertWebCopy,type WebDestination} from '../src/library/web-import';
-import {emptyPage} from '../src/reader/model';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { makeCopy } from '../src/library/model';
+import { commitCopies, editLibrary, putBlob, readCopies, readLibrary, saveCopy, savePosition } from '../src/library/store';
+import { insertWebCopy, type WebDestination } from '../src/library/web-import';
+import { emptyPage } from '../src/reader/model';
+import { sourcePageIdentity } from '../src/sources';
+import { initialChoices, moveChoice, refreshChoices, selectManifest } from '../src/sources/core/selection';
+import type { PageManifest, SourceItem } from '../src/sources/page';
+import { createSourceNavigation } from '../src/sources/page';
 
 beforeAll(()=>{const values=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)});});
 const image=(id:string,width=800,height=1200,order=0):SourceItem=>({id,url:'https://images.example/'+id,width,height,order});
 const manifest=(items:SourceItem[]):PageManifest=>({id:'snapshot',sourceTabId:2,navigationId:'nav',revision:1,title:'网页',url:'https://example.test/comic',adapter:'generic',direction:'rtl',discoveryComplete:false,note:'当前图片',items});
-
-describe('shared MangaCopy domains',()=>{
- it.each(['mangacopy.com','www.mangacopy.com','copy4000.com','www.copy4000.com'])('recognizes %s and shares the source identity',host=>{
-  const url=`https://${host}/comic/sample/chapter/724f819b-5306-11ea-b7ea-024352452ce0`;
-  expect(mangaCopyLocation(url)).toEqual({slug:'sample',chapterId:'724f819b-5306-11ea-b7ea-024352452ce0'});
-  expect(sourcePageIdentity(url)).toBe(sourcePageIdentity(url.replace(host,'www.mangacopy.com')));
-  const img={getAttribute:(name:string)=>name==='data-src'?'https://images.example/1':null};
-  const doc={title:'漫画',querySelector:()=>({textContent:'1'}),querySelectorAll:()=>[img]} as unknown as Document;
-  expect(discoverDocument(doc,url)).toMatchObject({adapter:'mangacopy',discoveryComplete:true,knownTotal:1});
-  const catalogDoc={title:'样本',querySelector:()=>null,querySelectorAll:()=>[]} as unknown as Document;
-  expect(discoverMangaCopyCatalog(catalogDoc,`https://${host}/comic/sample`)).toMatchObject({id:'mangacopy:sample',url:`https://${host}/comic/sample`});
- });
- it.each(['https://copy4000.com.evil.test/comic/sample','https://evilcopy4000.com/comic/sample','https://user@copy4000.com/comic/sample','http://copy4000.com/comic/sample','https://copy4000.com:8080/comic/sample'])('rejects an unrelated or unsafe origin %s',url=>expect(isMangaCopyUrl(url)).toBe(false));
- it('allows only the same content across mirror redirects',()=>{
-  const url='https://www.mangacopy.com/comic/sample/chapter/724f819b-5306-11ea-b7ea-024352452ce0';
-  expect(sameMangaCopyPage(url,url.replace('www.mangacopy.com','copy4000.com'))).toBe(true);
-  expect(sameMangaCopyPage(url,url.replace('sample','another'))).toBe(false);
-  expect(sameMangaCopyPage(url,'https://copy4000.com/comic/sample')).toBe(false);
-  expect(sameMangaCopyPage(url,url.replace('www.mangacopy.com','evil.test'))).toBe(false);
- });
-});
 
 describe('generic selection and refresh',()=>{
  it('selects the discovered manifest without another source-resolution filter',()=>{
@@ -56,8 +35,8 @@ describe('generic selection and refresh',()=>{
  it('keeps dedicated adapters lazy original URLs without mistaking placeholder dimensions for original dimensions',()=>{
   const imgs=[{dataset:{src:'https://images.example/full'},src:'https://images.example/pixel',currentSrc:'https://images.example/pixel',naturalWidth:1,naturalHeight:1,width:1,height:1},{dataset:{},src:'https://images.example/icon',naturalWidth:64,naturalHeight:64},{dataset:{},src:'javascript:alert(1)'}];
   const doc={title:'网页',querySelectorAll:()=>imgs} as unknown as Document;
-  const result=discoverDocument(doc,'https://xkcd.com/1');expect(result.items).toHaveLength(2);expect(result.items[0]).toMatchObject({url:'https://images.example/full',width:0,height:0});
-  const second=discoverDocument({...doc,querySelectorAll:()=>imgs.slice(1)} as unknown as Document,'https://xkcd.com/1');expect(second.items[0].id).toBe(result.items[1].id);
+  const session=createSourceNavigation(doc).get('https://xkcd.com/1').session,result=session.snapshot();expect(result.items).toHaveLength(2);expect(result.items[0]).toMatchObject({resource:{kind:'http',url:'https://images.example/full'},width:0,height:0});
+  Object.assign(doc,{querySelectorAll:()=>imgs.slice(1)});const second=session.snapshot();expect(second.items[0].id).toBe(result.items[1].id);
  });
 });
 
