@@ -21,7 +21,10 @@ const requests=[],operations=new Map(),jobs=new Map(),uploads=new Map(),images=n
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
 const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000,max_plan_items:4},entitlements:rights,retention_days:0};
-let output,api,site,complete=true,version=0;
+let output,api,site,complete=true;
+const resultRequests=[];
+let heldResult,releaseResult,failResult;
+const accessCount=()=>requests.filter(r=>r.path.startsWith('/v1/images/')&&r.path.endsWith('/access')).length;
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+job.id,completed_at:new Date().toISOString(),change_sequence:++changeSequence});};
 const snapshot=()=>({policy_revision:'1',server_time:new Date().toISOString(),entitlements:rights,image_rate_limit:{window_seconds:60,limit:10,remaining:10,retry_after_seconds:0}});
@@ -33,7 +36,12 @@ const server=createServer(async(req,res)=>{
     if(req.method==='POST'||req.method==='PUT'){const chunks=[];for await(const chunk of req)chunks.push(chunk);body=Buffer.concat(chunks);if(req.headers['content-type']?.includes('application/json'))body=JSON.parse(body);}
     const json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(data));};
     if(url.pathname.startsWith('/source/')){const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;}
-    if(url.pathname==='/result.png'){res.writeHead(200,{'Content-Type':'image/png'});res.end(output);return;}
+    if(url.pathname==='/result.png'){
+      const id=url.searchParams.get('id');resultRequests.push(id);
+      if(id===heldResult)await new Promise(resolve=>{releaseResult=resolve;});
+      if(id===failResult){failResult=undefined;res.writeHead(503);res.end();return;}
+      res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(output);return;
+    }
     requests.push({method:req.method,path:url.pathname,authorization:!!req.headers.authorization});refresh();
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
     if(url.pathname==='/v1/capabilities')return json(caps);
@@ -43,7 +51,6 @@ const server=createServer(async(req,res)=>{
       while(!res.destroyed){refresh();const items=[...jobs.values()].filter(job=>(job.change_sequence??0)>cursor).sort((a,b)=>a.change_sequence-b.change_sequence);if(items.length||Date.now()>=until)return json({items,deleted_job_ids:[],cursor:String(items.at(-1)?.change_sequence??cursor),has_more:false,...snapshot()});await new Promise(resolve=>setTimeout(resolve,50));}return;
     }
     if(url.pathname==='/v1/translation-operations/resolve')return json({items:body.operation_keys.map(key=>operationResult(key)),policy_revision:'1'});
-    if(url.pathname==='/v1/translation-operations')return json({items:[...operations.keys()].map(key=>operationResult(key)),total:operations.size,next_offset:null});
     if(url.pathname.startsWith('/v1/reading-sessions/')&&url.pathname.endsWith('/lease'))return json({session_id:url.pathname.split('/')[3],priority:priority(body.modes),policy_revision:'1'});
     if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,jobs:[],display_jobs:[]}))});
     if(url.pathname==='/v1/translation-plans'&&req.method==='POST'){
@@ -66,7 +73,7 @@ const server=createServer(async(req,res)=>{
     }
     if(url.pathname.startsWith('/upload/')){uploads.set(url.pathname.split('/').at(-1),body);res.writeHead(200);res.end();return;}
     if(url.pathname.startsWith('/v1/uploads/')){const id=url.pathname.split('/')[3],job=jobs.get(id);assert.equal(sha(uploads.get(id)),job.image_sha256);job.status='queued';job.phase='queued';job.change_sequence=++changeSequence;return json(job);}
-    if(url.pathname.startsWith('/v1/images/'))return json({url:api+'/result.png',authorization_required:true,expires_at:null});
+    if(url.pathname.startsWith('/v1/images/'))return json({url:api+'/result.png?id='+encodeURIComponent(url.pathname.split('/')[3]),authorization_required:true,expires_at:null});
     return json({error:{message:'fixture missing '+url.pathname}},404);
   }catch(error){errors.push(error.message);res.writeHead(500);res.end('fixture failure');}
 });
@@ -130,12 +137,15 @@ try{
   await page.waitForTimeout(300);assert.equal(createdJobs,1);
   await page.screenshot({path:path.join(out,'site-style-repaired.png')});
   check('site style/class rewrites retain the decoded result, original geometry and site edits without new jobs');
+  const accessesBeforeRestore=accessCount(),downloadsBeforeRestore=resultRequests.length;
   await button('恢复原图');await page.waitForFunction(()=>document.querySelector('#first').style.content==='normal');
   assert.equal(await page.locator('#first').evaluate(i=>i.style.aspectRatio),'auto');
   assert.equal(await page.locator('#first').evaluate(i=>i.style.opacity),'0.95');
   check('restoring originals preserves the latest site-authored content, aspect ratio and opacity');
   await page.locator('#first').evaluate(i=>i.removeAttribute('style'));
   await button('显示译图');await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
+  assert.equal(accessCount(),accessesBeforeRestore);assert.equal(resultRequests.length,downloadsBeforeRestore);
+  check('original/translation toggle uses persistent bytes with zero image access or download requests');
   await button('恢复原图');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');assert.equal(await page.locator('#first').getAttribute('width'),null);assert.equal(await page.locator('#first').getAttribute('height'),null);check('restore originals removes only extension-owned changes');
   await button('显示译图');await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(700);const mobile=await geometry();assert.equal(Math.round(mobile.width),351);assert(Math.abs(mobile.height-mobile.width*before.height/before.width)<1,JSON.stringify({before,mobile}));assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(out,'translated-mobile.png')});check('responsive page keeps original aspect ratio at 390px');
@@ -144,10 +154,12 @@ try{
   await page.locator('#lazy').evaluate((i,url)=>i.src=url,api+'/source/5.png');await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('site-owned source change removes stale translation and translates the new image');
   await page.locator('#lazy').evaluate((i,bytes)=>i.src=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'image/png'})),[...images.get(6)]);await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('page-owned blob images are read in the content script without exposing credentials');
   const jobsBeforeReturn=createdJobs;
+  const firstDownloadsBeforeReturn=resultRequests.filter(id=>id==='output-seed-1').length;
   await page.waitForFunction(()=>document.querySelector('#first').style.content==='');
   await page.locator('#first').scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});
   assert.equal(createdJobs,jobsBeforeReturn);assert.equal((await geometry()).height,before.height);
+  assert.equal(resultRequests.filter(id=>id==='output-seed-1').length,firstDownloadsBeforeReturn);
   await page.screenshot({path:path.join(out,'scroll-return.png')});
   check('scrolling back restores an evicted translation without creating another translation job or changing geometry');
   await worker.evaluate(async()=>{await chrome.storage.local.set({'nc-auth':{session:null}});});await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.waitForTimeout(800);assert.equal(await page.locator('#lazy').evaluate(i=>i.style.content),'');await page.screenshot({path:path.join(out,'logged-out.png')});check('logout immediately restores every image and stops authenticated work');
@@ -180,6 +192,56 @@ try{
   assert([...jobs.values()].filter(j=>[7,8,9,10,11,12].some(n=>j.image_sha256===sha(images.get(n)))).every(j=>j.status!=='succeeded'));
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('scrolling to page 2 admits page 5 and page 3 admits page 6 while previous translations remain unfinished');
+  // Complete the whole window together, holding one neighbour's bytes indefinitely.
+  await page.locator('#rolling-1').evaluate(i=>window.scrollTo(0,i.offsetTop));
+  const rollingJob=n=>[...jobs.values()].find(j=>j.image_sha256===sha(images.get(n+6)));
+  heldResult='output-'+rollingJob(2).id;
+  for(let n=1;n<=6;n++)Object.assign(rollingJob(n),{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+rollingJob(n).id,updated_at:new Date().toISOString(),change_sequence:++changeSequence});
+  await page.waitForFunction(()=>document.querySelector('#rolling-1').style.content.includes('blob:')&&document.querySelector('#rolling-3').style.content.includes('blob:'),null,{timeout:15000});
+  assert(releaseResult,'the neighbour download must actually be in flight');
+  assert.equal(await page.locator('#rolling-2').evaluate(i=>i.style.content),'');
+  await page.screenshot({path:path.join(out,'independent-downloads.png')});
+  heldResult=undefined;releaseResult();releaseResult=undefined;
+  await page.waitForFunction(()=>[1,2,3,4].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
+  check('current and other completed pages display while a neighbour download is still blocked');
+  const cacheAccesses=accessCount(),cacheDownloads=resultRequests.length,cacheJobs=createdJobs;
+  // Headless Chromium keeps tabs visible. Drive the real content-script visibility handler
+  // in its isolated world; this is a synthetic visibility event, not a native tab-switch test.
+  const visibility=hidden=>worker.evaluate(async({url,hidden})=>{
+    const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
+    await chrome.scripting.executeScript({target:{tabId:tab.id},func:hidden=>{
+      Object.defineProperty(document,'hidden',{configurable:true,get:()=>hidden});
+      Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>hidden?'hidden':'visible'});
+      document.dispatchEvent(new Event('visibilitychange'));
+    },args:[hidden]});
+  },{url:page.url(),hidden});
+  await visibility(true);
+  await page.waitForFunction(()=>!document.querySelector('#rolling-1').style.content);
+  await visibility(false);
+  await page.waitForFunction(()=>[1,2,3,4].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
+  assert.equal(accessCount(),cacheAccesses);assert.equal(resultRequests.length,cacheDownloads);
+  check('simulated hide/return releases decoded images but performs zero image HTTP requests');
+  await page.reload();await activate();
+  await page.waitForFunction(()=>document.querySelector('#rolling-1').style.content.includes('blob:'));
+  assert.equal(resultRequests.length,cacheDownloads);assert.equal(createdJobs,cacheJobs);
+  check('reloading a page restores translations from IndexedDB without downloading or translating again');
+  // A new delivered version must not reuse the old bitmap, and a failed GET must never regenerate it.
+  const failed=rollingJob(1),nextOutput='retry-'+failed.id;
+  const previousOutput=await page.locator('#rolling-1').evaluate(i=>i.style.content);
+  failResult=nextOutput;
+  Object.assign(failed,{output_asset_id:nextOutput,updated_at:new Date(Date.now()+1000).toISOString(),change_sequence:++changeSequence});
+  const retryUntil=Date.now()+15000;while(!resultRequests.includes(nextOutput)&&Date.now()<retryUntil)await page.waitForTimeout(50);
+  assert(resultRequests.includes(nextOutput));
+  await page.waitForTimeout(300);
+  const beforeReloadRetry=requests.length;
+  await page.screenshot({path:path.join(out,'download-failure.png')});
+  await button('加载失败 · 重试');
+  const doneUntil=Date.now()+15000;while(resultRequests.filter(id=>id===nextOutput).length<2&&Date.now()<doneUntil)await page.waitForTimeout(50);
+  await page.waitForFunction(previous=>{const value=document.querySelector('#rolling-1').style.content;return value.includes('blob:')&&value!==previous;},previousOutput);
+  assert.equal(resultRequests.filter(id=>id===nextOutput).length,2);
+  assert.equal(createdJobs,cacheJobs);
+  assert.equal(requests.slice(beforeReloadRetry).filter(r=>r.method==='POST'&&r.path==='/v1/translation-plans').length,0);
+  check('download failure retry only reads the new result; it submits no plan and creates no translation');
   assert.equal(requests.filter(r=>r.path.includes('/queues')||r.path.includes('/translation-submissions')||r.path.endsWith('/priority')).length,0,'normal reading must not use removed queue/submission contracts');check('new plans and long-poll run with zero queue, priority or old submission requests');
   // Match the real Comic PASH canvas structure with synthetic pixels and the same API fixture.
   complete=true;
@@ -227,7 +289,7 @@ try{
     check('Live Comic PASH source recognizes canvases, displays fixture translations, turns pages and restores originals; no live provider used');
   }
   assert.equal(errors.length,0,errors.join('\n'));
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));console.error('Artifacts: '+out);throw error;}
-finally{await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}
+finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

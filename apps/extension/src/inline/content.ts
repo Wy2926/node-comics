@@ -1,4 +1,5 @@
 import { msg, subscribeLocale } from '../i18n/runtime';
+import { RequestPool } from '../concurrency';
 import { imageDataUrl, sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
 import { comicImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
@@ -6,7 +7,7 @@ import { advancesReadingWindow } from '../translation/automatic';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
 import { imageDisplay, inlineStyles } from './display';
-import { readingImages, type InlineResponse, type InlineResult } from './protocol';
+import { readingImages, type InlineResponse, type InlineResult, type InlineImageResponse } from './protocol';
 import { connectInlineTheme } from './theme';
 
 interface Candidate {
@@ -18,6 +19,9 @@ interface Candidate {
   rect: DOMRect;
   display: ReturnType<typeof imageDisplay>;
   state?: InlineResult['state'];
+  resultKey?: string;
+  loadError?: InlineResult['state'];
+  loading?: { key: string; stamp: number };
 }
 export function installInline() {
   let navigationId: string = crypto.randomUUID(),
@@ -51,6 +55,7 @@ export function installInline() {
     scanTimer: ReturnType<typeof setTimeout> | undefined,
     raf = 0;
   const tracked = new Map<ComicElement, Candidate>();
+  const imageLoads = new RequestPool(2);
   const host = document.createElement('div');
   host.style.cssText =
     'all:initial!important;position:fixed!important;inset:0!important;z-index:2147483646!important;pointer-events:none!important';
@@ -140,7 +145,7 @@ export function installInline() {
     const visible = new Set<string>();
     for (const item of windowImages) {
       const rect = item.image.getBoundingClientRect(),
-        state = item.state;
+        state = item.loadError ?? (item.loading ? { kind: 'translating' as const, message: msg('正在读取译图') } : item.state);
       if (!state || rect.bottom <= 0 || rect.top >= innerHeight || rect.right <= 0 || rect.left >= innerWidth)
         continue;
       visible.add(item.id);
@@ -183,6 +188,11 @@ export function installInline() {
         b.onclick = () => {
           if (state.kind === 'login' || state.kind === 'upgrade') {
             void send('NC_INLINE_OPEN', { view: 'account' });
+            return;
+          }
+          if (item.loadError && item.resultKey) {
+            item.loadError = undefined;
+            void loadResult(item, item.resultKey, generation);
             return;
           }
           retryId = item.id;
@@ -308,9 +318,33 @@ export function installInline() {
       width: i.rect.width,
       height: i.rect.height,
     })),
-    known: Object.fromEntries(targets.map((i) => [i.id, i.display.key ?? ''])),
   });
-  async function apply(data: InlineResponse, targets: Candidate[], stamp: number) {
+  async function loadResult(item: Candidate, key: string, stamp: number) {
+    if (item.loading?.key === key && item.loading.stamp === stamp) return;
+    const loading = { key, stamp };
+    const live = () => enabled && !paused && !original && !document.hidden && stamp === generation
+      && item.resultKey === key && item.image.isConnected && current(item);
+    item.loading = loading;
+    paint();
+    try {
+      await imageLoads.run(async () => {
+        if (!live()) return;
+        const value = await send('NC_INLINE_IMAGE', { ...payload([item]), resultKey: key });
+        if (!live()) return;
+        if (!value?.ok) throw Error(value?.error ?? msg('翻译服务暂不可用'));
+        const result = value.data as InlineImageResponse;
+        if (result.resultKey !== key) return;
+        await item.display.show(result.data, key, live);
+        if (live()) item.loadError = undefined;
+      });
+    } catch (error) {
+      if (live()) item.loadError = { kind: 'error', message: (error as Error).message, retryLabel: msg('点击重新加载') };
+    } finally {
+      if (item.loading === loading) item.loading = undefined;
+      paint();
+    }
+  }
+  function apply(data: InlineResponse, targets: Candidate[], stamp: number) {
     if (stamp !== generation || !enabled || location.href !== initialUrl) return;
     if (scope && scope !== data.scope) for (const item of tracked.values()) item.display.restore();
     scope = data.scope;
@@ -323,18 +357,13 @@ export function installInline() {
       const item = targets.find((t) => t.id === result.id);
       if (!item || !item.image.isConnected || !current(item)) continue;
       item.state = result.state;
-      if (!result.resultKey) item.display.restore();
-      if (result.data && result.resultKey && !original) {
-        try {
-          await item.display.show(
-            result.data,
-            result.resultKey,
-            () => enabled && !original && stamp === generation && current(item),
-          );
-        } catch (error) {
-          item.state = { kind: 'error', message: (error as Error).message, retryLabel: msg('点击重新加载') };
-        }
+      if (item.resultKey !== result.resultKey) {
+        item.resultKey = result.resultKey;
+        item.loadError = undefined;
       }
+      if (!result.resultKey) item.display.restore();
+      if (result.resultKey && item.display.key !== result.resultKey && !item.loadError && !original)
+        void loadResult(item, result.resultKey, stamp);
     }
     if (data.retryAfterMs) schedule(data.retryAfterMs);
     if (data.needsPlan) schedule();
@@ -365,7 +394,7 @@ export function installInline() {
             retry = value?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++);
             break;
           }
-          if (value.data) await apply(value.data, targets, stamp);
+          if (value.data) apply(value.data, targets, stamp);
           if (value.data?.scope === 'logged-out') break;
           failures = 0;
         } catch {
@@ -396,7 +425,7 @@ export function installInline() {
       }
       const data = response.data as InlineResponse | undefined;
       if (!data) return;
-      await apply(data, targets, stamp);
+      apply(data, targets, stamp);
       failures = 0;
     } catch (error) {
       if (stamp === generation)
@@ -508,6 +537,8 @@ export function installInline() {
       for (const item of tracked.values()) {
         item.display.restore();
         item.state = undefined;
+        item.resultKey = undefined;
+        item.loadError = undefined;
       }
       schedule();
     }

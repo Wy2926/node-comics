@@ -6,6 +6,7 @@ import { assertCurrent, RequestPool, UPLOAD_CONCURRENCY } from '../concurrency';
 import { msg } from '../i18n/runtime';
 import { imageIdentity } from '../importers/hash';
 import { getBlob, putBlob, removeBlob } from '../library/store';
+import { loadResultBlob } from '../library/result-cache';
 import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
@@ -17,7 +18,7 @@ import { translationState } from '../translation/state';
 import { matchesPage } from '../translation/sync';
 import { defaults, supportsLanguage, type Capabilities, type Entitlements, type Job, type Page, type Settings } from '../types';
 import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
-import { comicSize, type InlineRequest, type InlineResponse, type InlineResult } from './protocol';
+import { comicSize, type InlineRequest, type InlineResponse, type InlineResult, type InlineImageResponse } from './protocol';
 import { settingsKey } from './settings';
 import { registerInlineThemeBackground } from './theme';
 
@@ -58,10 +59,13 @@ async function stopAutomaticInline(tabId:number){
   });
 }
 async function context(tabId:number,navigationId:string):Promise<Context|undefined>{
+  return navigator.locks.request('nc-inline-context:'+tabId,()=>createContext(tabId,navigationId));
+}
+async function createContext(tabId:number,navigationId:string):Promise<Context|undefined>{
   const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>},session=(await readAuth()).session;
   const origin=API_ORIGIN;if(!session||session.apiOrigin!==origin)return;
   const key=JSON.stringify([origin,session.id,settings.translationMode,settings.language,navigationId,configGeneration]);
-  const previous=contexts.get(tabId);if(previous?.key===key)return previous;
+  const previous=contexts.get(tabId);if(previous?.key===key){previous.settings=settings;return previous;}
   if(previous){previous.active=false;previous.waiting?.abort();}
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
   const api=new Api(API_BASE,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active),sessionAuthorization(session.id));
@@ -94,18 +98,45 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
   }
   return targets;
 }
-async function response(ctx:Context,request:InlineRequest):Promise<InlineResponse>{
-  const {translationMode:mode,language}=ctx.settings,origin=new URL(ctx.api.base).origin,scope=JSON.stringify([origin,ctx.session.user.id,mode,language]);
-  const items:InlineResult[]=[];let bytes=0;
+const resultScope=(ctx:Context)=>JSON.stringify([new URL(ctx.api.base).origin,ctx.session.user.id,ctx.settings.translationMode,ctx.settings.language]);
+function pageResult(ctx:Context,page:Page){
+  const {translationMode:mode,language}=ctx.settings,origin=new URL(ctx.api.base).origin;
+  const current=pageTranslation(page,mode,language,ctx.session.user.id,origin),fallback=mode==='redraw'?pageTranslation(page,'classic',language,ctx.session.user.id,origin):undefined;
+  return current.result&&!current.expired?current.result:fallback?.result&&!fallback.expired?fallback.result:undefined;
+}
+function response(ctx:Context,request:InlineRequest):InlineResponse{
+  const {translationMode:mode,language}=ctx.settings,origin=new URL(ctx.api.base).origin,scope=resultScope(ctx);
+  const items:InlineResult[]=[];
   for(const image of request.images){const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);if(error)items.push({id:image.id,state:{kind:'error',message:error}});continue;}
-    const current=pageTranslation(page,mode,language,ctx.session.user.id,origin),fallback=mode==='redraw'?pageTranslation(page,'classic',language,ctx.session.user.id,origin):undefined;
-    const result=current.result&&!current.expired?current.result:fallback?.result&&!fallback.expired?fallback.result:undefined;
-    const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,{copyId:'inline',page,mode}));
-    const item:InlineResult={id:image.id,state:translationState({page,mode,language,userId:ctx.session.user.id,origin,active:true,caps:ctx.caps,rights:ctx.rights,operation})};
-    if(result?.output_asset_id){item.resultKey=JSON.stringify([scope,result.id,result.output_asset_id]);if(request.known[image.id]!==item.resultKey){try{const blob=await ctx.api.image(result.output_asset_id);assertCurrent(ctx.api.isCurrent);if(blob.size>maxInlineBytes)throw Error(msg("译图超过 40 MB 限制，原图已保留。"));if(bytes+blob.size<=maxInlineBytes){item.data=await imageDataUrl(blob);bytes+=blob.size;item.state=undefined;}else item.state={kind:'translating',message:msg("正在读取译图")};}catch(error){item.state={kind:'error',message:(error as Error).message,retryLabel:msg("点击重新加载")};}}else item.state=undefined;}
+    const result=pageResult(ctx,page);
+    const item:InlineResult={id:image.id};
+    if(result?.output_asset_id)item.resultKey=JSON.stringify([scope,result.id,result.output_asset_id]);
+    else {
+      const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,{copyId:'inline',page,mode}));
+      item.state=translationState({page,mode,language,userId:ctx.session.user.id,origin,active:true,caps:ctx.caps,rights:ctx.rights,operation});
+    }
     items.push(item);
   }
-  return {mode,language,scope,items,retryAfterMs:ctx.core.retryDelay||undefined,policyRevision:ctx.core.state.policyRevision,needsPlan:ctx.core.session.sequence===0};
+  return {mode,language,scope,items,retryAfterMs:ctx.core.retryDelay||undefined,policyRevision:ctx.core.state.policyRevision,
+    needsPlan:ctx.core.session.sequence===0||request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
+}
+/** A display reload can only read this page's selected result; it never enters the plan/retry path. */
+async function imageResponse(request:InlineRequest,sender:chrome.runtime.MessageSender):Promise<InlineImageResponse>{
+  const ctx=await context(sender.tab!.id!,request.navigationId);
+  if(!ctx)throw Error(msg('登录后自动翻译'));
+  const current=()=>ctx.active&&ctx.api.isCurrent()&&request.generation===(windowGenerations.get(sender.tab!.id!)??0);
+  assertCurrent(current);
+  const page=ctx.pages.get(pageKey(request,request.images[0])),job=page&&pageResult(ctx,page);
+  const key=job&&JSON.stringify([resultScope(ctx),job.id,job.output_asset_id]);
+  if(!job?.output_asset_id||key!==request.resultKey)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
+  const blob=await loadResultBlob({origin:new URL(ctx.api.base).origin,userId:ctx.session.user.id,job,
+    download:()=>ctx.api.image(job.output_asset_id!),isCurrent:ctx.api.isCurrent,cacheLimitMb:ctx.settings.cacheLimitMb});
+  assertCurrent(current);
+  // Feed updates can revoke/change the result while its bytes are being read.
+  const latest=ctx.pages.get(pageKey(request,request.images[0])),selected=latest&&pageResult(ctx,latest);
+  if(selected?.id!==job.id||selected.output_asset_id!==job.output_asset_id)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
+  const data=await imageDataUrl(blob);assertCurrent(current);
+  return {resultKey:key!,data};
 }
 async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):Promise<InlineResponse>{
   const ctx=await context(sender.tab!.id!,request.navigationId);
@@ -127,8 +158,10 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
     if(request.retryId){const image=request.images.find(i=>i.id===request.retryId),page=image&&ctx.pages.get(pageKey(request,image));const target=targets.find(t=>t.page.id===page?.id);if(target)await ctx.core.manual(target,current);}
     else await ctx.core.plan(targets,false,current);
     ctx.currentKey=currentKey;
-    await ctx.core.finishUploads();
-    for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.job?.status!=='awaiting_upload')await removeBlob(target.page.blobKey);}
+    // Upload completion is durable and arrives through the feed. Do not hold ready images behind uploads.
+    void ctx.core.finishUploads().then(async()=>{
+      for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.job?.status!=='awaiting_upload')await removeBlob(target.page.blobKey);}
+    }).catch(()=>{});
   }
   return response(ctx,request);
 }
@@ -138,7 +171,7 @@ export function registerInlineBackground(){
   chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;const settingChange=changes[settingsKey],before=settingChange?.oldValue as Partial<Settings>|undefined,after=settingChange?.newValue as Partial<Settings>|undefined;const translationChanged=settingChange&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode);if(area==='local'&&(translationChanged||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
-    if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_LEASE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
+    if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_LEASE','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{
       const tabId=sender.tab!.id!,saved=await chrome.storage.session.get(activationKey(tabId)),activation=saved[activationKey(tabId)] as Activation|undefined;
       if(!activation||activation.navigationId!==message.navigationId||activation.documentId&&activation.documentId!==sender.documentId)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
@@ -149,7 +182,11 @@ export function registerInlineBackground(){
       const tab=await chrome.tabs.get(tabId);if(tab.url!==activation.url)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
       if(!activation.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
       if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
-      if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||!comicSize(v.width,v.height);})||!message.known||typeof message.known!=='object')throw Error(msg("图片范围无效。"));
+      if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||!comicSize(v.width,v.height);}))throw Error(msg("图片范围无效。"));
+      if(message.type==='NC_INLINE_IMAGE'){
+        if(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048)throw Error(msg('图片范围无效。'));
+        return imageResponse(message,sender);
+      }
       if(message.type==='NC_INLINE_WAIT')return step(message,sender);
       return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,sender));
     })().then(data=>respond({ok:true,data})).catch(error=>respond({ok:false,error:error.message,retryAfterMs:error.retryAfterSeconds?error.retryAfterSeconds*1000:undefined}));return true;

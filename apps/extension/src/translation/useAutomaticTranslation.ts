@@ -6,6 +6,7 @@ import {mergeJobs} from '../reader/jobs';
 import {latestResults,pageTranslation} from '../reader/presentation';
 import {assertCurrent} from '../concurrency';
 import * as libraryStore from '../library/store';
+import {loadResultBlob,resultBlobKey} from '../library/result-cache';
 import {applyAccountJobs} from './sync';
 import {TranslationCoordinator} from './coordinator';
 import {readOperations,translationScope,type LocalOperation} from './store';
@@ -18,14 +19,12 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
  const scope=userId?translationScope(origin,userId):'',copyRef=useRef(copies);copyRef.current=copies;
  const config=useRef({caps,rights,onPolicy});config.current={caps,rights,onPolicy};
  const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow()),visible=useRef<Page[]>([]);
- const resultDownloads=useRef(new Map<string,Promise<Blob>>());
  const coordinator=useRef<TranslationCoordinator|undefined>(undefined),wake=useRef<()=>void>(()=>{}),stamp=useRef(0);
  const commit=useCallback((copy:ReadingCopy)=>{copyRef.current=copyRef.current.map(c=>c.id===copy.id?copy:c);updateCopy(copy);},[updateCopy]);
  const attach=useCallback(async(incoming:Job[])=>{if(!api.isCurrent()||!userId)return;jobs.current=mergeJobs(jobs.current,incoming);for(const copy of copyRef.current){const changed=applyAccountJobs(copy,incoming,userId,origin);if(changed!==copy)commit(changed);}},[api,userId,origin,commit]);
  const downloadResult=useCallback(async(job:Job,current=api.isCurrent)=>{
-   assertCurrent(current);const key='result:'+origin+':'+userId+':'+job.id;
-   let pending=resultDownloads.current.get(key);if(!pending){pending=(async()=>{const blob=await libraryStore.getBlob(key)??await api.image(job.output_asset_id!);assertCurrent(api.isCurrent);await libraryStore.putBlob(key,blob);return blob;})();resultDownloads.current.set(key,pending);void pending.finally(()=>resultDownloads.current.delete(key)).catch(()=>{});}
-   await pending;assertCurrent(current);
+   assertCurrent(current);if(!userId)return;const key=resultBlobKey(origin,userId,job);
+   await loadResultBlob({origin,userId,job,download:()=>api.image(job.output_asset_id!),isCurrent:api.isCurrent});assertCurrent(current);
    for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{if(page.ownerId!==userId||page.apiOrigin!==origin||!page.jobs.some(j=>j.id===job.id))return page;changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};});if(changed)commit({...copy,pages});}
  },[api,userId,origin,commit]);
  useEffect(()=>{stamp.current++;if(!currentId){windowRef.current.update([]);visible.current=[];wake.current();}},[currentId,language]);

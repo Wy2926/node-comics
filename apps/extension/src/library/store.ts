@@ -97,7 +97,7 @@ export async function enforceCacheBudget(copies: ReadingCopy[], limitMb: number,
   const all=await transaction<{id:string;blob:Blob;usedAt:number}[]>('blobs','readonly',s=>s.getAll());let total=all.reduce((n,b)=>n+b.blob.size,0);const limit=limitMb*1024*1024;if(total<=limit)return;
   const originalKeys=new Set(copies.flatMap(c=>c.pages.flatMap(p=>p.blobKey?[p.blobKey]:[])));
   const protectedKeys=new Set(copies.filter(c=>c.id===protectedCopyId||c.retention==='offline').flatMap(c=>c.pages.flatMap(p=>[p.blobKey,...Object.values(p.outputBlobs)])));const removed=new Set<string>();
-  for(const b of all.sort((a,b)=>a.usedAt-b.usedAt)){if(total<=limit)break;if(!originalKeys.has(b.id)&&!b.id.startsWith('original:')&&!protectedKeys.has(b.id)){await removeBlob(b.id);removed.add(b.id);total-=b.blob.size;}}
+  for(const b of all.sort((a,b)=>a.usedAt-b.usedAt)){if(total<=limit)break;if(!originalKeys.has(b.id)&&!b.id.startsWith('original:')&&!b.id.startsWith('inline-original:')&&!protectedKeys.has(b.id)){await removeBlob(b.id);removed.add(b.id);total-=b.blob.size;}}
   for(const copy of copies){let changed=false;copy.pages=copy.pages.map(page=>{const outputBlobs=Object.fromEntries(Object.entries(page.outputBlobs).filter(([,key])=>!removed.has(key)));const lostOriginal=!!page.blobKey&&removed.has(page.blobKey);if(lostOriginal||Object.keys(outputBlobs).length!==Object.keys(page.outputBlobs).length){changed=true;return {...page,blobKey:lostOriginal?undefined:page.blobKey,outputBlobs,...(lostOriginal?{fetchError:msg("本地缓存达到上限，原图已清理，请重新导入。")}:{})};}return page;});if(changed)await saveCopy(copy);}
 }
 export async function cacheSize() {return (await transaction<{blob:Blob}[]>('blobs','readonly',s=>s.getAll())).reduce((n,b)=>n+b.blob.size,0);}

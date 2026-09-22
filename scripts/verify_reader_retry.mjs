@@ -17,6 +17,7 @@ async function open(offline=false){
   await page.goto(web+'/tests/reader-fixture.html?auto='+scenario+(offline?'&offline':''));
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开作品 自动翻译 · '+scenario,exact:true})}).getByRole('button',{name:'开始阅读',exact:true}).click();
   await page.locator('.nc-page-image').waitFor();
+  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
 }
 async function geometry(){return page.locator('.nc-page-picture').first().evaluate(i=>({width:i.clientWidth,height:i.clientHeight,scroll:document.querySelector('.nc-reading-viewport').scrollTop}));}
 async function waitSubmitted(count){await page.waitForFunction(count=>window.readerFixture.submitted.length===count,count,{timeout:15000});}
