@@ -24,6 +24,8 @@
 
 在 [src/data/site.ts](src/data/site.ts) 维护公开域名、邮件和三个商店 URL。下载页优先提供 Chrome / Edge 通用 ZIP 与手动安装、更新说明；三张商店卡片使用本地官方浏览器 Logo，空地址按钮不可点击。Firefox 不提供未签名 ZIP 安装入口。
 
+2026-09-22 已配置 [Chrome Web Store](https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo?utm_source=item-share-cb) 地址，五种语言的下载页均显示可点击的 Chrome 商店入口；Edge 和 Firefox 商店地址仍待配置。
+
 安装包版本目录由 [extension-release.json](../extension-release.json) 维护，`current` 选择官网展示版本，`releases` 保留历史版本。每个版本拥有独立、长期有效的 `/downloads/node-comics-<version>-chromium.zip` 地址；后台仅为目录中精确匹配的安装包生成 600 秒 R2 GET 签名并返回不缓存的 302，前端不保存签名 URL。R2 保持私有，安装包位于既有业务前缀下的 `releases/extensions/<version>/<sha256>/<filename>`，与漫画对象目录分离。未知包返回 404，存储配置不可用时返回可重试的 503。
 
 发布新版时先在 `apps/extension` 用正式 `VITE_API_BASE=https://comics.nodelane.net` 执行 `npm run check` 与 `npm run zip`，递增插件版本；计算 ZIP 字节数和 SHA-256，向版本目录追加条目，保留旧条目，再更新 `current`。使用后端依赖与生产 R2 环境运行 `python scripts/upload_extension_release.py --zip <zip> --manifest backend/extension-release.json`：校验包和正式 API 地址，按不可覆盖方式上传并重新读取核对哈希。验证成功后构建并部署官网及后端；仅发布静态页面不能启用下载端点。

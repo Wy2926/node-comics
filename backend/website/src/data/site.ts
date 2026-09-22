@@ -10,7 +10,7 @@ export const site = {
   extensionRelease,
   // Fill with the exact listing URLs; empty values render accessible disabled buttons.
   stores: {
-    chrome: '',
+    chrome: 'https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo?utm_source=item-share-cb',
     edge: '',
     firefox: '',
   },
