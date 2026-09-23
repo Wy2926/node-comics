@@ -2,11 +2,12 @@ import {msg} from '../../i18n/runtime';
 import {Sha256} from '../../importers/hash';
 import {MAX_PAGE} from '../formats/limits';
 import {imageMimeFromBytes} from '../formats/identify';
+import HashWorker from './hash.worker?worker';
 export interface PageInput {name: string; pageIndex?: number; blob: Blob; width?: number; height?: number}
 
 async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {
   if (blob.size >= 1024 * 1024 && typeof Worker !== 'undefined') {
-    const worker = new Worker(new URL('./hash.worker.ts', import.meta.url), {type: 'module'});
+    const worker = new HashWorker();
     return new Promise((resolve, reject) => {
       const finish = () => { clearTimeout(timer); signal?.removeEventListener('abort', cancel); worker.terminate(); };
       const cancel = () => { finish(); reject(signal?.reason ?? new DOMException('页面摘要已取消。', 'AbortError')); };

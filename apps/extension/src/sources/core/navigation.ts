@@ -20,11 +20,15 @@ export class SourceNavigation {
     this.dispose();
     const { definition, location } = resolveSource(url, this.definitions),
       factory = this.factories[definition.id];
-    if (!factory) throw Error('SOURCE_FACTORY_MISSING');
     const controller = new AbortController(),
-      session = factory({ document: this.document, location, signal: controller.signal });
+      session:SourcePageSession = factory ? factory({ document: this.document, location, signal: controller.signal }) : {
+        direction:'ltr',
+        snapshot:()=>({adapter:definition.id,url,title:definition.name,direction:'ltr',note:'',discoveryComplete:false,items:[]}),
+        discoverPages:async()=>({status:'unsupported',code:'SOURCE_PAGE_UNSUPPORTED'}),
+        inlineTargets:()=>[],dispose(){},
+      };
     if (
-      (definition.capabilities.catalog && !session.discoverCatalog) ||
+      (!factory && definition.capabilities.inline) ||
       (definition.capabilities.inline && !session.inlineTargets) ||
       (definition.capabilities.pages && !session.discoverPages)
     ) {

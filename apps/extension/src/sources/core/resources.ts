@@ -50,7 +50,7 @@ export class PageImageRegistry {
     const items: SourceItem[] = [];
     for (const { resource, ...slot } of snapshot.items) {
       if (resource.kind === 'http') {
-        items.push({ ...slot, url: resource.url });
+        items.push({ ...slot, url: resource.url, ...(resource.processing ? {processing:resource.processing} : {}) });
         continue;
       }
       const image = targets.get(resource.resourceKey);

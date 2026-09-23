@@ -8,6 +8,8 @@ import { resolveSource } from '../src/sources/core/resolve';
 import { createSourceNavigation, PageImageRegistry, type CreateSourcePage } from '../src/sources/page';
 import { definitions } from '../src/sources/registry/definitions';
 import { pageFactories } from '../src/sources/registry/pages';
+import { sourceNetworks } from '../src/sources/registry/networks';
+import { sourceInstallation as buildInstallation } from '../source-installation';
 const chapter = '724f819b-5306-11ea-b7ea-024352452ce0';
 const sourceUrl = 'https://www.mangacopy.com/comic/sample/chapter/' + chapter;
 const testDefinition: SourceDefinition = {
@@ -51,6 +53,10 @@ const testCatalog: SourceCatalogSnapshot = {
   ],
 };
 describe('source composition and identity', () => {
+  it('uses the same site-local installation metadata in the build and runtime',()=>{
+    expect([...buildInstallation.requiredOrigins].sort()).toEqual([...sourceInstallation.requiredOrigins].sort());
+    expect([...buildInstallation.autoContentMatches].sort()).toEqual([...sourceInstallation.autoContentMatches].sort());
+  });
   it('cancels a discovery message that has not responded', async () => {
     const controller = new AbortController(),
       poll = vi.fn(() => new Promise<never>(() => {})),
@@ -61,8 +67,14 @@ describe('source composition and identity', () => {
     await expect(pending).rejects.toThrow('paused');
   });
   it('keeps registry IDs and capabilities aligned with page factories', () => {
-    expect(Object.keys(pageFactories).sort()).toEqual(definitions.map((d) => d.id).sort());
+    expect(Object.keys(pageFactories).every(id=>definitions.some(d=>d.id===id))).toBe(true);
     for (const definition of definitions) {
+      if(!pageFactories[definition.id]){
+        expect(definition.capabilities.inline).toBe(false);
+        if(definition.capabilities.pages)expect(sourceNetworks[definition.id]?.pages).toBeTypeOf('function');
+        if(definition.capabilities.catalog)expect(sourceNetworks[definition.id]?.catalog).toBeTypeOf('function');
+        continue;
+      }
       const controller = new AbortController();
       const session = pageFactories[definition.id]({
         document: {} as Document,
@@ -71,7 +83,7 @@ describe('source composition and identity', () => {
       });
       expect(typeof session.discoverPages).toBe('function');
       expect(typeof session.inlineTargets).toBe('function');
-      expect(!!session.discoverCatalog).toBe(definition.capabilities.catalog);
+      expect(!!session.discoverCatalog||!!sourceNetworks[definition.id]?.catalog).toBe(definition.capabilities.catalog);
       session.dispose();
     }
   });

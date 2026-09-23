@@ -5,15 +5,25 @@
 ## 接口和边界
 
 - `sources/index.ts` 向后台、书库和 UI 提供身份、目录校验、权限和消息服务，不加载 DOM 页面工厂；`sources/page.ts` 向内容脚本提供导航与页面会话。
-- `registry/definitions.ts` 聚合纯 `SourceDefinition`；`registry/pages.ts` 聚合相同 ID 的 `CreateSourcePage`。先校验 URL，再要求恰好一个站点匹配；未知网站使用 `generic`，冲突报错。已认领站点等待、失败或不支持时不隐式退回通用规则。
+- `registry/` 按统一文件约定自动收集纯定义、页面工厂和独立的网络操作及图片能力，不手写引用具体站点。站点实现、权限元数据、图标和专属验收脚本归站点目录所有。先校验 URL，再要求恰好一个站点匹配；未知网站使用 `generic`，冲突报错。已认领站点等待、失败或不支持时不隐式退回通用规则。
 - 站点的主机、路径、图片／目录选择器、标签映射和专属观察属性只在 `sites/<id>/` 中。页面会话返回 `ready`、`not-ready`、`unsupported` 或 `error`，清单完整性独立表达。
 - `DiscoveredPage` 区分 HTTP 原图和页面逻辑资源。公共运行时生成临时页面句柄，绑定导航、页槽、元素和来源版本；站点不能自行生成授权。消息快照保留运行时的页槽和句柄，持久副本不保存临时页面引用。
 - 缩略图总量不超过 2 MB，原图单张不超过 40 MB；画布最多 6000 万像素，编码／读取 30 秒超时。取图前后核对元素、版本和导航，SPA 离开再返回也使旧授权失效。
 - `<img>` 使用通用图片展示，canvas 使用不修改原像素、不接收指针事件的覆盖层；恢复原图时移除。站点改变图源、回收 canvas 或重新渲染同一画布时撤销旧显示。
-- 目录能力当前只有 MangaCopy：定义提供可靠的目录归属，公共层检查重复 ID、分组引用、顺序和每个条目的归属。站点的原始分类只读展示，漫画直接绑定唯一来源。
-- 自动更新由 `SourceDefinition.catalogSync` 显式开放，目前 MangaCopy／拷贝漫画声明 720 分钟间隔。每部漫画按持久化的上次检查时间控制 12 小时间隔，重新打开不提前发请求；只有完整目录进入自动同步，发现新增条目后封面显示提示，成功阅读后清除。运行时和持久状态见[自动同步验收](validation/CATALOG_SYNC_2026_09_23.md)。
+- 目录能力当前包括 MangaCopy 和 Comix：定义提供可靠的目录归属，公共层检查重复 ID、分组引用、顺序和每个条目的归属。站点的原始分类只读展示，漫画直接绑定唯一来源。
+- 自动更新由 `SourceDefinition.catalogSync` 显式开放，目前 MangaCopy／拷贝漫画和 Comix 声明 720 分钟间隔。每部漫画按持久化的上次检查时间控制 12 小时间隔，重新打开不提前发请求；只有完整目录进入自动同步，发现新增条目后封面显示提示，成功阅读后清除。运行时和持久状态见[自动同步验收](validation/CATALOG_SYNC_2026_09_23.md)。
 
-已有 MangaCopy、Comic PASH、xkcd、Gunnerkrigg 与通用图片规则接入。原有安装权限与自动注入范围保持不变；新增站点默认依靠用户操作和可选授权。旧根目录站点文件与注册表已删除，没有转发、数据迁移或旧逻辑回退。
+已有 MangaCopy、Comic PASH、Comix、Gunnerkrigg 与通用图片规则接入。原有安装权限与自动注入范围保持不变；新增站点默认依靠用户操作和可选授权。旧根目录站点文件与注册表已删除，没有转发、数据迁移或旧逻辑回退。
+
+## Comix
+
+入口为 `https://comix.to/title/<作品 HID>-<标题>`。在“漫画网站”粘贴详情页链接后添加；目录、章节和自动更新均通过扩展 HTTP 请求读取，不创建来源标签页。第一次使用需授予来源与图片域名权限。xkcd 专属适配和图标已移除，其页面仅保留通用网页翻译能力。
+
+全量读取分页并核对总数后，按话号去重，保留第 0 话和小数话。首次优先 `isOfficial`，同优先级取最小上传 ID；后续更新优先保留仍存在的已选上传。同话新增另一上传不增加更新计数。目录身份按作品 HID、条目身份按话号，阅读进度不会随上传排序改变。当前验证的是英文目录；非英文或未知格式明确报错。
+
+签名、响应解码、图片切片还原均为插件内置实现，规则仅在 `sources/sites/comix/`。不下载执行源站脚本，不转发 Cookie。图片 CDN 的 Referer 通过通用会话请求规则设置，仅作用于扩展自身到已登记精确图片 URL 的请求；同 URL 用共享锁隔离请求头，响应完成或取消后释放规则。新增 `declarativeNetRequestWithHostAccess` 权限，站点域名仍使用可选授权。网页原位翻译不开放；来源验证、分页变化、未知图片还原版本会报错并保留旧目录。
+
+实现范围、实际验证和协议限制见 [Comix 适配说明](../apps/extension/src/sources/sites/comix/README.md)。
 
 ## Comic PASH
 
@@ -49,3 +59,5 @@ Remove-Item Env:RUN_LIVE_COMICPASH
 本轮架构重构及审查修复验证：类型／模块边界检查、单元测试和 Chrome MV3 构建通过。共 39 个测试文件、374 项单元测试；网页导入 13 个场景、原位翻译 23 个场景、Comic PASH 8 个场景及采集顺序／暂停恢复／仅重试缺图检查通过。新增覆盖 DOM 重建后选择／顺序保留、发现与原位翻译跨脚本共享会话、挂载容器替换、无关样式变化过滤、解析诊断跨消息传递、缩略图缓存和预算。已查看按钮恢复及原位译图截图。缓存恢复检查在实际扩展中模拟 `pagehide/pageshow` 事件，未证明浏览器实际进入 BFCache；真实网站可用性、原生权限弹窗及真实模型效果另行验证。
 
 本机复现隔离浏览器检查时，`PLAYWRIGHT_MODULE` 指向已安装的 Playwright；`TEST_CHROMIUM`（网页导入／采集顺序）及 `CHROMIUM_PATH`（画布／原位翻译）可指定现有 Chromium。验证使用 Chromium 141，不读取个人浏览器资料。当前证据在 `artifacts/web-import/results.json`、`artifacts/acquisition-order/results.json`、`artifacts/comicpash-validation/fixture-4X660w/results.json`、`artifacts/inline-validation/d01d35a1-0f81-40f9-b997-247c15095047/results.json`；这些运行产物位于忽略目录，不随源码提交。
+
+来源边界修正说明及当前回归见[来源边界验收](validation/SOURCE_BOUNDARIES_2026_09_23.md)。

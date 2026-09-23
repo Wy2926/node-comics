@@ -48,7 +48,7 @@ try{
   assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:snapshot.items[0].id})).ok);checks.push('Re-rendering the same canvas revokes its previous version');
   const fresh=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(fresh.ok,fresh.error);
   await source.evaluate(()=>history.pushState({},'',location.pathname+'?chapter=next'));
-  const navigated=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(navigated.ok,navigated.error);assert.notEqual(navigated.data.manifest.navigationId,fresh.data.manifest.navigationId);
+  const navigated=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(navigated.ok,navigated.error);assert.notEqual(navigated.data.manifest.pageContext.navigationId,fresh.data.manifest.pageContext.navigationId);
   assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:fresh.data.id,pageId:fresh.data.manifest.items[0].id})).ok);
   await source.evaluate(url=>history.replaceState({},'',url),url);
   assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:fresh.data.id,pageId:fresh.data.manifest.items[0].id})).ok);checks.push('SPA navigation and return to the same URL reject old navigation handles');

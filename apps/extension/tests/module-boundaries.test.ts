@@ -21,6 +21,12 @@ const source = (name: string, code: string) => {mkdirSync(path.dirname(path.join
 const run = () => spawnSync(process.execPath, [script, root], {encoding: 'utf8'});
 
 describe('module boundary check', () => {
+  it.each(['src/ui/ComicSites.ts','src/App.tsx','src/comics/pages/service.ts'])('rejects source runtime and registry shortcuts from %s',name=>{
+    source('entrypoints/main.ts',`import '../${name.replace(/\.tsx?$/,'')}';`);
+    const target='src/sources/registry/networks.ts',relative=path.posix.relative(path.posix.dirname(name),target).replace(/\.ts$/,'');
+    source(name,`import '${relative.startsWith('.')?relative:'./'+relative}';`);source(target,'export {};');
+    expect(run().stderr).toContain('application must use the public source API');
+  });
   it.each(["import '../sites/b/page';","export * from '../sites/b/page';","import('../sites/b/page');"])('rejects direct core site dependencies: %s',code=>{
     source('entrypoints/main.ts',"import '../src/sources/core/resolve';");source('src/sources/core/resolve.ts',code);source('src/sources/sites/b/page.ts','export const value=1;');
     expect(run().stderr).toContain('Source boundary');
@@ -37,9 +43,14 @@ describe('module boundary check', () => {
   });
   it('allows definitions and DOM factories in separate registries',()=>{
     source('entrypoints/main.ts',"import '../src/sources/registry/definitions';import '../src/sources/registry/pages';");
-    source('src/sources/registry/definitions.ts',"export * from '../sites/a/definition';");source('src/sources/registry/pages.ts',"export * from '../sites/a/page';");
+    source('src/sources/registry/definitions.ts',"import.meta.glob('../sites/*/definition.ts', {eager:true});");source('src/sources/registry/pages.ts',"import.meta.glob('../sites/*/page.ts', {eager:true});");
     source('src/sources/sites/a/definition.ts',"export const id='a';");source('src/sources/sites/a/page.ts','export const page=()=>document.title;');
     expect(run().status).toBe(0);
+  });
+  it.each(["import '../sites/a/definition';", "export * from '../sites/a/definition';", "import('../sites/a/definition');"] )('rejects concrete site references even in registries: %s', code=>{
+    source('entrypoints/main.ts', "import '../src/sources/registry/definitions';");
+    source('src/sources/registry/definitions.ts', code);source('src/sources/sites/a/definition.ts','export {};');
+    expect(run().stderr).toContain('registries must use uniform discovery');
   });
   it('rejects a runtime cycle through a shared component', () => {
     source('entrypoints/main.ts', "import '../src/app';");

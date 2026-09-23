@@ -1,13 +1,13 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({records: new Map<string, unknown>(), cache: new Map<string, Blob>(),
-  sourceImage: vi.fn(), sourceMessage: vi.fn(), permissions: vi.fn(), prepare: vi.fn(), put: vi.fn(),
+  sourceImage: vi.fn(), prepare: vi.fn(), put: vi.fn(),
   token: vi.fn(), cacheGet: vi.fn(), cachePut: vi.fn(), downloadGet:vi.fn(), openContainer:vi.fn(), originalReplica:vi.fn(),
 }));
 vi.mock('../repositories', () => ({catalog: {
   get: async (table: string, id: unknown) => mocks.records.get(JSON.stringify([table,id])),
   putMaterialization: (value: {id: string}, generation: number) => mocks.put(value,generation),
 }}));
-vi.mock('../../sources', () => ({sourceImage: mocks.sourceImage, sourceMessage: mocks.sourceMessage, requireImagePermissions: mocks.permissions, inExtension: () => true}));
+vi.mock('../../sources', () => ({readSourceImage: mocks.sourceImage}));
 vi.mock('./normalize', () => ({prepareComicPage: mocks.prepare}));
 vi.mock('../sources/local', () => ({openContainer: mocks.openContainer}));
 vi.mock('../formats', () => ({openDocument: vi.fn()}));
@@ -36,8 +36,6 @@ beforeEach(() => {
   put('pageDescriptors',['revision','page'],{name: '1', ordinal: 0, locator: {url: 'https://image.example/page.png', sourceId: 'source-page', manifestId: 'manifest', kind: 'image'}});
   put('comics','comic',{id:'comic',source:{generation:1,connectionId:'connection',status:'active'}}); put('connections','connection',{id: 'connection',generation:1,provider: 'website',status: 'connected'});
   mocks.sourceImage.mockResolvedValue(new Blob(['pixels'],{type:'image/png'}));
-  mocks.sourceMessage.mockResolvedValue({url:'https://image.example/page.png'});
-  mocks.permissions.mockResolvedValue(undefined);
   mocks.prepare.mockImplementation(async ({blob}: {blob: Blob}) => ({blob,width:100,height:200,imageSha256:'a'.repeat(64)}));
   mocks.put.mockImplementation(async (value: {id:string}) => {put('materializations',value.id,value);return true;});
 });
@@ -45,21 +43,14 @@ afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
   it('validates manifest membership and reuses normalized cached pixels without decoding or hashing again', async () => {
     const first = await acquirePage(request); first.release();
-    expect(mocks.sourceMessage).toHaveBeenCalledWith({type:'NC_SOURCE_IMAGE',manifestId:'manifest',pageId:'source-page'});
+    expect(mocks.sourceImage).toHaveBeenCalledWith({manifestId:'manifest',pageId:'source-page',expectedUrl:'https://image.example/page.png'},expect.any(AbortSignal));
     const second = await acquirePage(request); second.release();
     expect(mocks.sourceImage).toHaveBeenCalledTimes(1); expect(mocks.prepare).toHaveBeenCalledTimes(1);
   });
-  it('refuses a changed manifest URL before fetching image bytes', async () => {
-    mocks.sourceMessage.mockResolvedValue({url:'https://other.example/changed.png'});
+  it('propagates source authorization failures without publishing bytes', async()=>{
+    mocks.sourceImage.mockRejectedValueOnce(Error('图片来源已变化'));
     await expect(acquirePage(request)).rejects.toThrow('来源已变化');
-    expect(mocks.sourceImage).not.toHaveBeenCalled(); expect(mocks.cache.size).toBe(0);
-  });
-  it('loads canvas pages through validated inline bytes without requesting a pseudo-origin', async () => {
-    put('pageDescriptors',['revision','page'],{name:'canvas',ordinal:0,locator:{url:'page:canvas',sourceId:'source-page',manifestId:'manifest',kind:'page'}});
-    mocks.sourceMessage.mockResolvedValue({url:'page:canvas',data:'data:image/png;base64,cGl4ZWxz'});
-    const lease = await acquirePage(request); lease.release();
-    expect(mocks.permissions).not.toHaveBeenCalled();
-    expect(mocks.sourceImage.mock.calls[0][0]).toBe('data:image/png;base64,cGl4ZWxz');
+    expect(mocks.prepare).not.toHaveBeenCalled();expect(mocks.cache.size).toBe(0);
   });
   it('does not publish cache or return a late page after its generation was removed', async () => {
     mocks.put.mockResolvedValue(false);
@@ -95,14 +86,14 @@ describe('page leases and trusted source routing', () => {
     const error=new SourceDatabaseSchemaError(operation,'缺少 reservations');
     mocks[operation].mockRejectedValueOnce(error);
     await expect(acquirePage(request)).rejects.toBe(error);
-    expect(mocks.sourceMessage).not.toHaveBeenCalled();expect(mocks.sourceImage).not.toHaveBeenCalled();expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.sourceImage).not.toHaveBeenCalled();expect(mocks.prepare).not.toHaveBeenCalled();
     // A rejected shared request must be released so a repaired store can be retried.
     const lease=await acquirePage(request);lease.release();expect(mocks.sourceImage).toHaveBeenCalledOnce();
   });
   it('does not treat a broken retained download store as a miss during an explicit download',async()=>{
     const error=new SourceDatabaseSchemaError('downloads','缺少 reservations');mocks.downloadGet.mockRejectedValueOnce(error);
     await expect(acquirePage({...request,purpose:'download'})).rejects.toBe(error);
-    expect(mocks.token).not.toHaveBeenCalled();expect(mocks.cacheGet).not.toHaveBeenCalled();expect(mocks.sourceMessage).not.toHaveBeenCalled();expect(mocks.sourceImage).not.toHaveBeenCalled();
+    expect(mocks.token).not.toHaveBeenCalled();expect(mocks.cacheGet).not.toHaveBeenCalled();expect(mocks.sourceImage).not.toHaveBeenCalled();
   });
   it('propagates schema errors from publishing newly prepared source pixels',async()=>{
     const error=new SourceDatabaseSchemaError('source-pages','缺少 reservations');mocks.cachePut.mockRejectedValueOnce(error);

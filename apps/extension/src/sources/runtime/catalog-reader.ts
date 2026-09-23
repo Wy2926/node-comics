@@ -4,6 +4,7 @@ import {sameSource} from '../core/identity';
 import {validateCatalog} from '../core/catalog';
 import {definitions} from '../registry/definitions';
 import type {SourceCatalogSnapshot} from '../contracts/source';
+import {networkOperation,readNetworkCatalog} from './network';
 
 const prefix = 'nc-catalog-tab:';
 const owns = (url:string | undefined, expected:string) => !!url && sameSource(url, expected, definitions);
@@ -23,7 +24,8 @@ export async function recoverCatalogTabs() {
 }
 
 /** Read the adapter's complete directory without creating import records or loading chapter images. */
-export async function readSourceCatalog(url:string):Promise<SourceCatalogSnapshot> {
+export async function readSourceCatalog(url:string,options:{previous?:SourceCatalogSnapshot;signal?:AbortSignal}={}):Promise<SourceCatalogSnapshot> {
+  if(networkOperation(url,'catalog'))return readNetworkCatalog(url,options);
   const {definition, location} = resolveSource(url, definitions);
   if (!definition.capabilities.importable || !definition.capabilities.catalog || location.kind !== 'catalog')
     throw Error('SOURCE_CATALOG_UNSUPPORTED');
@@ -34,6 +36,7 @@ export async function readSourceCatalog(url:string):Promise<SourceCatalogSnapsho
     await chrome.storage.session.set({[key]:{url, expiresAt:Date.now() + 60_000}});
     const deadline = Date.now() + 20_000;
     while (Date.now() < deadline) {
+      options.signal?.throwIfAborted();
       await new Promise(resolve => setTimeout(resolve, 500));
       const current = await chrome.tabs.get(tab.id);
       if (current.pendingUrl && !owns(current.pendingUrl, url) || current.status === 'complete' && !owns(current.url, url))

@@ -22,8 +22,12 @@ describe('adapter-owned website directory', () => {
     for (const site of sites) {
       expect(site.name.trim()).not.toBe('');
       expect(new URL(site.url).protocol).toBe('https:');
-      expect(site.icon).toMatch(/^\/site-icons\/[a-z-]+\.svg$/);
-      expect(existsSync(new URL('../public' + site.icon, import.meta.url))).toBe(true);
+      if(site.icon.startsWith('data:image/svg+xml,')) {
+        expect(decodeURIComponent(site.icon.slice('data:image/svg+xml,'.length))).toMatch(/^<svg\b/);
+      } else {
+        expect(site.icon).toMatch(/^\/site-icons\/[a-z-]+\.svg$/);
+        expect(existsSync(new URL('../public' + site.icon, import.meta.url))).toBe(true);
+      }
     }
   });
 });

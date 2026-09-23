@@ -23,7 +23,9 @@ import { Reader } from './reader/Reader';
 import {ComicDirectory} from './reader/ComicDirectory';
 import { readingViewKey } from './reader/view';
 import { API_BASE, API_ORIGIN } from './service';
-import { discoverCatalog, copyOrigins, inExtension, type PageManifest } from './sources';
+import { copyOrigins, inExtension, type PageManifest } from './sources';
+import {readWebsiteCatalog} from './comics/application/website-catalog';
+import {importWebsiteLink} from './comics/application/website-import';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import { type Capabilities, type Entitlements, type ReadingEntry, type Settings } from './types';
 import { AccountPage, type AccountTab } from './ui/Account';
@@ -140,7 +142,7 @@ export function App(){
   void (async()=>{
    if(manifestId){const data=await chrome.storage.local.get('manifest:'+manifestId),manifest=data['manifest:'+manifestId] as PageManifest|undefined;if(!manifest)throw Error(msg('来源清单已失效，请重新发现。'));
     const result=await importManifest(manifest);await reloadLibrary();if(readingEpoch.current===request)await openEntry(result.id);
-    if(result.catalogUrl){try{const source=await discoverCatalog(result.catalogUrl);await importCatalog(source);await reloadLibrary();if(currentRef.current===result.id&&api.isCurrent()){const sequence=await readerSequence(result.id,accountScope);if(currentRef.current===result.id&&api.isCurrent()){setCopies(sequence.copies);setDirectory(sequence.directory);}}}catch(e){notify((e as Error).message);}}
+    if(result.catalogUrl){try{const source=await readWebsiteCatalog(result.catalogUrl);await importCatalog(source);await reloadLibrary();if(currentRef.current===result.id&&api.isCurrent()){const sequence=await readerSequence(result.id,accountScope);if(currentRef.current===result.id&&api.isCurrent()){setCopies(sequence.copies);setDirectory(sequence.directory);}}}catch(e){notify((e as Error).message);}}
    }else if(catalogId){const data=await chrome.storage.local.get('nc-import:'+catalogId),source=data['nc-import:'+catalogId] as {catalog?:SourceCatalog}|undefined;if(!source?.catalog)throw Error(msg('来源清单已失效，请重新发现。'));const comic=await importCatalog(source.catalog);await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);}
   })().catch(e=>setError(e.message)).finally(()=>{setBusy('');query.delete('manifest');query.delete('catalog');history.replaceState(null,'',location.pathname+(query.size?'?'+query:'')+location.hash);});
  },[api]);
@@ -149,13 +151,17 @@ export function App(){
  const translation=useAutomaticTranslation({api,userId:account?.user.id,origin:API_ORIGIN,copies,updateEntry,language:settings.language,currentId,caps,rights:usage??caps?.entitlements,onPolicy:receivePolicy,refreshConfiguration});
  function nav(value:View,tab:AccountTab='overview'){leaveReader();setView(value);setSourceDirectory(undefined);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
  const rights=usage??caps?.entitlements;
+ async function importWebsiteUrl(url:string){
+   const comic=await importWebsiteLink(url);await reloadLibrary();
+   setView('library');history.replaceState(null,'',location.pathname+location.search+'#library');await openComic(comic.id);
+ }
  return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current)chooseFiles(Array.from(e.dataTransfer.files));}}>
   <input aria-label={msg('选择漫画文件')} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
   {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button><button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe"/>{msg('漫画网站')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message"/></button><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
   <div className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
   {current?<Reader key={`${current.comicId}:${account?.user.id}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onReload={()=>void reloadCurrent()} onExport={()=>void exportCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onAcquire={()=>void grantDownloads([current.id],copyOrigins([current])).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId)=>void openEntry(id,pageId)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps} userId={account?.user.id} apiOrigin={API_ORIGIN}/>:
   <main className="nc-main">{view==='library'&&(sourceDirectory?<section className="nc-reading-start" aria-label={msg('选择开始阅读的位置')}><div className="nc-page-heading"><h1>{msg('选择开始阅读的位置')}</h1><button className="button secondary" onClick={()=>setSourceDirectory(undefined)}>{msg('返回我的漫画')}</button></div><ComicDirectory directory={sourceDirectory} index={0} pageCount={0} onNavigate={id=>void openEntry(id)}/></section>:<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>)}
-  {view==='sites'&&<ComicSites/>}
+  {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
   {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={caps}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={receivePolicy} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
   </div>

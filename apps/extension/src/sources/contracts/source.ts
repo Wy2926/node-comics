@@ -6,11 +6,13 @@ export interface SourceItem {
   order: number;
   kind?: 'page';
   preview?: string;
+  /** Adapter-owned, durable image decoding recipe. */
+  processing?: string;
 }
 export interface PageManifest {
   id: string;
-  sourceTabId: number;
-  navigationId: string;
+  /** Only page-bound resources require a live document authorization. */
+  pageContext?: {tabId:number; navigationId:string};
   revision: number;
   title: string;
   url: string;
@@ -21,7 +23,7 @@ export interface PageManifest {
   note: string;
   items: SourceItem[];
 }
-export type ImageResource = { kind: 'http'; url: string } | { kind: 'page'; resourceKey: string };
+export type ImageResource = { kind: 'http'; url: string; processing?:string } | { kind: 'page'; resourceKey: string };
 export interface DiscoveredPage {
   id: string;
   width: number;
@@ -29,7 +31,8 @@ export interface DiscoveredPage {
   order: number;
   resource: ImageResource;
 }
-export type PageSnapshot = Omit<PageManifest, 'id' | 'sourceTabId' | 'navigationId' | 'revision'>;
+export type PageSnapshot = Omit<PageManifest, 'id' | 'pageContext' | 'revision'>;
+export type DocumentSnapshot = PageSnapshot & {navigationId:string; revision:number};
 export type SourceSnapshot = Omit<PageSnapshot, 'items'> & { items: DiscoveredPage[] };
 export interface SourceEntry {
   id: string;

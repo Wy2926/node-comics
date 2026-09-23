@@ -1,0 +1,10 @@
+{
+  "requiredOrigins": [
+    "https://*.mangacopy.com/*",
+    "https://*.copy4000.com/*"
+  ],
+  "autoContentMatches": [
+    "https://*.mangacopy.com/comic/*",
+    "https://*.copy4000.com/comic/*"
+  ]
+}

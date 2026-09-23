@@ -1,6 +1,7 @@
 import {catalog} from '../repositories';
 import {applyCatalogRefresh, catalogSyncPolicy} from './catalog-service';
-import {discoverCatalog, type SourceCatalogSnapshot} from '../../sources';
+import type {SourceCatalogSnapshot} from '../../sources';
+import {readWebsiteCatalog} from './website-catalog';
 
 export async function nextCatalogCheckAt() {
   const connections = new Set((await catalog.list('connections', {limit:Number.MAX_SAFE_INTEGER})).filter(connection => connection.status === 'connected').map(connection => connection.id));
@@ -8,7 +9,7 @@ export async function nextCatalogCheckAt() {
   return comics.reduce((next, comic) => Math.min(next, comic.catalogSync?.nextCheckAt ?? 0), Infinity);
 }
 /** One bounded job per wakeup, with a persisted claim shared by all extension contexts. */
-export async function syncNextCatalog(read:(url:string)=>Promise<SourceCatalogSnapshot> = discoverCatalog) {
+export async function syncNextCatalog(read:(url:string)=>Promise<SourceCatalogSnapshot> = readWebsiteCatalog) {
   const now = Date.now();
   const connections = new Set((await catalog.list('connections', {limit:Number.MAX_SAFE_INTEGER})).filter(connection => connection.status === 'connected').map(connection => connection.id));
   const candidates = await catalog.search('comics', comic => !!catalogSyncPolicy(comic) &&

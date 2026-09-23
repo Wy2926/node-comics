@@ -32,7 +32,7 @@ describe('site adapter registry and Comic PASH canvases', () => {
   ])('does not match unrelated URLs: %s', (url) => expect(sourceFor(url).definition.id).toBe('generic'));
   it('routes existing sites through the registry', () => {
     for (const [url, id] of [
-      ['https://xkcd.com/1', 'xkcd'],
+      ['https://www.gunnerkrigg.com/?p=1', 'gunnerkrigg'],
       ['https://www.gunnerkrigg.com/', 'gunnerkrigg'],
       ['https://copy4000.com/comic/a/chapter/1', 'mangacopy'],
     ])

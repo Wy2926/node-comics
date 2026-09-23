@@ -26,6 +26,7 @@ const entrypoints = files(path.join(root, 'entrypoints'));
 const modules = new Set([...entrypoints, ...files(path.join(root, 'src'))]);
 const graph = new Map();
 const runtimeGraph = new Map();
+const discovered = new Map();
 const importErrors = [];
 for (const filename of modules) {
   const source = ts.createSourceFile(
@@ -36,6 +37,7 @@ for (const filename of modules) {
   );
   const dependencies = new Set(),
     runtime = new Set();
+  const automatic = new Set();
   function add(specifier, typeOnly = false) {
     if (!ts.isStringLiteral(specifier)) return;
     // Reject a removed module even when TypeScript resolution fails; no compatibility façade.
@@ -49,12 +51,28 @@ for (const filename of modules) {
     ).resolvedModule;
     if (!resolved) return; // CSS, WASM and other Vite-managed assets are not TS modules.
     const target = normalize(resolved.resolvedFileName);
+    const targetSite = relative(target).match(/^src\/sources\/sites\/([^/]+)\//)?.[1];
+    const owner = relative(filename).match(/^src\/sources\/sites\/([^/]+)\//)?.[1];
+    if (targetSite && targetSite !== owner)
+      importErrors.push(`Source boundary (concrete site imports require same site; registries must use uniform discovery): ${relative(filename)} -> ${relative(target)}`);
     if (!modules.has(target)) return;
     dependencies.add(target);
     if (!typeOnly) runtime.add(target);
   }
   function visit(node) {
-    if (ts.isImportDeclaration(node)) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.expression.kind === ts.SyntaxKind.MetaProperty && node.expression.name.text === 'glob') {
+      const pattern = node.arguments[0];
+      const kind = relative(filename).match(/^src\/sources\/registry\/(definitions|pages|networks|images)\.ts$/)?.[1];
+      const file = {definitions:'definition',pages:'page',networks:'network',images:'image'}[kind];
+      if (!file || !pattern || !ts.isStringLiteral(pattern) || pattern.text !== `../sites/*/${file}.ts`) {
+        importErrors.push(`Source boundary (only uniform registry discovery is allowed): ${relative(filename)}`);
+      } else {
+        for (const target of modules) if (new RegExp(`^src/sources/sites/[^/]+/${file}\\.ts$`).test(relative(target))) {
+          dependencies.add(target); runtime.add(target); automatic.add(target);
+        }
+      }
+    } else if (ts.isImportDeclaration(node)) {
       const clause = node.importClause;
       const named = clause?.namedBindings;
       const typeOnly =
@@ -95,6 +113,7 @@ for (const filename of modules) {
   visit(source);
   graph.set(filename, dependencies);
   runtimeGraph.set(filename, runtime);
+  discovered.set(filename, automatic);
 }
 
 const errors = [...importErrors],
@@ -112,6 +131,8 @@ for (const [filename, dependencies] of graph) {
     const destination = sourcePart(target),
       targetSite = site(target);
     const to = relative(target);
+    if ((ui || from === 'src/App.tsx' || /^src\/comics\/(?:application|pages)\//.test(from)) && /^src\/sources\/(?:runtime|registry)\//.test(to))
+      errors.push(`Source boundary (application must use the public source API): ${from} -> ${to}`);
     if (ui && (to.startsWith('src/comics/repositories/') || to.startsWith('src/storage/')))
       errors.push(`Comic boundary (UI must use application/page services): ${from} -> ${to}`);
     if (format && /^src\/(?:comics\/(?:sources|repositories|application)|storage|translation)\//.test(to))
@@ -120,8 +141,8 @@ for (const [filename, dependencies] of graph) {
       errors.push(`Comic boundary (source/page service depends on translations): ${from} -> ${to}`);
     const fail = (reason) =>
       errors.push(`Source boundary (${reason}): ${relative(filename)} -> ${relative(target)}`);
-    if (targetSite && owner !== targetSite && !part?.startsWith('registry/'))
-      fail('site imports require registry or same site');
+    if (targetSite && owner !== targetSite && !discovered.get(filename)?.has(target))
+      fail('concrete site imports require same site; registries must use uniform discovery');
     if (
       destination?.startsWith('generic/') &&
       !part?.startsWith('generic/') &&

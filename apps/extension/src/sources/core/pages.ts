@@ -46,6 +46,7 @@ export function validatePages(snapshot: SourceSnapshot, location: SourceLocation
     orders.add(item.order);
     if (item.resource?.kind === 'http') {
       if (safeImageUrl(item.resource.url, snapshot.url) !== item.resource.url) return fail();
+      if (item.resource.processing !== undefined && (typeof item.resource.processing !== 'string' || !item.resource.processing || item.resource.processing.length > 2048)) return fail();
     } else if (
       item.resource?.kind !== 'page' ||
       typeof item.resource.resourceKey !== 'string' ||

@@ -1,7 +1,6 @@
+import installation from './installation.json';
 import type { SourceDefinition } from '../../contracts/definition';
 export const MANGACOPY_DOMAINS = ['mangacopy.com', 'copy4000.com'];
-export const MANGACOPY_PERMISSIONS = MANGACOPY_DOMAINS.map((host) => `https://*.${host}/*`);
-export const MANGACOPY_MATCHES = MANGACOPY_DOMAINS.map((host) => `https://*.${host}/comic/*`);
 export function isMangaCopyUrl(value: string): boolean {
   try {
     const u = new URL(value);
@@ -35,7 +34,7 @@ export const definition: SourceDefinition = {
   ],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
   catalogSync: { intervalMinutes: 720 },
-  installation: { requiredOrigins: MANGACOPY_PERMISSIONS, autoContentMatches: MANGACOPY_MATCHES },
+  installation,
   identify(url) {
     if (!isMangaCopyUrl(url.href)) return null;
     const loc = mangaCopyLocation(url.href);

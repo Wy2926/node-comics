@@ -4,7 +4,7 @@ import { getSourceDriver } from '../sources/registry';
 import { openDocument } from '../formats';
 import type { ComicFormat, IndexedPage } from '../formats/contracts';
 import { prepareComicPage } from './normalize';
-import { sourceImage, sourceMessage, requireImagePermissions, inExtension } from '../../sources';
+import { readSourceImage } from '../../sources';
 import { sourcePageCache } from '../../storage/source-pages';
 import { downloadStore } from '../../storage/downloads';
 import { SourceDatabaseSchemaError } from '../../storage/database';
@@ -50,13 +50,9 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   if(!blob){
     try{
       if(doc.format==='website'){
-        const {url,manifestId,sourceId,kind}=descriptor.locator;
+        const {url,manifestId,sourceId}=descriptor.locator;
         if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
-        if(kind!=='page'&&inExtension())await requireImagePermissions([url]);
-        const valid=await sourceMessage<{url:string;data?:string}>({type:'NC_SOURCE_IMAGE',manifestId,pageId:sourceId});
-        signal.throwIfAborted();
-        if(valid.url!==url)throw Error('图片来源已变化，请重新发现。');
-        blob=await sourceImage(valid.data??valid.url,signal);
+        blob=await readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
       }else{
         const containerId=doc.containerId;
         const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});

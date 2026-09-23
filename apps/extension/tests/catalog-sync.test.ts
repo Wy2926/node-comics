@@ -22,7 +22,7 @@ describe('automatic source directory reconciliation',()=>{
   it('establishes a quiet baseline, detects additions once, and keeps images and reading positions',async()=>{
     const first=snapshot(),comic=await importCatalog(first),entry=(await continueEntry(comic.id))!;
     expect(comic.catalogUpdates).toBeUndefined();expect(catalogSyncPolicy(comic)?.intervalMinutes).toBe(720);
-    await importManifest({id:'manifest',sourceTabId:1,navigationId:'nav',revision:1,title:'第1话',url:first.entries[0].url,adapter:'mangacopy',direction:'rtl',discoveryComplete:true,knownTotal:1,note:'',items:[{id:'one',url:'https://images.example/one.png',width:800,height:1200,order:0}]});
+    await importManifest({id:'manifest',revision:1,title:'第1话',url:first.entries[0].url,adapter:'mangacopy',direction:'rtl',discoveryComplete:true,knownTotal:1,note:'',items:[{id:'one',url:'https://images.example/one.png',width:800,height:1200,order:0}]});
     const [page]=await catalog.listPages(entry.contentId),position={id:entry.id,comicId:comic.id,entryId:entry.id,contentId:entry.contentId,pageId:page.pageId,relativeOffset:.42,updatedAt:Date.now()};
     await catalog.savePosition(position);
     const next=append(first);await applyCatalogRefresh(comic.id,1,next);await applyCatalogRefresh(comic.id,1,next);
@@ -65,7 +65,7 @@ describe('persistent periodic and opening checks',()=>{
   it('skips repeated openings and unsupported sources, checks all due comics only after twelve hours',async()=>{
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-23T00:00:00Z'));
     const first=snapshot(),second=snapshot();await importCatalog(first);await importCatalog(second);
-    await importManifest({id:'other',sourceTabId:1,navigationId:'nav',revision:1,title:'Other',url:'https://xkcd.com/123/',adapter:'xkcd',direction:'ltr',discoveryComplete:true,note:'',items:[{id:'one',url:'https://imgs.xkcd.com/comics/fixture.png',width:800,height:1200,order:0}]});
+    await importManifest({id:'other',revision:1,title:'Other',url:'https://www.gunnerkrigg.com/?p=123',adapter:'gunnerkrigg',direction:'ltr',discoveryComplete:true,note:'',items:[{id:'one',url:'https://www.gunnerkrigg.com/comics/fixture.png',width:800,height:1200,order:0}]});
     const sources=new Map([first,second].map(value=>[value.url,append(value)])),read=vi.fn(async(url:string)=>sources.get(url)!);
     await syncNextCatalog(read);expect(read).not.toHaveBeenCalled();
     vi.setSystemTime(Date.now()+12*60*60_000);while(await syncNextCatalog(read)){}expect(read).toHaveBeenCalledTimes(2);

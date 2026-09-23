@@ -1,5 +1,5 @@
 import {nextCatalogCheckAt, syncNextCatalog} from './catalog-sync';
-import {readSourceCatalog, recoverCatalogTabs} from '../../sources/runtime/catalog-reader';
+import {recoverCatalogTabs} from '../../sources';
 
 export const CATALOG_SYNC_ALARM = 'nc-catalog-sync';
 export const CATALOG_CONTINUE_ALARM = 'nc-catalog-sync-continue';
@@ -11,7 +11,7 @@ export function registerCatalogSyncBackground() {
     await recoverCatalogTabs();
     // Keep network work sequential and bounded. Persisted due times survive worker suspension.
     const deadline = Date.now() + 25_000;
-    while (Date.now() < deadline && await syncNextCatalog(readSourceCatalog)) { /* drain due comics */ }
+    while (Date.now() < deadline && await syncNextCatalog()) { /* drain due comics */ }
   })().catch(() => {}).finally(async () => {
     try {
       const next = await nextCatalogCheckAt();

@@ -15,6 +15,12 @@ import {
 } from '../index';
 import { maxInlineBytes } from '../shared/bytes';
 import { isPageImageUrl } from '../shared/urls';
+import {networkOperation,readNetworkPages} from './network';
+import {sourceImages} from '../registry/images';
+import {recoverImageHeaders} from './image-headers';
+import {registerDocumentManifest} from './manifests';
+import {readSourceCatalog} from './catalog-reader';
+import type {DocumentSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 const sourceMessageTypes = new Set([
   'NC_IMPORT_CURRENT',
   'NC_TRANSLATE_TAB',
@@ -32,28 +38,17 @@ function trusted(sender: chrome.runtime.MessageSender) {
 async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
 }
-async function registerManifest(snapshot: PageManifest, tabId: number, id: string = crypto.randomUUID()) {
-  const resolved=sourceFor(snapshot.url);
-  if(!resolved.definition.capabilities.importable||resolved.location.kind!=='reader'||snapshot.adapter!==resolved.definition.id)throw Error('SOURCE_IMPORT_UNSUPPORTED');
-  if (!Array.isArray(snapshot.items) || typeof snapshot.navigationId !== 'string')
-    throw Error('SOURCE_PAGES_INVALID');
-  const ids = new Set<string>();
-  for (const item of snapshot.items) {
-    if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id)
-      || typeof item.url !== 'string'
-      || !(item.kind === 'page' ? isPageImageUrl(item.url) : safeImageUrl(item.url, snapshot.url) === item.url))
-      throw Error('SOURCE_IMAGE_URL_INVALID');
-    ids.add(item.id);
-  }
-  const manifest = { ...snapshot, id, sourceTabId: tabId };
-  await chrome.storage.local.set({ ['manifest:' + id]: manifest });
-  return manifest;
-}
-async function discover(tabId: number) {
+async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请打开普通漫画网页。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
+  if(loc.kind==='catalog'&&networkOperation(tab.url,'catalog')){
+    const catalog=await readCatalog(tab.url),id=crypto.randomUUID();await chrome.storage.local.set({['nc-import:'+id]:{catalog}});return {kind:'catalog',id,catalog};
+  }
+  if(loc.kind==='reader'&&networkOperation(tab.url,'pages')){
+    const manifest=await readNetworkPages(tab.url);return {kind:'pages',id:manifest.id,manifest};
+  }
   await inject(tabId);
   if (loc.kind === 'catalog' && definition.capabilities.catalog) {
     const snapshot = await chrome.tabs.sendMessage(tabId, { type: 'NC_CATALOG_SNAPSHOT' }, { frameId: 0 });
@@ -72,18 +67,19 @@ async function discover(tabId: number) {
     if (snapshot?.error) throw Error(snapshot.code ?? snapshot.error);
     if (!snapshot || snapshot.url !== tab.url || !Array.isArray(snapshot.items))
       throw Error(msg('来源页面已变化，请重新发现。'));
-    return snapshot as PageManifest;
+    return snapshot as DocumentSnapshot;
   };
   const result =
     loc.kind === 'reader' && definition.capabilities.completePageList
       ? await pollSourceDiscovery(read)
       : await read();
-  const manifest = await registerManifest(result, tabId);
+  const manifest = await registerDocumentManifest(result, tabId);
   return { kind: 'pages', id: manifest.id, manifest };
 }
-export function registerSourceBackground() {
+export function registerSourceBackground(readCatalog:(url:string)=>Promise<SourceCatalogSnapshot> = readSourceCatalog) {
   const localeReady = registerLocaleBackground();
   registerInlineBackground();
+  void recoverImageHeaders().catch(()=>{});
   void chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   chrome.runtime.onInstalled.addListener(() => {
     void localeReady().then(() =>
@@ -122,7 +118,7 @@ export function registerSourceBackground() {
         ['catalog','reader'].includes(sourceLocation(sender.url ?? '')?.kind??'') &&
         sourceFor(sender.url??'').definition.capabilities.importable;
       if (!fromDetail) return;
-      void discover(sender.tab!.id!)
+      void discover(sender.tab!.id!,readCatalog)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )
@@ -142,7 +138,7 @@ export function registerSourceBackground() {
         await activateInline(message.tabId);
         return true;
       }
-      if (message?.type === 'NC_DISCOVER_TAB') return discover(Number(message.tabId));
+      if (message?.type === 'NC_DISCOVER_TAB') return discover(Number(message.tabId),readCatalog);
       if (message?.type === 'NC_OPEN_PAGE') {
         const resolved=sourceFor(String(message.url));
         if(!resolved.definition.capabilities.importable||resolved.location.kind!=='reader')throw Error('SOURCE_IMPORT_UNSUPPORTED');
@@ -202,7 +198,7 @@ export function registerSourceBackground() {
         const snapshot = await chrome.tabs.sendMessage(tabId, { type: 'NC_DISCOVER' }, { frameId: 0 });
         if (snapshot?.error) throw Error(snapshot.code ?? snapshot.error);
         if (snapshot?.url !== managed.url) throw Error(msg('来源归属已变化。'));
-        return registerManifest(snapshot, tabId, managed.manifestId);
+        return registerDocumentManifest(snapshot, tabId, managed.manifestId);
       }
       if (message?.type === 'NC_SOURCE_IMAGE') {
         const data = await chrome.storage.local.get('manifest:' + message.manifestId),
@@ -218,18 +214,22 @@ export function registerSourceBackground() {
           throw Error(msg('图片不在来源清单内。'));
         // HTTP locators are durable registered metadata. Only page resources depend on
         // the original tab and navigation; managed discovery closes its tab on completion.
-        if (item.kind !== 'page') return { url: item.url };
+        if (item.kind !== 'page') {
+          return {url:item.url,...(item.processing||sourceImages[manifest.adapter]?{sourceId:manifest.adapter,processing:item.processing}:{})};
+        }
+        const pageContext=manifest.pageContext;
+        if(!pageContext)throw Error(msg('来源页已改变，请重新发现。'));
         const current = await chrome.tabs
-          .sendMessage(manifest.sourceTabId, { type: 'NC_NAVIGATION' }, { frameId: 0 })
+          .sendMessage(pageContext.tabId, { type: 'NC_NAVIGATION' }, { frameId: 0 })
           .catch(() => null);
-        if (current?.url !== manifest.url || current.navigationId !== manifest.navigationId)
+        if (current?.url !== manifest.url || current.navigationId !== pageContext.navigationId)
           throw Error(msg('来源页已改变，请重新发现。'));
         if (item.kind === 'page') {
           const source = await chrome.tabs.sendMessage(
-            manifest.sourceTabId,
+            pageContext.tabId,
             {
               type: 'NC_PAGE_IMAGE',
-              navigationId: manifest.navigationId,
+              navigationId: pageContext.navigationId,
               url: manifest.url,
               imageUrl: item.url,
               pageId: item.id,

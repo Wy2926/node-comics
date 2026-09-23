@@ -21,5 +21,5 @@ export interface SourceDefinition {
   capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean };
   /** Explicit opt-in: only adapters with a verified complete directory may refresh it automatically. */
   catalogSync?: { intervalMinutes: number };
-  installation: { requiredOrigins: readonly string[]; autoContentMatches: readonly string[] };
+  installation: { requiredOrigins: readonly string[]; autoContentMatches: readonly string[]; optionalOrigins?:readonly string[] };
 }
