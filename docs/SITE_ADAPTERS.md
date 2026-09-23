@@ -26,7 +26,7 @@
 5. **稳定身份与只读目录。** 身份包含来源命名空间，不按标题或临时 CDN 地址去重；保留必要的查询参数与片段，镜像等价须有证据。条目、分组、原始标签和可选阅读序列来自源站；不推断章节类型、正文归属或跨组连续阅读。目录更新只使用调用方给出的 `previous`，不另存已选上传状态。
 6. **发现不等于取图。** 返回稳定页槽和来源顺序，重复 URL 可以是不同页；缺页不重编号。`ready / not-ready / unsupported / error` 与清单完整性分开；只有可靠总数、完整列表或单页契约能证明完整，canvas 窗口和暂时不增长不能。
 7. **临时资源受控。** 站点给出 HTTP 地址或页面逻辑资源，公共层登记后才能读取。句柄绑定文档、导航、元素和版本，不能持久化为离线原图。导航、替换、画布重绘、取消与销毁后拒绝旧读取，清理观察器、挂载入口和译图；`pageshow` 重建会话而不复用旧句柄。
-8. **权限与数据。** 新站默认 `requiredOrigins`、`autoContentMatches` 为空，按用户操作申请必要的可选主机权限；不能因注册扩大安装权限。页面文字、HTML、URL 均不可信，不执行下载的源站脚本，不上传 Cookie／令牌，不记录私有图片、全文或签名地址。请求头与图片解码经公共取图接口处理，不直接修改全局网络规则。
+8. **权限与数据。** 新站默认 `requiredOrigins`、`autoContentMatches` 为空，按用户操作申请必要的可选主机权限；不能因注册扩大安装权限。需嵌入网站入口时声明 `optionalContentMatches`，公共运行时仅在主机授权后登记内容脚本，并在撤销后取消登记。页面文字、HTML、URL 均不可信，不执行下载的源站脚本，不上传 Cookie／令牌，不记录私有图片、全文或签名地址。请求头与图片解码经公共取图接口处理，不直接修改全局网络规则。
 9. **按能力开放。** 漫画导入须声明 `importable` 和页面能力；目录、原位翻译、完整页清单、自动同步分别声明并有实现。`catalogSync` 仅在能可靠读取完整目录时开放；调度、更新提示、缓存与阅读位置由公共应用层维护。网站入口使用 `sites` 元数据和随包图标，UI 不加专属组件。
 
 公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
@@ -53,6 +53,8 @@ npm run build
 | --- | --- |
 | [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | DOM 目录与 HTTP 图片；动态只读分类、完整性核对、12 小时目录同步 |
 | [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；不开放原位翻译 |
+| [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；授权后嵌入导入／管理按钮，章节 Referer，不创建来源采集标签页 |
+| [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口，无源站采集标签页 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | 已渲染 canvas 部分窗口，直接阅读与原位翻译；无目录或自动补全 |
 | [Gunnerkrigg](../apps/extension/src/sources/sites/gunnerkrigg/README.md) | 当前单页图片，无目录或自动翻页 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

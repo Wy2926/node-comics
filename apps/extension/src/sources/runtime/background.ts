@@ -38,11 +38,18 @@ function trusted(sender: chrome.runtime.MessageSender) {
 async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
 }
-async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>) {
+async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>, preferCatalog = false) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请打开普通漫画网页。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
+  if (preferCatalog && loc.kind === 'reader' && loc.catalog && networkOperation(loc.catalog.url, 'catalog')) {
+    const catalog = await readCatalog(loc.catalog.url), id = crypto.randomUUID();
+    const current = catalog.entries.find(entry => sameSourcePage(entry.url, tab.url!));
+    if (current) catalog.defaultEntryId = current.id;
+    await chrome.storage.local.set({['nc-import:' + id]: {catalog}});
+    return {kind: 'catalog', id, catalog};
+  }
   if(loc.kind==='catalog'&&networkOperation(tab.url,'catalog')){
     const catalog=await readCatalog(tab.url),id=crypto.randomUUID();await chrome.storage.local.set({['nc-import:'+id]:{catalog}});return {kind:'catalog',id,catalog};
   }
@@ -118,7 +125,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
         ['catalog','reader'].includes(sourceLocation(sender.url ?? '')?.kind??'') &&
         sourceFor(sender.url??'').definition.capabilities.importable;
       if (!fromDetail) return;
-      void discover(sender.tab!.id!,readCatalog)
+      void discover(sender.tab!.id!,readCatalog,true)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )

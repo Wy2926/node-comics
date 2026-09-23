@@ -66,6 +66,14 @@ describe('independent discovery operations and common manifest authority',()=>{
     const promise=authorizeCatalogImport(book);expect(chrome.permissions.request).toHaveBeenCalledWith({origins:['https://fixture.test/*']});
     expect(await promise).toEqual({url:book,catalogId:'fixture:book'});expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
+  it('rejects cross-origin and foreign-source Referers before issuing a request',async()=>{
+    const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+    for(const [target,referer] of [['https://other.test/api',url],['https://other.test/api','https://other.test/1']]) {
+      fixture.networks.fixture={pages:async(_url,context)=>{await context.request(target,{referer});return pages();}};
+      await expect(readNetworkPages(url)).rejects.toThrow();
+    }
+    expect(fetch).not.toHaveBeenCalled();expect(set).not.toHaveBeenCalled();
+  });
 });
 
 describe('source image facade',()=>{
@@ -82,6 +90,14 @@ describe('source image facade',()=>{
     await expect(readSourceImage(ref)).rejects.toThrow('来源已变化');
     send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl}});vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
     await expect(readSourceImage(ref)).rejects.toThrow('授权');expect(fetch).not.toHaveBeenCalled();
+  });
+  it('resolves dynamic image headers only after URL and permission authorization',async()=>{
+    const headers=vi.fn(()=>({}));fixture.images.fixture={headers};
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response('pixels')));
+    send.mockResolvedValue({ok:true,data:{url:'https://other.test/1.png',sourceId:'fixture'}});
+    await expect(readSourceImage(ref)).rejects.toThrow('来源已变化');expect(headers).not.toHaveBeenCalled();
+    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,sourceId:'fixture'}});
+    expect(await(await readSourceImage(ref)).text()).toBe('pixels');expect(headers).toHaveBeenCalledWith(ref.expectedUrl);
   });
   it('reads a canvas handle without asking for a pseudo-origin permission',async()=>{
     send.mockResolvedValue({ok:true,data:{url:'page-image:canvas',data:'data:image/png;base64,YQ=='}});

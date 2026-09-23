@@ -4,6 +4,7 @@ import { connectReaderSettings } from '../src/inline/settings';
 import { defaults } from '../src/types';
 
 vi.mock('wxt/utils/define-background',()=>({defineBackground:(main:()=>void)=>({main})}));
+vi.mock('../src/sources/runtime/optional-content',()=>({registerOptionalSourceContent:vi.fn()}));
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({registerInlineBackground:()=>{},activateInline:vi.fn()}));
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});

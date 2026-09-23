@@ -3,7 +3,8 @@ import type {SourceSnapshot, SourceCatalogSnapshot} from './source';
 export interface SourceNetworkContext {
   signal?: AbortSignal;
   previous?: SourceCatalogSnapshot;
-  request(url:string):Promise<string>;
+  /** Optional same-origin Referer, applied by the runtime to this exact request only. */
+  request(url:string, options?:{referer:string}):Promise<string>;
 }
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {

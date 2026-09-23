@@ -1,8 +1,9 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import background from '../entrypoints/background';
 
-// Keep every production message listener; only replace the WXT entrypoint wrapper.
+// Keep every production message listener; isolate the wrapper and optional content registration.
 vi.mock('wxt/utils/define-background', () => ({defineBackground: (main: () => void) => ({main})}));
+vi.mock('../src/sources/runtime/optional-content', () => ({registerOptionalSourceContent: vi.fn()}));
 
 type Listener = (message: unknown, sender: chrome.runtime.MessageSender, respond: (value: unknown) => void) => unknown;
 type Message = {type: string; [key: string]: unknown};

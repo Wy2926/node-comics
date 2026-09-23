@@ -39,7 +39,7 @@ async function routes(){
 async function state(){return reader.evaluate(()=>new Promise((resolve,reject)=>{const open=indexedDB.open('node-comics-reading-v1-catalog');open.onerror=()=>reject(open.error);open.onsuccess=()=>{try{const db=open.result,tx=db.transaction(['entries','pageDescriptors','tasks'],'readonly'),documents=tx.objectStore('entries').getAll(),pages=tx.objectStore('pageDescriptors').getAll(),tasks=tx.objectStore('tasks').getAll();tx.onerror=()=>reject(tx.error);tx.oncomplete=()=>{resolve({documents:documents.result,pages:pages.result,tasks:tasks.result});db.close();};}catch(error){reject(error);}};}));}
 async function imports(slug,offline){
   const source=await context.newPage();await source.goto('https://www.mangacopy.com/comic/'+slug);
-  const button=source.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true});await button.waitFor();
+  const button=source.getByRole('button',{name:'NodeLane Comics · 导入/管理漫画',exact:true});await button.waitFor();
   await source.screenshot({path:path.join(out,slug+'-embedded.png')});
   const created=context.waitForEvent('page');await button.click();reader=await created;await reader.waitForURL(/reader\.html\?catalog=/);
   await rendered();
@@ -56,7 +56,7 @@ try{
   await worker.evaluate(()=>chrome.storage.local.set({'nc-reader-settings':{uiLanguage:'zh-CN'}}));
   const warm=await context.newPage();await warm.goto(new URL('reader.html',worker.url()).href);await warm.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await warm.close();
   const navigationSource=await context.newPage();await navigationSource.goto('https://www.mangacopy.com/comic/navigation');
-  const opened=context.waitForEvent('page');await navigationSource.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true}).click();reader=await opened;
+  const opened=context.waitForEvent('page');await navigationSource.getByRole('button',{name:'NodeLane Comics · 导入/管理漫画',exact:true}).click();reader=await opened;
   const navigation=reader.getByRole('region',{name:'选择开始阅读的位置'});await navigation.waitFor();assert.equal(await reader.getByRole('dialog').count(),0);assert.equal((await state()).pages.length,0);
   await navigation.locator('summary').filter({hasText:'站点自定义分类'}).click();assert.equal(await navigation.getByRole('button',{name:/编辑|归属|版本/}).count(),0);await navigation.getByText('特别企划',{exact:true}).waitFor();
   await navigation.getByRole('button',{name:'正序 ↑',exact:true}).click();assert((await navigation.locator('.nc-chapter-entry').first().innerText()).includes('内容 B'));

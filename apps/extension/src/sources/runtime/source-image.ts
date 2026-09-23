@@ -13,7 +13,8 @@ export async function readSourceImage(reference:SourceImageReference,signal?:Abo
   if(!valid.data)await requireImagePermissions([valid.url]);
   const adapter=valid.sourceId?sourceImages[valid.sourceId]:undefined;
   if(valid.processing&&!adapter?.decode)throw Error('来源图片处理器不可用。');
-  const response=await fetchSourceImage(valid.data??valid.url,signal,valid.data?undefined:adapter?.headers);
+  const headers=valid.data?undefined:typeof adapter?.headers==='function'?adapter.headers(valid.url):adapter?.headers;
+  const response=await fetchSourceImage(valid.data??valid.url,signal,headers);
   signal?.throwIfAborted();
   const blob=adapter?.decode?await adapter.decode(response.blob,response.headers,valid.processing,signal):response.blob;
   signal?.throwIfAborted();

@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://www.dm5.com/*", "https://dm5.com/*", "https://*.cdndm5.com/*"],
+  "optionalContentMatches": ["https://www.dm5.com/*", "https://dm5.com/*"]
+}

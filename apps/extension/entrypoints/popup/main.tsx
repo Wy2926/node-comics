@@ -28,7 +28,7 @@ function Popup({initialError=''}:{initialError?:string}){
  const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
  async function readSource(){
   if(!source?.url||!importable||disabled)return;lock.current=true;setBusy(true);setDiscoveryError('');
-  try{if(!await chrome.permissions.request({origins:[new URL(source.url).origin+'/*']}))throw Error(msg('未取得本站权限，可再次授权后发现。'));
+  try{if(!await chrome.permissions.request({origins:[...new Set([new URL(source.url).origin+'/*',...(resolved?.definition.installation.optionalOrigins??[])])]}))throw Error(msg('未取得本站权限，可再次授权后发现。'));
    const discovered=await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:source.id});
    await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
