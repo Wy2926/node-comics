@@ -30,7 +30,8 @@ export async function restoreSourceSelection(selection:SourceSelection) {
   const ids=await catalog.mutate(['connections','comics','entries'],async tx=>{
     const connection=await tx.get('connections',selection.connection.id);if(!connection)return [];
     if(connection.provider!==selection.connection.provider||connection.accountId!==selection.connection.accountId)throw Error('来源账户身份不匹配。');
-    if(connection.status!=='connected')await tx.put('connections',{...connection,status:'connected',generation:connection.generation+1,updatedAt:Date.now()});
+    await tx.put('connections',{...connection,displayName:selection.connection.displayName,accountMetadata:selection.connection.accountMetadata,
+      status:'connected',generation:connection.generation+(connection.status==='connected'?0:1),updatedAt:Date.now()});
     const selected=new Set(selection.files.map(file=>file.id)),ids:string[]=[];
     for(const comic of await tx.list('comics',{index:'connectionId',range:connection.id,limit:10000})) {
       if(comic.source.status==='active'||comic.source.status==='revoked'&&!selected.has(comic.source.providerItemId))continue;

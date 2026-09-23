@@ -36,7 +36,6 @@ import { LocalImport } from './ui/LocalImport';
 import { Login } from './ui/Login';
 import { Preferences } from './ui/Preferences';
 import {DocumentExport} from './ui/DocumentExport';
-import {DownloadManagement} from './ui/DownloadManagement';
 import type {Entry} from './comics/domain';
 import { StorageManagement } from './ui/StorageManagement';
 
@@ -97,8 +96,9 @@ export function App(){
   if(sourceInProgress.current)return;const option=sourceActions.find(action=>action.id===providerId);if(!option)return;
   setError('');if(!option.configured){setError(msg('此来源尚未配置，请先完成连接设置。'));return;}
   sourceInProgress.current=true;const request=readingEpoch.current;
-  try{setBusy(msg('请选择 {0} 文件',{'0':option.label}));const selected=await chooseSourceFiles(providerId);if(!selected.files.length)return;
-   setBusy(msg('正在建立云盘文件目录'));const result=await importSourceFiles(selected);await reloadLibrary();
+  try{setBusy(msg('请选择 {0} 文件',{'0':option.label}));const selected=await chooseSourceFiles(providerId);
+   if(selected.files.length)setBusy(msg('正在建立云盘文件目录'));const result=await importSourceFiles(selected);await reloadLibrary();
+   if(!selected.files.length){notify(msg('{0} 已连接',{'0':option.label}));return;}
    if(result.failures.length)setError(result.failures.map(file=>file.name+'：'+file.error).join('；'));
    if(result.results.length===1&&selected.files.length===1&&request===readingEpoch.current)await openEntry(result.results[0].id);else notify(msg('{0} 份已导入 · {1} 份需要处理',{'0':result.results.length,'1':result.failures.length}));
   }catch(e){setError((e as Error).message);}finally{sourceInProgress.current=false;setBusy('');}
@@ -145,8 +145,8 @@ export function App(){
   {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
   <div className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
   {current?<Reader key={`${current.comicId}:${account?.user.id}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onReload={()=>void reloadCurrent()} onExport={()=>void exportCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onAcquire={()=>void grantDownloads([current.id],copyOrigins([current])).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId)=>void openEntry(id,pageId)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps} userId={account?.user.id} apiOrigin={API_ORIGIN}/>:
-  <main className="nc-main">{view==='library'&&<><DownloadManagement notify={notify} onOpen={id=>void openEntry(id)}/><Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onDirectory={id=>void showDirectory(id)} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/></>}
-  {view==='settings'&&<><Preferences settings={settings} setSettings={setSettings} caps={caps}/><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></>}
+  <main className="nc-main">{view==='library'&&<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onDirectory={id=>void showDirectory(id)} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}
+  {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={caps}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={receivePolicy} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}

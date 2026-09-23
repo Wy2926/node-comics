@@ -1,0 +1,13 @@
+.nc-source-account{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:14px 0;border-bottom:1px solid var(--line)}
+.nc-source-account:last-child{border-bottom:0;padding-bottom:0}
+.nc-source-account-info{flex:1;min-width:0}
+.nc-source-account-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;overflow-wrap:anywhere}
+.nc-source-account-heading h4{font-size:1rem;margin:0}
+.nc-source-account-heading .nc-muted{font-size:.875rem}
+.nc-source-account-status{flex-shrink:0;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:.8125rem;color:var(--muted);background:var(--surface-soft)}
+.nc-source-account-status[data-status=connected]{color:var(--accent);background:var(--accent-soft)}
+.nc-source-account-details{display:flex;flex-wrap:wrap;gap:6px 20px;margin:8px 0 0;font-size:.8125rem}
+.nc-source-account-details>div{display:flex;gap:6px;max-width:100%;min-width:0}
+.nc-source-account-details dt{flex-shrink:0;color:var(--muted)}
+.nc-source-account-details dd{margin:0;overflow-wrap:anywhere}
+.nc-source-account-actions{justify-content:flex-end;flex-shrink:0;gap:10px}

@@ -93,6 +93,7 @@ afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
 describe('production background listeners share the runtime message channel', () => {
   it('keeps the whole Drive connection, selection, token and disconnect flow out of source routing', async () => {
+    expect(await owned({type: 'NC_DRIVE_ACCOUNTS'})).toEqual({ok: true, accounts: []});
     const connected = await owned({type: 'NC_DRIVE_CONNECT'});
     expect(connected).toMatchObject({ok: true, id: expect.any(String), tabId: 7});
     expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toEqual({ok: true, pending: true});
@@ -104,10 +105,12 @@ describe('production background listeners share the runtime message channel', ()
     expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}}, sender)).toEqual({ok: true});
     expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: true, account: {id: 'account-1'}, files: [{fileId: 'file-1', format: 'cbz'}]});
     expect(await owned({type: 'NC_DRIVE_TOKEN', accountId: 'account-1'})).toMatchObject({ok: true, accessToken: 'synthetic-test-token', account: {id: 'account-1'}});
+    expect(await owned({type: 'NC_DRIVE_ACCOUNTS'})).toEqual({ok: true, accounts: [{account: {id: 'account-1', displayName: 'Test reader'}, status: 'connected'}]});
     expect(request).toHaveBeenCalledTimes(2);
     expect(await owned({type: 'NC_DRIVE_DISCONNECT', accountId: 'account-1'})).toEqual({ok: true});
     expect(await owned({type: 'NC_DRIVE_TOKEN', accountId: 'account-1'})).toMatchObject({ok: false, code: 'reconnect-required'});
     expect(Object.keys(session).some(key => key.startsWith('nc-drive-token:'))).toBe(false);
+    expect(await owned({type: 'NC_DRIVE_ACCOUNTS'})).toEqual({ok: true, accounts: []});
   });
 
   it.each(['NC_DRIVE_CONNECT', 'NC_DRIVE_STATUS', 'NC_DRIVE_TOKEN', 'NC_DRIVE_BRIDGE_INIT', 'NC_DRIVE_BRIDGE_RESULT', 'NC_DRIVE_DISCONNECT'])('leaves invalid %s requests to Drive validation rather than replying as a source', async type => {

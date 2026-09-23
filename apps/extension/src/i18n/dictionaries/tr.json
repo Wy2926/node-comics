@@ -1336,5 +1336,20 @@
   "每个文件是一本漫画，选中后自动导入。": "Each file becomes one comic and is imported automatically.",
   "打开漫画 {0}": "Open comic {0}",
   "更多操作 · {0}": "More actions · {0}",
-  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page."
+  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page.",
+  "邮箱": "E-posta",
+  "账户标识": "Hesap kimliği",
+  "已移除 {0} 部漫画": "{0} çizgi roman kaldırıldı",
+  "从书架移除选中的 {0} 部漫画及其阅读记录？": "Seçilen {0} çizgi roman ve okuma geçmişleri kitaplıktan kaldırılsın mı?",
+  "选择漫画 {0}": "{0} çizgi romanını seç",
+  "已连接": "Bağlı",
+  "离线": "Çevrimdışı",
+  "需要重新连接": "Yeniden bağlantı gerekiyor",
+  "已断开连接": "Bağlantı kesildi",
+  "授权已撤销": "Erişim iptal edildi",
+  "正在读取本机资料…": "Yerel veriler yükleniyor…",
+  "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Temizledikten sonra gerektiğinde yeniden yüklenir. Çizgi romanlar ve okuma konumları korunur.",
+  "云盘账户": "Bulut hesapları",
+  "暂无云盘账户，可从「我的漫画」连接云盘。": "Henüz bulut hesabı yok. Çizgi romanlarım bölümünden bağlayabilirsiniz.",
+  "正在读取云盘账户…": "Bulut hesapları yükleniyor…"
 }

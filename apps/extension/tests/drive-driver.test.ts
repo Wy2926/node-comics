@@ -5,6 +5,7 @@ import type {OpenFileSourceContext} from '../src/comics/sources/contracts';
 const client = vi.hoisted(() => ({
   chooseDriveFiles: vi.fn(), disconnectDrive: vi.fn(), openDriveSource: vi.fn(),
   isDriveConfigured: vi.fn(), onDriveAccessChanged: vi.fn(),
+  listDriveAccounts: vi.fn(), onDriveAccountsChanged: vi.fn(),
 }));
 vi.mock('../src/comics/sources/google-drive/index', () => client);
 import {googleDriveDriver} from '../src/comics/sources/google-drive/driver';
@@ -19,6 +20,11 @@ function context(): OpenFileSourceContext {
 beforeEach(() => { vi.resetAllMocks(); });
 
 describe('Google Drive file source driver', () => {
+  it('lists verified provider accounts without requiring imported comics',async()=>{
+    client.listDriveAccounts.mockResolvedValue([{account:{id:'account-1',displayName:'Alice',emailAddress:'reader@example.test'},status:'connected'}]);
+    expect(await googleDriveDriver.listAccounts!()).toEqual([{id:'drive:account-1',provider:'google-drive',accountId:'account-1',displayName:'Alice',accountMetadata:{emailAddress:'reader@example.test'},status:'connected'}]);
+    expect(client.chooseDriveFiles).not.toHaveBeenCalled();expect(client.openDriveSource).not.toHaveBeenCalled();
+  });
   it('maps verified selection into opaque source metadata with a real item ID distinct from its revision key', async () => {
     const chosen = {account: {id: 'account-1', displayName: 'Alice'}, files: [
       {...snapshot, name: 'Comic.cbz', mimeType: 'application/zip', format: 'cbz'},
@@ -42,6 +48,15 @@ describe('Google Drive file source driver', () => {
     await expect(googleDriveDriver.select!(connection)).rejects.toMatchObject({code: 'account-mismatch'});
   });
 
+  it('registers plain account fields and persists only display metadata from verified selection', async () => {
+    client.chooseDriveFiles.mockResolvedValue({account:{id:'account-1',displayName:'Alice',emailAddress:'reader@example.test',accessToken:'secret'},files:[]});
+    const selected=await googleDriveDriver.select!(connection);
+    expect(selected.connection).toEqual({id:connection.id,provider:'google-drive',accountId:'account-1',displayName:'Alice',accountMetadata:{emailAddress:'reader@example.test'}});
+    expect(googleDriveDriver.describeAccount!({...connection,...selected.connection})).toEqual([
+      {id:'email',label:'邮箱',value:'reader@example.test'}, {id:'account',label:'账户标识',value:'account-1'},
+    ]);
+    expect(googleDriveDriver.describeAccount!(connection)).toEqual([{id:'account',label:'账户标识',value:'account-1'}]);
+  });
   it('does not start a cancelled selection or return one cancelled while the provider is running', async () => {
     const early = new AbortController(); early.abort();
     await expect(googleDriveDriver.select!(undefined, early.signal)).rejects.toMatchObject({name: 'AbortError'});

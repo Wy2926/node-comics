@@ -102,6 +102,12 @@ describe('Drive metadata and authority', () => {
     expect(await fetchDriveAccount('token',undefined,request)).toEqual({id:'stable-account',displayName:'Alice'});
     expect(String(request.mock.calls[0][0])).toContain('/about?fields=');
   });
+  it('reads only optional display email from the verified account response', async () => {
+    const request=vi.fn<typeof fetch>().mockResolvedValue(Response.json({user:{permissionId:'stable-account',displayName:'Alice',emailAddress:' reader@example.test ',accessToken:'must-not-be-copied'}}));
+    expect(await fetchDriveAccount('token',undefined,request)).toEqual({id:'stable-account',displayName:'Alice',emailAddress:'reader@example.test'});
+    request.mockResolvedValue(Response.json({user:{permissionId:'stable-account',emailAddress:{invalid:true}}}));
+    expect(await fetchDriveAccount('token',undefined,request)).toEqual({id:'stable-account',displayName:'Google Drive'});
+  });
   it('requires verified download capability and refuses PDF before range reads', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(metadata('17', {capabilities:{canDownload:false}})).mockResolvedValueOnce(metadata('17',{name:'book.pdf',mimeType:'application/pdf'}));
     await expect(fetchDriveMetadata(binding,'token',undefined,request)).rejects.toMatchObject({code:'download-forbidden'});

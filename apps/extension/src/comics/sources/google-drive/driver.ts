@@ -1,12 +1,12 @@
-import type {SourceConnection} from '../../domain';
-import type {FileSourceDriver, SourceSelection} from '../contracts';
-import {chooseDriveFiles, disconnectDrive, isDriveConfigured, onDriveAccessChanged, openDriveSource} from './index';
+import type {FileSourceDriver, SourceAccount, SourceSelection} from '../contracts';
+import {chooseDriveFiles, disconnectDrive, isDriveConfigured, listDriveAccounts, onDriveAccountsChanged, onDriveAccessChanged, openDriveSource} from './index';
 import {DriveError} from './errors';
 import {validDriveIdentifier, type DriveBinding} from './metadata';
+import {msg} from '../../../i18n/runtime';
 
 const provider = 'google-drive';
 const connectionId = (accountId: string) => `drive:${accountId}`;
-function accountFor(connection: SourceConnection): string {
+function accountFor(connection: SourceAccount): string {
   if (connection.provider !== provider || !validDriveIdentifier(connection.accountId) || connection.id !== connectionId(connection.accountId))
     throw new DriveError('account-mismatch', 'Google Drive 来源账户无效，请重新连接原账户。');
   return connection.accountId;
@@ -31,6 +31,19 @@ export const googleDriveDriver: FileSourceDriver = {
   cachePages: true,
   cacheRanges: true,
   isConfigured: isDriveConfigured,
+  async listAccounts() {
+    return (await listDriveAccounts()).map(({account,status})=>({
+      id:connectionId(account.id),provider,accountId:account.id,displayName:account.displayName,status,
+      ...(account.emailAddress?{accountMetadata:{emailAddress:account.emailAddress}}:{}),
+    }));
+  },
+  subscribeAccounts: onDriveAccountsChanged,
+  describeAccount(connection) {
+    return [
+      ...(connection.accountMetadata?.emailAddress ? [{id:'email',label:msg('邮箱'),value:connection.accountMetadata.emailAddress}] : []),
+      {id:'account',label:msg('账户标识'),value:accountFor(connection)},
+    ];
+  },
   async select(connection, signal): Promise<SourceSelection> {
     signal?.throwIfAborted();
     const expectedAccount = connection && accountFor(connection);
@@ -39,7 +52,8 @@ export const googleDriveDriver: FileSourceDriver = {
     if (!validDriveIdentifier(selected.account.id) || (expectedAccount && selected.account.id !== expectedAccount))
       throw new DriveError('account-mismatch', '请选择原来连接的 Google Drive 账户。');
     return {
-      connection: {id: connectionId(selected.account.id), provider, accountId: selected.account.id, displayName: selected.account.displayName},
+      connection: {id: connectionId(selected.account.id), provider, accountId: selected.account.id, displayName: selected.account.displayName,
+        ...(selected.account.emailAddress ? {accountMetadata:{emailAddress:selected.account.emailAddress}} : {})},
       files: selected.files.map(file => {
         if (file.format !== 'cbz')
           throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP 漫画文件。');

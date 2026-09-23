@@ -1336,5 +1336,20 @@
   "每个文件是一本漫画，选中后自动导入。": "Each file becomes one comic and is imported automatically.",
   "打开漫画 {0}": "Open comic {0}",
   "更多操作 · {0}": "More actions · {0}",
-  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page."
+  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page.",
+  "邮箱": "Email",
+  "账户标识": "Account ID",
+  "已移除 {0} 部漫画": "Removed {0} comics",
+  "从书架移除选中的 {0} 部漫画及其阅读记录？": "Remove the {0} selected comics and their reading history from your library?",
+  "选择漫画 {0}": "Select comic {0}",
+  "已连接": "Connected",
+  "离线": "Offline",
+  "需要重新连接": "Reconnect required",
+  "已断开连接": "Disconnected",
+  "授权已撤销": "Access revoked",
+  "正在读取本机资料…": "Loading local data…",
+  "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Loaded again as needed after clearing. Comics and reading positions are kept.",
+  "云盘账户": "Cloud accounts",
+  "暂无云盘账户，可从「我的漫画」连接云盘。": "No cloud accounts yet. Connect one from My comics.",
+  "正在读取云盘账户…": "Loading cloud accounts…"
 }

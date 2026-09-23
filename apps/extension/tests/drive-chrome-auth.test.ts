@@ -27,7 +27,7 @@ describe('Chrome-managed Drive credentials', () => {
     expect(chromeDriveAvailable()).toBe(true);
     expect(await requestChromeDriveToken(true, 'permission-account')).toEqual({accessToken: firstToken, account: {id: 'permission-account', displayName: 'Reader'}});
     expect(getAuthToken).toHaveBeenCalledExactlyOnceWith({interactive: true, scopes: [scope], enableGranularPermissions: true});
-    expect(request).toHaveBeenCalledExactlyOnceWith('https://www.googleapis.com/drive/v3/about?fields=user(permissionId,displayName)', expect.objectContaining({credentials: 'omit', redirect: 'error'}));
+    expect(request).toHaveBeenCalledExactlyOnceWith('https://www.googleapis.com/drive/v3/about?fields=user(permissionId,displayName,emailAddress)', expect.objectContaining({credentials: 'omit', redirect: 'error'}));
     expect((request.mock.calls[0][1].headers as Headers).get('Authorization')).toBe(`Bearer ${firstToken}`);
   });
 

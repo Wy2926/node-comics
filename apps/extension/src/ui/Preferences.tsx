@@ -1,6 +1,6 @@
 import {Select} from './Select';
 import {msg} from '../i18n/runtime';
-import { type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { type Capabilities, type Settings } from '../types';
 import {InterfaceLanguage} from './InterfaceLanguage';
 import {AutoTranslateTabs} from './AutoTranslateTabs';
@@ -12,8 +12,9 @@ type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
+  children?: ReactNode;
 };
-export function Preferences({ settings, setSettings, caps }: Props) {
+export function Preferences({ settings, setSettings, caps, children }: Props) {
   return <div className="nc-preferences">
     <PageTitle eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
     <AppearanceSettings settings={settings} onChange={setSettings}>
@@ -53,5 +54,6 @@ export function Preferences({ settings, setSettings, caps }: Props) {
         <p>{msg("原图与译图保存在私有对象存储；{0}。图片归你的账户私有，不接收源网站 Cookie，也不会公开分享；用户主动删除或未来清理策略仍可能使资源不可用。", {"0": caps?.retention_days?msg("当前服务设置 {0} 天保留期", {"0": caps.retention_days}):msg("当前长期保留，未设自动清理")})}</p>
       </div>
     </section>
+    {children}
   </div>;
 }

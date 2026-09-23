@@ -21,7 +21,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_membership_admin.mjs` | 隔离后台的赠送与分钟配置 |
 | 插件 `tests/billing-focus-fixture.html` | Vite 指定 5192 端口后打开，点击“运行回归检查”；模拟订阅接口与窗口交接，验证焦点刷新、并发打开、返回对账和失败重试，不读取真实账户 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |
-| `verify_simple_reading.mjs` | 单来源新基线：自动导入、散图拒绝、重复文件续读、120 页窗口、浏览器重启、格式解码、失败隔离、卡片菜单与窄屏 |
+| `verify_simple_reading.mjs` | 桌面单来源新基线：自动导入、散图拒绝、重复文件续读、120 页窗口、浏览器重启、格式解码、失败隔离、最近阅读时间、跨虚拟列表批量移除、设置对齐和来源账户展示；窄屏不在兼容范围 |
 | `verify_source_database_baseline.mjs` | 在隔离扩展 profile 中先创建残缺旧 v1 库，再验证新基线导入、阅读、重开且旧库不变；另检查当前基线缺表的明确错误，无未处理 Promise |
 | `verify_drive_import.mjs` | 新建隔离扩展 profile、专用 HTTPS 测试页与模拟 Google 服务，覆盖 CBZ 选择、直接阅读、索引失败和授权复用；`TEST_DRIVE_AUTH_MODE=chrome` 增加模拟 Chrome Identity、真实浏览器重启后的静默恢复和断开检查，不读取用户 Chrome 或真实云盘，见 [Drive 授权回归](../docs/validation/DRIVE_AUTH_2026_09_23.md) |
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
@@ -63,7 +63,7 @@ $env:TEST_DRIVE_AUTH_MODE = 'chrome'
 node scripts/verify_drive_import.mjs
 ```
 
-网页模式验证有效 token 复用与自动打开 Picker。Chrome 模式模拟 `identity.getAuthToken`，还会真实关闭、重开隔离浏览器，检查 session 已清空而本地账户记录保留、通过非交互 API 恢复，以及断开后不能恢复。它不验证 Google 实际 grant 或长期续期。结果与截图写入 `artifacts/source-architecture/drive/run-*/`；token 为随机模拟数据，不写入报告。
+网页模式验证有效 token 复用与自动打开 Picker。两种模式均覆盖只连接账户、零文件导入后的设置显示；Chrome 模式还覆盖授权后取消 Picker、漫画目录完全没有账户记录时的显示，检查查看账户不发起授权、不写入目录。Chrome 模式模拟 `identity.getAuthToken`，并真实关闭、重开隔离浏览器，检查 session 已清空而本地账户记录保留、通过非交互 API 恢复，以及断开后不能恢复。它不验证 Google 实际 grant 或长期续期。结果与截图写入 `artifacts/source-architecture/drive/run-*/`；token 为随机模拟数据，不写入报告。
 
 旧作品管理、导入归属和通用网页图片导入脚本已删除。格式与新模型的验收统一使用 `verify_simple_reading.mjs`；历史验证记录不代表当前界面。
 

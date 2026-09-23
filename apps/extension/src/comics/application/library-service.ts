@@ -94,6 +94,15 @@ export async function removeComic(id:string) {
     if(entry.containerId)await releaseContainer(entry.containerId,entry.contentId);
   }
 }
+/** Each comic is independent: a failed removal must not stop the rest of the selection. */
+export async function removeComics(ids:readonly string[]) {
+  const removed:string[]=[],failures:{id:string;error:string}[]=[];
+  for(const id of new Set(ids)) {
+    try {await removeComic(id);removed.push(id);}
+    catch(error) {failures.push({id,error:error instanceof Error?error.message:String(error)});}
+  }
+  return {removed,failures};
+}
 export const subscribeLibrary=catalog.subscribe;
 export const markRead=catalog.markRead;
 export const completePageList=(copy:ReadingEntry)=>copy.pages.length>0&&copy.discoveryComplete&&(!copy.knownTotal||copy.knownTotal===copy.pages.length);

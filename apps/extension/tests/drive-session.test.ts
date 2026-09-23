@@ -41,7 +41,7 @@ beforeEach(() => {
       onMessage: {addListener: (value: Listener) => { listener = value; }}, sendMessage: vi.fn(async () => undefined)},
     identity: {removeCachedAuthToken: vi.fn(async () => undefined)},
     storage: {local: {
-      get: vi.fn(async (key: string) => structuredClone({[key]: local[key]})),
+      get: vi.fn(async (key: string | null) => structuredClone(key===null?local:{[key]: local[key]})),
       set: vi.fn(async (values: Reply) => { Object.assign(local, structuredClone(values)); }),
       remove: vi.fn(async (key: string) => { delete local[key]; }),
     }, session: {
@@ -63,6 +63,26 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('trusted Drive session reuse', () => {
+  it('lists explicit account choices before imports without exposing credentials or invoking OAuth',async()=>{
+    native.available.mockReturnValue(true);
+    const publicAccount={...account,emailAddress:'reader@example.test'};
+    local['nc-drive-chrome-connection:account-1']={account:{...publicAccount,accessToken:'hidden-extra'},generation:'native-generation'};
+    local.unrelated={private:'hidden-extra'};
+    seedToken({account:publicAccount,accessToken:'private-valid-token',provider:'chrome'});
+    const result=await send({type:'NC_DRIVE_ACCOUNTS'});
+    expect(result).toEqual({ok:true,accounts:[{account:publicAccount,status:'connected'}]});
+    expect(JSON.stringify(result)).not.toMatch(/private-valid-token|native-generation|hidden-extra/);
+    expect(api.account).not.toHaveBeenCalled();expect(native.token).not.toHaveBeenCalled();expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(await send({type:'NC_DRIVE_ACCOUNTS'},{...extensionSender,url:'https://untrusted.example'})).toMatchObject({ok:false,code:'invalid-bridge'});
+    await send({type:'NC_DRIVE_DISCONNECT',accountId:account.id});
+    expect(await send({type:'NC_DRIVE_ACCOUNTS'})).toEqual({ok:true,accounts:[]});
+  });
+  it('shows an expired web account as needing reconnect, ignoring pending results and malformed identities',async()=>{
+    seedToken({expiresAt:now-1});session['nc-drive-result:ignored']={account:{id:'unselected-account',displayName:'Wrong'}};
+    session['nc-drive-token:wrong']={...session[tokenKey()],account:{id:'different-account',displayName:'Wrong'}};
+    expect(await send({type:'NC_DRIVE_ACCOUNTS'})).toEqual({ok:true,accounts:[{account,status:'reauth-required'}]});
+    expect(native.token).not.toHaveBeenCalled();expect(api.account).not.toHaveBeenCalled();
+  });
   it('hands an unexpired token to one exact bridge and preserves its expiry and read generation after selection', async () => {
     const original = structuredClone(seedToken());
     const {operation, pending, sender} = await connect();

@@ -1,6 +1,6 @@
 import { catalog } from '../repositories';
 import { onSourceAccessChanged, requireSourceDriver } from '../sources/registry';
-import { connectionCapabilities, selectSourceFiles } from './source-service';
+import { getSourceAccount, selectSourceFiles } from './source-service';
 import { invalidateSourceAccess } from './source-access';
 export { invalidateSourceAccess } from './source-access';
 import { sourcePageCache } from '../../storage/source-pages';
@@ -42,24 +42,22 @@ export async function initializeSources() {
   });
 }
 export async function reconnectSource(connectionId: string) {
-  const connection = await catalog.get('connections', connectionId);
-  if (!connection) throw Error('来源连接已移除。');
+  const connection = await getSourceAccount(connectionId);
   const selection = await selectSourceFiles(connection.provider, connection);
   const result=await importSourceFiles(selection);
   if(result.failures.length)throw Error(result.failures.map(item=>item.name+'：'+item.error).join('；'));
 }
 export async function disconnectSource(connectionId: string) {
-  const connection = await catalog.get('connections', connectionId);
-  if (!connection) throw Error('来源连接已移除。');
+  const connection = await getSourceAccount(connectionId);
   const driver = requireSourceDriver(connection.provider);
   if (!driver.disconnect) throw Error('此来源不支持断开连接。');
   await driver.disconnect(connection);
   await invalidateSourceAccess({connectionId});
 }
 export async function storageOverview() {
-  const [sourcePages, ranges, translations, thumbnails, downloads, connections, device] = await Promise.all([sourcePageCache.usage(), sourceRangeCache.usage(), translationCache.usage(), thumbnailCache.usage(), downloadStore.usage(), catalog.list('connections', { limit: 1000 }), estimateStorage()]);
+  const [sourcePages, ranges, translations, thumbnails, downloads, device] = await Promise.all([sourcePageCache.usage(), sourceRangeCache.usage(), translationCache.usage(), thumbnailCache.usage(), downloadStore.usage(), estimateStorage()]);
   const containers = new Map<string, number>(); let after: string | undefined;
   do { const batch = await listContainerImports(100, after); after = batch.next; for (const container of batch.items) containers.set(container.id, container.size); } while (after);
-  return { containers: [...containers.values()].reduce((sum, size) => sum + size, 0), sourcePages, ranges, translations, thumbnails, downloads, connections: connections.map(connection => ({...connection, ...connectionCapabilities(connection)})), device };
+  return { containers: [...containers.values()].reduce((sum, size) => sum + size, 0), sourcePages, ranges, translations, thumbnails, downloads, device };
 }
 export async function clearStorage(kind: 'sourcePages' | 'ranges' | 'translations' | 'thumbnails') { await ({ sourcePages: sourcePageCache, ranges: sourceRangeCache, translations: translationCache, thumbnails: thumbnailCache })[kind].clear(); }

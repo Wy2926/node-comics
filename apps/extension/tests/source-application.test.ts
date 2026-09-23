@@ -2,12 +2,12 @@ import 'fake-indexeddb/auto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {catalog} from '../src/comics/repositories';
 import {importSourceFiles,reindexEntry} from '../src/comics/application/import-service';
-import {removeComic} from '../src/comics/application/library-service';
-import {disconnectSource,initializeSources,invalidateSourceAccess,reconnectSource,storageOverview} from '../src/comics/application/source-lifecycle';
-import {chooseSourceFiles,sourceImportOptions} from '../src/comics/application/source-service';
+import {removeComic,removeComics} from '../src/comics/application/library-service';
+import {disconnectSource,initializeSources,invalidateSourceAccess,reconnectSource} from '../src/comics/application/source-lifecycle';
+import {chooseSourceFiles,connectionCapabilities,listSourceAccounts,subscribeSourceAccounts,sourceImportOptions} from '../src/comics/application/source-service';
 import {registerSourceDriver} from '../src/comics/sources/registry';
 import {openFileSource} from '../src/comics/sources/runtime';
-import type {OpenFileSourceContext,SelectedSourceFile,SourceAccessChange,SourceSelection} from '../src/comics/sources/contracts';
+import type {OpenFileSourceContext,SelectedSourceFile,SourceAccessChange,SourceAccount,SourceSelection} from '../src/comics/sources/contracts';
 import {sourcePageCache} from '../src/storage/source-pages';
 const format=vi.hoisted(()=>({index:vi.fn(),close:vi.fn()}));
 vi.mock('../src/comics/formats',()=>({openDocument:async()=>({index:format.index,close:format.close})}));
@@ -21,7 +21,7 @@ beforeEach(()=>{
  open=vi.fn(async(context:OpenFileSourceContext)=>({snapshot:{identity:context.source.providerItemId,version:String(context.sourceSnapshot?.version),size:16,local:false},readAt:async(_o:number,length:number)=>new Uint8Array(length),validate:async()=>'unchanged' as const,close}));
  disposers=[registerSourceDriver({id:'fixture-cloud',label:'Fixture cloud',cachePages:true,cacheRanges:false,open,select,disconnect,subscribe(listener){changed=listener;return()=>{changed=undefined;};}})];
 });
-afterEach(()=>{for(const dispose of disposers)dispose();});
+afterEach(()=>{for(const dispose of disposers)dispose();vi.restoreAllMocks();});
 describe('single-source files and access lifecycle',()=>{
  it('offers registered selectable providers and rejects unconfigured or mismatched selection',async()=>{
   disposers.push(registerSourceDriver({id:'disabled',label:'Disabled',cachePages:false,cacheRanges:false,open,select,isConfigured:()=>false}));expect(sourceImportOptions()).toContainEqual({id:'fixture-cloud',label:'Fixture cloud',configured:true});await expect(chooseSourceFiles('disabled')).rejects.toThrow('尚未配置');
@@ -59,5 +59,59 @@ describe('single-source files and access lifecycle',()=>{
  it('rejects images and unregistered sources before publishing a comic',async()=>{
   const selected=selection();const bad={...selected,files:[{...selected.files[0],format:'image'}]} as unknown as SourceSelection;await expect(importSourceFiles(bad)).rejects.toThrow('不支持图片');const result=await importSourceFiles({...selected,connection:{...selected.connection,provider:'unregistered'}});expect(result.results).toEqual([]);expect(result.failures[0].error).toContain('来源未启用');expect(open).not.toHaveBeenCalled();
  });
- it('reports source capabilities from its driver registry',async()=>{const selected=selection();await importIds(selected);expect((await storageOverview()).connections.find(c=>c.id===selected.connection.id)).toMatchObject({providerLabel:'Fixture cloud',canReconnect:true,canDisconnect:true});});
+ it('reports source capabilities from its driver registry',async()=>{const selected=selection();await importIds(selected);expect((await listSourceAccounts()).accounts.find(c=>c.id===selected.connection.id)).toMatchObject({providerLabel:'Fixture cloud',canReconnect:true,canDisconnect:true});});
+ it('shows a new provider account through registration and refreshes metadata without changing source generations',async()=>{
+  const describeAccount=vi.fn((connection:SourceAccount)=>[{id:'workspace',label:'Workspace',value:connection.accountMetadata?.workspace??'Unavailable'}]);
+  disposers.push(registerSourceDriver({id:'another-cloud',label:'Another cloud',cachePages:false,cacheRanges:false,open,describeAccount}));
+  const selected={...selection(),files:[],connection:{...selection().connection,provider:'another-cloud',accountMetadata:{workspace:'Team One'}}};
+  await importSourceFiles(selected);const first=(await catalog.get('connections',selected.connection.id))!;
+  expect((await listSourceAccounts()).accounts.find(c=>c.id===first.id)).toMatchObject({providerLabel:'Another cloud',accountDetails:[{id:'workspace',label:'Workspace',value:'Team One'}],canReconnect:false,canDisconnect:false});
+  await importSourceFiles({...selected,connection:{...selected.connection,displayName:'Updated account',accountMetadata:{workspace:'Team Two'}}});
+  const updated=(await catalog.get('connections',first.id))!;
+  expect(updated).toMatchObject({displayName:'Updated account',accountMetadata:{workspace:'Team Two'},generation:first.generation});
+  expect(connectionCapabilities(updated).accountDetails[0].value).toBe('Team Two');
+  expect(connectionCapabilities({...updated,provider:'unavailable'})).toMatchObject({providerLabel:'unavailable',accountDetails:[],canReconnect:false,canDisconnect:false});
+ });
+ it('reads provider accounts before import, isolates failures, and never writes account snapshots into access records',async()=>{
+  const account:SourceAccount={...selection().connection,provider:'connected-cloud',status:'connected'};
+  const listAccounts=vi.fn(async()=>[account]),accessChanged=vi.fn();let notify:(()=>void)|undefined;
+  disposers.push(registerSourceDriver({id:'connected-cloud',label:'Connected cloud',cachePages:false,cacheRanges:false,open,listAccounts,disconnect,select,
+    subscribeAccounts(listener){notify=listener;return()=>{notify=undefined;};}}));
+  disposers.push(registerSourceDriver({id:'broken-cloud',label:'Broken cloud',cachePages:false,cacheRanges:false,open,listAccounts:async()=>{throw Error('Provider unavailable');}}));
+  vi.spyOn(sourcePageCache,'usage').mockRejectedValue(Error('Unrelated cache failure'));
+  const stop=subscribeSourceAccounts(accessChanged),result=await listSourceAccounts();
+  expect(result.accounts).toContainEqual({...account,providerLabel:'Connected cloud',accountDetails:[],canReconnect:true,canDisconnect:true});
+  expect(result.errors).toEqual([{providerLabel:'Broken cloud',error:'Provider unavailable'}]);expect(await catalog.get('connections',account.id)).toBeUndefined();
+  notify!();expect(accessChanged).toHaveBeenCalledOnce();stop();notify!();expect(accessChanged).toHaveBeenCalledOnce();
+  await disconnectSource(account.id);expect(disconnect).toHaveBeenCalledWith(expect.objectContaining({id:account.id}));
+  select.mockResolvedValue({connection:account,files:[]});await reconnectSource(account.id);
+  expect(await catalog.get('connections',account.id)).toMatchObject({id:account.id,status:'connected'});expect(await catalog.list('comics',{index:'connectionId',range:account.id})).toEqual([]);
+ });
+ it('uses fresh registered account metadata but keeps expired and disconnected access unavailable',async()=>{
+  const selected=selection();selected.connection.provider='account-cloud';
+  const listAccounts=vi.fn(async():Promise<SourceAccount[]>=>[]);
+  disposers.push(registerSourceDriver({id:'account-cloud',label:'Account cloud',cachePages:false,cacheRanges:false,open,listAccounts}));
+  await importSourceFiles({...selected,files:[]});
+  const original=(await catalog.get('connections',selected.connection.id))!;
+  expect((await listSourceAccounts()).accounts.find(item=>item.id===original.id)?.status).toBe('reauth-required');
+  listAccounts.mockResolvedValue([{...original,displayName:'Fresh account',accountMetadata:{emailAddress:'fresh@example.test'}}]);
+  expect((await listSourceAccounts()).accounts.find(item=>item.id===original.id)).toMatchObject({displayName:'Fresh account',accountMetadata:{emailAddress:'fresh@example.test'}});
+  expect(await catalog.get('connections',original.id)).toEqual(original);
+  await catalog.put('connections',{...original,status:'disconnected'});listAccounts.mockResolvedValue([]);
+  expect((await listSourceAccounts()).accounts.find(item=>item.id===original.id)?.status).toBe('disconnected');
+ });
+ it('deduplicates batch removal, keeps unselected comics, and retries a failure without blocking other removals',async()=>{
+  const selected=selection();selected.files.push(file(),file());const ids=await importIds(selected),records=await Promise.all(ids.map(record));
+  const [first,second,untouched]=records,token=await sourcePageCache.token(second.entry.id);
+  await sourcePageCache.put('batch:'+second.entry.id,new Blob(['cached']),{owner:second.entry.id,token});
+  const remove=catalog.deleteComic.bind(catalog),spy=vi.spyOn(catalog,'deleteComic');
+  spy.mockImplementationOnce(async()=>{throw Error('Storage temporarily unavailable');}).mockImplementation(remove);
+  const result=await removeComics([first.comic.id,second.comic.id,second.comic.id]);
+  expect(result).toEqual({removed:[second.comic.id],failures:[{id:first.comic.id,error:'Storage temporarily unavailable'}]});expect(spy).toHaveBeenCalledTimes(2);
+  expect(await catalog.get('comics',first.comic.id)).toBeDefined();expect(await catalog.get('comics',untouched.comic.id)).toBeDefined();
+  expect(await catalog.get('entries',second.entry.id)).toBeUndefined();expect(await sourcePageCache.get('batch:'+second.entry.id)).toBeUndefined();
+  expect(await sourcePageCache.put('late-batch',new Blob(['late']),{owner:second.entry.id,token})).toBe(false);
+  expect(await removeComics([first.comic.id,second.comic.id])).toEqual({removed:[first.comic.id,second.comic.id],failures:[]});
+  expect(await catalog.get('comics',untouched.comic.id)).toBeDefined();expect(await catalog.get('connections',selected.connection.id)).toBeDefined();
+ });
 });

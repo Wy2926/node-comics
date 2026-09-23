@@ -36,7 +36,7 @@ export function Stat({ label, value, suffix }: {
 export function SettingRow({ title, description, children }: {
   title: string;
   description: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return <div className="setting-row"><div><b>{title}</b><p>{description}</p></div>{children}</div>;
 }

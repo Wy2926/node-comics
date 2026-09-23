@@ -1,6 +1,6 @@
 import {checkDriveResponse, DriveError} from './errors';
 
-export interface DriveAccount { id: string; displayName: string; }
+export interface DriveAccount { id: string; displayName: string; emailAddress?: string; }
 export interface DriveFileReference { fileId: string; resourceKey?: string; }
 export interface DriveFileMetadata extends DriveFileReference {
   name: string; mimeType: string; size: number; version: string; modifiedTime?: string;
@@ -21,13 +21,15 @@ export function driveHeaders(token: string, reference?: DriveFileReference): Hea
   return headers;
 }
 export async function fetchDriveAccount(token: string, signal?: AbortSignal, request: DriveFetch = fetch): Promise<DriveAccount> {
-  const response = await request(`${DRIVE_API}/about?fields=user(permissionId,displayName)`, {
+  const response = await request(`${DRIVE_API}/about?fields=user(permissionId,displayName,emailAddress)`, {
     headers: driveHeaders(token), signal, cache: 'no-store', credentials: 'omit', redirect: 'error',
   });
   await checkDriveResponse(response);
   const body = await response.json();
   if (!validDriveIdentifier(body?.user?.permissionId)) throw new DriveError('invalid-response', 'Google Drive 未返回可核验的账户身份。');
-  return {id: body.user.permissionId, displayName: typeof body.user.displayName === 'string' ? body.user.displayName.slice(0,256) : 'Google Drive'};
+  const emailAddress = typeof body.user.emailAddress === 'string' ? body.user.emailAddress.trim().slice(0,320) : undefined;
+  return {id: body.user.permissionId, displayName: typeof body.user.displayName === 'string' ? body.user.displayName.slice(0,256) : 'Google Drive',
+    ...(emailAddress ? {emailAddress} : {})};
 }
 export function driveFormat(name: string, mimeType: string): 'cbz' {
   if (mimeType.startsWith('application/vnd.google-apps.')) throw new DriveError('unsupported-format', '在线文档、文件夹和快捷方式暂不支持云端直接阅读。');

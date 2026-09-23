@@ -20,7 +20,7 @@ const digest = (value:string) => new Sha256().update(new TextEncoder().encode(va
 export const stablePageId = (locator:unknown) => digest(JSON.stringify(locator));
 const titleFor = (name:string) => name.replace(/\.[^.]+$/, '') || name;
 const fileFormats = new Set(['cbz','cbr','pdf','mobi']);
-type ConnectionInput = Pick<SourceConnection,'id'|'provider'|'accountId'|'displayName'>;
+type ConnectionInput = SourceSelection['connection'];
 async function connection(input:ConnectionInput) {
   const existing=await catalog.get('connections',input.id);
   if(existing) {

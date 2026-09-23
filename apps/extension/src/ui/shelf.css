@@ -5,7 +5,16 @@
 .nc-shelf-tools>.nc-sort-label .nc-select{min-width:140px}
 .nc-shelf-window{position:relative;overflow-anchor:none;margin-bottom:32px}
 .nc-shelf-window>.nc-shelf-grid{position:absolute;top:0;left:0;right:0;margin:0}
-.nc-shelf-window .nc-book{align-self:start}
+.nc-shelf-window .nc-book{align-self:start;position:relative}
 .nc-library .nc-shelf-window .nc-library-card-actions>.button{height:48px;padding:6px 10px}
 .nc-shelf-window .nc-book[aria-busy=true] .nc-book-cover{background:var(--surface-soft)}
+.nc-card-reading-time{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);padding:5px 8px;border:1px solid #ffffff26;border-radius:6px;background:#172337dc;color:#fff;font-size:.6875rem;line-height:1.45;text-align:left;backdrop-filter:blur(8px)}
+.nc-card-reading-time>svg{flex-shrink:0}
+.nc-card-reading-time time{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.nc-card-select{position:absolute;top:12px;right:12px;z-index:2;width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer;box-shadow:0 0 0 3px var(--surface);border-radius:2px}
+.nc-book.is-managing .nc-card-reading-time{max-width:calc(100% - 56px)}
+.nc-library .nc-batch-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:14px 18px;margin-bottom:24px}
+.nc-batch-toolbar>span{font-weight:700;margin-right:auto}
+.nc-batch-toolbar>.nc-inline{flex-wrap:wrap;gap:16px}
+.nc-removal-list{padding-left:24px;overflow-wrap:anywhere}
 @media(max-width:640px){.nc-library .nc-shelf-title{gap:14px}.nc-app .nc-profile-avatar.nc-shelf-count{min-width:40px;height:40px;font-size:20px}.nc-library .nc-shelf-tools>.nc-search{flex:1 1 160px}.nc-shelf-tools>.nc-sort-label .nc-select{min-width:118px}}

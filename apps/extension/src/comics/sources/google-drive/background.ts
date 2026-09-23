@@ -129,7 +129,7 @@ export function registerDriveBackground() {
     })().catch(() => {});
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['NC_DRIVE_BRIDGE_INIT', 'NC_DRIVE_BRIDGE_RESULT', 'NC_DRIVE_CONNECT', 'NC_DRIVE_STATUS', 'NC_DRIVE_TOKEN', 'NC_DRIVE_DISCONNECT'].includes(message?.type)) return;
+    if (!['NC_DRIVE_BRIDGE_INIT', 'NC_DRIVE_BRIDGE_RESULT', 'NC_DRIVE_CONNECT', 'NC_DRIVE_STATUS', 'NC_DRIVE_TOKEN', 'NC_DRIVE_DISCONNECT', 'NC_DRIVE_ACCOUNTS'].includes(message?.type)) return;
     void (async () => {
       if (message.type === 'NC_DRIVE_BRIDGE_INIT') {
         const capturedTabEpoch = sender.tab?.id === undefined ? undefined : tabEpoch(sender.tab.id);
@@ -252,6 +252,29 @@ export function registerDriveBackground() {
         }
       }
       if (!extensionSender(sender)) throw new DriveError('invalid-bridge', '请通过插件页面连接 Google Drive。');
+      if (message.type === 'NC_DRIVE_ACCOUNTS') {
+        const epoch=authorizationEpoch;
+        await nativeWrites;
+        const [local,session]=await Promise.all([chrome.storage.local.get(null),chrome.storage.session.get(null)]);
+        if(disconnecting||replacingNative||epoch!==authorizationEpoch)throw new DriveError('reconnect-required','Google Drive 连接已变化，请重新连接。');
+        // Return a strict public projection, never token records, grants or browser profile accounts.
+        const accounts=new Map<string,{account:DriveAccount;status:'connected'|'reauth-required'}>();
+        const display=(value:DriveAccount):DriveAccount=>({id:value.id,displayName:typeof value.displayName==='string'?value.displayName.slice(0,256):'Google Drive',
+          ...(typeof value.emailAddress==='string'&&value.emailAddress?{emailAddress:value.emailAddress.slice(0,320)}:{})});
+        for(const [key,value] of Object.entries(local)) {
+          const connection=value as ChromeConnection|undefined;
+          if(!key.startsWith('nc-drive-chrome-connection:')||!validDriveIdentifier(connection?.account?.id)||key!==chromeConnectionKey(connection.account.id)||!connection.generation)continue;
+          accounts.set(connection.account.id,{account:display(connection.account),status:chromeDriveAvailable()?'connected':'reauth-required'});
+        }
+        for(const [key,value] of Object.entries(session)) {
+          const token=value as DriveToken|undefined;
+          if(!key.startsWith('nc-drive-token:')||!validDriveIdentifier(token?.account?.id)||key!==tokenKey(token.account.id)||!token.generation)continue;
+          if(token.provider==='chrome'&&!accounts.has(token.account.id))continue;
+          const connected=token.provider==='chrome'&&chromeDriveAvailable()||typeof token.accessToken==='string'&&Number.isFinite(token.expiresAt)&&token.expiresAt>Date.now();
+          accounts.set(token.account.id,{account:display(token.account),status:connected?'connected':'reauth-required'});
+        }
+        return {ok:true,accounts:[...accounts.values()]};
+      }
       if (message.type === 'NC_DRIVE_CONNECT') {
         const base = driveBridgeUrl();
         if (!base) throw new DriveError('not-configured', '尚未配置 Google Drive 授权页面。');

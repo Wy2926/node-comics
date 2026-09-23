@@ -1336,5 +1336,20 @@
   "每个文件是一本漫画，选中后自动导入。": "Each file becomes one comic and is imported automatically.",
   "打开漫画 {0}": "Open comic {0}",
   "更多操作 · {0}": "More actions · {0}",
-  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page."
+  "来源内容已变化，已回到第一页。": "Source content changed. Reading has restarted on the first page.",
+  "邮箱": "Email",
+  "账户标识": "ID tài khoản",
+  "已移除 {0} 部漫画": "Đã gỡ {0} truyện",
+  "从书架移除选中的 {0} 部漫画及其阅读记录？": "Gỡ {0} truyện đã chọn và lịch sử đọc khỏi thư viện?",
+  "选择漫画 {0}": "Chọn truyện {0}",
+  "已连接": "Đã kết nối",
+  "离线": "Ngoại tuyến",
+  "需要重新连接": "Cần kết nối lại",
+  "已断开连接": "Đã ngắt kết nối",
+  "授权已撤销": "Quyền truy cập đã bị thu hồi",
+  "正在读取本机资料…": "Đang tải dữ liệu cục bộ…",
+  "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Tải lại khi cần sau khi dọn dẹp. Truyện và vị trí đọc được giữ lại.",
+  "云盘账户": "Tài khoản đám mây",
+  "暂无云盘账户，可从「我的漫画」连接云盘。": "Chưa có tài khoản đám mây. Kết nối từ Truyện của tôi.",
+  "正在读取云盘账户…": "Đang tải tài khoản đám mây…"
 }

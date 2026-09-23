@@ -26,6 +26,14 @@ PageDescriptor 保存当前内容身份、稳定页键、ordinal、尺寸和格�
 
 Google Drive 只支持 CBZ/ZIP 的 Range 读取。Picker 过滤文件 MIME；元数据和格式入口再次拒绝图片。连接账户、resource key、版本和大小须核验；不支持的随机访问格式不能偷偷回退为整包下载。撤权和断开递增连接代次，关闭资源并阻止在途索引发布。重新选择文件才恢复明确选中的访问范围。
 
+## 账户展示注册
+
+设置中的账户通过文件来源注册契约 `FileSourceDriver.listAccounts()` 读取，`subscribeAccounts()` 通知授权状态变化，`describeAccount(account)` 返回纯文本的 `{id,label,value}` 字段列表。应用层按来源和账户身份合并授权后台与漫画目录已有的记录，UI 不读取供应商私有字段或判断供应商 ID。账户列表独立于缓存统计加载；某个来源失败时显示原因和重试入口，不把读取失败显示为“暂无云盘账户”，也不影响其他来源。
+
+`SourceAccount` 是展示快照，不携带漫画访问代次；读取账户不创建目录记录或恢复文件访问。来源选择成功时，即使没有选择文件也保存 `SourceConnection`。选择返回的 `accountMetadata` 只允许非敏感展示资料，保存在本机；重新选择或连接时刷新，资料变化不增加访问代次。Google Drive 的列表仅投影插件已核验的本地 Chrome 连接与会话账户，不返回令牌、不调用 OAuth、不探测浏览器登录账户；Chrome 授权后取消 Picker、尚未导入任何漫画时同样可以显示账户。
+
+Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮箱，并注册邮箱与账户标识字段；邮箱缺失时省略，设置页展示来源、名称与已知连接状态。网页授权到期或保存的连接已没有可用会话时提示重新连接，账户列表本身不远程验证授权。字段依据 [Google Drive User](https://developers.google.com/workspace/drive/api/reference/rest/v3/User)。新来源只需实现并注册同一账户契约；无专属字段的来源仍显示基本连接信息。
+
 ## 专用网站与页面服务
 
 导入要求适配器声明 `importable`、页面能力和明确的 reader/catalog 地址。未知网页不能导入；通用图片发现仅供原位翻译。目录验证来源、所属资源、条目与分组引用，分类只读而不固化为核心业务类型。

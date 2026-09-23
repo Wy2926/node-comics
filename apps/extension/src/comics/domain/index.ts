@@ -25,6 +25,8 @@ export interface Entry {
 }
 export interface SourceConnection {
   id: string; provider: string; accountId?: string; displayName: string;
+  /** Provider-owned display metadata only. Never store credentials or signed URLs here. */
+  accountMetadata?: Record<string, string>;
   status: 'connected' | 'offline' | 'reauth-required' | 'disconnected' | 'revoked';
   generation: number; createdAt: number; updatedAt: number;
 }

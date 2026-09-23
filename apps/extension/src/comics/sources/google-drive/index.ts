@@ -6,12 +6,25 @@ export {DriveError} from './errors';
 export {DriveRangeSource} from './range-source';
 export type {DriveAccount, DriveBinding, DriveFileMetadata} from './metadata';
 export interface DriveSelection { account: DriveAccount; files: DriveFileMetadata[]; }
+export interface DriveAccountSummary {account: DriveAccount; status: 'connected' | 'reauth-required'}
 
 async function message(input: Record<string, unknown>) {
   if (typeof chrome === 'undefined' || !chrome.runtime?.id) throw new DriveError('not-configured', '请在浏览器插件中连接 Google Drive。');
   const result = await chrome.runtime.sendMessage(input);
   if (!result?.ok) throw new DriveError((result?.code ?? 'unavailable') as DriveErrorCode, result?.error ?? 'Google Drive 连接失败。');
   return result;
+}
+/** Read verified connection choices only. Never probes the browser's signed-in Google accounts. */
+export async function listDriveAccounts(): Promise<DriveAccountSummary[]> {
+  return (await message({type:'NC_DRIVE_ACCOUNTS'})).accounts;
+}
+export function onDriveAccountsChanged(listener: () => void): () => void {
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return () => {};
+  const changed = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+    if (['local','session'].includes(area) && Object.keys(changes).some(key => key.startsWith('nc-drive-chrome-connection:') || key.startsWith('nc-drive-token:'))) listener();
+  };
+  chrome.storage.onChanged.addListener(changed);
+  return () => chrome.storage.onChanged.removeListener(changed);
 }
 export async function chooseDriveFiles(expectedAccountId?: string, signal?: AbortSignal): Promise<DriveSelection> {
   signal?.throwIfAborted();
