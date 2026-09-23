@@ -48,7 +48,9 @@ export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCata
           groupIds: [groupId],
           rawTypes,
           order,
-          related: /同人|其他系列|其它系列/.test(title),
+          // These are arbitrary source categories, not related-work markers.
+          // The URL above proves that every entry belongs to this comic.
+          related: false,
         });
       if (!entryIds.includes(entryId)) entryIds.push(entryId);
     }
@@ -77,6 +79,6 @@ export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCata
       sequenceId: !entry.related && entry.groupIds.length === 1 && entry.rawTypes.length === 1
         ? entry.groupIds[0] + ':' + entry.rawTypes[0] : undefined,
     })),
-    defaultEntryId: groups.find(group => /^(默认|默認)$/.test(group.title))?.entryIds.find(id => !entries.get(id)?.related),
+    defaultEntryId: groups.find(group => group.id === 'default')?.entryIds[0],
   };
 }

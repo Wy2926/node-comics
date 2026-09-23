@@ -9,8 +9,8 @@ import {Modal} from './components';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
 import './shelf.css';
-type Props={library:LibraryViewModel;onOpen:(comicId:string)=>void;onDirectory:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({library,onOpen,onDirectory,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+type Props={library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
@@ -22,8 +22,8 @@ export function Library({library,onOpen,onDirectory,onImport,onSource,sourceActi
  const toggle=(id:string)=>setSelected(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;});
  const actions=(comic:Comic)=>[
   {label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
-  ...(comic.sourceUrl?[{label:msg('目录'),onSelect:()=>onDirectory(comic.id)},{label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
-  {label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(async id=>{if(!id){onDirectory(comic.id);return;}onExport(id);}).catch(e=>notify(e.message))},
+  ...(comic.sourceUrl?[{label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
+  {label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
  ];
  async function confirmRemoval(){

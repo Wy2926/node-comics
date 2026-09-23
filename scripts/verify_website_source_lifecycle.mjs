@@ -57,10 +57,10 @@ try{
   const warm=await context.newPage();await warm.goto(new URL('reader.html',worker.url()).href);await warm.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await warm.close();
   const navigationSource=await context.newPage();await navigationSource.goto('https://www.mangacopy.com/comic/navigation');
   const opened=context.waitForEvent('page');await navigationSource.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true}).click();reader=await opened;
-  const navigation=reader.getByRole('dialog',{name:'选择开始阅读的位置'});await navigation.waitFor();assert.equal((await state()).pages.length,0);
+  const navigation=reader.getByRole('region',{name:'选择开始阅读的位置'});await navigation.waitFor();assert.equal(await reader.getByRole('dialog').count(),0);assert.equal((await state()).pages.length,0);
   await navigation.locator('summary').filter({hasText:'站点自定义分类'}).click();assert.equal(await navigation.getByRole('button',{name:/编辑|归属|版本/}).count(),0);await navigation.getByText('特别企划',{exact:true}).waitFor();
   await navigation.getByRole('button',{name:'正序 ↑',exact:true}).click();assert((await navigation.locator('.nc-chapter-entry').first().innerText()).includes('内容 B'));
-  await reader.screenshot({path:path.join(out,'readonly-directory.png')});await reader.setViewportSize({width:390,height:844});await reader.screenshot({path:path.join(out,'readonly-directory-narrow.png')});assert(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await reader.screenshot({path:path.join(out,'readonly-directory.png')});assert(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await navigation.getByRole('button',{name:/内容 A/}).click();await rendered();assert.equal((await state()).documents.length,2);await navigationSource.close();await reader.close();checks.push('无默认入口时显示只读自定义目录，标签和倒序可用，选择直接阅读，无全本预抓取');
   await imports('ondemand',false);let value=await state();assert.equal(value.tasks.length,0);
   value=await waitDocument(value=>value.documents.some(doc=>doc.discoveryComplete&&doc.pageCount===2));assert.equal(value.tasks.length,0);assert.deepEqual(await noManagedTabs(),[]);

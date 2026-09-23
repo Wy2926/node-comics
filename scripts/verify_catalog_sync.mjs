@@ -27,15 +27,18 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 p=pathlib.Path(sys.argv[1]); key=rsa.generate_private_key(public_exponent=65537,key_size=2048); name=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'www.mangacopy.com')]); now=datetime.datetime.now(datetime.timezone.utc)
 cert=x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(days=1)).not_valid_after(now+datetime.timedelta(days=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName('www.mangacopy.com')]),False).sign(key,hashes.SHA256())
 (p/'fixture-key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())); (p/'fixture-cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))`,profile]);
-const counts={first:2,second:2},failures=new Set(),catalogRequests=[];
-const title=slug=>slug==='first'?'星光书店 · 自动更新':'云端列车 · 自动更新';
+const counts={first:2,second:2,choose:2},failures=new Set(),catalogRequests=[];
+const title=slug=>slug==='first'?'星光书店 · 自动更新':slug==='second'?'云端列车 · 自动更新':'自定义目录 · 无默认入口';
 const chapterId=n=>chapter.slice(0,-1)+n;
 const html=url=>{
  const slug=url.pathname.split('/')[2];
  if(url.pathname.includes('/chapter/'))return `<title>${title(slug)} 第1话</title><span class="comicCount">2</span><ul class="comicContent-list"><li><img data-src="${origin}/${slug}/1.png"></li><li><img data-src="${origin}/${slug}/2.png"></li></ul>`;
  catalogRequests.push(slug);if(failures.has(slug))return '<title>暂不可用</title><div class="upLoop"><p class="wargin">目录尚未载入</p></div>';
- const links=Array.from({length:counts[slug]},(_,n)=>`<a href="/comic/${slug}/chapter/${chapterId(n)}">第${n+1}话</a>`).join('');
- return `<title>${title(slug)}</title><div class="comicParticulars-title-right"><h6>${title(slug)}</h6></div><div class="upLoop"><h4>默认</h4><div class="table-default"><div class="tab-pane" id="default全部">${links}</div><div class="tab-pane" id="default话">${links}</div></div></div>`;
+ const links=Array.from({length:counts[slug]},(_,n)=>`<a href="/comic/${slug}/chapter/${chapterId(n)}">第${n+1}话</a>`);
+ const group=(id,label,items,type='话')=>`<span>${label}</span><div class="table-default"><div class="tab-pane" id="${id}全部">${items}</div><div class="tab-pane" id="${id}${type}">${items}</div></div>`;
+ const categories=[['default','默認'],['custom_translation','其它汉化版'],['arbitrary_fanwork','同人漫画'],['another_series','其他系列'],['new_category_2026','新分类 · 彩色短篇']];
+ const directory=slug==='first'?group('default','默认',links.join('')):links.map((link,n)=>group(slug==='choose'?'choice_'+n:categories[n][0],slug==='choose'?'自由分类 '+(n+1):categories[n][1],link,n===4?'彩色短篇':'话')).join('');
+ return `<title>${title(slug)}</title><div class="comicParticulars-title-right"><h6>${title(slug)}</h6></div><div class="upLoop">${directory}</div>`;
 };
 const site=createHttpsServer({key:await readFile(path.join(profile,'fixture-key.pem')),cert:await readFile(path.join(profile,'fixture-cert.pem'))},(request,response)=>{response.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});response.end(html(new URL(request.url,'https://www.mangacopy.com')));});
 await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
@@ -66,7 +69,7 @@ async function openReader(){reader=await context.newPage();await reader.goto(rea
 async function importComic(slug){
  console.log('Import '+slug);
  const source=await context.newPage();await source.goto('https://www.mangacopy.com/comic/'+slug);
- const created=context.waitForEvent('page',{predicate:async page=>{try{await page.waitForURL(/reader\.html\?catalog=/,{timeout:10000});return true;}catch{return false;}}});await source.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true}).click();reader=await created;await rendered();await source.close();
+ const created=context.waitForEvent('page',{predicate:async page=>{try{await page.waitForURL(/reader\.html\?catalog=/,{timeout:10000});return true;}catch{return false;}}});await source.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true}).click();reader=await created;if(slug==='choose')await reader.getByRole('region',{name:'选择开始阅读的位置'}).waitFor();else await rendered();await source.close();
 }
 try{
  console.log('Importing two adapted comics in an isolated profile');
@@ -85,11 +88,12 @@ try{
  const placement=await card('first').evaluate(element=>{const badge=element.querySelector('.nc-card-update').getBoundingClientRect(),cover=element.querySelector('.nc-book-cover').getBoundingClientRect(),time=element.querySelector('.nc-card-reading-time').getBoundingClientRect(),source=element.querySelector('.nc-card-source').getBoundingClientRect();return badge.top<cover.top&&badge.right>cover.right&&source.top<cover.top+20&&source.left<cover.left+20&&time.bottom>cover.bottom-20&&time.left<cover.left+20&&getComputedStyle(element).overflow==='visible';});assert(placement);assert.equal(await reader.locator('.nc-cover-reading').count(),0);
  await reader.screenshot({path:path.join(out,'updated-covers.png')});checks.push('到达12小时间隔后检查全部支持漫画，新增内容显示封面提示，仅同步目录且保留第2页位置');
  console.log('Verified cover badges and automatic updates for both comics');
- await card('first').getByRole('button',{name:'更多操作 · '+title('first'),exact:true}).click();await reader.getByRole('menuitem',{name:'目录',exact:true}).click();
- const directory=reader.getByRole('dialog',{name:'选择开始阅读的位置'});await directory.locator('summary').click();await directory.getByText('第3话',{exact:true}).waitFor();
- await reader.screenshot({path:path.join(out,'synced-directory.png')});await directory.getByRole('button',{name:'关闭弹窗',exact:true}).click();
- assert.equal(await card('first').locator('.nc-card-update').count(),1);checks.push('查看目录可见新增条目，查看目录不清除更新提示');
- await card('first').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(1);await shelf();await card('first').locator('.nc-card-update').waitFor({state:'detached'});
+ await card('first').click({button:'right'});assert.equal(await reader.getByRole('menuitem',{name:'目录',exact:true}).count(),0);await reader.screenshot({path:path.join(out,'card-context-menu.png')});await reader.keyboard.press('Escape');
+ await card('first').getByRole('button',{name:'更多操作 · '+title('first'),exact:true}).click();assert.equal(await reader.getByRole('menuitem',{name:'目录',exact:true}).count(),0);await reader.keyboard.press('Escape');
+ assert.equal(await reader.getByRole('dialog').count(),0);assert.equal(await card('first').locator('.nc-card-update').count(),1);checks.push('卡片右键及更多菜单均无目录项，不弹出目录弹框');
+ await card('first').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(1);
+ await reader.getByRole('button',{name:'打开目录',exact:true}).click();await reader.getByText('第3话',{exact:true}).waitFor();await reader.screenshot({path:path.join(out,'synced-directory.png')});await reader.getByRole('button',{name:'关闭面板',exact:true}).click();
+ await shelf();await card('first').locator('.nc-card-update').waitFor({state:'detached'});
  assert.equal(await card('second').locator('.nc-card-update').count(),1);checks.push('成功续读恢复第2页后清除该漫画提示，其余漫画提示保留');
  failures.add('first');counts.first=4;counts.second=4;await makeDue();await reader.reload();
  await waitFor(value=>{const sync=value.comics.find(comic=>comic.id===first.id).catalogSync;return value.entries.filter(entry=>entry.comicId!==first.id).length===4&&!sync.lease&&sync.nextCheckAt>Date.now()+719*60_000&&sync.nextCheckAt<Date.now()+721*60_000;});
@@ -111,13 +115,23 @@ try{
  assert.equal(await reader.getByRole('spinbutton',{name:'跳转页码'}).inputValue(),'2');
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();await reader.getByText('第6话',{exact:true}).waitFor();await reader.screenshot({path:path.join(out,'live-directory-preserves-position.png')});
  await reader.getByRole('button',{name:'关闭面板',exact:true}).click();await shelf();await card('first').locator('.nc-card-update').waitFor();checks.push('阅读中同步新增目录立即可见，停留在第2页，新到达提示不会被旧阅读确认清除');
- await card('second').getByRole('button',{name:'更多操作 · '+title('second'),exact:true}).click();await reader.getByRole('menuitem',{name:'目录',exact:true}).click();
- const unreadDirectory=reader.getByRole('dialog',{name:'选择开始阅读的位置'});await unreadDirectory.locator('summary').click();imagesOffline=true;
- await unreadDirectory.getByRole('button',{name:/第4话/}).click();await reader.getByText('图片暂不可用',{exact:true}).first().waitFor();await reader.screenshot({path:path.join(out,'failed-reading.png')});
+ await card('second').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered();
+ await reader.getByRole('button',{name:'打开目录',exact:true}).click();
+ const readerDirectory=reader.getByRole('complementary',{name:'漫画目录'});
+ const fanEntry=(await state()).entries.find(entry=>entry.comicId!==first.id&&entry.title==='第3话');
+ await readerDirectory.locator('summary').filter({hasText:'同人漫画'}).click();await readerDirectory.getByRole('button',{name:/第3话/}).click();await reader.locator(`[data-copy-id="${fanEntry.id}"]`).waitFor();await rendered();
+ await reader.getByRole('button',{name:'打开目录',exact:true}).click();await readerDirectory.getByRole('button',{name:/第3话/}).waitFor();await reader.screenshot({path:path.join(out,'dynamic-categories.png')});
+ counts.second=5;await makeDue();await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}));await waitFor(value=>value.entries.filter(entry=>entry.comicId!==first.id).length===5);
+ await readerDirectory.locator('summary').filter({hasText:'新分类 · 彩色短篇'}).waitFor();checks.push('任意分类ID和名称原样显示，同人漫画可点击阅读，新增自定义分类自动同步');
+ await readerDirectory.locator('summary').filter({hasText:'其他系列'}).click();imagesOffline=true;
+ await readerDirectory.getByRole('button',{name:/第4话/}).click();await reader.getByText('图片暂不可用',{exact:true}).first().waitFor();await reader.screenshot({path:path.join(out,'failed-reading.png')});
  await shelf();await card('second').locator('.nc-card-update').waitFor();imagesOffline=false;checks.push('新条目图片读取失败时保留更新提示');
  await reader.getByRole('button',{name:'批量管理',exact:true}).click();
  const selection=reader.getByRole('checkbox',{name:'选择漫画 '+title('second'),exact:true});await selection.check();assert(await selection.isChecked());
  await reader.screenshot({path:path.join(out,'badge-selection.png')});await reader.getByRole('button',{name:'完成管理',exact:true}).click();checks.push('伸出封面的SVG徽章不遮挡批量选择，来源左上、阅读时间左下，无页数标签');
+ await reader.close();await importComic('choose');assert.equal(await reader.getByRole('dialog').count(),0);
+ const start=reader.getByRole('region',{name:'选择开始阅读的位置'});await start.locator('summary').first().click();await reader.screenshot({path:path.join(out,'choose-reading-start.png')});await start.getByRole('button',{name:/第1话/}).click();await rendered();await shelf();
+ checks.push('无可靠默认入口时在页面内选择开始位置，选择后正常阅读，无目录弹框');
  assert.deepEqual(errors,[]);await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,browser:context.browser()?.version(),liveSites:false,catalogRequests,extensionImageReads},null,2));console.log(JSON.stringify({checks,errors},null,2));
 }catch(error){if(reader&&!reader.isClosed()){await reader.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.txt'),await reader.locator('body').innerText());}await writeFile(path.join(out,'failure.json'),JSON.stringify({error:String(error),errors,state:await state().catch(String),catalogRequests},null,2));throw error;}
 finally{await context.close();await Promise.all([new Promise(resolve=>site.close(resolve)),new Promise(resolve=>images.close(resolve))]);}

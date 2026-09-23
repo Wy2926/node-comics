@@ -1,6 +1,8 @@
-.nc-comic-directory-heading{padding:18px 20px 14px;flex-shrink:0;background:linear-gradient(120deg,var(--surface),var(--accent-soft))}
+.nc-comic-directory-heading{display:flex;align-items:center;gap:12px;padding:18px 20px 14px;flex-shrink:0;background:linear-gradient(120deg,var(--surface),var(--accent-soft))}
+.nc-reading-start{max-width:900px;margin:0 auto;display:flex;flex-direction:column;height:calc(100dvh - 160px);min-height:420px}
 .nc-comic-directory-heading .nc-eyebrow{font-size:.65rem;margin:0 0 6px}
-.nc-comic-directory-heading h3{font-size:1.1rem;line-height:1.5;margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nc-comic-directory-heading h3{flex:1;min-width:0;font-size:1.1rem;line-height:1.5;margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nc-directory-source{flex-shrink:0;white-space:nowrap;font-size:.76rem}
 .nc-comic-directory-heading p{font-size:.8rem;color:var(--muted);margin:6px 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nc-comic-directory-heading>div{display:flex;justify-content:space-between;gap:12px;font-size:.78rem;color:var(--muted)}
 .nc-directory-tabs{display:flex;padding:0 18px;gap:20px;border-bottom:1px solid var(--line);flex-shrink:0}
