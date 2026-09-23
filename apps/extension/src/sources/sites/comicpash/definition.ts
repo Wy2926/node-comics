@@ -2,7 +2,7 @@ import type { SourceDefinition } from '../../contracts/definition';
 export const definition: SourceDefinition = {
   id: 'comicpash',
   name: 'Comic PASH!',
-  capabilities: { pages: true, inline: true, catalog: false, completePageList: false },
+  capabilities: { importable: true, pages: true, inline: true, catalog: false, completePageList: false },
   installation: { requiredOrigins: [], autoContentMatches: [] },
   identify(url) {
     return ['comicpash.jp', 'www.comicpash.jp'].includes(url.hostname) &&

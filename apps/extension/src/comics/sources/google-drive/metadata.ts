@@ -4,7 +4,7 @@ export interface DriveAccount { id: string; displayName: string; }
 export interface DriveFileReference { fileId: string; resourceKey?: string; }
 export interface DriveFileMetadata extends DriveFileReference {
   name: string; mimeType: string; size: number; version: string; modifiedTime?: string;
-  format: 'cbz' | 'image';
+  format: 'cbz';
 }
 export interface DriveBinding extends DriveFileReference { accountId: string; version: string; size: number; }
 export type DriveFetch = typeof fetch;
@@ -29,11 +29,10 @@ export async function fetchDriveAccount(token: string, signal?: AbortSignal, req
   if (!validDriveIdentifier(body?.user?.permissionId)) throw new DriveError('invalid-response', 'Google Drive 未返回可核验的账户身份。');
   return {id: body.user.permissionId, displayName: typeof body.user.displayName === 'string' ? body.user.displayName.slice(0,256) : 'Google Drive'};
 }
-export function driveFormat(name: string, mimeType: string): 'cbz' | 'image' {
+export function driveFormat(name: string, mimeType: string): 'cbz' {
   if (mimeType.startsWith('application/vnd.google-apps.')) throw new DriveError('unsupported-format', '在线文档、文件夹和快捷方式暂不支持云端直接阅读。');
-  if (/\.(zip|cbz)$/i.test(name)) return 'cbz';
-  if (/\.(png|jpe?g|webp|gif|avif)$/i.test(name) && mimeType.startsWith('image/')) return 'image';
-  throw new DriveError('unsupported-format', 'Google Drive 首轮仅开放 CBZ/ZIP 和独立图片；PDF、MOBI、RAR 请下载后从本地导入。');
+  if (!mimeType.toLowerCase().startsWith('image/') && /\.(zip|cbz)$/i.test(name)) return 'cbz';
+  throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP 漫画文件，不支持图片；PDF、MOBI、RAR 请下载后从本地导入。');
 }
 export async function fetchDriveMetadata(reference: DriveFileReference, token: string, signal?: AbortSignal, request: DriveFetch = fetch): Promise<DriveFileMetadata> {
   const headers = driveHeaders(token, reference);

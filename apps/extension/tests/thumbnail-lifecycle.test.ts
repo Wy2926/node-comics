@@ -12,13 +12,13 @@ beforeEach(async () => {
   vi.stubGlobal('OffscreenCanvas', class { getContext() { return { drawImage() {} }; } convertToBlob() { return mocks.encode(); } });
 });
 afterEach(() => vi.unstubAllGlobals());
-const reference = () => { const documentId = crypto.randomUUID(); return { documentId, key: pageReference({ documentId, revisionId: 'revision', pageId: 'page', renderProfileId: RENDER_PROFILE }) }; };
+const reference = () => { const entryId = crypto.randomUUID(); return { entryId, key: pageReference({ entryId, contentId: 'revision', pageId: 'page', renderProfileId: RENDER_PROFILE }) }; };
 describe('thumbnail lifecycle fences', () => {
   it.each(['clear', 'delete'] as const)('returns decoded bytes without restoring the cache after %s', async action => {
     const ref = reference(), ready = Promise.withResolvers<void>(), encoded = Promise.withResolvers<Blob>();
     mocks.encode.mockImplementationOnce(() => { ready.resolve(); return encoded.promise; });
     const loading = readThumbnail(ref.key); await ready.promise;
-    if (action === 'clear') await thumbnailCache.clear(); else await thumbnailCache.deleteOwner(ref.documentId, true);
+    if (action === 'clear') await thumbnailCache.clear(); else await thumbnailCache.deleteOwner(ref.entryId, true);
     encoded.resolve(new Blob(['late-thumbnail'])); expect(await (await loading).text()).toBe('late-thumbnail');
     expect(await thumbnailCache.get(ref.key)).toBeUndefined(); expect(mocks.close).toHaveBeenCalledOnce(); expect(mocks.release).toHaveBeenCalledOnce();
   });

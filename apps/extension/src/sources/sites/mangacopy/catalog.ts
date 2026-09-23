@@ -1,17 +1,6 @@
 import { msg } from '../../../i18n/runtime';
-import type { SourceCatalogSnapshot, SourceEntry, SourceKind } from '../../contracts/source';
+import type { SourceCatalogSnapshot, SourceEntry } from '../../contracts/source';
 import { mangaCopyLocation } from './definition';
-export function classify(types: string[], related: boolean): SourceKind {
-  return related
-    ? 'unclassified'
-    : types.includes('卷')
-      ? 'publication'
-      : types.includes('番外')
-        ? 'extra'
-        : types.some((t) => t === '話' || t === '话')
-          ? 'chapter'
-          : 'unclassified';
-}
 export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCatalogSnapshot {
   const location = mangaCopyLocation(url);
   if (!location || location.chapterId) throw Error(msg('请从 MangaCopy 漫画详情页导入作品。'));
@@ -84,7 +73,10 @@ export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCata
     groups: groups.filter((group) => group.id && group.title),
     entries: [...entries.values()].map((entry) => ({
       ...entry,
-      suggestedKind: classify(entry.rawTypes, entry.related),
+      // Never concatenate different editions/groups, collected volumes and serial chapters.
+      sequenceId: !entry.related && entry.groupIds.length === 1 && entry.rawTypes.length === 1
+        ? entry.groupIds[0] + ':' + entry.rawTypes[0] : undefined,
     })),
+    defaultEntryId: groups.find(group => /^(默认|默認)$/.test(group.title))?.entryIds.find(id => !entries.get(id)?.related),
   };
 }

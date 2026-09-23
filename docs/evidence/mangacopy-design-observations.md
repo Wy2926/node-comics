@@ -2,7 +2,7 @@
 
 本文记录实现前的历史观察。后续已经完成代码改造、全话／全卷／番外采集和恢复验证，当前证据见[实现记录](../COMIC_LIBRARY_IMPLEMENTATION.md)；下文“当时未验证”不代表现在仍未实现。
 
-检查日期：2026-09-14，Asia/Shanghai。用途：为[MangaCopy来源适配](../MANGACOPY_LIBRARY_DESIGN.md)提供可复查的来源事实，不作为行业类定义或插件功能验收。通用对象及行业依据见[漫画作品管理设计](../COMIC_LIBRARY_DESIGN.md)；本文中的“分组、话、卷、番外”均按当时源站UI描述，不能直接作为核心分类。
+检查日期：2026-09-14，Asia/Shanghai。用途：为[MangaCopy来源适配](../SIMPLE_COMIC_READING_DESIGN.md)提供可复查的来源事实，不作为行业类定义或插件功能验收。通用对象及行业依据见[漫画作品管理设计](../SIMPLE_COMIC_READING_DESIGN.md)；本文中的“分组、话、卷、番外”均按当时源站UI描述，不能直接作为核心分类。
 
 ## 方法和边界
 

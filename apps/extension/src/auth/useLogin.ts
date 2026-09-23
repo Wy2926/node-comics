@@ -29,8 +29,8 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
     if(callbackStarted.current||!isOidcCallback())return;
     callbackStarted.current=true;pending.current=true;setOpen(true);
     setState({kind:'pending',message:msg("正在确认登录结果")});
-    const copyId=sessionStorage.getItem('nc-login-copy');
-    if(copyId)restoreCopy(copyId);
+    const entryId=sessionStorage.getItem('nc-login-copy');
+    if(entryId)restoreCopy(entryId);
     sessionStorage.removeItem('nc-login-copy');
     void finishOidc().then(async value=>{
       if(!value)throw Error(msg("未收到登录结果，请重新登录。"));

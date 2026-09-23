@@ -8,7 +8,6 @@ export interface DriveRangeOptions {
   maxRequestBytes?: number;
   maxNetworkBytes?: number;
   timeoutMs?: number;
-  allowWholeFile200?: boolean;
   onAccessLost?: (binding: DriveBinding) => Promise<void>;
 }
 
@@ -34,7 +33,7 @@ export class DriveRangeSource implements RandomAccessSource {
     const result = await fetchDriveMetadata(this.binding, await this.options.token(), signal, this.request);
     if (result.version !== this.binding.version || result.size !== this.binding.size) {
       this.changed = true; this.controller.abort();
-      throw new DriveError('source-changed', 'Google Drive 文件已变化，请建立新版本后继续阅读。');
+      throw new DriveError('source-changed', 'Google Drive 文件已变化，请重新选择此文件载入当前内容。');
     }
     return result;
   }
@@ -92,8 +91,7 @@ export class DriveRangeSource implements RandomAccessSource {
         headers, signal: combined, cache: 'no-store', credentials: 'omit', redirect: 'error',
       });
       await checkDriveResponse(response);
-      const whole = offset === 0 && length === this.snapshot.size && this.options.allowWholeFile200 === true;
-      if (response.status !== 206 && !(response.status === 200 && whole)) {
+      if (response.status !== 206) {
         await response.body?.cancel();
         throw new DriveError('range-unsupported', '云盘没有按范围返回文件，已停止读取；请从本地导入。');
       }

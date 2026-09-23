@@ -1,3 +1,4 @@
+import {comicFile} from './comic-fixture';
 /** Isolated, synthetic identity provider and product API; no external traffic. */
 import {createRoot} from 'react-dom/client';
 import {useEffect,useState} from 'react';
@@ -7,8 +8,8 @@ import {API_BASE,API_ORIGIN} from '../src/service';
 import {sessionAuthorization} from '../src/auth/session';
 import {authKey,readAuth,saveSession,subscribeAuth} from '../src/auth/storage';
 import {tokenLifetime,type Session} from '../src/auth/model';
-import {listLibrary} from '../src/comics/application/library-service';
-import {importImageAlbum} from '../src/comics/application/import-service';
+import {listShelfIndex} from '../src/comics/application/library-service';
+import {importLocalFile} from '../src/comics/application/import-service';
 import {registerSourceDriver} from '../src/comics/sources/registry';
 import {localSourceDriver} from '../src/comics/sources/local/driver';
 registerSourceDriver(localSourceDriver);
@@ -19,12 +20,12 @@ import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5187')throw Error('Use isolated http://127.0.0.1:5187.');
-const existing=await listLibrary(0,1000),saved=(await readAuth()).session;
-if(existing.works.some(work=>work.title!=='会话过期时继续阅读')||saved&&!saved.user.id.startsWith('fixture-'))throw Error('This origin contains non-fixture data.');
+const existing=await listShelfIndex(),saved=(await readAuth()).session;
+if(existing.comics.some(work=>work.title!=='会话过期时继续阅读')||saved&&!saved.user.id.startsWith('fixture-'))throw Error('This origin contains non-fixture data.');
 const nativeFetch=window.fetch.bind(window),endpoint='https://fixture-identity.invalid/token';
 const image=await(await nativeFetch('/samples/starlight-bookshop.png')).blob();
-if(!existing.works.length){
-  await importImageAlbum(Array.from({length:3},(_,index)=>new File([image],`验收第 ${index+1} 页.png`,{type:'image/png'})),{title:'会话过期时继续阅读',kind:'book'});
+if(!existing.comics.length){
+  await importLocalFile(await comicFile('会话过期时继续阅读',[image,image,image]));
 }
 const makeSession=(name='账户 A'):Session=>({id:'auth-fixture-'+crypto.randomUUID(),token:'fixture-access',...tokenLifetime(3600),user:{id:'fixture-'+name,name,role:'reader'},apiOrigin:API_ORIGIN,credential:{kind:'oidc',refreshToken:'fixture-refresh',tokenEndpoint:endpoint,clientId:'fixture-client',resource:API_ORIGIN}});
 const loginFixture=new URLSearchParams(location.search).get('login');

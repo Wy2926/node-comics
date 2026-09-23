@@ -20,7 +20,6 @@ export interface PageManifest {
   knownTotal?: number;
   note: string;
   items: SourceItem[];
-  selectionConfirmed?: boolean;
 }
 export type ImageResource = { kind: 'http'; url: string } | { kind: 'page'; resourceKey: string };
 export interface DiscoveredPage {
@@ -32,7 +31,6 @@ export interface DiscoveredPage {
 }
 export type PageSnapshot = Omit<PageManifest, 'id' | 'sourceTabId' | 'navigationId' | 'revision'>;
 export type SourceSnapshot = Omit<PageSnapshot, 'items'> & { items: DiscoveredPage[] };
-export type SourceKind = 'chapter' | 'extra' | 'publication' | 'work' | 'unclassified';
 export interface SourceEntry {
   id: string;
   catalogId: string;
@@ -43,13 +41,15 @@ export interface SourceEntry {
   rawTypes: string[];
   order: number;
   related: boolean;
-  suggestedKind?: SourceKind;
+  /** Only the adapter defines a safe continuous reading sequence. */
+  sequenceId?: string;
 }
 export interface SourceGroup {
   id: string;
   title: string;
   entryIds: string[];
   complete: boolean;
+  parentId?: string;
 }
 export interface SourceCatalogSnapshot {
   id: string;
@@ -61,4 +61,5 @@ export interface SourceCatalogSnapshot {
   note: string;
   groups: SourceGroup[];
   entries: SourceEntry[];
+  defaultEntryId?: string;
 }

@@ -10,7 +10,6 @@ export function registerLocaleBackground(){
     await setUiLanguage(validUiLanguage(language)?language:'auto');
     await Promise.allSettled([
       chrome.contextMenus.update('nc-translate-page',{title:msg('翻译当前页面')}),
-      chrome.contextMenus.update('nc-read-image',{title:msg('在 NodeLane Comics 中阅读 / 翻译')}),
     ]);
   };
   let ready=chrome.storage.local.get(settingsKey).then(data=>apply(data[settingsKey]));

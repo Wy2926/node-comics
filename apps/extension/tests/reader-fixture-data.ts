@@ -1,17 +1,18 @@
+import {comicFile} from './comic-fixture';
 import {catalog} from '../src/comics/repositories';
-import {importImageAlbum} from '../src/comics/application/import-service';
-import {loadDocument} from '../src/comics/application/library-service';
+import {importLocalFile} from '../src/comics/application/import-service';
+import {loadEntry} from '../src/comics/application/library-service';
 import {acquirePage} from '../src/comics/pages/service';
 import {RENDER_PROFILE} from '../src/comics/pages/identity';
-import type {Job,ReadingCopy} from '../src/types';
+import type {Job,ReadingEntry} from '../src/types';
 import {registerSourceDriver} from '../src/comics/sources/registry';
 import {localSourceDriver} from '../src/comics/sources/local/driver';
 registerSourceDriver(localSourceDriver);
 
 /** Synthetic image bytes go through the actual container/index/PageService pipeline. */
-export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job):Promise<{copies:ReadingCopy[];ordinals:Record<string,number>}> {
+export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job):Promise<{copies:ReadingEntry[];ordinals:Record<string,number>}> {
   const marker='reader-fixture-source-v1';
-  if(await catalog.count('works')&&!await catalog.get('metadata',marker))throw Error('This origin contains non-fixture data. Use a new browser profile.');
+  if(await catalog.count('comics')&&!await catalog.get('metadata',marker))throw Error('This origin contains non-fixture data. Use a new browser profile.');
   await catalog.put('metadata',{id:marker,synthetic:true});
   const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'};
   const titles=scenario?['自动翻译 · '+scenario]:['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'];
@@ -20,7 +21,7 @@ export async function seedReaderFixture(origin:string,scenario:string|null,makeJ
   for(const [bookIndex,title] of titles.entries()) {
     const id=marker+':'+(scenario??'default')+':'+bookIndex;
     const saved=existing.find(value=>value.id===id);
-    if(typeof saved?.documentId==='string'){ids.push(saved.documentId);continue;}
+    if(typeof saved?.entryId==='string'){ids.push(saved.entryId);continue;}
     const count=scenario?(['retry','connection'].includes(scenario)?1:30):bookIndex===0?120:9;
     const files:File[]=[];
     for(let index=0;index<count;index++) {
@@ -33,23 +34,23 @@ export async function seedReaderFixture(origin:string,scenario:string|null,makeJ
       const blob=await canvas.convertToBlob({type:'image/png'});
       files.push(new File([blob],`${title} ${String(index+1).padStart(3,'0')}.png`,{type:'image/png'}));
     }
-    const result=await importImageAlbum(files,{title,kind:'chapter'});
-    await catalog.patch('documents',result.id,{title});
-    const doc=await catalog.get('documents',result.id);
+    const result=await importLocalFile(await comicFile(title,files));
+    await catalog.patch('entries',result.id,{title});
+    const doc=await catalog.get('entries',result.id);
     if(!doc)throw Error('Fixture document registration failed.');
     const states:Job['status'][]=scenario==='retry'?['failed']:scenario?[]:['queued','running','failed','succeeded','no_text','outcome_unknown'];
-    const pages=await catalog.listPages(doc.revisionId,{limit:states.length});
+    const pages=await catalog.listPages(doc.contentId,{limit:states.length});
     for(const [index,page] of pages.entries()) {
-      const lease=await acquirePage({documentId:doc.id,revisionId:doc.revisionId,pageId:page.pageId,renderProfileId:RENDER_PROFILE});
+      const lease=await acquirePage({entryId:doc.id,contentId:doc.contentId,pageId:page.pageId,renderProfileId:RENDER_PROFILE});
       try {
         const seed=makeJob(index,states[index]);
         const job={...seed,id:bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,image_sha256:lease.identity.imageSha256};
         await catalog.put('translationBindings',{id:JSON.stringify([origin,account.userId,lease.identity.imageSha256]),apiOrigin:origin,userId:account.userId,imageSha256:lease.identity.imageSha256,updatedAt:Date.now(),payload:{ownerId:account.userId,apiOrigin:origin,assetId:job.input_asset_id,jobs:[job]}});
       } finally {lease.release();}
     }
-    await catalog.put('metadata',{id,documentId:doc.id});ids.push(doc.id);
+    await catalog.put('metadata',{id,entryId:doc.id});ids.push(doc.id);
   }
-  const copies=await Promise.all(ids.map(id=>loadDocument(id,account)));
+  const copies=await Promise.all(ids.map(id=>loadEntry(id,account)));
   const ordinals:Record<string,number>={};for(const copy of copies)copy.pages.forEach((page,index)=>{ordinals[page.id]=index;});
   return {copies,ordinals};
 }

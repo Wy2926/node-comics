@@ -98,7 +98,7 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
       await ctx.originals.remember(page.blobKey!,blob,async()=>(await readInlineSource(ctx,request,image,sender)).blob);assertCurrent(ctx.api.isCurrent);ctx.pages.set(key,page);
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
-    ctx.sourceErrors.delete(key);targets.push({copyId:'inline',page,mode:ctx.settings.translationMode});
+    ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:ctx.settings.translationMode});
    }catch(error){ctx.sourceErrors.set(pageKey(request,image),(error as Error).message);if(index===0)throw error;}
   }
   return targets;
@@ -117,7 +117,7 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     const item:InlineResult={id:image.id};
     if(result?.output_asset_id)item.resultKey=JSON.stringify([scope,result.id,result.output_asset_id]);
     else {
-      const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,{copyId:'inline',page,mode}));
+      const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,{entryId:'inline',page,mode}));
       item.state=translationState({page,mode,language,userId:ctx.session.user.id,origin,active:true,caps:ctx.caps,rights:ctx.rights,operation});
     }
     items.push(item);

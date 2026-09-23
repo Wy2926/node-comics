@@ -10,7 +10,7 @@
 | CBR/RAR | node-unrar-js 2.0.2 有界本地 Worker：压缩输入 128 MiB、声明总展开 256 MiB、目标页实际输出 32 MiB、WASM heap 256 MiB、操作 60 秒。逐页请求，立即清除库内部保留的展开输出；固实包仍可能解码前序数据。 |
 | 图片 | 单页、最多 32 MiB。 |
 
-远程登记目前只开放 CBZ 与单图；PDF、MOBI、RAR 在格式入口明确拒绝，不能降级为下载整包。`capabilities.remote=false` 不表示本地格式不能阅读。
+本地与云盘都不支持散图。远程登记目前只开放 CBZ/ZIP；PDF、MOBI、RAR 在格式入口明确拒绝，不能降级为下载整包。`capabilities.remote=false` 不表示本地格式不能阅读。
 
 本地字节库固定为 `node-comics-sources-v1-container-bytes` / `chunked-idb-v1`，每块 1 MiB。复制期间增量计算 SHA-256；操作预约、块、ready 对象、引用和读取租约在一个新基线数据库中提交。完整文件不参加页面缓存 LRU。应用先登记导入 journal，传预建 revisionId 到 `importContainer` 第四参数；重启按 journal 使用 `listContainerReferences` 点查已发布对象。复制未完成的过期暂存清理，bytesClosed 操作可继续发布。已有对象失踪时修复内容相同的容器，不丢弃新字节继续引用空对象。
 

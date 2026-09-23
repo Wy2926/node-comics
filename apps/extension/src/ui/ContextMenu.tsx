@@ -18,7 +18,8 @@ export function useContextMenu(){
    onClickCapture:event=>{if(longPressed.current){event.preventDefault();event.stopPropagation();longPressed.current=false;}},
   };
  }
- return {bind,menu:menu&&<ContextMenu key={menu.x+':'+menu.y+':'+menu.label} menu={menu} onClose={()=>setMenu(undefined)}/>};
+ const open=(target:HTMLElement,label:string,actions:Action[])=>{const rect=target.getBoundingClientRect();setMenu({label,actions,target,x:rect.left,y:rect.bottom+4});};
+ return {bind,open,menu:menu&&<ContextMenu key={menu.x+':'+menu.y+':'+menu.label} menu={menu} onClose={()=>setMenu(undefined)}/>};
 }
 
 function ContextMenu({menu,onClose}:{menu:Menu;onClose:()=>void}){

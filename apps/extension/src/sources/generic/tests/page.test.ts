@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageManifest } from '../../contracts/source';
-import { refreshChoices } from '../../core/selection';
 import { createSourceNavigation, discoverDocument } from '../../page';
 import { comicImageRect } from '../../shared/geometry';
 
@@ -19,7 +18,7 @@ function image(name: string, options: Record<string, unknown> = {}) {
   } as unknown as HTMLImageElement;
 }
 describe('shared webpage image candidates', () => {
-  it('keeps deselection across remounts without merging duplicate URLs or stealing a surviving slot', () => {
+  it('keeps image identities across remounts without merging duplicate URLs or stealing a surviving slot', () => {
     vi.stubGlobal('getComputedStyle', () => ({ visibility: 'visible', opacity: '1' }));
     let images = [image('same'), image('same'), image('last')];
     const doc = { title: 'Page', querySelectorAll: () => images } as unknown as Document;
@@ -34,15 +33,12 @@ describe('shared webpage image candidates', () => {
         })),
       } as PageManifest;
     };
-    const first = wire(),
-      choices = first.items.map((item) => ({ ...item, selected: false }));
+    const first = wire();
     images = [image('same'), images[1], image('last')];
     const second = wire();
     expect(second.items.map((item) => item.id)).toEqual(first.items.map((item) => item.id));
     expect(new Set(second.items.map((item) => item.id)).size).toBe(3);
-    expect(refreshChoices(choices, second).every((item) => !item.selected)).toBe(true);
     images = [image('different')];
-    expect(refreshChoices(choices, wire())[0].selected).toBe(true);
   });
   it('uses rendered size, load status and visibility for both discovery and translation', () => {
     vi.stubGlobal('getComputedStyle', () => ({ visibility: 'visible', opacity: '1' }));

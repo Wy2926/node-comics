@@ -23,30 +23,29 @@ const queue:{priority:number;run:()=>void}[]=[];
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 function schedule<T>(priority:number,action:()=>Promise<T>):Promise<T>{return new Promise((resolve,reject)=>{queue.push({priority,run:()=>{active++;action().then(resolve,reject).finally(()=>{active--;drain();});}});queue.sort((a,b)=>a.priority-b.priority);drain();});}
 function drain(){while(active<2&&queue.length)queue.shift()!.run();}
-export const downloadKey=(revisionId:string,pageId:string)=>JSON.stringify([revisionId,pageId]);
-export const materializationId=(ref:PageReference)=>JSON.stringify([ref.revisionId,ref.pageId,ref.renderProfileId]);
+export const downloadKey=(contentId:string,pageId:string)=>JSON.stringify([contentId,pageId]);
+export const materializationId=(ref:PageReference)=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId]);
 export const onMaterialized=(listener:(identity:PageMaterialization)=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
 
 async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   signal.throwIfAborted();
   if(request.renderProfileId!==RENDER_PROFILE)throw Error('不支持的页面渲染版本，请重新打开漫画。');
-  const [revision,descriptor,doc]=await Promise.all([catalog.get('revisions',request.revisionId),catalog.get('pageDescriptors',[request.revisionId,request.pageId]),catalog.get('documents',request.documentId)]);
-  if(!revision||revision.documentId!==request.documentId||!descriptor||!doc)throw Error('页面或文档已移除。');
-  const binding=await catalog.get('bindings',doc.sourceBindingId);
+  const [descriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
+  if(!descriptor||!doc||doc.contentId!==request.contentId)throw Error('页面已移除或来源内容已变化。');
+  const comic=await catalog.get('comics',doc.comicId),binding=comic?.source;
   const connection=binding&&await catalog.get('connections',binding.connectionId);
-  if(!binding||!connection)throw Error('来源连接已移除。');
-  if(connection.status==='disconnected'||connection.status==='revoked')throw Error('来源连接已断开，请重新连接。');
-  if(binding.status==='disconnected'||binding.status==='revoked')throw Error('当前文件访问已撤销，请重新连接来源。');
+  if(!comic||!binding||!connection)throw Error('漫画来源已移除。');
+  if(connection.status==='disconnected'||connection.status==='revoked'||binding.status!=='active')throw Error('来源访问已断开，请重新连接。');
   const assertSourceCurrent=async()=>{
-    const [currentBinding,currentConnection,currentDocument]=await Promise.all([catalog.get('bindings',binding.id),catalog.get('connections',connection.id),catalog.get('documents',doc.id)]);
-    if(!currentBinding||!currentConnection||!currentDocument||currentDocument.generation!==doc.generation||currentBinding.generation!==binding.generation||currentConnection.generation!==connection.generation||currentBinding.status==='revoked'||currentBinding.status==='disconnected'||currentConnection.status==='revoked'||currentConnection.status==='disconnected')throw Error('页面来源已变化或访问被撤销，请重新打开。');
+    const [currentComic,currentConnection,currentEntry]=await Promise.all([catalog.get('comics',comic.id),catalog.get('connections',connection.id),catalog.get('entries',doc.id)]);
+    if(!currentComic||!currentConnection||!currentEntry||currentEntry.contentId!==request.contentId||currentEntry.generation!==doc.generation||currentComic.source.generation!==binding.generation||currentConnection.generation!==connection.generation||currentComic.source.status!=='active'||currentConnection.status==='revoked'||currentConnection.status==='disconnected')throw Error('页面来源已变化或访问被撤销，请重新打开。');
   };
   const cachePages=getSourceDriver(connection.provider)?.cachePages!==false;
   const cacheToken=cachePages&&request.purpose!=='download'?await sourcePageCache.token(doc.id).catch(cacheUnavailable):undefined;
   const id=materializationId(request),known=await catalog.get('materializations',id);
-  let blob=await downloadStore.get(downloadKey(request.revisionId,request.pageId)).catch(cacheUnavailable);
+  let blob=await downloadStore.get(downloadKey(request.contentId,request.pageId)).catch(cacheUnavailable);
   if(!blob&&cachePages)blob=await sourcePageCache.get(pageReference(request)).catch(cacheUnavailable);
-  // These repositories contain already-normalized output from this service, keyed by immutable revision/profile.
+  // These repositories contain already-normalized output from this service, keyed by current content identity/profile.
   const trustedCache=!!blob;
   if(!blob){
     try{
@@ -59,11 +58,11 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
         if(valid.url!==url)throw Error('图片来源已变化，请重新发现。');
         blob=await sourceImage(valid.data??valid.url,signal);
       }else{
-        const containerId=revision.containerId??(typeof descriptor.locator.containerId==='string'?descriptor.locator.containerId:undefined);
-        const source=await openFileSource({connection,binding,revision,documentId:doc.id,format:doc.format,containerId,signal});
+        const containerId=doc.containerId;
+        const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});
         try{
-          const session=await openDocument(doc.format==='images'?'image':doc.format as ComicFormat,source,signal);
-          try{blob=await session.materialize(doc.format==='images'?{ordinal:0,name:descriptor.name,locator:{image:0}}:{...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
+          const session=await openDocument(doc.format as ComicFormat,source,signal);
+          try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
         }finally{await source.close();}
       }
     }catch(error){if(signal.aborted||error instanceof SourceDatabaseSchemaError)throw error;blob=known&&await originalReplica(known.imageSha256);if(!blob)throw error;}
@@ -72,15 +71,15 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   const prepared=trustedCache&&known&&known.byteSize===blob.size&&known.mime===blob.type&&known.width>0&&known.height>0
     ? {blob,width:known.width,height:known.height,imageSha256:known.imageSha256}
     : await prepareComicPage({name:descriptor.name,pageIndex:descriptor.ordinal,blob},signal);
-  const identity:PageMaterialization={id,pageId:request.pageId,revisionId:request.revisionId,renderProfileId:request.renderProfileId,imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
-  if(known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新建立文档版本。');
+  const identity:PageMaterialization={id,pageId:request.pageId,contentId:request.contentId,renderProfileId:request.renderProfileId,imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
+  if(known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新载入当前内容。');
   signal.throwIfAborted();
-  // A deleted revision may not be resurrected by a late parser/network completion.
-  if(!await catalog.get('revisions',request.revisionId))throw Error('文档已移除。');
+  // Deleted source content may not be resurrected by a late parser/network completion.
+  if((await catalog.get('entries',request.entryId))?.contentId!==request.contentId)throw Error('来源内容已变化，请重新打开。');
   await assertSourceCurrent();
-  try{if(!await catalog.putMaterialization(identity,doc.generation))throw Error('页面所属文档版本已变化，请重新打开。');}
+  try{if(!await catalog.putMaterialization(identity,doc.generation))throw Error('页面来源内容已变化，请重新打开。');}
   catch(error){if((error as Error).name!=='QuotaExceededError')throw error;}
-  if(!trustedCache&&cacheToken&&request.purpose!=='download')await sourcePageCache.put(pageReference(request),prepared.blob,{owner:doc.id,token:cacheToken,connectionId:connection.id,revisionId:revision.id}).catch(cacheUnavailable);
+  if(!trustedCache&&cacheToken&&request.purpose!=='download')await sourcePageCache.put(pageReference(request),prepared.blob,{owner:doc.id,token:cacheToken,connectionId:connection.id,contentId:doc.contentId}).catch(cacheUnavailable);
   await assertSourceCurrent();
   for(const listener of listeners){try{listener(identity);}catch{/* A UI subscriber cannot make prepared source bytes unavailable. */}}
   return {blob:prepared.blob,identity,validate:assertSourceCurrent};

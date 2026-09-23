@@ -2,9 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { matchLocale, resolveLocale, uiLanguages, type UiLocale } from '../src/i18n/locales';
 import { getLocale, installDictionary, messageSource, msg, type Dictionary } from '../src/i18n/runtime';
-import { suggestedUnitKind } from '../src/comics/acquisition';
 import { saveSettings, settings } from '../src/comics/application/preferences';
-import type { SourceEntry } from '../src/sources';
 import { translationNotice } from '../src/translation/notice';
 import { defaults, modeLabels, statusLabels } from '../src/types';
 
@@ -53,8 +51,6 @@ describe('interface dictionaries',()=>{
       const message=msg('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。');
       expect(translationNotice({kind:'error',message}).message).toBe(msg('连接失败'));
       expect(messageSource(msg('第 {0} 页',{'0':123}))).toBe('第 {0} 页');
-      expect(suggestedUnitKind({rawTypes:['卷'],suggestedKind:'publication'} as SourceEntry)).toBe('volume');
-      expect(suggestedUnitKind({rawTypes:['番外'],suggestedKind:'extra'} as SourceEntry)).toBe('chapter');
     }
   });
   it('interpolates data as plain text without evaluating it or processing embedded tokens',()=>{

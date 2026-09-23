@@ -1,14 +1,13 @@
 import type {ComicFormat} from './contracts';
 export function detectFormat(name: string, prefix?: Uint8Array): ComicFormat | undefined {
   const extension = name.split('.').at(-1)?.toLowerCase();
-  const format: ComicFormat | undefined = ({zip: 'cbz', cbz: 'cbz', rar: 'cbr', cbr: 'cbr', pdf: 'pdf', mobi: 'mobi', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', gif: 'image'} as Record<string, ComicFormat>)[extension ?? ''];
+  const format: ComicFormat | undefined = ({zip: 'cbz', cbz: 'cbz', rar: 'cbr', cbr: 'cbr', pdf: 'pdf', mobi: 'mobi'} as Record<string, ComicFormat>)[extension ?? ''];
   if (!prefix) return format;
   const ascii = (offset: number, size: number) => String.fromCharCode(...prefix.subarray(offset, offset + size));
   if (format === 'cbz' && ascii(0, 2) === 'PK') return format;
   if (format === 'cbr' && ascii(0, 4) === 'Rar!') return format;
   if (format === 'pdf' && ascii(0, 5) === '%PDF-') return format;
   if (format === 'mobi' && ascii(60, 8) === 'BOOKMOBI') return format;
-  if (format === 'image' && imageMimeFromBytes(prefix)) return format;
   return undefined;
 }
 export function imageMimeFromBytes(bytes: Uint8Array): string | undefined {

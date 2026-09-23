@@ -8,7 +8,6 @@ import { resolveSource } from '../src/sources/core/resolve';
 import { createSourceNavigation, PageImageRegistry, type CreateSourcePage } from '../src/sources/page';
 import { definitions } from '../src/sources/registry/definitions';
 import { pageFactories } from '../src/sources/registry/pages';
-import { classify } from '../src/sources/sites/mangacopy/catalog';
 const chapter = '724f819b-5306-11ea-b7ea-024352452ce0';
 const sourceUrl = 'https://www.mangacopy.com/comic/sample/chapter/' + chapter;
 const testDefinition: SourceDefinition = {
@@ -48,7 +47,6 @@ const testCatalog: SourceCatalogSnapshot = {
       groupIds: ['main'],
       rawTypes: [],
       related: false,
-      suggestedKind: 'chapter',
     },
   ],
 };
@@ -222,8 +220,8 @@ describe('catalog ownership and normalized suggestions', () => {
       entries: [{ ...testCatalog.entries[0], catalogId: 'mangacopy:sample', url: sourceUrl }],
     };
     expect(
-      validateSourceCatalog({ ...catalog, workId: 'forged', excludedEntryIds: ['chapter'] }),
-    ).not.toHaveProperty('workId');
+      validateSourceCatalog({ ...catalog, comicId: 'forged', excludedEntryIds: ['chapter'] }),
+    ).not.toHaveProperty('comicId');
     expect(() =>
       validateSourceCatalog({
         ...catalog,
@@ -231,11 +229,9 @@ describe('catalog ownership and normalized suggestions', () => {
       }),
     ).toThrow();
   });
-  it('maps site labels before handing observations to the library', () => {
-    expect(classify(['卷'], false)).toBe('publication');
-    expect(classify(['番外'], false)).toBe('extra');
-    expect(classify(['話'], false)).toBe('chapter');
-    expect(classify(['話'], true)).toBe('unclassified');
+  it('preserves adapter-defined labels and nesting while rejecting cycles',()=>{
+    const source=structuredClone(testCatalog);source.entries[0].rawTypes=['特别企划','Color'];source.groups.push({id:'root',title:'任意来源分类',entryIds:[],complete:true});source.groups[0].parentId='root';source.defaultEntryId='chapter';
+    const valid=validateCatalog(source,[...definitions,testDefinition]);expect(valid.entries[0].rawTypes).toEqual(['特别企划','Color']);expect(valid.groups[0].parentId).toBe('root');expect(valid.defaultEntryId).toBe('chapter');source.groups[1].parentId='main';expect(()=>validateCatalog(source,[...definitions,testDefinition])).toThrow();
   });
 });
 describe('navigation-scoped page resources', () => {

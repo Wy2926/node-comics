@@ -28,18 +28,18 @@ export async function closeSourceAccess(change: SourceAccessChange) {
 /** Generic source selection and optional range caching. Providers own only acquisition. */
 export async function openFileSource(context: OpenFileSourceContext): Promise<RandomAccessSource> {
   context.signal?.throwIfAborted();
-  if (context.binding.connectionId !== context.connection.id) throw Error('来源绑定与连接不匹配。');
-  if (['disconnected', 'revoked'].includes(context.connection.status) || ['disconnected', 'revoked'].includes(context.binding.status ?? ''))
+  if (context.source.connectionId !== context.connection.id) throw Error('来源绑定与连接不匹配。');
+  if (['disconnected', 'revoked'].includes(context.connection.status) || ['disconnected', 'revoked'].includes(context.source.status ?? ''))
     throw Error('来源连接或文件访问已断开，请重新连接。');
   const driver = requireSourceDriver(context.connection.provider);
-  const version = accessVersion(context.connection.id, context.binding.providerItemId);
+  const version = accessVersion(context.connection.id, context.source.providerItemId);
   const source = await driver.open(context);
   if (context.signal?.aborted) { await source.close(); context.signal.throwIfAborted(); }
-  if (accessVersion(context.connection.id, context.binding.providerItemId) !== version) {
+  if (accessVersion(context.connection.id, context.source.providerItemId) !== version) {
     await source.close(); throw new DOMException('来源访问已变化。', 'AbortError');
   }
   const cachedRanges = driver.cacheRanges && !source.snapshot.local;
-  const {connection, binding, documentId} = context;
+  const {connection, source: binding, entryId} = context;
   let closed = false;
   const assertOpen = (signal?: AbortSignal) => {
     if (closed) throw new DOMException('来源已关闭。', 'AbortError');
@@ -67,12 +67,12 @@ export async function openFileSource(context: OpenFileSourceContext): Promise<Ra
         const bytes = new Uint8Array(await cached.arrayBuffer());
         assertOpen(signal); return bytes;
       }
-      const token = await sourceRangeCache.token(documentId).catch(cacheFailure);
+      const token = await sourceRangeCache.token(entryId).catch(cacheFailure);
       assertOpen(signal);
       const bytes = await source.readAt(offset, length, signal);
       assertOpen(signal);
       if (token) await sourceRangeCache.put(key, new Blob([bytes as Uint8Array<ArrayBuffer>]), {
-        owner: documentId, connectionId: connection.id, revisionId: context.revision.id, token,
+        owner: entryId, connectionId: connection.id, contentId: context.contentId, token,
       }).catch(cacheFailure);
       assertOpen(signal); return bytes;
     },

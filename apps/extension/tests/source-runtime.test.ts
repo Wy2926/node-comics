@@ -32,18 +32,17 @@ function deferred<T>() {
 function context(provider = 'fixture-files', connectionId = `${provider}:reader`, itemId = 'same-file', version = 'v1', marker = 7): OpenFileSourceContext {
   return {
     connection: {id: connectionId, provider, displayName: 'Fixture files', status: 'connected', generation: 1, createdAt: 1, updatedAt: 1},
-    binding: {id: `binding:${connectionId}:${itemId}`, connectionId, providerItemId: itemId, locator: {version: 'untrusted-current-version'}, generation: 1, createdAt: 1, updatedAt: 1},
-    revision: {id: `revision:${connectionId}:${itemId}:${version}`, documentId: 'document', sourceVersion: version,
-      sourceSnapshot: {version, marker}, parserVersion: 'fixture-parser', indexVersion: 1, generation: 1, status: 'ready', createdAt: 1},
-    documentId: 'document', format: 'cbz',
+    source:{connectionId,providerItemId:itemId,locator:{version:'untrusted-current-version'},generation:1,status:'active'},
+    contentId:`content:${connectionId}:${itemId}:${version}`,sourceSnapshot:{version,marker},
+    entryId: 'document', format: 'cbz',
   };
 }
 function fixtureDriver(options: {id?: string; local?: boolean; cacheRanges?: boolean} = {}) {
   const sources: (RandomAccessSource & {readAt: ReturnType<typeof vi.fn>; validate: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>})[] = [];
   const open = vi.fn(async (input: OpenFileSourceContext): Promise<RandomAccessSource> => {
     const source = {
-      snapshot: {identity: `${input.connection.id}/${input.binding.providerItemId}`, version: String(input.revision.sourceSnapshot!.version), size: 32, local: !!options.local},
-      readAt: vi.fn(async (_offset: number, length: number) => new Uint8Array(length).fill(Number(input.revision.sourceSnapshot!.marker))),
+      snapshot: {identity: `${input.connection.id}/${input.source.providerItemId}`, version: String(input.sourceSnapshot!.version), size: 32, local: !!options.local},
+      readAt: vi.fn(async (_offset: number, length: number) => new Uint8Array(length).fill(Number(input.sourceSnapshot!.marker))),
       validate: vi.fn(async () => 'unchanged' as const), close: vi.fn(async () => {}),
     };
     sources.push(source); return source;
@@ -59,11 +58,11 @@ async function open(input = context()) {
 describe('pluggable file-source runtime', () => {
   it('reads an arbitrary provider without Google and passes its frozen revision intact', async () => {
     const fixture = fixtureDriver(), input = context();
-    Object.freeze(input.revision.sourceSnapshot); Object.freeze(input.revision);
+    Object.freeze(input.sourceSnapshot); Object.freeze(input.sourceSnapshot);
     expect(getSourceDriver('google-drive')).toBeUndefined();
     const source = await open(input);
     expect(fixture.open).toHaveBeenCalledExactlyOnceWith(input);
-    expect(fixture.open.mock.calls[0][0].revision).toBe(input.revision);
+    expect(fixture.open.mock.calls[0][0].sourceSnapshot).toBe(input.sourceSnapshot);
     expect([...await source.readAt(4, 3)]).toEqual([7, 7, 7]);
     expect(source.snapshot.version).toBe('v1');
     expect(await source.validate()).toBe('unchanged');
@@ -76,14 +75,14 @@ describe('pluggable file-source runtime', () => {
     await expect(openFileSource(context('not-installed'))).rejects.toThrow('此来源未启用');
     expect(() => requireSourceDriver('google-drive')).toThrow('此来源未启用');
     expect(() => registerSourceDriver({...fixture.driver})).toThrow('来源标识无效或重复');
-    const input = context(); input.binding.connectionId = 'another-connection';
+    const input = context(); input.source.connectionId = 'another-connection';
     await expect(openFileSource(input)).rejects.toThrow('来源绑定与连接不匹配');
     expect(fixture.open).not.toHaveBeenCalled();
   });
 
   it('rejects disconnected or revoked connections and bindings before consulting the provider', async () => {
     const fixture = fixtureDriver();
-    for (const owner of ['connection', 'binding'] as const) for (const status of ['disconnected', 'revoked'] as const) {
+    for (const owner of ['connection', 'source'] as const) for (const status of ['disconnected', 'revoked'] as const) {
       const input = context(); input[owner].status = status;
       await expect(openFileSource(input)).rejects.toThrow();
     }
@@ -128,7 +127,7 @@ describe('pluggable file-source runtime', () => {
       expect([...await source.readAt(4, 2)]).toEqual([index + 7, index + 7]);
     }
     expect(saved.size).toBe(5);
-    const same = context(); same.documentId = 'another-document'; same.revision.id = 'another-catalog-revision';
+    const same = context(); same.entryId = 'another-document'; same.contentId = 'another-catalog-revision';
     const shared = await open(same);
     expect([...await shared.readAt(4, 2)]).toEqual([7, 7]);
     expect(one.sources.at(-1)!.readAt).not.toHaveBeenCalled();

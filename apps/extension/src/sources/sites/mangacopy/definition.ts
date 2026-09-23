@@ -29,7 +29,7 @@ export function mangaCopyLocation(value: string): { slug: string; chapterId?: st
 export const definition: SourceDefinition = {
   id: 'mangacopy',
   name: 'MangaCopy',
-  capabilities: { pages: true, inline: true, catalog: true, completePageList: true },
+  capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
   installation: { requiredOrigins: MANGACOPY_PERMISSIONS, autoContentMatches: MANGACOPY_MATCHES },
   identify(url) {
     if (!isMangaCopyUrl(url.href)) return null;

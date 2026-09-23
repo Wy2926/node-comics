@@ -7,15 +7,12 @@ import { definitions } from './registry/definitions';
 export type * from './contracts/definition';
 export type * from './contracts/source';
 export { pollSourceDiscovery } from './core/discovery';
-export { initialChoices, moveChoice, refreshChoices, selectManifest } from './core/selection';
-export type { ImageChoice } from './core/selection';
-export { discoverCatalog, discoverEntry, inExtension, sourceMessage } from './runtime/client';
+export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
 export { sourceImage } from './runtime/image-fetch';
 export {
   copyOrigins,
   imageOrigins,
   ImagePermissionsRequired,
-  prepareImageOrigins,
   requestImagePermissions,
   requireImagePermissions,
 } from './runtime/permissions';

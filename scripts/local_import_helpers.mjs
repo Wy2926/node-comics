@@ -1,15 +1,9 @@
-/** Shared UI steps for single-selection local imports in browser acceptance scripts. */
+/** Local imports start automatically; single successful files open the reader. */
 export async function completeLocalImport(page,{close=true}={}){
- const panel=page.getByRole('dialog',{name:'导入本地漫画'});await panel.waitFor();
- await page.waitForFunction(()=>!document.querySelector('.nc-import-item.checking'));
- const start=panel.getByRole('button',{name:/^(开始导入|导入其余所选)/});
- if(await start.count()){
-  await start.click();
-  await panel.locator('.nc-import-steps li:nth-child(3)[aria-current=step]').waitFor({timeout:120000});
- }
+ await page.waitForFunction(()=>document.querySelector('img.nc-page-image')||document.querySelector('.nc-local-import-modal .nc-import-item.failed'),null,{timeout:120000});
  if(close){
-  await panel.getByRole('button',{name:'完成',exact:true}).click();await panel.waitFor({state:'hidden'});
-  // Import now preserves the user's current view. Existing acceptance scenarios continue from the shelf.
-  if(await page.getByLabel('跳转页码').count())await page.getByLabel('返回我的漫画',{exact:true}).click();
+  if(await page.getByLabel('返回我的漫画',{exact:true}).isVisible())await page.getByLabel('返回我的漫画',{exact:true}).click();
+  const dock=page.locator('.nc-import-dock');if(await dock.isVisible())await dock.getByRole('button').click();
+  const panel=page.locator('.nc-local-import-modal');if(await panel.isVisible())await panel.getByRole('button',{name:'完成',exact:true}).click();
  }
 }

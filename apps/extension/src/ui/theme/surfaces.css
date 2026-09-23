@@ -130,7 +130,7 @@
 .nc-app .modal:not(.nc-login)>.modal-spark { display: inline-grid; place-items: center; width: 36px; height: 36px; border: var(--comic-border); background: var(--accent-soft); border-radius: var(--comic-control-radius); transform: rotate(-6deg); font-size: 23px; }
 .nc-app .modal h2 { font-weight: 850; letter-spacing: -.03em; }
 .nc-app .modal:not(.nc-login)>.modal-subtitle { padding-bottom: 18px; border-bottom: var(--comic-perforation); }
-.nc-app :is(.nc-modal-footer, .nc-import-footer, .nc-import-assignment) { border-top: var(--comic-perforation); }
+.nc-app :is(.nc-modal-footer, .nc-import-footer) { border-top: var(--comic-perforation); }
 .nc-app .nc-import-steps li>span { border: var(--comic-border); border-radius: var(--comic-control-radius); }
 .nc-app .nc-import-steps [aria-current=step]>span { color: var(--accent-on); box-shadow: var(--comic-shadow-small); }
 .nc-app :is(.nc-import-dock, .toast, .busy-pill) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }

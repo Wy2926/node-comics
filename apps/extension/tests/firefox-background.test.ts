@@ -29,7 +29,7 @@ it.each([false,true])('registers Firefox import without setAccessLevel and opens
   expect(result).toEqual({ok:true});
   expect(create).toHaveBeenCalledWith({url:expect.stringMatching(/^moz-extension:\/\/test\/reader.html\?catalog=/)});
   const catalogId=new URL(create.mock.calls[0][0].url).searchParams.get('catalog');
-  expect(set).toHaveBeenCalledWith({['nc-import:'+catalogId]:{catalog:{...catalog,excludedEntryIds:[]},sourceTabId:7}});
+  expect(set).toHaveBeenCalledWith({['nc-import:'+catalogId]:{catalog,sourceTabId:7}});
 });
 
 it('connects Firefox reader settings without a Chromium-only access-level API',async()=>{

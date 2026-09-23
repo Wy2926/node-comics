@@ -1,7 +1,7 @@
-import type {Page, ReadingCopy} from '../types';
+import type {Page, ReadingEntry} from '../types';
 
 export interface ChapterWindow {
-  copy: ReadingCopy;
+  copy: ReadingEntry;
   /** Prefix sums use the same page heights as the rendered frames; no invented inter-page gaps. */
   offsets: number[];
   start: number;
@@ -9,15 +9,15 @@ export interface ChapterWindow {
   before: number;
   after: number;
 }
-export function chapterWindow(sequence: ReadingCopy[], current: ReadingCopy): ReadingCopy[] {
+export function chapterWindow(sequence: ReadingEntry[], current: ReadingEntry): ReadingEntry[] {
   const at = sequence.findIndex(copy => copy.id === current.id);
   if (at < 0) return [current];
   return sequence.slice(Math.max(0, at - 1), at + 2).map(copy => copy.id === current.id ? current : copy);
 }
-export function pageWindow(copies: ReadingCopy[], copyId: string, index: number, height: (page: Page) => number, limit = 11): ChapterWindow[] {
+export function pageWindow(copies: ReadingEntry[], entryId: string, index: number, height: (page: Page) => number, limit = 11): ChapterWindow[] {
   let active = 0, count = 0;
   for (const copy of copies) {
-    if (copy.id === copyId) active = count + Math.max(0, Math.min(index, copy.pages.length - 1));
+    if (copy.id === entryId) active = count + Math.max(0, Math.min(index, copy.pages.length - 1));
     count += copy.pages.length;
   }
   const size = Math.max(1, Math.trunc(limit));

@@ -15,7 +15,7 @@ async function open(offline=false){
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   const scenario=offline?'connection':'retry';
   await page.goto(web+'/tests/reader-fixture.html?auto='+scenario+(offline?'&offline':''));
-  await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开作品 自动翻译 · '+scenario,exact:true})}).getByRole('button',{name:'开始阅读',exact:true}).click();
+  await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · '+scenario,exact:true})}).getByRole('button',{name:'开始阅读',exact:true}).click();
   await page.locator('.nc-page-image').waitFor();
   await page.getByRole('button',{name:'常规翻译',exact:true}).click();
 }

@@ -8,9 +8,9 @@ const tables = ['objects', 'chunks', 'operations', 'references', 'leases', 'sett
 beforeEach(async () => { await bytesTransaction(tables, 'readwrite', async tx => { for (const name of tables) tx.objectStore(name).clear(); }); });
 afterEach(()=>vi.unstubAllGlobals());
 function file(size = CHUNK_SIZE + 19) {
-  const bytes = new Uint8Array(size); bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
+  const bytes = new Uint8Array(size); bytes.set([80, 75, 3, 4, 0, 0, 0, 0]);
   for (let i = 8; i < size; i++) bytes[i] = i % 251;
-  return new File([bytes], 'page.png', {type: 'image/png'});
+  return new File([bytes], 'comic.cbz', {type: 'application/zip'});
 }
 const rows = (table: string) => bytesTransaction([table], 'readonly', tx => idbRequest(tx.objectStore(table).getAll()));
 
@@ -63,7 +63,7 @@ describe('immutable local containers', () => {
     expect(await rows('objects')).toHaveLength(1);
     expect(await rows('references')).toHaveLength(2);
     const source = await openContainer(restored.id);
-    try { expect(await source.readAt(0, 8)).toEqual(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])); }
+    try { expect(await source.readAt(0, 8)).toEqual(new Uint8Array([80, 75, 3, 4, 0, 0, 0, 0])); }
     finally { await source.close(); }
   });
   it('cancellation removes staging and never publishes a partial object or reference', async () => {
@@ -77,12 +77,12 @@ describe('immutable local containers', () => {
     const hash = createHash('sha256').update(new Uint8Array(bytes)).digest('hex');
     await bytesTransaction(['operations', 'chunks'], 'readwrite', async tx => {
       for (const [id, state, expiresAt] of [['closed', 'bytesClosed', 0], ['abandoned', 'staging', 0], ['active', 'staging', Date.now() + 60_000]] as const) {
-        tx.objectStore('operations').add({id, size: 100, written: 100, state, expiresAt, generation: 1, format: 'image', sha256: hash, fileName: 'recovered.png', referenceId: 'recovered'});
+        tx.objectStore('operations').add({id, size: 100, written: 100, state, expiresAt, generation: 1, format: 'cbz', sha256: hash, fileName: 'recovered.cbz', referenceId: 'recovered'});
         tx.objectStore('chunks').add({id: chunkId(id, 0), objectId: id, ordinal: 0, bytes});
       }
     });
     const recovered = await recoverContainerImports();
-    expect(recovered).toHaveLength(1); expect(recovered[0].fileName).toBe('recovered.png');
+    expect(recovered).toHaveLength(1); expect(recovered[0].fileName).toBe('recovered.cbz');
     expect((await rows('operations')).map(row => row.id)).toEqual(['active']);
     expect(await rows('chunks')).toHaveLength(2);
     await retainContainer(recovered[0].id, 'book');
@@ -97,7 +97,7 @@ describe('immutable local containers', () => {
     const first=await listContainerImports(1);expect(first.items).toHaveLength(1);expect(first.next).toBeTruthy();
     const second=await listContainerImports(1,first.next);expect(second.items).toHaveLength(1);expect(second.next).toBeUndefined();
     expect([...first.items,...second.items].map(item=>item.referenceId)).toEqual(['revision-a','revision-b']);
-    expect(first.items[0].fileName).toBe('page.png');expect(first.items[0].importId).toBeTruthy();
+    expect(first.items[0].fileName).toBe('comic.cbz');expect(first.items[0].importId).toBeTruthy();
   });
   it('rejects a low-space reservation before writing chunks',async()=>{
     vi.stubGlobal('navigator',{storage:{estimate:async()=>({quota:1024,usage:0})}});

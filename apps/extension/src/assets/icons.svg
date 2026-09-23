@@ -36,4 +36,5 @@
   <symbol id="logout" viewBox="0 0 24 24"><path d="M10 3H3v18h7 M8 12h13m-5-5 5 5-5 5"/></symbol>
   <symbol id="calendar" viewBox="0 0 24 24"><path d="M3 5h18v16H3z M7 2v6m10-6v6M3 10h18 M7 14h3m4 0h3m-10 4h3"/></symbol>
   <symbol id="bolt" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-13h-7z"/></symbol>
+<symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
 </svg>

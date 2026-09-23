@@ -74,7 +74,7 @@
       chooseFiles = () => {
         if (!validToken()) { fail(expiredText()); return; }
         busy = true; update(); status.textContent = `${connectedText()}，请在 Google Drive 中选择漫画文件。`;
-        const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(false).setSelectFolderEnabled(false);
+        const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(false).setSelectFolderEnabled(false).setMimeTypes('application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz');
         picker = new google.picker.PickerBuilder().setDeveloperKey(config.apiKey).setAppId(config.appId)
           .setOAuthToken(token.accessToken).setOrigin(location.origin)
           .enableFeature(google.picker.Feature.MULTISELECT_ENABLED).addView(view)

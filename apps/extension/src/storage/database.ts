@@ -1,5 +1,5 @@
 /** Final source-storage baseline. Earlier development databases are left untouched. */
-export const SOURCE_DATABASE_PREFIX = 'node-comics-sources-v1';
+export const SOURCE_DATABASE_PREFIX = 'node-comics-reading-v1';
 export const sourceDatabaseName = (name: string) => `${SOURCE_DATABASE_PREFIX}-${name}`;
 export interface StoreSchema {
   keyPath: string | string[] | null;

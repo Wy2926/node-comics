@@ -29,3 +29,4 @@
 .nc-catalog-hint p{color:var(--muted);font-size:.72rem;line-height:1.7;margin:0 0 8px}
 .nc-catalog-hint p:last-child{margin-bottom:0}
 @media(max-width:760px){.nc-reader-drawer.left{width:min(420px,calc(100% - 20px))}.nc-comic-directory-heading{padding:12px 16px}.nc-directory-search{padding:10px 14px}.nc-chapter-entry{padding:11px 8px}.nc-directory-tabs button{padding:11px 0}.nc-chapter-info b{font-size:.8rem}}
+.nc-source-group{border-bottom:1px solid var(--border,#ececf3);padding:8px 0}.nc-source-group>summary{cursor:pointer;font-weight:700;padding:10px 4px}.nc-source-group>summary>span{float:right;font-weight:400;opacity:.6}.nc-source-group .nc-source-group{margin-left:16px}.nc-library-card-actions{display:flex;justify-content:space-between;align-items:center}

@@ -5,7 +5,7 @@ export const MAX_PAGE = 32 * MiB;
 export const MAX_EXPANDED = 1024 * MiB;
 export const MAX_PAGES = 1500;
 export const MAX_ENTRIES = 10000;
-export const COMIC_ACCEPT = 'image/png,image/jpeg,image/webp,.mobi,.cbz,.zip,.cbr,.rar,.pdf';
+export const COMIC_ACCEPT = '.mobi,.cbz,.zip,.cbr,.rar,.pdf';
 export const isComicFile = (name: string) => /\.(mobi|cbz|zip|cbr|rar|pdf)$/i.test(name);
 
 export const imageMime = (name: string) => ({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif'}[name.split('.').at(-1)!.toLowerCase()]);

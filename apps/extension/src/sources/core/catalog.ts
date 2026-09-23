@@ -56,8 +56,7 @@ export function validateCatalog(
       e.rawTypes.length > 100 ||
       e.rawTypes.some((t) => !text(t, 180)) ||
       typeof e.related !== 'boolean' ||
-      (e.suggestedKind !== undefined &&
-        !['chapter', 'extra', 'publication', 'work', 'unclassified'].includes(e.suggestedKind))
+      (e.sequenceId !== undefined && !text(e.sequenceId))
     )
       return invalid();
     const target = resolveSource(e.url, definitions).location;
@@ -76,6 +75,7 @@ export function validateCatalog(
       !text(g.id) ||
       !text(g.title) ||
       typeof g.complete !== 'boolean' ||
+      (g.parentId !== undefined && (!text(g.parentId) || !groups.has(g.parentId))) ||
       !Array.isArray(g.entryIds) ||
       g.entryIds.length > 10000 ||
       new Set(g.entryIds).size !== g.entryIds.length ||
@@ -84,7 +84,10 @@ export function validateCatalog(
       return invalid();
     const orders = g.entryIds.map((id) => entries.get(id)!.order);
     if (orders.some((order, i) => i > 0 && order < orders[i - 1])) return invalid();
+    const parents = new Set<string>([g.id]); let parent = g.parentId;
+    while (parent) {if (parents.has(parent) || parents.size >= 8) return invalid(); parents.add(parent); parent = groups.get(parent)?.parentId;}
   }
+  if (c.defaultEntryId !== undefined && (!entries.has(c.defaultEntryId) || entries.get(c.defaultEntryId)?.related)) return invalid();
   return {
     id: c.id,
     sourceId: c.sourceId,
@@ -95,5 +98,6 @@ export function validateCatalog(
     note: c.note,
     groups: c.groups,
     entries: c.entries,
+    defaultEntryId: c.defaultEntryId,
   };
 }

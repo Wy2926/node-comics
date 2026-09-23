@@ -1,32 +1,28 @@
 import {msg} from '../i18n/runtime';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Mode, Page } from '../types';
-import { Icon } from '../icons';
 import { Thumbnail } from './Images';
 import { thumbnailRows } from './geometry';
 import { pageTranslation, taskText } from './presentation';
 import { TaskActivity } from './TaskActivity';
-export function ThumbnailDirectory({ pages, index, mode, language, ownerId, origin, manage, onJump, onMove, onRemove }: {
+export function ThumbnailDirectory({ pages, index, mode, language, ownerId, origin, onJump }: {
   pages: Page[];
   index: number;
   mode: Mode;
   language: string;
   ownerId?: string;
   origin: string;
-  manage: boolean;
   onJump: (n: number) => void;
-  onMove: (id: string, delta: number) => void;
-  onRemove: (p: Page) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [size, setSize] = useState({ width: 320, height: 500 });
-  const rows = useMemo(() => thumbnailRows(pages, size.width, manage), [pages, size.width, manage]);
+  const rows = useMemo(() => thumbnailRows(pages, size.width), [pages, size.width]);
   useLayoutEffect(() => {
     const el = ref.current; const row = rows[index]; if (!el || !row)
       return; if (row.top < el.scrollTop || row.top + row.height > el.scrollTop + el.clientHeight)
       el.scrollTop = row.top; setScrollTop(el.scrollTop);
-  }, [index, size.width, manage, pages.length]);
+  }, [index, size.width, pages.length]);
   useEffect(() => {
     if (!ref.current)
       return; const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height })); observer.observe(ref.current); return () => observer.disconnect();
@@ -46,15 +42,7 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
             <b>{msg("第 {0} 页", {"0": n + 1})}{n === index && <i>{msg("阅读中")}</i>}</b>
             <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.output_asset_id ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入")}</small>
           </span>
-        </button>{manage && <div className="nc-thumb-management">
-          <div className="nc-page-order">
-            <button aria-label={msg("上移第 {0} 页", {"0": n + 1})} disabled={n === 0} onClick={() => onMove(p.id, -1)}>↑</button>
-            <button aria-label={msg("下移第 {0} 页", {"0": n + 1})} disabled={n === pages.length - 1} onClick={() => onMove(p.id, 1)}>↓</button>
-            <button aria-label={msg("移除第 {0} 页", {"0": n + 1})} onClick={() => onRemove(p)}>
-              <Icon name="close" size={15} />
-            </button>
-          </div>
-        </div>}</div>;
+        </button></div>;
     })}</div>
   </div>;
 }

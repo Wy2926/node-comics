@@ -1,5 +1,5 @@
 /** Persistent locators contain JSON only; sessions own every disposable resource. */
-export type ComicFormat = 'cbz' | 'cbr' | 'pdf' | 'mobi' | 'image';
+export type ComicFormat = 'cbz' | 'cbr' | 'pdf' | 'mobi';
 export interface SourceSnapshot { identity: string; version: string; size: number; local: boolean }
 export interface RandomAccessSource {
   readonly snapshot: SourceSnapshot;

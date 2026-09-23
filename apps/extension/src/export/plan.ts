@@ -12,7 +12,7 @@ export interface ExportPage {
   job?: Job; cacheKey?: string; reason?: string;
 }
 export interface ExportPlan {
-  documentId: string; revisionId: string; generation: number; title: string; createdAt: string;
+  entryId: string; contentId: string; generation: number; title: string; createdAt: string;
   options: ExportOptions; pages: ExportPage[]; incomplete: boolean; expectedPages?: number;
   account?: {userId: string; origin: string};
 }
@@ -24,15 +24,15 @@ export function safeName(value: string): string {
 export const exportName = (title: string, options: ExportOptions) => `${safeName(title)}-${options.images === 'original' ? '原图' : safeName(options.language)+'-'+options.mode}${options.allowIncomplete ? '-已发现页面' : ''}.${options.format}`;
 
 /** Freeze metadata only. The explicit write command acquires one requested page at a time. */
-export async function planExport(documentId: string, options: ExportOptions, account?: ExportPlan['account'], signal?: AbortSignal): Promise<ExportPlan> {
+export async function planExport(entryId: string, options: ExportOptions, account?: ExportPlan['account'], signal?: AbortSignal): Promise<ExportPlan> {
   signal?.throwIfAborted();
-  const document = await catalog.get('documents',documentId);
+  const document = await catalog.get('entries',entryId);
   if (!document || document.indexState !== 'ready') throw new Error('文档尚未建立可读目录，请先完成索引。');
   if (options.images === 'translation' && !account) throw new Error('请先登录已有译图所属的账户。');
   const descriptors = [];
   for (let offset = 0;; offset += 100) {
     signal?.throwIfAborted();
-    const batch = await catalog.listPages(document.revisionId,{offset,limit:100}); descriptors.push(...batch);
+    const batch = await catalog.listPages(document.contentId,{offset,limit:100}); descriptors.push(...batch);
     if (descriptors.length > 10000) throw new Error('单次导出最多支持 10000 页，请拆分文档。');
     if (batch.length < 100) break;
   }
@@ -43,7 +43,7 @@ export async function planExport(documentId: string, options: ExportOptions, acc
   const pages: ExportPage[] = [];
   for (const descriptor of descriptors) {
     signal?.throwIfAborted();
-    const reference = {documentId,revisionId:document.revisionId,pageId:descriptor.pageId,renderProfileId:RENDER_PROFILE};
+    const reference = {entryId,contentId:document.contentId,pageId:descriptor.pageId,renderProfileId:RENDER_PROFILE};
     const page: ExportPage = {pageId:descriptor.pageId,ordinal:descriptor.ordinal,name:descriptor.name,reference,kind:'original'};
     if (options.images === 'translation') {
       const identity = await catalog.get('materializations',materializationId(reference));
@@ -57,7 +57,7 @@ export async function planExport(documentId: string, options: ExportOptions, acc
     pages.push(page);
   }
   signal?.throwIfAborted();
-  return {documentId,revisionId:document.revisionId,generation:document.generation,title:document.title,createdAt:new Date().toISOString(),options:{...options},pages,incomplete,expectedPages,account};
+  return {entryId,contentId:document.contentId,generation:document.generation,title:document.title,createdAt:new Date().toISOString(),options:{...options},pages,incomplete,expectedPages,account};
 }
 /** Explicit allowlist: no original URLs, account IDs, source locators, tokens or signed asset URLs. */
 export function exportManifest(plan: ExportPlan) {

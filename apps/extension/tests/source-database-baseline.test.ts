@@ -53,11 +53,11 @@ describe('source database baseline isolation', () => {
   });
 
   it('rejects a partial current catalog before the first catalog transaction can throw NotFoundError', async () => {
-    const database = await rawDatabase(sourceDatabaseName('catalog'), db => db.createObjectStore('works', { keyPath: 'id' })); database.close();
+    const database = await rawDatabase(sourceDatabaseName('catalog'), db => db.createObjectStore('comics', { keyPath: 'id' })); database.close();
     const { catalog, openCatalog } = await import('../src/comics/repositories');
-    await expect(openCatalog()).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError', message: expect.stringContaining('缺少 units') });
+    await expect(openCatalog()).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError', message: expect.stringContaining('缺少 entries') });
     await expect(catalog.list('tasks')).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError' });
-    const untouched = await rawDatabase(sourceDatabaseName('catalog')); expect(untouched.version).toBe(1); expect([...untouched.objectStoreNames]).toEqual(['works']);
+    const untouched = await rawDatabase(sourceDatabaseName('catalog')); expect(untouched.version).toBe(1); expect([...untouched.objectStoreNames]).toEqual(['comics']);
   });
 });
 
@@ -109,7 +109,7 @@ describe('cache and complete-source baseline errors', () => {
     const name = retained ? 'downloads' : 'source-pages';
     const database = await rawDatabase(sourceDatabaseName(name), db => {
       const metadata = db.createObjectStore('metadata', { keyPath: 'key' });
-      for (const index of ['usedAt', 'owner', 'connectionId', 'revisionId']) metadata.createIndex(index, index);
+      for (const index of ['usedAt', 'owner', 'connectionId', 'contentId']) metadata.createIndex(index, index);
       metadata.put({ key: 'keep', size: 4, usedAt: 1 }); db.createObjectStore('objects').put(new Blob(['keep']), 'keep');
       db.createObjectStore('state', { keyPath: 'id' }); // Earlier partial baseline has no reservations store.
     }); database.close();

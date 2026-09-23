@@ -4,12 +4,12 @@
  */
 import { openSourceDatabase, SourceDatabaseSchemaError, type DatabaseSchema } from './database';
 const schema: DatabaseSchema = {
-  metadata: { keyPath: 'key', indexes: ['usedAt', 'owner', 'connectionId', 'revisionId'].map(name => ({name,keyPath:name})) },
+  metadata: { keyPath: 'key', indexes: ['usedAt', 'owner', 'connectionId', 'contentId'].map(name => ({name,keyPath:name})) },
   objects: { keyPath: null }, state: { keyPath: 'id' },
   reservations: { keyPath: 'id', indexes: [{name:'expiresAt',keyPath:'expiresAt'},{name:'key',keyPath:'key'}] },
 };
 export interface CacheUsage { bytes: number; reservedBytes: number; count: number; budgetBytes: number }
-export interface CacheScope { owner?: string; connectionId?: string; revisionId?: string }
+export interface CacheScope { owner?: string; connectionId?: string; contentId?: string }
 export interface CacheToken { epoch: number; ownerGeneration: number; owner?: string }
 export interface CacheWriteOptions extends CacheScope { token?: CacheToken }
 interface CacheMeta extends CacheScope { key: string; size: number; usedAt: number }
@@ -99,7 +99,7 @@ export class ByteCache {
     const previous = await request(tx.objectStore('metadata').get(current.key)) as CacheMeta | undefined;
     if (!this.retained && usage.bytes + usage.reservedBytes + blob.size - (previous?.size ?? 0) > this.budget()) { state.put(usage); await done; return false; }
     tx.objectStore('objects').put(blob, current.key);
-    tx.objectStore('metadata').put({ key: current.key, size: blob.size, usedAt: Date.now(), owner: current.owner, connectionId: current.connectionId, revisionId: current.revisionId } satisfies CacheMeta);
+    tx.objectStore('metadata').put({ key: current.key, size: blob.size, usedAt: Date.now(), owner: current.owner, connectionId: current.connectionId, contentId: current.contentId } satisfies CacheMeta);
     usage.bytes += blob.size - (previous?.size ?? 0); if (!previous) usage.count++;
     state.put(usage); await done; return true;
   }
@@ -117,8 +117,8 @@ export class ByteCache {
   async delete(key: string): Promise<void> { await this.removeMatching('key', key); }
   async deleteOwner(owner: string, block = false): Promise<void> { await this.removeMatching('owner', owner, block); }
   async deleteConnection(connectionId: string): Promise<void> { await this.removeMatching('connectionId', connectionId); }
-  async deleteRevision(revisionId: string): Promise<void> { await this.removeMatching('revisionId', revisionId); }
-  private async removeMatching(index: 'key' | 'owner' | 'connectionId' | 'revisionId', value: string, block = false): Promise<void> {
+  async deleteRevision(contentId: string): Promise<void> { await this.removeMatching('contentId', contentId); }
+  private async removeMatching(index: 'key' | 'owner' | 'connectionId' | 'contentId', value: string, block = false): Promise<void> {
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx), metadata = tx.objectStore('metadata'), state = tx.objectStore('state');
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();
     const records = index === 'key' ? [await request(metadata.get(value))].filter(Boolean) as CacheMeta[] : await request(metadata.index(index).getAll(value)) as CacheMeta[];

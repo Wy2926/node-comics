@@ -5,7 +5,6 @@ import { sourceFailure } from './diagnostics';
 import { activateInline, registerInlineBackground } from '../../inline/background';
 import type { SourceCatalog } from '../../comics/application/types';
 import { pollSourceDiscovery } from '../core/discovery';
-import { selectManifest } from '../core/selection';
 import {
   safeImageUrl,
   sameSourcePage,
@@ -20,7 +19,7 @@ const sourceMessageTypes = new Set([
   'NC_IMPORT_CURRENT',
   'NC_TRANSLATE_TAB',
   'NC_DISCOVER_TAB',
-  'NC_SELECT_MANIFEST',
+  'NC_OPEN_PAGE',
   'NC_REGISTER_CATALOG',
   'NC_OPEN_SOURCE',
   'NC_POLL_SOURCE',
@@ -34,6 +33,8 @@ async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
 }
 async function registerManifest(snapshot: PageManifest, tabId: number, id: string = crypto.randomUUID()) {
+  const resolved=sourceFor(snapshot.url);
+  if(!resolved.definition.capabilities.importable||resolved.location.kind!=='reader'||snapshot.adapter!==resolved.definition.id)throw Error('SOURCE_IMPORT_UNSUPPORTED');
   if (!Array.isArray(snapshot.items) || typeof snapshot.navigationId !== 'string')
     throw Error('SOURCE_PAGES_INVALID');
   const ids = new Set<string>();
@@ -51,8 +52,9 @@ async function registerManifest(snapshot: PageManifest, tabId: number, id: strin
 async function discover(tabId: number) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请打开普通漫画网页。'));
-  await inject(tabId);
   const { definition, location: loc } = sourceFor(tab.url);
+  if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
+  await inject(tabId);
   if (loc.kind === 'catalog' && definition.capabilities.catalog) {
     const snapshot = await chrome.tabs.sendMessage(tabId, { type: 'NC_CATALOG_SNAPSHOT' }, { frameId: 0 });
     if (snapshot?.error) throw Error(snapshot.code ?? snapshot.error);
@@ -61,7 +63,7 @@ async function discover(tabId: number) {
       throw Error(msg('来源详情页已变化。'));
     const id = crypto.randomUUID();
     await chrome.storage.local.set({
-      ['nc-import:' + id]: { catalog: { ...catalog, excludedEntryIds: [] }, sourceTabId: tabId },
+      ['nc-import:' + id]: { catalog, sourceTabId: tabId },
     });
     return { kind: 'catalog', id, catalog };
   }
@@ -92,11 +94,6 @@ export function registerSourceBackground() {
           contexts: ['page', 'image', 'link', 'selection'],
           documentUrlPatterns: ['http://*/*', 'https://*/*'],
         });
-        chrome.contextMenus.create({
-          id: 'nc-read-image',
-          title: msg('在 NodeLane Comics 中阅读 / 翻译'),
-          contexts: ['image'],
-        });
       }),
     );
   });
@@ -111,28 +108,7 @@ export function registerSourceBackground() {
         );
       return;
     }
-    if (info.menuItemId !== 'nc-read-image' || !tab?.id || !tab.url) return;
-    const url = safeImageUrl(info.srcUrl ?? '', tab.url);
-    if (!url) return;
-    await inject(tab.id);
-    const source = await chrome.tabs.sendMessage(tab.id, { type: 'NC_NAVIGATION' }, { frameId: 0 });
-    if (source?.url !== tab.url) return;
-    const id = crypto.randomUUID();
-    const manifest: PageManifest = {
-      id,
-      sourceTabId: tab.id,
-      navigationId: source.navigationId,
-      revision: 1,
-      title: tab.title ?? msg('网页图片'),
-      url: tab.url,
-      adapter: 'context-menu',
-      direction: 'rtl',
-      discoveryComplete: false,
-      note: msg('右键导入的单张图片。'),
-      items: [{ id: 'slot-0', url, width: 800, height: 1200, order: 0 }],
-    };
-    await chrome.storage.local.set({ ['manifest:' + id]: manifest });
-    await chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?manifest=' + id) });
+
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     // Other background protocols share this event. Returning true or responding to
@@ -143,11 +119,12 @@ export function registerSourceBackground() {
         sender.id === chrome.runtime.id &&
         sender.tab?.id != null &&
         sender.frameId === 0 &&
-        sourceLocation(sender.url ?? '')?.kind === 'catalog';
+        ['catalog','reader'].includes(sourceLocation(sender.url ?? '')?.kind??'') &&
+        sourceFor(sender.url??'').definition.capabilities.importable;
       if (!fromDetail) return;
       void discover(sender.tab!.id!)
         .then((result) =>
-          chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?catalog=' + result.id) }),
+          chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )
         .then(() => respond({ ok: true }))
         .catch(() => respond({ ok: false, error: msg('目录读取失败，请通过插件弹窗重试。') }));
@@ -166,16 +143,17 @@ export function registerSourceBackground() {
         return true;
       }
       if (message?.type === 'NC_DISCOVER_TAB') return discover(Number(message.tabId));
-      if (message?.type === 'NC_SELECT_MANIFEST') {
-        const data = await chrome.storage.local.get('manifest:' + message.manifestId),
-          original = data['manifest:' + message.manifestId] as PageManifest | undefined;
-        if (!original) throw Error(msg('来源清单已失效，请重新发现。'));
-        const manifest = { ...selectManifest(original, message.itemIds), id: crypto.randomUUID() };
-        await chrome.storage.local.set({ ['manifest:' + manifest.id]: manifest });
-        return { id: manifest.id };
+      if (message?.type === 'NC_OPEN_PAGE') {
+        const resolved=sourceFor(String(message.url));
+        if(!resolved.definition.capabilities.importable||resolved.location.kind!=='reader')throw Error('SOURCE_IMPORT_UNSUPPORTED');
+        const tab=await chrome.tabs.create({url:resolved.location.url,active:false});
+        if(tab.id==null)throw Error(msg('无法打开来源。'));
+        await chrome.storage.session.set({['nc-managed:'+tab.id]:{url:resolved.location.url,manifestId:crypto.randomUUID()}});
+        return {tabId:tab.id};
       }
       if (message?.type === 'NC_REGISTER_CATALOG') {
         const catalog = validateSourceCatalog(message.catalog);
+        if(!sourceFor(catalog.url).definition.capabilities.importable)throw Error('SOURCE_IMPORT_UNSUPPORTED');
         await chrome.storage.local.set({ ['nc-source:' + catalog.id]: catalog });
         return true;
       }
@@ -185,7 +163,7 @@ export function registerSourceBackground() {
         const entry = catalog?.entries.find((e) => e.id === message.entryId);
         if (!entry) throw Error(msg('条目不在已确认来源目录中。'));
         validateSourceCatalog(catalog);
-        if (!sourceFor(entry.url).definition.capabilities.completePageList)
+        if (!sourceFor(entry.url).definition.capabilities.importable||!sourceFor(entry.url).definition.capabilities.pages)
           throw Error('SOURCE_COLLECTION_UNSUPPORTED');
         const tab = await chrome.tabs.create({ url: entry.url, active: false });
         if (tab.id == null) throw Error(msg('无法打开来源。'));
@@ -229,6 +207,8 @@ export function registerSourceBackground() {
       if (message?.type === 'NC_SOURCE_IMAGE') {
         const data = await chrome.storage.local.get('manifest:' + message.manifestId),
           manifest = data['manifest:' + message.manifestId] as PageManifest | undefined;
+        const authority=manifest&&sourceFor(manifest.url);
+        if(!authority?.definition.capabilities.importable||manifest?.adapter!==authority.definition.id)throw Error('SOURCE_IMPORT_UNSUPPORTED');
         const item = manifest?.items.find((i) => i.id === message.pageId);
         if (
           !manifest ||

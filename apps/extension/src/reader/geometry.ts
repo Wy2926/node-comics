@@ -8,11 +8,11 @@ export function pageFrame(page: Pick<Page,'width'|'height'>, viewport: {width:nu
   return {width, height:width / ratio};
 }
 
-export function thumbnailRows(pages: Page[], width: number, manage: boolean) {
+export function thumbnailRows(pages: Page[], width: number) {
   let top = 0;
   return pages.map(page => {
     const pictureHeight = Math.max(1,width - 2) * Math.max(1,page.height) / Math.max(1,page.width);
-    const row = {top, pictureHeight, height:pictureHeight + 82 + (manage ? 40 : 0)};
+    const row = {top, pictureHeight, height:pictureHeight + 82};
     top += row.height;
     return row;
   });

@@ -61,8 +61,8 @@ beforeEach(() => {
     const url = String(input);
     if (url.startsWith('https://www.googleapis.com/drive/v3/about?'))
       return Response.json({user: {permissionId: 'account-1', displayName: 'Test reader'}});
-    if (url.startsWith('https://www.googleapis.com/drive/v3/files/image-1?'))
-      return Response.json({id: 'image-1', name: 'page.png', mimeType: 'image/png', size: '1024', version: '1', capabilities: {canDownload: true}});
+    if (url.startsWith('https://www.googleapis.com/drive/v3/files/file-1?'))
+      return Response.json({id: 'file-1', name: 'book.cbz', mimeType: 'application/zip', size: '1024', version: '1', capabilities: {canDownload: true}});
     throw Error('Unexpected test request');
   });
   vi.stubGlobal('fetch', request);
@@ -101,8 +101,8 @@ describe('production background listeners share the runtime message channel', ()
     const sender: chrome.runtime.MessageSender = {id: extensionId, url: tabs.get(7)!.url, tab: {id: 7} as chrome.tabs.Tab, frameId: 0, documentId: 'test-document'};
     const bridge = await owned({type: 'NC_DRIVE_BRIDGE_INIT'}, sender);
     expect(bridge).toMatchObject({ok: true, nonce: expect.any(String)});
-    expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'image-1'}]}}, sender)).toEqual({ok: true});
-    expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: true, account: {id: 'account-1'}, files: [{fileId: 'image-1', format: 'image'}]});
+    expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}}, sender)).toEqual({ok: true});
+    expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: true, account: {id: 'account-1'}, files: [{fileId: 'file-1', format: 'cbz'}]});
     expect(await owned({type: 'NC_DRIVE_TOKEN', accountId: 'account-1'})).toMatchObject({ok: true, accessToken: 'synthetic-test-token', account: {id: 'account-1'}});
     expect(request).toHaveBeenCalledTimes(2);
     expect(await owned({type: 'NC_DRIVE_DISCONNECT', accountId: 'account-1'})).toEqual({ok: true});
@@ -117,7 +117,7 @@ describe('production background listeners share the runtime message channel', ()
   });
 
   it('preserves source messages while locale and theme listeners answer only their own protocol', async () => {
-    local['manifest:book'] = {id: 'book', url: 'https://example.test/book', items: [{id: 'page-1', url: 'https://example.test/1.png'}]};
+    local['manifest:book'] = {id: 'book', adapter:'xkcd',url: 'https://xkcd.com/123/', items: [{id: 'page-1', url: 'https://example.test/1.png'}]};
     expect(await owned({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'})).toEqual({ok: true, data: {url: 'https://example.test/1.png'}});
     expect(await owned({type: 'NC_UI_LOCALE'})).toMatchObject({locale: 'en', dictionary: expect.any(Object)});
     expect(await owned({type: 'NC_INLINE_THEME'}, {...extensionSender, tab: {id: 1} as chrome.tabs.Tab, frameId: 0})).toEqual({appearance: 'system', accentTheme: 'sky', textScale: 1});

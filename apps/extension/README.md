@@ -2,6 +2,8 @@
 
 React / TypeScript / WXT Manifest V3 漫画阅读器。原图、译图和阅读位置分别保存；插件轻量，翻译计算由后端集群执行。
 
+漫画使用单来源模型：本地漫画文件、Google Drive CBZ/ZIP 或专用网站适配器。选文件自动导入，点卡片直接读；没有散图导入、资料编辑、跨来源合并和版本管理。使用独立新库，不迁移或兼容旧书架。见[产品契约](../../docs/SIMPLE_COMIC_READING_DESIGN.md)与[本轮验收](../../docs/validation/SIMPLE_READING_2026_09_23.md)。
+
 ## 运行与检查
 
 界面现支持 16 种语言，包括韩语（한국어）。界面语言可在“外观与偏好”中选择；跟随浏览器时 `ko` / `ko-KR` 自动使用韩语，界面语言与漫画翻译目标语言独立保存。完整词典位于 `src/i18n/dictionaries/ko.json`；构建时同时生成包内 UI 词典与 Chrome `_locales/ko/messages.json` 商店元数据。`npm test -- tests/i18n.test.ts` 检查词典键、占位符、语言匹配与设置隔离，`npm run zip` 生成 Chrome MV3 安装包。
@@ -32,7 +34,7 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 
 ## 阅读翻译
 
-自动翻译当前页与后两页，逐页保存稳定操作编号并调用 `POST /v1/translation-plans`；响应丢失时按原编号核实。已有原图无需重传，缺失原图按回执上传。已受理任务在关闭客户端后继续由后端执行。
+自动翻译当前页与后三页，逐页保存稳定操作编号并调用 `POST /v1/translation-plans`；响应丢失时按原编号核实。已有原图无需重传，缺失原图按回执上传。已受理任务在关闭客户端后继续由后端执行。
 
 普通／PLUS 每滚动 60 秒最多新增 30／100 张翻译图片，跨模式、语言、设备合计；重复请求、重传与直接复用完成结果不计数。分钟限额与日／月页数权益分开。客户端不查询队列作准入预判、不显示批量预存或常规额度；限流按 Retry-After 恢复，额度不足在图内提供升级入口。
 
@@ -50,8 +52,8 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 
 目录、完整容器、五类缓存 / 下载与翻译操作统一使用 `node-comics-sources-v1-` 数据库基线，仍按类别分库。启动先校验表、主键、索引和字节后端；早期同名 v1 测试库原样保留，不迁移、不自动删除。早期导入需在新基线重新导入。详见[实施记录](../../docs/COMIC_SOURCE_IMPLEMENTATION.md)与[数据库回归](../../docs/validation/DATABASE_BASELINE_2026_09_22.md)。
 
-- 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/LOCAL_IMPORT_FLOW.md)。
-- 网页图片发现与字节采集分离；MangaCopy 按懒加载与总页数核对完整性，失败页有重试原因。参见[采集与漫画管理](../../docs/COMIC_LIBRARY_IMPLEMENTATION.md)、[网页图片导入](../../docs/WEB_IMAGE_IMPORT.md)。
+- 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/SIMPLE_COMIC_READING_DESIGN.md)。
+- 网页图片发现与字节采集分离；MangaCopy 按懒加载与总页数核对完整性，失败页有重试原因。参见[采集与漫画管理](../../docs/COMIC_LIBRARY_IMPLEMENTATION.md)、[网页图片导入](../../docs/SIMPLE_COMIC_READING_DESIGN.md)。
 - 身份、图片、任务归服务 origin 与账户 ID；来源 Cookie 与登录令牌不上传。登录前可读本地原图。
 - 会话统一在 `src/auth` 管理。Chrome / Edge 的访问令牌和续期凭据存于限制为 `TRUSTED_CONTEXTS` 的 `chrome.storage.local`；Firefox 不支持该访问级别 API，改存扩展 origin 的 IndexedDB，`storage.local` 仅广播无凭据的会话 ID 与变更标记。到期前自动续期，认证 401 最多续期重试一次，失效后同步退出并显示重新登录入口；断网保留会话，原图和阅读位置不受影响。旧会话结构已删除，不迁移或兼容。配置、边界与隔离验收见[生产身份说明](../../docs/PRODUCTION_IDENTITY.md#客户端会话与续期2026-09-20)。
 

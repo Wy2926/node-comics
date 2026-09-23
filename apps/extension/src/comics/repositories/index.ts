@@ -15,20 +15,16 @@ export interface CatalogMutation {
   remove(table: CatalogTable, id: IDBValidKey): Promise<void>;
 }
 const schema: Record<CatalogTable, [string, string | string[], boolean?][]> = {
-  works: [['updatedAt', 'updatedAt'], ['lastReadAt', 'lastReadAt']],
-  units: [['workId', 'workId'], ['workOrder', ['workId', 'order']]],
-  documents: [['unitId', 'unitId'], ['sourceKey', 'sourceKey', true], ['sourceBindingId', 'sourceBindingId']],
+  comics: [['sourceKey', 'sourceKey', true], ['connectionId', 'source.connectionId'], ['updatedAt', 'updatedAt'], ['lastReadAt', 'lastReadAt']],
+  entries: [['comicId', 'comicId'], ['comicOrder', ['comicId', 'order']], ['sourceEntry', ['comicId', 'sourceEntryId'], true], ['contentId', 'contentId', true]],
   connections: [['provider', 'provider']],
-  bindings: [['connectionId', 'connectionId'], ['providerItem', ['connectionId', 'providerItemId'], true]],
-  revisions: [['documentId', 'documentId'], ['containerId', 'containerId']],
-  pageDescriptors: [['revisionId', 'revisionId'], ['revisionOrdinal', ['revisionId', 'ordinal']], ['revisionLocator', ['revisionId', 'formatLocator'], true]],
-  materializations: [['revisionId', 'revisionId'], ['pageId', 'pageId'], ['imageSha256', 'imageSha256']],
-  positions: [['documentId', 'documentId', true], ['workId', 'workId'], ['updatedAt', 'updatedAt']],
+  pageDescriptors: [['contentId', 'contentId'], ['contentOrdinal', ['contentId', 'ordinal']], ['contentLocator', ['contentId', 'formatLocator'], true]],
+  materializations: [['contentId', 'contentId'], ['pageId', 'pageId'], ['imageSha256', 'imageSha256']],
+  positions: [['entryId', 'entryId', true], ['comicId', 'comicId'], ['updatedAt', 'updatedAt']],
   translationBindings: [['imageSha256', 'imageSha256'], ['account', ['apiOrigin', 'userId']]],
-  acquisitionTasks: [['documentId', 'documentId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
-  translationOperations: [['documentId', 'documentId'], ['status', 'status']],
-  catalogs: [['connectionId', 'connectionId']],
-  tasks: [['documentId', 'documentId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
+  translationOperations: [['entryId', 'entryId'], ['status', 'status']],
+  catalogs: [['comicId', 'comicId']],
+  tasks: [['entryId', 'entryId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
   metadata: [], tombstones: [],
 };
 export const idbRequest = <T>(request: IDBRequest<T>): Promise<T> => new Promise((resolve, reject) => {
@@ -43,7 +39,7 @@ export const idbCompleted = (tx: IDBTransaction): Promise<void> => {
 };
 let opening: Promise<IDBDatabase> | undefined;
 const databaseSchema: DatabaseSchema = Object.fromEntries(Object.entries(schema).map(([name, indices]) => [name, {
-  keyPath: name === 'pageDescriptors' ? ['revisionId', 'pageId'] : 'id',
+  keyPath: name === 'pageDescriptors' ? ['contentId', 'pageId'] : 'id',
   indexes: indices.map(([name, keyPath, unique]) => ({ name, keyPath, unique })),
 }]));
 export function openCatalog(): Promise<IDBDatabase> {
@@ -81,7 +77,7 @@ async function cursorValues<T>(source: IDBObjectStore | IDBIndex, options: ListO
     };
   });
 }
-export class StaleCatalogWriteError extends Error { constructor() { super('The document was removed or its revision changed.'); this.name = 'StaleCatalogWriteError'; } }
+export class StaleCatalogWriteError extends Error { constructor() { super('漫画已移除或来源内容已变化，请重新打开。'); this.name = 'StaleCatalogWriteError'; } }
 
 export const catalog = {
   /** Keep all reads and writes for an association change in one IDB transaction. */
@@ -94,12 +90,12 @@ export const catalog = {
         const store = tx.objectStore(table); return cursorValues(options.index ? store.index(options.index) : store, options);
       },
       async put(table, record) {
-        const key = table === 'pageDescriptors' ? [(record as PageDescriptor).revisionId, (record as PageDescriptor).pageId] : (record as {id: string}).id;
+        const key = table === 'pageDescriptors' ? [(record as PageDescriptor).contentId, (record as PageDescriptor).pageId] : (record as {id: string}).id;
         if (await idbRequest(tx.objectStore('tombstones').get([table, key].join(':')))) throw new StaleCatalogWriteError();
         tx.objectStore(table).put(record); writes.set(table, [...writes.get(table) ?? [], key]);
       },
       async remove(table, id) {
-        tx.objectStore(table).delete(id); tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
+        tx.objectStore(table).delete(id); if(table!=='catalogs')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
         writes.set(table, [...writes.get(table) ?? [], id]);
       },
     };
@@ -112,14 +108,15 @@ export const catalog = {
       await done.catch(() => {}); throw error;
     }
   },
-  async finishIndex(documentId: string, revisionId: string, generation: number, summary: Pick<CatalogTables['documents'], 'pageCount' | 'knownTotal' | 'discoveryComplete' | 'coverPageId'>): Promise<boolean> {
-    const db = await openCatalog(), tx = db.transaction(['documents', 'revisions'], 'readwrite'), done = idbCompleted(tx);
-    const document = await idbRequest(tx.objectStore('documents').get(documentId)) as CatalogTables['documents'] | undefined;
-    const revision = await idbRequest(tx.objectStore('revisions').get(revisionId)) as CatalogTables['revisions'] | undefined;
-    if (!document || document.generation !== generation || document.revisionId !== revisionId || revision?.documentId !== documentId) { await done; return false; }
-    tx.objectStore('documents').put({ ...document, ...summary, indexState: 'ready', error: undefined });
-    tx.objectStore('revisions').put({ ...revision, status: 'ready', pageCount: summary.pageCount, error: undefined });
-    await done; changed('documents', [documentId]); changed('revisions', [revisionId]); return true;
+  async finishIndex(entryId: string, contentId: string, generation: number, summary: Pick<CatalogTables['entries'], 'pageCount' | 'knownTotal' | 'discoveryComplete' | 'coverPageId'>): Promise<boolean> {
+    return catalog.mutate(['entries', 'comics'], async tx => {
+      const entry = await tx.get('entries', entryId);
+      if (!entry || entry.generation !== generation || entry.contentId !== contentId) return false;
+      await tx.put('entries', {...entry, ...summary, indexState: 'ready', error: undefined});
+      const comic = await tx.get('comics', entry.comicId);
+      if (comic && summary.coverPageId && (!comic.cover || comic.cover.entryId === entryId)) await tx.put('comics', {...comic, cover: {entryId, contentId, pageId: summary.coverPageId}});
+      return true;
+    });
   },
   async editTranslationBinding(id: string, edit: (previous: CatalogTables['translationBindings'] | undefined) => CatalogTables['translationBindings'] | undefined): Promise<CatalogTables['translationBindings'] | undefined> {
     const db = await openCatalog(), tx = db.transaction('translationBindings', 'readwrite'), done = idbCompleted(tx);
@@ -127,30 +124,19 @@ export const catalog = {
     const next = edit(previous); if (next) store.put(next); await done;
     if (next) changed('translationBindings', [id]); return next ?? previous;
   },
-  async commit(records: CatalogWrite[], options: { require?: { table: CatalogTable; id: IDBValidKey }[]; incrementWorkDocuments?: string } = {}): Promise<void> {
+  async commit(records: CatalogWrite[], options: {require?: {table: CatalogTable; id: IDBValidKey}[]} = {}): Promise<void> {
     if (!records.length) return;
-    const tables = [...new Set<CatalogTable>([...records.map(record => record.table), ...(options.require ?? []).map(record => record.table), ...(options.incrementWorkDocuments ? ['works' as const] : []), 'tombstones'])];
-    const db = await openCatalog(), tx = db.transaction(tables, 'readwrite'), done = idbCompleted(tx);
-    for (const { table, value } of records) {
-      const key = table === 'pageDescriptors' ? [(value as PageDescriptor).revisionId, (value as PageDescriptor).pageId] : (value as { id: string }).id;
-      if (table !== 'tombstones' && await idbRequest(tx.objectStore('tombstones').get([table, key].join(':')))) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
-      tx.objectStore(table).put(value);
-    }
-    for (const required of options.require ?? []) if (!await idbRequest(tx.objectStore(required.table).get(required.id))) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
-    if (options.incrementWorkDocuments) {
-      const work = await idbRequest(tx.objectStore('works').get(options.incrementWorkDocuments)) as CatalogTables['works'] | undefined;
-      if (!work) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
-      tx.objectStore('works').put({ ...work, documentCount: (work.documentCount ?? 0) + 1, updatedAt: Date.now() });
-    }
-    await done;
-    for (const table of tables) if (table !== 'tombstones') changed(table, records.filter(record => record.table === table).map(({ value }) => 'id' in value ? value.id : [value.revisionId, value.pageId]) as IDBValidKey[]);
+    await catalog.mutate([...records.map(r => r.table), ...(options.require ?? []).map(r => r.table)], async tx => {
+      for (const {table, value} of records) await tx.put(table, value);
+      for (const ref of options.require ?? []) if (!await tx.get(ref.table, ref.id)) throw new StaleCatalogWriteError();
+    });
   },
   async get<T extends CatalogTable>(table: T, id: IDBValidKey): Promise<CatalogTables[T] | undefined> {
     const db = await openCatalog(); return idbRequest(db.transaction(table).objectStore(table).get(id));
   },
   async put<T extends CatalogTable>(table: T, record: CatalogTables[T]): Promise<void> {
     const db = await openCatalog(), tx = db.transaction([table, 'tombstones'], 'readwrite'), done = idbCompleted(tx);
-    const key = table === 'pageDescriptors' ? [(record as PageDescriptor).revisionId, (record as PageDescriptor).pageId] : (record as { id: string }).id;
+    const key = table === 'pageDescriptors' ? [(record as PageDescriptor).contentId, (record as PageDescriptor).pageId] : (record as { id: string }).id;
     if (table !== 'tombstones' && await idbRequest(tx.objectStore('tombstones').get([table, key].join(':')))) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
     tx.objectStore(table).put(record); await done; changed(table, [key]);
   },
@@ -179,147 +165,91 @@ export const catalog = {
     const db = await openCatalog(), store = db.transaction(table).objectStore(table);
     return idbRequest((options.index ? store.index(options.index) : store).count(options.range));
   },
-  listWorks(options: { offset?: number; limit?: number } = {}) { return catalog.list('works', { ...options, index: 'updatedAt', direction: 'prev' }); },
-  /** Lightweight global shelf index: no descriptions, document trees, pages or image bytes. */
-  async workSummaries(): Promise<CatalogTables['works'][]> {
-    const db=await openCatalog(),store=db.transaction('works').objectStore('works');
-    return new Promise((resolve,reject)=>{
-      const works:CatalogTables['works'][]=[],request=store.index('updatedAt').openCursor(null,'prev');
-      request.onerror=()=>reject(request.error);
-      request.onsuccess=()=>{
-        const cursor=request.result;if(!cursor){resolve(works);return;}
-        const {id,title,aliases,createdAt,updatedAt,lastReadAt,documentCount,cover}=cursor.value as CatalogTables['works'];
-        works.push({id,title,aliases,createdAt,updatedAt,lastReadAt,documentCount,cover});cursor.continue();
-      };
+  listEntries(comicId: string, options: {offset?: number; limit?: number} = {}) {
+    return catalog.list('entries', {limit: 10000, ...options, index: 'comicOrder', range: IDBKeyRange.bound([comicId, -Infinity], [comicId, Infinity])});
+  },
+  listPages(contentId: string, options: { offset?: number; limit?: number } = {}) {
+    return catalog.list('pageDescriptors', { ...options, index: 'contentOrdinal', range: IDBKeyRange.bound([contentId, -Infinity], [contentId, Infinity]) });
+  },
+  async putPages(entryId: string, contentId: string, pages: PageDescriptor[], generation: number): Promise<void> {
+    await catalog.mutate(['entries', 'pageDescriptors'], async tx => {
+      const entry = await tx.get('entries', entryId);
+      if (!entry || entry.generation !== generation || entry.contentId !== contentId) throw new StaleCatalogWriteError();
+      for (const page of pages) {
+        if (page.contentId !== contentId) throw new StaleCatalogWriteError();
+        const [previous] = await tx.list('pageDescriptors', {index: 'contentLocator', range: [contentId, page.formatLocator], limit: 1});
+        await tx.put('pageDescriptors', {...page, pageId: previous?.pageId ?? page.pageId});
+      }
     });
   },
-  listUnits(workId: string, options: { offset?: number; limit?: number } = {}) {
-    return catalog.list('units', { limit: 1000, ...options, index: 'workOrder', range: IDBKeyRange.bound([workId, -Infinity], [workId, Infinity]) });
-  },
-  listDocuments(unitId: string, options: { offset?: number; limit?: number } = {}) { return catalog.list('documents', { limit: 100, ...options, index: 'unitId', range: unitId }); },
-  /** Aggregate source references without loading pages or retaining every document on the shelf. */
-  async workSourceBindings(workId: string): Promise<string[]> {
-    const db = await openCatalog(), tx = db.transaction(['units', 'documents'], 'readonly'), bindings = new Set<string>();
-    await new Promise<void>((resolve, reject) => {
-      const units = tx.objectStore('units').index('workId').openKeyCursor(workId);
-      tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error); tx.oncomplete = () => resolve();
-      units.onsuccess = () => {
-        const unit = units.result; if (!unit) return;
-        const documents = tx.objectStore('documents').index('unitId').openCursor(unit.primaryKey);
-        documents.onsuccess = () => {
-          const document = documents.result;
-          if (document) { bindings.add((document.value as CatalogTables['documents']).sourceBindingId); document.continue(); }
-          else unit.continue();
-        };
-      };
+  /** Atomically replace the current index after preparing it; no history is retained. */
+  async replaceContent(entryId: string, generation: number, content: Pick<CatalogTables['entries'], 'contentId' | 'containerId' | 'sourceSnapshot' | 'format'>, pages: PageDescriptor[], complete: boolean, total?: number): Promise<void> {
+    await catalog.mutate(['entries', 'comics', 'connections', 'pageDescriptors', 'materializations', 'positions'], async tx => {
+      const entry = await tx.get('entries', entryId);
+      if (!entry || entry.generation !== generation) throw new StaleCatalogWriteError();
+      const comic = await tx.get('comics', entry.comicId), connection = comic && await tx.get('connections', comic.source.connectionId);
+      if (!comic || comic.source.status !== 'active' || !connection || connection.status !== 'connected') throw new StaleCatalogWriteError();
+      for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
+      for (const value of await tx.list('materializations', {index: 'contentId', range: entry.contentId, limit: 5000})) await tx.remove('materializations', value.id);
+      for (const page of pages) {if (page.contentId !== content.contentId) throw new StaleCatalogWriteError(); await tx.put('pageDescriptors', page);}
+      await tx.put('entries', {...entry, ...content, generation: entry.generation + 1, indexState: 'ready', error: undefined, readAt: undefined, pageCount: pages.length, knownTotal: total ?? (complete ? pages.length : undefined), discoveryComplete: complete, coverPageId: pages[0]?.pageId, updatedAt: Date.now()});
+      const position = await tx.get('positions', entryId);
+      // An old ordinal does not prove that changed source bytes identify the same page.
+      if (position && pages.length) await tx.put('positions', {...position, contentId: content.contentId, pageId: pages[0].pageId, relativeOffset: 0});
+      if (comic) await tx.put('comics', {...comic,
+        ...(comic.lastEntryId === entryId ? {lastPage: pages.length ? 1 : undefined, lastPageCount: total ?? (complete ? pages.length : undefined)} : {}),
+        ...(comic.cover?.entryId === entryId ? {cover: pages.length ? {entryId, contentId: content.contentId, pageId: pages[0].pageId} : undefined} : {}),
+      });
     });
-    return [...bindings];
-  },
-  listPages(revisionId: string, options: { offset?: number; limit?: number } = {}) {
-    return catalog.list('pageDescriptors', { ...options, index: 'revisionOrdinal', range: IDBKeyRange.bound([revisionId, -Infinity], [revisionId, Infinity]) });
-  },
-  async putPages(documentId: string, revisionId: string, pages: PageDescriptor[], expectedGeneration: number): Promise<void> {
-    const db = await openCatalog(), tx = db.transaction(['documents', 'revisions', 'pageDescriptors'], 'readwrite'), done = idbCompleted(tx);
-    const document = await idbRequest(tx.objectStore('documents').get(documentId)) as CatalogTables['documents'] | undefined;
-    const revision = await idbRequest(tx.objectStore('revisions').get(revisionId)) as CatalogTables['revisions'] | undefined;
-    if (!document || document.generation !== expectedGeneration || document.revisionId !== revisionId || revision?.documentId !== documentId) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
-    const store = tx.objectStore('pageDescriptors');
-    for (const page of pages) {
-      if (page.revisionId !== revisionId) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
-      const previous = await idbRequest(store.index('revisionLocator').get([revisionId, page.formatLocator])) as PageDescriptor | undefined;
-      store.put({ ...page, pageId: previous?.pageId ?? page.pageId });
-    }
-    await done; changed('pageDescriptors', [revisionId]);
   },
   async savePosition(position: CatalogTables['positions']): Promise<void> {
-    const db = await openCatalog(), tx = db.transaction(['documents', 'positions', 'works', 'units', 'pageDescriptors'], 'readwrite'), done = idbCompleted(tx);
-    const document = await idbRequest(tx.objectStore('documents').get(position.documentId)) as CatalogTables['documents'] | undefined;
-    const previous = await idbRequest(tx.objectStore('positions').get(position.documentId)) as CatalogTables['positions'] | undefined;
-    if (!document || document.revisionId !== position.revisionId || (previous && previous.updatedAt > position.updatedAt)) { await done; return; }
-    const unit = await idbRequest(tx.objectStore('units').get(document.unitId)) as CatalogTables['units'] | undefined;
-    const page = await idbRequest(tx.objectStore('pageDescriptors').get([position.revisionId, position.pageId]));
-    if (!unit || unit.workId !== position.workId || !page || previous && previous.pageId === position.pageId && previous.revisionId === position.revisionId && previous.relativeOffset === position.relativeOffset && previous.updatedAt === position.updatedAt) { await done; return; }
-    tx.objectStore('positions').put({ ...position, id: position.documentId });
-    const work = await idbRequest(tx.objectStore('works').get(position.workId)) as CatalogTables['works'] | undefined;
-    if (work) tx.objectStore('works').put({ ...work, lastReadAt: Math.max(work.lastReadAt ?? 0, position.updatedAt) });
-    await done; changed('positions', [position.documentId]); changed('works', [position.workId]);
+    await catalog.mutate(['entries', 'positions', 'comics', 'pageDescriptors'], async tx => {
+      const entry = await tx.get('entries', position.entryId), previous = await tx.get('positions', position.entryId);
+      if (!entry || entry.comicId !== position.comicId || entry.contentId !== position.contentId || previous && previous.updatedAt > position.updatedAt) return;
+      const page = await tx.get('pageDescriptors', [position.contentId, position.pageId]);
+      if (!page) return;
+      if (previous && previous.pageId === position.pageId && previous.contentId === position.contentId && previous.relativeOffset === position.relativeOffset && previous.updatedAt === position.updatedAt) return;
+      await tx.put('positions', {...position, id: position.entryId});
+      const comic = await tx.get('comics', position.comicId);
+      if (comic && (comic.lastReadAt ?? 0) <= position.updatedAt) await tx.put('comics', {...comic, lastEntryId: entry.id, lastReadAt: position.updatedAt, lastPage: page.ordinal + 1, lastPageCount: entry.knownTotal ?? (entry.discoveryComplete ? entry.pageCount : undefined)});
+    });
+  },
+  async markRead(entryId: string): Promise<void> {
+    await catalog.mutate(['entries'], async tx => {
+      const entry = await tx.get('entries', entryId);
+      if (entry && !entry.readAt && entry.discoveryComplete && entry.pageCount && !entry.error) await tx.put('entries', {...entry, readAt: Date.now()});
+    });
   },
   async putMaterialization(value: CatalogTables['materializations'], expectedGeneration?: number): Promise<boolean> {
-    const db = await openCatalog(), tx = db.transaction(['documents', 'revisions', 'pageDescriptors', 'materializations', 'bindings', 'connections'], 'readwrite'), done = idbCompleted(tx);
-    const revision = await idbRequest(tx.objectStore('revisions').get(value.revisionId)) as CatalogTables['revisions'] | undefined;
-    const document = revision ? await idbRequest(tx.objectStore('documents').get(revision.documentId)) as CatalogTables['documents'] | undefined : undefined;
-    const page = await idbRequest(tx.objectStore('pageDescriptors').get([value.revisionId, value.pageId]));
-    if (!document || !page || document.revisionId !== value.revisionId || (expectedGeneration !== undefined && document.generation !== expectedGeneration)) { await done; return false; }
-    const binding = await idbRequest(tx.objectStore('bindings').get(document.sourceBindingId)) as CatalogTables['bindings'] | undefined;
-    const connection = binding ? await idbRequest(tx.objectStore('connections').get(binding.connectionId)) as CatalogTables['connections'] | undefined : undefined;
-    if (!binding || !connection || binding.status === 'revoked' || binding.status === 'disconnected' || connection.status === 'revoked' || connection.status === 'disconnected') { await done; return false; }
-    tx.objectStore('materializations').put(value); await done; changed('materializations', [value.id]); return true;
+    return catalog.mutate(['entries', 'comics', 'connections', 'pageDescriptors', 'materializations'], async tx => {
+      const [entry] = await tx.list('entries', {index: 'contentId', range: value.contentId, limit: 1});
+      if (!entry || expectedGeneration !== undefined && entry.generation !== expectedGeneration || !await tx.get('pageDescriptors', [value.contentId, value.pageId])) return false;
+      const comic = await tx.get('comics', entry.comicId), connection = comic && await tx.get('connections', comic.source.connectionId);
+      if (!comic || !connection || comic.source.status !== 'active' || ['disconnected', 'revoked'].includes(connection.status)) return false;
+      await tx.put('materializations', value); return true;
+    });
   },
-  async editTask(id: string, documentId: string, edit: (task: CatalogTables['tasks'] | undefined, document: CatalogTables['documents']) => CatalogTables['tasks'] | undefined): Promise<CatalogTables['tasks'] | undefined> {
-    const db = await openCatalog(), tx = db.transaction(['tasks', 'documents'], 'readwrite'), done = idbCompleted(tx);
-    const document = await idbRequest(tx.objectStore('documents').get(documentId)) as CatalogTables['documents'] | undefined;
+  async editTask(id: string, entryId: string, edit: (task: CatalogTables['tasks'] | undefined, document: CatalogTables['entries']) => CatalogTables['tasks'] | undefined): Promise<CatalogTables['tasks'] | undefined> {
+    const db = await openCatalog(), tx = db.transaction(['tasks', 'entries'], 'readwrite'), done = idbCompleted(tx);
+    const document = await idbRequest(tx.objectStore('entries').get(entryId)) as CatalogTables['entries'] | undefined;
     if (!document) { await done; return undefined; }
     const previous = await idbRequest(tx.objectStore('tasks').get(id)) as CatalogTables['tasks'] | undefined;
     const next = edit(previous, document);
-    if (next) tx.objectStore('tasks').put({ ...next, id, documentId }); await done;
+    if (next) tx.objectStore('tasks').put({ ...next, id, entryId }); await done;
     if (next) changed('tasks', [id]); return next;
   },
-  deleteDocument(documentId: string, options: {expectedUnitId?:string} = {}) { return deleteEntities({ documentId, expectedUnitId:options.expectedUnitId }); },
-  deleteWork(workId: string) { return deleteEntities({ workId }); },
+  async deleteComic(comicId: string): Promise<CatalogTables['entries'][]> {
+    return catalog.mutate(Object.keys(schema) as CatalogTable[], async tx => {
+      const entries = await tx.list('entries', {index: 'comicId', range: comicId, limit: 10000});
+      for (const entry of entries) {
+        for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
+        for (const value of await tx.list('materializations', {index: 'contentId', range: entry.contentId, limit: 5000})) await tx.remove('materializations', value.id);
+        for (const table of ['positions', 'tasks', 'translationOperations'] as const) for (const value of await tx.list(table, {index: 'entryId', range: entry.id, limit: 10000})) await tx.remove(table, value.id);
+        await tx.remove('entries', entry.id);
+      }
+      for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);
+      await tx.remove('comics', comicId); return entries;
+    });
+  },
   subscribe(listener: (change: CatalogChange) => void) { listeners.add(listener); broadcast(); return () => { listeners.delete(listener); }; },
 };
-
-/** Returns immutable revision/container references for the byte owner to release after commit. */
-async function deleteEntities(target: { documentId?: string; workId?: string; expectedUnitId?:string }): Promise<{ revisionIds: string[]; containerIds: string[]; documentIds: string[]; revisions: CatalogTables['revisions'][] }> {
-  const tables = Object.keys(schema) as CatalogTable[], db = await openCatalog(), tx = db.transaction(tables, 'readwrite'), done = idbCompleted(tx);
-  const allBy = async <T>(table: CatalogTable, index: string, key: string): Promise<T[]> => idbRequest(tx.objectStore(table).index(index).getAll(key));
-  const remove = (table: CatalogTable, id: IDBValidKey) => { tx.objectStore(table).delete(id); tx.objectStore('tombstones').put({ id: [table, id].join(':'), deletedAt: Date.now() }); };
-  const units = target.workId ? await allBy<CatalogTables['units']>('units', 'workId', target.workId) : [];
-  const documents: CatalogTables['documents'][] = [];
-  if (target.documentId) {
-    const doc = await idbRequest(tx.objectStore('documents').get(target.documentId)) as CatalogTables['documents']|undefined;
-    if(doc&&target.expectedUnitId!==undefined&&doc.unitId!==target.expectedUnitId){tx.abort();await done.catch(()=>{});throw Error('版本归属已变化，请刷新后重新选择。');}
-    if (doc) documents.push(doc);
-  }
-  for (const unit of units) documents.push(...await allBy<CatalogTables['documents']>('documents', 'unitId', unit.id));
-  const revisionIds: string[] = [], containerIds: string[] = [], removedRevisions: CatalogTables['revisions'][] = [];
-  const updatedWorkIds = new Set<string>();
-  for (const document of documents) {
-    const revisions = await allBy<CatalogTables['revisions']>('revisions', 'documentId', document.id);
-    removedRevisions.push(...revisions);
-    for (const revision of revisions) {
-      revisionIds.push(revision.id); if (revision.containerId) containerIds.push(revision.containerId);
-      for (const table of ['pageDescriptors', 'materializations'] as const) {
-        const keys = await idbRequest(tx.objectStore(table).index('revisionId').getAllKeys(revision.id));
-        for (const key of keys) tx.objectStore(table).delete(key);
-      }
-      remove('revisions', revision.id);
-    }
-    for (const table of ['positions', 'tasks', 'acquisitionTasks', 'translationOperations'] as const) {
-      const keys = await idbRequest(tx.objectStore(table).index('documentId').getAllKeys(document.id));
-      for (const key of keys) remove(table, key);
-    }
-    remove('documents', document.id);
-    const unit = await idbRequest(tx.objectStore('units').get(document.unitId)) as CatalogTables['units'] | undefined;
-    if (unit && !target.workId) {
-      const remaining = await allBy<CatalogTables['documents']>('documents', 'unitId', unit.id);
-      if (!remaining.length) remove('units', unit.id);
-      else if (unit.preferredDocumentId === document.id) {
-        const replacement = remaining.find(value => value.indexState === 'ready') ?? remaining[0];
-        tx.objectStore('units').put({ ...unit, preferredDocumentId: replacement.id, updatedAt: Date.now() });
-      }
-      const work = await idbRequest(tx.objectStore('works').get(unit.workId)) as CatalogTables['works'] | undefined;
-      if (work) { tx.objectStore('works').put({ ...work, documentCount: Math.max(0, (work.documentCount ?? 1) - 1), cover: work.cover?.documentId === document.id ? undefined : work.cover, updatedAt: Date.now() }); updatedWorkIds.add(work.id); }
-    }
-    const otherReferences = await idbRequest(tx.objectStore('documents').index('sourceBindingId').count(document.sourceBindingId));
-    if (!otherReferences) remove('bindings', document.sourceBindingId);
-  }
-  for (const unit of units) remove('units', unit.id);
-  if (target.workId) remove('works', target.workId);
-  await done;
-  for (const document of documents) changed('documents', [document.id]);
-  for (const document of documents) changed('units', [document.unitId]);
-  for (const workId of updatedWorkIds) changed('works', [workId]);
-  if (target.workId) changed('works', [target.workId]);
-  return { revisionIds, containerIds: [...new Set(containerIds)], documentIds: documents.map(item => item.id), revisions: removedRevisions };
-}

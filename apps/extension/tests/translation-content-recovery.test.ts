@@ -10,7 +10,7 @@ import {setTranslationCacheLimitMb,translationCache} from '../src/storage/transl
 
 describe('content identity and recoverable source references',()=>{
  it('freezes document revision/page/profile without file hash or durable blob key',async()=>{
-  const ref={documentId:'document',revisionId:'revision',pageId:'page-0',renderProfileId:'original-v1-gif-first-frame'};
+  const ref={entryId:'document',contentId:'revision',pageId:'page-0',renderProfileId:'original-v1-gif-first-frame'};
   const page={...target(0).page,...ref,blobKey:pageReference(ref)};
   const operation=await makeOperation({...target(0),page},'owner','en',undefined,async()=>originalBytes(0));
   expect(operation.pageRef).toEqual(ref);expect(operation.blobKey).toBeUndefined();
@@ -18,7 +18,7 @@ describe('content identity and recoverable source references',()=>{
   expect(operation.item.image.image_sha256).toBe(page.imageSha256);
  });
  it('reopens frozen source after cache loss, preserving the original operation key',async()=>{
-  const f=fixture(),ref={documentId:'document',revisionId:'revision',pageId:'page-0',renderProfileId:'original-v1-gif-first-frame'};
+  const f=fixture(),ref={entryId:'document',contentId:'revision',pageId:'page-0',renderProfileId:'original-v1-gif-first-frame'};
   const wanted={...target(0),page:{...target(0).page,...ref,blobKey:pageReference(ref)}};
   const record=await makeOperation(wanted,f.core.scope,'zh-Hans',f.rights.modes.classic,async()=>originalBytes(0));
   record.state='uncertain';await saveOperation(record);

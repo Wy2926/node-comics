@@ -44,10 +44,6 @@ describe('Drive range safety', () => {
     await expect(drive.readAt(10,4)).rejects.toMatchObject({code:'range-unsupported'});
     expect(cancel).toHaveBeenCalled(); expect(arrayBuffer).not.toHaveBeenCalled(); expect(request).toHaveBeenCalledTimes(2);
   });
-  it('only accepts an explicit complete-image range 200', async () => {
-    const {source: drive} = source([metadata(), new Response(new Uint8Array(1000)), metadata()], {allowWholeFile200:true});
-    expect((await drive.readAt(0,1000)).byteLength).toBe(1000);
-  });
   it.each([
     [new Uint8Array(4), {'Content-Range':'bytes 11-14/1000'}],
     [new Uint8Array(4), {'Content-Range':'bytes 10-13/999'}],

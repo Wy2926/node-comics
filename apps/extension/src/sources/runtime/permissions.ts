@@ -1,10 +1,9 @@
 import { msg } from '../../i18n/runtime';
-import type { SourceCatalog } from '../../comics/application/types';
-import type { ReadingCopy } from '../../types';
-import { discoverEntry, inExtension } from './client';
+import type { ReadingEntry } from '../../types';
+import { inExtension } from './client';
 
-export const imageOrigins = (urls: string[]) => [...new Set(urls.map((url) => new URL(url).origin + '/*'))];
-export const copyOrigins = (copies: ReadingCopy[]) =>
+export const imageOrigins = (urls: string[]) => [...new Set(urls.filter(url=>/^https?:/.test(url)).map((url) => new URL(url).origin + '/*'))];
+export const copyOrigins = (copies: ReadingEntry[]) =>
   imageOrigins(
     copies.flatMap((c) => [
       ...(c.sourceUrl ? [c.sourceUrl] : []),
@@ -19,10 +18,6 @@ export async function requestImagePermissions(origins: string[]) {
     !(await chrome.permissions.request({ origins: [...new Set(origins)] }))
   )
     throw Error(msg('图片域名未获授权；尚未开始下载，可再次授权。'));
-}
-export async function prepareImageOrigins(catalog: SourceCatalog, entryId: string, signal: AbortSignal) {
-  const first = await discoverEntry(catalog, entryId, signal, async () => {}, undefined, true);
-  return imageOrigins(first.items.map((item) => item.url));
 }
 export class ImagePermissionsRequired extends Error {
   constructor() {

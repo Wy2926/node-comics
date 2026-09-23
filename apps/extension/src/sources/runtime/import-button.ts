@@ -23,7 +23,7 @@ export function mountSourceImportButton(parent: Element) {
   status.setAttribute('aria-atomic', 'true');
   button.setAttribute('aria-describedby', status.id);
   const resetLabel = () => {
-    button.textContent = msg('NodeLane Comics · 导入／管理漫画');
+    button.textContent = 'NodeLane Comics · '+msg('开始阅读');
     button.setAttribute('aria-label', button.textContent);
     status.textContent = '';
   };

@@ -8,40 +8,30 @@ import { saveSettings, settings } from '../../src/comics/application/preferences
 import type { SourceCatalog } from '../../src/comics/application/types';
 import '../../src/redesign.css';
 import type { PageManifest } from '../../src/sources';
-import { initialChoices, refreshChoices, sourceMessage, type ImageChoice } from '../../src/sources';
+import { sourceFor, sourceMessage } from '../../src/sources';
 import '../../src/styles.css';
 import { useAppearance } from '../../src/ui/Appearance';
 import { AutoTranslateTabs } from '../../src/ui/AutoTranslateTabs';
 import { BrandLogo } from '../../src/ui/BrandLogo';
-import { SourceImagePicker } from '../../src/ui/SourceImagePicker';
 import { TargetLanguage, withTargetLanguage } from '../../src/ui/TargetLanguage';
 import './popup.css';
 
 type Discovery={kind:'catalog';id:string;catalog:SourceCatalog}|{kind:'pages';id:string;manifest:PageManifest};
-type Draft={discovery:Discovery;choices:ImageChoice[];url:string};
 function Popup({initialError=''}:{initialError?:string}){
- const [discovery,setDiscovery]=useState<Discovery>(),[choices,setChoices]=useState<ImageChoice[]>([]);
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
  const [error,setError]=useState(initialError),[discoveryError,setDiscoveryError]=useState('');
  const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState(false),[saving,setSaving]=useState(false);
- const previous=useRef<Discovery>(undefined),selection=useRef<ImageChoice[]>([]),lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
+ const lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
  const [preferences,setPreferences]=useState(settings);useAppearance(preferences);
  const disabled=busy||opening||translating||saving;
- const count=choices.filter(item=>item.selected).length;
- function accept(next:Discovery){
-  const last=previous.current;
-  const same=last?.kind==='pages'&&next.kind==='pages'&&last.manifest.url===next.manifest.url&&last.manifest.navigationId===next.manifest.navigationId;
-  const items=next.kind==='pages'?(same?refreshChoices(selection.current,next.manifest):initialChoices(next.manifest)):[];
-  previous.current=next;selection.current=items;setDiscovery(next);setChoices(items);
- }
- async function discover(tab:chrome.tabs.Tab){
-  if(lock.current||openLock.current||saveLock.current)return;lock.current=true;setBusy(true);setDiscoveryError('');
-  try{
-   // Restore a selection only after an explicit discovery request, never on popup open.
-   if(!previous.current){const key='nc-popup:'+tab.id,data=await chrome.storage.session.get(key),draft=data[key] as Draft|undefined;if(draft&&draft.url===tab.url){previous.current=draft.discovery;selection.current=draft.choices;}}
-   accept(await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:tab.id}));
-  }catch(e){setDiscoveryError((e as Error).message);}
-  finally{lock.current=false;setBusy(false);}
+ const resolved=source?.url?sourceFor(source.url):undefined;
+ const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
+ async function readSource(){
+  if(!source?.url||!importable||disabled)return;lock.current=true;setBusy(true);setDiscoveryError('');
+  try{if(!await chrome.permissions.request({origins:[new URL(source.url).origin+'/*']}))throw Error(msg('未取得本站权限，可再次授权后发现。'));
+   const discovered=await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:source.id});
+   await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
+  }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{
   void chrome.tabs.query({active:true,currentWindow:true}).then(([tab])=>{
@@ -51,7 +41,6 @@ function Popup({initialError=''}:{initialError?:string}){
   const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null)setPreferences(settings());};
   window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);
  },[]);
- useEffect(()=>{if(discovery&&source?.id!=null&&source.url)void chrome.storage.session.set({['nc-popup:'+source.id]:{discovery,choices,url:source.url} satisfies Draft}).catch(()=>setDiscoveryError(msg("图片选择暂未保存，关闭弹窗后需重新选择。")));},[discovery,choices,source]);
  async function changeLanguage(language:string){
   if(saveLock.current)return;saveLock.current=true;setSaving(true);setError('');
   const next=withTargetLanguage(settings(),language);setPreferences(next);
@@ -69,25 +58,10 @@ function Popup({initialError=''}:{initialError?:string}){
   }catch(e){setError((e as Error).message);}
   finally{openLock.current=false;setTranslating(false);}
  }
- async function grant(){
-  if(!source?.url||disabled)return;
-  try{if(!await chrome.permissions.request({origins:[new URL(source.url).origin+'/*']}))throw Error(msg("未取得本站权限，可再次授权后发现。"));await discover(source);}
-  catch(e){setDiscoveryError((e as Error).message);}
- }
- async function open(useDiscovery=false){
-  if(lock.current||openLock.current||saveLock.current)return;openLock.current=true;setOpening(true);setError('');
-  try{
-   let query='';
-   if(useDiscovery&&discovery){
-    if(discovery.kind==='catalog')query='?catalog='+discovery.id;
-    else{const result=await sourceMessage<{id:string}>({type:'NC_SELECT_MANIFEST',manifestId:discovery.id,itemIds:choices.filter(item=>item.selected).map(item=>item.id)});query='?manifest='+result.id;}
-   }
-   await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html'+query)});window.close();
-  }catch(e){setError((e as Error).message);}finally{openLock.current=false;setOpening(false);}
- }
+ async function open(){if(disabled)return;setOpening(true);try{await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html')});window.close();}catch(e){setError((e as Error).message);}finally{setOpening(false);}}
  async function openSettings(){try{await chrome.runtime.openOptionsPage();window.close();}catch{setError(msg("设置未能打开，请重试。"));}}
  return <main className="nc-app nc-popup">
-  <header className="nc-popup-header"><button className="nc-popup-brand" disabled={disabled} onClick={()=>void open()} aria-label={msg("漫译 · 打开漫画管理器")}><BrandLogo/></button><button className="nc-popup-settings" aria-label={msg("设置")} title={msg("设置")} disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={19}/></button></header>
+  <header className="nc-popup-header"><button className="nc-popup-brand" disabled={disabled} onClick={()=>void open()} aria-label={msg('打开我的漫画')}><BrandLogo/></button><button className="nc-popup-settings" aria-label={msg("设置")} title={msg("设置")} disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={19}/></button></header>
   <div className="nc-popup-scroll">
    <section className="nc-popup-cover nc-comic-paper">
     <div className="nc-popup-kicker"><Icon name="spark" size={14}/>{msg("YOUR NEXT CHAPTER")}<span>{msg("随读随译")}</span></div>
@@ -102,16 +76,12 @@ function Popup({initialError=''}:{initialError?:string}){
     <p className="nc-popup-hint">{msg("留在原网页，当前图片与后三张随读随译。")}</p>
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
-   <section className="nc-popup-import" aria-label={msg("网页图片导入")}>
-    <button className="nc-popup-discover" disabled={!source||disabled} onClick={()=>source&&void discover(source)}><Icon name={discovery?'refresh':'layers'} size={18}/><span><b>{busy?msg("正在发现网页图片…"):discovery?msg("刷新网页图片"):msg("发现网页图片")}</b><small>{msg("选择图片，加入漫画管理器")}</small></span><Icon name="arrow" size={17}/></button>
-    {busy&&<p className="nc-popup-loading" role="status">{discovery?msg("正在刷新，保留已有选择与顺序…"):msg("正在读取网页图片…")}</p>}
-    {discoveryError&&<div className="nc-popup-error" role="alert"><p>{discoveryError}</p>{source&&<button disabled={disabled} onClick={()=>void grant()}>{msg("授权本站并重试")}</button>}</div>}
-    {discovery?.kind==='pages'&&<div className="nc-popup-results"><SourceImagePicker choices={choices} disabled={disabled} onChange={items=>{selection.current=items;setChoices(items);}}/><p className="nc-popup-note">{discovery.manifest.note}</p></div>}
-    {discovery?.kind==='catalog'&&<div className="nc-popup-catalog"><Icon name="layers" size={24}/><h2>{discovery.catalog.title}</h2><p>{msg("{0} 个来源条目 · {1} 个分组", {"0": discovery.catalog.entries.length, "1": discovery.catalog.groups.length})}</p><small>{discovery.catalog.note}</small></div>}
-    {discovery&&<button className="button secondary full nc-popup-add" disabled={disabled||discovery.kind==='pages'&&!count} onClick={()=>void open(true)}>{opening?msg("正在打开…"):discovery.kind==='catalog'?msg("选择目录导入范围"):msg("加入漫画 · {0} 张", {"0": count})}<Icon name="arrow" size={16}/></button>}
+   <section className="nc-popup-import" aria-label={msg('漫画阅读')}>
+    {importable?<button className="button secondary full" disabled={disabled} onClick={()=>void readSource()}><Icon name="book"/>{busy?msg('正在打开漫画'):msg('开始阅读')}</button>:<p className="nc-popup-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
+    {discoveryError&&<div className="nc-popup-error" role="alert">{discoveryError}</div>}
    </section>
   </div>
-  <footer className="nc-popup-footer"><button disabled={disabled} onClick={()=>void open()}><Icon name="folder" size={18}/><span>{msg("漫画管理器")}<small>{msg("继续阅读 / 导入本地漫画")}</small></span><Icon name="arrow" size={16}/></button></footer>
+  <footer className="nc-popup-footer"><button disabled={disabled} onClick={()=>void open()}><Icon name="folder" size={18}/><span>{msg('我的漫画')}<small>{msg("继续阅读 / 导入本地漫画")}</small></span><Icon name="arrow" size={16}/></button></footer>
  </main>;
 }
 void connectReaderSettings(settings()).then(()=>'',()=> msg("偏好暂未同步，请重新打开插件重试。")).then(async initialError=>{await initializeUiLanguage();return initialError;}).then(initialError=>createRoot(document.getElementById('root')!).render(<Popup initialError={initialError}/>));

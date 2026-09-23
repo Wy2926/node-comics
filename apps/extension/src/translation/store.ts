@@ -2,7 +2,7 @@ import type {PageReference} from '../comics/pages/identity';
 import type {Entitlements,Job,PlanItem,TranslationOperation,Mode,ReadingPriority} from '../types';
 import {openSourceDatabase} from '../storage/database';
 
-export interface LocalOperation {id:string;scope:string;copyId:string;pageId:string;blobKey?:string;pageRef?:PageReference;item:PlanItem;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationOperation;error?:string;retryAt?:number;createdAt:number;}
+export interface LocalOperation {id:string;scope:string;entryId:string;pageId:string;blobKey?:string;pageRef?:PageReference;item:PlanItem;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationOperation;error?:string;retryAt?:number;createdAt:number;}
 export interface SyncState {id:string;cursor?:string;jobs:Job[];policyRevision?:string;entitlements?:Entitlements;imageLimit?:number;imageRetryAt?:number;controlRetryAt?:number;}
 export interface ReadingSession {id:string;sessionId:string;sequence:number;signature?:string;priority:Partial<Record<Mode,ReadingPriority>>;}
 let opening:Promise<IDBDatabase>|undefined;

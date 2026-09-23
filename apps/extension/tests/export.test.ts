@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import {seedComic} from './comic-fixture';
 import {describe,expect,it,vi} from 'vitest';
 import {BlobReader,BlobWriter,ZipReader} from '@zip.js/zip.js/index-native.js';
 import {catalog} from '../src/comics/repositories';
@@ -8,23 +9,17 @@ import {writeExport} from '../src/export/files';
 import {importContainer,releaseContainer} from '../src/storage/containers';
 import {exportOriginalFile} from '../src/comics/application/export-service';
 import type {Job} from '../src/types';
-vi.mock('../src/comics/pages/service',()=>({acquirePage:vi.fn(),materializationId:(ref:{revisionId:string;pageId:string;renderProfileId:string})=>JSON.stringify([ref.revisionId,ref.pageId,ref.renderProfileId])}));
+vi.mock('../src/comics/pages/service',()=>({acquirePage:vi.fn(),materializationId:(ref:{contentId:string;pageId:string;renderProfileId:string})=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId])}));
 const options:ExportOptions={format:'cbz',images:'original',mode:'classic',language:'zh-Hans'};
 const image=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,1,2,3,4])],{type:'image/png'});
 async function sample(count=3){
-  const id=crypto.randomUUID(),revisionId=crypto.randomUUID(),bindingId=crypto.randomUUID(),now=Date.now();
-  await catalog.commit([
-    {table:'documents',value:{id,revisionId,sourceBindingId:bindingId,unitId:'unit',title:'导出样本',generation:1,format:'cbz',indexState:'ready',pageCount:count,discoveryComplete:true,createdAt:now,updatedAt:now}},
-    {table:'revisions',value:{id:revisionId,documentId:id,parserVersion:'1',indexVersion:1,generation:1,status:'ready',createdAt:now}},
-    {table:'bindings',value:{id:bindingId,connectionId:'local',providerItemId:id,locator:{name:'source.cbz'},generation:1,createdAt:now,updatedAt:now}},
-    {table:'connections',value:{id:'local',provider:'local',displayName:'本地文件',status:'connected',generation:1,createdAt:now,updatedAt:now}},
-  ]);
-  const pages=Array.from({length:count},(_,ordinal)=>({revisionId,pageId:'page-'+ordinal,ordinal,name:String(ordinal),formatLocator:'entry:'+ordinal,locator:{entry:ordinal,url:'https://private.example/?token=secret'}}));
-  await catalog.putPages(id,revisionId,pages,1);return {id,revisionId,pages};
+  const {entry}=await seedComic({title:'导出样本',pageCount:count,discoveryComplete:true});const id=entry.id,contentId=entry.contentId;
+  const pages=Array.from({length:count},(_,ordinal)=>({contentId,pageId:'page-'+ordinal,ordinal,name:String(ordinal),formatLocator:'entry:'+ordinal,locator:{entry:ordinal,url:'https://private.example/?token=secret'}}));
+  await catalog.putPages(id,contentId,pages,1);return {id,contentId,pages};
 }
 const job=(id:string,changes:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:'private-result',status:'succeeded',mode:'classic',target_language:'zh-Hans',version:1,phase:'done',quota_pages:0,cache_hit:false,created_at:'2026-09-22',...changes});
 async function bind(s:Awaited<ReturnType<typeof sample>>,jobs:Job[],outputBlobs:Record<string,string>={}){
-  const identity={id:JSON.stringify([s.revisionId,'page-0',RENDER_PROFILE]),revisionId:s.revisionId,pageId:'page-0',renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),byteSize:12,mime:'image/png',width:100,height:100,updatedAt:Date.now()};
+  const identity={id:JSON.stringify([s.contentId,'page-0',RENDER_PROFILE]),contentId:s.contentId,pageId:'page-0',renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),byteSize:12,mime:'image/png',width:100,height:100,updatedAt:Date.now()};
   expect(await catalog.putMaterialization(identity,1)).toBe(true);
   await catalog.put('translationBindings',{id:JSON.stringify(['https://api.example','alice',identity.imageSha256]),apiOrigin:'https://api.example',userId:'alice',imageSha256:identity.imageSha256,payload:{ownerId:'alice',apiOrigin:'https://api.example',jobs,outputBlobs},updatedAt:Date.now()});
 }
@@ -32,7 +27,7 @@ describe('document export through page leases',()=>{
   it('plans source descriptors without reading image bytes and keeps a frozen revision',async()=>{
     const sampleData=await sample(105),plan=await planExport(sampleData.id,options);
     expect(plan.pages).toHaveLength(105);expect(plan.pages.map(page=>page.ordinal)).toEqual(Array.from({length:105},(_,i)=>i));
-    expect(plan.revisionId).toBe(sampleData.revisionId);expect(plan.pages.every(page=>page.kind==='original')).toBe(true);
+    expect(plan.contentId).toBe(sampleData.contentId);expect(plan.pages.every(page=>page.kind==='original')).toBe(true);
   });
   it('only uses the selected account’s latest delivered translation; missing pages remain explicit original fallbacks',async()=>{
     const s=await sample();await bind(s,[job('older'),job('latest',{version:2}),job('running',{version:3,status:'running'})],{latest:'result-cache-key'});
@@ -44,7 +39,7 @@ describe('document export through page leases',()=>{
     expect((await planExport(s.id,{...options,images:'translation'},{userId:'alice',origin:'https://api.example'})).pages[0].kind).toBe('fallback');
   });
   it('requires explicit partial export and emits a credential-free manifest',async()=>{
-    const s=await sample();await catalog.patch('documents',s.id,{discoveryComplete:false,knownTotal:8});
+    const s=await sample();await catalog.patch('entries',s.id,{discoveryComplete:false,knownTotal:8});
     await expect(planExport(s.id,options)).rejects.toThrow('尚未全部发现');
     await bind(s,[job('translated')]);
     const plan=await planExport(s.id,{...options,allowIncomplete:true,images:'translation'},{userId:'alice',origin:'https://api.example'});
@@ -78,9 +73,9 @@ describe('document export through page leases',()=>{
   });
   it('exports saved source bytes exactly without invoking a parser',async()=>{
     const s=await sample(1),input=new File([new Uint8Array([80,75,3,4,7,8,9,10])],'source.cbz');
-    const container=await importContainer(input,undefined,undefined,s.revisionId);await catalog.patch('revisions',s.revisionId,{containerId:container.id});
-    try{const result=await exportOriginalFile(s.id,{signal:new AbortController().signal});expect(result.name).toBe('source.cbz');expect(await result.blob!.arrayBuffer()).toEqual(await input.arrayBuffer());}
-    finally{await releaseContainer(container.id,s.revisionId);}
+    const container=await importContainer(input,undefined,undefined,s.contentId);await catalog.patch('entries',s.id,{containerId:container.id});
+    try{const result=await exportOriginalFile(s.id,{signal:new AbortController().signal});expect(result.name).toBe('导出样本.cbz');expect(await result.blob!.arrayBuffer()).toEqual(await input.arrayBuffer());}
+    finally{await releaseContainer(container.id,s.contentId);}
   });
   it('sanitizes filenames without traversal or reserved Windows device names',()=>{
     for(const name of ['../..\\目录:标题?*','CON','LPT1.txt','..','\u0000\u202eabc'])expect(safeName(name)).not.toMatch(/[\\/:?*\u0000\u202e]|^[. ]|[. ]$/);

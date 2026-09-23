@@ -17,8 +17,7 @@ try{
  await page.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN'})));await page.reload();
  const original=await readFile(path.join(root,'artifacts/import-validation/pages.cbz'));
  await page.locator('input[type=file]').setInputFiles({name:'导出验收.cbz',mimeType:'application/zip',buffer:original});
- const imports=page.getByRole('dialog',{name:'导入本地漫画'});await imports.getByRole('button',{name:/^开始导入/}).click();await imports.locator('.nc-import-item.created').waitFor({timeout:60000});await imports.getByRole('button',{name:'完成',exact:true}).click();
- await page.getByRole('button',{name:'目录',exact:true}).click();await page.getByRole('button',{name:'导出',exact:true}).click();const panel=page.getByRole('dialog',{name:'导出漫画'});
+ await page.locator('.nc-page-image').first().waitFor({timeout:60000});await page.getByRole('button',{name:'阅读设置',exact:true}).click();await page.getByRole('button',{name:'导出漫画',exact:true}).click();const panel=page.getByRole('dialog',{name:'导出漫画'});
  const source=await download(panel.getByRole('button',{name:'保存完整源文件',exact:true}));assert.deepEqual(source,original);checks.push('保存完整源文件逐字节相等');
  const zipped=await download(panel.getByRole('button',{name:'导出全部页面',exact:true}));const reader=new ZipReader(new Uint8ArrayReader(zipped));
  const entries=await reader.getEntries();assert.equal(entries.filter(e=>/\.png$/.test(e.filename)).length,3);const manifest=JSON.parse(await entries.find(e=>e.filename==='export-manifest.json').getData(new TextWriter()));assert(manifest);await reader.close();checks.push('CBZ主动物化全部3页，附导出清单');

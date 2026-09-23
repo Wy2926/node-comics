@@ -16,7 +16,7 @@ async function page({deferSdk = false} = {}) {
   const window = {postMessage: vi.fn(), addEventListener: (type: string, fn: (event: Message) => void) => listeners.set(type, [...listeners.get(type) ?? [], fn])};
   const pickers: {token: string; callback: (data: Message) => void; dispose: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn>}[] = [];
   const requestAccessToken = vi.fn();
-  class DocsView { setIncludeFolders() { return this; } setSelectFolderEnabled() { return this; } }
+  class DocsView { setMimeTypes(value:string) { if(value.includes("image/"))throw Error("Images are not selectable"); return this; } setIncludeFolders() { return this; } setSelectFolderEnabled() { return this; } }
   class PickerBuilder {
     private token = '';
     private callback!: (data: Message) => void;

@@ -47,7 +47,7 @@ export default {
     "featureBodies": [
       "The current image and the next two are translated as you read. Your reading position stays put when results arrive.",
       "Use classic translation for everyday reading, or try AI redraw for a different rendering. The original stays one click away.",
-      "Import images, comic archives, PDFs or supported DRM-free MOBI files. Organize chapters and pick up where you left off."
+      "Choose CBZ/ZIP, CBR/RAR, PDF or supported DRM-free MOBI to import and start reading automatically. Each file is one comic; loose images are not supported."
     ],
     "ribbon": [
       "Classic + AI redraw",
@@ -58,7 +58,7 @@ export default {
     "compareTitle": "Understand the dialogue. Keep the feeling.",
     "compareDescription": "No jumping between your manga and a translation window. Put words back into the picture and stay with the characters.",
     "readingTitle": "Your collection. A fresh way to read.",
-    "readingDescription": "Bring local comics into your browser. Find chapters, keep your place, and sign in when you want a translation.",
+    "readingDescription": "Open a comic and pick up where you left off. One source per comic, with a read-only source directory and no chapter or edition management.",
     "readingAlt": "Original illustration of an open manga by a window overlooking the sea",
     "guideHeading": "A few notes before the next page.",
     "allGuides": "All reading guides",
@@ -162,7 +162,7 @@ export default {
           {
             "title": "Discover, check, then read",
             "paragraphs": [
-              "Click the image-discovery action yourself and grant the required site and image-host permissions. Check the selection and order, excluding ads and avatars, before opening the reader. Sign in, choose a target language and a mode.",
+              "On a website with a dedicated adapter, click Start reading to open the reader directly. Other webpages can use Translate current tab but cannot be imported into the library. Grant site and image-host permissions when needed. Source contents are read-only; there is no image selection, metadata form or chapter assignment.",
               "Automatic translation works on the current image and the next two. Discovering image URLs does not mean the entire chapter has been downloaded: lazy loading, navigation changes and separate CDNs can affect retrieval."
             ]
           },
@@ -216,7 +216,7 @@ export default {
             "title": "Know the file format",
             "paragraphs": [
               "CBZ usually packages images in ZIP; CBR uses RAR. PDF pages must be rendered, and MOBI contains book records and image references. Changing an extension does not convert a file.",
-              "NodeLane Comics supports PNG, JPEG, WebP, CBZ/ZIP, CBR/RAR, PDF and supported unencrypted MOBI6/MOBI6+KF8 comics. Standalone KF8/AZW3, EPUB and DRM-protected files are not currently supported."
+              "CBZ/ZIP, CBR/RAR, PDF and supported DRM-free MOBI6/MOBI6+KF8 comics. Loose images cannot be imported. Website imports require a dedicated adapter."
             ]
           },
           {
@@ -455,7 +455,7 @@ export default {
       },
       {
         "question": "Which files can I import?",
-        "answer": "PNG, JPEG, WebP, CBZ/ZIP, CBR/RAR, PDF and supported DRM-free MOBI6/MOBI6+KF8 comics. Standalone KF8/AZW3, EPUB and encrypted books are not supported."
+        "answer": "CBZ/ZIP, CBR/RAR, PDF and supported DRM-free MOBI6/MOBI6+KF8 comics. Standalone KF8/AZW3, EPUB and encrypted books are not supported. Loose images cannot be imported. Website imports require a dedicated adapter."
       },
       {
         "question": "Are images uploaded or retained?",
@@ -521,7 +521,6 @@ export default {
     "停止续费时间": "Renewal ends",
     "订阅 PLUS，在插件中享受更多翻译权益。": "Subscribe to PLUS for more translation benefits in the extension.",
     "选择订阅套餐": "Choose a subscription",
-
     "网络连接失败，请检查连接后重试。": "Connection failed. Check your network and try again.",
     "操作暂未完成，请重试或重新登录。": "The action could not be completed. Retry or sign in again.",
     "正在确认登录结果，请稍候…": "Confirming your sign-in…",

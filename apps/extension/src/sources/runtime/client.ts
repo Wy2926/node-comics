@@ -56,7 +56,7 @@ export async function discoverCatalog(url: string): Promise<SourceCatalog> {
         type: 'NC_DISCOVER_TAB',
         tabId: tab.id,
       });
-      if (result.catalog?.complete) return { ...result.catalog, excludedEntryIds: [] };
+      if (result.catalog?.complete) return result.catalog;
     }
     throw Error(msg('目录未完整加载，请打开来源页处理后重试。'));
   } finally {
@@ -64,4 +64,11 @@ export async function discoverCatalog(url: string): Promise<SourceCatalog> {
     if (current?.url && (current.url === url || sameSourcePage(current.url, url)))
       await chrome.tabs.remove(tab.id);
   }
+}
+
+export async function discoverPage(url:string,signal:AbortSignal,onProgress:(manifest:PageManifest)=>Promise<void>,assertActive?:()=>Promise<void>) {
+  signal.throwIfAborted();
+  const {tabId}=await sourceMessage<{tabId:number}>({type:'NC_OPEN_PAGE',url});
+  try{return await pollSourceDiscovery(()=>sourceMessage<PageManifest|null>({type:'NC_POLL_SOURCE',tabId}),{signal,onProgress,assertActive});}
+  finally{await sourceMessage({type:'NC_CLOSE_SOURCE',tabId}).catch(()=>{});}
 }

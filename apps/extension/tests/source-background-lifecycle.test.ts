@@ -3,7 +3,7 @@ import type { PageManifest } from '../src/sources/contracts/source';
 import { safeImageUrl } from '../src/sources/shared/urls';
 vi.mock('../src/i18n/background', () => ({ registerLocaleBackground: () => async () => {} }));
 vi.mock('../src/inline/background', () => ({ activateInline: vi.fn(), registerInlineBackground: vi.fn() }));
-vi.mock('../src/sources/index', () => ({ safeImageUrl, sameSourcePage: (a: string, b: string) => a === b, sourceFor: () => ({ definition: { capabilities: { completePageList: true } } }), sourceLocation: () => undefined, validateSourceCatalog: (value: unknown) => value }));
+vi.mock('../src/sources/index', () => ({ safeImageUrl, sameSourcePage: (a: string, b: string) => a === b, sourceFor: () => ({ definition: {id:'test',capabilities: {importable:true,pages:true,completePageList: true}},location:{kind:'reader'} }), sourceLocation: () => undefined, validateSourceCatalog: (value: unknown) => value }));
 import { registerSourceBackground } from '../src/sources/runtime/background';
 
 let listener: (message: unknown, sender: chrome.runtime.MessageSender, response: (value: unknown) => void) => unknown;

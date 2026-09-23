@@ -60,12 +60,8 @@ describe('page indexes separate from materialization', () => {
     await expect(openMobiDocument(sourceFor(mobi([1],true).bytes).source).index()).rejects.toThrow('DRM');
     await expect(openMobiDocument(sourceFor(mobi([99]).bytes).source).index()).rejects.toThrow('不存在');
   });
-  it('respects cancellation before reading and treats an image as one immutable page', async () => {
-    const {source, reads} = sourceFor(png(100)), session = await openDocument('image', source);
-    const pages = await session.index(); expect(reads).toHaveLength(0); expect(pages).toHaveLength(1);
-    const controller = new AbortController(); controller.abort();
-    await expect(session.materialize(pages[0], controller.signal)).rejects.toThrow(); expect(reads).toHaveLength(0);
-    expect((await session.materialize(pages[0])).size).toBe(100);
-    expect(detectFormat('a.cbz', png(100))).toBeUndefined(); expect(detectFormat('a.png', png(100))).toBe('image');
+  it('rejects standalone images and respects cancellation before file reads',async()=>{
+    const {source,reads}=sourceFor(png(100));await expect(openDocument('image',source)).rejects.toThrow('不支持');expect(detectFormat('a.png',png(100))).toBeUndefined();expect(detectFormat('a.cbz',png(100))).toBeUndefined();
+    const controller=new AbortController();controller.abort();await expect(openDocument('cbz',source,controller.signal)).rejects.toThrow();expect(reads).toHaveLength(0);
   });
 });

@@ -10,6 +10,6 @@ export interface SourceDefinition {
   id: string;
   name: string;
   identify(url: URL): SourceLocation | null;
-  capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean };
+  capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean };
   installation: { requiredOrigins: readonly string[]; autoContentMatches: readonly string[] };
 }

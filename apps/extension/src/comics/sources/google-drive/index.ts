@@ -68,8 +68,8 @@ export async function openDriveSource(binding: DriveBinding, signal?: AbortSigna
       await accessChanged(binding.accountId, binding.fileId);
     throw error;
   });
-  if (metadata.version !== binding.version || metadata.size !== binding.size) throw new DriveError('source-changed', 'Google Drive 文件已变化，请重新选择文件建立新版本。');
-  const source = new DriveRangeSource(binding, {...options, token, allowWholeFile200: metadata.format === 'image',
+  if (metadata.version !== binding.version || metadata.size !== binding.size) throw new DriveError('source-changed', 'Google Drive 文件已变化，请重新选择此文件载入当前内容。');
+  const source = new DriveRangeSource(binding, {...options, token,
     onAccessLost: async reference => { await accessChanged(reference.accountId, reference.fileId); }});
   let set = sources.get(binding.accountId);
   if (!set) { set = new Set(); sources.set(binding.accountId, set); }

@@ -11,7 +11,7 @@ const page=await browser.newPage({viewport:{width:1440,height:1000}}),checks=[],
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const library=page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'我的漫画',exact:true});
-const book=page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开作品 星光书店',exact:true})});
+const book=page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 星光书店',exact:true})});
 async function inLibrary(){
   await page.waitForURL(url=>url.hash==='#library');
   await library.waitFor();

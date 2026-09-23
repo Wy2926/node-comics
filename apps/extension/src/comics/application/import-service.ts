@@ -1,141 +1,191 @@
 import {sourceLock} from './locks';
-import { catalog, type CatalogWrite } from '../repositories';
-import type { Document, DocumentRevision, PageDescriptor } from '../domain';
-import { importContainer, releaseContainer } from '../../storage/containers';
-import { openDocument } from '../formats';
-import type { ComicFormat, IndexedPage } from '../formats/contracts';
-import { openFileSource } from '../sources/runtime';
-import type { SourceSelection } from '../sources/contracts';
-import type { ImportAssignment, SourceCatalog } from './types';
-import type { PageManifest, SourceEntry } from '../../sources';
-import { Sha256 } from '../../importers/hash';
-import { beginImportJournal, completeImportJournal, recordCopiedFile } from './import-journal';
-import { restoreSourceSelection } from './source-access';
+import {catalog, type CatalogWrite} from '../repositories';
+import type {Comic, Entry, PageDescriptor, SourceConnection} from '../domain';
+import {importContainer, openContainer, releaseContainer, type ManagedContainer} from '../../storage/containers';
+import {openDocument} from '../formats';
+import type {ComicFormat, IndexedPage} from '../formats/contracts';
+import {openFileSource} from '../sources/runtime';
+import type {SourceSelection} from '../sources/contracts';
+import {sourceFor, safeImageUrl, isPageImageUrl, validateSourceCatalog, type PageManifest, type SourceCatalogSnapshot} from '../../sources';
+import {getSourceDriver} from '../sources/registry';
+import {Sha256} from '../../importers/hash';
+import {beginImportJournal, completeImportJournal, recordCopiedFile} from './import-journal';
+import {restoreSourceSelection} from './source-access';
+import {sourcePageCache} from '../../storage/source-pages';
+import {sourceRangeCache} from '../../storage/source-ranges';
+import {thumbnailCache} from '../../storage/thumbnails';
+import {downloadStore} from '../../storage/downloads';
 
-const digest=(value:string)=>new Sha256().update(new TextEncoder().encode(value)).digest();
-function validateAssignment(assignment:ImportAssignment){if(!assignment.workId&&!assignment.title.trim())throw Error('作品名称不能为空。');}
-export const stablePageId=(revisionId:string,locator:unknown)=>digest(JSON.stringify([revisionId,locator]));
-interface DocumentRegistration {title:string;format:Document['format'];sourceKey:string;connectionId:string;provider:string;providerItemId?:string;accountId?:string;displayName:string;locator:Record<string,unknown>;containerId?:string;sourceSnapshot?:Record<string,unknown>;revisionId?:string;sourceUrl?:string;sourceEntryId?:string}
-export function registerDocument(input:DocumentRegistration,assignment:ImportAssignment):Promise<{document:Document;created:boolean}>{return registerDocumentAttempt(input,assignment,false);}
-async function registerDocumentAttempt(input:DocumentRegistration,assignment:ImportAssignment,retried:boolean):Promise<{document:Document;created:boolean}>{
-  validateAssignment(assignment);
-  const existing=(await catalog.list('documents',{index:'sourceKey',range:input.sourceKey,limit:1}))[0];
-  if(existing)return {document:existing,created:false};
-  const providerItemId=input.providerItemId??input.sourceKey;
-  const binding=(await catalog.list('bindings',{index:'providerItem',range:[input.connectionId,providerItemId],limit:1}))[0];
-  const now=Date.now(),documentId=crypto.randomUUID(),revisionId=input.revisionId??crypto.randomUUID(),workId=assignment.workId??crypto.randomUUID(),unitId=assignment.unitId??crypto.randomUUID(),bindingId=binding?.id??crypto.randomUUID();
-  if(assignment.workId&&!await catalog.get('works',workId))throw Error('所选作品已移除。');
-  if(assignment.unitId){const unit=await catalog.get('units',unitId);if(!unit||unit.workId!==workId)throw Error('所选阅读单元不属于此作品。');}
-  const document:Document={id:documentId,unitId,sourceBindingId:bindingId,format:input.format,revisionId,title:input.title,generation:1,indexState:'indexing',sourceKey:input.sourceKey,createdAt:now,updatedAt:now,sourceUrl:input.sourceUrl,sourceEntryId:input.sourceEntryId};
-  const revision:DocumentRevision={id:revisionId,documentId,containerId:input.containerId,sourceSnapshot:input.sourceSnapshot,sourceVersion:typeof input.sourceSnapshot?.version==='string'?input.sourceSnapshot.version:undefined,parserVersion:'file-index-v1',indexVersion:1,generation:1,status:'indexing',createdAt:now};
-  const records:CatalogWrite[]=[{table:'documents',value:document},{table:'revisions',value:revision}];
-  if(!binding)records.push({table:'bindings',value:{id:bindingId,connectionId:input.connectionId,providerItemId,locator:input.locator,generation:1,createdAt:now,updatedAt:now}});
-  if(!await catalog.get('connections',input.connectionId))records.push({table:'connections',value:{id:input.connectionId,provider:input.provider,accountId:input.accountId,displayName:input.displayName,status:'connected',generation:1,createdAt:now,updatedAt:now}});
-  if(!assignment.workId)records.push({table:'works',value:{id:workId,title:assignment.title.trim()||input.title,aliases:[],createdAt:now,updatedAt:now}});
-  if(!assignment.unitId)records.push({table:'units',value:{id:unitId,workId,title:input.title,order:now,kind:assignment.kind,role:assignment.role??'unknown',preferredDocumentId:documentId,createdAt:now,updatedAt:now}});
-  try{await catalog.commit(records,{require:[{table:'works',id:workId},{table:'units',id:unitId},...(binding?[{table:'bindings' as const,id:bindingId}]:[])],incrementWorkDocuments:workId});}
-  catch(error){
-    const duplicate=(await catalog.list('documents',{index:'sourceKey',range:input.sourceKey,limit:1}))[0];if(duplicate)return {document:duplicate,created:false};
-    if(!retried&&!binding&&(await catalog.list('bindings',{index:'providerItem',range:[input.connectionId,providerItemId],limit:1}))[0])return registerDocumentAttempt(input,assignment,true);
-    throw error;
+const digest = (value:string) => new Sha256().update(new TextEncoder().encode(value)).digest();
+export const stablePageId = (locator:unknown) => digest(JSON.stringify(locator));
+const titleFor = (name:string) => name.replace(/\.[^.]+$/, '') || name;
+const fileFormats = new Set(['cbz','cbr','pdf','mobi']);
+type ConnectionInput = Pick<SourceConnection,'id'|'provider'|'accountId'|'displayName'>;
+async function connection(input:ConnectionInput) {
+  const existing=await catalog.get('connections',input.id);
+  if(existing) {
+    if(existing.provider!==input.provider||existing.accountId!==input.accountId)throw Error('来源账户身份不匹配。');
+    return existing;
   }
-  return {document,created:true};
+  const now=Date.now();
+  const value:SourceConnection={...input,status:'connected',generation:1,createdAt:now,updatedAt:now};
+  await catalog.put('connections',value);return value;
 }
-async function publishIndex(doc:Document,pages:IndexedPage[],complete=true,knownTotal?:number){
-  if(!pages.length&&complete)throw Error('文件中未找到可读漫画页面。');
-  const descriptors:PageDescriptor[]=pages.map(page=>({...page,pageId:stablePageId(doc.revisionId,doc.format==='website'?{url:page.locator.url,sourceId:page.locator.sourceId}:page.locator),revisionId:doc.revisionId,formatLocator:JSON.stringify(doc.format==='website'?{url:page.locator.url,sourceId:page.locator.sourceId}:page.locator)}));
-  for(let offset=0;offset<descriptors.length;offset+=100)await catalog.putPages(doc.id,doc.revisionId,descriptors.slice(offset,offset+100),doc.generation);
-  if(!await catalog.finishIndex(doc.id,doc.revisionId,doc.generation,{pageCount:pages.length,knownTotal:knownTotal??(complete?pages.length:undefined),discoveryComplete:complete,coverPageId:descriptors[0]?.pageId}))throw Error('文档版本已改变，目录结果已丢弃。');
+function descriptors(contentId:string,pages:IndexedPage[]):PageDescriptor[] {
+  return pages.map(page=>{const locator='sourceId' in page.locator?{url:page.locator.url,sourceId:page.locator.sourceId}:page.locator;return {...page,contentId,pageId:stablePageId(locator),formatLocator:JSON.stringify(locator)};});
 }
-export async function reindexDocument(id:string,signal?:AbortSignal){
-  signal?.throwIfAborted();
-  let doc=await catalog.get('documents',id);if(!doc)throw Error('文档已移除。');
-  if(doc.format==='website')throw Error('请通过网站来源重新发现页面。');
-  const revision=await catalog.get('revisions',doc.revisionId);if(!revision)throw Error('文档版本已移除。');
-  doc=await catalog.patch('documents',id,{indexState:'indexing',error:undefined,generation:doc.generation+1},{expectedGeneration:doc.generation});if(!doc)throw Error('文档已移除。');
-  try{
-    if(doc.format==='images'){
-      const ids=revision.sourceSnapshot?.containerIds,names=revision.sourceSnapshot?.fileNames;
-      if(!Array.isArray(ids)||!ids.length||ids.some(value=>typeof value!=='string'))throw Error('图集来源资料不完整，请重新导入。');
-      signal?.throwIfAborted();
-      const complete=revision.sourceSnapshot?.importComplete!==false;
-      await publishIndex(doc,ids.map((containerId,ordinal)=>({ordinal,name:Array.isArray(names)&&typeof names[ordinal]==='string'?names[ordinal]:`第 ${ordinal+1} 页`,locator:{containerId,imageIndex:ordinal}})),complete,typeof revision.sourceSnapshot?.expectedPageCount==='number'?revision.sourceSnapshot.expectedPageCount:ids.length);
-      if(!complete)await catalog.patch('documents',id,{indexState:'failed',error:'图集导入中断，已保存的原图保留；请重新选择完整图集。'},{expectedGeneration:doc.generation});
-      return id;
+async function filePages(context:Parameters<typeof openFileSource>[0]):Promise<IndexedPage[]> {
+  const source=await openFileSource(context);
+  try {const session=await openDocument(context.format,source,context.signal);try{return await session.index(context.signal);}finally{await session.close();}}
+  finally {await source.close();}
+}
+interface FileRegistration {
+  title:string; format:ComicFormat; connection:ConnectionInput; connectionGeneration?:number; resourceId:string;
+  locator:Record<string,unknown>; snapshot?:Record<string,unknown>; containerId?:string; contentId:string; pages:IndexedPage[];
+}
+async function registerFile(input:FileRegistration):Promise<{id:string;comicId:string;created:boolean}> {
+  if(!fileFormats.has(input.format)||!input.pages.length)throw Error('文件中未找到可读漫画页面。');
+  const sourceKey=JSON.stringify([input.connection.id,input.resourceId]);
+  const [existing]=await catalog.list('comics',{index:'sourceKey',range:sourceKey,limit:1});
+  if(existing) {
+    const active=await catalog.get('connections',input.connection.id);
+    if(existing.source.status!=='active'||!active||active.status!=='connected'||input.connectionGeneration!==undefined&&active.generation!==input.connectionGeneration)throw Error('来源访问已变化，请重新选择文件。');
+    const [entry]=await catalog.listEntries(existing.id,{limit:1});if(!entry)throw Error('漫画目录缺失，请移除后重新导入。');
+    if(JSON.stringify(entry.sourceSnapshot)!==JSON.stringify(input.snapshot)) {
+      await catalog.replaceContent(entry.id,entry.generation,{contentId:input.contentId,format:input.format,containerId:input.containerId,sourceSnapshot:input.snapshot},descriptors(input.contentId,input.pages),true);
+      await Promise.all([sourcePageCache.deleteOwner(entry.id),sourceRangeCache.deleteOwner(entry.id),thumbnailCache.deleteOwner(entry.id)]);
     }
-    const binding=await catalog.get('bindings',doc.sourceBindingId),connection=binding&&await catalog.get('connections',binding.connectionId);
-    if(!binding||!connection)throw Error('来源连接已移除。');
-    const source=await openFileSource({connection,binding,revision,documentId:doc.id,format:doc.format,containerId:revision.containerId,signal});
-    try{const session=await openDocument(doc.format as ComicFormat,source,signal);try{await publishIndex(doc,await session.index(signal));}finally{await session.close();}}finally{await source.close();}
-  }catch(error){await catalog.patch('documents',id,{indexState:'failed',error:(error as Error).message},{expectedGeneration:doc.generation}).catch(()=>{});throw error;}
-  return id;
+    return {id:entry.id,comicId:existing.id,created:false};
+  }
+  const now=Date.now(),comicId=crypto.randomUUID(),entryId=crypto.randomUUID();
+  const comic:Comic={id:comicId,sourceKey,title:input.title,sourceName:input.connection.provider==='local'?'本地文件':getSourceDriver(input.connection.provider)?.label??input.connection.provider,source:{connectionId:input.connection.id,providerItemId:input.resourceId,locator:input.locator,generation:1,status:'active'},startEntryId:entryId,cover:{entryId,contentId:input.contentId,pageId:stablePageId(input.pages[0].locator)},createdAt:now,updatedAt:now};
+  const entry:Entry={id:entryId,comicId,title:input.title,order:0,format:input.format,contentId:input.contentId,generation:1,indexState:'ready',containerId:input.containerId,sourceSnapshot:input.snapshot,createdAt:now,updatedAt:now,pageCount:input.pages.length,knownTotal:input.pages.length,discoveryComplete:true,coverPageId:comic.cover!.pageId};
+  await connection(input.connection);
+  const records:CatalogWrite[]=[{table:'comics',value:comic},{table:'entries',value:entry},...descriptors(input.contentId,input.pages).map(value=>({table:'pageDescriptors' as const,value}))];
+  await catalog.mutate(['comics','entries','connections','pageDescriptors'],async tx=>{const current=await tx.get('connections',input.connection.id);if(!current||current.status!=='connected'||input.connectionGeneration!==undefined&&current.generation!==input.connectionGeneration)throw Error('来源连接已变化，请重试。');for(const record of records)await tx.put(record.table,record.value);});
+  return {id:entryId,comicId,created:true};
 }
-async function saveLocalFile(file:File,assignment:ImportAssignment,signal?:AbortSignal,onProgress?:(label:string,done?:number,total?:number)=>void){
-  validateAssignment(assignment);
-  const revisionId=crypto.randomUUID();
-  const journal=await beginImportJournal(revisionId,'file',[file],assignment);
-  onProgress?.('正在保存完整源文件',0,file.size);
-  let container:Awaited<ReturnType<typeof importContainer>>|undefined,registered=false;
-  try{
-    container=await importContainer(file,signal,(done,total)=>onProgress?.('正在保存完整源文件',done,total),revisionId);
-    await recordCopiedFile(journal,0,container.id);
-    const result=await registerDocument({title:file.name.replace(/\.[^.]+$/,''),format:container.format,sourceKey:'local:'+container.id+':'+(assignment.unitId??assignment.workId??'new'),connectionId:'local',provider:'local',displayName:'本地源文件',locator:{containerId:container.id,name:file.name},containerId:container.id,revisionId},assignment);
-    if(!result.created){await releaseContainer(container.id,revisionId);await completeImportJournal(revisionId);if(result.document.indexState!=='ready')await reindexDocument(result.document.id,signal);return {id:result.document.id,created:false};}
-    registered=true;await completeImportJournal(revisionId);
-    onProgress?.('源文件已保存，正在建立目录');
-    await reindexDocument(result.document.id,signal);
-    return {id:result.document.id,created:true};
-  }catch(error){if(!registered&&container)await releaseContainer(container.id,revisionId);await completeImportJournal(revisionId).catch(()=>{});throw error;}
-}
-export async function importSourceFiles(selection:SourceSelection,assignment:ImportAssignment,signal?:AbortSignal){
+export async function registerLocalContainer(container:ManagedContainer,contentId:string,signal?:AbortSignal) {
+  const source=await openContainer(container.id);let pages:IndexedPage[];
+  try {const session=await openDocument(container.format,source,signal);try {pages=await session.index(signal);}finally {await session.close();}} finally {await source.close();}
   signal?.throwIfAborted();
-  validateAssignment(assignment);
-  await restoreSourceSelection(selection);
-  const ids:string[]=[];let sharedWork=assignment.workId;
-  for(const file of selection.files){
-    signal?.throwIfAborted();
-    const result=await registerDocument({title:file.name.replace(/\.[^.]+$/,''),format:file.format,sourceKey:file.sourceKey,providerItemId:file.id,connectionId:selection.connection.id,provider:selection.connection.provider,accountId:selection.connection.accountId,displayName:selection.connection.displayName,locator:file.locator,sourceSnapshot:file.snapshot}, {...assignment,workId:sharedWork});
-    const unit=await catalog.get('units',result.document.unitId);sharedWork??=unit?.workId;
-    if(result.created||result.document.indexState!=='ready')await reindexDocument(result.document.id,signal);ids.push(result.document.id);
-  }return ids;
+  return registerFile({title:titleFor(container.fileName??'漫画'),format:container.format,connection:{id:'local',provider:'local',displayName:'本地文件'},resourceId:container.id,locator:{containerId:container.id,name:container.fileName},containerId:container.id,contentId,pages});
 }
-export async function importWebsiteEntry(source:SourceCatalog,entry:SourceEntry,assignment:ImportAssignment){
-  const result=await registerDocument({title:entry.title,format:'website',sourceKey:'website:'+entry.id,connectionId:'website:'+source.sourceId,provider:'website',displayName:source.title,locator:{catalogId:source.id,entryId:entry.id,url:entry.url},sourceUrl:entry.url,sourceEntryId:entry.id},assignment);
-  const unit=await catalog.get('units',result.document.unitId);
-  await catalog.put('catalogs',{...source,workId:unit?.workId});
-  // Discovery stays pending until explicitly opening or downloading this document.
-  return result.document.id;
+async function saveLocalFile(file:File,signal?:AbortSignal,onProgress?:(label:string,done?:number,total?:number)=>void) {
+  const contentId=crypto.randomUUID(),journal=await beginImportJournal(contentId,file);
+  let container:ManagedContainer|undefined,registered=false;
+  try {
+    onProgress?.('正在保存完整源文件',0,file.size);
+    container=await importContainer(file,signal,(done,total)=>onProgress?.('正在保存完整源文件',done,total),contentId);
+    await recordCopiedFile(journal,container.id);
+    onProgress?.('源文件已保存，正在建立目录');
+    const result=await registerLocalContainer(container,contentId,signal);registered=result.created;
+    if(!registered)await releaseContainer(container.id,contentId);
+    await completeImportJournal(contentId);return result;
+  } catch(error) {
+    if(!registered&&container)await releaseContainer(container.id,contentId);
+    await completeImportJournal(contentId).catch(()=>{});throw error;
+  }
 }
-export async function importManifest(manifest:PageManifest,assignment:ImportAssignment){
-  const sourceKey='website-selection:'+digest(JSON.stringify([manifest.url,manifest.items.map(p=>p.id)]));
-  const result=await registerDocument({title:manifest.title,format:'website',sourceKey,connectionId:'website:'+manifest.adapter,provider:'website',displayName:manifest.adapter,locator:{url:manifest.url},sourceUrl:manifest.url},assignment);
-  if(result.created)await publishWebsiteManifest(result.document,manifest);
-  return result.document.id;
-}
-export async function publishWebsiteManifest(doc:Document,manifest:PageManifest){
-  const old=await catalog.listPages(doc.revisionId,{limit:1500});
-  for(const [index,page] of old.entries()){const incoming=manifest.items[index];if(incoming&&(page.locator.url!==incoming.url||page.locator.sourceId!==incoming.id))throw Error('来源页序或地址已变化，请导入新的文档版本。');}
-  const pages:IndexedPage[]=manifest.items.map((p,index)=>({ordinal:index,name:`第 ${index+1} 页`,width:p.width||undefined,height:p.height||undefined,locator:{url:p.url,sourceId:p.id,manifestId:manifest.id,...(p.kind?{kind:p.kind}:{})}}));
-  // A restarted discovery may report a shorter prefix. Do not truncate saved suffix pages.
-  for(let i=pages.length;i<old.length;i++)pages.push({...old[i],locator:old[i].locator as {url:string;sourceId:string}});
-  await publishIndex(doc,pages,manifest.discoveryComplete,manifest.knownTotal);
-}
-
-async function saveImageAlbum(files:File[],assignment:ImportAssignment,signal?:AbortSignal,onProgress?:(label:string,done?:number,total?:number)=>void){
-  validateAssignment(assignment);
-  if(!files.length)throw Error('请选择至少一张图片。');
-  const revisionId=crypto.randomUUID(),containers:Awaited<ReturnType<typeof importContainer>>[]=[];let registered=false;
-  const journal=await beginImportJournal(revisionId,'images',files,assignment);
-  try{
-    for(const [index,file] of files.entries()){onProgress?.(`正在保存原图 ${index+1} / ${files.length}`,index,files.length);const container=await importContainer(file,signal,undefined,revisionId);containers.push(container);await recordCopiedFile(journal,index,container.id);}
-    const result=await registerDocument({title:files[0].name.replace(/\.[^.]+$/,''),format:'images',sourceKey:'album:'+digest(JSON.stringify(containers.map(c=>c.id)))+':'+(assignment.unitId??assignment.workId??'new'),connectionId:'local',provider:'local',displayName:'本地图集',locator:{},sourceSnapshot:{containerIds:containers.map(c=>c.id),fileNames:files.map(f=>f.name),importComplete:true},revisionId},assignment);
-    if(!result.created){for(const c of containers)await releaseContainer(c.id,revisionId);await completeImportJournal(revisionId);if(result.document.indexState!=='ready')await reindexDocument(result.document.id,signal);return {id:result.document.id,created:false};}
-    registered=true;
-    await completeImportJournal(revisionId);
-    await reindexDocument(result.document.id,signal);
-    return {id:result.document.id,created:true};
-  }catch(error){if(!registered)for(const c of containers)await releaseContainer(c.id,revisionId);await completeImportJournal(revisionId).catch(()=>{});throw error;}
-}
-
 export const importLocalFile=(...args:Parameters<typeof saveLocalFile>)=>sourceLock(()=>saveLocalFile(...args));
-export const importImageAlbum=(...args:Parameters<typeof saveImageAlbum>)=>sourceLock(()=>saveImageAlbum(...args));
+export async function importSourceFiles(selection:SourceSelection,signal?:AbortSignal) {
+  return sourceLock(async()=>{
+    signal?.throwIfAborted();
+    for(const file of selection.files)if(!fileFormats.has(file.format))throw Error('不支持图片导入，请选择漫画文件。');
+    const connected=await connection(selection.connection);await restoreSourceSelection(selection);
+    const results:{id:string;comicId:string;created:boolean;name:string}[]=[],failures:{name:string;error:string}[]=[];
+    for(const file of selection.files) {
+      signal?.throwIfAborted();
+      try {
+        const contentId=crypto.randomUUID();
+        const source={connectionId:connected.id,providerItemId:file.id,locator:file.locator,generation:1,status:'active' as const};
+        const current=await catalog.get('connections',connected.id);
+        let pages:IndexedPage[];const owner='pending:'+contentId;
+        try{pages=await filePages({connection:current!,source,contentId,entryId:owner,sourceSnapshot:file.snapshot,format:file.format,signal});}finally{await sourceRangeCache.deleteOwner(owner,true);}
+        signal?.throwIfAborted();
+        const result=await registerFile({title:titleFor(file.name),format:file.format,connection:selection.connection,connectionGeneration:current!.generation,resourceId:file.id,locator:file.locator,snapshot:file.snapshot,contentId,pages});
+        results.push({...result,name:file.name});
+      }catch(error){if(signal?.aborted)throw error;failures.push({name:file.name,error:(error as Error).message});}
+    }
+    return {results,failures};
+  });
+}
+export async function reindexEntry(id:string,signal?:AbortSignal) {
+  const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
+  if(entry.format==='website')throw Error('请通过已适配的网站重新载入内容。');
+  const comic=await catalog.get('comics',entry.comicId),connected=comic&&await catalog.get('connections',comic.source.connectionId);
+  if(!comic||!connected)throw Error('漫画来源已移除。');
+  const pages=await filePages({connection:connected,source:comic.source,entryId:id,contentId:entry.contentId,sourceSnapshot:entry.sourceSnapshot,format:entry.format,containerId:entry.containerId,signal});
+  await publishIndex(entry,pages,true);
+}
+export async function publishIndex(entry:Entry,pages:IndexedPage[],complete:boolean,total?:number) {
+  if(!pages.length&&complete)throw Error('来源没有可读漫画页面。');
+  const values=descriptors(entry.contentId,pages);
+  for(let offset=0;offset<values.length;offset+=100)await catalog.putPages(entry.id,entry.contentId,values.slice(offset,offset+100),entry.generation);
+  if(!await catalog.finishIndex(entry.id,entry.contentId,entry.generation,{pageCount:pages.length,knownTotal:total??(complete?pages.length:undefined),discoveryComplete:complete,coverPageId:values[0]?.pageId}))throw Error('来源内容已变化，请重新打开。');
+}
+function requireWebsite(url:string,adapter?:string) {
+  const resolved=sourceFor(url);
+  if(!resolved.definition.capabilities.importable||!resolved.definition.capabilities.pages||resolved.location.kind==='other'||adapter&&adapter!==resolved.definition.id)throw Error('此网站尚未专门适配，不能导入漫画。');
+  return resolved;
+}
+async function websiteComic(url:string,title:string,resourceKey?:string) {
+  const {definition,location}=requireWebsite(url),resourceId=resourceKey??location.catalog?.key??location.pageKey,sourceKey=JSON.stringify(['website:'+definition.id,resourceId]);
+  const [existing]=await catalog.list('comics',{index:'sourceKey',range:sourceKey,limit:1});if(existing)return existing;
+  const now=Date.now(),value:Comic={id:crypto.randomUUID(),sourceKey,title,sourceName:definition.name,sourceUrl:location.catalog?.url??url,source:{connectionId:'website:'+definition.id,providerItemId:resourceId,locator:{url:location.catalog?.url??url,catalogId:location.catalog?.key},generation:1,status:'active'},createdAt:now,updatedAt:now};
+  await connection({id:value.source.connectionId,provider:'website',displayName:definition.name});
+  await catalog.put('comics',value);return value;
+}
+export async function importCatalog(snapshot:SourceCatalogSnapshot):Promise<Comic> {
+  return sourceLock(async()=>{
+    const source=validateSourceCatalog(snapshot);requireWebsite(source.url,source.sourceId);
+    const comic=await websiteComic(source.url,source.title),now=Date.now();
+    await catalog.mutate(['comics','entries','catalogs'],async tx=>{
+      const current=await tx.get('comics',comic.id);if(!current)throw Error('漫画已移除。');
+      const existing=await tx.list('entries',{index:'comicId',range:comic.id,limit:10000});
+      const bySource=new Map(existing.map(entry=>[entry.sourceEntryId,entry])),entries:Entry[]=[];
+      for(const item of source.entries.filter(item=>!item.related)) {
+        const previous=bySource.get(item.id);
+        const entry:Entry=previous?{...previous,title:item.title,order:item.order,sequenceId:item.sequenceId,sourceUrl:item.url}:{id:crypto.randomUUID(),comicId:comic.id,title:item.title,order:item.order,sequenceId:item.sequenceId,sourceEntryId:item.id,sourceUrl:item.url,format:'website',contentId:crypto.randomUUID(),generation:1,indexState:'pending',createdAt:now,updatedAt:now};
+        await tx.put('entries',entry);entries.push(entry);
+      }
+      const defaultEntry=entries.find(entry=>entry.sourceEntryId===source.defaultEntryId)??(entries.length===1?entries[0]:undefined);
+      await tx.put('comics',{...current,title:source.title,startEntryId:defaultEntry?.id,sourceUrl:source.url});
+      await tx.put('catalogs',{...source,comicId:comic.id});
+    });
+    return (await catalog.get('comics',comic.id))!;
+  });
+}
+export async function importManifest(manifest:PageManifest) {
+  return sourceLock(async()=>{
+    const {location}=validateManifest(manifest);
+    const comic=await websiteComic(manifest.url,manifest.title);
+    let [entry]=await catalog.list('entries',{index:'sourceEntry',range:[comic.id,location.pageKey],limit:1});
+    if(!entry) {
+      const now=Date.now();entry={id:crypto.randomUUID(),comicId:comic.id,title:manifest.title,order:0,format:'website',contentId:crypto.randomUUID(),generation:1,indexState:'pending',sourceEntryId:location.pageKey,sourceUrl:manifest.url,createdAt:now,updatedAt:now};
+      await catalog.commit([{table:'entries',value:entry}],{require:[{table:'comics',id:comic.id}]});
+      if(!location.catalog)await catalog.patch('comics',comic.id,{startEntryId:entry.id});
+    }
+    await publishWebsiteManifest(entry,manifest);
+    return {id:entry.id,comicId:comic.id,catalogUrl:location.catalog?.url};
+  });
+}
+export async function publishWebsiteManifest(entry:Entry,manifest:PageManifest,acceptChange=false) {
+  const {location}=validateManifest(manifest);
+  if(entry.sourceEntryId!==location.pageKey)throw Error('来源页面不属于此漫画内容。');
+  const old=await catalog.listPages(entry.contentId,{limit:1500});
+  const changed=manifest.discoveryComplete&&old.length>manifest.items.length||old.some((page,index)=>{const incoming=manifest.items[index];return incoming&&(page.locator.url!==incoming.url||page.locator.sourceId!==incoming.id);});
+  const pages:IndexedPage[]=manifest.items.map((page,ordinal)=>({ordinal,name:`第 ${ordinal+1} 页`,width:page.width||undefined,height:page.height||undefined,locator:{url:page.url,sourceId:page.id,manifestId:manifest.id,...(page.kind?{kind:page.kind}:{})}}));
+  if(changed||acceptChange&&old.length>0) {
+    if(!acceptChange)throw Error('来源内容已变化，请重新载入当前内容。');
+    const contentId=crypto.randomUUID();await catalog.replaceContent(entry.id,entry.generation,{contentId,format:'website'},descriptors(contentId,pages),manifest.discoveryComplete,manifest.knownTotal);
+    await Promise.all([sourcePageCache.deleteOwner(entry.id),sourceRangeCache.deleteOwner(entry.id),thumbnailCache.deleteOwner(entry.id),downloadStore.deleteOwner(entry.id)]);return;
+  }
+  for(let i=pages.length;i<old.length;i++)pages.push({...old[i],locator:old[i].locator as IndexedPage['locator']});
+  await publishIndex(entry,pages,manifest.discoveryComplete,manifest.knownTotal);
+}
+function validateManifest(manifest:PageManifest) {
+  const resolved=requireWebsite(manifest.url,manifest.adapter);
+  if(resolved.location.kind!=='reader'||!manifest.items.length||manifest.items.length>1500||new Set(manifest.items.map(p=>p.id)).size!==manifest.items.length||manifest.items.some(p=>typeof p.id!=='string'||!p.id||!(p.kind==='page'?isPageImageUrl(p.url):safeImageUrl(p.url,manifest.url)===p.url)))throw Error('来源页面清单无效。');
+  return resolved;
+}

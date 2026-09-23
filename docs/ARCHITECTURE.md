@@ -12,9 +12,9 @@ API、control-worker 和 maintenance 独立运行。图像节点 classic_node �
 
 2026-09-22：[来源与缓存重设计](COMIC_SOURCE_ARCHITECTURE.md)已替换旧实现。当前为 `Work → ReadingUnit → Document → DocumentRevision / PageDescriptor`，元数据位于 `node-comics-sources-v1-catalog`，完整本地源文件使用独立 `node-comics-sources-v1-container-bytes` / `chunked-idb-v1`，每块 1 MiB。来源、格式和统一 PageService 分开；原图页、分段、缩略图、译图缓存和网站下载资料分别管理。实际入口及验收边界见[实施记录](COMIC_SOURCE_IMPLEMENTATION.md)。没有旧数据迁移、双写或兼容回退。
 
-旧 `node-comics-library`、出版套系 / 收录 / 作品关系管理和顺序逐页物化导入链已删除；[旧模型](COMIC_LIBRARY_DESIGN.md)与[旧实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)仅保留历史依据。`ReadingCopy` 现在只是应用服务交给现有阅读器的瞬时 ViewModel，不是内嵌全卷 Blob 的持久实体。来源目录与稳定来源页身份仍保留；标题相同不会自动合并作品。
+旧 `node-comics-library`、出版套系 / 收录 / 作品关系管理和顺序逐页物化导入链已删除；[旧模型](SIMPLE_COMIC_READING_DESIGN.md)与[旧实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)仅保留历史依据。`ReadingCopy` 现在只是应用服务交给现有阅读器的瞬时 ViewModel，不是内嵌全卷 Blob 的持久实体。来源目录与稳定来源页身份仍保留；标题相同不会自动合并作品。
 
-MangaCopy是来源适配器之一，具体入口、原始标签映射和图片发现规则见[来源设计](MANGACOPY_LIBRARY_DESIGN.md)。站点分组、URL、章节UUID和图片地址不充当全局领域身份；源站变化不要求修改核心类的含义。
+MangaCopy是来源适配器之一，具体入口、原始标签映射和图片发现规则见[来源设计](SIMPLE_COMIC_READING_DESIGN.md)。站点分组、URL、章节UUID和图片地址不充当全局领域身份；源站变化不要求修改核心类的含义。
 
 ## 插件与导入
 

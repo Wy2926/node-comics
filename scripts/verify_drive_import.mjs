@@ -23,8 +23,9 @@ const configured=process.env.TEST_DRIVE_CONNECT_URL??background.match(/https:\/\
 assert(configured&&background.includes(configured),'Build the extension with a configured HTTPS Drive connect URL.');
 const bridge=new URL(configured);assert.equal(bridge.protocol,'https:');assert.equal(bridge.port,'');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const original=await readFile(path.join(root,'artifacts/import-validation/1.png'));
-const dimensions=[original.readUInt32BE(16),original.readUInt32BE(20)];
+const original=await readFile(path.join(root,'artifacts/import-validation/pages.cbz'));
+const sample=await readFile(path.join(root,'artifacts/import-validation/1.png')),dimensions=[sample.readUInt32BE(16),sample.readUInt32BE(20)];
+const fileChecks=new Map();
 const hosts=[bridge.hostname,'accounts.google.com','apis.google.com','www.googleapis.com'];
 const stats={authorizations:0,pickers:0,accountChecks:0,metadataChecks:0,rangeReads:0,browserAccountProbes:0,unauthorized:0,unsupported:0,nativeGrants:0,nativeInteractiveCalls:0,nativeSilentCalls:0};
 const checks=[],pageErrors=[],unsupportedRoutes=[],networkFailures=[];let chosenFile='fixture-page',failMetadataFor,phase='bootstrap';
@@ -38,7 +39,7 @@ p=pathlib.Path(sys.argv[1]); hosts=sys.argv[2:]; key=rsa.generate_private_key(pu
 cert=x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(days=1)).not_valid_after(now+datetime.timedelta(days=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName(h) for h in hosts]),False).sign(key,hashes.SHA256())
 (p/'fixture-key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())); (p/'fixture-cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))`,profile,...hosts]);
 const gis=`globalThis.google??={};google.accounts={oauth2:{hasGrantedAllScopes:()=>true,initTokenClient:options=>({requestAccessToken:()=>fetch('https://accounts.google.com/fixture-authorize',{method:'POST'}).then(()=>options.callback({access_token:${JSON.stringify(token)},expires_in:3600,scope:'https://www.googleapis.com/auth/drive.file'}))})}};`;
-const picker=`globalThis.google??={};globalThis.gapi={load:(_module,options)=>options.callback()};google.picker={ViewId:{DOCS:'docs'},Feature:{MULTISELECT_ENABLED:'multi'},Action:{CANCEL:'cancel',PICKED:'picked'},Response:{DOCUMENTS:'docs'},Document:{ID:'id'},DocsView:class{setIncludeFolders(){return this}setSelectFolderEnabled(){return this}},PickerBuilder:class{setDeveloperKey(){return this}setAppId(){return this}setOAuthToken(token){if(token!==${JSON.stringify(token)})throw Error('Unexpected fixture credential');return this}setOrigin(){return this}enableFeature(){return this}addView(){return this}setCallback(callback){this.callback=callback;return this}build(){const callback=this.callback;return {dispose(){},setVisible(visible){if(visible)fetch('https://www.googleapis.com/fixture-picker',{method:'POST'}).then(response=>response.json()).then(value=>callback({action:'picked',docs:[{id:value.fileId}]}))}}}}};`;
+const picker=`globalThis.google??={};globalThis.gapi={load:(_module,options)=>options.callback()};google.picker={ViewId:{DOCS:'docs'},Feature:{MULTISELECT_ENABLED:'multi'},Action:{CANCEL:'cancel',PICKED:'picked'},Response:{DOCUMENTS:'docs'},Document:{ID:'id'},DocsView:class{setMimeTypes(){return this}setIncludeFolders(){return this}setSelectFolderEnabled(){return this}},PickerBuilder:class{setDeveloperKey(){return this}setAppId(){return this}setOAuthToken(token){if(token!==${JSON.stringify(token)})throw Error('Unexpected fixture credential');return this}setOrigin(){return this}enableFeature(){return this}addView(){return this}setCallback(callback){this.callback=callback;return this}build(){const callback=this.callback;return {dispose(){},setVisible(visible){if(visible)fetch('https://www.googleapis.com/fixture-picker',{method:'POST'}).then(response=>response.json()).then(value=>callback({action:'picked',docs:[{id:value.fileId}]}))}}}}};`;
 const json=(response,value,status=200)=>{response.writeHead(status,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'});response.end(JSON.stringify(value));};
 const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem')),cert:await readFile(path.join(profile,'fixture-cert.pem'))},(request,response)=>{
   void(async()=>{
@@ -67,13 +68,13 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
       const fileId=url.pathname.split('/').at(-1);
       if(!['fixture-page','fixture-error'].includes(fileId)){stats.unsupported++;unsupportedRoutes.push({method:request.method,route:'drive-file-unknown'});json(response,{},404);return;}
       if(url.searchParams.get('alt')!=='media'){
-        stats.metadataChecks++;if(fileId===failMetadataFor){json(response,{},503);return;}
-        json(response,{id:fileId,name:fileId==='fixture-page'?'Drive 隔离漫画.png':'Drive 隔离错误.png',mimeType:'image/png',size:String(original.length),version:'1',capabilities:{canDownload:true},trashed:false});return;
+        stats.metadataChecks++;fileChecks.set(fileId,(fileChecks.get(fileId)||0)+1);if(fileId===failMetadataFor&&fileChecks.get(fileId)>1){json(response,{},503);return;}
+        json(response,{id:fileId,name:fileId==='fixture-page'?'Drive 隔离漫画.cbz':'Drive 隔离错误.cbz',mimeType:'application/zip',size:String(original.length),version:'1',capabilities:{canDownload:true},trashed:false});return;
       }
       stats.rangeReads++;const range=/^bytes=(\d+)-(\d+)$/.exec(request.headers.range??'');
       if(!range){json(response,{},416);return;}const begin=Number(range[1]),end=Number(range[2]);
       if(begin<0||end>=original.length||end<begin){json(response,{},416);return;}
-      const bytes=original.subarray(begin,end+1);response.writeHead(206,{'Content-Type':'image/png','Content-Length':bytes.length,'Content-Range':`bytes ${begin}-${end}/${original.length}`,'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Range,Content-Length'});response.end(bytes);return;
+      const bytes=original.subarray(begin,end+1);response.writeHead(206,{'Content-Type':'application/zip','Content-Length':bytes.length,'Content-Range':`bytes ${begin}-${end}/${original.length}`,'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Range,Content-Length'});response.end(bytes);return;
     }
     stats.unsupported++;unsupportedRoutes.push({method:request.method,route:url.pathname});json(response,{},404);
   })().catch(()=>{if(!response.headersSent)response.writeHead(500);response.end();});
@@ -104,16 +105,14 @@ try{
   await installNativeFixture(worker);
   reader=await context.newPage();await reader.goto(new URL('reader.html',worker.url()).href);
   await reader.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await reader.reload();
-  const sourceReply=await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_SELECT_MANIFEST',manifestId:'fixture-missing-manifest',itemIds:[]}));
-  assert.equal(sourceReply?.ok,false);assert.match(sourceReply.error,/来源清单|manifest/i);
+  const sourceReply=await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_SOURCE_IMAGE',manifestId:'fixture-missing-manifest',pageId:'missing'}));
+  assert.equal(sourceReply?.ok,false);
   checks.push('The compiled website-source listener is active alongside the Drive listener');
   const select=async expectedName=>{
     phase='open authorization';
     assert.equal(await reader.getByRole('button',{name:'Google Drive',exact:true}).count(),0,'The bookshelf should expose one generic import entry.');
-    await reader.getByRole('button',{name:'导入漫画',exact:true}).click();
-    const sourceDialog=reader.getByRole('dialog',{name:'导入漫画',exact:true});
-    await sourceDialog.getByRole('button',{name:'本地文件',exact:true}).waitFor();
-    const opened=context.waitForEvent('page');await sourceDialog.getByRole('button',{name:'Google Drive',exact:true}).click();const auth=await opened;
+    await reader.getByRole('button',{name:'云盘',exact:true}).click();
+    const opened=context.waitForEvent('page');await reader.getByRole('menuitem',{name:'Google Drive',exact:true}).click();const auth=await opened;
     await auth.waitForURL(url=>url.origin===bridge.origin&&url.pathname===bridge.pathname);
     phase='authorization ready';
     // A reused or Chrome-managed connection opens Picker automatically. Only a fresh
@@ -122,21 +121,16 @@ try{
       await auth.waitForFunction(()=>!document.getElementById('connect')?.disabled,{},{timeout:15000});await noReaderError();
       phase='pick and deliver';await auth.locator('#connect').click();
     }
-    const dialog=reader.getByRole('dialog',{name:'导入 Google Drive 文件',exact:true});await dialog.waitFor({timeout:15000});
-    await dialog.getByText(expectedName,{exact:true}).waitFor();await noReaderError();
-    await auth.getByRole('status').filter({hasText:'连接已完成'}).waitFor();await auth.close();return dialog;
+    await auth.getByRole('status').filter({hasText:'连接已完成'}).waitFor();await auth.close();
   };
-  let dialog=await select('Drive 隔离漫画.png');assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,1);
-  checks.push('Real extension button, dedicated bridge and simulated GIS/Picker deliver a named file to the import dialog with no competing source-listener error');
-  phase='register document';await reader.screenshot({path:path.join(run,'selection.png')});await dialog.getByRole('button',{name:'登记文件引用',exact:true}).click();await dialog.waitFor({state:'hidden'});
-  const card=reader.locator('article.nc-book').filter({has:reader.getByRole('button',{name:'打开作品 Drive 隔离漫画',exact:true})});await card.getByRole('button',{name:'开始阅读',exact:true}).click();
+  await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,1);
+  checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
   phase='decode original';await reader.waitForFunction(([width,height])=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===width&&image.naturalHeight===height;},dimensions,{timeout:15000});
   await noReaderError();assert(stats.rangeReads>0);await reader.screenshot({path:path.join(run,'reader.png')});checks.push('Confirmed Drive reference is registered and the real reader decodes the synthetic original through authenticated Range reads');
-  await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();chosenFile='fixture-error';
-  const firstChecks=stats.accountChecks;dialog=await select('Drive 隔离错误.png');assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,2);assert(stats.accountChecks>firstChecks);
+  await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();chosenFile='fixture-error';failMetadataFor='fixture-error';
+  const firstChecks=stats.accountChecks;await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,2);assert(stats.accountChecks>firstChecks);
   checks.push('A second selection reuses the unexpired token without another GIS authorization and still verifies account/file access');
-  phase='show import failure';failMetadataFor='fixture-error';await dialog.getByRole('button',{name:'登记文件引用',exact:true}).click();await dialog.getByRole('alert').waitFor();
-  assert(await dialog.isVisible());assert((await dialog.getByRole('alert').innerText()).trim());await reader.screenshot({path:path.join(run,'import-error.png')});checks.push('A metadata read failure stays visible in the import dialog instead of silently dismissing the selection');
+  phase='show import failure';await reader.getByRole('alert').waitFor();assert((await reader.getByRole('alert').innerText()).trim());await reader.screenshot({path:path.join(run,'import-error.png')});checks.push('云盘索引失败在书架显示可操作原因，不建立空漫画');
   if(nativeMode){
     phase='restart browser';await context.close();
     context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.TEST_CHROMIUM||chromium.executablePath(),locale:'zh-CN',ignoreHTTPSErrors:true,viewport:{width:1400,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--ignore-certificate-errors','--no-proxy-server','--host-resolver-rules='+resolver]});

@@ -60,9 +60,8 @@ export async function importContainer(file: File, signal?: AbortSignal, onProgre
   if (!file.size || file.size > 512 * CHUNK_SIZE) throw new Error('本地源文件需为 1 字节至 512 MB。');
   const prefix = new Uint8Array(await file.slice(0, 80).arrayBuffer());
   const format = detectFormat(file.name, prefix);
-  if (!format) throw new Error('请选择 CBZ、CBR、PDF、未加密 MOBI 或图片文件。');
+  if (!format) throw new Error('请选择 CBZ/ZIP、CBR/RAR、PDF 或未加密 MOBI 漫画文件，不支持散图。');
   if (format === 'cbr' && file.size > 128 * CHUNK_SIZE) throw new Error('CBR 解码会话最多支持 128 MB，请转换为 CBZ。');
-  if (format === 'image' && file.size > 32 * CHUNK_SIZE) throw new Error('单张图片最多支持 32 MB。');
   const op = await reserve(file, format, referenceId);
   try {
     const hash = new Sha256();
@@ -126,7 +125,7 @@ export async function listContainerImports(limit = 100, after?: string): Promise
   });
 }
 
-/** Point lookup for one persisted import journal / revision. */
+/** Point lookup for one persisted import journal / current content. */
 export async function listContainerReferences(referenceId: string): Promise<(ManagedContainer & {referenceId: string})[]> {
   return bytesTransaction(['references','objects'],'readonly',async tx=>{
     const references=await idbRequest(tx.objectStore('references').index('referenceId').getAll(referenceId)) as {containerId:string;fileName?:string;importId?:string}[];
