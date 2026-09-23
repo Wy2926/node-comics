@@ -2,6 +2,6 @@
 
 `definition.ts` 持有主站／copy4000 镜像的严格 HTTPS 主机、作品／章节身份、目录引用和原有安装权限。`catalog.ts` 动态读取当前 DOM 的分组 ID、名称、隐藏条目和原始标签，不设分类白名单、不映射标准类型。仅源站 `default` 分组确定默认入口；“同人漫画”“其他系列”等分类中的当前漫画章节均可阅读，不按名称标记关联作品。不同分组／标签保持独立阅读序列。`pages.ts` 保留容器中的页槽；`data.ts` 解码页面已有的 AES-CBC 数据并交叉核对页序，不执行页面脚本。
 
-目录和章节可有限等待完整清单；不自动滚动、翻章或处理登录挑战。缺少页槽保持部分结果，数据校验失败不退回通用图片发现。`tests/` 覆盖镜像、伪造域名、目录等待、清单解码、重复 URL、取消和暂停；`tests/catalog.test.ts` 覆盖两部示例漫画的分类结构、任意新增 ID／名称／标签、默认入口与重复分组引用。隔离浏览器验收使用仓库根目录 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`。真实页面核对与隔离验证分别记录在[动态分类验收](../../../../../../docs/validation/MANGACOPY_CATEGORIES_2026_09_23.md)。
+目录和章节可有限等待完整清单；不自动滚动、翻章或处理登录挑战。缺少页槽保持部分结果，数据校验失败不退回通用图片发现。`tests/` 覆盖镜像、伪造域名、目录等待、清单解码、重复 URL、取消和暂停；`tests/catalog.test.ts` 覆盖两部示例漫画的分类结构、任意新增 ID／名称／标签、默认入口与重复分组引用。隔离浏览器验收使用仓库根目录 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`。2026-09-23 真实浏览器核对 copy4000 的 grandblue／laizishenyuan 目录为 116／100 项，确认分类来自动态页面；此计数仅为当日样本，不代表章节图片下载或翻译已验收。
 
 `catalogSync.intervalMinutes = 720` 开启自动目录更新。持久记录上次检查与同步时间，仅每 12 小时检查到期作品，重新打开不提前检查；后台读取非活动详情页，复用本站完整目录解析，最多等待 20 秒。不完整目录不覆盖已有结果，不请求章节图片。更新检测、阅读后清除封面提示和任务恢复属于公共应用层，本站不访问书库或浏览器 API。`scripts/verify_catalog_sync.mjs` 使用本机合成 MangaCopy 页面验证该流程，不代表当日真实站点可用性。

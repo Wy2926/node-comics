@@ -89,7 +89,7 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 
 ## 验收与公开上线边界
 
-2026-09-20：类型检查和 105 页静态构建通过，五语字典／路由与 OIDC 配置单元测试 5 项通过，网站、私有后台和身份配置相关后端测试 51 项通过。Linux Docker 全镜像构建通过。浏览器检查包括桌面／390px 移动布局、日文语言切换保留路径、繁中指南、韩文首页、图片对照、PKCE 登录及英文账户回跳、授权失效后的重新登录、503 保留会话及重试恢复、模拟结账跳转和取消续费确认。截图位于仓库忽略的 `artifacts/website-validation/`。这是模拟身份与支付验证，不替代真实 Logto 和 Stripe 验收。
+隔离夹具用于检查五语页面、加载／失败、PKCE 返回与会话失效、订阅跳转及取消续费；身份和支付响应均为模拟，不代替真实服务验收。截图与报告写入忽略的 artifacts 目录，当前通过数以实际运行结果为准。
 
 依赖升级后执行 `npm run notices` 更新 [依赖许可](DEPENDENCIES.md)、公开许可证和图片校验和。后端相关回归命令（仓库根目录）：
 
@@ -97,9 +97,9 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 uv run --with-requirements backend/requirements.txt python -m pytest backend/tests/test_website.py backend/tests/test_admin_web.py backend/tests/test_identity_config.py -q -p no:cacheprovider
 ```
 
-本次完成代码、原创插画和本地验证，未提交、推送或公开部署。商店上架后填写对应地址；正式登录需登记 OIDC 回调，并由运营方核对实际主体名称、付款商品和政策联系方式；当前政策署名为产品团队，未编造公司登记信息。Search Console / Bing 站长平台验证及 sitemap 提交需要对应账户，未代为提交。
+公开部署需独立核验实际构建与商店地址；正式登录需登记 OIDC 回调，并由运营方核对实际主体名称、付款商品和政策联系方式；当前政策署名为产品团队，未编造公司登记信息。Search Console / Bing 站长平台验证及 sitemap 提交需要对应账户，未代为提交。
 
-2026-09-20 多渠道支付更新：官网支持后台指定的唯一 Stripe／Creem 默认渠道、月付／年付、在途订单固定原报价及渠道、按订阅所属渠道进入客户门户。11 项测试、类型检查与 110 页构建通过；隔离浏览器验证月／年切换、Creem 参数、在途恢复、到期及退款撤权后重新订阅和 390px 布局。真实支付由[订阅验收](../../docs/SUBSCRIPTION_ACCEPTANCE.md)单独记录，配置见[多渠道支付](../../docs/STRIPE_BILLING.md)。
+支付配置见[多渠道支付](../../docs/STRIPE_BILLING.md)，真实 test 结果与未验证项见[Creem 摘要](../../docs/CREEM_SANDBOX_ACCEPTANCE.md)。
 
 定价页的年付优惠仅比较公开目录中同产品、同权益版本、同币种的月付与年付报价：以月付金额 × 12 为基准，展示年付总额、折合月价和节省金额；节省比例四舍五入保留一位小数并标注约数。缺少可比月价或年付没有优惠时不显示折扣。当前默认报价年付省 US$19.89（16.6%），折合 US$8.33/月，实际按 US$99.99/年扣款。定价页不创建优惠券或修改结账金额。
 

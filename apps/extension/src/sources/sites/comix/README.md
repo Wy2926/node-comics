@@ -54,4 +54,4 @@ Remove-Item Env:RUN_LIVE_COMIX
 
 ## 来源边界回归
 
-`node apps/extension/src/sources/sites/comix/tests/verify-boundaries.mjs` 用隔离 Chromium、站点样本及真实本地 HTTP 服务检查公共目录 UI、错误恢复、导入阅读、缓存重开，以及跨扩展页面请求头隔离、取消清理与关闭页面后的规则恢复。它不代表真实源站或原生权限弹窗验收。详细结果见[来源边界验收](../../../../../../docs/validation/SOURCE_BOUNDARIES_2026_09_23.md)。
+`node apps/extension/src/sources/sites/comix/tests/verify-boundaries.mjs` 用隔离 Chromium、站点样本及真实本地 HTTP 服务检查公共目录 UI、错误恢复、导入阅读、缓存重开，以及跨扩展页面请求头隔离、取消清理与关闭页面后的规则恢复。它不代表真实源站或原生权限弹窗验收。公共约束见[网站适配规范](../../../../../../docs/SITE_ADAPTERS.md)，当次结果输出到忽略的 `artifacts/source-boundaries/`。

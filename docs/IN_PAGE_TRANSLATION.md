@@ -1,6 +1,6 @@
 # 网页内漫画翻译
 
-已实现扩展右键 **翻译当前页面**、Popup 的 **翻译当前标签页**，以及 Popup／设置共用的 **标签页自动翻译** 开关。用户留在原网站，翻译完成后原位显示译图；原有“在 Node Comics 中阅读 / 翻译”单图导入入口保留。
+已实现扩展右键 **翻译当前页面**、Popup 的 **翻译当前标签页**，以及 Popup／设置共用的 **标签页自动翻译** 开关。用户留在原网站，翻译完成后原位显示译图；原位翻译不创建漫画；只有专用网站适配器可提供导入阅读。
 
 ## 使用与识别
 
@@ -24,7 +24,7 @@
 
 ## 译图缓存与逐页加载
 
-- 网页翻译和内置阅读器共用 [`library/result-cache.ts`](../apps/extension/src/library/result-cache.ts)。缓存键包含服务 origin、账号、任务／结果 ID 和输出资产 ID，保存到现有 IndexedDB `blobs`，不保存签名下载地址。有效性由调用方的任务状态和账号范围约束；已知撤销或过期结果不能通过缓存加载。
+- 网页翻译和内置阅读器共用 [`storage/translations/results.ts`](../apps/extension/src/storage/translations/results.ts)。缓存键包含服务 origin、账号、任务／结果 ID 和输出资产 ID，保存到独立译图缓存，不保存签名下载地址。有效性由调用方的任务状态和账号范围约束；已知撤销或过期结果不能通过缓存加载。
 - 同一运行上下文合并在途下载，不同扩展标签页／service worker 通过 Web Locks 协调并在锁内重查缓存。缓存命中不请求 `/v1/images/{id}/access` 或 R2；未命中才获取授权并下载。模式、语言和结果版本通过服务端结果身份区分，不按原图 URL 复用译图。
 - `NC_INLINE_TICK/WAIT/LEASE` 只返回状态与结果标识；内容脚本按当前页优先，以两个并发执行单图 `NC_INLINE_IMAGE` 请求。每张完成后独立解码显示，不等待其他下载或原图上传，也不再把四张译图合成一个 Base64 响应。下载或解码失败的重试只走单图读取入口，不进入手动重译；翻译任务失败仍使用原有显式重试流程。
 - Blob URL 和解码图片只是显示资源。恢复原图、滚出窗口、隐藏标签页、关闭或刷新网页会释放显示引用，IndexedDB 译图仍可复用。新结果、账号／语言切换、页面换图和过时异步响应会重新校验身份，不能覆盖当前图片。
@@ -57,11 +57,3 @@ node scripts/verify_inline_translation.mjs
 产物写入已忽略的 `artifacts/inline-validation/<run-id>/`。验收在真实 MV3 扩展内执行实际注册的菜单回调；临时配置预授予可选权限，因此不覆盖操作系统原生右键菜单和首次权限弹窗。模拟 API 验证请求、SHA-256 上传、状态和 UI，不代表真实图片模型效果或公开部署验收。
 
 阅读器重试验收复用上述 Playwright / Chromium 环境变量。先运行 `npm --prefix apps/extension run dev -- --port 5176`，再在仓库根目录运行 `node scripts/verify_reader_retry.mjs`。脚本使用隔离账号和模拟 API，覆盖即时反馈、重复点击保护、原位恢复、仅重试下载、首次断网与网络恢复，截图和结果写入 `artifacts/reader-retry-validation/`。
-
-### 2026-09-22 缓存与加载优化验收
-
-- `npm run check`、`npm test`（40 个文件、382 项）、`npm run build` 通过。
-- Chromium 141 的 MV3 隔离验收通过 28 项检查。原图／译图切换、滚动返回、刷新网页、模拟隐藏／恢复复用本地字节；隐藏／恢复及切换查看方式新增图片授权和下载请求均为 0。某张预取图片被阻塞时，当前页和其他已完成页仍可显示；下载失败重试新增翻译计划和任务均为 0，并实际显示重试后的新结果。
-- 阅读器重试回归通过 6 项检查，包括保留阅读位置、下载重试不重新翻译、网络恢复；脚本明确选择“常规翻译”，与默认查看原图的产品规则一致。
-- 本轮网页证据：`artifacts/inline-validation/fb8462c2-35d2-46d8-8793-012edcb83582/results.json` 及同目录截图；阅读器证据：`artifacts/reader-retry-validation/results.json`。产物位于忽略目录，不随源码提交。
-- 使用模拟 API 和合成图片，没有调用真实翻译模型或生产 R2。Headless Chromium 的隐藏／恢复通过隔离世界内模拟 `visibilitychange` 验证实际内容脚本处理，不计作原生标签切换验收；原生权限弹窗和公开部署未验证。

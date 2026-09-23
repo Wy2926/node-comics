@@ -122,12 +122,10 @@ Stripe Portal 应开放付款方式、账单历史和期末取消，关闭套餐
 
 ## 验证边界
 
-后端与 PostgreSQL 命令见[后端说明](../backend/README.md#验证)，真实测试环境证据单独记录于[订阅验收](SUBSCRIPTION_ACCEPTANCE.md)。应覆盖跨渠道试用去重、并发／重复通知、在途固定渠道、月底拆月、迟付恢复、原价格续费、退款和订单状态历史。
+后端与 PostgreSQL 命令见[后端说明](../backend/README.md#验证)，真实测试环境证据单独记录于[订阅验收](CREEM_SANDBOX_ACCEPTANCE.md)。应覆盖跨渠道试用去重、并发／重复通知、在途固定渠道、月底拆月、迟付恢复、原价格续费、退款和订单状态历史。
 
-前端：插件 `npm run check`、`npm test`、`npm run build`；官网 `npm test`、`npm run build`。2026-09-20 本地官网 11 项测试、110 页静态构建通过；插件类型／模块检查、完整单元测试 31 文件／321 项及 MV3 构建通过。浏览器模拟验收覆盖月付／年付、Creem 选择、请求携带原价格与渠道、待付款恢复固定渠道、390px 移动布局。模拟夹具不创建真实支付，不能替代 Creem 沙盒付款、真实 webhook 和生产收费验收。
+前端在插件运行 `npm run check`、`npm test`、`npm run build`，官网运行 `npm test`、`npm run build`。用隔离浏览器覆盖周期切换、默认渠道、待付款恢复、退款撤权及失败重试；模拟响应不替代真实付款与 Webhook。
 
 后台独立验证：在 `backend/admin-ui` 执行 `npm ci`、`npm run check`、`npm test`、`npm run build`；随后在 `backend` 执行 `.venv/Scripts/python.exe tests/manual_billing_server.py`（已安装 `requirements.txt` 的 Python 3.11 环境）。浏览器打开 `http://127.0.0.1:18091/console-test/#billing`，用开发用户名 `admin` 登录。夹具创建独立临时 SQLite 和模拟渠道，不读取项目 `.env`；每次启动有 34 笔跨渠道订单，并打印 `controls.json` 路径。修改该文件的 `fail`、`empty_orders` 或 `delay` 可复现失败、空列表和加载状态。结束时在服务终端按 Ctrl+C。
-
-2026-09-20 后台类型检查、构建及 9 项测试通过。真实浏览器在隔离夹具验证：创建产品、年付默认 99.99、Creem 试用产品必填、保存关联／验证启用／发布、34 笔订单的两页边界、渠道与状态筛选、完整流转、支付通知重试信息、订单核实成功与错误提示、空列表及失败恢复、390px 布局。核实成功分支使用模拟只读平台同步，平台通知也是夹具数据，不构成真实收款或 Webhook 接入验收。
 
 官方参考：[Stripe 价格管理](https://docs.stripe.com/products-prices/manage-prices)、[Creem 产品](https://docs.creem.io/api-reference/endpoint/create-product)、[Creem 客户门户](https://docs.creem.io/features/customer-portal)、[Creem API](https://docs.creem.io/api-reference/introduction)。

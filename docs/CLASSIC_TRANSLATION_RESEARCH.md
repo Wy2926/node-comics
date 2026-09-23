@@ -1,6 +1,6 @@
 # 常规漫画翻译开源方案调研
 
-2026-09-14 候选调研，以下比较保留当时结论，不代表当前依赖或许可核验。当前实现为 [classic-engine](../services/classic-engine/README.md) 的 NCNN/Vulkan 流水线，抹字使用 AOT-GAN；用户允许 LaMa 仍是产品边界，不代表当前实现采用 LaMa。实际组件、权重与许可见[第三方清单](../services/classic-engine/THIRD_PARTY.md)。
+2026-09-14 候选调研，以下比较保留当时结论，不代表当前选型建议。实际实现、LaMa 抹字后端与平台要求统一见 [classic-engine](../services/classic-engine/README.md)，组件、权重与许可见[第三方清单](../services/classic-engine/THIRD_PARTY.md)。
 
 ## 1. “常规翻译”的技术边界
 

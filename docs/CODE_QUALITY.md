@@ -11,7 +11,7 @@
 | 偏好页面 | `src/ui/Preferences.tsx` 管理阅读、语言与外观偏好；不提供用户队列设置 |
 | 阅读目录 | `src/reader/ThumbnailDirectory.tsx` 管理缩略图虚拟列表；主阅读器保留图片窗口、导航和阅读位置 |
 | 任务状态 | `src/reader/jobs.ts` 统一状态优先级、排序、合并；恢复、轮询和 IndexedDB 写入共用，不允许旧快照恢复失效译图 |
-| 作品与副本存储／偏好 | `library/store.ts` 原子保存副本并按引用清理本机缓存；偏好只存当前 Settings 字段；阅读操作、幂等请求与上传进度由 `translation/store.ts` 的持久化清单管理 |
+| 漫画与持久化 | `comics/repositories/` 原子管理单来源漫画和引用；`storage/` 管理容器与独立缓存；`translation/store.ts` 管理翻译操作及上传恢复 |
 | 运营 API | `backend/app/admin_api.py` 包含供应商、额度调整与结果核实；认证、权限、幂等与结算仍复用原有实现 |
 | 请求校验 | `backend/app/request_models.py` 统一 JSON 请求拒绝额外字段的规则；响应模型与请求模型独立 |
 
@@ -35,3 +35,10 @@ npm --prefix apps/extension run build:web
 测试夹具使用临时 SQLite 和独立对象目录。PostgreSQL 并发用例需显式设置 `RUN_POSTGRES_CONCURRENCY=1` 并使用独立测试数据库；未启用时的 skipped 不代表通过。
 
 `.editorconfig` 约定 UTF-8、缩进和行尾。不要以压缩源码代替构建压缩；需要压缩的是发布产物。CSS 按规则和声明分行，保留必要的层叠顺序。清理选择器必须考虑弹出页、动态类名、响应式规则和阅读状态，不能只按一次截图的覆盖率删除。
+
+## 文档维护
+
+- 根 README 只作入口，产品文档定义行为，架构／模块 README 说明契约与运行方法；字段和默认值引用源码，不复制整份类型或数据表清单。
+- 新规则直接更新所属文档；已替代的设计、实施流水、跳转占位页和失效截图删除，历史从 Git 查询，不按每轮任务新增日期型报告。
+- 保留依赖／模型／字体来源、许可和必要的真实验收摘要；摘要写明日期、环境与未验证范围，不把旧通过数、临时服务或旧性能数据当成当前状态。
+- 验证命令集中在模块 README 或 `scripts/README.md`，运行产物放忽略目录。移动／删除文档同步检查相对链接、锚点和脚本路径；只有文档改动时无需重跑模型或完整业务测试。

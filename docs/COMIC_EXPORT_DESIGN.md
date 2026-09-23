@@ -23,4 +23,4 @@ CBZ／ZIP 依页序保存可用原始图片字节并包含 `export-manifest.json
 
 实现：[导出服务](../apps/extension/src/comics/application/export-service.ts)、[页面计划](../apps/extension/src/export/plan.ts)、[导出面板](../apps/extension/src/ui/DocumentExport.tsx)。依赖版本与许可证见[格式说明](IMPORT_FORMATS_AND_CACHE.md)。
 
-浏览器验证使用自制 CBZ：完整源文件逐字节一致、导出 CBZ 包含三页和清单、PDF 三页可重新解析。命令为 `node scripts/verify_source_export.mjs`，环境和本轮证据见[验证记录](validation/SIMPLE_READING_2026_09_23.md)。
+浏览器验证使用自制 CBZ：完整源文件逐字节一致、导出 CBZ 包含三页和清单、PDF 三页可重新解析。命令为 `node scripts/verify_source_export.mjs`，环境和复验方法见[脚本说明](../scripts/README.md#来源与阅读验收)。

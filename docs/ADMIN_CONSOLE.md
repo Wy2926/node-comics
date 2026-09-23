@@ -1,6 +1,6 @@
 # 服务端管理后台
 
-2026-09-21：独立 React + TypeScript + Vite 后台现有 15 个页面，已补齐供应商、异常任务、用户权益、支付、反馈、审计与诊断入口。服务端入口由私有环境变量 `ADMIN_WEB_PATH` 配置；旧 `/admin`、`/admin/` 及其资源返回 404，首页不跳转后台。实现面向当前模型与全新数据库，不增加旧队列、旧点数或旧数据适配逻辑。
+独立 React + TypeScript + Vite 后台提供供应商、异常任务、用户权益、支付、反馈、审计与诊断入口。服务端入口由私有环境变量 `ADMIN_WEB_PATH` 配置；旧 `/admin`、`/admin/` 及其资源返回 404，首页不跳转后台。实现面向当前模型与全新数据库，不增加旧队列、旧点数或旧数据适配逻辑。
 
 ## 页面与统计口径
 
@@ -37,7 +37,7 @@
 - **最近提交**表示最近任务创建时间；系统未记录用户最后登录或当前在线状态，后台不会据此推断。
 - 时间按浏览器本地时区显示。监控列表默认每 15 秒刷新，可暂停；后台标签页隐藏或详情打开时停止监控列表定时刷新。产品和订单页面手动刷新。请求失败保留上次数据并标记可能过时，支持重试；产品数据读取失败时禁用修改，刷新成功后恢复。
 
-`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，`#image-providers` 管理图片重绘，二者配置与测试分别执行。文本配置说明见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。本轮新增页面路由还有 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。完整 52 表及管理覆盖见[数据表与后台能力盘点](DATABASE_AND_ADMIN_AUDIT.md)。
+`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，`#image-providers` 管理图片重绘，二者配置与测试分别执行。文本配置说明见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[初始迁移](../backend/migrations/versions/0001_payments.py)和模型为准，不另维护表数／字段数快照。
 
 ### 处理操作与恢复
 
@@ -125,29 +125,23 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 统计取最近 1–90 天并按 UTC 日期汇总。供应商／模型筛选仅作用于文本调用表；最多返回 2000 个分组并显式标记截断。文本金额含估算／未知消耗预占，不是已对账费用；新增复用授权不是阅读浏览次数；订单原金额按币种分列，不作为净收入。服务健康只提供当前实例与积压，历史告警和消息通知未建设。
 
+
+## 匿名网站申请与插件反馈
+
+插件漫画网站页和通用反馈窗无需登录，网站入口来自适配器注册元数据与随包图标。管理员分别查看网站申请和插件反馈，不公开联系方式。
+
+- `POST /v1/support-requests`：`kind=website|plugin`，UUID `Idempotency-Key`；网站申请要求名称与公开 HTTP(S) 地址，插件反馈要求正文。名称／URL／说明／联系方式上限分别为 100／2048／1000／200 字符，联系方式可选且不限定邮箱。请求体最多 16 KiB。
+- 网站地址拒绝凭据和本地地址，去除 query／fragment；服务端只保存，不抓取。重复原请求不新增记录，同编号改内容为 409。未知回包冻结原草稿与编号重试，已知拒绝允许修改。
+- `GET /v1/admin/support-requests?kind=website|plugin&offset=0&limit=25` 仅管理员可读，按时间和 ID 倒序分页。两类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
+- `support_requests` 与 `support_request_admissions` 属空库初始基线。正文、联系方式、原网络地址不写默认日志；公开回执仅含 `id` 与 `created_at`。
+
+契约回归在 `backend/tests/test_support_requests.py`；隔离预览按后端运行文档准备 Python 依赖后，在 `backend` 执行 `python tests/support_preview.py --lose-first-response`，在插件目录以 `VITE_API_BASE=http://127.0.0.1:18089` 启动 Vite 5191。访问插件 `/#sites` 和后台 `/console-fixture/`（测试用户名 admin）；夹具创建临时库并模拟首次回包丢失，不访问外部服务。正式构建前清除 `VITE_API_BASE`。
+
 ## 验证
 
-### 2026-09-22 页面优化与真实接口验证
+后台从 `backend/admin-ui` 执行 `npm ci`、`npm run check`、`npm test`、`npm run build`；后端与专用 PostgreSQL 环境见[后端说明](../backend/README.md#验证)。检查管理员隔离、重复写入／未知回执恢复、审计同事务、订单定向核实，以及页面加载、空结果、失败和重试。
 
-本轮继续完善新增页面的操作层级：侧栏按翻译运行、用户交易、配置审计分组并保留底部退出入口；支付事件提供状态快捷筛选、异常摘要和独立重试区域；反馈按用户问题、处理操作、历史记录展开；会员处置展示当前权益与本次影响；图片配置折叠输入限制和高级参数，图片测试改为独立弹窗；订阅优先展示周期、授权期和额度；审计提供中文动作筛选、字段前后值对照与可展开完整记录。统计分别处理订单“待付款”与事件“待处理”，保留空金额、零金额和币种单位的区别；审计区分未记录、空值、空对象、false 与 0。
-
-本轮实际运行后台 TypeScript 检查、生产构建和 **14 项前端单元测试**，全部通过。在 Codex 内置 Chromium 使用一次性 SQLite 完成截图与交互验收，覆盖筛选与空结果、支付重试回执关闭及刷新恢复、反馈状态与历史、7 页额度补偿、提前结束运营赠送并保留付费订阅、图片测试关闭后恢复原文件与原任务、订阅编号展开、审计前后值、统计币种显示。数据库再次核实支付重试、图片测试、补偿、会员结束各只有 1 笔审计；最终浏览器控制台无运行错误。截图和报告保存在本机忽略目录 `artifacts/admin-ux-20260922/`。独立 Playwright 验收脚本已适配图片弹窗与订阅折叠布局并通过语法检查，本轮浏览器验收直接通过 Codex 完成，未重新运行该脚本。
-
-AI 重绘已用授权测试密钥，对 `https://sub2api.nodelane.net/v1/images/edits` 的 `gpt-image-2` 完成 **1 次真实请求**。合成英文样图通过管理员测试 API、持久任务、调度租约、工作进程、供应商适配器、本地私有对象与授权下载完整走通：HTTP 200，工作进程耗时 **26.61 秒**，任务成功，1 页只结算一次，跨用户下载返回 404。图中文字译为简体中文，构图保留但线条与渐变被重绘；请求 `quality=low / size=1024x1024`，实际返回可解码 **1254 × 1254 PNG**。供应商报告 936 tokens，未核对货币账单。此结果使用独立 SQLite 与本地对象，未验证生产 R2。原图、译图和脱敏报告保存在 `artifacts/real-image-verification/run-20260922-01/`，复现脚本为 `scripts/verify_image_provider_live.py`；脚本拒绝复用已存在的运行目录，避免不确定结果被重复付费调用。
-
-Creem 测试环境的真实月付、年付、试用、签名回调、重复通知、历史订单定向核实与 Docker PostgreSQL 证据见 [Creem 沙箱验收](CREEM_SANDBOX_ACCEPTANCE.md)。退款受测试商户余额限制，不据此宣称退款端到端通过。本轮没有公开部署后台，没有将测试凭据或原始签名回调写入仓库。
-
-### 2026-09-21 功能补齐基线
-
-2026-09-21 本轮代码验证：后端全套 **741 passed / 118 skipped**；另在原生 PostgreSQL 18.3 的独立临时实例完成 **46 项专项测试**，覆盖审计事务、诊断查询、迁移一致性、历史订单、分笔退款、事件重试及支付／设置并发。实例仅监听本机地址，使用专用测试库与随机 schema，不连接现有产品数据库。
-
-后台 TypeScript 检查、生产构建和 **9 项前端单元测试**通过。桌面 Chrome（1440 × 1000）隔离验收覆盖 15 页、11 组场景、16 张截图：管理员／普通账户边界、图片供应商编辑启停、合成图片测试入队、任务终态回执恢复与错误文件拒绝、反馈处理历史、会员补偿与提前结束、逐笔退款、订阅额度桶、支付事件回执跨刷新恢复、诊断／统计／审计，以及加载、失败、空结果和刷新恢复。没有浏览器运行异常。
-
-验收服务使用一次性 SQLite 与合成图片，阻止支付平台调用且不启动翻译／支付工作进程；图片测试仅证明提交、持久化和恢复，不证明真实图片模型交付。未执行真实扣费、生产 OIDC／R2 验收或公开部署。
-
-主要新增测试：`test_admin_provider_actions.py / test_admin_cross_review.py / test_user_admin_history.py / test_feedback_admin.py / test_admin_audit.py / test_admin_operations.py / test_billing_admin_completion.py / test_admin_completion_postgres.py`。
-
-### 复现本轮浏览器验收
+### 隔离浏览器
 
 先构建后台，然后在一个终端运行服务：
 
@@ -167,18 +161,15 @@ node scripts/verify_admin_completion.mjs
 
 脚本会修改合成数据，每次复验先重启夹具以重建空库。报告和截图写入已忽略的 `artifacts/admin-completion/`；`controls.json` 的 `lose_receipt` 会在业务事务成功后模拟一次 503，验证不确定回包恢复。该机制仅存在于独立验收服务。
 
-PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD`，运行 `test_admin_completion_postgres.py` 及既有支付／设置并发套件；测试固定限制在 `nodecomics_concurrency_test` 库，详见 `test_postgres_concurrency.py` 和 `deploy/compose.tests.yaml`。下列历史记录不计入本轮结果。
+PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD`，运行 `test_admin_completion_postgres.py` 及既有支付／设置并发套件；测试固定限制在 `nodecomics_concurrency_test` 库，详见 `test_postgres_concurrency.py` 和 `deploy/compose.tests.yaml`。未启用的专用测试不计通过。
 
-### 历史验证记录
 
-2026-09-16 曾完成隐匿入口、模拟 OIDC、节点配置和旧版后台的浏览器／PostgreSQL 验证。其通过数量、旧入口、临时端口和窄屏检查不代表当前验收范围；详细历史可查 Git。当前复验使用上方完整后台夹具，OIDC／生产部署的未验证边界仍保留。
+### 真实接入边界
+
+2026-09-22 曾通过管理员图片测试入口，以 `gpt-image-2` 的一次真实 `images/edits` 请求完成合成图翻译、持久任务、授权下载及跨用户拒绝；设置 `quality=low / size=1024x1024`，实际得到可解码的 1254×1254 PNG。环境是独立 SQLite 和本地私有对象，未验证生产 R2 或货币账单；图像会重绘线条与渐变，不代表自然漫画普遍质量。脱敏产物位于忽略目录 `artifacts/real-image-verification/`，真实付费复验入口为 `scripts/verify_image_provider_live.py`，不能自动重建未知请求。
+
+真实 Creem test 结果与退款限制见[沙箱摘要](CREEM_SANDBOX_ACCEPTANCE.md)。浏览器夹具不等于真实 OIDC、支付或生产部署；历史测试数量不作为当前检查结果。
 
 ## 前端依赖
 
 实际版本由 `backend/admin-ui/package-lock.json` 固定，下载完整性由其中 `integrity` 校验。运行时 React / React DOM **19.3.0**（MIT）；构建 Vite **7.3.6**（MIT）、TypeScript **5.9.3**（Apache-2.0）。其余类型与构建插件以锁文件和包内许可为准。使用系统字体，无新增字体文件、模型权重、外部 CDN 或图片依赖。
-
-计算节点页已支持后台预建、独立凭据、配置编辑、停用和轮换，见[节点配置](NODE_CONFIGURATION.md)。
-
-2026-09-16 更新：配置支持表单／JSON 双向切换、全部 16 种目标语言多选；图像节点以及 AI 重绘／文本翻译／上传校验三个控制资源池均有配置入口。控制池容量持久化，API 启动初始化缺失资源池，工作进程重启不覆盖管理设置。文本金额使用人民币单位，只统计每次调用及未知成本预占，不限制成本；重试次数、时限、RPM 保留。任务详情显示具体失败原因与错误码。新实现面向新数据库，不增加旧数据转换分支。
-
-隔离浏览器服务端口可通过 `ADMIN_FIXTURE_PORT` 覆盖；`controls.json` 的延迟／失败注入同时覆盖节点配置读取和保存。

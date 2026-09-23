@@ -4,7 +4,7 @@
 
 生产入口是单进程的 `classic_node`：主动向中心领取整页租约，直接读取受限 R2 URL，执行检测／OCR、LaMa Large 抹字和嵌字，通过中心提供的临时 PUT URL 并发直传最终 PNG 到 R2，再提交元数据回执。LLM 由中心调用，节点无需文本供应商、数据库或 R2 长期凭据。2026-09-21 已将 AOT-GAN 替换为参考 manga-image-translator 的 LaMa Large（18 个 FFC block，无 MPE）：抹字使用 ONNX Runtime DirectML GPU FP32，检测和日文 OCR 特征继续使用 NCNN Vulkan。节点不监听 HTTP 端口，也不需要旧 `compute-agent`。
 
-外部协议见 [COMPUTE_PROTOCOL.md](../../docs/COMPUTE_PROTOCOL.md)，具体消息与中心迁移见 [v2 实施说明](../../docs/COMPUTE_V2_IMPLEMENTATION.md)。
+外部协议见 [COMPUTE_PROTOCOL.md](../../docs/COMPUTE_PROTOCOL.md)，节点只与中心 API 和授权对象存储通信。
 
 ## 安装与准备
 
@@ -40,7 +40,7 @@ uv sync --locked --extra test --extra build
 
 `check` 只校验本地模型、字体并预热，不注册或连接中心；`run` 才进行真实注册。不能把 `check` 成功视为已接入集群。生产连接强制 HTTPS，禁止凭据 URL、任意 R2 主机和重定向；本地测试使用显式适配器，不提供生产明文／中心转发回退。
 
-私有中心可用 `control_ca` 指定 PEM 信任文件（相对配置文件解析），保留证书和主机名校验；R2 客户端不使用这个信任文件。历史在线文本与 R2 验收见[实测记录](../../docs/PIPELINE_VALIDATION.md)，不代表当前已准备模型或启动节点。
+私有中心可用 `control_ca` 指定 PEM 信任文件（相对配置文件解析），保留证书和主机名校验；R2 客户端不使用这个信任文件。历史在线文本与 R2 验收见[实测记录](../../docs/COMPUTE_PROTOCOL.md#验证边界)，不代表当前已准备模型或启动节点。
 
 `max_leases` 是节点愿意承接的本地上限，中心仍按数据库中的 `execution_slots` 限额；`local_pages` 是同时运行的有限图像计算步骤数，默认 2，可设为 1。默认最多 8 个整页租约，下载、分析提交与交付使用独立网络池，等待文本不占计算线程。等待文本和等待完成回执持续占接单名额；本地线程、NCNN 内部线程和 OCR 池不由中心修改。
 

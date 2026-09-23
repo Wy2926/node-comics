@@ -1,6 +1,6 @@
 # 来源、当前内容与缓存架构
 
-2026-09-23。当前代码使用单来源基线；产品行为见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)，测试见[本轮验收](validation/SIMPLE_READING_2026_09_23.md)。旧作品聚合、章节归属、来源绑定数组和文件修订历史已删除。
+当前代码使用单来源基线；产品行为见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)，复验见[脚本入口](../scripts/README.md)。
 
 ## 元数据与身份
 
@@ -17,6 +17,12 @@ PageDescriptor 保存当前内容身份、稳定页键、ordinal、尺寸和格�
 [storage/database.ts](../apps/extension/src/storage/database.ts)统一使用 `node-comics-reading-v1-*`，初始版本 1。目录库包括 comics、entries、connections、pageDescriptors、materializations、positions、catalogs、tasks、translationBindings、translationOperations、metadata、tombstones。
 
 不扫描、升级或读取旧库，也没有双写、别名、迁移链。当前基线缺表会明确报告结构不一致，不能静默重建用户数据。删除使用 tombstone 和内容代次保护迟到写入；catalog 是来源资源快照，重新导入时允许在新的漫画身份下重新创建。
+
+## 文件来源驱动
+
+[contracts.ts](../apps/extension/src/comics/sources/contracts.ts) 定义选择、打开和访问变化契约，[registry.ts](../apps/extension/src/comics/sources/registry.ts) 注册能力，[runtime.ts](../apps/extension/src/comics/sources/runtime.ts) 负责范围缓存与关闭失效读取，[install.ts](../apps/extension/src/comics/sources/install.ts) 显式装配来源。新增同格式文件来源实现驱动并注册，不修改阅读器、页面服务或翻译。
+
+驱动核验自己的账户、资源与冻结快照，只获取字节和通知访问变化；不导入仓储、应用、其他驱动或缓存策略。公共核心不解析供应商私有字段，也不把未知来源猜成 Google Drive。来源打开或读取期间撤权，迟到实例关闭、结果拒绝；重新选择只恢复明确核实的文件范围。
 
 ## 本地与云盘
 
@@ -63,6 +69,6 @@ Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮�
 - [领域模型](../apps/extension/src/comics/domain/index.ts)与[事务仓储](../apps/extension/src/comics/repositories/index.ts)
 - [导入服务](../apps/extension/src/comics/application/import-service.ts)与[自动队列](../apps/extension/src/comics/application/import-queue.ts)
 - [来源运行时](../apps/extension/src/comics/sources/runtime.ts)、[来源权限](../apps/extension/src/comics/application/source-access.ts)与[页面服务](../apps/extension/src/comics/pages/service.ts)
-- [适配器架构](SOURCE_ADAPTER_ARCHITECTURE.md)与[格式边界](IMPORT_FORMATS_AND_CACHE.md)
+- [适配器架构](SITE_ADAPTERS.md)与[格式边界](IMPORT_FORMATS_AND_CACHE.md)
 
 后端结果复用、持久任务、额度和共享对象保留沿用[阅读计划契约](READING_TRANSLATION_CONTRACT.md)，本次没有改变结算或生产存储策略。

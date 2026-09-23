@@ -1,63 +1,58 @@
-# 网站图片适配
+# 网站适配开发规范
 
-本文记录当前实现。公共执行层、通用适配、独立站点目录和目录／身份解耦已落地，详见[适配架构](SOURCE_ADAPTER_ARCHITECTURE.md)。
+新增或修复网站从本文开始。产品边界见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)，类型以 [sources/contracts](../apps/extension/src/sources/contracts) 为准；站点规则和验证限制放在各站自己的 README，不复制公共契约。
 
-## 接口和边界
+## 最小目录与接入
 
-- `sources/index.ts` 向后台、书库和 UI 提供身份、目录校验、权限和消息服务，不加载 DOM 页面工厂；`sources/page.ts` 向内容脚本提供导航与页面会话。
-- `registry/` 按统一文件约定自动收集纯定义、页面工厂和独立的网络操作及图片能力，不手写引用具体站点。站点实现、权限元数据、图标和专属验收脚本归站点目录所有。先校验 URL，再要求恰好一个站点匹配；未知网站使用 `generic`，冲突报错。已认领站点等待、失败或不支持时不隐式退回通用规则。
-- 站点的主机、路径、图片／目录选择器、标签映射和专属观察属性只在 `sites/<id>/` 中。页面会话返回 `ready`、`not-ready`、`unsupported` 或 `error`，清单完整性独立表达。
-- `DiscoveredPage` 区分 HTTP 原图和页面逻辑资源。公共运行时生成临时页面句柄，绑定导航、页槽、元素和来源版本；站点不能自行生成授权。消息快照保留运行时的页槽和句柄，持久副本不保存临时页面引用。
-- 缩略图总量不超过 2 MB，原图单张不超过 40 MB；画布最多 6000 万像素，编码／读取 30 秒超时。取图前后核对元素、版本和导航，SPA 离开再返回也使旧授权失效。
-- `<img>` 使用通用图片展示，canvas 使用不修改原像素、不接收指针事件的覆盖层；恢复原图时移除。站点改变图源、回收 canvas 或重新渲染同一画布时撤销旧显示。
-- 目录能力当前包括 MangaCopy 和 Comix：定义提供可靠的目录归属，公共层检查重复 ID、分组引用、顺序和每个条目的归属。站点的原始分类只读展示，漫画直接绑定唯一来源。
-- 自动更新由 `SourceDefinition.catalogSync` 显式开放，目前 MangaCopy／拷贝漫画和 Comix 声明 720 分钟间隔。每部漫画按持久化的上次检查时间控制 12 小时间隔，重新打开不提前发请求；只有完整目录进入自动同步，发现新增条目后封面显示提示，成功阅读后清除。运行时和持久状态见[自动同步验收](validation/CATALOG_SYNC_2026_09_23.md)。
+在 `apps/extension/src/sources/sites/<id>/` 添加文件，注册表按统一通配约定静态收集，无需手工注册具体站点：
 
-已有 MangaCopy、Comic PASH、Comix、Gunnerkrigg 与通用图片规则接入。原有安装权限与自动注入范围保持不变；新增站点默认依靠用户操作和可选授权。旧根目录站点文件与注册表已删除，没有转发、数据迁移或旧逻辑回退。
+| 文件 | 职责 |
+| --- | --- |
+| `definition.ts`（必需） | 导出 `definition`：与目录名一致且唯一的稳定 ID、纯 URL 识别、能力、可选目录同步与网站入口元数据 |
+| `installation.json`（必需） | 安装权限与可选来源；由定义引用，构建工具直接读取 |
+| `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理 |
+| `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages` HTTP 解析操作 |
+| `image.ts`（按需） | 导出 `image`：图片请求头或解码；不依赖是否实现网络目录 |
+| `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与证据、脱敏夹具和站点测试 |
 
-## Comix
+先检查真实站点的目录、页序、懒加载、图片与权限，再声明能力。选择 DOM、HTTP 或混合通道；纯网络站点不创建空 `page.ts`。公共接口缺少必要能力时修改契约及通用实现，不向核心添加站点分支。
 
-入口为 `https://comix.to/title/<作品 HID>-<标题>`。在“漫画网站”粘贴详情页链接后添加；目录、章节和自动更新均通过扩展 HTTP 请求读取，不创建来源标签页。第一次使用需授予来源与图片域名权限。xkcd 专属适配和图标已移除，其页面仅保留通用网页翻译能力。
+## 必须保持的约束
 
-全量读取分页并核对总数后，按话号去重，保留第 0 话和小数话。首次优先 `isOfficial`，同优先级取最小上传 ID；后续更新优先保留仍存在的已选上传。同话新增另一上传不增加更新计数。目录身份按作品 HID、条目身份按话号，阅读进度不会随上传排序改变。当前验证的是英文目录；非英文或未知格式明确报错。
+1. **站点隔离。** 域名、路径、选择器、特殊观察属性、协议与分类规则只在本站目录；站点之间不互相导入。复用无站点语义的 `shared/` 工具，不调用整个 `generic` 作隐式兜底。
+2. **依赖方向。** 站点只依赖自身、`contracts/`、`shared/` 和现有 i18n；不调用 `chrome.*`／`browser.*`，不导入 UI、漫画仓储、缓存、翻译或来源运行时。`definition.ts` 的传递依赖不访问 DOM、浏览器全局或 CSS。
+3. **公共入口。** UI、漫画应用与页面服务使用 `sources/index.ts`；内容脚本使用 `sources/page.ts`。公共层负责权限、网络、消息、标签页、清单登记和生命周期，注册表不得直接引用具体站点文件。
+4. **明确认领。** 先校验 HTTP(S) URL，再精确核对主机、路径与资源归属。一个站点匹配才使用；冲突报错。未知站点仅用通用原位翻译，不能导入漫画。已认领站点等待、失败或能力缺失时不退回通用规则或另一读取通道。
+5. **稳定身份与只读目录。** 身份包含来源命名空间，不按标题或临时 CDN 地址去重；保留必要的查询参数与片段，镜像等价须有证据。条目、分组、原始标签和可选阅读序列来自源站；不推断章节类型、正文归属或跨组连续阅读。目录更新只使用调用方给出的 `previous`，不另存已选上传状态。
+6. **发现不等于取图。** 返回稳定页槽和来源顺序，重复 URL 可以是不同页；缺页不重编号。`ready / not-ready / unsupported / error` 与清单完整性分开；只有可靠总数、完整列表或单页契约能证明完整，canvas 窗口和暂时不增长不能。
+7. **临时资源受控。** 站点给出 HTTP 地址或页面逻辑资源，公共层登记后才能读取。句柄绑定文档、导航、元素和版本，不能持久化为离线原图。导航、替换、画布重绘、取消与销毁后拒绝旧读取，清理观察器、挂载入口和译图；`pageshow` 重建会话而不复用旧句柄。
+8. **权限与数据。** 新站默认 `requiredOrigins`、`autoContentMatches` 为空，按用户操作申请必要的可选主机权限；不能因注册扩大安装权限。页面文字、HTML、URL 均不可信，不执行下载的源站脚本，不上传 Cookie／令牌，不记录私有图片、全文或签名地址。请求头与图片解码经公共取图接口处理，不直接修改全局网络规则。
+9. **按能力开放。** 漫画导入须声明 `importable` 和页面能力；目录、原位翻译、完整页清单、自动同步分别声明并有实现。`catalogSync` 仅在能可靠读取完整目录时开放；调度、更新提示、缓存与阅读位置由公共应用层维护。网站入口使用 `sites` 元数据和随包图标，UI 不加专属组件。
 
-签名、响应解码、图片切片还原均为插件内置实现，规则仅在 `sources/sites/comix/`。不下载执行源站脚本，不转发 Cookie。图片 CDN 的 Referer 通过通用会话请求规则设置，仅作用于扩展自身到已登记精确图片 URL 的请求；同 URL 用共享锁隔离请求头，响应完成或取消后释放规则。新增 `declarativeNetRequestWithHostAccess` 权限，站点域名仍使用可选授权。网页原位翻译不开放；来源验证、分页变化、未知图片还原版本会报错并保留旧目录。
+公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
 
-实现范围、实际验证和协议限制见 [Comix 适配说明](../apps/extension/src/sources/sites/comix/README.md)。
+## 验收与交付
 
-## Comic PASH
-
-适配入口：`https://comicpash.jp/episodes/<id>`（包括 www 主机）。示例：<https://comicpash.jp/episodes/60cfe4785e2af>。
-
-该站 Comici 阅读器加载图片后绘制到 canvas；普通 `<img>` 多为封面和广告，网络图片也可能尚未完成阅读器的切片还原。适配器读取 `#comici-viewer #xCVPages` 下包含 `.-cv-page-canvas` 的漫画页，仅接纳 `mode-rendered` 中的画布。广告页、推荐书籍、点赞页和结束页不计入漫画总数。
-
-- 网页翻译：读取当前已渲染画布，翻页后自动发现新画布，沿用当前页及后续可用页的有限翻译窗口。
-- 图片导入：通过插件“发现网页图片”选择当前已加载页面；翻页后刷新发现。导入完成前保持来源页打开，画布被回收或页面改变时需重新发现。
-- 当前已渲染窗口始终按部分清单交付；所有当前页槽可见也不推断整章完整。
-- 清晰度以源站当前渲染为准；不声称得到 CDN 原始分辨率，不自动翻完全部页面，不绕过付费／登录限制。
-
-## 验证
-
-先在 `apps/extension` 执行 `npm run check`、`npm test`、`npm run build`。在仓库根目录执行：
+在 `apps/extension` 执行：
 
 ```powershell
-# Playwright 不在默认模块目录时设置 PLAYWRIGHT_MODULE；浏览器位置可用 CHROMIUM_PATH 指定。
-node scripts/verify_comicpash.mjs
-node scripts/verify_inline_translation.mjs
-
-# 真实来源页面；翻译服务仍为本地模拟，不调用真实供应商。
-$env:RUN_LIVE_COMICPASH = '1'
-node scripts/verify_comicpash.mjs
-node scripts/verify_inline_translation.mjs
-Remove-Item Env:RUN_LIVE_COMICPASH
+npm run check
+npm test
+npm run build
 ```
 
-两个脚本使用临时扩展副本、隔离浏览器资料和预授权来源。`verify_comicpash.mjs` 覆盖识别、排除广告、页序／完整性、取图权限、画布更新与实际导入阅读器；`verify_inline_translation.mjs` 覆盖普通图片回归和 RTL 画布的取图、显示、点击、原图恢复、替换节点及截图像素对比。`RUN_LIVE_COMICPASH=1` 额外验证真实网页；不等同真实模型翻译效果验收，未验证原生浏览器授权弹窗。
+`check` 包含类型和[模块边界检查](../apps/extension/scripts/check-modules.mjs)。测试至少覆盖 URL／伪造主机／资源归属、能力与安装元数据一致性、页序与重复 URL、部分／完整清单、取消及失效读取；有目录则覆盖重复条目、分组引用、更新和失败保留旧目录。源码类型与字段以契约为准，文档不维护第二份接口声明。
 
-此前真实站点验证（不是本轮架构重构的验证结果）：2026-09-22 实测样例包含 32 个漫画页槽，初始读取 3 页；首张导入图片为 844 × 1200。来源结构、视口与懒加载会影响实际发现数量及尺寸，以当次页面为准。脱敏检查结果和截图输出到忽略目录 `artifacts/comicpash-validation` 与 `artifacts/inline-validation`。
+在桌面目标浏览器加载构建产物，实际完成导入 → 取图／解码 → 阅读 → 重开恢复，检查错误提示与阅读位置。按能力补测原位译图恢复、canvas 重绘／SPA 导航或无标签页网络读取；仅下载成功不能代替完整阅读器验收。
 
-本轮架构重构及审查修复验证：类型／模块边界检查、单元测试和 Chrome MV3 构建通过。共 39 个测试文件、374 项单元测试；网页导入 13 个场景、原位翻译 23 个场景、Comic PASH 8 个场景及采集顺序／暂停恢复／仅重试缺图检查通过。新增覆盖 DOM 重建后选择／顺序保留、发现与原位翻译跨脚本共享会话、挂载容器替换、无关样式变化过滤、解析诊断跨消息传递、缩略图缓存和预算。已查看按钮恢复及原位译图截图。缓存恢复检查在实际扩展中模拟 `pagehide/pageshow` 事件，未证明浏览器实际进入 BFCache；真实网站可用性、原生权限弹窗及真实模型效果另行验证。
+通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及带日期的真实验证摘要和未验证范围。区分隔离样本、真实站点、原生授权弹窗与模型翻译效果；不保留每次测试总数和临时服务地址。
 
-本机复现隔离浏览器检查时，`PLAYWRIGHT_MODULE` 指向已安装的 Playwright；`TEST_CHROMIUM`（网页导入／采集顺序）及 `CHROMIUM_PATH`（画布／原位翻译）可指定现有 Chromium。验证使用 Chromium 141，不读取个人浏览器资料。当前证据在 `artifacts/web-import/results.json`、`artifacts/acquisition-order/results.json`、`artifacts/comicpash-validation/fixture-4X660w/results.json`、`artifacts/inline-validation/d01d35a1-0f81-40f9-b997-247c15095047/results.json`；这些运行产物位于忽略目录，不随源码提交。
+## 现有站点
 
-来源边界修正说明及当前回归见[来源边界验收](validation/SOURCE_BOUNDARIES_2026_09_23.md)。
+| 适配器 | 能力与说明 |
+| --- | --- |
+| [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | DOM 目录与 HTTP 图片；动态只读分类、完整性核对、12 小时目录同步 |
+| [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；不开放原位翻译 |
+| [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | 已渲染 canvas 部分窗口，直接阅读与原位翻译；无目录或自动补全 |
+| [Gunnerkrigg](../apps/extension/src/sources/sites/gunnerkrigg/README.md) | 当前单页图片，无目录或自动翻页 |
+| `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

@@ -80,11 +80,6 @@ translations[2]{id,text}:
 
 验证入口：`backend/.venv/Scripts/python.exe -m pytest backend/tests/test_translation_providers.py backend/tests/test_text_adapter.py backend/tests/test_classic.py backend/tests/test_classic_parallel.py backend/tests/test_cluster_scheduler.py -q`；管理后台在 `backend/admin-ui` 执行 `npm run build`。测试使用隔离数据库和模拟供应商，无真实付费模型调用。
 
-## 本轮验证
+## 验收要求
 
-- 全量后端回归：459 通过、84 跳过（默认关闭的 PostgreSQL／专项入口）；之后补充的两个 429 边界用例与供应商专项一起在 SQLite／PostgreSQL 验证，22 通过。
-- PostgreSQL 17.6 独立测试数据库与随机 schema：文本、调度、限流、禁用恢复并发套件通过；真实迁移入口、两个进程争用迁移锁及共享任务测试通过。迁移后不生成任何文本供应商或导入旧配置。
-- 管理后台 TypeScript 检查与 Vite 构建通过。浏览器使用本地隔离 SQLite、假密钥，验证空列表、必填校验、创建两个 OpenAI 供应商、两种协议、默认切换、停用／启用、保留密钥编辑及新版本、刷新恢复、断网失败与恢复，并检查页面截图。
-- 专项覆盖日志参数／驱动错误详情脱敏、停用发生在预占之后但请求之前、未发送记录不占重试与 RPM、分组中途限流释放执行位、429 跨租约恢复及次数耗尽、后台密钥不回显。
-
-没有真实模型效果验收或付费调用，没有更新现有本地业务实例或生产部署。依赖输出的两项弃用警告不影响上述测试结果。
+覆盖供应商停用／默认切换、不可变版本、密钥不回显、RPM 与 429 恢复、未知成本预占、格式修复／次数上限及日志脱敏；浏览器检查空列表、配置、加载、失败与恢复。模拟供应商及隔离 PostgreSQL 只验证协议和并发，真实文本质量与费用另行测量。
