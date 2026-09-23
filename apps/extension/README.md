@@ -41,14 +41,14 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 ## 账户同步与按需取图
 
 - `GET /v1/me/translation-changes` 提供账户增量状态，游标和任务快照在同一 IndexedDB 记录保存。后台仅同步状态，不下载全部已完成译图。
-- 原始文件 SHA-256、不可变 `pageIndex` 与图片 SHA-256 用于跨设备恢复；本地页排序不会改写文件页身份。打开漫画或手动恢复时，`POST /v1/file-pages/match` 每次最多 100 页，身份与返回次序必须一致。
+- 来源修订与页面定位符用于按需读取；真正物化后的图片 SHA-256 是翻译内容身份。恢复上传重新读取冻结页引用并核对 SHA-256 / 字节数，不依赖旧整文件页匹配接口。
 - 当前页附近按需下载原图和最新译图；阅读视口按 3200 万像素预算进一步收缩解码窗口。译图变化不修改原图布局尺寸、页 ID 或相对阅读位置。
 - 新状态使用服务端 `change_sequence` 排序，能接受租约恢复后的状态变化并拒绝迟到快照。不同模式、语言、版本与账户的结果分别标识。
 - 原图缺少本地缓存时，可按本人有效 R2 原图恢复；授权链接按需请求，不写入持久清单。删除服务端译图撤销远端访问，用户已保存的本地副本保留。
 
 ## 本地导入、书架与采集
 
-书架使用 `node-comics-library` IndexedDB，翻译操作与账户同步使用独立 `node-comics-translations` 数据库。
+目录、完整容器、五类缓存 / 下载与翻译操作统一使用 `node-comics-sources-v1-` 数据库基线，仍按类别分库。启动先校验表、主键、索引和字节后端；早期同名 v1 测试库原样保留，不迁移、不自动删除。早期导入需在新基线重新导入。详见[实施记录](../../docs/COMIC_SOURCE_IMPLEMENTATION.md)与[数据库回归](../../docs/validation/DATABASE_BASELINE_2026_09_22.md)。
 
 - 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/LOCAL_IMPORT_FLOW.md)。
 - 网页图片发现与字节采集分离；MangaCopy 按懒加载与总页数核对完整性，失败页有重试原因。参见[采集与漫画管理](../../docs/COMIC_LIBRARY_IMPLEMENTATION.md)、[网页图片导入](../../docs/WEB_IMAGE_IMPORT.md)。
@@ -58,10 +58,10 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 ## 浏览器隔离验收入口
 
 ```powershell
-npm run dev -- --port 5174
+npm run dev -- --port 5176
 ```
 
-访问 `http://127.0.0.1:5174/tests/reader-fixture.html`；`?plus` 切换会员名额，`?redrawOutcome=success` 或 `failure` 提供模拟完成与失败。fixture 拒绝其他源站请求并检查非测试书架数据。模拟译图使用原创《星光书店》原图字节，只验证交互、状态和位置稳定，不代表真实模型翻译效果。
+访问 `http://127.0.0.1:5176/tests/reader-fixture.html`；`?plus` 切换会员名额，`?redrawOutcome=success` 或 `failure` 提供模拟完成与失败。fixture 拒绝其他源站请求并检查非测试书架数据。模拟译图使用原创《星光书店》原图字节，只验证交互、状态和位置稳定，不代表真实模型翻译效果。
 
 本次前端类型与模块检查、单元测试、Chrome MV3 构建和 Web 构建已通过。真实浏览器、R2 与多机器验收由整体验收记录分别说明；历史证据文件保留其日期，不能当作本轮验收。
 

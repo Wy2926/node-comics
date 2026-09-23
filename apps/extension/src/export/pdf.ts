@@ -8,8 +8,9 @@ export async function pdfWriter(title: string) {
   doc.setTitle(title); doc.setCreator(msg("NodeLane Comics")); doc.setProducer('NodeLane Comics / pdf-lib');
   let bytes = 0;
   return {
-    async add(blob: Blob) {
-      const image = await exportImage(blob, true);
+    async add(blob: Blob, signal?: AbortSignal) {
+      const image = await exportImage(blob, true, undefined, signal);
+      signal?.throwIfAborted();
       bytes += image.blob.size;
       if (bytes > 128 * 1024 * 1024) throw Error(msg("单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。"));
       const embedded = await doc.embedJpg(await image.blob.arrayBuffer());

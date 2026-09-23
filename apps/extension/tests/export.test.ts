@@ -1,121 +1,89 @@
-import {describe, expect, it, vi} from 'vitest';
-import {attachCopy, emptyLibrary, makeCopy} from '../src/library/model';
-import {emptyPage} from '../src/reader/model';
-import {exportCopies, exportManifest, planExport, safeName, type ExportOptions} from '../src/export/plan';
+import 'fake-indexeddb/auto';
+import {describe,expect,it,vi} from 'vitest';
+import {BlobReader,BlobWriter,ZipReader} from '@zip.js/zip.js/index-native.js';
+import {catalog} from '../src/comics/repositories';
+import {RENDER_PROFILE} from '../src/comics/pages/identity';
+import {exportManifest,MAX_EXPORT_BYTES,planExport,safeName,type ExportOptions} from '../src/export/plan';
 import {writeExport} from '../src/export/files';
+import {importContainer,releaseContainer} from '../src/storage/containers';
+import {exportOriginalFile} from '../src/comics/application/export-service';
 import type {Job} from '../src/types';
-
-const options: ExportOptions = {format: 'cbz', images: 'both', language: 'zh-Hans', mode: 'classic'};
-function sample() {
-  const state = emptyLibrary();
-  const copy = makeCopy('第 2 话', [0, 1, 2].map(n => ({...emptyPage('page-' + n, 600, 900), blobKey: 'original-' + n, ownerId: 'alice', apiOrigin: 'https://api.example'})));
-  const workId = attachCopy(state, copy, {title: '样本', kind: 'chapter'});
-  const blobs = new Map(copy.pages.map(p => [p.blobKey!, new Blob(['original'])]));
-  return {state, copy, workId, blobs, get: async (key: string) => blobs.get(key)};
+vi.mock('../src/comics/pages/service',()=>({acquirePage:vi.fn(),materializationId:(ref:{revisionId:string;pageId:string;renderProfileId:string})=>JSON.stringify([ref.revisionId,ref.pageId,ref.renderProfileId])}));
+const options:ExportOptions={format:'cbz',images:'original',mode:'classic',language:'zh-Hans'};
+const image=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,1,2,3,4])],{type:'image/png'});
+async function sample(count=3){
+  const id=crypto.randomUUID(),revisionId=crypto.randomUUID(),bindingId=crypto.randomUUID(),now=Date.now();
+  await catalog.commit([
+    {table:'documents',value:{id,revisionId,sourceBindingId:bindingId,unitId:'unit',title:'导出样本',generation:1,format:'cbz',indexState:'ready',pageCount:count,discoveryComplete:true,createdAt:now,updatedAt:now}},
+    {table:'revisions',value:{id:revisionId,documentId:id,parserVersion:'1',indexVersion:1,generation:1,status:'ready',createdAt:now}},
+    {table:'bindings',value:{id:bindingId,connectionId:'local',providerItemId:id,locator:{name:'source.cbz'},generation:1,createdAt:now,updatedAt:now}},
+    {table:'connections',value:{id:'local',provider:'local',displayName:'本地文件',status:'connected',generation:1,createdAt:now,updatedAt:now}},
+  ]);
+  const pages=Array.from({length:count},(_,ordinal)=>({revisionId,pageId:'page-'+ordinal,ordinal,name:String(ordinal),formatLocator:'entry:'+ordinal,locator:{entry:ordinal,url:'https://private.example/?token=secret'}}));
+  await catalog.putPages(id,revisionId,pages,1);return {id,revisionId,pages};
 }
-function job(id: string, overrides: Partial<Job> = {}): Job {
-  return {id, input_asset_id: 'in', output_asset_id: id + '-asset', mode: 'classic', target_language: 'zh-Hans', status: 'succeeded', phase: 'done', quota_pages: 0, created_at: '2026-09-15T00:00:00Z', version: 1, cache_hit: false, ...overrides};
+const job=(id:string,changes:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:'private-result',status:'succeeded',mode:'classic',target_language:'zh-Hans',version:1,phase:'done',quota_pages:0,cache_hit:false,created_at:'2026-09-22',...changes});
+async function bind(s:Awaited<ReturnType<typeof sample>>,jobs:Job[],outputBlobs:Record<string,string>={}){
+  const identity={id:JSON.stringify([s.revisionId,'page-0',RENDER_PROFILE]),revisionId:s.revisionId,pageId:'page-0',renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),byteSize:12,mime:'image/png',width:100,height:100,updatedAt:Date.now()};
+  expect(await catalog.putMaterialization(identity,1)).toBe(true);
+  await catalog.put('translationBindings',{id:JSON.stringify(['https://api.example','alice',identity.imageSha256]),apiOrigin:'https://api.example',userId:'alice',imageSha256:identity.imageSha256,payload:{ownerId:'alice',apiOrigin:'https://api.example',jobs,outputBlobs},updatedAt:Date.now()});
 }
-
-describe('export planning', () => {
-  it('exports a shared copy once, keeps distinct sources, and orders by catalogue order', () => {
-    const s = sample();
-    s.state.coverage.push({...s.state.coverage[0], id: 'another-coverage'});
-    const first = makeCopy('第 1 话', [emptyPage('one', 1, 1)]);
-    attachCopy(s.state, first, {workId: s.workId, title: '样本', kind: 'chapter'});
-    s.state.chapters[1].order = -1;
-    const variant = {...s.copy, id: 'second-source', source: '另一来源'};
-    attachCopy(s.state, variant, {workId: s.workId, title: '样本', kind: 'chapter', targetId: s.state.chapters[0].id});
-    attachCopy(s.state, s.copy, {title: '另一作品', kind: 'work'});
-    const entries = exportCopies(s.state, [s.copy, first, variant], s.workId);
-    expect(entries.map(e => e.copy.id)).toEqual([first.id, s.copy.id, variant.id].sort((a, b) => a === first.id ? -1 : b === first.id ? 1 : a.localeCompare(b)));
-    expect(entries.find(e => e.copy.id === s.copy.id)?.otherWorks).toEqual(['另一作品']);
-    expect(entries.find(e => e.copy.id === s.copy.id)?.coverage).toEqual(['第 2 话']);
+describe('document export through page leases',()=>{
+  it('plans source descriptors without reading image bytes and keeps a frozen revision',async()=>{
+    const sampleData=await sample(105),plan=await planExport(sampleData.id,options);
+    expect(plan.pages).toHaveLength(105);expect(plan.pages.map(page=>page.ordinal)).toEqual(Array.from({length:105},(_,i)=>i));
+    expect(plan.revisionId).toBe(sampleData.revisionId);expect(plan.pages.every(page=>page.kind==='original')).toBe(true);
   });
-  it('keeps current page order and separates originals from latest translated results', async () => {
-    const s = sample();
-    s.copy.pages[0].jobs = [job('old'), job('new', {version: 2}), job('pending', {status: 'running', version: 3})];
-    s.copy.pages[0].outputBlobs = {new: 'translated'}; s.blobs.set('translated', new Blob(['translated']));
-    s.copy.pages[1].jobs = [job('blank', {status: 'no_text', output_asset_id: null})];
-    s.copy.pages.reverse();
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, 'alice', 'https://api.example');
-    expect(p.books).toHaveLength(2);
-    expect(p.books[0].pages.map(p => p.id)).toEqual(s.copy.pages.map(p => p.id));
-    expect(p.books[1].pages.map(p => p.kind)).toEqual(['fallback', 'no_text', 'translation']);
-    expect(p.books[1].pages[2]).toMatchObject({jobId: 'new', version: 2, blobKey: 'translated'});
-    s.copy.pages.pop();
-    expect(p.books[0].pages).toHaveLength(3);
+  it('only uses the selected account’s latest delivered translation; missing pages remain explicit original fallbacks',async()=>{
+    const s=await sample();await bind(s,[job('older'),job('latest',{version:2}),job('running',{version:3,status:'running'})],{latest:'result-cache-key'});
+    const plan=await planExport(s.id,{...options,images:'translation'},{userId:'alice',origin:'https://api.example'});
+    expect(plan.pages.map(page=>page.kind)).toEqual(['translation','fallback','fallback']);expect(plan.pages[0].job?.id).toBe('latest');
+    const other=await planExport(s.id,{...options,images:'translation'},{userId:'bob',origin:'https://api.example'});
+    expect(other.pages.every(page=>page.kind==='fallback')).toBe(true);
+    await bind(s,[job('old'),job('expired',{version:2,output_asset_id:null,result_expired:true})],{old:'older-cache'});
+    expect((await planExport(s.id,{...options,images:'translation'},{userId:'alice',origin:'https://api.example'})).pages[0].kind).toBe('fallback');
   });
-  it('checks actual blob presence, prefers local output after remote expiry, and never revives older versions', async () => {
-    const s = sample();
-    s.copy.pages[0].jobs = [job('old'), job('new', {version: 2, result_expired: true, output_asset_id: null})];
-    s.copy.pages[0].outputBlobs = {old: 'old-blob', new: 'missing-blob'}; s.blobs.set('old-blob', new Blob(['old']));
-    s.copy.pages[1].jobs = [job('local', {result_expired: true, output_asset_id: null})];
-    s.copy.pages[1].outputBlobs = {local: 'local-blob'}; s.blobs.set('local-blob', new Blob(['local']));
-    s.copy.pages[2].jobs = [job('remote')];
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, 'alice', 'https://api.example');
-    expect(p.books[1].pages.map(p => p.kind)).toEqual(['fallback', 'translation', 'translation']);
-    expect(p.books[1].pages[2].assetId).toBe('remote-asset');
+  it('requires explicit partial export and emits a credential-free manifest',async()=>{
+    const s=await sample();await catalog.patch('documents',s.id,{discoveryComplete:false,knownTotal:8});
+    await expect(planExport(s.id,options)).rejects.toThrow('尚未全部发现');
+    await bind(s,[job('translated')]);
+    const plan=await planExport(s.id,{...options,allowIncomplete:true,images:'translation'},{userId:'alice',origin:'https://api.example'});
+    const manifest=JSON.stringify(exportManifest(plan));expect(JSON.parse(manifest).complete).toBe(false);
+    for(const secret of ['private.example','token','secret','alice','api.example','private-result','sourceUrl','cacheKey'])expect(manifest).not.toContain(secret);
   });
-  it.each([['bob', 'https://api.example'], ['alice', 'https://other.example']])('does not export translations for another identity %s %s', async (owner, origin) => {
-    const s = sample(); s.copy.pages[0].jobs = [job('private')]; s.copy.pages[0].outputBlobs = {private: 'private'}; s.blobs.set('private', new Blob(['private']));
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, owner, origin);
-    expect(p.books[1].pages.every(p => p.kind === 'fallback' && !p.jobId && !p.assetId)).toBe(true);
+  it('writes a real archive incrementally with at most one live page lease and includes its manifest',async()=>{
+    const s=await sample(),plan=await planExport(s.id,options);let active=0,maximum=0,released=0;
+    const result=await writeExport(plan,{assertCurrent(){},async acquire(){active++;maximum=Math.max(maximum,active);return {blob:image(),width:100,height:100,release(){active--;released++;}};}},new AbortController().signal);
+    expect(maximum).toBe(1);expect(released).toBe(3);expect(result.blob).toBeDefined();
+    const reader=new ZipReader(new BlobReader(result.blob!));
+    try{const entries=await reader.getEntries();expect(entries.map(entry=>entry.filename)).toEqual(['00001.png','00002.png','00003.png','export-manifest.json']);
+      const entry=entries[0];if(entry.directory)throw Error('unexpected directory');expect(await(await entry.getData(new BlobWriter())).arrayBuffer()).toEqual(await image().arrayBuffer());
+    }finally{await reader.close();}
   });
-  it('flags partial discovery and missing images without losing original page slots', async () => {
-    const s = sample(); s.copy.sourceEntryId = 'source'; s.copy.discoveryComplete = false; s.blobs.delete('original-1');
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), {...options, images: 'original'}, s.get);
-    expect(p.books[0]).toMatchObject({incomplete: true, total: undefined});
-    expect(p.books[0].pages[1]).toMatchObject({ordinal: 2, kind: 'missing'});
-    expect(p.books[0].path).toContain('不完整');
-    await expect(writeExport(p, {getBlob: s.get, download: vi.fn(), isCurrent: () => true, progress: vi.fn()}, new AbortController().signal)).rejects.toThrow('不完整');
+  it('streams directly to a supplied file destination without returning an in-memory archive',async()=>{
+    const s=await sample(),plan=await planExport(s.id,options);let bytes=0,closed=false;
+    const stream=new WritableStream<Uint8Array>({write(chunk){bytes+=chunk.length;},close(){closed=true;}});
+    const result=await writeExport(plan,{assertCurrent(){},async acquire(){return {blob:image(),width:100,height:100,release(){}};}},new AbortController().signal,stream);
+    expect(result.blob).toBeUndefined();expect(result.bytes).toBe(bytes);expect(closed).toBe(true);
   });
-  it('omits raw source URLs, account details and blob/asset access identities from manifests', async () => {
-    const s = sample(); s.copy.sourceUrl = 'https://private.example/?token=secret'; s.copy.pages[0].sourceUrl = s.copy.sourceUrl; s.copy.pages[0].jobs = [job('ok')];
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, 'alice', 'https://api.example');
-    const manifest = JSON.stringify(exportManifest(p));
-    for (const secret of ['token', 'secret', 'alice', 'api.example', 'sourceUrl', 'blobKey', 'assetId', 'ok-asset']) expect(manifest).not.toContain(secret);
+  it('aborts the file and releases the active page when account/revision validation changes mid-read',async()=>{
+    const s=await sample(),plan=await planExport(s.id,options);let current=true;const released=vi.fn(),aborted=vi.fn(),closed=vi.fn();
+    const stream=new WritableStream<Uint8Array>({write(){},close:closed,abort:aborted});
+    await expect(writeExport(plan,{assertCurrent(){if(!current)throw Error('账户已变化');},async acquire(){current=false;return {blob:image(),release:released};}},new AbortController().signal,stream)).rejects.toThrow('账户已变化');
+    expect(released).toHaveBeenCalledOnce();expect(aborted).toHaveBeenCalledOnce();expect(closed).not.toHaveBeenCalled();
   });
-  it('stops cancelled inspections and stale or shared exports before any downloads', async () => {
-    const s = sample(), signal = new AbortController(); signal.abort();
-    await expect(planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, 'alice', '', signal.signal)).rejects.toThrow();
-    attachCopy(s.state, s.copy, {title: '其他作品', kind: 'work'});
-    const p = await planExport('样本', exportCopies(s.state, [s.copy], s.workId), options, s.get, 'alice', 'https://api.example');
-    const download = vi.fn(), deps = {getBlob: s.get, download, isCurrent: () => true, progress: vi.fn()};
-    await expect(writeExport(p, deps, new AbortController().signal)).rejects.toThrow('其他作品');
-    await expect(writeExport(p, {...deps, isCurrent: () => false}, new AbortController().signal)).rejects.toThrow('账户');
-    expect(download).not.toHaveBeenCalled();
+  it('enforces the 128 MiB fallback ceiling before copying the large page into output',async()=>{
+    const s=await sample(1),plan=await planExport(s.id,options),blob=image(),release=vi.fn();Object.defineProperty(blob,'size',{value:MAX_EXPORT_BYTES+1});
+    await expect(writeExport(plan,{assertCurrent(){},async acquire(){return {blob,release};}},new AbortController().signal)).rejects.toThrow('128 MiB');expect(release).toHaveBeenCalledOnce();
   });
-  it('produces portable names without traversal, controls or reserved Windows devices', () => {
-    for (const name of ['../..\\目录:标题?*', 'CON', 'LPT1.txt', '..', '\u0000\u202eabc']) {
-      const result = safeName(name);
-      expect(result).not.toMatch(/[\\/:?*\u0000\u202e]/); expect(result).not.toMatch(/^[. ]|[. ]$/);
-    }
+  it('exports saved source bytes exactly without invoking a parser',async()=>{
+    const s=await sample(1),input=new File([new Uint8Array([80,75,3,4,7,8,9,10])],'source.cbz');
+    const container=await importContainer(input,undefined,undefined,s.revisionId);await catalog.patch('revisions',s.revisionId,{containerId:container.id});
+    try{const result=await exportOriginalFile(s.id,{signal:new AbortController().signal});expect(result.name).toBe('source.cbz');expect(await result.blob!.arrayBuffer()).toEqual(await input.arrayBuffer());}
+    finally{await releaseContainer(container.id,s.revisionId);}
+  });
+  it('sanitizes filenames without traversal or reserved Windows device names',()=>{
+    for(const name of ['../..\\目录:标题?*','CON','LPT1.txt','..','\u0000\u202eabc'])expect(safeName(name)).not.toMatch(/[\\/:?*\u0000\u202e]|^[. ]|[. ]$/);
     expect(safeName('CON')).toBe('_CON');
-  });
-  it('detects other works recorded only on a shared publication or its inclusions', () => {
-    const s = sample();
-    const other = makeCopy('另一作品的章节', []);
-    const otherWork = attachCopy(s.state, other, {title: '另一作品', kind: 'chapter'});
-    const book = makeCopy('合订册', []);
-    attachCopy(s.state, book, {title: '样本', workId: s.workId, kind: 'publication'});
-    s.state.publications[0].workIds.push(otherWork);
-    expect(exportCopies(s.state, [book], s.workId)[0].otherWorks).toEqual(['另一作品']);
-    s.state.publications[0].workIds = [s.workId];
-    s.state.inclusions.push({id: 'inclusion', publicationId: s.state.publications[0].id, target: {kind: 'chapter', id: s.state.chapters[1].id}, order: 0, evidence: {status: 'user', source: 'test'}});
-    expect(exportCopies(s.state, [book], s.workId)[0].otherWorks).toEqual(['另一作品']);
-  });
-  it('rejects post-inspection image eviction and account changes during a remote fetch', async () => {
-    const s = sample(); s.copy.pages = [s.copy.pages[0]];
-    const entries = exportCopies(s.state, [s.copy], s.workId);
-    const original = await planExport('样本', entries, {...options, images: 'original'}, s.get);
-    const deps = {getBlob: async () => undefined, download: vi.fn(), isCurrent: () => true, progress: vi.fn()};
-    await expect(writeExport(original, deps, new AbortController().signal)).rejects.toThrow('图片在检查后被清理');
-    s.copy.pages[0].jobs = [job('remote')];
-    const translated = await planExport('样本', entries, {...options, images: 'translation'}, s.get, 'alice', 'https://api.example');
-    let current = true;
-    const download = vi.fn(async () => { current = false; return new Blob(['must not export']); });
-    await expect(writeExport(translated, {...deps, download, isCurrent: () => current}, new AbortController().signal)).rejects.toThrow('账户或服务');
-    expect(download).toHaveBeenCalledOnce();
   });
 });

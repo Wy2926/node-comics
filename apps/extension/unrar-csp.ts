@@ -20,7 +20,7 @@ export function unrarCsp():Plugin {
     if(!id.replaceAll('\\','/').endsWith('/node-unrar-js/esm/js/unrar.js'))return;
     const pattern=/function createNamedFunction\(name,body\)\{.*?\}function extendError/;
     const invoker=/function craftInvokerFunction\(humanName,argTypes,classType,cppInvokerFunc,cppTargetFunc\)\{.*?\}function __embind_register_class_function/;
-    if(!pattern.test(code)||!invoker.test(code)||code.match(/new Function/g)?.length!==1||code.match(/new_\(Function/g)?.length!==1)throw Error('UnRAR glue changed; review its MV3 CSP compatibility before upgrading.');
+    if(!pattern.test(code)||!invoker.test(code)||code.match(/new Function/g)?.length!==1||code.match(/new_\(Function/g)?.length!==1||!code.includes('function getHeapMax(){return 2147483648}'))throw Error('UnRAR glue changed; review its MV3 CSP compatibility and memory limit before upgrading.');
     const patched=code.replace(pattern,'function createNamedFunction(name,body){const fn=function(){return body.apply(this,arguments)};Object.defineProperty(fn,"name",{value:makeLegalFunctionName(name)});return fn}function extendError')
       .replace(invoker,`function craftInvokerFunction(humanName,argTypes,classType,cppInvokerFunc,cppTargetFunc){
         const count=argTypes.length;
@@ -38,7 +38,9 @@ export function unrarCsp():Plugin {
           else for(let index=member?1:2;index<count;index++)if(argTypes[index].destructorFunction!==null)argTypes[index].destructorFunction(wired[index]);
           if(argTypes[0].name!=="void")return argTypes[0].fromWireType(result);
         });
-      }function __embind_register_class_function`);
+      }function __embind_register_class_function`)
+      // The local CBR Worker additionally bounds compressed input and target output.
+      .replace('function getHeapMax(){return 2147483648}', 'function getHeapMax(){return 268435456}');
     return {code:patched,map:null};
   }};
 }

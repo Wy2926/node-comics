@@ -788,6 +788,14 @@ a {
   color: var(--ink);
   border-radius: 12px;
 }
+.nc-comparison-pane > .nc-image-failure:not(.over-image) {
+  align-self: flex-start;
+  margin-top: min(80px, 10vh);
+}
+.nc-comparison-pane > .nc-image-placeholder {
+  justify-content: flex-start;
+  padding-top: min(100px, 15vh);
+}
 .nc-image-failure.over-image {
   position: absolute;
   bottom: 24px;

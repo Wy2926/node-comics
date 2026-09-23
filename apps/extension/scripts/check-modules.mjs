@@ -26,6 +26,7 @@ const entrypoints = files(path.join(root, 'entrypoints'));
 const modules = new Set([...entrypoints, ...files(path.join(root, 'src'))]);
 const graph = new Map();
 const runtimeGraph = new Map();
+const importErrors = [];
 for (const filename of modules) {
   const source = ts.createSourceFile(
     filename,
@@ -37,6 +38,9 @@ for (const filename of modules) {
     runtime = new Set();
   function add(specifier, typeOnly = false) {
     if (!ts.isStringLiteral(specifier)) return;
+    // Reject a removed module even when TypeScript resolution fails; no compatibility façade.
+    if (/(?:^|\/)library(?:\/|$)/.test(specifier.text))
+      importErrors.push(`Comic boundary (removed library model): ${relative(filename)} -> ${specifier.text}`);
     const resolved = ts.resolveModuleName(
       specifier.text.split('?')[0],
       filename,
@@ -93,7 +97,7 @@ for (const filename of modules) {
   runtimeGraph.set(filename, runtime);
 }
 
-const errors = [],
+const errors = [...importErrors],
   reachable = new Set(),
   visited = new Set(),
   stack = [];
@@ -102,9 +106,18 @@ const site = (filename) => sourcePart(filename)?.match(/^sites\/([^/]+)\//)?.[1]
 for (const [filename, dependencies] of graph) {
   const part = sourcePart(filename),
     owner = site(filename);
+  const from = relative(filename), ui = /^src\/(?:ui|reader)\//.test(from), format = from.startsWith('src/comics/formats/');
+  if (from.startsWith('src/library/')) errors.push(`Comic boundary (removed library model): ${from}`);
   for (const target of dependencies) {
     const destination = sourcePart(target),
       targetSite = site(target);
+    const to = relative(target);
+    if (ui && (to.startsWith('src/comics/repositories/') || to.startsWith('src/storage/')))
+      errors.push(`Comic boundary (UI must use application/page services): ${from} -> ${to}`);
+    if (format && /^src\/(?:comics\/(?:sources|repositories|application)|storage|translation)\//.test(to))
+      errors.push(`Comic boundary (format driver depends on source, persistence or translation): ${from} -> ${to}`);
+    if (/^src\/(?:comics\/(?:pages|sources)|storage\/source-(?:pages|ranges))\//.test(from) && /^src\/(?:translation|storage\/translations)\//.test(to))
+      errors.push(`Comic boundary (source/page service depends on translations): ${from} -> ${to}`);
     const fail = (reason) =>
       errors.push(`Source boundary (${reason}): ${relative(filename)} -> ${relative(target)}`);
     if (targetSite && owner !== targetSite && !part?.startsWith('registry/'))
@@ -146,7 +159,7 @@ for (const [filename, dependencies] of graph) {
     )
       fail('utility depends on application');
   }
-  if (owner || part?.startsWith('generic/')) {
+  if (owner || part?.startsWith('generic/') || ui || format) {
     const source = ts.createSourceFile(
       filename,
       fs.readFileSync(filename, 'utf8'),
@@ -154,12 +167,38 @@ for (const [filename, dependencies] of graph) {
       true,
     );
     const visit = (node) => {
-      if (ts.isIdentifier(node) && ['chrome', 'browser'].includes(node.text))
+      if ((owner || part?.startsWith('generic/')) && ts.isIdentifier(node) && ['chrome', 'browser'].includes(node.text))
         errors.push(`Source boundary (adapter browser API): ${relative(filename)}`);
+      if ((ui || format) && ts.isIdentifier(node) && ['indexedDB', 'IDBKeyRange', 'getDirectory', 'createSyncAccessHandle', 'showDirectoryPicker'].includes(node.text))
+        errors.push(`Comic boundary (${ui ? 'UI' : 'format'} accesses IDB/OPFS): ${from} (${node.text})`);
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
+}
+// Re-exporting a helper must not provide a hidden path from pure drivers/caches into translation.
+function checkTransitiveBoundary(filename, predicate, label, seen = new Set()) {
+  if (seen.has(filename)) return;
+  seen.add(filename);
+  for (const dependency of graph.get(filename) ?? []) {
+    if (predicate(relative(dependency))) errors.push(`Comic boundary (${label}): ${relative(filename)} -> ${relative(dependency)}`);
+    checkTransitiveBoundary(dependency, predicate, label, seen);
+  }
+}
+for (const filename of modules) {
+  const name = relative(filename);
+  const concreteSource = target => /^src\/comics\/sources\/[^/]+\//.test(target);
+  if (name.startsWith('src/comics/formats/')) checkTransitiveBoundary(filename, target => concreteSource(target) || /^src\/(?:translation|storage\/translations)\//.test(target), 'format transitive source/translation dependency');
+  if (name === 'src/App.tsx' || /^src\/(?:comics\/(?:application|domain|pages|repositories)|ui|reader|translation|export|storage)\//.test(name) ||
+      /^src\/comics\/sources\/(?:contracts|registry|runtime)\.ts$/.test(name)) {
+    checkTransitiveBoundary(filename, concreteSource, 'shared code depends on a concrete file source');
+  }
+  const provider = /^src\/comics\/sources\/([^/]+)\//.exec(name)?.[1];
+  if (provider) checkTransitiveBoundary(filename, target => {
+    const other = /^src\/comics\/sources\/([^/]+)\//.exec(target)?.[1];
+    return (other && other !== provider) || /^src\/(?:comics\/(?:application|pages|repositories)|ui|reader|translation|storage\/(?:cache|source-pages|source-ranges|thumbnails|translations))\//.test(target);
+  }, 'file source depends on another provider or application/cache policy');
+  if (/^src\/storage\/source-(?:pages|ranges)\//.test(name)) checkTransitiveBoundary(filename, target => target.startsWith('src/storage/translations/'), 'source cache transitive translation dependency');
 }
 // A type-only DOM declaration is harmless; runtime transitive dependencies are not.
 function pureDefinition(filename, seen = new Set()) {
@@ -235,6 +274,6 @@ if (errors.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${modules.size} modules: source boundaries, pure definitions, runtime cycles and reachability passed.`,
+    `Checked ${modules.size} modules: comic/source boundaries, pure definitions, runtime cycles and reachability passed.`,
   );
 }

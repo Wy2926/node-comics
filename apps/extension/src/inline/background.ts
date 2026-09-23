@@ -4,9 +4,9 @@ import { sessionAuthorization } from '../auth/session';
 import { authKey, readAuth } from '../auth/storage';
 import { assertCurrent, RequestPool, UPLOAD_CONCURRENCY } from '../concurrency';
 import { msg } from '../i18n/runtime';
-import { imageIdentity } from '../importers/hash';
-import { getBlob, putBlob, removeBlob } from '../library/store';
-import { loadResultBlob } from '../library/result-cache';
+import {prepareComicPage} from '../comics/pages/normalize';
+import {InlineOriginals} from './originals';
+import { loadResultBlob } from '../storage/translations/results';
 import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
@@ -23,7 +23,7 @@ import { settingsKey } from './settings';
 import { registerInlineThemeBackground } from './theme';
 
 interface Activation {url:string;navigationId:string;documentId?:string;automatic?:boolean;}
-interface Context {key:string;api:Api;core:TranslationCoordinator;settings:Settings;session:Session;caps:Capabilities;rights:Entitlements;pages:Map<string,Page>;sourceErrors:Map<string,string>;currentKey?:string;waiting?:AbortController;active:boolean;}
+interface Context {key:string;api:Api;core:TranslationCoordinator;settings:Settings;session:Session;caps:Capabilities;rights:Entitlements;pages:Map<string,Page>;originals:InlineOriginals;sourceErrors:Map<string,string>;currentKey?:string;waiting?:AbortController;active:boolean;}
 const activationKey=(tabId:number)=>'nc-inline:'+tabId;
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 export async function activateInline(tabId:number,automatic=false){
@@ -42,7 +42,7 @@ export async function activateInline(tabId:number,automatic=false){
     if(!identity||identity.url!==tab.url)throw Error(msg("网页已变化，请重新启动翻译。"));
     if(automatic&&!await automaticTabsAllowed())return;
     windowGenerations.delete(tabId);
-    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();contexts.delete(tabId);}
+    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();old.originals.clear();contexts.delete(tabId);}
     await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic} satisfies Activation});
     await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic},target);
   });
@@ -53,7 +53,7 @@ async function stopAutomaticInline(tabId:number){
     if(await automaticTabsAllowed())return;
     const key=activationKey(tabId),saved=await chrome.storage.session.get(key),activation=saved[key] as Activation|undefined;
     if(!activation?.automatic)return;
-    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();contexts.delete(tabId);}
+    const old=contexts.get(tabId);if(old){old.active=false;old.waiting?.abort();old.originals.clear();contexts.delete(tabId);}
     await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP_AUTO'},{frameId:0,...(activation.documentId?{documentId:activation.documentId}:{})}).catch(()=>{});
     await chrome.storage.session.remove(key);windowGenerations.delete(tabId);
   });
@@ -66,32 +66,37 @@ async function createContext(tabId:number,navigationId:string):Promise<Context|u
   const origin=API_ORIGIN;if(!session||session.apiOrigin!==origin)return;
   const key=JSON.stringify([origin,session.id,settings.translationMode,settings.language,navigationId,configGeneration]);
   const previous=contexts.get(tabId);if(previous?.key===key){previous.settings=settings;return previous;}
-  if(previous){previous.active=false;previous.waiting?.abort();}
+  if(previous){previous.active=false;previous.waiting?.abort();previous.originals.clear();}
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
   const api=new Api(API_BASE,session.token,new RequestPool(UPLOAD_CONCURRENCY),()=>generation===configGeneration&&(!ctx||ctx.active),sessionAuthorization(session.id));
   const [caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);
   const attach=async(jobs:Job[])=>{assertCurrent(api.isCurrent);for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,ownerId:session.user.id,apiOrigin:origin,assetId:incoming.find(j=>j.input_asset_id)?.input_asset_id??page.assetId,jobs:mergeJobs(page.jobs,incoming)});}};
-  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob,rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
-  ctx={key,api,core,settings,session,caps,rights,pages,sourceErrors:new Map(),active:true};contexts.set(tabId,ctx);await core.init();await core.recover();return ctx;
+  const originals=new InlineOriginals('inline:'+key,Math.min(128*1024*1024,caps.limits.max_bytes*4));
+  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob:key=>originals.read(key),rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
+  ctx={key,api,core,settings,session,caps,rights,pages,originals,sourceErrors:new Map(),active:true};contexts.set(tabId,ctx);await core.init();await core.recover();return ctx;
 }
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
+async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
+  assertCurrent(ctx.api.isCurrent);let blob:Blob;
+  if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await(await fetch(source.data)).blob();}
+  else blob=await sourceImage(image.url);
+  assertCurrent(ctx.api.isCurrent);if(blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
+  const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(ctx.api.isCurrent);
+  if(prepared.blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
+  if(prepared.width*prepared.height>ctx.caps.limits.max_pixels||Math.max(prepared.width,prepared.height)>ctx.caps.limits.max_dimension)throw Error(msg("图片尺寸超过翻译服务限制。"));
+  return prepared;
+}
 async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.MessageSender){
   const targets:ReadingTarget[]=[];
   for(const [index,image] of request.images.entries()){
    try{
     const key=pageKey(request,image);let page=ctx.pages.get(key);
     if(!page){
-      let blob:Blob;
-      if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await (await fetch(source.data)).blob();}
-      else blob=await sourceImage(image.url);
-      assertCurrent(ctx.api.isCurrent);if(blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
-      const bitmap=await createImageBitmap(blob),width=bitmap.width,height=bitmap.height;bitmap.close();
-      if(width*height>ctx.caps.limits.max_pixels||Math.max(width,height)>ctx.caps.limits.max_dimension)throw Error(msg("图片尺寸超过翻译服务限制。"));
-      const identity=await imageIdentity(blob);assertCurrent(ctx.api.isCurrent);
-      page={...emptyPage(msg("网页漫画"),width,height),...identity,id:identity.imageSha256,imageByteSize:blob.size,imageMime:blob.type,blobKey:'inline-original:'+ctx.core.scope+':'+identity.imageSha256,ownerId:ctx.session.user.id,apiOrigin:new URL(ctx.api.base).origin};
+      const {blob,width,height,imageSha256}=await readInlineSource(ctx,request,image,sender);
+      page={...emptyPage(msg("网页漫画"),width,height),imageSha256,id:imageSha256,imageByteSize:blob.size,imageMime:blob.type,blobKey:'inline-original:'+ctx.core.scope+':'+imageSha256,ownerId:ctx.session.user.id,apiOrigin:new URL(ctx.api.base).origin};
       page.jobs=ctx.core.state.jobs.filter(job=>matchesPage(page!,job));
-      await putBlob(page.blobKey!,blob);ctx.pages.set(key,page);
-      if(ctx.pages.size>200)ctx.pages.delete(ctx.pages.keys().next().value!);
+      await ctx.originals.remember(page.blobKey!,blob,async()=>(await readInlineSource(ctx,request,image,sender)).blob);assertCurrent(ctx.api.isCurrent);ctx.pages.set(key,page);
+      if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
     ctx.sourceErrors.delete(key);targets.push({copyId:'inline',page,mode:ctx.settings.translationMode});
    }catch(error){ctx.sourceErrors.set(pageKey(request,image),(error as Error).message);if(index===0)throw error;}
@@ -130,7 +135,7 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.output_asset_id]);
   if(!job?.output_asset_id||key!==request.resultKey)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
   const blob=await loadResultBlob({origin:new URL(ctx.api.base).origin,userId:ctx.session.user.id,job,
-    download:()=>ctx.api.image(job.output_asset_id!),isCurrent:ctx.api.isCurrent,cacheLimitMb:ctx.settings.cacheLimitMb});
+    download:()=>ctx.api.image(job.output_asset_id!),isCurrent:ctx.api.isCurrent});
   assertCurrent(current);
   // Feed updates can revoke/change the result while its bytes are being read.
   const latest=ctx.pages.get(pageKey(request,request.images[0])),selected=latest&&pageResult(ctx,latest);
@@ -160,7 +165,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
     ctx.currentKey=currentKey;
     // Upload completion is durable and arrives through the feed. Do not hold ready images behind uploads.
     void ctx.core.finishUploads().then(async()=>{
-      for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.job?.status!=='awaiting_upload')await removeBlob(target.page.blobKey);}
+      for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.job?.status!=='awaiting_upload')await ctx.originals.uploaded(target.page.blobKey);}
     }).catch(()=>{});
   }
   return response(ctx,request);
@@ -168,8 +173,8 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
 export function registerInlineBackground(){
   registerInlineThemeBackground();
   registerAutomaticTabs(activateInline,stopAutomaticInline);
-  chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;const settingChange=changes[settingsKey],before=settingChange?.oldValue as Partial<Settings>|undefined,after=settingChange?.newValue as Partial<Settings>|undefined;const translationChanged=settingChange&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode);if(area==='local'&&(translationChanged||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
-  chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
+  chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;const settingChange=changes[settingsKey],before=settingChange?.oldValue as Partial<Settings>|undefined,after=settingChange?.newValue as Partial<Settings>|undefined;const translationChanged=settingChange&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode);if(area==='local'&&(translationChanged||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();ctx.originals.clear();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
+  chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();ctx.originals.clear();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_LEASE','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{

@@ -1,5 +1,9 @@
 # 本地格式与翻译缓存
 
+2026-09-22：[来源与缓存架构](COMIC_SOURCE_ARCHITECTURE.md)已落地：本地导入保存完整源文件至固定 `chunked-idb-v1`，按需索引 / 取页，不再预先持久化整卷展开图；源文件、原图页、分段、缩略图、译图和下载资料分别管理。当前格式与资源上限以[格式模块说明](../apps/extension/src/comics/formats/README.md)为准，运行证据和限制见[新实施记录](COMIC_SOURCE_IMPLEMENTATION.md)。Drive 只开放 CBZ/ZIP 与单图代码入口，真实 OAuth 与云盘 Range 未实测。
+
+**以下保留 2026-09-14 / 09-20 的历史导入链和缓存记录，不是当前实现说明。** 其中“逐页解码后入库”、旧本地库补齐、统一原图 / 译图预算与“清理缓存提高清单修订”等流程已删除；后端命中与保留规则以[阅读计划契约](READING_TRANSLATION_CONTRACT.md)、[译图共享](RESULT_SHARING.md)和[对象存储](OBJECT_STORAGE.md)为准。本轮没有迁移旧本地数据或更改后端计费。
+
 2026-09-14：已实现 CBZ/ZIP、CBR/RAR、PDF 导入及按页内容摘要恢复。保留图片与 MOBI。前后端需要配套更新；本次未更新正在运行的产品 API、未公开部署。
 
 ## 格式范围

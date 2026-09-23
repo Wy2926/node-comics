@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { grantImagePermissions } from '../../../../library/acquisition';
-import { makeCopy } from '../../../../library/model';
+import { grantDownloads } from '../../../../comics/acquisition';
 import { pollSourceDiscovery } from '../../../core/discovery';
 import { createSourceNavigation, discoverDocument } from '../../../page';
 import { sourceFailure } from '../../../runtime/diagnostics';
@@ -199,12 +198,7 @@ describe('MangaCopy source discovery', () => {
   it('requests known source and image permissions synchronously from the click', async () => {
     const request = vi.fn(async () => false);
     vi.stubGlobal('chrome', { runtime: { id: 'extension' }, permissions: { request } });
-    const copy = {
-      ...makeCopy('sample', []),
-      sourceUrl: 'https://www.mangacopy.com/comic/a/chapter/724f819b-5306-11ea-b7ea-024352452ce0',
-      pages: [{ sourceUrl: 'https://images.example/page.jpg' }] as unknown as Parameters<typeof makeCopy>[1],
-    };
-    const result = grantImagePermissions([copy.id], [copy]);
+    const result = grantDownloads(['sample'], ['https://www.mangacopy.com/*', 'https://images.example/*']);
     expect(request).toHaveBeenCalledWith({
       origins: ['https://www.mangacopy.com/*', 'https://images.example/*'],
     });

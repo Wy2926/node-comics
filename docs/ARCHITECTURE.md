@@ -10,7 +10,9 @@ API、control-worker 和 maintenance 独立运行。图像节点 classic_node �
 
 ## 漫画管理领域模型
 
-作品管理按漫画内容与出版关系建立来源无关模型，见[通用漫画作品管理设计](COMIC_LIBRARY_DESIGN.md)。已实现作品、章节、内容版本、出版套系、卷册及收录关系，来源目录通过映射关联`ReadingCopy`。`Chapter`表示章节内容，不保存图片；页面与阅读锚点属于副本及其清单修订。使用独立 IndexedDB `node-comics-library`，事务协调元数据与副本身份，Web Locks 协调来源采集。旧扁平书架及存储模块已删除，没有旧数据迁移、兼容字段或结构回退。模块与运行证据见[实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)。
+2026-09-22：[来源与缓存重设计](COMIC_SOURCE_ARCHITECTURE.md)已替换旧实现。当前为 `Work → ReadingUnit → Document → DocumentRevision / PageDescriptor`，元数据位于 `node-comics-sources-v1-catalog`，完整本地源文件使用独立 `node-comics-sources-v1-container-bytes` / `chunked-idb-v1`，每块 1 MiB。来源、格式和统一 PageService 分开；原图页、分段、缩略图、译图缓存和网站下载资料分别管理。实际入口及验收边界见[实施记录](COMIC_SOURCE_IMPLEMENTATION.md)。没有旧数据迁移、双写或兼容回退。
+
+旧 `node-comics-library`、出版套系 / 收录 / 作品关系管理和顺序逐页物化导入链已删除；[旧模型](COMIC_LIBRARY_DESIGN.md)与[旧实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)仅保留历史依据。`ReadingCopy` 现在只是应用服务交给现有阅读器的瞬时 ViewModel，不是内嵌全卷 Blob 的持久实体。来源目录与稳定来源页身份仍保留；标题相同不会自动合并作品。
 
 MangaCopy是来源适配器之一，具体入口、原始标签映射和图片发现规则见[来源设计](MANGACOPY_LIBRARY_DESIGN.md)。站点分组、URL、章节UUID和图片地址不充当全局领域身份；源站变化不要求修改核心类的含义。
 
@@ -22,7 +24,9 @@ MangaCopy是来源适配器之一，具体入口、原始标签映射和图片�
 
 通用适配与各站点独立目录的目标结构、目录／身份解耦和依赖检查见[适配架构设计](SOURCE_ADAPTER_ARCHITECTURE.md)。源码已按公共执行层、通用适配和四个独立站点目录完成解耦，边界由模块检查与契约测试约束。
 
-清单、任务ID、原图与结果Blob存IndexedDB；Blob URL每次重建并撤销。连续阅读有限窗口解码，页面ID+相对位置恢复，原图尺寸占位。结果增量由可见阅读器或网页内容脚本驱动长轮询，重开核实操作回执，不依赖MV3后台常驻。
+页面索引、阅读位置和翻译操作分记录保存；阅读器通过 PageService 租约取得图片，释放时撤销显示资源。连续阅读最多保留 3 个章节 / 11 个页面 DOM，解码窗口另限约 5 页 / 3200 万像素，以页面 ID + 相对位置恢复并随真实尺寸校正占位。结果增量由可见阅读器或网页内容脚本驱动长轮询，重开核实操作回执，不依赖 MV3 后台常驻。
+
+Google Drive 使用独立 HTTPS GIS / Picker 页面和受 nonce、来源、标签页及导航约束的专用桥，短期 token 仅存可信 session；仅 CBZ/ZIP 与单图开放远程入口，PDF / MOBI / RAR 暂拒绝。代码和模拟契约验证已完成，真实 OAuth / Picker / 云盘网络行为尚未验收；授权页未部署。Chrome / Edge 本地扩展已有运行证据，Firefox runtime 尚未验证。
 
 MOBI按Blob分段读取PDB表与有限正文，解析PalmDOC和recindex；不执行电子书HTML，不全量读200MB文件进ArrayBuffer，不在解析时解码全卷。检查DRM、压缩、越界、展开大小、页数与单页限制。
 

@@ -11,7 +11,7 @@ const live=process.env.RUN_LIVE_COMICPASH==='1',run=await mkdtemp(path.join(outp
 const extension=path.join(run,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 manifest.host_permissions.push('https://comicpash.jp/*');await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
-const context=await chromium.launchPersistentContext(path.join(run,'profile'),{channel:'chromium',headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
+const context=await chromium.launchPersistentContext(path.join(run,'profile'),{channel:'chromium',headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),locale:'zh-CN',viewport:{width:1280,height:900},args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,...(!live?['--host-resolver-rules=MAP * ~NOTFOUND','--no-proxy-server']:[])]});
 const source=await context.newPage(),url='https://comicpash.jp/episodes/60cfe4785e2af',checks=[];
 const html=`<!doctype html><meta charset="utf-8"><title>Canvas comic fixture</title><style>body{margin:0;background:#eee}#xCVPages{display:flex;flex-direction:row-reverse;width:1800px}.-cv-page{width:600px;height:800px;flex:none}canvas{width:600px;height:800px}</style><div id="comici-viewer" data-comici-viewer-id="fixture"><div id="xCVPages"><div class="-cv-page mode-empty"><canvas width="600" height="800"></canvas></div><div class="-cv-page mode-rendered"><div class="-cv-page-canvas"><canvas width="600" height="800"></canvas></div></div><div class="-cv-page"><div class="-cv-page-canvas"><i></i></div></div></div></div><canvas id="ad" width="600" height="800"></canvas><script>for(const canvas of document.querySelectorAll('canvas')){const ctx=canvas.getContext('2d');ctx.fillStyle='#eef5ff';ctx.fillRect(0,0,600,800);ctx.fillStyle='#203050';ctx.font='40px sans-serif';ctx.fillText('Original canvas',50,150);}</script>`;
 if(!live)await context.route('https://comicpash.jp/**',route=>route.fulfill({contentType:'text/html',body:html}));
@@ -22,6 +22,7 @@ try{
  await source.goto(url);await source.locator('#comici-viewer .mode-rendered canvas').first().waitFor({timeout:45000});
  const sourceId=await worker.evaluate(async url=>(await chrome.tabs.query({url}))[0].id,url);
  const ui=await context.newPage();await ui.goto(new URL('popup.html',worker.url()).href);
+ await ui.evaluate(async()=>{localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'}));await chrome.storage.local.set({'nc-reader-settings':{uiLanguage:'zh-CN'}});});
  const send=message=>ui.evaluate(message=>chrome.runtime.sendMessage(message),message);
  const first=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(first.ok,first.error);
  const snapshot=first.data.manifest;assert.equal(snapshot.adapter,'comicpash');assert(snapshot.items.length>0);assert(snapshot.items.every(item=>item.kind==='page'&&item.preview?.startsWith('data:image/png;')));
@@ -34,11 +35,17 @@ try{
  assert.deepEqual(dimensions,[snapshot.items[0].width,snapshot.items[0].height]);checks.push('Registered page handle yields a decodable PNG at the rendered dimensions');
  const forged=await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:'unregistered'});assert(!forged.ok);checks.push('Unregistered image request is rejected');
  const reader=await context.newPage();await reader.goto(new URL('reader.html?manifest='+selected.data.id,worker.url()).href);
- await reader.getByRole('button',{name:'获取原图并加入漫画',exact:true}).click();await reader.getByLabel('跳转页码').waitFor();
- const copies=await reader.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-library');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('copies'),all=tx.objectStore('copies').getAll();tx.oncomplete=()=>{resolve(all.result);db.close();};};}));
- assert.equal(copies.length,1);assert.equal(copies[0].pages.length,1);assert(copies[0].pages[0].blobKey);assert(!copies[0].pages[0].fetchError);assert(!copies[0].pages[0].sourceUrl);checks.push('Canvas imports into the real reader with local original bytes and no unusable remote URL');
+ await reader.getByRole('button',{name:'加入漫画',exact:true}).click();await reader.getByRole('button',{name:'开始阅读',exact:true}).click();await reader.getByLabel('跳转页码',{exact:true}).waitFor();
+ await reader.waitForFunction(()=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===600&&image.naturalHeight===800;});
+ const data=await reader.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-sources-v1-catalog');request.onerror=()=>reject(request.error);request.onsuccess=()=>{try{const db=request.result,tx=db.transaction(['documents','pageDescriptors','materializations','tasks']),documents=tx.objectStore('documents').getAll(),pages=tx.objectStore('pageDescriptors').getAll(),materializations=tx.objectStore('materializations').getAll(),tasks=tx.objectStore('tasks').getAll();tx.onerror=()=>reject(tx.error);tx.oncomplete=()=>{resolve({documents:documents.result,pages:pages.result,materializations:materializations.result,tasks:tasks.result});db.close();};}catch(error){reject(error);}};}));
+ assert.equal(data.documents.length,1);assert.equal(data.documents[0].pageCount,1);assert.equal(data.documents[0].discoveryComplete,true);assert.equal(data.pages.length,1);assert.equal(data.pages[0].locator.kind,'page');assert(data.pages[0].locator.url.startsWith('page-image:'));assert.equal(data.materializations.length,1);assert.equal(data.tasks.length,0);checks.push('Fixed canvas selection creates one indexed document and materializes only when the real reader opens it');
  await reader.screenshot({path:path.join(run,'reader.png')});
  await source.screenshot({path:path.join(run,'source.png')});
+ await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.getByRole('button',{name:'外观与设置',exact:true}).click();
+ await reader.locator('.setting-row').filter({has:reader.getByText('原图页缓存',{exact:true})}).getByRole('button',{name:'清理',exact:true}).click();
+ await reader.goto(new URL('reader.html?manifest='+selected.data.id,worker.url()).href);await reader.getByLabel('下载并保留所选原图',{exact:true}).check();await reader.getByRole('button',{name:'加入漫画',exact:true}).click();
+ await reader.waitForFunction(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-sources-v1-catalog');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('tasks'),all=tx.objectStore('tasks').getAll();tx.oncomplete=()=>{resolve(all.result.some(task=>task.status==='complete'&&task.completed===1));db.close();};};}),null,{timeout:30000});
+ checks.push('Explicitly saving the selected canvas reacquires its live page resource after automatic cache clearing');
  if(!live){
   await source.evaluate(()=>{const page=document.querySelector('#xCVPages > .-cv-page:last-child');page.classList.add('mode-rendered');const canvas=document.createElement('canvas');canvas.width=600;canvas.height=800;canvas.getContext('2d').fillRect(0,0,600,800);page.querySelector('.-cv-page-canvas').replaceChildren(canvas);});
   const refresh=await send({type:'NC_DISCOVER_TAB',tabId:sourceId});assert(refresh.ok);assert.equal(refresh.data.manifest.items.length,2);assert.equal(refresh.data.manifest.discoveryComplete,false);checks.push('Later canvas rendering is found on refresh');
@@ -52,6 +59,7 @@ try{
   assert(!(await send({type:'NC_SOURCE_IMAGE',manifestId:fresh.data.id,pageId:fresh.data.manifest.items[0].id})).ok);checks.push('SPA navigation and return to the same URL reject old navigation handles');
   await source.evaluate(()=>document.querySelector('#comici-viewer .mode-rendered canvas').remove());
   const expired=await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:snapshot.items[0].id});assert(!expired.ok);checks.push('Detached canvas fails with an actionable error');
+  await source.close();const closed=await send({type:'NC_SOURCE_IMAGE',manifestId:snapshot.id,pageId:snapshot.items[0].id});assert(!closed.ok);assert(/重新发现|discover/i.test(closed.error));checks.push('Closed canvas source keeps a rediscovery error instead of accepting a durable HTTP locator');
  }
  await writeFile(path.join(run,'results.json'),JSON.stringify({live,checks,loadedPages:snapshot.items.length,knownTotal:snapshot.knownTotal,dimensions,liveProvider:false,nativePermissionDialog:false},null,2));
  console.log(JSON.stringify({run,live,checks,loadedPages:snapshot.items.length,knownTotal:snapshot.knownTotal,dimensions}));

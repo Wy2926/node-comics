@@ -1,0 +1,130 @@
+{
+  "date": "2026-09-22",
+  "automated": {
+    "passed": 406,
+    "skippedByDefault": 1,
+    "scaleTestPassedSeparately": true,
+    "modules": 181
+  },
+  "builds": [
+    "chrome-mv3",
+    "firefox-mv2",
+    "web"
+  ],
+  "evidence": {
+    "chromeWeb": {
+      "browser": "chrome-web",
+      "version": "153.0.8010.52",
+      "extension": false,
+      "checks": [
+        "插件页只提供本地与Drive入口，网站入口保留在网页",
+        "120页导入仅完整容器+索引，最多封面一次物化",
+        "跳第100页按需物化，DOM有界，pageId位置持久化",
+        "关闭浏览器并重启相同新profile，无需重新选源文件直接读第100页",
+        "独立清理4类缓存，源容器/修订/阅读位置不变",
+        "390px窄屏无横向溢出，导入按钮保持横排文字"
+      ],
+      "errors": []
+    },
+    "chromeExtension": {
+      "browser": "chromium-extension",
+      "version": "141.0.7390.37",
+      "extension": true,
+      "checks": [
+        "插件页只提供本地与Drive入口，网站入口保留在网页",
+        "120页导入仅完整容器+索引，最多封面一次物化",
+        "跳第100页按需物化，DOM有界，pageId位置持久化",
+        "关闭浏览器并重启相同新profile，无需重新选源文件直接读第100页",
+        "独立清理4类缓存，源容器/修订/阅读位置不变",
+        "390px窄屏无横向溢出，导入按钮保持横排文字"
+      ],
+      "errors": []
+    },
+    "edgeExtension": {
+      "browser": "edge-extension",
+      "version": "153.0.4234.48",
+      "extension": true,
+      "checks": [
+        "120页导入仅完整容器+索引，最多封面一次物化",
+        "跳第100页按需物化，DOM有界，pageId位置持久化",
+        "关闭浏览器并重启相同新profile，无需重新选源文件直接读第100页",
+        "独立清理4类缓存，源容器/修订/阅读位置不变",
+        "390px窄屏无横向溢出，导入按钮保持横排文字"
+      ],
+      "errors": []
+    },
+    "formats": {
+      "browser": "141.0.7390.37",
+      "extension": true,
+      "checks": [
+        {
+          "file": "pages.pdf",
+          "rendered": true,
+          "pageCount": "3"
+        },
+        {
+          "file": "pages.mobi",
+          "rendered": true,
+          "pageCount": "3"
+        },
+        {
+          "file": "rar4.cbr",
+          "rendered": true,
+          "pageCount": "3"
+        },
+        {
+          "file": "rar5.rar",
+          "rendered": true,
+          "pageCount": "3"
+        },
+        {
+          "file": "locked.pdf",
+          "rejected": true,
+          "reason": "PDF 已加密，当前只支持未加密文件。"
+        },
+        {
+          "file": "corrupt.pdf",
+          "rejected": true,
+          "reason": "PDF 文件结构损坏，无法建立目录。"
+        },
+        {
+          "file": "broken-image.cbz",
+          "firstPageReadable": true,
+          "secondPageFailsIndependently": true
+        }
+      ],
+      "errors": []
+    },
+    "export": {
+      "browser": "141.0.7390.37",
+      "checks": [
+        "保存完整源文件逐字节相等",
+        "CBZ主动物化全部3页，附导出清单",
+        "PDF导出3页可重新解析"
+      ],
+      "errors": [],
+      "liveProvider": false
+    },
+    "website": {
+      "checks": [
+        "Embedded website button opens on-demand confirmation",
+        "Discovery closes managed tab; registered HTTP pages still render without creating a download task",
+        "Embedded website button opens explicit download confirmation",
+        "Explicit download discovers and retains both pages after the managed source tab closes",
+        "Clearing automatic source pages and thumbnails preserves both explicit downloads",
+        "Browser restart reads retained pages while source responses fail, without another retained-source fetch"
+      ],
+      "errors": [],
+      "extensionImageReads": 6,
+      "originalBytes": 15274,
+      "liveSites": false,
+      "browser": "141.0.7390.37"
+    }
+  },
+  "limitations": [
+    "No real Drive OAuth or Picker credentials/deployment",
+    "Firefox runtime not tested",
+    "No live translation providers",
+    "No Git commit/push or deployment"
+  ]
+}

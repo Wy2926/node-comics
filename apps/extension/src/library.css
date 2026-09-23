@@ -221,7 +221,7 @@
 .nc-acquisition-toolbar>.nc-inline>.button{flex:1}
 .nc-catalog-disclosure>summary>span{display:block;margin:7px 0 0}
 .nc-page-heading>.nc-inline{width:100%}
-.nc-page-heading>.nc-inline>.button{flex:1}}
+.nc-page-heading>.nc-inline>.button{flex:1 1 130px;white-space:nowrap}}
 /* One content layout for shelf, chapters, volumes, copies and related works. */
 html:has(.nc-library) {scrollbar-gutter:stable}
 .nc-library-card-body {

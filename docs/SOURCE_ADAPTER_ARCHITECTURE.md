@@ -280,4 +280,4 @@ HTTP 图片只在已登记范围内获取。页面内图片在编码前后核实
 - 目录快照不携带 `workId` 或用户排除项；公共校验核实唯一 ID、组引用、顺序、边界和逐条 URL 目录归属。MangaCopy 将原始标签映射为 `suggestedKind`，书库不再解析站点语言标签。
 - 安装权限仍只有原有 MangaCopy／copy4000 来源授权；新增注册不扩大安装权限。真实权限弹窗、真实模型效果与隔离浏览器测试分别看待。
 
-本轮使用扩展的 `npm run check`、`npm test`、`npm run build` 及仓库根目录的 `verify_web_import.mjs`、`verify_inline_translation.mjs`、`verify_comicpash.mjs`、`verify_acquisition_order.mjs`。浏览器使用临时扩展副本／隔离资料和模拟来源、模拟翻译服务。运行结果见 [网站图片适配](SITE_ADAPTERS.md#验证)。未调用真实图片模型，也未把此前真实站点记录作为本轮通过证据。
+以下是旧库基线的历史验证；其中 `verify_web_import.mjs`、`verify_acquisition_order.mjs` 已移除，新入口见[来源架构验收](validation/SOURCE_ARCHITECTURE_2026_09_22.md)。当时使用扩展的 `npm run check`、`npm test`、`npm run build` 及仓库根目录的 `verify_web_import.mjs`、`verify_inline_translation.mjs`、`verify_comicpash.mjs`、`verify_acquisition_order.mjs`。浏览器使用临时扩展副本／隔离资料和模拟来源、模拟翻译服务。运行结果见 [网站图片适配](SITE_ADAPTERS.md#验证)。未调用真实图片模型，也未把此前真实站点记录作为本轮通过证据。

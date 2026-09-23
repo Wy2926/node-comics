@@ -1,6 +1,6 @@
 import {msg} from '../i18n/runtime';
 import {useId,useRef,useState} from 'react';
-import {settings,saveSettings} from '../library/store';
+import {settings,saveSettings} from '../comics/application/preferences';
 import type {Settings} from '../types';
 import {inlineOrigins} from '../inline/auto-tabs';
 import './auto-translate-tabs.css';

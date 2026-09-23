@@ -3,7 +3,7 @@ import { msg } from '../../i18n/runtime';
 import { sourceFailure } from './diagnostics';
 
 import { activateInline, registerInlineBackground } from '../../inline/background';
-import type { SourceCatalog } from '../../library/types';
+import type { SourceCatalog } from '../../comics/application/types';
 import { pollSourceDiscovery } from '../core/discovery';
 import { selectManifest } from '../core/selection';
 import {
@@ -16,11 +16,37 @@ import {
 } from '../index';
 import { maxInlineBytes } from '../shared/bytes';
 import { isPageImageUrl } from '../shared/urls';
+const sourceMessageTypes = new Set([
+  'NC_IMPORT_CURRENT',
+  'NC_TRANSLATE_TAB',
+  'NC_DISCOVER_TAB',
+  'NC_SELECT_MANIFEST',
+  'NC_REGISTER_CATALOG',
+  'NC_OPEN_SOURCE',
+  'NC_POLL_SOURCE',
+  'NC_CLOSE_SOURCE',
+  'NC_SOURCE_IMAGE',
+]);
 function trusted(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && !!sender.url?.startsWith(chrome.runtime.getURL(''));
 }
 async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
+}
+async function registerManifest(snapshot: PageManifest, tabId: number, id: string = crypto.randomUUID()) {
+  if (!Array.isArray(snapshot.items) || typeof snapshot.navigationId !== 'string')
+    throw Error('SOURCE_PAGES_INVALID');
+  const ids = new Set<string>();
+  for (const item of snapshot.items) {
+    if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id)
+      || typeof item.url !== 'string'
+      || !(item.kind === 'page' ? isPageImageUrl(item.url) : safeImageUrl(item.url, snapshot.url) === item.url))
+      throw Error('SOURCE_IMAGE_URL_INVALID');
+    ids.add(item.id);
+  }
+  const manifest = { ...snapshot, id, sourceTabId: tabId };
+  await chrome.storage.local.set({ ['manifest:' + id]: manifest });
+  return manifest;
 }
 async function discover(tabId: number) {
   const tab = await chrome.tabs.get(tabId);
@@ -50,13 +76,8 @@ async function discover(tabId: number) {
     loc.kind === 'reader' && definition.capabilities.completePageList
       ? await pollSourceDiscovery(read)
       : await read();
-  const id = crypto.randomUUID();
-  const manifest = { ...result, id, sourceTabId: tabId } as PageManifest;
-  manifest.items = manifest.items.filter((i) =>
-    i.kind === 'page' ? isPageImageUrl(i.url) : safeImageUrl(i.url, tab.url!) === i.url,
-  );
-  await chrome.storage.local.set({ ['manifest:' + id]: manifest });
-  return { kind: 'pages', id, manifest };
+  const manifest = await registerManifest(result, tabId);
+  return { kind: 'pages', id: manifest.id, manifest };
 }
 export function registerSourceBackground() {
   const localeReady = registerLocaleBackground();
@@ -114,12 +135,16 @@ export function registerSourceBackground() {
     await chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?manifest=' + id) });
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    const fromDetail =
-      sender.id === chrome.runtime.id &&
-      sender.tab?.id != null &&
-      sender.frameId === 0 &&
-      sourceLocation(sender.url ?? '')?.kind === 'catalog';
-    if (message?.type === 'NC_IMPORT_CURRENT' && fromDetail) {
+    // Other background protocols share this event. Returning true or responding to
+    // an unowned message would race their reply, even for a trusted extension page.
+    if (!sourceMessageTypes.has(message?.type)) return;
+    if (message.type === 'NC_IMPORT_CURRENT') {
+      const fromDetail =
+        sender.id === chrome.runtime.id &&
+        sender.tab?.id != null &&
+        sender.frameId === 0 &&
+        sourceLocation(sender.url ?? '')?.kind === 'catalog';
+      if (!fromDetail) return;
       void discover(sender.tab!.id!)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?catalog=' + result.id) }),
@@ -164,13 +189,13 @@ export function registerSourceBackground() {
           throw Error('SOURCE_COLLECTION_UNSUPPORTED');
         const tab = await chrome.tabs.create({ url: entry.url, active: false });
         if (tab.id == null) throw Error(msg('无法打开来源。'));
-        await chrome.storage.session.set({ ['nc-managed:' + tab.id]: { url: entry.url } });
+        await chrome.storage.session.set({ ['nc-managed:' + tab.id]: { url: entry.url, manifestId: crypto.randomUUID() } });
         return { tabId: tab.id };
       }
       if (message?.type === 'NC_POLL_SOURCE' || message?.type === 'NC_CLOSE_SOURCE') {
         const tabId = Number(message.tabId),
           data = await chrome.storage.session.get('nc-managed:' + tabId);
-        const managed = data['nc-managed:' + tabId] as { url: string } | undefined;
+        const managed = data['nc-managed:' + tabId] as { url: string; manifestId: string } | undefined;
         if (!managed) throw Error(msg('采集标签页已失效。'));
         const tab = await chrome.tabs.get(tabId).catch(() => null);
         if (message.type === 'NC_CLOSE_SOURCE') {
@@ -199,7 +224,7 @@ export function registerSourceBackground() {
         const snapshot = await chrome.tabs.sendMessage(tabId, { type: 'NC_DISCOVER' }, { frameId: 0 });
         if (snapshot?.error) throw Error(snapshot.code ?? snapshot.error);
         if (snapshot?.url !== managed.url) throw Error(msg('来源归属已变化。'));
-        return snapshot;
+        return registerManifest(snapshot, tabId, managed.manifestId);
       }
       if (message?.type === 'NC_SOURCE_IMAGE') {
         const data = await chrome.storage.local.get('manifest:' + message.manifestId),
@@ -208,9 +233,12 @@ export function registerSourceBackground() {
         if (
           !manifest ||
           !item ||
-          !(item.kind === 'page' ? isPageImageUrl(item.url) : safeImageUrl(item.url, manifest.url))
+          !(item.kind === 'page' ? isPageImageUrl(item.url) : safeImageUrl(item.url, manifest.url) === item.url)
         )
           throw Error(msg('图片不在来源清单内。'));
+        // HTTP locators are durable registered metadata. Only page resources depend on
+        // the original tab and navigation; managed discovery closes its tab on completion.
+        if (item.kind !== 'page') return { url: item.url };
         const current = await chrome.tabs
           .sendMessage(manifest.sourceTabId, { type: 'NC_NAVIGATION' }, { frameId: 0 })
           .catch(() => null);
@@ -236,7 +264,6 @@ export function registerSourceBackground() {
             throw Error(source?.error ?? msg('网页原图读取失败。'));
           return { url: item.url, data: source.data };
         }
-        return { url: item.url };
       }
       throw Error(msg('不支持的操作。'));
     })()

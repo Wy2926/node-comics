@@ -7,7 +7,12 @@ writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
-  manifest: {
+  // WXT loads .env files after importing this config; resolve permissions afterwards.
+  manifest: ({browser}) => ({
+    ...(browser === 'chrome' && process.env.VITE_GOOGLE_CHROME_CLIENT_ID ? {oauth2: {
+      client_id: process.env.VITE_GOOGLE_CHROME_CLIENT_ID,
+      scopes: ['https://www.googleapis.com/auth/drive.file'],
+    }} : {}),
     browser_specific_settings: {
       gecko: {
         id: 'comics@nodelane.net',
@@ -27,8 +32,9 @@ export default defineConfig({
     permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     host_permissions: ['https://*.nodelane.net/*',...sourceInstallation.requiredOrigins,
+      ...(process.env.VITE_DRIVE_CONNECT_URL ? ['https://www.googleapis.com/*', new URL(process.env.VITE_DRIVE_CONNECT_URL).origin+'/*'] : []),
       ...(process.env.VITE_API_BASE ? [new URL(process.env.VITE_API_BASE).origin+'/*'] : [])],
     action: { default_title: '__MSG_actionTitle__', default_icon: {16:'brand/icon-16.png',24:'brand/icon-24.png',32:'brand/icon-32.png'} },
     content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';" },
-  },
+  }),
 });

@@ -79,4 +79,22 @@ for name, encrypted in [('pages.pdf', False), ('locked.pdf', True)]:
         pdf.drawImage(ImageReader(BytesIO(data)), 0, 0, 320, 480)
         pdf.showPage()
     pdf.save()
+
+# Small, unencrypted MOBI6 image book with deliberately repeated image references.
+# Each occurrence is a different page even when it references the same resource.
+records = [bytearray(248), b'<html><img recindex="2"><img recindex="1"><img recindex="2"></html>', entries[0][1], entries[-1][1]]
+struct.pack_into('>H', records[0], 0, 1)
+struct.pack_into('>H', records[0], 8, 1)
+records[0][16:20] = b'MOBI'
+struct.pack_into('>I', records[0], 20, 232)
+struct.pack_into('>I', records[0], 36, 6)
+struct.pack_into('>I', records[0], 108, 2)
+mobi_header = bytearray(78 + len(records) * 8)
+mobi_header[60:68] = b'BOOKMOBI'
+struct.pack_into('>H', mobi_header, 76, len(records))
+offset = len(mobi_header)
+for index, record in enumerate(records):
+    struct.pack_into('>I', mobi_header, 78 + index * 8, offset)
+    offset += len(record)
+(ROOT / 'pages.mobi').write_bytes(bytes(mobi_header) + b''.join(records))
 print(f'Generated original fixtures in {ROOT}')

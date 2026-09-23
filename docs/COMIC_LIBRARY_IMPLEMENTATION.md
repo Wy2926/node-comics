@@ -1,5 +1,7 @@
 # 漫画作品管理与 MangaCopy 实现
 
+2026-09-22：本文转为 **09-14 至 09-20 旧实现的历史记录**；下文的功能、数据表、源码路径、截图和命令均按当时版本理解，不作为新架构验收证据。当前源码已删除旧 `src/library/`、复杂出版关系 UI 与逐页导入链，改用完整源文件、分记录目录和 PageService，见[新架构实施与验收](COMIC_SOURCE_IMPLEMENTATION.md)。旧源码已删除的链接保留为历史路径文本。网站适配器和安全执行层继续复用，不能据此推导所有历史管理功能仍然存在。
+
 日期：2026-09-14。用户已确认[通用模型](COMIC_LIBRARY_DESIGN.md)与[MangaCopy 来源方案](MANGACOPY_LIBRARY_DESIGN.md)，本轮完成首轮实现和本地验收。未提交 Git、发布商店或部署。
 
 ## 管理和操作
@@ -20,12 +22,12 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| [library/types.ts](../apps/extension/src/library/types.ts)、[model.ts](../apps/extension/src/library/model.ts) | 作品、章节、内容版本、出版套系、卷册、收录／出版／作品关系、来源目录与副本归属 |
+| `src/library/types.ts`、`src/library/model.ts` | 作品、章节、内容版本、出版套系、卷册、收录／出版／作品关系、来源目录与副本归属 |
 | [types.ts](../apps/extension/src/types.ts) | `ReadingCopy` 保存实际页面清单、修订、原图与译图引用和阅读位置 |
-| [library/store.ts](../apps/extension/src/library/store.ts) | 原子更新、精确来源去重、资源引用清理、修订及阅读状态 |
-| [local-import.ts](../apps/extension/src/library/local-import.ts)、[reading.ts](../apps/extension/src/library/reading.ts) | 本地格式接入、按作品／出版套系／版本限定阅读序列 |
+| `src/library/store.ts` | 原子更新、精确来源去重、资源引用清理、修订及阅读状态 |
+| `src/library/local-import.ts`、`src/library/reading.ts` | 本地格式接入、按作品／出版套系／版本限定阅读序列 |
 | [来源公共接口](../apps/extension/src/sources/index.ts)、[页面接口](../apps/extension/src/sources/page.ts)、[MangaCopy 目录](../apps/extension/src/sources/sites/mangacopy/catalog.ts) | 来源目录、原始分组／类型与页面清单发现 |
-| [来源消息客户端](../apps/extension/src/sources/runtime/client.ts)、[acquisition.ts](../apps/extension/src/library/acquisition.ts) | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
+| [来源消息客户端](../apps/extension/src/sources/runtime/client.ts)、`src/library/acquisition.ts` | 打开的插件页面协调原图采集、持久化进度、跨标签页互斥 |
 | [background.ts](../apps/extension/entrypoints/background.ts)、[content.ts](../apps/extension/entrypoints/content.ts) | 消息与导航校验、安装时注册的站点脚本、详情入口和受管理的来源标签页 |
 | [Library.tsx](../apps/extension/src/ui/Library.tsx)、[CatalogImport.tsx](../apps/extension/src/ui/CatalogImport.tsx) | 作品管理、选择与归属预览 |
 
@@ -82,14 +84,14 @@ $env:TEST_CHROMIUM='<Chromium 可执行文件绝对路径>'
 node scripts/verify_library.mjs
 ```
 
-真实站点检查会下载一个来源条目，显式开启：
+以下是先前真实站点验收所用命令，会下载一个来源条目；旧库脚本现已移除，仅保留为历史证据。当前本地来源检查使用 `node scripts/verify_website_source_lifecycle.mjs`，环境要求见[脚本入口](../scripts/README.md#新来源架构验收)。
 
 ```powershell
 $env:RUN_LIVE_MANGACOPY='1'
 node scripts/verify_mangacopy.mjs
 ```
 
-该脚本复制正式构建到隔离目录，**只在测试副本中**预先授权本站及实际观察到的图片域名，以测试采集、浏览器重启和互斥。正式构建保持按操作请求权限；本轮没有验证原生浏览器权限弹窗，也没有在用户日常浏览器配置中安装插件。
+当时的脚本复制正式构建到隔离目录，**只在测试副本中**预先授权本站及实际观察到的图片域名，以测试采集、浏览器重启和互斥。正式构建保持按操作请求权限；该轮没有验证原生浏览器权限弹窗，也没有在用户日常浏览器配置中安装插件。
 
 后续范围保持原方案边界：精细跨版本页映射、自动拆章、完整期刊管理、复杂书单、跨设备云书架。登录／验证码及真实图片地址到期后的完整端到端恢复不在本次样本验收结论内。当前实现提供回源、重新解析和补齐操作，不声称全站页面永远完整或所有 CDN 都可访问。
 

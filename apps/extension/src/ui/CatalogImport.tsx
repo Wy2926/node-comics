@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { msg } from '../i18n/runtime';
-import { queueCopies } from '../library/acquisition';
-import { makeCopy, selectRange, suggestedKind } from '../library/model';
-import { commitCopies } from '../library/store';
-import type { ImportAssignment, LibraryState, SourceCatalog, SourceEntry } from '../library/types';
-import { requestImagePermissions, sourceName } from '../sources';
-import type { ReadingCopy } from '../types';
+import { importCatalogEntries, queueDownloads, runDownloads, suggestedUnitKind as suggestedKind } from '../comics/acquisition';
+import type { ImportAssignment, LibraryViewModel, SourceCatalog } from '../comics/application/types';
+import { requestImagePermissions, type SourceEntry } from '../sources';
 import './catalog.css';
 import { Select } from './Select';
 import { useImagePermissions } from './useImagePermissions';
+import {ImportAssignmentFields} from './ImportAssignment';
+import {getWork} from '../comics/application/library-service';
 
 const PAGE_SIZE=40;
-const kinds:Record<ImportAssignment['kind'],string>={get chapter(){return msg("章节");},get extra(){return msg("番外");},get publication(){return msg("卷册");},get unclassified(){return msg("待整理");},get work(){return msg("独立作品");}};
-type Props={catalog:SourceCatalog;library:LibraryState;copies:ReadingCopy[];onClose:()=>void;onDone:()=>void;onRefresh:()=>void|Promise<void>;onNotice?:(message:string)=>void};
+const kinds:Record<ImportAssignment['kind'],string>={get chapter(){return msg("章节");},get volume(){return msg("卷册");},get unclassified(){return msg("待整理");},get book(){return msg("独立作品");}};
+const selectRange=(entries:SourceEntry[],from:string,to:string)=>{const a=entries.findIndex(e=>e.id===from),b=entries.findIndex(e=>e.id===to);return a<0||b<0?[]:entries.slice(Math.min(a,b),Math.max(a,b)+1).map(e=>e.id);};
+type Props={catalog:SourceCatalog;library:LibraryViewModel;onClose:()=>void;onDone:()=>void;onRefresh:()=>void|Promise<void>;onNotice?:(message:string)=>void};
 
-export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,onNotice}:Props){
- const previous=library.catalogs.find(c=>c.id===catalog.id);
- const already=useMemo(()=>new Set(copies.map(c=>c.sourceEntryId)),[copies]);
+export function CatalogImport({catalog,library,onClose,onDone,onRefresh,onNotice}:Props){
+ const previous=catalog.workId?catalog:undefined;
+ const already=useMemo(()=>new Set(library.documents.map(c=>c.sourceEntryId)),[library.documents]);
  const excluded=useMemo(()=>new Set(previous?.excludedEntryIds),[previous]);
  const [group,setGroup]=useState(catalog.groups[0]?.id??'');
  const [type,setType]=useState(''),[query,setQuery]=useState(''),[status,setStatus]=useState('all'),[sort,setSort]=useState('source');
@@ -30,7 +30,9 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
  const [offline,setOffline]=useState(false),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false);
  const [error,setError]=useState(''),[feedback,setFeedback]=useState('');
  const [assignment,setAssignment]=useState<ImportAssignment>({workId:previous?.workId,title:catalog.title,kind:'unclassified'});
- const [workQuery,setWorkQuery]=useState(''),[overrides,setOverrides]=useState<Record<string,ImportAssignment['kind']>>({});
+ const [overrides,setOverrides]=useState<Record<string,ImportAssignment['kind']>>({});
+ const [targetWork,setTargetWork]=useState<{id:string;title:string}>();
+ useEffect(()=>{let active=true;setTargetWork(undefined);if(assignment.workId)void getWork(assignment.workId).then(work=>{if(active&&work)setTargetWork(work);}).catch(()=>{});return()=>{active=false;};},[assignment.workId]);
  useEffect(()=>{try{localStorage.setItem('nc-catalog-selection:'+catalog.id,JSON.stringify([...selected]));}catch{/* Selection remains available for this visit when storage is full. */}},[catalog.id,selected]);
  const filtered=useMemo(()=>{
   const entries=catalog.entries.filter(e=>(!group||e.groupIds.includes(group))&&(!type||e.rawTypes.includes(type))&&(!query.trim()||e.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))&&(status==='all'||status==='new'&&!already.has(e.id)&&!excluded.has(e.id)||status==='imported'&&already.has(e.id)||status==='removed'&&excluded.has(e.id)&&!already.has(e.id)));
@@ -42,9 +44,9 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
  const added=catalog.entries.filter(e=>!previous?.entries.some(p=>p.id===e.id)).length;
  const changed=catalog.entries.filter(e=>previous?.entries.some(p=>p.id===e.id&&(p.title!==e.title||p.rawTypes.join()!==e.rawTypes.join()))).length;
  const newCount=chosen.filter(e=>!already.has(e.id)).length,relatedCount=chosen.filter(e=>e.related&&!already.has(e.id)).length;
- const destination=assignment.workId?library.works.find(w=>w.id===assignment.workId)?.title??msg("作品已移除"):assignment.title.trim()||msg("未命名作品");
+ const destination=assignment.workId?(targetWork?.id===assignment.workId?targetWork.title:library.works.find(w=>w.id===assignment.workId)?.title??assignment.title.trim())||msg("正在读取作品…"):assignment.title.trim()||msg("未命名作品");
  const needsDestination=chosen.some(e=>!e.related&&!already.has(e.id));
- const assignmentValid=!needsDestination||!!(assignment.workId?library.works.some(w=>w.id===assignment.workId):assignment.title.trim());
+ const assignmentValid=!needsDestination||!!(assignment.workId||assignment.title.trim());
  const activePage=Math.min(page,Math.max(0,Math.ceil(filtered.length/PAGE_SIZE)-1));
  const reviewPage=Math.min(confirmPage,Math.max(0,Math.ceil(chosen.length/PAGE_SIZE)-1));
  const rangeLabel=rangeStart?catalog.entries.find(e=>e.id===rangeStart)?.title:undefined;
@@ -65,12 +67,10 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
   saving.current=true;setBusy(true);setError('');setFeedback(msg("正在保存 {0} 个来源条目…", {"0": chosen.length}));
   try{
    if(offline)await requestImagePermissions([new URL(catalog.url).origin+'/*',...permissions.origins]);
-   const incoming=chosen.map(entry=>({...makeCopy(entry.title,[],sourceName(catalog.sourceId),entry.id),sourceEntryId:entry.id,sourceUrl:entry.url,retention:offline?'offline' as const:'cache' as const,discoveryComplete:false}));
-   const mappings=chosen.map(entry=>entry.related?{title:entry.title,kind:'unclassified' as const}:{...assignment,kind:overrides[entry.id]??suggestedKind(entry)});
-   const result=await commitCopies(incoming,mappings,catalog);
+   const result=await importCatalogEntries(catalog,chosen,assignment,overrides);
    let message=msg("已导入 {0} 个新条目{1}。", {"0": result.created, "1": (chosen.length>result.created?msg("，保留 {0} 个已有条目", {"0": (chosen.length-result.created)}):'')});
    if(offline){
-    try{await queueCopies(result.copyIds);message+=msg(" 原图将离线保留，待获取内容可在采集中心查看。");}
+    try{await queueDownloads(result.ids);void runDownloads().catch(error=>onNotice?.(error instanceof Error?error.message:'下载未能启动。'));message+=msg(" 原图将离线保留，待获取内容可在采集中心查看。");}
     catch(e){message+=msg(" 原图未加入队列：{0}", {"0": (e instanceof Error?e.message:msg("请在采集中心重试。"))});}
    }
    try{localStorage.removeItem('nc-catalog-selection:'+catalog.id);}catch{}
@@ -95,7 +95,7 @@ export function CatalogImport({catalog,library,copies,onClose,onDone,onRefresh,o
    <div className="nc-catalog-actionbar"><div className="nc-catalog-selection-summary"><strong>{msg("已选 {0} 项", {"0": chosen.length})}</strong><span>{msg("{0} 项新内容{1}", {"0": newCount, "1": hiddenSelected?msg(" · 含其他筛选中 {0} 项", {"0": hiddenSelected}):''})}</span></div><div className="nc-catalog-batch-actions"><button className="text-link" disabled={!filtered.length||filtered.every(e=>selected.has(e.id))} onClick={()=>{select(filtered.map(e=>e.id));setFeedback(msg("已选中当前筛选的全部 {0} 项，包含其他分页。", {"0": filtered.length}));}}>{msg("全选当前结果（跨页）")}</button><button className="text-link" disabled={!filtered.length} aria-pressed={rangeMode} onClick={()=>{setRangeMode(!rangeMode);setRangeStart(undefined);setFeedback(rangeMode?msg("已退出范围选择。"):msg("请选择范围起点和终点。"));}}>{msg("连续范围")}</button><button className="text-link" disabled={!selected.size} onClick={()=>{setSelected(new Set());setFeedback(msg("已清空全部选择。"));}}>{msg("清空")}</button></div><button className="button primary" disabled={!chosen.length} onClick={()=>{setConfirm(true);setConfirmPage(0);setFeedback(msg("已进入归属预览，确认后保存到书架。"));}}>{msg("下一步 · 确认归属")}</button></div>
   </>:<>
    <div className="nc-catalog-review-heading"><div><h2>{msg("{0} 个条目待确认", {"0": chosen.length})}</h2><p>{msg("新增 {0} 项 · 已有 {1} 项保留原归属{2}", {"0": newCount, "1": chosen.length-newCount, "2": relatedCount?msg(" · {0} 项关联内容单独建立作品", {"0": relatedCount}):''})}</p></div><button className="button secondary" disabled={busy} onClick={()=>{setConfirm(false);setFeedback(msg("可继续调整选择，归属设置已保留。"));}}>{msg("调整选择")}</button></div>
-   {needsDestination&&<div className="nc-catalog-destination"><span className="nc-catalog-destination-icon" aria-hidden="true">▤</span><div><span className="nc-eyebrow">{msg("新内容归入")}</span><h3>{destination}</h3><p>{msg("{0} · 各条目将自动识别为章节、番外或卷册", {"0": assignment.workId?msg("加入现有作品"):msg("在书架新建作品")})}</p></div><details className="nc-catalog-work-picker"><summary>{msg("更换作品")}</summary><div className="nc-catalog-work-options"><input type="search" aria-label={msg("搜索目标作品")} value={workQuery} onChange={e=>setWorkQuery(e.target.value)} placeholder={msg("搜索书架作品")}/><button className="nc-catalog-work-option" aria-pressed={!assignment.workId} disabled={busy} onClick={()=>setAssignment({...assignment,workId:undefined})}>{msg("＋ 新建作品")}</button>{library.works.filter(w=>!workQuery.trim()||w.title.toLocaleLowerCase().includes(workQuery.trim().toLocaleLowerCase())).map(work=><button className="nc-catalog-work-option" key={work.id} aria-pressed={assignment.workId===work.id} disabled={busy} onClick={()=>{setAssignment({...assignment,workId:work.id});setFeedback(msg("新内容将归入「{0}」。", {"0": work.title}));}}>{work.title}</button>)}{!assignment.workId&&<label className="field">{msg("新作品名称")}<input aria-label={msg("作品名称")} value={assignment.title} disabled={busy} onChange={e=>setAssignment({...assignment,title:e.target.value})} maxLength={180}/></label>}</div></details></div>}
+   {needsDestination&&<fieldset className="nc-catalog-assignment" disabled={busy}><ImportAssignmentFields value={assignment} onChange={setAssignment} library={library} workOnly/><p className="nc-muted">{msg("{0} · 各条目将自动识别为章节、番外或卷册", {"0": assignment.workId?msg("加入现有作品"):msg("在书架新建作品")})}</p></fieldset>}
    <div className="nc-catalog-grid nc-catalog-review-grid" aria-label={msg("条目归属预览")}>{chosen.slice(reviewPage*PAGE_SIZE,reviewPage*PAGE_SIZE+PAGE_SIZE).map(entry=><article className="nc-catalog-card nc-catalog-review-card" key={entry.id}><div className="nc-catalog-card-top"><span className="nc-catalog-kind">{kinds[overrides[entry.id]??suggestedKind(entry)]}</span><span className="nc-catalog-review-state">{already.has(entry.id)?msg("已有内容"):msg("新内容")}</span></div><h3>{entry.title}</h3><p>{already.has(entry.id)?msg("保留当前作品与内容版本"):entry.related?msg("单独建立「{0}」", {"0": entry.title}):destination}</p>{!entry.related&&!already.has(entry.id)&&<details className="nc-catalog-kind-picker"><summary>{msg("调整分类")}</summary><div role="group" aria-label={msg("{0}归属", {"0": entry.title})}>{Object.entries(kinds).map(([value,label])=><button key={value} disabled={busy} aria-pressed={(overrides[entry.id]??suggestedKind(entry))===value} onClick={()=>{setOverrides(previous=>({...previous,[entry.id]:value as ImportAssignment['kind']}));setFeedback(msg("「{0}」已设为{1}。", {"0": entry.title, "1": label}));}}>{label}</button>)}</div></details>}</article>)}</div>
    {pagination(chosen.length,reviewPage,setConfirmPage)}
    <div className="nc-catalog-save-options" role="group" aria-label={msg("原图保存方式")}><button aria-pressed={!offline} disabled={busy} onClick={()=>setOffline(false)}><b>{msg("按需读取")}</b><span>{msg("先加入书架，阅读时获取原图")}</span></button><button aria-pressed={offline} disabled={busy} onClick={()=>setOffline(true)}><b>{msg("离线保存")}</b><span>{msg("导入后加入统一采集队列")}</span></button></div>

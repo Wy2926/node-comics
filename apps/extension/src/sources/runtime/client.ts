@@ -1,5 +1,5 @@
 import { msg } from '../../i18n/runtime';
-import type { SourceCatalog } from '../../library/types';
+import type { SourceCatalog } from '../../comics/application/types';
 import type { PageManifest } from '../contracts/source';
 import { pollSourceDiscovery } from '../core/discovery';
 import { sameSource } from '../core/identity';

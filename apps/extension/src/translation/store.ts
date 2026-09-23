@@ -1,10 +1,12 @@
+import type {PageReference} from '../comics/pages/identity';
 import type {Entitlements,Job,PlanItem,TranslationOperation,Mode,ReadingPriority} from '../types';
+import {openSourceDatabase} from '../storage/database';
 
-export interface LocalOperation {id:string;scope:string;copyId:string;pageId:string;blobKey?:string;item:PlanItem;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationOperation;error?:string;retryAt?:number;createdAt:number;}
+export interface LocalOperation {id:string;scope:string;copyId:string;pageId:string;blobKey?:string;pageRef?:PageReference;item:PlanItem;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationOperation;error?:string;retryAt?:number;createdAt:number;}
 export interface SyncState {id:string;cursor?:string;jobs:Job[];policyRevision?:string;entitlements?:Entitlements;imageLimit?:number;imageRetryAt?:number;controlRetryAt?:number;}
 export interface ReadingSession {id:string;sessionId:string;sequence:number;signature?:string;priority:Partial<Record<Mode,ReadingPriority>>;}
-let opening:Promise<IDBDatabase>;
-function db(){return opening??=new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-operations',1);request.onupgradeneeded=()=>{request.result.createObjectStore('operations',{keyPath:'id'}).createIndex('scope','scope');request.result.createObjectStore('sync',{keyPath:'id'});request.result.createObjectStore('sessions',{keyPath:'id'});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+let opening:Promise<IDBDatabase>|undefined;
+function db(){return opening??=openSourceDatabase('content-operations',{operations:{keyPath:'id',indexes:[{name:'scope',keyPath:'scope'}]},sync:{keyPath:'id'},sessions:{keyPath:'id'}},()=>{opening=undefined;}).catch(error=>{opening=undefined;throw error;});}
 async function transaction<T>(name:string,mode:IDBTransactionMode,action:(store:IDBObjectStore)=>IDBRequest<T>):Promise<T>{const database=await db();return new Promise((resolve,reject)=>{const tx=database.transaction(name,mode);const request=action(tx.objectStore(name));tx.oncomplete=()=>resolve(request.result);tx.onabort=tx.onerror=()=>reject(tx.error);});}
 export const translationScope=(origin:string,userId:string)=>JSON.stringify([origin,userId]);
 export const readOperations=(scope:string)=>transaction<LocalOperation[]>('operations','readonly',s=>s.index('scope').getAll(scope));

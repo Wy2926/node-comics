@@ -6,5 +6,7 @@ import './redesign.css';
 import './library.css';
 import './ui/theme/surfaces.css';
 import {connectReaderSettings} from './inline/settings';
-import {settings} from './library/store';
+import {settings} from './comics/application/preferences';
+import {installFileSources} from './comics/sources/install';
+installFileSources();
 void connectReaderSettings(settings()).catch(()=>{}).then(initializeUiLanguage).then(()=>createRoot(document.getElementById('root')!).render(<App/>));

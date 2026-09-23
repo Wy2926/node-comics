@@ -39,7 +39,7 @@
 
 隔离扩展验证了事前图片域名探测、从点击发起权限请求、拒绝授权不入队、按 1→2→3 话执行、仅发现 1 页时即下载、暂停后恢复页身份、缺页重试及全程零滚动。使用合成来源和原创图片；原生拒绝决定被模拟，允许的 CDN 由安装权限覆盖，未验收原生权限对话框。截图与结果位于 `artifacts/acquisition-order/`。
 
-在仓库根运行 `node scripts/verify_acquisition_order.mjs` 可重复隔离验收；运行环境变量沿用下述真实验收脚本的 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`。真实 JS 清单验收使用 `RUN_LIVE_MANGACOPY=1`、`MANGACOPY_DISCOVERY_ONLY=1` 运行 `scripts/verify_mangacopy.mjs`，命令见 [实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)。本轮类型／模块检查、205 项测试与 MV3 构建通过。
+旧库的 `verify_acquisition_order.mjs` 已移除；当前顺序、暂停和恢复由扩展的 `tests/website-downloads.test.ts` 及新网站生命周期脚本覆盖。上文真实 JS 清单证据来自当时以 `RUN_LIVE_MANGACOPY=1`、`MANGACOPY_DISCOVERY_ONLY=1` 执行的 `scripts/verify_mangacopy.mjs`；该旧库脚本已移除，历史记录见 [实现记录](COMIC_LIBRARY_IMPLEMENTATION.md)。当前 MangaCopy 本地验收入口为 `node scripts/verify_website_source_lifecycle.mjs`，见[脚本说明](../scripts/README.md#新来源架构验收)。当轮类型／模块检查、205 项测试与 MV3 构建通过。
 
 ## 可重复验证
 

@@ -40,6 +40,14 @@
 .nc-app-header nav>button { height: 42px; border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 0 14px; }
 .nc-app-header nav>button[aria-current=page] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
 .nc-app-header nav>button[aria-current=page]::after { display: none; }
+@media (max-width: 760px) {
+  .nc-app-header { height: auto; gap: 0; padding-bottom: 8px; }
+  .nc-app-header nav { gap: 8px; }
+}
+@media (max-width: 480px) {
+  .nc-app-header .nc-header-actions { gap: 8px; }
+  .nc-app-header .nc-account-button>span { display: none; }
+}
 .nc-account-button { padding: 4px 10px 4px 4px; border: 0; border-radius: var(--comic-control-radius); font-size: .8125rem; font-weight: 650; color: var(--muted); }
 .nc-account-button:hover, .nc-account-button[aria-current=page] { box-shadow: none; background: var(--accent-soft); color: var(--accent); }
 .nc-avatar { border-radius: var(--comic-control-radius); }

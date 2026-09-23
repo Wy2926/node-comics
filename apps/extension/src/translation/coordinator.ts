@@ -1,3 +1,6 @@
+import type {PageReference} from '../comics/pages/identity';
+import {hashFile} from '../importers/hash';
+import {registerOriginal} from '../comics/originals';
 import {msg} from '../i18n/runtime';
 import {Api,ApiError} from '../api';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../concurrency';
@@ -7,7 +10,7 @@ import type {Entitlements,Job,Mode,TranslationChanges,TranslationOperation,Trans
 import {makeOperation,operationId,quotaErrors,type ReadingTarget} from './automatic';
 import {readOperation,readOperations,readSession,readSync,saveOperation,saveSession,saveSync,translationScope,withTranslationLock,type LocalOperation,type ReadingSession,type SyncState} from './store';
 
-interface Options {api:Api;userId:string;language:string;sessionId:string;getBlob:(key:string)=>Promise<Blob|undefined>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;onPolicy?:(rights:Entitlements)=>void;}
+interface Options {api:Api;userId:string;language:string;sessionId:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;onPolicy?:(rights:Entitlements)=>void;}
 const revisionNewer=(a:string|undefined,b:string|undefined)=>!b||a===b||!!a&&(/^\d+$/.test(a)&&/^\d+$/.test(b)?BigInt(a)>BigInt(b):a>b);
 /** One shared protocol for reader and content-script driven background steps. No queue preflight. */
 export class TranslationCoordinator {
@@ -61,9 +64,12 @@ export class TranslationCoordinator {
     if(this.uploads.has(record.item.operation_key))return;
     const work=this.uploadPool.run(async()=>{try{
       const plan=record.result?.upload;if(!plan)return;this.current();
-      const blob=record.blobKey?await this.options.getBlob(record.blobKey):undefined;if(!blob)throw new ApiError(msg("本地原图尚未就绪，请重新采集。"),'LOCAL_IMAGE_MISSING');
-      await this.options.api.uploadOriginal(plan,blob);const job=await this.options.api.completeUpload(plan.id);this.current();record.result={...record.result!,job,upload:null};record.error=undefined;record.retryAt=undefined;await this.save(record);await this.options.onJobs([job]);
-    }catch(error){if(!this.options.api.isCurrent())return;record.error=(error as Error).message;record.retryAt=Date.now()+15000;await this.save(record);}finally{this.uploads.delete(record.item.operation_key);}});
+      const lease=record.pageRef?await this.options.readOriginal?.(record.pageRef):undefined;
+      let blob:Blob|undefined;try{blob=lease?.blob??(record.blobKey?await this.options.getBlob(record.blobKey):undefined);}finally{lease?.release();}
+      if(!blob)throw new ApiError(msg("本地原图尚未就绪，请重新采集。"),'LOCAL_IMAGE_MISSING');
+      if(blob.size!==record.item.image.byte_size||await hashFile(blob)!==record.item.image.image_sha256)throw new ApiError('原图内容已变化，原翻译操作已停止。','SOURCE_CHANGED');
+      await this.options.api.uploadOriginal(plan,blob);const job=await this.options.api.completeUpload(plan.id);this.current();if(job.input_asset_id)await registerOriginal(new URL(this.options.api.base).origin,this.options.userId,record.item.image.image_sha256,job.input_asset_id);record.result={...record.result!,job,upload:null};record.error=undefined;record.retryAt=undefined;await this.save(record);await this.options.onJobs([job]);
+    }catch(error){if(!this.options.api.isCurrent())return;record.error=(error as Error).message;if(error instanceof ApiError&&error.code==='SOURCE_CHANGED'){record.state='blocked';record.retryAt=undefined;}else record.retryAt=Date.now()+15000;await this.save(record);}finally{this.uploads.delete(record.item.operation_key);}});
     this.uploads.set(record.item.operation_key,work);
   }
   async finishUploads(){await Promise.all(this.uploads.values());}

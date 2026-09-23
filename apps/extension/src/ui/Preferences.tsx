@@ -12,11 +12,8 @@ type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
-  cacheBytes: number;
-  notify: (message: string) => void;
-  onClearCache: () => void;
 };
-export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCache }: Props) {
+export function Preferences({ settings, setSettings, caps }: Props) {
   return <div className="nc-preferences">
     <PageTitle eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
     <AppearanceSettings settings={settings} onChange={setSettings}>
@@ -46,17 +43,10 @@ export function Preferences({ settings, setSettings, caps, cacheBytes, onClearCa
     <section className="settings-card">
       <h3>
         <Icon name="storage" />{msg("图片与隐私")}</h3>
-      <SettingRow title={msg("本地图片缓存")} description={msg("当前约 {0} MB。无限制仍受设备空间和浏览器存储配额限制；登录后只发送文件标识查找已有翻译；开始翻译时才上传缺失的选定原图。", {"0": (cacheBytes / 1024 / 1024).toFixed(1)})}>
-        <Select aria-label={msg("本地图片缓存")} value={settings.cacheLimitMb} onChange={e => setSettings(s => ({ ...s, cacheLimitMb: Number(e.target.value) }))}>
-          <option value="128">128 MB</option>
-          <option value="512">512 MB</option>
-          <option value="1024">1 GB</option>
-          <option value="10240">{msg("10 GB（默认）")}</option>
-          <option value="-1">{msg("无限制")}</option>
+      <SettingRow title="译图缓存预算" description="仅限制本机译图。完整源文件、网站下载资料和原图缓存各自管理。">
+        <Select value={settings.cacheLimitMb} onChange={e=>setSettings(s=>({...s,cacheLimitMb:Number(e.target.value)}))}>
+          <option value="0">不保存译图缓存</option><option value="128">128 MB</option><option value="512">512 MB</option><option value="1024">1 GB（默认）</option><option value="10240">10 GB</option><option value="-1">受设备容量限制</option>
         </Select>
-      </SettingRow>
-      <SettingRow title={msg("清理本地译图")} description={msg("保留原图、书架与阅读位置；译图需要时重新下载。")}>
-        <button className="button danger small" onClick={onClearCache}>{msg("清理译图缓存")}</button>
       </SettingRow>
       <div className="privacy-note">
         <Icon name="shield" />

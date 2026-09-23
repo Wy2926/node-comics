@@ -6,7 +6,7 @@ import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const web='http://127.0.0.1:5176',out=path.resolve('artifacts/reader-retry-validation');
 await mkdir(out,{recursive:true});
-const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{channel:'chromium'})});
+const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 const checks=[],errors=[];let page;
 const check=label=>{checks.push(label);console.log('PASS '+label);};
 async function open(offline=false){

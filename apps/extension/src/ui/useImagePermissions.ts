@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { msg } from '../i18n/runtime';
-import type { SourceCatalog } from '../library/types';
+import type { SourceCatalog } from '../comics/application/types';
 import { inExtension, prepareImageOrigins } from '../sources';
 
 /** Resolve the first CDN before enabling the click that opens Chrome's prompt. */

@@ -6,7 +6,7 @@ import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const web='http://127.0.0.1:5176',out=path.resolve('artifacts/history-removal-validation');
 await mkdir(out,{recursive:true});
-const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{channel:'chrome'})});
+const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 const page=await browser.newPage({viewport:{width:1440,height:1000}}),checks=[],errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
@@ -39,7 +39,7 @@ try{
   await inLibrary();
   check('legacy hash changes, browser back and forward retain valid navigation');
 
-  await page.getByRole('button',{name:'我的账户',exact:true}).click();
+  await page.locator('button.nc-account-button').click();
   await page.waitForURL(url=>url.hash==='#account');
   await page.getByRole('heading',{name:'我的账户',exact:true}).waitFor();
   await page.evaluate(()=>{location.hash='queue';});
@@ -47,7 +47,7 @@ try{
   check('account navigation still works and unknown hashes return to the library');
 
   await openBook();
-  await page.getByLabel('跳转页码',{exact:true}).fill('5');
+  await page.getByLabel('跳转页码',{exact:true}).fill('5');await page.getByLabel('跳转页码',{exact:true}).press('Enter');
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='5');
   await page.waitForTimeout(600);
   await page.screenshot({path:path.join(out,'reader.png')});
@@ -59,13 +59,16 @@ try{
   await page.evaluate(()=>{location.hash='queue';});
   await inLibrary();
 
+  const rightsBefore=await page.evaluate(()=>window.readerFixture.requests.filter(url=>url==='/v1/me/entitlements').length);
   await page.clock.install();
   await page.clock.runFor(120_000);
-  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+  await page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));});
+  await page.clock.runFor(100);
   const requests=await page.evaluate(()=>window.readerFixture.requests);
   assert(!requests.some(url=>url==='/v1/translation-operations'||url.startsWith('/v1/me/queues')));
-  assert(requests.includes('/v1/me/translation-changes'));
-  check('no history or queue queries during navigation, two minutes idle or visibility refresh; account state sync remains active');
+  assert(!requests.includes('/v1/me/translation-changes'));
+  assert(requests.filter(url=>url==='/v1/me/entitlements').length>rightsBefore);
+  check('no history, queue or translation polling in original mode; after two minutes idle, focus still refreshes account rights');
   assert.deepEqual(errors,[]);
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,requests,liveProvider:false},null,2));
 }catch(error){

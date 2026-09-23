@@ -8,6 +8,7 @@
 | --- | --- |
 | 项目阶段、已确认需求、待定项 | [README.md](README.md) |
 | 阅读器、翻译体验、首版范围、产品验收 | [产品设计](docs/PRODUCT_DESIGN.md) |
+| 本地源文件保存、云盘按需读取、漫画管理与缓存重构 | [来源与缓存重设计](docs/COMIC_SOURCE_ARCHITECTURE.md)（设计稿，实施状态需核实代码） |
 | 插件边界、任务、数据、供应商、API、部署 | [架构设计](docs/ARCHITECTURE.md) |
 | 图片模型协议、文件格式、样本与技术验证 | [技术调研](docs/TECH_RESEARCH.md) |
 | 常规翻译、OCR、LaMa 抹字、嵌字、LLM 与成本 | [常规翻译调研](docs/CLASSIC_TRANSLATION_RESEARCH.md) |

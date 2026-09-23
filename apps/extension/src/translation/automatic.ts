@@ -1,13 +1,13 @@
 import {msg} from '../i18n/runtime';
 import {hashFile} from '../importers/hash';
-import {pageSource} from '../reader/recovery';
+import {parsePageReference} from '../comics/pages/identity';
 import {pageTranslation} from '../reader/presentation';
 import type {Mode,Page,ModeEntitlement,PlanItem} from '../types';
 import type {LocalOperation} from './store';
 
 export type ReadingTarget={copyId:string;page:Page;mode:Mode};
 export type TranslationState={kind:'waiting'|'translating'|'upgrade'|'error'|'login';message:string;retryable?:boolean;retryLabel?:string};
-export const targetKey=(copyId:string,page:Page,mode:Mode)=>JSON.stringify([copyId,page.id,mode]);
+export const targetKey=(copyId:string,page:Page,mode:Mode)=>JSON.stringify([copyId,page.revisionId??null,page.id,mode]);
 export const exhausted=(rights:ModeEntitlement)=>!rights.allowed||!rights.unlimited&&(rights.quota?.available??0)<=0;
 export const quotaErrors=new Set(['DAILY_QUOTA_EXHAUSTED','REDRAW_QUOTA_EXHAUSTED','PLUS_REQUIRED','QUOTA_BOUND_EXCEEDED','ENTITLEMENT_CHANGED']);
 export const operationId=(scope:string,language:string,target:ReadingTarget)=>JSON.stringify([scope,language,targetKey(target.copyId,target.page,target.mode)]);
@@ -32,6 +32,6 @@ export async function makeOperation(target:ReadingTarget,scope:string,language:s
   const blob=(!page.imageSha256||!page.imageByteSize)&&page.blobKey?await getBlob(page.blobKey):undefined;
   const sha=page.imageSha256??(blob?await hashFile(blob):undefined),size=page.imageByteSize??blob?.size;
   if(!sha||!size)throw Error(msg("原图尚未就绪，请完成采集或重新导入。"));
-  const item:PlanItem={page_key:targetKey(copyId,page,mode),operation_key:crypto.randomUUID(),role:'current',mode,target_language:language,max_quota_pages:rights&&exhausted(rights)?0:1,...(rights?{expected_kind:rights.quota_kind}:{}),image:{client_item_id:page.id,...pageSource(page),image_sha256:sha,byte_size:size,content_type:page.imageMime||blob?.type||'image/png',name:page.name,...(page.assetId?{asset_id:page.assetId}:{})},...(manual?{action:manual.action,source_job_id:manual.sourceJobId}:{})};
-  return {id:operationId(scope,language,target),scope,copyId,pageId:page.id,blobKey:page.blobKey,item,state:'local',createdAt:Date.now()};
+  const item:PlanItem={page_key:targetKey(copyId,page,mode),operation_key:crypto.randomUUID(),role:'current',mode,target_language:language,max_quota_pages:rights&&exhausted(rights)?0:1,...(rights?{expected_kind:rights.quota_kind}:{}),image:{client_item_id:page.id,image_sha256:sha,byte_size:size,content_type:page.imageMime||blob?.type||'image/png',name:page.name,...(page.assetId?{asset_id:page.assetId}:{})},...(manual?{action:manual.action,source_job_id:manual.sourceJobId}:{})};
+  return {id:operationId(scope,language,target),scope,copyId,pageId:page.id,blobKey:page.documentId?undefined:page.blobKey,pageRef:page.blobKey?parsePageReference(page.blobKey):undefined,item,state:'local',createdAt:Date.now()};
 }

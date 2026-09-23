@@ -1,3 +1,4 @@
+import {acquirePage} from '../comics/pages/service';
 import {msg} from '../i18n/runtime';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Api,ApiError} from '../api';
@@ -5,8 +6,8 @@ import {supportsLanguage,type Capabilities,type Entitlements,type Job,type Mode,
 import {mergeJobs} from '../reader/jobs';
 import {latestResults,pageTranslation} from '../reader/presentation';
 import {assertCurrent} from '../concurrency';
-import * as libraryStore from '../library/store';
-import {loadResultBlob,resultBlobKey} from '../library/result-cache';
+import {readImage} from '../comics/application/image-access';
+import {loadResultBlob,resultBlobKey} from '../storage/translations/results';
 import {applyAccountJobs} from './sync';
 import {TranslationCoordinator} from './coordinator';
 import {readOperations,translationScope,type LocalOperation} from './store';
@@ -35,7 +36,7 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
    let watchController=new AbortController(),retry=0;
    const live=()=>!stopped&&api.isCurrent();
    const reload=()=>{void readOperations(scope).then(records=>{if(live())setOperations(records);});};
-   const core=new TranslationCoordinator({api,userId,language,sessionId:readingSessionSlot(scope),getBlob:libraryStore.getBlob,rights:()=>config.current.rights??undefined,onJobs:attach,onChange:()=>{reload();wake.current();},onPolicy:value=>{config.current.rights=value;config.current.onPolicy?.(value);}});
+   const core=new TranslationCoordinator({api,userId,language,sessionId:readingSessionSlot(scope),getBlob:readImage,readOriginal:ref=>acquirePage({...ref,purpose:'translation'}),rights:()=>config.current.rights??undefined,onJobs:attach,onChange:()=>{reload();wake.current();},onPolicy:value=>{config.current.rights=value;config.current.onPolicy?.(value);}});
    coordinator.current=core;
    async function downloads(){
      const generation=stamp.current,current=()=>live()&&generation===stamp.current;
@@ -45,7 +46,7 @@ export function useAutomaticTranslation({api,userId,origin,copies,updateCopy,lan
      const needed=[...new Map(pages.flatMap(p=>p.ownerId===userId&&p.apiOrigin===origin?latestResults(p.jobs).filter(j=>j.target_language===language&&j.output_asset_id&&!p.outputBlobs[j.id]):[]).map(j=>[j.id,j])).values()];
      await Promise.allSettled([
        ...needed.map(async job=>{try{await downloadResult(job,current);}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}}),
-       ...pages.filter(p=>!p.blobKey&&p.assetId&&p.ownerId===userId&&p.apiOrigin===origin).map(async page=>{try{const key=page.imageSha256?'original:'+page.imageSha256:'original:'+origin+':'+userId+':'+page.assetId;const blob=await libraryStore.getBlob(key)??await api.image(page.assetId!);assertCurrent(current);await libraryStore.putBlob(key,blob);assertCurrent(current);for(const copy of copyRef.current)if(copy.pages.some(p=>p.id===page.id))commit({...copy,pages:copy.pages.map(p=>p.id===page.id?{...p,blobKey:key,fetchError:undefined}:p)});}catch{/* Preserve the reader's original recovery action. */}}),
+
      ]);
    }
    const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>void tick(),Math.max(0,delay));};

@@ -6,12 +6,12 @@ import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const web='http://127.0.0.1:5176',out=path.resolve('artifacts/reading-plans-validation');
 await mkdir(out,{recursive:true});
-const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{channel:'chrome'})});
+const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 const page=await browser.newPage({viewport:{width:1280,height:900}}),checks=[],errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
-const snapshot=()=>page.evaluate(()=>({submitted:window.readerFixture.submitted,requests:window.readerFixture.requests,plans:window.readerFixture.planBodies}));
-async function jump(n){await page.getByLabel('跳转页码',{exact:true}).fill(String(n));}
+const snapshot=()=>page.evaluate(()=>({submitted:window.readerFixture.submitted,requests:window.readerFixture.requests,plans:window.readerFixture.planBodies,ordinals:window.readerFixture.ordinals}));
+async function jump(n){const input=page.getByLabel('跳转页码',{exact:true});await input.fill(String(n));await input.press('Enter');}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline');
@@ -26,7 +26,7 @@ try{
   check('same-image scrolling sends no duplicate plan');
   for(const current of [2,3]){
     await jump(current);await page.waitForFunction(n=>window.readerFixture.submitted.includes(n+2),current);
-    const rolling=await snapshot();assert.deepEqual(rolling.plans.at(-1).items.map(i=>i.image.page_index),[current-1,current,current+1,current+2]);
+    const rolling=await snapshot();assert.deepEqual(rolling.plans.at(-1).items.map(i=>rolling.ordinals[i.image.client_item_id]),[current-1,current,current+1,current+2]);
     assert.equal(rolling.submitted.filter(n=>n===current+2).length,1);
   }
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
@@ -40,7 +40,7 @@ try{
   state=await snapshot();assert.equal(state.submitted.filter(n=>n===13).length,1);
   check('lost acceptance response resolves the original operation without a duplicate translation');
   await page.evaluate(()=>window.readerFixture.rateBlockedUntil=Date.now()+4000);await jump(18);
-  await page.waitForFunction(()=>window.readerFixture.planBodies.some(p=>p.items.some(i=>i.image.page_index===17)));
+  await page.waitForFunction(()=>window.readerFixture.planBodies.some(p=>p.items.some(i=>window.readerFixture.ordinals[i.image.client_item_id]===17)));
   await page.waitForTimeout(350);const limited=await snapshot();assert(!limited.submitted.includes(17));
   await page.evaluate(()=>window.readerFixture.finishNext());await page.waitForTimeout(600);
   assert.equal((await snapshot()).plans.length,limited.plans.length);

@@ -7,9 +7,11 @@ import {API_BASE,API_ORIGIN} from '../src/service';
 import {sessionAuthorization} from '../src/auth/session';
 import {authKey,readAuth,saveSession,subscribeAuth} from '../src/auth/storage';
 import {tokenLifetime,type Session} from '../src/auth/model';
-import {readCopies,commitCopies,putBlob} from '../src/library/store';
-import {makeCopy} from '../src/library/model';
-import {emptyPage} from '../src/reader/model';
+import {listLibrary} from '../src/comics/application/library-service';
+import {importImageAlbum} from '../src/comics/application/import-service';
+import {registerSourceDriver} from '../src/comics/sources/registry';
+import {localSourceDriver} from '../src/comics/sources/local/driver';
+registerSourceDriver(localSourceDriver);
 import type {Entitlements} from '../src/types';
 import '../src/styles.css';
 import '../src/redesign.css';
@@ -17,13 +19,12 @@ import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5187')throw Error('Use isolated http://127.0.0.1:5187.');
-const existing=await readCopies(),saved=(await readAuth()).session;
-if(existing.some(c=>!c.id.startsWith('auth-fixture-'))||saved&&!saved.user.id.startsWith('fixture-'))throw Error('This origin contains non-fixture data.');
+const existing=await listLibrary(0,1000),saved=(await readAuth()).session;
+if(existing.works.some(work=>work.title!=='会话过期时继续阅读')||saved&&!saved.user.id.startsWith('fixture-'))throw Error('This origin contains non-fixture data.');
 const nativeFetch=window.fetch.bind(window),endpoint='https://fixture-identity.invalid/token';
 const image=await(await nativeFetch('/samples/starlight-bookshop.png')).blob();
-if(!existing.length){
-  const bitmap=await createImageBitmap(image),pages=Array.from({length:3},(_,i)=>({...emptyPage(`验收第 ${i+1} 页`,bitmap.width,bitmap.height),id:`auth-fixture-page-${i}`,blobKey:'auth-fixture-original'}));bitmap.close();
-  await putBlob('auth-fixture-original',image);await commitCopies([{...makeCopy('会话过期时继续阅读',pages,'隔离验收'),id:'auth-fixture-comic'}],[{title:'会话过期时继续阅读',kind:'work'}]);
+if(!existing.works.length){
+  await importImageAlbum(Array.from({length:3},(_,index)=>new File([image],`验收第 ${index+1} 页.png`,{type:'image/png'})),{title:'会话过期时继续阅读',kind:'book'});
 }
 const makeSession=(name='账户 A'):Session=>({id:'auth-fixture-'+crypto.randomUUID(),token:'fixture-access',...tokenLifetime(3600),user:{id:'fixture-'+name,name,role:'reader'},apiOrigin:API_ORIGIN,credential:{kind:'oidc',refreshToken:'fixture-refresh',tokenEndpoint:endpoint,clientId:'fixture-client',resource:API_ORIGIN}});
 const loginFixture=new URLSearchParams(location.search).get('login');

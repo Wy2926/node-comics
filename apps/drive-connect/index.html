@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://ssl.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; frame-src https://accounts.google.com https://docs.google.com; connect-src https://accounts.google.com https://www.googleapis.com; img-src 'self' https://*.googleusercontent.com https://*.gstatic.com; base-uri 'none'; form-action 'none'">
+  <title>连接 Google Drive · NodeLane Comics</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js" defer></script>
+  <script src="connect.js" defer></script>
+</head>
+<body>
+  <main>
+    <span class="brand">NODELANE COMICS</span>
+    <h1>从 Google Drive<br>选择你的漫画</h1>
+    <p>选中的漫画留在云盘，插件只在阅读时获取所需内容。连接云盘不需要登录漫画翻译账户。</p>
+    <div class="notice">Google 的“所选文件”权限也包含修改能力。本应用仅实现读取，不会修改或删除云盘文件。</div>
+    <button id="connect" disabled>连接账户并选择文件</button>
+    <button id="reconnect" class="secondary" disabled>切换 / 重新连接账户</button>
+    <small id="connection-info">已有有效连接时会直接打开文件选择器。</small>
+    <p id="status" role="status">等待插件建立安全连接…</p>
+    <small>目前开放 CBZ / ZIP 和独立图片。PDF、MOBI、RAR 请下载后从插件的本地入口导入。</small>
+  </main>
+</body>
+</html>

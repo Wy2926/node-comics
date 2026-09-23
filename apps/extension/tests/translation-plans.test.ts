@@ -13,9 +13,9 @@ describe('translation plan coordination',()=>{
   for(let current=0;current<4;current++){
    await f.core.plan([current,current+1,current+2,current+3].map(target));
    const body=f.plan.mock.calls.at(-1)![0];
-   expect(body.items.map(i=>i.image.page_index)).toEqual([current,current+1,current+2,current+3]);
+   expect(body.items.map(i=>Number(i.image.client_item_id.replace('page-','')))).toEqual([current,current+1,current+2,current+3]);
    expect(body.items.map(i=>i.role)).toEqual(['current','prefetch','prefetch','prefetch']);
-   for(const item of body.items){const page=item.image.page_index!;if(keys.has(page))expect(item.operation_key).toBe(keys.get(page));else keys.set(page,item.operation_key);}
+   for(const item of body.items){const page=Number(item.image.client_item_id.replace('page-',''));if(keys.has(page))expect(item.operation_key).toBe(keys.get(page));else keys.set(page,item.operation_key);}
   }
   expect(keys.size).toBe(7);expect(f.plan).toHaveBeenCalledTimes(4);
  });
@@ -38,7 +38,7 @@ describe('translation plan coordination',()=>{
   await expect(f.core.plan([target(1)])).rejects.toThrow('offline');
   const original=(await readOperation(operationId(f.core.scope,'zh-Hans',target(1))))!;original.retryAt=0;await saveOperation(original);
   await f.core.recover();await f.core.plan([target(2)]);
-  expect(f.api.resolveOperations).toHaveBeenCalledWith([original.item.operation_key]);expect(f.plan.mock.calls[1][0].items[0].image.page_index).toBe(2);
+  expect(f.api.resolveOperations).toHaveBeenCalledWith([original.item.operation_key]);expect(f.plan.mock.calls[1][0].items[0].image.client_item_id).toBe('page-2');
   await f.core.plan([target(1)]);expect(f.plan.mock.calls[2][0].items[0].operation_key).toBe(original.item.operation_key);
  });
  it('does not clear image backpressure when a job finishes, but permits cache-only new windows',async()=>{
@@ -94,7 +94,7 @@ describe('translation plan coordination',()=>{
   await f.core.plan([target(2)]);expect(f.plan).toHaveBeenCalledOnce();expect(f.core.controlDelay).toBeGreaterThan(17000);
  });
  it('leaves a prepared old window unsent after the user hides or navigates away',async()=>{
-  const f=fixture();await f.core.plan([target(1)],false,()=>false);expect(f.plan).not.toHaveBeenCalled();const prepared=(await readOperation(operationId(f.core.scope,'zh-Hans',target(1))))!;expect(prepared.state).toBe('local');await f.core.plan([target(2)]);expect(f.plan.mock.calls[0][0].items[0].image.page_index).toBe(2);
+  const f=fixture();await f.core.plan([target(1)],false,()=>false);expect(f.plan).not.toHaveBeenCalled();const prepared=(await readOperation(operationId(f.core.scope,'zh-Hans',target(1))))!;expect(prepared.state).toBe('local');await f.core.plan([target(2)]);expect(f.plan.mock.calls[0][0].items[0].image.client_item_id).toBe('page-2');
  });
  it('replaces a definite quota denial with a new key after policy changes',async()=>{
   const f=fixture();f.plan.mockImplementationOnce(async body=>({...receipt(body),items:[{operation_key:body.items[0].operation_key,disposition:'blocked',code:'DAILY_QUOTA_EXHAUSTED'}]}));await f.core.plan([target(1)]);await f.core.refreshPolicy(entitlement(true));await f.core.plan([target(1)]);expect(f.plan.mock.calls[1][0].items[0].operation_key).not.toBe(f.plan.mock.calls[0][0].items[0].operation_key);expect((await readOperation(operationId(f.core.scope,'zh-Hans',target(1))))?.item.operation_key).toBe(f.plan.mock.calls[1][0].items[0].operation_key);

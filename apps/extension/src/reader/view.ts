@@ -1,12 +1,9 @@
-import type {LibraryState} from '../library/types';
+
 import type {Mode} from '../types';
 import {resolvePageView,type PageView} from './presentation';
 
 /** Chapters and editions of the same comic share the reader's explicit choice. */
-export function readingViewKey(library:LibraryState,copyId:string){
-  const workId=library.coverage.find(item=>item.copyId===copyId)?.workId;
-  return 'nc-reading-view:'+JSON.stringify(workId?['work',workId]:['copy',copyId]);
-}
+export function readingViewKey(workId:string|undefined,documentId:string){return 'nc-reading-view:'+JSON.stringify(workId?['work',workId]:['document',documentId]);}
 export function readReadingView(key:string,defaultMode:Mode):PageView{
   try{
     const value=JSON.parse(localStorage.getItem(key)??'null');

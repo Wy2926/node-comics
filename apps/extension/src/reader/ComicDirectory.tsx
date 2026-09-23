@@ -1,7 +1,7 @@
 import {msg} from '../i18n/runtime';
 import {useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {ReactNode} from 'react';
-import type {ReadingDirectory} from '../library/directory';
+import type {ReadingDirectory} from '../comics/application/library-service';
 import './directory.css';
 
 export function ComicDirectory({directory,index,pageCount,onNavigate,onCatalog,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string)=>void;onCatalog?:()=>void;children:ReactNode}){
