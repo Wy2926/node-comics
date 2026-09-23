@@ -50,6 +50,8 @@ Chrome / Edge 扩展管理页打开开发者模式，加载 `.output/chrome-mv3`
 
 ## 本地导入、书架与采集
 
+顶部“漫画网站”是独立目录页，站点名称、地址与图标由适配器 `SourceDefinition.sites` 提供，单个适配器可列出多个入口。页面提供无需登录的网站适配申请；设置左侧的反馈按钮可提交整个插件的问题和建议，两者都允许选填任意格式联系方式，并在管理后台分别查看。协议、限流、图标来源及隔离验证见[网站目录与匿名反馈验收](../../docs/validation/WEBSITE_FEEDBACK_2026_09_23.md)。
+
 目录、完整容器、五类缓存 / 下载与翻译操作统一使用 `node-comics-sources-v1-` 数据库基线，仍按类别分库。启动先校验表、主键、索引和字节后端；早期同名 v1 测试库原样保留，不迁移、不自动删除。早期导入需在新基线重新导入。详见[实施记录](../../docs/COMIC_SOURCE_IMPLEMENTATION.md)与[数据库回归](../../docs/validation/DATABASE_BASELINE_2026_09_22.md)。
 
 - 支持图片、无 DRM MOBI、CBZ/ZIP、CBR/RAR、PDF。MOBI 分块摘要每次读取至多 1 MiB，不执行书内 HTML；GIF 首帧转 PNG。参见[格式与缓存](../../docs/IMPORT_FORMATS_AND_CACHE.md)、[本地导入](../../docs/SIMPLE_COMIC_READING_DESIGN.md)。

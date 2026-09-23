@@ -29,6 +29,10 @@ export function mangaCopyLocation(value: string): { slug: string; chapterId?: st
 export const definition: SourceDefinition = {
   id: 'mangacopy',
   name: 'MangaCopy',
+  sites: [
+    { id: 'copy4000', name: '拷贝漫画', url: 'https://www.copy4000.com/', icon: '/site-icons/mangacopy.svg' },
+    { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg' },
+  ],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
   installation: { requiredOrigins: MANGACOPY_PERMISSIONS, autoContentMatches: MANGACOPY_MATCHES },
   identify(url) {

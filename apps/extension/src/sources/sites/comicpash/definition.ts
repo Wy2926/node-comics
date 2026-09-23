@@ -2,6 +2,7 @@ import type { SourceDefinition } from '../../contracts/definition';
 export const definition: SourceDefinition = {
   id: 'comicpash',
   name: 'Comic PASH!',
+  sites: [{ id: 'comicpash', name: 'Comic PASH!', url: 'https://comicpash.jp/', icon: '/site-icons/comicpash.svg' }],
   capabilities: { importable: true, pages: true, inline: true, catalog: false, completePageList: false },
   installation: { requiredOrigins: [], autoContentMatches: [] },
   identify(url) {

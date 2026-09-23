@@ -41,6 +41,7 @@ from .translation_providers import router as translation_providers_router
 from .file_pages import FilePageIdentity, FilePageMatchRequest, FilePageMatches, match_file_pages, upload_file_page
 from .queue_api import router as queue_router
 from .reader_api import router as reader_router
+from .support_requests import router as support_requests_router
 from .quota_grants import router as grants_router
 from .billing_api import router as billing_router
 from .billing_admin import router as billing_admin_router
@@ -72,6 +73,7 @@ app.include_router(plan_router)
 app.include_router(upload_router)
 app.include_router(compute_v2_router)
 app.include_router(reader_router)
+app.include_router(support_requests_router)
 app.include_router(grants_router)
 app.include_router(billing_router)
 app.include_router(billing_admin_router)
@@ -107,6 +109,8 @@ async def request_guards(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, exc):
+    if request.url.path == '/v1/support-requests':
+        return JSONResponse(status_code=422, content={"error": {"code": "SUPPORT_REQUEST_INVALID", "message": "请检查网站名称、公开网址或反馈内容，以及字段长度。"}})
     if any(item['type'] == 'language_unsupported' for item in exc.errors()):
         return JSONResponse(status_code=422, content={"error": {"code": "LANGUAGE_UNSUPPORTED", "message": "此目标语言尚未开放，请选择支持的语言"}})
     if request.url.path.startswith('/v1/admin/compute-nodes'):

@@ -29,6 +29,8 @@ import { type Capabilities, type Entitlements, type ReadingEntry, type Settings 
 import { AccountPage, type AccountTab } from './ui/Account';
 import { useAppearance } from './ui/Appearance';
 import { BrandLogo } from './ui/BrandLogo';
+import { ComicSites } from './ui/ComicSites';
+import { SupportRequestForm } from './ui/SupportRequestForm';
 import { Modal } from './ui/components';
 import { Library } from './ui/Library';
 import type {ShelfView} from './ui/ShelfGrid';
@@ -39,8 +41,8 @@ import {DocumentExport} from './ui/DocumentExport';
 import type {Entry} from './comics/domain';
 import { StorageManagement } from './ui/StorageManagement';
 
-type View='library'|'settings'|'account';
-function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
+type View='library'|'sites'|'settings'|'account';
+function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='sites'||value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
 export function App(){
  const [library,setLibrary]=useState(emptyLibrary),[copies,setCopies]=useState<ReadingEntry[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
  const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent'});
@@ -50,6 +52,7 @@ export function App(){
  const readingEpoch=useRef(0),libraryEpoch=useRef(0),documentRefreshEpoch=useRef(0);
  const [readingBusy,setReadingBusy]=useState(false);
  const [exporting,setExporting]=useState<Entry>();
+ const [feedbackOpen,setFeedbackOpen]=useState(false);
  const [sourceDirectory,setSourceDirectory]=useState<ReadingDirectory>();
  const [localImport]=useState(()=>new LocalImportQueue()),[importExpanded,setImportExpanded]=useState(false);
  const sourceInProgress=useRef(false),sourceQueryHandled=useRef(false);
@@ -142,16 +145,18 @@ export function App(){
  const rights=usage??caps?.entitlements;
  return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current)chooseFiles(Array.from(e.dataTransfer.files));}}>
   <input aria-label={msg('选择漫画文件')} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
-  {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
+  {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button><button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe"/>{msg('漫画网站')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message"/></button><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
   <div className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
   {current?<Reader key={`${current.comicId}:${account?.user.id}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onReload={()=>void reloadCurrent()} onExport={()=>void exportCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onAcquire={()=>void grantDownloads([current.id],copyOrigins([current])).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId)=>void openEntry(id,pageId)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps} userId={account?.user.id} apiOrigin={API_ORIGIN}/>:
   <main className="nc-main">{view==='library'&&<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onDirectory={id=>void showDirectory(id)} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}
+  {view==='sites'&&<ComicSites/>}
   {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={caps}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={receivePolicy} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}{toast&&<div className="toast" role="status"><Icon name="check"/>{toast}<button onClick={()=>setToast('')}><Icon name="close"/></button></div>}
   {exporting&&<DocumentExport document={exporting} api={api} userId={account?.user.id} settings={settings} onClose={()=>setExporting(undefined)}/>}
+  {feedbackOpen&&<Modal title={msg('插件反馈')} subtitle={msg('使用中遇到问题或有建议？无需登录，欢迎告诉我们。')} onClose={()=>setFeedbackOpen(false)}><SupportRequestForm kind="plugin"/></Modal>}
   <Login login={login}/><LocalImport reading={!!current} queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onAdd={beginImport} onOpen={id=>void openEntry(id)}/>
   {sourceDirectory&&<Modal title={msg('选择开始阅读的位置')} onClose={()=>setSourceDirectory(undefined)}><ComicDirectory directory={sourceDirectory} index={0} pageCount={0} onNavigate={id=>void openEntry(id)}/></Modal>}
 
