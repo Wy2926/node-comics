@@ -1,0 +1,11 @@
+.nc-library .nc-shelf-title{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.nc-app .nc-profile-avatar.nc-shelf-count{width:auto;min-width:46px;height:46px;padding:0 .55em;font-size:22px;letter-spacing:0;font-variant-numeric:tabular-nums;line-height:1;transition:min-width .15s}
+.nc-library .nc-shelf-tools{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.nc-library .nc-shelf-tools>.nc-sort-label{margin-left:auto;flex-shrink:0;white-space:nowrap}
+.nc-shelf-tools>.nc-sort-label .nc-select{min-width:140px}
+.nc-shelf-window{position:relative;overflow-anchor:none;margin-bottom:32px}
+.nc-shelf-window>.nc-shelf-grid{position:absolute;top:0;left:0;right:0;margin:0}
+.nc-shelf-window .nc-book{align-self:start}
+.nc-library .nc-shelf-window .nc-library-card-actions>.button{height:48px;padding:6px 10px}
+.nc-shelf-window .nc-book[aria-busy=true] .nc-book-cover{background:var(--surface-soft)}
+@media(max-width:640px){.nc-library .nc-shelf-title{gap:14px}.nc-app .nc-profile-avatar.nc-shelf-count{min-width:40px;height:40px;font-size:20px}.nc-library .nc-shelf-tools>.nc-search{flex:1 1 160px}.nc-shelf-tools>.nc-sort-label .nc-select{min-width:118px}}

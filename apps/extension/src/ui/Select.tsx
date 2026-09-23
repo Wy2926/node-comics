@@ -84,12 +84,15 @@ export function Select({value, onChange, children, disabled, id, name, className
     function position() {
       if (!button || !list) return;
       const rect = button.getBoundingClientRect(), gap = 6, margin = 8;
-      const width = Math.min(Math.max(rect.width, 180), window.innerWidth - margin * 2);
+      // The stable scrollbar gutter is outside the popover's usable viewport.
+      const root = document.documentElement;
+      const viewportWidth = Math.min(root.clientWidth, root.getBoundingClientRect().width);
+      const width = Math.min(Math.max(rect.width, 180), viewportWidth - margin * 2);
       const below = window.innerHeight - rect.bottom - gap - margin, above = rect.top - gap - margin;
       list.style.width = `${width}px`;
       const upwards = below < Math.min(list.scrollHeight + 4, 320) && above > below;
       list.style.maxHeight = `${Math.max(0, Math.min(320, upwards ? above : below))}px`;
-      list.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin))}px`;
+      list.style.left = `${Math.max(margin, Math.min(rect.left, viewportWidth - width - margin))}px`;
       list.style.top = `${upwards ? rect.top - gap - list.getBoundingClientRect().height : rect.bottom + gap}px`;
     }
     position();

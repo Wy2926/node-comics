@@ -180,10 +180,41 @@ export const catalog = {
     return idbRequest((options.index ? store.index(options.index) : store).count(options.range));
   },
   listWorks(options: { offset?: number; limit?: number } = {}) { return catalog.list('works', { ...options, index: 'updatedAt', direction: 'prev' }); },
+  /** Lightweight global shelf index: no descriptions, document trees, pages or image bytes. */
+  async workSummaries(): Promise<CatalogTables['works'][]> {
+    const db=await openCatalog(),store=db.transaction('works').objectStore('works');
+    return new Promise((resolve,reject)=>{
+      const works:CatalogTables['works'][]=[],request=store.index('updatedAt').openCursor(null,'prev');
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const cursor=request.result;if(!cursor){resolve(works);return;}
+        const {id,title,aliases,createdAt,updatedAt,lastReadAt,documentCount,cover}=cursor.value as CatalogTables['works'];
+        works.push({id,title,aliases,createdAt,updatedAt,lastReadAt,documentCount,cover});cursor.continue();
+      };
+    });
+  },
   listUnits(workId: string, options: { offset?: number; limit?: number } = {}) {
     return catalog.list('units', { limit: 1000, ...options, index: 'workOrder', range: IDBKeyRange.bound([workId, -Infinity], [workId, Infinity]) });
   },
   listDocuments(unitId: string, options: { offset?: number; limit?: number } = {}) { return catalog.list('documents', { limit: 100, ...options, index: 'unitId', range: unitId }); },
+  /** Aggregate source references without loading pages or retaining every document on the shelf. */
+  async workSourceBindings(workId: string): Promise<string[]> {
+    const db = await openCatalog(), tx = db.transaction(['units', 'documents'], 'readonly'), bindings = new Set<string>();
+    await new Promise<void>((resolve, reject) => {
+      const units = tx.objectStore('units').index('workId').openKeyCursor(workId);
+      tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error); tx.oncomplete = () => resolve();
+      units.onsuccess = () => {
+        const unit = units.result; if (!unit) return;
+        const documents = tx.objectStore('documents').index('unitId').openCursor(unit.primaryKey);
+        documents.onsuccess = () => {
+          const document = documents.result;
+          if (document) { bindings.add((document.value as CatalogTables['documents']).sourceBindingId); document.continue(); }
+          else unit.continue();
+        };
+      };
+    });
+    return [...bindings];
+  },
   listPages(revisionId: string, options: { offset?: number; limit?: number } = {}) {
     return catalog.list('pageDescriptors', { ...options, index: 'revisionOrdinal', range: IDBKeyRange.bound([revisionId, -Infinity], [revisionId, Infinity]) });
   },

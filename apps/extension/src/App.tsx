@@ -11,7 +11,7 @@ import { Icon } from './icons';
 import { COMIC_ACCEPT } from './comics/formats/limits';
 import { LocalImportQueue } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
-import { listLibrary, loadDocument, readerSequence, saveReaderState, subscribeLibrary, markRead, type ReadingDirectory } from './comics/application/library-service';
+import { listShelfIndex, loadDocument, readerSequence, saveReaderState, subscribeLibrary, markRead, type ReadingDirectory } from './comics/application/library-service';
 import { importSourceFiles } from './comics/application/import-service';
 import { settings as readSettings, saveSettings } from './comics/application/preferences';
 import { discoverDocument, pauseDownloads, grantDownloads, runDownloads, stopDownloads } from './comics/acquisition';
@@ -31,6 +31,7 @@ import { BrandLogo } from './ui/BrandLogo';
 import { CatalogImport } from './ui/CatalogImport';
 import { Modal } from './ui/components';
 import { Library } from './ui/Library';
+import type {ShelfView} from './ui/ShelfGrid';
 import { LocalImport } from './ui/LocalImport';
 import { Login } from './ui/Login';
 import { Preferences } from './ui/Preferences';
@@ -45,11 +46,12 @@ import type {ImportAssignment} from './comics/application/types';
 type View='library'|'settings'|'account';
 function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
 export function App(){
- const [library,setLibrary]=useState(emptyLibrary),[offset,setOffset]=useState(0),[libraryWorkId,setLibraryWorkId]=useState<string>(),[copies,setCopies]=useState<ReadingCopy[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
+ const [library,setLibrary]=useState(emptyLibrary),[libraryWorkId,setLibraryWorkId]=useState<string>(),[copies,setCopies]=useState<ReadingCopy[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
+ const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'updated'});
  const copiesRef=useRef(copies);copiesRef.current=copies;
  const [currentId,setCurrentId]=useState<string>(),current=copies.find(c=>c.id===currentId),[navigationKey,setNavigationKey]=useState(0);
  const currentRef=useRef(currentId);currentRef.current=currentId;
- const readingEpoch=useRef(0),libraryEpoch=useRef(0),documentRefreshEpoch=useRef(0),offsetRef=useRef(offset);offsetRef.current=offset;
+ const readingEpoch=useRef(0),libraryEpoch=useRef(0),documentRefreshEpoch=useRef(0);
  const [readingBusy,setReadingBusy]=useState(false);
  const [exporting,setExporting]=useState<ComicDocument>();
  const [catalog,setCatalog]=useState<SourceCatalog>(),[sourceManifest,setSourceManifest]=useState<PageManifest>();
@@ -69,10 +71,10 @@ export function App(){
  const accountScope=account?{userId:account.user.id,origin:API_ORIGIN}:undefined;
  useAppearance(settings);
  const reloadLibrary=useCallback(async()=>{
-   if(offsetRef.current!==offset)return;const request=++libraryEpoch.current;
-   try{const value=await listLibrary(offset);if(request===libraryEpoch.current&&offsetRef.current===offset)setLibrary(value);}
-   catch(reason){if(request===libraryEpoch.current&&offsetRef.current===offset)throw reason;}
- },[offset]);
+   const request=++libraryEpoch.current;
+   try{const value=await listShelfIndex();if(request===libraryEpoch.current)setLibrary(value);}
+   catch(reason){if(request===libraryEpoch.current)throw reason;}
+ },[]);
  const leaveReader=useCallback(()=>{readingEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[]);
  const updateCopy=useCallback((copy:ReadingCopy)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));},[]);
  const openCopy=useCallback(async(id:string,pageId?:string)=>{
@@ -109,7 +111,7 @@ export function App(){
  useEffect(()=>{localImport.activate();void initializeSources().then(reloadLibrary).catch(e=>setError(e.message));return()=>localImport.dispose();},[localImport]);
  useEffect(()=>{void reloadLibrary().catch(e=>setError(e.message));},[reloadLibrary]);
  useEffect(()=>subscribeLibrary(change=>{
-   if(['works','units','documents'].includes(change.table))void reloadLibrary().catch(e=>setError(e.message));
+   if(['works','units','documents','bindings','connections'].includes(change.table))void reloadLibrary().catch(e=>setError(e.message));
    const id=currentRef.current;
    if(change.table==='documents'&&id&&change.ids.includes(id)){
      const request=readingEpoch.current,refresh=++documentRefreshEpoch.current,isCurrent=()=>request===readingEpoch.current&&refresh===documentRefreshEpoch.current&&currentRef.current===id&&api.isCurrent();
@@ -135,7 +137,7 @@ export function App(){
   {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
   <div className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
   {current?<Reader key={`${current.workId}:${account?.user.id}:${navigationKey}`} viewKey={readingViewKey(current.workId,current.id)} directory={directory} onMarkRead={markRead} sequence={copies} onActiveCopy={activateCopy} onLoadCopy={loadCopy} onAcquire={()=>void grantDownloads([current.id]).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId)=>void openCopy(id,pageId)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateCopy} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={caps} userId={account?.user.id} apiOrigin={API_ORIGIN}/>:
-  <main className="nc-main">{view==='library'&&<DownloadManagement notify={notify} onOpen={id=>void openCopy(id)}/>} {view==='library'&&(catalog?<CatalogImport catalog={catalog} library={library} onClose={()=>setCatalog(undefined)} onDone={()=>void reloadLibrary()} onNotice={notify} onRefresh={()=>openSource(catalog.url)}/>:<Library library={library} workId={libraryWorkId} onSelectWork={id=>{leaveReader();setLibraryWorkId(id);}} onOpen={id=>void openCopy(id)} onImport={beginImport} onChanged={reloadLibrary} notify={notify} onExport={setExporting} offset={offset} onNext={()=>{leaveReader();setOffset(library.nextOffset??offset);}} onPrevious={()=>{leaveReader();setOffset(Math.max(0,offset-48));}}/>)}
+  <main className="nc-main">{view==='library'&&<DownloadManagement notify={notify} onOpen={id=>void openCopy(id)}/>} {view==='library'&&(catalog?<CatalogImport catalog={catalog} library={library} onClose={()=>setCatalog(undefined)} onDone={()=>void reloadLibrary()} onNotice={notify} onRefresh={()=>openSource(catalog.url)}/>:<Library library={library} workId={libraryWorkId} onSelectWork={id=>{leaveReader();setLibraryWorkId(id);}} onOpen={id=>void openCopy(id)} onImport={beginImport} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>)}
   {view==='settings'&&<><Preferences settings={settings} setSettings={setSettings} caps={caps}/><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={receivePolicy} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
   </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { msg } from '../i18n/runtime';
 import { importCatalogEntries, queueDownloads, runDownloads, suggestedUnitKind as suggestedKind } from '../comics/acquisition';
 import type { ImportAssignment, LibraryViewModel, SourceCatalog } from '../comics/application/types';
@@ -7,7 +7,7 @@ import './catalog.css';
 import { Select } from './Select';
 import { useImagePermissions } from './useImagePermissions';
 import {ImportAssignmentFields} from './ImportAssignment';
-import {getWork} from '../comics/application/library-service';
+import {getWork,importedCatalogEntries} from '../comics/application/library-service';
 
 const PAGE_SIZE=40;
 const kinds:Record<ImportAssignment['kind'],string>={get chapter(){return msg("章节");},get volume(){return msg("卷册");},get unclassified(){return msg("待整理");},get book(){return msg("独立作品");}};
@@ -16,15 +16,18 @@ type Props={catalog:SourceCatalog;library:LibraryViewModel;onClose:()=>void;onDo
 
 export function CatalogImport({catalog,library,onClose,onDone,onRefresh,onNotice}:Props){
  const previous=catalog.workId?catalog:undefined;
- const already=useMemo(()=>new Set(library.documents.map(c=>c.sourceEntryId)),[library.documents]);
+ const selectionTouched=useRef(false),selectionRestored=useRef(false),selectionInitialized=useRef(false);
+ const [already,setAlready]=useState(new Set<string>());
+ useEffect(()=>{let active=true;void importedCatalogEntries(catalog.entries.map(entry=>entry.id)).then(ids=>{if(!active)return;const imported=new Set(ids);setAlready(imported);if(!selectionInitialized.current&&!selectionTouched.current&&!selectionRestored.current)commitSelected(previous=>new Set([...previous].filter(id=>!imported.has(id))));selectionInitialized.current=true;}).catch(error=>{if(active)onNotice?.(error.message);});return()=>{active=false;};},[catalog,library]);
  const excluded=useMemo(()=>new Set(previous?.excludedEntryIds),[previous]);
  const [group,setGroup]=useState(catalog.groups[0]?.id??'');
  const [type,setType]=useState(''),[query,setQuery]=useState(''),[status,setStatus]=useState('all'),[sort,setSort]=useState('source');
  const [page,setPage]=useState(0),[confirmPage,setConfirmPage]=useState(0);
- const [selected,setSelected]=useState(()=>{
-  try{const ids=JSON.parse(localStorage.getItem('nc-catalog-selection:'+catalog.id)??'null');if(Array.isArray(ids))return new Set<string>(ids.filter(id=>catalog.entries.some(e=>e.id===id)&&!excluded.has(id)));}catch{}
+ const [selected,commitSelected]=useState(()=>{
+  try{const ids=JSON.parse(localStorage.getItem('nc-catalog-selection:'+catalog.id)??'null');if(Array.isArray(ids)){selectionRestored.current=true;return new Set<string>(ids.filter(id=>catalog.entries.some(e=>e.id===id)&&!excluded.has(id)));}}catch{}
   return new Set((catalog.groups[0]?.entryIds??catalog.entries.map(e=>e.id)).filter(id=>!excluded.has(id)&&!already.has(id)));
  });
+ const setSelected=(value:SetStateAction<Set<string>>)=>{selectionTouched.current=true;commitSelected(value);};
  const [rangeMode,setRangeMode]=useState(false),[rangeStart,setRangeStart]=useState<string>();
  const lastClicked=useRef<string|undefined>(undefined),saving=useRef(false);
  const [offline,setOffline]=useState(false),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false);

@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {selectOption} from './select_helpers.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const require=createRequire(import.meta.url);
@@ -27,7 +28,7 @@ const context=await chromium.launchPersistentContext(profile,{
   executablePath:process.env.TEST_CHROMIUM,
   args:['--disable-extensions-except='+extension,'--load-extension='+extension],
 });
-const errors=[],consoleErrors=[],checks=[];
+const errors=[],consoleErrors=[],checks=[],metrics={};
 let page,stage='boot',failure;
 const startedAt=new Date().toISOString();
 context.on('page',value=>{
@@ -55,13 +56,16 @@ async function until(test,label,timeout=15000){
 async function recordsUntil(test,label){return until(async()=>{const value=await snapshot();return test(value)&&value;},label);}
 async function count(locator,expected){await until(async()=>await locator.count()===expected,`expected ${expected} matching elements`);}
 async function screenshot(name){
-  const toast=page.locator('.toast button');if(!await page.locator('dialog[open]').count()&&await toast.count())await toast.click();
-  await page.screenshot({path:path.join(output,name+'.png'),fullPage:!name.startsWith('import-')&&!name.includes('editor')});
+  const toast=page.locator('.toast button');if(!await page.locator('dialog[open]').count()&&!await page.getByRole('menu').count()&&await toast.count())await toast.click();
+  const menuVisible=await page.getByRole('menu').count()>0;
+  await page.screenshot({path:path.join(output,name+'.png'),fullPage:!menuVisible&&!await page.locator('.nc-shelf-window').count()&&!name.startsWith('import-')&&!name.includes('editor')});
+  if(menuVisible)assert(await page.getByRole('menu').isVisible(),'screenshot preserves the open context menu');
 }
 function dialog(name){return page.getByRole('dialog',{name,exact:true});}
 function unitCard(id){return page.locator(`[data-unit-id="${id}"]`);}
 function versionRow(id){return page.locator(`[data-document-id="${id}"]`);}
 async function clickAction(scope,name){
+  if(await scope.evaluate(element=>element.matches('.nc-content-card,.nc-book'))){await scope.click({button:'right'});await page.getByRole('menuitem',{name,exact:true}).click();return;}
   // Some secondary controls have a decorative ::after arrow in their accessible
   // name. Match their actual text while retaining the owning card/row scope.
   const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -155,14 +159,42 @@ try{
   assert(first&&second);assert.notEqual(first.sourceKey,second.sourceKey,'fixtures must have distinct content');
   const firstUnit=first.unitId,secondUnit=second.unitId;
   checks.push('从统一导入弹框选择本地文件，2 个不同 CBZ 归入同一作品的 2 个阅读条目');
+  await until(async()=>await page.locator('.nc-book .nc-source-tag').count()===1,'lazy source badge ready');assert.equal(await page.locator('.nc-book .nc-source-tag').innerText(),'本地文件');
+  await page.locator('.nc-book').click({button:'right'});await page.getByRole('menu').waitFor();
+  assert.equal(await page.getByRole('menuitem').count(),4);
+  await screenshot('shelf-context-menu');await page.keyboard.press('Escape');await page.getByRole('menu').waitFor({state:'hidden'});
   await openWork('作品管理验收');
   for(const id of [firstUnit,secondUnit]){
     assert.equal(await unitCard(id).locator('.nc-library-card-actions > button').count(),1,'card keeps one primary reading button');
     assert.equal(await unitCard(id).locator('details[open]').count(),0,'management actions start collapsed');
   }
 
+  stage='context menu and card layout';
+  assert.equal(await page.locator('.nc-content-card details').count(),0);
+  assert.equal(await page.locator('.nc-content-card .nc-card-meta,.nc-content-card .nc-card-kicker').count(),0);
+  assert.equal(await unitCard(firstUnit).locator('.nc-source-tag').innerText(),'本地文件');
+  assert.equal(await page.locator('.nc-work-detail select').count(),0,'all detail dropdowns are custom');
+  assert.equal(await page.locator('.nc-content-card .nc-version-tag').count(),0,'file type is not a card tag');
+  assert.equal(await page.locator('.nc-more-dots i').count(),3);
+  assert.equal(await unitCard(firstUnit).locator('.nc-content-read').getAttribute('data-state'),'unread');
+  const coverBounds=await unitCard(firstUnit).locator('.nc-content-cover').boundingBox();assert(coverBounds.height>coverBounds.width);
+  const identity=await page.locator('.nc-work-identity').boundingBox(),actions=await page.locator('.nc-work-action-panel').boundingBox();assert(actions.x>identity.x+identity.width);
+  assert.equal(await page.getByRole('button',{name:'添加内容',exact:true}).isVisible(),false);
+  assert.equal(await page.getByRole('button',{name:'编辑作品',exact:true}).isVisible(),false);
+  const card=unitCard(firstUnit),coverButton=card.locator('.nc-content-cover');
+  await coverButton.focus();await page.keyboard.press('Shift+F10');await page.getByRole('menu').waitFor();
+  await page.keyboard.press('End');assert.equal(await page.locator(':focus').innerText(),'标记已读');
+  await page.keyboard.press('Home');assert.equal(await page.locator(':focus').innerText(),'版本与来源');
+  await page.keyboard.press('Escape');assert(await coverButton.evaluate(element=>element===document.activeElement));
+  await card.click({button:'right'});await screenshot('detail-context-menu');
+  await page.getByRole('heading',{name:'作品管理验收',level:1}).click();await page.getByRole('menu').waitFor({state:'hidden'});
+  const view=page.viewportSize();await card.dispatchEvent('contextmenu',{clientX:view.width-2,clientY:view.height-2});
+  let bounds=await page.getByRole('menu').boundingBox();assert(bounds.x+bounds.width<=view.width&&bounds.y+bounds.height<=view.height);
+  await page.keyboard.press('Escape');
+  checks.push('书架和详情右键菜单、键盘方向键与 Escape 焦点恢复、外部点击关闭、边缘定位；纵向封面标签及左右顶部栏');
+
   stage='edit work and units';
-  await page.getByRole('button',{name:'编辑作品',exact:true}).click();
+  await clickAction(page.locator('.nc-work-primary-actions'),'编辑作品');
   let editor=dialog('编辑作品');
   await editor.getByRole('textbox',{name:'作品名称',exact:true}).fill('星河漫游 · 管理验收');
   await editor.getByRole('textbox',{name:'作者（每行一位，选填）',exact:true}).fill('合成作者\n测试绘者');
@@ -175,8 +207,8 @@ try{
   for(const [id,title,kind,role] of [[firstUnit,'第一话 · 启程','chapter','main'],[secondUnit,'第二卷 · 番外','volume','extra']]){
     await clickAction(unitCard(id),'编辑条目');editor=dialog('编辑条目');
     await editor.getByRole('textbox',{name:'名称',exact:true}).fill(title);
-    await editor.getByRole('combobox',{name:'内容类型',exact:true}).selectOption(kind);
-    await editor.getByRole('combobox',{name:'内容性质',exact:true}).selectOption(role);
+    await selectOption(editor.getByRole('combobox',{name:'内容类型',exact:true}),kind);
+    await selectOption(editor.getByRole('combobox',{name:'内容性质',exact:true}),role);
     await editor.getByRole('button',{name:'保存修改',exact:true}).click();await editor.waitFor({state:'hidden'});
   }
   records=await snapshot();assert.equal(records.units.find(value=>value.id===secondUnit).role,'extra');
@@ -186,20 +218,20 @@ try{
   const categories=page.getByRole('navigation',{name:'内容分类'});
   await categories.getByRole('button',{name:/^章节/}).click();await count(page.locator('.nc-content-card'),1);assert(await unitCard(firstUnit).isVisible());
   await categories.getByRole('button',{name:/^全部内容/}).click();
-  await page.getByRole('combobox',{name:'内容性质筛选'}).selectOption('extra');await count(page.locator('.nc-content-card'),1);assert(await unitCard(secondUnit).isVisible());
-  await page.getByRole('combobox',{name:'内容性质筛选'}).selectOption('all');
+  await selectOption(page.getByRole('combobox',{name:'内容性质筛选'}),'extra');await count(page.locator('.nc-content-card'),1);assert(await unitCard(secondUnit).isVisible());
+  await selectOption(page.getByRole('combobox',{name:'内容性质筛选'}),'all');
   await page.getByRole('searchbox',{name:'搜索章节或卷册',exact:true}).fill('启程');await count(page.locator('.nc-content-card'),1);
   await page.getByRole('searchbox',{name:'搜索章节或卷册',exact:true}).fill('');
-  await page.getByRole('combobox',{name:'目录排序'}).selectOption('title');await count(page.locator('.nc-content-card'),2);
+  await selectOption(page.getByRole('combobox',{name:'目录排序'}),'title');await count(page.locator('.nc-content-card'),2);
   const titles=await page.locator('.nc-content-card .nc-card-title').allTextContents();assert.deepEqual(titles,[...titles].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})));
   await page.getByRole('button',{name:'批量整理',exact:true}).click();
   const batch=page.locator('.nc-batch-toolbar');await batch.getByRole('button',{name:'全选筛选结果',exact:true}).click();
   await batch.getByRole('button',{name:'标记已读',exact:true}).click();await recordsUntil(value=>value.units.every(unit=>unit.readAt),'batch read persisted');
   await page.getByRole('button',{name:'完成整理',exact:true}).click();
-  await page.getByRole('combobox',{name:'阅读状态筛选'}).selectOption('unread');await count(page.locator('.nc-content-card'),0);
-  await page.getByRole('combobox',{name:'阅读状态筛选'}).selectOption('read');await count(page.locator('.nc-content-card'),2);
-  await page.reload();await openWork(workTitle);await page.getByRole('combobox',{name:'阅读状态筛选'}).selectOption('read');await count(page.locator('.nc-content-card'),2);
-  await page.getByRole('combobox',{name:'阅读状态筛选'}).selectOption('all');
+  await selectOption(page.getByRole('combobox',{name:'阅读状态筛选'}),'unread');await count(page.locator('.nc-content-card'),0);
+  await selectOption(page.getByRole('combobox',{name:'阅读状态筛选'}),'read');await count(page.locator('.nc-content-card'),2);
+  await page.reload();await openWork(workTitle);await selectOption(page.getByRole('combobox',{name:'阅读状态筛选'}),'read');await count(page.locator('.nc-content-card'),2);
+  await selectOption(page.getByRole('combobox',{name:'阅读状态筛选'}),'all');
   checks.push('分类、正文／番外、关键词、名称排序和已读筛选有效；批量已读刷新后仍保留');
   await screenshot('work-detail-desktop');
 
@@ -233,6 +265,7 @@ try{
   records=await recordsUntil(value=>value.positions.some(position=>position.documentId===alternate.id),'explicit version position persisted');
   const position=records.positions.find(value=>value.documentId===alternate.id);assert.equal(position.workId,workId);
   await page.locator('.nc-work-primary-actions').getByRole('button',{name:'继续阅读',exact:true}).click();await assertReader(alternate.id,1);await backFromReader();
+  const timestamp=await page.locator('.nc-work-resume time').getAttribute('datetime');assert.equal(Date.parse(timestamp),(await snapshot()).works.find(work=>work.id===workId).lastReadAt);
   checks.push('首选保留原版本时，显式打开修订版仍读取修订版；作品继续阅读恢复修订版第 2 页');
 
   stage='work cover and same-work reassignment';
@@ -240,7 +273,7 @@ try{
   await dialog('更换作品封面').locator('.nc-cover-choice').filter({hasText:'第一话 · 修订版'}).click();await dialog('更换作品封面').waitFor({state:'hidden'});
   await recordsUntil(value=>value.works.find(work=>work.id===workId).cover?.documentId===alternate.id,'custom work cover persisted');
   await openVersions(firstUnit);await clickAction(versionRow(alternate.id),'纠正归属');
-  const move=dialog('纠正归属');await move.getByRole('combobox',{name:'目标条目',exact:true}).selectOption(secondUnit);await move.getByRole('button',{name:'确认调整',exact:true}).click();await move.waitFor({state:'hidden'});
+  const move=dialog('纠正归属');await selectOption(move.getByRole('combobox',{name:'目标条目',exact:true}),secondUnit);await move.getByRole('button',{name:'确认调整',exact:true}).click();await move.waitFor({state:'hidden'});
   records=await recordsUntil(value=>value.documents.find(doc=>doc.id===alternate.id).unitId===secondUnit,'version moved within work');
   assert.equal(records.documents.find(doc=>doc.id===alternate.id).revisionId,alternate.revisionId);
   const movedPosition=records.positions.find(value=>value.documentId===alternate.id);
@@ -249,17 +282,30 @@ try{
   checks.push('更换作品封面、同作品纠正版本归属成功；冻结修订、独立阅读位置及有效作品封面保持');
 
   stage='add content defaults to current work';
-  await page.getByRole('button',{name:'添加内容',exact:true}).click();panel=await sourceFiles([files[3]]);
+  await clickAction(page.locator('.nc-work-primary-actions'),'添加内容');panel=await sourceFiles([files[3]]);
   assert(await panel.locator('.nc-assignment-selected').filter({hasText:workTitle}).count());
   assert.equal(await panel.getByRole('button',{name:'新建阅读条目',exact:true}).getAttribute('aria-pressed'),'true');
   await finishImport(panel,1);records=await recordsUntil(value=>value.documents.length===4,'new content added');assert.equal(records.works.length,1);assert.equal(records.units.length,3);
   checks.push('作品详情添加内容默认归入当前作品，并创建新阅读条目');
+  await clickAction(unitCard(firstUnit),'标记未读');
+  await unitCard(firstUnit).getByRole('button',{name:'开始阅读',exact:true}).click();await assertReader(first.id);await backFromReader();
+  await until(async()=>await unitCard(firstUnit).locator('.nc-content-read').getAttribute('data-state')==='reading','reading badge follows saved position');
+  assert.equal(await unitCard(secondUnit).locator('.nc-content-read').getAttribute('data-state'),'read');
+  const newUnit=records.units.find(unit=>unit.id!==firstUnit&&unit.id!==secondUnit);
+  assert.equal(await unitCard(newUnit.id).locator('.nc-content-read').getAttribute('data-state'),'unread');
+  await screenshot('reading-status-badges');
 
   stage='narrow screen and refresh';
   await page.setViewportSize({width:390,height:844});
   assert(await page.evaluate(()=>{const header=document.querySelector('.nc-app-header'),nav=header?.querySelector('nav');return !!header&&!!nav&&nav.getBoundingClientRect().bottom<=header.getBoundingClientRect().bottom+1;}),'narrow header must contain its navigation without overlapping content');
+  await unitCard(firstUnit).click({button:'right'});bounds=await page.getByRole('menu').boundingBox();assert(bounds.x>=0&&bounds.x+bounds.width<=390);await screenshot('context-menu-narrow');await page.keyboard.press('Escape');
+  const touchCover=unitCard(firstUnit).locator('.nc-content-cover');await touchCover.scrollIntoViewIfNeeded();
+  const touchBounds=await touchCover.boundingBox();
+  await touchCover.dispatchEvent('pointerdown',{pointerType:'touch',clientX:touchBounds.x+30,clientY:touchBounds.y+30});
+  await page.getByRole('menu').waitFor();await touchCover.dispatchEvent('pointerup',{pointerType:'touch'});await touchCover.dispatchEvent('click');
+  assert.equal(await dialog('版本与来源').count(),0,'long press must not also activate the cover');await page.keyboard.press('Escape');
   await screenshot('work-detail-narrow');assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'narrow work detail must not overflow');
-  await page.getByRole('button',{name:'编辑作品',exact:true}).click();await screenshot('work-editor-narrow');
+  await clickAction(page.locator('.nc-work-primary-actions'),'编辑作品');await screenshot('work-editor-narrow');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'narrow editor must not overflow');
   await dialog('编辑作品').getByRole('button',{name:'取消',exact:true}).click();
   await page.reload();await openWork(workTitle);records=await snapshot();
@@ -276,20 +322,52 @@ try{
   const targetId='fixture-cross-page-target',targetTitle='跨页目标作品 · 合成';
   await page.evaluate(async({targetId,targetTitle})=>{
     const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-sources-v1-catalog');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-    try{await new Promise((resolve,reject)=>{const transaction=db.transaction('works','readwrite'),store=transaction.objectStore('works');for(let index=0;index<50;index++)store.put({id:index===0?targetId:'fixture-empty-work-'+index,title:index===0?targetTitle:'分页占位作品 '+String(index).padStart(2,'0'),createdAt:1,updatedAt:index===0?1:Date.now()+index,documentCount:0});transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error);transaction.onabort=()=>reject(transaction.error);});}finally{db.close();}
+    try{await new Promise((resolve,reject)=>{const transaction=db.transaction('works','readwrite'),store=transaction.objectStore('works');for(let index=0;index<1000;index++)store.put({id:index===0?targetId:'fixture-empty-work-'+index,title:index===0?targetTitle:'分页占位作品 '+String(index).padStart(2,'0'),createdAt:1,updatedAt:index===0?1:Date.now()+index,documentCount:0});transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error);transaction.onabort=()=>reject(transaction.error);});}finally{db.close();}
   },{targetId,targetTitle});
   await page.reload();await page.getByRole('heading',{name:'我的漫画',exact:true}).waitFor();
-  await page.getByRole('navigation',{name:'书架分页'}).getByRole('button',{name:'下一页',exact:true}).click();
-  await openWork(workTitle);await page.getByRole('button',{name:'编辑作品',exact:true}).click();editor=dialog('编辑作品');
-  await editor.getByRole('textbox',{name:'作品简介（选填）',exact:true}).fill('第二页编辑后仍留在作品详情。');
+  await until(async()=>await page.locator('.nc-shelf-count').innerText()==='1001','full library count');
+  assert.equal(await page.getByRole('navigation',{name:'书架分页'}).count(),0);
+  assert.equal(await page.locator('.nc-library select').count(),0);
+  assert(await page.locator('.nc-book').count()<50,'only nearby shelf cards are mounted');
+  metrics.shelfWorks=1001;metrics.cardsAtTop=await page.locator('.nc-book').count();
+  const counter=await page.locator('.nc-shelf-count').boundingBox();assert(counter.width>46,'four digit count expands the avatar badge');
+  const toolbar=await page.locator('.nc-shelf-tools').boundingBox(),sortControl=await page.getByRole('combobox',{name:'作品排序'}).boundingBox();assert(Math.abs(toolbar.x+toolbar.width-sortControl.x-sortControl.width)<2,'sort is at the far right');
+  await screenshot('shelf-lazy-top');
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+  await until(async()=>await page.getByRole('button',{name:'打开作品 '+workTitle,exact:true}).count()===1,'lazy work near the end');
+  assert(await page.locator('.nc-book').count()<50,'scrolling does not accumulate cards');
+  metrics.cardsAtEnd=await page.locator('.nc-book').count();
+  await page.getByRole('button',{name:'打开作品 '+workTitle,exact:true}).scrollIntoViewIfNeeded();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const savedScroll=await page.evaluate(()=>scrollY);
+  await openWork(workTitle);await page.getByRole('button',{name:'← 我的漫画',exact:true}).click();
+  await until(async()=>Math.abs(await page.evaluate(()=>scrollY)-savedScroll)<3,'shelf restores its scroll position').catch(async error=>{throw Error(error.message+JSON.stringify({savedScroll,current:await page.evaluate(()=>({scroll:scrollY,height:document.documentElement.scrollHeight,grid:document.querySelector('.nc-shelf-grid')?.getAttribute('style')}))}));});
+  await screenshot('shelf-lazy-bottom');
+
+  await openWork(workTitle);await clickAction(page.locator('.nc-work-primary-actions'),'编辑作品');editor=dialog('编辑作品');
+  await editor.getByRole('textbox',{name:'作品简介（选填）',exact:true}).fill('远端窗口编辑后仍留在作品详情。');
   await editor.getByRole('button',{name:'保存修改',exact:true}).click();await editor.waitFor({state:'hidden'});
   await page.getByRole('heading',{name:workTitle,level:1,exact:true}).waitFor();
-  await recordsUntil(value=>value.works.find(work=>work.id===workId).description==='第二页编辑后仍留在作品详情。','off-page edit remains in details');
-  checks.push('从书架第 2 页编辑作品导致排序变化后，作品详情保持打开');
+  await recordsUntil(value=>value.works.find(work=>work.id===workId).description==='远端窗口编辑后仍留在作品详情。','off-page edit remains in details');
+  checks.push('千部作品的虚拟书架只挂载邻近卡片，返回恢复滚动；窗口外作品编辑后详情保持打开');
   await page.getByRole('button',{name:'← 我的漫画',exact:true}).click();
-  await page.getByRole('navigation',{name:'书架分页'}).getByRole('button',{name:'上一页',exact:true}).click();
+  await page.evaluate(()=>window.scrollTo(0,0));
   await page.getByRole('heading',{name:'我的漫画',exact:true}).waitFor();
-  await count(page.locator('.nc-shelf-grid > .nc-book'),48);
+  await until(async()=>await page.locator('.nc-book').count()>0&&await page.locator('.nc-book').count()<50,'bounded shelf cards');
+  await selectOption(page.getByRole('combobox',{name:'作品排序'}),'title');
+  await page.getByRole('searchbox',{name:'搜索书架作品',exact:true}).fill(targetTitle);await count(page.locator('.nc-book'),1);
+  assert(await page.getByRole('button',{name:'打开作品 '+targetTitle,exact:true}).isVisible(),'search covers the full library');
+  await page.getByRole('searchbox',{name:'搜索书架作品',exact:true}).fill('');await selectOption(page.getByRole('combobox',{name:'作品排序'}),'updated');
+  await until(async()=>await page.getByRole('button',{name:'打开作品 '+targetTitle,exact:true}).count()===0,'sort resets the lazy window');
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));
+  await until(async()=>await page.locator('.nc-book').count()<25,'narrow shelf window');
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  metrics.cardsOnNarrowScreen=await page.locator('.nc-book').count();
+  await screenshot('shelf-narrow');await page.getByRole('combobox',{name:'作品排序'}).click();
+  const sortBounds=await page.getByRole('listbox').filter({visible:true}).evaluate(element=>({right:element.getBoundingClientRect().right,viewport:Math.min(document.documentElement.clientWidth,document.documentElement.getBoundingClientRect().width)}));
+  assert(sortBounds.right<=sortBounds.viewport-8,'rightmost dropdown leaves room for the scrollbar gutter');
+  await screenshot('shelf-sort-narrow');await page.keyboard.press('Escape');
+  await page.setViewportSize({width:1440,height:1000});
   assert.equal(await page.getByRole('button',{name:'打开作品 '+targetTitle,exact:true}).count(),0,'target must be outside first shelf page');
   await page.getByRole('button',{name:'导入漫画',exact:true}).click();panel=await sourceFiles([files[4]]);
   await panel.getByRole('button',{name:'加入已有作品',exact:true}).click();
@@ -297,14 +375,46 @@ try{
   await panel.locator('.nc-assignment-results').getByRole('button',{name:new RegExp(targetTitle)}).click();
   await screenshot('import-cross-page-work');await finishImport(panel,1);
   records=await recordsUntil(value=>value.documents.length===5,'cross-page work import');
-  const crossDocument=records.documents.find(value=>value.title.includes('05-跨页作品'));assert(crossDocument);assert.equal(records.units.find(value=>value.id===crossDocument.unitId).workId,targetId);assert.equal(records.works.length,51);
-  checks.push('隔离目录添加 50 个空作品后，导入全库搜索能选择书架首页之外的作品并正确归属');
+  const crossDocument=records.documents.find(value=>value.title.includes('05-跨页作品'));assert(crossDocument);assert.equal(records.units.find(value=>value.id===crossDocument.unitId).workId,targetId);assert.equal(records.works.length,1001);
+  checks.push('隔离目录添加 1000 个空作品后，首页和导入全库搜索、排序有效，四位数徽章自适应宽度');
+
+  stage='multiple source badges and failed metadata';
+  // Presentation-only source fixture in this run's isolated catalog; no website is accessed.
+  await page.evaluate(async({documentId})=>{
+    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-sources-v1-catalog');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    try{await new Promise((resolve,reject)=>{
+      const tx=db.transaction(['documents','bindings','connections'],'readwrite');
+      const request=tx.objectStore('documents').get(documentId);
+      request.onsuccess=()=>{const doc=request.result;tx.objectStore('documents').put({...doc,indexState:'failed',error:'合成目录失败',coverPageId:undefined});
+        tx.objectStore('connections').put({id:'fixture-website',provider:'website',displayName:'不应显示的作品名称',status:'connected',generation:1,createdAt:1,updatedAt:1});
+        tx.objectStore('bindings').put({id:doc.sourceBindingId,connectionId:'fixture-website',providerItemId:doc.id,locator:{url:'https://xkcd.com/1/'},generation:1,createdAt:1,updatedAt:1});};
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+    });}finally{db.close();}
+  },{documentId:alternate.id});
+  await page.reload();
+  await page.getByRole('searchbox',{name:'搜索书架作品',exact:true}).fill(workTitle);
+  const shelfCard=page.locator('.nc-book').filter({has:page.getByRole('button',{name:'打开作品 '+workTitle,exact:true})});
+  await until(async()=>await shelfCard.locator('.nc-source-tag').innerText()==='2 个来源','multiple sources on shelf');
+  assert.deepEqual((await shelfCard.locator('.nc-source-tag').getAttribute('title')).split(' · ').sort(),['本地文件','xkcd'].sort());
+  await screenshot('shelf-sources');
+  await clickAction(shelfCard,'编辑作品');await dialog('编辑作品').getByRole('button',{name:'取消',exact:true}).click();
+  assert.equal(await page.locator('.nc-work-stats .nc-source-tag').innerText(),'2 个来源');
+  assert.equal(await unitCard(secondUnit).locator('.nc-source-tag').innerText(),'2 个来源');
+  assert.equal(await unitCard(firstUnit).locator('.nc-source-tag').innerText(),'本地文件');
+  await openVersions(secondUnit);assert(await versionRow(alternate.id).getByText('xkcd · 需要恢复目录',{exact:true}).isVisible());
+  assert(await versionRow(alternate.id).getByText('合成目录失败',{exact:true}).isVisible());
+  await dialog('版本与来源').getByRole('button',{name:'关闭',exact:true}).click();
+  await screenshot('detail-sources');
+  await page.getByRole('button',{name:'← 我的漫画',exact:true}).click();await clickAction(shelfCard,'移除作品');
+  await dialog('移除作品').getByRole('button',{name:'取消',exact:true}).click();
+  records=await snapshot();assert(records.works.some(work=>work.id===workId),'cancel removal must preserve the work');
+  checks.push('作品与条目按来源去重显示名称或 2 个来源，来源名称取站点定义；失败版本保留原因及恢复入口；书架右键编辑与取消移除可用');
   assert.deepEqual(errors,[],'browser page errors');
 }catch(error){
   failure={stage,message:error.message,stack:error.stack};
   if(page)await screenshot('failure').catch(()=>{});
 }finally{
-  const result={startedAt,finishedAt:new Date().toISOString(),browser:context.browser()?.version(),extension:true,manifestSha256:createHash('sha256').update(manifest).digest('hex'),profile:'fresh isolated profile',fixture:'generated PNG pages in distinct CBZ archives; 50 synthetic empty works for pagination',status:failure?'failed':'passed',checks,errors,consoleErrors,...(failure?{failure}:{})};
+  const result={startedAt,finishedAt:new Date().toISOString(),browser:context.browser()?.version(),extension:true,manifestSha256:createHash('sha256').update(manifest).digest('hex'),profile:'fresh isolated profile',fixture:'generated PNG pages in distinct CBZ archives; 1000 synthetic empty works for lazy shelf loading',status:failure?'failed':'passed',checks,metrics,errors,consoleErrors,...(failure?{failure}:{})};
   await writeFile(path.join(output,'results.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify({output,...result},null,2));
   await context.close();

@@ -11,6 +11,7 @@ import { downloadStore } from '../../storage/downloads';
 import type { LibraryViewModel } from './types';
 import { mergeJobs } from '../../reader/jobs';
 import {markDocumentRead, preferredDocument, updateWork} from './work-management';
+import {withSourceLabels} from './source-labels';
 export {preferredDocument, continueDocument} from './work-management';
 
 type TranslationPayload = Pick<Page,'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
@@ -19,7 +20,12 @@ const payload = (page: Page): TranslationPayload => ({ownerId:page.ownerId,apiOr
 
 export async function listLibrary(offset=0,limit=48):Promise<LibraryViewModel>{
   const values=await catalog.list('works',{index:'updatedAt',direction:'prev',offset,limit:limit+1});
-  const works=values.slice(0,limit),units=(await Promise.all(works.map(w=>catalog.listUnits(w.id)))).flat();
+  return {...await loadShelfCards(values.slice(0,limit)),nextOffset:values.length>limit?offset+limit:undefined};
+}
+/** Global title index supports sorting/search; card details are requested only by the visible window. */
+export async function listShelfIndex():Promise<LibraryViewModel>{return {works:await catalog.workSummaries(),units:[],documents:[]};}
+export async function loadShelfCards(works:Work[]):Promise<LibraryViewModel>{
+  const units=(await metadataBatch(works,w=>catalog.listUnits(w.id))).flat();
   const documents=(await Promise.all(units.map(u=>catalog.listDocuments(u.id)))).flat();
   const positions=(await Promise.all(works.map(work=>catalog.list('positions',{index:'workId',range:work.id,limit:Number.MAX_SAFE_INTEGER})))).flat();
   const loaded=new Set(documents.map(document=>document.id)),unitIds=new Set(units.map(unit=>unit.id));
@@ -42,7 +48,14 @@ export async function listLibrary(offset=0,limit=48):Promise<LibraryViewModel>{
     for(const position of recent)if(await includeReference(position.documentId,work.id,{revisionId:position.revisionId}))break;
   });
   await metadataBatch(units,async unit=>{if(unit.preferredDocumentId)await includeReference(unit.preferredDocumentId,unit.workId,{unitId:unit.id});});
-  return {works,units,documents,positions,nextOffset:values.length>limit?offset+limit:undefined};
+  return withSourceLabels({works,units,documents,positions});
+}
+/** Catalog import state is independent of the shelf's mounted card window. */
+export async function importedCatalogEntries(ids:string[]):Promise<string[]>{
+  return (await metadataBatch(ids,async id=>{
+    const [document]=await catalog.list('documents',{index:'sourceKey',range:'website:'+id,limit:1});
+    return document?.sourceEntryId===id?[id]:[];
+  })).flat();
 }
 async function metadataBatch<T,U>(values:T[],read:(value:T)=>Promise<U>):Promise<U[]>{
   const result:U[]=[];
@@ -61,11 +74,7 @@ async function workMetadata(workId:string):Promise<LibraryViewModel|undefined>{
 /** Complete metadata for one work; document pages and source bytes remain lazy. */
 export async function loadWorkDetails(workId:string):Promise<LibraryViewModel|undefined>{
   const details=await workMetadata(workId);if(!details)return undefined;
-  const bindings=await metadataBatch([...new Set(details.documents.map(document=>document.sourceBindingId))],id=>catalog.get('bindings',id));
-  const connections=await metadataBatch([...new Set(bindings.flatMap(binding=>binding?[binding.connectionId]:[]))],id=>catalog.get('connections',id));
-  const connectionLabels=new Map(connections.flatMap(connection=>connection?[[connection.id,connection.displayName] as const]:[]));
-  const bindingLabels=new Map(bindings.flatMap(binding=>binding&&connectionLabels.has(binding.connectionId)?[[binding.id,connectionLabels.get(binding.connectionId)!] as const]:[]));
-  return {...details,sourceLabels:Object.fromEntries(details.documents.flatMap(document=>bindingLabels.has(document.sourceBindingId)?[[document.id,bindingLabels.get(document.sourceBindingId)!]]:[]))};
+  return withSourceLabels(details,true);
 }
 const searchTerm=(value:string)=>value.trim().normalize('NFKC').toLocaleLowerCase();
 function searchPage(offset:number,limit:number){return {offset:Number.isFinite(offset)?Math.max(0,Math.floor(offset)):0,limit:Number.isFinite(limit)?Math.max(1,Math.min(100,Math.floor(limit))):30};}

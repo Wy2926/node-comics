@@ -1,0 +1,4 @@
+.nc-context-menu{position:fixed;inset:auto;margin:0;min-width:min(190px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;padding:6px;border:var(--comic-border,1px solid var(--line));border-radius:var(--comic-control-radius,10px);box-shadow:var(--comic-shadow,var(--shadow));background:var(--surface);color:var(--ink);z-index:100}
+.nc-context-menu>button{display:block;width:100%;padding:11px 14px;text-align:left;border-radius:5px;font-size:.85rem;line-height:1.4}
+.nc-context-menu>button:is(:hover,:focus-visible){background:var(--accent-soft);outline:none}
+.nc-context-menu>button:disabled{opacity:.45;cursor:default}

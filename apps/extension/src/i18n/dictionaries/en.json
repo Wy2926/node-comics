@@ -1667,5 +1667,10 @@
   "导入内容将建立新的阅读条目。": "Imported content will create new reading entries.",
   "请先完成或停止当前导入，再添加新的内容。": "Finish or stop the current import before adding more content.",
   "更多 {0} 操作": "More actions for {0}",
-  "更多版本操作": "More version actions"
+  "更多版本操作": "More version actions",
+  "{0} 个来源": "{0} sources",
+  "更多": "More",
+  "来源": "Source",
+  "版本": "Versions",
+  "作品排序": "Sort works"
 }

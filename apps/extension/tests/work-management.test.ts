@@ -1,9 +1,10 @@
 import 'fake-indexeddb/auto';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {catalog, type CatalogWrite} from '../src/comics/repositories';
 import type {Document, ReadingPosition, ReadingUnit, Work} from '../src/comics/domain';
-import {continueDocument, getReadingUnit, getWork, listLibrary, listWorkUnits, loadDocument, loadWorkDetails, markRead, preferredDocument, readerSequence, removeDocument, searchWorks, searchWorkUnits} from '../src/comics/application/library-service';
+import {continueDocument, getReadingUnit, getWork, importedCatalogEntries, listLibrary, listShelfIndex, listWorkUnits, loadDocument, loadShelfCards, loadWorkDetails, markRead, preferredDocument, readerSequence, removeDocument, searchWorks, searchWorkUnits} from '../src/comics/application/library-service';
 import {moveDocument, reorderReadingUnits, setPreferredDocument, setUnitRead, setWorkCover, updateDocument, updateReadingUnit, updateWork} from '../src/comics/application/work-management';
+import {registerSourceDriver} from '../src/comics/sources/registry';
 
 async function fixture(counts = [2, 1, 1]) {
   const prefix = crypto.randomUUID(), now = Date.now();
@@ -30,6 +31,60 @@ const position = (work: Work, document: Document, updatedAt: number): ReadingPos
 });
 
 describe('work metadata and relationship management', () => {
+
+  it('loads a lightweight global index before reading only requested shelf cards', async () => {
+    const visible=await fixture([2]),hidden=await fixture([3]);
+    await updateWork(hidden.work.id,{title:'Offscreen work',description:'long description '.repeat(150),aliases:['Globally searchable']});
+    const units=vi.spyOn(catalog,'listUnits'),documents=vi.spyOn(catalog,'listDocuments'),pages=vi.spyOn(catalog,'listPages');
+    try{
+      const index=await listShelfIndex(),offscreen=index.works.find(work=>work.id===hidden.work.id)!;
+      expect(offscreen.title).toBe('Offscreen work');expect(offscreen.aliases).toEqual(['Globally searchable']);expect(offscreen.description).toBeUndefined();
+      expect(index.units).toEqual([]);expect(index.documents).toEqual([]);
+      expect(units).not.toHaveBeenCalled();expect(documents).not.toHaveBeenCalled();expect(pages).not.toHaveBeenCalled();
+      const cards=await loadShelfCards([visible.work]);
+      expect(cards.works.map(work=>work.id)).toEqual([visible.work.id]);expect(cards.documents).toHaveLength(2);
+      expect(units.mock.calls.map(([workId])=>workId)).toEqual([visible.work.id]);expect(pages).not.toHaveBeenCalled();
+    }finally{units.mockRestore();documents.mockRestore();pages.mockRestore();}
+  });
+
+  it('finds imported website entries independently of the mounted shelf window', async () => {
+    const {documents}=await fixture([1]),entry=crypto.randomUUID();
+    await catalog.patch('documents',documents[0].id,{sourceKey:'website:'+entry,sourceEntryId:entry});
+    expect(await importedCatalogEntries([entry,'missing-entry'])).toEqual([entry]);
+    await removeDocument(documents[0].id);
+    expect(await importedCatalogEntries([entry])).toEqual([]);
+  });
+
+  it('uses registered source names and counts appended sources beyond the shelf version limit', async () => {
+    const {work, units, documents}=await fixture([101]);
+    const unregister=registerSourceDriver({id:'fixture',label:'Extension source',cachePages:false,cacheRanges:false,async open(){throw Error('Metadata must not open source bytes');}});
+    try{
+      await catalog.put('connections',{id:work.id+':connection',provider:'fixture',displayName:'Private account name',status:'offline',generation:1,createdAt:1,updatedAt:1});
+      const firstPage=await catalog.listDocuments(units[0].id),omitted=documents.find(doc=>!firstPage.some(first=>first.id===doc.id))!;
+      await catalog.put('connections',{id:work.id+':website',provider:'website',displayName:'Comic title, not source name',status:'connected',generation:1,createdAt:1,updatedAt:1});
+      const binding=(await catalog.get('bindings',omitted.sourceBindingId))!;
+      await catalog.put('bindings',{...binding,connectionId:work.id+':website',locator:{url:'https://xkcd.com/1/'}});
+      const shelf=await listLibrary(0,100),details=(await loadWorkDetails(work.id))!;
+      expect(shelf.documents.some(doc=>doc.id===omitted.id)).toBe(false);
+      expect(shelf.workSources?.[work.id]).toEqual(expect.arrayContaining([{id:'fixture',label:'Extension source'},{id:'website:xkcd',label:'xkcd'}]));
+      expect(shelf.workSources?.[work.id]).toHaveLength(2);
+      expect(details.workSources?.[work.id]).toEqual(shelf.workSources?.[work.id]);
+      expect(details.documentSources?.[omitted.id]).toEqual({id:'website:xkcd',label:'xkcd'});
+      await removeDocument(omitted.id);
+      expect((await listLibrary(0,100)).workSources?.[work.id]).toEqual([{id:'fixture',label:'Extension source'}]);
+    }finally{unregister();}
+  });
+
+  it('keeps generic websites distinct while grouping multiple versions from one site', async () => {
+    const {work,documents}=await fixture([3]);
+    await catalog.put('connections',{id:work.id+':connection',provider:'website',displayName:'generic',status:'connected',generation:1,createdAt:1,updatedAt:1});
+    for(const [index,doc] of documents.entries()){
+      const binding=(await catalog.get('bindings',doc.sourceBindingId))!;
+      await catalog.put('bindings',{...binding,locator:{url:`https://${index===2?'second':'first'}.example/chapter/${index}`}});
+    }
+    const details=(await loadWorkDetails(work.id))!;
+    expect(details.workSources?.[work.id]).toEqual([{id:'website:first.example',label:'first.example'},{id:'website:second.example',label:'second.example'}]);
+  });
   it('normalizes editable metadata and preserves concurrent edits and source identity', async () => {
     const {work, units, documents} = await fixture();
     await Promise.all([updateWork(work.id, {title: ' Renamed ', aliases: [' Alias ', '', 'Alias']}), updateWork(work.id, {description: ' About this book ', creators: [' Author ', 'Author']})]);
@@ -170,8 +225,8 @@ describe('document preference, continuation and metadata search', () => {
     expect(details?.works.map(value => value.id)).toEqual([work.id]);
     expect(details?.units).toHaveLength(1001); expect(details?.documents).toHaveLength(1101);
     expect(details?.documents.some(value => value.id === foreign.documents[0].id)).toBe(false);
-    expect(Object.keys(details?.sourceLabels ?? {})).toHaveLength(documents.length);
-    expect(details?.sourceLabels?.[current.id]).toBe('Test library source');
+    expect(Object.keys(details?.documentSources ?? {})).toHaveLength(documents.length);
+    expect(details?.documentSources?.[current.id]?.label).toBe('fixture');
     expect(details?.positions?.map(value => value.documentId)).toEqual([current.id]);
     expect(continueDocument(work.id, details!)?.id).toBe(current.id);
     const shelf = await listLibrary(0, 100);

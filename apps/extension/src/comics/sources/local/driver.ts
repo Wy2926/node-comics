@@ -1,8 +1,9 @@
 import {openContainer} from './index';
 import type {FileSourceDriver} from '../contracts';
+import {msg} from '../../../i18n/runtime';
 
 export const localSourceDriver: FileSourceDriver = {
-  id: 'local', label: '本地文件', cachePages: false, cacheRanges: false,
+  id: 'local', get label(){return msg('本地文件');}, cachePages: false, cacheRanges: false,
   async open({revision, containerId, signal}) {
     signal?.throwIfAborted();
     const id = containerId ?? revision.containerId;
