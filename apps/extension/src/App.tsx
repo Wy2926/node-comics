@@ -23,7 +23,7 @@ import { Reader } from './reader/Reader';
 import {ComicDirectory} from './reader/ComicDirectory';
 import { readingViewKey } from './reader/view';
 import { API_BASE, API_ORIGIN } from './service';
-import { discoverCatalog, copyOrigins, type PageManifest } from './sources';
+import { discoverCatalog, copyOrigins, inExtension, type PageManifest } from './sources';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import { type Capabilities, type Entitlements, type ReadingEntry, type Settings } from './types';
 import { AccountPage, type AccountTab } from './ui/Account';
@@ -110,12 +110,19 @@ export function App(){
  async function exportCurrent(){if(!currentId)return;const entry=await getEntry(currentId);if(entry)setExporting(entry);}
  useEffect(()=>{localImport.activate();void initializeSources().then(reloadLibrary).catch(e=>setError(e.message));return()=>localImport.dispose();},[localImport]);
  useEffect(()=>{void reloadLibrary().catch(e=>setError(e.message));},[reloadLibrary]);
+ useEffect(()=>{if(inExtension())void chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}).catch(()=>{});},[]);
  useEffect(()=>subscribeLibrary(change=>{
    if(['comics','entries','connections'].includes(change.table))void reloadLibrary().catch(e=>setError(e.message));
    const id=currentRef.current;
+   if(change.table==='catalogs'&&id){
+     const request=readingEpoch.current;
+     void readerSequence(id,accountScope).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
+       setDirectory(result.directory);setCopies(previous=>result.copies.map(copy=>{const old=previous.find(old=>old.id===copy.id&&old.contentId===copy.contentId);return old?{...old,title:copy.title,sourceUrl:copy.sourceUrl}:copy;}));
+     }}).catch(()=>{});
+   }
    if(change.table==='entries'&&id&&change.ids.includes(id)){
      const request=readingEpoch.current,refresh=++documentRefreshEpoch.current,isCurrent=()=>request===readingEpoch.current&&refresh===documentRefreshEpoch.current&&currentRef.current===id&&api.isCurrent();
-     void readEntry(id,accountScope).then(copy=>{if(isCurrent()){if(copiesRef.current.find(c=>c.id===copy.id)?.contentId!==copy.contentId){setNavigationKey(n=>n+1);notify(msg('来源内容已变化，已回到第一页。'));}setCopies(values=>values.map(c=>c.id===copy.id?copy:c));}}).catch(()=>{if(isCurrent())leaveReader();});
+     void readEntry(id,accountScope).then(copy=>{if(isCurrent()){if(copiesRef.current.find(c=>c.id===copy.id)?.contentId!==copy.contentId){setNavigationKey(n=>n+1);notify(msg('来源内容已变化，已回到第一页。'));}setCopies(values=>values.map(c=>c.id!==copy.id?c:c.contentId===copy.contentId&&copy.pages.some(page=>page.id===c.pageId)?{...copy,pageId:c.pageId,relativeOffset:c.relativeOffset,lastReadAt:c.lastReadAt,catalogUpdateRevision:c.catalogUpdateRevision}:copy));}}).catch(()=>{if(isCurrent())leaveReader();});
    }
  }),[reloadLibrary,api,leaveReader]);
  useEffect(()=>onMaterialized(identity=>setCopies(values=>values.map(c=>c.contentId===identity.contentId?{...c,pages:c.pages.map(p=>p.id===identity.pageId?{...p,imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime,width:identity.width,height:identity.height}:p)}:c))),[]);

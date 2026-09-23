@@ -1376,5 +1376,7 @@
   "反馈内容": "Your feedback",
   "请勿提交密码、登录凭据或私密图片。": "Do not submit passwords, login credentials or private images.",
   "提交反馈": "Send feedback",
-  "请填写反馈内容。": "Please enter your feedback."
+  "请填写反馈内容。": "Please enter your feedback.",
+  "有更新": "Updated",
+  "新增 {0} 个条目，目录已自动同步": "{0} new entries. Contents synced automatically."
 }

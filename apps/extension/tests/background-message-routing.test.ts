@@ -74,6 +74,7 @@ beforeEach(() => {
       sendMessage: async (message: unknown) => (await dispatch(message)).response,
     },
     storage: {local: storage(local), session: storage(session), onChanged: event()},
+    alarms: {get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:event()},
     contextMenus: {onClicked: event(), update: vi.fn(async () => {})},
     permissions: {onRemoved: event(), contains: vi.fn(async () => false)},
     scripting: {executeScript: vi.fn(async () => [])},
@@ -86,7 +87,7 @@ beforeEach(() => {
     },
   });
   background.main();
-  expect(listeners).toHaveLength(5); // Locale, inline theme, inline reader, website sources, Drive.
+  expect(listeners).toHaveLength(6); // Locale, inline theme, inline reader, website sources, Drive, catalog sync.
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
@@ -131,8 +132,8 @@ describe('production background listeners share the runtime message channel', ()
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]); expect(result.response).toBeUndefined();
   });
 
-  it('keeps extension-only source operations inaccessible to a website tab', async () => {
-    const result = await dispatch({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'}, {id: extensionId, url: 'https://example.test/book', frameId: 0, tab: {id: 1} as chrome.tabs.Tab});
+  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
+    const result = await dispatch({type, manifestId: 'book', pageId: 'page-1'}, {id: extensionId, url: 'https://example.test/book', frameId: 0, tab: {id: 1} as chrome.tabs.Tab});
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]);
   });
 });

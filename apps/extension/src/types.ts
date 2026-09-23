@@ -23,6 +23,7 @@ export interface ReadingEntry {
   sourceUrl?:string; sourceEntryId?:string; generation:number; createdAt:number; updatedAt:number;
   lastReadAt?:number; coverPageId?:string; pages:Page[]; pageId:string; relativeOffset:number;
   demo?:boolean; discoveryComplete:boolean; knownTotal?:number;
+  catalogUpdateRevision?:number;
 }
 export interface User { id: string; name: string; role: string; }
 export type QuotaKind='classic_daily'|'classic_unlimited'|'redraw_monthly'|'classic_grant'|'redraw_grant'|'unavailable';

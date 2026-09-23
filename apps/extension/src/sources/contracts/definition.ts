@@ -19,5 +19,7 @@ export interface SourceDefinition {
   sites?: readonly SourceSite[];
   identify(url: URL): SourceLocation | null;
   capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean };
+  /** Explicit opt-in: only adapters with a verified complete directory may refresh it automatically. */
+  catalogSync?: { intervalMinutes: number };
   installation: { requiredOrigins: readonly string[]; autoContentMatches: readonly string[] };
 }

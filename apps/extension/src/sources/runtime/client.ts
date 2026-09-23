@@ -2,9 +2,7 @@ import { msg } from '../../i18n/runtime';
 import type { SourceCatalog } from '../../comics/application/types';
 import type { PageManifest } from '../contracts/source';
 import { pollSourceDiscovery } from '../core/discovery';
-import { sameSource } from '../core/identity';
-import { definitions } from '../registry/definitions';
-const sameSourcePage = (a: string, b: string) => sameSource(a, b, definitions);
+import {readSourceCatalog} from './catalog-reader';
 export const inExtension = () => typeof chrome !== 'undefined' && !!chrome.runtime?.id;
 export async function sourceMessage<T>(message: unknown): Promise<T> {
   if (!inExtension()) throw Error(msg('网站采集需在已安装的浏览器插件中执行。'));
@@ -43,27 +41,7 @@ export async function discoverEntry(
 }
 export async function discoverCatalog(url: string): Promise<SourceCatalog> {
   if (!inExtension()) throw Error(msg('网站采集需在已安装的浏览器插件中执行。'));
-  const tab = await chrome.tabs.create({ url, active: false });
-  if (tab.id == null) throw Error(msg('无法打开来源页面。'));
-  try {
-    for (let i = 0; i < 40; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const t = await chrome.tabs.get(tab.id);
-      if (t.url !== url && t.status === 'complete' && (!t.url || !sameSourcePage(t.url, url)))
-        throw Error(msg('来源页面跳转，请回源核实。'));
-      if (t.status !== 'complete') continue;
-      const result = await sourceMessage<{ kind: string; catalog?: SourceCatalog }>({
-        type: 'NC_DISCOVER_TAB',
-        tabId: tab.id,
-      });
-      if (result.catalog?.complete) return result.catalog;
-    }
-    throw Error(msg('目录未完整加载，请打开来源页处理后重试。'));
-  } finally {
-    const current = await chrome.tabs.get(tab.id).catch(() => null);
-    if (current?.url && (current.url === url || sameSourcePage(current.url, url)))
-      await chrome.tabs.remove(tab.id);
-  }
+  return readSourceCatalog(url);
 }
 
 export async function discoverPage(url:string,signal:AbortSignal,onProgress:(manifest:PageManifest)=>Promise<void>,assertActive?:()=>Promise<void>) {

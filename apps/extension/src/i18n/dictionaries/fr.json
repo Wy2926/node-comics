@@ -1376,5 +1376,7 @@
   "反馈内容": "Votre retour",
   "请勿提交密码、登录凭据或私密图片。": "N’envoyez aucun mot de passe, identifiant de connexion ou image privée.",
   "提交反馈": "Envoyer mon avis",
-  "请填写反馈内容。": "Veuillez saisir votre retour."
+  "请填写反馈内容。": "Veuillez saisir votre retour.",
+  "有更新": "Nouveautés",
+  "新增 {0} 个条目，目录已自动同步": "{0} nouvelles entrées. Sommaire synchronisé automatiquement."
 }

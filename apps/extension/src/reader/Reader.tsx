@@ -17,6 +17,7 @@ import {FeedbackForm} from '../ui/Feedback';
 import {useChapterStream,pageKey,completeManifest} from './useChapterStream';
 import {ThumbnailDirectory} from './ThumbnailDirectory';
 import {ComicDirectory} from './ComicDirectory';
+import {acknowledgeCatalogUpdates} from '../comics/application/catalog-service';
 import type {ReadingDirectory} from '../comics/application/library-service';
 import {PageTranslationBar} from './PageTranslationBar';
 import {readReadingView,saveReadingView} from './view';
@@ -32,6 +33,7 @@ const root=useRef<HTMLDivElement>(null);const [viewportSize,setViewportSize]=use
 const page=copy.pages[Math.min(index,copy.pages.length-1)];const {mode,preference}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
 const scopeBase=`${userId??''}:${apiOrigin}:${settings.language}`;const scope=(p:Page,c=copy)=>`${scopeBase}:${pageKey(c,p.id)}`;
 const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;const shownJob=shown?.job;
+useEffect(()=>{if(shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowledgeCatalogUpdates(copy.comicId,copy.catalogUpdateRevision).catch(()=>{});},[!!shown,copy.comicId,copy.catalogUpdateRevision]);
 const streamPages=useMemo(()=>stream.flatMap(c=>c.pages.map(p=>({page:p,key:pageKey(c,p.id),entryId:c.id}))),[stream]);
 const decodedSet=useMemo(()=>{const set=new Set<string>();let pixels=0;const current=streamPages.findIndex(p=>p.key===pageKey(copy,page?.id??''));for(const delta of [0,1,-1,2,-2]){const item=streamPages[current+delta];if(!item||settings.layout==='single'&&delta!==0)continue;const pagePixels=item.page.width*item.page.height*(compare?2:1);if(pixels+pagePixels>32_000_000&&set.size)continue;set.add(item.key);pixels+=pagePixels;}return set;},[index,streamPages,settings.layout,compare,copy.id]);
 useEffect(()=>{setFeedback(undefined);},[copy.id]);

@@ -8,7 +8,7 @@
 
 公共层负责选择适配器、生命周期、消息校验、权限、资源登记、有限轮询和结果交付。阅读器、书库、翻译调度和后端不包含站点名称分支、域名、站点选择器或 URL 拼装规则。
 
-这次重构目标包含现有目录能力的解耦；不会因此新增任何站点的目录、付费内容获取或自动翻章功能。
+目录能力仍按站点提供。2026-09-23 增加 MangaCopy／拷贝漫画的自动目录同步与封面更新提示；不扩大其他站点的目录或付费内容获取范围。
 
 ## 3. 目录结构
 
@@ -126,6 +126,7 @@ interface SourceDefinition {
     catalog: boolean;
     completePageList: boolean;  // 能否在受管发现流程中补全清单
   };
+  catalogSync?: { intervalMinutes: number }; // 经确认支持完整目录更新的站点显式声明；当前为 720
   installation: {
     requiredOrigins: readonly string[];
     autoContentMatches: readonly string[];

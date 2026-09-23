@@ -15,6 +15,7 @@ import {sourcePageCache} from '../../storage/source-pages';
 import {sourceRangeCache} from '../../storage/source-ranges';
 import {thumbnailCache} from '../../storage/thumbnails';
 import {downloadStore} from '../../storage/downloads';
+import {reconcileCatalog} from './catalog-service';
 
 const digest = (value:string) => new Sha256().update(new TextEncoder().encode(value)).digest();
 export const stablePageId = (locator:unknown) => digest(JSON.stringify(locator));
@@ -139,19 +140,10 @@ async function websiteComic(url:string,title:string,resourceKey?:string) {
 export async function importCatalog(snapshot:SourceCatalogSnapshot):Promise<Comic> {
   return sourceLock(async()=>{
     const source=validateSourceCatalog(snapshot);requireWebsite(source.url,source.sourceId);
-    const comic=await websiteComic(source.url,source.title),now=Date.now();
+    const comic=await websiteComic(source.url,source.title);
     await catalog.mutate(['comics','entries','catalogs'],async tx=>{
       const current=await tx.get('comics',comic.id);if(!current)throw Error('漫画已移除。');
-      const existing=await tx.list('entries',{index:'comicId',range:comic.id,limit:10000});
-      const bySource=new Map(existing.map(entry=>[entry.sourceEntryId,entry])),entries:Entry[]=[];
-      for(const item of source.entries.filter(item=>!item.related)) {
-        const previous=bySource.get(item.id);
-        const entry:Entry=previous?{...previous,title:item.title,order:item.order,sequenceId:item.sequenceId,sourceUrl:item.url}:{id:crypto.randomUUID(),comicId:comic.id,title:item.title,order:item.order,sequenceId:item.sequenceId,sourceEntryId:item.id,sourceUrl:item.url,format:'website',contentId:crypto.randomUUID(),generation:1,indexState:'pending',createdAt:now,updatedAt:now};
-        await tx.put('entries',entry);entries.push(entry);
-      }
-      const defaultEntry=entries.find(entry=>entry.sourceEntryId===source.defaultEntryId)??(entries.length===1?entries[0]:undefined);
-      await tx.put('comics',{...current,title:source.title,startEntryId:defaultEntry?.id,sourceUrl:source.url});
-      await tx.put('catalogs',{...source,comicId:comic.id});
+      await reconcileCatalog(tx,current,source);
     });
     return (await catalog.get('comics',comic.id))!;
   });

@@ -15,7 +15,8 @@ it.each([false,true])('registers Firefox import without setAccessLevel and opens
   const catalog={url,sourceId:'mangacopy',id:'mangacopy:sample',title:'Sample',observedAt:1,complete:false,note:'',groups:[],entries:[]};
   const create=vi.fn(async(_properties:{url:string})=>({id:8})),set=vi.fn(async()=>{});
   vi.stubGlobal('chrome',{
-    runtime:{id:'test-extension',getURL:(path:string)=>'moz-extension://test'+path,onInstalled:{addListener:vi.fn()},onMessage:{addListener:(fn:typeof listeners[number])=>listeners.push(fn)}},
+    runtime:{id:'test-extension',getURL:(path:string)=>'moz-extension://test'+path,onInstalled:{addListener:vi.fn()},onStartup:{addListener:vi.fn()},onMessage:{addListener:(fn:typeof listeners[number])=>listeners.push(fn)}},
+    alarms:{get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:{addListener:vi.fn()}},
     storage:{local:{set},session:{get:async()=>({}),set:vi.fn(async()=>{}),remove:vi.fn(async()=>{})}},
     scripting:{executeScript:async()=>[]},
     contextMenus:{onClicked:{addListener:vi.fn()}},

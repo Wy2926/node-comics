@@ -34,6 +34,7 @@ function Popup({initialError=''}:{initialError?:string}){
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{
+  void chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}).catch(()=>{});
   void chrome.tabs.query({active:true,currentWindow:true}).then(([tab])=>{
    if(tab?.id==null||!tab.url||!['https:','http:'].includes(new URL(tab.url).protocol)){setSourceNotice(msg("请切换到普通漫画网页，再打开插件。"));return;}
    setSource(tab);setSourceNotice('');

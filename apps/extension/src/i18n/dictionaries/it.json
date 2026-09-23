@@ -1376,5 +1376,7 @@
   "反馈内容": "Il tuo feedback",
   "请勿提交密码、登录凭据或私密图片。": "Non inviare password, credenziali di accesso o immagini private.",
   "提交反馈": "Invia feedback",
-  "请填写反馈内容。": "Inserisci il tuo feedback."
+  "请填写反馈内容。": "Inserisci il tuo feedback.",
+  "有更新": "Aggiornato",
+  "新增 {0} 个条目，目录已自动同步": "{0} nuove voci. Indice sincronizzato automaticamente."
 }

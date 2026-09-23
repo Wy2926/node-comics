@@ -11,6 +11,8 @@ export interface Comic {
   startEntryId?: string; sourceName: string; sourceUrl?: string;
   lastPage?: number; lastPageCount?: number;
   cover?: { entryId: string; contentId: string; pageId: string };
+  catalogSync?: { nextCheckAt: number; lastAttemptAt?: number; lastSuccessAt?: number; lease?: string };
+  catalogUpdates?: { revision: number; seenRevision: number; count: number };
 }
 /** Source-owned navigation destination; a file has one implicit entry. */
 export interface Entry {
@@ -22,6 +24,8 @@ export interface Entry {
   knownTotal?: number; pageCount?: number; error?: string; coverPageId?: string;
   /** Current content only. There is no revision history or alternative document relation. */
   containerId?: string; sourceSnapshot?: Record<string, unknown>;
+  /** Retain reading data when the source removes a destination, but hide it from navigation. */
+  sourceRemoved?: boolean;
 }
 export interface SourceConnection {
   id: string; provider: string; accountId?: string; displayName: string;

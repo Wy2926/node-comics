@@ -1,9 +1,12 @@
 import {msg} from '../i18n/runtime';
-import {useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {comicDirectory,subscribeLibrary} from '../comics/application/library-service';
 import type {ReadingDirectory,DirectoryEntry,DirectoryGroup} from '../comics/application/library-service';
 import './directory.css';
 /** Source labels, nesting and repeated references are navigation only. */
-export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string)=>void;children?:ReactNode}){
+export function ComicDirectory({directory:input,index,pageCount,onNavigate,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string)=>void;children?:ReactNode}){
+ const [directory,setDirectory]=useState(input);
+ useEffect(()=>{let active=true;setDirectory(input);const refresh=()=>{if(input.comicId)void comicDirectory(input.comicId,input.entries.find(entry=>entry.current)?.id).then(value=>{if(active)setDirectory(value);}).catch(()=>{});};refresh();const stop=subscribeLibrary(change=>{if(change.table==='catalogs')refresh();});return()=>{active=false;stop();};},[input]);
  const [tab,setTab]=useState<'contents'|'pages'>(directory.entries.length===1&&pageCount?'pages':'contents'),[search,setSearch]=useState(''),[descending,setDescending]=useState(false),[limit,setLimit]=useState(200);
  const singleFile=!directory.sourceUrl&&directory.entries.length===1;
  const list=useRef<HTMLDivElement>(null),query=search.trim().toLocaleLowerCase();

@@ -34,6 +34,7 @@ export const definition: SourceDefinition = {
     { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg' },
   ],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
+  catalogSync: { intervalMinutes: 720 },
   installation: { requiredOrigins: MANGACOPY_PERMISSIONS, autoContentMatches: MANGACOPY_MATCHES },
   identify(url) {
     if (!isMangaCopyUrl(url.href)) return null;

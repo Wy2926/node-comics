@@ -16,9 +16,6 @@ html:has(.nc-library){scrollbar-gutter:stable}
 .nc-library-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
 .nc-library-card-actions>.button{flex:1;min-width:0;min-height:40px;font-size:.82rem}
 .nc-library-card-actions>.icon-button{flex:0 0 36px}
-.nc-cover-tag{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:4px 7px;border:1px solid #ffffff26;border-radius:6px;background:#172337dc;color:#fff;font-size:11px;font-weight:600;line-height:1.4;backdrop-filter:blur(8px)}
-.nc-cover-details{position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:38px 12px 12px;background:linear-gradient(transparent,#101c2cdd);color:#fff;text-align:left;pointer-events:none}
-.nc-cover-reading{font-size:11px;line-height:1.5;font-weight:500;text-shadow:0 1px 3px #0008}
 .nc-source-status{display:flex;justify-content:center;align-items:center;gap:16px;padding:8px 16px;background:var(--accent-soft);color:var(--ink);flex-shrink:0}
 .nc-source-status button{border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:8px;padding:6px 10px}
 .nc-export-options .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -28,7 +25,6 @@ html:has(.nc-library){scrollbar-gutter:stable}
  .nc-library .nc-books.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
  .nc-library-card-body{--card-title-size:1rem;padding:.75rem;gap:.5rem}
  .nc-library-card-actions{gap:6px}.nc-library-card-actions>.button{font-size:.75rem;padding:8px 6px}
- .nc-cover-tag{font-size:10px;padding:3px 5px}.nc-cover-details{padding:30px 9px 10px;gap:6px}.nc-cover-reading{font-size:10px}
  .nc-library .nc-search{flex-basis:100%;max-width:none}.nc-page-heading>.nc-inline{width:100%}.nc-page-heading>.nc-inline>.button{flex:1;white-space:nowrap}
 }
 @media(max-width:359px){.nc-library .nc-books.grid{grid-template-columns:minmax(0,1fr)}}
