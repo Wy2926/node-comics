@@ -113,14 +113,15 @@ describe('Drive metadata and authority', () => {
     await expect(fetchDriveMetadata(binding,'token',undefined,request)).rejects.toMatchObject({code:'download-forbidden'});
     await expect(fetchDriveMetadata(binding,'token',undefined,request)).rejects.toMatchObject({code:'unsupported-format'});
   });
-  it.each(['application/x-mobipocket-ebook', 'application/octet-stream'])('recognizes MOBI from verified metadata (%s)', async mimeType => {
+  it.each(['application/x-mobipocket-ebook', 'application/octet-stream', 'application/x-unknown'])('recognizes MOBI from verified metadata (%s)', async mimeType => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(metadata('17', {name: 'book.MOBI', mimeType}));
     expect(await fetchDriveMetadata(binding, 'token', undefined, request)).toMatchObject({format: 'mobi', name: 'book.MOBI', version: '17', size: 1000});
   });
   it.each([
     ['page.mobi', 'image/png'], ['shortcut.mobi', 'application/vnd.google-apps.shortcut'],
+    ['folder.mobi', 'application/vnd.google-apps.folder'],
     ['book.azw3', 'application/octet-stream'], ['book.rar', 'application/octet-stream'], ['page.png', 'application/octet-stream'],
-  ])('does not admit unrelated files through the binary MIME filter (%s)', async (name, mimeType) => {
+  ])('rejects unsupported selections even without picker MIME filtering (%s)', async (name, mimeType) => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(metadata('17', {name, mimeType}));
     await expect(fetchDriveMetadata(binding, 'token', undefined, request)).rejects.toMatchObject({code: 'unsupported-format'});
   });

@@ -17,7 +17,12 @@ async function page({deferSdk = false} = {}) {
   const pickers: {token: string; callback: (data: Message) => void; dispose: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn>}[] = [];
   const requestAccessToken = vi.fn();
   const mimeFilters: string[][] = [];
-  class DocsView { setMimeTypes(value:string) { if(value.includes("image/"))throw Error("Images are not selectable"); mimeFilters.push(value.split(',')); return this; } setIncludeFolders() { return this; } setSelectFolderEnabled() { return this; } }
+  const folderOptions: {include?: boolean; selectable?: boolean} = {};
+  class DocsView {
+    setMimeTypes(value: string) { mimeFilters.push(value.split(',')); return this; }
+    setIncludeFolders(value: boolean) { folderOptions.include = value; return this; }
+    setSelectFolderEnabled(value: boolean) { folderOptions.selectable = value; return this; }
+  }
   class PickerBuilder {
     private token = '';
     private callback!: (data: Message) => void;
@@ -43,7 +48,7 @@ async function page({deferSdk = false} = {}) {
   };
   if (!deferSdk) await loadSdk();
   const emit = (data: Message, patch = {}) => { for (const fn of listeners.get('message') ?? []) fn({source: window, origin, data: {nonce, ...data}, ...patch}); };
-  return {buttons, pickers, mimeFilters, requestAccessToken, storage, window, location, emit, loadSdk,
+  return {buttons, pickers, mimeFilters, folderOptions, requestAccessToken, storage, window, location, emit, loadSdk,
     authorize: (response: Message) => oauth.callback(response),
     advance: (milliseconds: number) => { now += milliseconds; },
     ready: (session?: Message, authMode = 'web') => emit({type: 'NC_DRIVE_READY', session, authMode}),
@@ -53,11 +58,11 @@ async function page({deferSdk = false} = {}) {
 }
 
 describe('Drive authorization page session reuse', () => {
-  it('includes MOBI and generic binary uploads in the picker while excluding images', async () => {
+  it('shows all MIME types and folders for navigation without allowing folder imports', async () => {
     const ui = await page(); ui.ready(ui.valid());
-    expect(ui.mimeFilters).toHaveLength(1);
-    expect(ui.mimeFilters[0]).toEqual(expect.arrayContaining(['application/zip', 'application/x-mobipocket-ebook', 'application/octet-stream']));
-    expect(ui.mimeFilters[0].some(mime => mime.startsWith('image/'))).toBe(false);
+    expect(ui.pickers).toHaveLength(1);
+    expect(ui.mimeFilters).toEqual([]);
+    expect(ui.folderOptions).toEqual({include: true, selectable: false});
   });
   it.each(['bridge-first', 'sdk-first'])('opens an existing session exactly once after both prerequisites are ready (%s)', async order => {
     const ui = await page({deferSdk: true});

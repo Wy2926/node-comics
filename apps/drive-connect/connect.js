@@ -74,9 +74,9 @@
       chooseFiles = () => {
         if (!validToken()) { fail(expiredText()); return; }
         busy = true; update(); status.textContent = `${connectedText()}，请在 Google Drive 中选择漫画文件。`;
-        // Binary uploads may have a generic MIME; the extension verifies the name,
-        // metadata and container bytes before publishing a comic.
-        const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(false).setSelectFolderEnabled(false).setMimeTypes('application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz,application/x-mobipocket-ebook,application/octet-stream');
+        // Allow folder navigation and unknown MIME types (including MOBI uploads).
+        // The extension verifies file metadata and container bytes before import.
+        const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(true).setSelectFolderEnabled(false);
         picker = new google.picker.PickerBuilder().setDeveloperKey(config.apiKey).setAppId(config.appId)
           .setOAuthToken(token.accessToken).setOrigin(location.origin)
           .enableFeature(google.picker.Feature.MULTISELECT_ENABLED).addView(view)
