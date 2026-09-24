@@ -4,7 +4,7 @@ export type {ComicFormat, DocumentSession, IndexedPage, RandomAccessSource} from
 
 export async function openDocument(format: ComicFormat | string, source: RandomAccessSource, signal?: AbortSignal): Promise<DocumentSession> {
   throwIfAborted(signal);
-  if(!source.snapshot.local&&format!=='cbz')throw new Error('此格式尚未通过云端范围读取验证，请下载后从本地导入。');
+  if(!source.snapshot.local&&!['cbz','mobi'].includes(format))throw new Error('此格式尚未通过云端范围读取验证，请下载后从本地导入。');
   if (format === 'pdf') return (await import('./pdf')).openPdfDocument(source,signal);
   if (!['cbz', 'cbr', 'mobi'].includes(format)) throw new Error('不支持此漫画格式。');
   // Production parsing runs off the UI thread. Direct drivers remain testable without Worker globals.

@@ -25,16 +25,16 @@ describe('Google Drive file source driver', () => {
     expect(await googleDriveDriver.listAccounts!()).toEqual([{id:'drive:account-1',provider:'google-drive',accountId:'account-1',displayName:'Alice',accountMetadata:{emailAddress:'reader@example.test'},status:'connected'}]);
     expect(client.chooseDriveFiles).not.toHaveBeenCalled();expect(client.openDriveSource).not.toHaveBeenCalled();
   });
-  it('maps verified selection into opaque source metadata with a real item ID distinct from its revision key', async () => {
+  it.each(['cbz', 'mobi'])('maps verified %s selection into opaque source metadata with a real item ID distinct from its revision key', async format => {
     const chosen = {account: {id: 'account-1', displayName: 'Alice'}, files: [
-      {...snapshot, name: 'Comic.cbz', mimeType: 'application/zip', format: 'cbz'},
+      {...snapshot, name: `Comic.${format}`, mimeType: 'application/octet-stream', format},
     ]};
     client.chooseDriveFiles.mockResolvedValue(chosen);
     const signal = new AbortController().signal;
     const result = await googleDriveDriver.select!(connection, signal);
     expect(client.chooseDriveFiles).toHaveBeenCalledWith('account-1', signal);
     expect(result.connection).toEqual({id: 'drive:account-1', provider: 'google-drive', accountId: 'account-1', displayName: 'Alice'});
-    expect(result.files[0]).toEqual({id: 'file-1', name: 'Comic.cbz', format: 'cbz', locator: snapshot, snapshot});
+    expect(result.files[0]).toEqual({id: 'file-1', name: `Comic.${format}`, format, locator: snapshot, snapshot});
     chosen.files[0].version = '18';
     expect(result.files[0].snapshot.version).toBe('17');
     expect(googleDriveDriver).toMatchObject({id: 'google-drive', label: 'Google Drive', cachePages: true, cacheRanges: true});
@@ -66,7 +66,7 @@ describe('Google Drive file source driver', () => {
     await expect(googleDriveDriver.select!(connection, during.signal)).rejects.toMatchObject({name: 'AbortError'});
   });
 
-  it.each(['cbz', 'zip'] as const)('opens %s from the frozen revision instead of the mutable binding locator', async format => {
+  it.each(['cbz', 'zip', 'mobi'] as const)('opens %s from the frozen revision instead of the mutable binding locator', async format => {
     const input = context(); input.format = format; input.signal = new AbortController().signal;
     const source = {snapshot: {identity: 'source'}, close: vi.fn()}; client.openDriveSource.mockResolvedValue(source);
     expect(await googleDriveDriver.open(input)).toBe(source);
@@ -76,7 +76,7 @@ describe('Google Drive file source driver', () => {
     input.sourceSnapshot!.version = '18'; expect(opened.version).toBe('17');
   });
 
-  it.each(['pdf', 'mobi', 'rar', 'cbr', 'website'] as const)('refuses remote %s before requesting credentials or bytes', async format => {
+  it.each(['pdf', 'rar', 'cbr', 'website'] as const)('refuses remote %s before requesting credentials or bytes', async format => {
     const input = context(); input.format = format;
     await expect(googleDriveDriver.open(input)).rejects.toMatchObject({code: 'unsupported-format'});
     expect(client.openDriveSource).not.toHaveBeenCalled();

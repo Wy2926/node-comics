@@ -16,7 +16,7 @@
 
 界面使用二次元漫画风：清晰文字、大封面、描边、纸面、硬阴影，四种强调色与亮暗主题共用[视觉令牌](POPUP_AND_THEME.md)。插件兼容与交互验收以桌面浏览器为目标，不新增窄屏适配要求。
 
-单来源身份、导入、卡片、更新提示与已读判定统一见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)。不支持散图导入、跨来源合并、资料／归属编辑或版本管理；本地支持未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF，Google Drive 仅 CBZ/ZIP，网站须专门适配。
+单来源身份、导入、卡片、更新提示与已读判定统一见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)。不支持散图导入、跨来源合并、资料／归属编辑或版本管理；本地支持未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF，Google Drive 支持 CBZ/ZIP、未加密 MOBI，网站须专门适配。
 
 ## 翻译体验
 

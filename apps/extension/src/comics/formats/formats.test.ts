@@ -1,13 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {BlobReader, Uint8ArrayWriter, ZipWriter} from '@zip.js/zip.js/index-native.js';
 import {openZipDocument} from './zip';
-import {openMobiDocument} from './mobi';
 import {openDocument, detectFormat} from './index';
 import {checkRange, type RandomAccessSource} from './contracts';
 
-function sourceFor(bytes: Uint8Array) {
+function sourceFor(bytes: Uint8Array, local = true) {
   const reads: {offset: number; length: number}[] = [];
-  const source: RandomAccessSource = {snapshot: {identity: 'fixture', version: 'v1', size: bytes.length, local: true},
+  const source: RandomAccessSource = {snapshot: {identity: 'fixture', version: 'v1', size: bytes.length, local},
     async readAt(offset, length, signal) { signal?.throwIfAborted(); checkRange(source, offset, length); reads.push({offset, length}); return bytes.slice(offset, offset + length); },
     async validate() { return 'unchanged'; }, async close() {},
   };
@@ -44,9 +43,10 @@ describe('page indexes separate from materialization', () => {
       await expect(session.materialize({...pages[0], locator: {entry: 'foreign.png'}})).rejects.toThrow('不属于');
     } finally { await session.close(); }
   });
-  it('MOBI indexes repeated body references without reading any image bytes', async () => {
-    const fixture = mobi(), {source, reads} = sourceFor(fixture.bytes), session = openMobiDocument(source);
+  it.each([true, false])('MOBI indexes repeated body references without reading any image bytes (local=%s)', async local => {
+    const fixture = mobi(), {source, reads} = sourceFor(fixture.bytes, local), session = await openDocument('mobi', source);
     try {
+      expect(session.capabilities).toMatchObject({access: 'random', remote: true});
       const pages = await session.index(); expect(pages.map(page => page.locator.record)).toEqual([3,2,3]);
       expect(pages.map(page => page.ordinal)).toEqual([0,1,2]);
       expect(new Set(pages.map(page=>JSON.stringify(page.locator))).size).toBe(3);
@@ -56,9 +56,37 @@ describe('page indexes separate from materialization', () => {
       expect(reads).toEqual([{offset: pages[2].locator.offset, length: pages[2].locator.length}]);
     } finally { await session.close(); }
   });
-  it('rejects DRM and malformed image references during indexing', async () => {
-    await expect(openMobiDocument(sourceFor(mobi([1],true).bytes).source).index()).rejects.toThrow('DRM');
-    await expect(openMobiDocument(sourceFor(mobi([99]).bytes).source).index()).rejects.toThrow('不存在');
+  it.each([true, false])('rejects DRM and malformed image references during indexing (local=%s)', async local => {
+    for (const [fixture, reason] of [[mobi([1],true), 'DRM'], [mobi([99]), '不存在']] as const) {
+      const session = await openDocument('mobi', sourceFor(fixture.bytes, local).source);
+      try { await expect(session.index()).rejects.toThrow(reason); } finally { await session.close(); }
+    }
+  });
+  it.each([
+    [0, 17480, 'HUFF/CDIC'], [36, 8, 'KF8'], [4, 16 * 1024 * 1024 + 1, '安全限制'],
+  ])('rejects unsupported or oversized remote MOBI before reading images (field=%s)', async (field, value, reason) => {
+    const fixture = mobi(), view = new DataView(fixture.bytes.buffer);
+    if (field === 0) view.setUint16(110 + field, value); else view.setUint32(110 + field, value);
+    const {source, reads} = sourceFor(fixture.bytes, false), session = await openDocument('mobi', source);
+    try {
+      await expect(session.index()).rejects.toThrow(reason);
+      expect(reads.every(read => read.offset + read.length <= fixture.imageStart)).toBe(true);
+    } finally { await session.close(); }
+  });
+  it('cancels remote MOBI page reads and refuses foreign locators', async () => {
+    const {source, reads} = sourceFor(mobi().bytes, false), session = await openDocument('mobi', source);
+    try {
+      const pages = await session.index(); reads.length = 0;
+      const controller = new AbortController(); controller.abort();
+      await expect(session.materialize(pages[0], controller.signal)).rejects.toMatchObject({name: 'AbortError'});
+      await expect(session.materialize({...pages[0], locator: {...pages[0].locator, offset: 0}})).rejects.toThrow('不属于');
+      expect(reads).toHaveLength(0);
+    } finally { await session.close(); }
+  });
+  it.each(['pdf', 'cbr', 'image'])('keeps unsupported remote formats closed (%s)', async format => {
+    const {source, reads} = sourceFor(png(100), false);
+    await expect(openDocument(format, source)).rejects.toThrow('云端范围读取');
+    expect(reads).toHaveLength(0);
   });
   it('rejects standalone images and respects cancellation before file reads',async()=>{
     const {source,reads}=sourceFor(png(100));await expect(openDocument('image',source)).rejects.toThrow('不支持');expect(detectFormat('a.png',png(100))).toBeUndefined();expect(detectFormat('a.cbz',png(100))).toBeUndefined();

@@ -23,7 +23,11 @@ const configured=process.env.TEST_DRIVE_CONNECT_URL??background.match(/https:\/\
 assert(configured&&background.includes(configured),'Build the extension with a configured HTTPS Drive connect URL.');
 const bridge=new URL(configured);assert.equal(bridge.protocol,'https:');assert.equal(bridge.port,'');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const original=await readFile(path.join(root,'artifacts/import-validation/pages.cbz'));
+const format=process.env.TEST_DRIVE_FORMAT??'cbz';assert(['cbz','mobi'].includes(format),'TEST_DRIVE_FORMAT must be cbz or mobi');
+const original=await readFile(path.join(root,`artifacts/import-validation/pages.${format}`));
+const protectedMobi=Buffer.from(original);
+if(format==='mobi')protectedMobi.writeUInt16BE(1,original.readUInt32BE(78)+12);
+const mimeType=format==='mobi'?'application/octet-stream':'application/zip';
 const sample=await readFile(path.join(root,'artifacts/import-validation/1.png')),dimensions=[sample.readUInt32BE(16),sample.readUInt32BE(20)];
 const fileChecks=new Map();
 const hosts=[bridge.hostname,'accounts.google.com','apis.google.com','www.googleapis.com'];
@@ -68,15 +72,16 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
       if(request.headers.authorization!=='Bearer '+token){stats.unauthorized++;json(response,{},401);return;}
       if(url.pathname==='/drive/v3/about'){stats.accountChecks++;json(response,{user:{permissionId:'fixture-account',displayName:'隔离测试 Drive',emailAddress:'reader@example.test'}});return;}
       const fileId=url.pathname.split('/').at(-1);
-      if(!['fixture-page','fixture-error'].includes(fileId)){stats.unsupported++;unsupportedRoutes.push({method:request.method,route:'drive-file-unknown'});json(response,{},404);return;}
+      if(!['fixture-page','fixture-error','fixture-drm'].includes(fileId)){stats.unsupported++;unsupportedRoutes.push({method:request.method,route:'drive-file-unknown'});json(response,{},404);return;}
+      const fileBytes=fileId==='fixture-drm'?protectedMobi:original;
       if(url.searchParams.get('alt')!=='media'){
         stats.metadataChecks++;fileChecks.set(fileId,(fileChecks.get(fileId)||0)+1);if(fileId===failMetadataFor&&fileChecks.get(fileId)>1){json(response,{},503);return;}
-        json(response,{id:fileId,name:fileId==='fixture-page'?'Drive 隔离漫画.cbz':'Drive 隔离错误.cbz',mimeType:'application/zip',size:String(original.length),version:'1',capabilities:{canDownload:true},trashed:false});return;
+        json(response,{id:fileId,name:`Drive ${fileId==='fixture-page'?'隔离漫画':fileId==='fixture-drm'?'受保护漫画':'隔离错误'}.${format}`,mimeType,size:String(fileBytes.length),version:'1',capabilities:{canDownload:true},trashed:false});return;
       }
       stats.rangeReads++;const range=/^bytes=(\d+)-(\d+)$/.exec(request.headers.range??'');
       if(!range){json(response,{},416);return;}const begin=Number(range[1]),end=Number(range[2]);
-      if(begin<0||end>=original.length||end<begin){json(response,{},416);return;}
-      const bytes=original.subarray(begin,end+1);response.writeHead(206,{'Content-Type':'application/zip','Content-Length':bytes.length,'Content-Range':`bytes ${begin}-${end}/${original.length}`,'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Range,Content-Length'});response.end(bytes);return;
+      if(begin<0||end>=fileBytes.length||end<begin){json(response,{},416);return;}
+      const bytes=fileBytes.subarray(begin,end+1);response.writeHead(206,{'Content-Type':mimeType,'Content-Length':bytes.length,'Content-Range':`bytes ${begin}-${end}/${fileBytes.length}`,'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Range,Content-Length'});response.end(bytes);return;
     }
     stats.unsupported++;unsupportedRoutes.push({method:request.method,route:url.pathname});json(response,{},404);
   })().catch(()=>{if(!response.headersSent)response.writeHead(500);response.end();});
@@ -150,7 +155,7 @@ try{
     }
     await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();
     assert(await auth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Popup content must fit without horizontal scrolling');
-    await auth.screenshot({path:path.join(run,'drive-popup.png')});
+    await auth.screenshot({path:path.join(run,'drive-popup.png'),fullPage:true});
     await worker.evaluate(id=>chrome.windows.remove(id),popup.id);
   };
   if(nativeMode){
@@ -167,10 +172,24 @@ try{
   checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
   phase='decode original';await reader.waitForFunction(([width,height])=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===width&&image.naturalHeight===height;},dimensions,{timeout:15000});
   await noReaderError();assert(stats.rangeReads>0);await reader.screenshot({path:path.join(run,'reader.png')});checks.push('Confirmed Drive reference is registered and the real reader decodes the synthetic original through authenticated Range reads');
+  phase='restore reading position';
+  const pageNumber=reader.getByRole('spinbutton',{name:'跳转页码'});await pageNumber.fill('2');await pageNumber.press('Enter');
+  await reader.waitForFunction(()=>{const image=document.querySelector('[data-page-index="1"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
+  await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+  await reader.getByRole('button',{name:'继续阅读',exact:true}).click();
+  await reader.waitForFunction(()=>{const image=document.querySelector('[data-page-index="1"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
+  assert.equal(await pageNumber.inputValue(),'2');
+  await noReaderError();await reader.screenshot({path:path.join(run,'restored-page.png')});checks.push(`${format.toUpperCase()} resumes page 2 after returning to the shelf and reopening`);
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();chosenFile='fixture-error';failMetadataFor='fixture-error';
   const firstChecks=stats.accountChecks;await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,initialPickers+2);assert(stats.accountChecks>firstChecks);
   checks.push('A second selection reuses the unexpired token without another GIS authorization and still verifies account/file access');
   phase='show import failure';await reader.getByRole('alert').waitFor();assert((await reader.getByRole('alert').innerText()).trim());await reader.screenshot({path:path.join(run,'import-error.png')});checks.push('云盘索引失败在书架显示可操作原因，不建立空漫画');
+  if(format==='mobi'){
+    chosenFile='fixture-drm';phase='reject protected MOBI';await select();
+    await reader.getByRole('alert').filter({hasText:'DRM'}).waitFor();
+    assert.deepEqual(await catalogCounts(),[1,1]);await reader.screenshot({path:path.join(run,'mobi-drm-error.png')});
+    checks.push('The shared MOBI Worker rejects DRM with a visible cause and no empty comic');
+  }
   if(nativeMode){
     phase='restart browser';await context.close();
     context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.TEST_CHROMIUM||chromium.executablePath(),locale:'zh-CN',ignoreHTTPSErrors:true,viewport:{width:1400,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--ignore-certificate-errors','--no-proxy-server','--host-resolver-rules='+resolver]});
@@ -190,7 +209,7 @@ try{
     checks.push('An explicit disconnect prevents automatic credential restoration');
   }
   assert.deepEqual(pageErrors,[]);assert.equal(stats.unauthorized,0);assert.equal(stats.unsupported,0);
-  const result={checks,stats,pageErrors,dimensions,authMode:nativeMode?'mocked-chrome-identity':'mocked-gis',liveGoogle:false,liveAccounts:false,browser:context.browser()?.version()};await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+  const result={checks,stats,pageErrors,dimensions,format,authMode:nativeMode?'mocked-chrome-identity':'mocked-gis',liveGoogle:false,liveAccounts:false,browser:context.browser()?.version()};await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }catch(error){
   if(reader&&!reader.isClosed())await reader.screenshot({path:path.join(run,'failure.png')}).catch(()=>{});
   // Never record authorization URLs, page HTML, token storage or raw network diagnostics.

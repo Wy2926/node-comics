@@ -1,6 +1,6 @@
 # Node Comics 插件
 
-React / TypeScript / WXT Manifest V3 漫画阅读器，翻译由后端执行。漫画使用单来源模型：本地未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF，Google Drive CBZ/ZIP，或专门适配的网站。选择文件自动导入，点卡片直接读；不支持散图导入、资料编辑、多来源和版本管理。
+React / TypeScript / WXT Manifest V3 漫画阅读器，翻译由后端执行。漫画使用单来源模型：本地未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF，Google Drive CBZ/ZIP、未加密 MOBI，或专门适配的网站。选择文件自动导入，点卡片直接读；不支持散图导入、资料编辑、多来源和版本管理。
 
 产品行为见[单来源阅读](../../docs/SIMPLE_COMIC_READING_DESIGN.md)，存储采用 `node-comics-reading-v2-*` 空库基线，不迁移或兼容旧书架。界面验收以桌面浏览器为目标。新客户端需要重新导入漫画；旧本机数据库保留但不读取。
 

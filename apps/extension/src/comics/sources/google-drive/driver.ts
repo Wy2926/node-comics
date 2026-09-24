@@ -55,8 +55,8 @@ export const googleDriveDriver: FileSourceDriver = {
       connection: {id: connectionId(selected.account.id), provider, accountId: selected.account.id, displayName: selected.account.displayName,
         ...(selected.account.emailAddress ? {accountMetadata:{emailAddress:selected.account.emailAddress}} : {})},
       files: selected.files.map(file => {
-        if (file.format !== 'cbz')
-          throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP 漫画文件。');
+        if (file.format !== 'cbz' && file.format !== 'mobi')
+          throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP、未加密 MOBI 漫画文件。');
         const snapshot = snapshotBinding({accountId: selected.account.id, fileId: file.fileId, resourceKey: file.resourceKey, version: file.version, size: file.size});
         return {id: file.fileId, name: file.name, format: file.format,
           locator: {...snapshot}, snapshot: {...snapshot}};
@@ -66,8 +66,8 @@ export const googleDriveDriver: FileSourceDriver = {
   async open(context) {
     context.signal?.throwIfAborted();
     const accountId = accountFor(context.connection);
-    if (!['cbz', 'zip'].includes(context.format))
-      throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP 漫画文件。');
+    if (!['cbz', 'zip', 'mobi'].includes(context.format))
+      throw new DriveError('unsupported-format', 'Google Drive 仅支持 CBZ/ZIP、未加密 MOBI 漫画文件。');
     const snapshot = snapshotBinding(context.sourceSnapshot);
     if (snapshot.accountId !== accountId || context.source.connectionId !== context.connection.id)
       throw new DriveError('account-mismatch', '此漫画属于另一个 Google Drive 账户，请连接原账户。');

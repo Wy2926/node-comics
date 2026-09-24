@@ -1,6 +1,6 @@
 # NodeLane 漫译 · NodeLane Comics
 
-带漫画阅读器的 Chrome / Edge Manifest V3 浏览器插件。支持本地未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF 与专门适配的网站漫画；云盘支持 CBZ/ZIP。一本漫画一个来源，不支持散图导入；通用网页可使用原位翻译。
+带漫画阅读器的 Chrome / Edge Manifest V3 浏览器插件。支持本地未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF 与专门适配的网站漫画；云盘支持 CBZ/ZIP、未加密 MOBI。一本漫画一个来源，不支持散图导入；通用网页可使用原位翻译。
 
 常规翻译由 [classic-engine](services/classic-engine/README.md) 完成检测、OCR、抹字和嵌字，具体模型与运行要求在引擎文档维护，文本 LLM 由中心调用；AI 重绘使用兼容 `POST /v1/images/edits` 的图片供应商。原图与译图保存在私有 R2，任务由后端持久化管理，供应商密钥不进入插件。
 

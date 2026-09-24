@@ -52,6 +52,8 @@ Chrome 配置有效时，用户点击插件 Drive 入口才允许 `getAuthToken(
 
 隔离回归入口与两种授权模式命令见 [scripts/README.md](../../scripts/README.md)。脚本新建 profile，用本机 TLS / DNS 夹具模拟 Google 服务和 Chrome Identity API，不访问用户 profile、真实账户或私有图片。真实验收仍需分别覆盖目标浏览器的首次同意、重启后的读取、Google 凭据更新、多账户、撤权和断开；模拟回归不替代这些检查。
 
-首轮远程仅允许 CBZ/ZIP 漫画文件，不支持图片。快捷方式、Google 在线文档、文件夹直接拒绝；PDF / MOBI / RAR 云端入口关闭，没有整包回退或全盘扫描。
+远程允许 CBZ/ZIP、未加密 MOBI 漫画文件，不支持图片。MOBI 沿用本地 MOBI6 / MOBI6+KF8 解析范围，不支持独立 KF8/AZW3、HUFF/CDIC 或 DRM；记录索引与逐页解析由通用格式模块负责，Drive 驱动只提供经权限和版本核验的范围字节。快捷方式、Google 在线文档、文件夹直接拒绝；PDF / RAR 云端入口关闭，没有整包回退或全盘扫描。
+
+Picker 的 [MIME 过滤](https://developers.google.com/workspace/drive/picker/reference/picker.view.setmimetypes)包含 `application/x-mobipocket-ebook` 与 `application/octet-stream`，兼容使用通用二进制 MIME 的上传。过滤不作为格式证明；扩展只接受已核验元数据中的 `.cbz` / `.zip` / `.mobi`，拒绝图片 MIME，并由格式模块验证文件内容后才发布漫画。
 
 Picker 配置和读取协议依据：[Picker key 限制](https://developers.google.com/workspace/drive/picker/guides/web-picker)、[Picker 同项目配置](https://developers.google.com/workspace/drive/picker/guides/web-picker-sample)、[Drive about.get](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get)、[Range 下载](https://developers.google.com/workspace/drive/api/guides/manage-downloads)、[资源密钥](https://developers.google.com/workspace/drive/api/guides/resource-keys)。

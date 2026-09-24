@@ -1,5 +1,5 @@
 import {msg} from '../../i18n/runtime';
-/** Bounded local MOBI image import. No ebook HTML is ever executed or rendered.
+/** Bounded random-access MOBI image import. No ebook HTML is ever executed or rendered.
  * Supports DRM-free MOBI6/PalmDOC (including MOBI6+KF8 combo books).
  * The record table and text references determine image order; HD/KF8 resources
  * are not blindly appended, so thumbnails and duplicate renditions stay out.
@@ -84,7 +84,7 @@ export function openMobiDocument(source: RandomAccessSource): DocumentSession {
   let pages: IndexedPage[] | undefined, closed = false;
   let offsets: number[] = [];
   let readBytes = 0;
-  const capabilities = {access: 'random' as const, remote: false, encrypted: false as const, multiVolume: false as const, indexComplete: false};
+  const capabilities = {access: 'random' as const, remote: true, encrypted: false as const, multiVolume: false as const, indexComplete: false};
   const read = async (offset: number, length: number, signal?: AbortSignal) => {
     throwIfAborted(signal); readBytes += length;
     if (readBytes > 16 * 1024 * 1024) fail('MOBI 目录读取超过 16 MB 安全预算。');

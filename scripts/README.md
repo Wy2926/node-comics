@@ -24,7 +24,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；原位回归包含自动翻译关闭时的右键入口、通用／站点识别及 Comix 图片和画布。真实 Comix 开关见[站点说明](../apps/extension/src/sources/sites/comix/README.md#网页原位翻译回归)，浏览器可用 `CHROMIUM_PATH` 指定；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |
 | `verify_simple_reading.mjs` | 桌面单来源新基线：自动导入、散图拒绝、重复文件续读、120 页窗口、浏览器重启、格式解码、失败隔离、最近阅读时间、跨虚拟列表批量移除、设置对齐和来源账户展示；窄屏不在兼容范围 |
 | `verify_source_database_baseline.mjs` | 在隔离扩展 profile 中先创建残缺旧 v1 库，再验证新基线导入、阅读、重开且旧库不变；另检查当前基线缺表的明确错误，无未处理 Promise |
-| `verify_drive_import.mjs` | 新建隔离扩展 profile、专用 HTTPS 测试页与模拟 Google 服务，覆盖 CBZ 选择、直接阅读、索引失败和授权复用；`TEST_DRIVE_AUTH_MODE=chrome` 增加模拟 Chrome Identity、真实浏览器重启后的静默恢复和断开检查，不读取用户 Chrome 或真实云盘，真实授权边界见 [Drive 说明](../apps/drive-connect/README.md) |
+| `verify_drive_import.mjs` | 新建隔离扩展 profile、专用 HTTPS 测试页与模拟 Google 服务，覆盖 CBZ 选择、直接阅读、位置恢复、索引失败和授权复用；`TEST_DRIVE_FORMAT=mobi` 改用未加密 MOBI 并检查 DRM 拒绝；`TEST_DRIVE_AUTH_MODE=chrome` 增加模拟 Chrome Identity、真实浏览器重启后的静默恢复和断开检查，不读取用户 Chrome 或真实云盘，真实授权边界见 [Drive 说明](../apps/drive-connect/README.md) |
 | `verify_login_popup.mjs` | 构建后的 Chrome 扩展、隔离 profile 与本机 TLS 模拟 OIDC / API；使用真实 `launchWebAuthFlow` 检查 600 × 760 登录窗口、主窗口标签不变、关闭取消、拒绝后重试、成功自动关闭、PKCE 交换及第 2 页阅读位置恢复。需 Python `cryptography`、自制 `pages.cbz` 和下方 Playwright / 浏览器变量；不访问真实身份服务 |
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
 | `verify_website_source_lifecycle.mjs` | 本机 TLS / 隔离 DNS 下操作真实网站嵌入按钮、直接阅读、来源标签页、按需取图和主动下载；重开并让图片源失败后已下载页仍可读 |
@@ -66,6 +66,8 @@ Drive 完整交互回归沿用上述 Playwright / 浏览器变量和自制 `page
 
 ```powershell
 $env:TEST_DRIVE_AUTH_MODE = 'web'
+node scripts/verify_drive_import.mjs
+$env:TEST_DRIVE_FORMAT = 'mobi'
 node scripts/verify_drive_import.mjs
 $env:TEST_DRIVE_AUTH_MODE = 'chrome'
 node scripts/verify_drive_import.mjs

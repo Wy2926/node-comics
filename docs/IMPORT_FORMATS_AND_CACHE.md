@@ -1,6 +1,6 @@
 # 漫画格式与翻译缓存
 
-2026-09-23。当前采用[单来源读取架构](COMIC_SOURCE_ARCHITECTURE.md)。本地保存完整源文件与索引，逐页取图；不支持单图、多张散图或云盘图片文件。
+2026-09-24。当前采用[单来源读取架构](COMIC_SOURCE_ARCHITECTURE.md)。本地保存完整源文件与索引，逐页取图；不支持单图、多张散图或云盘图片文件。
 
 ## 格式范围
 
@@ -9,7 +9,7 @@
 | CBZ / ZIP | 完整路径自然排序，Store / Deflate；忽略隐藏项和非图片项 | 本地和 Google Drive；512 MiB、1500 页、10000 项；展开最多 1024 MiB、单项 32 MiB；不支持加密和分卷 |
 | CBR / RAR | RAR4 / RAR5，独立 Worker 按自然路径索引 | 仅本地；128 MiB，展开 256 MiB，单项 32 MiB、1500 页；不支持加密和分卷 |
 | PDF | 原始页序与旋转，按需渲染 PNG | 仅本地；512 MiB、1500 页；144 dpi，限制 1600 万像素、单边 8192；拒绝加密文件 |
-| 未加密 MOBI | MOBI6 / MOBI6+KF8，按正文 recindex 引用顺序 | 仅本地；512 MiB、1500 页；不支持独立 KF8/AZW3、HUFF/CDIC 和 DRM |
+| 未加密 MOBI | MOBI6 / MOBI6+KF8，按正文 recindex 引用顺序；索引不读图片，逐页读图片记录 | 本地和 Google Drive；本地容器 512 MiB、1500 页；索引/正文 16 MiB、图片 32 MiB；不支持独立 KF8/AZW3、HUFF/CDIC 和 DRM |
 
 压缩包内可包含 PNG、JPEG、WebP、GIF，GIF 阅读使用规范化 PNG 首帧。容器索引成功即能阅读，不等待全部解码；某页损坏不妨碍其他页。全本格式错误或受保护文件不创建空漫画。
 

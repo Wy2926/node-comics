@@ -10,11 +10,11 @@
 | CBR/RAR | node-unrar-js 2.0.2 有界本地 Worker：压缩输入 128 MiB、声明总展开 256 MiB、目标页实际输出 32 MiB、WASM heap 256 MiB、操作 60 秒。逐页请求，立即清除库内部保留的展开输出；固实包仍可能解码前序数据。 |
 | 内部图片解码 | 单页、最多 32 MiB；不是散图导入入口。 |
 
-本地与云盘都不支持散图。远程登记目前只开放 CBZ/ZIP；PDF、MOBI、RAR 在格式入口明确拒绝，不能降级为下载整包。`capabilities.remote=false` 不表示本地格式不能阅读。
+本地与云盘都不支持散图。远程登记开放 CBZ/ZIP、未加密 MOBI；MOBI 通过通用 `RandomAccessSource` 按记录读取，不依赖具体云盘。PDF、RAR 在格式入口明确拒绝，不能降级为下载整包。`capabilities.remote=false` 不表示本地格式不能阅读。
 
 本地字节库固定为 `node-comics-reading-v1-container-bytes` / `chunked-idb-v1`，每块 1 MiB。复制期间增量计算 SHA-256；操作预约、块、ready 对象、引用和读取租约在一个新基线数据库中提交。完整文件不参加页面缓存 LRU。应用先登记导入 journal，传预建 contentId 到 `importContainer` 第四参数；重启按 journal 使用 `listContainerReferences` 点查已发布对象。复制未完成的过期暂存清理，bytesClosed 操作可继续发布。已有对象失踪时修复内容相同的容器，不丢弃新字节继续引用空对象。
 
-已验证的自动化范围：真实 Store/Deflate ZIP、CRC 与加密拒绝、合成 MOBI、真实 UnRAR WASM + 自制 RAR4 Store 档案，以及 IndexedDB 并发去重、引用/租约、缺失修复、取消与恢复。PDF 当前自动化是 range/按页渲染接口模拟；不能据此宣称任意 PDF、固实 RAR、真实 Drive 或三浏览器扩展重启均已验收。
+已验证的自动化范围：真实 Store/Deflate ZIP、CRC 与加密拒绝、合成 MOBI、真实 UnRAR WASM + 自制 RAR4 Store 档案，以及 IndexedDB 并发去重、引用/租约、缺失修复、取消与恢复。MOBI 覆盖来源无关的本地/远程索引、模拟 Drive Range 的逐页读取、文件变化、撤权和拒绝整包回退；隔离 MV3 浏览器覆盖导入、解码、位置恢复和 DRM 错误。PDF 当前自动化是 range/按页渲染接口模拟；不能据此宣称任意 PDF、固实 RAR、真实 Drive 或三浏览器扩展重启均已验收。
 
 在 `apps/extension` 运行：
 
