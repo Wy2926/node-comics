@@ -20,6 +20,8 @@ describe('single-file comic imports',()=>{
   const input=file(),first=await importLocalFile(input),second=await importLocalFile(new File([input],'renamed.zip'));
   expect(second).toEqual({...first,created:false});expect(mocks.materialize).not.toHaveBeenCalled();
   const entry=(await catalog.get('entries',first.id))!;expect(await catalog.listEntries(first.comicId)).toHaveLength(1);expect(await listContainerReferences(entry.contentId)).toHaveLength(1);
+  const comic=(await catalog.get('comics',first.comicId))!,pages=await catalog.listPages(entry.contentId);
+  expect(comic.sourceCover).toBeUndefined();expect(comic.cover).toEqual({entryId:entry.id,contentId:entry.contentId,pageId:pages[0].pageId});
   const source=await openContainer(entry.containerId!);try{expect(await source.readAt(0,input.size)).toEqual(new Uint8Array(await input.arrayBuffer()));}finally{await source.close();}
  });
  it('serializes concurrent duplicate imports and keeps different files separate regardless of title',async()=>{

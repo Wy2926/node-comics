@@ -35,6 +35,8 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 原位正文筛选由 `inlineTargets()` 负责：未知站点的大图启发式只在 `generic` 适配器执行，显示层统一检查渲染状态。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
 
+目录可选提供 `cover`，必须取自作品专门封面，不能使用推荐图或章节缩略图。`readSourceCover` 校验目录归属、HTTP(S) 地址与主机权限，经公共取图管线读取；防盗链规则不同时使用 `image.coverHeaders`。新增 CDN 只申请可选权限。封面不进入正文、翻译或下载清单，缩略图沿用缓存预算与访问失效规则；换封面不触发章节更新徽章。展示行为见[单来源阅读设计](SIMPLE_COMIC_READING_DESIGN.md)。
+
 公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，最多跟随 5 次；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。实现依据和验证边界见[跨域取图调研](PAGE_IMAGE_ACCESS_RESEARCH.md)。
 
 ## 验收与交付
@@ -52,6 +54,8 @@ npm run build
 在桌面目标浏览器加载构建产物，实际完成导入 → 取图／解码 → 阅读 → 重开恢复，检查错误提示与阅读位置。按能力补测原位译图恢复、canvas 重绘／SPA 导航或无标签页网络读取；仅下载成功不能代替完整阅读器验收。
 
 通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及带日期的真实验证摘要和未验证范围。区分隔离样本、真实站点、原生授权弹窗与模型翻译效果；不保留每次测试总数和临时服务地址。
+
+2026-09-24 封面验收：隔离 Chromium 中，MangaCopy grandblue、Comix rrzm、DM5 妖神记、NAVER 758037、Comic PASH 1fafeeae328df 均在未读取章节时显示真实封面。合成样本覆盖缓存、失败重试、封面更新与阅读位置恢复；权限恢复使用模拟响应，原生弹窗未验。复现入口见[脚本说明](../scripts/README.md)。
 
 ## 现有站点
 

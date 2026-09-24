@@ -1,6 +1,7 @@
 import type {SourceCatalogSnapshot, SourceEntry, SourceGroup} from '../../contracts/source';
 import {catalogUrl, chapterUrl, dm5Location} from './definition';
 import {assignment, attribute, htmlText, positive, scripts, text} from './parsing';
+import {sourceCover} from '../../shared/cover';
 
 export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const loc = dm5Location(new URL(url));
@@ -42,6 +43,9 @@ export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
     groups.push({id: groupId, title, entryIds, complete: true});
   }
   if (!groups.length || !entries.length || entries.length > 10000) throw Error('DM5 未返回完整章节目录。');
+  const coverPanel = /<div\b[^>]*class=["']banner_detail_form["'][^>]*>\s*<div\b[^>]*class=["']cover["'][^>]*>([\s\S]*?)<\/div>/i.exec(html)?.[1];
+  const coverImage = coverPanel && /<img\b([^>]*)>/i.exec(coverPanel)?.[1];
   return {id, sourceId: 'dm5', url: catalogUrl(loc.slug), title: text(assignment(data, 'DM5_COMIC_MNAME')),
+    cover: sourceCover(coverImage ? attribute(coverImage, 'src') : undefined, url),
     observedAt: Date.now(), complete: true, note: '', groups, entries, defaultEntryId: entries[0].id};
 }

@@ -59,6 +59,8 @@ export interface SourceCatalogSnapshot {
   sourceId: string;
   url: string;
   title: string;
+  /** Optional dedicated artwork supplied by this catalog, never a reading page. */
+  cover?: {url: string};
   observedAt: number;
   complete: boolean;
   note: string;

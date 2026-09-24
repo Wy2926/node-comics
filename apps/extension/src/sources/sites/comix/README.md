@@ -1,5 +1,7 @@
 # Comix
 
+专门封面读取 `poster.large`，缺失时使用 `poster.medium`；`static.comix.to` 按操作申请可选权限，封面无需章节切片还原。
+
 仅认领 HTTPS `comix.to/title/<hid>-<slug>` 详情页与 `/<upload-id>-chapter-<number>` 阅读页。作品身份为 HID；章节身份为话号，保留 0 和小数话。xkcd 专属适配已删除，不提供旧来源迁移。
 
 ## 边界与实现

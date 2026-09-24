@@ -3,6 +3,7 @@
     "https://*.mangacopy.com/*",
     "https://*.copy4000.com/*"
   ],
+  "optionalOrigins": ["https://*.mangafunb.fun/*"],
   "autoContentMatches": [
     "https://*.mangacopy.com/comic/*",
     "https://*.copy4000.com/comic/*"

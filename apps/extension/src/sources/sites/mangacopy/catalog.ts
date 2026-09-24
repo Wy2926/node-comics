@@ -1,6 +1,7 @@
 import { msg } from '../../../i18n/runtime';
 import type { SourceCatalogSnapshot, SourceEntry } from '../../contracts/source';
 import { mangaCopyLocation } from './definition';
+import { sourceCover } from '../../shared/cover';
 export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCatalogSnapshot {
   const location = mangaCopyLocation(url);
   if (!location || location.chapterId) throw Error(msg('请从 MangaCopy 漫画详情页导入作品。'));
@@ -59,9 +60,11 @@ export function discoverMangaCopyCatalog(doc: Document, url: string): SourceCata
     if (!valid) complete = false;
     return { id: groupId, title, entryIds, complete: valid };
   });
+  const coverImage = doc.querySelector('.comicParticulars-title-left img');
   return {
     id,
     sourceId: 'mangacopy',
+    cover: sourceCover(coverImage?.getAttribute('data-src'), url) ?? sourceCover(coverImage?.getAttribute('src'), url),
     url: new URL('/comic/' + location.slug, url).href,
     title:
       doc.querySelector('.comicParticulars-title-right h6')?.textContent?.trim() ||

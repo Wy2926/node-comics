@@ -28,6 +28,14 @@ const request = vi.fn(async(target: string, options?: {referer: string}) => {
 });
 afterEach(() => {vi.unstubAllGlobals();vi.clearAllMocks();});
 describe('DM5 HTTP adapter', () => {
+  it('takes only the main cover, ignoring backgrounds and recommended thumbnails', () => {
+    const artwork='<img class="banner_detail_bg" src="/blur.jpg"><div class="banner_detail_form"><div class="cover"><img src="https://mhfm5tel.cdndm5.com/1/98761/cover.jpg?width=450&amp;height=600"></div></div><img src="/recommendation.jpg">';
+    const source=validateSourceCatalog(parseCatalog(artwork+html(),url));
+    expect(source.cover).toEqual({url:'https://mhfm5tel.cdndm5.com/1/98761/cover.jpg?width=450&height=600'});
+    expect(source.entries).toHaveLength(2);
+    expect(image.coverHeaders).toEqual({referer:'https://www.dm5.com/'});
+    expect(parseCatalog(html(),url).cover).toBeUndefined();
+  });
   it('claims exact HTTPS hosts, chapters, source binding and stable page identities', () => {
     expect(definition.identify(new URL(url))?.catalog?.key).toBe('dm5:fixture');
     expect(definition.identify(new URL(reader(true)))?.catalog?.key).toBe('dm5:fixture');

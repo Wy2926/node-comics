@@ -34,6 +34,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_reader_directory.mjs` | Vite 独立 5181 端口，`tests/reader-directory-fixture.html` 的 620 章合成目录；覆盖当前项超出首批、倒序、嵌套分组、搜索恢复、状态刷新不抢滚动、页面缩略图、失败／未就绪和重开位置；截图在 `artifacts/reader-directory/` |
 | `verify_extension_theme.mjs` | 新书架、真实导入、菜单 / 导出弹窗、4 色 × 亮暗主题、阅读浮层与位置恢复；默认 Vite 5175，可用 `TEST_READER_URL` 指定隔离主应用 |
 | `verify_catalog_sync.mjs` | 本机 TLS / 合成目录下的自动同步、动态分组、更新提示、失败保留与阅读位置；依赖 Python cryptography，使用下方相同浏览器变量 |
+| `verify_source_covers.mjs` | 构建后的隔离 MV3：五站封面、缓存、重试、更新和阅读位置。使用 `PLAYWRIGHT_MODULE` / `TEST_CHROMIUM`；默认合成数据，`RUN_LIVE_COVERS=1` 读取公开样本。预授权／模拟授权，不验原生弹窗；产物在 `artifacts/source-covers/` |
 | Comix `tests/verify-*.mjs` | 站点目录、图片还原、完整阅读器与请求头隔离；样本／真实网络边界见[Comix 说明](../apps/extension/src/sources/sites/comix/README.md) |
 | `verify_comicpash.mjs` | Comic PASH 完整目录、整章取图还原、站内导入与阅读位置恢复；隔离样本／真实来源开关见[站点说明](../apps/extension/src/sources/sites/comicpash/README.md) |
 | `verify_r2_download.mjs` | 模拟 R2 响应下的浏览器下载与权限处理，不访问 Cloudflare |

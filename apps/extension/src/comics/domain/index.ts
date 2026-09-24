@@ -11,6 +11,8 @@ export interface Comic {
   startEntryId?: string; sourceName: string; sourceUrl?: string;
   lastPage?: number; lastPageCount?: number;
   cover?: { entryId: string; contentId: string; pageId: string };
+  /** Dedicated website artwork; independent of the file/first-page cover. */
+  sourceCover?: {url: string};
   catalogSync?: { nextCheckAt: number; lastAttemptAt?: number; lastSuccessAt?: number; lease?: string };
   catalogUpdates?: { revision: number; seenRevision: number; count: number };
 }

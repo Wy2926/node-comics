@@ -27,6 +27,13 @@ function fixture(rows=[row(20,0),row(30,1),row(10,1,true),row(40,1.5)],mutate?:(
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('Comix network adapter',()=>{
+ it('reads the dedicated poster without treating it as a chapter image',async()=>{
+   const context=fixture(),request=async(target:string)=>(await context.request(target)).replace('"title":"Fixture"','"title":"Fixture","poster":{"large":"https://static.comix.to/cover.jpg","medium":"https://static.comix.to/small.jpg"}');
+   const source=validateSourceCatalog(await network.catalog(url,{request}));
+   expect(source.cover).toEqual({url:'https://static.comix.to/cover.jpg'});
+   expect(source.entries).toHaveLength(3);
+   expect((await network.catalog(url,fixture())).cover).toBeUndefined();
+ });
  it('removes xkcd imports and isolates supported Comix paths and identities',()=>{
    expect(sourceFor('https://xkcd.com/1/').definition.capabilities.importable).not.toBe(true);
    expect(definition.identify(new URL(url))?.catalog?.key).toBe('comix:rrzm');

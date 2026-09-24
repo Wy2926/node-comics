@@ -10,6 +10,8 @@ import {thumbnailCache} from '../../storage/thumbnails';
 import {downloadStore} from '../../storage/downloads';
 import type {LibraryViewModel,SourceCatalog} from './types';
 import {mergeJobs} from '../../reader/jobs';
+import {sourceCoverOwner} from './cover-access';
+export {coverReference} from './cover-access';
 
 type TranslationPayload=Pick<Page,'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
 const savedPages=new WeakMap<Page,string>();
@@ -89,6 +91,7 @@ export async function saveReaderState(copy:ReadingEntry) {
 }
 export async function removeComic(id:string) {
   const entries=await catalog.deleteComic(id);
+  await thumbnailCache.deleteOwner(sourceCoverOwner(id),true);
   for(const entry of entries) {
     await Promise.all([sourcePageCache.deleteOwner(entry.id,true),sourceRangeCache.deleteOwner(entry.id,true),thumbnailCache.deleteOwner(entry.id,true),downloadStore.deleteOwner(entry.id,true)]);
     if(entry.containerId)await releaseContainer(entry.containerId,entry.contentId);
@@ -106,7 +109,6 @@ export async function removeComics(ids:readonly string[]) {
 export const subscribeLibrary=catalog.subscribe;
 export const markRead=catalog.markRead;
 export const completePageList=(copy:ReadingEntry)=>copy.pages.length>0&&copy.discoveryComplete&&(!copy.knownTotal||copy.knownTotal===copy.pages.length);
-export const coverReference=(cover:Comic['cover'])=>cover?pageReference({...cover,renderProfileId:RENDER_PROFILE}):undefined;
 export type {Comic,Entry};
 
 

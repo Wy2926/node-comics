@@ -11,7 +11,7 @@ export { pollSourceDiscovery } from './core/discovery';
 export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
 export {authorizeCatalogImport} from './runtime/import';
 export {listSupportedSites} from './registry/sites';
-export {readSourceImage,readInlineSourceImage} from './runtime/source-image';
+export {readSourceImage,readInlineSourceImage,readSourceCover} from './runtime/source-image';
 export {recoverCatalogTabs} from './runtime/catalog-reader';
 export { sourceImage } from './runtime/image-fetch';
 export {

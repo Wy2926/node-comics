@@ -34,6 +34,18 @@ function fixture(rows = [row(1), row(3), row(7)], mutate?: (data: any, page: num
 }
 afterEach(() => vi.unstubAllGlobals());
 describe('NAVER Webtoon', () => {
+  it('prefers the work poster and supports the thumbnail field when no poster is supplied', async () => {
+    for (const poster of [true,false]) {
+      const context=fixture(),request=async(target:string)=>{
+        const raw=await context.request(target);if(!target.includes('/info?'))return raw;
+        return JSON.stringify({...JSON.parse(raw),thumbnailUrl:'https://image-comic.pstatic.net/cover.jpg',
+          ...(poster?{posterThumbnailUrl:'https://image-comic.pstatic.net/poster.jpg'}:{})});
+      };
+      const source=validateSourceCatalog(await network.catalog(url,{request}));
+      expect(source.cover?.url).toBe('https://image-comic.pstatic.net/'+(poster?'poster':'cover')+'.jpg');
+      expect(source.entries).toHaveLength(3);
+    }
+  });
   it('uses stable title and episode identity and rejects forged/ambiguous URLs', () => {
     expect(definition.identify(new URL(url + '&tab=mon&page=3'))?.pageKey).toBe('naver:webtoon:123');
     expect(definition.identify(new URL(reader + '&week=mon'))?.pageKey).toBe('naver:webtoon:123:episode:1');

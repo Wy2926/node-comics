@@ -29,6 +29,8 @@ describe('single-source files and access lifecycle',()=>{
  });
  it('imports opaque metadata without leaking account labels and keeps a single current source',async()=>{
   const selected=selection(),[id]=await importIds(selected),saved=await record(id);expect(saved.source.providerItemId).toBe(selected.files[0].id);expect(saved.sourceSnapshot).toEqual(selected.files[0].snapshot);expect(saved.comic.sourceName).toBe('Fixture cloud');expect(saved.entry.indexState).toBe('ready');expect(saved.entry).not.toHaveProperty('sourceBindingId');expect(await importIds(selected)).toEqual([id]);
+  const [page]=await catalog.listPages(saved.entry.contentId);expect(saved.comic.sourceCover).toBeUndefined();
+  expect(saved.comic.cover).toEqual({entryId:id,contentId:saved.entry.contentId,pageId:page.pageId});
  });
  it('leaves no comic on a failed index and retries independently of successful files',async()=>{
   const selected=selection();selected.files.push(file());format.index.mockRejectedValueOnce(Error('temporary failure'));const result=await importSourceFiles(selected);expect(result.results).toHaveLength(1);expect(result.failures).toEqual([{name:selected.files[0].name,error:'temporary failure'}]);expect(await importIds(selected)).toHaveLength(2);

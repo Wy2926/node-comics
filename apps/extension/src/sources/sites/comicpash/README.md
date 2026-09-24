@@ -1,5 +1,7 @@
 # Comic PASH!
 
+专门封面取自 `img.series-h-img`，缺失时使用作品页 `og:image`；`cdn-public.comici.jp` 按操作申请可选权限，封面无需正文图块还原。
+
 支持 HTTPS `comicpash.jp`／`www.comicpash.jp` 的 `/series/<id>` 作品目录、数字分页及 new／old 排序地址，以及 `/episodes/<id>` 章节。首页、搜索等只认领为非阅读页面，不把封面或推荐图当正文。
 
 - 作品导入：HTTP 读取完整只读目录、按源站顺序阅读、每 12 小时检查更新。授权后在作品页 `.series-act` 嵌入导入／管理按钮；也可在插件中粘贴作品链接导入。

@@ -1,6 +1,7 @@
 import type {SourceNetwork,SourceNetworkContext} from '../../contracts/network';
 import type {SourceCatalogSnapshot,SourceEntry,SourceSnapshot} from '../../contracts/source';
 import {safeImageUrl} from '../../shared/urls';
+import {sourceCover} from '../../shared/cover';
 import {comixLocation} from './definition';
 import {encodeRequest,decodeResponse} from './protocol';
 
@@ -60,7 +61,9 @@ export const network={
       id:id+':chapter:'+row.number,catalogId:id,remoteId:String(row.id),url:row.url,
       title:'Chapter '+row.number+(row.name?' · '+row.name:''),groupIds:['chapters'],rawTypes:[row.official?'官方':row.group],order,related:false,sequenceId:id,
     }));
+    const poster=detail.poster as {large?:unknown;medium?:unknown}|undefined;
     const snapshot:SourceCatalogSnapshot={id,sourceId:'comix',url:canonical,title:text(detail.title),observedAt:Date.now(),complete:true,
+      cover:sourceCover(poster?.large,canonical)??sourceCover(poster?.medium,canonical),
       note:`已读取 ${rows.length} 条上传记录，每话保留一条。`,groups:[{id:'chapters',title:'全部章节',entryIds:entries.map(e=>e.id),complete:true}],entries,defaultEntryId:entries[0]?.id};
     return snapshot;
   },

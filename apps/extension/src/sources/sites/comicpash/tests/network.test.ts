@@ -14,6 +14,14 @@ const row = (sort: number) => ({sort, width: 720, height: 1024, scramble: JSON.s
   imageUrl: `https://viewer.comicpash.jp/book/${viewer}/page.jpg?signature=synthetic`});
 const contents = (sorts = [0, 1]) => ({totalPages: 2, scrollDirection: '横', result: sorts.map(row)});
 describe('Comic PASH public network source', () => {
+  it('uses the series artwork with og:image as an optional fallback, never an episode thumbnail', async () => {
+    for (const main of [true,false]) {
+      const artwork=`<meta property="og:image" content="https://cdn-public.comici.jp/series/social.webp">${main?'<img class="series-h-img" src="//cdn-public.comici.jp/series/main.webp">':''}<img class="series-eplist-item-img" src="/episode.webp">`;
+      const source=validateSourceCatalog(await network.catalog(base,{request:async target=>artwork+html(target.endsWith('/2')?['third']:[episode,'second'])}));
+      expect(source.cover?.url).toBe('https://cdn-public.comici.jp/series/'+(main?'main':'social')+'.webp');
+      expect(source.entries).toHaveLength(3);
+    }
+  });
   it('binds paginated catalogs and episode identities without trusting arbitrary hosts or bindings', () => {
     expect(definition.identify(new URL(base + '/new'))?.catalog?.key).toBe('comicpash:series:' + series);
     expect(definition.identify(new URL(url))?.pageKey).toBe(definition.identify(new URL(episodeUrl(episode)))?.pageKey);

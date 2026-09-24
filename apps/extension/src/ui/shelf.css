@@ -22,3 +22,4 @@
 .nc-batch-toolbar>.nc-inline{flex-wrap:wrap;gap:16px}
 .nc-removal-list{padding-left:24px;overflow-wrap:anywhere}
 @media(max-width:640px){.nc-library .nc-shelf-title{gap:14px}.nc-app .nc-profile-avatar.nc-shelf-count{min-width:40px;height:40px;font-size:20px}.nc-library .nc-shelf-tools>.nc-search{flex:1 1 160px}.nc-shelf-tools>.nc-sort-label .nc-select{min-width:118px}}
+.nc-cover-retry{position:absolute;top:44px;right:10px;z-index:2}

@@ -4,6 +4,7 @@
   "optionalContentMatches": ["https://comix.to/*"],
   "optionalOrigins": [
     "https://comix.to/*",
+    "https://static.comix.to/*",
     "https://*.wowpic1.store/*"
   ]
 }

@@ -2,6 +2,7 @@ import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network'
 import type {SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {catalogUrl, episodeUrl, naverLocation, origin, levels, type Section} from './definition';
 import {attributes, inertHtml} from './html';
+import {sourceCover} from '../../shared/cover';
 
 type RecordValue = Record<string, unknown>;
 function object(value: unknown): RecordValue {
@@ -100,6 +101,7 @@ export const network = {
         throw Error('NAVER 目录在读取期间发生变化，请重试。');
     }
     return {id, sourceId: 'naver', url: catalogUrl(loc.titleId, loc.section), title: text(info.titleName), observedAt: Date.now(), complete: true,
+      cover: sourceCover(info.posterThumbnailUrl, url) ?? sourceCover(info.thumbnailUrl, url),
       note: '已读取网站公开目录；需要登录、验证或购买的话仍受源站访问限制。',
       groups: [{id: 'episodes', title: '회차', entryIds: entries.map(entry => entry.id), complete: true}], entries, defaultEntryId: entries[0]?.id};
   },

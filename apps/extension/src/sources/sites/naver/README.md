@@ -1,5 +1,7 @@
 # NAVER Webtoon
 
+专门封面读取作品信息的 `posterThumbnailUrl`，缺失时使用 `thumbnailUrl`；复用 `image-comic.pstatic.net` 权限与 Naver Referer。
+
 支持 `https://comic.naver.com/` 桌面站的 `webtoon`、`bestChallenge`、`challenge` 三类作品：
 
 - `/<分类>/list?titleId=<作品 ID>`：完整公开目录、直接导入、手动刷新和每 12 小时自动检查更新。

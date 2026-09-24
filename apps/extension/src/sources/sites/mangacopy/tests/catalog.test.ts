@@ -21,6 +21,14 @@ function document(categories:Category[]):Document {
 const discover = (categories:Category[]) => validateSourceCatalog(discoverMangaCopyCatalog(document(categories), url));
 
 describe('MangaCopy source-defined categories', () => {
+  it('uses the dedicated lazy cover and keeps it outside the chapter list', () => {
+    const doc = document([{id:'default', title:'默认', chapters:[1]}]);
+    doc.querySelector = ((selector: string) => selector === '.comicParticulars-title-left img'
+      ? {getAttribute:(name:string) => name === 'data-src' ? '//sg.mangafunb.fun/series/cover.jpg' : '/placeholder.gif'} : null) as typeof doc.querySelector;
+    const result = validateSourceCatalog(discoverMangaCopyCatalog(doc, url));
+    expect(result.cover).toEqual({url:'https://sg.mangafunb.fun/series/cover.jpg'});
+    expect(result.entries).toHaveLength(1);
+  });
   it.each([
     [
       {id:'default', title:'默認', chapters:[1]},

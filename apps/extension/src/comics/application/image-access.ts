@@ -5,6 +5,7 @@ import { translationCache } from '../../storage/translations';
 import { sourcePageCache } from '../../storage/source-pages';
 import { thumbnailCache } from '../../storage/thumbnails';
 import { RequestPool } from '../../concurrency';
+import {openSourceCover} from './cover-access';
 
 const thumbnails=new RequestPool(2);
 export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<PageLease,'blob'|'release'>>{
@@ -17,13 +18,27 @@ export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<
 }
 export async function readImage(key:string):Promise<Blob|undefined>{const lease=await acquireImage(key);try{return lease.blob;}finally{lease.release();}}
 export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob>{
+  signal?.throwIfAborted();
   const reference=parsePageReference(key);
-  const token=await thumbnailCache.token(reference?.entryId).catch(()=>undefined);
-  const cached=await thumbnailCache.get(key);if(cached)return cached;
+  const source=await openSourceCover(key);
+  const owner=source?.owner??reference?.entryId;
+  const token=await thumbnailCache.token(owner).catch(()=>undefined);
+  const cached=await thumbnailCache.get(key);if(cached){await source?.validate();signal?.throwIfAborted();return cached;}
   return thumbnails.run(async()=>{
-    const lease=reference?await acquirePage({...reference,signal,priority:'background',purpose:'thumbnail'}):await acquireImage(key,signal);
-    try{signal?.throwIfAborted();const bitmap=await createImageBitmap(lease.blob,{resizeWidth:240,resizeQuality:'medium'});
-      try{const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);canvas.getContext('2d')!.drawImage(bitmap,0,0);const blob=await canvas.convertToBlob({type:'image/webp',quality:.75});signal?.throwIfAborted();if(token)await thumbnailCache.put(key,blob,{owner:reference?.entryId,contentId:reference?.contentId,token});return blob;}finally{bitmap.close();}
+    signal?.throwIfAborted();
+    await source?.validate();
+    const lease=source?{blob:await source.read(signal),release(){}}:reference?await acquirePage({...reference,signal,priority:'background',purpose:'thumbnail'}):await acquireImage(key,signal);
+    try{
+      signal?.throwIfAborted();
+      const bitmap=await createImageBitmap(lease.blob,{resizeWidth:240,resizeQuality:'medium'});
+      try{
+        const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
+        canvas.getContext('2d')!.drawImage(bitmap,0,0);
+        const blob=await canvas.convertToBlob({type:'image/webp',quality:.75});
+        signal?.throwIfAborted();await source?.validate();
+        if(token)await thumbnailCache.put(key,blob,{owner,connectionId:source?.connectionId,contentId:reference?.contentId,token});
+        await source?.validate();return blob;
+      }finally{bitmap.close();}
     }finally{lease.release();}
   });
 }

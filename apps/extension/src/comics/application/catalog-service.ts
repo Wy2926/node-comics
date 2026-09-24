@@ -41,6 +41,7 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
   const defaultEntry = entries.find(entry => entry.sourceEntryId === source.defaultEntryId) ?? (entries.length === 1 ? entries[0] : undefined);
   const policy = catalogSyncPolicy(current), updates = current.catalogUpdates;
   const next:Comic = {...current, title:source.title, sourceUrl:source.url, startEntryId:defaultEntry?.id,
+    sourceCover:source.cover,
     ...(added ? {updatedAt:now, catalogUpdates:{revision:(updates?.revision ?? 0) + 1,
       seenRevision:updates?.seenRevision ?? 0, count:(updates?.count ?? 0) + added}} : {}),
     ...(policy && source.complete ? {catalogSync:{nextCheckAt:now + policy.intervalMinutes * 60_000,

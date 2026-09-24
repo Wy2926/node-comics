@@ -3,6 +3,7 @@ import type {SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {catalogUrl, comicpashLocation, episodeUrl, origin} from './definition';
 import {attributes, hasClass, inertHtml, tags, textContent} from './html';
 import {parseProcessing} from './images';
+import {sourceCover} from '../../shared/cover';
 
 const changed = () => Error('Comic PASH 目录或阅读协议已变化，请回源确认后重试。');
 function location(url: string) {
@@ -49,7 +50,9 @@ export function parseCatalogPage(raw: string, url: string) {
     return {remoteId: target.episodeId, title};
   });
   if (!entries.length || new Set(entries.map(e => e.remoteId)).size !== entries.length) throw changed();
-  return {title, ranges, entries};
+  const cover = sourceCover(tags(html, 'img').find(attrs => hasClass(attrs, 'series-h-img'))?.src, url)
+    ?? sourceCover(tags(html, 'meta').find(attrs => attrs.property === 'og:image')?.content, url);
+  return {title, cover, ranges, entries};
 }
 async function request(context: SourceNetworkContext, url: string) {
   context.signal?.throwIfAborted();
@@ -116,6 +119,7 @@ export const network = {
       if (JSON.stringify(check) !== JSON.stringify(first)) throw changed();
     }
     return {id, sourceId: 'comicpash', url: catalogUrl(loc.seriesId), title: first.title, observedAt: Date.now(),
+      cover: first.cover,
       complete: true, groups: [], entries, defaultEntryId: entries[0]?.id,
       note: '已读取网站公开目录；需要登录、等待或购买的章节仍受源站访问限制。'};
   },

@@ -1,6 +1,7 @@
 import type { SourceDefinition } from '../contracts/definition';
 import type { SourceCatalogSnapshot } from '../contracts/source';
 import { resolveSource } from './resolve';
+import { safeImageUrl } from '../shared/urls';
 /** Validate observations, never accept library bindings as source authority. */
 export function validateCatalog(
   input: unknown,
@@ -29,6 +30,7 @@ export function validateCatalog(
   )
     return invalid();
   const { definition, location } = resolveSource(c.url, definitions);
+  if (c.cover !== undefined && (!c.cover || !text(c.cover.url, 8192) || safeImageUrl(c.cover.url, c.url) !== c.cover.url)) return invalid();
   if (
     !definition.capabilities.catalog ||
     location.kind !== 'catalog' ||
@@ -93,6 +95,7 @@ export function validateCatalog(
     sourceId: c.sourceId,
     url: c.url,
     title: c.title,
+    cover: c.cover ? {url: c.cover.url} : undefined,
     observedAt: c.observedAt,
     complete: c.complete,
     note: c.note,
