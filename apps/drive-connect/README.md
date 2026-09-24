@@ -10,7 +10,7 @@
 
 ## 配置与构建
 
-页面与官网共用 [design-tokens.css](../../backend/website/public/design-tokens.css)，颜色、字体、描边、圆角、硬阴影与网点只在该文件维护；授权页的布局样式在 `style.css`。官网构建将令牌打入自身样式，并保留 `/design-tokens.css` 供独立授权页读取。发布本次样式时需先更新官网静态产物，再发布授权页；只复制授权页三个文件会缺少新的共享令牌。独立站点或本地夹具须将官网 `public` 中的 `design-tokens.css`、`icon-128.png`、`favicon.ico` 分别映射到根路径的同名文件，无需开放源码目录。授权桥、Google SDK 和选文件逻辑仍由原 `connect.js` 提供。
+页面与官网共用 [design-tokens.css](../../backend/website/public/design-tokens.css)，颜色、字体、描边、圆角、硬阴影与网点只在该文件维护；授权页的布局样式在 `style.css`。官网构建将令牌打入自身样式，并保留 `/design-tokens.css` 供独立授权页读取。VPS 独立发布授权页时，将该共享文件一同复制到授权页静态目录，由 OpenResty 的 `/design-tokens.css` 精确路由提供，无需为授权页重建 API；只复制授权页三个文件会缺少共享令牌。独立站点或本地夹具须将官网 `public` 中的 `design-tokens.css`、`icon-128.png`、`favicon.ico` 分别映射到根路径的同名文件，无需开放源码目录。授权桥、Google SDK 和选文件逻辑仍由原 `connect.js` 提供。
 
 1. 在同一 Google Cloud 项目启用 Google Drive API 与 Google Picker API，创建 **Web application** 类型的 OAuth client。将选文件页的 HTTPS origin 登记为 Authorized JavaScript origin，例如 `https://example.com`，不带页面路径。页面使用 `initTokenClient` 弹窗和 JavaScript callback，不需要 redirect URI 或 client secret。仅申请 `https://www.googleapis.com/auth/drive.file`。
 2. 填写页面 `config.js` 的公开 `clientId`、`apiKey`、`appId`。这里的 `clientId` 始终是 Web client；`appId` 是同项目的数字 **project number**，不是 project ID 或 extension ID。API key 设置 Websites 限制，添加选文件页的 `https://<host>/*` 与 `https://docs.google.com/*`；后者用于 Picker iframe，遗漏会导致 developer key 无效。API restrictions 限定 Google Picker API 和 Google Drive API。实际配置放在忽略文件或部署配置中，不提交仓库。

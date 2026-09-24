@@ -2,6 +2,16 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 插件 0.2.0 与云盘页更新
+
+- 插件 `package.json` 与 lockfile 升级为 0.2.0，生成 Chrome MV3、Firefox MV3 和 Firefox 审核源码 ZIP。构建写入正式 API / Drive URL；Chrome 保留既有 OAuth client，Firefox 使用网页授权。包、SHA-256 清单和验证日志位于本地忽略目录 `artifacts/release-0.2.0/`。
+- Chrome 包 6,758,659 字节，SHA-256 `848001abd2aa4cf908239cc41ed78e18bdf68a2d92a1529452a9ec0aba2ce245`；Firefox 包 6,758,560 字节，SHA-256 `9fe349242e6286d3a905ae34c4e9263f854ac18dbd8d90a8487e936c6334ccac`。本次仅打包，未签名或提交商店，官网下载仍为 0.1.1。
+- 美国 VPS 云盘页更新 `index.html`、`style.css`、`connect.js`；实际 `config.js` 哈希保持不变。此前线上缺少 `/design-tokens.css`，现同步官网共享令牌到静态目录并增加 OpenResty 精确路由，无需重建 API 镜像。
+- 原云盘页和代理配置备份于服务器私有目录 `/opt/nodelane/node-comics/drive-release-0.2.0-20260924-1720/backup/`。OpenResty 配置检查、重载以及五个公网资源的逐字节和安全响应头核对通过。API 镜像、数据库和后台进程未更新。
+- 公网 Chrome 桌面检查通过：页面、脚本、样式、图标均与源码一致，21 个共享样式变量已加载，无横向溢出或页面异常；直接访问正确提示从插件入口打开。截图与报告保存于同一本地产物目录。
+- 插件类型、模块和 i18n 检查通过，835 项测试通过、1 项跳过。新包通过隔离 Chrome 的网页授权 CBZ 与托管授权 MOBI 回归，覆盖文件选择、阅读位置恢复、失败处理、重启和断开；Google 服务为模拟，未重新验证真实账户授权。
+- Firefox `web-ext lint` 为 0 错误、18 条警告，涉及跨浏览器 API 和打包依赖中的动态导入、HTML、PDF 求值代码。未声称 Firefox 真实浏览器运行或商店审核通过。
+
 ## 2026-09-24 发布
 
 - 后端业务提交 `ee95a5d`，API、control-worker、maintenance 统一使用 `docker.nodelane.net/nodelane/node-comics:20260924-ee95a5d`；镜像已推送到既有仓库。摘要为 `sha256:0ef26001f19f6c6669e0098f465651d2bfa86a547c0d1fe3035c67c29bf0750f`。

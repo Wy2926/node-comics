@@ -44,9 +44,9 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
     <section className="settings-card">
       <h3>
         <Icon name="storage" />{msg("图片与隐私")}</h3>
-      <SettingRow title="译图缓存预算" description="仅限制本机译图。完整源文件、网站下载资料和原图缓存各自管理。">
+      <SettingRow title={msg('译图缓存预算')} description={msg('仅限制本机译图。完整源文件、网站下载资料和原图缓存各自管理。')}>
         <Select value={settings.cacheLimitMb} onChange={e=>setSettings(s=>({...s,cacheLimitMb:Number(e.target.value)}))}>
-          <option value="0">不保存译图缓存</option><option value="128">128 MB</option><option value="512">512 MB</option><option value="1024">1 GB（默认）</option><option value="10240">10 GB</option><option value="-1">受设备容量限制</option>
+          <option value="0">{msg('不保存译图缓存')}</option><option value="128">128 MB</option><option value="512">512 MB</option><option value="1024">{msg('1 GB（默认）')}</option><option value="10240">10 GB</option><option value="-1">{msg('受设备容量限制')}</option>
         </Select>
       </SettingRow>
       <div className="privacy-note">

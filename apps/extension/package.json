@@ -1,6 +1,6 @@
 {
   "name": "@node-comics/extension",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,10 +9,12 @@
     "build": "wxt build",
     "build:web": "vite build",
     "zip": "wxt zip",
-    "check": "wxt prepare && tsc --noEmit && npm run check:modules",
+    "check": "wxt prepare && tsc --noEmit && npm run check:modules && npm run check:i18n",
     "test": "vitest run",
     "postinstall": "wxt prepare",
-    "check:modules": "node scripts/check-modules.mjs"
+    "check:modules": "node scripts/check-modules.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "audit:i18n": "node scripts/check-i18n.mjs --json"
   },
   "dependencies": {
     "@zip.js/zip.js": "2.15.0",

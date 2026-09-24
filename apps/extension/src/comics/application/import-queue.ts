@@ -1,4 +1,4 @@
-import {msg,englishDictionary,type MessageKey} from '../../i18n/runtime';
+import {msg} from '../../i18n/runtime';
 import {importLocalFile} from './import-service';
 
 export type ImportStatus='queued'|'importing'|'created'|'duplicate'|'failed'|'cancelled';
@@ -33,7 +33,7 @@ export class LocalImportQueue {
    const item=this.state.items.find(i=>i.status==='queued');if(!item)break;
    this.controller=new AbortController();this.patch(item.id,{status:'importing',message:msg('正在保存源文件')});
    try{
-    const progress=(label:string,done?:number,total?:number)=>this.patch(item.id,{message:Object.hasOwn(englishDictionary,label)?msg(label as MessageKey):label,progress:{done,total}});
+    const progress:NonNullable<Parameters<typeof importLocalFile>[2]>=(label,done,total)=>this.patch(item.id,{message:msg(label),progress:{done,total}});
     const result=await importLocalFile(item.file,this.controller.signal,progress);
     this.patch(item.id,{status:result.created?'created':'duplicate',entryId:result.id,message:result.created?msg('可以开始阅读'):msg('已存在，继续阅读'),progress:undefined});
    }catch(error){this.patch(item.id,{status:this.controller.signal.aborted?'cancelled':'failed',message:(error as Error).message,progress:undefined});}

@@ -72,7 +72,8 @@ export async function registerLocalContainer(container:ManagedContainer,contentI
   signal?.throwIfAborted();
   return registerFile({title:titleFor(container.fileName??'漫画'),format:container.format,connection:{id:'local',provider:'local',displayName:'本地文件'},resourceId:container.id,locator:{containerId:container.id,name:container.fileName},containerId:container.id,contentId,pages});
 }
-async function saveLocalFile(file:File,signal?:AbortSignal,onProgress?:(label:string,done?:number,total?:number)=>void) {
+type ImportProgressLabel='正在保存完整源文件'|'源文件已保存，正在建立目录';
+async function saveLocalFile(file:File,signal?:AbortSignal,onProgress?:(label:ImportProgressLabel,done?:number,total?:number)=>void) {
   const contentId=crypto.randomUUID(),journal=await beginImportJournal(contentId,file);
   let container:ManagedContainer|undefined,registered=false;
   try {

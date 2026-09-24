@@ -87,6 +87,7 @@ beforeEach(() => {
       onRemoved: event(), onUpdated: event(), onActivated: event(), query: async () => [],
       create: async ({url}: {url: string}) => {const tab = {id: 7, url}; tabs.set(tab.id, tab); return tab;},
       get: async (id: number) => {const tab = tabs.get(id); if (!tab) throw Error('Tab closed'); return tab;},
+      remove: vi.fn(async (id: number) => {tabs.delete(id);}),
       update: async (id: number, change: {url: string}) => {const tab = {id, ...change}; tabs.set(id, tab); return tab;},
       sendMessage: vi.fn(async () => undefined),
     },
@@ -142,6 +143,7 @@ describe('production background listeners share the runtime message channel', ()
     const bridge = await owned({type: 'NC_DRIVE_BRIDGE_INIT'}, sender);
     expect(bridge).toMatchObject({ok: true, nonce: expect.any(String)});
     expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}}, sender)).toEqual({ok: true});
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(7);
     expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: true, account: {id: 'account-1'}, files: [{fileId: 'file-1', format: 'cbz'}]});
     expect(await owned({type: 'NC_DRIVE_TOKEN', accountId: 'account-1'})).toMatchObject({ok: true, accessToken: 'synthetic-test-token', account: {id: 'account-1'}});
     expect(await owned({type: 'NC_DRIVE_ACCOUNTS'})).toEqual({ok: true, accounts: [{account: {id: 'account-1', displayName: 'Test reader'}, status: 'connected'}]});
