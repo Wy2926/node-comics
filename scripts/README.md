@@ -28,6 +28,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_login_popup.mjs` | 构建后的 Chrome 扩展、隔离 profile 与本机 TLS 模拟 OIDC / API；使用真实 `launchWebAuthFlow` 检查 600 × 760 登录窗口、主窗口标签不变、关闭取消、拒绝后重试、成功自动关闭、PKCE 交换及第 2 页阅读位置恢复。需 Python `cryptography`、自制 `pages.cbz` 和下方 Playwright / 浏览器变量；不访问真实身份服务 |
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
 | `verify_website_source_lifecycle.mjs` | 本机 TLS / 隔离 DNS 下操作真实网站嵌入按钮、直接阅读、来源标签页、按需取图和主动下载；重开并让图片源失败后已下载页仍可读 |
+| `verify_source_image_cache.mjs` | 构建后的 MV3 扩展、隔离 profile 与本机 HTTP 图片服务；不使用会禁用缓存的请求拦截，复现可缓存 503，检查图片重试访问网络、位置保持及成功后的应用缓存复用。使用下方 Playwright / 浏览器变量，运行 `node scripts/verify_source_image_cache.mjs`，结果在 `artifacts/source-image-cache/` |
 | 插件 `tests/reader-window-fixture.html` | Vite 独立 5181 端口，30 章 × 120 页合成夹具；检查 3 章 / 11 页 DOM 上限、跳页、偏移恢复与失败；桌面目标浏览器检查截图及位置恢复 |
 | `verify_reader_directory.mjs` | Vite 独立 5181 端口，`tests/reader-directory-fixture.html` 的 620 章合成目录；覆盖当前项超出首批、倒序、嵌套分组、搜索恢复、状态刷新不抢滚动、页面缩略图、失败／未就绪和重开位置；截图在 `artifacts/reader-directory/` |
 | `verify_extension_theme.mjs` | 新书架、真实导入、菜单 / 导出弹窗、4 色 × 亮暗主题、阅读浮层与位置恢复；默认 Vite 5175，可用 `TEST_READER_URL` 指定隔离主应用 |

@@ -13,6 +13,8 @@ async function readResponse(url:string,signal:AbortSignal,customHeaders:boolean)
   const max = maxInlineBytes;
   const response = await fetch(url, {
     credentials: 'include',
+    // Validated images have an application cache; HTTP errors must not survive a retry.
+    cache: 'no-store',
     redirect:customHeaders?'error':'follow',
     signal,
   });
