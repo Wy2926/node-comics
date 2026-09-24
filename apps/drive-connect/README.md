@@ -2,7 +2,9 @@
 
 这是独立 HTTPS 静态页面源码，承载 Google Picker 和网页授权，不在扩展页加载远程 SDK。Chrome 可使用浏览器托管授权，Edge / Firefox 保留 GIS token model；两种方式都需要此选文件页面。未设置页面地址的构建默认关闭 Drive 入口。
 
-截至 2026-09-23，两种模式已通过模拟 Google 服务的隔离 Chrome 浏览器回归。此前用户确认网页授权后实际文件“已导入并能阅读”，本次交付后反馈当前流程恢复正常；真实账户重启恢复和长期续期尚未单独确认。模拟 Identity API 的成功不等于真实 Google 长期续期通过。没有生产部署或由代理修改 Google Cloud 资源。
+截至 2026-09-23，两种模式已通过模拟 Google 服务的隔离 Chrome 浏览器回归。此前用户确认网页授权后实际文件“已导入并能阅读”，本次交付后反馈当前流程恢复正常；真实账户重启恢复和长期续期尚未单独确认。模拟 Identity API 的成功不等于真实 Google 长期续期通过。
+
+2026-09-24 发布配置使用固定地址 `https://comics.nodelane.net/drive-connect/index.html`，插件 0.1.1 写入该地址和既有 Chrome OAuth client。已核对 Web OAuth 来源包含正式域名，并将 Picker key 的网站限制设置为 `https://comics.nodelane.net/*` 与 `https://docs.google.com/*`，API 限定 Drive 与 Picker。部署及线上验证状态见 [VPS 部署记录](../../docs/VPS_DEPLOYMENT.md)。
 
 ## 配置与构建
 
@@ -11,6 +13,8 @@
 3. 将此目录发布到专用、无广告和分析脚本的 HTTPS 路径，例如 `https://example.com/drive-connect/index.html`。响应头使用 `Cache-Control: no-store`、`Referrer-Policy: strict-origin-when-cross-origin`、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: frame-ancestors 'none'`。页面只在 `style-src` 允许 Google SDK 所需的 inline CSS，`script-src` 仍限制为本页脚本和指定 Google SDK origin。不要记录 hash、postMessage 内容或 token。
 4. 构建前设置 `VITE_DRIVE_CONNECT_URL` 为完整、最终不跳转的 HTTPS 页面 URL。构建会加入该 origin 与 `www.googleapis.com` 的 host permissions。普通 Vite 网页预览不提供扩展安全桥，不能授权。
 5. Chrome 托管授权额外需要 **Chrome Extension** 类型 OAuth client，其注册的扩展 ID 必须匹配实际安装 ID。用扩展的稳定公钥 / 商店 ID 保持解压构建 ID 稳定，核对控制台登记后将该 client ID 配置为 `VITE_GOOGLE_CHROME_CLIENT_ID`。它与 Web client、Picker key / appId 使用同一 Google Cloud 项目。WXT 仅对 Chrome 构建写入 `oauth2.client_id` 和 `drive.file` scope；不要把 Chrome client 填进页面的 `config.js`。参见 [Chrome OAuth 配置](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth)。
+
+现有 VPS 通过 [OpenResty 配置](../../deploy/openresty.comics.conf) 仅映射四个公开文件。宿主机目录为 `/opt/1panel/www/sites/comics-drive-connect/`，代理容器内为 `/www/sites/comics-drive-connect/`；复制 `index.html`、`style.css`、`connect.js`，并单独安装实际 `config.js`。不要把整个仓库或私密部署目录映射为网站目录。修改后先执行 OpenResty 配置检查，再 reload。
 
 在 `apps/extension` 目录构建的示例，所有值均为占位符：
 

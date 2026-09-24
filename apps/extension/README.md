@@ -2,7 +2,9 @@
 
 React / TypeScript / WXT Manifest V3 漫画阅读器，翻译由后端执行。漫画使用单来源模型：本地未加密 MOBI、CBZ/ZIP、CBR/RAR、PDF，Google Drive CBZ/ZIP，或专门适配的网站。选择文件自动导入，点卡片直接读；不支持散图导入、资料编辑、多来源和版本管理。
 
-产品行为见[单来源阅读](../../docs/SIMPLE_COMIC_READING_DESIGN.md)，存储采用 `node-comics-reading-v1-*` 空库基线，不迁移或兼容旧书架。界面验收以桌面浏览器为目标。
+产品行为见[单来源阅读](../../docs/SIMPLE_COMIC_READING_DESIGN.md)，存储采用 `node-comics-reading-v2-*` 空库基线，不迁移或兼容旧书架。界面验收以桌面浏览器为目标。新客户端需要重新导入漫画；旧本机数据库保留但不读取。
+
+翻译使用逐图 UUID、按需原图上传和批量快照，上传自动启动；本地页面键为固定 64 字符 SHA-256。没有阅读会话续租或旧 API 回退，客户端与后端须使用相同的新[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md)。
 
 ## 运行与构建
 
@@ -37,7 +39,7 @@ npx --no-install web-ext lint --source-dir .output/firefox-mv3
 | --- | --- |
 | 网站适配 | [精简开发规范](../../docs/SITE_ADAPTERS.md)，站点代码与说明在 `src/sources/sites/<id>/` |
 | 来源、页面和缓存 | [来源架构](../../docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式约束](../../docs/IMPORT_FORMATS_AND_CACHE.md) |
-| 阅读翻译与恢复 | [阅读计划契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
+| 阅读翻译与恢复 | [翻译接口契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
 | 账户、额度和支付 | [身份](../../docs/PRODUCTION_IDENTITY.md)、[会员规则](../../docs/MEMBERSHIP_AND_QUOTAS.md)、[订阅](../../docs/STRIPE_BILLING.md) |
 | UI 与文案 | [共享视觉令牌](../../docs/POPUP_AND_THEME.md)、[16 种界面语言](../../docs/UI_INTERNATIONALIZATION.md) |
 | 匿名适配申请与插件反馈 | [后台接口与边界](../../docs/ADMIN_CONSOLE.md#匿名网站申请与插件反馈) |

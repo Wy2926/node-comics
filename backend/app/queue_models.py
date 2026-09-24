@@ -11,9 +11,6 @@ class UserModeQueue(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     mode: Mapped[str] = mapped_column(String(20), primary_key=True)
     version: Mapped[int] = mapped_column(Integer, default=0)
-    session_id: Mapped[str | None] = mapped_column(String(80))
-    session_epoch: Mapped[int] = mapped_column(Integer, default=0)
-    session_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class ComputeNode(Base):

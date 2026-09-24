@@ -5,7 +5,7 @@ import type { FilePageMatch, FilePageSource, Job } from '../src/types';
 
 const origin = 'https://api.example';
 const source = (index: number): FilePageSource => ({ file_hash: index.toString(16).padStart(64, '0'), page_index: 0 });
-const match = (page: FilePageSource): FilePageMatch => ({ ...page, asset: { id: 'asset', width: 100, height: 200, expires_at: null }, jobs: [] });
+const match = (page: FilePageSource): FilePageMatch => ({ ...page, asset: { id: 'asset', width: 100, height: 200, expires_at: null }, translations: [] });
 const job = (status: Job['status'], extra: Partial<Job> = {}): Job => ({ id: 'job', input_asset_id: 'asset', output_asset_id: status === 'succeeded' ? 'result' : null, mode: 'classic', target_language: 'zh-Hans', status, phase: '', quota_pages: 1, created_at: '2026-09-14T00:00:00Z', version: 1, cache_hit: false, ...extra });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -41,6 +41,10 @@ describe('translation result versions', () => {
     expect(mergeJobs([job('succeeded')], [job('running')])[0].status).toBe('succeeded');
     expect(mergeJobs([job('outcome_unknown')], [job('queued')])[0].status).toBe('outcome_unknown');
     expect(mergeJobs([job('succeeded', { output_asset_id: null })], [job('succeeded', { output_asset_id: 'stale-result' })])[0]).toMatchObject({ output_asset_id: null, result_available: false, result_expired: true });
+  });
+  it('applies revoked authorization regardless of execution timestamps and prevents late revival',()=>{
+    const revoked=job('failed',{output_asset_id:null,result_expired:true,error:{code:'TRANSLATION_UNAVAILABLE',message:'unavailable'}});
+    const merged=mergeJobs([job('succeeded')],[revoked]);expect(merged[0].result_expired).toBe(true);expect(merged[0].output_asset_id).toBeNull();expect(mergeJobs(merged,[job('succeeded')])[0].output_asset_id).toBeNull();
   });
   it('retains independent versions from different configurations', () => {
     const old = job('succeeded', { id: 'old-config', version: 2, created_at: '2026-09-13T00:00:00Z' });

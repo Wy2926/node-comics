@@ -6,7 +6,7 @@ from sqlalchemy import delete, select, text, update
 from .config import settings
 from .db import session_factory
 from .models import now, uid
-from .plan_models import ControlAdmission, ImageAdmission, ReadingSession, TranslationPolicy
+from .translation_requests import ControlAdmission, ImageAdmission
 
 
 def server_now(db):
@@ -44,33 +44,7 @@ def admit_image(db, user, job_id):
     db.flush()
 
 
-def policy_snapshot(db, user, *, released=False):
-    from .entitlements import entitlements_json
-    from .providers import digest
-    from .scheduler import lock_scheduler
-    from .notifications import publish
-    lock_scheduler(db)
-    rights = entitlements_json(db, user)
-    def stable(value):
-        if isinstance(value, dict):
-            return {key: stable(item) for key, item in value.items() if key not in {'used', 'reserved', 'available'}}
-        if isinstance(value, list):
-            return [stable(item) for item in value]
-        return value
-    identity = stable({key: rights[key] for key in ('plan', 'plus_started_at', 'plus_expires_at', 'modes')})
-    fingerprint = digest({'rights': identity, 'images': image_limit(db, user)})
-    row = db.get(TranslationPolicy, user.id)
-    if row is None:
-        row = TranslationPolicy(owner_id=user.id, revision=1, fingerprint=fingerprint)
-        db.add(row)
-    elif row.fingerprint != fingerprint or released:
-        row.fingerprint, row.revision = fingerprint, row.revision + 1
-        publish(db, 'user:' + user.id)
-    db.flush()
-    return str(row.revision)
-
-
-def acquire_control(owner_id, scope='plan'):
+def acquire_control(owner_id, scope='translation'):
     cfg, at, token = settings(), now(), uid()
     with session_factory()() as db:
         if db.get_bind().dialect.name == 'postgresql':
@@ -78,27 +52,27 @@ def acquire_control(owner_id, scope='plan'):
         else:
             from sqlalchemy.dialects.sqlite import insert
         db.execute(insert(ControlAdmission).values(owner_id=owner_id, scope=scope,
-            tokens=cfg.plan_request_burst, refilled_at=at, leases=[]).on_conflict_do_nothing())
+            tokens=cfg.translation_request_burst, refilled_at=at, leases=[]).on_conflict_do_nothing())
         row = db.scalar(select(ControlAdmission).where(ControlAdmission.owner_id == owner_id,
             ControlAdmission.scope == scope).with_for_update())
-        row.tokens = min(cfg.plan_request_burst, row.tokens + max(0, (at - row.refilled_at).total_seconds()) * cfg.plan_requests_per_minute / 60)
+        row.tokens = min(cfg.translation_request_burst, row.tokens + max(0, (at - row.refilled_at).total_seconds()) * cfg.translation_requests_per_minute / 60)
         row.refilled_at = max(at, row.refilled_at)
         row.leases = [entry for entry in row.leases if entry['until'] > at.isoformat()]
-        busy = len(row.leases) >= cfg.plan_request_concurrency
+        busy = len(row.leases) >= cfg.translation_request_concurrency
         denied = busy or row.tokens < 1
-        retry = 1 if busy else max(1, ceil((1 - row.tokens) * 60 / cfg.plan_requests_per_minute))
+        retry = 1 if busy else max(1, ceil((1 - row.tokens) * 60 / cfg.translation_requests_per_minute))
         if not denied:
             row.tokens -= 1
-            row.leases = [*row.leases, {'id': token, 'until': (at + timedelta(seconds=cfg.plan_request_lease_seconds)).isoformat()}]
+            row.leases = [*row.leases, {'id': token, 'until': (at + timedelta(seconds=cfg.translation_request_lease_seconds)).isoformat()}]
         db.commit()
     if denied:
-        raise HTTPException(429, detail={'code': 'CONTROL_BUSY' if busy else 'CONTROL_RATE_LIMITED',
+        raise HTTPException(429, detail={'code': 'REQUEST_RATE_LIMITED',
             'message': '请求过于频繁，请稍后重试', 'scope': 'control_request', 'retry_after_seconds': retry},
             headers={'Retry-After': str(retry)})
     return token
 
 
-def release_control(owner_id, token, scope='plan'):
+def release_control(owner_id, token, scope='translation'):
     with session_factory()() as db:
         db.execute(update(ControlAdmission).where(ControlAdmission.owner_id == owner_id,
             ControlAdmission.scope == scope).values(tokens=ControlAdmission.tokens))
@@ -111,5 +85,3 @@ def release_control(owner_id, token, scope='plan'):
 
 def clean_admissions(db):
     db.execute(delete(ImageAdmission).where(ImageAdmission.admitted_at <= now() - timedelta(minutes=2)))
-    # Keep a compact fencing tombstone, but never retain historical image windows.
-    db.execute(update(ReadingSession).where(ReadingSession.expires_at <= now()).values(window=[]))

@@ -36,7 +36,7 @@ async function routes(){
   context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
   await context.route('https://**.nodelane.net/**',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
 }
-async function state(){return reader.evaluate(()=>new Promise((resolve,reject)=>{const open=indexedDB.open('node-comics-reading-v1-catalog');open.onerror=()=>reject(open.error);open.onsuccess=()=>{try{const db=open.result,tx=db.transaction(['entries','pageDescriptors','tasks'],'readonly'),documents=tx.objectStore('entries').getAll(),pages=tx.objectStore('pageDescriptors').getAll(),tasks=tx.objectStore('tasks').getAll();tx.onerror=()=>reject(tx.error);tx.oncomplete=()=>{resolve({documents:documents.result,pages:pages.result,tasks:tasks.result});db.close();};}catch(error){reject(error);}};}));}
+async function state(){return reader.evaluate(()=>new Promise((resolve,reject)=>{const open=indexedDB.open('node-comics-reading-v2-catalog');open.onerror=()=>reject(open.error);open.onsuccess=()=>{try{const db=open.result,tx=db.transaction(['entries','pageDescriptors','tasks'],'readonly'),documents=tx.objectStore('entries').getAll(),pages=tx.objectStore('pageDescriptors').getAll(),tasks=tx.objectStore('tasks').getAll();tx.onerror=()=>reject(tx.error);tx.oncomplete=()=>{resolve({documents:documents.result,pages:pages.result,tasks:tasks.result});db.close();};}catch(error){reject(error);}};}));}
 async function imports(slug,offline){
   const source=await context.newPage();await source.goto('https://www.mangacopy.com/comic/'+slug);
   const button=source.getByRole('button',{name:'NodeLane Comics · 导入/管理漫画',exact:true});await button.waitFor();
@@ -48,7 +48,7 @@ async function imports(slug,offline){
 }
 async function waitDocument(predicate){for(let n=0;n<100;n++){const value=await state();if(predicate(value))return value;await new Promise(resolve=>setTimeout(resolve,100));}throw Error('Document state timed out: '+JSON.stringify(await state()));}
 async function noManagedTabs(){return reader.evaluate(async()=>{const managed=await chrome.storage.session.get(null);return Object.keys(managed).filter(key=>key.startsWith('nc-managed:'));});}
-async function cacheCount(name){return reader.evaluate(name=>new Promise((resolve,reject)=>{const open=indexedDB.open('node-comics-reading-v1-'+name);open.onerror=()=>reject(open.error);open.onsuccess=()=>{try{const db=open.result,count=db.transaction('metadata').objectStore('metadata').count();count.onsuccess=()=>{resolve(count.result);db.close();};count.onerror=()=>reject(count.error);}catch(error){reject(error);}};}),name);}
+async function cacheCount(name){return reader.evaluate(name=>new Promise((resolve,reject)=>{const open=indexedDB.open('node-comics-reading-v2-'+name);open.onerror=()=>reject(open.error);open.onsuccess=()=>{try{const db=open.result,count=db.transaction('metadata').objectStore('metadata').count();count.onsuccess=()=>{resolve(count.result);db.close();};count.onerror=()=>reject(count.error);}catch(error){reject(error);}};}),name);}
 async function rendered(){await reader.waitForFunction(()=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===800&&image.naturalHeight===1200;},{},{timeout:30000});}
 try{
   await routes();let worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');

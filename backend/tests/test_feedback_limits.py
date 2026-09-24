@@ -10,6 +10,7 @@ def seed_feedback_job(owner_id, png):
     from app.assets import create_asset
     from app.db import session_factory
     from app.models import Job, now, uid
+    from app.translation_requests import TranslationRequest
     with session_factory()() as db:
         source = create_asset(db, owner_id, png)
         output = create_asset(db, owner_id, png, kind="classic", parent_id=source.id)
@@ -20,12 +21,17 @@ def seed_feedback_job(owner_id, png):
                   config={}, quota_pages=0, quota_kind="classic_daily", settlement="free",
                   completed_at=now())
         db.add(job)
+        db.flush()
+        translation_id = uid()
+        db.add(TranslationRequest(owner_id=owner_id, id=translation_id, job_id=job.id, request_hash='a' * 64,
+            descriptor={'image': {'sha256': source.sha256, 'byte_size': source.byte_size, 'content_type': source.mime},
+                'mode': job.mode, 'target_language': job.target_language}))
         db.commit()
-        return job.id
+        return translation_id
 
 
 def send_feedback(client, auth, job_id, key, comment="同一条合成反馈"):
-    return client.post(f"/v1/jobs/{job_id}/feedback",
+    return client.post(f"/v1/translations/{job_id}/feedback",
                        headers={**auth, "Idempotency-Key": key},
                        json={"issues": ["meaning"], "comment": comment})
 
@@ -142,9 +148,9 @@ def test_feedback_budget_is_independent_of_submission_and_page_quotas(feedback_c
     from app.config import settings
     from app.db import session_factory
     from app.models import Ledger
-    from app.plan_models import ControlAdmission
+    from app.translation_requests import ControlAdmission
     client, auth, _, job_id, _ = feedback_case
-    settings().plan_request_burst = 1
+    settings().translation_request_burst = 1
     settings().free_daily_pages = 0
     for index in range(3):
         assert send_feedback(client, auth, job_id, str(index)).status_code == 201

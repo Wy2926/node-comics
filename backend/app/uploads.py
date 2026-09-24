@@ -74,16 +74,6 @@ def owned_upload(db, upload_id, owner_id, *, lock=False):
     return reservation
 
 
-def upload_json(reservation):
-    return {"id": reservation.id, "job_id": reservation.job_id, "status": reservation.status,
-            "asset_id": reservation.asset_id,
-            "url": f"/v1/uploads/{reservation.id}/content", "method": "PUT",
-            "headers": {"Content-Type": reservation.mime}, "authorization_required": True,
-            "expires_at": reservation.expires_at.isoformat() + "Z",
-            "error": ({"code": reservation.error_code, "message": reservation.error_message}
-                      if reservation.error_code else None)}
-
-
 async def read_upload_stream(request, expected_size, *, limits=None):
     """Count bytes including chunked requests; never trust a declared length."""
     maximum = min(settings().max_upload_bytes, expected_size)
@@ -172,8 +162,8 @@ def _active_locked(db, reservation):
     if reservation.status not in UPLOAD_ACTIVE:
         return False
     job = db.get(Job, reservation.job_id)
-    if reservation.expires_at <= now() and not _validating(job):
-        _fail_locked(db, reservation, "UPLOAD_EXPIRED", "上传会话已过期，请重新提交", status="expired")
+    if reservation.expires_at <= now() and not reservation.verified_info and not _validating(job):
+        _fail_locked(db, reservation, "INPUT_EXPIRED", "原图输入已过期，请手动重试", status="expired")
         return False
     if not job or job.cancel_requested or job.discard_output or not (job.status == "awaiting_upload" or _validating(job)):
         _fail_locked(db, reservation, "UPLOAD_CANCELLED", "上传任务已取消", status="cancelled")
@@ -261,9 +251,60 @@ def expire_uploads(db, *, limit=100):
     lock_scheduler(db)
     reservations = db.scalars(select(UploadReservation).join(Job, Job.id == UploadReservation.job_id).where(
         UploadReservation.status == "awaiting_upload", UploadReservation.expires_at <= now(),
-        Job.status == "awaiting_upload")
+        Job.status == "awaiting_upload", UploadReservation.verified_info.is_(None))
         .order_by(UploadReservation.expires_at, UploadReservation.id).limit(limit)
         .with_for_update(skip_locked=True)).all()
     for reservation in reservations:
-        _fail_locked(db, reservation, "UPLOAD_EXPIRED", "上传会话已过期，请重新提交", status="expired")
+        _fail_locked(db, reservation, "INPUT_EXPIRED", "原图输入已过期，请手动重试", status="expired")
     return len(reservations)
+
+
+def recover_received_uploads(limit=100):
+    """Schedule validation of immutable originals written before an API crash.
+
+    The validated identity was committed before storage I/O. Inspect only bounded
+    receipts whose ingress lease is gone, then use the existing fenced worker
+    stage to reread and verify bytes. No database connection spans object I/O.
+    """
+    from .db import session_factory
+    from .upload_models import UploadIngressLease
+    from .queue_models import JobStage
+    from .scheduler import lock_scheduler, touch_job
+    active_ingress = select(UploadIngressLease.id).where(UploadIngressLease.upload_id == UploadReservation.id,
+        UploadIngressLease.expires_at > now())
+    with session_factory()() as db:
+        rows = db.execute(select(UploadReservation.id, UploadReservation.storage_backend,
+            UploadReservation.expected_sha256, UploadReservation.expires_at)
+            .where(UploadReservation.status == 'awaiting_upload', UploadReservation.verified_info.is_not(None),
+                ~active_ingress.exists()).order_by(UploadReservation.created_at).limit(limit)).all()
+    restored = 0
+    for row in rows:
+        try:
+            present = get_store(row.storage_backend).exists(content_storage_key(row.expected_sha256))
+        except (StorageError, OSError):
+            continue
+        if not present and row.expires_at > now():
+            continue
+        with session_factory()() as db:
+            lock_scheduler(db)
+            receipt = db.get(UploadReservation, row.id)
+            if not receipt or receipt.status != 'awaiting_upload':
+                continue
+            if db.scalar(select(UploadIngressLease.id).where(UploadIngressLease.upload_id == row.id,
+                    UploadIngressLease.expires_at > now())):
+                continue
+            if present:
+                job = db.get(Job, receipt.job_id)
+                if not _active_locked(db, receipt):
+                    db.commit()
+                    continue
+                receipt.status = 'validating'
+                job.status, job.phase = 'validating_upload', 'validating_upload'
+                if not db.scalar(select(JobStage.id).where(JobStage.job_id == job.id, JobStage.name == 'validate_upload')):
+                    db.add(JobStage(job_id=job.id, name='validate_upload', status='ready'))
+                touch_job(db, job)
+                restored += 1
+            else:
+                _fail_locked(db, receipt, 'INPUT_EXPIRED', '原图输入已过期，请手动重试', status='expired')
+            db.commit()
+    return restored

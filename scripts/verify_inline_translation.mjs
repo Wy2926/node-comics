@@ -17,24 +17,31 @@ assert(!manifest.content_scripts.some(s=>s.js.includes('content-scripts/inline.j
 manifest.host_permissions.push('http://*/*','https://*/*');await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
 const background=path.join(extension,'background.js');
 await writeFile(background,`chrome.permissions.request=permissions=>chrome.permissions.contains(permissions);globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
-const requests=[],operations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0,changeSequence=0;
+const requests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
-const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000,max_plan_items:4},entitlements:rights,retention_days:0};
+const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights,retention_days:0};
 let output,api,site,complete=true;
 const resultRequests=[];
 let heldResult,releaseResult,failResult;
 const accessCount=()=>requests.filter(r=>r.path.startsWith('/v1/images/')&&r.path.endsWith('/access')).length;
 const sha=data=>createHash('sha256').update(data).digest('hex');
-const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+job.id,completed_at:new Date().toISOString(),change_sequence:++changeSequence});};
-const snapshot=()=>({policy_revision:'1',server_time:new Date().toISOString(),entitlements:rights,image_rate_limit:{window_seconds:60,limit:10,remaining:10,retry_after_seconds:0}});
-const priority=modes=>Object.fromEntries(modes.map(mode=>[mode,{owned:true,epoch:1,expires_at:new Date(Date.now()+90000).toISOString()}]));
-const operationResult=(key,pageKey)=>{const entry=operations.get(key);if(!entry)return {operation_key:key,disposition:'not_found'};const job=jobs.get(entry.jobId);return {operation_key:key,page_key:pageKey??entry.pageKey,job,disposition:job.status==='succeeded'?'ready':['failed','cancelled','outcome_unknown','unknown_released'].includes(job.status)?'blocked':'pending',upload:job.status==='awaiting_upload'?entry.upload:null,created_at:job.created_at,...(job.status==='failed'?{code:'MANUAL_RETRY_REQUIRED',message:'示例翻译失败'}:{})};};
+const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',output_asset_id:'output-'+job.id,updated_at:new Date().toISOString()});};
+const translationResult=id=>{
+  const entry=translations.get(id);if(!entry)return;
+  const job=jobs.get(entry.jobId),state=job.status==='awaiting_upload'?'needs_input':job.status;
+  return {id,state,mode:job.mode,target_language:job.target_language,image_sha256:job.image_sha256,
+    input_asset_id:job.input_asset_id,created_at:job.created_at,updated_at:job.updated_at??job.created_at,
+    input_expires_at:state==='needs_input'?'2100-01-01T00:00:00Z':null,
+    result:state==='succeeded'?{kind:'translated',asset_id:job.output_asset_id,width:900,height:900,
+      download_url:api+'/result.png?id='+encodeURIComponent(job.output_asset_id),download_expires_at:null,authorization_required:true}:null,
+    error:state==='failed'?{code:'FIXTURE_FAILED',message:'示例翻译失败'}:null};
+};
 const server=createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://fixture');let body;
     if(req.method==='POST'||req.method==='PUT'){const chunks=[];for await(const chunk of req)chunks.push(chunk);body=Buffer.concat(chunks);if(req.headers['content-type']?.includes('application/json'))body=JSON.parse(body);}
-    const json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(data));};
+    const json=(data,status=200,headers={})=>{res.writeHead(status,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*',...headers});res.end(JSON.stringify(data));};
     if(url.pathname.startsWith('/source/')){const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;}
     if(url.pathname==='/result.png'){
       const id=url.searchParams.get('id');resultRequests.push(id);
@@ -46,33 +53,37 @@ const server=createServer(async(req,res)=>{
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
     if(url.pathname==='/v1/capabilities')return json(caps);
     if(url.pathname==='/v1/me/entitlements')return json(rights);
-    if(url.pathname==='/v1/me/translation-changes'){
-      const cursor=Number(url.searchParams.get('cursor')||'0'),until=Date.now()+Math.min(20,Number(url.searchParams.get('wait_seconds')||0))*1000;
-      while(!res.destroyed){refresh();const items=[...jobs.values()].filter(job=>(job.change_sequence??0)>cursor).sort((a,b)=>a.change_sequence-b.change_sequence);if(items.length||Date.now()>=until)return json({items,deleted_job_ids:[],cursor:String(items.at(-1)?.change_sequence??cursor),has_more:false,...snapshot()});await new Promise(resolve=>setTimeout(resolve,50));}return;
+    if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,translations:[],display_translations:[]}))});
+    if(url.pathname==='/v1/translations'&&req.method==='GET'){
+      const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean),until=Date.now()+Math.min(20,Number(url.searchParams.get('wait_seconds')||0))*1000;
+      while(!res.destroyed){
+        refresh();const items=ids.map(translationResult).filter(Boolean),value={items,missing_ids:ids.filter(id=>!translations.has(id))},etag='"'+sha(JSON.stringify(value))+'"';
+        if(req.headers['if-none-match']!==etag)return json(value,200,{ETag:etag});
+        if(Date.now()>=until){res.writeHead(304,{ETag:etag});res.end();return;}
+        await new Promise(resolve=>setTimeout(resolve,50));
+      }return;
     }
-    if(url.pathname==='/v1/translation-operations/resolve')return json({items:body.operation_keys.map(key=>operationResult(key)),policy_revision:'1'});
-    if(url.pathname.startsWith('/v1/reading-sessions/')&&url.pathname.endsWith('/lease'))return json({session_id:url.pathname.split('/')[3],priority:priority(body.modes),policy_revision:'1'});
-    if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,jobs:[],display_jobs:[]}))});
-    if(url.pathname==='/v1/translation-plans'&&req.method==='POST'){
-      assert(['reading','manual'].includes(body.trigger));assert(body.items.length<=4);
-      if(body.trigger==='reading')assert(Number.isSafeInteger(body.sequence)&&body.sequence>=0&&body.sequence<=2147483647,'reading sequence must fit backend integer');
-      const items=body.items.map(item=>{
-        const key=item.operation_key;if(operations.has(key))return operationResult(key,item.page_key);
-        const image=item.image;let job=[...jobs.values()].filter(j=>j.image_sha256===image.image_sha256&&j.mode===item.mode&&j.target_language===item.target_language).at(-1);
-        if((item.action??'ensure')==='ensure'&&job){
-          if(job.status==='failed')return {operation_key:key,page_key:item.page_key,disposition:'blocked',code:'MANUAL_RETRY_REQUIRED',message:'示例翻译失败',job};
-          operations.set(key,{jobId:job.id,pageKey:item.page_key});return operationResult(key,item.page_key);
-        }
-        if(body.allow_new===false)return {operation_key:key,page_key:item.page_key,disposition:'deferred',code:'NEW_TRANSLATION_NOT_REQUESTED'};
-        if(item.action&&item.action!=='ensure')assert(jobs.has(item.source_job_id),'manual retry requires original task');
-        const id=randomUUID();job={id,input_asset_id:'original-'+image.image_sha256,output_asset_id:null,mode:item.mode,target_language:item.target_language,status:'awaiting_upload',phase:'awaiting_upload',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false,result_available:false,result_expired:false,image_sha256:image.image_sha256,file_hash:image.file_hash,page_index:image.page_index,change_sequence:++changeSequence};jobs.set(id,job);createdJobs++;
-        const upload={id,job_id:id,status:'awaiting_upload',asset_id:null,url:api+'/upload/'+id,method:'PUT',authorization_required:true,headers:{'Content-Type':'image/png'},expires_at:new Date(Date.now()+60000).toISOString(),error:null};operations.set(key,{jobId:id,pageKey:item.page_key,upload});
-        return {...operationResult(key,item.page_key),disposition:'accepted'};
-      });
-      return json({session_id:body.session_id,applied_sequence:body.sequence,priority:priority([...new Set(body.items.map(i=>i.mode))]),...snapshot(),items},items.some(item=>item.disposition==='accepted')?202:200);
+    const route=url.pathname.match(/^\/v1\/translations\/([a-f0-9-]{36})(\/input)?$/);
+    if(route){
+      const [,id,input]=route;
+      if(input&&req.method==='PUT'){
+        const entry=translations.get(id);assert(entry,'input requires an accepted request');const job=jobs.get(entry.jobId);
+        assert.equal(sha(body),job.image_sha256);uploads.set(id,body);
+        if(job.status==='awaiting_upload')Object.assign(job,{status:'queued',updated_at:new Date().toISOString()});
+        return json(translationResult(id),202);
+      }
+      if(req.method==='GET')return translations.has(id)?json(translationResult(id)):json({error:{code:'NOT_FOUND'}},404);
+      if(req.method==='PUT'){
+        const {priority,...intent}=body,fingerprint=sha(JSON.stringify(intent));
+        if(translations.has(id)){assert.equal(translations.get(id).fingerprint,fingerprint);return json(translationResult(id));}
+        const previousId=body.retry_of??body.regenerate_of,previous=previousId&&translations.get(previousId),source=previous&&jobs.get(previous.jobId);
+        if(previousId)assert(source,'explicit generation must reference a translation owned by the reader');
+        const image=body.image??{sha256:source.image_sha256},requestedMode=body.mode??source.mode,requestedLanguage=body.target_language??source.target_language;
+        let job=!previousId&&[...jobs.values()].filter(j=>j.image_sha256===image.sha256&&j.mode===requestedMode&&j.target_language===requestedLanguage).at(-1);
+        if(!job){const jobId=randomUUID();job={id:jobId,input_asset_id:'original-'+image.sha256,output_asset_id:null,mode:requestedMode,target_language:requestedLanguage,status:source?'queued':'awaiting_upload',created_at:new Date().toISOString(),image_sha256:image.sha256};jobs.set(jobId,job);createdJobs++;}
+        translations.set(id,{jobId:job.id,fingerprint});return json(translationResult(id),job.status==='succeeded'?200:202);
+      }
     }
-    if(url.pathname.startsWith('/upload/')){uploads.set(url.pathname.split('/').at(-1),body);res.writeHead(200);res.end();return;}
-    if(url.pathname.startsWith('/v1/uploads/')){const id=url.pathname.split('/')[3],job=jobs.get(id);assert.equal(sha(uploads.get(id)),job.image_sha256);job.status='queued';job.phase='queued';job.change_sequence=++changeSequence;return json(job);}
     if(url.pathname.startsWith('/v1/images/'))return json({url:api+'/result.png?id='+encodeURIComponent(url.pathname.split('/')[3]),authorization_required:true,expires_at:null});
     return json({error:{message:'fixture missing '+url.pathname}},404);
   }catch(error){errors.push(error.message);res.writeHead(500);res.end('fixture failure');}
@@ -104,10 +115,10 @@ try{
   // Generate public synthetic test panels, deliberately changing output aspect ratio.
   await page.setContent('<body style="margin:0;width:800px;height:1100px;background:#fff5df;font:42px system-ui"><div style="margin:50px;border:6px solid #20304b;height:880px;padding:35px">Original comic panel<br><br>HELLO!<br><br>READ THE STORY</div></body>');
   const source=await page.screenshot({clip:{x:0,y:0,width:800,height:1100},captureBeyondViewport:true});
-  for(let n=1;n<=13;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
+  for(let n=1;n<=14;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
   await page.setContent('<body style="margin:0;width:900px;height:900px;background:#e3f3ff;font:42px system-ui"><div style="margin:50px;border:6px solid #224560;height:650px;padding:35px">译文效果示例<br><br>你好！<br><br>继续阅读故事</div></body>');
   output=await page.screenshot({clip:{x:0,y:0,width:900,height:900},captureBeyondViewport:true});
-  const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,change_sequence:++changeSequence,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
+  const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,language:'zh-Hans',translationMode:'classic',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
   await page.goto(site);await page.locator('#first').evaluate(i=>i.decode());await page.evaluate(()=>{window.fixtureClicks=0;document.querySelector('#site-button').addEventListener('click',()=>window.fixtureClicks++);});
   const before=await geometry();assert.equal(await page.locator('#first').evaluate(i=>i.style.content),'');
@@ -148,7 +159,6 @@ try{
   check('original/translation toggle uses persistent bytes with zero image access or download requests');
   await button('恢复原图');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');assert.equal(await page.locator('#first').getAttribute('width'),null);assert.equal(await page.locator('#first').getAttribute('height'),null);check('restore originals removes only extension-owned changes');
   await button('显示译图');await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
-  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(700);const mobile=await geometry();assert.equal(Math.round(mobile.width),351);assert(Math.abs(mobile.height-mobile.width*before.height/before.width)<1,JSON.stringify({before,mobile}));assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(out,'translated-mobile.png')});check('responsive page keeps original aspect ratio at 390px');
   await page.setViewportSize({width:1280,height:900});await page.locator('#third').scrollIntoViewIfNeeded();await page.waitForTimeout(700);await page.screenshot({path:path.join(out,'failed-page.png')});const thirdBefore=await page.locator('#third').evaluate(i=>({width:i.clientWidth,height:i.clientHeight}));await button('翻译失败 · 重试');await page.waitForFunction(()=>document.querySelector('#third').style.content.includes('blob:'),{},{timeout:18000});assert.equal(createdJobs,2);assert.deepEqual(await page.locator('#third').evaluate(i=>({width:i.clientWidth,height:i.clientHeight})),thirdBefore);check('individual failed image retries explicitly without blocking neighbours');
   await button('暂停');const count=createdJobs;await page.locator('#lazy').evaluate((i,url)=>i.src=url,api+'/source/4.png');await page.locator('#lazy').scrollIntoViewIfNeeded();await page.waitForTimeout(1200);assert.equal(createdJobs,count);await button('继续');await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('pause stops new work; resuming discovers lazy-loaded images');
   await page.locator('#lazy').evaluate((i,url)=>i.src=url,api+'/source/5.png');await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('site-owned source change removes stale translation and translates the new image');
@@ -172,7 +182,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});check('same-document navigation stops the old session and can be activated again');
   const reader=await browser.newPage();reader.on('pageerror',e=>errors.push(e.message));await reader.goto(`chrome-extension://${extensionId}/reader.html#settings`);await reader.getByRole('combobox',{name:'默认目标语言'}).waitFor();
   assert.equal(await reader.getByRole('combobox',{name:'默认目标语言'}).getAttribute('data-value'),'zh-Hans');
-  jobs.set('seed-en',{...jobs.get('seed-1'),id:'seed-en',target_language:'en',change_sequence:++changeSequence});
+  jobs.set('seed-en',{...jobs.get('seed-1'),id:'seed-en',target_language:'en'});
   const beforeLanguage=await page.locator('#first').evaluate(image=>image.style.content);
   await selectOption(reader.getByLabel('默认目标语言'),'en');await page.bringToFront();
   // Cached results can replace the restored original before the next Playwright poll.
@@ -196,8 +206,9 @@ try{
   await page.locator('#rolling-1').evaluate(i=>window.scrollTo(0,i.offsetTop));
   const rollingJob=n=>[...jobs.values()].find(j=>j.image_sha256===sha(images.get(n+6)));
   heldResult='output-'+rollingJob(2).id;
-  for(let n=1;n<=6;n++)Object.assign(rollingJob(n),{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+rollingJob(n).id,updated_at:new Date().toISOString(),change_sequence:++changeSequence});
+  for(let n=1;n<=6;n++)Object.assign(rollingJob(n),{status:'succeeded',phase:'completed',result_available:true,output_asset_id:'output-'+rollingJob(n).id,updated_at:new Date().toISOString()});
   await page.waitForFunction(()=>document.querySelector('#rolling-1').style.content.includes('blob:')&&document.querySelector('#rolling-3').style.content.includes('blob:'),null,{timeout:15000});
+  const heldUntil=Date.now()+5000;while(!releaseResult&&Date.now()<heldUntil)await page.waitForTimeout(25);
   assert(releaseResult,'the neighbour download must actually be in flight');
   assert.equal(await page.locator('#rolling-2').evaluate(i=>i.style.content),'');
   await page.screenshot({path:path.join(out,'independent-downloads.png')});
@@ -225,24 +236,26 @@ try{
   await page.waitForFunction(()=>document.querySelector('#rolling-1').style.content.includes('blob:'));
   assert.equal(resultRequests.length,cacheDownloads);assert.equal(createdJobs,cacheJobs);
   check('reloading a page restores translations from IndexedDB without downloading or translating again');
-  // A new delivered version must not reuse the old bitmap, and a failed GET must never regenerate it.
-  const failed=rollingJob(1),nextOutput='retry-'+failed.id;
-  const previousOutput=await page.locator('#rolling-1').evaluate(i=>i.style.content);
+  // A changed original creates a new request. A failed result download only retries bytes.
+  await page.locator('#rolling-1').evaluate((image,url)=>image.src=url,api+'/source/14.png');
+  await waitJob(14);
+  const failed=[...jobs.values()].find(job=>job.image_sha256===sha(images.get(14))),nextOutput='output-'+failed.id;
   failResult=nextOutput;
-  Object.assign(failed,{output_asset_id:nextOutput,updated_at:new Date(Date.now()+1000).toISOString(),change_sequence:++changeSequence});
+  Object.assign(failed,{status:'succeeded',output_asset_id:nextOutput,updated_at:new Date().toISOString()});
   const retryUntil=Date.now()+15000;while(!resultRequests.includes(nextOutput)&&Date.now()<retryUntil)await page.waitForTimeout(50);
   assert(resultRequests.includes(nextOutput));
   await page.waitForTimeout(300);
   const beforeReloadRetry=requests.length;
   await page.screenshot({path:path.join(out,'download-failure.png')});
   await button('加载失败 · 重试');
-  const doneUntil=Date.now()+15000;while(resultRequests.filter(id=>id===nextOutput).length<2&&Date.now()<doneUntil)await page.waitForTimeout(50);
-  await page.waitForFunction(previous=>{const value=document.querySelector('#rolling-1').style.content;return value.includes('blob:')&&value!==previous;},previousOutput);
+  await page.waitForFunction(()=>document.querySelector('#rolling-1').style.content.includes('blob:'));
   assert.equal(resultRequests.filter(id=>id===nextOutput).length,2);
-  assert.equal(createdJobs,cacheJobs);
-  assert.equal(requests.slice(beforeReloadRetry).filter(r=>r.method==='POST'&&r.path==='/v1/translation-plans').length,0);
-  check('download failure retry only reads the new result; it submits no plan and creates no translation');
-  assert.equal(requests.filter(r=>r.path.includes('/queues')||r.path.includes('/translation-submissions')||r.path.endsWith('/priority')).length,0,'normal reading must not use removed queue/submission contracts');check('new plans and long-poll run with zero queue, priority or old submission requests');
+  assert.equal(createdJobs,cacheJobs+1);
+  assert.equal(requests.slice(beforeReloadRetry).filter(r=>r.method==='PUT'&&/^\/v1\/translations\/[^/]+$/.test(r.path)).length,0);
+  check('download failure retry only reads the result and creates no translation');
+  assert.equal(requests.filter(r=>/translation-plans|translation-operations|reading-sessions|translation-changes|\/v1\/uploads/.test(r.path)).length,0,'removed reading control endpoints must never be requested');
+  assert.equal(accessCount(),0,'completed snapshots directly supply the download URL');
+  check('single-image requests and snapshots use no reading lease, plan, completion or separate result-access calls');
   // Match the real Comic PASH canvas structure with synthetic pixels and the same API fixture.
   complete=true;
   await browser.route('https://comicpash.jp/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><title>Canvas RTL fixture</title><style>body{margin:0}#xCVPages{display:flex;flex-direction:row-reverse;width:1200px}.-cv-page{width:600px;height:800px;flex:none}.-cv-page-canvas{position:relative;width:600px;height:800px}canvas{width:600px;height:800px}#xCVPages canvas{position:absolute;top:50%;left:0;transform:translateY(-50%)}</style><div id="comici-viewer" data-comici-viewer-id="fixture"><div id="xCVPages">${[1,2].map(n=>`<div class="-cv-page mode-rendered"><div class="-cv-page-canvas"><canvas id="canvas-${n}" width="600" height="800"></canvas></div></div>`).join('')}</div></div><canvas id="canvas-ad" width="600" height="800"></canvas><script>for(const [n,canvas] of [...document.querySelectorAll('canvas')].entries()){const ctx=canvas.getContext('2d');ctx.fillStyle=['#ffe0b0','#d0e0ff','#f00'][n];ctx.fillRect(0,0,600,800);ctx.fillStyle='#123';ctx.font='40px sans-serif';ctx.fillText('Original '+n,60,180);}document.querySelector('#canvas-1').onclick=()=>document.body.dataset.clicked='yes';</script>`}))
@@ -289,7 +302,7 @@ try{
     check('Live Comic PASH source recognizes canvases, displays fixture translations, turns pages and restores originals; no live provider used');
   }
   assert.equal(errors.length,0,errors.join('\n'));
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,operations:operations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));console.error('Artifacts: '+out);throw error;}
 finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

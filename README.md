@@ -8,7 +8,7 @@
 
 ## 开发与验证
 
-当前后端只支持 `payments_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
+当前后端只支持 `translations_0001` 全新空库，不升级旧数据库。部署记录与当前源码分开维护；[VPS 记录](docs/VPS_DEPLOYMENT.md)不代表最新代码已上线。
 
 - [后端运行与 Docker 隔离测试](backend/README.md)：根 `.env` 配置、`scripts/bootstrap.ps1 -Start`、控制进程与数据库。
 - [五语官网与账户](backend/website/README.md)：静态 SEO 页面、独立语言字典、同域 API 与 OIDC 登录、商店链接配置。
@@ -23,7 +23,7 @@
 | 范围 | 入口 |
 | --- | --- |
 | 产品与界面 | [产品设计](docs/PRODUCT_DESIGN.md)、[品牌与商店文案](docs/BRAND_AND_STORE_LISTING.md)、[界面国际化](docs/UI_INTERNATIONALIZATION.md)、[共享主题](docs/POPUP_AND_THEME.md) |
-| 阅读与翻译 | [阅读计划契约](docs/READING_TRANSLATION_CONTRACT.md)、[网页内翻译](docs/IN_PAGE_TRANSLATION.md)、[语言支持](docs/NODE_CONFIGURATION.md#目标语言与节点能力)、[译图共享](docs/RESULT_SHARING.md) |
+| 阅读与翻译 | [当前翻译接口契约](docs/READING_TRANSLATION_CONTRACT.md)、[翻译接口简化设计](docs/TRANSLATION_API_SIMPLIFICATION.md)、[网页内翻译](docs/IN_PAGE_TRANSLATION.md)、[语言支持](docs/NODE_CONFIGURATION.md#目标语言与节点能力)、[译图共享](docs/RESULT_SHARING.md) |
 | 漫画与直接阅读 | [单来源简化设计](docs/SIMPLE_COMIC_READING_DESIGN.md)、[来源与缓存架构](docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式与缓存](docs/IMPORT_FORMATS_AND_CACHE.md) |
 | 网站适配开发 | [精简规范与站点入口](docs/SITE_ADAPTERS.md) |
 | 服务端 | [架构](docs/ARCHITECTURE.md)、[集群调度](docs/TRANSLATION_CLUSTER_DESIGN.md)、[计算协议](docs/COMPUTE_PROTOCOL.md)、[节点配置](docs/NODE_CONFIGURATION.md) |

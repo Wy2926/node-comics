@@ -1,21 +1,11 @@
+from conftest import inspect_job
 from conftest import quota_usage
 from conftest import run_job, claim_job
 from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import create, login_plus as login, upload, submit_asset, png_variant
-
-
-def submit_pages(client, auth, asset_ids, key="batch-1", max_pages=None):
-    from app.db import session_factory
-    from app.models import Asset
-    with session_factory()() as db:
-        items = [{"client_item_id": str(index), "asset_id": asset.id, "image_sha256": asset.sha256,
-                  "byte_size": asset.byte_size, "content_type": asset.mime}
-                 for index, asset in enumerate(db.get(Asset, aid) for aid in asset_ids)]
-    from test_cluster_submissions import submit
-    return submit(client, auth, items, key=key, mode="redraw", max_pages=max_pages)
+from conftest import create, login_plus as login, upload, submit_asset, png_variant, request_for_job, configure_system_limits
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -37,7 +27,7 @@ def test_idempotency_binds_input_and_parameters(client, png):
     asset = upload(client, auth, png)
     first = create(client, auth, asset)
     second = create(client, auth, asset)
-    assert first.status_code == 202 and second.status_code == 200
+    assert first.status_code == 202 and second.status_code == 202
     assert first.json()["id"] == second.json()["id"]
     assert create(client, auth, asset, language="en").json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
     assert quota_usage(client, auth)["reserved"] == 1
@@ -61,17 +51,17 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     process_job(job_id)
     process_job(job_id)
     assert len(calls) == 1
-    job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
+    job = inspect_job(job_id)
     assert job["status"] == "succeeded"
     assert client.get(f"/v1/images/{job['output_asset_id']}/content", headers=auth).content == png
     usage = quota_usage(client, auth)
     assert (usage["used"], usage["reserved"], usage["available"]) == (1, 0, 299)
     cached = submit_asset(client, auth, asset, key="cached").json()
-    assert cached["items"][0]["disposition"] == "ready"
-    assert cached["items"][0]["job"]["output_asset_id"] == job["output_asset_id"]
-    rerun = submit_asset(client, auth, asset, key="explicit-rerun", regenerate=True, rerun_job_id=job_id)
-    assert rerun.status_code == 202 and rerun.json()["items"][0]["disposition"] == "accepted"
-    assert rerun.json()["items"][0]["job"]["version"] > job["version"]
+    assert cached["state"] == "succeeded"
+    assert cached["result"]["asset_id"] == job["output_asset_id"]
+    rerun = create(client, auth, asset, key="explicit-rerun", regenerate=True, rerun_job_id=job_id)
+    assert rerun.status_code == 202
+    assert rerun.json()["version"] > job["version"]
     assert quota_usage(client, auth)["reserved"] == 1
 
 
@@ -90,9 +80,9 @@ def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypat
     process_job(job_id)
     process_job(job_id)
     assert calls == [1]
-    assert client.get(f"/v1/jobs/{job_id}", headers=auth).json()["status"] == "outcome_unknown"
+    assert inspect_job(job_id)["status"] == "outcome_unknown"
     assert quota_usage(client, auth)["reserved"] == 1
-    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).json()["items"][0]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
+    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).json()["error"]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
     def rejected(*args):
         raise ProcessingError("PROVIDER_REJECTED", "请求被拒绝")
     monkeypatch.setattr(workers, "redraw", rejected)
@@ -109,8 +99,8 @@ def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypat
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
     for _ in range(2):
-        result = client.post(f"/v1/jobs/{job_id}/cancel", headers=auth)
-        assert result.json()["status"] == "cancelled"
+        result = client.post("/v1/translations/" + request_for_job(client, auth, job_id) + "/cancel", headers=auth)
+        assert result.json()["state"] == "failed"
     process_job(job_id)
     usage = quota_usage(client, auth)
     assert usage["used"] == 0 and usage["reserved"] == 0
@@ -129,7 +119,7 @@ def test_running_cancel_or_delete_discards_output_without_charge(client, png, mo
         return TranslationOutput(png)
     monkeypatch.setattr(workers, "redraw", cancel_during_provider)
     run_job(job_id)
-    job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
+    job = inspect_job(job_id)
     assert job["status"] == "cancelled" and job["output_asset_id"] is None
     assert quota_usage(client, auth)["used"] == 0
     assert client.get(f"/v1/images/{asset}/content", headers=auth).status_code == 410
@@ -145,64 +135,53 @@ def test_deleted_or_expired_output_not_a_cache_hit(client, png, monkeypatch):
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
     run_job(job_id)
-    original = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
+    original = inspect_job(job_id)
     output_id = original["output_asset_id"]
     with session_factory()() as db:
         db.get(Asset, output_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
     assert client.get(f"/v1/images/{output_id}/access", headers=auth).status_code == 410
-    history = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
+    history = inspect_job(job_id)
     assert history["result_expired"] and history["output_asset_id"] is None
     new_job = create(client, auth, asset, key="expired-cache").json()
     assert not new_job["cache_hit"] and new_job["status"] == "queued"
 
 
-def test_cross_user_jobs_are_private_and_completed_images_are_shared(client, png, monkeypatch):
+def test_cross_user_translation_ids_are_private_and_completed_bytes_are_shared(client, png, monkeypatch):
     import app.workers as workers
     from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(png))
-    alice, bob = login(client), login(client, "bob")
-    alice_asset = upload(client, alice, png)
-    job_id = create(client, alice, alice_asset).json()["id"]
+    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    alice, bob = login(client), login(client, 'bob')
+    source = upload(client, alice, png)
+    job_id = create(client, alice, source).json()['id']
     run_job(job_id)
-    assert client.get(f"/v1/jobs/{job_id}", headers=bob).status_code == 404
-    assert client.post("/v1/jobs/status", headers=bob, json={"ids": [job_id]}).json() == {"items": []}
-    assert create(client, bob, alice_asset).json()["error"]["code"] == "NOT_FOUND"
-    bob_job = create(client, bob, upload(client, bob, png)).json()
-    assert bob_job["cache_hit"] and bob_job["quota_pages"] == 0
-    assert bob_job["id"] != job_id and bob_job["status"] == "succeeded"
+    translation_id = request_for_job(client, alice, job_id)
+    assert client.get('/v1/translations/' + translation_id, headers=bob).status_code == 404
+    assert client.get('/v1/translations', headers=bob, params={'ids':translation_id}).json() == {
+        'items':[], 'missing_ids':[translation_id]}
+    reused = submit_asset(client, bob, upload(client, bob, png)).json()
+    assert reused['state'] == 'succeeded' and reused['result']['download_url']
+    assert quota_usage(client, bob)['used'] == 0
 
 
-def test_per_page_budget_keeps_accepted_receipts_and_job_cancellation(client,png):
-    auth=login(client)
-    assets=[upload(client,auth,png_variant(png,index)) for index in range(3)]
-    response=submit_pages(client,auth,assets,max_pages=2)
-    assert response.status_code==202,response.text
-    items=response.json()["items"]
-    assert [item["disposition"] for item in items]==["accepted","accepted","blocked"]
-    assert items[2]["code"]=="QUOTA_BOUND_EXCEEDED"
-    assert quota_usage(client,auth)["reserved"]==2
-    replay=submit_pages(client,auth,assets,max_pages=2)
-    assert replay.status_code==200
-    assert [item["job"]["id"] for item in replay.json()["items"][:2]]==[item["job"]["id"] for item in items[:2]]
-    for item in items[:2]:
-        assert client.post(f"/v1/jobs/{item['job']['id']}/cancel",headers=auth).json()["status"]=="cancelled"
-    assert quota_usage(client,auth)["reserved"]==0
-
-
-def test_bad_asset_rejection_does_not_rollback_accepted_neighbor(client,png):
+def test_independent_page_quota_and_cancellation_are_atomic(client, png):
+    auth = login(client)
+    assets = [upload(client,auth,png_variant(png,index)) for index in range(3)]
+    first = create(client,auth,assets[0],key='page-0').json()
     from app.db import session_factory
-    from app.models import Asset,now
-    auth=login(client)
-    assets=[upload(client,auth,png_variant(png,index)) for index in range(2)]
+    from app.entitlement_models import QuotaPeriod
     with session_factory()() as db:
-        db.get(Asset,assets[1]).deleted_at=now()
+        db.get(QuotaPeriod,first['quota_period_id']).granted = 2
         db.commit()
-    response=submit_pages(client,auth,assets,key="bad-page")
-    assert response.status_code==202
-    assert [item["disposition"] for item in response.json()["items"]]==["accepted","blocked"]
-    assert client.get("/v1/jobs",headers=auth).json()["total"]==1
-    assert quota_usage(client,auth)["reserved"]==1
+    second = create(client,auth,assets[1],key='page-1')
+    denied = create(client,auth,assets[2],key='page-2')
+    assert second.status_code == 202 and denied.status_code == 403
+    assert denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
+    assert quota_usage(client,auth)['reserved'] == 2
+    for item in [first, second.json()]:
+        path = '/v1/translations/' + request_for_job(client,auth,item['id']) + '/cancel'
+        assert client.post(path,headers=auth).json()['state'] == 'failed'
+    assert quota_usage(client,auth)['reserved'] == 0
 
 
 def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, png, monkeypatch):
@@ -282,7 +261,7 @@ def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypa
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(buffer.getvalue()))
     job_id = create(client, auth, asset).json()["id"]
     run_job(job_id)
-    job = client.get(f"/v1/jobs/{job_id}", headers=auth).json()
+    job = inspect_job(job_id)
     assert job["status"] == "failed" and job["error"]["code"] == "INVALID_PROVIDER_OUTPUT"
     assert quota_usage(client, auth)["available"] == 300
 
@@ -299,8 +278,8 @@ def test_insufficient_quota_creates_no_job(client, png):
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
     asset = upload(client, auth, png_variant(png, 2))
     rejected = create(client, auth, asset, key="no-credit")
-    assert rejected.status_code == 200 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
-    assert client.get("/v1/jobs", headers=auth).json()["total"] == 2
+    assert rejected.status_code == 403 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
+    assert client.get("/v1/translations", headers=auth).json()["total"] == 2
     assert quota_usage(client, auth)["reserved"] == 2
 
 
@@ -321,5 +300,5 @@ def test_upload_signature_limits_and_inputs(client, png):
     asset = upload(client, auth, png)
     assert create(client, auth, asset, language="unsupported").status_code == 422
     assert submit_asset(client, auth, asset, mode="standard").status_code == 422
-    assert client.post("/v1/translation-plans", headers=auth, json={}).status_code == 422
+    assert client.put("/v1/translations/" + __import__("uuid").uuid4().hex, headers=auth, json={}).status_code == 422
     assert client.post("/v1/images", headers=auth).status_code == 404

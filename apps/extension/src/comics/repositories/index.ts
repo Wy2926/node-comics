@@ -22,7 +22,6 @@ const schema: Record<CatalogTable, [string, string | string[], boolean?][]> = {
   materializations: [['contentId', 'contentId'], ['pageId', 'pageId'], ['imageSha256', 'imageSha256']],
   positions: [['entryId', 'entryId', true], ['comicId', 'comicId'], ['updatedAt', 'updatedAt']],
   translationBindings: [['imageSha256', 'imageSha256'], ['account', ['apiOrigin', 'userId']]],
-  translationOperations: [['entryId', 'entryId'], ['status', 'status']],
   catalogs: [['comicId', 'comicId']],
   tasks: [['entryId', 'entryId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
   metadata: [], tombstones: [],
@@ -244,7 +243,7 @@ export const catalog = {
       for (const entry of entries) {
         for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
         for (const value of await tx.list('materializations', {index: 'contentId', range: entry.contentId, limit: 5000})) await tx.remove('materializations', value.id);
-        for (const table of ['positions', 'tasks', 'translationOperations'] as const) for (const value of await tx.list(table, {index: 'entryId', range: entry.id, limit: 10000})) await tx.remove(table, value.id);
+        for (const table of ['positions', 'tasks'] as const) for (const value of await tx.list(table, {index: 'entryId', range: entry.id, limit: 10000})) await tx.remove(table, value.id);
         await tx.remove('entries', entry.id);
       }
       for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);

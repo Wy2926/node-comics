@@ -141,13 +141,13 @@ describe('authenticated API boundaries',()=>{
     await expect(bound().entitlements()).rejects.toMatchObject({status:403});expect(request).toHaveBeenCalledOnce();expect((await readAuth()).session).not.toBeNull();
   });
   it('keeps the same session binding for the long-poll listener',async()=>{
-    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(Response.json({jobs:[]}));
-    await bound().waitForTranslationChanges('1',new AbortController().signal);
+    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(Response.json({items:[],missing_ids:[]}));
+    await bound().translations(['1'],{wait:true,signal:new AbortController().signal});
     expect(new Headers(request.mock.calls[2][1].headers).get('Authorization')).toBe('Bearer new-access');
   });
   it('applies refresh to authenticated uploads',async()=>{
-    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(new Response('',{status:200}));
-    await bound().uploadOriginal({id:'test-upload',url:API_BASE+'/upload',method:'PUT',headers:{},authorization_required:true,expires_at:new Date(Date.now()+60000).toISOString()},new Blob(['bytes']));
+    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(Response.json({id:'test-upload',state:'queued'}));
+    await bound().translationInput('test-upload',new Blob(['bytes']));
     expect(new Headers(request.mock.calls[2][1].headers).get('Authorization')).toBe('Bearer new-access');
   });
   it('refreshes signed image URLs without touching the login session',async()=>{

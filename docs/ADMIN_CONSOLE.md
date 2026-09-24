@@ -37,7 +37,7 @@
 - **最近提交**表示最近任务创建时间；系统未记录用户最后登录或当前在线状态，后台不会据此推断。
 - 时间按浏览器本地时区显示。监控列表默认每 15 秒刷新，可暂停；后台标签页隐藏或详情打开时停止监控列表定时刷新。产品和订单页面手动刷新。请求失败保留上次数据并标记可能过时，支持重试；产品数据读取失败时禁用修改，刷新成功后恢复。
 
-`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，`#image-providers` 管理图片重绘，二者配置与测试分别执行。文本配置说明见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[初始迁移](../backend/migrations/versions/0001_payments.py)和模型为准，不另维护表数／字段数快照。
+`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，`#image-providers` 管理图片重绘，二者配置与测试分别执行。文本配置说明见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[初始迁移](../backend/migrations/versions/0001_translations.py)和模型为准，不另维护表数／字段数快照。
 
 ### 处理操作与恢复
 
@@ -84,7 +84,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 
-容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库仅保留 `payments_0001` 全新空库基线，当前包含 52 表及本轮新增的审计、反馈处理、退款和争议结构，不升级旧库。API 与工作进程应使用同版本代码。
+容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库仅保留 `translations_0001` 全新空库基线，包含翻译请求、审计、反馈处理、退款和争议结构，不升级旧库。API 与工作进程应使用同版本代码。
 
 ### 登录
 

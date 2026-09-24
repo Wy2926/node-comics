@@ -14,16 +14,15 @@ from test_classic import text_database
 def test_replays_consume_control_tokens_but_not_image_budget(cluster,png):
     from app.config import settings
     from app.db import session_factory
-    from app.plan_models import ControlAdmission, ImageAdmission
+    from app.translation_requests import ControlAdmission, ImageAdmission
     client,_=cluster
     auth=login(client)
-    settings().plan_request_burst=3
-    settings().plan_requests_per_minute=1
-    responses=[submit(client,auth,[descriptor(png)],key=f'reuse-{i}') for i in range(6)]
-    assert [r.status_code for r in responses] == [202,200,200,429,429,429]
+    settings().translation_request_burst=3
+    settings().translation_requests_per_minute=1
+    responses=[submit(client,auth,descriptor(png),key=f'reuse-{i}') for i in range(6)]
+    assert [r.status_code for r in responses] == [202,202,202,429,429,429]
     for response in responses[3:]:
-        assert response.json()['error']['code']=='CONTROL_RATE_LIMITED'
-        assert response.json()['error']['scope']=='control_request'
+        assert response.json()['error']['code']=='REQUEST_RATE_LIMITED'
         assert int(response.headers['Retry-After']) > 0
     with session_factory()() as db:
         assert len(list(db.scalars(select(ImageAdmission))))==1
@@ -31,15 +30,15 @@ def test_replays_consume_control_tokens_but_not_image_budget(cluster,png):
 
 
 def test_independent_sessions_enforce_same_account_concurrency(scheduler_case):
-    from app.plan_limits import acquire_control,release_control
+    from app.translation_limits import acquire_control,release_control
     from app.config import settings
-    settings().plan_request_concurrency=2
+    settings().translation_request_concurrency=2
     gate=Barrier(8)
     def enter(index):
         gate.wait()
         try:return acquire_control('free-user')
         except HTTPException as error:
-            assert error.status_code==429 and error.detail['code']=='CONTROL_BUSY'
+            assert error.status_code==429 and error.detail['code']=='REQUEST_RATE_LIMITED'
             return None
     with ThreadPoolExecutor(8) as pool:
         accepted=[token for token in pool.map(enter,range(8)) if token]
@@ -52,33 +51,33 @@ def test_independent_sessions_enforce_same_account_concurrency(scheduler_case):
 
 
 def test_expired_admission_lease_does_not_permanently_block_account(scheduler_case,monkeypatch):
-    from app import plan_limits
+    from app import translation_limits
     from app.config import settings
     from app.models import now
-    settings().plan_request_concurrency=1
-    first=plan_limits.acquire_control('free-user')
-    later=now()+timedelta(seconds=settings().plan_request_lease_seconds+1)
-    monkeypatch.setattr(plan_limits,'now',lambda:later)
-    following=plan_limits.acquire_control('free-user')
+    settings().translation_request_concurrency=1
+    first=translation_limits.acquire_control('free-user')
+    later=now()+timedelta(seconds=settings().translation_request_lease_seconds+1)
+    monkeypatch.setattr(translation_limits,'now',lambda:later)
+    following=translation_limits.acquire_control('free-user')
     assert following != first
-    plan_limits.release_control('free-user',first)
-    with pytest.raises(HTTPException) as denied:plan_limits.acquire_control('free-user')
-    assert denied.value.detail['code']=='CONTROL_BUSY'
-    plan_limits.release_control('free-user',following)
+    translation_limits.release_control('free-user',first)
+    with pytest.raises(HTTPException) as denied:translation_limits.acquire_control('free-user')
+    assert denied.value.detail['code']=='REQUEST_RATE_LIMITED'
+    translation_limits.release_control('free-user',following)
 
 
 def test_independent_sessions_share_control_request_burst(scheduler_case):
-    from app.plan_limits import acquire_control,release_control
+    from app.translation_limits import acquire_control,release_control
     from app.config import settings
-    settings().plan_request_concurrency=32
-    settings().plan_request_burst=3
-    settings().plan_requests_per_minute=1
+    settings().translation_request_concurrency=32
+    settings().translation_request_burst=3
+    settings().translation_requests_per_minute=1
     gate=Barrier(8)
     def enter(index):
         gate.wait()
         try:return acquire_control('free-user')
         except HTTPException as error:
-            assert error.detail['code']=='CONTROL_RATE_LIMITED'
+            assert error.detail['code']=='REQUEST_RATE_LIMITED'
             return None
     with ThreadPoolExecutor(8) as pool:
         accepted=[token for token in pool.map(enter,range(8)) if token]

@@ -54,12 +54,11 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 20 * 1024 * 1024
     max_pixels: int = 24_000_000
     max_dimension: int = 8192
-    plan_requests_per_minute: int = Field(default=300, ge=1, le=10000)
-    plan_request_burst: int = Field(default=30, ge=1, le=1000)
-    plan_request_concurrency: int = Field(default=4, ge=1, le=32)
-    plan_request_lease_seconds: int = Field(default=60, ge=10, le=300)
-    plan_max_body_bytes: int = Field(default=65536, ge=1024, le=1048576)
-    reading_session_limit: int = Field(default=8, ge=1, le=32)
+    translation_requests_per_minute: int = Field(default=300, ge=1, le=10000)
+    translation_request_burst: int = Field(default=30, ge=1, le=1000)
+    translation_request_concurrency: int = Field(default=4, ge=1, le=32)
+    translation_request_lease_seconds: int = Field(default=60, ge=10, le=300)
+    translation_max_body_bytes: int = Field(default=65536, ge=1024, le=1048576)
     free_images_per_minute: int = Field(default=10, ge=1, le=10000)
     plus_images_per_minute: int = Field(default=100, ge=1, le=10000)
     feedback_requests_per_minute: int = Field(default=30, ge=1, le=1000)

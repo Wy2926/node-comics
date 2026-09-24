@@ -2,14 +2,14 @@
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import func, select
-from conftest import create, login_plus as login, upload
+from conftest import create, login_plus as login, upload, request_for_job, request_record, submit_asset
 from test_file_pages import complete
 
 
 def fixture_feedback(client, png, monkeypatch):
     auth = login(client)
     job = complete(client, auth, upload(client, auth, png), png, monkeypatch)
-    response = client.post(f"/v1/jobs/{job['id']}/feedback", headers={**auth, 'Idempotency-Key': 'feedback'},
+    response = client.post(f"/v1/translations/{request_for_job(client, auth, job['id'])}/feedback", headers={**auth, 'Idempotency-Key': 'feedback'},
         json={'issues': ['meaning'], 'comment': 'test version'})
     assert response.status_code == 201, response.text
     return auth, job, response.json()
@@ -18,9 +18,10 @@ def fixture_feedback(client, png, monkeypatch):
 def test_feedback_filters_link_reused_version_and_do_not_expose_private_keys(client, png, monkeypatch):
     auth, job, feedback = fixture_feedback(client, png, monkeypatch)
     other, admin = login(client, 'other'), login(client, 'admin')
-    reused = create(client, other, upload(client, other, png)).json()
-    assert reused['id'] != job['id'] and reused['cache_hit']
-    assert client.post(f"/v1/jobs/{reused['id']}/feedback", headers={**other, 'Idempotency-Key': 'reuse'},
+    reused = submit_asset(client, other, upload(client, other, png)).json()
+    access_id = request_record(client, other, reused['id']).access_id
+    assert access_id and reused['state'] == 'succeeded'
+    assert client.post(f"/v1/translations/{reused['id']}/feedback", headers={**other, 'Idempotency-Key': 'reuse'},
         json={'issues': ['typesetting']}).status_code == 201
     path = '/v1/admin/feedback'
     assert client.get(path, headers=auth).status_code == 403
@@ -28,7 +29,7 @@ def test_feedback_filters_link_reused_version_and_do_not_expose_private_keys(cli
     assert page['total'] == 2 and page['next_offset'] == 1
     all_rows = client.get(path + f"?job_id={job['id']}", headers=admin).json()['items']
     assert {row['actual_job_id'] for row in all_rows} == {job['id']}
-    assert {row['access_id'] for row in all_rows} == {None, reused['id']}
+    assert {row['access_id'] for row in all_rows} == {None, access_id}
     assert all(row['result_version'] == 1 and 'request_hash' not in row and 'idempotency_key' not in row for row in all_rows)
     assert client.get(path + '?issue=meaning&status=received', headers=admin).json()['total'] == 1
     assert client.get(path + '?issue=other', headers=admin).json()['total'] == 0

@@ -101,7 +101,7 @@ describe('NAVER Webtoon', () => {
     }}});
     const context = fixture();
     vi.stubGlobal('fetch', vi.fn(async (target: string, init: RequestInit) => {
-      expect(init.credentials).toBe('omit');
+      expect(init.credentials).toBe('include');
       expect(init.redirect).toBe('error');
       return new Response(await context.request(String(target)));
     }));

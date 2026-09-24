@@ -5,7 +5,7 @@ import os
 import pytest
 from sqlalchemy import select
 
-from conftest import create, login, login_plus, png_variant, quota_usage, run_job, upload
+from conftest import create, login, login_plus, png_variant, quota_usage, run_job, upload, request_record, request_for_job
 from test_cluster_submissions import cluster, descriptor, submit
 
 
@@ -25,27 +25,25 @@ def test_second_account_skips_upload_and_translation_and_keeps_private_ids(clust
     run_job(alice_job["id"])
     before = list(sdk.calls)
     bob_quota = client.get('/v1/me/usage', headers=bob).json()
-    response = submit(client, bob, [descriptor(png, file_hash="c" * 64, page_index=4)],
-                      mode="redraw", max_pages=0)
+    response = submit(client, bob, descriptor(png), key="bob-shared", mode="redraw")
     assert response.status_code == 200, response.text
-    item = response.json()["items"][0]
-    job = item["job"]
-    assert item["upload"] is None and item["disposition"] == "ready"
-    assert job["status"] == "succeeded" and job["cache_hit"] and job["quota_pages"] == 0
-    assert job["id"] != alice_job["id"] and job["input_asset_id"] != alice_source
+    item = response.json()
+    assert item["state"] == "succeeded" and item["result"]["download_url"]
+    assert request_record(client, bob, item["id"]).job_id is None
+    assert item["input_asset_id"] != alice_source
     assert len(calls) == 1 and len(sdk.objects) == 2 and sdk.calls == before
     after_quota = client.get('/v1/me/usage', headers=bob).json()
     assert after_quota['items'] == bob_quota['items'] == []
     assert after_quota['entitlements']['modes']['redraw']['quota'] == bob_quota['entitlements']['modes']['redraw']['quota']
     with session_factory()() as db:
         original = db.get(Job, alice_job["id"])
-        assert original.output_asset_id != job["output_asset_id"]
-        assert db.get(Asset, original.output_asset_id).storage_key == db.get(Asset, job["output_asset_id"]).storage_key
-        assert db.get(Asset, alice_source).storage_key == db.get(Asset, job["input_asset_id"]).storage_key
-    assert client.get(f"/v1/jobs/{alice_job['id']}", headers=bob).status_code == 404
+        assert original.output_asset_id != item["result"]["asset_id"]
+        assert db.get(Asset, original.output_asset_id).storage_key == db.get(Asset, item["result"]["asset_id"]).storage_key
+        assert db.get(Asset, alice_source).storage_key == db.get(Asset, item["input_asset_id"]).storage_key
+    assert client.get("/v1/translations/" + request_for_job(client, alice, alice_job["id"]), headers=bob).status_code == 404
     assert client.get(f"/v1/images/{alice_source}/access", headers=bob).status_code == 404
     assert client.delete(f"/v1/images/{alice_source}", headers=alice).status_code == 200
-    assert client.get(f"/v1/images/{job['output_asset_id']}/access", headers=bob).status_code == 200
+    assert client.get(f"/v1/images/{item['result']['asset_id']}/access", headers=bob).status_code == 200
     assert len(sdk.objects) == 2
 
 
@@ -67,7 +65,7 @@ def test_shared_original_checks_descriptor_metadata(cluster, png, field, value):
     upload(client, login(client), png)
     page = descriptor(png)
     page[field] = value
-    assert submit(client, login(client, "bob"), [page]).json()["items"][0]["disposition"] == "blocked"
+    assert submit(client, login(client, "bob"), page).status_code == 422
 
 
 @pytest.mark.parametrize("invalid", ["expired", "deleted", "config", "language"])
@@ -97,12 +95,12 @@ def test_invalid_or_different_results_are_not_shared(cluster, png, monkeypatch, 
             from app.results import TranslationResult
             db.get(TranslationResult, job.id).cache_key = job.cache_key
         db.commit()
-    response = submit(client, bob, [descriptor(png)], mode="redraw")
+    response = submit(client, bob, descriptor(png), key="bob-shared", mode="redraw")
     assert response.status_code == 202, response.text
-    item = response.json()["items"][0]
-    assert item["upload"] is None  # The verified original still avoids re-upload.
-    assert item["job"]["status"] == "queued" and not item["job"]["cache_hit"]
-    assert item["job"]["quota_pages"] == 1
+    item = response.json()
+    assert item['state'] == 'queued' and item['input_asset_id']
+    with session_factory()() as db:
+        assert db.get(Job, request_record(client, bob, item['id']).job_id).quota_pages == 1
 
 
 def test_maintenance_never_scans_or_deletes_old_unreferenced_objects(cluster, png):

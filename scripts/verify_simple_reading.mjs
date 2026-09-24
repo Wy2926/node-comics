@@ -27,7 +27,7 @@ async function boot(){
 async function state(){return page.evaluate(async()=>{
  const open=name=>new Promise((resolve,reject)=>{const r=indexedDB.open(name);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
  const all=(db,name)=>new Promise((resolve,reject)=>{const r=db.transaction(name).objectStore(name).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
- const db=await open('node-comics-reading-v1-catalog'),bytes=await open('node-comics-reading-v1-container-bytes');
+ const db=await open('node-comics-reading-v2-catalog'),bytes=await open('node-comics-reading-v2-container-bytes');
  const [comics,entries,pages,materials,positions,objects,chunks]=await Promise.all([all(db,'comics'),all(db,'entries'),all(db,'pageDescriptors'),all(db,'materializations'),all(db,'positions'),all(bytes,'objects'),all(bytes,'chunks')]);
  const stores=[...db.objectStoreNames];db.close();bytes.close();return {comics,entries,pages,materials,positions,objects,stores,chunkBytes:chunks.reduce((n,c)=>n+c.bytes.byteLength,0)};
 });}
@@ -67,7 +67,7 @@ try{
  await shelf();await card.getByRole('button',{name:'更多操作 · 长篇漫画',exact:true}).click();await page.getByRole('menuitem',{name:'移除漫画',exact:true}).click();await page.getByRole('dialog',{name:'移除漫画'}).getByRole('button',{name:'移除漫画',exact:true}).click();await card.waitFor({state:'detached'});value=await state();assert(!value.comics.some(c=>c.title==='长篇漫画'));checks.push('移除漫画同时移除其本地阅读记录');
  // Actual extension UI, isolated catalog fixtures; no real account or cloud requests.
  await page.evaluate(async()=>{
-  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('node-comics-reading-v1-catalog');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('node-comics-reading-v2-catalog');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   const tx=db.transaction(['comics','connections'],'readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
   const now=Date.now();
   for(let n=0;n<42;n++)tx.objectStore('comics').put({id:'batch-fixture-'+n,sourceKey:'batch-fixture-'+n,title:'批量测试 '+String(n).padStart(2,'0'),sourceName:'本地文件',source:{connectionId:'local',providerItemId:'batch-fixture-'+n,locator:{},generation:1,status:'active'},createdAt:now,updatedAt:now});

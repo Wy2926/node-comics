@@ -25,7 +25,7 @@ from app.billing_models import (BillingAccount, BillingCustomer, BillingCheckout
 from app.entitlement_models import QuotaPeriod
 from app.health_models import ServiceHeartbeat
 from app.upload_models import UploadReservation
-from app.plan_models import TranslationOperation, ReadingSession
+from app.translation_requests import TranslationRequest
 from app import creem_client, stripe_client
 
 
@@ -84,12 +84,11 @@ with session_factory()() as db:
     db.add_all([job, unknown])
     db.flush()
     publish_result(db, job)
-    db.add(Feedback(id='fixture-feedback', owner_id=reader.id, job_id=job.id, output_asset_id=output.id,
-        issues=['typesetting'], comment='隔离样例：气泡文字需要调整字号。', idempotency_key='fixture-feedback', request_hash='3' * 64))
-    db.add(TranslationOperation(owner_id=reader.id, operation_key='fixture-operation', job_id=job.id,
+    db.add(TranslationRequest(owner_id=reader.id, id='11111111-1111-4111-8111-111111111111', job_id=job.id,
         request_hash='4' * 64, descriptor={}))
-    db.add(ReadingSession(owner_id=reader.id, session_id='fixture-reading', sequence=1,
-        window=[{'job_id': job.id}], expires_at=at + timedelta(minutes=10)))
+    db.flush()
+    db.add(Feedback(id='fixture-feedback', owner_id=reader.id, job_id=job.id, translation_id='11111111-1111-4111-8111-111111111111', output_asset_id=output.id,
+        issues=['typesetting'], comment='隔离样例：气泡文字需要调整字号。', idempotency_key='fixture-feedback', request_hash='3' * 64))
     db.add(UploadReservation(id='fixture-upload', job_id=unknown.id, owner_id=reader.id, mode='redraw',
         expected_sha256=source.sha256, expected_size=source.byte_size, mime='image/png', storage_backend='local',
         expires_at=at + timedelta(minutes=5), max_expires_at=at + timedelta(minutes=10)))

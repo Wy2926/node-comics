@@ -1,8 +1,8 @@
 # Node Comics 后端
 
-2026-09-19 已实现[阅读计划契约](../docs/READING_TRANSLATION_CONTRACT.md)：普通／PLUS 分别最多新增 30／100 张翻译图片每滚动 60 秒，取消账户在途数量限制。统一逐页回执、断线核实、会话优先级与增量通知；后台持久任务、公平调度和私有 R2 保留。
+已实现[翻译接口契约](../docs/READING_TRANSLATION_CONTRACT.md)：每张图片一个 UUID 请求，缺图时补传，上传自动校验与排队，批量快照直接交付结果。删除阅读会话、续租、策略版本与账户游标；后台持久任务、公平调度、普通／PLUS 每滚动 60 秒 10／100 张限频、会员额度和私有 R2 保留。取舍见[简化实施说明](../docs/TRANSLATION_API_SIMPLIFICATION.md)。
 
-数据库只保留最终初始基线 `payments_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
+数据库只保留最终初始基线 `translations_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
 
 FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Stripe／Creem 默认均关闭，测试与生产使用不同数据库，见[多渠道支付接入](../docs/STRIPE_BILLING.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
 
@@ -17,7 +17,7 @@ FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-eng
 # 配置 ADMIN_WEB_PATH 后，在该后台入口的 #translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `payments_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `translations_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
 
 三个控制进程可独立运行。以下仅列进程入口；本机运行需先安装 `backend/requirements.txt`，启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
 
@@ -36,10 +36,10 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 | 配置 | 默认／用途 |
 | --- | --- |
 | `FREE_IMAGES_PER_MINUTE` / `PLUS_IMAGES_PER_MINUTE` | 10 / 100，首次初始化种子；后续在后台配置，跨模式、语言和设备共用滚动 60 秒预算 |
-| `PLAN_REQUESTS_PER_MINUTE` / `PLAN_REQUEST_BURST` / `PLAN_REQUEST_CONCURRENCY` | 300 / 30 / 4，独立 HTTP 请求保护，与新增翻译图片数分开 |
+| `TRANSLATION_REQUESTS_PER_MINUTE` / `TRANSLATION_REQUEST_BURST` / `TRANSLATION_REQUEST_CONCURRENCY` | 300 / 30 / 4，独立 HTTP 请求保护，与新增翻译图片数分开 |
 | `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
 | `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
-| `PRIORITY_TTL_SECONDS` | 90，离线自动降为预存 |
+| `PRIORITY_TTL_SECONDS` | 90，一次性当前页优先期限，无客户端续租 |
 | 节点身份 | 后台添加后一次性返回 NODE_ID / NODE_TOKEN；每节点独立凭据，数据库仅保存摘要 |
 | `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
 | `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，仅首次创建资源池时使用，后续在后台配置，所有控制副本共享限额 |
@@ -70,12 +70,12 @@ API、control-worker、maintenance 使用相同数据库与私有 R2 配置；�
 
 交互文档 `/docs`，机器契约 `/openapi.json`。
 
-- `POST /v1/translation-plans`：自动阅读至多当前页及后两页；手动重试一页。每项稳定 `operation_key`，逐页受理、拒绝或延后；新任务与分钟计数、额度预占同事务提交。
-- `POST /v1/translation-operations/resolve`：至多十个操作编号核实；`GET /v1/translation-operations` 分页历史。
-- `PUT /v1/reading-sessions/{id}/lease`：阅读优先级续租与条件接管，不重提生成请求。
-- `PUT /v1/uploads/{id}/content`、`POST /v1/uploads/{id}/complete`：有限字节上传与校验；已有原图无需重传。
-- `GET /v1/me/translation-changes`：最多 20 秒长轮询，直接返回任务增量及权益策略；不重复逐页查询。
-- `GET /v1/images/{id}/access`：所有权、元数据寿命核验后签名直链；状态查询不探测 R2。
+- `PUT /v1/translations/{id}`：逐图受理，UUID 永久绑定业务输入，重复请求返回原资源。
+- `PUT /v1/translations/{id}/input`：缺图时发送原图字节，自动校验排队，无 complete。
+- `GET /v1/translations/{id}`、`GET /v1/translations?ids=…&wait_seconds=20`：单图／至多 32 图快照，ETag 未变化返回 304；成功快照直接包含短期下载地址。
+- `GET /v1/translations?offset=0&limit=30`：私有分页历史，插件不用其恢复当前阅读。
+- `POST /v1/translations/{id}/cancel`、`/feedback`、`GET .../classic`：同一公开 UUID 的取消、反馈与常规结果详情。
+- `PUT /v1/file-pages/bind`：独立文件页关联，不在翻译请求中传书目或页码。
 - `/internal/compute/v2/nodes/register`、`/internal/compute/v2/nodes/{id}/claim` 等：受认证整页计算协议；分析、授权上传、交付与恢复见[计算协议](../docs/COMPUTE_PROTOCOL.md)。
 - `GET/POST /v1/admin/compute-nodes`：查询／添加节点，`/{id}/config` 编辑配置、`/{id}/rotate-credential` 轮换凭据。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。
 - 权益、限时赠送、用量账本、作品文件页匹配和私有反馈接口继续适用。

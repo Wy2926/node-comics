@@ -67,11 +67,7 @@ window.fetch=async(input,init)=>{
   if(url.pathname==='/v1/me/entitlements')return Response.json(rights());
   if(url.pathname==='/v1/me/usage/summary')return Response.json({entitlements:rights(),days:[],start_date:'2026-09-20',end_date:'2026-09-20',timezone:'Asia/Shanghai',delivered:0,by_mode:{classic:0,redraw:0},included_delivered:0,free_delivered:0,quota_used:{redraw:0}});
   if(url.pathname==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
-  if(url.pathname==='/v1/translation-operations/resolve')return Response.json({items:[]});
-  if(url.pathname==='/v1/me/translation-changes'){
-    if(url.searchParams.has('wait_seconds'))await new Promise<void>((resolve,reject)=>{const timer=setTimeout(resolve,1000);init?.signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));},{once:true});});
-    return Response.json({items:[],deleted_job_ids:[],cursor:'0',has_more:false});
-  }
+  if(url.pathname==='/v1/translations')return Response.json({items:[],missing_ids:(url.searchParams.get('ids')??'').split(',')});
   throw Error('Unexpected fixture route: '+url.pathname);
 };
 async function probe(){try{const session=(await readAuth()).session;if(!session)throw Error('未登录');await new Api(API_BASE,session.token,undefined,undefined,sessionAuthorization(session.id)).entitlements();status='请求成功';}catch(e){status=(e as Error).message;}changed();}

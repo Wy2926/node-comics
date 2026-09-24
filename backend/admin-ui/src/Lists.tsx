@@ -5,7 +5,7 @@ export function Tasks({items, onTask}: {items: Task[]; onTask: (id: string) => v
   if (!items.length) return <Empty>没有符合条件的任务</Empty>;
   return <Table heads={['任务 / 提交时间', '用户', '模式 / 优先级', '状态 / 阶段', '总耗时 / 执行占用', '执行节点', '操作']}>
     {items.map(j => <tr key={j.id}>
-      <td><code title={j.id}>{j.id.slice(0, 8)}</code>{j.page_index != null && <span className="page-index">第 {j.page_index + 1} 页</span>}<small>{time(j.created_at)}</small></td>
+      <td><code title={j.id}>{j.id.slice(0, 8)}</code><small>{time(j.created_at)}</small></td>
       <td><Jump view="tasks" params={{owner_id: j.owner_id}}>{j.owner_name}</Jump></td>
       <td>{label(j.mode)}<small>{j.cache_hit ? '缓存命中' : label(j.priority)}</small></td>
       <td><Badge value={j.status}/><small>{label(j.phase)}{j.expired_leases > 0 && ' · 租约待回收'}</small></td>

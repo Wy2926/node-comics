@@ -1,5 +1,5 @@
 """Public response contracts exported through OpenAPI for extension type generation."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal
 
 
@@ -90,9 +90,6 @@ class JobResponse(BaseModel):
     id: str
     input_asset_id: str | None
     image_sha256: str
-    file_hash: str | None = None
-    page_index: int | None = None
-    change_sequence: int = 0
     priority: str = "preload"
     requested_asset_id: str | None = None
     output_asset_id: str | None
@@ -164,79 +161,37 @@ class CapabilitiesResponse(BaseModel):
     unknown_release_seconds: int
 
 
-class ImageRateLimit(BaseModel):
-    window_seconds: Literal[60]
-    limit: int
-    remaining: int
-    retry_after_seconds: int
+class TranslationResultResponse(BaseModel):
+    kind: Literal['translated', 'no_text', 'partial']
+    asset_id: str | None = None
+    width: int | None = None
+    height: int | None = None
+    download_url: str | None = None
+    download_expires_at: str | None = None
+    authorization_required: bool = False
+    quality_flags: list[str] = Field(default_factory=list)
 
 
-class UploadPlanResponse(BaseModel):
+class TranslationResponse(BaseModel):
     id: str
-    job_id: str
-    status: str
-    asset_id: str | None
-    url: str
-    method: Literal['PUT']
-    headers: dict[str, str]
-    authorization_required: bool
-    expires_at: str
+    state: Literal['needs_input', 'queued', 'running', 'succeeded', 'failed', 'needs_attention']
+    mode: Literal['classic', 'redraw']
+    target_language: str
+    image_sha256: str
+    input_asset_id: str | None
+    input_expires_at: str | None
+    result: TranslationResultResponse | None
     error: ErrorInfo | None
+    created_at: str
+    updated_at: str
 
 
-class OperationResponse(BaseModel):
-    operation_key: str
-    page_key: str | None = None
-    disposition: Literal['ready', 'pending', 'accepted', 'deferred', 'blocked', 'not_found']
-    job: JobResponse | None = None
-    upload: UploadPlanResponse | None = None
-    code: str | None = None
-    message: str | None = None
-    scope: str | None = None
-    retry_after_seconds: int | None = None
-    created_at: str | None = None
+class TranslationsResponse(BaseModel):
+    items: list[TranslationResponse]
+    missing_ids: list[str] = Field(default_factory=list)
 
 
-class PriorityResponse(BaseModel):
-    owned: bool
-    epoch: int
-    expires_at: str | None
-
-
-class PlanSnapshotResponse(BaseModel):
-    policy_revision: str
-    server_time: str
-    image_rate_limit: ImageRateLimit
-    entitlements: EntitlementsResponse
-
-
-class TranslationPlanResponse(PlanSnapshotResponse):
-    session_id: str | None
-    applied_sequence: int | None
-    priority: dict[str, PriorityResponse]
-    items: list[OperationResponse]
-    error: dict | None = None
-
-
-class OperationResolutionResponse(BaseModel):
-    items: list[OperationResponse]
-    policy_revision: str
-
-
-class OperationPageResponse(BaseModel):
-    items: list[OperationResponse]
+class TranslationHistoryResponse(BaseModel):
+    items: list[TranslationResponse]
     total: int
     next_offset: int | None
-
-
-class ReadingLeaseResponse(BaseModel):
-    session_id: str
-    priority: dict[str, PriorityResponse]
-    policy_revision: str
-
-
-class TranslationChangesResponse(PlanSnapshotResponse):
-    items: list[JobResponse]
-    deleted_job_ids: list[str]
-    cursor: str
-    has_more: bool

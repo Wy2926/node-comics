@@ -12,7 +12,7 @@ export async function sourceImage(url:string,signal?:AbortSignal):Promise<Blob> 
 async function readResponse(url:string,signal:AbortSignal,customHeaders:boolean) {
   const max = maxInlineBytes;
   const response = await fetch(url, {
-    credentials: 'omit',
+    credentials: 'include',
     redirect:customHeaders?'error':'follow',
     signal,
   });

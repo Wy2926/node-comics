@@ -1,11 +1,12 @@
 """Reader-facing history, accounting summaries and private result feedback."""
 from datetime import datetime, time, timedelta, timezone
+from uuid import UUID
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
-from sqlalchemy import CheckConstraint, ForeignKey, Index, JSON, String, UniqueConstraint, and_, cast, exists, func, literal, or_, select, union_all, update
+from sqlalchemy import CheckConstraint, ForeignKey, ForeignKeyConstraint, Index, JSON, String, UniqueConstraint, and_, cast, exists, func, literal, or_, select, union_all, update
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
 
 from .auth import admin, identity
@@ -26,30 +27,13 @@ from .feedback_review_models import FeedbackReview
 router = APIRouter(tags=["Reader"])
 
 
-class LatestResult(BaseModel):
-    latest: JobResponse | None
-    result: JobResponse | None
-
-
-@router.get("/v1/jobs/{job_id}/latest-result", response_model=LatestResult)
-def latest_result(job_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
-    reference = owned_job(db, job_id, user.id)
-    Job = ReaderEntry
-    query = select(Job).where(
-        Job.owner_id == user.id, Job.source_sha256 == reference.source_sha256,
-        Job.mode == reference.mode, Job.target_language == reference.target_language
-    ).order_by(Job.created_at.desc(), Job.version.desc(), Job.id.desc())
-    latest = db.scalar(query.limit(1))
-    delivered = db.scalar(query.where(Job.status == "succeeded").limit(1))
-    return {"latest": job_json(db, latest) if latest else None, "result": job_json(db, delivered) if delivered else None}
-
-
 class Feedback(Base):
     __tablename__ = "translation_feedback"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"))
     access_id: Mapped[str | None] = mapped_column(ForeignKey("result_accesses.id"))
+    translation_id: Mapped[str] = mapped_column(String(36))
     output_asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"))
     issues: Mapped[list] = mapped_column(JSON)
     comment: Mapped[str] = mapped_column(String(500), default="")
@@ -59,6 +43,7 @@ class Feedback(Base):
     created_at: Mapped[datetime] = mapped_column(default=now)
     updated_at: Mapped[datetime] = mapped_column(default=now)
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
+                     ForeignKeyConstraint(["owner_id", "translation_id"], ["translation_requests.owner_id", "translation_requests.id"]),
                      CheckConstraint('(job_id IS NOT NULL AND access_id IS NULL) OR (job_id IS NULL AND access_id IS NOT NULL)'),
                      Index("ix_feedback_owner_created", "owner_id", "created_at"),
                      Index("ix_feedback_job", "job_id"))
@@ -88,7 +73,7 @@ class FeedbackRequest(RequestBody):
 
 class FeedbackResponse(BaseModel):
     id: str
-    job_id: str
+    translation_id: str
     output_asset_id: str
     issues: list[str]
     comment: str
@@ -119,12 +104,12 @@ class FeedbackUpdate(RequestBody):
 
 def feedback_json(row):
     return {name: getattr(row, name) for name in ("id", "output_asset_id", "issues", "comment", "status")} | {
-        "job_id": row.job_id or row.access_id,
+        "translation_id": row.translation_id,
         "created_at": row.created_at.isoformat() + "Z", "updated_at": row.updated_at.isoformat() + "Z"}
 
 
-@router.post("/v1/jobs/{job_id}/feedback", response_model=FeedbackResponse, status_code=201)
-def submit_feedback(job_id: str, body: FeedbackRequest,
+@router.post("/v1/translations/{translation_id}/feedback", response_model=FeedbackResponse, status_code=201)
+def submit_feedback(translation_id: UUID, body: FeedbackRequest,
                     idempotency_key: Annotated[str | None, Header()] = None,
                     user: User = Depends(identity), db: Session = Depends(get_db)):
     key = idem_key(idempotency_key)
@@ -134,7 +119,13 @@ def submit_feedback(job_id: str, body: FeedbackRequest,
     db.rollback()
     limits = get_request_limits(db)
     admission = lock_feedback_admission(db, owner_id, limits=limits)
-    job = owned_job(db, job_id, owner_id)
+    from .translation_api import owned_translation, unavailable
+    from .results import get_entry
+    receipt = owned_translation(db, owner_id, translation_id)
+    job = get_entry(db, receipt.entry_id)
+    if unavailable(db, receipt, job):
+        problem("TRANSLATION_UNAVAILABLE", "翻译访问已撤销或过期", 410)
+    job_id = job.id
     # Local copies can outlive access grants. Feedback still targets that exact,
     # immutable job output; it does not restore image access or attach new bytes.
     if job.status != "succeeded" or not job.output_asset_id:
@@ -151,7 +142,7 @@ def submit_feedback(job_id: str, body: FeedbackRequest,
         db.commit()
         return result
     reserve_feedback_receipt(db, admission, limits=limits)
-    row = Feedback(owner_id=owner_id, job_id=job_id if isinstance(job, Job) else None,
+    row = Feedback(owner_id=owner_id, translation_id=str(translation_id), job_id=job_id if isinstance(job, Job) else None,
                    access_id=None if isinstance(job, Job) else job_id, output_asset_id=job.output_asset_id,
                    issues=body.issues, comment=body.comment, idempotency_key=key, request_hash=request_hash)
     db.add(row)
@@ -184,7 +175,7 @@ def admin_feedback_json(db, row):
     review = db.scalar(select(FeedbackReview).where(FeedbackReview.feedback_id == row.id).order_by(
         FeedbackReview.created_at.desc(), FeedbackReview.id.desc()).limit(1))
     actor = db.get(User, review.actor_id) if review else None
-    return {**feedback_json(row), "owner_id": row.owner_id, "owner_name": owner.name if owner else row.owner_id,
+    return {**feedback_json(row), "job_id": row.job_id or row.access_id, "owner_id": row.owner_id, "owner_name": owner.name if owner else row.owner_id,
             "actual_job_id": actual_job_id, "access_id": row.access_id,
             "result_version": access.version if access else job.version if job else None,
             "mode": job.mode if job else None, "target_language": job.target_language if job else None,

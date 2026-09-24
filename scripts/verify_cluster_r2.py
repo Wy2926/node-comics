@@ -98,6 +98,7 @@ def run(env_file):
             from sqlalchemy import select
             from app.main import app
             from app.models import Asset, Job, Ledger, User, now
+            from app.translation_requests import TranslationRequest
             from app.queue_models import ComputeNode
             from app.scheduler import claim_stage
             from app.adapters.images import TranslationOutput
@@ -127,23 +128,21 @@ def run(env_file):
                         db.add(ComputeNode(id="smoke-" + name, name="smoke-" + name, capabilities=[name], capacity=1,
                             resource_id="smoke-" + name, engine_version="control", device="network"))
                     db.commit()
-                request = {"trigger": "manual", "items": [{"page_key": "synthetic-page",
-                    "operation_key": "isolated-r2-plan", "mode": "redraw", "target_language": "zh-Hans",
-                    "max_quota_pages": 1, "image": {"client_item_id": "synthetic-page",
-                    "image_sha256": hashlib.sha256(original).hexdigest(),
-                    "byte_size": len(original), "content_type": "image/png"}}]}
+                request_id = str(uuid4())
+                request = {"mode": "redraw", "target_language": "zh-Hans",
+                    "image": {"sha256": hashlib.sha256(original).hexdigest(),
+                    "byte_size": len(original), "content_type": "image/png"}}
                 headers = auth
-                report["phase"] = "plan"
-                submitted = client.post("/v1/translation-plans", headers=headers, json=request)
+                report["phase"] = "translation"
+                submitted = client.put(f"/v1/translations/{request_id}", headers=headers, json=request)
                 assert submitted.status_code == 202
-                item = submitted.json()["items"][0]
-                job_id, upload = item["job"]["id"], item["upload"]
+                assert submitted.json()["state"] == "needs_input"
+                with session_factory()() as db:
+                    job_id = db.get(TranslationRequest, (login.json()["user"]["id"], request_id)).job_id
                 report["phase"] = "original_upload"
-                uploaded = client.put(upload["url"], headers={**auth, **upload["headers"]}, content=original)
-                assert uploaded.status_code == 200
-                report["phase"] = "enqueue_validation"
-                accepted = client.post(f"/v1/uploads/{upload['id']}/complete", headers=auth)
-                assert accepted.status_code == 200 and accepted.json()["status"] == "validating_upload"
+                uploaded = client.put(f"/v1/translations/{request_id}/input",
+                    headers={**auth, "Content-Type": "image/png"}, content=original)
+                assert uploaded.status_code == 202 and uploaded.json()["state"] == "queued"
                 for name in ("validate_upload", "redraw"):
                     report["phase"] = name
                     with session_factory()() as db:
@@ -151,24 +150,24 @@ def run(env_file):
                         assert lease and lease.job_id == job_id
                         db.commit()
                     workers.run_control_stage(lease.id)
-                delivered = client.get(f"/v1/jobs/{job_id}", headers=auth)
-                assert delivered.status_code == 200 and delivered.json()["status"] == "succeeded"
-                output_id = delivered.json()["output_asset_id"]
+                delivered = client.get(f"/v1/translations/{request_id}", headers=auth)
+                assert delivered.status_code == 200 and delivered.json()["state"] == "succeeded"
+                result = delivered.json()["result"]
+                output_id = result["asset_id"]
                 report["phase"] = "authorized_download"
-                access = client.get(f"/v1/images/{output_id}/access", headers=auth)
-                assert access.status_code == 200 and not access.json()["authorization_required"]
+                assert not result["authorization_required"] and result["download_url"]
                 cors_missing = 0
                 origins = ("http://127.0.0.1:5174", "http://localhost:5173")
                 with httpx.Client(timeout=60, follow_redirects=False) as download:
                     for origin in origins:
-                        response = download.get(access.json()["url"], headers={"Origin": origin})
+                        response = download.get(result["download_url"], headers={"Origin": origin})
                         assert response.status_code == 200 and response.content == translated
                         with Image.open(BytesIO(response.content)) as image:
                             image.verify()
                         cors_missing += response.headers.get("access-control-allow-origin") not in (origin, "*")
-                replay = client.post("/v1/translation-plans", headers=headers, json=request)
+                replay = client.put(f"/v1/translations/{request_id}", headers=headers, json=request)
                 report["phase"] = "replay_and_settlement"
-                assert replay.status_code == 200 and replay.json()["items"][0]["job"]["id"] == job_id
+                assert replay.status_code == 200 and replay.json()["id"] == request_id
                 with session_factory()() as db:
                     job = db.get(Job, job_id)
                     assert job.status == "succeeded" and job.settlement == "settled" and not job.input_pinned
@@ -183,15 +182,17 @@ def run(env_file):
                 assert second_login.status_code == 200
                 second_auth = {"Authorization": "Bearer " + second_login.json()["access_token"]}
                 io_before = counters.copy()
-                shared = client.post("/v1/translation-plans", headers=second_auth,
-                    json={**request, "items": [{**request["items"][0], "max_quota_pages": 0}]})
+                shared = client.put(f"/v1/translations/{request_id}", headers=second_auth, json=request)
                 assert shared.status_code == 200
-                shared_item = shared.json()["items"][0]
-                assert shared_item["upload"] is None and shared_item["disposition"] == "ready"
-                assert shared_item["job"]["status"] == "succeeded" and shared_item["job"]["cache_hit"]
-                assert shared_item["job"]["quota_pages"] == 0 and counters == io_before and stub_calls == [1]
+                shared_item = shared.json()
+                assert shared_item["state"] == "succeeded" and shared_item["result"]["asset_id"] != output_id
+                assert {k: v for k, v in counters.items() if k != "generate_presigned_url"} == {k: v for k, v in io_before.items() if k != "generate_presigned_url"}
+                assert stub_calls == [1]
                 assert client.get(f"/v1/images/{output_id}/access", headers=second_auth).status_code == 404
                 with session_factory()() as db:
+                    receipt = db.get(TranslationRequest, (second_login.json()["user"]["id"], request_id))
+                    assert receipt.access_id and receipt.job_id is None
+                    assert list(db.scalars(select(Job.id))) == [job_id]
                     output_asset = db.get(Asset, output_id)
                     store.put(output_asset.storage_key, translated, output_asset.mime, kind="redraw")
                 assert report.get("conditional_write_reused") is True

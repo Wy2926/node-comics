@@ -221,7 +221,7 @@ try {
   await page.getByRole('button', {name: '查询用户'}).click();
   await visible(page.getByText('fixture-reading', {exact: true}));
   await shot('10-user-diagnostics');
-  for (const name of ['上传会话', '提交回执', '图片记录', '文件页映射', '生成版本', '结果授权']) {
+  for (const name of ['上传会话', '翻译请求', '图片记录', '文件页映射', '生成版本', '结果授权']) {
     await page.getByRole('button', {name, exact: true}).click(); await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('main [role="alert"]').count(), 0, name);
   }

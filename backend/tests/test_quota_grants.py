@@ -40,12 +40,12 @@ def test_ordinary_redraw_gift_is_temporary_and_exhaustion_creates_no_job(client,
     job = submit(client, auth, upload(client, auth, png), 'redraw').json()
     assert job['quota_kind'] == 'redraw_grant' and job['quota_period_id'] == result.json()['grant']['id']
     denied = submit(client, auth, upload(client, auth, png_variant(png, 2)), 'redraw', 'extra')
-    assert denied.status_code == 200 and denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
+    assert denied.status_code == 403 and denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
     freeze(monkeypatch, AT + timedelta(hours=1))
     assert not entitlement(client, auth)['modes']['redraw']['allowed']
     assert submit(client, auth, job['input_asset_id'], 'redraw').json()['id'] == job['id']
     finish(job['id'])
-    assert client.get('/v1/jobs', headers=auth).json()['total'] == 1
+    assert client.get('/v1/translations', headers=auth).json()['total'] == 1
 
 
 @pytest.mark.parametrize('mode', ['classic', 'redraw'])
@@ -127,5 +127,5 @@ def test_simultaneous_last_gift_and_daily_page_admissions(client, png):
         barrier.wait(timeout=10)
         return submit(client, auth, assets[n], key=str(n)).status_code
     with ThreadPoolExecutor(4) as pool:
-        assert sorted(pool.map(attempt, range(4))) == [200, 200, 202, 202]
+        assert sorted(pool.map(attempt, range(4))) == [202, 202, 403, 403]
     assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 2

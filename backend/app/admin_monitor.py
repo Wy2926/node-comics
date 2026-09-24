@@ -13,7 +13,6 @@ from .db import get_db
 from .entitlements import entitlements_json, is_plus, is_operator_plus, iso, period_json, plus_dates
 from .billing_access import access_exists
 from .entitlement_models import QuotaPeriod
-from .plan_models import ReadingSession
 from .errors import problem
 from .models import Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
@@ -84,7 +83,7 @@ def task_json(job, owner_name, leases, at):
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
             "priority": priority_of(job, at) if job.status in ACTIVE else (leases[-1].priority_class if leases else None),
-            "cache_hit": job.cache_hit, "page_index": job.page_index,
+            "cache_hit": job.cache_hit,
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
             "cancel_requested": job.cancel_requested, "discard_output": job.discard_output, **timing(job, leases, at),
@@ -256,8 +255,4 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
             "operator_membership": {"active": is_operator_plus(user), "expires_at": iso(user.plus_expires_at)},
             "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
                 QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
-                .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))],
-            "reading_sessions": [{"session_id": row.session_id, "sequence": row.sequence,
-                "page_count": len(row.window), "fenced": row.fenced, "expires_at": iso(row.expires_at)} for row in db.scalars(
-                select(ReadingSession).where(ReadingSession.owner_id == user.id)
-                .order_by(ReadingSession.expires_at.desc()).limit(50))]}
+                .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))]}

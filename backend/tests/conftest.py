@@ -100,36 +100,82 @@ def upload(client, headers, png):
         return asset.id
 
 
+def request_id(key):
+    """Stable valid public UUIDs for readable isolated fixture names."""
+    from uuid import UUID, NAMESPACE_URL, uuid5
+    try:
+        return str(UUID(key))
+    except ValueError:
+        return str(uuid5(NAMESPACE_URL, "node-comics-test:" + key))
+
+
+def request_record(client, headers, translation_id):
+    from app.db import session_factory
+    from app.translation_requests import TranslationRequest
+    owner = client.get("/v1/me", headers=headers).json()["user"]["id"]
+    with session_factory()() as db:
+        return db.get(TranslationRequest, (owner, request_id(translation_id)))
+
+
+def request_for_job(client, headers, job_id):
+    from sqlalchemy import select
+    from app.db import session_factory
+    from app.translation_requests import TranslationRequest
+    owner = client.get("/v1/me", headers=headers).json()["user"]["id"]
+    with session_factory()() as db:
+        return db.scalar(select(TranslationRequest.id).where(
+            TranslationRequest.owner_id == owner,
+            (TranslationRequest.job_id == job_id) | (TranslationRequest.access_id == job_id)))
+
+
 def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="redraw", **fields):
     from app.db import session_factory
     from app.models import Asset
     with session_factory()() as db:
         asset = db.get(Asset, asset_id)
-        item = {"client_item_id": "page-1", "asset_id": asset.id, "image_sha256": asset.sha256,
-                "byte_size": asset.byte_size, "content_type": asset.mime, "name": "sample.png"}
+        body = {"image": {"sha256": asset.sha256, "byte_size": asset.byte_size, "content_type": asset.mime},
+                "mode": mode, "target_language": language}
     action = fields.pop("action", "regenerate" if fields.pop("regenerate", False) else "ensure")
-    source_job_id = fields.pop("source_job_id", fields.pop("rerun_job_id", None))
-    plan_item = {"page_key": "page-1", "operation_key": key, "role": "current", "mode": mode,
-                 "target_language": language, "max_quota_pages": 1, "image": item, "action": action, **fields}
-    if source_job_id is not None:
-        plan_item["source_job_id"] = source_job_id
-    return client.post("/v1/translation-plans", headers=headers,
-                       json={"trigger": "manual", "items": [plan_item]})
+    source = fields.pop("source_job_id", fields.pop("rerun_job_id", None))
+    if action != "ensure":
+        assert source is not None, "Explicit retry/regeneration fixture requires its source"
+        body = {action + "_of": request_for_job(client, headers, source)}
+    body.update(fields)
+    return client.put("/v1/translations/" + request_id(key), headers=headers, json=body)
 
 
-def create(client, headers, asset_id, key="operation-1", language="zh-Hans"):
-    """Extract the first job for worker fixtures, retaining the real HTTP status.
+def internal_job_response(client, headers, response):
+    """Resolve worker fixture jobs from a real translation response, preserving HTTP status.
 
-    Admission contract tests use submit_asset directly and inspect dispositions.
-    This helper does not manufacture legacy status codes or accepted receipts.
+    Public contract tests inspect the original response. Worker/settlement tests use
+    the actual persisted job, never a synthetic public cache-as-job response.
     """
     import httpx
-    response = submit_asset(client, headers, asset_id, key, language)
+    from app.db import session_factory
+    from app.jobs import job_json
+    from app.models import Job
     data = response.json()
-    if data.get("items"):
-        item = data["items"][0]
-        data = item.get("job") or {"error": item}
+    if response.status_code < 300 and "id" in data:
+        record = request_record(client, headers, data["id"])
+        with session_factory()() as db:
+            job = db.get(Job, record.job_id) if record.job_id else None
+            if job is not None:
+                data = job_json(db, job)
     return httpx.Response(response.status_code, json=data)
+
+
+def create(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="redraw", **fields):
+    return internal_job_response(client, headers,
+        submit_asset(client, headers, asset_id, key, language, mode, **fields))
+
+
+def inspect_job(job_id):
+    """Read a real persisted worker state; this does not emulate a removed HTTP API."""
+    from app.db import session_factory
+    from app.jobs import job_json
+    from app.models import Job
+    with session_factory()() as db:
+        return job_json(db, db.get(Job, job_id))
 
 
 def control_node(db, stage="redraw"):

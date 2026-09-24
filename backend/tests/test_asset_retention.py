@@ -35,8 +35,8 @@ def test_completed_original_and_result_survive_age_and_cleanup(cluster, png, mon
         cleanup(db)
         assert all(not asset.deleted_at and not asset.purged_at for asset in db.scalars(select(Asset)))
     assert len(sdk.objects) == 1
-    history = client.get("/v1/translation-operations", headers=auth)
-    assert history.status_code == 200 and history.json()["items"][0]["disposition"] == "ready"
+    history = client.get("/v1/translations", headers=auth)
+    assert history.status_code == 200 and history.json()["items"][0]["state"] == "succeeded"
     assert client.get(f"/v1/images/{output_id}/access", headers=auth).status_code == 200
     deleted = client.delete(f"/v1/images/{source_id}", headers=auth)
     assert deleted.status_code == 200

@@ -49,14 +49,14 @@ await context.route('https://**.nodelane.net/**',route=>route.fulfill({status:50
 const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
 const readerUrl=new URL('reader.html',worker.url()).href;
 async function state(){return worker.evaluate(()=>new Promise((resolve,reject)=>{
- const open=indexedDB.open('node-comics-reading-v1-catalog');open.onerror=()=>reject(open.error);open.onsuccess=()=>{
+ const open=indexedDB.open('node-comics-reading-v2-catalog');open.onerror=()=>reject(open.error);open.onsuccess=()=>{
  const db=open.result,tx=db.transaction(['comics','entries','positions','pageDescriptors']),comics=tx.objectStore('comics').getAll(),entries=tx.objectStore('entries').getAll(),positions=tx.objectStore('positions').getAll(),pages=tx.objectStore('pageDescriptors').getAll();
  tx.oncomplete=()=>{resolve({comics:comics.result,entries:entries.result,positions:positions.result,pages:pages.result});db.close();};tx.onerror=()=>reject(tx.error);
  };}));}
 
 // Only isolated fixture records are advanced; the production UI exposes no force-refresh command.
 async function makeDue(){await worker.evaluate(()=>new Promise((resolve,reject)=>{
- const r=indexedDB.open('node-comics-reading-v1-catalog');r.onerror=()=>reject(r.error);r.onsuccess=()=>{
+ const r=indexedDB.open('node-comics-reading-v2-catalog');r.onerror=()=>reject(r.error);r.onsuccess=()=>{
  const db=r.result,tx=db.transaction('comics','readwrite'),request=tx.objectStore('comics').getAll();request.onsuccess=()=>{for(const comic of request.result)tx.objectStore('comics').put({...comic,catalogSync:{...comic.catalogSync,nextCheckAt:0}});};
  tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);
  };}));}
@@ -104,7 +104,7 @@ try{
  await card('first').locator('.nc-card-update').waitFor();await reader.close();counts.first=5;
  await worker.evaluate(async()=>{
    const alarms=await chrome.alarms.get('nc-catalog-sync');if(alarms.periodInMinutes!==720)throw Error('Expected a 12-hour alarm');
-   await new Promise((resolve,reject)=>{const r=indexedDB.open('node-comics-reading-v1-catalog');r.onsuccess=()=>{const db=r.result,tx=db.transaction('comics','readwrite'),request=tx.objectStore('comics').getAll();request.onsuccess=()=>{for(const comic of request.result)tx.objectStore('comics').put({...comic,catalogSync:{...comic.catalogSync,nextCheckAt:0}});};tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};});
+   await new Promise((resolve,reject)=>{const r=indexedDB.open('node-comics-reading-v2-catalog');r.onsuccess=()=>{const db=r.result,tx=db.transaction('comics','readwrite'),request=tx.objectStore('comics').getAll();request.onsuccess=()=>{for(const comic of request.result)tx.objectStore('comics').put({...comic,catalogSync:{...comic.catalogSync,nextCheckAt:0}});};tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};});
    await chrome.alarms.create('nc-catalog-sync-continue',{when:Date.now()+500});
  });
  await waitFor(value=>value.entries.filter(entry=>entry.comicId===first.id).length===5);checks.push('关闭阅读器后仍由真实扩展 alarm 自动同步；周期参数为720分钟');

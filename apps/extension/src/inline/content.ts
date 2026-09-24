@@ -46,9 +46,8 @@ export function installInline() {
   let prefetchAt = 0,
     burstAt = 0,
     scheduledAt = 0,
-    policyRevision = '',
-    failures = 0,
-    leaseTimer: ReturnType<typeof setInterval> | undefined;
+    failures = 0;
+  let refreshRights = true, hasPending = false;
   let candidates: Candidate[] = [],
     windowImages: Candidate[] = [],
     timer: ReturnType<typeof setTimeout> | undefined,
@@ -366,14 +365,14 @@ export function installInline() {
         void loadResult(item, result.resultKey, stamp);
     }
     if (data.retryAfterMs) schedule(data.retryAfterMs);
-    if (data.needsPlan) schedule();
-    if (policyRevision && data.policyRevision && policyRevision !== data.policyRevision) schedule();
-    policyRevision = data.policyRevision ?? policyRevision;
+    if (data.needsSubmit) schedule();
+    hasPending = data.hasPending ?? false;
     paint();
   }
   async function watch() {
     if (
       watching ||
+      !hasPending ||
       !enabled ||
       paused ||
       original ||
@@ -395,7 +394,7 @@ export function installInline() {
             break;
           }
           if (value.data) apply(value.data, targets, stamp);
-          if (value.data?.scope === 'logged-out') break;
+          if (value.data?.scope === 'logged-out' || !hasPending) break;
           failures = 0;
         } catch {
           retry = Math.min(30000, 1000 * 2 ** failures++);
@@ -417,7 +416,7 @@ export function installInline() {
     const retry = retryId;
     retryId = undefined;
     try {
-      const response = await send('NC_INLINE_TICK', { ...payload(targets), retryId: retry });
+      const response = await send('NC_INLINE_TICK', { ...payload(targets), retryId: retry, refreshRights });
       if (stamp !== generation || !enabled || location.href !== initialUrl) return;
       if (!response?.ok) {
         schedule(response?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++));
@@ -426,6 +425,7 @@ export function installInline() {
       const data = response.data as InlineResponse | undefined;
       if (!data) return;
       apply(data, targets, stamp);
+      refreshRights = false;
       failures = 0;
     } catch (error) {
       if (stamp === generation)
@@ -465,18 +465,7 @@ export function installInline() {
     window.addEventListener('online', visibility);
     scan();
     schedule();
-    leaseTimer = setInterval(() => {
-      if (enabled && !paused && !original && !document.hidden && windowImages.length) {
-        const stamp = generation,
-          targets = [...windowImages];
-        void send('NC_INLINE_LEASE', payload(targets))
-          .then((value) => {
-            if (value?.ok && value.data) return apply(value.data, targets, stamp);
-            if (value?.retryAfterMs) schedule(value.retryAfterMs);
-          })
-          .catch(() => {});
-      }
-    }, 30000);
+
   }
   function stop() {
     if (!enabled) return;
@@ -484,7 +473,6 @@ export function installInline() {
     invalidate();
     clearTimeout(timer);
     clearTimeout(scanTimer);
-    clearInterval(leaseTimer);
     scanTimer = undefined;
     cancelAnimationFrame(raf);
     raf = 0;
@@ -503,6 +491,7 @@ export function installInline() {
     visibleBadges.clear();
   }
   function visibility() {
+    refreshRights = true;
     invalidate();
     scan();
     schedule();

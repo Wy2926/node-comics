@@ -81,7 +81,7 @@ def test_postgres_concurrent_accounts_reuse_completed_result_without_new_charge(
         with session_factory()() as db:
             barrier.wait(timeout=10)
             job = create_job(db, db.get(User, owner_id), None, "redraw", "zh-Hans", "shared-completion",
-                             source_sha256=source_hash, max_quota_pages=0)
+                             source_sha256=source_hash)
             db.commit()
             return job.id
 

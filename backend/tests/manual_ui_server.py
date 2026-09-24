@@ -18,7 +18,9 @@ from types import SimpleNamespace
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
-directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-"))
+fixture_root = Path(os.environ.get("READER_FIXTURE_ROOT", root / ".tmp"))
+fixture_root.mkdir(parents=True, exist_ok=True)
+directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-", dir=fixture_root))
 port = int(os.environ.get("READER_FIXTURE_PORT", "18089"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
     APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="30", PLUS_MONTHLY_REDRAW_PAGES="300", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",

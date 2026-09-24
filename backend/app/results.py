@@ -25,10 +25,8 @@ class ResultAccess(Base):
     version: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    change_sequence: Mapped[int] = mapped_column(BigInteger, default=0)
     __table_args__ = (UniqueConstraint('owner_id', 'result_id'),
-        Index('ix_result_accesses_result', 'result_id'),
-        Index('ix_result_accesses_owner_changes', 'owner_id', 'change_sequence'))
+        Index('ix_result_accesses_result', 'result_id'))
 
 
 # Read-only reader projection. Only actual jobs are in the task history, queue,
@@ -37,11 +35,11 @@ _access_columns = {
     'id': ResultAccess.id, 'owner_id': ResultAccess.owner_id,
     'input_asset_id': ResultAccess.input_asset_id, 'output_asset_id': ResultAccess.output_asset_id,
     'version': ResultAccess.version, 'created_at': ResultAccess.created_at,
-    'changed_at': ResultAccess.changed_at, 'change_sequence': ResultAccess.change_sequence,
+    'changed_at': ResultAccess.changed_at,
     'completed_at': TranslationResult.generated_at,
 }
 _access_constants = {
-    'input_pinned': False, 'file_hash': None, 'page_index': None,
+    'input_pinned': False,
     'priority_rank': 1000000, 'realtime_until': None, 'phase': 'completed',
     'idempotency_key': '', 'operation': 'result_access', 'request_hash': '',
     'config': {}, 'quota_pages': 0, 'quota_period_id': None,

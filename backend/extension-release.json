@@ -1,5 +1,5 @@
 {
-  "current": "0.1.0",
+  "current": "0.1.1",
   "releases": [
     {
       "version": "0.1.0",
@@ -7,6 +7,13 @@
       "sha256": "5f43b8a3bdb029df8466f70c146aeb5f1fe8dc1563cfc1d48621c05f0725c5de",
       "bytes": 6970698,
       "path": "/downloads/node-comics-0.1.0-chromium.zip"
+    },
+    {
+      "version": "0.1.1",
+      "filename": "node-comics-0.1.1-chromium.zip",
+      "sha256": "c43a0477071da43876a30d30d3ff9794ddbeb68baa1535aacd409476e8753880",
+      "bytes": 7144656,
+      "path": "/downloads/node-comics-0.1.1-chromium.zip"
     }
   ]
 }

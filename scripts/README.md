@@ -17,7 +17,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | 工具 | 验证边界 |
 | --- | --- |
 | `verify_reading_api.mjs` | 临时 API、worker、合成供应商与浏览器的完整阅读链路 |
-| `verify_reading_plans.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | 新容器 / 目录夹具、模拟接口下的阅读窗口、限流、恢复，以及未知地址回退和无历史轮询；专用 Vite 5176，检查当前页与后三页、分钟退避、原操作核实、下载重试和位置恢复 |
+| `verify_reading_translations.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | 新容器 / 目录夹具、模拟接口下的阅读窗口、限流、恢复，以及未知地址回退和无历史轮询；专用 Vite 5176，检查当前页与后三页、分钟退避、UUID 快照核实、下载重试和位置恢复 |
 | `verify_membership_admin.mjs` | 隔离后台的赠送与分钟配置 |
 | 插件 `tests/billing-focus-fixture.html` | Vite 指定 5192 端口后打开，点击“运行回归检查”；模拟订阅接口与窗口交接，验证焦点刷新、并发打开、返回对账和失败重试，不读取真实账户 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |
@@ -33,7 +33,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_comicpash.mjs` | Comic PASH 画布发现与导入，隔离样本／真实来源开关见[站点说明](../apps/extension/src/sources/sites/comicpash/README.md) |
 | `verify_r2_download.mjs` | 模拟 R2 响应下的浏览器下载与权限处理，不访问 Cloudflare |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2 接入；运行前阅读脚本中的对象范围与清理规则，不作为普通离线回归 |
-| `smoke_api.py` | 默认检查 API；`--translate` 会发起真实付费图片请求，保存操作编号以便核实与恢复，不自动重建未知请求 |
+| `smoke_api.py` | 默认检查 API；`--translate` 会发起真实付费图片请求，保存请求 UUID 以便核实与恢复，不自动重建未知请求 |
 
 浏览器脚本需要 Node.js、已安装的 Playwright 和对应浏览器；`PLAYWRIGHT_MODULE` 可指向已有模块。脚本使用各自的隔离端口、夹具或扩展配置，并非所有工具支持相同环境变量。阅读与后台检查的完整启动顺序见[阅读契约验收](../docs/READING_TRANSLATION_CONTRACT.md#10-验证入口)。模拟图片只能验证交互，不能证明翻译效果。
 
@@ -72,6 +72,6 @@ node scripts/verify_drive_import.mjs
 ## 样本与共享模块
 
 - `generate_import_fixtures.py` 生成原创导入样本，输出到被忽略的 `artifacts/import-validation/`。
-- `plan_client.py`、`plan_helpers.mjs`、`local_import_helpers.mjs` 供检查脚本复用，不是独立命令。
+- `translation_client.py`、`local_import_helpers.mjs` 供检查脚本复用，不是独立命令。
 
 原本绑定特定 Windows 虚拟环境的本机常规翻译启动器已移除。需要计算节点时，按[classic-engine 安装说明](../services/classic-engine/README.md)单独准备环境和模型。

@@ -1,3 +1,4 @@
+from conftest import create as create_translation_job
 """Whole-page control lifecycle against an isolated database/object-store adapter."""
 import base64
 import hashlib
@@ -52,9 +53,9 @@ def v2(client, monkeypatch, png):
         for index in range(count):
             user = login(client, 'reader' + str(index // 3))
             asset = upload(client, user, png_variant(png, index))
-            response = submit_asset(client, user, asset, key=uuid4().hex, language='en', mode='classic')
+            response = create_translation_job(client, user, asset, key=uuid4().hex, language='en', mode='classic')
             assert response.status_code == 202, response.text
-            jobs.append(response.json()['items'][0]['job']['id'])
+            jobs.append(response.json()['id'])
         return jobs
     def sign_upload(self, key, info, ttl):
         return {'url': 'https://r2.example.test/' + key + '?signature=test', 'headers': {

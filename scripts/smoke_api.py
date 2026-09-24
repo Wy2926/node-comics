@@ -14,14 +14,14 @@ from pathlib import Path
 
 import httpx
 from PIL import Image
-from plan_client import submit_page, body_for, download
+from translation_client import submit_page, body_for, download
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def checked(response, statuses=(200,)):
     if response.status_code not in statuses:
-        raise RuntimeError(f"API returned HTTP {response.status_code}: {response.text[:400]}")
+        raise RuntimeError(f"API returned HTTP {response.status_code}")
     return response.json()
 
 
@@ -35,11 +35,13 @@ def main():
     args = parser.parse_args()
     evidence = ROOT / "artifacts" / "cluster-smoke"
     evidence.mkdir(parents=True, exist_ok=True)
-    record_path = evidence / f"cluster-live-{args.mode}.json"
+    record_path = evidence / f"translation-live-{args.mode}.json"
     record = json.loads(record_path.read_text("utf-8")) if record_path.exists() else {
         "mode": args.mode, "username": f"acceptance-{args.mode}-{uuid.uuid4().hex[:10]}",
-        "operation_id": str(uuid.uuid4()), "checks": [],
+        "translation_id": str(uuid.uuid4()), "checks": [], "api": args.api,
     }
+    if record["api"] != args.api:
+        raise RuntimeError("The saved translation belongs to a different API; use a separate evidence directory")
 
     def save():
         record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), "utf-8")
@@ -57,49 +59,52 @@ def main():
             operator = checked(client.post("/v1/auth/dev", json={"username": "admin"}))
             checked(client.post(f"/v1/admin/users/{auth['user']['id']}/membership",
                 headers={"Authorization": "Bearer " + operator["access_token"],
-                         "Idempotency-Key": "smoke-membership-" + record["operation_id"]},
+                         "Idempotency-Key": "smoke-membership-" + record["translation_id"]},
                 json={"months": 1, "note": "Explicit isolated smoke membership"}))
         record["capabilities"] = checked(client.get("/v1/capabilities"))
         record["usage"] = checked(client.get("/v1/me/usage"))
         passed("isolated_local_login_and_capabilities")
-        if not args.translate and "job_id" not in record:
+        if not args.translate:
             save()
             print(json.dumps({"status": "api_ready", "mode": args.mode}, ensure_ascii=False))
             return
-        if "job_id" not in record and not record["capabilities"]["entitlements"]["modes"][args.mode]["allowed"]:
+        if not record.get("accepted") and not record["capabilities"]["entitlements"]["modes"][args.mode]["allowed"]:
             raise RuntimeError("Test account requires PLUS or a valid redraw gift; explicitly use --grant-plus for a local test membership")
         sample = (ROOT / "samples" / "starlight-bookshop.png").read_bytes()
         record["input_sha256"] = hashlib.sha256(sample).hexdigest()
-        result = submit_page(client, sample, record["operation_id"], args.mode)
-        record["job_id"] = result["id"]
+        result = submit_page(client, sample, record["translation_id"], args.mode)
+        record["accepted"] = True
         save()
-        replay = submit_page(client, sample, record["operation_id"], args.mode)
+        replay = submit_page(client, sample, record["translation_id"], args.mode)
         assert replay["id"] == result["id"]
-        passed("duplicate_click_returns_same_job")
-        conflict = client.post("/v1/translation-plans", json=body_for(sample, record["operation_id"], args.mode, "en"))
-        assert conflict.status_code == 200
-        assert conflict.json()["items"][0]["code"] == "IDEMPOTENCY_CONFLICT"
+        passed("duplicate_click_returns_same_translation")
+        conflict = client.put(f"/v1/translations/{record['translation_id']}", json=body_for(sample, args.mode, "en"))
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
         passed("idempotency_key_rejects_changed_payload")
         with httpx.Client(base_url=args.api, timeout=30, trust_env=False) as stranger:
             other = checked(stranger.post("/v1/auth/dev", json={"username": record["username"] + "-other"}))
             stranger.headers["Authorization"] = "Bearer " + other["access_token"]
-            assert stranger.get(f"/v1/jobs/{record['job_id']}").status_code == 404
-            if result["input_asset_id"]:
+            assert stranger.get(f"/v1/translations/{record['translation_id']}").status_code == 404
+            if result.get("input_asset_id"):
                 assert stranger.get(f"/v1/images/{result['input_asset_id']}/content").status_code == 404
             passed("another_user_cannot_read_job_or_original")
         deadline = time.monotonic() + (1200 if args.wait else 0)
         while True:
-            job = checked(client.get(f"/v1/jobs/{record['job_id']}"))
-            record["job"] = job
+            job = checked(client.get(f"/v1/translations/{record['translation_id']}"))
+            record["translation"] = {key: value for key, value in job.items() if key != 'result'}
+            if job.get('result'):
+                record["translation"]["result"] = {key: value for key, value in job['result'].items()
+                    if key not in ('download_url', 'download_expires_at')}
             record["usage"] = checked(client.get("/v1/me/usage"))
             save()
-            print(json.dumps({"job_id": job["id"], "mode": args.mode, "status": job["status"],
-                              "phase": job["phase"], "error": job.get("error")}, ensure_ascii=False), flush=True)
-            if job["status"] not in ("awaiting_upload", "validating_upload", "queued", "running") or time.monotonic() >= deadline:
+            print(json.dumps({"translation_id": job["id"], "mode": args.mode, "state": job["state"],
+                              "error": job.get("error")}, ensure_ascii=False), flush=True)
+            if job["state"] not in ("needs_input", "queued", "running") or time.monotonic() >= deadline:
                 break
             time.sleep(5)
-        if job["status"] == "succeeded":
-            output = download(client, job["output_asset_id"])
+        if job["state"] == "succeeded" and job['result']['kind'] != 'no_text':
+            output = download(client, job)
             picture = Image.open(io.BytesIO(output))
             picture.load()
             assert picture.width > 0 and picture.height > 0
@@ -110,7 +115,7 @@ def main():
             passed("delivered_image_downloaded_and_decoded")
             passed("server_job_survives_client_disconnect")
             save()
-        elif job["status"] in ("failed", "outcome_unknown"):
+        elif job["state"] in ("failed", "needs_attention"):
             print("Upstream call will NOT be automatically repeated.", flush=True)
         print(json.dumps({"evidence": str(record_path), "checks": record["checks"]}, ensure_ascii=False))
 

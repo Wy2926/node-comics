@@ -48,15 +48,14 @@ export interface ReadingPosition {
 }
 export interface TranslationBinding {
   id: string; apiOrigin: string; userId: string; imageSha256: string;
-  mode?: 'classic' | 'redraw'; language?: string; configVersion?: string; resultVersion?: string;
-  operationKey?: string; jobId?: string; payload: unknown; updatedAt: number;
+  payload: unknown; updatedAt: number;
 }
 export interface CatalogRecord { id: string; [key: string]: unknown }
 export interface CatalogTables {
   comics: Comic; entries: Entry; connections: SourceConnection;
   pageDescriptors: PageDescriptor; materializations: PageMaterialization;
   positions: ReadingPosition; translationBindings: TranslationBinding;
-  translationOperations: CatalogRecord; catalogs: CatalogRecord;
+  catalogs: CatalogRecord;
   tasks: CatalogRecord; metadata: CatalogRecord; tombstones: CatalogRecord;
 }
 export type CatalogTable = keyof CatalogTables;

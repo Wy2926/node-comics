@@ -218,15 +218,12 @@ def run_control_stage(lease_id):
         if name == "validate_upload":
             from .upload_models import UploadReservation
             from .uploads import complete_upload
-            from .plan_api import bind_file_page
             with session_factory()() as db:
                 reservation = db.scalar(select(UploadReservation).where(UploadReservation.job_id == job_id))
                 complete_upload(db, reservation, reservation.owner_id, lease_id=lease_id, lease_token=token)
                 lease = db.get(ExecutionLease, lease_id)
                 stage = db.get(JobStage, lease.stage_id)
                 job = db.get(Job, job_id)
-                if job.input_asset_id:
-                    bind_file_page(db, job)
                 stage.status, stage.completed_at = ("succeeded" if job.input_asset_id else "failed"), now()
                 release_lease(db, lease, stage.status)
                 touch_job(db, job)

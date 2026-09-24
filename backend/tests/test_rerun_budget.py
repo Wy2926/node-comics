@@ -1,97 +1,72 @@
-"""Regeneration uses per-image budgets and bound source identity."""
+"""Explicit regeneration inherits frozen intent and uses present membership limits."""
 from datetime import timedelta
-import hashlib
 import pytest
 from sqlalchemy import func, select
-from conftest import create, login_plus as login, upload, submit_asset, quota_usage, png_variant
+from conftest import create, login_plus as login, upload, submit_asset, quota_usage, request_id, request_record, run_job
 
 
-def rerun(client, auth, job_id, asset_id, key="rerun-confirmed", **fields):
-    return submit_asset(client, auth, asset_id, key=key, regenerate=True, rerun_job_id=job_id, **fields)
+def done(client, auth, png, monkeypatch):
+    from app import workers
+    from app.adapters.images import TranslationOutput
+    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    original = submit_asset(client, auth, upload(client, auth, png)).json()
+    run_job(request_record(client, auth, original['id']).job_id)
+    return client.get('/v1/translations/' + original['id'], headers=auth).json()
 
 
-def test_rerun_honors_per_image_maximum_budget(client, png):
-    auth = login(client)
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
-    # Explicit zero confirmation may never be widened by the server.
-    response = rerun(client, auth, job_id, asset, max_quota_pages=0)
-    assert response.status_code == 200 and response.json()["items"][0]["code"] == "QUOTA_BOUND_EXCEEDED"
-    assert quota_usage(client, auth)["reserved"] == 1
+def regenerate(client, auth, previous, key='new', **fields):
+    return client.put('/v1/translations/' + request_id(key), headers=auth,
+        json={'regenerate_of':previous['id'], **fields})
 
 
-def test_rerun_checks_current_entitlement_kind_before_reserving(client, png):
-    auth = login(client)
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
-    response = rerun(client, auth, job_id, asset, expected_kind="redraw_grant")
-    assert response.status_code == 200 and response.json()["items"][0]["code"] == "ENTITLEMENT_CHANGED"
-    assert quota_usage(client, auth)["reserved"] == 1
-
-
-def test_confirmed_rerun_replay_survives_later_membership_and_provider_change(client, png):
+def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client, png, monkeypatch):
     from app.db import session_factory
     from app.models import Job, Ledger, Provider, User, now
     auth = login(client)
-    asset = upload(client, auth, png)
-    original = create(client, auth, asset).json()
-    first = rerun(client, auth, original["id"], asset)
-    assert first.status_code == 202 and first.json()["items"][0]["disposition"] == "accepted"
-    revised = first.json()["items"][0]["job"]
-    assert revised["id"] != original["id"] and revised["version"] > original["version"]
+    original = done(client, auth, png, monkeypatch)
+    first = regenerate(client, auth, original)
+    assert first.status_code == 202 and first.json()['state'] == 'queued'
+    original_job = request_record(client, auth, original['id']).job_id
+    revised_job = request_record(client, auth, first.json()['id']).job_id
     with session_factory()() as db:
-        db.get(User, db.get(Job, original["id"]).owner_id).plus_expires_at = now() - timedelta(seconds=1)
-        db.get(Provider, "default").enabled = False
+        assert db.get(Job,revised_job).version > db.get(Job,original_job).version
+        db.get(User,db.get(Job,original_job).owner_id).plus_expires_at = now()-timedelta(seconds=1)
+        db.get(Provider,'default').enabled = False
         db.commit()
-    repeated = rerun(client, auth, original["id"], asset)
-    assert repeated.status_code == 200 and repeated.json()["items"][0]["job"]["id"] == first.json()["items"][0]["job"]["id"]
-    conflict = rerun(client, auth, original["id"], asset, max_quota_pages=0)
-    assert conflict.status_code == 200 and conflict.json()["items"][0]["code"] == "IDEMPOTENCY_CONFLICT"
+    repeat = regenerate(client,auth,original)
+    assert repeat.status_code == 202 and repeat.json()['id'] == first.json()['id']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 2
-        assert db.scalar(select(func.count()).select_from(Ledger)) == 2
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind=='reserve')) == 2
 
 
-@pytest.mark.parametrize("scope", ["other_user", "other_image", "other_language", "other_mode"])
-def test_rerun_is_bound_to_owner_source_mode_and_language(client, png, scope):
-    auth = login(client)
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
-    fields = {}
-    if scope == "other_user":
-        auth = login(client, "bob")
-        asset = upload(client, auth, png)
-    elif scope == "other_image":
-        asset = upload(client, auth, png_variant(png, 17))
-    elif scope == "other_language":
-        fields["language"] = "en"
-    else:
-        fields["mode"] = "classic"
-    response = rerun(client, auth, job_id, asset, **fields)
-    assert response.status_code == 200 and response.json()["items"][0]["disposition"] == "blocked"
-
-
-def test_rerun_accepts_reimported_identical_bytes(client, png):
-    auth = login(client)
-    original = upload(client, auth, png)
-    job_id = create(client, auth, original).json()["id"]
-    alias = upload(client, auth, png)
-    response = rerun(client, auth, job_id, alias)
-    assert response.status_code == 202 and response.json()["items"][0]["disposition"] == "accepted"
-
-
-def test_unknown_rerun_requires_explicit_acknowledgement_and_budget(client, png):
+def test_regeneration_checks_membership_before_creating_work(client, png, monkeypatch):
     from app.db import session_factory
-    from app.models import Job, now
+    from app.models import User, now
     auth = login(client)
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
+    original = done(client, auth, png, monkeypatch)
+    owner = client.get('/v1/me',headers=auth).json()['user']['id']
     with session_factory()() as db:
-        job = db.get(Job, job_id)
-        job.status, job.unknown_since = "outcome_unknown", now()
+        db.get(User,owner).plus_expires_at = now()-timedelta(seconds=1)
         db.commit()
-    refused = rerun(client, auth, job_id, asset)
-    assert refused.status_code == 200 and refused.json()["items"][0]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
-    accepted = rerun(client, auth, job_id, asset, acknowledge_unknown_cost=True)
-    assert accepted.status_code == 202 and accepted.json()["items"][0]["job"]["id"] != job_id
-    assert quota_usage(client, auth)["reserved"] == 2
+    response = regenerate(client,auth,original)
+    assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
+    assert client.get('/v1/translations/'+original['id'],headers=auth).json()['state']=='succeeded'
+
+
+@pytest.mark.parametrize('extra', [
+    {'mode':'classic'}, {'target_language':'en'}, {'image':{'sha256':'a'*64,'byte_size':1,'content_type':'image/png'}},
+    {'retry_of':'11111111-1111-4111-8111-111111111111'}, {'max_quota_pages':0}, {'expected_kind':'redraw_grant'}])
+def test_regeneration_rejects_mixed_intent_and_removed_controls(client,png,monkeypatch,extra):
+    auth = login(client)
+    original = done(client,auth,png,monkeypatch)
+    response = regenerate(client,auth,original,**extra)
+    assert response.status_code == 422
+    assert quota_usage(client,auth)['reserved'] == 0
+
+
+def test_regeneration_cannot_reference_another_account(client,png,monkeypatch):
+    auth = login(client)
+    original = done(client,auth,png,monkeypatch)
+    response = regenerate(client,login(client,'bob'),original)
+    assert response.status_code == 404

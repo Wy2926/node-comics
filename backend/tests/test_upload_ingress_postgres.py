@@ -13,7 +13,7 @@ from test_upload_ingress import (
     test_cancel_during_r2_put_keeps_slot_and_heartbeat_until_thread_finishes,
     test_body_timeout_is_bounded_and_reservation_remains_retryable,
     test_lost_ingress_stops_waiting_for_client_body,
-    test_accepted_replay_does_not_read_body_or_allocate_slot,
+    test_verified_receipt_replay_is_bounded_and_checks_immutable_bytes,
     test_cancelled_acquisition_releases_committed_slot,
     test_settings_changes_only_affect_new_upload_timeout_and_renewal,
 )
@@ -69,7 +69,7 @@ def test_two_http_replicas_share_limits_and_leave_single_connection_pool_free(in
     def hold(port, owner, index):
         connection = socket.create_connection(('127.0.0.1', port), timeout=3)
         sockets.append(connection)
-        path = f"/v1/uploads/{case['uploads'][owner][index]}/content"
+        path = f"/v1/translations/{case['uploads'][owner][index]}/input"
         headers = (f'PUT {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
                    f'Authorization: Bearer {tokens[owner]}\r\nContent-Type: image/png\r\n'
                    f"Content-Length: {len(case['data'])}\r\nConnection: close\r\n\r\n")
@@ -77,7 +77,7 @@ def test_two_http_replicas_share_limits_and_leave_single_connection_pool_free(in
         return connection
 
     def rejected(port, owner, index):
-        path = f"http://127.0.0.1:{port}/v1/uploads/{case['uploads'][owner][index]}/content"
+        path = f"http://127.0.0.1:{port}/v1/translations/{case['uploads'][owner][index]}/input"
         response = httpx.put(path, headers={'Authorization': 'Bearer ' + tokens[owner]},
                              content=case['data'], timeout=3, trust_env=False)
         assert response.status_code == 429
@@ -123,7 +123,7 @@ def test_two_http_replicas_share_limits_and_leave_single_connection_pool_free(in
         for connection in sockets:
             connection.sendall(case['data'][1:])
             response = connection.recv(4096)
-            assert response.startswith(b'HTTP/1.1 200 OK'), response[:100]
+            assert response.startswith(b'HTTP/1.1 202 Accepted'), response[:100]
         until(lambda: active_leases() == [])
     finally:
         for connection in sockets:

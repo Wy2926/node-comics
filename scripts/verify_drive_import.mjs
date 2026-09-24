@@ -109,7 +109,7 @@ try{
   assert.equal(sourceReply?.ok,false);
   checks.push('The compiled website-source listener is active alongside the Drive listener');
   const catalogCounts=()=>reader.evaluate(async()=>{
-    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-reading-v1-catalog');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('node-comics-reading-v2-catalog');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
     const counts=await Promise.all(['connections','comics'].map(name=>new Promise((resolve,reject)=>{const request=db.transaction(name).objectStore(name).count();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);})));db.close();return counts;
   });
   const checkAccount=async name=>{

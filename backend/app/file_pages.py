@@ -1,10 +1,11 @@
 """Private source-file identities. Page indices belong to the file, not reader order."""
 import hashlib
+from uuid import UUID
 from typing import Literal
 from fastapi import HTTPException
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, tuple_
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, or_, select, tuple_
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .assets import asset_json, available, create_asset
@@ -16,7 +17,7 @@ from .jobs import job_json, locked_user
 from .models import Asset
 from .results import ReaderEntry as Job
 from .providers import configuration, digest
-from .schemas import AssetResponse, JobResponse
+from .schemas import AssetResponse, TranslationResponse
 
 
 class FilePage(Base):
@@ -36,6 +37,10 @@ class FilePageIdentity(RequestBody):
     @classmethod
     def lowercase_hash(cls, value):
         return value.lower()
+
+
+class FilePageBinding(FilePageIdentity):
+    translation_id: UUID
 
 
 class FilePageLookup(FilePageIdentity):
@@ -67,8 +72,8 @@ class FilePageMatchRequest(RequestBody):
 
 class FilePageMatch(FilePageIdentity):
     asset: AssetResponse | None
-    jobs: list[JobResponse]
-    display_jobs: list[JobResponse] = Field(default_factory=list)
+    translations: list[TranslationResponse]
+    display_translations: list[TranslationResponse] = Field(default_factory=list)
 
 
 class FilePageMatches(BaseModel):
@@ -170,7 +175,7 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
                     continue
                 if output.parent_id and not available(db.get(Asset, output.parent_id)):
                     continue
-            jobs_by_key.setdefault(job.cache_key, []).append(job_json(db, job))
+            jobs_by_key.setdefault(job.cache_key, []).append(job)
     display_by_hash = {}
     if body.include_display and display_sources:
         # A display result is independent of the currently configured provider.
@@ -188,9 +193,52 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
                 bucket.setdefault("pending", job)
             if job.status == "succeeded":
                 bucket.setdefault("result", job)
-    # Always return request order, including misses; this is lookup only, with no billing.
-    return {"items": [{"file_hash": page.file_hash, "page_index": page.page_index,
-        "asset": asset_json(sources[key]) if key in sources else None,
-        "jobs": jobs_by_key.get(cache_keys.get(key), []),
-        **({"display_jobs": [job_json(db, job) for job in {job.id: job for job in display_by_hash.get(display_sources[key].sha256, {}).values()}.values()] if key in display_sources else []} if body.include_display else {})}
+    # Resolve real jobs and shared grants to this account's public request UUIDs.
+    from .translation_requests import TranslationRequest
+    from .translation_api import translation_page
+    entry_ids = {job.id for entries in jobs_by_key.values() for job in entries}
+    entry_ids.update(job.id for bucket in display_by_hash.values() for job in bucket.values())
+    receipts = {}
+    if entry_ids:
+        rows = db.scalars(select(TranslationRequest).where(TranslationRequest.owner_id == owner_id,
+            or_(TranslationRequest.job_id.in_(entry_ids), TranslationRequest.access_id.in_(entry_ids)))
+            .order_by(TranslationRequest.created_at.desc(), TranslationRequest.id))
+        for row in rows:
+            receipts.setdefault(row.entry_id, row)
+    payloads = {item['id']: item for item in translation_page(db, receipts.values())}
+    def snapshots(entries):
+        return [payloads[receipts[job.id].id] for job in entries if job.id in receipts]
+    result = {'items': [{'file_hash': page.file_hash, 'page_index': page.page_index,
+        'asset': asset_json(sources[key]) if key in sources else None,
+        'translations': snapshots(jobs_by_key.get(cache_keys.get(key), [])),
+        **({'display_translations': snapshots(list({job.id: job for job in display_by_hash.get(display_sources[key].sha256, {}).values()}.values()))
+            if key in display_sources else []} if body.include_display else {})}
         for page in body.pages for key in [(page.file_hash, page.page_index)]]}
+    db.commit()
+    return result
+
+
+def bind_translation_page(db, owner_id, body):
+    from .translation_api import owned_translation, unavailable
+    from .results import get_entry
+    from .scheduler import lock_scheduler
+    lock_scheduler(db)
+    row = owned_translation(db, owner_id, body.translation_id)
+    entry = get_entry(db, row.entry_id)
+    if unavailable(db, row, entry):
+        problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
+    if not entry.input_asset_id:
+        problem('INPUT_NOT_READY', '请先提供原图', 409)
+    key = (owner_id, body.file_hash, body.page_index)
+    previous = db.get(FilePage, key)
+    if previous:
+        original = db.get(Asset, previous.asset_id)
+        if original and original.sha256 != entry.source_sha256:
+            problem('FILE_PAGE_CONFLICT', '文件页已绑定不同原图', 409)
+        previous.asset_id = entry.input_asset_id
+    else:
+        db.add(FilePage(owner_id=owner_id, file_hash=body.file_hash,
+            page_index=body.page_index, asset_id=entry.input_asset_id))
+    db.commit()
+    return {'file_hash': body.file_hash, 'page_index': body.page_index,
+        'asset_id': entry.input_asset_id, 'translation_id': str(body.translation_id)}

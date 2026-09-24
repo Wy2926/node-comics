@@ -21,7 +21,7 @@ function networkContext(sourceUrl:string,signal?:AbortSignal){return {signal,asy
     resolveSource(options.referer,definitions).definition.id!==resolveSource(sourceUrl,definitions).definition.id))throw Error('来源请求头归属无效。');
   const lifetime=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(30_000)]);
   return withImageHeaders(url,options?{referer:options.referer}:undefined,lifetime,async()=>{
-  const response=await fetch(url,{credentials:'omit',redirect:'error',headers:{Accept:'application/json, text/html'},
+  const response=await fetch(url,{credentials:'include',redirect:'error',headers:{Accept:'application/json, text/html'},
     signal:lifetime});
   if(!response.ok)throw Error(`来源请求失败（HTTP ${response.status}），请稍后重试或在源站完成验证。`);
   if(!response.body)throw Error('来源响应为空。');

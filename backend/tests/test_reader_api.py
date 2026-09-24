@@ -6,14 +6,14 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
-from conftest import create, login_plus as login, submit_asset, run_job, upload, png_variant
+from conftest import create, login_plus as login, submit_asset, run_job, upload, png_variant, request_for_job, request_id
 from test_file_pages import FILE_HASH, bind, complete
 
 
 def rerun(client, auth, job, asset=None, key="rerun-latest"):
-    response = submit_asset(client, auth, asset or job['input_asset_id'], key=key, regenerate=True, rerun_job_id=job['id'])
+    response = create(client, auth, asset or job['input_asset_id'], key=key, regenerate=True, rerun_job_id=job['id'])
     assert response.status_code == 202, response.text
-    return response.json()['items'][0]['job']
+    return response.json()
 
 
 def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypatch):
@@ -26,14 +26,15 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
     original = complete(client, auth, upload(client, auth, png), png, monkeypatch)
     newer = rerun(client, auth, original)
     before = quota_usage(client, auth)
-    route = f"/v1/jobs/{original['id']}/feedback"
+    route = f"/v1/translations/{request_for_job(client, auth, original['id'])}/feedback"
     payload = {"issues": ["meaning", "meaning"], "comment": "  右下角的对白  ", "output_asset_id": original["output_asset_id"]}
     assert client.post(route, headers={**other, "Idempotency-Key": "feedback"}, json=payload).status_code == 404
     assert client.post(route, headers={**auth, "Idempotency-Key": "empty"}, json={}).status_code == 422
     assert client.post(route, headers={**auth, "Idempotency-Key": "wrong"}, json={**payload, "output_asset_id": original["input_asset_id"]}).status_code == 409
     first = client.post(route, headers={**auth, "Idempotency-Key": "feedback"}, json=payload)
     assert first.status_code == 201, first.text
-    assert first.json()["job_id"] == original["id"] != newer["id"]
+    assert first.json()["translation_id"] == request_for_job(client, auth, original["id"])
+    assert first.json()["translation_id"] != request_for_job(client, auth, newer["id"])
     assert first.json()["issues"] == ["meaning"]
     assert first.json()["comment"] == "右下角的对白"
     assert client.post(route, headers={**auth, "Idempotency-Key": "feedback"}, json=payload).json() == first.json()
@@ -54,59 +55,64 @@ def test_latest_effect_survives_pending_and_failure_but_never_expired_fallback(c
     from app.jobs import settle
     from app.models import Asset, Job, Provider, now
     auth = login(client)
-    asset = bind(client, auth, png).json()["id"]
+    asset = bind(client, auth, png).json()['id']
     first = complete(client, auth, asset, png, monkeypatch)
     second = rerun(client, auth, first)
+    first_id = request_for_job(client, auth, first['id'])
+    second_id = request_for_job(client, auth, second['id'])
     def projected():
-        response = client.post("/v1/file-pages/match", headers=auth, json={"pages": [{"file_hash": FILE_HASH, "page_index": 0}], "mode": "redraw", "target_language": "zh-Hans", "include_display": True})
+        response = client.post('/v1/file-pages/match', headers=auth, json={
+            'pages': [{'file_hash': FILE_HASH, 'page_index': 0}], 'mode': 'redraw',
+            'target_language': 'zh-Hans', 'include_display': True})
         assert response.status_code == 200, response.text
-        return response.json()["items"][0]
-    assert {j["id"] for j in projected()["display_jobs"]} == {first["id"], second["id"]}
-    latest_route = f"/v1/jobs/{first['id']}/latest-result"
-    assert client.get(latest_route, headers=auth).json()["result"]["id"] == first["id"]
-    run_job(second["id"])
-    third = rerun(client, auth, second, key="failed-third")
+        return response.json()['items'][0]
+    assert {j['id'] for j in projected()['display_translations']} == {first_id, second_id}
+    run_job(second['id'])
+    third = rerun(client, auth, second, key='failed-third')
+    third_id = request_for_job(client, auth, third['id'])
     with session_factory()() as db:
-        job = db.get(Job, third["id"]);job.status = "failed";job.completed_at = now()
+        job = db.get(Job, third['id'])
+        job.status, job.completed_at = 'failed', now()
         settle(db, job, success=False)
-        output = db.get(Asset, db.get(Job, second["id"]).output_asset_id);output.deleted_at = now()
+        db.get(Asset, db.get(Job, second['id']).output_asset_id).deleted_at = now()
         db.commit()
-    result = client.get(latest_route, headers=auth).json()
-    assert result["latest"]["id"] == third["id"]
-    assert result["result"]["id"] == second["id"]
-    assert result["result"]["output_asset_id"] is None
-    assert result["result"]["result_expired"]
-    display = projected()["display_jobs"]
-    assert {j["id"] for j in display} == {second["id"], third["id"]}
-    # Even disabled suppliers and expired source assets retain readable metadata.
+    display = projected()['display_translations']
+    assert {j['id'] for j in display} == {second_id, third_id}
+    removed = next(j for j in display if j['id'] == second_id)
+    assert removed['state'] == 'failed' and removed['error']['code'] == 'TRANSLATION_UNAVAILABLE'
+    assert removed['result'] is None
+    history = client.get('/v1/translations?offset=0&limit=2', headers=auth).json()
+    assert history['total'] == 3 and history['next_offset'] == 2
+    assert [j['id'] for j in history['items']] == [third_id, second_id]
     with session_factory()() as db:
         db.get(Asset, asset).expires_at = now() - timedelta(days=1)
-        for provider in db.scalars(select(Provider)): provider.enabled = False
+        for provider in db.scalars(select(Provider)):
+            provider.enabled = False
         db.commit()
-    assert projected()["asset"] is None
-    assert {j["id"] for j in projected()["display_jobs"]} == {second["id"], third["id"]}
-    other = login(client, "bob")
-    assert client.get(latest_route, headers=other).status_code == 404
+    assert projected()['asset'] is None
+    assert {j['id'] for j in projected()['display_translations']} == {second_id, third_id}
+    other = login(client, 'bob')
+    assert client.get('/v1/translations/' + first_id, headers=other).status_code == 404
+    assert client.get('/v1/translations', headers=other).json()['total'] == 0
 
 
-def test_rerun_after_original_reimport_checks_same_bytes_and_receipt(client, png, monkeypatch):
+def test_revoked_source_cannot_be_regenerated_or_resurrected(client, png, monkeypatch):
     from app.db import session_factory
     from app.models import Asset, now
     auth = login(client)
-    old_asset = bind(client, auth, png).json()["id"]
+    old_asset = bind(client, auth, png).json()['id']
     first = complete(client, auth, old_asset, png, monkeypatch)
+    first_id = request_for_job(client, auth, first['id'])
     with session_factory()() as db:
-        db.get(Asset, old_asset).expires_at = now() - timedelta(days=1);db.commit()
-    new_asset = bind(client, auth, png).json()["id"]
+        db.get(Asset, old_asset).expires_at = now() - timedelta(days=1)
+        db.commit()
+    new_asset = bind(client, auth, png).json()['id']
     assert old_asset != new_asset
-    created = submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id'])
-    assert created.status_code == 202, created.text
-    assert created.json()['items'][0]['job']['input_asset_id'] == new_asset
-    before = quota_usage(client, auth)
-    assert submit_asset(client, auth, new_asset, key='restore-rerun', regenerate=True, rerun_job_id=first['id']).json()['items'][0]['job']['id'] == created.json()['items'][0]['job']['id']
-    assert quota_usage(client, auth) == before
-    wrong_asset = upload(client, auth, png_variant(png, 23))
-    assert submit_asset(client,auth,wrong_asset,key='wrong-page',regenerate=True,rerun_job_id=first['id']).json()['items'][0]['code'] == 'RERUN_SOURCE_MISMATCH'
+    response = client.put('/v1/translations/' + request_id('restore-rerun'), headers=auth,
+        json={'regenerate_of': first_id})
+    assert response.status_code == 410
+    assert response.json()['error']['code'] == 'TRANSLATION_UNAVAILABLE'
+    assert client.get('/v1/translations/' + first_id, headers=auth).json()['error']['code'] == 'TRANSLATION_UNAVAILABLE'
 
 
 def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png, monkeypatch):

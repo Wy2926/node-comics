@@ -72,8 +72,8 @@ async function createContext(tabId:number,navigationId:string):Promise<Context|u
   const [caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);
   const attach=async(jobs:Job[])=>{assertCurrent(api.isCurrent);for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,ownerId:session.user.id,apiOrigin:origin,assetId:incoming.find(j=>j.input_asset_id)?.input_asset_id??page.assetId,jobs:mergeJobs(page.jobs,incoming)});}};
   const originals=new InlineOriginals('inline:'+key,Math.min(128*1024*1024,caps.limits.max_bytes*4));
-  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,sessionId:navigationId,getBlob:key=>originals.read(key),rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{},onPolicy:value=>{if(ctx)ctx.rights=value;}});
-  ctx={key,api,core,settings,session,caps,rights,pages,originals,sourceErrors:new Map(),active:true};contexts.set(tabId,ctx);await core.init();await core.recover();return ctx;
+  const core=new TranslationCoordinator({api,userId:session.user.id,language:settings.language,getBlob:key=>originals.read(key),rights:()=>ctx?.rights??rights,onJobs:attach,onChange:()=>{}});
+  ctx={key,api,core,settings,session,caps,rights,pages,originals,sourceErrors:new Map(),active:true};contexts.set(tabId,ctx);await core.init();return ctx;
 }
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
 async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
@@ -88,7 +88,7 @@ async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRe
 }
 async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.MessageSender){
   const targets:ReadingTarget[]=[];
-  for(const [index,image] of request.images.entries()){
+  for(const image of request.images){
    try{
     const key=pageKey(request,image);let page=ctx.pages.get(key);
     if(!page){
@@ -99,7 +99,7 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
     ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:ctx.settings.translationMode});
-   }catch(error){ctx.sourceErrors.set(pageKey(request,image),(error as Error).message);if(index===0)throw error;}
+   }catch(error){ctx.sourceErrors.set(pageKey(request,image),(error as Error).message);}
   }
   return targets;
 }
@@ -122,8 +122,8 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     }
     items.push(item);
   }
-  return {mode,language,scope,items,retryAfterMs:ctx.core.retryDelay||undefined,policyRevision:ctx.core.state.policyRevision,
-    needsPlan:ctx.core.session.sequence===0||request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
+  return {mode,language,scope,items,retryAfterMs:ctx.core.retryDelay||undefined,hasPending:ctx.core.hasPending,
+    needsSubmit:request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
 }
 /** A display reload can only read this page's selected result; it never enters the plan/retry path. */
 async function imageResponse(request:InlineRequest,sender:chrome.runtime.MessageSender):Promise<InlineImageResponse>{
@@ -135,7 +135,7 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.output_asset_id]);
   if(!job?.output_asset_id||key!==request.resultKey)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
   const blob=await loadResultBlob({origin:new URL(ctx.api.base).origin,userId:ctx.session.user.id,job,
-    download:()=>ctx.api.image(job.output_asset_id!),isCurrent:ctx.api.isCurrent});
+    download:()=>ctx.api.translationImage(job.id),isCurrent:ctx.api.isCurrent});
   assertCurrent(current);
   // Feed updates can revoke/change the result while its bytes are being read.
   const latest=ctx.pages.get(pageKey(request,request.images[0])),selected=latest&&pageResult(ctx,latest);
@@ -151,21 +151,21 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
   if(request.type==='NC_INLINE_WAIT'){
     ctx.waiting?.abort();const waiting=new AbortController();ctx.waiting=waiting;
     try{await ctx.core.wait(waiting.signal);}catch(error){if(waiting.signal.aborted)return response(ctx,request);throw error;}
-  }else if(request.type==='NC_INLINE_LEASE')await ctx.core.renew([ctx.settings.translationMode]);
-  else {
+  }else {
     ctx.waiting?.abort();
     const {translationMode:mode,language}=ctx.settings;
     if(!ctx.caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(ctx.caps,mode,language))return {mode,language,scope:ctx.key,items:request.images.map(i=>({id:i.id,state:{kind:'error',message:msg("此翻译方式暂不可用"),retryable:false}}))};
+    if(request.refreshRights||request.retryId){ctx.rights=await ctx.api.entitlements();await ctx.core.refreshEntitlements(ctx.rights);}
     const currentKey=request.images[0]&&pageKey(request,request.images[0]);
-    if(!request.retryId&&currentKey!==ctx.currentKey&&!ctx.pages.has(currentKey)&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);await ctx.core.plan(targets,false,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
+    if(!request.retryId&&currentKey!==ctx.currentKey&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);await ctx.core.submit(targets,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
     const targets=await prepare(ctx,request,sender);
     if(!current())return response(ctx,request);
     if(request.retryId){const image=request.images.find(i=>i.id===request.retryId),page=image&&ctx.pages.get(pageKey(request,image));const target=targets.find(t=>t.page.id===page?.id);if(target)await ctx.core.manual(target,current);}
-    else await ctx.core.plan(targets,false,current);
+    else await ctx.core.submit(targets,current);
     ctx.currentKey=currentKey;
     // Upload completion is durable and arrives through the feed. Do not hold ready images behind uploads.
     void ctx.core.finishUploads().then(async()=>{
-      for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.job?.status!=='awaiting_upload')await ctx.originals.uploaded(target.page.blobKey);}
+      for(const target of targets){const operation=ctx.core.records.find(r=>r.id===operationId(ctx.core.scope,language,target));if(target.page.blobKey&&operation?.state==='accepted'&&operation.result?.state!=='needs_input')await ctx.originals.uploaded(target.page.blobKey);}
     }).catch(()=>{});
   }
   return response(ctx,request);
@@ -176,7 +176,7 @@ export function registerInlineBackground(){
   chrome.storage.onChanged.addListener((changes,area)=>{const auth=changes[authKey],accountChanged=auth&&(auth.oldValue as AuthState|undefined)?.session?.id!==(auth.newValue as AuthState|undefined)?.session?.id;const settingChange=changes[settingsKey],before=settingChange?.oldValue as Partial<Settings>|undefined,after=settingChange?.newValue as Partial<Settings>|undefined;const translationChanged=settingChange&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode);if(area==='local'&&(translationChanged||accountChanged)){configGeneration++;for(const ctx of contexts.values()){ctx.active=false;ctx.waiting?.abort();ctx.originals.clear();}contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));}});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){ctx.active=false;ctx.waiting?.abort();ctx.originals.clear();}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
-    if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_LEASE','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
+    if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{
       const tabId=sender.tab!.id!,saved=await chrome.storage.session.get(activationKey(tabId)),activation=saved[activationKey(tabId)] as Activation|undefined;
       if(!activation||activation.navigationId!==message.navigationId||activation.documentId&&activation.documentId!==sender.documentId)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));

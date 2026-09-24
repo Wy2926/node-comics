@@ -7,7 +7,7 @@ const common = [c('id', '编号'), c('owner_id', '用户')];
 const catalog = {
   uploads: {title: '上传会话', filters: ['owner_id', 'job_id', 'status'], columns: [...common, c('job_id', '任务'), c('status', '状态'),
     c('expected_size', '期望字节数'), c('expires_at', '到期', 'time'), c('ingress_expires_at', '上传占位到期', 'time'), c('error_code', '错误码'), c('error_message', '原因')]},
-  receipts: {title: '提交回执', filters: ['owner_id', 'job_id', 'operation_key'], columns: [c('owner_id', '用户'), c('operation_key', '操作编号'),
+  requests: {title: '翻译请求', filters: ['owner_id', 'job_id', 'request_id', 'access_id'], columns: [c('owner_id', '用户'), c('id', '请求编号'),
     c('job_id', '真实任务'), c('access_id', '复用授权'), c('created_at', '受理时间', 'time')]},
   assets: {title: '图片记录', filters: ['owner_id', 'q', 'job_id'], columns: [...common, c('sha256', '图片哈希'), c('kind', '类型'),
     c('available', '访问记录有效'), c('byte_size', '字节数'), c('active_references', '活跃引用'), c('result_access_count', '结果授权引用'),
@@ -18,11 +18,11 @@ const catalog = {
   accesses: {title: '结果授权', filters: ['owner_id', 'result_id'], columns: [...common, c('result_id', '生成任务'), c('version', '版本'), c('available', '有效'),
     c('input_asset_id', '原图访问记录'), c('output_asset_id', '译图访问记录'), c('created_at', '授权时间', 'time')]},
 } as const;
-const fieldLabels: Record<string, string> = {owner_id: '用户 ID', job_id: '任务 ID', status: '状态', operation_key: '操作编号', q: '图片哈希 / 编号', mode: '翻译模式', file_hash: '文件哈希', asset_id: '图片 ID', result_id: '生成任务 ID'};
+const fieldLabels: Record<string, string> = {owner_id: '用户 ID', job_id: '任务 ID', status: '状态', request_id: '请求编号', access_id: '复用授权 ID', q: '图片哈希 / 编号', mode: '翻译模式', file_hash: '文件哈希', asset_id: '图片 ID', result_id: '生成任务 ID'};
 type View = 'health' | 'user' | 'provider-history' | keyof typeof catalog;
 type Health = {items: Row[]; alerts: Record<string, number>; billing_backlog: Row[]; generated_at: string};
 type UserDiagnostics = {owner_id: string; owner_name: string; image_budget: {limit: number; remaining: number; retry_after_seconds: number};
-  upload_active: number; policy_revision: number | null; sessions: Row[]; controls: Row[]; feedback: Row | null; generated_at: string};
+  upload_active: number; controls: Row[]; feedback: Row | null; generated_at: string};
 
 function HealthPanel({onUnauthorized}: {onUnauthorized: (message: string) => void}) {
   const {data, error, busy, reload} = useAdminResource<Health>('/v1/admin/operations/health', onUnauthorized);
@@ -43,7 +43,6 @@ function UserPanel({onUnauthorized}: {onUnauthorized: (message: string) => void}
     <label>用户 ID<input name="owner" required maxLength={36}/></label><button className="primary" disabled={busy}>查询用户</button></form><ResourceError error={error} stale={!!data}/>
     {data && <><h2>{data.owner_name}</h2><div className="stats-grid"><Stat title="本分钟剩余图片名额" value={`${data.image_budget.remaining} / ${data.image_budget.limit}`} note="跨模式、语言和设备合计"/>
       <Stat title="可再次受理等待" value={`${data.image_budget.retry_after_seconds} 秒`} note="当前滚动 60 秒窗口"/><Stat title="进行中上传" value={String(data.upload_active)} note="尚未到期的收流占位"/></div>
-      <section className="panel"><h3>最近阅读会话（最多 50 个）</h3><DataTable rows={data.sessions} columns={[c('session_id', '会话'), c('sequence', '更新序号'), c('page_count', '窗口页数'), c('active', '当前有效'), c('fenced', '已隔离'), c('expires_at', '到期', 'time')]}/></section>
       <section className="panel"><h3>请求保护</h3><DataTable rows={data.controls} columns={[c('scope', '请求范围'), c('recorded_tokens', '记录的令牌余额'), c('active_leases', '活跃请求'), c('refilled_at', '最后更新', 'time')]}/>
         <p className="panel-note">令牌数为最近持久化快照，实时补充在下次请求时结算。</p></section>
       {data.feedback && <section className="panel"><h3>反馈预算</h3><DataTable rows={[data.feedback]} columns={[c('daily_receipts', '记录窗口已收反馈'), c('day_started_at', '日窗口起点', 'time'), c('recorded_tokens', '记录的令牌余额'), c('refilled_at', '最后更新', 'time')]}/><p className="panel-note">显示最近持久化快照；跨 UTC 日后的窗口重置在下次反馈请求时结算。</p></section>}
@@ -68,7 +67,7 @@ function ListPanel({view, onUnauthorized}: {view: keyof typeof catalog; onUnauth
   const {data, error, busy, reload} = useAdminResource<DataPage>(`/v1/admin/operations/${view}?${query}`, onUnauthorized);
   return <><form className="filters filter-form" onSubmit={event => {event.preventDefault(); const next = new URLSearchParams();
     for (const [key, value] of new FormData(event.currentTarget)) if (String(value).trim()) next.set(key, String(value).trim()); if (next.toString() === query.toString()) reload(); else setQuery(next);}}>
-    {definition.filters.map(key => <label key={key}>{fieldLabels[key]}<input name={key} maxLength={key === 'operation_key' ? 128 : 64}/></label>)}
+    {definition.filters.map(key => <label key={key}>{fieldLabels[key]}<input name={key} maxLength={key === 'request_id' ? 36 : 64}/></label>)}
     <div className="filter-actions"><button type="reset" className="secondary" onClick={() => setQuery(new URLSearchParams())}>重置</button><button type="button" className="secondary" onClick={reload} disabled={busy}>刷新</button><button className="primary">查询</button></div></form>
     <ResourceError error={error} stale={!!data}/>{busy && <p role="status">正在读取{definition.title}…</p>}
     {data && <section className="panel"><DataTable rows={data.items} columns={[...definition.columns]}/>

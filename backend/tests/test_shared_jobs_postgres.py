@@ -7,23 +7,25 @@ from conftest import run_job
 from app.db import engine, session_factory
 from app.entitlement_models import QuotaPeriod
 from app.models import Asset, Job, Ledger, User
-from app.plan_models import TranslationOperation, ImageAdmission
-from app.plan_api import TranslationPlan, translate
+from app.translation_requests import TranslationRequest, ImageAdmission
+from app.translation_api import TranslationInput, translate
+from conftest import request_id
+from uuid import UUID
 import json
 
 
 def submit_existing(pg, key, asset_ids=None):
-    with session_factory()() as db:
-        user = db.get(User, pg["owner_id"])
-        assets = [db.get(Asset, asset_id) for asset_id in (asset_ids or [pg["asset_id"]])]
-        body = TranslationPlan(trigger="manual" if len(assets)==1 else "reading",
-            session_id="pg-"+key if len(assets)>1 else None,sequence=1 if len(assets)>1 else None,
-            items=[{"page_key":str(index),"operation_key":key if len(assets)==1 else f"{key}:{index}",
-                    "role":"current" if index==0 else "prefetch","mode":"redraw","target_language":"zh-Hans",
-                    "max_quota_pages":1,"image":{"client_item_id":str(index),"asset_id":asset.id,
-                        "image_sha256":asset.sha256,"byte_size":asset.byte_size,"content_type":asset.mime}}
-                   for index,asset in enumerate(assets)])
-        return json.loads(translate(body,user=user,db=db).body)
+    rows = []
+    for index, asset_id in enumerate(asset_ids or [pg['asset_id']]):
+        with session_factory()() as db:
+            user, asset = db.get(User, pg['owner_id']), db.get(Asset, asset_id)
+            body = TranslationInput(mode='redraw',target_language='zh-Hans',image={
+                'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime})
+            identifier = request_id(key if not asset_ids else f'{key}:{index}')
+            response = translate(UUID(identifier),body,user=user,db=db)
+            assert response.status_code in {200,202}
+            rows.append(db.get(TranslationRequest,(user.id,identifier)))
+    return rows
 
 
 def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
@@ -33,17 +35,16 @@ def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
     def confirmation(index):
         barrier.wait(timeout=10)
         result = submit_existing(pg, f"device-{index}")
-        return result["items"][0]["operation_key"], result["items"][0]["job"]["id"], result["items"][0]["disposition"]
+        return result[0].id, result[0].job_id
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(confirmation, range(2)))
     assert len({row[0] for row in results}) == 2
     assert len({row[1] for row in results}) == 1
-    assert sorted(row[2] for row in results) == ["accepted", "pending"]
     job_id = results[0][1]
     with session_factory()() as db:
         for model in (Job, Ledger):
             assert db.scalar(select(func.count()).select_from(model)) == 1
-        for model in (TranslationOperation,):
+        for model in (TranslationRequest,):
             assert db.scalar(select(func.count()).select_from(model)) == 2
         assert db.scalar(select(QuotaPeriod.reserved).where(QuotaPeriod.owner_id == pg["owner_id"])) == 1
     calls = []
@@ -89,7 +90,7 @@ def test_completion_and_new_receipt_serialize_without_fk_deadlock(pg, monkeypatc
             result = receipt.result(timeout=15)
     finally:
         event.remove(engine(), "before_cursor_execute", observe)
-    assert result["items"][0]["disposition"] == "ready" and result["items"][0]["job"]["id"] == job_id
+    assert result[0].job_id == job_id
     assert_single_charge(pg, job_id)
 
 
@@ -111,12 +112,12 @@ def test_single_and_multi_page_submission_keep_both_receipts(pg):
     def multi():
         barrier.wait(timeout=10)
         result = submit_existing(pg, "multi-device", [alias_id, pg["asset_id"]])
-        assert len({item["job"]["id"] for item in result["items"]}) == 1
-        return result["items"][0]["job"]["id"]
+        assert len({item.job_id for item in result}) == 1
+        return result[0].job_id
     with ThreadPoolExecutor(max_workers=2) as pool:
         first, second = pool.submit(single), pool.submit(multi)
         assert first.result(timeout=15) == second.result(timeout=15)
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
-        assert db.scalar(select(func.count()).select_from(TranslationOperation)) == 3
+        assert db.scalar(select(func.count()).select_from(TranslationRequest)) == 3
         assert db.scalar(select(QuotaPeriod.reserved).where(QuotaPeriod.owner_id == pg["owner_id"])) == 1

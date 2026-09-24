@@ -54,8 +54,8 @@ def test_gift_requires_admin_and_can_exclude_redraw(client):
     assert rights['modes']['redraw']['quota']['available'] == 0
 
 
-@pytest.mark.parametrize('mode,expected', [('redraw', 'unavailable'), ('classic', 'classic_daily')])
-def test_zero_quota_reuse_cannot_create_work_after_membership_upgrade(client, png, mode, expected):
+@pytest.mark.parametrize('mode', ['redraw', 'classic'])
+def test_new_requests_use_server_membership_after_upgrade(client, png, mode):
     from app.config import settings
     settings().classic_enabled = True
     from conftest import submit_asset
@@ -63,12 +63,11 @@ def test_zero_quota_reuse_cannot_create_work_after_membership_upgrade(client, pn
     from app.models import Job
     auth = login(client)
     asset = upload(client, auth, png)
-    assert issue(client, auth, {'days': 30}).status_code == 200
-    result = submit_asset(client, auth, asset, mode=mode, max_quota_pages=0, expected_kind=expected)
-    assert result.status_code == 200, result.text
-    assert result.json()['items'][0]['code'] == 'ENTITLEMENT_CHANGED'
+    assert issue(client, auth, {'days':30}).status_code == 200
+    result = submit_asset(client, auth, asset, mode=mode)
+    assert result.status_code == 202 and result.json()['state'] == 'queued'
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Job)) == 0
+        assert db.scalar(select(func.count()).select_from(Job)) == 1
 
 
 def test_admin_detail_shows_scheduled_grants_without_affecting_current_entitlement(client):

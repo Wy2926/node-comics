@@ -6,10 +6,10 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "payments_0001"
+HEAD = "translations_0001"
 NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
-              "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_operations", "image_admissions", "reading_sessions", "translation_policies", "control_admissions"}
+              "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests", "image_admissions", "control_admissions"}
 
 
 @pytest.fixture
@@ -34,6 +34,9 @@ def assert_current_schema_matches_models(engine):
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
         inspector = inspect(connection)
         assert NEW_TABLES <= set(inspector.get_table_names())
+        assert not {"translation_operations", "reading_sessions", "translation_policies"} & set(inspector.get_table_names())
+        queue_columns = {column['name'] for column in inspector.get_columns('user_mode_queues')}
+        assert not {'session_id', 'session_epoch', 'session_expires_at'} & queue_columns
         assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
         assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []

@@ -151,9 +151,10 @@ async def provider_test(provider_id: str, image: Annotated[UploadFile, File()], 
         backend = settings().result_storage_backend
         get_store(backend).put(content_storage_key(info['sha256']), data, info['mime'], kind='original')
         lock_scheduler(db)
-        from .plan_models import TranslationOperation
+        from .translation_requests import TranslationRequest
         from .results import get_entry
-        receipt = db.get(TranslationOperation, (user.id, key), populate_existing=True)
+        from .jobs import request_identifier
+        receipt = db.get(TranslationRequest, (user.id, request_identifier(key)), populate_existing=True)
         if receipt:
             if receipt.request_hash != request_hash:
                 problem("IDEMPOTENCY_CONFLICT", "此操作编号已用于其他图片或参数", 409)

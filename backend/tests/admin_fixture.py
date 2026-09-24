@@ -38,7 +38,7 @@ def seed(db):
         row = Job(id=f"10000000-0000-4000-8000-{i:012}", owner_id=readers[owner].id, mode=mode,
             target_language="zh-Hans", status=status, phase=status, idempotency_key=f"fixture-{i}", operation="admin-fixture",
             request_hash=f"{i:064x}", cache_key=f"{i:064x}", config={"provider": {"id": "fixture", "secret": "SHOULD_NOT_LEAK"}},
-            quota_pages=1, quota_kind="classic_unlimited", settlement="reserved", created_at=at-timedelta(seconds=age), page_index=i-1,
+            quota_pages=1, quota_kind="classic_unlimited", settlement="reserved", created_at=at-timedelta(seconds=age),
             realtime_until=at+timedelta(minutes=30) if i%3 == 0 else None)
         if status in {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}:
             row.completed_at = row.created_at + timedelta(seconds=120)

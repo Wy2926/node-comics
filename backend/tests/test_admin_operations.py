@@ -14,7 +14,7 @@ PRIVATE = 'PRIVATE_FIXTURE_MUST_NOT_LEAK'
 def operations(client):
     from app.db import session_factory
     from app.models import Asset, Attempt, Job, TextCall, User, now
-    from app.plan_models import ControlAdmission, ImageAdmission, ReadingSession, TranslationOperation, TranslationPolicy
+    from app.translation_requests import ControlAdmission, ImageAdmission, TranslationRequest
     from app.feedback_models import FeedbackAdmission
     from app.results import ResultAccess, TranslationResult
     from app.file_pages import FilePage
@@ -60,16 +60,12 @@ def operations(client):
             input_asset_id=shared_source.id, output_asset_id=shared_output.id, version=1, created_at=at - timedelta(seconds=3))
         db.add(access); db.flush()
         db.add_all([
-            TranslationOperation(owner_id=a.id, operation_key='reader-submission', request_hash='x' * 64, job_id=done.id,
+            TranslationRequest(owner_id=a.id, id='11111111-1111-4111-8111-111111111111', request_hash='x' * 64, job_id=done.id,
                 descriptor={'source_url': f'https://private.example/page?token={PRIVATE}'}),
-            TranslationOperation(owner_id=b.id, operation_key='reuse-submission', request_hash='y' * 64, access_id=access.id),
+            TranslationRequest(owner_id=b.id, id='22222222-2222-4222-8222-222222222222', request_hash='y' * 64, access_id=access.id),
             FilePage(owner_id=a.id, file_hash='f' * 64, page_index=1, asset_id=source.id),
-            ReadingSession(owner_id=a.id, session_id='current-session', sequence=8, window=[{'source': PRIVATE}], expires_at=at + timedelta(minutes=1)),
-            ReadingSession(owner_id=a.id, session_id='fenced-session', sequence=4, window=[], fenced=True, expires_at=at + timedelta(minutes=1)),
-            ReadingSession(owner_id=b.id, session_id='other-session', sequence=99, window=[], expires_at=at + timedelta(minutes=1)),
-            ControlAdmission(owner_id=a.id, scope='plan', tokens=2.5, refilled_at=at,
+            ControlAdmission(owner_id=a.id, scope='translation', tokens=2.5, refilled_at=at,
                 leases=[{'id': PRIVATE, 'until': (at + timedelta(seconds=30)).isoformat()}, {'id': PRIVATE, 'until': (at - timedelta(seconds=30)).isoformat()}]),
-            TranslationPolicy(owner_id=a.id, revision=7, fingerprint=PRIVATE),
             FeedbackAdmission(owner_id=a.id, request_tokens=4, refilled_at=at, day_started_at=at.replace(hour=0), daily_receipts=3),
             ImageAdmission(owner_id=a.id, job_id=done.id, admitted_at=at - timedelta(seconds=10)),
             ImageAdmission(owner_id=a.id, job_id=waiting.id, admitted_at=at - timedelta(seconds=65)),
@@ -97,7 +93,7 @@ def operations(client):
         yield {'client': client, 'admin': admin, 'reader': reader, 'a': a.id, 'b': b.id, 'at': at}
 
 
-@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/uploads', '/receipts', '/assets', '/file-pages', '/results', '/accesses', '/statistics'])
+@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/uploads', '/requests', '/assets', '/file-pages', '/results', '/accesses', '/statistics'])
 def test_diagnostics_are_admin_only(client, path):
     assert client.get(ROOT + path).status_code == 401
     assert client.get(ROOT + path, headers=login(client, 'reader')).status_code == 403
@@ -112,7 +108,7 @@ def test_metadata_views_never_touch_objects_or_expose_private_payloads(operation
             if hasattr(cls, name):
                 monkeypatch.setattr(cls, name, forbidden)
     case = operations
-    for path in ['/health', f'/users/{case["a"]}', '/uploads', '/receipts', '/assets', '/file-pages', '/results', '/accesses', '/statistics']:
+    for path in ['/health', f'/users/{case["a"]}', '/uploads', '/requests', '/assets', '/file-pages', '/results', '/accesses', '/statistics']:
         result = case['client'].get(ROOT + path, headers=case['admin'])
         assert result.status_code == 200, result.text
         assert PRIVATE not in result.text
@@ -137,8 +133,8 @@ def test_filters_pagination_and_reuse_relationships(operations):
     assert get('/uploads?status=expired')['items'][0]['job_id'] == 'expired-upload-job'
     assert get('/uploads?job_id=waiting-job')['items'][0]['ingress_expires_at']
     assert get(f'/uploads?owner_id={case["b"]}')['total'] == 0
-    assert get('/receipts?operation_key=reuse-submission')['items'][0]['access_id'] == 'reuse-access'
-    assert get('/receipts?job_id=done-job')['total'] == 1
+    assert get('/requests?request_id=22222222-2222-4222-8222-222222222222')['items'][0]['access_id'] == 'reuse-access'
+    assert get('/requests?job_id=done-job')['total'] == 1
     assert get('/file-pages?asset_id=source-a')['items'][0]['page_index'] == 1
     assert get(f'/results?owner_id={case["b"]}')['items'][0]['access_count'] == 1
     assert get('/results?q=done-job&mode=classic')['total'] == 1
@@ -171,8 +167,8 @@ def test_user_admissions_and_service_health_explain_current_state(operations):
     case = operations
     data = case['client'].get(ROOT + f'/users/{case["a"]}', headers=case['admin']).json()
     assert data['image_budget']['remaining'] == data['image_budget']['limit'] - 1
-    assert data['upload_active'] == 1 and data['policy_revision'] == 7
-    assert {row['session_id']: row['active'] for row in data['sessions']} == {'current-session': True, 'fenced-session': False}
+    assert data['upload_active'] == 1
+    assert 'policy_revision' not in data and 'sessions' not in data
     assert data['controls'][0]['active_leases'] == 1 and data['feedback']['daily_receipts'] == 3
     assert case['client'].get(ROOT + '/users/missing', headers=case['admin']).status_code == 404
     health = case['client'].get(ROOT + '/health', headers=case['admin']).json()

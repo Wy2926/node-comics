@@ -1,4 +1,4 @@
-"""Durable per-image operations and bounded reading coordination."""
+"""Immutable translation requests and admission accounting."""
 from datetime import datetime
 from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -6,16 +6,17 @@ from .db import Base
 from .models import now
 
 
-class TranslationOperation(Base):
-    __tablename__ = 'translation_operations'
+class TranslationRequest(Base):
+    __tablename__ = 'translation_requests'
     owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    operation_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
     request_hash: Mapped[str] = mapped_column(String(64))
     job_id: Mapped[str | None] = mapped_column(ForeignKey('jobs.id'), index=True)
     access_id: Mapped[str | None] = mapped_column(ForeignKey('result_accesses.id'), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
     descriptor: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (Index('ix_translation_operations_owner_created', 'owner_id', 'created_at'),
+    __table_args__ = (Index('ix_translation_requests_owner_created', 'owner_id', 'created_at'),
         CheckConstraint('(job_id IS NOT NULL AND access_id IS NULL) OR (job_id IS NULL AND access_id IS NOT NULL)'),)
 
     @property
@@ -29,24 +30,6 @@ class ImageAdmission(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'))
     admitted_at: Mapped[datetime] = mapped_column(DateTime)
     __table_args__ = (Index('ix_image_admissions_owner_time', 'owner_id', 'admitted_at'),)
-
-
-class ReadingSession(Base):
-    __tablename__ = 'reading_sessions'
-    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    session_id: Mapped[str] = mapped_column(String(80), primary_key=True)
-    sequence: Mapped[int] = mapped_column(Integer, default=-1)
-    window_hash: Mapped[str] = mapped_column(String(64), default='')
-    window: Mapped[list] = mapped_column(JSON, default=list)
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
-    fenced: Mapped[bool] = mapped_column(default=False)
-
-
-class TranslationPolicy(Base):
-    __tablename__ = 'translation_policies'
-    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    revision: Mapped[int] = mapped_column(Integer, default=1)
-    fingerprint: Mapped[str] = mapped_column(String(64), default='')
 
 
 class ControlAdmission(Base):

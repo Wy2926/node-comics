@@ -153,7 +153,7 @@ def allowance_json(db, user, kind, at=None):
 def entitlements_json(db, user, at=None):
     at = at or now()
     plus = is_plus(db, user, at)
-    from .plan_limits import image_limit
+    from .translation_limits import image_limit
     modes = {}
     for mode in ("classic", "redraw"):
         kind = quota_kind(user, mode, at, db)
@@ -170,12 +170,10 @@ def entitlements_json(db, user, at=None):
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}
 
 
-def require_entitlement(user, mode, at=None, expected_kind=None, db=None):
+def require_entitlement(user, mode, at=None, db=None):
     kind = quota_kind(user, mode, at, db)
     if kind == "unavailable":
         problem("PLUS_REQUIRED", "AI 重绘需要有效 PLUS 会员或限时重绘赠送额度；已有译图仍可查看", 403)
-    if expected_kind is not None and expected_kind != kind:
-        problem("ENTITLEMENT_CHANGED", "账户翻译权益已变化，请查看当前额度后重新确认", 409)
     return kind
 
 
@@ -196,7 +194,7 @@ def reserve(db, user, job, at=None):
     if period is None:
         spec = period_spec(user, kind, at, db=db)
         problem("DAILY_QUOTA_EXHAUSTED" if job.mode == "classic" else "REDRAW_QUOTA_EXHAUSTED",
-                "可用常规翻译页数已用完" if job.mode == "classic" else "可用 AI 重绘页数已用完", 409,
+                "可用常规翻译页数已用完" if job.mode == "classic" else "可用 AI 重绘页数已用完", 403,
                 resets_at=iso(spec["ends_at"]) if spec else None)
     if period not in db:
         db.add(period)
@@ -230,10 +228,6 @@ def settle(db, job, *, success):
                   quota_kind=job.quota_kind, transaction_key=f"{job.id}:{operation}", kind=operation,
                   amount=job.quota_pages))
     job.settlement = "settled" if success else "released"
-    if not success:
-        from .plan_limits import policy_snapshot
-        db.flush()
-        policy_snapshot(db, db.get(User, job.owner_id), released=True)
 
 
 def change_membership(db, owner_id, operator_id, key, *, action, months=None, days=None, monthly_pages=None, note):

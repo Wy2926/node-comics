@@ -28,7 +28,15 @@ def ingress_case(storage_db, png):
             db.add(user)
             db.flush()
             owners.append(user.id)
-            uploads[user.id] = [pending(db, user.id, png)[1].id for _ in range(4)]
+            uploads[user.id] = []
+            from app.translation_requests import TranslationRequest
+            from hashlib import sha256
+            for _ in range(4):
+                job, receipt = pending(db, user.id, png)
+                uploads[user.id].append(receipt.id)
+                db.add(TranslationRequest(owner_id=user.id,id=receipt.id,job_id=job.id,request_hash='a'*64,
+                    descriptor={'image':{'sha256':sha256(png).hexdigest(),'byte_size':len(png),'content_type':'image/png'},
+                        'mode':job.mode,'target_language':job.target_language}))
         db.commit()
     return {'owners': owners, 'uploads': uploads, 'data': png}
 
@@ -62,12 +70,13 @@ async def until_async(predicate, timeout=5):
 async def call_handler(case, request, index=0):
     from app.db import session_factory
     from app.models import User
-    from app.upload_api import upload_content
+    from app.translation_api import translation_input
+    from uuid import UUID
     owner = case['owners'][0]
     with session_factory()() as db:
         # Match the identity dependency's already checked-out connection.
         user = db.get(User, owner)
-        return await upload_content(case['uploads'][owner][index], request, user, db)
+        return await translation_input(UUID(case['uploads'][owner][index]), request, user, db)
 
 
 def test_shared_owner_global_and_same_upload_limits(ingress_case):
@@ -284,28 +293,28 @@ def test_lost_ingress_stops_waiting_for_client_body(ingress_case, monkeypatch):
     asyncio.run(run())
 
 
-def test_accepted_replay_does_not_read_body_or_allocate_slot(ingress_case, monkeypatch):
-    from app import upload_ingress
-    from app.db import session_factory
-    from app.upload_models import UploadReservation
+def test_verified_receipt_replay_is_bounded_and_checks_immutable_bytes(ingress_case):
+    from app.upload_ingress import acquire_ingress, release_ingress, persist_received_upload
     owner = ingress_case['owners'][0]
     upload_id = ingress_case['uploads'][owner][0]
-    with session_factory()() as db:
-        receipt = db.get(UploadReservation, upload_id)
-        receipt.status = 'validating'
-        expires = receipt.expires_at
-        db.commit()
-    monkeypatch.setattr(upload_ingress, 'get_store', lambda *args: pytest.fail('replay must not access storage'))
-    class Request:
-        headers = {}
-        async def stream(self):
-            pytest.fail('accepted replay must not read its request body')
-            yield b''
-    result = asyncio.run(call_handler(ingress_case, Request()))
-    assert result['status'] == 'validating'
+    lease = acquire_ingress(upload_id, owner)
+    try:
+        persist_received_upload(lease, ingress_case['data'])
+    finally:
+        release_ingress(lease)
+    replay = acquire_ingress(upload_id, owner)
+    try:
+        assert [row.id for row in active_leases()] == [replay.id]
+        with pytest.raises(HTTPException) as busy:
+            acquire_ingress(upload_id, owner)
+        assert busy.value.status_code == 429
+        with pytest.raises(HTTPException) as conflict:
+            persist_received_upload(replay, b'x' * len(ingress_case['data']))
+        assert conflict.value.detail['code'] == 'UPLOAD_HASH_MISMATCH'
+        assert persist_received_upload(replay, ingress_case['data'])['status'] == 'verified'
+    finally:
+        release_ingress(replay)
     assert active_leases() == []
-    with session_factory()() as db:
-        assert db.get(UploadReservation, upload_id).expires_at == expires
 
 
 def test_cancelled_acquisition_releases_committed_slot(ingress_case, monkeypatch):

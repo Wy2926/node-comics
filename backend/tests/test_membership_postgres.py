@@ -11,7 +11,10 @@ from app.models import Asset, Job, Ledger, User, now
 from app.entitlement_models import QuotaPeriod
 from app.jobs import settle
 import json
-from app.plan_api import TranslationPlan, PlanItem, ImageDescriptor, translate
+from app.translation_api import TranslationInput, translate
+from app.translation_requests import TranslationRequest
+from conftest import request_id
+from uuid import UUID
 from app.quota_grants import GrantRequest, grant_pages
 
 
@@ -19,7 +22,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
     from app.config import settings
     from app.assets import create_asset
     settings().free_daily_pages = 1
-    settings().plan_request_concurrency = 8  # Exercise quota contention, independently of admission throttling.
+    settings().translation_request_concurrency = 8  # Exercise quota contention, independently of admission throttling.
     with session_factory()() as db:
         db.get(User, pg['owner_id']).plus_expires_at = now() - timedelta(seconds=1)
         assets = [create_asset(db, pg['owner_id'], png_variant(pg['png'], n)) for n in range(6)]
@@ -32,17 +35,17 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
         with session_factory()() as db:
             user, asset = db.get(User, pg['owner_id']), db.get(Asset, ids[n])
             barrier.wait(timeout=10)
-            response = translate(TranslationPlan(trigger='manual', items=[PlanItem(
-                page_key=str(n), operation_key=str(n), mode='classic', target_language='zh-Hans',
-                max_quota_pages=1, image=ImageDescriptor(client_item_id=str(n), asset_id=asset.id,
-                    image_sha256=asset.sha256, byte_size=asset.byte_size, content_type=asset.mime))]),
-                user=user, db=db)
-            receipt = json.loads(response.body)
-            item = receipt['items'][0]
-            if response.status_code == 202:
-                return item['job']['id']
-            assert response.status_code == 200 and item['code'] == 'DAILY_QUOTA_EXHAUSTED', receipt
-            return None
+            key = request_id(str(n))
+            try:
+                response = translate(UUID(key), TranslationInput(image={
+                    'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime},
+                    mode='classic',target_language='zh-Hans'), user=user, db=db)
+            except HTTPException as error:
+                assert error.status_code == 403 and error.detail['code'] == 'DAILY_QUOTA_EXHAUSTED'
+                return None
+            assert response.status_code == 202
+            return db.get(TranslationRequest, (user.id, key)).job_id
+
     with ThreadPoolExecutor(6) as pool:
         accepted = [job_id for job_id in pool.map(accept, range(6)) if job_id]
     assert len(accepted) == 2

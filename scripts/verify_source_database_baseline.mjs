@@ -7,7 +7,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const root=process.cwd(),out=path.join(root,'artifacts/source-database-baseline');await mkdir(out,{recursive:true});
 const extension=path.join(root,'apps/extension/.output/chrome-mv3');
 const options={headless:true,executablePath:process.env.TEST_CHROMIUM,locale:'zh-CN',viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension]};
-const oldNames=['node-comics-catalog','node-comics-container-bytes',...['source-pages','source-ranges','downloads','thumbnails','translations'].map(name=>'node-comics-'+name),'node-comics-content-operations'];
+const oldNames=['node-comics-catalog','node-comics-container-bytes',...['source-pages','source-ranges','downloads','thumbnails','translations'].map(name=>'node-comics-'+name),'node-comics-content-operations',...['catalog','container-bytes','source-pages','source-ranges','downloads','thumbnails','translations','content-operations'].map(name=>'node-comics-reading-v1-'+name)];
 const results=[];
 for(const malformed of [false,true]){
  const profile=await mkdtemp(path.join(out,malformed?'malformed-':'old-'));let context=await chromium.launchPersistentContext(profile,options),page,errors=[];
@@ -20,10 +20,13 @@ for(const malformed of [false,true]){
  },oldNames);}
  try{
   const origin=await open();await page.goto(origin+'/brand/icon-128.png');
+  if(malformed)await page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase('node-comics-reading-v2-catalog');request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('isolated catalog deletion blocked'));}));
   await page.evaluate(async names=>{
    for(const name of names)await new Promise((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('works',{keyPath:'id'}).put({id:'preserve',title:'旧库保留'});request.onsuccess=()=>{request.result.close();resolve();};request.onerror=()=>reject(request.error);});
-  },malformed?[...oldNames,'node-comics-reading-v1-catalog']:oldNames);
-  const before=await oldState();await page.goto(origin+'/reader.html');await page.locator('input[type=file]').waitFor({state:'attached'});
+  },malformed?[...oldNames,'node-comics-reading-v2-catalog']:oldNames);
+  const before=await oldState();
+  if(malformed){await context.close();context=await chromium.launchPersistentContext(profile,options);await open();}
+  await page.goto(origin+'/reader.html');await page.locator('input[type=file]').waitFor({state:'attached'});
   if(malformed){
    await page.getByRole('alert').filter({hasText:'本机资料库结构与当前扩展不一致'}).first().waitFor();await page.waitForTimeout(1800);assert.deepEqual(errors,[]);
    assert.deepEqual(await oldState(),before);await page.screenshot({path:path.join(out,'schema-error.png')});results.push('当前基线缺表在打开时明确报错，下载列表无未处理Promise，旧库不变');
@@ -31,7 +34,7 @@ for(const malformed of [false,true]){
    await page.waitForTimeout(1800);assert.equal(await page.getByRole('alert').count(),0);assert.deepEqual(await oldState(),before);
    await page.locator('input[type=file]').setInputFiles({name:'数据库回归.cbz',mimeType:'application/zip',buffer:await readFile(path.join(root,'artifacts/import-validation/pages.cbz'))});
    await page.locator('.nc-page-image').first().waitFor({timeout:60000});await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
-   await page.close();await context.close();context=await chromium.launchPersistentContext(profile,options);const reopened=await open();await page.goto(reopened+'/reader.html');await page.getByRole('button',{name:'继续阅读',exact:true}).click();await page.locator('.nc-page-image').first().waitFor();assert.deepEqual(await oldState(),before);assert.deepEqual(errors,[]);await page.screenshot({path:path.join(out,'old-database-restart.png')});results.push('8个残缺旧v1库存在时可导入阅读并关闭重开，旧库版本/表/记录原样保留');
+   await page.close();await context.close();context=await chromium.launchPersistentContext(profile,options);const reopened=await open();await page.goto(reopened+'/reader.html');await page.getByRole('button',{name:'继续阅读',exact:true}).click();await page.locator('.nc-page-image').first().waitFor();assert.deepEqual(await oldState(),before);assert.deepEqual(errors,[]);await page.screenshot({path:path.join(out,'old-database-restart.png')});results.push('残缺旧库存在时可导入阅读并关闭重开，旧库版本/表/记录原样保留');
   }
  }catch(error){await page?.screenshot({path:path.join(out,'failure.png')});throw error;}finally{await context.close();}
 }

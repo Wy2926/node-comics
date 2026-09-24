@@ -65,7 +65,7 @@ def test_independent_sessions_share_feedback_limits(feedback_database, budget, e
         assert db.get(FeedbackAdmission, "feedback-owner").daily_receipts == 3
         result = submit_feedback(other_job, FeedbackRequest(issues=["meaning"]), "other",
                                  SimpleNamespace(id="other-owner"), db)
-        assert result["job_id"] == other_job
+        assert result["translation_id"] == other_job
 
 
 def test_concurrent_replay_creates_exactly_one_receipt(feedback_database):

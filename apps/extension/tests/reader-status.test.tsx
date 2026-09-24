@@ -51,7 +51,7 @@ describe('in-image retry status',()=>{
   expect(html).toContain(`title="${detail}"`);expect(html.replace(/<[^>]*>/g,'')).toBe('连接失败重试');
  });
  it('shows a connection failure instead of silently waiting on a local retry plan',()=>{
-  const operation:LocalOperation={id:'retry',scope:'reader',entryId:'copy',pageId:'page',state:'local',createdAt:0,item:{page_key:'page',operation_key:'retry',role:'current',mode:'classic',target_language:'zh-Hans',max_quota_pages:1,image:{client_item_id:'page',image_sha256:'a'.repeat(64),byte_size:1,content_type:'image/png',name:'page'}}};
+  const operation:LocalOperation={id:'retry',requestId:'retry',scope:'reader',entryId:'copy',pageId:'page',state:'local',createdAt:0,mode:'classic',language:'zh-Hans',image:{sha256:'a'.repeat(64),byte_size:1,content_type:'image/png'},request:{retry_of:'previous'}};
   const state=translationState({page:fixture('failed'),mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',operation});
   // A cached previous image can remain visible while a new attempt waits.
   expect(state?.kind).toBe('waiting');

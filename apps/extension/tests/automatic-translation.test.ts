@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect} from 'vitest';
-import {ReadingWindow,makeOperation,needsTranslation} from '../src/translation/automatic';
-import {entitlement,job,origin,target} from './translation-fixture';
+import {ReadingWindow,makeOperation,needsTranslation,targetKey} from '../src/translation/automatic';
+import {job,origin,target} from './translation-fixture';
 describe('local reading timing',()=>{
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
@@ -29,7 +29,8 @@ describe('local reading timing',()=>{
   const page={...target(0).page,ownerId:'alice',apiOrigin:origin,jobs:[job(0,{status})]};expect(needsTranslation(page,'classic','zh-Hans','alice',origin)).toBe(false);
  });
  it('keeps account, page, mode and language operations separate and allows free reuse',async()=>{
-  const rights={...entitlement().modes.classic,unlimited:false};const a=await makeOperation(target(0),'alice','zh-Hans',rights,async()=>undefined),b=await makeOperation(target(0),'bob','en',rights,async()=>undefined);
-  expect(a.id).not.toBe(b.id);expect(a.item.operation_key).not.toBe(b.item.operation_key);expect(a.item.max_quota_pages).toBe(0);
+  const a=await makeOperation(target(0),'alice','zh-Hans',async()=>undefined),b=await makeOperation(target(0),'bob','en',async()=>undefined);
+  expect(a.id).not.toBe(b.id);expect(a.requestId).not.toBe(b.requestId);expect(a.request).not.toHaveProperty("max_quota_pages");
+  expect(targetKey(crypto.randomUUID(),{...target(0).page,contentId:crypto.randomUUID(),id:"a".repeat(640)},"classic")).toMatch(/^[a-f0-9]{64}$/);
  });
 });

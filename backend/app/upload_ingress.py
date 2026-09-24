@@ -14,7 +14,7 @@ from .scheduler import lock_scheduler
 from .storage import get_store
 from .system_settings import RequestLimits, get_request_limits
 from .upload_models import UploadIngressLease, UploadIngressMutex
-from .uploads import _active_locked, _lock_current, fail_upload, owned_upload, read_upload_stream, accept_verified_upload, upload_json
+from .uploads import _active_locked, _lock_current, fail_upload, owned_upload, read_upload_stream, accept_verified_upload
 
 
 @dataclass(frozen=True)
@@ -28,19 +28,19 @@ class Ingress:
 
 def response_for(receipt):
     if receipt.error_code:
-        problem(receipt.error_code, receipt.error_message, 422)
-    return upload_json(receipt)
+        problem(receipt.error_code, receipt.error_message, 410 if receipt.error_code == 'INPUT_EXPIRED' else 422)
+    return {'status': receipt.status}
 
 
 def acquire_ingress(upload_id, owner_id):
     with session_factory()() as db:
         cfg = get_request_limits(db)
         receipt = owned_upload(db, upload_id, owner_id)
-        if receipt.status != "awaiting_upload":
-            if receipt.status == "verified":
-                owned_asset(db, receipt.asset_id, owner_id)
+        if receipt.status == "verified":
+            owned_asset(db, receipt.asset_id, owner_id)
+        elif receipt.status not in {'awaiting_upload', 'validating'}:
             return response_for(receipt)
-        if not _active_locked(db, _lock_current(db, receipt)):
+        elif not _active_locked(db, _lock_current(db, receipt)):
             db.commit()
             return response_for(receipt)
         expected_size = receipt.expected_size
@@ -115,8 +115,8 @@ def record_body_failure(lease, error):
 def persist_received_upload(lease, data):
     with session_factory()() as db:
         receipt = current_receipt(db, lease)
-        active = _active_locked(db, receipt)
-        if not active or receipt.status != "awaiting_upload":
+        replay = receipt.status in {'verified', 'validating'}
+        if not replay and not _active_locked(db, receipt):
             db.commit()
             return response_for(receipt)
         expected_hash = receipt.expected_sha256
@@ -126,6 +126,8 @@ def persist_received_upload(lease, data):
         error = HTTPException(422, detail={"code": "UPLOAD_HASH_MISMATCH", "message": "实际图片摘要与提交清单不一致"})
         record_body_failure(lease, error)
         raise error
+    if replay:
+        return response_for(receipt)
     try:
         info = inspect_image(data)
         if mime not in {'application/octet-stream', info['mime']}:
@@ -147,10 +149,6 @@ def persist_received_upload(lease, data):
         receipt = current_receipt(db, lease)
         if receipt.status == 'awaiting_upload':
             accept_verified_upload(db, receipt, data, info)
-        from .plan_api import bind_file_page
-        from .models import Job
-        if receipt.asset_id:
-            bind_file_page(db, db.get(Job, receipt.job_id))
         db.commit()
         return response_for(receipt)
 

@@ -15,8 +15,8 @@ from .models import Asset, Attempt, ClassicState, Job, Provider, now
 from .queue_models import ExecutionLease, JobStage
 from .scheduler import lock_scheduler, release_lease, touch_job
 from .storage import get_store, StorageError
-from .uploads import expire_uploads
-from .plan_limits import clean_admissions
+from .uploads import expire_uploads, recover_received_uploads
+from .translation_limits import clean_admissions
 from .workers import fail_stage, finish_job
 
 def recover_lease(lease_id):
@@ -93,6 +93,7 @@ def recover_lease(lease_id):
 
 
 def recover_once():
+    recover_received_uploads()
     with session_factory()() as db:
         ids = list(db.scalars(select(ExecutionLease.id).where(ExecutionLease.completed_at.is_(None), ExecutionLease.expires_at <= now()).limit(100)))
     for lease_id in ids:

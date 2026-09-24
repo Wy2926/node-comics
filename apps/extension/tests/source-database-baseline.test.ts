@@ -21,14 +21,15 @@ afterEach(() => { for (const database of opened) database.close(); opened.clear(
 
 describe('source database baseline isolation', () => {
   it('opens all final databases beside incomplete development v1 databases without changing old records', async () => {
-    const names = ['catalog', 'container-bytes', 'source-pages', 'source-ranges', 'downloads', 'thumbnails', 'translations', 'content-operations'];
+    const names = ['catalog', 'container-bytes', 'source-pages', 'source-ranges', 'downloads', 'thumbnails', 'translations', 'translation-requests'];
     for (const name of names) {
       const database = await rawDatabase('node-comics-' + name, db => db.createObjectStore('sentinel', { keyPath: 'id' }));
       const tx = database.transaction('sentinel', 'readwrite'), done = completed(tx);
       tx.objectStore('sentinel').put({ id: 'keep', label: name, bytes: new Uint8Array([7, 8, 9]) }); await done; database.close();
     }
     const { catalog, openCatalog } = await import('../src/comics/repositories');
-    expect(track(await openCatalog()).name).toBe(sourceDatabaseName('catalog'));
+    const currentCatalog=track(await openCatalog());expect(currentCatalog.name).toBe(sourceDatabaseName('catalog'));
+    expect(currentCatalog.objectStoreNames.contains('translationOperations')).toBe(false);
     expect(await catalog.list('tasks')).toEqual([]); expect(await catalog.list('metadata')).toEqual([]);
     const { byteDatabase, BYTE_BACKEND } = await import('../src/storage/bytes/database');
     const bytes = track(await byteDatabase()); expect(bytes.name).toBe(sourceDatabaseName('container-bytes'));

@@ -14,10 +14,10 @@ describe('front-end request concurrency', () => {
     vi.stubGlobal('createImageBitmap', async () => ({close: () => {}}));
     vi.stubGlobal('fetch', async () => {
       active++;peak = Math.max(peak, active);await pause();active--;
-      return new Response();
+      return Response.json({id:'upload',state:'queued'});
     });
     const api = new Api('https://api.example', 'token', new RequestPool(concurrency));
-    await Promise.all(Array.from({length: 25}, () => api.uploadOriginal({id:'upload',url:'https://api.example/upload',method:'PUT',headers:{},expires_at:'2099-01-01'},new Blob(['a']))));
+    await Promise.all(Array.from({length: 25}, () => api.translationInput('upload',new Blob(['a']))));
     expect(peak).toBe(concurrency);
   });
   it('defaults to five uploads while downloads and image access bypass occupied pools', async () => {
@@ -28,11 +28,11 @@ describe('front-end request concurrency', () => {
     vi.stubGlobal('fetch', async (url: string | URL) => {
       const path = String(url);
       if (path.endsWith('/access')) {accesses++;await gate;return Response.json({url:'/result',expires_at:null});}
-      if (path.endsWith('/upload')) {uploads++;await gate;return new Response();}
+      if (path.endsWith('/input')) {uploads++;await gate;return Response.json({id:'upload',state:'queued'});}
       downloads++;await gate;return new Response(new Blob(['image']));
     });
     const api = new Api('https://api.example');
-    const pendingUploads = Array.from({length:12}, () => api.uploadOriginal({id:'upload',url:'https://api.example/upload',method:'PUT',headers:{},expires_at:'2099-01-01'},new Blob(['a'])));
+    const pendingUploads = Array.from({length:12}, () => api.translationInput('upload',new Blob(['a'])));
     const pendingDownloads = Array.from({length:12}, (_, i) => api.image('image-'+i));
     await pause();
     try {expect(uploads).toBe(5);expect(accesses).toBe(12);} finally {release();}
@@ -68,7 +68,7 @@ describe('front-end request concurrency', () => {
     const blocking = pool.run(() => new Promise<void>(resolve => {release=resolve;}));await pause();
     const fetch = vi.fn();vi.stubGlobal('fetch', fetch);
     const api = new Api('https://api.example', 'old-token', pool, () => current);
-    const request = api.uploadOriginal({id:'upload',url:'https://api.example/upload',method:'PUT',headers:{},expires_at:'2099-01-01'},new Blob(['a'])).catch(error => error);
+    const request = api.translationInput('upload',new Blob(['a'])).catch(error => error);
     current=false;release();await blocking;expect(await request).toBeInstanceOf(StaleOperation);expect(fetch).not.toHaveBeenCalled();
   });
 });

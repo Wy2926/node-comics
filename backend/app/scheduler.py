@@ -42,7 +42,7 @@ def queue_for(db, owner_id, mode):
 def touch_job(db, job):
     lock_scheduler(db)
     job.changed_at = now()
-    job.change_sequence = db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1)
+    db.execute(update(SchedulerMutex).where(SchedulerMutex.id == 1)
         .values(revision=SchedulerMutex.revision + 1).returning(SchedulerMutex.revision)).scalar_one()
     from .notifications import publish
     publish(db, 'user:' + job.owner_id)
@@ -114,7 +114,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
                 (JobStage.name == "validate_upload", literal("upload")), else_=JobStage.name)
     cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
     page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
-        case((UserModeQueue.session_expires_at > at, Job.priority_rank), else_=1000000),
+        case((Job.realtime_until > at, Job.priority_rank), else_=1000000),
         Job.created_at, Job.id, JobStage.id]
     eligible = select(JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
         pool.label("pool"), cls.label("priority_class"),
@@ -285,7 +285,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         owner = min(accounts, key=lambda key: (accounts[key].service, accounts[key].updated_at, key))
         stage, job = min(by_user[owner], key=lambda pair: (
             0 if pair[1].created_at < at - timedelta(minutes=30) and chosen_class == "preload" else 1,
-            pair[1].priority_rank if snapshot["queues"][(owner, pair[1].mode)].session_expires_at and snapshot["queues"][(owner, pair[1].mode)].session_expires_at > at else 1000000,
+            pair[1].priority_rank if pair[1].realtime_until and pair[1].realtime_until > at else 1000000,
             pair[1].created_at, pair[1].id, pair[0].id))
         choices.append((0 if chosen_class == "realtime" else 1, cls_states[chosen_class].updated_at,
                         stage, job, pool, chosen_class, accounts[owner], cls_states[chosen_class], floor, accounts))

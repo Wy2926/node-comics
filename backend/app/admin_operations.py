@@ -11,8 +11,8 @@ from .errors import problem
 from .models import Asset, Job, TextCall, User, now
 from .health import queue_alerts
 from .health_models import ServiceHeartbeat
-from .plan_models import ControlAdmission, ImageAdmission, ReadingSession, TranslationOperation, TranslationPolicy
-from .plan_limits import image_budget
+from .translation_requests import ControlAdmission, ImageAdmission, TranslationRequest
+from .translation_limits import image_budget
 from .feedback_models import FeedbackAdmission
 from .results import ResultAccess, TranslationResult, valid_asset_sql
 from .file_pages import FilePage
@@ -65,18 +65,12 @@ def user_diagnostics(owner_id: str, db: Session = Depends(get_db)):
     if user is None:
         problem('NOT_FOUND', '用户不存在', 404)
     at = now()
-    sessions = db.scalars(select(ReadingSession).where(ReadingSession.owner_id == owner_id)
-        .order_by(ReadingSession.expires_at.desc(), ReadingSession.session_id).limit(50))
     admissions = db.scalars(select(ControlAdmission).where(ControlAdmission.owner_id == owner_id))
     feedback = db.get(FeedbackAdmission, owner_id)
-    policy = db.get(TranslationPolicy, owner_id)
     return {'owner_id': owner_id, 'owner_name': user.name, 'generated_at': at,
         'image_budget': image_budget(db, user, at),
-        'policy_revision': policy.revision if policy else None,
         'upload_active': db.scalar(select(func.count()).select_from(UploadIngressLease).where(
             UploadIngressLease.owner_id == owner_id, UploadIngressLease.expires_at > at)),
-        'sessions': [{'session_id': row.session_id, 'sequence': row.sequence, 'page_count': len(row.window),
-            'expires_at': row.expires_at, 'fenced': row.fenced, 'active': not row.fenced and row.expires_at > at} for row in sessions],
         'controls': [{'scope': row.scope, 'recorded_tokens': row.tokens, 'refilled_at': row.refilled_at,
             'active_leases': sum(entry.get('until', '') > at.isoformat() for entry in row.leases)} for row in admissions],
         'feedback': {'recorded_tokens': feedback.request_tokens, 'refilled_at': feedback.refilled_at,
@@ -96,17 +90,17 @@ def uploads(owner_id: str | None = Query(None, max_length=36), job_id: str | Non
     return page(db, query.order_by(UploadReservation.created_at.desc(), UploadReservation.id), offset, limit)
 
 
-@router.get('/receipts')
-def receipts(owner_id: str | None = Query(None, max_length=36), operation_key: str | None = Query(None, max_length=128),
-        job_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
+@router.get('/requests')
+def requests(owner_id: str | None = Query(None, max_length=36), request_id: str | None = Query(None, max_length=36),
+        job_id: str | None = Query(None, max_length=36), access_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
         limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(TranslationOperation, 'owner_id operation_key job_id access_id created_at'))
-    for col, value in ((TranslationOperation.owner_id, owner_id), (TranslationOperation.operation_key, operation_key),
-                       (TranslationOperation.job_id, job_id)):
+    query = select(*columns(TranslationRequest, 'owner_id id job_id access_id created_at revoked_at'))
+    for col, value in ((TranslationRequest.owner_id, owner_id), (TranslationRequest.id, request_id),
+                       (TranslationRequest.job_id, job_id), (TranslationRequest.access_id, access_id)):
         if value:
             query = query.where(col == value)
-    return page(db, query.order_by(TranslationOperation.created_at.desc(), TranslationOperation.owner_id,
-        TranslationOperation.operation_key), offset, limit)
+    return page(db, query.order_by(TranslationRequest.created_at.desc(), TranslationRequest.owner_id,
+        TranslationRequest.id), offset, limit)
 
 
 @router.get('/assets')

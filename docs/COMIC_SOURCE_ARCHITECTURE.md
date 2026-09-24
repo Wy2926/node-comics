@@ -14,7 +14,7 @@ PageDescriptor 保存当前内容身份、稳定页键、ordinal、尺寸和格�
 
 ## 新库基线
 
-[storage/database.ts](../apps/extension/src/storage/database.ts)统一使用 `node-comics-reading-v1-*`，初始版本 1。目录库包括 comics、entries、connections、pageDescriptors、materializations、positions、catalogs、tasks、translationBindings、translationOperations、metadata、tombstones。
+[storage/database.ts](../apps/extension/src/storage/database.ts)统一使用 `node-comics-reading-v2-*`，初始版本 1。目录库包括 comics、entries、connections、pageDescriptors、materializations、positions、catalogs、tasks、translationBindings、metadata、tombstones。
 
 不扫描、升级或读取旧库，也没有双写、别名、迁移链。当前基线缺表会明确报告结构不一致，不能静默重建用户数据。删除使用 tombstone 和内容代次保护迟到写入；catalog 是来源资源快照，重新导入时允许在新的漫画身份下重新创建。
 
@@ -71,4 +71,4 @@ Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮�
 - [来源运行时](../apps/extension/src/comics/sources/runtime.ts)、[来源权限](../apps/extension/src/comics/application/source-access.ts)与[页面服务](../apps/extension/src/comics/pages/service.ts)
 - [适配器架构](SITE_ADAPTERS.md)与[格式边界](IMPORT_FORMATS_AND_CACHE.md)
 
-后端结果复用、持久任务、额度和共享对象保留沿用[阅读计划契约](READING_TRANSLATION_CONTRACT.md)，本次没有改变结算或生产存储策略。
+后端结果复用、持久任务、额度和共享对象保留沿用[翻译接口契约](READING_TRANSLATION_CONTRACT.md)，本次没有改变结算或生产存储策略。

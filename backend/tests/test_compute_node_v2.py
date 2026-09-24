@@ -1,3 +1,4 @@
+from conftest import create
 """Run the actual node client against the controller, with isolated image/text fixtures."""
 import base64
 import hashlib
@@ -255,9 +256,9 @@ def test_real_vulkan_node_uploads_final_page(v2, tmp_path, ocr_language, source_
     image.save(buffer, 'PNG')
     auth = login(v2['client'], 'real-model-reader')
     original = upload(v2['client'], auth, buffer.getvalue())
-    response = submit_asset(v2['client'], auth, original, key='real-model', language='en', mode='classic')
+    response = create(v2['client'], auth, original, key='real-model', language='en', mode='classic')
     assert response.status_code == 202, response.text
-    job_id = response.json()['items'][0]['job']['id']
+    job_id = response.json()['id']
     agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
     agent.local['engine']['gpu'] = 0
     started = time.monotonic()
@@ -366,11 +367,11 @@ def test_resident_budget_applies_backpressure_and_all_pages_eventually_finish(v2
 
 def test_restart_acknowledges_stopped_lease_without_input_or_config(v2, tmp_path):
     from test_compute_v2 import claim
-    from conftest import login
+    from conftest import login, request_for_job
     jobs = v2['create']()
     lease = claim(v2).json()['leases'][0]
     auth = login(v2['client'], 'reader0')
-    v2['client'].post('/v1/jobs/' + jobs[0] + '/cancel', headers=auth).raise_for_status()
+    v2['client'].post('/v1/translations/' + request_for_job(v2['client'],auth,jobs[0]) + '/cancel', headers=auth).raise_for_status()
     runtime = FixtureRuntime()
     agent, transport, journal = node_for(v2, tmp_path, 1, runtime)
     try:

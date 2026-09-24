@@ -36,7 +36,7 @@ def analysis(segments=None):
 @pytest.fixture
 def text_database(tmp_path, monkeypatch):
     # This fixture can run without importing the HTTP app or other test modules.
-    from app import plan_models, system_settings  # noqa: F401
+    from app import translation_requests, system_settings  # noqa: F401
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///' + (tmp_path / 'stages.db').as_posix())
     monkeypatch.setenv('DEV_AUTH', 'true')
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
