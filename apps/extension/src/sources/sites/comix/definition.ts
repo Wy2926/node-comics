@@ -10,7 +10,7 @@ export function comixLocation(url:URL) {
 export const definition:SourceDefinition={
   id:'comix',name:'Comix',
   sites:[{id:'comix',name:'Comix',url:'https://comix.to/',icon:icon}],
-  capabilities:{importable:true,pages:true,inline:false,catalog:true,completePageList:true},
+  capabilities:{importable:true,pages:true,inline:true,catalog:true,completePageList:true},
   catalogSync:{intervalMinutes:720},
   installation,
   identify(url){

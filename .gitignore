@@ -29,3 +29,6 @@ engines/
 private-test-data/
 /apps/extension/public/_locales/
 /apps/extension/public/i18n/
+# Generated store delivery bundles; keep artwork and review copy locally.
+/output/chrome-web-store-*/
+/output/chrome-web-store-*.zip

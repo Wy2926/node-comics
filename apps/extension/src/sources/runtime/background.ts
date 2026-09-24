@@ -103,14 +103,16 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     );
   });
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    await localeReady();
     if (info.menuItemId === 'nc-translate-page' && tab?.id != null) {
-      // A webpage's image CDN can be on any origin; Chrome asks once, in this user gesture.
-      const granted = await chrome.permissions.request({ origins: ['https://*/*', 'http://*/*'] });
-      if (granted)
-        await activateInline(tab.id).catch(() =>
-          chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html#settings') }),
-        );
+      try {
+        // Request before any await: loading locale/storage can lose the menu's user gesture.
+        const granted = await chrome.permissions.request({ origins: ['https://*/*', 'http://*/*'] });
+        if (!granted) return;
+        await localeReady();
+        await activateInline(tab.id);
+      } catch {
+        await chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html#settings') });
+      }
       return;
     }
 
@@ -226,7 +228,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
         // HTTP locators are durable registered metadata. Only page resources depend on
         // the original tab and navigation; managed discovery closes its tab on completion.
         if (item.kind !== 'page') {
-          return {url:item.url,...(item.processing||sourceImages[manifest.adapter]?{sourceId:manifest.adapter,processing:item.processing}:{})};
+          return {url:item.url,pageUrl:manifest.url,...(item.processing||sourceImages[manifest.adapter]?{sourceId:manifest.adapter,processing:item.processing}:{})};
         }
         const pageContext=manifest.pageContext;
         if(!pageContext)throw Error(msg('来源页已改变，请重新发现。'));

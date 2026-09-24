@@ -79,6 +79,10 @@ beforeEach(() => {
     contextMenus: {onClicked: event(), update: vi.fn(async () => {})},
     permissions: {onRemoved: event(), contains: vi.fn(async () => false)},
     scripting: {executeScript: vi.fn(async () => [])},
+    windows: {
+      create: async ({url}:{url:string}) => {const tab={id:7,url};tabs.set(tab.id,tab);return {id:1,tabs:[tab]};},
+      remove: vi.fn(async()=>{}),
+    },
     tabs: {
       onRemoved: event(), onUpdated: event(), onActivated: event(), query: async () => [],
       create: async ({url}: {url: string}) => {const tab = {id: 7, url}; tabs.set(tab.id, tab); return tab;},
@@ -94,6 +98,39 @@ beforeEach(() => {
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
 describe('production background listeners share the runtime message channel', () => {
+  it('requests menu permission during the click and starts a manual session with automatic tabs disabled', async () => {
+    let clicking = true;
+    const request = vi.fn(() => {
+      if (!clicking) throw Error('Permission request lost its user gesture');
+      return Promise.resolve(true);
+    });
+    Object.assign(chrome.permissions, {request});
+    vi.stubGlobal('navigator', {locks: {request: async (_name:string, run:()=>Promise<unknown>) => run()}});
+    const tab = {id: 42, url: 'https://example.test/comic'};
+    tabs.set(tab.id, tab);
+    Object.assign(chrome.scripting,{executeScript:vi.fn(async()=>[{documentId:'document-42',frameId:0}])});
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_id, message) => (message as Message).type === 'NC_INLINE_IDENTITY'
+      ? {url:tab.url,navigationId:'navigation-42'} : {ok:true});
+    const click = vi.mocked(chrome.contextMenus.onClicked.addListener).mock.calls[0][0];
+    const pending = click({menuItemId:'nc-translate-page',editable:false},tab as chrome.tabs.Tab);
+    clicking = false;
+    expect(request).toHaveBeenCalledExactlyOnceWith({origins:['https://*/*','http://*/*']});
+    await pending;
+    expect(session['nc-inline:42']).toMatchObject({url:tab.url,automatic:false,navigationId:'navigation-42'});
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(42,{type:'NC_INLINE_START',automatic:false},expect.anything());
+    expect(local['nc-reader-settings']).toMatchObject({autoTranslateTabs:false});
+  });
+
+  it.each(['denied','rejected'])('handles %s menu permission without starting translation', async outcome => {
+    Object.assign(chrome.permissions, {request:vi.fn(() => outcome === 'denied'
+      ? Promise.resolve(false) : Promise.reject(Error('Permission request failed')))});
+    const click = vi.mocked(chrome.contextMenus.onClicked.addListener).mock.calls[0][0];
+    await click({menuItemId:'nc-translate-page',editable:false},{id:42} as chrome.tabs.Tab);
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+    expect(session['nc-inline:42']).toBeUndefined();
+    expect(tabs.get(7)?.url).toBe(outcome==='rejected' ? `chrome-extension://${extensionId}/reader.html#settings` : undefined);
+  });
+
   it('keeps the whole Drive connection, selection, token and disconnect flow out of source routing', async () => {
     expect(await owned({type: 'NC_DRIVE_ACCOUNTS'})).toEqual({ok: true, accounts: []});
     const connected = await owned({type: 'NC_DRIVE_CONNECT'});
@@ -123,7 +160,7 @@ describe('production background listeners share the runtime message channel', ()
 
   it('preserves source messages while locale and theme listeners answer only their own protocol', async () => {
     local['manifest:book'] = {id: 'book', adapter:'gunnerkrigg',url: 'https://www.gunnerkrigg.com/?p=123', items: [{id: 'page-1', url: 'https://example.test/1.png'}]};
-    expect(await owned({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'})).toEqual({ok: true, data: {url: 'https://example.test/1.png'}});
+    expect(await owned({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'})).toEqual({ok: true, data: {url: 'https://example.test/1.png',pageUrl:'https://www.gunnerkrigg.com/?p=123'}});
     expect(await owned({type: 'NC_UI_LOCALE'})).toMatchObject({locale: 'en', dictionary: expect.any(Object)});
     expect(await owned({type: 'NC_INLINE_THEME'}, {...extensionSender, tab: {id: 1} as chrome.tabs.Tab, frameId: 0})).toEqual({appearance: 'system', accentTheme: 'sky', textScale: 1});
   });

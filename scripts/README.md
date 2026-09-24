@@ -21,7 +21,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_reading_translations.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | 新容器 / 目录夹具、模拟接口下的阅读窗口、限流、恢复，以及未知地址回退和无历史轮询；专用 Vite 5176，检查当前页与后三页、分钟退避、UUID 快照核实、下载重试和位置恢复 |
 | `verify_membership_admin.mjs` | 隔离后台的赠送与分钟配置 |
 | 插件 `tests/billing-focus-fixture.html` | Vite 指定 5192 端口后打开，点击“运行回归检查”；模拟订阅接口与窗口交接，验证焦点刷新、并发打开、返回对账和失败重试，不读取真实账户 |
-| `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |
+| `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；原位回归包含自动翻译关闭时的右键入口、通用／站点识别及 Comix 图片和画布。真实 Comix 开关见[站点说明](../apps/extension/src/sources/sites/comix/README.md#网页原位翻译回归)，浏览器可用 `CHROMIUM_PATH` 指定；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |
 | `verify_simple_reading.mjs` | 桌面单来源新基线：自动导入、散图拒绝、重复文件续读、120 页窗口、浏览器重启、格式解码、失败隔离、最近阅读时间、跨虚拟列表批量移除、设置对齐和来源账户展示；窄屏不在兼容范围 |
 | `verify_source_database_baseline.mjs` | 在隔离扩展 profile 中先创建残缺旧 v1 库，再验证新基线导入、阅读、重开且旧库不变；另检查当前基线缺表的明确错误，无未处理 Promise |
 | `verify_drive_import.mjs` | 新建隔离扩展 profile、专用 HTTPS 测试页与模拟 Google 服务，覆盖 CBZ 选择、直接阅读、索引失败和授权复用；`TEST_DRIVE_AUTH_MODE=chrome` 增加模拟 Chrome Identity、真实浏览器重启后的静默恢复和断开检查，不读取用户 Chrome 或真实云盘，真实授权边界见 [Drive 说明](../apps/drive-connect/README.md) |
@@ -29,6 +29,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
 | `verify_website_source_lifecycle.mjs` | 本机 TLS / 隔离 DNS 下操作真实网站嵌入按钮、直接阅读、来源标签页、按需取图和主动下载；重开并让图片源失败后已下载页仍可读 |
 | `verify_source_image_cache.mjs` | 构建后的 MV3 扩展、隔离 profile 与本机 HTTP 图片服务；不使用会禁用缓存的请求拦截，复现可缓存 503，检查图片重试访问网络、位置保持及成功后的应用缓存复用。使用下方 Playwright / 浏览器变量，运行 `node scripts/verify_source_image_cache.mjs`，结果在 `artifacts/source-image-cache/` |
+| `verify_image_transport.mjs` | 构建后的 MV3 扩展及公共取图代码、隔离 profile 和真实本机 HTTP 服务；验证无 CORS、通用 Referer、防盗链失败、逐跳授权、跨来源请求头隔离、循环跳转、显式引用策略、合成 Cookie、并发和取消清理。设置下方 `PLAYWRIGHT_MODULE` / `TEST_CHROMIUM` 后运行 `node scripts/verify_image_transport.mjs`，结果在 `artifacts/image-transport/`；不访问真实账户或翻译服务 |
 | 插件 `tests/reader-window-fixture.html` | Vite 独立 5181 端口，30 章 × 120 页合成夹具；检查 3 章 / 11 页 DOM 上限、跳页、偏移恢复与失败；桌面目标浏览器检查截图及位置恢复 |
 | `verify_reader_directory.mjs` | Vite 独立 5181 端口，`tests/reader-directory-fixture.html` 的 620 章合成目录；覆盖当前项超出首批、倒序、嵌套分组、搜索恢复、状态刷新不抢滚动、页面缩略图、失败／未就绪和重开位置；截图在 `artifacts/reader-directory/` |
 | `verify_extension_theme.mjs` | 新书架、真实导入、菜单 / 导出弹窗、4 色 × 亮暗主题、阅读浮层与位置恢复；默认 Vite 5175，可用 `TEST_READER_URL` 指定隔离主应用 |
@@ -74,6 +75,22 @@ node scripts/verify_drive_import.mjs
 单来源格式与导入统一使用 `verify_simple_reading.mjs`。可选规模检查在插件目录设置 `NC_CATALOG_SCALE=1` 后运行 `npm test -- tests/catalog-scale.test.ts`；该检查使用 fake-indexeddb，不是实际设备性能基准。
 
 ## 样本与共享模块
+
+### 页面图片读取研究
+
+`probe_page_image_access.mjs` 不依赖产品构建。它创建临时 MV3 扩展、隔离 profile 和两个本机 HTTP 来源，比较网站授权下的页面像素、原始文件和缓存读取；没有外部图片、账户或翻译请求。结果在 `artifacts/page-image-access/<运行 ID>/`，结论见[调研文档](../docs/PAGE_IMAGE_ACCESS_RESEARCH.md)。
+
+```powershell
+$env:PLAYWRIGHT_MODULE = '<已安装 playwright 模块的绝对路径>'
+$env:TEST_CHROMIUM = '<支持加载解压扩展的 Chromium 或 Edge 可执行文件绝对路径>'
+node scripts/probe_page_image_access.mjs
+```
+
+可选设置 `PROBE_DEBUGGER=1` 或 `PROBE_PAGE_CAPTURE=1`，只给临时研究扩展增加对应权限，验证已加载跨域图片的原文件读取。默认不开启，两者可独立运行。页面捕获实验输出自制页面 MHTML，其解析器仅用于固定实验样本，不是产品 MIME 解析实现。`TEST_CHROMIUM` 未设置时依次使用 `CHROMIUM_PATH` 或 Playwright 默认浏览器。
+
+`PROBE_REQUEST_CONTEXT=1` 为临时扩展增加产品已有的 `declarativeNetRequestWithHostAccess` 权限，验证页面可加载而后台缺少 Referer 时 403、公共来源请求规则下成功、规则清理后再次拒绝的场景。样本不含 CORS 响应头，测试来源拒绝与页面 CORS 的区别。
+
+### 共享模块
 
 - `generate_import_fixtures.py` 生成原创导入样本，输出到被忽略的 `artifacts/import-validation/`。
 - `translation_client.py`、`local_import_helpers.mjs` 供检查脚本复用，不是独立命令。

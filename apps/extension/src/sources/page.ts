@@ -8,7 +8,7 @@ export type * from './contracts/page';
 export type * from './contracts/source';
 export { PageImageRegistry } from './core/resources';
 export { canvasImage } from './shared/canvas';
-export { comicImageRect, MAX_COMIC_IMAGES } from './shared/geometry';
+export { comicImageRect, renderedImageRect, MAX_COMIC_IMAGES } from './shared/geometry';
 export const createSourceNavigation = (
   doc: Document,
   invalidated?: () => void,
@@ -33,3 +33,4 @@ export function discoverDocument(doc: Document, url: string) {
     navigation.dispose();
   }
 }
+export {pageImageReferrerPolicy} from './shared/referrer';

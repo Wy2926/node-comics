@@ -12,6 +12,7 @@ vi.mock('../src/sources/registry/definitions',()=>({definitions:[{
 import {networkOperation,readNetworkCatalog,readNetworkPages} from '../src/sources/runtime/network';
 import {readSourceCatalog} from '../src/sources/runtime/catalog-reader';
 import {discoverPage} from '../src/sources/runtime/client';
+vi.mock('../src/sources/runtime/image-headers',()=>({withImageHeaders:async(_url:unknown,_headers:unknown,_signal:unknown,read:()=>Promise<unknown>)=>read()}));
 import {readSourceImage} from '../src/sources/runtime/source-image';
 import {authorizeCatalogImport} from '../src/sources/runtime/import';
 import {registerDocumentManifest} from '../src/sources/runtime/manifests';
@@ -80,7 +81,7 @@ describe('source image facade',()=>{
   const ref={manifestId:'manifest',pageId:'one',expectedUrl:'https://images.test/one.png'};
   it('decodes an adapter image independently of network discovery',async()=>{
     const decode=vi.fn(async()=>new Blob(['decoded']));fixture.images.fixture={decode};
-    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,sourceId:'fixture',processing:'recipe-1'}});
+    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url,sourceId:'fixture',processing:'recipe-1'}});
     const fetch=vi.fn(async()=>new Response('encoded',{headers:{'x-format':'fixture'}}));vi.stubGlobal('fetch',fetch);
     expect(await(await readSourceImage(ref)).text()).toBe('decoded');
     expect(decode).toHaveBeenCalledWith(expect.any(Blob),expect.any(Headers),'recipe-1',undefined);expect(fixture.networks.fixture).toBeUndefined();
@@ -88,7 +89,7 @@ describe('source image facade',()=>{
   it('rejects changed URLs and missing permission before fetching',async()=>{
     const fetch=vi.fn();vi.stubGlobal('fetch',fetch);send.mockResolvedValue({ok:true,data:{url:'https://other.test/1.png'}});
     await expect(readSourceImage(ref)).rejects.toThrow('来源已变化');
-    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl}});vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
+    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url}});vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
     await expect(readSourceImage(ref)).rejects.toThrow('授权');expect(fetch).not.toHaveBeenCalled();
   });
   it('resolves dynamic image headers only after URL and permission authorization',async()=>{
@@ -96,7 +97,7 @@ describe('source image facade',()=>{
     vi.stubGlobal('fetch',vi.fn(async()=>new Response('pixels')));
     send.mockResolvedValue({ok:true,data:{url:'https://other.test/1.png',sourceId:'fixture'}});
     await expect(readSourceImage(ref)).rejects.toThrow('来源已变化');expect(headers).not.toHaveBeenCalled();
-    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,sourceId:'fixture'}});
+    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url,sourceId:'fixture'}});
     expect(await(await readSourceImage(ref)).text()).toBe('pixels');expect(headers).toHaveBeenCalledWith(ref.expectedUrl);
   });
   it('reads a canvas handle without asking for a pseudo-origin permission',async()=>{

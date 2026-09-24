@@ -1379,5 +1379,8 @@
   "提交反馈": "Kirim masukan",
   "请填写反馈内容。": "Silakan tulis masukan Anda.",
   "有更新": "Diperbarui",
-  "新增 {0} 个条目，目录已自动同步": "{0} entri baru. Daftar isi tersinkron otomatis."
+  "新增 {0} 个条目，目录已自动同步": "{0} entri baru. Daftar isi tersinkron otomatis.",
+  "图片重定向无效或次数过多，请刷新来源页面后重试。": "Pengalihan gambar tidak valid atau memiliki terlalu banyak langkah. Muat ulang halaman sumber dan coba lagi.",
+  "图片网络请求失败，请检查连接或刷新来源页面后重试。": "Permintaan gambar gagal. Periksa koneksi atau muat ulang halaman sumber dan coba lagi.",
+  "图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。": "Akses domain gambar belum diizinkan. Klik kanan dan pilih lagi “Terjemahkan halaman ini” untuk memberi izin."
 }

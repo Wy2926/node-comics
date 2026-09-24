@@ -1379,5 +1379,8 @@
   "提交反馈": "Geri bildirim gönder",
   "请填写反馈内容。": "Lütfen geri bildiriminizi yazın.",
   "有更新": "Güncellendi",
-  "新增 {0} 个条目，目录已自动同步": "{0} yeni bölüm. İçindekiler otomatik eşitlendi."
+  "新增 {0} 个条目，目录已自动同步": "{0} yeni bölüm. İçindekiler otomatik eşitlendi.",
+  "图片重定向无效或次数过多，请刷新来源页面后重试。": "Görsel yönlendirmesi geçersiz veya çok fazla adım içeriyor. Kaynak sayfayı yenileyip tekrar deneyin.",
+  "图片网络请求失败，请检查连接或刷新来源页面后重试。": "Görsel isteği başarısız oldu. Bağlantıyı kontrol edin veya kaynak sayfayı yenileyip tekrar deneyin.",
+  "图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。": "Görsel alan adına erişim izni verilmedi. Sağ tıklayıp “Geçerli sayfayı çevir” seçeneğini yeniden seçerek izin verin."
 }

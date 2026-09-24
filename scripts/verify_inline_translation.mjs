@@ -2,10 +2,21 @@
 import assert from 'node:assert/strict';
 import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
 import {createHash, randomUUID} from 'node:crypto';
 import {cp, mkdir, readFile, writeFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
+const sitesDirectory=path.resolve('apps/extension/src/sources/sites');
+const siteChecks=[];
+for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
+  if(!site.isDirectory())continue;
+  const tests=path.join(sitesDirectory,site.name,'tests');
+  const files=await readdir(tests).catch(error=>{if(error.code==='ENOENT')return [];throw error;});
+  if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
+}
+const selectedSite=process.env.INLINE_SITE_ONLY;
+assert(!selectedSite||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -16,8 +27,8 @@ assert(!manifest.content_scripts.some(s=>s.js.includes('content-scripts/inline.j
 // registered menu callback; only this temporary copy exposes its listener and installed menu titles.
 manifest.host_permissions.push('http://*/*','https://*/*');await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
 const background=path.join(extension,'background.js');
-await writeFile(background,`chrome.permissions.request=permissions=>chrome.permissions.contains(permissions);globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
-const requests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
+await writeFile(background,`let fixtureGesture=false;chrome.permissions.request=permissions=>{if(!fixtureGesture)throw Error('Permission request lost its user gesture');return chrome.permissions.contains(permissions)};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=(...args)=>{fixtureGesture=true;try{return listener(...args)}finally{fixtureGesture=false}};return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
+const requests=[],sourceRequests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
 const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights,retention_days:0};
@@ -42,7 +53,11 @@ const server=createServer(async(req,res)=>{
     const url=new URL(req.url,'http://fixture');let body;
     if(req.method==='POST'||req.method==='PUT'){const chunks=[];for await(const chunk of req)chunks.push(chunk);body=Buffer.concat(chunks);if(req.headers['content-type']?.includes('application/json'))body=JSON.parse(body);}
     const json=(data,status=200,headers={})=>{res.writeHead(status,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*',...headers});res.end(JSON.stringify(data));};
-    if(url.pathname.startsWith('/source/')){const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;}
+    if(url.pathname.startsWith('/source/')){
+      sourceRequests.push({path:url.pathname,referer:req.headers.referer??null});
+      if(req.headers.referer!==site+'/'){res.writeHead(403,{'Cache-Control':'no-store'});res.end();return;}
+      const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;
+    }
     if(url.pathname==='/result.png'){
       const id=url.searchParams.get('id');resultRequests.push(id);
       if(id===heldResult)await new Promise(resolve=>{releaseResult=resolve;});
@@ -119,11 +134,16 @@ try{
   await page.setContent('<body style="margin:0;width:900px;height:900px;background:#e3f3ff;font:42px system-ui"><div style="margin:50px;border:6px solid #224560;height:650px;padding:35px">译文效果示例<br><br>你好！<br><br>继续阅读故事</div></body>');
   output=await page.screenshot({clip:{x:0,y:0,width:900,height:900},captureBeyondViewport:true});
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
-  await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,language:'zh-Hans',translationMode:'classic',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',translationMode:'classic',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  if(!selectedSite) {
   await page.goto(site);await page.locator('#first').evaluate(i=>i.decode());await page.evaluate(()=>{window.fixtureClicks=0;document.querySelector('#site-button').addEventListener('click',()=>window.fixtureClicks++);});
   const before=await geometry();assert.equal(await page.locator('#first').evaluate(i=>i.style.content),'');
   const menus=await worker.evaluate(()=>fixtureMenus);assert(menus.some(m=>m.id==='nc-translate-page'&&m.title==='翻译当前页面'));check('build registers page menu and does not inject on its own');
   await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:20000});
+  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'].autoTranslateTabs),false);
+  check('manual menu activation requests permission synchronously with automatic tabs explicitly disabled');
+  assert(sourceRequests.every(request=>request.referer===site+'/'));
+  check('generic inline images pass cross-origin Referer checks without CORS response headers or a site adapter');
   assert.deepEqual(await geometry(),before);assert.equal(await page.locator('#thumb').evaluate(i=>i.style.content),'');assert.equal(await page.locator('#hidden').evaluate(i=>i.style.content),'');
   check('existing result replaces picture visually with unchanged geometry, src, srcset and scroll; thumbnail/hidden image excluded');
   const sharedIdentity=await worker.evaluate(async url=>{
@@ -138,6 +158,21 @@ try{
   await page.screenshot({path:path.join(out,'translated-desktop.png')});
   await page.waitForFunction(()=>document.querySelector('#second').style.content.includes('blob:'),{},{timeout:15000});assert.equal(createdJobs,1);assert.equal(uploads.size,1);check('next page submits, uploads verified bytes and displays completion; failed page does not loop');
   await activate();await page.waitForTimeout(900);assert.equal(createdJobs,1);check('repeated page activation creates no duplicate submissions');
+  const readsBeforeDenied=sourceRequests.length;
+  await worker.evaluate(origin=>{
+    globalThis.fixturePermissionContains=chrome.permissions.contains.bind(chrome.permissions);
+    chrome.permissions.contains=permissions=>permissions.origins?.includes(origin+'/*')?Promise.resolve(false):globalThis.fixturePermissionContains(permissions);
+  },api);
+  await activate();
+  await page.waitForFunction(()=>[...document.querySelectorAll('img.comic')].every(image=>!image.style.content));
+  await page.waitForTimeout(800);
+  assert.equal(sourceRequests.length,readsBeforeDenied);
+  const permissionTree=await cdp.send('Accessibility.getFullAXTree');assert(permissionTree.nodes.some(node=>node.name?.value==='等待图片授权'));
+  await page.screenshot({path:path.join(out,'source-permission-required.png')});
+  check('missing image permission reports an actionable notice before downloading; native permission UI is not simulated as verified');
+  await worker.evaluate(()=>{chrome.permissions.contains=globalThis.fixturePermissionContains;delete globalThis.fixturePermissionContains;});
+  await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),null,{timeout:15000});
+  check('manual authorization recovery resumes the same page and restores its translation');
   const displayed=await page.locator('#first').evaluate(i=>i.style.content);
   for(const style of ['opacity: 0.95', 'content: normal; aspect-ratio: auto; opacity: 0.95']){
     await page.locator('#first').evaluate((i,style)=>{i.setAttribute('style',style);i.classList.add('site-rendered');},style);
@@ -301,8 +336,16 @@ try{
     await page.screenshot({path:path.join(out,'comicpash-live-restored.png')});
     check('Live Comic PASH source recognizes canvases, displays fixture translations, turns pages and restores originals; no live provider used');
   }
+  }
+  complete=true;
+  let liveSource=process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite;
+  for(const site of siteChecks.filter(site=>!selectedSite||site.id===selectedSite)) {
+    const {verifyInline}=await import(site.url);
+    const result=await verifyInline({browser,page,activate,button,source:images.get(2),out,check});
+    liveSource ||= !!result?.liveSource;
+  }
   assert.equal(errors.length,0,errors.join('\n'));
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource:process.env.RUN_LIVE_COMICPASH==='1',liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
-}catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));console.error('Artifacts: '+out);throw error;}
+}catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
 finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

@@ -2,7 +2,7 @@ import { msg, subscribeLocale } from '../i18n/runtime';
 import { RequestPool } from '../concurrency';
 import { imageDataUrl, sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
-import { comicImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
+import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
 import { advancesReadingWindow } from '../translation/automatic';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
@@ -234,7 +234,7 @@ export function installInline() {
       const previous = tracked.get(image);
       if (previous && previous.url === target.url && previous.sourceKey === target.key)
         previous.display.sync();
-      const rect = comicImageRect(image);
+      const rect = renderedImageRect(image);
       if (!rect) continue;
       const url = target.url;
       let item = tracked.get(image);
@@ -316,6 +316,7 @@ export function installInline() {
       url: /^(blob:|data:|page-image:)/.test(i.url) ? 'page-image:' + i.id : i.url,
       width: i.rect.width,
       height: i.rect.height,
+      referrerPolicy:pageImageReferrerPolicy(i.image),
     })),
   });
   async function loadResult(item: Candidate, key: string, stamp: number) {

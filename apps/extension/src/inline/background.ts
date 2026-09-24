@@ -11,19 +11,19 @@ import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
 import { API_BASE, API_ORIGIN } from '../service';
-import { imageDataUrl, maxInlineBytes, safeImageUrl, sourceImage } from '../sources';
+import { imageDataUrl, maxInlineBytes, safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
 import { operationId, type ReadingTarget } from '../translation/automatic';
 import { TranslationCoordinator } from '../translation/coordinator';
 import { translationState } from '../translation/state';
 import { matchesPage } from '../translation/sync';
 import { defaults, supportsLanguage, type Capabilities, type Entitlements, type Job, type Page, type Settings } from '../types';
 import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
-import { comicSize, type InlineRequest, type InlineResponse, type InlineResult, type InlineImageResponse } from './protocol';
+import type { InlineRequest, InlineResponse, InlineResult, InlineImageResponse } from './protocol';
 import { settingsKey } from './settings';
 import { registerInlineThemeBackground } from './theme';
 
 interface Activation {url:string;navigationId:string;documentId?:string;automatic?:boolean;}
-interface Context {key:string;api:Api;core:TranslationCoordinator;settings:Settings;session:Session;caps:Capabilities;rights:Entitlements;pages:Map<string,Page>;originals:InlineOriginals;sourceErrors:Map<string,string>;currentKey?:string;waiting?:AbortController;active:boolean;}
+interface Context {key:string;api:Api;core:TranslationCoordinator;settings:Settings;session:Session;caps:Capabilities;rights:Entitlements;pages:Map<string,Page>;originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;currentKey?:string;waiting?:AbortController;active:boolean;}
 const activationKey=(tabId:number)=>'nc-inline:'+tabId;
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 export async function activateInline(tabId:number,automatic=false){
@@ -79,7 +79,7 @@ const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSO
 async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
   assertCurrent(ctx.api.isCurrent);let blob:Blob;
   if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await(await fetch(source.data)).blob();}
-  else blob=await sourceImage(image.url);
+  else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy);
   assertCurrent(ctx.api.isCurrent);if(blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
   const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(ctx.api.isCurrent);
   if(prepared.blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
@@ -99,7 +99,9 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
     ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:ctx.settings.translationMode});
-   }catch(error){ctx.sourceErrors.set(pageKey(request,image),(error as Error).message);}
+   }catch(error){ctx.sourceErrors.set(pageKey(request,image),error instanceof ImagePermissionsRequired
+     ?{kind:'error',message:msg('图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。'),retryable:false}
+     :{kind:'error',message:(error as Error).message});}
   }
   return targets;
 }
@@ -112,7 +114,7 @@ function pageResult(ctx:Context,page:Page){
 function response(ctx:Context,request:InlineRequest):InlineResponse{
   const {translationMode:mode,language}=ctx.settings,origin=new URL(ctx.api.base).origin,scope=resultScope(ctx);
   const items:InlineResult[]=[];
-  for(const image of request.images){const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);if(error)items.push({id:image.id,state:{kind:'error',message:error}});continue;}
+  for(const image of request.images){const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);if(error)items.push({id:image.id,state:error});continue;}
     const result=pageResult(ctx,page);
     const item:InlineResult={id:image.id};
     if(result?.output_asset_id)item.resultKey=JSON.stringify([scope,result.id,result.output_asset_id]);
@@ -187,13 +189,15 @@ export function registerInlineBackground(){
       const tab=await chrome.tabs.get(tabId);if(tab.url!==activation.url)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
       if(!activation.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
       if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
-      if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||!comicSize(v.width,v.height);}))throw Error(msg("图片范围无效。"));
+      if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg("图片范围无效。"));
       if(message.type==='NC_INLINE_IMAGE'){
         if(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048)throw Error(msg('图片范围无效。'));
         return imageResponse(message,sender);
       }
-      if(message.type==='NC_INLINE_WAIT')return step(message,sender);
-      return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,sender));
+      // Use the current, activation-checked tab URL; sender.url can lag behind SPA navigation.
+      const currentSender={...sender,tab};
+      if(message.type==='NC_INLINE_WAIT')return step(message,currentSender);
+      return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,currentSender));
     })().then(data=>respond({ok:true,data})).catch(error=>respond({ok:false,error:error.message,retryAfterMs:error.retryAfterSeconds?error.retryAfterSeconds*1000:undefined}));return true;
   });
 }

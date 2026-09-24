@@ -64,6 +64,8 @@ describe('shared webpage image candidates', () => {
     );
     const doc = { title: 'Page', querySelectorAll: () => images } as unknown as Document;
     const manifest = discoverDocument(doc, 'https://example.test/page');
+    const session = createSourceNavigation(doc).get('https://example.test/page').session;
+    expect(session.inlineTargets().map(({ element }) => element)).toEqual(images.slice(0, 2));
     expect(
       manifest.items.map((item) => (item.resource.kind === 'http' ? item.resource.url : undefined)),
     ).toEqual(images.slice(0, 2).map((img) => img.src));

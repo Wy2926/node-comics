@@ -31,6 +31,12 @@
 
 公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
 
+HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅读器由受信扩展页面请求，均先检查实际图片域名权限，再根据已校验的来源页生成 Referer。原位入口传递图片属性／meta 中的显式引用策略，缺省为 `strict-origin-when-cross-origin`；仅 HTTP 响应头声明的页面策略未回溯读取。站点 `image.headers` 只覆盖必要差异，不再为普通来源 Referer 增加专用适配。Blob／Data／Canvas 保留页面读取与导航版本校验。
+
+原位正文筛选由 `inlineTargets()` 负责：未知站点的大图启发式只在 `generic` 适配器执行，显示层统一检查渲染状态。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
+
+公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，最多跟随 5 次；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。实现依据和验证边界见[跨域取图调研](PAGE_IMAGE_ACCESS_RESEARCH.md)。
+
 ## 验收与交付
 
 在 `apps/extension` 执行：
@@ -52,7 +58,7 @@ npm run build
 | 适配器 | 能力与说明 |
 | --- | --- |
 | [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | DOM 目录与 HTTP 图片；动态只读分类、完整性核对、12 小时目录同步 |
-| [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；授权后在详情页与章节页嵌入导入／管理入口，不开放原位翻译 |
+| [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；已加载正文图片／还原画布的原位翻译，授权后在详情页与章节页嵌入导入／管理入口 |
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；授权后嵌入导入／管理按钮，章节 Referer，不创建来源采集标签页 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口，无源站采集标签页 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | 已渲染 canvas 部分窗口，直接阅读与原位翻译；无目录或自动补全 |

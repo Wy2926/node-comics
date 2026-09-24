@@ -24,7 +24,7 @@ describe('persisted source manifest authority', () => {
     expect(discovered).toMatchObject({ ok: true, data: { id: 'trusted-manifest', pageContext:{tabId:7,navigationId:'navigation'} } });
     expect(local['manifest:trusted-manifest']).toMatchObject({ items: snapshot.items });
     expect(await send({ type: 'NC_CLOSE_SOURCE', tabId: 7 })).toMatchObject({ ok: true });
-    expect(await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'page-1' })).toEqual({ ok: true, data: { url: snapshot.items[0].url } });
+    expect(await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'page-1' })).toEqual({ ok: true, data: { url: snapshot.items[0].url,pageUrl:snapshot.url } });
     expect((await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'forged-page' })).ok).toBe(false);
     expect((await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'untrusted-content-id', pageId: 'page-1' })).ok).toBe(false);
   });

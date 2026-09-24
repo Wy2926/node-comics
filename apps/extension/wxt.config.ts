@@ -29,7 +29,7 @@ export default defineConfig({
     name: '__MSG_extensionName__', description: '__MSG_extensionDescription__',
     default_locale: 'en', short_name: 'NodeLane', homepage_url: 'https://comics.nodelane.net/',
     icons: {16:'brand/icon-16.png',32:'brand/icon-32.png',48:'brand/icon-48.png',128:'brand/icon-128.png'},
-    permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity', 'alarms', 'declarativeNetRequestWithHostAccess'],
+    permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity', 'alarms', 'declarativeNetRequestWithHostAccess', 'webRequest'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     host_permissions: ['https://*.nodelane.net/*',...sourceInstallation.requiredOrigins,
       ...(process.env.VITE_DRIVE_CONNECT_URL ? ['https://www.googleapis.com/*', new URL(process.env.VITE_DRIVE_CONNECT_URL).origin+'/*'] : []),

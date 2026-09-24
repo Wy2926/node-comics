@@ -1379,5 +1379,8 @@
   "提交反馈": "Envoyer mon avis",
   "请填写反馈内容。": "Veuillez saisir votre retour.",
   "有更新": "Nouveautés",
-  "新增 {0} 个条目，目录已自动同步": "{0} nouvelles entrées. Sommaire synchronisé automatiquement."
+  "新增 {0} 个条目，目录已自动同步": "{0} nouvelles entrées. Sommaire synchronisé automatiquement.",
+  "图片重定向无效或次数过多，请刷新来源页面后重试。": "La redirection de l’image est invalide ou trop longue. Actualisez la page source et réessayez.",
+  "图片网络请求失败，请检查连接或刷新来源页面后重试。": "La requête de l’image a échoué. Vérifiez la connexion ou actualisez la page source et réessayez.",
+  "图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。": "L’accès au domaine de l’image n’est pas autorisé. Faites un clic droit et choisissez à nouveau « Traduire la page actuelle » pour l’autoriser."
 }

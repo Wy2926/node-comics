@@ -4,13 +4,14 @@ import { validateCatalog } from './core/catalog';
 import { sameSource } from './core/identity';
 import { resolveSource } from './core/resolve';
 import { definitions } from './registry/definitions';
+import { comicSize } from './shared/dimensions';
 export type * from './contracts/definition';
 export type * from './contracts/source';
 export { pollSourceDiscovery } from './core/discovery';
 export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
 export {authorizeCatalogImport} from './runtime/import';
 export {listSupportedSites} from './registry/sites';
-export {readSourceImage} from './runtime/source-image';
+export {readSourceImage,readInlineSourceImage} from './runtime/source-image';
 export {recoverCatalogTabs} from './runtime/catalog-reader';
 export { sourceImage } from './runtime/image-fetch';
 export {
@@ -23,6 +24,7 @@ export {
 export { imageDataUrl, maxInlineBytes } from './shared/bytes';
 export { comicSize } from './shared/dimensions';
 export { isPageImageUrl, safeImageUrl } from './shared/urls';
+export {isImageReferrerPolicy} from './shared/referrer';
 export function createSourceService(registry: readonly SourceDefinition[]) {
   return {
     resolve: (url: string) => resolveSource(url, registry),
@@ -32,6 +34,13 @@ export function createSourceService(registry: readonly SourceDefinition[]) {
 }
 const service = createSourceService(definitions);
 export const sourceFor = service.resolve;
+/** Validate against the resolved source, never a caller-supplied adapter flag. */
+export function inlineImageSize(width:number,height:number,url:string) {
+  const {definition,location}=sourceFor(url);
+  if(!definition.capabilities.inline||location.kind!=='reader')return false;
+  return definition.id==='generic' ? comicSize(width,height)
+    : Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0;
+}
 export const sourceLocation = (url: string) => {
   try {
     return sourceFor(url).location;

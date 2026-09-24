@@ -6,7 +6,8 @@ export function translationNotice(state:TranslationState){
   let message=state.message;
   if(state.kind==='error'){
     const source=messageSource(state.message);
-    message=/核实|未知/.test(source)?msg("结果待核实")
+    message=/图片域名.*授权|网页与图片访问权限/.test(source)?msg('等待图片授权')
+      :/核实|未知/.test(source)?msg("结果待核实")
       :state.retryLabel?msg("加载失败")
       :/连接|网络|NETWORK|fetch/i.test(source)?msg("连接失败")
       :/原图|本地图片/.test(source)?msg("原图不可用")

@@ -20,12 +20,12 @@ export async function requestImagePermissions(origins: string[]) {
     throw Error(msg('图片域名未获授权；尚未开始下载，可再次授权。'));
 }
 export class ImagePermissionsRequired extends Error {
-  constructor() {
+  constructor(readonly origins:string[]) {
     super(msg('需要授权图片域名。点击“授权并继续”后开始下载，已发现链接已保留。'));
   }
 }
 export async function requireImagePermissions(urls: string[]) {
   const origins = imageOrigins(urls);
   if (origins.length && !(await chrome.permissions.contains({ origins })))
-    throw new ImagePermissionsRequired();
+    throw new ImagePermissionsRequired(origins);
 }

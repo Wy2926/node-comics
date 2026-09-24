@@ -1379,5 +1379,8 @@
   "提交反馈": "Gửi phản hồi",
   "请填写反馈内容。": "Vui lòng nhập nội dung phản hồi.",
   "有更新": "Có cập nhật",
-  "新增 {0} 个条目，目录已自动同步": "{0} mục mới. Mục lục đã tự động đồng bộ."
+  "新增 {0} 个条目，目录已自动同步": "{0} mục mới. Mục lục đã tự động đồng bộ.",
+  "图片重定向无效或次数过多，请刷新来源页面后重试。": "Chuyển hướng ảnh không hợp lệ hoặc có quá nhiều bước. Hãy tải lại trang nguồn và thử lại.",
+  "图片网络请求失败，请检查连接或刷新来源页面后重试。": "Yêu cầu tải ảnh thất bại. Hãy kiểm tra kết nối hoặc tải lại trang nguồn rồi thử lại.",
+  "图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。": "Chưa cấp quyền truy cập tên miền ảnh. Hãy nhấp chuột phải và chọn lại “Dịch trang hiện tại” để cấp quyền."
 }

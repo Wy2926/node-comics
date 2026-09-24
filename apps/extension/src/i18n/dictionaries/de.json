@@ -1379,5 +1379,8 @@
   "提交反馈": "Feedback senden",
   "请填写反馈内容。": "Bitte gib dein Feedback ein.",
   "有更新": "Aktualisiert",
-  "新增 {0} 个条目，目录已自动同步": "{0} neue Einträge. Inhaltsverzeichnis automatisch synchronisiert."
+  "新增 {0} 个条目，目录已自动同步": "{0} neue Einträge. Inhaltsverzeichnis automatisch synchronisiert.",
+  "图片重定向无效或次数过多，请刷新来源页面后重试。": "Die Bildumleitung ist ungültig oder hat zu viele Schritte. Laden Sie die Quellseite neu und versuchen Sie es erneut.",
+  "图片网络请求失败，请检查连接或刷新来源页面后重试。": "Die Bildanfrage ist fehlgeschlagen. Prüfen Sie die Verbindung oder laden Sie die Quellseite neu und versuchen Sie es erneut.",
+  "图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。": "Der Zugriff auf die Bilddomain wurde nicht erlaubt. Klicken Sie mit der rechten Maustaste und wählen Sie erneut „Aktuelle Seite übersetzen“, um ihn zu erlauben."
 }
