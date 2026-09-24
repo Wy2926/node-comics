@@ -9,6 +9,7 @@
 | `bootstrap.ps1` | 生成本地控制服务配置；`-Start` 启动 Docker，`-Production` 使用独立生产配置。见[后端说明](../backend/README.md) |
 | `database_backup.py` / `verify_database_restore.py` | 数据库备份与新库恢复演练。连接、隔离校验、PostgreSQL 客户端要求见[运维说明](../docs/OPERATIONS.md) |
 | `export_openapi.py` | 从当前后端导出机器契约，见[契约说明](../contracts/README.md) |
+| `remove-test-temporaries.ps1` | 默认只预览登录 / Drive 小窗口验收的隔离 profile、Drive 扩展副本及登录构建日志；加 `-Apply` 才删除。保留截图、结果报告、源码、配置及全部 `output/` 交付物；拒绝越界路径与链接目录 |
 
 Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带已安装的虚拟环境。默认后端回归使用[测试 Compose](../deploy/compose.tests.yaml)，不读取产品环境文件。单独运行运维工具前，按对应文档准备其配置。
 
@@ -24,6 +25,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_simple_reading.mjs` | 桌面单来源新基线：自动导入、散图拒绝、重复文件续读、120 页窗口、浏览器重启、格式解码、失败隔离、最近阅读时间、跨虚拟列表批量移除、设置对齐和来源账户展示；窄屏不在兼容范围 |
 | `verify_source_database_baseline.mjs` | 在隔离扩展 profile 中先创建残缺旧 v1 库，再验证新基线导入、阅读、重开且旧库不变；另检查当前基线缺表的明确错误，无未处理 Promise |
 | `verify_drive_import.mjs` | 新建隔离扩展 profile、专用 HTTPS 测试页与模拟 Google 服务，覆盖 CBZ 选择、直接阅读、索引失败和授权复用；`TEST_DRIVE_AUTH_MODE=chrome` 增加模拟 Chrome Identity、真实浏览器重启后的静默恢复和断开检查，不读取用户 Chrome 或真实云盘，真实授权边界见 [Drive 说明](../apps/drive-connect/README.md) |
+| `verify_login_popup.mjs` | 构建后的 Chrome 扩展、隔离 profile 与本机 TLS 模拟 OIDC / API；使用真实 `launchWebAuthFlow` 检查 600 × 760 登录窗口、主窗口标签不变、关闭取消、拒绝后重试、成功自动关闭、PKCE 交换及第 2 页阅读位置恢复。需 Python `cryptography`、自制 `pages.cbz` 和下方 Playwright / 浏览器变量；不访问真实身份服务 |
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
 | `verify_website_source_lifecycle.mjs` | 本机 TLS / 隔离 DNS 下操作真实网站嵌入按钮、直接阅读、来源标签页、按需取图和主动下载；重开并让图片源失败后已下载页仍可读 |
 | 插件 `tests/reader-window-fixture.html` | Vite 独立 5181 端口，30 章 × 120 页合成夹具；检查 3 章 / 11 页 DOM 上限、跳页、偏移恢复与失败；桌面目标浏览器检查截图及位置恢复 |

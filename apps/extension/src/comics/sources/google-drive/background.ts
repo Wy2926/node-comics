@@ -290,8 +290,14 @@ export function registerDriveBackground() {
         }
         assertActive();
         const id = crypto.randomUUID(), nonce = crypto.randomUUID() + crypto.randomUUID();
-        const tab = await chrome.tabs.create({url: 'about:blank', active: true});
-        if (tab.id === undefined) throw new DriveError('unavailable', '无法打开授权页面。');
+        // Keep authorization outside the reader's tab strip. The popup's tab still
+        // uses the same document-bound bridge and cancellation handling.
+        const popup = await chrome.windows.create({url: 'about:blank', type: 'popup', width: 1000, height: 800, focused: true});
+        const tab = popup?.tabs?.[0];
+        if (tab?.id === undefined) {
+          if (popup?.id !== undefined) await chrome.windows.remove(popup.id).catch(() => {});
+          throw new DriveError('unavailable', '无法打开授权页面。');
+        }
         try {
           assertActive();
           const pending: PendingDriveBridge = {id, nonce, tabId: tab.id, url: `${base}#state=${nonce}`, expiresAt: Date.now() + 10 * 60_000, expectedAccountId: message.expectedAccountId};

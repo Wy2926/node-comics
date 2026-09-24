@@ -127,10 +127,20 @@ try{
   };
   const select=async()=>{
     phase='open authorization';
+    const readerWindow=await reader.evaluate(()=>chrome.windows.getCurrent({populate:true}));
     assert.equal(await reader.getByRole('button',{name:'Google Drive',exact:true}).count(),0,'The bookshelf should expose one generic import entry.');
     await reader.getByRole('button',{name:'云盘',exact:true}).click();
     const opened=context.waitForEvent('page');await reader.getByRole('menuitem',{name:'Google Drive',exact:true}).click();const auth=await opened;
     await auth.waitForURL(url=>url.origin===bridge.origin&&url.pathname===bridge.pathname);
+    const windows=await worker.evaluate(()=>chrome.windows.getAll({populate:true}));
+    const popup=windows.find(window=>window.type==='popup');
+    assert(popup,'Drive selection must open a popup window');
+    assert.notEqual(popup.id,readerWindow.id);
+    assert.equal(popup.tabs.length,1);
+    assert.deepEqual(windows.find(window=>window.id===readerWindow.id).tabs.map(tab=>tab.id),readerWindow.tabs.map(tab=>tab.id),'Opening Drive must not add a tab to the reader window');
+    // Playwright's fixed viewport overrides window bounds; inspect the page at
+    // the popup's actual content size as well as checking its native window type.
+    await auth.setViewportSize({width:1000,height:720});
     phase='authorization ready';
     // A reused or Chrome-managed connection opens Picker automatically. Only a fresh
     // web authorization needs the button that launches GIS from a user gesture.
@@ -138,7 +148,10 @@ try{
       await auth.waitForFunction(()=>!document.getElementById('connect')?.disabled,{},{timeout:15000});await noReaderError();
       phase='pick and deliver';await auth.locator('#connect').click();
     }
-    await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();await auth.close();
+    await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();
+    assert(await auth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Popup content must fit without horizontal scrolling');
+    await auth.screenshot({path:path.join(run,'drive-popup.png')});
+    await worker.evaluate(id=>chrome.windows.remove(id),popup.id);
   };
   if(nativeMode){
     cancelPicker=true;await select();await reader.getByRole('alert').waitFor();cancelPicker=false;
@@ -150,6 +163,7 @@ try{
   checks.push('An account-only selection saves its verified name and email even with zero imported files');
   chosenFile='fixture-page';const initialPickers=stats.pickers;
   await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,initialPickers+1);
+  checks.push('Drive opens in a separate popup without adding a tab to the reader window');
   checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
   phase='decode original';await reader.waitForFunction(([width,height])=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===width&&image.naturalHeight===height;},dimensions,{timeout:15000});
   await noReaderError();assert(stats.rangeReads>0);await reader.screenshot({path:path.join(run,'reader.png')});checks.push('Confirmed Drive reference is registered and the real reader decodes the synthetic original through authenticated Range reads');

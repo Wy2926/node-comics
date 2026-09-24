@@ -35,6 +35,8 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 ## 撤销与并发行为
 
+插件登录保留浏览器原生 `identity.launchWebAuthFlow` 和既有 OIDC 回调，在授权期间将新开的身份服务弹出窗口调整为 600 × 760，不占主窗口标签栏。完成授权后由浏览器自动关闭；手动关闭可重试，清理本次登录上下文与窗口监听。网页阅读器仍使用原页面跳转。
+
 插件退出登录清除本机账户会话，身份服务的浏览器 SSO 会话仍可能存在。插件与网页阅读器主动登录统一请求 `openid profile offline_access` 和 `prompt=login consent`，允许输入其他账户并授权自动续期；不触发其他应用的全局退出。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
 
 ### 客户端会话与续期（2026-09-20）

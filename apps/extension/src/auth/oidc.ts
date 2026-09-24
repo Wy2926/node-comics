@@ -2,6 +2,7 @@ import {msg} from '../i18n/runtime';
 import { Api } from '../api';
 import type { User } from '../types';
 import {secureIdentityUrl,tokenLifetime,type Session} from './model';
+import {launchLoginWindow} from './auth-window';
 export interface AuthConfig { mode: 'development'|'oidc'; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
 interface Pending { state:string; verifier:string; redirect:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
 const KEY='nc-oidc-pending';
@@ -48,6 +49,15 @@ export async function startOidc(config:AuthConfig,apiBase:string):Promise<Sessio
   // sign-in must let the reader enter another account instead of reusing it.
   const scopes=[...new Set(['openid','profile','offline_access',...config.scopes.split(/\s+/).filter(Boolean)])].join(' ');
   authorization.search=new URLSearchParams({response_type:'code',client_id:config.client_id,redirect_uri:redirect,scope:scopes,prompt:'login consent',state,code_challenge:challenge,code_challenge_method:'S256',...(config.audience?{resource:config.audience,audience:config.audience}:{})}).toString();
-  if(extension){const callback=await chrome.identity.launchWebAuthFlow({url:authorization.href,interactive:true});if(!callback)throw Error(msg("登录窗口已关闭。"));return exchange(callback,pending);}
+  if(extension){
+    try {
+      const callback=await launchLoginWindow(authorization.href);
+      if(!callback)throw Error(msg("登录窗口已关闭。"));
+      return await exchange(callback,pending);
+    } catch(error) {
+      if(error instanceof Error&&/user did not approve|user (?:cancelled|canceled)|window (?:was )?closed/i.test(error.message))throw Error(msg("登录窗口已关闭。"));
+      throw error;
+    } finally {sessionStorage.removeItem(KEY);}
+  }
   location.assign(authorization.href);return null;
 }

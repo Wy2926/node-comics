@@ -2,6 +2,8 @@
 
 这是独立 HTTPS 静态页面源码，承载 Google Picker 和网页授权，不在扩展页加载远程 SDK。Chrome 可使用浏览器托管授权，Edge / Firefox 保留 GIS token model；两种方式都需要此选文件页面。未设置页面地址的构建默认关闭 Drive 入口。
 
+插件在独立的 1000 × 800 弹出窗口中打开此页，不占阅读器所在主窗口的标签栏。关闭窗口会取消尚未完成的选择；授权桥仍按窗口内的 tab 与具体文档校验来源。
+
 截至 2026-09-23，两种模式已通过模拟 Google 服务的隔离 Chrome 浏览器回归。此前用户确认网页授权后实际文件“已导入并能阅读”，本次交付后反馈当前流程恢复正常；真实账户重启恢复和长期续期尚未单独确认。模拟 Identity API 的成功不等于真实 Google 长期续期通过。
 
 2026-09-24 发布配置使用固定地址 `https://comics.nodelane.net/drive-connect/index.html`，插件 0.1.1 写入该地址和既有 Chrome OAuth client。已核对 Web OAuth 来源包含正式域名，并将 Picker key 的网站限制设置为 `https://comics.nodelane.net/*` 与 `https://docs.google.com/*`，API 限定 Drive 与 Picker。部署及线上验证状态见 [VPS 部署记录](../../docs/VPS_DEPLOYMENT.md)。

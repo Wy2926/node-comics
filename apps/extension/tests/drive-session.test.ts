@@ -50,8 +50,11 @@ beforeEach(() => {
       set: vi.fn(async (values: Reply) => { Object.assign(session, structuredClone(values)); }),
       remove: vi.fn(async (key: string) => { delete session[key]; }),
     }},
+    windows: {
+      create: vi.fn(async ({url}: {url: string}) => { const tab = {id: ++tabId, url}; tabs.set(tab.id, tab); return {id: tab.id, tabs: [tab]}; }),
+      remove: vi.fn(async (id: number) => { tabs.delete(id); }),
+    },
     tabs: {
-      create: vi.fn(async ({url}: {url: string}) => { const tab = {id: ++tabId, url}; tabs.set(tab.id, tab); return tab; }),
       update: vi.fn(async (id: number, patch: {url: string}) => Object.assign(tabs.get(id)!, patch)),
       remove: vi.fn(async (id: number) => { tabs.delete(id); }),
       get: vi.fn(async (id: number) => tabs.get(id)),
@@ -72,7 +75,7 @@ describe('trusted Drive session reuse', () => {
     const result=await send({type:'NC_DRIVE_ACCOUNTS'});
     expect(result).toEqual({ok:true,accounts:[{account:publicAccount,status:'connected'}]});
     expect(JSON.stringify(result)).not.toMatch(/private-valid-token|native-generation|hidden-extra/);
-    expect(api.account).not.toHaveBeenCalled();expect(native.token).not.toHaveBeenCalled();expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(api.account).not.toHaveBeenCalled();expect(native.token).not.toHaveBeenCalled();expect(chrome.windows.create).not.toHaveBeenCalled();
     expect(await send({type:'NC_DRIVE_ACCOUNTS'},{...extensionSender,url:'https://untrusted.example'})).toMatchObject({ok:false,code:'invalid-bridge'});
     await send({type:'NC_DRIVE_DISCONNECT',accountId:account.id});
     expect(await send({type:'NC_DRIVE_ACCOUNTS'})).toEqual({ok:true,accounts:[]});
@@ -367,11 +370,11 @@ describe('Chrome-managed Drive authorization', () => {
     expect(Object.keys(session).some(key => key.startsWith('nc-drive-pending:'))).toBe(false);
   });
 
-  it.each(['tab-create', 'pending-write', 'tab-navigation'] as const)('cleans up a connection cancelled while its %s is pending', async stage => {
+  it.each(['popup-create', 'pending-write', 'tab-navigation'] as const)('cleans up a connection cancelled while its %s is pending', async stage => {
     let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }), paused = vi.fn();
-    if (stage === 'tab-create') {
-      const create = vi.mocked(chrome.tabs.create), original = create.getMockImplementation() as unknown as (values: chrome.tabs.CreateProperties) => Promise<chrome.tabs.Tab>;
-      create.mockImplementationOnce(async values => { const tab = await original(values); paused(); await wait; return tab; });
+    if (stage === 'popup-create') {
+      const create = vi.mocked(chrome.windows.create), original = create.getMockImplementation() as unknown as (values?: chrome.windows.CreateData) => Promise<chrome.windows.Window>;
+      create.mockImplementationOnce(async values => { const popup = await original(values); paused(); await wait; return popup; });
     } else if (stage === 'pending-write') {
       const set = vi.mocked(chrome.storage.session.set), original = set.getMockImplementation() as unknown as (values: Reply) => Promise<void>;
       set.mockImplementation(async values => {
