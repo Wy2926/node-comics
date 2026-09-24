@@ -9,10 +9,6 @@ export default defineConfig({
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
   // WXT loads .env files after importing this config; resolve permissions afterwards.
   manifest: ({browser}) => ({
-    ...(browser === 'chrome' && process.env.VITE_GOOGLE_CHROME_CLIENT_ID ? {oauth2: {
-      client_id: process.env.VITE_GOOGLE_CHROME_CLIENT_ID,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
-    }} : {}),
     browser_specific_settings: {
       gecko: {
         id: 'comics@nodelane.net',

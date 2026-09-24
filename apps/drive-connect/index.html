@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://ssl.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; frame-src https://accounts.google.com https://docs.google.com; connect-src https://accounts.google.com https://www.googleapis.com; img-src 'self' https://*.googleusercontent.com https://*.gstatic.com; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
   <title>连接 Google Drive · NodeLane Comics</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="stylesheet" href="/design-tokens.css">
@@ -49,7 +49,7 @@
           <button id="connect" class="button" type="button" aria-describedby="connection-info" disabled>连接账户并选择文件</button>
           <button id="reconnect" class="button secondary" type="button" aria-describedby="connection-info" disabled>切换 / 重新连接账户</button>
         </div>
-        <p id="connection-info">已有有效连接时会直接打开文件选择器。</p>
+        <p id="connection-info">已连接过的账户再次进入时会自动前往 Google。</p>
         <div class="notice">
           <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/></svg>
           <div><h3>只读取你选择的漫画</h3><p>Google 的“所选文件”权限也包含修改能力。本应用仅实现读取，不会修改或删除云盘文件。</p></div>

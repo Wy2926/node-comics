@@ -24,5 +24,5 @@ export async function installDriveBridge() {
   };
   window.addEventListener('message', listener);
   const timeout = setTimeout(() => window.removeEventListener('message', listener), Math.max(0, ready.expiresAt - Date.now()));
-  window.postMessage({type: 'NC_DRIVE_READY', nonce: ready.nonce, oauthRedirect: ready.oauthRedirect === true, ...(ready.authMode === 'chrome' ? {authMode: 'chrome'} : {}), ...(ready.session ? {session: ready.session} : {})}, origin);
+  window.postMessage({type: 'NC_DRIVE_READY', nonce: ready.nonce, oauthRedirect: ready.oauthRedirect === true, autoRedirect: ready.autoRedirect === true}, origin);
 }

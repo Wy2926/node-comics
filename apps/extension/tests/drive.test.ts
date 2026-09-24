@@ -131,7 +131,7 @@ describe('Drive metadata and authority', () => {
 });
 describe('dedicated authorization bridge', () => {
   const nonce = 'c3c74259-6c74-4774-8f9b-c60c945dfc0c';
-  const pending: PendingDriveBridge = {id:'operation', nonce, tabId:42, url:`https://trusted.example/drive-connect/index.html#state=${nonce}`, expiresAt:2000, documentId:'document'};
+  const pending: PendingDriveBridge = {id:'operation', nonce, tabId:42, url:`https://trusted.example/drive-connect/index.html#state=${nonce}`, expiresAt:2000, documentId:'document', oauth:{state:'oauth-state',phase:'returned'}};
   const sender: chrome.runtime.MessageSender = {id:'extension', frameId:0, tab:{id:42} as chrome.tabs.Tab, url:pending.url, documentId:'document'};
   it('accepts only the exact active top-level tab document', () => {
     expect(() => validateBridgeSender(pending,sender,'extension',pending.url,1000)).not.toThrow();
@@ -149,11 +149,11 @@ describe('dedicated authorization bridge', () => {
     expect(() => validateBridgeSender(pending,sender,'extension',pending.url,2000)).toThrow();
   });
   it('accepts only bounded identifiers and drops picker download URLs and claimed account IDs', () => {
-    const result = parseBridgePayload({nonce,accessToken:'private-session-token',expiresIn:3600,accountId:'untrusted',files:[{fileId:'file-1',downloadUrl:'https://evil.example/private'},{fileId:'file-1'}]},pending);
+    const result = parseBridgePayload({nonce,oauthState:'oauth-state',accessToken:'private-session-token',expiresIn:3600,accountId:'untrusted',files:[{fileId:'file-1',downloadUrl:'https://evil.example/private'},{fileId:'file-1'}]},pending);
     expect(result.files).toEqual([{fileId:'file-1',resourceKey:undefined}]);
     expect(result).not.toHaveProperty('accountId');
-    expect(() => parseBridgePayload({...result,nonce:'other'},pending)).toThrow();
-    expect(() => parseBridgePayload({...result,files:[{fileId:'../../other'}]},pending)).toThrow();
-    expect(() => parseBridgePayload({...result,files:Array.from({length:101},()=>({fileId:'file'}))},pending)).toThrow();
+    expect(() => parseBridgePayload({...result,oauthState:'oauth-state',nonce:'other'},pending)).toThrow();
+    expect(() => parseBridgePayload({...result,oauthState:'oauth-state',files:[{fileId:'../../other'}]},pending)).toThrow();
+    expect(() => parseBridgePayload({...result,oauthState:'oauth-state',files:Array.from({length:101},()=>({fileId:'file'}))},pending)).toThrow();
   });
 });

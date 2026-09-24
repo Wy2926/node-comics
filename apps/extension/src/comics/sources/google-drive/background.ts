@@ -2,20 +2,15 @@ import {driveBridgeUrl} from './config';
 import {DriveError} from './errors';
 import {fetchDriveAccount, fetchDriveMetadata, validDriveIdentifier, type DriveAccount, type DriveFileMetadata} from './metadata';
 import {parseBridgePayload, validateBridgeSender, type PendingDriveBridge} from './bridge-protocol';
-import {chromeDriveAvailable, requestChromeDriveToken} from './chrome-auth';
 
 const pendingKey = (tabId: number) => `nc-drive-pending:${tabId}`;
 const resultKey = (id: string) => `nc-drive-result:${id}`;
 const tokenKey = (id: string) => `nc-drive-token:${id}`;
-const chromeConnectionKey = (id: string) => `nc-drive-chrome-connection:${id}`;
-interface ChromeConnection { account: DriveAccount; generation: string; }
-interface DriveToken { accessToken: string; expiresAt: number; account: DriveAccount; generation: string; provider?: 'chrome'; }
-async function reusableToken(accountId?: string): Promise<DriveToken | undefined> {
-  const session = accountId ? {[tokenKey(accountId)]: await read<DriveToken>(tokenKey(accountId))} : await chrome.storage.session.get(null);
-  return Object.entries(session).filter(([key]) => key.startsWith('nc-drive-token:')).map(([, value]) => value as DriveToken | undefined)
-    .filter((token): token is DriveToken => !!token && token.expiresAt > Date.now() + 30_000 && typeof token.accessToken === 'string' && !!token.generation && validDriveIdentifier(token.account?.id))
-    .sort((a, b) => b.expiresAt - a.expiresAt)[0];
-}
+const connectionKey = (id: string) => `nc-drive-connection:${id}`;
+interface DriveConnection { account: DriveAccount; generation: string; }
+interface DriveToken extends DriveConnection { accessToken: string; expiresAt: number; }
+const validConnection = (key: string, value: DriveConnection | undefined): value is DriveConnection =>
+  !!value && validDriveIdentifier(value.account?.id) && key === connectionKey(value.account.id) && typeof value.generation === 'string' && !!value.generation;
 function extensionSender(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && !!sender.url?.startsWith(chrome.runtime.getURL(''));
 }
@@ -47,67 +42,14 @@ export function registerDriveBackground() {
   };
   const invalidateTab = (tabId: number) => { if (tabEpochs.has(tabId)) tabEpochs.set(tabId, tabEpochs.get(tabId)! + 1); };
   let authorizationEpoch = 0;
-  let disconnecting = 0, nativeEpoch = 0, replacingNative = 0;
-  const replacementVersions = new Map<string, number>();
-  let nativeWrites: Promise<unknown> = Promise.resolve();
-  const writeNative = <T>(action: () => Promise<T>): Promise<T> => {
-    const result = nativeWrites.then(action);
-    nativeWrites = result.catch(() => {});
+  let disconnecting = 0;
+  // Serialize verified connection writes and explicit disconnects. Only account
+  // metadata persists across restarts; OAuth credentials remain in trusted session storage.
+  let connectionWrites: Promise<unknown> = Promise.resolve();
+  const writeConnection = <T>(action: () => Promise<T>): Promise<T> => {
+    const result = connectionWrites.then(action);
+    connectionWrites = result.catch(() => {});
     return result;
-  };
-  const nativeRequests = new Map<string, Promise<DriveToken>>();
-  const readChromeConnection = async (id: string): Promise<ChromeConnection | undefined> => {
-    const value = (await chrome.storage.local.get(chromeConnectionKey(id)))[chromeConnectionKey(id)] as ChromeConnection | undefined;
-    return value?.account?.id === id && typeof value.generation === 'string' ? value : undefined;
-  };
-  const chromeToken = (accountId: string | undefined, interactive: boolean): Promise<DriveToken> => {
-    const requestKey = `${authorizationEpoch}:${nativeEpoch}:${interactive}:${accountId ?? ''}`;
-    const running = nativeRequests.get(requestKey);
-    if (running) return running;
-    const request = (async () => {
-      const capturedEpoch = authorizationEpoch;
-      const capturedNativeEpoch = nativeEpoch;
-      const assertActive = () => {
-        if (disconnecting || replacingNative || capturedEpoch !== authorizationEpoch || capturedNativeEpoch !== nativeEpoch)
-          throw new DriveError('reconnect-required', 'Google Drive 连接已变化，请重新连接。');
-      };
-      assertActive();
-      const previous = accountId ? await readChromeConnection(accountId) : undefined;
-      // Persist only the user's connection choice, never an OAuth credential. A disconnect
-      // must remain effective across browser restarts even if Chrome retains its grant.
-      if (!interactive && !previous) throw new DriveError('reconnect-required', '请先连接 Google Drive。');
-      const credential = await requestChromeDriveToken(interactive, accountId);
-      assertActive();
-      return writeNative(async () => {
-      assertActive();
-      const current = await readChromeConnection(credential.account.id);
-      assertActive();
-      if (!interactive && current?.generation !== previous?.generation)
-        throw new DriveError('reconnect-required', 'Google Drive 连接已变化，请重新打开文档。');
-      const connection: ChromeConnection = {account: credential.account, generation: current?.generation ?? crypto.randomUUID()};
-      const token: DriveToken = {...credential, generation: connection.generation, provider: 'chrome',
-        // This is a short lease for the Picker bridge, not Google's token expiry.
-        // Every reading request goes back to Chrome's expiry-aware token cache.
-        expiresAt: Date.now() + 5 * 60_000};
-      try {
-        if (!current) await chrome.storage.local.set({[chromeConnectionKey(credential.account.id)]: connection});
-        assertActive();
-        await chrome.storage.session.set({[tokenKey(credential.account.id)]: token});
-        assertActive();
-        return token;
-      } catch (error) {
-        const stored = await read<DriveToken>(tokenKey(credential.account.id));
-        if (stored?.provider === 'chrome' && stored.generation === token.generation && stored.accessToken === token.accessToken)
-          await chrome.storage.session.remove(tokenKey(credential.account.id));
-        if (!current && (await readChromeConnection(credential.account.id))?.generation === connection.generation)
-          await chrome.storage.local.remove(chromeConnectionKey(credential.account.id));
-        throw error;
-      }
-      });
-    })();
-    nativeRequests.set(requestKey, request);
-    void request.finally(() => { if (nativeRequests.get(requestKey) === request) nativeRequests.delete(requestKey); }).catch(() => {});
-    return request;
   };
   void chrome.storage.session.setAccessLevel?.({accessLevel: 'TRUSTED_CONTEXTS'});
   chrome.tabs.onRemoved.addListener(tabId => {
@@ -179,7 +121,7 @@ export function registerDriveBackground() {
             include_granted_scopes: 'false', prompt: 'consent select_account', trigger_onepick: 'true',
             allow_multiple: 'true', state}).toString();
           pending.oauth = {state, phase: 'away'};
-          delete pending.documentId; delete pending.initialized; delete pending.reusedToken;
+          delete pending.documentId; delete pending.initialized;
           await chrome.storage.session.set({[pendingKey(pending.tabId)]: pending});
           assertActive();
           return {ok: true, state, url: authorize.href, expiresAt: pending.expiresAt};
@@ -201,21 +143,26 @@ export function registerDriveBackground() {
         if (pending.oauth?.phase === 'away') throw new DriveError('invalid-bridge', '授权页面已失效。');
         initializing.add(pending.id);
         try {
-          const token = pending.oauth ? undefined : await reusableToken(pending.expectedAccountId);
+          await connectionWrites;
+          const [connections, session] = await Promise.all([chrome.storage.local.get(null), chrome.storage.session.get(null)]);
+          const expectedAccount = (id: string) => !pending.expectedAccountId || id === pending.expectedAccountId;
+          const remembered = Object.entries(connections).some(([key, value]) =>
+            validConnection(key, value as DriveConnection) && expectedAccount((value as DriveConnection).account.id));
+          const connected = Object.entries(session).some(([key, value]) => {
+            const token = value as DriveToken | undefined;
+            return validDriveIdentifier(token?.account?.id) && key === tokenKey(token.account.id) &&
+              expectedAccount(token.account.id) && !!token.generation && typeof token.accessToken === 'string' && token.expiresAt > Date.now();
+          });
+          const autoRedirect = !pending.oauth && (remembered || connected);
           const current = await pendingSender(sender);
           assertActive();
           if (current.id !== pending.id || current.initialized) throw new DriveError('invalid-bridge', '授权页面已失效。');
           pending.documentId = sender.documentId; pending.initialized = true;
-          if (token) pending.reusedToken = {accountId: token.account.id, generation: token.generation, expiresAt: token.expiresAt, accessToken: token.accessToken};
           await chrome.storage.session.set({[pendingKey(pending.tabId)]: pending});
           await pendingSender(sender);
-          const latest = token && await read<DriveToken>(tokenKey(token.account.id));
           assertActive();
-          const reusable = token && latest?.accessToken === token.accessToken && latest.generation === token.generation &&
-            (token.provider === 'chrome' ? latest.expiresAt >= token.expiresAt : latest.expiresAt === token.expiresAt) && token.expiresAt > Date.now() + 30_000;
-          // Credentials stay in trusted session storage and this exact document's one-use bridge.
-          return {ok: true, nonce: pending.nonce, expiresAt: pending.expiresAt, oauthRedirect: true, ...(token?.provider === 'chrome' ? {authMode: 'chrome'} : {}),
-            ...(reusable ? {session: {accessToken: token.accessToken, expiresAt: token.expiresAt, displayName: token.account.displayName}} : {})};
+          // The page receives a navigation hint, never a cached access token.
+          return {ok: true, nonce: pending.nonce, expiresAt: pending.expiresAt, oauthRedirect: true, autoRedirect};
         } catch (error) {
           await failPending(pending, error instanceof DriveError ? error : new DriveError('unavailable', 'Google Drive 连接未完成，请重新尝试。'));
           throw error;
@@ -237,18 +184,13 @@ export function registerDriveBackground() {
         const receivedAt = Date.now();
         // Consume before doing network I/O. A replay cannot issue a second import or replace the token.
         pending.consumed = true;
-        let committedToken: DriveToken | undefined, keptExistingToken = false;
-        let replacedConnection: ChromeConnection | undefined, replacementEpoch: number | undefined, replacementVersion: number | undefined;
         try {
           await chrome.storage.session.set({[pendingKey(pending.tabId)]: pending});
           assertActive();
           const signal = AbortSignal.timeout(30_000);
           const account = await fetchDriveAccount(payload.accessToken, signal);
           if (pending.expectedAccountId && account.id !== pending.expectedAccountId) throw new DriveError('account-mismatch', '请选择原来连接的 Google Drive 账户。');
-          const reused = pending.reusedToken?.accessToken === payload.accessToken ? pending.reusedToken : undefined;
           const existing = await read<DriveToken>(tokenKey(account.id));
-          if (reused && (reused.accountId !== account.id || existing?.generation !== reused.generation || existing.accessToken !== payload.accessToken || existing.expiresAt <= Date.now()))
-            throw new DriveError('reconnect-required', 'Google Drive 连接已变化或过期，请重新连接。');
           // A returned access token cannot renew itself by claiming a fresh relative lifetime.
           const sameToken = existing?.accessToken === payload.accessToken ? existing : undefined;
           const expiresAt = sameToken ? sameToken.expiresAt : receivedAt + payload.expiresIn * 1000 - 30_000;
@@ -267,70 +209,64 @@ export function registerDriveBackground() {
           }
           assertActive();
           if (expiresAt <= Date.now()) throw new DriveError('reconnect-required', 'Google Drive 连接已变化或过期，请重新连接。');
-          const token: DriveToken = {accessToken: payload.accessToken, expiresAt, account, generation: sameToken?.generation ?? crypto.randomUUID(),
-            ...(sameToken?.provider === 'chrome' ? {provider: 'chrome' as const} : {})};
-          if (chromeDriveAvailable() && token.provider !== 'chrome') {
-            // Explicitly choosing a web account must not silently switch it back on restart.
-            replacingNative++; replacementEpoch = ++nativeEpoch;
-            replacementVersion = (replacementVersions.get(account.id) ?? 0) + 1;
-            replacementVersions.set(account.id, replacementVersion);
-            await nativeWrites;
+          await writeConnection(async () => {
             assertActive();
-            replacedConnection = await readChromeConnection(account.id);
-            await chrome.storage.local.remove(chromeConnectionKey(account.id));
+            if (expiresAt <= Date.now() || pending.expiresAt <= Date.now()) throw new DriveError('reconnect-required', 'Google Drive 授权已过期，请重新连接。');
+            const key = connectionKey(account.id);
+            const previousConnection = (await chrome.storage.local.get(key))[key] as DriveConnection | undefined;
+            const previousToken = await read<DriveToken>(tokenKey(account.id));
             assertActive();
-          }
-          committedToken = token; keptExistingToken = !!sameToken;
-          await chrome.storage.session.set({[tokenKey(account.id)]: token,
-            [resultKey(pending.id)]: {ok: true, account, files, expiresAt: pending.expiresAt}});
-          assertActive();
-          await chrome.storage.session.remove(pendingKey(pending.tabId));
-          assertActive();
+            if (previousToken?.generation !== existing?.generation || previousToken?.accessToken !== existing?.accessToken)
+              throw new DriveError('reconnect-required', 'Google Drive 连接已更新，请重新连接。');
+            const token: DriveToken = {accessToken: payload.accessToken, expiresAt, account, generation: sameToken?.generation ?? crypto.randomUUID()};
+            try {
+              await chrome.storage.local.set({[key]: {account, generation: token.generation} satisfies DriveConnection});
+              assertActive();
+              await chrome.storage.session.set({[tokenKey(account.id)]: token,
+                [resultKey(pending.id)]: {ok: true, account, files, expiresAt: pending.expiresAt}});
+              assertActive();
+              await chrome.storage.session.remove(pendingKey(pending.tabId));
+              assertActive();
+            } catch (error) {
+              // Roll back before a queued disconnect can finish, including writes
+              // that were already in flight when navigation invalidated the bridge.
+              if (previousConnection && capturedEpoch === authorizationEpoch) await chrome.storage.local.set({[key]: previousConnection});
+              else await chrome.storage.local.remove(key);
+              if (previousToken && capturedEpoch === authorizationEpoch) await chrome.storage.session.set({[tokenKey(account.id)]: previousToken});
+              else await chrome.storage.session.remove(tokenKey(account.id));
+              throw error;
+            }
+          });
           // Finish the bridge before closing, so onRemoved cannot cancel the saved selection.
           if (files.length) await chrome.tabs.remove(pending.tabId).catch(() => {});
           return {ok: true};
         } catch (error) {
-          // A storage write already in flight when the tab is cancelled must not restore credentials.
-          if (committedToken && (!keptExistingToken || capturedEpoch !== authorizationEpoch)) {
-            const stored = await read<DriveToken>(tokenKey(committedToken.account.id));
-            if (stored?.generation === committedToken.generation && stored.accessToken === committedToken.accessToken)
-              await chrome.storage.session.remove(tokenKey(committedToken.account.id));
-          }
-          const restore = replacedConnection;
-          if (restore) await writeNative(async () => {
-            if (capturedEpoch !== authorizationEpoch || replacementVersion !== replacementVersions.get(restore.account.id)) return;
-            await chrome.storage.local.set({[chromeConnectionKey(restore.account.id)]: restore});
-            if (capturedEpoch !== authorizationEpoch && (await readChromeConnection(restore.account.id))?.generation === restore.generation)
-              await chrome.storage.local.remove(chromeConnectionKey(restore.account.id));
-          });
           await chrome.storage.session.remove(pendingKey(pending.tabId));
           await chrome.storage.session.set({[resultKey(pending.id)]: {...errorResult(error), expiresAt: pending.expiresAt}});
           return errorResult(error);
         } finally {
-          if (replacementEpoch !== undefined) { replacingNative--; nativeEpoch++; }
           consuming.delete(pending.id);
         }
       }
       if (!extensionSender(sender)) throw new DriveError('invalid-bridge', '请通过插件页面连接 Google Drive。');
       if (message.type === 'NC_DRIVE_ACCOUNTS') {
         const epoch=authorizationEpoch;
-        await nativeWrites;
+        await connectionWrites;
         const [local,session]=await Promise.all([chrome.storage.local.get(null),chrome.storage.session.get(null)]);
-        if(disconnecting||replacingNative||epoch!==authorizationEpoch)throw new DriveError('reconnect-required','Google Drive 连接已变化，请重新连接。');
+        if(disconnecting||epoch!==authorizationEpoch)throw new DriveError('reconnect-required','Google Drive 连接已变化，请重新连接。');
         // Return a strict public projection, never token records, grants or browser profile accounts.
         const accounts=new Map<string,{account:DriveAccount;status:'connected'|'reauth-required'}>();
         const display=(value:DriveAccount):DriveAccount=>({id:value.id,displayName:typeof value.displayName==='string'?value.displayName.slice(0,256):'Google Drive',
           ...(typeof value.emailAddress==='string'&&value.emailAddress?{emailAddress:value.emailAddress.slice(0,320)}:{})});
         for(const [key,value] of Object.entries(local)) {
-          const connection=value as ChromeConnection|undefined;
-          if(!key.startsWith('nc-drive-chrome-connection:')||!validDriveIdentifier(connection?.account?.id)||key!==chromeConnectionKey(connection.account.id)||!connection.generation)continue;
-          accounts.set(connection.account.id,{account:display(connection.account),status:chromeDriveAvailable()?'connected':'reauth-required'});
+          const connection=value as DriveConnection|undefined;
+          if(!validConnection(key,connection))continue;
+          accounts.set(connection.account.id,{account:display(connection.account),status:'reauth-required'});
         }
         for(const [key,value] of Object.entries(session)) {
           const token=value as DriveToken|undefined;
           if(!key.startsWith('nc-drive-token:')||!validDriveIdentifier(token?.account?.id)||key!==tokenKey(token.account.id)||!token.generation)continue;
-          if(token.provider==='chrome'&&!accounts.has(token.account.id))continue;
-          const connected=token.provider==='chrome'&&chromeDriveAvailable()||typeof token.accessToken==='string'&&Number.isFinite(token.expiresAt)&&token.expiresAt>Date.now();
+          const connected=typeof token.accessToken==='string'&&Number.isFinite(token.expiresAt)&&token.expiresAt>Date.now();
           accounts.set(token.account.id,{account:display(token.account),status:connected?'connected':'reauth-required'});
         }
         return {ok:true,accounts:[...accounts.values()]};
@@ -343,11 +279,6 @@ export function registerDriveBackground() {
         const assertActive = () => {
           if (disconnecting || capturedEpoch !== authorizationEpoch) throw new DriveError('cancelled', 'Google Drive 连接已取消。');
         };
-        assertActive();
-        if (chromeDriveAvailable()) {
-          const existing = await reusableToken(message.expectedAccountId);
-          if (!existing || existing.provider === 'chrome') await chromeToken(message.expectedAccountId, true);
-        }
         assertActive();
         const id = crypto.randomUUID(), nonce = crypto.randomUUID() + crypto.randomUUID();
         // Keep authorization outside the reader's tab strip. The popup's tab still
@@ -387,10 +318,7 @@ export function registerDriveBackground() {
         const capturedEpoch = authorizationEpoch;
         if (disconnecting) throw new DriveError('reconnect-required', 'Google Drive 正在断开连接。');
         const key = tokenKey(message.accountId);
-        let token = await read<DriveToken>(key);
-        if (chromeDriveAvailable() && (token?.provider === 'chrome' || await readChromeConnection(message.accountId))) {
-          token = await chromeToken(message.accountId, false);
-        }
+        const token = await read<DriveToken>(key);
         if (capturedEpoch !== authorizationEpoch) throw new DriveError('reconnect-required', 'Google Drive 连接已断开，请重新连接。');
         if (!token || token.expiresAt <= Date.now()) {
           if (token) await chrome.storage.session.remove(key);
@@ -403,13 +331,10 @@ export function registerDriveBackground() {
         if (!validDriveIdentifier(message.accountId)) throw new DriveError('invalid-bridge', '无效的账户标识。');
         authorizationEpoch++; disconnecting++;
         try {
-        await nativeWrites;
-        const previousToken = await read<DriveToken>(tokenKey(message.accountId));
-        if (chromeDriveAvailable()) {
-          await chrome.storage.local.remove(chromeConnectionKey(message.accountId));
-          if (previousToken?.provider === 'chrome') await chrome.identity.removeCachedAuthToken({token: previousToken.accessToken}).catch(() => {});
-        }
-        await chrome.storage.session.remove(tokenKey(message.accountId));
+        await writeConnection(async () => {
+          await chrome.storage.local.remove(connectionKey(message.accountId));
+          await chrome.storage.session.remove(tokenKey(message.accountId));
+        });
         const session = await chrome.storage.session.get(null);
         for (const [key, value] of Object.entries(session)) {
           if (key.startsWith('nc-drive-pending:')) {

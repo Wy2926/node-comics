@@ -2,6 +2,15 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 各浏览器统一 Google 跳转与自动进入
+
+- Chrome、Edge、Firefox 统一 Web OAuth 顶层选文件，删除 Chrome 托管授权、内嵌 Picker 与扩展 OAuth client 配置。已核验连接保存本机账户资料，再次进入与浏览器重启后自动前往 Google；取消停留、断开清除记录，凭据仍只在可信 session 内保存。
+- 已重新核对 OpenResty 实际目录与挂载，在 `/opt/1panel/www/sites/comics-drive-connect/` 备份后原子替换 `connect.js`、`index.html`、`config.js`。备份目录 `/opt/nodelane/node-comics/drive-unified-20260924T143414Z/backup/`；保留原 Web client ID，移除不再使用的公开 API key / appId 字段。CSS、代理配置哈希不变。
+- 三个公网资源 HTTP 200、内容哈希与部署源一致，保留 `no-store, no-transform` 与 `nosniff`。脚本 SHA-256 为 `6966af3682d565f2d38f37a15e6d2bc85d0cf459a7c431d96b7719b499546ca0`。报告位于本机忽略目录 `artifacts/drive-oauth-deploy/unified-result.json`、`unified-public.json`。
+- 102 项相关测试与类型、模块、i18n 检查通过；Edge 153 CBZ、Chromium 153 MOBI 隔离回归均通过，包含禁止第三方 Cookie、自动跳转、取消、导入与位置恢复、浏览器重启、断开。Google 服务为本机模拟；结果分别在 `artifacts/source-architecture/drive/run-v1gmy7/`、`run-kFZRbe/`。
+- 真实 Edge 使用新版插件访问公网连接页，首次手动进入及隔离 profile 中模拟已连接记录后的自动进入，均到达真实 Google 登录页。未登录真实账户或替用户选文件，本次不声称新增真实授权验收。
+- 已重新生成 Chrome、Edge、Firefox MV3 安装包并核对归档内容；需更新插件才能使用自动跳转。Firefox 本次仅构建与后台单测通过，未运行真实浏览器账户流程。此记录不表示商店上架或 R2 下载目录发布。下列 Chrome 托管模式内容为本次改造前的历史记录。
+
 ## 2026-09-24 Edge Google Drive 顶层授权
 
 - 已先核对实际 OpenResty 配置与容器挂载：连接页宿主机目录为 `/opt/1panel/www/sites/comics-drive-connect/`。本次只原子更新 `connect.js`，备份为 `/opt/nodelane/node-comics/drive-oauth-20260924T141020Z/backup/connect.js`。`config.js`、HTML、CSS、代理配置哈希保持不变；未部署 API 或数据库。

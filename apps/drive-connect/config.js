@@ -2,6 +2,4 @@
 // Replace values only in your deployed HTTPS authorization site.
 globalThis.NODE_COMICS_DRIVE_CONFIG = Object.freeze({
   clientId: '',
-  apiKey: '',
-  appId: '',
 });

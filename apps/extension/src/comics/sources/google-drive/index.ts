@@ -21,7 +21,7 @@ export async function listDriveAccounts(): Promise<DriveAccountSummary[]> {
 export function onDriveAccountsChanged(listener: () => void): () => void {
   if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return () => {};
   const changed = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-    if (['local','session'].includes(area) && Object.keys(changes).some(key => key.startsWith('nc-drive-chrome-connection:') || key.startsWith('nc-drive-token:'))) listener();
+    if (['local','session'].includes(area) && Object.keys(changes).some(key => key.startsWith('nc-drive-connection:') || key.startsWith('nc-drive-token:'))) listener();
   };
   chrome.storage.onChanged.addListener(changed);
   return () => chrome.storage.onChanged.removeListener(changed);

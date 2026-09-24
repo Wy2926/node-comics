@@ -142,7 +142,8 @@ describe('production background listeners share the runtime message channel', ()
     const sender: chrome.runtime.MessageSender = {id: extensionId, url: tabs.get(7)!.url, tab: {id: 7} as chrome.tabs.Tab, frameId: 0, documentId: 'test-document'};
     const bridge = await owned({type: 'NC_DRIVE_BRIDGE_INIT'}, sender);
     expect(bridge).toMatchObject({ok: true, nonce: expect.any(String)});
-    expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}}, sender)).toEqual({ok: true});
+    (session['nc-drive-pending:7'] as {oauth?: unknown}).oauth = {state: 'test-oauth-state', phase: 'returned'};
+    expect(await owned({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: bridge.nonce, oauthState: 'test-oauth-state', accessToken: 'synthetic-test-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}}, sender)).toEqual({ok: true});
     expect(chrome.tabs.remove).toHaveBeenCalledWith(7);
     expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: true, account: {id: 'account-1'}, files: [{fileId: 'file-1', format: 'cbz'}]});
     expect(await owned({type: 'NC_DRIVE_TOKEN', accountId: 'account-1'})).toMatchObject({ok: true, accessToken: 'synthetic-test-token', account: {id: 'account-1'}});
