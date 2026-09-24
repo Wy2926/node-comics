@@ -14,7 +14,9 @@
 4. 构建前设置 `VITE_DRIVE_CONNECT_URL` 为完整、最终不跳转的 HTTPS 页面 URL。构建会加入该 origin 与 `www.googleapis.com` 的 host permissions。普通 Vite 网页预览不提供扩展安全桥，不能授权。
 5. Chrome 托管授权额外需要 **Chrome Extension** 类型 OAuth client，其注册的扩展 ID 必须匹配实际安装 ID。用扩展的稳定公钥 / 商店 ID 保持解压构建 ID 稳定，核对控制台登记后将该 client ID 配置为 `VITE_GOOGLE_CHROME_CLIENT_ID`。它与 Web client、Picker key / appId 使用同一 Google Cloud 项目。WXT 仅对 Chrome 构建写入 `oauth2.client_id` 和 `drive.file` scope；不要把 Chrome client 填进页面的 `config.js`。参见 [Chrome OAuth 配置](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth)。
 
-现有 VPS 通过 [OpenResty 配置](../../deploy/openresty.comics.conf) 仅映射四个公开文件。宿主机目录为 `/opt/1panel/www/sites/comics-drive-connect/`，代理容器内为 `/www/sites/comics-drive-connect/`；复制 `index.html`、`style.css`、`connect.js`，并单独安装实际 `config.js`。不要把整个仓库或私密部署目录映射为网站目录。修改后先执行 OpenResty 配置检查，再 reload。
+现有 VPS 通过 [OpenResty 配置](../../deploy/openresty.comics.conf) 仅映射四个公开文件。宿主机目录为 `/opt/1panel/www/sites/comics-drive-connect/`，代理容器内为 `/www/sites/comics-drive-connect/`；目录权限 0755、公开文件 0644。复制 `index.html`、`style.css`、`connect.js`，并单独安装实际 `config.js`。不要把整个仓库或私密部署目录映射为网站目录。修改后先执行 OpenResty 配置检查，再 reload。
+
+该路径额外返回 `Cache-Control: no-store, no-transform`，脚本声明 `data-cfasync="false"`，防止 Cloudflare Rocket Loader 改写脚本执行顺序和自动注入统计脚本。2026-09-24 已逐一核对四个公网资源与部署源内容一致。依据：[Cloudflare 内容改写](https://developers.cloudflare.com/rules/configuration-rules/response-body-inspection/)、[排除 Rocket Loader 脚本](https://developers.cloudflare.com/speed/optimization/content/rocket-loader/ignore-javascripts/)。
 
 在 `apps/extension` 目录构建的示例，所有值均为占位符：
 

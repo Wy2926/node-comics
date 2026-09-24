@@ -1,6 +1,19 @@
 # VPS 部署与核验
 
-本文保留 2026-09-21 最后一次已记录部署的必要信息，不是当前线上查询结果。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
+本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
+
+## 2026-09-24 发布
+
+- 后端业务提交 `ee95a5d`，API、control-worker、maintenance 统一使用 `docker.nodelane.net/nodelane/node-comics:20260924-ee95a5d`；镜像已推送到既有仓库。摘要为 `sha256:0ef26001f19f6c6669e0098f465651d2bfa86a547c0d1fe3035c67c29bf0750f`。
+- 用户本次明确授权清库重建。先演练新基线的配置恢复、确认无在途任务，再备份并重建专用 `nodecomics_production` 到 `translations_0001`。用户、图片访问、翻译任务、额度账本和订单记录清空；R2 对象及其他数据库未删除。
+- `.env.server` 字节级保持不变；复用文本供应商及版本、4 个节点及原凭据、系统设置和计费目录。普通每分钟上限继续保留线上既有 30，PLUS 100，未用源码默认 10 覆盖。被替代的旧业务表不恢复。计算节点重启后完成真实注册，重新确认配置版本和心跳。
+- 清库前完整 custom dump、SHA-256 清单和配置快照保存在服务器私有目录 `/opt/nodelane/node-comics/backup-before-20260924-ee95a5d`，目录 0700、文件 0600。未上传数据库备份到 Git，也未建立自动备份任务。回退旧镜像需要配套旧数据库恢复，不能直接连接新基线。
+- Google Drive 固定连接页为 `https://comics.nodelane.net/drive-connect/index.html`，复用既有 Web / Chrome OAuth client 与 Picker key。已核对正式 OAuth 来源，并设置 key 的生产网站与 Picker iframe 来源限制；只允许 Drive / Picker API。静态页通过独立 OpenResty 路径发布，禁止缓存及 CDN 改写，实际配置不入库。详见 [Drive 配置](../apps/drive-connect/README.md)。
+- 官网当前下载升级为插件 **0.1.1**，写入正式 API / Drive URL，保留 0.1.0 历史下载。新包 7,144,656 字节，SHA-256 `c43a0477071da43876a30d30d3ff9794ddbeb68baa1535aacd409476e8753880`，已验证私有 R2 上传回读及真实浏览器公网下载。没有提交 Chrome 商店更新；旧插件需要更新到新接口版本。
+- 验证：插件 725 通过、1 跳过，后端本机 737 通过、146 跳过；隔离 PostgreSQL 首轮 879 通过、3 跳过，1 个迁移测试夹具遗漏支付配置隔离，修正后两个相关用例通过。后台 14 项、官网 12 项通过；后台、官网、插件构建完成。阅读器浏览器验收覆盖独立 UUID、优先当前页、后三页预取、丢失响应恢复、限流恢复与长轮询；Drive 网页 / Chrome 两种模拟授权模式均通过。
+- 线上检查：三个容器 healthy，公网 readiness 的数据库、控制进程、OIDC、执行池和计算节点均 ready；五语下载页、ZIP 文件名 / 大小 / 哈希、四个 Drive 资源及安全响应头已核验。模拟 Google 不等于真实账户授权或长期续期通过；本次未发起付费图片翻译或真实支付。
+
+当次脱敏检查与浏览器截图位于本地忽略目录 `artifacts/release-20260924/`、`artifacts/extension-download/`、`artifacts/reading-translations-validation/` 与 `artifacts/source-architecture/drive/`。服务器 `/opt/nodelane/node-comics/release.json` 保存实际镜像与私有备份位置。
 
 ## 历史部署基准
 

@@ -15,13 +15,15 @@ NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", 
 @pytest.fixture
 def isolated_migration_database(tmp_path, monkeypatch):
     """No environment files, configured database, identity or object store is used."""
-    from app import db
+    from app import billing_providers, db
     private_engine = create_engine(f"sqlite:///{(tmp_path / 'upgrade.db').as_posix()}")
     @event.listens_for(private_engine, "connect")
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
     monkeypatch.setattr(db, "engine", lambda: private_engine)
-    monkeypatch.setattr(db, "settings", lambda: SimpleNamespace(storage_path=tmp_path / "objects", stripe_enabled=False, creem_enabled=False))
+    isolated_settings = lambda: SimpleNamespace(storage_path=tmp_path / "objects", stripe_enabled=False, creem_enabled=False)
+    monkeypatch.setattr(db, "settings", isolated_settings)
+    monkeypatch.setattr(billing_providers, "settings", isolated_settings)
     try:
         yield private_engine
     finally:
