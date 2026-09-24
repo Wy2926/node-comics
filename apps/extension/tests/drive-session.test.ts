@@ -60,19 +60,20 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
+async function start(expectedAccountId?: string, switchAccount = false) {
+  const flow = await connect(expectedAccountId);
+  await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
+  const result = await send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test-client.apps.googleusercontent.com', switchAccount}, flow.sender);
+  expect(result.ok).toBe(true);
+  return {...flow, result};
+}
+
 describe('top-level Google OAuth bridge', () => {
-  async function start() {
-    const flow = await connect();
-    await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
-    const result = await send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test-client.apps.googleusercontent.com'}, flow.sender);
-    expect(result.ok).toBe(true);
-    return {...flow, result};
-  }
   it('constructs a bounded public-client request and accepts a new callback document only once', async () => {
     const flow = await start(), url = new URL(flow.result.url);
     expect(url.origin).toBe('https://accounts.google.com');
     expect(Object.fromEntries(url.searchParams)).toMatchObject({response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.file',
-      trigger_onepick: 'true', include_granted_scopes: 'false', redirect_uri: 'https://trusted.example/drive-connect/index.html'});
+      prompt: 'consent', trigger_onepick: 'true', include_granted_scopes: 'false', redirect_uri: 'https://trusted.example/drive-connect/index.html'});
     const tab = tabs.get(flow.pending.tabId)!; tab.url = url.href;
     onUpdated(tab.id, {url: url.href, status: 'loading'}, tab);
     await vi.waitFor(() => expect(session['nc-drive-pending:' + tab.id]?.oauth.phase).toBe('away'));
@@ -168,6 +169,33 @@ describe('remembered Google connections', () => {
     expect(JSON.stringify(ready)).not.toContain('private-valid-token');
     now += 3_600_001; const expired = await connect();
     expect(await send({type: 'NC_DRIVE_BRIDGE_INIT'}, expired.sender)).toMatchObject({autoRedirect: false});
+  });
+  it('uses a verified email hint after restart without forcing account selection', async () => {
+    local['nc-drive-connection:account-1'] = {account: {...account, emailAddress: 'alice@example.test'}, generation: 'verified'};
+    const flow = await start(); const url = new URL(flow.result.url);
+    expect(url.searchParams.get('prompt')).toBe('consent');
+    expect(url.searchParams.get('login_hint')).toBe('alice@example.test');
+    expect(api.account).not.toHaveBeenCalled();
+  });
+  it('uses the expected verified account and leaves ambiguous multiple accounts to Google', async () => {
+    seedToken({account: {...account, emailAddress: 'alice@example.test'}});
+    local['nc-drive-connection:account-2'] = {account: {id: 'account-2', emailAddress: 'bob@example.test'}, generation: 'verified'};
+    expect(new URL((await start()).result.url).searchParams.has('login_hint')).toBe(false);
+    expect(new URL((await start('account-2')).result.url).searchParams.get('login_hint')).toBe('bob@example.test');
+    expect(new URL((await start('unknown-account')).result.url).searchParams.has('login_hint')).toBe(false);
+  });
+  it('only forces an account chooser on explicit switching, without a previous-account hint', async () => {
+    seedToken({account: {...account, emailAddress: 'alice@example.test'}});
+    const url = new URL((await start(undefined, true)).result.url);
+    expect(url.searchParams.get('prompt')).toBe('consent select_account');
+    expect(url.searchParams.has('login_hint')).toBe(false);
+  });
+  it('does not treat a Drive permission ID, malformed record or unverified page field as a login hint', async () => {
+    seedToken(); local['nc-drive-connection:wrong'] = {account: {...account, emailAddress: 'wrong@example.test'}, generation: 'invalid-key'};
+    expect(new URL((await start()).result.url).searchParams.has('login_hint')).toBe(false);
+    const flow = await connect(); await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
+    const reply = await send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test.apps.googleusercontent.com', loginHint: 'untrusted@example.test'}, flow.sender);
+    expect(new URL(reply.url).searchParams.has('login_hint')).toBe(false);
   });
   it('first connection waits; a verified connection auto-forwards across restart without exposing credentials', async () => {
     const first = await connect();

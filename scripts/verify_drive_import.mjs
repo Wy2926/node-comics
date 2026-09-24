@@ -57,6 +57,8 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
       assert.equal(url.searchParams.get('trigger_onepick'),'true');assert.equal(url.searchParams.get('response_type'),'token');
       assert.equal(url.searchParams.get('scope'),'https://www.googleapis.com/auth/drive.file');
       assert.equal(url.searchParams.get('include_granted_scopes'),'false');assert.equal(url.searchParams.get('redirect_uri'),bridge.href);
+      assert.equal(url.searchParams.get('prompt'),stats.authorizations===0?'consent select_account':'consent');
+      assert.equal(url.searchParams.get('login_hint'),stats.authorizations===0?null:'reader@example.test');
       stats.authorizations++;stats.pickers++;
       const result=cancelPicker?{state:url.searchParams.get('state'),error:'access_denied'}:
         {state:url.searchParams.get('state'),access_token:token,token_type:'Bearer',expires_in:'3600',scope:'https://www.googleapis.com/auth/drive.file',picked_file_ids:chosenFile??'fixture-page'};

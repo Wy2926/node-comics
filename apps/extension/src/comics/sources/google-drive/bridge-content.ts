@@ -9,7 +9,7 @@ export async function installDriveBridge() {
     if (delivered || event.source !== window || event.origin !== origin || event.data?.nonce !== ready.nonce) return;
     if (event.data.type === 'NC_DRIVE_OAUTH_START') {
       delivered = true;
-      void chrome.runtime.sendMessage({type: 'NC_DRIVE_OAUTH_START', nonce: ready.nonce, clientId: event.data.clientId})
+      void chrome.runtime.sendMessage({type: 'NC_DRIVE_OAUTH_START', nonce: ready.nonce, clientId: event.data.clientId, switchAccount: event.data.switchAccount})
         .then(result => window.postMessage({type: 'NC_DRIVE_OAUTH_STARTED', nonce: ready.nonce, result}, origin))
         .catch(() => window.postMessage({type: 'NC_DRIVE_OAUTH_STARTED', nonce: ready.nonce, result: {ok: false}}, origin));
       return;

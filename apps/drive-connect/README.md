@@ -4,7 +4,11 @@ Chrome、Edge、Firefox 统一使用同一 Web OAuth client：插件在独立的
 
 首次进入连接页时点击“前往 Google 授权并选择文件”。账户经过 Drive API 核验后，插件记住本机连接选择；下次从插件进入云盘时自动跳转 Google，浏览器重启也保留此行为。取消授权会停留在连接页，允许手动重试，不自动反复跳转。主动断开连接会删除这项记录。自动跳转省去本站按钮，Google 页面仍按其登录与授权状态要求用户操作。
 
-请求沿用 `response_type=token`、`trigger_onepick=true`、`prompt=consent select_account`、`allow_multiple=true`，仅申请 `drive.file`。读取已导入文件仍使用未过期的本机会话；过期或浏览器重启清空会话后提示重新连接，不在阅读期间自动弹出授权页。“切换 / 重新连接账户”入口完成 Google 选文件后只更新账户，不导入所选文件。
+请求沿用 `response_type=token`、`trigger_onepick=true`、`prompt=consent`、`allow_multiple=true`，仅申请 `drive.file`。读取已导入文件仍使用未过期的本机会话；过期或浏览器重启清空会话后提示重新连接，不在阅读期间自动弹出授权页。“切换 / 重新连接账户”入口完成 Google 选文件后只更新账户，不导入所选文件。
+
+默认不再强制 `select_account`；唯一已连接账户或重连指定账户时，用已核验邮箱作为 `login_hint`，不把 Drive permissionId 当成 Google 登录 ID。仅用户点击“切换 / 重新连接账户”时才加上 `select_account` 并省略邮箱提示。多个账户且未指定目标时不擅自选择。
+
+[Google 顶层 Picker 文档](https://developers.google.com/workspace/drive/picker/guides/desktop-mobile-picker#integrate_the_google_picker_into_your_app)明确将 `prompt=consent` 列为必填，因此即使已授权也仍可能展示“允许访问”的文件授权确认；账户提示只能减少重复选账号，不代表免确认。不能简单删除 `consent` 或改为 `prompt=none` 后宣称该选文件流程仍受支持。若产品要求只首次同意，需重新设计选文件方式；当前仍遵循统一 Google 域名顶层选择的约定。
 
 ## 配置与构建
 

@@ -51,7 +51,7 @@
     if (!bridgeReady || busy) return;
     onlyConnect = reconnectOnly;
     busy = true; update(); status.textContent = '正在前往 Google，请在 Google 页面完成账户授权和文件选择。';
-    window.postMessage({type: 'NC_DRIVE_OAUTH_START', nonce, clientId: config.clientId}, location.origin);
+    window.postMessage({type: 'NC_DRIVE_OAUTH_START', nonce, clientId: config.clientId, switchAccount: reconnectOnly}, location.origin);
   };
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin || !nonce || event.data?.nonce !== nonce) return;

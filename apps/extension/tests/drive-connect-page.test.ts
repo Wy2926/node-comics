@@ -37,7 +37,7 @@ describe('top-level Google file selection', () => {
   it('waits for first-time consent without loading any Google SDK', () => {
     const ui = page(); ui.ready(); expect(ui.scripts).toEqual([]); expect(ui.window.postMessage).not.toHaveBeenCalled();
     ui.buttons.connect.click(); ui.buttons.connect.click();
-    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId}, origin);
+    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId, switchAccount: false}, origin);
   });
   it('saves only a one-use state before navigating the current window to Google', () => {
     const ui = page(); ui.ready(); ui.buttons.connect.click();
@@ -78,6 +78,10 @@ describe('top-level Google file selection', () => {
     expect(ui.buttons.status.textContent).toContain('已取消'); expect(ui.window.postMessage).not.toHaveBeenCalled();
     ui.buttons.connect.click(); expect(ui.window.postMessage.mock.calls[0][0].type).toBe('NC_DRIVE_OAUTH_START');
   });
+  it('requests an account chooser only for an explicit switch', () => {
+    const ui = page(); ui.ready(); ui.buttons.reconnect.click();
+    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId, switchAccount: true}, origin);
+  });
   it('supports explicit account reconnect without importing selected files', () => {
     const ui = page({hash: response(), saved: {...pending(), onlyConnect: true}}); ui.ready(); expect(ui.window.postMessage.mock.calls[0][0].files).toEqual([]);
   });
@@ -91,7 +95,7 @@ describe('top-level Google file selection', () => {
 describe('remembered connection navigation', () => {
   it('auto-forwards once without a button click or a cached credential', () => {
     const ui = page(); ui.ready(true); ui.ready(true); ui.buttons.connect.click();
-    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId}, origin);
+    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId, switchAccount: false}, origin);
     expect(ui.buttons.connect.disabled).toBe(true); expect(ui.scripts).toEqual([]);
   });
   it('does not auto-forward successful callbacks or after completion', () => {

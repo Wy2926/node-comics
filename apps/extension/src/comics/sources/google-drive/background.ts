@@ -109,7 +109,8 @@ export function registerDriveBackground() {
         const pending = await pendingSender(sender);
         assertActive();
         if (!pending.initialized || message.nonce !== pending.nonce || typeof message.clientId !== 'string' ||
-            !/^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$/.test(message.clientId) || initializing.has(pending.id))
+            !/^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$/.test(message.clientId) || initializing.has(pending.id) ||
+            (message.switchAccount !== undefined && typeof message.switchAccount !== 'boolean'))
           throw new DriveError('invalid-bridge', '授权返回无效。');
         initializing.add(pending.id);
         try {
@@ -118,8 +119,29 @@ export function registerDriveBackground() {
           const authorize = new URL('https://accounts.google.com/o/oauth2/v2/auth');
           authorize.search = new URLSearchParams({client_id: message.clientId, redirect_uri: callback.href,
             response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.file',
-            include_granted_scopes: 'false', prompt: 'consent select_account', trigger_onepick: 'true',
+            include_granted_scopes: 'false', prompt: message.switchAccount === true ? 'consent select_account' : 'consent', trigger_onepick: 'true',
             allow_multiple: 'true', state}).toString();
+          // The top-level Picker requires consent. Account selection is optional:
+          // only force it when the user explicitly chooses to switch accounts.
+          if (message.switchAccount !== true) {
+            await connectionWrites;
+            const [connections, session] = await Promise.all([chrome.storage.local.get(null), chrome.storage.session.get(null)]);
+            const accounts = new Map<string, DriveAccount>();
+            for (const [key, value] of Object.entries(connections)) {
+              const connection = value as DriveConnection | undefined;
+              if (validConnection(key, connection)) accounts.set(connection.account.id, connection.account);
+            }
+            for (const [key, value] of Object.entries(session)) {
+              const token = value as DriveToken | undefined;
+              if (validDriveIdentifier(token?.account?.id) && key === tokenKey(token.account.id) && token.generation)
+                accounts.set(token.account.id, token.account);
+            }
+            const account = pending.expectedAccountId ? accounts.get(pending.expectedAccountId) : accounts.size === 1 ? [...accounts.values()][0] : undefined;
+            const email = typeof account?.emailAddress === 'string' ? account.emailAddress.trim() : undefined;
+            // Drive permissionId is not an OIDC subject. Only verified email is a login hint.
+            if (typeof email === 'string' && email.length <= 320 && /^[^\s@]+@[^\s@]+$/.test(email)) authorize.searchParams.set('login_hint', email);
+            assertActive();
+          }
           pending.oauth = {state, phase: 'away'};
           delete pending.documentId; delete pending.initialized;
           await chrome.storage.session.set({[pendingKey(pending.tabId)]: pending});

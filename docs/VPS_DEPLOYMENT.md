@@ -2,6 +2,14 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 减少 Google 重复选账号
+
+- 修正上一版默认 `prompt=consent select_account` 导致强制重复选账号的问题：默认仅保留 Google 顶层 Picker 要求的 `consent`，使用唯一已核验账户或指定重连账户的邮箱作为 `login_hint`；显式切换账户时才启用 `select_account`。
+- 这项修复不消除 Google 的文件访问确认。官方顶层 Picker 将 `prompt=consent` 列为必填；不能把自动跳转或账户提示描述成完全免重复确认。
+- 线上只更新 `connect.js`，实际目录及代理挂载再次核对通过。备份 `/opt/nodelane/node-comics/drive-account-hint-20260924T145228Z/backup/connect.js`；HTML、CSS、OAuth 配置及代理配置哈希不变。公网 HTTP 200，脚本 SHA-256 `8bd490fec97638aa10868cf7114114c3e5c88dfeb2edfc903145041f1ecd2765`。
+- 107 项相关测试通过，隔离构建通过类型、模块、语言检查；Edge CBZ / Chromium MOBI 模拟回归验证正常进入携带邮箱提示且不含 `select_account`、显式切换保留选账号，以及取消、重启、断开与阅读恢复。未代用户登录真实 Google 账户，不宣称真实 Google 确认页面消失。
+- Chrome、Edge、Firefox MV3 包从独立 checkout 构建，未混入同时进行的漫画缓存改动，位于本机 `artifacts/drive-oauth-prompt-fix/`；Firefox 未进行真实浏览器账户验收。该目录同时保存包摘要与部署报告；需要更新插件，未发布商店或 R2 目录。
+
 ## 2026-09-24 各浏览器统一 Google 跳转与自动进入
 
 - Chrome、Edge、Firefox 统一 Web OAuth 顶层选文件，删除 Chrome 托管授权、内嵌 Picker 与扩展 OAuth client 配置。已核验连接保存本机账户资料，再次进入与浏览器重启后自动前往 Google；取消停留、断开清除记录，凭据仍只在可信 session 内保存。
