@@ -9,7 +9,8 @@ export const createPage: CreateSourcePage = (context) => ({
     containers: '.comicParticulars-title-right',
     snapshot: () => discoverMangaCopyDocument(context.document, context.location.url),
     read: () => readMangaCopyData(context.document, context.location.url),
-    targets: () => renderedImages(context.document, context.location.url, '.comicContent-list img'),
+    targets: () => renderedImages(context.document, context.location.url, '.comicContent-list img')
+      .filter(({element}) => 'naturalWidth' in element && element.complete && element.naturalWidth > 0 && element.naturalHeight > 0),
   }),
   discoverCatalog() {
     if (context.location.kind !== 'catalog') return { status: 'unsupported', code: 'UNSUPPORTED_CATALOG' };

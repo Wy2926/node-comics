@@ -1,16 +1,21 @@
 import type {CreateSourcePage} from '../../contracts/page';
 import {imageSession} from '../../shared/session';
+import {renderedImages} from '../../shared/dom-images';
 
 const catalogAnchor = '[class*="EpisodeListInfo__info_area--"]';
 const readerAnchor = '#viewerHeader';
-/** DOM is used only for the embedded entry. All acquisition uses the network adapter. */
+/** DOM supplies displayed originals and the entry; full acquisition uses HTTP. */
 export const createPage: CreateSourcePage = context => {
   let readerEntry: HTMLElement | undefined;
   const session = imageSession(context, {
-    containers: `${catalogAnchor}, ${readerAnchor}, [data-nc-naver-entry]`,
+    containers: `${catalogAnchor}, ${readerAnchor}, .wt_viewer, [data-nc-naver-entry]`,
     snapshot: () => ({url: context.location.url, adapter: 'naver', title: context.document.title,
       direction: 'ltr', discoveryComplete: false, note: '', items: []}),
-    targets: () => [],
+    targets: () => renderedImages(context.document, context.location.url, '.wt_viewer > img[id^="content_image_"]')
+      .filter(({element}) => /^content_image_\d+$/.test(element.id) && 'naturalWidth' in element &&
+        element.complete && element.naturalWidth > 0 && element.naturalHeight > 0)
+      .sort((a, b) => Number(a.element.id.slice(14)) - Number(b.element.id.slice(14)))
+      .map(image => ({...image, key: `${image.element.id}:${image.url}`})),
   });
   return {
     ...session,

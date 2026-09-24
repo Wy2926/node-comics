@@ -10,12 +10,20 @@ const pageElements = (doc: Document) =>
     page.querySelector('.-cv-page-canvas'),
   );
 export const createPage: CreateSourcePage = (context) => {
-  const ids = new WeakMap<HTMLCanvasElement, string>();
+  let ids = new WeakMap<HTMLCanvasElement, string>();
   let versionObserver: MutationObserver | undefined;
   const revisions = (records: MutationRecord[]) => {
     let changed = false;
     for (const record of records) {
       const target = record.target as Element;
+      if (record.attributeName === 'data-comici-viewer-id') {
+        ids = new WeakMap();
+        changed = true;
+      }
+      if (record.attributeName === 'width' || record.attributeName === 'height') {
+        ids.delete(target as HTMLCanvasElement);
+        changed = true;
+      }
       if (
         record.attributeName === 'class' &&
         target.matches('.-cv-page') &&
@@ -47,19 +55,31 @@ export const createPage: CreateSourcePage = (context) => {
           id = crypto.randomUUID();
           ids.set(canvas, id);
         }
+        const key = `${episode}:${order}:${canvas.width}:${canvas.height}`;
         return [
           {
             element: canvas,
-            key: `${episode}:${order}:${canvas.width}:${canvas.height}`,
+            key,
             url: 'page-image:' + id,
-            read: () => canvasImage(canvas, context.signal),
+            read: async () => {
+              const current = () => {
+                context.signal.throwIfAborted();
+                const target = session.inlineTargets().find(image => image.element === canvas);
+                if (!canvas.isConnected || target?.url !== 'page-image:' + id ||
+                  target.key !== key) throw Error('SOURCE_RESOURCE_EXPIRED');
+              };
+              current();
+              const blob = await canvasImage(canvas, context.signal);
+              current();
+              return blob;
+            },
           },
         ];
       });
   }
   const session = imageSession(context, {
     attributes: ['data-comici-viewer-id'],
-    containers: '#comici-viewer, .-cv-page',
+    containers: '#comici-viewer, .-cv-page, .series-act, .episode-header',
     targets: () => images(context.document),
     snapshot() {
       const doc = context.document,
@@ -92,6 +112,12 @@ export const createPage: CreateSourcePage = (context) => {
   });
   return {
     ...session,
+    // Full import uses HTTP; the snapshot above describes only the currently rendered inline window.
+    async discoverPages() { session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'}; },
+    importAnchor() {
+      session.snapshot();
+      return context.location.kind === 'catalog' ? context.document.querySelector('.series-act') : null;
+    },
     observe(changed) {
       const cleanup = session.observe!(changed);
       versionObserver = new MutationObserver((records) => {
@@ -101,7 +127,7 @@ export const createPage: CreateSourcePage = (context) => {
         subtree: true,
         attributes: true,
         attributeOldValue: true,
-        attributeFilter: ['class'],
+        attributeFilter: ['class', 'width', 'height', 'data-comici-viewer-id'],
       });
       return () => {
         cleanup();

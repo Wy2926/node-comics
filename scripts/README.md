@@ -35,7 +35,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_extension_theme.mjs` | 新书架、真实导入、菜单 / 导出弹窗、4 色 × 亮暗主题、阅读浮层与位置恢复；默认 Vite 5175，可用 `TEST_READER_URL` 指定隔离主应用 |
 | `verify_catalog_sync.mjs` | 本机 TLS / 合成目录下的自动同步、动态分组、更新提示、失败保留与阅读位置；依赖 Python cryptography，使用下方相同浏览器变量 |
 | Comix `tests/verify-*.mjs` | 站点目录、图片还原、完整阅读器与请求头隔离；样本／真实网络边界见[Comix 说明](../apps/extension/src/sources/sites/comix/README.md) |
-| `verify_comicpash.mjs` | Comic PASH 画布发现与导入，隔离样本／真实来源开关见[站点说明](../apps/extension/src/sources/sites/comicpash/README.md) |
+| `verify_comicpash.mjs` | Comic PASH 完整目录、整章取图还原、站内导入与阅读位置恢复；隔离样本／真实来源开关见[站点说明](../apps/extension/src/sources/sites/comicpash/README.md) |
 | `verify_r2_download.mjs` | 模拟 R2 响应下的浏览器下载与权限处理，不访问 Cloudflare |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2 接入；运行前阅读脚本中的对象范围与清理规则，不作为普通离线回归 |
 | `smoke_api.py` | 默认检查 API；`--translate` 会发起真实付费图片请求，保存请求 UUID 以便核实与恢复，不自动重建未知请求 |

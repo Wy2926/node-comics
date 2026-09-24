@@ -159,8 +159,8 @@ describe('production background listeners share the runtime message channel', ()
   });
 
   it('preserves source messages while locale and theme listeners answer only their own protocol', async () => {
-    local['manifest:book'] = {id: 'book', adapter:'gunnerkrigg',url: 'https://www.gunnerkrigg.com/?p=123', items: [{id: 'page-1', url: 'https://example.test/1.png'}]};
-    expect(await owned({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'})).toEqual({ok: true, data: {url: 'https://example.test/1.png',pageUrl:'https://www.gunnerkrigg.com/?p=123'}});
+    local['manifest:book'] = {id: 'book', adapter:'comicpash',url: 'https://comicpash.jp/episodes/test123', items: [{id: 'page-1', url: 'https://example.test/1.png'}]};
+    expect(await owned({type: 'NC_SOURCE_IMAGE', manifestId: 'book', pageId: 'page-1'})).toEqual({ok: true, data: {url: 'https://example.test/1.png',pageUrl:'https://comicpash.jp/episodes/test123',sourceId:'comicpash',processing:undefined}});
     expect(await owned({type: 'NC_UI_LOCALE'})).toMatchObject({locale: 'en', dictionary: expect.any(Object)});
     expect(await owned({type: 'NC_INLINE_THEME'}, {...extensionSender, tab: {id: 1} as chrome.tabs.Tab, frameId: 0})).toEqual({appearance: 'system', accentTheme: 'sky', textScale: 1});
   });

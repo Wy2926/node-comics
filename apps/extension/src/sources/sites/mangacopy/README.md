@@ -1,5 +1,7 @@
 # MangaCopy
 
+标签页原位翻译使用 `.comicContent-list img`，仅识别已解码的正文图片，短切片和重复 URL 的独立元素均保留；不扫描目录、广告和推荐图。2026-09-24 补上未加载／失败图片过滤，并通过隔离 MV3 的懒加载、换图、原图恢复和位置保持检查。定向运行：配置公共浏览器环境后，设置 `INLINE_SITE_ONLY=mangacopy` 并执行 `node scripts/verify_inline_translation.mjs`。此回归使用合成网页和模拟译图，不代表本次已重验真实图片 CDN 或模型效果。
+
 `definition.ts` 持有主站／copy4000 镜像的严格 HTTPS 主机、作品／章节身份、目录引用和原有安装权限。`catalog.ts` 动态读取当前 DOM 的分组 ID、名称、隐藏条目和原始标签，不设分类白名单、不映射标准类型。仅源站 `default` 分组确定默认入口；“同人漫画”“其他系列”等分类中的当前漫画章节均可阅读，不按名称标记关联作品。不同分组／标签保持独立阅读序列。`pages.ts` 保留容器中的页槽；`data.ts` 解码页面已有的 AES-CBC 数据并交叉核对页序，不执行页面脚本。
 
 目录和章节可有限等待完整清单；不自动滚动、翻章或处理登录挑战。缺少页槽保持部分结果，数据校验失败不退回通用图片发现。`tests/` 覆盖镜像、伪造域名、目录等待、清单解码、重复 URL、取消和暂停；`tests/catalog.test.ts` 覆盖两部示例漫画的分类结构、任意新增 ID／名称／标签、默认入口与重复分组引用。隔离浏览器验收使用仓库根目录 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`。2026-09-23 真实浏览器核对 copy4000 的 grandblue／laizishenyuan 目录为 116／100 项，确认分类来自动态页面；此计数仅为当日样本，不代表章节图片下载或翻译已验收。

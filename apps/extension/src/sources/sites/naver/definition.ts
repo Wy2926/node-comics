@@ -19,7 +19,7 @@ export const episodeUrl = (titleId: string, no: number, section: Section) => `${
 export const definition: SourceDefinition = {
   id: 'naver', name: 'NAVER Webtoon',
   sites: [{id: 'naver', name: 'NAVER Webtoon', url: origin + '/', icon}],
-  capabilities: {importable: true, pages: true, inline: false, catalog: true, completePageList: true},
+  capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {
     if (url.protocol !== 'https:' || url.hostname !== 'comic.naver.com' || url.port || url.username || url.password) return null;

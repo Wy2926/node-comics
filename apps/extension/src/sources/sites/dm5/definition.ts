@@ -20,7 +20,7 @@ export const chapterUrl = (id: string) => `${origin}/m${id}/`;
 export const definition: SourceDefinition = {
   id: 'dm5', name: '动漫屋 DM5',
   sites: [{id: 'dm5', name: '动漫屋 DM5', url: origin + '/', icon}],
-  capabilities: {importable: true, pages: true, inline: false, catalog: true, completePageList: true},
+  capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {
     if (url.protocol !== 'https:' || !['www.dm5.com', 'dm5.com'].includes(url.hostname) || url.port || url.username || url.password) return null;

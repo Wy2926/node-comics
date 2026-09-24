@@ -27,13 +27,13 @@ function fixture() {
 describe('site adapter registry and Comic PASH canvases', () => {
   it.each([
     'https://comicpash.jp.evil.test/episodes/a',
-    'https://comicpash.jp/series/a',
+    'http://comicpash.jp/episodes/a',
     'https://other.example/episodes/a',
   ])('does not match unrelated URLs: %s', (url) => expect(sourceFor(url).definition.id).toBe('generic'));
   it('routes existing sites through the registry', () => {
     for (const [url, id] of [
-      ['https://www.gunnerkrigg.com/?p=1', 'gunnerkrigg'],
-      ['https://www.gunnerkrigg.com/', 'gunnerkrigg'],
+      ['https://www.gunnerkrigg.com/?p=1', 'generic'],
+      ['https://comicpash.jp/series/a', 'comicpash'],
       ['https://copy4000.com/comic/a/chapter/1', 'mangacopy'],
     ])
       expect(sourceFor(url).definition.id).toBe(id);

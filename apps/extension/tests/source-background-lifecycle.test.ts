@@ -12,7 +12,7 @@ const storage = (records: Record<string, unknown>) => ({ get: async (key: string
 const send = (message: unknown) => new Promise<{ ok: boolean; data?: PageManifest | { url: string }; error?: string }>(resolve => listener(message, { id: 'test', url: 'chrome-extension://test/reader.html' }, value => resolve(value as never)));
 beforeEach(() => {
   local = {}; session = {}; tabs.clear();
-  snapshot = { id: 'untrusted-content-id', sourceTabId: 999, navigationId: 'navigation', revision: 1, title: 'Test', url: 'https://www.gunnerkrigg.com/?p=123', adapter: 'gunnerkrigg', direction: 'rtl', discoveryComplete: true, knownTotal:1, note: '', items: [{ id: 'page-1', url: 'https://images.example.org/1.png', width: 800, height: 1200, order: 0 }] };
+  snapshot = { id: 'untrusted-content-id', sourceTabId: 999, navigationId: 'navigation', revision: 1, title: 'Test', url: 'https://comicpash.jp/episodes/test123', adapter: 'comicpash', direction: 'rtl', discoveryComplete: true, knownTotal:1, note: '', items: [{ id: 'page-1', url: 'https://images.example.org/1.png', width: 800, height: 1200, order: 0 }] };
   tabs.set(7, { id: 7, url: snapshot.url, status: 'complete' }); session['nc-managed:7'] = { url: snapshot.url, manifestId: 'trusted-manifest' };
   vi.stubGlobal('chrome', { runtime: { id: 'test', getURL: (path: string) => 'chrome-extension://test/' + path, onInstalled: { addListener() {} }, onMessage: { addListener: (fn: typeof listener) => { listener = fn; } } }, contextMenus: { onClicked: { addListener() {} } }, scripting: { executeScript: async () => {} }, storage: { local: storage(local), session: storage(session) }, tabs: { get: async (id: number) => tabs.get(id), remove: async (id: number) => { tabs.delete(id); }, sendMessage: async (id: number, message: { type: string }) => { if (!tabs.has(id)) throw Error('Tab closed'); return message.type === 'NC_NAVIGATION' ? { url: snapshot.url, navigationId: snapshot.navigationId } : snapshot; } } });
   registerSourceBackground();
@@ -24,7 +24,7 @@ describe('persisted source manifest authority', () => {
     expect(discovered).toMatchObject({ ok: true, data: { id: 'trusted-manifest', pageContext:{tabId:7,navigationId:'navigation'} } });
     expect(local['manifest:trusted-manifest']).toMatchObject({ items: snapshot.items });
     expect(await send({ type: 'NC_CLOSE_SOURCE', tabId: 7 })).toMatchObject({ ok: true });
-    expect(await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'page-1' })).toEqual({ ok: true, data: { url: snapshot.items[0].url,pageUrl:snapshot.url } });
+    expect(await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'page-1' })).toEqual({ ok: true, data: { url: snapshot.items[0].url,pageUrl:snapshot.url,sourceId:'comicpash',processing:undefined } });
     expect((await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'trusted-manifest', pageId: 'forged-page' })).ok).toBe(false);
     expect((await send({ type: 'NC_SOURCE_IMAGE', manifestId: 'untrusted-content-id', pageId: 'page-1' })).ok).toBe(false);
   });

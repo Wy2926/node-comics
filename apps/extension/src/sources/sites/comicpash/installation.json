@@ -1,4 +1,6 @@
 {
   "requiredOrigins": [],
-  "autoContentMatches": []
+  "autoContentMatches": [],
+  "optionalContentMatches": ["https://comicpash.jp/*", "https://www.comicpash.jp/*"],
+  "optionalOrigins": ["https://comicpash.jp/*", "https://www.comicpash.jp/*", "https://viewer.comicpash.jp/*"]
 }
