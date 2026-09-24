@@ -228,6 +228,8 @@ export function registerDriveBackground() {
           assertActive();
           await chrome.storage.session.remove(pendingKey(pending.tabId));
           assertActive();
+          // Finish the bridge before closing, so onRemoved cannot cancel the saved selection.
+          if (files.length) await chrome.tabs.remove(pending.tabId).catch(() => {});
           return {ok: true};
         } catch (error) {
           // A storage write already in flight when the tab is cancelled must not restore credentials.

@@ -153,10 +153,19 @@ try{
       await auth.waitForFunction(()=>!document.getElementById('connect')?.disabled,{},{timeout:15000});await noReaderError();
       phase='pick and deliver';await auth.locator('#connect').click();
     }
-    await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();
-    assert(await auth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Popup content must fit without horizontal scrolling');
-    await auth.screenshot({path:path.join(run,'drive-popup.png'),fullPage:true});
-    await worker.evaluate(id=>chrome.windows.remove(id),popup.id);
+    if(!cancelPicker&&chosenFile){
+      if(!auth.isClosed())await auth.waitForEvent('close');
+      const remaining=await worker.evaluate(()=>chrome.windows.getAll());
+      assert(!remaining.some(window=>window.id===popup.id),'Successful file selection must close its popup');
+      assert(remaining.some(window=>window.id===readerWindow.id),'The reader window must remain open');
+    }else{
+      await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();
+      assert(await auth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Popup content must fit without horizontal scrolling');
+      await auth.screenshot({path:path.join(run,cancelPicker?'drive-popup-cancelled.png':'drive-popup.png'),fullPage:true});
+      assert(!auth.isClosed(),'Cancellation and account-only connections must leave the popup open');
+      if(cancelPicker)assert(await auth.locator('#connect').isEnabled(),'Cancellation must allow another selection');
+      await worker.evaluate(id=>chrome.windows.remove(id),popup.id);
+    }
   };
   if(nativeMode){
     cancelPicker=true;await select();await reader.getByRole('alert').waitFor();cancelPicker=false;
@@ -166,9 +175,15 @@ try{
   chosenFile=undefined;await select();await reader.getByRole('status').filter({hasText:'Google Drive 已连接'}).waitFor();
   assert.deepEqual(await catalogCounts(),[1,0]);await checkAccount('account-only-connection');
   checks.push('An account-only selection saves its verified name and email even with zero imported files');
+  if(!nativeMode){
+    cancelPicker=true;await select();await reader.getByRole('alert').waitFor();cancelPicker=false;
+    assert.deepEqual(await catalogCounts(),[1,0]);
+  }
+  checks.push('Cancelling Picker keeps its popup open with file selection enabled and imports no files');
   chosenFile='fixture-page';const initialPickers=stats.pickers;
   await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,initialPickers+1);
   checks.push('Drive opens in a separate popup without adding a tab to the reader window');
+  checks.push('Successful file selection automatically closes the popup while keeping the reader open');
   checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
   phase='decode original';await reader.waitForFunction(([width,height])=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===width&&image.naturalHeight===height;},dimensions,{timeout:15000});
   await noReaderError();assert(stats.rangeReads>0);await reader.screenshot({path:path.join(run,'reader.png')});checks.push('Confirmed Drive reference is registered and the real reader decodes the synthetic original through authenticated Range reads');

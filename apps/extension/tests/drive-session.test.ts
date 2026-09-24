@@ -56,7 +56,7 @@ beforeEach(() => {
     },
     tabs: {
       update: vi.fn(async (id: number, patch: {url: string}) => Object.assign(tabs.get(id)!, patch)),
-      remove: vi.fn(async (id: number) => { tabs.delete(id); }),
+      remove: vi.fn(async (id: number) => { tabs.delete(id); onRemoved(id); }),
       get: vi.fn(async (id: number) => tabs.get(id)),
       onRemoved: {addListener: (value: typeof onRemoved) => { onRemoved = value; }}, onUpdated: {addListener: (value: typeof onUpdated) => { onUpdated = value; }},
     }, scripting: {executeScript: vi.fn(async () => [])},
@@ -96,6 +96,7 @@ describe('trusted Drive session reuse', () => {
     now += 120_000;
     const payload = {nonce: pending.nonce, accessToken: original.accessToken, expiresIn: 86_400, files: [{fileId: 'file-1'}]};
     expect(await send({type: 'NC_DRIVE_BRIDGE_RESULT', payload}, sender)).toEqual({ok: true});
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(pending.tabId);
     expect(session[tokenKey()]).toEqual(original);
     expect(api.account).toHaveBeenCalledOnce(); expect(api.metadata).toHaveBeenCalledOnce();
     expect(await send({type: 'NC_DRIVE_TOKEN', accountId: account.id, generation: original.generation})).toMatchObject({ok: true, ...original});
@@ -149,6 +150,7 @@ describe('trusted Drive session reuse', () => {
     const second = {id: 'account-2', displayName: 'Bob'}; api.account.mockResolvedValueOnce(second);
     const reply = await send({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: pending.nonce, accessToken: 'new-account-token', expiresIn: 3600, files: []}}, sender);
     expect(reply).toEqual({ok: true}); expect(session[tokenKey()]).toEqual(old);
+    expect(chrome.tabs.remove).not.toHaveBeenCalled();
     expect(session[tokenKey(second.id)]).toMatchObject({accessToken: 'new-account-token', account: second, expiresAt: now + 3_570_000});
     expect(session[tokenKey(second.id)].generation).not.toBe(old.generation);
   });
