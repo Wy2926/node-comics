@@ -1,0 +1,76 @@
+---
+import { Image, getImage } from 'astro:assets';
+import Compare from './Compare';
+import ScreenshotGallery from './ScreenshotGallery';
+import { localPath, type Locale } from '../i18n';
+import { homeCopy } from '../i18n/home';
+import original from '../assets/journey-original.webp';
+import chinese from '../assets/journey-translated.webp';
+import english from '../assets/journey-en.webp';
+import korean from '../assets/journey-ko.webp';
+import library from '../assets/product/01-your-comic-library.png';
+import reader from '../assets/product/02-reading-controls.png';
+import languages from '../assets/product/03-translation-languages.png';
+import websites from '../assets/product/04-supported-websites.png';
+import appearance from '../assets/product/05-personalize-your-reader.png';
+import popup from '../assets/product/06-browser-popup.png';
+import '../styles/home.css';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const h = homeCopy[locale];
+const href = (path: string) => localPath(path, locale);
+const examples = await Promise.all([
+  { id: 'original', image: original },
+  { id: 'zh', image: chinese },
+  { id: 'en', image: english },
+  { id: 'ko', image: korean },
+].map(async ({ id, image }, i) => ({ id, label: h.comparison.labels[i], width: image.width, height: image.height, src: (await getImage({ src: image, width: 760, format: 'webp', quality: 88 })).src })));
+const crops = [
+  [{ x: 350, y: 104, width: 1328, height: 760 }],
+  [{ x: 768, y: 402, width: 506, height: 796 }, { x: 1580, y: 12, width: 374, height: 590 }],
+  [{ x: 768, y: 402, width: 506, height: 796 }, { x: 1645, y: 442, width: 310, height: 569 }],
+  [{ x: 350, y: 104, width: 1328, height: 825 }],
+  [{ x: 449, y: 315, width: 1134, height: 550 }],
+];
+const images = await Promise.all([library, reader, languages, websites, appearance].map(async (image, i) => ({
+  src: (await getImage({ src: image, format: 'webp', quality: 90 })).src,
+  width: image.width, height: image.height, label: h.galleryLabels[i], description: h.galleryBodies[i], alt: h.galleryAlt[i], crops: crops[i],
+})));
+---
+<div class="product-home">
+  <section class="container product-hero">
+    <div class="product-hero-copy">
+      <p class="eyebrow">{h.eyebrow}</p>
+      <h1>{h.title[0]}<br/><span>{h.title[1]}</span></h1>
+      <p class="product-lead">{h.description}</p>
+      <div class="hero-actions"><a class="button" href={href('/download/')}>{h.install}</a><a class="text-link" href="#see-it">{h.seeReader}</a></div>
+      <p class="product-platform">{h.desktop}<span>Chrome / Edge</span></p>
+    </div>
+    <figure class="popup-showcase">
+      <div class="popup-image"><Image src={popup} alt={h.popupAlt} width={420} format="webp" quality={95} loading="eager" fetchpriority="high" /></div>
+      <figcaption>{h.popupCaption}</figcaption>
+    </figure>
+  </section>
+  <div class="product-trust"><div class="container">{h.trust.map(text => <p>{text}</p>)}</div></div>
+  <section class="container product-section toolbar-story">
+    <div class="product-section-heading"><div><p class="eyebrow">01 / NODELANE COMICS</p><h2>{h.stepsTitle}</h2></div><p>{h.stepsIntro}</p></div>
+    <ol class="toolbar-steps">{h.steps.map(([title, body], index) => <li><span class="step-index">0{index + 1}</span><h3>{title}</h3><p>{body}</p></li>)}</ol>
+  </section>
+  <section class="product-reader-section" id="see-it"><div class="container product-section">
+    <div class="product-section-heading"><div><p class="eyebrow">{h.readerEyebrow}</p><h2>{h.readerTitle}</h2></div><p>{h.readerBody}</p></div>
+    <ScreenshotGallery client:visible images={images} name={h.galleryName} enlarge={h.enlarge} close={h.close} note={h.screenshotNote}/>
+  </div></section>
+  <section class="container product-section product-comparison" id="translation">
+    <div class="product-comparison-copy"><p class="eyebrow">{h.compareEyebrow}</p><h2>{h.compareTitle}</h2><p>{h.compareBody}</p><p class="sample-note">{h.compareNote}</p><a class="text-link" href={href('/guides/translation-modes/')}>{h.compareLink}</a></div>
+    <Compare client:visible examples={examples} locale={locale} copy={h.comparison}/>
+  </section>
+  <section class="container product-section product-sources"><div class="product-section-heading"><div><p class="eyebrow">{h.sourcesEyebrow}</p><h2>{h.sourcesTitle}</h2></div></div>
+    <div class="source-grid">{h.sources.map(([title, body, link], i) => <article><span class="source-number">0{i + 1}</span><h3>{title}</h3><p>{body}</p>{i === 0 && <div class="format-tags">{['CBZ / ZIP', 'CBR / RAR', 'PDF', 'DRM-free MOBI'].map(format => <span>{format}</span>)}</div>}<a class="text-link" href={href(i === 0 ? '/guides/local-comics/' : '/guides/manga-translation/')}>{link}</a></article>)}</div>
+  </section>
+  <section class="container product-section product-modes"><div class="product-section-heading"><div><p class="eyebrow">{h.modesEyebrow}</p><h2>{h.modesTitle}</h2></div><p>{h.controlNote}</p></div>
+    <div class="mode-grid">{h.modes.map(([title, body]) => <article><h3>{title}</h3><p>{body}</p></article>)}</div>
+    <aside class="product-privacy"><div><h3>{h.privacyTitle}</h3><p>{h.privacyBody}</p></div><div><a class="text-link" href={href('/privacy/')}>{h.privacy}</a><a class="text-link" href={href('/pricing/')}>{h.pricing}</a></div></aside>
+  </section>
+  <section class="container cta-section product-cta"><div><p class="eyebrow">{h.eyebrow}</p><h2>{h.ctaTitle}</h2><p>{h.ctaBody}</p></div><a class="button light" href={href('/download/')}>{h.install}</a></section>
+</div>

@@ -1,6 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dictionaries, locales, localPath, basePath, localeFromPath, publicPaths } from '../src/i18n';
+import { homeCopy } from '../src/i18n/home';
+
+test('homepage locales provide complete text and matching gallery/translation entries', () => {
+  function check(value: unknown, reference: unknown, path: string) {
+    if (typeof reference === 'string') {
+      assert.equal(typeof value, 'string', path);
+      assert.ok((value as string).trim(), `${path} must not be empty`);
+    } else if (Array.isArray(reference)) {
+      assert.ok(Array.isArray(value), path);
+      assert.equal(value.length, reference.length, path);
+      reference.forEach((entry, index) => check(value[index], entry, `${path}.${index}`));
+    } else if (reference && typeof reference === 'object') {
+      assert.ok(value && typeof value === 'object', path);
+      assert.deepEqual(Object.keys(value).sort(), Object.keys(reference).sort(), path);
+      for (const [key, entry] of Object.entries(reference)) check((value as Record<string, unknown>)[key], entry, `${path}.${key}`);
+    }
+  }
+  for (const locale of locales) check(homeCopy[locale], homeCopy.en, locale);
+});
 test('five independent dictionaries cover all public content and account messages',()=>{
   const reference=dictionaries['zh-CN'];
   for(const locale of locales){

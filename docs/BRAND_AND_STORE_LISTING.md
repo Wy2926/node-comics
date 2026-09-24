@@ -1,6 +1,6 @@
 # 产品名称与 Chrome 应用商店文案
 
-日期：2026-09-20。交付状态：用户已采纳中英文名称；客户端名称、manifest 名称与简介已接入 15 种语言字典，尚未发布商店。官网为 https://comics.nodelane.net/ 。
+日期：2026-09-24。交付状态：用户已采纳中英文名称；客户端名称、manifest 名称与简介已接入 16 种语言字典。官网为 https://comics.nodelane.net/ 。本次公开 Chrome 商店链接显示商品不能下载；后台审核状态未核实，不能把已配置商店地址写成已上架。
 
 ## 名称
 
@@ -32,11 +32,11 @@
 NodeLane 漫译是一款集 AI 漫画翻译与漫画阅读器于一体的浏览器插件。将支持的网页漫画或本地文件放入阅读器，选择目标语言，边看边译，随时对照原图与译图。
 
 - 边看边译：开启自动翻译后，随阅读进度处理当前页和后续页面，逐页显示翻译结果。
-- 网页漫画翻译：在支持的网页中显示译图，也可将漫画图片导入独立阅读器。
+- 网页漫画翻译：在支持的网页中显示译图；将网站漫画导入独立阅读器需要该网站有专门适配。
 - 沉浸阅读：支持连续滚动、单页阅读、左右阅读方向、缩放和全屏，自动记录阅读位置。
 - 原图译图对照：随时切换原图与译图，切换时保留阅读位置。
 - 本地漫画导入：支持 CBZ/ZIP、CBR/RAR、PDF 和未加密 MOBI 漫画。
-- 整理与保存：管理作品和章节，将原图或译图导出为 CBZ、图片 ZIP 或 PDF。
+- 书架与保存：一本漫画绑定一个来源，记录阅读位置；将原图或译图导出为 CBZ、图片 ZIP 或 PDF。不支持散图导入或章节资料编辑。
 - 翻译方式：提供常规翻译与 AI 重绘翻译，可选语言与使用权益以账户内显示为准。
 
 阅读本地原图无需登录；翻译需要登录和网络连接，并受账户权益与额度限制。发起翻译的图片会上传至云端处理。网页兼容性和翻译效果取决于站点结构、图片质量及语言支持。
@@ -48,11 +48,11 @@ NodeLane 漫译是一款集 AI 漫画翻译与漫画阅读器于一体的浏览�
 NodeLane Comics combines an AI manga translator with a dedicated comic reader. Bring comics from supported websites or import local files, choose a target language, and translate as you read. Keep the original pages available for comparison.
 
 - Translate as you read: enable automatic translation to process the current page and upcoming pages, with results appearing page by page.
-- Read on the web: display translations on supported pages or bring comic images into the dedicated reader.
+- Read on the web: display translations on supported pages. Importing a website comic into the dedicated reader requires a supported website adapter.
 - Read comfortably: use continuous scrolling or single-page mode, choose your reading direction, zoom in, and go full screen. Your reading position is saved automatically.
 - Compare originals and translations: switch views without losing your place.
-- Import local comics: open images, CBZ/ZIP, CBR/RAR, PDF, and DRM-free MOBI comics.
-- Organize and export: manage works and chapters, and export original or translated pages as CBZ, image ZIP, or PDF.
+- Import local comics: open CBZ/ZIP, CBR/RAR, PDF, and supported DRM-free MOBI comics. Loose image import is not supported.
+- Keep your place and export: each comic has one source and saved reading progress. Export original or translated pages as CBZ, image ZIP, or PDF. Chapter metadata editing is not supported.
 - Choose a translation mode: use standard translation or AI redraw translation. Available languages and access depend on the options shown in your account.
 
 Use NodeLane Comics to read manga, manhwa, manhua, and other image-based comics in one place.
@@ -66,7 +66,7 @@ Website: https://comics.nodelane.net/
 - 中文标题自然包含“漫画翻译”和“阅读器”；英文标题包含 Manga Translator 与 Reader，简介补充 comic reader、manhwa、manhua。此关键词取舍依据功能与搜索意图，不是已验证的搜索量或排名权重。
 - NodeLane 提供品牌区分和域名关联。避免仅使用泛称“漫画翻译器”，也不在标题罗列同类品牌或重复关键词。
 - 名称不超过 75 字符，简介不超过 132 字符；上述中英文标题分别为 25、46 字符，简介分别为 72、131 字符。
-- 通过扩展本地化机制分别提供名称与简介，并在商店后台提供对应语言的详细描述与截图。客户端已实现 15 种界面语言；商店后台的条目语言与应用内语言偏好分别管理。
+- 通过扩展本地化机制分别提供名称与简介，并在商店后台提供对应语言的详细描述与截图。客户端已实现 16 种界面语言；商店后台的条目语言与应用内语言偏好分别管理。
 - Google 官方说明排名会考虑用户评价以及下载、卸载等使用统计。此方案旨在提高用途辨识和相关性，不承诺排名提升或具体名次。
 - 文案基于当前仓库声明的功能范围。正式上架时须与发布包和生产服务一致；仅展示可用的翻译模式和语言，不宣称支持所有网站、所有语言、无限免费或即时完成。
 - 当前产品语言选项不等于源语言 OCR 已完成效果验收，详见[语言支持](NODE_CONFIGURATION.md#目标语言与节点能力)。格式边界见[导入格式与缓存](IMPORT_FORMATS_AND_CACHE.md)，网页能力见[网页内翻译](IN_PAGE_TRANSLATION.md)。

@@ -26,7 +26,7 @@ export default {
     "support": "Reader support",
     "company": "About us",
     "copyright": "Made for people who love stories.",
-    "artNote": "Original AI-generated artwork · Respect creators and copyright",
+    "artNote": "Product screenshots & original AI illustrations · Comic artwork belongs to its respective owners",
     "ogAlt": "Original NodeLane Comics seaside manga illustration",
     "heroTitle": "Beyond words. Into the story.",
     "heroDescription": "Give your favorite manga a version you can understand. Read and translate web comics and your local collection, one page at a time.",
@@ -45,7 +45,7 @@ export default {
       "A new chapter for your collection"
     ],
     "featureBodies": [
-      "The current image and the next two are translated as you read. Your reading position stays put when results arrive.",
+      "Choose translation to process the current image and the next three as you read. Your reading position stays put when results arrive.",
       "Use classic translation for everyday reading, or try AI redraw for a different rendering. The original stays one click away.",
       "Choose CBZ/ZIP, CBR/RAR, PDF or supported DRM-free MOBI to import and start reading automatically. Each file is one comic; loose images are not supported."
     ],
@@ -105,7 +105,7 @@ export default {
     "installStepLoad": "Click Load unpacked, select the folder containing manifest.json, then pin the extension to your toolbar.",
     "manualUpdateNote": "Manual installations do not update automatically. Download the new version, replace the files in the original folder, then click Reload on the extensions page. Keep the installation folder in place.",
     "firefoxDownloadNote": "A Firefox ZIP installation is not available. Use Chrome or Edge, or install from the Firefox store when its link is available.",
-    "storeHeading": "Or install from your browser’s store",
+    "storeHeading": "Browser store links",
     "storeNote": "If a store link is unavailable, use the Chrome / Edge ZIP above.",
     "guidesTitle": "Make reading a little easier.",
     "guidesDescription": "Practical guides to translation modes, local formats, troubleshooting and where your data goes.",
@@ -163,7 +163,7 @@ export default {
             "title": "Discover, check, then read",
             "paragraphs": [
               "On a website with a dedicated adapter, click Start reading to open the reader directly. Other webpages can use Translate current tab but cannot be imported into the library. Grant site and image-host permissions when needed. Source contents are read-only; there is no image selection, metadata form or chapter assignment.",
-              "Automatic translation works on the current image and the next two. Discovering image URLs does not mean the entire chapter has been downloaded: lazy loading, navigation changes and separate CDNs can affect retrieval."
+              "After you choose translation, it works on the current image and the next three. Discovering image URLs does not mean the entire chapter has been downloaded: lazy loading, navigation changes and separate CDNs can affect retrieval."
             ]
           },
           {
