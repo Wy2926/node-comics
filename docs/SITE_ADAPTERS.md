@@ -52,7 +52,7 @@ npm run build
 | 适配器 | 能力与说明 |
 | --- | --- |
 | [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | DOM 目录与 HTTP 图片；动态只读分类、完整性核对、12 小时目录同步 |
-| [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；不开放原位翻译 |
+| [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；授权后在详情页与章节页嵌入导入／管理入口，不开放原位翻译 |
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；授权后嵌入导入／管理按钮，章节 Referer，不创建来源采集标签页 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口，无源站采集标签页 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | 已渲染 canvas 部分窗口，直接阅读与原位翻译；无目录或自动补全 |

@@ -1,6 +1,7 @@
 {
   "requiredOrigins": [],
   "autoContentMatches": [],
+  "optionalContentMatches": ["https://comix.to/*"],
   "optionalOrigins": [
     "https://comix.to/*",
     "https://*.wowpic1.store/*"

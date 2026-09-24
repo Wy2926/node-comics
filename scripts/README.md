@@ -27,6 +27,7 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_source_export.mjs` | 新基线解压扩展：完整源文件逐字节导出、3 页 CBZ 与 PDF 可重新解析；仅自制样本与本机下载 |
 | `verify_website_source_lifecycle.mjs` | 本机 TLS / 隔离 DNS 下操作真实网站嵌入按钮、直接阅读、来源标签页、按需取图和主动下载；重开并让图片源失败后已下载页仍可读 |
 | 插件 `tests/reader-window-fixture.html` | Vite 独立 5181 端口，30 章 × 120 页合成夹具；检查 3 章 / 11 页 DOM 上限、跳页、偏移恢复与失败；桌面目标浏览器检查截图及位置恢复 |
+| `verify_reader_directory.mjs` | Vite 独立 5181 端口，`tests/reader-directory-fixture.html` 的 620 章合成目录；覆盖当前项超出首批、倒序、嵌套分组、搜索恢复、状态刷新不抢滚动、页面缩略图、失败／未就绪和重开位置；截图在 `artifacts/reader-directory/` |
 | `verify_extension_theme.mjs` | 新书架、真实导入、菜单 / 导出弹窗、4 色 × 亮暗主题、阅读浮层与位置恢复；默认 Vite 5175，可用 `TEST_READER_URL` 指定隔离主应用 |
 | `verify_catalog_sync.mjs` | 本机 TLS / 合成目录下的自动同步、动态分组、更新提示、失败保留与阅读位置；依赖 Python cryptography，使用下方相同浏览器变量 |
 | Comix `tests/verify-*.mjs` | 站点目录、图片还原、完整阅读器与请求头隔离；样本／真实网络边界见[Comix 说明](../apps/extension/src/sources/sites/comix/README.md) |

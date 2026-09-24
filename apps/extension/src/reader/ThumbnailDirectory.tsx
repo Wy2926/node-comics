@@ -18,11 +18,12 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
   const [scrollTop, setScrollTop] = useState(0);
   const [size, setSize] = useState({ width: 320, height: 500 });
   const rows = useMemo(() => thumbnailRows(pages, size.width), [pages, size.width]);
+  const current = rows[index];
   useLayoutEffect(() => {
-    const el = ref.current; const row = rows[index]; if (!el || !row)
+    const el = ref.current; const row = current; if (!el || !row)
       return; if (row.top < el.scrollTop || row.top + row.height > el.scrollTop + el.clientHeight)
-      el.scrollTop = row.top; setScrollTop(el.scrollTop);
-  }, [index, size.width, pages.length]);
+      el.scrollTop = row.top - Math.max(0, (el.clientHeight - row.height) / 2); setScrollTop(el.scrollTop);
+  }, [pages[index]?.id, index, current?.top, current?.height, size.height]);
   useEffect(() => {
     if (!ref.current)
       return; const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height })); observer.observe(ref.current); return () => observer.disconnect();

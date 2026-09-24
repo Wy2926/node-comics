@@ -11,14 +11,26 @@ export function ComicDirectory({directory:input,index,pageCount,onNavigate,child
  const singleFile=!directory.sourceUrl&&directory.entries.length===1;
  const list=useRef<HTMLDivElement>(null),query=search.trim().toLocaleLowerCase();
  const visible=useMemo(()=>{const entries=directory.entries.filter(e=>e.title.toLocaleLowerCase().includes(query));return descending?entries.reverse():entries;},[directory.entries,query,descending]);
- const entries=new Map(visible.slice(0,limit).map(e=>[e.id,e]));
+ const currentIndex=visible.findIndex(entry=>entry.current),currentId=visible[currentIndex]?.id;
+ // Include the current chapter even when it falls beyond the first batch.
+ const shownLimit=Math.max(limit,Math.ceil((currentIndex+1)/200)*200);
+ const entries=new Map(visible.slice(0,shownLimit).map(e=>[e.id,e]));
  const grouped=new Set(directory.groups.flatMap(g=>g.entryIds));
  const row=(entry:DirectoryEntry)=><button key={entry.id} className="nc-chapter-entry" aria-current={entry.current?'true':undefined} title={entry.error} onClick={()=>{if(entry.current&&pageCount)setTab('pages');else onNavigate(entry.id);}}><span className="nc-chapter-info"><b>{entry.title}</b>{entry.tags.length>0&&<small>{entry.tags.join(' · ')}</small>}<small>{entry.error||entry.status}{entry.total!=null&&' · '+msg('{0} 页',{'0':entry.total})}</small></span><span className={'nc-chapter-state '+(entry.current?'current':'')}>{entry.current?msg('阅读中'):entry.read?msg('已读'):msg('未读')}</span></button>;
  const group=(item:DirectoryGroup,depth=0):ReactNode=>{const children=directory.groups.filter(g=>g.parentId===item.id),ids=item.entryIds.map(id=>entries.get(id)).filter((e):e is DirectoryEntry=>!!e);if(descending)ids.reverse();if(depth>8)return null;return <details key={item.id} className="nc-source-group" open={query?true:undefined}><summary>{item.title}<span>{item.entryIds.length}</span></summary>{ids.map(row)}{children.map(child=>group(child,depth+1))}</details>;};
- useLayoutEffect(()=>{const active=list.current?.querySelector<HTMLElement>('[aria-current="true"]');if(active&&list.current&&tab==='contents'){let parent=active.parentElement;while(parent&&parent!==list.current){if(parent.tagName==='DETAILS')(parent as HTMLDetailsElement).open=true;parent=parent.parentElement;}}},[tab,directory]);
+ const groupLayout=JSON.stringify(directory.groups);
+ useLayoutEffect(()=>{
+  const container=list.current,active=container?.querySelector<HTMLElement>('[aria-current="true"]');
+  if(!container||!active||tab!=='contents')return;
+  let parent=active.parentElement;
+  while(parent&&parent!==container){if(parent.tagName==='DETAILS')(parent as HTMLDetailsElement).open=true;parent=parent.parentElement;}
+  // Scroll only the directory, leaving the reading viewport and focus untouched.
+  const bounds=container.getBoundingClientRect(),row=active.getBoundingClientRect();
+  container.scrollTop+=row.top-bounds.top-container.clientTop-(container.clientHeight-row.height)/2;
+ },[tab,currentId,currentIndex,query,descending,groupLayout]);
  return <><div className="nc-comic-directory-heading"><h3>{directory.title}</h3>{directory.sourceUrl&&<a className="text-link nc-directory-source" href={directory.sourceUrl} target="_blank" rel="noreferrer">{msg('打开来源')}</a>}</div>
   {!!pageCount&&!singleFile&&<div className="nc-directory-tabs" role="tablist" aria-label={msg('目录')}><button role="tab" aria-selected={tab==='contents'} onClick={()=>setTab('contents')}>{msg('目录')}<span>{directory.entries.length}</span></button><button role="tab" aria-selected={tab==='pages'} onClick={()=>setTab('pages')}>{msg('页面')}<span>{pageCount}</span></button></div>}
-  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={e=>{setSearch(e.target.value);setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(v=>!v)}>{descending?msg('倒序 ↓'):msg('正序 ↑')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?[...entries.values()].map(row):<>{directory.groups.filter(g=>!g.parentId).map(g=>group(g))}{[...entries.values()].filter(e=>!grouped.has(e.id)).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>limit&&<button className="button secondary" onClick={()=>setLimit(v=>v+200)}>{msg('显示更多')}</button>}</div></>}
+  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={e=>{setSearch(e.target.value);setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(v=>!v)}>{descending?msg('倒序 ↓'):msg('正序 ↑')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?[...entries.values()].map(row):<>{directory.groups.filter(g=>!g.parentId).map(g=>group(g))}{[...entries.values()].filter(e=>!grouped.has(e.id)).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>shownLimit&&<button className="button secondary" onClick={()=>setLimit(shownLimit+200)}>{msg('显示更多')}</button>}</div></>}
   {!!directory.related?.length&&<div className="nc-directory-footer">{directory.related.map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a></p>)}</div>}
  </>;
 }

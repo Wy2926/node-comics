@@ -1,0 +1,30 @@
+/* Shared by the public website and the standalone Drive connection page.
+   Palette and comic vocabulary follow apps/extension/src/ui/theme/tokens.css. */
+:root {
+  --canvas: #f6f8fc;
+  --surface: #fff;
+  --surface-soft: #f0f3f8;
+  --ink: #202d43;
+  --muted: #5e6d82;
+  --line: #dce3ed;
+  --accent: #1769b3;
+  --accent-hover: #125591;
+  --accent-soft: #eaf3ff;
+  --accent-on: #fff;
+  --success: #267352;
+  --danger: #af3845;
+  --comic-border: 2px solid var(--ink);
+  --comic-control-radius: 5px;
+  --comic-panel-radius: 8px 24px 24px 24px;
+  --comic-shadow: 4px 4px 0 var(--ink);
+  --comic-shadow-hover: 5px 5px 0 var(--ink);
+  --comic-shadow-active: 1px 1px 0 var(--ink);
+  --comic-perforation: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  --comic-dot-pattern: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) .7px, transparent .7px);
+  --comic-dot-size: 7px 7px;
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--canvas);
+  font-synthesis: none;
+  color-scheme: light;
+}

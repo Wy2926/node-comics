@@ -83,7 +83,7 @@ OpenResty 的根路径已改为沿用同一 upstream；不配置 SPA 回退。�
 - JSON-LD 包含 Organization、WebSite、WebPage、BreadcrumbList、SoftwareApplication、定价 Service/Offer、Article 和可见 FAQ 对应的 FAQPage。不伪造评分、评论、下载数量或商店地址。结构化数据不保证排名或搜索引擎展示富结果。
 - HTML 允许缓存但每次重新校验；带 hash 的静态资源缓存一年。账户和回调 `private, no-store`。真实 API 继续 `private, no-store`，不会因挂载官网而变成公开缓存。不存在的页面返回真实 404，尾斜线与 index.html 统一到规范 URL。
 - CSP 使用构建脚本的 SHA-256 授权 Astro 岛初始化，不放开任意内联脚本；脚本、字体、图片均本地提供，连接只允许同源和配置的身份令牌端点。默认无统计脚本、广告 Cookie 或第三方字体。
-- 视觉颜色、描边、折角圆角、硬阴影和网点来自插件登录窗口的 [tokens.css](../../apps/extension/src/ui/theme/tokens.css)。响应式布局支持移动端，支持键盘焦点与减少动态效果偏好。Logo 来源于插件，介绍插画通过指定图片接口生成，提示词与来源见 [ASSETS.md](ASSETS.md)。
+- 视觉颜色、描边、折角圆角、硬阴影和网点沿用插件登录窗口的 [tokens.css](../../apps/extension/src/ui/theme/tokens.css)，官网与 Google Drive 授权页共用 [public/design-tokens.css](public/design-tokens.css) 作为令牌来源。官网既有响应式布局保留；当前交互验收以桌面浏览器为目标，支持键盘焦点与减少动态效果偏好。Logo 来源于插件，介绍插画通过指定图片接口生成，提示词与来源见 [ASSETS.md](ASSETS.md)。
 
 构建检查会验证 HTML 标题、单一 H1、语言、canonical/hreflang、JSON-LD、图片属性、站内链接、sitemap 与私有索引边界。技术参考：[Astro 静态输出](https://docs.astro.build/en/guides/on-demand-rendering/)、[Google 多语言页面](https://developers.google.com/search/docs/specialty/international/localized-versions)、[Google 结构化数据](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data)。
 

@@ -2,12 +2,12 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {syncOptionalSourceContent} from '../src/sources/runtime/optional-content';
 afterEach(() => vi.unstubAllGlobals());
 describe('optional site entries', () => {
-  it('registers only after host grant, injects existing tabs, updates idempotently, and removes after revocation', async () => {
+  it.each([['naver', 'https://comic.naver.com/*'], ['comix', 'https://comix.to/*']])('registers %s only after host grant, injects existing tabs, updates idempotently, and removes after revocation', async (id, origin) => {
     let allowed = false;
     const scripts: chrome.scripting.RegisteredContentScript[] = [], injected = vi.fn(async () => []);
     vi.stubGlobal('navigator', {locks: {request: async (_key: string, run: () => Promise<void>) => run()}});
     vi.stubGlobal('chrome', {
-      permissions: {contains: async ({origins}: {origins: string[]}) => allowed && origins.every(origin => origin === 'https://comic.naver.com/*')}, tabs: {query: async () => [{id: 7}]},
+      permissions: {contains: async ({origins}: {origins: string[]}) => allowed && origins.every(value => value === origin)}, tabs: {query: async () => [{id: 7}]},
       scripting: {
         getRegisteredContentScripts: async () => [...scripts],
         registerContentScripts: async (rows: chrome.scripting.RegisteredContentScript[]) => scripts.push(...rows),
@@ -18,7 +18,7 @@ describe('optional site entries', () => {
     });
     await syncOptionalSourceContent(true); expect(scripts).toEqual([]); expect(injected).not.toHaveBeenCalled();
     allowed = true; await syncOptionalSourceContent(true);
-    expect(scripts).toEqual([expect.objectContaining({id: 'nc-source-entry-naver', matches: ['https://comic.naver.com/*'], allFrames: false})]);
+    expect(scripts).toEqual([expect.objectContaining({id: 'nc-source-entry-'+id, matches: [origin], allFrames: false})]);
     expect(injected).toHaveBeenCalledWith({target: {tabId: 7}, files: ['content-scripts/content.js']});
     await syncOptionalSourceContent(); expect(scripts).toHaveLength(1);
     scripts.push({id: 'another-feature', matches: ['https://example.com/*'], js: ['other.js']});
