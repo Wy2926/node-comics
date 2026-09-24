@@ -24,16 +24,21 @@
 从插件目录执行 `npm run check`、`npm test`、`npm run build`。定向回归：
 
 ```powershell
-npm test -- src/sources/sites/naver/tests/network.test.ts tests/optional-source-content.test.ts
+npm test -- src/sources/sites/naver/tests/network.test.ts tests/optional-source-content.test.ts tests/source-import-navigation.test.ts
 ```
 
 真实扩展验收从仓库根目录执行，沿用[公共浏览器环境](../../../../../../scripts/README.md#来源与阅读验收)的 `PLAYWRIGHT_MODULE` / `TEST_CHROMIUM`：
 
 ```powershell
 node apps/extension/src/sources/sites/naver/tests/verify-browser.mjs
+node apps/extension/src/sources/sites/naver/tests/verify-import-navigation.mjs
 ```
 
-脚本新建隔离 profile 和构建产物副本，预授予本站权限，仅读取公开作品，不读取用户浏览器账号，不调用翻译模型。截图与脱敏结果存入被忽略的 `artifacts/naver-validation/`。
+`verify-browser.mjs` 新建隔离 profile 和构建产物副本，预授予本站权限，仅读取公开作品，不读取用户浏览器账号，不调用翻译模型。截图与脱敏结果存入被忽略的 `artifacts/naver-validation/`。
+
+`verify-import-navigation.mjs` 使用隔离的合成网页、目录与随包样图，拦截外部网络，不访问真实 Naver。覆盖从首页 `pushState` 到作品页后首次点击、直接进入目录、图片解码、重开阅读与目录失败后的再次导入；结果与截图存入 `artifacts/naver-import-navigation/`。
+
+2026-09-24：在 Chromium 扩展中复现并修复首页站内跳转后的首次点击失败。Chrome 的消息 `sender.url` 仍是原始首页，而 `tabs.get` 已是作品页；公共导入入口改为验证发送方来源与当前标签页同源，再按当前页面判定导入能力。上述合成页面浏览器回归通过；本次未重验真实网站网络协议或原生授权弹窗。
 
 2026-09-23 实测：正式 Webtoon 样本 `758037` 的目录为 266 条，第一话清单为 137 张；通过真实嵌入按钮导入，关闭源站后读图、跳至第 10 页、回书架重开恢复通过，实际目录调度刷新通过；阅读与刷新新增源站标签页为 0。阅读页按钮复用同一本漫画，未重复创建。`bestChallenge/851953`、`challenge/842677` 的目录与首话清单分别为 5 条／12 张、6 条／4 张。正式 Webtoon 样本完整阅读器流程已验，两个投稿样本验到真实清单解析，未逐页解码全部图片。
 

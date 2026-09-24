@@ -38,9 +38,11 @@ function trusted(sender: chrome.runtime.MessageSender) {
 async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
 }
-async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>, preferCatalog = false) {
+async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>, preferCatalog = false, senderUrl?: string) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请打开普通漫画网页。'));
+  if (senderUrl && new URL(tab.url).origin !== new URL(senderUrl).origin)
+    throw Error(msg('来源页面已变化，请重新发现。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
   if (preferCatalog && loc.kind === 'reader' && loc.catalog && networkOperation(loc.catalog.url, 'catalog')) {
@@ -118,14 +120,16 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     // an unowned message would race their reply, even for a trusted extension page.
     if (!sourceMessageTypes.has(message?.type)) return;
     if (message.type === 'NC_IMPORT_CURRENT') {
-      const fromDetail =
+      // Chrome can retain the document's original sender.url after pushState.
+      // Authenticate the source here; discover validates the current tab's page and origin.
+      const fromSourcePage =
         sender.id === chrome.runtime.id &&
         sender.tab?.id != null &&
         sender.frameId === 0 &&
-        ['catalog','reader'].includes(sourceLocation(sender.url ?? '')?.kind??'') &&
+        !!sourceLocation(sender.url ?? '') &&
         sourceFor(sender.url??'').definition.capabilities.importable;
-      if (!fromDetail) return;
-      void discover(sender.tab!.id!,readCatalog,true)
+      if (!fromSourcePage) return;
+      void discover(sender.tab!.id!,readCatalog,true,sender.url)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )
