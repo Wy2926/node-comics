@@ -2,6 +2,13 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 Drive 文件夹与未知类型显示修复
+
+- 修复提交 `e736d38` 已推送至 `main`，线上仅原子替换 `/drive-connect/connect.js`：显示文件夹供浏览、禁止整目录选择，取消 MIME 过滤以免未知类型 MOBI 被隐藏。导入后的格式、权限和内容核验保持有效，无需重发插件包。
+- 服务器备份位于 `/opt/nodelane/node-comics/drive-picker-e736d38/backup/`，同目录上级保存部署脚本与验证记录。OAuth 配置哈希不变；未更新 API、数据库、代理配置或其他静态文件。
+- 公网脚本 SHA-256 为 `de47c9d8252ebb39a3f430c08a0e02d39c36de1e5a276cf412c6a8e04577e6fd`，HTTP 200，保留 `no-store, no-transform`。本机 Chrome 公网核对六项资源与源码一致，无页面异常，直接访问的插件入口校验正常；截图和报告位于 `artifacts/drive-picker-e736d38/`。
+- 81 项相关测试通过；隔离 Chrome 的模拟 Google / Identity MOBI 回归覆盖选择器配置、导入、位置恢复、失败、重启和断开。真实账户中的目录导航及用户具体 MOBI 文件尚未验收。
+
 ## 2026-09-24 插件 0.2.0 与云盘页更新
 
 - 插件 `package.json` 与 lockfile 升级为 0.2.0，生成 Chrome MV3、Firefox MV3 和 Firefox 审核源码 ZIP。构建写入正式 API / Drive URL；Chrome 保留既有 OAuth client，Firefox 使用网页授权。包、SHA-256 清单和验证日志位于本地忽略目录 `artifacts/release-0.2.0/`。
