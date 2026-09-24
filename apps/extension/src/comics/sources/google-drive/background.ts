@@ -119,6 +119,31 @@ export function registerDriveBackground() {
     void (async () => {
       const pending = await read<PendingDriveBridge>(pendingKey(tabId));
       if (!pending) return;
+      if (pending.oauth?.phase === 'away' && pending.expiresAt > Date.now()) {
+        // Google pages do not need host permissions. Their URLs may be hidden
+        // from tabs events; only our exact callback gets the bridge again.
+        if (!change.url && !tab.url) return;
+        const currentUrl = new URL(change.url ?? tab.url ?? 'about:blank');
+        const callback = new URL(pending.url);
+        const onCallback = currentUrl.origin === callback.origin && currentUrl.pathname === callback.pathname;
+        const onGoogle = currentUrl.protocol === 'https:' && !currentUrl.port &&
+          ['accounts.google.com', 'docs.google.com', 'drive.google.com'].includes(currentUrl.hostname);
+        if (!onCallback && !onGoogle) {
+          await failPending(pending, new DriveError('invalid-bridge', '授权页面已过期或离开。')); return;
+        }
+        // The local callback script removes the OAuth fragment before this document
+        // receives the bridge. Never persist or log the navigation URL / credentials.
+        if (change.status === 'complete' && tab.url === pending.url) {
+          const capturedEpoch = authorizationEpoch, capturedTabEpoch = tabEpoch(tabId);
+          pending.oauth.phase = 'returned';
+          await chrome.storage.session.set({[pendingKey(tabId)]: pending});
+          if (disconnecting || authorizationEpoch !== capturedEpoch || tabEpochs.get(tabId) !== capturedTabEpoch) {
+            await failPending(pending, new DriveError('invalid-bridge', '授权页面已离开。')); return;
+          }
+          await chrome.scripting.executeScript({target: {tabId, frameIds: [0]}, files: ['content-scripts/drive-bridge.js']});
+        }
+        return;
+      }
       if (pending.expiresAt < Date.now() || (change.url && change.url !== pending.url) || ((pending.initialized || initializing.has(pending.id)) && change.status === 'loading')) {
         await failPending(pending, new DriveError('invalid-bridge', '授权页面已过期或离开。')); return;
       }
@@ -129,8 +154,40 @@ export function registerDriveBackground() {
     })().catch(() => {});
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['NC_DRIVE_BRIDGE_INIT', 'NC_DRIVE_BRIDGE_RESULT', 'NC_DRIVE_CONNECT', 'NC_DRIVE_STATUS', 'NC_DRIVE_TOKEN', 'NC_DRIVE_DISCONNECT', 'NC_DRIVE_ACCOUNTS'].includes(message?.type)) return;
+    if (!['NC_DRIVE_BRIDGE_INIT', 'NC_DRIVE_BRIDGE_RESULT', 'NC_DRIVE_OAUTH_START', 'NC_DRIVE_CONNECT', 'NC_DRIVE_STATUS', 'NC_DRIVE_TOKEN', 'NC_DRIVE_DISCONNECT', 'NC_DRIVE_ACCOUNTS'].includes(message?.type)) return;
     void (async () => {
+      if (message.type === 'NC_DRIVE_OAUTH_START') {
+        const capturedEpoch = authorizationEpoch;
+        const capturedTabEpoch = sender.tab?.id === undefined ? undefined : tabEpoch(sender.tab.id);
+        const assertActive = () => {
+          if (disconnecting || capturedEpoch !== authorizationEpoch || capturedTabEpoch === undefined ||
+              tabEpochs.get(sender.tab!.id!) !== capturedTabEpoch)
+            throw new DriveError('invalid-bridge', '授权页面已失效。');
+        };
+        const pending = await pendingSender(sender);
+        assertActive();
+        if (!pending.initialized || message.nonce !== pending.nonce || typeof message.clientId !== 'string' ||
+            !/^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$/.test(message.clientId) || initializing.has(pending.id))
+          throw new DriveError('invalid-bridge', '授权返回无效。');
+        initializing.add(pending.id);
+        try {
+          const state = crypto.randomUUID() + crypto.randomUUID();
+          const callback = new URL(pending.url); callback.hash = '';
+          const authorize = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+          authorize.search = new URLSearchParams({client_id: message.clientId, redirect_uri: callback.href,
+            response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.file',
+            include_granted_scopes: 'false', prompt: 'consent select_account', trigger_onepick: 'true',
+            allow_multiple: 'true', state}).toString();
+          pending.oauth = {state, phase: 'away'};
+          delete pending.documentId; delete pending.initialized; delete pending.reusedToken;
+          await chrome.storage.session.set({[pendingKey(pending.tabId)]: pending});
+          assertActive();
+          return {ok: true, state, url: authorize.href, expiresAt: pending.expiresAt};
+        } catch (error) {
+          await failPending(pending, new DriveError('invalid-bridge', '授权页面已失效。'));
+          throw error;
+        } finally { initializing.delete(pending.id); }
+      }
       if (message.type === 'NC_DRIVE_BRIDGE_INIT') {
         const capturedTabEpoch = sender.tab?.id === undefined ? undefined : tabEpoch(sender.tab.id);
         const capturedEpoch = authorizationEpoch;
@@ -141,9 +198,10 @@ export function registerDriveBackground() {
         const pending = await pendingSender(sender);
         assertActive();
         if (pending.initialized || initializing.has(pending.id)) throw new DriveError('invalid-bridge', '授权页面已初始化。');
+        if (pending.oauth?.phase === 'away') throw new DriveError('invalid-bridge', '授权页面已失效。');
         initializing.add(pending.id);
         try {
-          const token = await reusableToken(pending.expectedAccountId);
+          const token = pending.oauth ? undefined : await reusableToken(pending.expectedAccountId);
           const current = await pendingSender(sender);
           assertActive();
           if (current.id !== pending.id || current.initialized) throw new DriveError('invalid-bridge', '授权页面已失效。');
@@ -156,7 +214,7 @@ export function registerDriveBackground() {
           const reusable = token && latest?.accessToken === token.accessToken && latest.generation === token.generation &&
             (token.provider === 'chrome' ? latest.expiresAt >= token.expiresAt : latest.expiresAt === token.expiresAt) && token.expiresAt > Date.now() + 30_000;
           // Credentials stay in trusted session storage and this exact document's one-use bridge.
-          return {ok: true, nonce: pending.nonce, expiresAt: pending.expiresAt, ...(token?.provider === 'chrome' ? {authMode: 'chrome'} : {}),
+          return {ok: true, nonce: pending.nonce, expiresAt: pending.expiresAt, oauthRedirect: true, ...(token?.provider === 'chrome' ? {authMode: 'chrome'} : {}),
             ...(reusable ? {session: {accessToken: token.accessToken, expiresAt: token.expiresAt, displayName: token.account.displayName}} : {})};
         } catch (error) {
           await failPending(pending, error instanceof DriveError ? error : new DriveError('unavailable', 'Google Drive 连接未完成，请重新尝试。'));

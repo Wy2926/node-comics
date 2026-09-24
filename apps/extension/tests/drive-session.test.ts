@@ -65,6 +65,87 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
+describe('top-level Google OAuth bridge', () => {
+  async function start() {
+    const flow = await connect();
+    await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
+    const result = await send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test-client.apps.googleusercontent.com'}, flow.sender);
+    expect(result.ok).toBe(true);
+    return {...flow, result};
+  }
+  it('constructs a bounded public-client request and accepts a new callback document only once', async () => {
+    const flow = await start(), url = new URL(flow.result.url);
+    expect(url.origin).toBe('https://accounts.google.com');
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.file',
+      trigger_onepick: 'true', include_granted_scopes: 'false', redirect_uri: 'https://trusted.example/drive-connect/index.html'});
+    const tab = tabs.get(flow.pending.tabId)!; tab.url = url.href;
+    onUpdated(tab.id, {url: url.href, status: 'loading'}, tab);
+    await vi.waitFor(() => expect(session['nc-drive-pending:' + tab.id]?.oauth.phase).toBe('away'));
+    expect((await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender)).ok).toBe(false);
+    tab.url = flow.pending.url;
+    onUpdated(tab.id, {status: 'complete'}, tab);
+    await vi.waitFor(() => expect(chrome.scripting.executeScript).toHaveBeenCalled());
+    const sender = {...flow.sender, documentId: 'new-callback-document'};
+    expect(await send({type: 'NC_DRIVE_BRIDGE_INIT'}, sender)).toMatchObject({ok: true});
+    const message = {type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: flow.pending.nonce, oauthState: flow.result.state,
+      accessToken: 'authorized-web-token', expiresIn: 3600, files: [{fileId: 'file-1'}]}};
+    expect(await send(message, sender)).toEqual({ok: true});
+    expect((await send(message, sender)).ok).toBe(false);
+    expect(api.account).toHaveBeenCalledTimes(1); expect(api.metadata).toHaveBeenCalledTimes(1);
+  });
+  it('rejects uninitialized callers and stale document / wrong nonce / arbitrary client URL', async () => {
+    const flow = await connect();
+    const message = {type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test.apps.googleusercontent.com'};
+    expect((await send(message, flow.sender)).ok).toBe(false);
+    await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
+    for (const [request, sender] of [[{...message, nonce: 'wrong'}, flow.sender], [{...message, clientId: 'https://evil.example'}, flow.sender],
+      [message, {...flow.sender, documentId: 'stale'}]] as const) expect((await send(request, sender)).ok).toBe(false);
+  });
+  it('permits hidden Google tab URLs without requesting access to Google pages', async () => {
+    const flow = await start();
+    onUpdated(flow.pending.tabId, {status: 'loading'}, {id: flow.pending.tabId, url: undefined as unknown as string});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(session['nc-drive-pending:' + flow.pending.tabId]?.oauth.phase).toBe('away');
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+  });
+  it.each(['https://evil.example/', 'https://accounts.google.com.evil.example/'])('cancels navigation to %s', async url => {
+    const flow = await start(), tab = tabs.get(flow.pending.tabId)!; tab.url = url;
+    onUpdated(tab.id, {url}, tab);
+    await vi.waitFor(() => expect(session['nc-drive-pending:' + tab.id]).toBeUndefined());
+    expect(api.account).not.toHaveBeenCalled(); expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+  });
+  it('rejects a wrong OAuth state before calling Drive', async () => {
+    const flow = await start(), tab = tabs.get(flow.pending.tabId)!;
+    onUpdated(tab.id, {status: 'complete'}, tab);
+    await vi.waitFor(() => expect(session['nc-drive-pending:' + tab.id].oauth.phase).toBe('returned'));
+    const sender = {...flow.sender, documentId: 'returned-document'};
+    await send({type: 'NC_DRIVE_BRIDGE_INIT'}, sender);
+    const result = await send({type: 'NC_DRIVE_BRIDGE_RESULT', payload: {nonce: flow.pending.nonce, oauthState: 'wrong', accessToken: 'authorized-web-token', expiresIn: 3600, files: []}}, sender);
+    expect(result).toMatchObject({ok: false, code: 'invalid-bridge'}); expect(api.account).not.toHaveBeenCalled();
+  });
+  it('does not resurrect a pending authorization after disconnect races with its storage write', async () => {
+    const flow = await connect(); await send({type: 'NC_DRIVE_BRIDGE_INIT'}, flow.sender);
+    let release!: () => void, reached!: () => void;
+    const gate = new Promise<void>(resolve => {release = resolve;}); const ready = new Promise<void>(resolve => {reached = resolve;});
+    vi.mocked(chrome.storage.session.set).mockImplementationOnce(async values => { reached(); await gate; Object.assign(session, structuredClone(values)); });
+    const starting = send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test.apps.googleusercontent.com'}, flow.sender);
+    await ready; await send({type: 'NC_DRIVE_DISCONNECT', accountId: account.id}); release();
+    expect((await starting).ok).toBe(false); expect(session['nc-drive-pending:' + flow.pending.tabId]).toBeUndefined();
+  });
+  it('survives a background restart and issues a fresh state after cancellation', async () => {
+    const flow = await start();
+    registerDriveBackground();
+    const tab = tabs.get(flow.pending.tabId)!;
+    onUpdated(tab.id, {status: 'complete'}, tab);
+    await vi.waitFor(() => expect(session['nc-drive-pending:' + tab.id].oauth.phase).toBe('returned'));
+    const sender = {...flow.sender, documentId: 'callback-after-restart'};
+    expect((await send({type: 'NC_DRIVE_BRIDGE_INIT'}, sender)).ok).toBe(true);
+    const next = await send({type: 'NC_DRIVE_OAUTH_START', nonce: flow.pending.nonce, clientId: 'test.apps.googleusercontent.com'}, sender);
+    expect(next.ok).toBe(true); expect(next.state).not.toBe(flow.result.state);
+    expect(api.account).not.toHaveBeenCalled();
+  });
+});
+
 describe('trusted Drive session reuse', () => {
   it('lists explicit account choices before imports without exposing credentials or invoking OAuth',async()=>{
     native.available.mockReturnValue(true);

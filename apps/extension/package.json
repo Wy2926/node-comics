@@ -9,6 +9,7 @@
     "build": "wxt build",
     "build:web": "vite build",
     "zip": "wxt zip",
+    "zip:edge": "wxt zip --browser edge --mv3",
     "check": "wxt prepare && tsc --noEmit && npm run check:modules && npm run check:i18n",
     "test": "vitest run",
     "postinstall": "wxt prepare",

@@ -3,170 +3,125 @@ import {runInNewContext} from 'node:vm';
 import {describe, expect, it, vi} from 'vitest';
 
 const script = readFileSync(new URL('../../drive-connect/connect.js', import.meta.url), 'utf8');
-const nonce = 'a'.repeat(72), origin = 'https://trusted.example';
+const nonce = 'a'.repeat(72), state = 'b'.repeat(72), origin = 'https://trusted.example';
+const scope = 'https://www.googleapis.com/auth/drive.file', oauthKey = 'nc-drive-oauth-pending';
+const clientId = 'test-client.apps.googleusercontent.com';
 type Message = Record<string, any>;
-async function page({deferSdk = false} = {}) {
-  let now = 1_800_000_000_000, oauth!: {callback: (value: Message) => void};
+function page({hash = '#state=' + nonce, search = '', saved = undefined as Message | undefined} = {}) {
+  let now = 1_800_000_000_000;
   const buttons = Object.fromEntries(['connect', 'reconnect', 'status', 'connection-info'].map(id => [id, {
     disabled: true, textContent: '', click: () => {}, addEventListener: function (_type: string, action: () => void) { this.click = () => { if (!this.disabled) action(); }; },
   }]));
   const listeners = new Map<string, ((event: Message) => void)[]>();
-  const location = {origin, protocol: 'https:', hash: '#state=' + nonce};
-  const storage = {setItem: vi.fn()};
+  const location = {origin, protocol: 'https:', pathname: '/drive-connect/index.html', hash, search, assign: vi.fn()};
+  const storage = new Map(saved ? [[oauthKey, JSON.stringify(saved)]] : []);
+  const sessionStorage = {getItem: (key: string) => storage.get(key), setItem: vi.fn((key, value) => storage.set(key, value)), removeItem: vi.fn(key => storage.delete(key))};
+  const history = {replaceState: vi.fn((_state, _title, value) => { const url = new URL(value, origin); location.hash = url.hash; location.search = url.search; })};
   const window = {postMessage: vi.fn(), addEventListener: (type: string, fn: (event: Message) => void) => listeners.set(type, [...listeners.get(type) ?? [], fn])};
-  const pickers: {token: string; callback: (data: Message) => void; dispose: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn>}[] = [];
-  const requestAccessToken = vi.fn();
-  const mimeFilters: string[][] = [];
-  const folderOptions: {include?: boolean; selectable?: boolean} = {};
+  const pickers: Message[] = [], scripts: Message[] = [];
   class DocsView {
-    setMimeTypes(value: string) { mimeFilters.push(value.split(',')); return this; }
-    setIncludeFolders(value: boolean) { folderOptions.include = value; return this; }
-    setSelectFolderEnabled(value: boolean) { folderOptions.selectable = value; return this; }
+    setIncludeFolders(value: boolean) { expect(value).toBe(true); return this; }
+    setSelectFolderEnabled(value: boolean) { expect(value).toBe(false); return this; }
   }
   class PickerBuilder {
-    private token = '';
-    private callback!: (data: Message) => void;
+    token = ''; callback = (_data: Message) => {};
     setDeveloperKey() { return this; } setAppId() { return this; } setOrigin() { return this; }
     enableFeature() { return this; } addView() { return this; }
     setOAuthToken(value: string) { this.token = value; return this; }
     setCallback(value: (data: Message) => void) { this.callback = value; return this; }
     build() { const picker = {token: this.token, callback: this.callback, dispose: vi.fn(), setVisible: vi.fn()}; pickers.push(picker); return picker; }
   }
-  const initTokenClient = vi.fn((options: typeof oauth) => { oauth = options; return {requestAccessToken}; });
-  const sdkScripts: {onload: () => void}[] = [];
   runInNewContext(script, {
-    NODE_COMICS_DRIVE_CONFIG: {clientId: 'test-client', apiKey: 'test-key', appId: '123'},
-    window, location, URLSearchParams, Date: {now: () => now}, localStorage: storage, sessionStorage: storage,
-    document: {getElementById: (id: string) => buttons[id], createElement: () => ({}), head: {appendChild: (element: {onload: () => void}) => sdkScripts.push(element)}},
+    NODE_COMICS_DRIVE_CONFIG: {clientId, apiKey: 'test-key', appId: '123'},
+    window, location, history, URL, URLSearchParams, Date: {now: () => now}, sessionStorage,
+    document: {getElementById: (id: string) => buttons[id], createElement: () => ({}), head: {appendChild: (element: Message) => scripts.push(element)}},
     gapi: {load: (_name: string, options: {callback: () => void}) => options.callback()},
-    google: {accounts: {oauth2: {initTokenClient, hasGrantedAllScopes: () => true}},
-      picker: {DocsView, PickerBuilder, ViewId: {DOCS: 'docs'}, Feature: {MULTISELECT_ENABLED: 'multi'}, Action: {CANCEL: 'cancel', PICKED: 'picked'}, Response: {DOCUMENTS: 'docs'}, Document: {ID: 'id'}}},
+    google: {picker: {DocsView, PickerBuilder, ViewId: {DOCS: 'docs'}, Feature: {MULTISELECT_ENABLED: 'multi'}, Action: {CANCEL: 'cancel', PICKED: 'picked'}, Response: {DOCUMENTS: 'docs'}, Document: {ID: 'id'}}},
   });
-  const loadSdk = async () => {
-    for (const element of sdkScripts.splice(0)) element.onload();
-    await vi.waitFor(() => expect(initTokenClient).toHaveBeenCalledOnce());
-  };
-  if (!deferSdk) await loadSdk();
   const emit = (data: Message, patch = {}) => { for (const fn of listeners.get('message') ?? []) fn({source: window, origin, data: {nonce, ...data}, ...patch}); };
-  return {buttons, pickers, mimeFilters, folderOptions, requestAccessToken, storage, window, location, emit, loadSdk,
-    authorize: (response: Message) => oauth.callback(response),
+  return {buttons, pickers, scripts, storage, sessionStorage, history, window, location, emit,
+    loadSdk: async () => { for (const element of scripts) element.onload(); await vi.waitFor(() => expect(pickers.length > 0 || !buttons.connect.disabled).toBe(true)); },
     advance: (milliseconds: number) => { now += milliseconds; },
-    ready: (session?: Message, authMode = 'web') => emit({type: 'NC_DRIVE_READY', session, authMode}),
+    ready: (session?: Message, authMode = 'web') => emit({type: 'NC_DRIVE_READY', session, authMode, oauthRedirect: true}),
     valid: () => ({accessToken: 'private-existing-token', expiresAt: now + 3_600_000, displayName: 'Alice'}),
     hide: () => { for (const fn of listeners.get('pagehide') ?? []) fn({}); },
   };
 }
+const pending = () => ({state, nonce, expiresAt: 1_800_000_600_000, onlyConnect: false});
+const response = (patch = {}) => '#' + new URLSearchParams({state, access_token: 'private-returned-token', token_type: 'Bearer', expires_in: '3600', scope, picked_file_ids: 'file-1,file-2', ...patch});
 
-describe('Drive authorization page session reuse', () => {
-  it('shows all MIME types and folders for navigation without allowing folder imports', async () => {
-    const ui = await page(); ui.ready(ui.valid());
-    expect(ui.pickers).toHaveLength(1);
-    expect(ui.mimeFilters).toEqual([]);
-    expect(ui.folderOptions).toEqual({include: true, selectable: false});
+describe('top-level Google file selection', () => {
+  it('never loads an embedded Picker or GIS for web, even with an existing token', () => {
+    const ui = page(); ui.ready(ui.valid()); expect(ui.scripts).toEqual([]); expect(ui.pickers).toEqual([]);
+    ui.buttons.connect.click(); ui.buttons.connect.click();
+    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_OAUTH_START', nonce, clientId}, origin);
   });
-  it.each(['bridge-first', 'sdk-first'])('opens an existing session exactly once after both prerequisites are ready (%s)', async order => {
-    const ui = await page({deferSdk: true});
-    if (order === 'bridge-first') {
-      ui.ready(ui.valid()); expect(ui.pickers).toHaveLength(0); await ui.loadSdk();
-    } else {
-      await ui.loadSdk(); expect(ui.pickers).toHaveLength(0); ui.ready(ui.valid());
+  it('saves only a one-use state before navigating the current window to Google', () => {
+    const ui = page(); ui.ready(); ui.buttons.connect.click();
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?state=${state}`;
+    ui.emit({type: 'NC_DRIVE_OAUTH_STARTED', result: {ok: true, state, url, expiresAt: pending().expiresAt}});
+    expect(JSON.parse(ui.storage.get(oauthKey)!)).toEqual(pending()); expect(ui.location.assign).toHaveBeenCalledWith(url);
+    expect(JSON.stringify([...ui.storage])).not.toContain('accessToken');
+  });
+  it('scrubs the fragment immediately, returns selected IDs once, and loads no Google scripts', () => {
+    const ui = page({hash: response(), saved: pending()});
+    expect(ui.location.hash).toBe('#state=' + nonce); expect(ui.storage.size).toBe(0);
+    expect(ui.history.replaceState).toHaveBeenNthCalledWith(1, null, '', '/drive-connect/index.html'); ui.ready(); ui.ready();
+    expect(ui.window.postMessage).toHaveBeenCalledExactlyOnceWith({type: 'NC_DRIVE_SELECTION', nonce, accessToken: 'private-returned-token', expiresIn: 3600, oauthState: state, files: [{fileId: 'file-1'}, {fileId: 'file-2'}]}, origin);
+    expect(ui.scripts).toEqual([]); expect(ui.sessionStorage.setItem).not.toHaveBeenCalled();
+  });
+  it('accepts selected IDs in the query but never accepts a token there', () => {
+    const params = new URLSearchParams(response().slice(1)); params.delete('picked_file_ids');
+    const ui = page({hash: '#' + params, search: '?picked_file_ids=file-1', saved: pending()}); ui.ready();
+    expect(ui.window.postMessage.mock.calls[0][0].files).toEqual([{fileId: 'file-1'}]); params.delete('access_token');
+    const invalid = page({hash: '#' + params, search: '?picked_file_ids=file-1&access_token=private-token', saved: pending()}); invalid.ready();
+    expect(invalid.window.postMessage).not.toHaveBeenCalled();
+  });
+  it.each([
+    {state: 'wrong'}, {scope: 'openid'}, {scope: scope + ' openid'}, {expires_in: '-1'}, {expires_in: 'Infinity'}, {token_type: 'Basic'},
+    {picked_file_ids: '../file'}, {picked_file_ids: ''}, {picked_file_ids: Array(101).fill('file-1').join(',')},
+  ])('rejects invalid response %j without exposing credentials', patch => {
+    const ui = page({hash: response(patch), saved: pending()}); ui.ready();
+    expect(ui.window.postMessage).not.toHaveBeenCalled(); expect(ui.buttons.status.textContent).toContain('无效或已过期');
+    expect(ui.location.hash).not.toContain('private-returned-token');
+  });
+  it('rejects replay, duplicate fields and callbacks after expiry', () => {
+    for (const setup of [{hash: response()}, {hash: response() + '&state=' + state, saved: pending()}, {hash: response(), saved: {...pending(), expiresAt: 0}}]) {
+      const ui = page(setup); ui.ready(); expect(ui.window.postMessage).not.toHaveBeenCalled();
     }
-    expect(ui.pickers).toHaveLength(1); expect(ui.pickers[0].setVisible).toHaveBeenCalledWith(true);
-    ui.ready(ui.valid()); ui.buttons.connect.click(); expect(ui.pickers).toHaveLength(1);
-    expect(ui.requestAccessToken).not.toHaveBeenCalled();
   });
-
-  it('opens Picker with the existing token and reuses it after cancelling without calling GIS', async () => {
-    const ui = await page(); ui.ready(ui.valid());
-    expect(ui.buttons.connect.textContent).toBe('选择 Google Drive 文件');
-    expect(ui.pickers[0].token).toBe('private-existing-token'); expect(ui.requestAccessToken).not.toHaveBeenCalled();
-    ui.pickers[0].callback({action: 'cancel'}); ui.buttons.connect.click();
-    expect(ui.pickers).toHaveLength(2); expect(ui.requestAccessToken).not.toHaveBeenCalled();
+  it('allows a cancelled callback to retry without importing or loading the SDK', () => {
+    const ui = page({hash: '#state=' + state + '&error=access_denied', saved: pending()}); ui.ready();
+    expect(ui.buttons.status.textContent).toContain('已取消'); expect(ui.window.postMessage).not.toHaveBeenCalled();
+    ui.buttons.connect.click(); expect(ui.window.postMessage.mock.calls[0][0].type).toBe('NC_DRIVE_OAUTH_START');
   });
-
-  it.each(['web', 'chrome'])('does not open Picker or GIS if the %s session expires while its SDK loads', async mode => {
-    const ui = await page({deferSdk: true}); ui.ready(ui.valid(), mode); ui.advance(3_600_001); await ui.loadSdk();
-    expect(ui.pickers).toHaveLength(0); expect(ui.requestAccessToken).not.toHaveBeenCalled();
-    expect(ui.buttons.status.textContent).toContain(mode === 'chrome' ? '没有可用的 Chrome 连接' : '没有可复用的连接');
+  it('supports explicit account reconnect without importing selected files', () => {
+    const ui = page({hash: response(), saved: {...pending(), onlyConnect: true}}); ui.ready(); expect(ui.window.postMessage.mock.calls[0][0].files).toEqual([]);
   });
-
-  it.each([false, true])('requests GIS only after a click when the existing web token is missing or expired (expired=%s)', async expired => {
-    const ui = await page(); const token = ui.valid(); ui.advance(3_600_001); ui.ready(expired ? token : undefined);
-    expect(ui.requestAccessToken).not.toHaveBeenCalled(); expect(ui.pickers).toHaveLength(0);
-    expect(ui.buttons.status.textContent).toContain('没有可复用的连接');
-    ui.buttons.connect.click(); expect(ui.requestAccessToken).toHaveBeenCalledWith({prompt: 'select_account'}); expect(ui.pickers).toHaveLength(0);
-    ui.authorize({access_token: 'fresh-authorized-token', expires_in: 3600});
-    expect(ui.pickers[0].token).toBe('fresh-authorized-token');
+  it('ignores other origins, windows and a callback after pagehide', () => {
+    const ui = page({hash: response(), saved: pending()});
+    ui.emit({type: 'NC_DRIVE_READY'}, {origin: 'https://evil.example'}); ui.emit({type: 'NC_DRIVE_READY'}, {source: {}}); ui.hide(); ui.ready();
+    expect(ui.window.postMessage).not.toHaveBeenCalled();
   });
+});
 
-  it('explicit account reconnect requests new authorization even with a valid existing session', async () => {
-    const ui = await page(); ui.ready(ui.valid()); ui.pickers[0].callback({action: 'cancel'}); ui.buttons.reconnect.click();
-    expect(ui.requestAccessToken).toHaveBeenCalledOnce();
-    ui.authorize({access_token: 'new-account-token', expires_in: 3600});
-    expect(ui.pickers).toHaveLength(1);
-    expect(ui.window.postMessage).toHaveBeenCalledWith({type: 'NC_DRIVE_SELECTION', nonce, accessToken: 'new-account-token', expiresIn: 3600, files: []}, origin);
+describe('Chrome-managed Picker', () => {
+  it('opens once, reuses after cancel, and delivers remaining lifetime', async () => {
+    const ui = page(); ui.ready(ui.valid(), 'chrome'); await ui.loadSdk();
+    expect(ui.scripts.map(script => script.src)).toEqual(['https://apis.google.com/js/api.js']);
+    expect(ui.pickers).toHaveLength(1); expect(ui.pickers[0].token).toBe('private-existing-token');
+    ui.pickers[0].callback({action: 'cancel'}); ui.buttons.connect.click(); expect(ui.pickers).toHaveLength(2);
+    ui.advance(120_000); ui.pickers[1].callback({action: 'picked', docs: [{id: 'file-1', resourceKey: 'key-1'}]});
+    expect(ui.window.postMessage).toHaveBeenCalledWith({type: 'NC_DRIVE_SELECTION', nonce, accessToken: 'private-existing-token', expiresIn: 3480, files: [{fileId: 'file-1', resourceKey: 'key-1'}]}, origin);
   });
-
-  it.each([false, true])('does not request web authorization when a Chrome connection is missing or expired (expired=%s)', async expired => {
-    const ui = await page(); const token = ui.valid(); ui.advance(3_600_001); ui.ready(expired ? token : undefined, 'chrome');
-    expect(ui.pickers).toHaveLength(0); expect(ui.requestAccessToken).not.toHaveBeenCalled();
-    expect(ui.buttons.status.textContent).toContain('没有可用的 Chrome 连接');
-    ui.buttons.connect.click();
-    expect(ui.requestAccessToken).not.toHaveBeenCalled(); expect(ui.pickers).toHaveLength(0);
-    expect(ui.buttons.status.textContent).toContain('返回插件重新打开 Google Drive');
-    expect(ui.buttons['connection-info'].textContent).toContain('临时网页授权');
+  it('does not silently switch expired Chrome connections to web OAuth', async () => {
+    const ui = page(); ui.ready(ui.valid(), 'chrome'); ui.advance(3_600_001); await ui.loadSdk();
+    ui.buttons.connect.click(); expect(ui.pickers).toEqual([]); expect(ui.window.postMessage).not.toHaveBeenCalled();
+    expect(ui.buttons.status.textContent).toContain('返回插件重新打开');
   });
-
-  it('sends an expired Chrome Picker lease back to the extension without silently switching authorization models', async () => {
-    const ui = await page(); ui.ready(ui.valid(), 'chrome'); ui.pickers[0].callback({action: 'cancel'});
-    ui.advance(3_600_001); ui.buttons.connect.click();
-    expect(ui.requestAccessToken).not.toHaveBeenCalled(); expect(ui.pickers).toHaveLength(1);
-    expect(ui.buttons.status.textContent).toContain('返回插件重新打开 Google Drive');
-  });
-
-  it('allows a deliberate switch from Chrome to a temporary web account connection', async () => {
-    const ui = await page(); ui.ready(ui.valid(), 'chrome'); ui.pickers[0].callback({action: 'cancel'}); ui.buttons.reconnect.click();
-    expect(ui.requestAccessToken).toHaveBeenCalledOnce(); expect(ui.buttons.status.textContent).toContain('临时网页连接');
-    ui.authorize({access_token: 'explicit-web-account-token', expires_in: 3600});
-    expect(ui.window.postMessage).toHaveBeenCalledWith({type: 'NC_DRIVE_SELECTION', nonce, accessToken: 'explicit-web-account-token', expiresIn: 3600, files: []}, origin);
-    expect(ui.buttons['connection-info'].textContent).toContain('网页连接仅在授权有效期内复用');
-  });
-
-  it('cannot deliver a selection made after a Chrome Picker lease expires', async () => {
-    const ui = await page(); ui.ready(ui.valid(), 'chrome'); ui.advance(3_600_001);
-    ui.pickers[0].callback({action: 'picked', docs: [{id: 'file-1'}]});
-    expect(ui.window.postMessage).not.toHaveBeenCalled(); expect(ui.requestAccessToken).not.toHaveBeenCalled();
-    expect(ui.buttons.status.textContent).toContain('返回插件重新打开 Google Drive');
-  });
-
-  it('delivers the remaining lifetime and bounded file references without placing credentials in URL or storage', async () => {
-    const ui = await page(); ui.ready(ui.valid()); ui.buttons.connect.click(); ui.advance(120_000);
-    ui.pickers[0].callback({action: 'picked', docs: [{id: 'file-1', resourceKey: 'resource-1', downloadUrl: 'https://untrusted.example'}]});
-    expect(ui.window.postMessage).toHaveBeenCalledWith({type: 'NC_DRIVE_SELECTION', nonce, accessToken: 'private-existing-token', expiresIn: 3480, files: [{fileId: 'file-1', resourceKey: 'resource-1'}]}, origin);
-    expect(ui.storage.setItem).not.toHaveBeenCalled(); expect(ui.location.hash).toBe('#state=' + nonce);
-  });
-
-  it('ignores cross-origin, cross-window and repeated ready credentials, and cannot restart after acknowledgement', async () => {
-    const ui = await page();
-    ui.emit({type: 'NC_DRIVE_READY', session: ui.valid(), nonce: 'wrong'}); expect(ui.buttons.connect.disabled).toBe(true);
-    ui.emit({type: 'NC_DRIVE_READY', session: ui.valid()}, {origin: 'https://evil.example'});
-    ui.emit({type: 'NC_DRIVE_READY', session: ui.valid()}, {source: {}}); expect(ui.buttons.connect.disabled).toBe(true);
-    ui.ready(ui.valid()); ui.ready({...ui.valid(), accessToken: 'replacement-token'}); ui.buttons.connect.click();
-    expect(ui.pickers[0].token).toBe('private-existing-token');
-    ui.pickers[0].callback({action: 'picked', docs: [{id: 'file-1'}]});
-    ui.emit({type: 'NC_DRIVE_ACK', ok: true}); ui.ready(ui.valid()); ui.buttons.connect.click();
-    expect(ui.buttons.connect.disabled).toBe(true); expect(ui.pickers).toHaveLength(1); expect(ui.requestAccessToken).not.toHaveBeenCalled();
-  });
-
-  it('drops access to a token and closes Picker when the authorization document leaves', async () => {
-    const ui = await page(); ui.ready(ui.valid()); ui.buttons.connect.click(); ui.hide(); ui.buttons.connect.click();
-    expect(ui.pickers[0].dispose).toHaveBeenCalledOnce(); expect(ui.buttons.connect.disabled).toBe(true);
-    ui.pickers[0].callback({action: 'picked', docs: [{id: 'file-1'}]}); expect(ui.window.postMessage).not.toHaveBeenCalled();
-  });
-
-  it('ignores authorization completion after the document leaves', async () => {
-    const ui = await page(); ui.ready(); ui.buttons.connect.click(); ui.hide();
-    ui.authorize({access_token: 'late-authorized-token', expires_in: 3600});
-    expect(ui.pickers).toHaveLength(0); expect(ui.window.postMessage).not.toHaveBeenCalled();
+  it('explicit reconnect uses top-level Google and drops a late Picker result on pagehide', async () => {
+    const ui = page(); ui.ready(ui.valid(), 'chrome'); await ui.loadSdk(); ui.pickers[0].callback({action: 'cancel'});
+    ui.buttons.reconnect.click(); expect(ui.window.postMessage.mock.calls[0][0].type).toBe('NC_DRIVE_OAUTH_START');
+    ui.hide(); ui.pickers[0].callback({action: 'picked', docs: [{id: 'file-1'}]}); expect(ui.window.postMessage).toHaveBeenCalledTimes(1);
   });
 });

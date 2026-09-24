@@ -2,6 +2,14 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 Edge Google Drive 顶层授权
+
+- 已先核对实际 OpenResty 配置与容器挂载：连接页宿主机目录为 `/opt/1panel/www/sites/comics-drive-connect/`。本次只原子更新 `connect.js`，备份为 `/opt/nodelane/node-comics/drive-oauth-20260924T141020Z/backup/connect.js`。`config.js`、HTML、CSS、代理配置哈希保持不变；未部署 API 或数据库。
+- 公网 `https://comics.nodelane.net/drive-connect/connect.js` 返回 HTTP 200，与本地文件逐字节一致，SHA-256 为 `03fbe2936384d8041cfbb234047eddee72996bfe538a81f3a148ac9970e4cbf1`，保留 `no-store, no-transform` 和 `nosniff`。部署报告及截图在本地忽略目录 `artifacts/drive-oauth-deploy/`。
+- 需同时更新插件：新版后台支持一次性 OAuth state 和 Google 页面往返，新版网页对不支持该协议的旧网页授权客户端提示更新。Edge 0.2.0 ZIP 已重新生成，打包路径为 `apps/extension/.output/node-comicsextension-0.2.0-edge.zip`；这不是商店上架或 R2 下载目录发布。Chrome 托管连接仍保留原有模式。
+- 163 项相关单测通过，类型、模块和语言检查通过。真实 Edge 153 隔离 profile 禁用第三方 Cookie 后，模拟 Google 回归覆盖 CBZ / MOBI 导入、取消、失败与阅读位置恢复；隔离 Chromium 的模拟 Chrome Identity 回归覆盖重启恢复、断开。
+- 公网入口实测：真实 Edge 153 禁用第三方 Cookie，新包通过线上连接页成功跳转真实 Google 登录页。Google Web OAuth 完整回调地址已由用户确认添加；2026-09-24 用户随后确认新流程已手动测试通过并授权提交推送。自动化未代用户登录真实账户，用户确认与隔离回归分别作为验收证据。
+
 ## 2026-09-24 Drive 文件夹与未知类型显示修复
 
 - 修复提交 `e736d38` 已推送至 `main`，线上仅原子替换 `/drive-connect/connect.js`：显示文件夹供浏览、禁止整目录选择，取消 MIME 过滤以免未知类型 MOBI 被隐藏。导入后的格式、权限和内容核验保持有效，无需重发插件包。

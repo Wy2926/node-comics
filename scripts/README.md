@@ -62,7 +62,7 @@ node scripts/verify_website_source_lifecycle.mjs
 
 单来源验收固定检查构建后的 `.output/chrome-mv3`，不需要 Vite。结果位于 `artifacts/simple-reading/`，其余来源验证仍位于 `artifacts/source-architecture/`。运行报告用于当次验收，不沿用历史通过数。
 
-Drive 完整交互回归沿用上述 Playwright / 浏览器变量和自制 `pages.cbz`，需要 Python `cryptography`。构建扩展时须配置 `VITE_DRIVE_CONNECT_URL`（HTTPS 的 `/drive-connect/index.html`）；Chrome 托管授权构建另设 `VITE_GOOGLE_CHROME_CLIENT_ID`，两种客户端配置见 [drive-connect](../apps/drive-connect/README.md)。脚本读取构建中的地址，在新建 profile 的隔离 DNS 内将授权页、GIS / Picker 与 Drive API 全部映射到本机 TLS 夹具，不访问真实 Google 或用户 profile，也不读取实际授权页配置。
+Drive 完整交互回归沿用上述 Playwright / 浏览器变量和自制 `pages.cbz`，需要 Python `cryptography`。构建扩展时须配置 `VITE_DRIVE_CONNECT_URL`（HTTPS 的 `/drive-connect/index.html`）；Chrome 托管授权构建另设 `VITE_GOOGLE_CHROME_CLIENT_ID`，两种客户端配置见 [drive-connect](../apps/drive-connect/README.md)。脚本读取构建中的地址，在新建 profile 的隔离 DNS 内将授权页、Google 顶层授权 / Picker 与 Drive API 全部映射到本机 TLS 夹具，不访问真实 Google 或用户 profile，也不读取实际授权页配置。`web` 模式通过 CDP 禁用第三方 Cookie，实际导航到模拟 Google 页面后回调并导入；支持 `TEST_EXTENSION_DIR` 指定 `.output/edge-mv3`，配合 `TEST_CHROMIUM` 指向 Edge。模拟回调不证明真实 Google 返回字段已经验收。
 
 ```powershell
 $env:TEST_DRIVE_AUTH_MODE = 'web'

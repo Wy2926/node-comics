@@ -5,28 +5,59 @@
   const reconnect = document.getElementById('reconnect');
   const status = document.getElementById('status');
   const connectionInfo = document.getElementById('connection-info');
-  const nonce = new URLSearchParams(location.hash.slice(1)).get('state');
-  const scope = 'https://www.googleapis.com/auth/drive.file';
+  const params = new URLSearchParams(location.hash.slice(1));
+  const query = new URLSearchParams(location.search);
+  const oauthKey = 'nc-drive-oauth-pending';
+  let nonce = params.get('state'), returned, returnError;
+  const isReturn = ['access_token', 'error', 'code', 'picked_file_ids'].some(key => params.has(key) || query.has(key));
+  if (isReturn) {
+    // OAuth uses the fragment: never send credentials to our server, store them,
+    // load Google SDKs, or keep them in the browser's current history entry.
+    history.replaceState(null, '', location.pathname);
+    try {
+      const pending = JSON.parse(sessionStorage.getItem(oauthKey) || 'null');
+      sessionStorage.removeItem(oauthKey);
+      if (!pending || params.getAll('state').length !== 1 || params.get('state') !== pending.state ||
+          !Number.isFinite(pending.expiresAt) || pending.expiresAt <= Date.now() || !/^[a-f0-9-]{72}$/.test(pending.nonce)) throw Error();
+      nonce = pending.nonce;
+      history.replaceState(null, '', location.pathname + '#state=' + nonce);
+      if (params.has('error') || query.has('error')) {
+        returnError = 'Google 授权或选文件已取消。可重新连接。';
+      } else {
+        const accessToken = params.get('access_token'), expiresIn = Number(params.get('expires_in'));
+        const selections = [...params.getAll('picked_file_ids'), ...query.getAll('picked_file_ids')];
+        const ids = selections.length === 1 && selections[0] ? selections[0].split(',') : [];
+        if (query.has('access_token') || query.has('code') || params.has('code') ||
+            ['access_token', 'token_type', 'expires_in', 'scope'].some(key => params.getAll(key).length !== 1) ||
+            !accessToken || accessToken.length < 10 || accessToken.length > 8192 || /\s/.test(accessToken) ||
+            params.get('token_type')?.toLowerCase() !== 'bearer' || !Number.isFinite(expiresIn) || expiresIn <= 30 || expiresIn > 86_400 ||
+            params.get('scope')?.trim() !== 'https://www.googleapis.com/auth/drive.file' ||
+            selections.length !== 1 || ids.length === 0 || ids.length > 100 || ids.some(id => !/^[a-zA-Z0-9_-]{1,256}$/.test(id))) throw Error();
+        returned = {accessToken, expiresAt: Date.now() + expiresIn * 1000, oauthState: pending.state,
+          files: pending.onlyConnect ? [] : [...new Set(ids)].map(fileId => ({fileId}))};
+      }
+    } catch { nonce = undefined; returnError = 'Google 授权返回无效或已过期，请关闭此窗口并从插件重新连接。'; }
+  }
   let bridgeReady = false, bridgeInitialized = false, sdkReady = false, busy = false, token, picker, onlyConnect = false;
-  let authMode = 'web', autoPickerOpened = false, chooseFiles;
+  let authMode = 'web', autoPickerOpened = false, chooseFiles, oauthRedirect = false;
   const validToken = () => token && token.expiresAt > Date.now() + 30_000;
   const expiredText = () => authMode === 'chrome'
     ? '此页面的 Chrome 连接已过期，请返回插件重新打开 Google Drive。'
     : 'Google Drive 授权已过期，请重新连接后选择文件。';
   const update = () => {
     connect.disabled = reconnect.disabled = !(bridgeReady && sdkReady) || busy;
-    connect.textContent = validToken() ? '选择 Google Drive 文件' : authMode === 'chrome' ? '返回插件重新打开 Google Drive' : '连接账户并选择文件';
+    connect.textContent = authMode === 'web' ? '前往 Google 授权并选择文件' : validToken() ? '选择 Google Drive 文件' : '返回插件重新打开 Google Drive';
     connectionInfo.textContent = authMode === 'chrome'
       ? '当前连接由 Chrome 管理。在此页切换或重新连接账户，将使用临时网页授权。'
-      : '网页连接仅在授权有效期内复用；切换或重新连接账户会打开 Google 授权窗口。';
+      : '将在 Google 页面完成授权和选文件，然后自动返回插件。网页连接在授权有效期内可用于阅读。';
   };
   const connectedText = () => `已连接${token?.displayName ? ' ' + token.displayName : ' Google Drive'}`;
   const readyText = () => validToken() ? `${connectedText()}，可直接选择文件。` : authMode === 'chrome'
     ? '此页面没有可用的 Chrome 连接，请返回插件重新打开 Google Drive。'
-    : '此页面没有可复用的连接。点击连接以选择 Google Drive 文件。';
+    : '点击下方按钮，前往 Google 选择要导入的文件。';
   const fail = text => { token = undefined; busy = false; status.textContent = text; update(); };
   const openExistingSession = () => {
-    if (!bridgeReady || !sdkReady || busy || autoPickerOpened || !validToken()) return;
+    if (authMode !== 'chrome' || !bridgeReady || !sdkReady || busy || autoPickerOpened || !validToken()) return;
     autoPickerOpened = true;
     chooseFiles();
   };
@@ -45,30 +76,54 @@
     if (event.data.type === 'NC_DRIVE_READY' && !bridgeInitialized) {
       bridgeReady = bridgeInitialized = true;
       authMode = event.data.authMode === 'chrome' ? 'chrome' : 'web';
+      oauthRedirect = event.data.oauthRedirect === true;
+      if (authMode === 'web' && !oauthRedirect) {
+        bridgeReady = false; status.textContent = '请更新 NodeLane Comics 插件后重新连接 Google Drive。'; update(); return;
+      }
       const session = event.data.session;
-      if (typeof session?.accessToken === 'string' && session.accessToken.length >= 10 && session.accessToken.length <= 8192 && !/\s/.test(session.accessToken) && Number.isFinite(session.expiresAt) && session.expiresAt > Date.now() + 30_000)
+      if (authMode === 'chrome' && typeof session?.accessToken === 'string' && session.accessToken.length >= 10 && session.accessToken.length <= 8192 && !/\s/.test(session.accessToken) && Number.isFinite(session.expiresAt) && session.expiresAt > Date.now() + 30_000)
         token = {accessToken: session.accessToken, expiresAt: session.expiresAt, displayName: typeof session.displayName === 'string' ? session.displayName : undefined};
-      if (sdkReady) status.textContent = readyText();
+      if (returned) {
+        const result = returned; returned = undefined;
+        if (result.expiresAt <= Date.now() + 30_000) { fail(expiredText()); return; }
+        busy = true; update(); status.textContent = '正在核验账户和所选文件的读取权限…';
+        window.postMessage({type: 'NC_DRIVE_SELECTION', nonce, accessToken: result.accessToken,
+          expiresIn: Math.floor((result.expiresAt - Date.now()) / 1000), files: result.files, oauthState: result.oauthState}, location.origin);
+        return;
+      }
+      if (authMode === 'web') sdkReady = true;
+      else loadPicker();
+      if (sdkReady) status.textContent = returnError || readyText();
       update();
       openExistingSession();
+    }
+    if (event.data.type === 'NC_DRIVE_OAUTH_STARTED' && bridgeReady && busy) {
+      const result = event.data.result;
+      try {
+        if (!result?.ok || !/^[a-f0-9-]{72}$/.test(result.state) || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()) throw Error();
+        const url = new URL(result.url);
+        if (url.origin !== 'https://accounts.google.com' || url.pathname !== '/o/oauth2/v2/auth' || url.searchParams.get('state') !== result.state) throw Error();
+        sessionStorage.setItem(oauthKey, JSON.stringify({state: result.state, nonce, expiresAt: result.expiresAt, onlyConnect}));
+        location.assign(url.href);
+      } catch { fail('无法开始 Google 授权，请关闭此窗口并从插件重新连接。'); }
     }
     if (event.data.type === 'NC_DRIVE_ACK') {
       token = undefined; bridgeReady = false; update();
       status.textContent = event.data.ok ? '连接已完成。请返回 NodeLane Comics 插件继续。' : '核验未完成。请返回插件查看原因，并重新发起连接。';
     }
   });
-  window.addEventListener('pagehide', () => { token = undefined; bridgeReady = false; picker?.dispose(); update(); });
+  window.addEventListener('pagehide', () => { token = returned = undefined; bridgeReady = false; bridgeInitialized = true; picker?.dispose(); update(); });
   if (location.protocol !== 'https:' || !nonce || !/^[a-f0-9-]{72}$/.test(nonce)) {
-    status.textContent = '请通过 NodeLane Comics 插件的 Google Drive 入口打开此页面。'; return;
+    status.textContent = returnError || '请通过 NodeLane Comics 插件的 Google Drive 入口打开此页面。'; return;
   }
-  if (!config?.clientId || !config?.apiKey || !/^\d+$/.test(config?.appId ?? '')) {
-    status.textContent = 'Google Drive 尚未配置。管理员需先填写此授权站点的 OAuth client ID、API key 和 Cloud project number。'; return;
+  if (!/^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$/.test(config?.clientId ?? '')) {
+    status.textContent = 'Google Drive 尚未配置。管理员需先填写此授权站点的 Web OAuth client ID。'; return;
   }
   const script = src => new Promise((resolve, reject) => {
     const element = document.createElement('script'); element.src = src; element.async = true;
     element.onload = resolve; element.onerror = reject; document.head.appendChild(element);
   });
-  Promise.all([script('https://accounts.google.com/gsi/client'), script('https://apis.google.com/js/api.js')])
+  const loadPicker = () => Promise.all([script('https://apis.google.com/js/api.js')])
     .then(() => new Promise((resolve, reject) => gapi.load('picker', {callback: resolve, onerror: reject})))
     .then(() => {
       chooseFiles = () => {
@@ -93,32 +148,20 @@
           }).build();
         picker.setVisible(true);
       };
-      const client = google.accounts.oauth2.initTokenClient({client_id: config.clientId, scope, include_granted_scopes: false,
-        error_callback: () => fail('授权窗口已关闭或无法打开，请再次点击连接。'),
-        callback: response => {
-          if (!bridgeReady) return;
-          if (response.error || !google.accounts.oauth2.hasGrantedAllScopes(response, scope)) { fail('未获得所选文件的访问授权。'); return; }
-          const expiresIn = Number(response.expires_in);
-          if (typeof response.access_token !== 'string' || !Number.isFinite(expiresIn) || expiresIn <= 30 || expiresIn > 86_400) { fail('Google Drive 授权无效，请重新连接。'); return; }
-          authMode = 'web';
-          token = {accessToken: response.access_token, expiresAt: Date.now() + expiresIn * 1000};
-          update();
-          if (onlyConnect) { deliver([]); return; }
-          chooseFiles();
-        }});
-      const authorize = reconnectOnly => {
-        if (!bridgeReady || !sdkReady || busy) return;
-        onlyConnect = reconnectOnly;
-        if (!reconnectOnly && validToken()) { chooseFiles(); return; }
-        if (!reconnectOnly && authMode === 'chrome') { fail(expiredText()); return; }
-        token = undefined; busy = true; update(); status.textContent = authMode === 'chrome'
-          ? '请在 Google 窗口中选择账户并授权。本次将建立临时网页连接。'
-          : '请在 Google 窗口中选择账户并授权。';
-        client.requestAccessToken({prompt: 'select_account'});
-      };
-      connect.addEventListener('click', () => authorize(false));
-      reconnect.addEventListener('click', () => authorize(true));
       sdkReady = true; status.textContent = bridgeReady ? readyText() : '等待插件建立安全连接…'; update();
       openExistingSession();
     }).catch(() => fail('无法加载 Google 授权服务，请检查网络并从插件重新连接。'));
+  const authorize = reconnectOnly => {
+    if (!bridgeReady || !sdkReady || busy) return;
+    onlyConnect = reconnectOnly;
+    if (!reconnectOnly && authMode === 'chrome' && validToken()) { chooseFiles(); return; }
+    if (!reconnectOnly && authMode === 'chrome') { fail(expiredText()); return; }
+    if (!oauthRedirect) { fail('请更新 NodeLane Comics 插件后重新连接 Google Drive。'); return; }
+    token = undefined; busy = true; update(); status.textContent = authMode === 'chrome'
+      ? '请在 Google 窗口中选择账户并授权。本次将建立临时网页连接。'
+      : '请在 Google 窗口中选择账户并授权。';
+    window.postMessage({type: 'NC_DRIVE_OAUTH_START', nonce, clientId: config.clientId}, location.origin);
+  };
+  connect.addEventListener('click', () => authorize(false));
+  reconnect.addEventListener('click', () => authorize(true));
 })();

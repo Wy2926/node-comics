@@ -13,11 +13,13 @@ import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const output=path.join(root,'artifacts/source-architecture/drive');await mkdir(output,{recursive:true});
 const run=await mkdtemp(path.join(output,'run-')),extension=path.join(run,'extension'),profile=path.join(run,'profile');
-await mkdir(profile);await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
+await mkdir(profile);await cp(process.env.TEST_EXTENSION_DIR??path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
 const nativeMode=process.env.TEST_DRIVE_AUTH_MODE==='chrome';
 const manifestPath=path.join(extension,'manifest.json'),manifest=JSON.parse(await readFile(manifestPath,'utf8'));
-if(nativeMode) assert(manifest.oauth2?.client_id,'Chrome mode needs a configured Chrome OAuth build.');
-else {delete manifest.oauth2;await writeFile(manifestPath,JSON.stringify(manifest));}
+// The isolated native test replaces the Identity API; no real OAuth client is used.
+if(nativeMode) manifest.oauth2={client_id:'fixture.apps.googleusercontent.com',scopes:['https://www.googleapis.com/auth/drive.file']};
+else delete manifest.oauth2;
+await writeFile(manifestPath,JSON.stringify(manifest));
 const background=await readFile(path.join(extension,'background.js'),'utf8');
 const configured=process.env.TEST_DRIVE_CONNECT_URL??background.match(/https:\/\/[^"'`\s<>]+\/drive-connect\/index\.html/)?.[0];
 assert(configured&&background.includes(configured),'Build the extension with a configured HTTPS Drive connect URL.');
@@ -53,11 +55,22 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
       const sharedAssets={'/design-tokens.css':'text/css','/icon-128.png':'image/png','/favicon.ico':'image/x-icon'};
       if(Object.hasOwn(sharedAssets,url.pathname)){response.writeHead(200,{'Content-Type':sharedAssets[url.pathname]});response.end(await readFile(path.join(root,'backend/website/public',url.pathname.slice(1))));return;}
       const base=new URL('.',bridge).pathname,name=url.pathname===bridge.pathname?'index.html':url.pathname.startsWith(base)?url.pathname.slice(base.length):'';
-      if(name==='config.js'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end('globalThis.NODE_COMICS_DRIVE_CONFIG={clientId:"fixture-client",apiKey:"fixture-public-key",appId:"123456"};');return;}
+      if(name==='config.js'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end('globalThis.NODE_COMICS_DRIVE_CONFIG={clientId:"fixture-client.apps.googleusercontent.com",apiKey:"fixture-public-key",appId:"123456"};');return;}
       if(['index.html','connect.js','style.css'].includes(name)){response.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html;charset=utf-8':name.endsWith('.js')?'text/javascript':'text/css'});response.end(await readFile(path.join(root,'apps/drive-connect',name)));return;}
       response.writeHead(404);response.end();return;
     }
     if(host==='accounts.google.com'&&url.pathname==='/gsi/client'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end(gis);return;}
+    if(host==='accounts.google.com'&&url.pathname==='/o/oauth2/v2/auth'){
+      assert.equal(url.searchParams.get('trigger_onepick'),'true');assert.equal(url.searchParams.get('response_type'),'token');
+      assert.equal(url.searchParams.get('scope'),'https://www.googleapis.com/auth/drive.file');
+      assert.equal(url.searchParams.get('include_granted_scopes'),'false');assert.equal(url.searchParams.get('redirect_uri'),bridge.href);
+      stats.authorizations++;stats.pickers++;
+      const result=cancelPicker?{state:url.searchParams.get('state'),error:'access_denied'}:
+        {state:url.searchParams.get('state'),access_token:token,token_type:'Bearer',expires_in:'3600',scope:'https://www.googleapis.com/auth/drive.file',picked_file_ids:chosenFile??'fixture-page'};
+      const destination=bridge.href+'#'+new URLSearchParams(result);
+      response.writeHead(200,{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'});
+      response.end('<!doctype html><html lang="zh-CN"><title>Google top-level Picker fixture</title><body><h1>Google 文件选择器（隔离夹具）</h1><button id="finish">'+(cancelPicker?'取消授权':'选择文件并返回')+'</button><script>document.getElementById("finish").onclick=()=>location.replace('+JSON.stringify(destination)+')</script></body></html>');return;
+    }
     if(host==='apis.google.com'&&url.pathname==='/js/api.js'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end(picker);return;}
     if(host==='accounts.google.com'&&url.pathname==='/fixture-authorize'){stats.authorizations++;json(response,{});return;}
     if(host==='accounts.google.com'&&url.pathname==='/ListAccounts'){stats.browserAccountProbes++;json(response,{},503);return;}
@@ -149,9 +162,16 @@ try{
     phase='authorization ready';
     // A reused or Chrome-managed connection opens Picker automatically. Only a fresh
     // web authorization needs the button that launches GIS from a user gesture.
-    if(!nativeMode&&stats.authorizations===0){
+    if(!nativeMode){
       await auth.waitForFunction(()=>!document.getElementById('connect')?.disabled,{},{timeout:15000});await noReaderError();
-      phase='pick and deliver';await auth.locator('#connect').click();
+      const cdp=await context.newCDPSession(auth);
+      await cdp.send('Network.enable');
+      await cdp.send('Network.setCookieControls',{enableThirdPartyCookieRestriction:true,disableThirdPartyCookieMetadata:true,disableThirdPartyCookieHeuristics:true});
+      phase='pick and deliver';await auth.locator(chosenFile?'#connect':'#reconnect').click();
+      await auth.waitForURL(url=>url.hostname==='accounts.google.com');
+      assert.equal(await auth.locator('iframe').count(),0);
+      await auth.screenshot({path:path.join(run,'google-top-level-picker.png')});
+      await auth.locator('#finish').click();
     }
     if(!cancelPicker&&chosenFile){
       if(!auth.isClosed())await auth.waitForEvent('close');
@@ -159,7 +179,7 @@ try{
       assert(!remaining.some(window=>window.id===popup.id),'Successful file selection must close its popup');
       assert(remaining.some(window=>window.id===readerWindow.id),'The reader window must remain open');
     }else{
-      await auth.getByRole('status').filter({hasText:cancelPicker?'已取消选择':'连接已完成'}).waitFor();
+      await auth.getByRole('status').filter({hasText:cancelPicker?(nativeMode?'已取消选择':'已取消'):'连接已完成'}).waitFor();
       assert(await auth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Popup content must fit without horizontal scrolling');
       await auth.screenshot({path:path.join(run,cancelPicker?'drive-popup-cancelled.png':'drive-popup.png'),fullPage:true});
       assert(!auth.isClosed(),'Cancellation and account-only connections must leave the popup open');
@@ -181,7 +201,7 @@ try{
   }
   checks.push('Cancelling Picker keeps its popup open with file selection enabled and imports no files');
   chosenFile='fixture-page';const initialPickers=stats.pickers;
-  await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,initialPickers+1);
+  await select();assert.equal(stats.authorizations,nativeMode?0:3);assert.equal(stats.pickers,initialPickers+1);
   checks.push('Drive opens in a separate popup without adding a tab to the reader window');
   checks.push('Successful file selection automatically closes the popup while keeping the reader open');
   checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
@@ -196,8 +216,8 @@ try{
   assert.equal(await pageNumber.inputValue(),'2');
   await noReaderError();await reader.screenshot({path:path.join(run,'restored-page.png')});checks.push(`${format.toUpperCase()} resumes page 2 after returning to the shelf and reopening`);
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();chosenFile='fixture-error';failMetadataFor='fixture-error';
-  const firstChecks=stats.accountChecks;await select();assert.equal(stats.authorizations,nativeMode?0:1);assert.equal(stats.pickers,initialPickers+2);assert(stats.accountChecks>firstChecks);
-  checks.push('A second selection reuses the unexpired token without another GIS authorization and still verifies account/file access');
+  const firstChecks=stats.accountChecks;await select();assert.equal(stats.authorizations,nativeMode?0:4);assert.equal(stats.pickers,initialPickers+2);assert(stats.accountChecks>firstChecks);
+  checks.push(nativeMode?'A second selection reuses the Chrome token and verifies account/file access':'Each new web selection completes top-level Google authorization with third-party cookies blocked, then verifies account/file access');
   phase='show import failure';await reader.getByRole('alert').waitFor();assert((await reader.getByRole('alert').innerText()).trim());await reader.screenshot({path:path.join(run,'import-error.png')});checks.push('云盘索引失败在书架显示可操作原因，不建立空漫画');
   if(format==='mobi'){
     chosenFile='fixture-drm';phase='reject protected MOBI';await select();
@@ -224,7 +244,7 @@ try{
     checks.push('An explicit disconnect prevents automatic credential restoration');
   }
   assert.deepEqual(pageErrors,[]);assert.equal(stats.unauthorized,0);assert.equal(stats.unsupported,0);
-  const result={checks,stats,pageErrors,dimensions,format,authMode:nativeMode?'mocked-chrome-identity':'mocked-gis',liveGoogle:false,liveAccounts:false,browser:context.browser()?.version()};await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+  const result={checks,stats,pageErrors,dimensions,format,authMode:nativeMode?'mocked-chrome-identity':'mocked-top-level-oauth',thirdPartyCookiesBlocked:!nativeMode,liveGoogle:false,liveAccounts:false,browser:context.browser()?.version()};await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }catch(error){
   if(reader&&!reader.isClosed())await reader.screenshot({path:path.join(run,'failure.png')}).catch(()=>{});
   // Never record authorization URLs, page HTML, token storage or raw network diagnostics.

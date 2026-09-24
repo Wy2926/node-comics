@@ -31,6 +31,10 @@ npm run zip -- --browser firefox --mv3
 npx --no-install web-ext lint --source-dir .output/firefox-mv3
 ```
 
+Edge 商店提交包：运行 `npm run zip:edge`，产物为 `.output/node-comicsextension-<版本>-edge.zip`。此构建不包含 Chrome 固定扩展 ID 使用的 `manifest.key`；不要将带有该字段的 Chrome 包提交到 Edge 商店。
+
+Edge 的 Google Drive 构建须设置 `$env:VITE_DRIVE_CONNECT_URL='https://comics.nodelane.net/drive-connect/index.html'`。网页连接在同一授权窗口跳转 Google 完成选文件后返回，需同步发布新版 `apps/drive-connect/connect.js`，并在 Google Web OAuth 客户端登记该完整地址为 Authorized redirect URI。Chrome 托管连接保持原有模式；细节及真实授权验收边界见 [Drive 配置](../drive-connect/README.md)。
+
 固定 Firefox ID 为 `comics@nodelane.net`；数据同意声明与最低版本以 [wxt.config.ts](wxt.config.ts) 为准。打包不代表签名、上架或真实登录／取图已通过；浏览器运行与原生权限需单独验证。Firefox 凭据使用扩展 origin 的 IndexedDB，Chrome / Edge 使用限制为 `TRUSTED_CONTEXTS` 的本地存储，见[身份说明](../../docs/PRODUCTION_IDENTITY.md)。
 
 ## 开发入口
