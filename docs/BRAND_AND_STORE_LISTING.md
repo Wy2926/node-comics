@@ -1,6 +1,6 @@
 # 产品名称与 Chrome 应用商店文案
 
-日期：2026-09-24。交付状态：用户已采纳中英文名称；客户端名称、manifest 名称与简介已接入 16 种语言字典。官网为 https://comics.nodelane.net/ 。本次公开 Chrome 商店链接显示商品不能下载；后台审核状态未核实，不能把已配置商店地址写成已上架。
+产品名称与商店文案在插件语言字典维护，官网入口为 `https://comics.nodelane.net/`。对外文案应与实际发布包及服务能力一致。
 
 ## 名称
 
@@ -71,9 +71,15 @@ Website: https://comics.nodelane.net/
 - 文案基于当前仓库声明的功能范围。正式上架时须与发布包和生产服务一致；仅展示可用的翻译模式和语言，不宣称支持所有网站、所有语言、无限免费或即时完成。
 - 当前产品语言选项不等于源语言 OCR 已完成效果验收，详见[语言支持](NODE_CONFIGURATION.md#目标语言与节点能力)。格式边界见[导入格式与缓存](IMPORT_FORMATS_AND_CACHE.md)，网页能力见[网页内翻译](IN_PAGE_TRANSLATION.md)。
 
-官方依据（2026-09-20 查阅）：
+商店规范参考：
 
 - [Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing)：标题清晰、简洁、有区分度，简介突出主要用途，说明排名与使用表现有关。
 - [Manifest name](https://developer.chrome.com/docs/extensions/reference/manifest/name)：名称长度和本地化。
 - [Manifest description](https://developer.chrome.com/docs/extensions/reference/manifest/description)：简介长度和本地化。
 - [Listing requirements](https://developer.chrome.com/docs/webstore/program-policies/listing-requirements)：信息须准确，禁止无关或过量关键词。
+
+## 推广规范
+
+面向海外漫画读者与浏览器扩展社区，优先英文介绍连续阅读、原图对照和支持格式。以开发者身份说明产品，按社区调整内容，发布前核对当前规则与安装入口；不跨社区复制刷帖。截图使用已授权素材，功能、价格和可用性以实际发布版本为准。
+
+品牌图形与导出入口见[素材说明](../output/imagegen/nodelane-logo-v1/README.md)。

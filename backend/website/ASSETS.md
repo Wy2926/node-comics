@@ -1,23 +1,14 @@
-# 官网图片来源
+# 官网素材来源
 
-## 2026-09-24 产品截图
+| 素材 | 来源与使用规范 |
+| --- | --- |
+| `src/assets/product/` | 用户授权用于官网和插件推广的六张实际截图。保留原图，构建转 WebP；界面内漫画归各自权利人，不能作为原创素材重新授权 |
+| `journey-original.webp` / `reading-corner.webp` | 原创 AI 插画，gpt-image-2、high；提示词见 [hero.txt](assets/prompts/hero.txt)、[reading.txt](assets/prompts/reading.txt) |
+| `journey-translated.webp` / `journey-en.webp` / `journey-ko.webp` | 用户提供并确认为常规翻译实测产物的中／英／韩对照图 |
+| `public/social-cover.webp` | 阅读角插画的 1200 × 630 分享图 |
+| Logo / favicon | 复用插件品牌资源，命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
 
-`src/assets/product/` 的六张 PNG 是用户在本任务中提供并授权用于官网和插件推广的实际截图：书架、阅读设置、翻译语言、支持网站、外观偏好及浏览器 Popup。前五张为 2042 × 1214，Popup 为 420 × 600。保留原文件，构建时由 Astro 输出 WebP；没有用图片模型重画 UI 或修改截图中文字。
-
-首页 Popup 等比显示；画廊通过 CSS 显示截图局部，阅读和翻译设置会将漫画区域与对应设置区域并列排版。点击「查看完整截图」显示未经裁切的截图。具体区域坐标位于 `src/components/HomePage.astro`，不代表插件重新布局。截图内漫画封面与页面归各自权利人所有，不作为项目原创 AI 插画重新授权。截图展示英语界面，功能可能与用户安装的发布版本不同。
-
-新增首页图片不依赖临时剪贴板目录或本机营销产物目录。已有翻译样例仍使用以下用户确认的实测产物，本次官网实现没有发起翻译调用。
-
-2026-09-20：三张介绍插画使用用户指定的兼容图片 API，模型固定 gpt-image-2、high 品质。通过 imagegen 技能的 CLI 备用路径完成两次生成和一次图片编辑，使用真实请求并检查可解码图片；没有调用其他生图服务。接口密钥只用于生成时的进程环境，不保存到项目、静态 HTML 或日志。
-
-- journey-original.webp：1024 × 1536，海边车站漫画三格；[原始提示词](assets/prompts/hero.txt)，生成约 59.7 秒。
-- reading-corner.webp：1536 × 1024，海边阅读角；[原始提示词](assets/prompts/reading.txt)，生成约 53 秒。
-- journey-translated.webp、journey-en.webp、journey-ko.webp：2026-09-21 用户提供的中文、英文、韩文效果图，原文件分别为「中文效果.png」「英文效果.png」「韩文效果.png」，760 × 1140；转换为 WebP quality 92，中文图替换先前生成版本。本次未调用图片模型。
-- social-cover.webp：阅读角图片裁切为 1200 × 630、WebP quality 85，用于分享卡片。构建时 Astro/Sharp 另外生成响应式尺寸与压缩版本。
-
-日文原图与阅读角为原创 AI 插画；中文、英文、韩文对照图由用户确认为产品常规翻译实测产物，对照组件标注“产品常规翻译实测效果”。AI 图片不以第三方开源许可证重新授权，不假定其具备排他版权。生成模型由指定 API 提供，不分发模型权重。
-
-品牌 Logo 与 favicon 复用插件已确认的 `apps/extension/src/assets/brand/*-light.webp`、`apps/extension/public/brand`，未重新生成；品牌命名依据 [品牌文档](../../docs/BRAND_AND_STORE_LISTING.md)。SVG/CSS UI 元素不属于介绍插画。
+截图可裁切展示，放大查看保持完整原图；不重画 UI 或修改截图文字。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
 
 | 产物 | SHA-256 |
 | --- | --- |
@@ -32,10 +23,9 @@
 | [public/icon-128.png](public/icon-128.png) | `a83fe892bb1599baaba3c8c11f2a19ce10cff2560956c3072cde57f20f52da53` |
 | [public/favicon.ico](public/favicon.ico) | `6ec5ace09c14e6a3865397956490a92488059b8ac07fee995907670b529017c2` |
 
-
 ## 浏览器商店标识
 
-2026-09-21：下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
+下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
 
 | 文件 | 来源 | SHA-256 |
 | --- | --- | --- |

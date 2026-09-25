@@ -1,6 +1,6 @@
 # 网站适配开发规范
 
-新增或修复网站从本文开始。产品边界见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)，类型以 [sources/contracts](../apps/extension/src/sources/contracts) 为准；站点规则和验证限制放在各站自己的 README，不复制公共契约。
+新增或修复网站从本文开始。产品边界见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)，类型以 [sources/contracts](../apps/extension/src/sources/contracts) 为准；站点规则和验证入口放在各站自己的 README，不复制公共契约。
 
 ## 最小目录与接入
 
@@ -13,7 +13,7 @@
 | `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理 |
 | `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages` HTTP 解析操作；章节 URL 缺少作品身份时可提供 `resolveCatalog` |
 | `image.ts`（按需） | 导出 `image`：图片请求头或解码；不依赖是否实现网络目录 |
-| `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与证据、脱敏夹具和站点测试 |
+| `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与协议来源、脱敏夹具和站点测试 |
 
 先检查真实站点的目录、页序、懒加载、图片与权限，再声明能力。选择 DOM、HTTP 或混合通道；纯网络站点不创建空 `page.ts`。公共接口缺少必要能力时修改契约及通用实现，不向核心添加站点分支。
 
@@ -41,7 +41,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 目录可选提供 `cover`，必须取自作品专门封面，不能使用推荐图或章节缩略图。`readSourceCover` 校验目录归属、HTTP(S) 地址与主机权限，经公共取图管线读取；防盗链规则不同时使用 `image.coverHeaders`。新增 CDN 只申请可选权限。封面不进入正文、翻译或下载清单，缩略图沿用缓存预算与访问失效规则；换封面不触发章节更新徽章。展示行为见[单来源阅读设计](SIMPLE_COMIC_READING_DESIGN.md)。
 
-公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，最多跟随 5 次；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。实现依据和验证边界见[跨域取图调研](PAGE_IMAGE_ACCESS_RESEARCH.md)。
+公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，最多跟随 5 次；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。读取与验证规则见[公共图片读取](IMAGE_ACCESS.md)。
 
 ## 验收与交付
 
@@ -57,9 +57,7 @@ npm run build
 
 在桌面目标浏览器加载构建产物，实际完成导入 → 取图／解码 → 阅读 → 重开恢复，检查错误提示与阅读位置。按能力补测原位译图恢复、canvas 重绘／SPA 导航或无标签页网络读取；仅下载成功不能代替完整阅读器验收。
 
-通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及带日期的真实验证摘要和未验证范围。区分隔离样本、真实站点、原生授权弹窗与模型翻译效果；不保留每次测试总数和临时服务地址。
-
-2026-09-24 封面验收：隔离 Chromium 中，MangaCopy grandblue、Comix rrzm、DM5 妖神记、NAVER 758037、Comic PASH 1fafeeae328df 均在未读取章节时显示真实封面。合成样本覆盖缓存、失败重试、封面更新与阅读位置恢复；权限恢复使用模拟响应，原生弹窗未验。复现入口见[脚本说明](../scripts/README.md)。
+通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及各验证入口的环境与范围。区分隔离样本、真实站点、原生授权弹窗与模型翻译效果；测试结果和截图写入忽略的产物目录，不在 README 追加流水记录。
 
 ## 现有站点
 

@@ -1,6 +1,6 @@
 # 漫画格式与翻译缓存
 
-2026-09-24。当前采用[单来源读取架构](COMIC_SOURCE_ARCHITECTURE.md)。本地保存完整源文件与索引，逐页取图；不支持单图、多张散图或云盘图片文件。
+当前采用[单来源读取架构](COMIC_SOURCE_ARCHITECTURE.md)。本地保存完整源文件与索引，逐页取图；不支持单图、多张散图或云盘图片文件。
 
 ## 格式范围
 
@@ -32,7 +32,7 @@
 | [PDF.js](https://github.com/mozilla/pdf.js) | `pdfjs-dist 6.3.289`，legacy 主模块与同版本 Worker | Apache-2.0；内含 core-js `3.50.0`（MIT） |
 | PDF 基础字体/字符映射/图像解码器 | 同一 PDF.js 包的 `standard_fonts`、`cmaps`、`wasm` | Foxit/PDFium BSD、Liberation SIL OFL 1.1、Adobe CMap BSD、QCMS MIT、OpenJPEG BSD 等；各自许可随构建打包 |
 
-本次无模型权重。包下载地址与 SHA-512 integrity 在 [package-lock.json](../apps/extension/package-lock.json)；WASM、Worker、字体、CMap 的逐文件 SHA-256 在 [dependency-checksums.json](../apps/extension/public/import-assets/licenses/dependency-checksums.json)，其中还记录官方 UnRAR 6.1.7 源码包摘要。[UnRAR 许可](../apps/extension/public/import-assets/licenses/unrar.txt)与其他完整许可进入扩展和 Web 包。
+这些格式组件不包含模型权重。包下载地址与 SHA-512 integrity 在 [package-lock.json](../apps/extension/package-lock.json)；WASM、Worker、字体、CMap 的逐文件 SHA-256 在 [dependency-checksums.json](../apps/extension/public/import-assets/licenses/dependency-checksums.json)，其中还记录官方 UnRAR 6.1.7 源码包摘要。[UnRAR 许可](../apps/extension/public/import-assets/licenses/unrar.txt)与其他完整许可进入扩展和 Web 包。
 
 RAR 的 Emscripten 动态命名和 Embind 参数转换函数由 [unrar-csp.ts](../apps/extension/unrar-csp.ts)替换为静态闭包，保留参数转换、析构顺序和原 WASM。升级时构建检查会要求重新审阅。MV3 只增加本地 WASM 所需的 `wasm-unsafe-eval`，未允许 JavaScript `unsafe-eval`。Worker、字体、WASM 均随扩展发布，无运行时 CDN 依赖。
 

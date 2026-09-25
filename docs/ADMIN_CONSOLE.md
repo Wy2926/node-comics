@@ -48,7 +48,7 @@
 - 支付事件人工重试只重新入队既有事件，先核对渠道环境及处理次数；处理中或已完成事件不能重复入队，一分钟内最多一次人工重试。本站不提供发起退款或争议举证。
 - 订单退款明细分别显示平台累计退款、已记录成功金额和完整性；缺失金额不是零。历史订单核实使用所选订单的渠道／订阅／交易／结账关联。
 
-### 四项新增系统规则
+### 系统规则
 
 | 设置字段 | 生效边界 |
 | --- | --- |
@@ -105,7 +105,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 - `/users`：用户分页，支持 `q / plan / offset / limit`。
 - `/users/{id}`：用户权益与实际阅读会话摘要。
 
-本轮补齐的接口按业务归属注册，不限定于 monitor：
+管理接口按业务归属注册：
 
 | API 前缀 | 路径与用途 |
 | --- | --- |
@@ -121,10 +121,9 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 监控与诊断 GET 只读取数据库元数据，不访问 R2、不调用供应商、不改变队列或结算；状态“有效”不等于已探测对象存在。管理写操作和平台核实按各自业务产生副作用并记录审计。不向页面发送节点令牌、供应商密钥、图片、OCR 或译文全文；反馈评论和管理员处理备注属于有权限的业务记录。
 
-除支付管理模块使用 `page / page_size` 外，新增历史和诊断列表使用 `offset / limit`，每页上限 100；最近阅读会话单次最多 50 个。审计记录操作者、目标、前后值、原因与时间，同事务写入；回滚业务不留下成功审计。令牌、密钥、对象路径、签名地址、OCR／译文载荷不写入审计快照。
+除支付管理模块使用 `page / page_size` 外，新增历史和诊断列表使用 `offset / limit`，每页上限 100。审计记录操作者、目标、前后值、原因与时间，同事务写入；回滚业务不留下成功审计。令牌、密钥、对象路径、签名地址、OCR／译文载荷不写入审计快照。
 
 统计取最近 1–90 天并按 UTC 日期汇总。供应商／模型筛选仅作用于文本调用表；最多返回 2000 个分组并显式标记截断。文本金额含估算／未知消耗预占，不是已对账费用；新增复用授权不是阅读浏览次数；订单原金额按币种分列，不作为净收入。服务健康只提供当前实例与积压，历史告警和消息通知未建设。
-
 
 ## 匿名网站申请与插件反馈
 
@@ -163,12 +162,9 @@ node scripts/verify_admin_completion.mjs
 
 PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD`，运行 `test_admin_completion_postgres.py` 及既有支付／设置并发套件；测试固定限制在 `nodecomics_concurrency_test` 库，详见 `test_postgres_concurrency.py` 和 `deploy/compose.tests.yaml`。未启用的专用测试不计通过。
 
+### 真实接入
 
-### 真实接入边界
-
-2026-09-22 曾通过管理员图片测试入口，以 `gpt-image-2` 的一次真实 `images/edits` 请求完成合成图翻译、持久任务、授权下载及跨用户拒绝；设置 `quality=low / size=1024x1024`，实际得到可解码的 1254×1254 PNG。环境是独立 SQLite 和本地私有对象，未验证生产 R2 或货币账单；图像会重绘线条与渐变，不代表自然漫画普遍质量。脱敏产物位于忽略目录 `artifacts/real-image-verification/`，真实付费复验入口为 `scripts/verify_image_provider_live.py`，不能自动重建未知请求。
-
-真实 Creem test 结果与退款限制见[沙箱摘要](CREEM_SANDBOX_ACCEPTANCE.md)。浏览器夹具不等于真实 OIDC、支付或生产部署；历史测试数量不作为当前检查结果。
+真实图片供应商检查使用 `scripts/verify_image_provider_live.py`，结果未知先核实原请求；OIDC、支付、R2 与模型效果按目标环境分别验收。
 
 ## 前端依赖
 

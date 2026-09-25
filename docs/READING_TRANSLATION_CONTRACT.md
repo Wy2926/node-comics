@@ -2,7 +2,7 @@
 
 本文约束 **NodeLane 官方渠道**的后端 API 与客户端恢复行为。客户端渠道抽象、MTU 直传协议及缓存边界见[客户端翻译渠道](TRANSLATION_CHANNELS.md)；本地渠道不要求实现本文的账号、权益或持久任务协议。
 
-当前实现采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。后端使用 `translations_0001` 全新空库，客户端使用 `node-comics-reading-v2-*` 新数据库；不读取、迁移或兼容旧数据。旧库不会自动删除，新客户端需要重新导入漫画。设计取舍见[简化说明](TRANSLATION_API_SIMPLIFICATION.md)。代码实现与本地验证不代表公开部署。
+采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。后端使用 `translations_0001` 全新空库，客户端使用 `node-comics-reading-v2-*` 新数据库；不读取、迁移或兼容旧数据。旧库不会自动删除，新客户端需要重新导入漫画。
 
 ## 1. 翻译流程
 
@@ -106,11 +106,7 @@ R2 签名地址直接下载且不附带账户令牌；显式测试环境的本�
 
 图片授权和请求按用户隔离；内容去重与已完成结果跨用户复用遵循[结果共享](RESULT_SHARING.md)。删除只撤销本人访问，原图和最终译图不按年龄或无数据库引用自动删除。供应商成本与用户页数独立计量。
 
-## 9. 删除的旧协议
-
-已删除 `translation-plans`、`reading-sessions`、`translation-operations`、`translation-changes`、公开 `/v1/jobs` 及 `/v1/uploads` 控制端点；不保留兼容路由。数据库删除阅读会话、策略版本、旧操作回执与账户变更序号，以最终模型重建初始迁移。计算节点执行租约、内部 Job、结算账本与必要上传保护继续保留。
-
-## 10. 验证入口
+## 9. 验证入口
 
 使用[后端说明](../backend/README.md#验证)的 Docker 隔离测试或本地虚拟环境。PostgreSQL 并发套件仅连接 `nodecomics_concurrency_test`，每例随机 schema；不读取或重置产品库。
 

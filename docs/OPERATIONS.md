@@ -1,6 +1,6 @@
 # 健康监控与隔离恢复
 
-适用当前 `translations_0001` 新空库基线。本文的实现是健康信号、数据库备份及隔离恢复工具；没有执行生产部署、切库或真实 R2 备份。
+适用当前 `translations_0001` 新空库基线。涵盖健康信号、数据库备份和隔离恢复。
 
 ## 健康信号
 
@@ -39,11 +39,11 @@ Compose 已为三个控制服务配置健康检查，每 15 秒一次，启动�
 ```powershell
 backend/.venv/Scripts/python.exe scripts/database_backup.py backup `
   --database-env BACKUP_DATABASE_URL `
-  --directory D:/private-backups/node-comics/2026-09-16T120000 `
+  --directory D:/private-backups/node-comics/backup-new `
   --pg-container <当前 PostgreSQL 容器名>
 ```
 
-输出 PostgreSQL custom dump 和 `manifest.json`（时间、格式、大小、SHA-256）。只有备份及格式检查完成才写清单；不覆盖已有目录、不删除旧备份。备份包含身份、权益、账本及对象键，应保存于受控目录，并由部署环境加密、复制至独立备份介质。建议至少每日备份、每月隔离恢复演练；这是部署建议，没有在本次创建自动任务，也没有宣称已满足某个 RPO/RTO。
+输出 PostgreSQL custom dump 和 `manifest.json`（时间、格式、大小、SHA-256）。只有备份及格式检查完成才写清单；不覆盖已有目录、不删除旧备份。备份包含身份、权益、账本及对象键，应保存于受控目录，并由部署环境加密、复制至独立备份介质。建议每日备份、每月隔离恢复演练，具体周期由部署环境配置。
 
 隔离 SQLite 验证使用在线 backup API，而非复制正在使用的 `.db` 文件：
 
@@ -59,7 +59,7 @@ backend/.venv/Scripts/python.exe scripts/database_backup.py backup `
 ```powershell
 backend/.venv/Scripts/python.exe scripts/database_backup.py restore `
   --database-env RESTORE_DATABASE_URL `
-  --directory D:/private-backups/node-comics/2026-09-16T120000 `
+  --directory D:/private-backups/node-comics/backup-new `
   --reference-output D:/private-backups/node-comics/restored-object-references.json `
   --pg-container <当前 PostgreSQL 容器名>
 ```
@@ -77,11 +77,7 @@ backend/.venv/Scripts/python.exe scripts/database_backup.py restore `
 
 隔离恢复后先保持 API、控制执行与维护进程关闭，仅检查数据。在线备份后的新任务、额度结算、撤销授权及图片上游调用可能不在快照内，不能直接启动恢复库：需先对照运行记录与上游核实，尤其是所有未终态重绘任务，避免把快照中的排队任务当成尚未调用。生产切换属于单独的受控恢复操作，本工具不替操作者启动服务或重放任务。
 
-## 本次验证
-
-2026-09-16 在隔离 PostgreSQL 17.6 容器创建两个随机命名的新库完成真实 `pg_dump` / `pg_restore` 演练：2 个用户和 2 个图片授权恢复后对应 1 个共享对象引用；备份后的第三个用户未进入快照；第二次恢复拒绝覆盖。两个演练库已删除，未访问真实用户库、真实 R2 或模型。
-
-历史版本恢复证据（不是当前基线）：`artifacts/production-fixes/restore-drill-final/report.json`，恢复后已验证 `shared_0001` 基线，备份摘要 `fe45e77eab14a7f251597365cfad64792a402dc6eea99348acb26cf0323076cb`。合成图片与备份仅保留于忽略的 artifacts 目录。
+## 恢复验证
 
 重复演练使用与 PostgreSQL 并发套件相同的显式 `TEST_PG_*` 环境变量，且要求 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_DATABASE=nodecomics_concurrency_test`。可选 `TEST_PG_CONTAINER` 指向该隔离服务器的容器，输出目录必须不存在：
 
@@ -95,8 +91,6 @@ backend/.venv/Scripts/python.exe -m pytest backend/tests/test_health.py backend/
 
 ## 部署验收边界
 
-2026-09-16 的审查曾验证 R2 公开域名可以匿名读取测试对象；当时的代码修复没有改变 Cloudflare 绑定。本地身份、权限或签名测试不能证明公开入口已关闭，部署前需独立核实桶的公开域名和 r2.dev 状态。该记录不是对当前线上状态的新检查。
+生产身份校验、公钥撤销、首次登录竞争、请求保护、共享对象权限和健康检查的现行说明分别见[生产身份](PRODUCTION_IDENTITY.md)、[请求保护](SUBMISSION_SCHEDULING.md)、[对象存储](OBJECT_STORAGE.md)与本文。
 
-生产身份校验、公钥撤销、首次登录竞争、请求保护、共享对象权限和健康检查的现行说明分别见[生产身份](PRODUCTION_IDENTITY.md)、[请求保护](SUBMISSION_SCHEDULING.md)、[对象存储](OBJECT_STORAGE.md)与本文。旧审查中的提交表和旧迁移链已删除，不能继续作为当前缺陷清单。
-
-真实 OIDC 用户／管理员登录、反向代理与下载 CORS、目标规模容量、控制进程告警及桶级灾备需在目标部署验收；本地或模拟响应测试不代替这些证据。
+部署前检查 R2 公开域名和 r2.dev 均已关闭。真实 OIDC 用户／管理员登录、反向代理与下载 CORS、目标规模容量、控制进程告警及桶级灾备需在目标部署验收；本地或模拟响应测试不代替这些证据。

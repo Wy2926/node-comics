@@ -1,6 +1,6 @@
 # 节点配置
 
-当前图像节点统一使用整页 v2 协议，入口为 [classic-engine](../services/classic-engine/README.md)。旧阶段接口、compute-agent 与中心下发引擎线程／缓存覆盖已删除，不接收旧配置字段。切换使用空数据库和新节点日志；原图与译图的 R2 对象保留。
+图像节点使用整页 v2 协议。部署使用 [Windows 节点包](../services/compute-node/README.md)，开发使用 [classic-engine](../services/classic-engine/README.md)。
 
 ## 中心与本地的职责
 

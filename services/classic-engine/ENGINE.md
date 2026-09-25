@@ -14,13 +14,13 @@
 
 `--ocr-language auto` 直接使用上游多语言 `48px_ctc`，无需输入来源语言；`--source` 仅作为 CLI 文本翻译提示，默认 Auto。识别模型一次只加载一种，不根据目标语言选择 OCR，也不逐行轮跑语言模型。自动模式按区域文字类型拼接英文、韩文和 CJK 行，不修改漫画默认从右到左的区域顺序。显式 `ja/zh/en/ko/latin` 仍可用于模型对照与专项处理。
 
-本地权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。识别范围对齐这个 `48px_ctc`，不等同于上游默认 `48px` 或所有可选模型能力的合集。模型字表支持不等于所有艺术字、手写字或语言组合均准确。清晰文字样本验证了日文、简繁中文、英文、韩文；俄文和越南文样本存在误识别，不能承诺任意语言都可靠。
+OCR 权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。识别范围对齐这个 `48px_ctc`，不等同于上游默认 `48px` 或所有可选模型能力的合集。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
 
 采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。无字体覆盖时明确报错，避免静默嵌入方框。`--direction horizontal/vertical` 可覆盖默认方向。
 
 长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每条 OCR 最多进行一次低置信度重裁剪；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
 
-LaMa 推理掩膜与最终回填掩膜独立：给模型的未知区域额外扩展 5 个原图像素，减轻紧贴文字形状导致的笔画残影；实际写入仍限于原去字掩膜。[上游对照、定位证据与回归](docs/INPAINTING_DIAGNOSIS.md)。
+LaMa 推理掩膜与最终回填掩膜独立：给模型的未知区域额外扩展 5 个原图像素，减轻紧贴文字形状导致的笔画残影；实际写入仍限于原去字掩膜。
 
 ## 安装与模型
 
@@ -42,15 +42,15 @@ MIT OCR 与 LaMa 的完整构建统一使用 [Windows 节点构建入口](../com
 
 ```powershell
 # 日文漫画嵌入英文：即使原文竖排，英文仍按单词横排
-.\.venv\Scripts\python -m manhua_engine.cli run 'D:/漫画/日文' `
+.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/日文' `
   --source Japanese --target English --translation online --output artifacts/english
 
 # 韩文识别与日文嵌字；设置主要 OCR 语言也适用于包含英文的韩漫
-.\.venv\Scripts\python -m manhua_engine.cli run 'D:/漫画/韩文' `
+.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/韩文' `
   --source Korean --target Japanese --translation online --output artifacts/japanese
 
 # 英文识别与韩文嵌字
-.\.venv\Scripts\python -m manhua_engine.cli run 'D:/漫画/英文' `
+.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/英文' `
   --source English --target Korean --translation online --output artifacts/korean
 ```
 
@@ -70,24 +70,22 @@ MIT OCR 与 LaMa 的完整构建统一使用 [Windows 节点构建入口](../com
 - `--tile 768` 是局部去字上限，当前 LaMa ONNX 进一步限制为 512，并保持裁剪比例；`--png-compression 1` 默认快速无损输出。
 - `--gpu -1` 显式使用 CPU。模型只加载一次，字体覆盖与网络预热在计时前完成。
 
-以下是 **2026-09-19 的 AOT 历史测量，不适用于当前 LaMa**。当前性能见 [LaMa 验证](docs/LAMA_VALIDATION.md)。本机 Windows / RX 6900 XT / Ryzen 7 5800X：40 页最终双页测量约 131.2 页/分钟，单页平均约 0.522 秒；后续排版对照中新版约 134.8 页/分钟。改造前为 138.1 页/分钟；同机后台负载变化明显，尚不能保证完全无回退。NVIDIA / Linux 未实机验收。准确率、性能口径和限制见 [质量验证](docs/QUALITY.md)。
-
 ```powershell
-.\.venv\Scripts\python -m pytest -q
-.\.venv\Scripts\python tools/validate_multilingual.py
-.\.venv\Scripts\python tools/benchmark.py '0001-第01話-修订1' `
+.\.venv-lama\Scripts\python -m pytest -q
+.\.venv-lama\Scripts\python tools/validate_multilingual.py
+.\.venv-lama\Scripts\python tools/benchmark.py 'D:/test-comics/source' `
   --source 'Japanese and Chinese (mixed; preserve existing Chinese)' `
   --configs '1:8,2:8' --output artifacts/benchmark
-.\.venv\Scripts\python tools/validate_quality.py '0001-第01話-修订1' artifacts/benchmark/d2-w8
-.\.venv\Scripts\python tools/probe_ocr.py '0001-第01話-修订1' --limit 24 --output artifacts/ocr-probe-new
+.\.venv-lama\Scripts\python tools/validate_quality.py 'D:/test-comics/source' artifacts/benchmark/d2-w8
+.\.venv-lama\Scripts\python tools/probe_ocr.py 'D:/test-comics/source' --limit 24 --output artifacts/ocr-probe-new
 ```
 
-测试集主要为已有中文漫画，基准使用历史翻译缓存，不代表日韩英自然漫画的准确率。多语言生成样张验证真实识别模型和固定测试译文嵌字，不评估在线翻译质量。复杂艺术字、音效、弯曲文字和极窄气泡仍需人工检查；无法完整嵌字时会报错，不静默截断。
+效果检查应覆盖 OCR 漏字、背景残影、缺字、换行、气泡边界和画面保持。生成样张与固定译文验证图像阶段，在线文本质量使用真实样本单独评估；性能须记录设备、引擎版本和阶段耗时。
 
 ## 目录
 
-`manhua_engine/` 只保留运行代码、字表和模型清单；`vendor/` 保留有出处的分组 / CTC / 几何算法。`tools/` 放构建、基准、质量与可视化工具，`tests/` 放离线回归，`docs/QUALITY.md` 统一验收记录。
+`manhua_engine/` 只保留运行代码、字表和模型清单；`vendor/` 保留有出处的分组 / CTC / 几何算法。`tools/` 放构建、基准、质量与可视化工具，`tests/` 放离线回归。
 
-`models/` 放可加载权重及验证参考，`build-models/` 放上游源码、检查点与中间产物；`cache/` 和 `artifacts/` 保存本地缓存与输出。移除旧 INT8 / baseline 分支、重复排版和冗余基准入口。原图、缓存、模型和生成样张均不提交 Git。
+`models/` 放可加载权重及验证参考，`build-models/` 放上游源码、检查点与中间产物；`cache/` 和 `artifacts/` 保存本地缓存与输出。原图、缓存、模型和生成样张均不提交 Git。
 
 GPL-3.0；具体上游版本和依赖许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。

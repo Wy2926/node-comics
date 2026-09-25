@@ -15,7 +15,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 ## OIDC 必需项
 
-官网也使用同域名和现有客户端，新增精确回调 `https://comics.nodelane.net/auth/callback/`（含尾斜线）；五语页面共用此回调，登录后返回原语言账户页。保留已有插件和私有后台回调，身份端点允许官网 origin。官网使用 public client 的 PKCE 流程，不配置 client secret，运行与会话边界见[官网说明](../backend/website/README.md#oidc-与账户)。此记录是配置要求，尚未代为修改 Logto。
+官网也使用同域名和现有客户端，新增精确回调 `https://comics.nodelane.net/auth/callback/`（含尾斜线）；五语页面共用此回调，登录后返回原语言账户页。保留已有插件和私有后台回调，身份端点允许官网 origin。官网使用 public client 的 PKCE 流程，不配置 client secret，运行与会话边界见[官网说明](../backend/website/README.md#内容与规范)。
 
 管理后台入口改为私有 `ADMIN_WEB_PATH`，为空时关闭页面。部署前须在 Logto 新增 `https://<服务域名><ADMIN_WEB_PATH>` 精确回调（含尾斜线）；保留插件及其他客户端回调，不改变现有身份端点、Client ID 或 Audience。新入口不会通过公开身份配置返回。迁移顺序见[后台入口与登录](ADMIN_CONSOLE.md#登录)。
 
@@ -29,9 +29,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 | `CORS_ORIGINS` | 精确 HTTPS 网页来源，不能含路径、通配符或凭据；只服务扩展时可空 |
 | `EXTENSION_IDS` | 逗号分隔的固定 32 字符扩展 ID；不允许扩展来源通配符 |
 
-2026-09-16 已重新读取 [Logto 公开 discovery](https://auth.nodelane.net/oidc/.well-known/openid-configuration) 和对应 JWKS：issuer 为 `https://auth.nodelane.net/oidc`，端点为 `/oidc/auth`、`/oidc/token`、`/oidc/jwks`，支持 PKCE S256，公钥为 EC / P-384 / ES384。用户确认应用 ID 为 `dept2iz42nzidf5pao6fo`，与现有本地配置一致。
-
-2026-09-16 用户确认已创建 API 资源，Identifier 为 `https://comics.nodelane.net/api`，线上域名为 `https://comics.nodelane.net`。根 `.env` 已补齐相同 audience；独立 `deploy/.env.production` 使用生产模式、关闭开发登录、精确来源和专用新数据库密码，`COMPOSE_PROJECT_NAME=node-comics-production` 隔离生产卷，`R2_KEY_PREFIX=node-comics-production/` 隔离生产对象。`deploy/.env.local` 已显式标记 `APP_ENV=development`，仍作为本地开发入口。未切换本机运行服务，未公开部署。真实登录验收仍需核实该应用的资源授权、网页 / 扩展回调和允许来源。固定扩展回调为 `https://aiajdjliifeeaogpalejpggkiccjbneo.chromiumapp.org/oidc`。网页回调为 `location.origin + location.pathname`，在 Logto 登记实际完整路径及其 CORS origin；插件回调以 `chrome.identity.getRedirectURL('oidc')` 为准。商店公钥在 `apps/extension/wxt.config.ts`，更换扩展 ID 后须同步身份平台登记及 `EXTENSION_IDS`。
+插件回调以 `chrome.identity.getRedirectURL('oidc')` 为准，网页回调为实际 origin 与路径；更换扩展 ID 后同步身份平台和 `EXTENSION_IDS`。
 
 ## 撤销与并发行为
 
@@ -39,7 +37,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 
 插件退出登录清除本机账户会话，身份服务的浏览器 SSO 会话仍可能存在。插件与网页阅读器主动登录统一请求 `openid profile offline_access` 和 `prompt=login consent`，允许输入其他账户并授权自动续期；不触发其他应用的全局退出。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
 
-### 客户端会话与续期（2026-09-20）
+### 客户端会话与续期
 
 - `src/auth` 统一管理新会话模型：每次登录独立的会话 ID、服务 origin、用户、访问令牌、到期时间、提前刷新时间和 OIDC 续期凭据。Chrome / Edge 在 `chrome.storage.local` 的 `nc-auth` 中保存一份，限制为 `TRUSTED_CONTEXTS`；Firefox 缺少 `setAccessLevel`，使用扩展 origin 的 `node-comics-auth` IndexedDB，网页内容脚本不能读取该库，`storage.local` 的 `nc-auth` 仅保存会话 ID 和随机变更标记，用于通知其他扩展上下文。网页阅读器在自身 origin 的同名 localStorage 记录保存。凭据不在阅读器与后台间镜像。旧会话读写已删除，没有旧账户或旧数据迁移、双写与兼容回退；更新后需重新登录。
 - 活跃阅读器在令牌到期前最多 60 秒自动续期（短令牌取有效期的 10%）；恢复前台和发起带账户认证的请求时同样检查。关闭页面后不依赖常驻定时器，扩展后台下次工作时按需续期。开发测试会话依照后端 `expires_in=43200` 到期，不能自动重新签发开发身份。
@@ -58,7 +56,7 @@ npm run build
 npm run dev -- --port 5187
 ```
 
-浏览器隔离验收入口为 `http://127.0.0.1:5187/tests/auth-lifecycle-fixture.html`。只使用模拟身份服务、模拟产品 API 和本地原创漫画；拒绝非验收数据与外部网络请求。2026-09-20 前端类型／模块检查、304 项测试与 Chrome MV3 构建通过；已在 Chrome 检查自动续期、断网保留会话、撤销与持续 401 后双标签页同步退出、重新登录入口，以及第 2 页原图在失效和重新登录后保持位置；检查了账户页和阅读器截图。真实 Logto 的离线授权、刷新令牌轮换及扩展后台休眠恢复仍需真实环境验收，不能将模拟结果视为线上验证。本机缺少后端测试环境依赖，本轮后端 pytest 未运行成功。
+浏览器夹具为 `http://127.0.0.1:5187/tests/auth-lifecycle-fixture.html`，使用模拟身份与 API 检查自动续期、断网、撤销、双标签页退出与阅读位置。真实 OIDC 授权、令牌轮换和后台休眠恢复单独验收。
 
 ### 服务端撤销与并发
 

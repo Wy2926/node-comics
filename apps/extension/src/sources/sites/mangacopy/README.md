@@ -17,5 +17,3 @@
 ## 验证
 
 插件目录运行 `npm test -- src/sources/sites/mangacopy/tests tests/catalog-sync.test.ts tests/catalog-reader.test.ts`。按[脚本说明](../../../../../../scripts/README.md)配置隔离浏览器并构建后，运行根目录的 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`、`scripts/verify_source_covers.mjs`；覆盖 HTTP 目录、零目录标签页、后台 alarm、更新／失败保留、封面和阅读位置。原位回归设置 `INLINE_SITE_ONLY=mangacopy` 后运行 `scripts/verify_inline_translation.mjs`，使用合成网页和模拟译图。
-
-2026-09-25 真实 HTTP 样本 `hzpyszbsdekadjxzqmzmdwqglsytm` 最初返回 16 项，捕获响应通过新解析器回放；随后直接请求及源站网页请求均返回空目录，原因未确认，真实 MV3 在线验收未通过。隔离样本验证不能证明当前源站、图片 CDN 或翻译模型可用性。

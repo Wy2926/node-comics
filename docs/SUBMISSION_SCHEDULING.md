@@ -20,7 +20,7 @@ HTTP 保护在取得调度锁前，使用独立短事务更新 `control_admissio
 
 ## 幂等保留
 
-`translation_requests` 的用户、UUID、请求摘要及 Job／私有结果授权关联永久保留。重复请求不新建任务或扣量；已撤销 UUID 不能重新授权。两分钟前的分钟事件可清理，不删除请求回执。删除阅读窗口租约、会话 fencing、策略版本与账户增量游标。当前页优先采用一次性短时提示，重复 PUT 不续期。
+`translation_requests` 的用户、UUID、请求摘要及 Job／私有结果授权关联永久保留。重复请求不新建任务或扣量；已撤销 UUID 不能重新授权。两分钟前的分钟事件可清理，不删除请求回执。当前页优先采用一次性短时提示，重复 PUT 不续期。
 
 ## 数据库候选选举
 
@@ -37,4 +37,4 @@ cd backend
 .venv/Scripts/python.exe -m pytest tests/test_translation_requests.py tests/test_submission_limits.py tests/test_cluster_scheduler.py -q
 ```
 
-真实 PostgreSQL 使用专用 `nodecomics_concurrency_test`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_*`，验证分钟竞争、重复操作、独立请求回滚、跨副本控制保护、事务提交后通知及公平调度。`RUN_SCHEDULER_SCALE=1` 启用 50,000 页规模测试；报告锁外选举耗时和锁内持有时间，不能用它推断生产吞吐。复验入口见[阅读契约验证](READING_TRANSLATION_CONTRACT.md#10-验证入口)。
+真实 PostgreSQL 使用专用 `nodecomics_concurrency_test`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_*`，验证分钟竞争、重复操作、独立请求回滚、跨副本控制保护、事务提交后通知及公平调度。`RUN_SCHEDULER_SCALE=1` 启用 50,000 页规模测试；报告锁外选举耗时和锁内持有时间，不能用它推断生产吞吐。复验入口见[阅读契约验证](READING_TRANSLATION_CONTRACT.md#9-验证入口)。

@@ -1,106 +1,48 @@
 # Node Comics 后端
 
-已实现[翻译接口契约](../docs/READING_TRANSLATION_CONTRACT.md)：每张图片一个 UUID 请求，缺图时补传，上传自动校验与排队，批量快照直接交付结果。删除阅读会话、续租、策略版本与账户游标；后台持久任务、公平调度、普通／PLUS 每滚动 60 秒 10／100 张限频、会员额度和私有 R2 保留。取舍见[简化实施说明](../docs/TRANSLATION_API_SIMPLIFICATION.md)。
-
-数据库只保留最终初始基线 `translations_0001`，必须使用全新空库。旧迁移链、提交清单接口和用户队列接口已删除，无升级或兼容分支。当前代码与本地隔离验收不代表已更新[VPS 部署](../docs/VPS_DEPLOYMENT.md)。
-
-FastAPI／SQLAlchemy／PostgreSQL 控制服务管理任务；独立 [classic-engine](../services/classic-engine/README.md) 通过整页租约执行常规翻译。文本供应商在后台创建和版本化管理，见[供应商设计](../docs/TRANSLATION_PROVIDERS.md)。Stripe／Creem 默认均关闭，测试与生产使用不同数据库，见[多渠道支付接入](../docs/STRIPE_BILLING.md)。后台“系统设置”统一维护分钟速率、上传和反馈保护，见[系统设置](../docs/SYSTEM_SETTINGS.md)。
+FastAPI + SQLAlchemy + PostgreSQL 控制服务。API、control-worker、maintenance 分别负责请求、任务执行与维护；图像计算由独立节点完成，原图与译图存入私有 R2。
 
 ## 运行
 
-需要 Python 3.11、PostgreSQL（隔离验证使用 17.6）、私有 R2。后端默认生产模式并校验完整身份配置；以下为显式开发环境入口。在根目录填写 `.env` 后：
+推荐 Docker Compose。从仓库根目录执行：
 
 ```powershell
 ./scripts/bootstrap.ps1
-# 填写 R2、图片供应商后启动本地开发集群：
+# 填写根 .env 中的 R2 与供应商配置
 ./scripts/bootstrap.ps1 -Start
-# 配置 ADMIN_WEB_PATH 后，在该后台入口的 #translation-providers 创建文本供应商。
 ```
 
-本地 Compose 项目 `node-comics-nodes` 使用 `nodes_postgres` 卷，默认库 `nodecomics_cluster`。新基线 `translations_0001` 不升级旧表；已有旧版本卷需另选全新 Compose 项目 / 数据库，不会自动清空。本次不自动切换已有实例。若旧 API 占用 18088，在 `deploy/.env.local` 设置新的 `API_PORT`。生产使用 `deploy/.env.production` 与 `scripts/bootstrap.ps1 -Production -Start`，固定独立项目 `node-comics-production`。不同环境使用独立 R2 前缀。生产启动和身份校验见[生产身份配置](../docs/PRODUCTION_IDENTITY.md)。
+本地 API 默认 `http://127.0.0.1:18088`；环境配置位于 `deploy/.env.local`，后台路径取其中的 `ADMIN_WEB_PATH`。数据库使用 `translations_0001` 空库基线；首次安装准备新库。
 
-三个控制进程可独立运行。以下仅列进程入口；本机运行需先安装 `backend/requirements.txt`，启动器或秘密管理需预先向各进程注入完整 `DATABASE_URL`、身份和存储配置，程序不会自动读取 `deploy/.env.local` / `deploy/.env.production`。本地调试必须显式设置 `APP_ENV=development`，不能依赖默认配置绕过生产校验：
+直接运行需要 Python 3.11+ 和 [requirements.txt](requirements.txt)，并向各进程注入数据库、身份和存储配置；本地调试显式设置 `APP_ENV=development`。在本目录的三个终端分别执行：
 
 ```powershell
-cd backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 18088 --no-access-log
-# 另两个终端：
 python -m app.workers
 python -m app.dispatcher
 ```
 
-API、control-worker、maintenance 使用相同数据库与私有 R2 配置；不挂载共享图片卷。独立计算节点只需要内部 API 令牌和本机引擎令牌，部署方式见[节点说明](../docs/NODE_CONFIGURATION.md)。`local` 存储仅供显式开发 / 测试环境、`DEV_AUTH=true` 且配置足够长度签名密钥的隔离验证，不能作为公开部署。
+Docker 自动构建官网与管理后台；本机运行页面前，分别在 `website`、`admin-ui` 执行 `npm ci` 和 `npm run build`。正式环境配置与发布见[部署规范](../docs/DEPLOYMENT.md)。
 
-## 配置
+## 开发入口
 
-| 配置 | 默认／用途 |
+| 范围 | 规范 |
 | --- | --- |
-| `FREE_IMAGES_PER_MINUTE` / `PLUS_IMAGES_PER_MINUTE` | 10 / 100，首次初始化种子；后续在后台配置，跨模式、语言和设备共用滚动 60 秒预算 |
-| `TRANSLATION_REQUESTS_PER_MINUTE` / `TRANSLATION_REQUEST_BURST` / `TRANSLATION_REQUEST_CONCURRENCY` | 300 / 30 / 4，独立 HTTP 请求保护，与新增翻译图片数分开 |
-| `FREE_SCHEDULER_WEIGHT` / `PLUS_SCHEDULER_WEIGHT` | 1 / 2，同级用户资源份额 |
-| `REALTIME_SHARE` | 0.9，预存保底 0.1，空闲互借 |
-| `PRIORITY_TTL_SECONDS` | 90，一次性当前页优先期限，无客户端续租 |
-| 节点身份 | 后台添加后一次性返回 NODE_ID / NODE_TOKEN；每节点独立凭据，数据库仅保存摘要 |
-| `CLUSTER_LEASE_SECONDS` | 90，心跳续期与代次隔离 |
-| `CLUSTER_TEXT_SLOTS` / `CLUSTER_REDRAW_SLOTS` | 各 4，仅首次创建资源池时使用，后续在后台配置，所有控制副本共享限额 |
-| `CLUSTER_UPLOAD_SLOTS` | 2，仅首次创建时使用，后续在后台配置 |
-| 后台文本供应商 `config.requests_per_minute` | 默认60，每供应商独立 RPM，跨副本与该供应商历史版本共享；与文本执行位分开 |
-| `CLUSTER_STAGE_ATTEMPTS` | 3，安全阶段恢复上限 |
-| `UPLOAD_SESSION_TTL_SECONDS` / `UPLOAD_SESSION_MAX_LIFETIME_SECONDS` | 900 / 3600 |
-| 上传并发、收流超时、反馈预算 | 后台“系统设置”统一维护；对应环境变量只作为首次初始化种子，见[参数表](../docs/SYSTEM_SETTINGS.md) |
-| `FREE_DAILY_PAGES` / `PLUS_MONTHLY_REDRAW_PAGES` | 30 / 300，独立于分钟速率 |
-| `RETENTION_DAYS` | 默认0表示无限期保留；当前部署为0 |
-| `RESULT_STORAGE_BACKEND` | 部署固定 `r2`，含原图与译图 |
-| `R2_ENDPOINT_URL` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | 私有桶 S3 配置 |
-| `R2_KEY_PREFIX` | 独立部署专用前缀 |
-| `CLASSIC_ENABLED` | 常规引擎总开关；文本模型、协议、密钥、计量和重试在后台供应商中配置，默认关闭；接入要求见[计算协议](../docs/COMPUTE_PROTOCOL.md) |
-| `OPENAI_*` / `PROVIDERS_JSON` | 初始化图片供应商，后续管理员维护 |
-
-文本供应商密钥保存在后端 DB revision 中，调用前严格校验完整配置快照并加载对应版本密钥，不读取环境变量或借用图片供应商配置。密钥不进入 API 响应、任务快照或计算节点；数据库及备份包含敏感密钥，必须限制访问权限。有效供应商及版本进入内容缓存身份；会员页数和权重不改变图片缓存身份。
-
-## 管理后台
-
-“产品与价格”（`#billing`）按产品管理月付／年付价格及 Stripe／Creem 渠道绑定，验证渠道后才能发布价格。初始 PLUS 月付 US$9.99、年付 US$99.99 均为草稿，每月 300 页重绘、首次试用 7 天／30 页；已购订阅保留原价和权益。“订单管理”（`#orders`）查看各渠道全部订单、流转、支付通知与核实结果，见[多渠道订阅设计及浏览器验证](../docs/STRIPE_BILLING.md)。`PLUS_MONTHLY_REDRAW_PAGES` 仅作为运营会员默认值，付费订阅使用其绑定版本。
-
-公开官网位于 [website](website/README.md)，与 API 共用 `https://comics.nodelane.net`；Astro 静态输出、React 账户岛、五语独立字典，并复用相同 OIDC。Docker 构建自动打包，商店 URL 配置及身份回调要求见官网说明。
-
-服务端由 `ADMIN_WEB_PATH` 配置私有入口，提供独立 **React + TypeScript + Vite** 后台，可查看用户与权益、节点心跳与容量、双模式积压，以及逐页翻译的等待／执行耗时、交付节点和执行机。构建、登录、统计口径和验收见[后台说明](../docs/ADMIN_CONSOLE.md)。Docker 构建自动打包页面；本机启动 API 前先在 `backend/admin-ui` 执行 `npm ci` 和 `npm run build`。
-
-## API
-
-交互文档 `/docs`，机器契约 `/openapi.json`。
-
-- `PUT /v1/translations/{id}`：逐图受理，UUID 永久绑定业务输入，重复请求返回原资源。
-- `PUT /v1/translations/{id}/input`：缺图时发送原图字节，自动校验排队，无 complete。
-- `GET /v1/translations/{id}`、`GET /v1/translations?ids=…&wait_seconds=20`：单图／至多 32 图快照，ETag 未变化返回 304；成功快照直接包含短期下载地址。
-- `GET /v1/translations?offset=0&limit=30`：私有分页历史，插件不用其恢复当前阅读。
-- `POST /v1/translations/{id}/cancel`、`/feedback`、`GET .../classic`：同一公开 UUID 的取消、反馈与常规结果详情。
-- `PUT /v1/file-pages/bind`：独立文件页关联，不在翻译请求中传书目或页码。
-- `/internal/compute/v2/nodes/register`、`/internal/compute/v2/nodes/{id}/claim` 等：受认证整页计算协议；分析、授权上传、交付与恢复见[计算协议](../docs/COMPUTE_PROTOCOL.md)。
-- `GET/POST /v1/admin/compute-nodes`：查询／添加节点，`/{id}/config` 编辑配置、`/{id}/rotate-credential` 轮换凭据。管理员 `reconcile`／`reconcile-image` 核实未知结果或补交译图，不重新调用模型。
-- 权益、限时赠送、用量账本、作品文件页匹配和私有反馈接口继续适用。
-
-## 故障与安全
-
-调度、受理、排序、租约和结算按 scheduler → user/job 锁顺序短事务完成。网络和模型 I/O 不持调度锁。固定结果摘要与租约记录的不可变内容对象键防止迟到结果覆盖，恢复重新核验租约。重绘已持久化调用意图后不自动重发；未知期限释放后补交付不补扣。
-
-输入图按实际接收字节、摘要、可解码尺寸验证。图片供应商 URL 通过白名单、DNS/IP 和每次跳转校验；输出需解码和持久化成功才结算。原图和译图默认无限期保留，最近授权访问时间供未来清理策略使用；活跃引用保护原图。删除先提交墓碑；签名已经发出时可能在其短暂有效期内继续读取。
+| 公开 API | [翻译契约](../docs/READING_TRANSLATION_CONTRACT.md)、[OpenAPI](../contracts/README.md)；运行时 `/docs` 与 `/openapi.json` |
+| 任务执行 | [调度](../docs/TRANSLATION_CLUSTER_DESIGN.md)、[计算协议](../docs/COMPUTE_PROTOCOL.md)、[节点配置](../docs/NODE_CONFIGURATION.md) |
+| 账户与支付 | [身份](../docs/PRODUCTION_IDENTITY.md)、[会员](../docs/MEMBERSHIP_AND_QUOTAS.md)、[支付](../docs/STRIPE_BILLING.md) |
+| 管理与配置 | [后台](../docs/ADMIN_CONSOLE.md)、[系统设置](../docs/SYSTEM_SETTINGS.md)、[文本供应商](../docs/TRANSLATION_PROVIDERS.md)、[配置模板](../.env.example) |
+| 存储与运维 | [R2](../docs/OBJECT_STORAGE.md)、[备份与恢复](../docs/OPERATIONS.md) |
 
 ## 验证
 
-推荐使用隔离 Docker 测试容器，不依赖宿主机 Python/npm 环境；本地接入和浏览器验证也可使用已安装的虚拟环境及前端依赖。以下 Docker 命令从仓库根目录执行：
+在仓库根目录运行隔离测试：
 
 ```powershell
 docker compose -p node-comics-tests -f deploy/compose.tests.yaml up --build --abort-on-container-exit --exit-code-from tests
 docker compose -p node-comics-tests -f deploy/compose.tests.yaml down
 ```
 
-若本机已有 `backend/.venv` 且安装了 `backend/requirements.txt`，可在 `backend` 目录运行 `./.venv/Scripts/python.exe -m pytest -q tests`。测试使用隔离数据；此命令不会自动启用 PostgreSQL 并发套件，仍需按下文显式配置专用测试数据库。
+也可安装依赖后，在本目录执行 `python -m pytest -q tests`。PostgreSQL 并发套件需显式设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / PORT / USER / PASSWORD`，仅使用 `nodecomics_concurrency_test`；测试 Compose 提供独立临时库。未启用的用例记为 skipped。
 
-PostgreSQL 并发套件必须显式设置 `RUN_POSTGRES_CONCURRENCY=1`、`TEST_PG_HOST`、`TEST_PG_PORT`、`TEST_PG_USER`、`TEST_PG_PASSWORD`；只接受 `nodecomics_concurrency_test`，每例随机 schema。未启用的用例显示 skipped。节点与引擎单元检查见节点说明。
-
-运行前设置 `$env:RUN_POSTGRES_CONCURRENCY='1'` 可启用真实 PostgreSQL 套件。上述 Compose 自带只在容器网络访问、使用 tmpfs 的专用测试库，不读产品数据库或环境文件；每个测试仍使用随机 schema。调度负载基准另需 `RUN_SCHEDULER_SCALE=1`，常规回归无需启用。DB 供应商 fixture 的真实接入边界见[常规翻译验证](../services/classic-engine/README.md)。
-
-`tests/translation_fixtures.py` 为 SQLite、PostgreSQL、HTTP 子进程及手工 UI 显式创建隔离 DB 文本供应商，使用假密钥；修改协议或模型先写新 revision 再获取快照。测试 fixture 的创建不属于应用启动 seed。
-
-`tests/manual_ui_server.py` 使用临时 SQLite、合成图片与模拟重绘供应商启动真实 API/control-worker，监听 18089；`tests/manual_admin_server.py` 提供 18090 管理后台隔离数据。两者均显式创建 DB 文本供应商，不读取生产环境文件、不调用付费模型。浏览器及完整证据见[验收说明](../docs/READING_TRANSLATION_CONTRACT.md)。
+浏览器测试使用 `tests/manual_*_server.py` 的临时库和合成供应商，启动顺序见[脚本入口](../scripts/README.md)。真实 OIDC、R2、支付和模型效果分别验收。

@@ -1,6 +1,6 @@
 # LLM 翻译供应商
 
-2026-09-16：常规翻译的文本阶段改为数据库管理的独立供应商，不再读取或初始化 `TEXT_*`、`CLUSTER_TEXT_REQUESTS_PER_MINUTE`，也不借用图片供应商的 `OPENAI_*`。旧配置、旧协议值及旧任务快照均不转换、不回退、不兼容。
+常规翻译的文本阶段使用数据库管理的独立供应商和不可变配置版本，独立于图片供应商配置。
 
 ## 管理与使用
 
@@ -30,7 +30,7 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 
 ## 限流、缓存与计量
 
-### LLM 文本格式（2026-09-21）
+### LLM 文本格式
 
 发布切换时先停止接收新的常规翻译任务，并让旧文本任务完成，再协调更新 API 与文本 worker。当前运行代码不会根据旧任务的 `prompt_version` 选择历史提示词／解析器，不能让新旧 worker 混跑旧任务。已保存译文检查点仍是 ID 到译文的映射，插件、计算节点及数据库结构无须更换格式；独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
 
@@ -56,8 +56,6 @@ translations[2]{id,text}:
 
 专项命令（在 `backend` 目录）：`.venv/Scripts/python.exe -m pytest -q tests/test_toon_text.py tests/test_text_adapter.py tests/test_classic.py tests/test_classic_parallel.py tests/test_compute_v2.py tests/test_translation_providers.py`。隔离测试验证两种传输协议、转义、ID 对应、重试计费和检查点恢复；不代表真实模型翻译质量或 token 降幅已验证。单条短文本的格式说明开销可能抵消数据压缩收益。
 
-2026-09-21 真实样本补充：用户指定 `gpt-5.6-luna` 兼容服务，6 页繁体中文漫画译成英语，最终 `comic-toon-v5` 共 62 个文本块、7 次请求（1 次引号格式重试），6 张成图解码与尺寸检查通过。Chat / Responses 各 3 页；两个同输入 JSON 对照的输入 token 分别从 274 降到 247、4604 降到 4580，但输出用量及延迟一升一降，不能推出总成本或延迟稳定下降。小字、拟声词漏译和人名一致性仍需后续处理；本轮未验证生产队列、额度结算或 R2。私有图文、调用记录和报告仅留在被忽略的本地 `artifacts/toon-live-final-20260921/`，不进入仓库。
-
 每个供应商的 RPM 默认 60；所有副本与供应商的历史版本共享该供应商当前的 RPM 限额。在调度与每次请求预占时均检查。分组之间触及 RPM 或上游返回 429 时，释放文本执行位并持久化下次可执行时间，单个供应商的限流等待不会占住其他供应商的执行位。文本执行池依旧限制全局并发，不随供应商数量倍增。停用竞态中明确未发送的调用保留零消耗记录，但不占请求次数、RPM 或页处理时限。
 
 默认每次超时 60 秒、每组最多 3 次请求、分组 1800 字节、输出上限 1024 token。计价单位为人民币／百万 token（等值于微元／token），默认输入 5、输出 30，只是运营估价。未知消耗保守预占，实际子请求逐次计量；用户页数结算与供应商成本分开。供应商与版本进入缓存身份，不能跨不同有效配置复用译图。
@@ -76,7 +74,7 @@ translations[2]{id,text}:
 | `PATCH /v1/admin/translation-providers/{id}` | 更新 `enabled` |
 | `POST /v1/admin/translation-providers/{id}/default` | 设为默认，要求已启用 |
 
-数据库迁移 `translations_0001` 创建独立表与请求计量索引，不导入任何旧配置或转换旧任务。API 与 control-worker 应一起更新；新机制需管理员重新创建供应商。旧版本在途任务不属于新实现支持范围。本次代码改动不等于已更新运行实例或公开部署。
+数据库迁移 `translations_0001` 创建独立表与请求计量索引，不导入任何旧配置或转换旧任务。API 与 control-worker 应一起更新；新机制需管理员重新创建供应商。旧版本在途任务不属于新实现支持范围。
 
 验证入口：`backend/.venv/Scripts/python.exe -m pytest backend/tests/test_translation_providers.py backend/tests/test_text_adapter.py backend/tests/test_classic.py backend/tests/test_classic_parallel.py backend/tests/test_cluster_scheduler.py -q`；管理后台在 `backend/admin-ui` 执行 `npm run build`。测试使用隔离数据库和模拟供应商，无真实付费模型调用。
 

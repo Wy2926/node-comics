@@ -75,4 +75,4 @@ Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮�
 - [来源运行时](../apps/extension/src/comics/sources/runtime.ts)、[来源权限](../apps/extension/src/comics/application/source-access.ts)与[页面服务](../apps/extension/src/comics/pages/service.ts)
 - [适配器架构](SITE_ADAPTERS.md)与[格式边界](IMPORT_FORMATS_AND_CACHE.md)
 
-后端结果复用、持久任务、额度和共享对象保留沿用[翻译接口契约](READING_TRANSLATION_CONTRACT.md)，本次没有改变结算或生产存储策略。
+后端结果复用、持久任务、额度和共享对象保留沿用[翻译接口契约](READING_TRANSLATION_CONTRACT.md)。

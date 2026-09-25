@@ -1,6 +1,6 @@
 # 原图与译图对象存储（R2）
 
-2026-09-16：原图与最终 `classic` / `redraw` 结果统一使用私有 R2，并按内容跨账户共享物理对象。公开部署不允许本地持久原图；隔离环境需显式设置 `APP_ENV=test` / `development`、`DEV_AUTH=true`、至少 32 字符签名密钥及 `RESULT_STORAGE_BACKEND=local`。真实 R2 新链路与模拟 S3／SDK 检查分别记录于[阅读契约与验收](READING_TRANSLATION_CONTRACT.md)。
+原图与最终 `classic` / `redraw` 结果统一使用私有 R2，并按内容跨账户共享物理对象。公开部署不允许本地持久原图；隔离环境需显式设置 `APP_ENV=test` / `development`、`DEV_AUTH=true`、至少 32 字符签名密钥及 `RESULT_STORAGE_BACKEND=local`。真实 R2 新链路与模拟 S3／SDK 检查分别记录于[阅读契约与验收](READING_TRANSLATION_CONTRACT.md)。
 
 ## 数据路径
 
@@ -79,11 +79,11 @@ backend/.venv/Scripts/python.exe -m pytest backend/tests/test_upload_storage.py 
 backend/.venv/Scripts/python.exe scripts/verify_cluster_r2.py --env-file .env
 ```
 
-实际参数以脚本 `--help` 为准。R2 脚本只调用存储，不调用付费模型，退出时仅删除本次记录的测试对象键并确认这些对象已清除，不扫描清空整个前缀。没有配置时明确输出 `not_verified`，不以模拟结果替代实际接入证据。此前旧存储链路的验收记录不能证明本次新上传协议已在线验证。
+实际参数以脚本 `--help` 为准。R2 脚本只调用存储，不调用付费模型，退出时仅删除本次记录的测试对象键并确认这些对象已清除，不扫描清空整个前缀。没有配置时明确输出 `not_verified`，不以模拟结果替代实际接入证据。
 
 ## SDK 版本与许可
 
-来源为 [PyPI boto3](https://pypi.org/project/boto3/1.43.94/)，版本固定在 `backend/requirements.txt`。以下为本次安装的 wheel SHA-256；许可核对实际 wheel 内的 LICENSE，未引入模型权重或字体。
+来源为 [PyPI boto3](https://pypi.org/project/boto3/1.43.94/)，版本固定在 `backend/requirements.txt`。以下为固定版本 wheel 的 SHA-256；许可核对实际 wheel 内的 LICENSE，未引入模型权重或字体。
 
 | 包 | 版本 | 许可 | wheel SHA-256 |
 | --- | --- | --- | --- |
