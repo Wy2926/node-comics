@@ -30,10 +30,11 @@ export async function withImageHeaders<T>(url:string,headers:Readonly<Record<str
         const used=new Set(rules.map(rule=>rule.id));let id=firstId;while(used.has(id)&&id<lastId)id++;
         if(id===lastId)throw Error('来源图片请求规则超过限制。');
         await chrome.declarativeNetRequest.updateSessionRules({addRules:[{
-          id,priority:1,action:{type:chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-            requestHeaders:Object.entries(headers!).map(([header,value])=>({header,value,operation:chrome.declarativeNetRequest.HeaderOperation.SET}))},
+          // Firefox accepts the schema strings but does not expose Chrome's runtime enums.
+          id,priority:1,action:{type:'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+            requestHeaders:Object.entries(headers!).map(([header,value])=>({header,value,operation:'set' as chrome.declarativeNetRequest.HeaderOperation}))},
           condition:{initiatorDomains:[new URL(chrome.runtime.getURL('')).hostname],regexFilter:expression,isUrlFilterCaseSensitive:true,
-            resourceTypes:[chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST]},
+            resourceTypes:['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType]},
         }]});
       });
       signal?.throwIfAborted();
