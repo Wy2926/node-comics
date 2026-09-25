@@ -16,6 +16,11 @@ import {discoverEntry} from '../../../runtime/client';
 const url = 'https://www.dm5.com/manhua-fixture/';
 const reader = (bound: boolean) => `https://www.dm5.com/m1836194/${bound ? '#nodelane-dm5=fixture' : ''}`;
 const packed = readFileSync(new URL('./images.txt', import.meta.url), 'utf8');
+const accessKey = 'a'.repeat(32);
+function imageResponse(paths: string[], prefix = 'https://images.cdndm5.com/99/98761/1836194') {
+  const program = `var cid=1836194;var key='${accessKey}';var pix=${JSON.stringify(prefix)};var pvalue=${JSON.stringify(paths)};for(var i=0;i<pvalue.length;i++){pvalue[i]=pix+pvalue[i]+'?cid=1836194&key=${accessKey}'};`;
+  return `eval(function(p,a,c,k,e,d){}(${JSON.stringify(program)},2,1,''.split('|'),0,{}))`;
+}
 function html(ids = [1836194, 1836195], sort = 1) {
   return `<script>var DM5_COMIC_MID=98761;var DM5_COMIC_URL='/manhua-fixture/';var DM5_COMIC_MNAME='测试作品';var DM5_COMIC_SORT=${sort};</script>
     <div class="detail-list-title"><a onclick="titleSelect(this, 'detail-list-select', 'detail-list-select-1');">连载<span>（${ids.length}）</span></a></div>
@@ -65,16 +70,79 @@ describe('DM5 HTTP adapter', () => {
     expect(() => parseCatalog(value, url)).toThrow();
   });
   it('decodes observed packed data without eval and checks image ownership', () => {
-    const urls = imageUrls(packed, '1836194', 98761);
+    const urls = imageUrls(packed, '1836194');
     expect(urls).toHaveLength(2);
     expect(new URL(urls[0]).pathname).toBe('/99/98761/1836194/1_8334.jpg');
     expect(new URL(urls[1]).pathname).toBe('/99/98761/1836194/2_7876.jpg');
     expect(typeof image.headers === 'function' && image.headers(urls[0])).toEqual({referer: 'https://www.dm5.com/m1836194/'});
-    expect(() => imageUrls(packed, '1', 98761)).toThrow('归属');
-    expect(() => imageUrls(packed, '1836194', 1)).toThrow('归属');
+    expect(() => imageUrls(packed, '1')).toThrow('归属');
     expect(() => unpackImages('globalThis.executed=true')).toThrow();
     expect(() => unpackImages(packed + ';globalThis.executed=true')).toThrow();
     expect(() => unpackImages(packed.replace(',30,30,', ',63,30,'))).toThrow();
+  });
+  it('accepts DM5 reused storage paths and uses the signed current chapter as Referer', () => {
+    const urls = imageUrls(imageResponse(['/18.jpg'], 'https://images.cdndm5.com/zszj/21/20802/225202'), '1836194');
+    expect(new URL(urls[0]).pathname).toBe('/zszj/21/20802/225202/18.jpg');
+    expect(typeof image.headers === 'function' && image.headers(urls[0])).toEqual({referer: 'https://www.dm5.com/m1836194/'});
+    for (const url of [
+      `https://images.cdndm5.com/zszj/21/20802/225202/18.jpg?cid=123&key=${accessKey}`,
+      `https://images.cdndm5.com/99/98761/1836194/18.jpg?cid=1836194&cid=123&key=${accessKey}`,
+      `https://images.cdndm5.com/99/98761/1836194/18.jpg?cid=1836194&key=${'b'.repeat(32)}`,
+      `https://images.cdndm5.com.evil.test/99/98761/1836194/18.jpg?cid=1836194&key=${accessKey}`,
+    ]) expect(() => imageUrls(imageResponse([url]), '1836194')).toThrow();
+  });
+  it('advances through variable-sized batches without missing or renumbering page slots', async () => {
+    const requested: number[] = [];
+    const snapshot = await network.pages!(reader(true), {request: async target => {
+      if (!target.includes('chapterfun')) return readerHtml.replace('DM5_IMAGE_COUNT=2', 'DM5_IMAGE_COUNT=6');
+      const page = Number(new URL(target).searchParams.get('page')); requested.push(page);
+      return imageResponse((page === 1 ? [1, 2, 3] : page === 4 ? [4] : [5, 6]).map(n => `/${n}.jpg`));
+    }});
+    expect(requested).toEqual([1, 4, 5]);
+    expect(snapshot.knownTotal).toBe(6);
+    expect(snapshot.items.map(item => [item.id, item.order, item.resource.kind === 'http' && new URL(item.resource.url).pathname.split('/').at(-1)]))
+      .toEqual(Array.from({length: 6}, (_, n) => ['page-' + n, n, `${n + 1}.jpg`]));
+  });
+  it.each(['', imageResponse([])])('retries a temporary empty list and preserves already discovered pages (%#)', async empty => {
+    const queries: URLSearchParams[] = [];
+    const snapshot = await network.pages!(reader(true), {request: async target => {
+      if (!target.includes('chapterfun')) return readerHtml;
+      queries.push(new URL(target).searchParams);
+      return queries.length === 1 ? imageResponse(['/1.jpg']) : queries.length === 2 ? empty : imageResponse(['/2.jpg']);
+    }});
+    expect(queries.map(q => q.get('page'))).toEqual(['1', '2', '2']);
+    expect(queries[2].has('_')).toBe(true);
+    expect(snapshot.items).toHaveLength(2);
+  });
+  it('limits empty-list retries across the whole chapter and never returns a partial manifest', async () => {
+    let calls = 0;
+    await expect(network.pages!(reader(true), {request: async target => {
+      if (!target.includes('chapterfun')) return readerHtml;
+      calls++;
+      return calls === 2 ? imageResponse(['/1.jpg']) : imageResponse([]);
+    }})).rejects.toThrow('暂未返回');
+    expect(calls).toBe(4); // two empty retries total, even when the cursor advances
+  });
+  it('does not retry protocol/ownership failures or requests cancelled after an empty response', async () => {
+    for (const response of ['not the image protocol', imageResponse(['/1.jpg'], 'https://evil.test/1/2/3')]) {
+      let calls = 0;
+      await expect(network.pages!(reader(true), {request: async target => {
+        if (!target.includes('chapterfun')) return readerHtml;
+        calls++; return response;
+      }})).rejects.toThrow();
+      expect(calls).toBe(1);
+    }
+    const controller = new AbortController(); let calls = 0;
+    await expect(network.pages!(reader(true), {signal: controller.signal, request: async target => {
+      if (!target.includes('chapterfun')) return readerHtml;
+      calls++; controller.abort(); return '';
+    }})).rejects.toThrow();
+    expect(calls).toBe(1);
+  });
+  it('recognizes the paid-chapter page without requesting its image list', async () => {
+    const request = vi.fn(async () => '<script>var DM5_CID=1836194;</script><div class="view-pay-form">付费章节</div>');
+    await expect(network.pages!(reader(true), {request})).rejects.toThrow('购买');
+    expect(request).toHaveBeenCalledOnce();
   });
   it('reads complete page slots, including duplicate URLs, and rejects cross-comic bindings', async () => {
     const snapshot = await network.pages!(reader(true), {request});
@@ -119,5 +187,11 @@ describe('DM5 HTTP adapter', () => {
     // rejecting there, before any source tab could be created.
     await expect(discoverEntry(source, source.entries[0].id, new AbortController().signal, vi.fn())).rejects.toThrow('请求规则');
     expect(tabs.create).not.toHaveBeenCalled();
+  });
+  it('checks updates with one catalog request and no chapter/image requests', async () => {
+    const previous = parseCatalog(html([1836194]), url), reads = vi.fn(async () => html());
+    const next = await network.catalog!(url, {previous, request: reads});
+    expect(next.entries).toHaveLength(2);
+    expect(reads).toHaveBeenCalledExactlyOnceWith(url);
   });
 });
