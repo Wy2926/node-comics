@@ -58,7 +58,7 @@ describe('independent discovery operations and common manifest authority',()=>{
     fixture.networks.fixture={resolveCatalog:resolve,...(catalogTransport==='http'?{catalog:readCatalog}:{}),...(pageTransport==='http'?{pages:readPages}:{})};
     vi.mocked(chrome.tabs.sendMessage).mockImplementation(async()=>snapshot);
     const [imported]=await Promise.all([readImportCatalog(unbound),vi.advanceTimersByTimeAsync(500)]);
-    expect(imported).toMatchObject({id:snapshot.id,defaultEntryId:'one'});expect(resolve).toHaveBeenCalledOnce();
+    expect(imported).toEqual(snapshot);expect(resolve).toHaveBeenCalledOnce();
     if(catalogTransport==='http'){expect(readCatalog).toHaveBeenCalledOnce();expect(chrome.tabs.create).not.toHaveBeenCalled();}
     else {expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url:book,active:false});expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);}
     const manifest={...pageSource,id:'document',revision:1,items:[{id:'one',order:0,width:800,height:1200,url:'https://images.test/one.png'}]};
@@ -122,6 +122,55 @@ describe('independent discovery operations and common manifest authority',()=>{
       await expect(readNetworkPages(url)).rejects.toThrow();
     }
     expect(fetch).not.toHaveBeenCalled();expect(set).not.toHaveBeenCalled();
+  });
+});
+
+describe('renewable HTTP manifest registration',()=>{
+  const renewable=()=>{const value=pages();value.items[0].contentKey='content/one';return value;};
+  it('deduplicates identical full snapshots even when adapter object keys arrive in a different order',async()=>{
+    const value=renewable(),read=vi.fn(async()=>value);fixture.networks.fixture={pages:read};
+    const first=await readNetworkPages(url);
+    read.mockResolvedValueOnce({...value,items:value.items.map(({resource,id,order,width,height,contentKey})=>({resource,contentKey,height,width,order,id}))});
+    const second=await readNetworkPages(url);
+    expect(second).toEqual(first);expect(first.id).toMatch(/^network-sha256:[a-f\d]{64}$/);
+    expect(Object.keys(saved)).toEqual(['manifest:'+first.id]);
+  });
+  it.each(['cdn','content','slot','processing','source-url','metadata'])('preserves the old registered locator when %s changes',async(change)=>{
+    const value=renewable(),read=vi.fn(async()=>value);fixture.networks.fixture={pages:read};
+    const first=await readNetworkPages(url),next=structuredClone(value);
+    if(change==='cdn')next.items[0].resource={kind:'http',url:'https://other-cdn.test/one.png',processing:'recipe-1'};
+    if(change==='content')next.items[0].contentKey='content/two';
+    if(change==='slot')next.items[0].id='another-slot';
+    if(change==='processing')next.items[0].resource={kind:'http',url:'https://images.test/one.png',processing:'recipe-2'};
+    if(change==='source-url')next.url='https://fixture.test/2';
+    if(change==='metadata')next.title='Changed title';
+    read.mockResolvedValueOnce(next);
+    const second=await readNetworkPages(next.url);
+    expect(second.id).not.toBe(first.id);expect(saved['manifest:'+first.id]).toEqual(first);
+    expect(saved['manifest:'+second.id]).toEqual(second);expect(Object.keys(saved)).toHaveLength(2);
+  });
+  it.each(['unkeyed','mixed'])('keeps random IDs for %s HTTP snapshots',async(kind)=>{
+    const value=pages();
+    if(kind==='mixed'){
+      value.items.push({...value.items[0],id:'two',order:1,contentKey:'content/two'});value.knownTotal=2;
+    }
+    fixture.networks.fixture={pages:async()=>value};
+    const first=await readNetworkPages(url),second=await readNetworkPages(url);
+    expect(first.id).not.toBe(second.id);expect(first.id).not.toMatch(/^network-sha256:/);
+  });
+  it('keeps document observation IDs and navigation authority independent of renewable HTTP keys',async()=>{
+    const value=renewable(),observation={...value,navigationId:'nav',revision:1,
+      items:[{id:'one',order:0,width:800,height:1200,contentKey:'content/one',url:'https://images.test/one.png'}]};
+    const first=await registerDocumentManifest(observation,7),second=await registerDocumentManifest(observation,7);
+    expect(first.id).not.toBe(second.id);expect(first.pageContext).toEqual({tabId:7,navigationId:'nav'});
+  });
+  it.each(['empty-key','page-resource','invalid-url'])('rejects an invalid %s renewable snapshot before registration',async(kind)=>{
+    const value=renewable();
+    if(kind==='empty-key')value.items[0].contentKey='';
+    if(kind==='page-resource')value.items[0].resource={kind:'page',resourceKey:'page-image:one'};
+    if(kind==='invalid-url')value.items[0].resource={kind:'http',url:'javascript:alert(1)'};
+    fixture.networks.fixture={pages:async()=>value};
+    await expect(readNetworkPages(url)).rejects.toThrow();expect(set).not.toHaveBeenCalled();
   });
 });
 

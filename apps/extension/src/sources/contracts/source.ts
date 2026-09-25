@@ -1,5 +1,7 @@
 export interface SourceItem {
   id: string;
+  /** Source-proven content identity; transport URL changes alone do not replace these bytes. */
+  contentKey?: string;
   url: string;
   width: number;
   height: number;
@@ -26,6 +28,8 @@ export interface PageManifest {
 export type ImageResource = { kind: 'http'; url: string; processing?:string } | { kind: 'page'; resourceKey: string };
 export interface DiscoveredPage {
   id: string;
+  /** Durable identity supplied by the adapter, independent of temporary HTTP hosts. */
+  contentKey?: string;
   width: number;
   height: number;
   order: number;
@@ -44,8 +48,14 @@ export interface SourceEntry {
   rawTypes: string[];
   order: number;
   related: boolean;
-  /** Only the adapter defines a safe continuous reading sequence. */
+  /** Adapter-declared logical reading chain; each slot may provide several languages. */
   sequenceId?: string;
+  /** BCP 47 language of these source images, independent of translation output. */
+  contentLanguage?: string;
+  /** Adapter-owned, opaque reading position shared by equivalent releases. */
+  readingSlotId?: string;
+  /** False only when the source explicitly reports an external, removed or empty release. */
+  readable?: boolean;
 }
 export interface SourceGroup {
   id: string;

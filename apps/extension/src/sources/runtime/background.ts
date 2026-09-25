@@ -48,7 +48,8 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
   if (definition.capabilities.catalog && (loc.kind==='reader'||networkOperation(tab.url,'catalog'))) {
     const catalog = await readImportCatalog(tab.url,readCatalog), id = crypto.randomUUID();
-    await chrome.storage.local.set({['nc-import:' + id]: {catalog}});
+    const selectedEntryId = loc.kind === 'reader' ? catalog.entries.find(entry => !entry.related && sameSourcePage(entry.url, tab.url!))?.id : undefined;
+    await chrome.storage.local.set({['nc-import:' + id]: {catalog, ...(selectedEntryId ? {selectedEntryId} : {})}});
     return {kind: 'catalog', id, catalog};
   }
   if(loc.kind==='reader'&&networkOperation(tab.url,'pages')){

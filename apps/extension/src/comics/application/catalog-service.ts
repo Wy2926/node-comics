@@ -23,12 +23,14 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
   const oldIds = new Set(previous?.entries.filter(entry => !entry.related).map(entry => entry.id));
   const available = new Set<string>(), entries:Entry[] = [];
   let added = 0;
-  for (const item of source.entries.filter(item => !item.related)) {
+  for (const [sourceOrder,item] of source.entries.entries()) {
+    if(item.related)continue;
     const old = bySource.get(item.id);
+    const navigation = {title:item.title, order:item.order, sourceOrder, sequenceId:item.sequenceId, contentLanguage:item.contentLanguage,
+      readingSlotId:item.readingSlotId, readable:item.readable, sourceUrl:item.url};
     const entry:Entry = old
-      ? {...old, title:item.title, order:item.order, sequenceId:item.sequenceId, sourceUrl:item.url, sourceRemoved:undefined}
-      : {id:crypto.randomUUID(), comicId:current.id, title:item.title, order:item.order, sequenceId:item.sequenceId,
-        sourceEntryId:item.id, sourceUrl:item.url, format:'website', contentId:crypto.randomUUID(), generation:1,
+      ? {...old, ...navigation, sourceRemoved:undefined}
+      : {id:crypto.randomUUID(), comicId:current.id, ...navigation, sourceEntryId:item.id, format:'website', contentId:crypto.randomUUID(), generation:1,
         indexState:'pending', createdAt:now, updatedAt:now};
     if (!old || JSON.stringify(old) !== JSON.stringify(entry)) await tx.put('entries', entry);
     available.add(item.id); entries.push(entry);

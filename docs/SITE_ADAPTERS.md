@@ -29,9 +29,13 @@
 8. **权限与数据。** 新站默认 `requiredOrigins`、`autoContentMatches` 为空，按用户操作申请必要的可选主机权限；不能因注册扩大安装权限。需嵌入网站入口时声明 `optionalContentMatches`，公共运行时仅在主机授权后登记内容脚本，并在撤销后取消登记。页面文字、HTML、URL 均不可信，不执行下载的源站脚本，不上传 Cookie／令牌，不记录私有图片、全文或签名地址。请求头与图片解码经公共取图接口处理，不直接修改全局网络规则。
 9. **按能力开放。** 漫画导入须声明 `importable` 和页面能力；目录、原位翻译、完整页清单、自动同步分别声明并有实现。`catalogSync` 仅在能可靠读取完整目录时开放；调度、更新提示、缓存与阅读位置由公共应用层维护。网站入口使用 `sites` 元数据和随包图标，UI 不加专属组件。
 
+多语言目录可提供条目的 `contentLanguage` 和 `readingSlotId`。前者是实际源内容的规范语言标签；后者是适配器依据源站明确关系给出的不透明阅读位置键，同位置候选使用相同顺序。`sequenceId` 声明安全的逻辑连读范围，可以包含同话的不同语言；同一位置的多个发布条目保留各自稳定 ID，公共层负责按话合并目录、逐话自动选择及独立进度。目录直接使用条目标题，发布组等说明通过已有 `rawTypes` 提供；源站明确标注外链、不可用或无正文时使用 `readable: false`，未提供表示没有目录层不可读证据。无可信对应关系时不共享位置；无位置键时每个条目独立。相同位置候选按完整快照中的稳定顺序选择，完整目录包含全部支持语言。目标语言、手动选择和续读属于本机应用数据，选择规则见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md#网站与只读目录)。
+
 公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
 
-弹窗、站内按钮和粘贴链接共用 `readImportCatalog`：目录型站点先确定作品身份，再导入完整目录并选择当前章节；无作品绑定的章节清单不能直接建库。URL 已含作品身份时继续使用纯 `identify`；缺少身份才调用可选 `resolveCatalog`，由本站 HTTP 解析器给出作品地址，公共层校验同一适配器及完整目录中的章节归属。归属解析、目录和正文读取独立选择能力：`resolveCatalog` 不要求实现 HTTP `catalog`，目录交给公共读取器选择 HTTP 或 DOM；已选择的 HTTP 操作失败时不自动换通道。当前瓜子漫画、DM5、Comic PASH 实现归属解析，其他适配器不必实现。它不引入新数据库结构。
+HTTP 页面可提供源站证明的 `contentKey`，用于内容不变而临时下载地址变化的场景；页槽 ID 与内容键保持一致时只刷新取图定位，不重置页身份和进度。打开或预载此类条目时重新发现可用地址，发现失败保留原索引。内容键变化、消失或页槽变化仍需明确重新载入。未提供内容键的页面继续以 URL 与页槽判断变化；实际字节摘要始终由页面服务独立核验。页面绑定的临时资源不能声明此键。
+
+弹窗、站内按钮和粘贴链接共用 `readImportCatalog`：目录型站点先确定作品身份，再导入完整目录；无作品绑定的章节清单不能直接建库。明确导入章节链接时保存该发布条目选择；导入作品链接时保留已有续读选择，首次按公共规则直接阅读。完整目录缺少指定章节时明确失败，不能替换成其他章节。URL 已含作品身份时继续使用纯 `identify`；缺少身份才调用可选 `resolveCatalog`，由本站 HTTP 解析器给出作品地址，公共层校验同一适配器及完整目录中的章节归属。归属解析、目录和正文读取独立选择能力：`resolveCatalog` 不要求实现 HTTP `catalog`，目录交给公共读取器选择 HTTP 或 DOM；已选择的 HTTP 操作失败时不自动换通道。
 
 归属解析期间的成功 HTTP 响应可通过 `storage.session` 一次性交给阅读器复用：按来源、章节、作品绑定，读取时重新检查主机权限，并精确匹配请求 URL 与 Referer。有效期 30 秒，过期后不再复用，存储内容在下一次交接操作时清理；最多 4 组、合计 4 MiB，每组限额统一为 2 MiB／8 个响应，导入失败或目录归属不符时清理对应记录。此机制不保存目录快照，不影响更新请求的新鲜度；交接不可用时照常 HTTP 读取。无站点语义的 HTML 属性、文本和惰性标记清理集中在 `shared/html.ts`，结构及协议校验留在各站目录。
 
@@ -69,4 +73,5 @@ npm run build
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口；网页正文切片原位翻译 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；授权后嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | HTTP 完整分页目录／章节、图片还原、12 小时更新；授权后嵌入作品导入入口；网页已渲染 canvas 原位翻译 |
+| [MangaDex](../apps/extension/src/sources/sites/mangadex/README.md) | HTTP 多语言目录与章节、同话候选、作品封面、12 小时更新；章节 UUID 独立身份，图片内容标识不依赖临时服务器地址 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

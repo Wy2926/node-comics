@@ -2,6 +2,11 @@ import type { SourceDefinition } from '../contracts/definition';
 import type { SourceCatalogSnapshot } from '../contracts/source';
 import { resolveSource } from './resolve';
 import { safeImageUrl } from '../shared/urls';
+/** Normalize source content labels without guessing the language from a title. */
+function normalizeContentLanguage(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value || value.length > 80) return;
+  try { return Intl.getCanonicalLocales(value)[0]; } catch { return; }
+}
 /** Validate observations, never accept library bindings as source authority. */
 export function validateCatalog(
   input: unknown,
@@ -41,6 +46,7 @@ export function validateCatalog(
   const entries = new Map(c.entries.map((e) => [e?.id, e])),
     groups = new Map(c.groups.map((g) => [g?.id, g]));
   if (entries.size !== c.entries.length || groups.size !== c.groups.length) return invalid();
+  const slotOrders = new Map<string, number>();
   for (const e of c.entries) {
     if (
       !e ||
@@ -58,9 +64,17 @@ export function validateCatalog(
       e.rawTypes.length > 100 ||
       e.rawTypes.some((t) => !text(t, 180)) ||
       typeof e.related !== 'boolean' ||
-      (e.sequenceId !== undefined && !text(e.sequenceId))
+      (e.sequenceId !== undefined && !text(e.sequenceId)) ||
+      (e.readingSlotId !== undefined && !text(e.readingSlotId)) ||
+      (e.readable !== undefined && typeof e.readable !== 'boolean') ||
+      (e.contentLanguage !== undefined && !normalizeContentLanguage(e.contentLanguage))
     )
       return invalid();
+    if (e.readingSlotId) {
+      const key = JSON.stringify([e.sequenceId ?? null, e.readingSlotId]);
+      if (slotOrders.has(key) && slotOrders.get(key) !== e.order) return invalid();
+      slotOrders.set(key, e.order);
+    }
     const target = resolveSource(e.url, definitions).location;
     if (
       target.sourceId !== c.sourceId ||
@@ -100,7 +114,7 @@ export function validateCatalog(
     complete: c.complete,
     note: c.note,
     groups: c.groups,
-    entries: c.entries,
+    entries: c.entries.map(entry => entry.contentLanguage === undefined ? entry : {...entry, contentLanguage: normalizeContentLanguage(entry.contentLanguage)}),
     defaultEntryId: c.defaultEntryId,
   };
 }

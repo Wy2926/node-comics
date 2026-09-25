@@ -4,10 +4,11 @@ import type {ReadingEntry,Settings} from '../types';
 import {anchorFor} from './model';
 import {completePageList} from '../comics/application/library-service';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
+import {ChapterResourceWindow} from './chapter-resources';
 
 export const pageKey=(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`;
 export const completeManifest=completePageList;
-type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string)=>void;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
+type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string)=>void|Promise<void>;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
 /** Three metadata chapters, with viewport position independent of mounted page DOM. */
 export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
  const initialIndex=Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId));
@@ -19,7 +20,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  const copyRef=useRef(copy),indexRef=useRef(index);copyRef.current=copy;indexRef.current=index;
  const anchor=useRef({entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset});
  const suppressScroll=useRef(false),lastScrollTop=useRef(0),saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),restoreFrame=useRef<number|undefined>(undefined);
- const requested=useRef(new Set<string>()),read=useRef(new Set<string>()),shown=useRef(new Set<string>());
+ const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
+ const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
  const navigationReason=useRef<'scroll'|'direct'>('direct');
  const nextOf=(chapter:ReadingEntry)=>{const at=sequence.findIndex(item=>item.id===chapter.id);return at<0?undefined:sequence[at+1];};
  const next=completeManifest(copy)?nextOf(copy):undefined;
@@ -80,7 +82,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
   navigationReason.current='direct';const chapter=copyRef.current;if(!Number.isFinite(n)||!chapter.pages.length)return;
   if(n>=chapter.pages.length&&completeManifest(chapter)){
    const destination=nextOf(chapter);
-   if(destination){markRead(chapter);persist();anchor.current={entryId:destination.id,pageId:destination.pages[0]?.id??'',relativeOffset:0};activate(destination,0);onLoadEntry(destination.id);return;}
+   if(destination){markRead(chapter);persist();anchor.current={entryId:destination.id,pageId:destination.pages[0]?.id??'',relativeOffset:0};activate(destination,0);return;}
   }
   const target=Math.max(0,Math.min(chapter.pages.length-1,Math.trunc(n)));
   anchor.current={entryId:chapter.id,pageId:chapter.pages[target].id,relativeOffset:0};indexRef.current=target;setActive({entryId:chapter.id,index:target});persist();
@@ -92,9 +94,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
   restore();
  });
  useEffect(()=>{
-  for(const chapter of stream){if(chapter.pages.length||requested.current.has(chapter.id))continue;requested.current.add(chapter.id);onLoadEntry(chapter.id);}
-  const keep=new Set(stream.map(chapter=>chapter.id));for(const id of requested.current)if(!keep.has(id))requested.current.delete(id);
- },[copy.id,sequence,layout]);
- useEffect(()=>()=>{clearTimeout(saveTimer.current);if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);},[]);
- return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown};
+  resources.prepare(stream,onLoadEntry,()=>setResourceVersion(value=>value+1));
+ },[stream,onLoadEntry,resources]);
+ useEffect(()=>()=>{resources.clear();clearTimeout(saveTimer.current);if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);},[]);
+ return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,resources,resourceVersion};
 }

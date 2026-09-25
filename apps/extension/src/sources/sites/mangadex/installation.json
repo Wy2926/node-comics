@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://mangadex.org/*", "https://api.mangadex.org/*", "https://uploads.mangadex.org/*", "https://*.mangadex.network/*"],
+  "optionalContentMatches": ["https://mangadex.org/*"]
+}

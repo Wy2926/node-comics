@@ -1,5 +1,4 @@
 .nc-comic-directory-heading{display:flex;align-items:center;gap:12px;padding:18px 20px 14px;flex-shrink:0;background:linear-gradient(120deg,var(--surface),var(--accent-soft))}
-.nc-reading-start{max-width:900px;margin:0 auto;display:flex;flex-direction:column;height:calc(100dvh - 160px);min-height:420px}
 .nc-comic-directory-heading .nc-eyebrow{font-size:.65rem;margin:0 0 6px}
 .nc-comic-directory-heading h3{flex:1;min-width:0;font-size:1.1rem;line-height:1.5;margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .nc-directory-source{flex-shrink:0;white-space:nowrap;font-size:.76rem}
@@ -32,3 +31,9 @@
 .nc-catalog-hint p:last-child{margin-bottom:0}
 @media(max-width:760px){.nc-reader-drawer.left{width:min(420px,calc(100% - 20px))}.nc-comic-directory-heading{padding:12px 16px}.nc-directory-search{padding:10px 14px}.nc-chapter-entry{padding:11px 8px}.nc-directory-tabs button{padding:11px 0}.nc-chapter-info b{font-size:.8rem}}
 .nc-source-group{border-bottom:1px solid var(--border,#ececf3);padding:8px 0}.nc-source-group>summary{cursor:pointer;font-weight:700;padding:10px 4px}.nc-source-group>summary>span{float:right;font-weight:400;opacity:.6}.nc-source-group .nc-source-group{margin-left:16px}.nc-library-card-actions{display:flex;justify-content:space-between;align-items:center}
+.nc-directory-chapter-main{display:flex;align-items:center;gap:4px}
+.nc-directory-chapter-main>.nc-chapter-entry{flex:1;min-width:0}
+.nc-chapter-expand{flex-shrink:0;width:34px;height:34px}
+.nc-chapter-releases{margin:0 8px 8px 20px;padding-left:10px;border-left:2px solid var(--line)}
+.nc-chapter-releases .nc-chapter-info b{font-size:.77rem;font-weight:500}
+.nc-chapter-entry:disabled{opacity:.58;cursor:not-allowed}

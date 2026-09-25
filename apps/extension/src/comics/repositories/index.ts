@@ -252,6 +252,7 @@ export const catalog = {
         await tx.remove('entries', entry.id);
       }
       for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);
+      await tx.remove('metadata', 'reading-preferences:' + comicId);
       await tx.remove('comics', comicId); return entries;
     });
   },

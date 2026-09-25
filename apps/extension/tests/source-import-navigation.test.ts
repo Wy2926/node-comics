@@ -11,8 +11,11 @@ const catalogUrl = 'https://comic.naver.com/webtoon/list?titleId=123';
 const readerUrl = 'https://comic.naver.com/webtoon/detail?titleId=123&no=2';
 const snapshot: SourceCatalogSnapshot = {
   id: 'naver:webtoon:123', sourceId: 'naver', url: catalogUrl, title: 'Fixture', observedAt: 1,
-  complete: true, note: '', groups: [], entries: [{id: 'episode-2', remoteId: '2', catalogId: 'naver:webtoon:123',
-    url: readerUrl, title: 'Episode 2', groupIds: [], rawTypes: [], order: 0, related: false}],
+  complete: true, note: '', groups: [], defaultEntryId: 'episode-1', entries: [
+    {id: 'episode-1', remoteId: '1', catalogId: 'naver:webtoon:123', url: readerUrl.replace('no=2','no=1'),
+      title: 'Episode 1', groupIds: [], rawTypes: [], order: 0, related: false},
+    {id: 'episode-2', remoteId: '2', catalogId: 'naver:webtoon:123',
+      url: readerUrl, title: 'Episode 2', groupIds: [], rawTypes: [], order: 1, related: false}],
 };
 let currentUrl: string;
 let readCatalog: ReturnType<typeof vi.fn<(url: string) => Promise<SourceCatalogSnapshot>>>;
@@ -48,19 +51,20 @@ describe('embedded import after same-document navigation', () => {
     expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
     expect(create).toHaveBeenCalledExactlyOnceWith({url: expect.stringMatching(/reader.html\?catalog=/)});
     const importId = new URL(create.mock.calls[0][0].url).searchParams.get('catalog');
-    expect(set).toHaveBeenCalledWith({['nc-import:' + importId]: {catalog: {
-      ...snapshot, ...(url === readerUrl ? {defaultEntryId: 'episode-2'} : {}),
-    }}});
+    expect(set).toHaveBeenCalledWith({['nc-import:' + importId]: {
+      ...(url === readerUrl ? {selectedEntryId:'episode-2'} : {}),catalog: snapshot,
+    }});
   });
   it('keeps direct catalog imports working', async () => {
     expect(await send(sender(catalogUrl))).toEqual({ok: true});
     expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
   });
-  it('keeps a URL-bound reader import usable when the current chapter has been removed',async()=>{
+  it('rejects a URL-bound reader import when its requested chapter has been removed',async()=>{
     currentUrl=readerUrl.replace('no=2','no=3');
     readCatalog.mockResolvedValueOnce({...snapshot,defaultEntryId:'episode-2'});
-    expect(await send()).toEqual({ok:true});
-    expect(create).toHaveBeenCalledOnce();
+    expect(await send()).toMatchObject({ok:false});
+    expect(create).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
   });
   it.each(['https://comic.naver.com/webtoon', 'https://comic.naver.com/webtoon/list?titleId=invalid',
     'https://www.gunnerkrigg.com/?p=123', 'https://comic.naver.com.evil.test/webtoon/list?titleId=123'])

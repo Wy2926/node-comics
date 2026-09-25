@@ -4,7 +4,7 @@ import {resolveSource} from '../core/resolve';
 import {validateCatalog} from '../core/catalog';
 import {validatePages} from '../core/pages';
 import {registerManifest} from './manifests';
-import type {PageManifest,SourceCatalogSnapshot} from '../contracts/source';
+import type {PageManifest,PageSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 import {withImageHeaders} from './image-headers';
 import {safeImageUrl} from '../shared/urls';
 import {importResponseLimits,rememberImportResponses,takeImportResponses,type ImportResponse} from './import-responses';
@@ -79,8 +79,19 @@ export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<P
   const replay=await takeImportResponses(location,signal);
   const snapshot=validatePages(await read(url,networkContext(url,signal,replay)),location);
   signal?.throwIfAborted();
-  return registerManifest({...snapshot,items:snapshot.items.map(({resource,...item})=>{
+  const manifest:PageSnapshot={adapter:snapshot.adapter,url:snapshot.url,title:snapshot.title,direction:snapshot.direction,
+    discoveryComplete:snapshot.discoveryComplete,knownTotal:snapshot.knownTotal,note:snapshot.note,
+    items:snapshot.items.map(({resource,id,contentKey,width,height,order})=>{
     if(resource.kind!=='http')throw Error('SOURCE_PAGES_INVALID');
-    return {...item,url:resource.url,...(resource.processing?{processing:resource.processing}:{})};
-  })});
+    return {id,contentKey,url:resource.url,width,height,order,processing:resource.processing};
+  })};
+  if(manifest.items.length&&manifest.items.every(item=>item.contentKey!==undefined)){
+    // Equal renewable HTTP observations share one immutable record. A changed URL,
+    // page slot, recipe or content key gets another ID, preserving in-flight locators.
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(manifest)));
+    signal?.throwIfAborted();
+    const id='network-sha256:'+Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+    return registerManifest(manifest,{id});
+  }
+  return registerManifest(manifest);
 }

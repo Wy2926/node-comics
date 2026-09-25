@@ -36,8 +36,9 @@ it.each(['valid', 'missing-chapter', 'foreign-parent', 'failed-request'])('resol
     expect(read).toHaveBeenCalledWith(url);
     if(entry==='embedded')expect(create).toHaveBeenCalledExactlyOnceWith({url: expect.stringContaining('reader.html?catalog=')});
     else {expect(create).not.toHaveBeenCalled();expect(result).toMatchObject({data:{kind:'catalog'}});expect(result).not.toHaveProperty('data.manifest');}
-    const stored = Object.values(set.mock.calls.at(-1)![0] as object)[0] as {catalog: {defaultEntryId: string}};
-    expect(stored.catalog.defaultEntryId).toBe('guazimanhua:chapter:11');
+    const stored = Object.values(set.mock.calls.at(-1)![0] as object)[0] as {catalog: {defaultEntryId: string};selectedEntryId?:string};
+    expect(stored.catalog).toEqual(await read.mock.results[0].value);
+    expect(stored.selectedEntryId).toBe('guazimanhua:chapter:11');
   } else {
     expect(result).toMatchObject({ok: false});
     expect(create).not.toHaveBeenCalled();

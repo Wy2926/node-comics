@@ -32,6 +32,7 @@ export function validatePages(snapshot: SourceSnapshot, location: SourceLocation
       !item.id ||
       item.id.length > 2048 ||
       ids.has(item.id) ||
+      (item.contentKey !== undefined && (typeof item.contentKey !== 'string' || !item.contentKey || item.contentKey.length > 2048 || item.resource?.kind !== 'http')) ||
       !Number.isInteger(item.order) ||
       item.order < 0 ||
       item.order > 10000 ||

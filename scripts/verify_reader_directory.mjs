@@ -25,7 +25,10 @@ try{
  const before=await position();await page.screenshot({path:path.join(out,'long-directory.png')});
  checks.push('Opening includes and centers chapter 250 beyond the first 200 entries');
  await list.evaluate(el=>el.scrollTop=0);await page.getByRole('button',{name:'刷新目录状态',exact:true}).click();
- await page.getByText('状态已刷新',{exact:false}).first().waitFor();assert.equal(await list.evaluate(el=>el.scrollTop),0);
+ await page.waitForFunction(()=>document.querySelector('[data-directory-revision]')?.getAttribute('data-directory-revision')==='1');
+ // The fixture confirms a new source status; wait through the directory's prop synchronization and paint.
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert.doesNotMatch(await list.innerText(),/状态已刷新/);assert.equal(await list.evaluate(el=>el.scrollTop),0);
  checks.push('Status refresh preserves manual directory scrolling');
  await closePanel();await openPanel();await centered();assert.equal(await position(),before);
  await page.getByRole('button',{name:'正序 ↑',exact:true}).click();await centered();assert.equal(await position(),before);

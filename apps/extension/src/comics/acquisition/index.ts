@@ -16,11 +16,18 @@ const message = (error: unknown) => error instanceof Error ? error.message : '�
 const aborted = () => new DOMException('下载已暂停或文档已移除。', 'AbortError');
 
 /** Metadata discovery only. Opening a document never creates an explicit download task. */
-export async function discoverEntryContent(id: string, signal?: AbortSignal, reload=false): Promise<void> {
+export async function discoverEntryContent(id: string, signal?: AbortSignal, options:{reload?:boolean;refreshResources?:boolean}={}): Promise<void> {
+  const {reload=false,refreshResources=false}=options;
   signal?.throwIfAborted();
   const document = await catalog.get('entries', id);
   if (!document) throw Error('文档已移除。');
-  if (document.format !== 'website' || document.discoveryComplete&&!reload) return;
+  if (document.format !== 'website') return;
+  if (document.sourceRemoved || document.readable === false) throw Error('源站此章节暂不可读，已保存的页面仍可阅读。');
+  if (document.discoveryComplete&&!reload) {
+    if(!refreshResources)return;
+    const pages=await catalog.listPages(document.contentId,{limit:1500});
+    if(!pages.some(page=>typeof page.locator.contentKey==='string'))return;
+  }
   const comic=await catalog.get('comics',document.comicId);
   const source=typeof comic?.source.locator.catalogId==='string'?await catalog.get('catalogs',comic.source.locator.catalogId) as unknown as SourceCatalog|undefined:undefined;
   if(!document.sourceUrl)throw Error('来源地址不可用。');
@@ -97,7 +104,7 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
   });
   const heartbeat = setInterval(() => { void active().then(() => patch({})).catch(error => controller.abort(error)); }, 20_000);
   try {
-    await active(); await discoverEntryContent(task.entryId, signal);
+    await active(); await discoverEntryContent(task.entryId, signal, {refreshResources:true});
     let document = await active(), offset = 0, completed = 0, failed = 0;
     const errors: Record<string, string> = {};
     await patch({ total: document.pageCount, error: undefined, pageErrors: {} });

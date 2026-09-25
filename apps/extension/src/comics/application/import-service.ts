@@ -33,7 +33,12 @@ async function connection(input:ConnectionInput) {
   await catalog.put('connections',value);return value;
 }
 function descriptors(contentId:string,pages:IndexedPage[]):PageDescriptor[] {
-  return pages.map(page=>{const locator='sourceId' in page.locator?{url:page.locator.url,sourceId:page.locator.sourceId}:page.locator;return {...page,contentId,pageId:stablePageId(locator),formatLocator:JSON.stringify(locator)};});
+  return pages.map(page=>{
+    const locator='sourceId' in page.locator
+      ? (typeof page.locator.contentKey==='string' ? {contentKey:page.locator.contentKey,sourceId:page.locator.sourceId} : {url:page.locator.url,sourceId:page.locator.sourceId})
+      : page.locator;
+    return {...page,contentId,pageId:stablePageId(locator),formatLocator:JSON.stringify(locator)};
+  });
 }
 async function filePages(context:Parameters<typeof openFileSource>[0]):Promise<IndexedPage[]> {
   const source=await openFileSource(context);
@@ -172,8 +177,14 @@ export async function publishWebsiteManifest(entry:Entry,manifest:PageManifest,a
   const {location}=validateManifest(manifest);
   if(entry.sourceEntryId!==location.pageKey)throw Error('来源页面不属于此漫画内容。');
   const old=await catalog.listPages(entry.contentId,{limit:1500});
-  const changed=manifest.discoveryComplete&&old.length>manifest.items.length||old.some((page,index)=>{const incoming=manifest.items[index];return incoming&&(page.locator.url!==incoming.url||page.locator.sourceId!==incoming.id);});
-  const pages:IndexedPage[]=manifest.items.map((page,ordinal)=>({ordinal,name:`第 ${ordinal+1} 页`,width:page.width||undefined,height:page.height||undefined,locator:{url:page.url,sourceId:page.id,manifestId:manifest.id,...(page.kind?{kind:page.kind}:{})}}));
+  const changed=manifest.discoveryComplete&&old.length>manifest.items.length||old.some((page,index)=>{
+    const incoming=manifest.items[index];
+    return incoming&&(page.locator.sourceId!==incoming.id ||
+      (page.locator.contentKey!==undefined || incoming.contentKey!==undefined
+        ? page.locator.contentKey!==incoming.contentKey
+        : page.locator.url!==incoming.url));
+  });
+  const pages:IndexedPage[]=manifest.items.map((page,ordinal)=>({ordinal,name:`第 ${ordinal+1} 页`,width:page.width||undefined,height:page.height||undefined,locator:{url:page.url,sourceId:page.id,manifestId:manifest.id,...(page.contentKey!==undefined?{contentKey:page.contentKey}:{}),...(page.kind?{kind:page.kind}:{})}}));
   if(changed||acceptChange&&old.length>0) {
     if(!acceptChange)throw Error('来源内容已变化，请重新载入当前内容。');
     const contentId=crypto.randomUUID();await catalog.replaceContent(entry.id,entry.generation,{contentId,format:'website'},descriptors(contentId,pages),manifest.discoveryComplete,manifest.knownTotal);
@@ -184,6 +195,8 @@ export async function publishWebsiteManifest(entry:Entry,manifest:PageManifest,a
 }
 function validateManifest(manifest:PageManifest) {
   const resolved=requireWebsite(manifest.url,manifest.adapter);
-  if(resolved.location.kind!=='reader'||!manifest.items.length||manifest.items.length>1500||new Set(manifest.items.map(p=>p.id)).size!==manifest.items.length||manifest.items.some(p=>typeof p.id!=='string'||!p.id||!(p.kind==='page'?isPageImageUrl(p.url):safeImageUrl(p.url,manifest.url)===p.url)))throw Error('来源页面清单无效。');
+  if(resolved.location.kind!=='reader'||!manifest.items.length||manifest.items.length>1500||new Set(manifest.items.map(p=>p.id)).size!==manifest.items.length||manifest.items.some(p=>typeof p.id!=='string'||!p.id||
+    p.contentKey!==undefined&&(typeof p.contentKey!=='string'||!p.contentKey||p.contentKey.length>2048||p.kind==='page')||
+    !(p.kind==='page'?isPageImageUrl(p.url):safeImageUrl(p.url,manifest.url)===p.url)))throw Error('来源页面清单无效。');
   return resolved;
 }

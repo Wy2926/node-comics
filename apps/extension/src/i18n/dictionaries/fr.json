@@ -618,7 +618,6 @@
   "漫画阅读": "Comic reading",
   "此网站尚未专门适配，不能导入漫画。": "This website needs a dedicated adapter before comics can be imported.",
   "正在重新载入": "Reloading",
-  "选择开始阅读的位置": "Choose where to start reading",
   "可以开始阅读": "Ready to read",
   "已存在，继续阅读": "Already added. Continue reading.",
   "页面": "Pages",
@@ -740,5 +739,8 @@
   "{0} · 清理后本地渠道需要重新翻译，漫画与阅读位置保留。": "{0} · Après le nettoyage, les canaux locaux devront retraduire. Les mangas et les positions de lecture sont conservés.",
   "重新翻译": "Retraduire",
   "请先选择已有译图所属的翻译渠道。": "Sélectionnez d’abord le canal qui a produit les images traduites existantes.",
-  "翻译渠道已切换，本次导出已停止。": "Le canal de traduction a changé. Cette exportation a été arrêtée."
+  "翻译渠道已切换，本次导出已停止。": "Le canal de traduction a changé. Cette exportation a été arrêtée.",
+  "源站已移除，缓存页面仍可阅读。": "Supprimé du site source. Les pages en cache restent lisibles.",
+  "展开章节选项": "Afficher les options du chapitre",
+  "收起章节选项": "Masquer les options du chapitre"
 }

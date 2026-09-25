@@ -44,7 +44,8 @@ describe('automatic source directory reconciliation',()=>{
     const next={...first,observedAt:first.observedAt+1,title:'改名',defaultEntryId:first.entries[1].id,entries:[{...first.entries[1],title:'新标题',order:0}],groups:[{...first.groups[0],title:'新分类',entryIds:[first.entries[1].id]}]};
     await applyCatalogRefresh(comic.id,1,next);
     expect((await catalog.get('comics',comic.id))?.catalogUpdates).toBeUndefined();
-    expect((await comicDirectory(comic.id)).entries.map(entry=>entry.title)).toEqual(['新标题']);
+    expect((await comicDirectory(comic.id)).entries.filter(entry=>entry.readable).map(entry=>entry.title)).toEqual(['新标题']);
+    expect((await comicDirectory(comic.id)).entries.find(entry=>entry.id===entries[0].id)).toMatchObject({readable:false,sourceRemoved:true});
     expect((await comicDirectory(comic.id)).groups[0].title).toBe('新分类');
     expect(await catalog.get('entries',entries[0].id)).toMatchObject({sourceRemoved:true,contentId:entries[0].contentId});
     expect((await comicDirectory(comic.id,entries[0].id)).entries).toHaveLength(2);

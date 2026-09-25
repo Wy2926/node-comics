@@ -20,10 +20,8 @@ export async function readImportCatalog(url:string,readCatalog:(url:string)=>Pro
     if(catalog.sourceId!==definition.id||catalog.id!==parent.catalog?.key||!catalog.complete||catalog.groups.some(group=>!group.complete))throw Error('SOURCE_CATALOG_CHANGED');
     if(location.kind==='reader'){
       const current=catalog.entries.find(entry=>sameSource(entry.url,location.url,definitions));
-      // HTTP-discovered parenthood must be confirmed by the complete directory. Existing
-      // URL bindings keep their original behavior when a source has removed a chapter.
-      if(!current&&!location.catalog)throw Error('SOURCE_CATALOG_CHANGED');
-      if(current)return {...catalog,defaultEntryId:current.id};
+      // A bound parent cannot turn a missing requested release into another chapter.
+      if(!current||current.related)throw Error('源站目录未包含指定章节，无法打开当前发布条目。');
     }
     return catalog;
   }catch(error){await forgetImportResponses(location);throw error;}

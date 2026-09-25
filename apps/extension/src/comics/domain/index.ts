@@ -19,6 +19,9 @@ export interface Comic {
 /** Source-owned navigation destination; a file has one implicit entry. */
 export interface Entry {
   id: string; comicId: string; title: string; order: number; sequenceId?: string;
+  contentLanguage?: string; readingSlotId?: string; readable?: boolean;
+  /** Candidate preference order supplied by the complete source snapshot. */
+  sourceOrder?: number;
   format: EntryFormat; contentId: string; generation: number;
   indexState: 'pending' | 'indexing' | 'ready' | 'failed';
   createdAt: number; updatedAt: number; readAt?: number;
@@ -26,7 +29,7 @@ export interface Entry {
   knownTotal?: number; pageCount?: number; error?: string; coverPageId?: string;
   /** Current content only. There is no revision history or alternative document relation. */
   containerId?: string; sourceSnapshot?: Record<string, unknown>;
-  /** Retain reading data when the source removes a destination, but hide it from navigation. */
+  /** Retain reading data and its slot when the source removes this release. */
   sourceRemoved?: boolean;
 }
 export interface SourceConnection {

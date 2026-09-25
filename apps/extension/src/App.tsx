@@ -11,7 +11,7 @@ import { Icon } from './icons';
 import { COMIC_ACCEPT } from './comics/formats/limits';
 import { LocalImportQueue } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
-import { listShelfIndex, loadEntry as readEntry, continueEntry, comicDirectory, getEntry, readerSequence, saveReaderState, subscribeLibrary, markRead, type ReadingDirectory } from './comics/application/library-service';
+import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, type ReadingDirectory } from './comics/application/library-service';
 import { importSourceFiles, importCatalog, importManifest, reindexEntry } from './comics/application/import-service';
 import { settings as readSettings, saveSettings } from './comics/application/preferences';
 import { discoverEntryContent, pauseDownloads, grantDownloads, runDownloads, stopDownloads } from './comics/acquisition';
@@ -20,12 +20,11 @@ import { onMaterialized } from './comics/pages/service';
 import { authorizeOriginals } from './comics/originals';
 import { initializeSources } from './comics/application/source-lifecycle';
 import { Reader } from './reader/Reader';
-import {ComicDirectory} from './reader/ComicDirectory';
 import { readingViewKey } from './reader/view';
 import { API_BASE, API_ORIGIN } from './service';
 import { copyOrigins, inExtension, type PageManifest } from './sources';
 import {readWebsiteCatalog} from './comics/application/website-catalog';
-import {importWebsiteLink} from './comics/application/website-import';
+import {importWebsiteCatalog,importWebsiteLink} from './comics/application/website-import';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import {useTranslationChannel} from './translation/channels/useChannel';
 import { type Capabilities, type Entitlements, type ReadingEntry, type Settings } from './types';
@@ -52,16 +51,16 @@ export function App(){
  const copiesRef=useRef(copies);copiesRef.current=copies;
  const [currentId,setCurrentId]=useState<string>(),current=copies.find(c=>c.id===currentId),[navigationKey,setNavigationKey]=useState(0);
  const currentRef=useRef(currentId);currentRef.current=currentId;
- const readingEpoch=useRef(0),libraryEpoch=useRef(0),documentRefreshEpoch=useRef(0);
+ const readingEpoch=useRef(0),readingLoadEpoch=useRef(0),libraryEpoch=useRef(0),documentRefreshEpoch=useRef(0);
  const [readingBusy,setReadingBusy]=useState(false);
  const [exporting,setExporting]=useState<Entry>();
  const [feedbackOpen,setFeedbackOpen]=useState(false);
- const [sourceDirectory,setSourceDirectory]=useState<ReadingDirectory>();
  const [localImport]=useState(()=>new LocalImportQueue()),[importExpanded,setImportExpanded]=useState(false);
  const sourceInProgress=useRef(false),sourceQueryHandled=useRef(false);
  const sourceActions=sourceImportOptions();
  const [view,setView]=useState<View>(viewFromHash),[accountTab,setAccountTab]=useState<AccountTab>('overview');
  const [settings,setSettings]=useState<Settings>(readSettings),auth=useSession(),account=auth.session;
+ const settingsRef=useRef(settings);settingsRef.current=settings;
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState(''),[drag,setDrag]=useState(false);
  const input=useRef<HTMLInputElement>(null),pool=useRef(new RequestPool(UPLOAD_CONCURRENCY));
  const api=useMemo(()=>new Api(API_BASE,account?.token??'',pool.current,undefined,account?sessionAuthorization(account.id):undefined),[account?.id]);
@@ -77,21 +76,29 @@ export function App(){
    try{const value=await listShelfIndex();if(request===libraryEpoch.current)setLibrary(value);}
    catch(reason){if(request===libraryEpoch.current)throw reason;}
  },[]);
- const leaveReader=useCallback(()=>{readingEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[]);
+ const readSequence=useCallback(async(id:string)=>{
+   for(;;){const language=settingsRef.current.language,scope=channelRef.current?.scope,result=await readerSequence(id,scope,language);if(language===settingsRef.current.language&&scope?.key===channelRef.current?.scope.key)return result;}
+ },[]);
+ const leaveReader=useCallback(()=>{readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[]);
  const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));},[]);
- const openEntry=useCallback(async(id:string,pageId?:string)=>{
-   const request=++readingEpoch.current,isCurrent=()=>request===readingEpoch.current&&api.isCurrent();setReadingBusy(true);setError('');
-   try{try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readerSequence(id,channelRef.current?.scope);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setSourceDirectory(undefined);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
+ const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false)=>{
+   const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>request===readingEpoch.current&&api.isCurrent();setReadingBusy(true);setError('');
+   try{await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;try{await discoverEntryContent(id,undefined,{refreshResources:true});}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readSequence(id);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
  },[api]);
  function activateEntry(id:string){
    const request=++readingEpoch.current;currentRef.current=id;setCurrentId(id);setReadingBusy(false);
-   void readerSequence(id,translationScope).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
+   void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
  }
- function loadEntry(id:string){
-   const request=readingEpoch.current,isCurrent=()=>request===readingEpoch.current&&api.isCurrent();
-   void discoverEntryContent(id).then(()=>isCurrent()?readEntry(id,translationScope):undefined).then(copy=>{if(copy&&isCurrent())setCopies(values=>values.map(c=>c.id===id?copy:c));}).catch(e=>{if(isCurrent())setError(e.message);});
+ async function loadEntry(id:string){
+   const request=readingLoadEpoch.current,isCurrent=()=>request===readingLoadEpoch.current&&api.isCurrent();
+   try{
+     const entry=await getEntry(id);if(!isCurrent())return;
+     try{if(entry&&entry.readable!==false&&!entry.sourceRemoved)await discoverEntryContent(id,undefined,{refreshResources:true});}catch(error){if(isCurrent())setError((error as Error).message);}
+     if(!isCurrent())return;const loaded=await readEntry(id,channelRef.current?.scope);if(!isCurrent())return;
+     setCopies(values=>values.map(copy=>copy.id!==id?copy:copy.contentId===loaded.contentId&&loaded.pages.some(page=>page.id===copy.pageId)?{...loaded,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:loaded));
+   }catch(error){if(isCurrent())setError((error as Error).message);}
  }
- async function openComic(comicId:string){const entry=await continueEntry(comicId);if(entry)await openEntry(entry.id);else{setSourceDirectory(await comicDirectory(comicId));window.scrollTo({top:0,behavior:'instant'});}}
+ async function openComic(comicId:string){const entry=await continueEntry(comicId,settingsRef.current.language);if(!entry)throw Error(msg('无法打开来源。'));await openEntry(entry.id);}
  function beginImport(){const state=localImport.getSnapshot();if(state.running||state.phase==='paused'){setImportExpanded(true);return;}input.current?.click();}
  function chooseFiles(files:File[]){
   if(input.current)input.current.value='';if(!files.length)return;
@@ -110,7 +117,7 @@ export function App(){
    if(result.results.length===1&&selected.files.length===1&&request===readingEpoch.current)await openEntry(result.results[0].id);else notify(msg('{0} 份已导入 · {1} 份需要处理',{'0':result.results.length,'1':result.failures.length}));
   }catch(e){setError((e as Error).message);}finally{sourceInProgress.current=false;setBusy('');}
  }
- async function reloadCurrent(){if(!currentId)return;const id=currentId;setBusy(msg('正在重新载入'));try{const entry=await getEntry(id);if(!entry)return;if(entry.format==='website')await discoverEntryContent(id,undefined,true);else await reindexEntry(id);await openEntry(id);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
+ async function reloadCurrent(){if(!currentId)return;const id=currentId;setBusy(msg('正在重新载入'));try{const entry=await getEntry(id);if(!entry)return;if(entry.format==='website')await discoverEntryContent(id,undefined,{reload:true});else await reindexEntry(id);await openEntry(id);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
  async function exportCurrent(){if(!currentId)return;const entry=await getEntry(currentId);if(entry)setExporting(entry);}
  useEffect(()=>{localImport.activate();void initializeSources().then(reloadLibrary).catch(e=>setError(e.message));return()=>localImport.dispose();},[localImport]);
  useEffect(()=>{void reloadLibrary().catch(e=>setError(e.message));},[reloadLibrary]);
@@ -118,9 +125,9 @@ export function App(){
  useEffect(()=>subscribeLibrary(change=>{
    if(['comics','entries','connections'].includes(change.table))void reloadLibrary().catch(e=>setError(e.message));
    const id=currentRef.current;
-   if(change.table==='catalogs'&&id){
+   if((change.table==='catalogs'||change.table==='metadata')&&id){
      const request=readingEpoch.current;
-     void readerSequence(id,translationScope).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
+     void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
        setDirectory(result.directory);setCopies(previous=>result.copies.map(copy=>{const old=previous.find(old=>old.id===copy.id&&old.contentId===copy.contentId);return old?{...old,title:copy.title,sourceUrl:copy.sourceUrl}:copy;}));
      }}).catch(()=>{});
    }
@@ -129,6 +136,13 @@ export function App(){
      void readEntry(id,translationScope).then(copy=>{if(isCurrent()){if(copiesRef.current.find(c=>c.id===copy.id)?.contentId!==copy.contentId){setNavigationKey(n=>n+1);notify(msg('来源内容已变化，已回到第一页。'));}setCopies(values=>values.map(c=>c.id!==copy.id?c:c.contentId===copy.contentId&&copy.pages.some(page=>page.id===c.pageId)?{...copy,pageId:c.pageId,relativeOffset:c.relativeOffset,lastReadAt:c.lastReadAt,catalogUpdateRevision:c.catalogUpdateRevision}:copy));}}).catch(()=>{if(isCurrent())leaveReader();});
    }
  }),[reloadLibrary,api,leaveReader,translationScope?.key]);
+ useEffect(()=>{
+   const id=currentRef.current;if(!id)return;const request=readingEpoch.current;let active=true;
+   void readSequence(id).then(result=>{if(active&&request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
+     setDirectory(result.directory);setCopies(previous=>result.copies.map(copy=>previous.find(old=>old.id===copy.id&&old.contentId===copy.contentId)??copy));
+   }}).catch(error=>{if(active&&request===readingEpoch.current)setError(error.message);});
+   return()=>{active=false;};
+ },[settings.language,readSequence,api]);
  useEffect(()=>{
    if(!channel)return;
    let stopped=false;
@@ -145,7 +159,7 @@ export function App(){
  useEffect(()=>{const timer=setInterval(()=>void runDownloads().catch(e=>setError(e.message)),1500);return()=>{clearInterval(timer);stopDownloads();};},[]);
  useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),6000);return()=>clearTimeout(timer);},[toast]);
  useEffect(()=>{const changed=()=>{setView(viewFromHash());setAccountTab(location.hash==='#account/subscription'?'subscription':'overview');leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
- useEffect(()=>()=>{readingEpoch.current++;libraryEpoch.current++;},[]);
+ useEffect(()=>()=>{readingEpoch.current++;readingLoadEpoch.current++;libraryEpoch.current++;},[]);
  useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);const refresh=async()=>{try{const value=await api.capabilities();if(live)setCaps(value);if(account){const value=await api.entitlements();if(live)setUsage(value);}}catch{/* Keep local reading available offline. */}};void refresh();window.addEventListener('focus',refresh);return()=>{live=false;window.removeEventListener('focus',refresh);};},[api]);
  useEffect(()=>{
   if(sourceQueryHandled.current||typeof chrome==='undefined'||!chrome.storage?.local)return;
@@ -154,12 +168,12 @@ export function App(){
   void (async()=>{
    if(manifestId){const data=await chrome.storage.local.get('manifest:'+manifestId),manifest=data['manifest:'+manifestId] as PageManifest|undefined;if(!manifest)throw Error(msg('来源清单已失效，请重新发现。'));
     const result=await importManifest(manifest);await reloadLibrary();if(readingEpoch.current===request)await openEntry(result.id);
-    if(result.catalogUrl){try{const source=await readWebsiteCatalog(result.catalogUrl);await importCatalog(source);await reloadLibrary();if(currentRef.current===result.id&&api.isCurrent()){const sequence=await readerSequence(result.id,translationScope);if(currentRef.current===result.id&&api.isCurrent()){setCopies(sequence.copies);setDirectory(sequence.directory);}}}catch(e){notify((e as Error).message);}}
-   }else if(catalogId){const data=await chrome.storage.local.get('nc-import:'+catalogId),source=data['nc-import:'+catalogId] as {catalog?:SourceCatalog}|undefined;if(!source?.catalog)throw Error(msg('来源清单已失效，请重新发现。'));const comic=await importCatalog(source.catalog);await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);}
+    if(result.catalogUrl){const catalogRequest=readingEpoch.current;try{const source=await readWebsiteCatalog(result.catalogUrl);await importCatalog(source);await reloadLibrary();if(catalogRequest===readingEpoch.current&&currentRef.current===result.id&&api.isCurrent()){await selectReadingEntry(result.id);const sequence=await readSequence(result.id);if(catalogRequest===readingEpoch.current&&currentRef.current===result.id&&api.isCurrent()){setCopies(sequence.copies);setDirectory(sequence.directory);}}}catch(e){notify((e as Error).message);}}
+   }else if(catalogId){const data=await chrome.storage.local.get('nc-import:'+catalogId),source=data['nc-import:'+catalogId] as {catalog?:SourceCatalog;selectedEntryId?:string}|undefined;if(!source?.catalog)throw Error(msg('来源清单已失效，请重新发现。'));const comic=await importWebsiteCatalog(source.catalog,source.selectedEntryId);await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);}
   })().catch(e=>setError(e.message)).finally(()=>{setBusy('');query.delete('manifest');query.delete('catalog');history.replaceState(null,'',location.pathname+(query.size?'?'+query:'')+location.hash);});
  },[api]);
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
- function nav(value:View,tab:AccountTab='overview'){leaveReader();setView(value);setSourceDirectory(undefined);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
+ function nav(value:View,tab:AccountTab='overview'){leaveReader();setView(value);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
  const rights=usage??caps?.entitlements;
  async function importWebsiteUrl(url:string){
    const comic=await importWebsiteLink(url);await reloadLibrary();
@@ -169,8 +183,8 @@ export function App(){
   <input aria-label={msg('选择漫画文件')} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
   {!current&&<header className="nc-app-header"><button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button><nav aria-label={msg('主导航')}><button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book"/>{msg('我的漫画')}</button><button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe"/>{msg('漫画网站')}</button></nav><div className="nc-header-actions"><button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message"/></button><button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings"/></button><button aria-label={msg('我的账户')} className="nc-account-button" onClick={()=>nav('account')}><Icon name="user"/><span>{account?(rights?.plan==='plus'?'PLUS':msg('普通用户')):msg('我的账户')}</span></button></div></header>}
   <div className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
-  {current?<Reader key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onReload={()=>void reloadCurrent()} onExport={()=>void exportCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onAcquire={()=>void grantDownloads([current.id],copyOrigins([current])).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId)=>void openEntry(id,pageId)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
-  <main className="nc-main">{view==='library'&&(sourceDirectory?<section className="nc-reading-start" aria-label={msg('选择开始阅读的位置')}><div className="nc-page-heading"><h1>{msg('选择开始阅读的位置')}</h1><button className="button secondary" onClick={()=>setSourceDirectory(undefined)}>{msg('返回我的漫画')}</button></div><ComicDirectory directory={sourceDirectory} index={0} pageCount={0} onNavigate={id=>void openEntry(id)}/></section>:<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>)}
+  {current?<Reader key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onReload={()=>void reloadCurrent()} onExport={()=>void exportCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onAcquire={()=>void grantDownloads([current.id],copyOrigins([current])).catch(e=>setError(e.message))} onPauseAcquire={()=>void pauseDownloads([current.id])} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
+  <main className="nc-main">{view==='library'&&<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
   {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={channel?.capabilities}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={value=>{setUsage(value);setCaps(c=>c?{...c,entitlements:value}:c);}} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}

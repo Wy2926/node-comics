@@ -12,17 +12,29 @@ import type {LibraryViewModel,SourceCatalog} from './types';
 import {mergeJobs} from '../../reader/jobs';
 import {sourceCoverOwner} from './cover-access';
 import type {TranslationScope} from '../../translation/channels/contracts';
+import {readReadingPreferences, readingSelectionKey, readingSlots, chooseReadingEntry, resolveReadingSequence, entryReadable, entryRetained, sourceOrder} from './reading-preferences';
 export {coverReference} from './cover-access';
+export {selectReadingEntry} from './reading-preferences';
 
 type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
 const savedPages=new WeakMap<Page,string>();
 const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
-export async function continueEntry(comicId:string):Promise<Entry|undefined> {
+export async function continueEntry(comicId:string,targetLanguage?:string):Promise<Entry|undefined> {
   const comic=await catalog.get('comics',comicId);if(!comic)return;
-  if(comic.lastEntryId){const entry=await catalog.get('entries',comic.lastEntryId);if(entry?.comicId===comicId)return entry;}
-  if(comic.startEntryId){const entry=await catalog.get('entries',comic.startEntryId);if(entry?.comicId===comicId)return entry;}
-  const entries=(await catalog.listEntries(comicId)).filter(entry=>!entry.sourceRemoved);return entries.length===1?entries[0]:undefined;
+  const [allEntries,preferences]=await Promise.all([catalog.listEntries(comicId),readReadingPreferences(comic)]);
+  const slots=readingSlots(allEntries),byId=new Map(allEntries.map(entry=>[entry.id,entry]));
+  const resume=(entry:Entry)=>entryReadable(entry)?entry:chooseReadingEntry(slots.find(slot=>slot.id===readingSelectionKey(entry))!,preferences,targetLanguage);
+  const positions=await catalog.list('positions',{index:'comicId',range:comicId,limit:10000});
+  const recent=positions.filter(position=>byId.get(position.entryId)?.contentId===position.contentId)
+    .sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+  const explicit=preferences.lastEntryId?byId.get(preferences.lastEntryId):undefined;
+  if(explicit&&(preferences.selectedAt??0)>=(recent?.updatedAt??0))return resume(explicit);
+  if(recent)return resume(byId.get(recent.entryId)!);
+  const last=comic.lastEntryId?byId.get(comic.lastEntryId):undefined;if(last)return resume(last);
+  const start=slots.find(slot=>slot.entries.some(entry=>entry.id===comic.startEntryId)&&slot.entries.some(entryReadable))
+    ??slots.find(slot=>slot.entries.some(entryReadable))??slots[0];
+  return start?chooseReadingEntry(start,preferences,targetLanguage):undefined;
 }
 export function descriptorView(entry:Entry,page:PageDescriptor,identity?:PageMaterialization):Page {
   return {id:page.pageId,name:page.name,width:identity?.width??page.width??900,height:identity?.height??page.height??1300,
@@ -54,24 +66,43 @@ export async function loadEntry(id:string,scope?:TranslationScope):Promise<Readi
   }));
   return {...readingEntry(entry,pages,position),catalogUpdateRevision:comic?.catalogUpdates?.revision};
 }
-export interface DirectoryEntry {id:string;title:string;tags:string[];current:boolean;read:boolean;total?:number;status:string;error?:string}
+export interface DirectoryEntry {id:string;title:string;tags:string[];current:boolean;read:boolean;readable:boolean;total?:number;status:string;error?:string;contentLanguage?:string;sourceRemoved?:boolean}
 export interface DirectoryGroup {id:string;title:string;entryIds:string[];parentId?:string}
-export interface ReadingDirectory {comicId?:string;title:string;entries:DirectoryEntry[];groups:DirectoryGroup[];sourceUrl?:string;related?:{id:string;title:string;url:string}[]}
-export async function comicDirectory(comicId:string,currentId?:string):Promise<ReadingDirectory> {
+export interface DirectoryChapter {id:string;title:string;entryIds:string[];selectedEntryId:string;groupIds:string[];current:boolean;readable:boolean}
+export interface ReadingDirectory {comicId?:string;title:string;entries:DirectoryEntry[];chapters:DirectoryChapter[];groups:DirectoryGroup[];sourceUrl?:string;related?:{id:string;title:string;url:string}[]}
+export async function comicDirectory(comicId:string,currentId?:string,targetLanguage?:string):Promise<ReadingDirectory> {
   const comic=await catalog.get('comics',comicId);if(!comic)throw Error('漫画已移除。');
-  const entries=(await catalog.listEntries(comicId)).filter(entry=>!entry.sourceRemoved||entry.id===currentId);
+  const slots=readingSlots(await catalog.listEntries(comicId)).map(slot=>{
+    const present=slot.entries.filter(entry=>!entry.sourceRemoved||entry.id===currentId);
+    return {...slot,entries:present.length?present:[slot.entries[0]]};
+  });
+  const entries=slots.flatMap(slot=>slot.entries).sort(sourceOrder);
+  const preferences=await readReadingPreferences(comic);
   const [source]=await catalog.list('catalogs',{index:'comicId',range:comicId,limit:1}) as unknown as SourceCatalog[];
+  const sourceEntries=new Map(source?.entries.map(entry=>[entry.id,entry]));
   const bySource=new Map(entries.map(entry=>[entry.sourceEntryId,entry.id]));
   const groups=source?.groups.map(group=>({...group,entryIds:group.entryIds.flatMap(id=>{const entryId=bySource.get(id);return entryId?[entryId]:[];})})).filter(group=>group.entryIds.length||source.groups.some(child=>child.parentId===group.id))??[];
-  return {comicId,title:comic.title,sourceUrl:comic.sourceUrl,groups,related:source?.entries.filter(entry=>entry.related).map(({id,title,url})=>({id,title,url})),entries:entries.map(entry=>({id:entry.id,title:entry.title,tags:source?.entries.find(item=>item.id===entry.sourceEntryId)?.rawTypes??[],current:entry.id===currentId,read:!!entry.readAt,total:entry.knownTotal??entry.pageCount,status:entry.error??(entry.indexState==='ready'?'可以阅读':'按需载入'),error:entry.error}))};
+  const available=(entry:Entry)=>entryReadable(entry)||entry.id===currentId&&entryRetained(entry);
+  const chapters=slots.map(slot=>{
+    const current=slot.entries.find(entry=>entry.id===currentId),selected=current??chooseReadingEntry(slot,preferences,targetLanguage);
+    return {id:slot.id,title:selected.title,entryIds:slot.entries.map(entry=>entry.id),selectedEntryId:selected.id,
+      groupIds:[...new Set(slot.entries.flatMap(entry=>sourceEntries.get(entry.sourceEntryId??'')?.groupIds??[]))],current:!!current,readable:available(selected)};
+  });
+  return {comicId,title:comic.title,sourceUrl:comic.sourceUrl,groups,chapters,
+    related:source?.entries.filter(entry=>entry.related).map(({id,title,url})=>({id,title,url})),entries:entries.map(entry=>({id:entry.id,title:entry.title,tags:sourceEntries.get(entry.sourceEntryId??'')?.rawTypes??[],current:entry.id===currentId,read:!!entry.readAt,readable:available(entry),total:entry.knownTotal??entry.pageCount,
+      contentLanguage:entry.contentLanguage,sourceRemoved:entry.sourceRemoved,
+      status:!available(entry)?'该话暂无可读内容。':entry.sourceRemoved?'源站已移除':entry.error??(entry.indexState==='ready'?'可以阅读':'按需载入'),error:!available(entry)?'该话暂无可读内容。':entry.error}))};
 }
 /** Only one adapter-declared sequence may be read continuously. Other groups remain explicit navigation. */
-export async function readerSequence(entryId:string,scope?:TranslationScope):Promise<{copies:ReadingEntry[];directory:ReadingDirectory}> {
+export async function readerSequence(entryId:string,scope?:TranslationScope,targetLanguage?:string):Promise<{copies:ReadingEntry[];directory:ReadingDirectory}> {
   const entry=await catalog.get('entries',entryId);if(!entry)throw Error('漫画已移除。');
-  const entries=entry.sequenceId?(await catalog.listEntries(entry.comicId)).filter(item=>item.sequenceId===entry.sequenceId&&(!item.sourceRemoved||item.id===entryId)):[entry];
+  const comic=await catalog.get('comics',entry.comicId);if(!comic)throw Error('漫画已移除。');
+  const entries=resolveReadingSequence(entry,await catalog.listEntries(entry.comicId),await readReadingPreferences(comic),targetLanguage);
   const at=entries.findIndex(item=>item.id===entryId);
-  const copies=await Promise.all(entries.map((item,index)=>Math.abs(index-at)<=1?loadEntry(item.id,scope):Promise.resolve(readingEntry(item))));
-  return {copies,directory:await comicDirectory(entry.comicId,entryId)};
+  const copies=await Promise.all(entries.map((item,index)=>item.id!==entryId&&!entryReadable(item)
+    ?Promise.resolve(readingEntry({...item,discoveryComplete:false}))
+    :Math.abs(index-at)<=1?loadEntry(item.id,scope):Promise.resolve(readingEntry(item))));
+  return {copies,directory:await comicDirectory(entry.comicId,entryId,targetLanguage)};
 }
 export async function saveReaderState(copy:ReadingEntry) {
   if(!copy.contentId||!copy.comicId)return;
