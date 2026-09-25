@@ -151,6 +151,27 @@ def test_prior_versions_remain_downloadable(website, monkeypatch):
     assert '/0.0.9/' in calls[-1]
 
 
+def test_firefox_signed_download_preserves_xpi_metadata(website, monkeypatch):
+    from app import website as module
+    release = next(item for item in module.RELEASES if item['browser'] == 'firefox')
+    calls = []
+    def sign(key, expires):
+        calls.append((key, expires))
+        return 'https://storage.example/package.xpi'
+    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
+    head = website.head(release['path'])
+    assert head.status_code == 200 and head.content == b''
+    assert head.headers['content-type'] == 'application/x-xpinstall'
+    assert head.headers['content-length'] == str(release['bytes'])
+    assert head.headers['content-disposition'] == f'attachment; filename="{release["filename"]}"'
+    assert calls == []
+    response = website.get(release['path'], follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert calls == [(f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}', 600)]
+    assert website.get(release['path'].replace('.xpi', '.zip')).status_code == 404
+
+
 def test_real_api_guard_does_not_make_private_routes_public(client, tmp_path, monkeypatch):
     from conftest import login
     from app.main import app

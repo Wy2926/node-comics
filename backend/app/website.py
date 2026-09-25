@@ -64,7 +64,7 @@ class WebsiteFiles(StaticFiles):
                        'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex, nofollow'}
             scope.setdefault('state', {})['public_website'] = True
             if scope['method'] == 'HEAD':
-                return Response(headers={**headers, 'Content-Type': 'application/zip',
+                return Response(headers={**headers, 'Content-Type': release.get('content_type', 'application/zip'),
                     'Content-Length': str(release['bytes']),
                     'Content-Disposition': f'attachment; filename="{release["filename"]}"'})
             if scope['method'] != 'GET':

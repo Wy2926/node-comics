@@ -88,7 +88,7 @@ export interface UI {
   installStepBrowser: string;
   installStepLoad: string;
   manualUpdateNote: string;
-  firefoxDownloadNote: string;
+  downloadXpi: string;
   storeHeading: string;
   storeNote: string;
   guidesTitle: string;

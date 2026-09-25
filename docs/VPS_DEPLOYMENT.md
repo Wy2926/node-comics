@@ -2,6 +2,15 @@
 
 本文记录最近一次 2026-09-25 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-25 发布 Firefox 商店签名版 0.3.0
+
+- 火狐图片请求头修复提交 `61cfc39` 已推送；规则改用 API schema 字符串，兼容 Firefox 不暴露 Chromium 运行时枚举的情况。两项成功／失败清理回归及插件类型、模块、国际化检查通过；本轮未重新验收 Firefox 内的实际阅读流程。
+- 从 [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/nodelane-comics/) 下载公开 0.3.0 XPI，核对 AMO 官方大小与 SHA-256、扩展 ID 和 Mozilla 签名文件。包内代码与本地商店提交包逐字节一致，清单 JSON 内容一致；审核源码中的图片请求头修复与提交一致。
+- 已上传私有 R2 并回读验证，官网长期地址为 `/downloads/node-comics-0.3.0-firefox.xpi`，MIME 为 `application/x-xpinstall`。大小 6,881,037 字节，SHA-256 `fcf6b4386bd3e8bc6b8c99ccd8afdd876deb3a00b82642eebca62268eb2ceec7`。Chrome / Edge 安装包和全部历史对象保留原样。
+- 五语官网加入 Firefox 商店与 XPI 下载入口，移除卡片附加说明，保持三张卡片按钮与版本信息对齐；解压安装步骤明确适用于 Chrome / Edge。
+- API 镜像 `node-comics-website:firefox-030-20260925t042929z` 已健康运行，仅替换官网、下载目录与下载 HEAD 的 MIME 处理。工作进程、业务环境、Compose 和代理配置保持不变；备份位于 `/opt/nodelane/node-comics/extension-firefox-030-20260925T042929Z/backup/`。
+- 13 项官网测试、11 项网站路由测试、110 页构建检查通过。本机 Chrome 公网验证五语页面，实际下载三平台包并核对文件名、大小和 SHA-256；7 个当前／历史下载的 HEAD 元数据及卡片对齐通过。普通 Python 公网请求被 CDN 拒绝，公开验证使用真实 Chrome。产物和脱敏记录在 `artifacts/firefox-store-0.3.0/`，截图与下载在 `artifacts/extension-download/`。
+
 ## 2026-09-25 发布 Chrome / Edge 0.3.0 与五语更新日志
 
 - 两个平台手动安装包已上传私有 R2 并回读校验，官网当前版本切换到 0.3.0，长期地址为 `/downloads/node-comics-0.3.0-chrome.zip`、`/downloads/node-comics-0.3.0-edge.zip`。保留全部既有版本目录与 R2 对象。下载包保留各平台固定身份，与独立商店提交包除 `manifest.key` 外内容一致。

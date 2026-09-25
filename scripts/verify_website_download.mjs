@@ -6,7 +6,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4321';
 const catalog=JSON.parse(await readFile('backend/extension-release.json','utf8'));
 const releases=catalog.releases.filter(item=>item.version===catalog.current);
-assert.deepEqual(releases.map(item=>item.browser).sort(),['chrome','edge']);
+assert.deepEqual(releases.map(item=>item.browser).sort(),['chrome','edge','firefox']);
 const output='artifacts/extension-download';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:1100},acceptDownloads:true});
@@ -22,8 +22,9 @@ try{
    const storeBox=await card.locator('.store-link').boundingBox(),downloadBox=await link.boundingBox();
    assert(downloadBox.y>=storeBox.y+storeBox.height,'Package download must appear below its own store button');
   }
-  assert.equal(await page.locator('[data-browser="firefox"] .package-download').count(),0);
-  assert.equal(await page.locator('.package-download').count(),2);
+  assert.equal(await page.locator('[data-browser="firefox"] .store-link').getAttribute('href'),'https://addons.mozilla.org/firefox/addon/nodelane-comics/');
+  assert.equal(await page.locator('[data-browser="firefox"] .package-download').count(),1);
+  assert.equal(await page.locator('.package-download').count(),3);
   assert.equal(await page.locator('.direct-download').count(),0);
   assert.equal(await page.locator('.install-steps li').count(),3);
   const logos=page.locator('.store-card img.store-icon');

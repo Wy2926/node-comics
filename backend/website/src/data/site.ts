@@ -1,5 +1,5 @@
 import extensionReleases from '../../../extension-release.json';
-const extensionPackages = Object.fromEntries(['chrome', 'edge'].map(browser => {
+const extensionPackages = Object.fromEntries(['chrome', 'edge', 'firefox'].map(browser => {
   const release = extensionReleases.releases.find(item => item.version === extensionReleases.current && item.browser === browser);
   if (!release) throw new Error('Missing current extension package: ' + browser);
   return [browser, release];
@@ -16,7 +16,7 @@ export const site = {
   stores: {
     chrome: 'https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo?utm_source=item-share-cb',
     edge: '',
-    firefox: '',
+    firefox: 'https://addons.mozilla.org/firefox/addon/nodelane-comics/',
   },
 } as const;
 

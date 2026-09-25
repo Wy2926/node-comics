@@ -48,6 +48,15 @@
       "sha256": "746ea9cc4cc7fa8f37cafe1ca636052fbceb34f9debfbac2258e94006b42b104",
       "bytes": 6804847,
       "path": "/downloads/node-comics-0.3.0-edge.zip"
+    },
+    {
+      "version": "0.3.0",
+      "browser": "firefox",
+      "filename": "node-comics-0.3.0-firefox.xpi",
+      "sha256": "fcf6b4386bd3e8bc6b8c99ccd8afdd876deb3a00b82642eebca62268eb2ceec7",
+      "bytes": 6881037,
+      "path": "/downloads/node-comics-0.3.0-firefox.xpi",
+      "content_type": "application/x-xpinstall"
     }
   ]
 }
