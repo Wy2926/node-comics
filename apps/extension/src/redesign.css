@@ -1155,6 +1155,12 @@ a {
 .nc-theme-options [data-color=iris] {
   background: #8c6bcc;
 }
+.nc-theme-options [data-color=amber] {
+  background: #cb792d;
+}
+.nc-theme-options [data-color=slate] {
+  background: #75849a;
+}
 .nc-app .account-summary {
   background: var(--surface);
   border-color: var(--line);

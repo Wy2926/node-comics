@@ -22,10 +22,10 @@ try{
  await page.getByRole('button',{name:'更多操作 · 主题验收',exact:true}).click();await shot('comic-menu');await page.getByRole('menuitem',{name:'导出漫画',exact:true}).click();await page.getByRole('dialog').getByRole('combobox').first().click();await shot('export-dropdown');await page.keyboard.press('Escape');await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();checks.push('单来源书架、简短菜单与导出弹窗');
  await page.getByRole('button',{name:'外观与设置',exact:true}).click();
  const target=page.getByRole('combobox',{name:'默认目标语言',exact:true}),original=await target.getAttribute('data-value');await target.click();await page.getByRole('listbox').waitFor();await shot('settings-dropdown');await target.press('End');await target.press('Escape');assert.equal(await target.getAttribute('data-value'),original);assert(await target.evaluate(el=>el===document.activeElement));
- for(const [theme,label] of [['sky','晴空蓝'],['rose','樱花粉'],['mint','薄荷绿'],['iris','鸢尾紫']])for(const mode of ['light','dark']){
+ for(const [theme,label] of [['sky','晴空蓝'],['rose','樱花粉'],['mint','薄荷绿'],['iris','鸢尾紫'],['amber','琥珀橙'],['slate','石墨灰']])for(const mode of ['light','dark']){
   await page.getByRole('button',{name:label,exact:true}).click();await selectOption(page.getByRole('combobox',{name:'亮暗外观',exact:true}),mode);await noOverflow();await shot('settings-'+theme+'-'+mode);
  }
- await selectOption(page.getByRole('combobox',{name:'界面文字大小',exact:true}),'1.25');await noOverflow();await shot('settings-large-text');checks.push('4种主题色×亮暗外观、大字体、下拉键盘取消与焦点');
+ await selectOption(page.getByRole('combobox',{name:'界面文字大小',exact:true}),'1.25');await noOverflow();await shot('settings-large-text');checks.push('6种主题色×亮暗外观、大字体、下拉键盘取消与焦点');
  await selectOption(page.getByRole('combobox',{name:'界面文字大小',exact:true}),'1');await selectOption(page.getByRole('combobox',{name:'亮暗外观',exact:true}),'light');
  await page.getByRole('button',{name:'我的账户',exact:true}).click();await shot('account-guest');await page.getByRole('button',{name:'登录账户',exact:true}).first().click();await page.getByRole('dialog').waitFor();await shot('login-light');await page.getByRole('button',{name:'关闭登录',exact:true}).click();
  await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await page.getByRole('button',{name:'继续阅读',exact:true}).click();await page.locator('.nc-page-image').first().waitFor();await shot('reader-light');

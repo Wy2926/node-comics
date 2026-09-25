@@ -41,6 +41,16 @@
   --accent-hover: #5c3e98;
   --accent-soft: #f3efff;
 }
+:root[data-accent=amber] {
+  --accent: #a65010;
+  --accent-hover: #843d09;
+  --accent-soft: #fff3e3;
+}
+:root[data-accent=slate] {
+  --accent: #526176;
+  --accent-hover: #3e4b5e;
+  --accent-soft: #eef1f5;
+}
 :root[data-appearance=dark] {
   --canvas: #151b27;
   --surface: #1d2737;
@@ -57,6 +67,9 @@
   --danger: #ffacb5;
   --danger-soft: #452b35;
   --shadow: 0 12px 40px #0003;
+  --comic-stroke: #53627a;
+  --comic-shadow-color: #080f1a;
+  --comic-shadow-disabled-color: #101722;
   color-scheme: dark;
 }
 :root[data-appearance=dark][data-accent=rose] {
@@ -78,19 +91,35 @@
   --accent-on: #31204e;
 }
 
+:root[data-appearance=dark][data-accent=amber] {
+  --accent: #ffc078;
+  --accent-hover: #ffdbaf;
+  --accent-soft: #493525;
+  --accent-on: #452508;
+}
+:root[data-appearance=dark][data-accent=slate] {
+  --accent: #becbdd;
+  --accent-hover: #e0e8f3;
+  --accent-soft: #303b4a;
+  --accent-on: #243143;
+}
+
 /* Login-passport vocabulary shared by every extension surface. */
 :root {
-  --comic-border: 2px solid var(--ink);
+  --comic-stroke: var(--ink);
+  --comic-shadow-color: var(--ink);
+  --comic-shadow-disabled-color: var(--line);
+  --comic-border: 2px solid var(--comic-stroke);
   --comic-control-radius: 5px;
   --comic-panel-radius: 8px 24px 24px 24px;
   --comic-card-radius: 5px 16px 16px 16px;
   --comic-cover-radius: 3px 14px 0 0;
-  --comic-shadow-small: 2px 2px 0 var(--ink);
-  --comic-shadow: 4px 4px 0 var(--ink);
-  --comic-shadow-hover: 5px 5px 0 var(--ink);
-  --comic-shadow-active: 1px 1px 0 var(--ink);
-  --comic-shadow-disabled: 2px 2px 0 var(--line);
-  --comic-dialog-shadow: 8px 8px 0 color-mix(in srgb, var(--ink) 24%, transparent), 0 24px 90px #0004;
+  --comic-shadow-small: 2px 2px 0 var(--comic-shadow-color);
+  --comic-shadow: 4px 4px 0 var(--comic-shadow-color);
+  --comic-shadow-hover: 5px 5px 0 var(--comic-shadow-color);
+  --comic-shadow-active: 1px 1px 0 var(--comic-shadow-color);
+  --comic-shadow-disabled: 2px 2px 0 var(--comic-shadow-disabled-color);
+  --comic-dialog-shadow: 8px 8px 0 color-mix(in srgb, var(--comic-shadow-color) 24%, transparent), 0 24px 90px #0004;
   --comic-perforation: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent);
   --comic-dot-pattern: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) .7px, transparent .7px);
   --comic-dot-size: 7px 7px;

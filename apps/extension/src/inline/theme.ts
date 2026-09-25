@@ -7,7 +7,7 @@ function inlineTheme(input?:unknown):InlineTheme{
   const value=input&&typeof input==='object'?input as Partial<InlineTheme>:undefined;
   return {
     appearance:value?.appearance==='light'||value?.appearance==='dark'?value.appearance:'system',
-    accentTheme:value?.accentTheme==='rose'||value?.accentTheme==='mint'||value?.accentTheme==='iris'?value.accentTheme:'sky',
+    accentTheme:value?.accentTheme==='rose'||value?.accentTheme==='mint'||value?.accentTheme==='iris'||value?.accentTheme==='amber'||value?.accentTheme==='slate'?value.accentTheme:'sky',
     textScale:value?.textScale===1.125||value?.textScale===1.25?value.textScale:1,
   };
 }

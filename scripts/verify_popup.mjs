@@ -72,7 +72,7 @@ try{
 await source.goto(site+'/new');await openPopup();await source.goto(site+'/changed');await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'网页已变化'}).waitFor();check('标签页导航后不误启动旧页面翻译');await popup.close();
  await source.goto('about:blank');await openPopup();assert(await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).isDisabled());assert.equal(await popup.getByRole('button',{name:'开始阅读',exact:true}).count(),0);assert(await popup.getByRole('button',{name:'我的漫画',exact:false}).last().isEnabled());await screenshot('popup-unavailable');check('浏览器内部页禁用网页操作，保留管理器和设置');await popup.close();
  await source.goto(site);await openPopup();
- for(const theme of ['sky','rose','mint','iris'])for(const appearance of ['light','dark']){
+ for(const theme of ['sky','rose','mint','iris','amber','slate'])for(const appearance of ['light','dark']){
   await worker.evaluate(async({theme,appearance})=>{const key='nc-reader-settings',data=await chrome.storage.local.get(key);await chrome.storage.local.set({[key]:{...data[key],accentTheme:theme,appearance,textScale:1}});},{theme,appearance});
   await popup.waitForFunction(({theme,appearance})=>document.documentElement.dataset.accent===theme&&document.documentElement.dataset.appearance===appearance,{theme,appearance});
   assert.equal(await popup.evaluate(()=>document.documentElement.scrollWidth),420);await screenshot('popup-'+theme+'-'+appearance);
