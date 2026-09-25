@@ -66,6 +66,7 @@ export function App(){
  const api=useMemo(()=>new Api(API_BASE,account?.token??'',pool.current,undefined,account?sessionAuthorization(account.id):undefined),[account?.id]);
  const apiRef=useRef(api);apiRef.current=api;api.isCurrent=()=>apiRef.current===api;
  const [caps,setCaps]=useState<Capabilities>(),[usage,setUsage]=useState<Entitlements>();
+ const updateEntitlements=useCallback((value:Entitlements)=>{setUsage(value);setCaps(c=>c?{...c,entitlements:value}:c);},[]);
  const notify=useCallback((message:string)=>setToast(message),[]),login=useLogin(currentId,setCurrentId,notify);
  const {channel,error:channelError}=useTranslationChannel();
  const channelRef=useRef(channel);channelRef.current=channel;
@@ -186,7 +187,7 @@ export function App(){
   <main className="nc-main">{view==='library'&&<Library library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
   {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={channel?.capabilities}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
-  {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={value=>{setUsage(value);setCaps(c=>c?{...c,entitlements:value}:c);}} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
+  {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={updateEntitlements} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>}
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}{toast&&<div className="toast" role="status"><Icon name="check"/>{toast}<button onClick={()=>setToast('')}><Icon name="close"/></button></div>}

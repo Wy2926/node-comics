@@ -480,6 +480,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.4.0",
+        "date": "2026-09-25",
+        "title": "0.4.0: More manga sources, smoother reading",
+        "items": [
+          "Added MangaDex and Guazi Manga sources with a unified website-link import flow. Improved MangaCopy catalog loading and recovery from DM5 import failures.",
+          "Choose a reading language for each MangaDex chapter, with language indicators in the directory to make chapters easier to find and switch between.",
+          "Refined the reader directory and common actions, added more accent colors, and improved interface and translation language selectors.",
+          "Fixed Firefox compatibility with image request-header rules for more reliable image loading from supported sites.",
+          "Chrome and Edge 0.4.0 downloads are available. The Firefox download remains the AMO-signed 0.3.0; store versions depend on review completion."
+        ]
+      },
+      {
         "date": "2026-09-25",
         "title": "0.3.0: Connect your own translation service",
         "items": [

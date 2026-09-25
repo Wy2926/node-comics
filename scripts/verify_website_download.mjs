@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4321';
 const catalog=JSON.parse(await readFile('backend/extension-release.json','utf8'));
-const releases=catalog.releases.filter(item=>item.version===catalog.current);
+const releases=catalog.releases.filter(item=>item.version===(catalog.current_by_browser?.[item.browser]??catalog.current));
 assert.deepEqual(releases.map(item=>item.browser).sort(),['chrome','edge','firefox']);
 const output='artifacts/extension-download';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});

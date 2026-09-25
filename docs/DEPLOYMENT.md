@@ -26,7 +26,7 @@ curl --fail https://comics.nodelane.net/health/ready
 
 1. 在 `apps/extension` 设置正式 `VITE_API_BASE`、`VITE_DRIVE_CONNECT_URL`，更新版本并完成 `npm run check`、`npm test`。
 2. 分别生成 Chrome／Edge 手动安装包与无 `manifest.key` 的商店包。Firefox 审核包运行 `npx --no-install web-ext lint --source-dir .output/firefox-mv3`；公开下载使用 AMO 已签名 XPI。
-3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小和 SHA-256；保留已有下载地址，全部平台包就绪后更新 `current`。
+3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小和 SHA-256；保留已有下载地址，更新 `current` 与 `current_by_browser` 中各浏览器已就绪的版本。Firefox 新版尚未取得 AMO 签名时，保留其上一已签名版本并在更新日志中说明。
 4. 使用后端 Python 依赖并注入目标 R2 配置，从仓库根目录运行：
 
 ```powershell

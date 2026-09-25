@@ -1,6 +1,6 @@
 import extensionReleases from '../../../extension-release.json';
-const extensionPackages = Object.fromEntries(['chrome', 'edge', 'firefox'].map(browser => {
-  const release = extensionReleases.releases.find(item => item.version === extensionReleases.current && item.browser === browser);
+const extensionPackages = Object.fromEntries((['chrome', 'edge', 'firefox'] as const).map(browser => {
+  const release = extensionReleases.releases.find(item => item.version === extensionReleases.current_by_browser[browser] && item.browser === browser);
   if (!release) throw new Error('Missing current extension package: ' + browser);
   return [browser, release];
 }));

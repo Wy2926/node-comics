@@ -116,4 +116,4 @@ export interface UI {
   callbackDescription: string;
   noscript: string;
 }
-export interface Dictionary {ui:UI;documents:{guides:Guide[];policies:Record<string,Policy>;faqs:{question:string;answer:string}[];releases:{date:string;title:string;items:string[]}[]};account?:Record<string,string>}
+export interface Dictionary {ui:UI;documents:{guides:Guide[];policies:Record<string,Policy>;faqs:{question:string;answer:string}[];releases:{id?:string;date:string;title:string;items:string[]}[]};account?:Record<string,string>}

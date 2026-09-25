@@ -25,7 +25,8 @@ def main():
     from app.storage import get_store
     from botocore.exceptions import ClientError
     catalog = json.loads(args.manifest.read_text(encoding='utf-8'))
-    matches = [item for item in catalog['releases'] if item['version'] == catalog['current'] and item['browser'] == args.browser]
+    version = catalog.get('current_by_browser', {}).get(args.browser, catalog['current'])
+    matches = [item for item in catalog['releases'] if item['version'] == version and item['browser'] == args.browser]
     assert len(matches) == 1
     release = matches[0]
     suffix = 'xpi' if args.browser == 'firefox' else 'zip'

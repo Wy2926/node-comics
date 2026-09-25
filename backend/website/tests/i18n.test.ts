@@ -39,3 +39,15 @@ test('language switching preserves pages and round-trips all public routes',()=>
     assert.equal(localeFromPath(target),to);
   }
 });
+
+
+test('localized releases have stable unique anchors and matching entries',()=>{
+  const reference=dictionaries['zh-CN'].documents.releases;
+  for(const locale of locales){
+    const releases=dictionaries[locale].documents.releases;
+    const anchors=releases.map(release=>release.id??release.date);
+    assert.equal(new Set(anchors).size,anchors.length,locale);
+    assert.deepEqual(anchors,reference.map(release=>release.id??release.date),locale);
+    assert.deepEqual(releases.map(release=>release.date),reference.map(release=>release.date),locale);
+  }
+});
