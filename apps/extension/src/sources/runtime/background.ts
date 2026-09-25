@@ -16,6 +16,7 @@ import {
 import { maxInlineBytes } from '../shared/bytes';
 import { isPageImageUrl } from '../shared/urls';
 import {networkOperation,readNetworkPages} from './network';
+import {readImportCatalog} from './import';
 import {sourceImages} from '../registry/images';
 import {recoverImageHeaders} from './image-headers';
 import {registerDocumentManifest} from './manifests';
@@ -38,22 +39,17 @@ function trusted(sender: chrome.runtime.MessageSender) {
 async function inject(tabId: number) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
 }
-async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>, preferCatalog = false, senderUrl?: string) {
+async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>, senderUrl?: string) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请打开普通漫画网页。'));
   if (senderUrl && new URL(tab.url).origin !== new URL(senderUrl).origin)
     throw Error(msg('来源页面已变化，请重新发现。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
-  if (preferCatalog && loc.kind === 'reader' && loc.catalog && networkOperation(loc.catalog.url, 'catalog')) {
-    const catalog = await readCatalog(loc.catalog.url), id = crypto.randomUUID();
-    const current = catalog.entries.find(entry => sameSourcePage(entry.url, tab.url!));
-    if (current) catalog.defaultEntryId = current.id;
+  if (definition.capabilities.catalog && (loc.kind==='reader'||networkOperation(tab.url,'catalog'))) {
+    const catalog = await readImportCatalog(tab.url,readCatalog), id = crypto.randomUUID();
     await chrome.storage.local.set({['nc-import:' + id]: {catalog}});
     return {kind: 'catalog', id, catalog};
-  }
-  if(loc.kind==='catalog'&&networkOperation(tab.url,'catalog')){
-    const catalog=await readCatalog(tab.url),id=crypto.randomUUID();await chrome.storage.local.set({['nc-import:'+id]:{catalog}});return {kind:'catalog',id,catalog};
   }
   if(loc.kind==='reader'&&networkOperation(tab.url,'pages')){
     const manifest=await readNetworkPages(tab.url);return {kind:'pages',id:manifest.id,manifest};
@@ -131,7 +127,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
         !!sourceLocation(sender.url ?? '') &&
         sourceFor(sender.url??'').definition.capabilities.importable;
       if (!fromSourcePage) return;
-      void discover(sender.tab!.id!,readCatalog,true,sender.url)
+      void discover(sender.tab!.id!,readCatalog,sender.url)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )

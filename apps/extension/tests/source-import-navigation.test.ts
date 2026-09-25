@@ -56,6 +56,12 @@ describe('embedded import after same-document navigation', () => {
     expect(await send(sender(catalogUrl))).toEqual({ok: true});
     expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
   });
+  it('keeps a URL-bound reader import usable when the current chapter has been removed',async()=>{
+    currentUrl=readerUrl.replace('no=2','no=3');
+    readCatalog.mockResolvedValueOnce({...snapshot,defaultEntryId:'episode-2'});
+    expect(await send()).toEqual({ok:true});
+    expect(create).toHaveBeenCalledOnce();
+  });
   it.each(['https://comic.naver.com/webtoon', 'https://comic.naver.com/webtoon/list?titleId=invalid',
     'https://www.gunnerkrigg.com/?p=123', 'https://comic.naver.com.evil.test/webtoon/list?titleId=123'])
   ('rejects a current page outside the importable source scope: %s', async url => {

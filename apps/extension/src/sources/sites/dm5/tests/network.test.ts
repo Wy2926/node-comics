@@ -33,6 +33,16 @@ const request = vi.fn(async(target: string, options?: {referer: string}) => {
 });
 afterEach(() => {vi.unstubAllGlobals();vi.clearAllMocks();});
 describe('DM5 HTTP adapter', () => {
+  it('resolves bare chapters through the same validated reader identity without requesting images', async () => {
+    const read=vi.fn(async()=>readerHtml);
+    expect(await network.resolveCatalog!(reader(false),{request:read})).toBe(url);
+    expect(read).toHaveBeenCalledExactlyOnceWith(reader(false));
+    await expect(network.resolveCatalog!(reader(true).replace('=fixture','=foreign'),{request:read})).rejects.toThrow();
+    await expect(network.resolveCatalog!(reader(false),{request:async()=>readerHtml.replace('DM5_CID=1836194','DM5_CID=1')})).rejects.toThrow();
+    const controller=new AbortController();read.mockImplementationOnce(async()=>{controller.abort();return readerHtml;});
+    await expect(network.resolveCatalog!(reader(false),{request:read,signal:controller.signal})).rejects.toThrow();
+    read.mockClear();await expect(network.resolveCatalog!(reader(false),{request:read,signal:controller.signal})).rejects.toThrow();expect(read).not.toHaveBeenCalled();
+  });
   it('takes only the main cover, ignoring backgrounds and recommended thumbnails', () => {
     const artwork='<img class="banner_detail_bg" src="/blur.jpg"><div class="banner_detail_form"><div class="cover"><img src="https://mhfm5tel.cdndm5.com/1/98761/cover.jpg?width=450&amp;height=600"></div></div><img src="/recommendation.jpg">';
     const source=validateSourceCatalog(parseCatalog(artwork+html(),url));

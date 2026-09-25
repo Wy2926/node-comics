@@ -1,7 +1,7 @@
 import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network';
 import type {SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {catalogUrl, comicpashLocation, episodeUrl, origin} from './definition';
-import {attributes, hasClass, inertHtml, tags, textContent} from './html';
+import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
 import {parseProcessing} from './images';
 import {sourceCover} from '../../shared/cover';
 
@@ -70,7 +70,7 @@ export function parseReader(raw: string, url: string) {
     !/^[a-zA-Z0-9]+$/.test(viewer['data-series-id'] ?? ''))
     throw Error('Comic PASH 未提供可读取的正文，请在源站确认登录、免费范围或购买状态。');
   if (viewer['data-api-domain'] !== '/api' || loc.seriesId && loc.seriesId !== viewer['data-series-id']) throw changed();
-  return {viewerId: viewer['data-comici-viewer-id'],
+  return {viewerId: viewer['data-comici-viewer-id'], seriesId:viewer['data-series-id'],
     title: tags(html, 'meta').find(attrs => attrs.property === 'og:title')?.content?.slice(0, 2048) || `Comic PASH ${loc.episodeId}`};
 }
 type Contents = {totalPages: number; scrollDirection: string; result: Array<{sort: number; width: number; height: number; scramble: string; imageUrl: string}>};
@@ -97,6 +97,11 @@ export function parseContents(raw: string, viewerId: string) {
   return {total: body.totalPages, direction: body.scrollDirection === '縦' ? 'ltr' as const : 'rtl' as const, items};
 }
 export const network = {
+  async resolveCatalog(url,context){
+    const loc=location(url);
+    if(!loc.episodeId)throw changed();
+    return catalogUrl(parseReader(await request(context,episodeUrl(loc.episodeId)),url).seriesId);
+  },
   async catalog(url, context) {
     const loc = location(url);
     if (!loc.seriesId || loc.episodeId) throw changed();

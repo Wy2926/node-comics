@@ -14,6 +14,16 @@ const row = (sort: number) => ({sort, width: 720, height: 1024, scramble: JSON.s
   imageUrl: `https://viewer.comicpash.jp/book/${viewer}/page.jpg?signature=synthetic`});
 const contents = (sorts = [0, 1]) => ({totalPages: 2, scrollDirection: '横', result: sorts.map(row)});
 describe('Comic PASH public network source', () => {
+  it('resolves the series from validated viewer metadata without requesting the image API',async()=>{
+    const request=vi.fn(async()=>reader);
+    expect(await network.resolveCatalog!(episodeUrl(episode),{request})).toBe(base);
+    expect(request).toHaveBeenCalledExactlyOnceWith(episodeUrl(episode));
+    await expect(network.resolveCatalog!(episodeUrl(episode,'foreign'),{request})).rejects.toThrow();
+    await expect(network.resolveCatalog!(episodeUrl(episode),{request:async()=>heading})).rejects.toThrow();
+    const controller=new AbortController();request.mockImplementationOnce(async()=>{controller.abort();return reader;});
+    await expect(network.resolveCatalog!(episodeUrl(episode),{request,signal:controller.signal})).rejects.toThrow();
+    request.mockClear();await expect(network.resolveCatalog!(episodeUrl(episode),{request,signal:controller.signal})).rejects.toThrow();expect(request).not.toHaveBeenCalled();
+  });
   it('uses the series artwork with og:image as an optional fallback, never an episode thumbnail', async () => {
     for (const main of [true,false]) {
       const artwork=`<meta property="og:image" content="https://cdn-public.comici.jp/series/social.webp">${main?'<img class="series-h-img" src="//cdn-public.comici.jp/series/main.webp">':''}<img class="series-eplist-item-img" src="/episode.webp">`;

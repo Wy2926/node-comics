@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://www.guazimanhua.com/*", "https://img.guazicdn.com/*", "https://api.guaziapp.com/*", "http://api.guaziapp.com/*"],
+  "optionalContentMatches": ["https://www.guazimanhua.com/*"]
+}

@@ -5,7 +5,25 @@ import {catalogUrl, chapterUrl, dm5Location} from './definition';
 import {assignment, attribute, positive, scripts, text} from './parsing';
 import {EmptyImageListError, imageUrls} from './protocol';
 
+function readerIdentity(html:string,url:string){
+  const loc=dm5Location(new URL(url));
+  if(!loc?.chapterId)throw Error('DM5 章节地址无效。');
+  const canonical=chapterUrl(loc.chapterId),data=scripts(html);
+  if(String(assignment(data,'DM5_CID'))!==loc.chapterId||assignment(data,'DM5_CURL')!==new URL(canonical).pathname)throw Error('DM5 章节归属已变化。');
+  const backlinks=[...html.matchAll(/<a\b([^>]*)>/gi)].filter(m=>(attribute(m[1],'class')??'').split(/\s+/).includes('back'));
+  const parent=backlinks.length===1&&dm5Location(new URL(attribute(backlinks[0][1],'href')??'',canonical));
+  if(!parent||!parent.slug||parent.chapterId||loc.slug&&parent.slug!==loc.slug)throw Error('DM5 章节不属于已导入漫画。');
+  return {data,slug:parent.slug};
+}
 export const network: SourceNetwork = {
+  async resolveCatalog(url,context){
+    const loc=dm5Location(new URL(url));
+    if(!loc?.chapterId)throw Error('DM5 章节地址无效。');
+    context.signal?.throwIfAborted();
+    const html=await context.request(chapterUrl(loc.chapterId));
+    context.signal?.throwIfAborted();
+    return catalogUrl(readerIdentity(html,url).slug);
+  },
   async catalog(url, context) {
     const loc = dm5Location(new URL(url));
     if (!loc?.slug || loc.chapterId) throw Error('请使用 DM5 漫画详情页链接。');
@@ -18,16 +36,13 @@ export const network: SourceNetwork = {
     const loc = dm5Location(new URL(url));
     if (!loc?.chapterId) throw Error('DM5 章节地址无效。');
     context.signal?.throwIfAborted();
-    const canonical = chapterUrl(loc.chapterId), html = await context.request(canonical), data = scripts(html);
+    const canonical = chapterUrl(loc.chapterId), html = await context.request(canonical);
     context.signal?.throwIfAborted();
     if (/<div\b[^>]*class=["'][^"']*\bview-pay-form\b/.test(html))
       throw Error('DM5 此章节需要源站登录或购买，暂不能导入。');
-    if (String(assignment(data, 'DM5_CID')) !== loc.chapterId || assignment(data, 'DM5_CURL') !== new URL(canonical).pathname) throw Error('DM5 章节归属已变化。');
+    const {data}=readerIdentity(html,url);
     if (assignment(data, 'DM5_ISNEED') !== 'False') throw Error('DM5 此章节需要源站登录或购买，暂不能导入。');
     const comicId = positive(assignment(data, 'DM5_MID')), total = positive(assignment(data, 'DM5_IMAGE_COUNT'), 1500);
-    const backlinks = [...html.matchAll(/<a\b([^>]*)>/gi)].filter(m => (attribute(m[1], 'class') ?? '').split(/\s+/).includes('back'));
-    const parent = backlinks.length === 1 && dm5Location(new URL(attribute(backlinks[0][1], 'href') ?? '', canonical));
-    if (!parent || !parent.slug || parent.chapterId || loc.slug && parent.slug !== loc.slug) throw Error('DM5 章节不属于已导入漫画。');
     const date = text(assignment(data, 'DM5_VIEWSIGN_DT')), sign = text(assignment(data, 'DM5_VIEWSIGN'));
     const keyTags = [...html.matchAll(/<input\b([^>]*)>/gi)].filter(m => attribute(m[1], 'id') === 'dm5_key');
     if (keyTags.length > 1) throw Error('DM5 图片参数重复。');

@@ -11,7 +11,7 @@
 | `definition.ts`（必需） | 导出 `definition`：与目录名一致且唯一的稳定 ID、纯 URL 识别、能力、可选目录同步与网站入口元数据 |
 | `installation.json`（必需） | 安装权限与可选来源；由定义引用，构建工具直接读取 |
 | `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理 |
-| `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages` HTTP 解析操作 |
+| `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages` HTTP 解析操作；章节 URL 缺少作品身份时可提供 `resolveCatalog` |
 | `image.ts`（按需） | 导出 `image`：图片请求头或解码；不依赖是否实现网络目录 |
 | `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与证据、脱敏夹具和站点测试 |
 
@@ -30,6 +30,10 @@
 9. **按能力开放。** 漫画导入须声明 `importable` 和页面能力；目录、原位翻译、完整页清单、自动同步分别声明并有实现。`catalogSync` 仅在能可靠读取完整目录时开放；调度、更新提示、缓存与阅读位置由公共应用层维护。网站入口使用 `sites` 元数据和随包图标，UI 不加专属组件。
 
 公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
+
+弹窗、站内按钮和粘贴链接共用 `readImportCatalog`：目录型站点先确定作品身份，再导入完整目录并选择当前章节；无作品绑定的章节清单不能直接建库。URL 已含作品身份时继续使用纯 `identify`；缺少身份才调用可选 `resolveCatalog`，由本站 HTTP 解析器给出作品地址，公共层校验同一适配器及完整目录中的章节归属。归属解析、目录和正文读取独立选择能力：`resolveCatalog` 不要求实现 HTTP `catalog`，目录交给公共读取器选择 HTTP 或 DOM；已选择的 HTTP 操作失败时不自动换通道。当前瓜子漫画、DM5、Comic PASH 实现归属解析，其他适配器不必实现。它不引入新数据库结构。
+
+归属解析期间的成功 HTTP 响应可通过 `storage.session` 一次性交给阅读器复用：按来源、章节、作品绑定，读取时重新检查主机权限，并精确匹配请求 URL 与 Referer。有效期 30 秒，过期后不再复用，存储内容在下一次交接操作时清理；最多 4 组、合计 4 MiB，每组限额统一为 2 MiB／8 个响应，导入失败或目录归属不符时清理对应记录。此机制不保存目录快照，不影响更新请求的新鲜度；交接不可用时照常 HTTP 读取。无站点语义的 HTML 属性、文本和惰性标记清理集中在 `shared/html.ts`，结构及协议校验留在各站目录。
 
 HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅读器由受信扩展页面请求，均先检查实际图片域名权限，再根据已校验的来源页生成 Referer。原位入口传递图片属性／meta 中的显式引用策略，缺省为 `strict-origin-when-cross-origin`；仅 HTTP 响应头声明的页面策略未回溯读取。站点 `image.headers` 只覆盖必要差异，不再为普通来源 Referer 增加专用适配。Blob／Data／Canvas 保留页面读取与导航版本校验。
 
@@ -65,5 +69,6 @@ npm run build
 | [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；已加载正文图片／还原画布的原位翻译，授权后在详情页与章节页嵌入导入／管理入口 |
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；授权后嵌入导入／管理按钮，章节 Referer；网页正文图片原位翻译 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口；网页正文切片原位翻译 |
+| [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；授权后嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | HTTP 完整分页目录／章节、图片还原、12 小时更新；授权后嵌入作品导入入口；网页已渲染 canvas 原位翻译 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

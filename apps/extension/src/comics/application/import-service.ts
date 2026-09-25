@@ -155,7 +155,8 @@ export async function importCatalog(snapshot:SourceCatalogSnapshot):Promise<Comi
 }
 export async function importManifest(manifest:PageManifest) {
   return sourceLock(async()=>{
-    const {location}=validateManifest(manifest);
+    const {definition,location}=validateManifest(manifest);
+    if(definition.capabilities.catalog&&!location.catalog)throw Error('章节尚未绑定所属漫画，请重新导入。');
     const comic=await websiteComic(manifest.url,manifest.title);
     let [entry]=await catalog.list('entries',{index:'sourceEntry',range:[comic.id,location.pageKey],limit:1});
     if(!entry) {

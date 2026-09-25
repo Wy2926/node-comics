@@ -39,6 +39,8 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | `verify_catalog_sync.mjs` | 本机 TLS / 合成目录下的自动同步、动态分组、更新提示、失败保留与阅读位置；依赖 Python cryptography，使用下方相同浏览器变量 |
 | `verify_source_covers.mjs` | 构建后的隔离 MV3：五站封面、缓存、重试、更新和阅读位置。使用 `PLAYWRIGHT_MODULE` / `TEST_CHROMIUM`；默认合成数据，`RUN_LIVE_COVERS=1` 读取公开样本。预授权／模拟授权，不验原生弹窗；产物在 `artifacts/source-covers/` |
 | Comix `tests/verify-*.mjs` | 站点目录、图片还原、完整阅读器与请求头隔离；样本／真实网络边界见[Comix 说明](../apps/extension/src/sources/sites/comix/README.md) |
+| 瓜子漫画 `tests/verify-browser.mjs` | 真实公开 HTTP、隔离预授权 MV3：弹窗／链接／站内导入统一身份、章节 HTML 复用、整章取图、专门封面、目录刷新和页码恢复；运行方式和边界见[站点说明](../apps/extension/src/sources/sites/guazimanhua/README.md) |
+| `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节 → 完整作品目录 → 正文清单，核对归属及一次性 HTML 复用，无来源标签页；构建后按下方 `PLAYWRIGHT_MODULE` / `TEST_CHROMIUM` 运行，结果在 `artifacts/chapter-imports/`。预授权隔离 MV3，不下载正文图片、不调用产品 API 或翻译模型 |
 | `verify_comicpash.mjs` | Comic PASH 完整目录、整章取图还原、站内导入与阅读位置恢复；隔离样本／真实来源开关见[站点说明](../apps/extension/src/sources/sites/comicpash/README.md) |
 | `verify_r2_download.mjs` | 模拟 R2 响应下的浏览器下载与权限处理，不访问 Cloudflare |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2 接入；运行前阅读脚本中的对象范围与清理规则，不作为普通离线回归 |

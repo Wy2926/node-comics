@@ -12,8 +12,8 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
     <div className="nc-page-heading"><div><span className="nc-eyebrow">{msg('DISCOVER YOUR NEXT STORY')}</span><h1>{msg('漫画网站')}</h1><p>{msg('打开已适配的网站，把喜欢的故事带回书架。')}</p></div><span className="nc-sites-heading-icon" aria-hidden="true"><Icon name="globe" size={42}/><Icon name="spark" size={20}/></span></div>
     {onImport&&<form className="nc-site-link-import" onSubmit={event=>{event.preventDefault();if(busy)return;setError('');setBusy(true);void onImport(url.trim()).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}>
       <label htmlFor="nc-site-url">{msg('通过链接添加漫画')}</label>
-      <div><input id="nc-site-url" type="url" required value={url} onChange={event=>setUrl(event.target.value)} placeholder={msg('粘贴漫画详情页链接')} disabled={busy}/><button className="button primary" disabled={busy}>{busy?msg('正在获取全部章节…'):msg('添加到书架')}</button></div>
-      <p>{msg('粘贴已适配网站的漫画详情页链接，读取目录后即可开始阅读。')}</p>
+      <div><input id="nc-site-url" type="url" required value={url} onChange={event=>setUrl(event.target.value)} placeholder={msg('粘贴漫画详情页或章节链接')} disabled={busy}/><button className="button primary" disabled={busy}>{busy?msg('正在获取全部章节…'):msg('添加到书架')}</button></div>
+      <p>{msg('粘贴已适配网站的漫画详情页或章节链接，读取目录后即可开始阅读。')}</p>
       {error&&<p role="alert">{error}</p>}
     </form>}
     <div className="nc-sites-layout">

@@ -26,9 +26,7 @@ export async function recoverCatalogTabs() {
 /** Read the adapter's complete directory without creating import records or loading chapter images. */
 export async function readSourceCatalog(url:string,options:{previous?:SourceCatalogSnapshot;signal?:AbortSignal}={}):Promise<SourceCatalogSnapshot> {
   if(networkOperation(url,'catalog'))return readNetworkCatalog(url,options);
-  const {definition, location} = resolveSource(url, definitions);
-  if (!definition.capabilities.importable || !definition.capabilities.catalog || location.kind !== 'catalog')
-    throw Error('SOURCE_CATALOG_UNSUPPORTED');
+  const {location} = resolveSource(url, definitions);
   const tab = await chrome.tabs.create({url, active:false});
   if (tab.id == null) throw Error(msg('无法打开来源页面。'));
   const key = prefix + tab.id;

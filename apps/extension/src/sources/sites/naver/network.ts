@@ -1,7 +1,7 @@
 import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network';
 import type {SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {catalogUrl, episodeUrl, naverLocation, origin, levels, type Section} from './definition';
-import {attributes, inertHtml} from './html';
+import {attributes, inertHtml} from '../../shared/html';
 import {sourceCover} from '../../shared/cover';
 
 type RecordValue = Record<string, unknown>;

@@ -7,14 +7,14 @@ vi.mock('../src/sources/registry/networks',()=>({sourceNetworks:fixture.networks
 vi.mock('../src/sources/registry/images',()=>({sourceImages:fixture.images}));
 vi.mock('../src/sources/registry/definitions',()=>({definitions:[{
   id:'fixture',name:'Fixture',capabilities:{importable:true,pages:true,catalog:true,inline:false},installation:{requiredOrigins:[],autoContentMatches:[]},
-  identify:(url:URL)=>url.hostname==='fixture.test'?{sourceId:'fixture',url:url.href,pageKey:url.pathname,kind:url.pathname==='/book'?'catalog':'reader',catalog:{key:'fixture:book',url:'https://fixture.test/book'}}:null,
+  identify:(url:URL)=>url.hostname==='fixture.test'?{sourceId:'fixture',url:url.href,pageKey:url.pathname,kind:url.pathname==='/book'?'catalog':'reader',...(url.pathname==='/unbound'&&url.hash!=='#book'?{}:{catalog:{key:'fixture:book',url:'https://fixture.test/book'}})}:null,
 }]}));
-import {networkOperation,readNetworkCatalog,readNetworkPages} from '../src/sources/runtime/network';
+import {networkOperation,readNetworkCatalog,readNetworkPages,resolveNetworkCatalog} from '../src/sources/runtime/network';
 import {readSourceCatalog} from '../src/sources/runtime/catalog-reader';
-import {discoverPage} from '../src/sources/runtime/client';
+import {discoverEntry,discoverPage} from '../src/sources/runtime/client';
 vi.mock('../src/sources/runtime/image-headers',()=>({withImageHeaders:async(_url:unknown,_headers:unknown,_signal:unknown,read:()=>Promise<unknown>)=>read()}));
 import {readSourceImage} from '../src/sources/runtime/source-image';
-import {authorizeCatalogImport} from '../src/sources/runtime/import';
+import {authorizeCatalogImport,readImportCatalog} from '../src/sources/runtime/import';
 import {registerDocumentManifest} from '../src/sources/runtime/manifests';
 
 const book='https://fixture.test/book',url='https://fixture.test/1';
@@ -32,6 +32,54 @@ beforeEach(()=>{
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('independent discovery operations and common manifest authority',()=>{
+  it('resolves missing parent identity only through the owning HTTP adapter and validates the target',async()=>{
+    const unbound='https://fixture.test/unbound';
+    expect(await resolveNetworkCatalog(unbound)).toBeUndefined();
+    const resolve=vi.fn(async()=>book);
+    fixture.networks.fixture={resolveCatalog:resolve};
+    expect(await resolveNetworkCatalog(unbound)).toBe(book);
+    expect(resolve).toHaveBeenCalledOnce();expect(chrome.tabs.create).not.toHaveBeenCalled();
+    for(const target of ['https://other.test/book',url,'javascript:alert(1)']){
+      resolve.mockResolvedValueOnce(target);
+      await expect(resolveNetworkCatalog(unbound)).rejects.toThrow();
+    }
+    const controller=new AbortController();
+    resolve.mockImplementationOnce(async()=>{controller.abort();return book;});
+    await expect(resolveNetworkCatalog(unbound,controller.signal)).rejects.toThrow();
+  });
+  it.each([
+    ['http','http'],['http','document'],['document','http'],['document','document'],
+  ])('resolves a bare chapter before independent %s catalog / %s page discovery',async(catalogTransport,pageTransport)=>{
+    vi.useFakeTimers();
+    const unbound='https://fixture.test/unbound',bound=unbound+'#book';
+    const snapshot={...source(),entries:[{...source().entries[0],url:bound}]};
+    const pageSource={...pages(),url:bound};
+    const readCatalog=vi.fn(async()=>snapshot),readPages=vi.fn(async()=>pageSource),resolve=vi.fn(async()=>book);
+    fixture.networks.fixture={resolveCatalog:resolve,...(catalogTransport==='http'?{catalog:readCatalog}:{}),...(pageTransport==='http'?{pages:readPages}:{})};
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async()=>snapshot);
+    const [imported]=await Promise.all([readImportCatalog(unbound),vi.advanceTimersByTimeAsync(500)]);
+    expect(imported).toMatchObject({id:snapshot.id,defaultEntryId:'one'});expect(resolve).toHaveBeenCalledOnce();
+    if(catalogTransport==='http'){expect(readCatalog).toHaveBeenCalledOnce();expect(chrome.tabs.create).not.toHaveBeenCalled();}
+    else {expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url:book,active:false});expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);}
+    const manifest={...pageSource,id:'document',revision:1,items:[{id:'one',order:0,width:800,height:1200,url:'https://images.test/one.png'}]};
+    send.mockImplementation(async(m:{type:string})=>({ok:true,data:m.type==='NC_OPEN_SOURCE'?{tabId:8}:m.type==='NC_POLL_SOURCE'?manifest:true}));
+    const result=await discoverEntry(imported,'one',new AbortController().signal,async()=>{});
+    expect(result.url).toBe(bound);
+    if(pageTransport==='http'){expect(readPages).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();}
+    else {expect(send).toHaveBeenCalledWith({type:'NC_OPEN_SOURCE',catalogId:snapshot.id,entryId:'one'});expect(send).toHaveBeenCalledWith({type:'NC_CLOSE_SOURCE',tabId:8});}
+  });
+  it('does not switch to a document catalog after an HTTP catalog fails',async()=>{
+    fixture.networks.fixture={resolveCatalog:async()=>book,catalog:async()=>{throw Error('HTTP offline');}};
+    await expect(readImportCatalog('https://fixture.test/unbound')).rejects.toThrow('HTTP offline');
+    expect(chrome.tabs.create).not.toHaveBeenCalled();expect(set).not.toHaveBeenCalled();
+  });
+  it.each(['missing-chapter','incomplete','foreign'])('validates an injected %s catalog after resolving a bare reader',async mode=>{
+    fixture.networks.fixture={resolveCatalog:async()=>book};
+    const value=source();if(mode==='incomplete')value.complete=false;if(mode==='foreign')value.sourceId='foreign';
+    const read=vi.fn(async()=>value);
+    await expect(readImportCatalog('https://fixture.test/unbound',read)).rejects.toThrow();
+    expect(read).toHaveBeenCalledExactlyOnceWith(book);expect(set).not.toHaveBeenCalled();
+  });
   it('supports network catalogs with document page discovery',async()=>{
     fixture.networks.fixture={catalog:async()=>source()};
     expect(networkOperation(url,'pages')).toBeUndefined();
@@ -65,7 +113,7 @@ describe('independent discovery operations and common manifest authority',()=>{
   });
   it('requests link permissions in the user gesture without requiring a network implementation',async()=>{
     const promise=authorizeCatalogImport(book);expect(chrome.permissions.request).toHaveBeenCalledWith({origins:['https://fixture.test/*']});
-    expect(await promise).toEqual({url:book,catalogId:'fixture:book'});expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(await promise).toBe(book);expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
   it('rejects cross-origin and foreign-source Referers before issuing a request',async()=>{
     const fetch=vi.fn();vi.stubGlobal('fetch',fetch);

@@ -65,7 +65,7 @@ describe('persistent periodic and opening checks',()=>{
   it('skips repeated openings and unsupported sources, checks all due comics only after twelve hours',async()=>{
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-23T00:00:00Z'));
     const first=snapshot(),second=snapshot();await importCatalog(first);await importCatalog(second);
-    await importManifest({id:'other',revision:1,title:'Other',url:'https://comicpash.jp/episodes/test123',adapter:'comicpash',direction:'ltr',discoveryComplete:true,note:'',items:[{id:'one',url:'https://images.example.org/fixture.png',width:800,height:1200,order:0}]});
+    await catalog.put('comics',{id:'other',sourceKey:'other',title:'Other',sourceName:'Local',source:{connectionId:'local',providerItemId:'other',locator:{},generation:1,status:'active'},createdAt:Date.now(),updatedAt:Date.now()});
     const sources=new Map([first,second].map(value=>[value.url,append(value)])),read=vi.fn(async(url:string)=>sources.get(url)!);
     await syncNextCatalog(read);expect(read).not.toHaveBeenCalled();
     vi.setSystemTime(Date.now()+12*60*60_000);while(await syncNextCatalog(read)){}expect(read).toHaveBeenCalledTimes(2);
