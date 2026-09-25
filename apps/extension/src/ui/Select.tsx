@@ -12,7 +12,11 @@ export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'de
   onChange: (event: SelectChangeEvent) => void;
   children?: ReactNode;
 };
-type Option = {value: string; label: string; disabled: boolean};
+type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode};
+type Option = {value: string; label: string; disabled: boolean; icon?: ReactNode};
+
+/** Declarative option for Select. Icons are decorative; labels stay plain text for type-ahead. */
+export function SelectOption(_props: SelectOptionProps) { return null; }
 
 function textContent(children: ReactNode): string {
   return Children.toArray(children).map(child => isValidElement<{children?: ReactNode}>(child)
@@ -21,11 +25,11 @@ function textContent(children: ReactNode): string {
 
 function readOptions(children: ReactNode, disabled = false): Option[] {
   return Children.toArray(children).flatMap(child => {
-    if (!isValidElement<ComponentPropsWithoutRef<'option'>>(child)) return [];
+    if (!isValidElement<SelectOptionProps>(child)) return [];
     if (child.type === Fragment || child.type === 'optgroup') return readOptions(child.props.children, disabled || !!child.props.disabled);
-    if (child.type !== 'option' || child.props.hidden) return [];
+    if ((child.type !== 'option' && child.type !== SelectOption) || child.props.hidden) return [];
     const label = child.props.label ?? textContent(child.props.children);
-    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled}];
+    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled, icon: child.props.icon}];
   });
 }
 
@@ -164,7 +168,7 @@ export function Select({value, onChange, children, disabled, id, name, className
       aria-expanded={expanded} aria-controls={listId} aria-activedescendant={expanded && activeIndex !== undefined ? `${listId}-${activeIndex}` : undefined}
       onKeyDown={keyDown} onBlur={event => { close(); onBlur?.(event); }}
       onClick={event => { onClick?.(event); if (!event.defaultPrevented) { if (expanded) close(); else show(); } }}>
-      <span className="nc-select-value">{options[selected]?.label ?? String(value)}</span>
+      <span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value">{options[selected]?.label ?? String(value)}</span></span>
       <Icon name="chevron" size={16} className="nc-select-chevron"/>
     </button>
     {name && <input type="hidden" name={name} value={value} disabled={unavailable} form={props.form}/>}
@@ -177,7 +181,7 @@ export function Select({value, onChange, children, disabled, id, name, className
         className="nc-select-option" data-active={expanded && index === activeIndex || undefined}
         onPointerMove={() => { if (!option.disabled) setActive(index); }}
         onClick={event => { event.preventDefault(); event.stopPropagation(); choose(index); }}>
-        <span>{option.label}</span><Icon name="check" size={16} className="nc-select-check"/>
+        <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label">{option.label}</span></span><Icon name="check" size={16} className="nc-select-check"/>
       </span>)}
     </span>
   </>;

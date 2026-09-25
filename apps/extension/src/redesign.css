@@ -1626,7 +1626,10 @@ a {
   width: 100%;
 }
 .nc-app .nc-reader-choices button {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  gap: 7px;
   flex: 1;
   padding: 8px;
   white-space: nowrap;

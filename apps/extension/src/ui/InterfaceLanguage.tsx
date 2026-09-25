@@ -1,4 +1,5 @@
-import {Select} from './Select';
+import {Select,SelectOption} from './Select';
+import {LanguageFlag} from './LanguageFlag';
 import {useState} from 'react';
 import {msg} from '../i18n/runtime';
 import {uiLanguages,type UiLanguage} from '../i18n/locales';
@@ -13,8 +14,8 @@ export function InterfaceLanguage({value,onChange}:{value:UiLanguage;onChange:(v
   }
   return <SettingRow title={msg('界面语言')} description={msg('选择菜单和按钮的语言，不影响漫画翻译目标语言。')}>
     <div><Select aria-label={msg('界面语言')} value={value} disabled={busy} onChange={e=>void change(e.target.value as UiLanguage)}>
-      <option value="auto">{msg('跟随浏览器')}</option>
-      {uiLanguages.map(language=><option key={language.id} value={language.id}>{language.label}</option>)}
+      <SelectOption value="auto" icon={<LanguageFlag language="auto"/>}>{msg('跟随浏览器')}</SelectOption>
+      {uiLanguages.map(language=><SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}
     </Select>{busy&&<span role="status">{msg('正在切换语言…')}</span>}{error&&<p role="alert">{msg('语言切换失败，请重试。')}</p>}</div>
   </SettingRow>;
 }

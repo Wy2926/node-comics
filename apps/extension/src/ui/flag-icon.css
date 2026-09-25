@@ -1,0 +1,2 @@
+.nc-flag-icon { display: inline-block; width: 20px; height: 15px; flex: none; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent); vertical-align: middle; }
+.nc-language-globe { flex: none; color: var(--muted); vertical-align: middle; }

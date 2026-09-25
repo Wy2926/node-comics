@@ -165,10 +165,20 @@ test('long lists flip above viewport edge and scroll only options; light/dark fo
 test('shared language controls work with popup sizing and the same option helper', async () => {
   const target = page.getByRole('combobox', {name: '默认目标语言', exact: true});
   assert.equal(Math.round((await target.boundingBox()).width), 148);
+  assert.match(await target.locator('img').getAttribute('src'), /\/flags\/cn\.svg$/);
+  await target.focus(); await target.press('e');
+  const targetList = await listFor(target);
+  assert.equal(await active(target), 'en');
+  assert.equal(await targetList.getByRole('option', {name: 'English', exact: true}).count(), 1);
+  assert.equal(await targetList.locator('img[alt=""][aria-hidden=true]').count(), 16);
+  await target.press('Enter');
+  assert.match(await target.locator('img').getAttribute('src'), /\/flags\/us\.svg$/);
   await choose(target, 'en'); assert.equal(await target.getAttribute('data-value'), 'en'); await focused(target);
   assert.equal(await target.getAttribute('aria-describedby'), 'work-help');
   const language = page.getByRole('combobox', {name: '界面语言', exact: true});
+  assert.equal(await language.locator('.nc-language-globe').count(), 1);
   await choose(language, 'zh-CN');
   await page.waitForFunction(() => document.querySelector('[aria-label="界面语言"]').dataset.value === 'zh-CN');
   assert(!(await language.isDisabled()));
+  assert.match(await language.locator('img').getAttribute('src'), /\/flags\/cn\.svg$/);
 });

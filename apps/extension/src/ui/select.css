@@ -17,7 +17,11 @@ button.nc-select {
   text-align: start;
   cursor: pointer;
 }
+.nc-select-content { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.nc-select-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; }
+.nc-select-icon > svg { width: 20px; height: 20px; }
 .nc-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-select-label { min-width: 0; overflow-wrap: anywhere; }
 .nc-select-chevron { flex: none; transform: rotate(90deg); }
 .nc-select[aria-expanded=true] .nc-select-chevron { transform: rotate(270deg); }
 button.nc-select:hover:not(:disabled), button.nc-select[aria-expanded=true] { background: var(--accent-soft); }
@@ -76,5 +80,6 @@ button.nc-select:disabled {
 .nc-select-option[aria-disabled=true] { color: var(--muted); opacity: .6; cursor: not-allowed; }
 
 /* Preserve the popup's existing compact language control without changing its layout. */
-.nc-popup-language .nc-select { width: 148px; min-width: 0; min-height: 40px; padding: 8px; font-size: .75rem; }
+.nc-popup-language .nc-select { width: 148px; min-width: 0; min-height: 40px; padding: 8px; gap: 6px; font-size: .75rem; }
 .nc-popup-language .nc-select-list { font-size: .75rem; }
+.nc-popup-language .nc-select-content { gap: 7px; }

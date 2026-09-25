@@ -151,9 +151,6 @@
 .nc-app .nc-drawer-title, .nc-app .nc-comic-directory-heading { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); border-bottom: var(--comic-perforation); }
 .nc-app .nc-translation-popover .nc-drawer-title { margin-bottom: 14px; }
 .nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }
-.nc-app .nc-chapter-entry { border-radius: var(--comic-control-radius); }
-.nc-app .nc-chapter-entry[aria-current=true] { border: var(--comic-border); }
-.nc-app .nc-chapter-error { color: var(--danger); }
 .nc-app .nc-image-translation { background: var(--surface); color: var(--ink); border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); }
 .nc-app .nc-image-translation.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); box-shadow: 2px 2px 0 var(--danger); }
 .nc-app .nc-image-translation.upgrade { background: var(--comic-warning-paper); color: var(--comic-warning-ink); border-color: var(--comic-warning-ink); }

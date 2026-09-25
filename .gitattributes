@@ -2,3 +2,6 @@
 *.ts text eol=lf
 *.tsx text eol=lf
 *.mjs text eol=lf
+# Preserve the recorded checksums of vendored flag assets on Windows checkouts.
+apps/extension/public/flags/* text eol=lf
+apps/extension/public/licenses/flag-icons.txt text eol=lf

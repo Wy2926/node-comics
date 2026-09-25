@@ -13,7 +13,8 @@ describe('chapter-first directory',()=>{
   const html=markup(directory);
   expect(html.match(/data-chapter-main="true"/g)).toHaveLength(2);
   expect(html.match(/data-release-choice="true"/g)).toHaveLength(2);
-  expect(html).toContain('English 1 A team');expect(html).toContain('French 1 B team');expect(html).toContain('Volume<span>2</span>');
+  expect(html).toContain('English 1 A team');expect(html).toContain('French 1 B team');
+  expect(html.match(/<summary>(.*?)<\/summary>/)?.[1].replace(/<[^>]*>/g,'')).toBe('Volume2');
   expect(html).not.toContain('内容语言');expect(html).not.toContain('data-reading-boundary');
   expect(html.match(/aria-current="true"/g)).toHaveLength(1);expect(html).toContain('aria-pressed="true"');
   expect(html).not.toContain('ready');expect(html.match(/未读/g)).toHaveLength(1);
