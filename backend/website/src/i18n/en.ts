@@ -480,6 +480,17 @@ export default {
     ],
     "releases": [
       {
+        "date": "2026-09-25",
+        "title": "0.3.0: Connect your own translation service",
+        "items": [
+          "New translation channel settings let you choose NodeLane or your own manga-translator-ui service. Save multiple service configurations and use your own service without a NodeLane account.",
+          "The reader and in-page translation share your selected channel, translating the current image and the next three. Switching channels preserves reading position and keeps translated images separate.",
+          "Long in-page translations can keep waiting for results while the extension background process sleeps. Interrupted connections offer manual retry without automatically submitting the image again.",
+          "Improved translated-image caching and export, with clear guidance when clearing the cache means a result from your own service needs to be translated again.",
+          "Separate Chrome and Edge 0.3.0 downloads are available. Choose the package for your browser to update."
+        ]
+      },
+      {
         "date": "2026-09-20",
         "title": "A clearer start to reading",
         "items": [
