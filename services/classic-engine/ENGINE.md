@@ -34,18 +34,9 @@ uv sync --locked --extra test --extra build
 
 也可只下载所需模型，如 `download --ocr-language ko`。模型清单随包分发，支持从其他工作目录调用；下载时校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
 
-日文 MIT OCR 首次使用需构建（本机已有构建产物）。独立构建环境：
+MIT OCR 与 LaMa 的完整构建统一使用 [Windows 节点构建入口](../compute-node/README.md#开发构建与验证)。它自动下载固定源码与检查点，分别创建锁定的 OCR 和 LaMa 转换环境，不依赖本机已有的 `models/` 或 `.venv-build`。构建不要求 Git 克隆上游完整应用；OCR 所需模型源码单文件以固定提交 URL 和 SHA-256 校验。
 
-```powershell
-python -m venv .venv-build
-.\.venv-build\Scripts\python -m pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
-.\.venv-build\Scripts\python -m pip install pnnx==20260526 onnx==1.17.0 einops opencv-python
-git clone https://github.com/zyddnys/manga-image-translator.git build-models/mit
-git -C build-models/mit checkout d5a3eee4a7b7b7754b71baa2ee82309dfff468bc
-.\.venv-build\Scripts\python tools/build_ocr.py
-```
-
-构建校验源码提交、检查点和字典；临时导出文件在构建目录中自动清理。运行只需要 `ocr-fp32/backbone.ncnn.param/bin` 和 `decoder.onnx`；保留 `ocr.onnx` 与 `build.json` 供数值验证。实际推理始终关闭 FP16。
+转换器 `tools/build_ocr.py` 由构建入口传入已校验的 `--source-file`、`--archive`、`--work` 和 `--output`。它校验检查点和字典；运行只需要 `ocr-fp32/backbone.ncnn.param/bin` 和 `decoder.onnx`。构建工作目录另保留 `ocr.onnx` 与 `build.json` 供数值验证。实际推理始终关闭 FP16。
 
 ## 使用
 

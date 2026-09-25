@@ -8,6 +8,7 @@ import time
 from uuid import uuid4
 
 from .protocol import ControlFailure, NodeFailure, digest, timestamp
+from .operations import NetworkLog, utc_now
 
 LOG = logging.getLogger('classic-node')
 
@@ -59,7 +60,7 @@ class Page:
 
 
 class Agent:
-    def __init__(self, config, runtime, transport, journal):
+    def __init__(self, config, runtime, transport, journal, *, stop=None, operations=None):
         self.local, self.runtime, self.transport, self.journal = config, runtime, transport, journal
         self.config = None
         self.pages = {}
@@ -69,10 +70,24 @@ class Agent:
         self.control_pool = ThreadPoolExecutor(1, thread_name_prefix='heartbeat-claim')
         self.notice_pool = ThreadPoolExecutor(1, thread_name_prefix='updates')
         self.control_future = self.notice_future = None
+        self.control_action = 'control'
         self.revision = 0
         self.next_notice = 0
-        self.stop = Event()
+        self.stop = stop if stop is not None else Event()
+        self.operations = operations
+        self.network_log = NetworkLog()
+        self.heartbeat_at = None
+        self.heartbeat_monotonic = 0
+        self.heartbeat_logged = 0
         self.last_heartbeat = 0
+
+    def connected(self, action):
+        self.network_log.succeeded(action)
+        self.heartbeat_at = utc_now()
+        self.heartbeat_monotonic = time.monotonic()
+        if action == 'registration' or self.heartbeat_monotonic - self.heartbeat_logged >= 60:
+            LOG.info('event=%s config_version=%s active_leases=%s', action, self.config['version'], len(self.pages))
+            self.heartbeat_logged = self.heartbeat_monotonic
 
     def apply_config(self, config):
         if config is not None:
@@ -118,6 +133,7 @@ class Agent:
         for lease in response['leases']:
             self.adopt(lease, response['server_time'], sent_at)
         self.last_heartbeat = sent_at
+        self.connected('registration')
 
     def heartbeat(self):
         entries = []
@@ -137,6 +153,7 @@ class Agent:
             if page:
                 page.update(item, response['server_time'], sent_at)
         self.last_heartbeat = sent_at
+        self.connected('heartbeat')
 
     def claim(self):
         pending = self.journal.get('claim')
@@ -259,6 +276,8 @@ class Agent:
 
     def close(self):
         self.stop.set()
+        if self.operations:
+            self.operations.stopping()
         self.control_pool.shutdown(wait=True)
         for page in list(self.pages.values()):
             page.stopped = True
@@ -270,10 +289,11 @@ class Agent:
         if self.notice_future and self.notice_future.done():
             try:
                 self.revision = self.notice_future.result()['revision']
+                self.network_log.succeeded('updates')
                 self.last_heartbeat = 0
                 self.next_claim = 0
             except NodeFailure as error:
-                LOG.warning('updates: %s', error.code)
+                self.network_log.failed('updates', error)
                 self.next_notice = time.monotonic() + 1
             self.notice_future = None
         if not self.notice_future and not self.stop.is_set() and time.monotonic() >= self.next_notice:
@@ -285,39 +305,48 @@ class Agent:
         if self.control_future and self.control_future.done():
             try:
                 self.control_future.result()
+                self.network_log.succeeded(self.control_action)
             except NodeFailure as error:
-                LOG.warning('control: %s', error.code)
+                self.network_log.failed(self.control_action, error)
             self.control_future = None
         if not self.control_future:
             if time.monotonic() - self.last_heartbeat >= self.config['heartbeat_seconds']:
                 self.last_heartbeat = time.monotonic()
+                self.control_action = 'heartbeat'
                 self.control_future = self.control_pool.submit(self.heartbeat)
             elif not self.stop.is_set() and time.monotonic() >= self.next_claim:
                 self.next_claim = time.monotonic() + self.config['poll_seconds']
+                self.control_action = 'claim'
                 self.control_future = self.control_pool.submit(self.claim)
             if self.control_future:
                 self.control_future.add_done_callback(lambda _: self.wake.set())
 
     def run(self):
         try:
+            delay = 1
             while not self.stop.is_set():
+                if self.operations:
+                    self.operations.pulse()
                 try:
                     self.register()
                     break
                 except ControlFailure as error:
+                    self.network_log.failed('registration', error)
                     if error.status and error.status < 500 and error.status != 429:
                         raise
-                    LOG.warning('registration: %s', error.code)
-                    self.stop.wait(1)
+                    self.stop.wait(delay)
+                    delay = min(30, delay * 2)
             self.next_claim = 0
             while not self.stop.is_set() or self.pages:
+                if self.operations:
+                    self.operations.pulse()
                 try:
                     self.poll_control()
                     self.reap()
                     if self.stop.is_set() and all(not p.future and not p.analysis_future for p in self.pages.values()):
                         break  # Keep uncertain deliveries in the journal for startup reconciliation.
                 except NodeFailure as error:
-                    LOG.warning('control: %s', error.code)
+                    self.network_log.failed('control', error)
                 self.wake.wait(.02)
                 self.wake.clear()
         finally:

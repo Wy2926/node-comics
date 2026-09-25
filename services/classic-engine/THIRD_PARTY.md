@@ -1,6 +1,6 @@
 # Sources and licenses
 
-This project is GPL-3.0. Model weights, operating-system fonts, private test images and generated outputs are not bundled.
+This project is GPL-3.0. Model weights are excluded from the source repository but selected verified inference weights are included in the separate Windows release described below. Operating-system fonts, private test images and generated outputs are never distributed.
 
 - [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine/tree/bbe574041ef1ffa2bb183424a2d4cc0830f4ed71), GPL-3.0: DBNet preprocessing and model manifest provenance (historical AOT removed); `vendor/grouping.py` derives from its `parity/mit_grouping.py`. `vendor/ocr.py` retains point ordering and greedy CTC primitives from `parity/ocr_parity.py`. CTC normalization is limited to emitted frames. The old desktop typesetting copy has been removed.
 - [manga-image-translator](https://github.com/zyddnys/manga-image-translator/tree/d5a3eee4a7b7b7754b71baa2ee82309dfff468bc), GPL-3.0: original 48px CTC checkpoint, grouping and right-context padding. `tools/build_ocr.py` pins this exact revision. The original [ocr-ctc.zip](https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr-ctc.zip) SHA-256 is `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`.
@@ -12,6 +12,8 @@ This project is GPL-3.0. Model weights, operating-system fonts, private test ima
 - [fontTools](https://github.com/fonttools/fonttools), MIT: font cmap coverage. [Pillow](https://github.com/python-pillow/Pillow), HPND: FreeType rasterization. User/system fonts remain under their own licenses.
 
 Other installed dependencies retain their upstream licenses: NCNN (BSD-3-Clause), ONNX Runtime (MIT), NumPy (BSD-3-Clause), OpenCV (Apache-2.0), NetworkX (BSD-3-Clause), Shapely (BSD-3-Clause), Requests (Apache-2.0), psutil (BSD-3-Clause) and portalocker (BSD-3-Clause). This is a Python desktop engine, not an Android/JNI wrapper; no Android Canvas pixel identity is claimed.
+
+The separate Windows [Node Comics Node release](../compute-node/README.md) bundles inference weights verified by this engine, dependency license files, and explicit Noto fonts under SIL OFL 1.1. Font commits, download URLs and SHA-256 checksums are pinned in [assets.json](../compute-node/assets.json); it does not redistribute Windows system fonts. Its native Go host uses Go, golang.org/x/sys v0.46.0 and golang.org/x/term v0.44.0 (BSD-style licenses), with notices included in the release. The CPython runtime retains its upstream LICENSE.txt; each release records the runtime version and every bundled file's checksum. Runtime assets and private node data are separate.
 
 ## LaMa Large (2026-09-21 replacement)
 

@@ -26,8 +26,10 @@ class Transport:
     def post(self, path, body):
         try:
             response = self.control.post(PREFIX + path, json=body)
-        except httpx.HTTPError:
-            raise ControlFailure('CONTROL_UNAVAILABLE') from None
+        except httpx.HTTPError as error:
+            failure = ControlFailure('CONTROL_UNAVAILABLE')
+            failure.cause = type(error).__name__
+            raise failure from None
         if response.status_code >= 300:
             code = 'CONTROL_REJECTED'
             try:

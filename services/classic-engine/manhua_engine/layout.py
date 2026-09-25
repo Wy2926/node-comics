@@ -35,6 +35,10 @@ def font_paths(custom=(), language='zh'):
     for path in candidates:
         if not Path(path).is_file():
             raise FileNotFoundError(f'Font not found: {path}')
+    # An explicit release font set must not vary with fonts installed on the
+    # destination computer. It is the complete, ordered fallback set.
+    if candidates:
+        return tuple(dict.fromkeys(candidates))
     candidates += [f'C:/Windows/Fonts/{name}' for name in names]
     candidates += ['/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
                    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf']

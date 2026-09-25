@@ -7,6 +7,13 @@ from PIL import Image
 import pytest
 from manhua_engine.languages import language_code, join_lines, text_language
 from manhua_engine.layout import draw_region, horizontal_lines, font_paths, font_runs, break_units, measure
+
+
+def test_explicit_release_fonts_do_not_depend_on_machine_fonts(tmp_path):
+    custom = tmp_path / 'release-font.ttf'
+    custom.touch()
+    assert font_paths((str(custom),), 'ja') == (str(custom),)
+    assert font_paths((str(custom), str(custom)), 'en') == (str(custom),)
 from manhua_engine.ocr import Recognizer
 from manhua_engine.quality import detection_windows, unique_quads
 from manhua_engine.engine import group

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "platform": "windows-amd64",
+  "python": {
+    "version": "3.12.11",
+    "build": "20251007",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20251007/cpython-3.12.11%2B20251007-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+    "sha256": "d2877f74b01871c82d140a9eefe57b18185c7a84128727cbedcae45dc5c9e54f"
+  },
+  "uv": {
+    "version": "0.12.17",
+    "url": "https://github.com/astral-sh/uv/releases/download/0.12.17/uv-x86_64-pc-windows-msvc.zip",
+    "sha256": "a252121d5b59398fcb137c6ea448176459a44010f33f67e0072305a637119ca7"
+  },
+  "go": {
+    "version": "1.27.0",
+    "url": "https://go.dev/dl/go1.27.0.windows-amd64.zip",
+    "sha256": "f0c0a0d33ba94f4d2c5dbc887334ce678b21813504ddb3aafcb06e60a5a667c4"
+  },
+  "ocr_source": {
+    "revision": "d5a3eee4a7b7b7754b71baa2ee82309dfff468bc",
+    "url": "https://raw.githubusercontent.com/zyddnys/manga-image-translator/d5a3eee4a7b7b7754b71baa2ee82309dfff468bc/manga_translator/ocr/model_48px_ctc.py",
+    "sha256": "4f068e45b2bec8741219a30d1784a30aa058a0bd3058d4247da85f3ab7caf530"
+  },
+  "ocr_checkpoint": {
+    "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr-ctc.zip",
+    "sha256": "fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101"
+  }
+}
