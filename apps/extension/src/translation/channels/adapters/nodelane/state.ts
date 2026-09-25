@@ -1,12 +1,13 @@
-import {msg} from '../i18n/runtime';
-import {pageTranslation} from '../reader/presentation';
-import {supportsLanguage,type Page,type Mode,type Capabilities,type Entitlements} from '../types';
-import {quotaErrors,exhausted,type TranslationState} from './automatic';
-import type {LocalOperation} from './store';
+import {msg} from '../../../../i18n/runtime';
+import {pageTranslation} from '../../../../reader/presentation';
+import {supportsLanguage,type Page,type Mode,type Capabilities,type Entitlements} from '../../../../types';
+import type {TranslationState} from '../../../automatic';
+import {quotaErrors,exhausted} from './operations';
+import {translationScope,type LocalOperation} from './store';
 
 export function translationState({page,mode,language,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
   if(!userId)return active?{kind:'login',message:msg("登录后自动翻译")}:undefined;
-  const t=pageTranslation(page,mode,language,userId,origin);
+  const t=pageTranslation(page,mode,language,translationScope(origin,userId));
   if(operation?.state==='blocked'){
     const code=operation.errorCode??'';
     if(quotaErrors.has(code))return {kind:'upgrade',message:msg("升级权益，继续翻译")};

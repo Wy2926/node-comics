@@ -20,7 +20,7 @@ interface Candidate {
   display: ReturnType<typeof imageDisplay>;
   state?: InlineResult['state'];
   resultKey?: string;
-  loadError?: InlineResult['state'];
+  loadError?: InlineResult['state'] & {retranslate?:boolean};
   loading?: { key: string; stamp: number };
 }
 export function installInline() {
@@ -32,7 +32,7 @@ export function installInline() {
   const sourcePageImages = () => sourcePage().inlineTargets();
   let automatic = false,
     dismissedUrl = '';
-  let translatedView: Pick<InlineResponse, 'mode' | 'language'> | undefined;
+  let translatedView: Pick<InlineResponse, 'mode' | 'language' | 'requiresInternet'> | undefined;
   let enabled = false,
     paused = false,
     original = false,
@@ -189,11 +189,12 @@ export function installInline() {
             void send('NC_INLINE_OPEN', { view: 'account' });
             return;
           }
-          if (item.loadError && item.resultKey) {
+          if (item.loadError && item.resultKey && !item.loadError.retranslate) {
             item.loadError = undefined;
             void loadResult(item, item.resultKey, generation);
             return;
           }
+          item.loadError = undefined;
           retryId = item.id;
           invalidate();
           item.state = { kind: 'translating', message: msg('重试中…') };
@@ -301,7 +302,7 @@ export function installInline() {
     const due = delay === 80 ? Math.min(now + 80, burstAt + 200) : now + delay;
     clearTimeout(timer);
     scheduledAt = due;
-    if (enabled && !paused && !original && !document.hidden && navigator.onLine !== false)
+    if (enabled && !paused && !original && !document.hidden && (translatedView?.requiresInternet !== true || navigator.onLine !== false))
       timer = setTimeout(
         () => {
           scheduledAt = 0;
@@ -331,14 +332,17 @@ export function installInline() {
         if (!live()) return;
         const value = await send('NC_INLINE_IMAGE', { ...payload([item]), resultKey: key });
         if (!live()) return;
-        if (!value?.ok) throw Error(value?.error ?? msg('翻译服务暂不可用'));
+        if (!value?.ok) throw Object.assign(Error(value?.error ?? msg('翻译服务暂不可用')), {code:value?.errorCode});
         const result = value.data as InlineImageResponse;
         if (result.resultKey !== key) return;
         await item.display.show(result.data, key, live);
         if (live()) item.loadError = undefined;
       });
     } catch (error) {
-      if (live()) item.loadError = { kind: 'error', message: (error as Error).message, retryLabel: msg('点击重新加载') };
+      if (live()) {
+        const retranslate=(error as {code?:string}).code==='RESULT_NOT_CACHED';
+        item.loadError = { kind: 'error', message: (error as Error).message, retranslate, retryAction:retranslate?'translate':undefined, retryLabel: msg('点击重新加载') };
+      }
     } finally {
       if (item.loading === loading) item.loading = undefined;
       paint();
@@ -379,7 +383,7 @@ export function installInline() {
       original ||
       document.hidden ||
       !windowImages.length ||
-      navigator.onLine === false
+      translatedView?.requiresInternet === true && navigator.onLine === false
     )
       return;
     watching = true;
@@ -395,7 +399,7 @@ export function installInline() {
             break;
           }
           if (value.data) apply(value.data, targets, stamp);
-          if (value.data?.scope === 'logged-out' || !hasPending) break;
+          if (!hasPending) break;
           failures = 0;
         } catch {
           retry = Math.min(30000, 1000 * 2 ** failures++);
@@ -523,6 +527,7 @@ export function installInline() {
     }
     if (message?.type === 'NC_INLINE_CONFIG_CHANGED' && enabled) {
       scope = '';
+      translatedView = undefined;
       invalidate();
       for (const item of tracked.values()) {
         item.display.restore();

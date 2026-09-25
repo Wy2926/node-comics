@@ -118,6 +118,24 @@ def test_extension_download_failure_is_retryable_and_not_cached(website, monkeyp
     assert response.headers['cache-control'] == 'private, no-store'
 
 
+def test_platform_downloads_sign_separate_objects_and_reject_removed_shared_package(website, monkeypatch):
+    from app import website as module
+    calls = []
+    def sign(key, expires):
+        calls.append(key)
+        return 'https://storage.example/package.zip'
+    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
+    for browser in ['chrome', 'edge']:
+        release = next(item for item in module.RELEASES if item['version'] == '0.2.0' and item['browser'] == browser)
+        assert release['filename'] == f'node-comics-0.2.0-{browser}.zip'
+        response = website.get(release['path'], follow_redirects=False)
+        assert response.status_code == 302
+        assert calls[-1] == f'releases/extensions/0.2.0/{release["sha256"]}/{release["filename"]}'
+        assert website.head(release['path']).headers['content-length'] == str(release['bytes'])
+    assert len(set(calls)) == 2
+    assert website.get('/downloads/node-comics-0.2.0-chromium.zip', follow_redirects=False).status_code == 404
+
+
 def test_prior_versions_remain_downloadable(website, monkeypatch):
     from app import website as module
     prior = dict(module.RELEASES[0], version='0.0.9', filename='node-comics-0.0.9-chromium.zip',

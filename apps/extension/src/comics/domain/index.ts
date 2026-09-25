@@ -49,7 +49,7 @@ export interface ReadingPosition {
   relativeOffset: number; updatedAt: number;
 }
 export interface TranslationBinding {
-  id: string; apiOrigin: string; userId: string; imageSha256: string;
+  id: string; scope: string; imageSha256: string;
   payload: unknown; updatedAt: number;
 }
 export interface CatalogRecord { id: string; [key: string]: unknown }

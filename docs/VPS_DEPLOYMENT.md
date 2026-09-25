@@ -2,6 +2,23 @@
 
 本文记录最近一次 2026-09-24 已验证部署；它不是持续的线上状态查询。历史发布流水、镜像摘要及旧数据库记录从 Git 与服务器私有发布记录查询；源码更新不代表已经上线。
 
+## 2026-09-24 拆分 Chrome / Edge 0.2.0 下载与商店提交包
+
+- 官网五语下载页已按浏览器分组，各自商店按钮下提供对应 ZIP；Chrome / Edge 长期地址为 `/downloads/node-comics-0.2.0-chrome.zip`、`/downloads/node-comics-0.2.0-edge.zip`。Firefox 暂无未签名包下载。
+- 手动安装包分别带平台公钥：Chrome ID `aiajdjliifeeaogpalejpggkiccjbneo`，Edge 使用用户提供的公钥，ID `haelhcdomcfllhpfjdpbejccbjcdeaig`。两个商店提交 ZIP 独立生成、不含 `key`；Chromium 包同时移除 Firefox 专用清单字段。未提交商店，不能据此宣称商店审核通过。
+- Chrome 下载包 6,758,059 字节，SHA-256 `fc13d39b1b41b4e3558316c4b39e8335fc40e092bab1761bb8029e15fed13b97`；Edge 下载包 6,758,058 字节，SHA-256 `314c388ac6353b2649ac4fde8059697c07047b9b86e1e4f12702363b23c7b246`。通过 VPS 上传私有 R2 并回读验证。
+- API 镜像 `node-comics-website:020-platforms-20260924t153347z` 已健康运行，仅更新官网静态文件和下载目录；工作进程、业务环境、代理配置不变。备份在 `/opt/nodelane/node-comics/extension-020-platforms-20260924T153347Z/backup/`。
+- 官网构建、13 项官网测试、10 项下载路由测试、3 项平台身份测试和插件类型／模块／语言检查通过。实际 Edge 加载最终包通过模拟 Drive 的 MOBI 导入、四段索引复用、位置恢复、失败、DRM、重启及断开回归。公网 Chrome 检查五语页面，并分别点击两种下载，文件名、大小、SHA-256 和解包后的平台身份均匹配。
+- 公网验证后已删除旧通用 0.2.0 R2 对象（`e5edc7a060b14756b046e7887e1cabb59406b780f1002fa589d04d0a9f3da15e`），查询确认 404；旧通用 0.2.0 下载地址从目录移除。历史 0.1.x 保留。产物与脱敏部署记录在 `artifacts/release-0.2.0-platforms/`，商店提交使用其中 `node-comics-0.2.0-<chrome|edge>-store.zip`。
+
+## 2026-09-24 替换 0.2.0 下载包：MOBI 索引与最新授权修复（后被平台包替代）
+
+- 按用户要求保留版本及原下载入口 `https://comics.nodelane.net/downloads/node-comics-0.2.0-chromium.zip`，替换为包含连续 MOBI 正文索引合并读取、导入缓存复用和最新 Google 账户提示的生产包。包为 6,758,179 字节，SHA-256 `e5edc7a060b14756b046e7887e1cabb59406b780f1002fa589d04d0a9f3da15e`。
+- 已核对实际代理 `/opt/1panel/www/conf.d/comics.conf`、Compose 目录 `/opt/nodelane/node-comics` 和容器官网目录 `/app/app/website_dist`。新包经 VPS 上传私有 R2 并回读校验；下载目录改为新摘要对象，长期链接不变。
+- API 从当时线上 `node-comics-website:aeca65a84993` 派生为 `node-comics-website:020-mobi-20260924t151138z`，仅替换 `/app/extension-release.json`。页面显示的版本、链接和两位小数包大小均不变，官网静态文件逐层继承；未替换业务代码、数据库、控制进程或维护进程。API healthy，代理、Compose 和 `.env.server` 哈希不变，`.env` 仅切换 `API_IMAGE`。部署记录与配置备份位于 `/opt/nodelane/node-comics/extension-020-mobi-20260924T151138Z/`。
+- 插件 799 项测试通过、1 项跳过，类型、模块和语言检查通过；官网 13 项测试通过。实际编译插件的隔离 Chromium / 模拟 Drive 回归确认四段索引只读取一次，覆盖位置恢复、失败、DRM、重启与断开。公网真实 Chrome 验证五语下载页面并点击下载，ZIP 文件名、大小及 SHA-256 均与新包一致；不宣称真实 Google 私有文件性能已验收。
+- 用户明确要求删除旧包：公网下载核验后，删除本次替换的旧 0.2.0 R2 对象（摘要 `848001abd2aa4cf908239cc41ed78e18bdf68a2d92a1529452a9ec0aba2ce245`），再次查询确认 404。0.1.0 / 0.1.1 历史目录未改动。本地产物与脱敏报告在 `artifacts/release-0.2.0-mobi/`，浏览器截图和实际下载在 `artifacts/extension-download/`；未提交商店更新。
+
 ## 2026-09-24 减少 Google 重复选账号
 
 - 修正上一版默认 `prompt=consent select_account` 导致强制重复选账号的问题：默认仅保留 Google 顶层 Picker 要求的 `consent`，使用唯一已核验账户或指定重连账户的邮箱作为 `login_hint`；显式切换账户时才启用 `select_account`。

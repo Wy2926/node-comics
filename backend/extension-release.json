@@ -6,21 +6,32 @@
       "filename": "node-comics-0.1.0-chromium.zip",
       "sha256": "5f43b8a3bdb029df8466f70c146aeb5f1fe8dc1563cfc1d48621c05f0725c5de",
       "bytes": 6970698,
-      "path": "/downloads/node-comics-0.1.0-chromium.zip"
+      "path": "/downloads/node-comics-0.1.0-chromium.zip",
+      "browser": "chrome"
     },
     {
       "version": "0.1.1",
       "filename": "node-comics-0.1.1-chromium.zip",
       "sha256": "c43a0477071da43876a30d30d3ff9794ddbeb68baa1535aacd409476e8753880",
       "bytes": 7144656,
-      "path": "/downloads/node-comics-0.1.1-chromium.zip"
+      "path": "/downloads/node-comics-0.1.1-chromium.zip",
+      "browser": "chrome"
     },
     {
       "version": "0.2.0",
-      "filename": "node-comics-0.2.0-chromium.zip",
-      "sha256": "848001abd2aa4cf908239cc41ed78e18bdf68a2d92a1529452a9ec0aba2ce245",
-      "bytes": 6758659,
-      "path": "/downloads/node-comics-0.2.0-chromium.zip"
+      "browser": "chrome",
+      "filename": "node-comics-0.2.0-chrome.zip",
+      "sha256": "fc13d39b1b41b4e3558316c4b39e8335fc40e092bab1761bb8029e15fed13b97",
+      "bytes": 6758059,
+      "path": "/downloads/node-comics-0.2.0-chrome.zip"
+    },
+    {
+      "version": "0.2.0",
+      "browser": "edge",
+      "filename": "node-comics-0.2.0-edge.zip",
+      "sha256": "314c388ac6353b2649ac4fde8059697c07047b9b86e1e4f12702363b23c7b246",
+      "bytes": 6758058,
+      "path": "/downloads/node-comics-0.2.0-edge.zip"
     }
   ]
 }

@@ -14,6 +14,6 @@ export function translationNotice(state:TranslationState){
       :state.retryable===false?msg("暂不可用"):msg("翻译失败");
   }else if(state.kind==='login')message=msg("登录后翻译");
   else if(state.kind==='upgrade')message=msg("额度不足");
-  const action=state.kind==='error'&&state.retryable!==false?msg("重试"):state.kind==='upgrade'?msg("升级"):undefined;
+  const action=state.kind==='error'&&state.retryable!==false?(state.retryAction==='translate'?msg('重新翻译'):msg("重试")):state.kind==='upgrade'?msg("升级"):undefined;
   return {message,action,label:action?`${message} · ${action}`:message,detail:state.message};
 }

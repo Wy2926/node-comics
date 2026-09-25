@@ -1,6 +1,6 @@
 import {describe,expect,it,vi} from 'vitest';
 import {Api} from '../src/api';
-import {translationScope} from '../src/translation/store';
+import {translationScope} from '../src/translation/channels/adapters/nodelane/store';
 describe('independent translation modes',()=>{
  it('scopes requests by account and service',()=>{expect(translationScope('https://a','alice')).not.toBe(translationScope('https://a','bob'));expect(translationScope('https://a','alice')).not.toBe(translationScope('https://b','alice'));});
  it.each(['classic','redraw'] as const)('submits %s without reading metadata',async mode=>{

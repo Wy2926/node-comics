@@ -28,7 +28,7 @@ export function StorageManagement({onNotice,onChanged}:{onNotice:(message:string
    {!value&&!error&&<p role="status" className="nc-muted">{msg('正在读取本机资料…')}</p>}
    <SettingRow title={msg('本地源文件')} description={msg('{0} · 不自动淘汰；移除最后一份引用后释放。',{'0':size(value?.containers)})}/>
    <SettingRow title={msg('网站下载资料')} description={msg('{0} · 主动下载的原图，不参与缓存淘汰。',{'0':size(value?.downloads.bytes)})}/>
-   {([['sourcePages',msg('原图页缓存')],['ranges',msg('源文件分段')],['translations',msg('译图缓存')],['thumbnails',msg('缩略图')]] as const).map(([kind,label])=><SettingRow key={kind} title={label} description={msg('{0} · 清理后按需重新读取，漫画与阅读位置保留。',{'0':size(value?.[kind].bytes)})}><button className="button secondary small" disabled={busy||!value} onClick={()=>void run(()=>clearStorage(kind))}>{msg('清理')}</button></SettingRow>)}
+   {([['sourcePages',msg('原图页缓存')],['ranges',msg('源文件分段')],['translations',msg('译图缓存')],['thumbnails',msg('缩略图')]] as const).map(([kind,label])=><SettingRow key={kind} title={label} description={msg(kind==='translations'?'{0} · 清理后本地渠道需要重新翻译，漫画与阅读位置保留。':'{0} · 清理后按需重新读取，漫画与阅读位置保留。',{'0':size(value?.[kind].bytes)})}><button className="button secondary small" disabled={busy||!value} onClick={()=>void run(()=>clearStorage(kind))}>{msg('清理')}</button></SettingRow>)}
   </section>
   <SourceAccounts onNotice={onNotice} onChanged={onChanged}/>
  </>;

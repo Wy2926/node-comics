@@ -28,6 +28,7 @@ if(format==='mobi')protectedMobi.writeUInt16BE(1,original.readUInt32BE(78)+12);
 const mimeType=format==='mobi'?'application/octet-stream':'application/zip';
 const sample=await readFile(path.join(root,'artifacts/import-validation/1.png')),dimensions=[sample.readUInt32BE(16),sample.readUInt32BE(20)];
 const fileChecks=new Map();
+const importedRanges=[];
 const hosts=[bridge.hostname,'accounts.google.com','www.googleapis.com'];
 const stats={authorizations:0,pickers:0,accountChecks:0,metadataChecks:0,rangeReads:0,browserAccountProbes:0,unauthorized:0,unsupported:0,autoRedirects:0};
 const checks=[],pageErrors=[],unsupportedRoutes=[],networkFailures=[];let chosenFile='fixture-page',cancelPicker=false,failMetadataFor,phase='bootstrap';
@@ -82,6 +83,7 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
       stats.rangeReads++;const range=/^bytes=(\d+)-(\d+)$/.exec(request.headers.range??'');
       if(!range){json(response,{},416);return;}const begin=Number(range[1]),end=Number(range[2]);
       if(begin<0||end>=fileBytes.length||end<begin){json(response,{},416);return;}
+      if(fileId==='fixture-page')importedRanges.push({begin,end});
       const bytes=fileBytes.subarray(begin,end+1);response.writeHead(206,{'Content-Type':mimeType,'Content-Length':bytes.length,'Content-Range':`bytes ${begin}-${end}/${fileBytes.length}`,'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Range,Content-Length'});response.end(bytes);return;
     }
     stats.unsupported++;unsupportedRoutes.push({method:request.method,route:url.pathname});json(response,{},404);
@@ -176,6 +178,14 @@ try{
   checks.push('云盘选择完成后直接导入，无资料、归属或登记确认');
   phase='decode original';await reader.waitForFunction(([width,height])=>{const image=document.querySelector('img.nc-page-image');return image?.complete&&image.naturalWidth===width&&image.naturalHeight===height;},dimensions,{timeout:15000});
   await noReaderError();assert(stats.rangeReads>0);await reader.screenshot({path:path.join(run,'reader.png')});checks.push('Confirmed Drive reference is registered and the real reader decodes the synthetic original through authenticated Range reads');
+  if(format==='mobi'){
+    const count=original.readUInt16BE(76),first=original.readUInt32BE(78),textCount=original.readUInt16BE(first+8);
+    const offset=index=>original.readUInt32BE(78+index*8);
+    const indexRanges=[[0,77],[78,78+count*8-1],[first,offset(1)-1],[offset(1),offset(textCount+1)-1]];
+    for(const [begin,end] of indexRanges)assert.equal(importedRanges.filter(range=>range.begin===begin&&range.end===end).length,1,
+      'Each MOBI index range must be fetched once and reused by the reader/cover, not discarded after import');
+    checks.push('The compiled MOBI import makes four index Range reads; opening the reader reuses them without duplicate media requests');
+  }
   phase='restore reading position';
   const pageNumber=reader.getByRole('spinbutton',{name:'跳转页码'});await pageNumber.fill('2');await pageNumber.press('Enter');
   await reader.waitForFunction(()=>{const image=document.querySelector('[data-page-index="1"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});

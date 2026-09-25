@@ -42,7 +42,7 @@ describe('source database baseline isolation', () => {
       expect(await cache.put('new', new Blob(['new bytes']))).toBe(true);
       expect(await (await cache.get('new'))?.text()).toBe('new bytes');
     }
-    const { saveSync, readSync } = await import('../src/translation/store');
+    const { saveSync, readSync } = await import('../src/translation/channels/adapters/nodelane/store');
     await saveSync({ id: 'new-account-scope', jobs: [] }); expect(await readSync('new-account-scope')).toEqual({ id: 'new-account-scope', jobs: [] });
     for (const name of names) {
       const old = await rawDatabase('node-comics-' + name);
@@ -97,10 +97,10 @@ describe('cache and complete-source baseline errors', () => {
   it('surfaces a real malformed result database through concurrent result loaders without a remote download', async () => {
     const database = await rawDatabase(sourceDatabaseName('translations'), db => db.createObjectStore('objects').put(new Blob(['saved result']), 'keep')); database.close();
     const { loadResultBlob, resultBlobKey, resultInMemory } = await import('../src/storage/translations/results');
-    const job: Job = { id: 'result-job', input_asset_id: 'original', output_asset_id: 'output', status: 'succeeded', phase: 'completed', mode: 'classic', target_language: 'zh-Hans', created_at: '2026-09-22T00:00:00Z', version: 1, quota_pages: 1, cache_hit: false };
-    const input = { origin: 'https://api.example', userId: 'account', job, isCurrent: () => true, download: vi.fn(async () => new Blob(['remote result'])) };
+    const job: Job = { id: 'result-job', input_asset_id: 'original', output_asset_id: 'output', result:{key:'output',recoverable:true}, status: 'succeeded', phase: 'completed', mode: 'classic', target_language: 'zh-Hans', created_at: '2026-09-22T00:00:00Z', version: 1, quota_pages: 1, cache_hit: false };
+    const input = { scope:{key:JSON.stringify(['https://api.example','account'])}, job, isCurrent: () => true, download: vi.fn(async () => new Blob(['remote result'])) };
     await Promise.all([loadResultBlob(input), loadResultBlob(input)].map(pending => expect(pending).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError', message: expect.stringContaining('缺少 metadata') })));
-    expect(input.download).not.toHaveBeenCalled(); expect(resultInMemory(resultBlobKey(input.origin, input.userId, job))).toBeUndefined();
+    expect(input.download).not.toHaveBeenCalled(); expect(resultInMemory(resultBlobKey(input.scope, job))).toBeUndefined();
     await expect(loadResultBlob(input)).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError' }); expect(input.download).not.toHaveBeenCalled();
     const unchanged = await rawDatabase(sourceDatabaseName('translations')); expect([...unchanged.objectStoreNames]).toEqual(['objects']);
     expect(await (await request(unchanged.transaction('objects').objectStore('objects').get('keep')) as Blob).text()).toBe('saved result');

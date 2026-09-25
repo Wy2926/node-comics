@@ -6,6 +6,31 @@ const makeCache = (budgetBytes = 12, retained = false) => new ByteCache({ name: 
 const blob = (size: number) => new Blob([new Uint8Array(size)]);
 
 describe('independent byte stores', () => {
+  it('adopts import ranges without copying bytes and cleans them up with their final owner', async () => {
+    const cache = makeCache();
+    await cache.put('index', blob(6), {owner: 'pending', connectionId: 'cloud', contentId: 'temporary'});
+    const writes = vi.spyOn(IDBObjectStore.prototype, 'put');
+    await cache.adoptOwner('pending', 'entry', 'content');
+    expect(writes.mock.calls.every(([value]) => !(value instanceof Blob))).toBe(true);
+    writes.mockRestore();
+    await cache.deleteOwner('pending', true);
+    expect((await cache.get('index'))?.size).toBe(6);
+    expect(await cache.usage()).toMatchObject({bytes: 6, count: 1});
+    await cache.deleteRevision('temporary');
+    expect(await cache.has('index')).toBe(true);
+    await cache.deleteOwner('entry', true);
+    expect(await cache.usage()).toMatchObject({bytes: 0, count: 0});
+  });
+  it.each(['clear', 'source', 'target'])('does not revive cache data after %s during import adoption', async action => {
+    const cache = makeCache();
+    await cache.put('index', blob(6), {owner: 'pending'});
+    if (action === 'clear') await cache.clear();
+    else await cache.deleteOwner(action === 'source' ? 'pending' : 'entry', true);
+    await cache.adoptOwner('pending', 'entry', 'content');
+    await cache.deleteOwner('pending', true);
+    expect(await cache.has('index')).toBe(false);
+    expect(await cache.usage()).toMatchObject({bytes: 0, count: 0});
+  });
   it('accounts concurrent reservations transactionally so multiple tabs cannot overspend', async () => {
     const first = makeCache(), second = new ByteCache({ name: first.name, budgetBytes: 12 });
     const reservations = await Promise.all([first.reserve('a', 8), second.reserve('b', 8)]);

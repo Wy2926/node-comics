@@ -1,29 +1,30 @@
 import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {Api} from '../src/api';
 import type {Job,Page} from '../src/types';
 import {emptyPage} from '../src/reader/model';
 import {readingImage} from '../src/reader/presentation';
 import {ImageTranslationStatus} from '../src/reader/ImageTranslationStatus';
-import {useAutomaticTranslation} from '../src/translation/useAutomaticTranslation';
 import {translationNotice} from '../src/translation/notice';
-import {translationState} from '../src/translation/state';
-import type {LocalOperation} from '../src/translation/store';
+import {translationState} from '../src/translation/channels/adapters/nodelane/state';
+import type {LocalOperation} from '../src/translation/channels/adapters/nodelane/store';
 
 const origin='https://fixture.example';
 const noop=()=>{};
 function statusMarkup(page:Page){
  function Status(){
-  const {stateFor}=useAutomaticTranslation({api:new Api(origin),userId:'reader',origin,copies:[],updateEntry:noop,language:'zh-Hans'});
-  return <ImageTranslationStatus state={stateFor('copy',page,'classic')} onRetry={noop} onUpgrade={noop} onLogin={noop}/>;
+  const state=translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:false});
+  return <ImageTranslationStatus state={state} onRetry={noop} onUpgrade={noop} onLogin={noop}/>;
  }
  return renderToStaticMarkup(<Status/>);
 }
 function fixture(status:Job['status']):Page{
- const delivered:Job={id:'delivered',input_asset_id:'input',output_asset_id:'output',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
- return {...emptyPage('page',800,1200),ownerId:'reader',apiOrigin:origin,blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',output_asset_id:null,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
+ const delivered:Job={id:'delivered',input_asset_id:'input',output_asset_id:'output',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
+ return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',output_asset_id:null,result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
 describe('in-image retry status',()=>{
+ it('explicitly names a new translation when local result bytes cannot be recovered',()=>{
+  expect(translationNotice({kind:'error',message:'本地译图缓存已清理，请手动重新翻译。',retryAction:'translate'}).action).toBe('重新翻译');
+ });
  it('replaces stale errors and pending tasks with the login action after sign-out',()=>{
   const page=fixture('running');page.translationError='旧账户下载失败';
   expect(translationState({page,mode:'classic',language:'zh-Hans',origin,active:true,error:'登录已过期'})).toEqual({kind:'login',message:'登录后自动翻译'});
@@ -31,7 +32,7 @@ describe('in-image retry status',()=>{
  });
  it('exposes a failed rerun even while the previous translation remains readable',()=>{
   const page=fixture('failed');
-  expect(readingImage(page,'classic',true,'zh-Hans','reader',origin).key).toBe('translated');
+  expect(readingImage(page,'classic',true,'zh-Hans',JSON.stringify([origin,'reader'])).key).toBe('translated');
   const html=statusMarkup(page);
   expect(html).toContain('<button');expect(html).toContain('翻译失败 · 重试');expect(html).not.toContain('点击重新生成');
  });

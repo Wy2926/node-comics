@@ -8,6 +8,7 @@ import {TargetLanguage,withTargetLanguage} from './TargetLanguage';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
+import {TranslationChannels} from './TranslationChannels';
 type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
@@ -20,6 +21,7 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
     <AppearanceSettings settings={settings} onChange={setSettings}>
       <InterfaceLanguage value={settings.uiLanguage} onChange={uiLanguage=>setSettings(s=>({...s,uiLanguage}))}/>
     </AppearanceSettings>
+    <TranslationChannels/>
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
@@ -51,7 +53,7 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
       </SettingRow>
       <div className="privacy-note">
         <Icon name="shield" />
-        <p>{msg("原图与译图保存在私有对象存储；{0}。图片归你的账户私有，不接收源网站 Cookie，也不会公开分享；用户主动删除或未来清理策略仍可能使资源不可用。", {"0": caps?.retention_days?msg("当前服务设置 {0} 天保留期", {"0": caps.retention_days}):msg("当前长期保留，未设自动清理")})}</p>
+        <p>{msg('图片仅发送至所选翻译渠道；译图缓存保存在本机。本地服务的译图缓存清理后需要重新翻译。')}</p>
       </div>
     </section>
     {children}

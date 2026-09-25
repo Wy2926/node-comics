@@ -19,6 +19,9 @@ Python 脚本需准备 `backend/requirements.txt` 中的依赖；仓库不附带
 | --- | --- |
 | `verify_reading_api.mjs` | 临时 API、worker、合成供应商与浏览器的完整阅读链路 |
 | `verify_reading_translations.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | 新容器 / 目录夹具、模拟接口下的阅读窗口、限流、恢复，以及未知地址回退和无历史轮询；专用 Vite 5176，检查当前页与后三页、分钟退避、UUID 快照核实、下载重试和位置恢复 |
+| `verify_translation_channels.mjs` | Vite 5176 的独立渠道夹具；实际 Chromium 操作设置、MTU 模拟登录、未登录翻译、模式与渠道切换、缓存清理重译、互联网离线标记；不访问真实 MTU |
+| `verify_translation_channel_host.mjs` | 已构建 MV3 扩展、隔离 profile、本机 MTU 模拟服务；原位翻译超过 35 秒无响应、强停后台后读取宿主回执且不重发、零磁盘预算跨上下文读取和清理；不调用真实算力引擎 |
+| `verify_translation_channel_live.mjs` | 显式运行的真实本机 MTU 验收；通过构建后设置页登录，发送一张合成图，验证译图原位显示与刷新复用。用 `MTU_USERNAME` / `MTU_PASSWORD` 环境变量提供凭据；默认 `MTU_BASE_URL=http://127.0.0.1:8000/`，仅允许回环地址。真实执行服务端配置的引擎；扩展副本预授予本机权限，结束后注销测试会话并删除隔离 profile；报告不保存凭据 |
 | `verify_membership_admin.mjs` | 隔离后台的赠送与分钟配置 |
 | 插件 `tests/billing-focus-fixture.html` | Vite 指定 5192 端口后打开，点击“运行回归检查”；模拟订阅接口与窗口交接，验证焦点刷新、并发打开、返回对账和失败重试，不读取真实账户 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 构建后的 MV3 扩展与隔离网页，覆盖原位翻译与弹窗；原位回归包含自动翻译关闭时的右键入口、通用／站点识别及 Comix 图片和画布。真实 Comix 开关见[站点说明](../apps/extension/src/sources/sites/comix/README.md#网页原位翻译回归)，浏览器可用 `CHROMIUM_PATH` 指定；网站下载顺序、暂停恢复现由 `tests/website-downloads.test.ts` 与网站生命周期脚本验证 |

@@ -122,3 +122,75 @@ describe('module boundary check', () => {
     expect(run().status).toBe(0);
   });
 });
+
+describe('translation channel boundaries',()=>{
+  const channels='src/translation/channels/';
+  const adapter=(id:string,file='definition')=>channels+`adapters/${id}/${file}.ts`;
+  it('allows registry composition, own-adapter helpers and account-independent transport',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels';");
+    source(channels+'index.ts',"export * from './registry';");
+    source(channels+'registry.ts',"import './adapters/nodelane/definition';import './adapters/manga-translator-ui/definition';");
+    source(adapter('nodelane'),"import './operations';");
+    source(adapter('nodelane','operations'),"import '../../../../api';import '../../../../auth/session';");
+    source('src/api.ts','export {};');source('src/auth/session.ts','export {};');
+    source(adapter('manga-translator-ui'),"import '../../transport/runtime';import type {Channel} from '../../contracts';");
+    source(channels+'transport/runtime.ts',"import type {Channel} from '../contracts';");
+    source(channels+'contracts.ts','export interface Channel {}');
+    const result=run();expect(result.stderr).toBe('');expect(result.status).toBe(0);
+  });
+  it.each(['src/App.tsx','src/inline/background.ts','src/translation/useAutomaticTranslation.ts','src/ui/ChannelSettings.tsx'])('rejects direct concrete channel imports from %s',name=>{
+    source('entrypoints/main.ts',`import '../${name.replace(/\.tsx?$/,'')}';`);
+    const relative=path.posix.relative(path.posix.dirname(name),adapter('nodelane','store')).replace(/\.ts$/,'');
+    source(name,`import '${relative.startsWith('.')?relative:'./'+relative}';`);source(adapter('nodelane','store'),'export {};');
+    expect(run().stderr).toContain('concrete adapters require their own directory or the definition registry');
+  });
+  it.each(["export * from './translation/channels/adapters/nodelane/store';","import('./translation/channels/adapters/nodelane/store');","import type {State} from './translation/channels/adapters/nodelane/store';"])('rejects adapter coupling hidden behind another module: %s',code=>{
+    source('entrypoints/main.ts',"import '../src/helper';");source('src/helper.ts',code);source(adapter('nodelane','store'),'export interface State {}');
+    expect(run().stderr).toContain('concrete adapters require their own directory or the definition registry');
+  });
+  it('rejects registry imports of implementation details and cross-adapter helpers',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels/registry';");
+    source(channels+'registry.ts',"import './adapters/nodelane/store';import './adapters/manga-translator-ui/definition';");
+    source(adapter('nodelane','store'),'export {};');source(adapter('manga-translator-ui'),"import '../nodelane/store';");
+    const result=run();expect(result.stderr).toContain('registry.ts -> src/translation/channels/adapters/nodelane/store.ts');
+    expect(result.stderr).toContain('manga-translator-ui/definition.ts -> src/translation/channels/adapters/nodelane/store.ts');
+  });
+  it('rejects contracts reaching composition through a re-export',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels/contracts';");
+    source(channels+'contracts.ts',"import '../../helper';");source('src/helper.ts',"export * from './translation/channels/registry';");
+    source(channels+'registry.ts','export {};');
+    expect(run().stderr).toContain('contracts depend on composition or execution');
+  });
+  it.each(['src/api.ts','src/auth/session.ts','src/ui/ChannelSettings.tsx','src/reader/Reader.tsx'])('rejects transport depending on %s through a helper',target=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels/transport/runtime';");
+    source(channels+'transport/runtime.ts',"import '../../../helper';");
+    source('src/helper.ts',`export * from './${target.replace(/^src\//,'').replace(/\.tsx?$/,'')}';`);source(target,'export {};');
+    expect(run().stderr).toContain('transport depends on an adapter, UI or official account/API');
+  });
+  it('rejects transport reaching an adapter through the registry',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels/transport/runtime';");
+    source(channels+'transport/runtime.ts',"import '../registry';");source(channels+'registry.ts',"import './adapters/nodelane/definition';");
+    source(adapter('nodelane'),'export {};');expect(run().stderr).toContain('transport depends on an adapter, UI or official account/API');
+  });
+  it('rejects an adapter reaching UI through a helper',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/channels/registry';");source(channels+'registry.ts',"import './adapters/nodelane/definition';");
+    source(adapter('nodelane'),"import '../../../../helper';");source('src/helper.ts',"import './ui/Account';");source('src/ui/Account.tsx','export {};');
+    expect(run().stderr).toContain('adapter depends on UI implementation');
+  });
+  it.each(["if(profile.adapterId==='custom')translate();","switch(profile.adapterId){default:translate();}","const execute=profile.id==='nodelane'?official:local;","switch(protocol){case 'nodelane':translate();}"])('rejects protocol dispatch in business code: %s',code=>{
+    source('entrypoints/main.ts',"import '../src/business';import '../src/translation/channels/registry';");source('src/business.ts',code);
+    source(channels+'registry.ts',"import './adapters/nodelane/definition';");source(adapter('nodelane'),'export {};');
+    expect(run().stderr).toContain('business code must not branch on a concrete channel protocol');
+  });
+  it('allows schema-driven UI selection and configuration identity comparisons',()=>{
+    source('entrypoints/main.ts',"import '../src/ui/ChannelSettings';import '../src/translation/channels/registry';");
+    source('src/ui/ChannelSettings.tsx',"export const selected=(profile,protocols)=>protocols.find(p=>p.id===profile.adapterId);export const changed=(before,after)=>before.adapterId!==after.adapterId;");
+    source(channels+'registry.ts',"import './adapters/nodelane/definition';");source(adapter('nodelane'),"export const id='nodelane';");
+    expect(run().status).toBe(0);
+  });
+  it('rejects restoring the removed official facade even when unresolved',()=>{
+    source('entrypoints/main.ts',"import '../src/translation/coordinator';");
+    expect(run().stderr).toContain('removed official facade');
+    source('src/translation/coordinator.ts','export {};');expect(run().stderr).toContain('removed official facade');
+  });
+});

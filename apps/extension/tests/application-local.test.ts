@@ -9,6 +9,7 @@ import {registerSourceDriver} from '../src/comics/sources/registry';
 import {loadEntry,removeComic,saveReaderState} from '../src/comics/application/library-service';
 import {LocalImportQueue} from '../src/comics/application/import-queue';
 import type {Job} from '../src/types';
+import {RENDER_PROFILE} from '../src/comics/pages/identity';
 const mocks=vi.hoisted(()=>({index:vi.fn(),materialize:vi.fn()}));
 vi.mock('../src/comics/formats',()=>({openDocument:async()=>({index:mocks.index,materialize:mocks.materialize,close:async()=>{}})}));
 let dispose:()=>void;
@@ -16,6 +17,18 @@ beforeEach(()=>{mocks.index.mockReset().mockResolvedValue([{ordinal:0,name:'page
 afterEach(()=>dispose());
 const file=(name=crypto.randomUUID()+'.cbz',content=crypto.randomUUID())=>new File(['PK',content],name,{type:'application/zip'});
 describe('single-file comic imports',()=>{
+ it('restores channel bindings independently while preserving source bytes and reading position',async()=>{
+  const input=file(),created=await importLocalFile(input),copy=await loadEntry(created.id),page=copy.pages[0],sha='c'.repeat(64);
+  await catalog.putMaterialization({id:JSON.stringify([copy.contentId,page.id,RENDER_PROFILE]),contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE,imageSha256:sha,width:800,height:1200,byteSize:10,mime:'image/png',updatedAt:Date.now()},copy.generation);
+  const delivered=(id:string):Job=>({id,status:'succeeded',result:{key:id,recoverable:false},input_asset_id:null,output_asset_id:null,mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:0});
+  for(const channel of ['local-a','local-b'])await saveReaderState({...copy,pageId:page.id,lastReadAt:100,relativeOffset:.3,pages:[{...page,imageSha256:sha,translationScope:channel,jobs:[delivered(channel)]}]});
+  for(const channel of ['local-a','local-b']){
+   const restored=await loadEntry(copy.id,{key:channel});expect(restored.pages[0]).toMatchObject({translationScope:channel,jobs:[{id:channel}],outputBlobs:{}});expect(restored.pages[0].ownerId).toBeUndefined();expect(restored.relativeOffset).toBe(.3);
+   expect(await catalog.list('translationBindings',{index:'scope',range:channel})).toHaveLength(1);
+  }
+  expect((await loadEntry(copy.id,{key:'other'})).pages[0].jobs).toEqual([]);
+  const entry=(await catalog.get('entries',copy.id))!,source=await openContainer(entry.containerId!);try{expect(await source.readAt(0,input.size)).toEqual(new Uint8Array(await input.arrayBuffer()));}finally{await source.close();}
+ });
  it('deduplicates identical files even after renaming, without decoding pages',async()=>{
   const input=file(),first=await importLocalFile(input),second=await importLocalFile(new File([input],'renamed.zip'));
   expect(second).toEqual({...first,created:false});expect(mocks.materialize).not.toHaveBeenCalled();
@@ -54,8 +67,8 @@ describe('single-file comic imports',()=>{
  it('merges concurrent translation results without persisting runtime URLs or regressing terminal jobs',async()=>{
   const result=await importLocalFile(file()),copy=await loadEntry(result.id),page=copy.pages[0],sha='d'.repeat(64);
   const job=(id:string,status:Job['status']='succeeded'):Job=>({id,status,input_asset_id:'asset',output_asset_id:status==='succeeded'?id+'-out':null,mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:1});
-  const first={...page,imageSha256:sha,ownerId:'reader',apiOrigin:'https://api.example',jobs:[job('one')],outputBlobs:{one:'runtime-output'}},second={...first,jobs:[job('two')],outputBlobs:{two:'other-output'}};
-  await Promise.all([saveReaderState({...copy,pages:[first]}),saveReaderState({...copy,pages:[second]})]);const binding=(await catalog.get('translationBindings',JSON.stringify(['https://api.example','reader',sha])))!;expect((binding.payload as {jobs:Job[]}).jobs.map(j=>j.id)).toEqual(['one','two']);expect(binding.payload).not.toHaveProperty('outputBlobs');
+  const first={...page,imageSha256:sha,translationScope:'local-channel',jobs:[job('one')],outputBlobs:{one:'runtime-output'}},second={...first,jobs:[job('two')],outputBlobs:{two:'other-output'}};
+  await Promise.all([saveReaderState({...copy,pages:[first]}),saveReaderState({...copy,pages:[second]})]);const binding=(await catalog.get('translationBindings',JSON.stringify(['local-channel',sha])))!;expect((binding.payload as {jobs:Job[]}).jobs.map(j=>j.id)).toEqual(['one','two']);expect(binding.payload).not.toHaveProperty('outputBlobs');
   await saveReaderState({...copy,pages:[first],lastReadAt:123,pageId:page.id,relativeOffset:.4});expect(await catalog.get('positions',copy.id)).toMatchObject({relativeOffset:.4,updatedAt:123});
   await saveReaderState({...copy,pages:[{...first,jobs:[job('one','running')]}]});expect(((await catalog.get('translationBindings',binding.id))!.payload as {jobs:Job[]}).jobs.find(j=>j.id==='one')?.status).toBe('succeeded');
  });

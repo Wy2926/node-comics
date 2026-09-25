@@ -28,6 +28,11 @@ const graph = new Map();
 const runtimeGraph = new Map();
 const discovered = new Map();
 const importErrors = [];
+const channelAdapter = (filename) => relative(filename).match(/^src\/translation\/channels\/adapters\/([^/]+)\//)?.[1];
+const channelRegistry = 'src/translation/channels/registry.ts';
+const removedTranslationModule = /(?:^|\/)translation\/(?:coordinator|store|state)(?:\.tsx?)?$/;
+const channelIds = new Set([...modules].map(channelAdapter).filter(Boolean));
+const channelUi = (filename) => /^src\/ui\//.test(filename) || filename === 'src/App.tsx' || /^src\/reader\/.*\.tsx$/.test(filename);
 for (const filename of modules) {
   const source = ts.createSourceFile(
     filename,
@@ -43,6 +48,8 @@ for (const filename of modules) {
     // Reject a removed module even when TypeScript resolution fails; no compatibility façade.
     if (/(?:^|\/)library(?:\/|$)/.test(specifier.text))
       importErrors.push(`Comic boundary (removed library model): ${relative(filename)} -> ${specifier.text}`);
+    if (removedTranslationModule.test(specifier.text.split('?')[0]))
+      importErrors.push(`Translation boundary (removed official facade): ${relative(filename)} -> ${specifier.text}`);
     const resolved = ts.resolveModuleName(
       specifier.text.split('?')[0],
       filename,
@@ -51,6 +58,10 @@ for (const filename of modules) {
     ).resolvedModule;
     if (!resolved) return; // CSS, WASM and other Vite-managed assets are not TS modules.
     const target = normalize(resolved.resolvedFileName);
+    const targetAdapter = channelAdapter(target), adapter = channelAdapter(filename);
+    if (targetAdapter && adapter !== targetAdapter &&
+        !(relative(filename) === channelRegistry && relative(target) === `src/translation/channels/adapters/${targetAdapter}/definition.ts`))
+      importErrors.push(`Translation boundary (concrete adapters require their own directory or the definition registry): ${relative(filename)} -> ${relative(target)}`);
     const targetSite = relative(target).match(/^src\/sources\/sites\/([^/]+)\//)?.[1];
     const owner = relative(filename).match(/^src\/sources\/sites\/([^/]+)\//)?.[1];
     if (targetSite && targetSite !== owner)
@@ -60,6 +71,15 @@ for (const filename of modules) {
     if (!typeOnly) runtime.add(target);
   }
   function visit(node) {
+    if (!channelAdapter(filename)) {
+      const adapterIdentity = value => ts.isIdentifier(value) && value.text === 'adapterId' || ts.isPropertyAccessExpression(value) && value.name.text === 'adapterId' || ts.isElementAccessExpression(value) && ts.isStringLiteral(value.argumentExpression) && value.argumentExpression.text === 'adapterId';
+      const protocolLiteral = value => ts.isStringLiteral(value) && channelIds.has(value.text);
+      const comparison = ts.isBinaryExpression(node) && [ts.SyntaxKind.EqualsEqualsToken,ts.SyntaxKind.EqualsEqualsEqualsToken,ts.SyntaxKind.ExclamationEqualsToken,ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(node.operatorToken.kind);
+      if (comparison && (protocolLiteral(node.left) || protocolLiteral(node.right) ||
+          adapterIdentity(node.left) && ts.isStringLiteral(node.right) || adapterIdentity(node.right) && ts.isStringLiteral(node.left)) ||
+          ts.isSwitchStatement(node) && adapterIdentity(node.expression) || ts.isCaseClause(node) && protocolLiteral(node.expression))
+        importErrors.push(`Translation boundary (business code must not branch on a concrete channel protocol): ${relative(filename)}`);
+    }
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
         node.expression.expression.kind === ts.SyntaxKind.MetaProperty && node.expression.name.text === 'glob') {
       const pattern = node.arguments[0];
@@ -127,6 +147,7 @@ for (const [filename, dependencies] of graph) {
     owner = site(filename);
   const from = relative(filename), ui = /^src\/(?:ui|reader)\//.test(from), format = from.startsWith('src/comics/formats/');
   if (from.startsWith('src/library/')) errors.push(`Comic boundary (removed library model): ${from}`);
+  if (/^src\/translation\/(coordinator|store|state)\.tsx?$/.test(from)) errors.push(`Translation boundary (removed official facade): ${from}`);
   for (const target of dependencies) {
     const destination = sourcePart(target),
       targetSite = site(target);
@@ -198,16 +219,22 @@ for (const [filename, dependencies] of graph) {
   }
 }
 // Re-exporting a helper must not provide a hidden path from pure drivers/caches into translation.
-function checkTransitiveBoundary(filename, predicate, label, seen = new Set()) {
+function checkTransitiveBoundary(filename, predicate, label, seen = new Set(), boundary = 'Comic') {
   if (seen.has(filename)) return;
   seen.add(filename);
   for (const dependency of graph.get(filename) ?? []) {
-    if (predicate(relative(dependency))) errors.push(`Comic boundary (${label}): ${relative(filename)} -> ${relative(dependency)}`);
-    checkTransitiveBoundary(dependency, predicate, label, seen);
+    if (predicate(relative(dependency))) errors.push(`${boundary} boundary (${label}): ${relative(filename)} -> ${relative(dependency)}`);
+    checkTransitiveBoundary(dependency, predicate, label, seen, boundary);
   }
 }
 for (const filename of modules) {
   const name = relative(filename);
+  if (name === 'src/translation/channels/contracts.ts')
+    checkTransitiveBoundary(filename, target => /^src\/translation\/channels\/(?!contracts\.ts$)/.test(target), 'contracts depend on composition or execution', new Set(), 'Translation');
+  if (name.startsWith('src/translation/channels/transport/'))
+    checkTransitiveBoundary(filename, target => /^src\/translation\/channels\/(?:adapters\/|registry\.ts$|index\.ts$)/.test(target) || /^src\/(?:auth\/|api\.ts$)/.test(target) || channelUi(target), 'transport depends on an adapter, UI or official account/API', new Set(), 'Translation');
+  if (channelAdapter(filename))
+    checkTransitiveBoundary(filename, channelUi, 'adapter depends on UI implementation', new Set(), 'Translation');
   const concreteSource = target => /^src\/comics\/sources\/[^/]+\//.test(target);
   if (name.startsWith('src/comics/formats/')) checkTransitiveBoundary(filename, target => concreteSource(target) || /^src\/(?:translation|storage\/translations)\//.test(target), 'format transitive source/translation dependency');
   if (name === 'src/App.tsx' || /^src\/(?:comics\/(?:application|domain|pages|repositories)|ui|reader|translation|export|storage)\//.test(name) ||
@@ -295,6 +322,6 @@ if (errors.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${modules.size} modules: comic/source boundaries, pure definitions, runtime cycles and reachability passed.`,
+    `Checked ${modules.size} modules: comic/source/translation boundaries, pure definitions, runtime cycles and reachability passed.`,
   );
 }

@@ -34,7 +34,7 @@ function Fixture(){
    <label>章节<input aria-label="验收章节" type="number" min={1} max={620} value={Number(id.slice(8))} onChange={e=>navigate('chapter-'+e.target.value)}/></label>
    <output aria-label="保存位置">{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>
   </div>
-  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={empty?{...copy,pages:[]}:copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} apiOrigin={location.origin} api={api} busy={false} onAcquire={noop} onPauseAcquire={noop}/>}
+  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={empty?{...copy,pages:[]}:copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} api={api} busy={false} onAcquire={noop} onPauseAcquire={noop}/>}
  </div>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

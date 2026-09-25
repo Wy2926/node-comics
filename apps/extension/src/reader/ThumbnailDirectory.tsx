@@ -5,13 +5,12 @@ import { Thumbnail } from './Images';
 import { thumbnailRows } from './geometry';
 import { pageTranslation, taskText } from './presentation';
 import { TaskActivity } from './TaskActivity';
-export function ThumbnailDirectory({ pages, index, mode, language, ownerId, origin, onJump }: {
+export function ThumbnailDirectory({ pages, index, mode, language, translationScope, onJump }: {
   pages: Page[];
   index: number;
   mode: Mode;
   language: string;
-  ownerId?: string;
-  origin: string;
+  translationScope?: string;
   onJump: (n: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -33,7 +32,7 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
   return <div className="nc-thumb-list" ref={ref} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} data-thumbnail-count={visible.length}>
     <div style={{ height: total, position: 'relative' }}>{visible.map(({ n, top, height, pictureHeight }) => {
       const p = pages[n];
-      const t = pageTranslation(p, mode, language, ownerId, origin);
+      const t = pageTranslation(p, mode, language, translationScope);
       return <div className={`nc-thumb-row ${n === index ? 'current' : ''}`} style={{ position: 'absolute', top, height: height - 12 }} key={p.id}>
         <button className="nc-thumb-main" aria-current={n === index ? 'page' : undefined} onClick={() => onJump(n)}>
           <span className="nc-thumb-picture" style={{ height: pictureHeight }}>
@@ -41,7 +40,7 @@ export function ThumbnailDirectory({ pages, index, mode, language, ownerId, orig
           </span>
           <span className="nc-thumb-info">
             <b>{msg("第 {0} 页", {"0": n + 1})}{n === index && <i>{msg("阅读中")}</i>}</b>
-            <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.output_asset_id ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入")}</small>
+            <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.result ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入")}</small>
           </span>
         </button></div>;
     })}</div>

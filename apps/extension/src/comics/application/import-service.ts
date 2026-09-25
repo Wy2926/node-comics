@@ -102,11 +102,15 @@ export async function importSourceFiles(selection:SourceSelection,signal?:AbortS
         const contentId=crypto.randomUUID();
         const source={connectionId:connected.id,providerItemId:file.id,locator:file.locator,generation:1,status:'active' as const};
         const current=await catalog.get('connections',connected.id);
-        let pages:IndexedPage[];const owner='pending:'+contentId;
-        try{pages=await filePages({connection:current!,source,contentId,entryId:owner,sourceSnapshot:file.snapshot,format:file.format,signal});}finally{await sourceRangeCache.deleteOwner(owner,true);}
-        signal?.throwIfAborted();
-        const result=await registerFile({title:titleFor(file.name),format:file.format,connection:selection.connection,connectionGeneration:current!.generation,resourceId:file.id,locator:file.locator,snapshot:file.snapshot,contentId,pages});
-        results.push({...result,name:file.name});
+        const owner='pending:'+contentId;
+        try {
+          const pages=await filePages({connection:current!,source,contentId,entryId:owner,sourceSnapshot:file.snapshot,format:file.format,signal});
+          signal?.throwIfAborted();
+          const result=await registerFile({title:titleFor(file.name),format:file.format,connection:selection.connection,connectionGeneration:current!.generation,resourceId:file.id,locator:file.locator,snapshot:file.snapshot,contentId,pages});
+          const entry=await catalog.get('entries',result.id);
+          if(entry)await sourceRangeCache.adoptOwner(owner,entry.id,entry.contentId);
+          results.push({...result,name:file.name});
+        } finally {await sourceRangeCache.deleteOwner(owner,true);}
       }catch(error){if(signal?.aborted)throw error;failures.push({name:file.name,error:(error as Error).message});}
     }
     return {results,failures};

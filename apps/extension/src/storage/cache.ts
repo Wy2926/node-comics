@@ -118,6 +118,17 @@ export class ByteCache {
   async deleteOwner(owner: string, block = false): Promise<void> { await this.removeMatching('owner', owner, block); }
   async deleteConnection(connectionId: string): Promise<void> { await this.removeMatching('connectionId', connectionId); }
   async deleteRevision(contentId: string): Promise<void> { await this.removeMatching('contentId', contentId); }
+  /** Adopt completed import ranges without copying bytes or reviving cleared/deleted cache data. */
+  async adoptOwner(from: string, to: string, contentId: string): Promise<void> {
+    const db = await this.open(), tx = db.transaction(['metadata', 'state'], 'readwrite'), done = completed(tx);
+    const state = tx.objectStore('state'), metadata = tx.objectStore('metadata');
+    const [source, target] = await Promise.all([request(state.get('owner:' + from)), request(state.get('owner:' + to))]) as (ScopeRecord | undefined)[];
+    if (!source?.blocked && !target?.blocked) {
+      const entries = await request(metadata.index('owner').getAll(from)) as CacheMeta[];
+      for (const entry of entries) metadata.put({...entry, owner: to, contentId});
+    }
+    await done;
+  }
   private async removeMatching(index: 'key' | 'owner' | 'connectionId' | 'contentId', value: string, block = false): Promise<void> {
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx), metadata = tx.objectStore('metadata'), state = tx.objectStore('state');
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();

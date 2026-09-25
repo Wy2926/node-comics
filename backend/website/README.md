@@ -22,13 +22,13 @@
 
 ## 配置与运行
 
-在 [src/data/site.ts](src/data/site.ts) 维护公开域名、邮件和三个商店 URL。下载页优先提供 Chrome / Edge 通用 ZIP 与手动安装、更新说明；三张商店卡片使用本地官方浏览器 Logo，空地址按钮不可点击。Firefox 不提供未签名 ZIP 安装入口。
+在 [src/data/site.ts](src/data/site.ts) 维护公开域名、邮件和三个商店 URL。Chrome / Edge 各自商店按钮下提供对应平台 ZIP，卡片下方提供手动安装和更新说明；三张卡片使用本地官方浏览器 Logo，空商店地址按钮不可点击。Firefox 不提供未签名 ZIP 安装入口。
 
 2026-09-22 已配置 [Chrome Web Store](https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo?utm_source=item-share-cb) 地址，五种语言的下载页均显示可点击的 Chrome 商店入口；Edge 和 Firefox 商店地址仍待配置。
 
-安装包版本目录由 [extension-release.json](../extension-release.json) 维护，`current` 选择官网展示版本，`releases` 保留历史版本。每个版本拥有独立、长期有效的 `/downloads/node-comics-<version>-chromium.zip` 地址；后台仅为目录中精确匹配的安装包生成 600 秒 R2 GET 签名并返回不缓存的 302，前端不保存签名 URL。R2 保持私有，安装包位于既有业务前缀下的 `releases/extensions/<version>/<sha256>/<filename>`，与漫画对象目录分离。未知包返回 404，存储配置不可用时返回可重试的 503。
+安装包版本目录由 [extension-release.json](../extension-release.json) 维护，`current` 与 `browser` 选择官网展示版本及平台，`releases` 保留历史版本。平台包拥有长期有效的 `/downloads/node-comics-<version>-<chrome|edge>.zip` 地址；历史 0.1.x 地址保持不变。后台仅为目录中精确匹配的安装包生成 600 秒 R2 GET 签名并返回不缓存的 302，前端不保存签名 URL。R2 保持私有，安装包位于既有业务前缀下的 `releases/extensions/<version>/<sha256>/<filename>`，与漫画对象目录分离。未知包返回 404，存储配置不可用时返回可重试的 503。
 
-发布新版时先在 `apps/extension` 用正式 `VITE_API_BASE=https://comics.nodelane.net` 执行 `npm run check` 与 `npm run zip`，递增插件版本；计算 ZIP 字节数和 SHA-256，向版本目录追加条目，保留旧条目，再更新 `current`。使用后端依赖与生产 R2 环境运行 `python scripts/upload_extension_release.py --zip <zip> --manifest backend/extension-release.json`：校验包和正式 API 地址，按不可覆盖方式上传并重新读取核对哈希。验证成功后构建并部署官网及后端；仅发布静态页面不能启用下载端点。
+发布新版时先在 `apps/extension` 用正式 `VITE_API_BASE=https://comics.nodelane.net`、`VITE_DRIVE_CONNECT_URL=https://comics.nodelane.net/drive-connect/index.html` 执行 `npm run check`，递增插件版本；分别运行 `node scripts/package-extension.mjs chrome download` 与 `node scripts/package-extension.mjs edge download`。计算各 ZIP 字节数和 SHA-256，向版本目录追加带 `browser` 的条目，再更新 `current`。使用后端依赖与生产 R2 环境分别运行 `python scripts/upload_extension_release.py --browser <chrome|edge> --zip <zip> --manifest backend/extension-release.json`：校验平台身份和正式 API 地址，按不可覆盖方式上传并重新读取核对哈希。验证成功后构建并部署官网及后端；仅发布静态页面不能启用下载端点。商店提交包不含公钥，独立生成，不上传到手动安装下载目录。
 
 `node scripts/verify_website_download.mjs` 从仓库根目录检查五语下载页、安装步骤和浏览器 Logo；设置 `WEBSITE_PREVIEW_URL=https://comics.nodelane.net` 后会真实点击下载，并核对文件名、大小、SHA-256。Playwright 模块可通过 `PLAYWRIGHT_MODULE` 指定。
 

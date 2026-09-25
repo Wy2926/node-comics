@@ -1,22 +1,20 @@
-import type {Api} from '../../api';
+import type {Job} from '../../types';
+import type {TranslationScope} from '../../translation/channels/contracts';
 import {msg} from '../../i18n/runtime';
 import {catalog} from '../repositories';
 import {acquirePage} from '../pages/service';
 import {openContainer} from '../../storage/containers';
-import {translationCache} from '../../storage/translations';
-import {loadResultBlob, resultBlobKey, resultInMemory} from '../../storage/translations/results';
 import {planExport, MAX_EXPORT_BYTES, safeName, type ExportOptions} from '../../export/plan';
 import {writeExport, type ExportProgress, type ExportResult} from '../../export/files';
 export type {ExportOptions,ExportProgress,ExportResult};
 export {exportName} from '../../export/plan';
-export interface ExportContext {signal:AbortSignal;api?:Api;userId?:string;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
+export interface ExportContext {signal:AbortSignal;scope?:TranslationScope;readResult?:(job:Job,signal?:AbortSignal)=>Promise<Blob>;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
 
 export async function exportDocument(entryId:string,options:ExportOptions,context:ExportContext):Promise<ExportResult>{
-  const {api,userId,signal}=context;
-  const account=api&&userId?{origin:api.base,userId}:undefined;
-  const plan=await planExport(entryId,options,account,signal);
+  const {scope,signal}=context;
+  const plan=await planExport(entryId,options,scope,signal);
   const assertCurrent=async()=>{
-    if(options.images==='translation'&&(!api?.isCurrent()||context.isCurrent?.()===false))throw Error('账户或服务已切换，本次导出已停止。');
+    if(options.images==='translation'&&context.isCurrent?.()===false)throw Error(msg('翻译渠道已切换，本次导出已停止。'));
     const doc=await catalog.get('entries',entryId);
     if(!doc||doc.contentId!==plan.contentId||doc.generation!==plan.generation)throw Error('来源内容已变化，本次导出已停止。');
   };
@@ -26,10 +24,8 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
       const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
       return {blob:lease.blob,width:lease.identity.width,height:lease.identity.height,release:lease.release};
     }
-    if(!page.job||!api||!userId)throw Error('已有译图身份缺失，请重新打开导出面板。');
-    const key=page.cacheKey??resultBlobKey(api.base,userId,page.job);
-    const cached=resultInMemory(key)??await translationCache.get(key);
-    const blob=cached??await loadResultBlob({origin:api.base,userId,job:page.job,download:()=>api.image(page.job!.output_asset_id!,readSignal),isCurrent:()=>api.isCurrent()&&context.isCurrent?.()!==false});
+    if(!page.job||!scope||!context.readResult)throw Error('已有译图身份缺失，请重新打开导出面板。');
+    const blob=await context.readResult(page.job,readSignal);
     readSignal.throwIfAborted();await assertCurrent();return {blob,release(){}};
   }},signal,context.destination);
 }

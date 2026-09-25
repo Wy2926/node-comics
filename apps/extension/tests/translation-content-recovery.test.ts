@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect,vi} from 'vitest';
-import {TranslationCoordinator} from '../src/translation/coordinator';
-import {makeOperation,operationId} from '../src/translation/automatic';
-import {readOperation,saveOperation} from '../src/translation/store';
+import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
+import {makeOperation,operationId} from '../src/translation/channels/adapters/nodelane/operations';
+import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
 import {pageReference} from '../src/comics/pages/identity';
 import {fixture,target,originalBytes,job,origin,snapshot} from './translation-fixture';
 import {loadResultBlob,resultInMemory,resultBlobKey} from '../src/storage/translations/results';
@@ -35,7 +35,8 @@ describe('content identity and recoverable source references',()=>{
   await core.submit([target(0)]);await core.finishUploads();expect(upload).not.toHaveBeenCalled();const saved=await readOperation(record.id);expect(saved?.state).toBe('blocked');expect(saved?.requestId).toBe(record.requestId);expect(saved?.result?.id).toBe(record.requestId);
  });
  it('disabling result cache still delivers memory bytes without regenerating',async()=>{
-  await setTranslationCacheLimitMb(0);const result=job(9,{id:crypto.randomUUID(),status:'succeeded',output_asset_id:'output'}),blob=new Blob(['result']),download=vi.fn(async()=>blob);
-  try{await loadResultBlob({origin,userId:'no-cache',job:result,download,isCurrent:()=>true});const key=resultBlobKey(origin,'no-cache',result);expect(await translationCache.get(key)).toBeUndefined();expect(resultInMemory(key)).toBe(blob);expect(download).toHaveBeenCalledOnce();}finally{await setTranslationCacheLimitMb(1024);}
+  await setTranslationCacheLimitMb(0);const scope={key:JSON.stringify([origin,'no-cache'])},result=job(9,{id:crypto.randomUUID(),status:'succeeded',output_asset_id:'output'}),blob=new Blob(['result']),download=vi.fn(async()=>blob);
+  vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:800,height:1200,close(){}})));
+  try{await loadResultBlob({scope,job:result,download,isCurrent:()=>true});const key=resultBlobKey(scope,result);expect(await translationCache.get(key)).toBeUndefined();expect(resultInMemory(key)).toBe(blob);expect(download).toHaveBeenCalledOnce();}finally{await setTranslationCacheLimitMb(1024);vi.unstubAllGlobals();}
  });
 });

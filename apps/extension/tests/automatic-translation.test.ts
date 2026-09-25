@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect} from 'vitest';
-import {ReadingWindow,makeOperation,needsTranslation,targetKey} from '../src/translation/automatic';
+import {ReadingWindow,needsTranslation,targetKey} from '../src/translation/automatic';
+import {makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {job,origin,target} from './translation-fixture';
 describe('local reading timing',()=>{
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
@@ -26,7 +27,7 @@ describe('local reading timing',()=>{
   window.update([target(30)],220,true);expect(window.ready(220)[0].page.id).toBe('page-30');
  });
  it.each(['queued','running','failed','cancelled','outcome_unknown','unknown_released','no_text','succeeded'] as const)('never automatically regenerates %s',status=>{
-  const page={...target(0).page,ownerId:'alice',apiOrigin:origin,jobs:[job(0,{status})]};expect(needsTranslation(page,'classic','zh-Hans','alice',origin)).toBe(false);
+  const scope=JSON.stringify([origin,'alice']),page={...target(0).page,translationScope:scope,jobs:[job(0,{status})]};expect(needsTranslation(page,'classic','zh-Hans',scope)).toBe(false);
  });
  it('keeps account, page, mode and language operations separate and allows free reuse',async()=>{
   const a=await makeOperation(target(0),'alice','zh-Hans',async()=>undefined),b=await makeOperation(target(0),'bob','en',async()=>undefined);

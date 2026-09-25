@@ -1,5 +1,7 @@
 # 翻译接口与阅读恢复契约
 
+本文约束 **NodeLane 官方渠道**的后端 API 与客户端恢复行为。客户端渠道抽象、MTU 直传协议及缓存边界见[客户端翻译渠道](TRANSLATION_CHANNELS.md)；本地渠道不要求实现本文的账号、权益或持久任务协议。
+
 当前实现采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。后端使用 `translations_0001` 全新空库，客户端使用 `node-comics-reading-v2-*` 新数据库；不读取、迁移或兼容旧数据。旧库不会自动删除，新客户端需要重新导入漫画。设计取舍见[简化说明](TRANSLATION_API_SIMPLIFICATION.md)。代码实现与本地验证不代表公开部署。
 
 ## 1. 翻译流程

@@ -32,7 +32,7 @@ for (const file of htmlFiles) {
     const target = $(node).attr('href') ?? $(node).attr('src') ?? '';
     if (!target.startsWith('/') || target.startsWith('//')) continue;
     const path = new URL(target, site.url).pathname;
-    if (path === site.extensionRelease.path) continue; // Backend allowlisted R2 download.
+    if (Object.values(site.extensionPackages).some(release => path === release.path)) continue; // Backend allowlisted R2 downloads.
     const actual = join(root, path.endsWith('/') ? `${path}index.html` : path);
     if (!await stat(actual).catch(() => false)) errors.push(`${label}: broken local link ${target}`);
   }

@@ -1,13 +1,19 @@
-import { ByteCache } from '../cache';
-let overrideMb: number | undefined;
-function budgetBytes(): number {
-  if (overrideMb !== undefined) return overrideMb === -1 ? Infinity : overrideMb * 1024 ** 2;
-  try { const value = JSON.parse(localStorage.getItem('nc-settings') ?? '{}').cacheLimitMb; if (value === -1) return Infinity; if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value * 1024 ** 2; } catch { /* Worker/no localStorage: use independent default. */ }
-  return 1024 ** 3;
+import { ByteCache,type CacheWriteOptions } from '../cache';
+import {invalidateResultMemory} from './memory';
+import {initializeTranslationBudget,overrideTranslationBudget,translationBudgetBytes} from './policy';
+class TranslationCache extends ByteCache {
+  private ready?:Promise<void>;
+  private initialize(){return this.ready??=initializeTranslationBudget(()=>{void this.enforceBudget().catch(()=>{});}).then(async()=>{const usage=await super.usage();await super.trim(Math.max(0,usage.bytes+usage.reservedBytes-translationBudgetBytes()));});}
+  override async token(owner?:string){await this.initialize();return super.token(owner);}
+  override async usage(){await this.initialize();return super.usage();}
+  override async get(key:string){await this.initialize();return super.get(key);}
+  override async has(key:string){await this.initialize();return super.has(key);}
+  override async reserve(key:string,size:number,options:CacheWriteOptions={}){await this.initialize();return super.reserve(key,size,options);}
+  override async clear(){await this.initialize();await super.clear();invalidateResultMemory();}
+  override async delete(key:string){await this.initialize();await super.delete(key);invalidateResultMemory(key);}
+  override async deleteOwner(owner:string,block=false){await this.initialize();await super.deleteOwner(owner,block);invalidateResultMemory(undefined,owner);}
 }
-export const translationCache = new ByteCache({ name: 'translations', budgetBytes });
+export const translationCache = new TranslationCache({ name: 'translations', budgetBytes:translationBudgetBytes });
 export async function setTranslationCacheLimitMb(mb: number): Promise<void> {
-  if (!Number.isFinite(mb) || mb < 0 && mb !== -1) throw Error('Invalid translation cache budget');
-  overrideMb = mb; await translationCache.enforceBudget();
+  overrideTranslationBudget(mb);await translationCache.enforceBudget();
 }
-export const translationKey = (apiOrigin: string, userId: string, resultVersion: string, outputAssetId: string) => JSON.stringify([apiOrigin, userId, resultVersion, outputAssetId]);

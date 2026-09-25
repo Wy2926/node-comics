@@ -10,6 +10,8 @@
     "build:web": "vite build",
     "zip": "wxt zip",
     "zip:edge": "wxt zip --browser edge --mv3",
+    "zip:chrome:store": "node scripts/package-extension.mjs chrome store",
+    "zip:edge:store": "node scripts/package-extension.mjs edge store",
     "check": "wxt prepare && tsc --noEmit && npm run check:modules && npm run check:i18n",
     "test": "vitest run",
     "postinstall": "wxt prepare",

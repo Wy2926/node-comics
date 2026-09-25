@@ -1,5 +1,6 @@
 import type { CatalogTable, CatalogTables, PageDescriptor } from '../domain';
 import { openSourceDatabase, sourceDatabaseName, type DatabaseSchema } from '../../storage/database';
+import {openTranslationBindings} from './translation-bindings';
 
 export const CATALOG_DATABASE = sourceDatabaseName('catalog');
 export interface CatalogChange { table: CatalogTable; ids: IDBValidKey[] }
@@ -14,14 +15,13 @@ export interface CatalogMutation {
   put<T extends CatalogTable>(table: T, record: CatalogTables[T]): Promise<void>;
   remove(table: CatalogTable, id: IDBValidKey): Promise<void>;
 }
-const schema: Record<CatalogTable, [string, string | string[], boolean?][]> = {
+const schema: Record<Exclude<CatalogTable,'translationBindings'>, [string, string | string[], boolean?][]> = {
   comics: [['sourceKey', 'sourceKey', true], ['connectionId', 'source.connectionId'], ['updatedAt', 'updatedAt'], ['lastReadAt', 'lastReadAt']],
   entries: [['comicId', 'comicId'], ['comicOrder', ['comicId', 'order']], ['sourceEntry', ['comicId', 'sourceEntryId'], true], ['contentId', 'contentId', true]],
   connections: [['provider', 'provider']],
   pageDescriptors: [['contentId', 'contentId'], ['contentOrdinal', ['contentId', 'ordinal']], ['contentLocator', ['contentId', 'formatLocator'], true]],
   materializations: [['contentId', 'contentId'], ['pageId', 'pageId'], ['imageSha256', 'imageSha256']],
   positions: [['entryId', 'entryId', true], ['comicId', 'comicId'], ['updatedAt', 'updatedAt']],
-  translationBindings: [['imageSha256', 'imageSha256'], ['account', ['apiOrigin', 'userId']]],
   catalogs: [['comicId', 'comicId']],
   tasks: [['entryId', 'entryId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
   metadata: [], tombstones: [],
@@ -45,13 +45,18 @@ export function openCatalog(): Promise<IDBDatabase> {
   if (!opening) opening = openSourceDatabase('catalog', databaseSchema, () => { opening = undefined; }).catch(error => { opening = undefined; throw error; });
   return opening;
 }
+function openTables(tables:CatalogTable[]):Promise<IDBDatabase>{
+  if(!tables.includes('translationBindings'))return openCatalog();
+  if(tables.some(table=>table!=='translationBindings'&&table!=='tombstones'))throw Error('Translation bindings cannot participate in a source catalog transaction');
+  return openTranslationBindings();
+}
 const listeners = new Set<(change: CatalogChange) => void>();
 let channel: BroadcastChannel | undefined;
 function broadcast(): BroadcastChannel | undefined {
   // A service worker has no window; it still sends invalidations to reader tabs.
   if (!channel && typeof BroadcastChannel !== 'undefined' && typeof navigator !== 'undefined' && typeof indexedDB !== 'undefined') {
     channel = new BroadcastChannel(sourceDatabaseName('catalog-changes'));
-    channel.onmessage = event => { const change = event.data as CatalogChange; if (change?.table in schema && Array.isArray(change.ids)) for (const listener of listeners) listener(change); };
+    channel.onmessage = event => { const change = event.data as CatalogChange; if ((change?.table in schema||change?.table==='translationBindings') && Array.isArray(change.ids)) for (const listener of listeners) listener(change); };
   }
   return channel;
 }
@@ -81,7 +86,7 @@ export class StaleCatalogWriteError extends Error { constructor() { super('æ¼«ç”
 export const catalog = {
   /** Keep all reads and writes for an association change in one IDB transaction. */
   async mutate<T>(tables: CatalogTable[], edit: (records: CatalogMutation) => Promise<T>): Promise<T> {
-    const db = await openCatalog(), tx = db.transaction([...new Set([...tables, 'tombstones'])], 'readwrite'), done = idbCompleted(tx);
+    const db = await openTables(tables), tx = db.transaction([...new Set([...tables, 'tombstones'])], 'readwrite'), done = idbCompleted(tx);
     const writes = new Map<CatalogTable, IDBValidKey[]>();
     const records: CatalogMutation = {
       get: (table, id) => idbRequest(tx.objectStore(table).get(id)),
@@ -118,7 +123,7 @@ export const catalog = {
     });
   },
   async editTranslationBinding(id: string, edit: (previous: CatalogTables['translationBindings'] | undefined) => CatalogTables['translationBindings'] | undefined): Promise<CatalogTables['translationBindings'] | undefined> {
-    const db = await openCatalog(), tx = db.transaction('translationBindings', 'readwrite'), done = idbCompleted(tx);
+    const db = await openTranslationBindings(), tx = db.transaction('translationBindings', 'readwrite'), done = idbCompleted(tx);
     const store = tx.objectStore('translationBindings'), previous = await idbRequest(store.get(id)) as CatalogTables['translationBindings'] | undefined;
     const next = edit(previous); if (next) store.put(next); await done;
     if (next) changed('translationBindings', [id]); return next ?? previous;
@@ -131,37 +136,37 @@ export const catalog = {
     });
   },
   async get<T extends CatalogTable>(table: T, id: IDBValidKey): Promise<CatalogTables[T] | undefined> {
-    const db = await openCatalog(); return idbRequest(db.transaction(table).objectStore(table).get(id));
+    const db = await openTables([table]); return idbRequest(db.transaction(table).objectStore(table).get(id));
   },
   async put<T extends CatalogTable>(table: T, record: CatalogTables[T]): Promise<void> {
-    const db = await openCatalog(), tx = db.transaction([table, 'tombstones'], 'readwrite'), done = idbCompleted(tx);
+    const db = await openTables([table]), tx = db.transaction([table, 'tombstones'], 'readwrite'), done = idbCompleted(tx);
     const key = table === 'pageDescriptors' ? [(record as PageDescriptor).contentId, (record as PageDescriptor).pageId] : (record as { id: string }).id;
     if (table !== 'tombstones' && await idbRequest(tx.objectStore('tombstones').get([table, key].join(':')))) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
     tx.objectStore(table).put(record); await done; changed(table, [key]);
   },
   async patch<T extends CatalogTable>(table: T, id: IDBValidKey, patch: Partial<CatalogTables[T]>, options: { expectedGeneration?: number } = {}): Promise<CatalogTables[T] | undefined> {
-    const db = await openCatalog(), tx = db.transaction(table, 'readwrite'), done = idbCompleted(tx), store = tx.objectStore(table);
+    const db = await openTables([table]), tx = db.transaction(table, 'readwrite'), done = idbCompleted(tx), store = tx.objectStore(table);
     const value = await idbRequest(store.get(id)) as CatalogTables[T] | undefined;
     if (!value) { await done; return undefined; }
     if (options.expectedGeneration !== undefined && (value as unknown as { generation: number }).generation !== options.expectedGeneration) { tx.abort(); await done.catch(() => {}); throw new StaleCatalogWriteError(); }
     const next = { ...value, ...patch }; store.put(next); await done; changed(table, [id]); return next;
   },
   async remove(table: CatalogTable, id: IDBValidKey): Promise<void> {
-    const db = await openCatalog(), tx = db.transaction([table, 'tombstones'], 'readwrite'), done = idbCompleted(tx);
+    const db = await openTables([table]), tx = db.transaction([table, 'tombstones'], 'readwrite'), done = idbCompleted(tx);
     tx.objectStore(table).delete(id);
     if (table !== 'tombstones') tx.objectStore('tombstones').put({ id: [table, id].join(':'), deletedAt: Date.now() });
     await done; changed(table, [id]);
   },
   async list<T extends CatalogTable>(table: T, options: ListOptions = {}): Promise<CatalogTables[T][]> {
-    const db = await openCatalog(), store = db.transaction(table).objectStore(table);
+    const db = await openTables([table]), store = db.transaction(table).objectStore(table);
     return cursorValues(options.index ? store.index(options.index) : store, options);
   },
   async search<T extends CatalogTable>(table: T, matches: (value: CatalogTables[T]) => boolean, options: ListOptions = {}): Promise<CatalogTables[T][]> {
-    const db = await openCatalog(), store = db.transaction(table).objectStore(table);
+    const db = await openTables([table]), store = db.transaction(table).objectStore(table);
     return cursorValues(options.index ? store.index(options.index) : store, options, matches);
   },
   async count(table: CatalogTable, options: Pick<ListOptions, 'index' | 'range'> = {}): Promise<number> {
-    const db = await openCatalog(), store = db.transaction(table).objectStore(table);
+    const db = await openTables([table]), store = db.transaction(table).objectStore(table);
     return idbRequest((options.index ? store.index(options.index) : store).count(options.range));
   },
   listEntries(comicId: string, options: {offset?: number; limit?: number} = {}) {

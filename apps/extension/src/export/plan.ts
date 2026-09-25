@@ -1,8 +1,12 @@
 import type {Job, Mode, Page} from '../types';
+import {msg} from '../i18n/runtime';
 import {catalog} from '../comics/repositories';
 import {RENDER_PROFILE, type PageReference} from '../comics/pages/identity';
 import {materializationId} from '../comics/pages/service';
 import {pageTranslation} from '../reader/presentation';
+import type {TranslationScope} from '../translation/channels/contracts';
+import {resultBlobKey,resultInMemory} from '../storage/translations/results';
+import {translationCache} from '../storage/translations';
 
 export type ExportFormat = 'cbz' | 'zip' | 'pdf';
 export interface ExportOptions {format: ExportFormat; images: 'original' | 'translation'; mode: Mode; language: string; allowIncomplete?: boolean}
@@ -14,7 +18,7 @@ export interface ExportPage {
 export interface ExportPlan {
   entryId: string; contentId: string; generation: number; title: string; createdAt: string;
   options: ExportOptions; pages: ExportPage[]; incomplete: boolean; expectedPages?: number;
-  account?: {userId: string; origin: string};
+  scope?: TranslationScope;
 }
 export const MAX_EXPORT_BYTES = 128 * 1024 * 1024;
 export function safeName(value: string): string {
@@ -24,11 +28,11 @@ export function safeName(value: string): string {
 export const exportName = (title: string, options: ExportOptions) => `${safeName(title)}-${options.images === 'original' ? '原图' : safeName(options.language)+'-'+options.mode}${options.allowIncomplete ? '-已发现页面' : ''}.${options.format}`;
 
 /** Freeze metadata only. The explicit write command acquires one requested page at a time. */
-export async function planExport(entryId: string, options: ExportOptions, account?: ExportPlan['account'], signal?: AbortSignal): Promise<ExportPlan> {
+export async function planExport(entryId: string, options: ExportOptions, scope?: TranslationScope, signal?: AbortSignal): Promise<ExportPlan> {
   signal?.throwIfAborted();
   const document = await catalog.get('entries',entryId);
   if (!document || document.indexState !== 'ready') throw new Error('文档尚未建立可读目录，请先完成索引。');
-  if (options.images === 'translation' && !account) throw new Error('请先登录已有译图所属的账户。');
+  if (options.images === 'translation' && !scope) throw new Error(msg('请先选择已有译图所属的翻译渠道。'));
   const descriptors = [];
   for (let offset = 0;; offset += 100) {
     signal?.throwIfAborted();
@@ -47,17 +51,19 @@ export async function planExport(entryId: string, options: ExportOptions, accoun
     const page: ExportPage = {pageId:descriptor.pageId,ordinal:descriptor.ordinal,name:descriptor.name,reference,kind:'original'};
     if (options.images === 'translation') {
       const identity = await catalog.get('materializations',materializationId(reference));
-      const binding = identity && await catalog.get('translationBindings',JSON.stringify([account!.origin,account!.userId,identity.imageSha256]));
-      const projection: Page = {id:descriptor.pageId,name:descriptor.name,width:identity?.width ?? 0,height:identity?.height ?? 0,jobs:[],outputBlobs:{},...(binding?.payload as Partial<Page> | undefined)};
-      const translated = pageTranslation(projection,options.mode,options.language,account!.userId,account!.origin);
-      if (translated.result && (translated.blobKey || !translated.expired)) Object.assign(page,{kind:'translation',job:structuredClone(translated.result),cacheKey:translated.blobKey});
+      const binding = identity && await catalog.get('translationBindings',JSON.stringify([scope!.key,identity.imageSha256]));
+      const projection: Page = {id:descriptor.pageId,name:descriptor.name,width:identity?.width ?? 0,height:identity?.height ?? 0,jobs:[],outputBlobs:{},...(binding?.scope===scope!.key?binding.payload as Partial<Page>:undefined)};
+      const translated = pageTranslation(projection,options.mode,options.language,scope!.key);
+      const key=translated.result?.result?resultBlobKey(scope!,translated.result):undefined;
+      const cached=!!key&&(!!resultInMemory(key)||await translationCache.has(key));
+      if (translated.result && !translated.expired && (cached||translated.result.result?.recoverable)) Object.assign(page,{kind:'translation',job:structuredClone(translated.result),cacheKey:key});
       else if (translated.latest?.status === 'no_text') Object.assign(page,{kind:'no_text',reason:'未检测到文字，保留原图'});
       else Object.assign(page,{kind:'fallback',reason:'没有可用的已完成译图，保留原图'});
     }
     pages.push(page);
   }
   signal?.throwIfAborted();
-  return {entryId,contentId:document.contentId,generation:document.generation,title:document.title,createdAt:new Date().toISOString(),options:{...options},pages,incomplete,expectedPages,account};
+  return {entryId,contentId:document.contentId,generation:document.generation,title:document.title,createdAt:new Date().toISOString(),options:{...options},pages,incomplete,expectedPages,scope};
 }
 /** Explicit allowlist: no original URLs, account IDs, source locators, tokens or signed asset URLs. */
 export function exportManifest(plan: ExportPlan) {

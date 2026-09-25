@@ -95,3 +95,5 @@
 @media(max-width:760px){.direct-download{grid-template-columns:1fr;gap:28px}}
 
 .store-icon{width:48px;height:48px;object-fit:contain}
+
+.store-card{display:flex;flex-direction:column}.store-actions{margin-top:auto}.platform-download{margin-top:16px}.store-card .package-meta{margin:12px 0 0;font-size:.76rem}.store-card .package-unavailable{margin:16px 0 0;font-size:.78rem}.download-install{margin-bottom:24px}.download-install h2{margin-bottom:16px}.download-install .note{margin-bottom:0}

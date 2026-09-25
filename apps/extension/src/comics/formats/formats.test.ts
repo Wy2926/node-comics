@@ -83,6 +83,19 @@ describe('page indexes separate from materialization', () => {
       expect(reads).toHaveLength(0);
     } finally { await session.close(); }
   });
+  it('rejects an oversized contiguous text span before fetching it', async () => {
+    const fixture = mobi(), fields = new DataView(fixture.bytes.buffer);
+    const textStart = fields.getUint32(86), imageStart = textStart + 16 * 1024 * 1024;
+    fields.setUint32(94, imageStart); fields.setUint32(102, imageStart + 1024 * 1024);
+    const {source, reads} = sourceFor(fixture.bytes, false);
+    source.snapshot.size = imageStart + 2 * 1024 * 1024;
+    const session = await openDocument('mobi', source);
+    try {
+      await expect(session.index()).rejects.toThrow('安全预算');
+      expect(reads).toHaveLength(3);
+      expect(reads.every(read => read.offset + read.length <= textStart)).toBe(true);
+    } finally { await session.close(); }
+  });
   it.each(['pdf', 'cbr', 'image'])('keeps unsupported remote formats closed (%s)', async format => {
     const {source, reads} = sourceFor(png(100), false);
     await expect(openDocument(format, source)).rejects.toThrow('云端范围读取');

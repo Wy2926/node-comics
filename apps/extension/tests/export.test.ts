@@ -7,9 +7,12 @@ import {RENDER_PROFILE} from '../src/comics/pages/identity';
 import {exportManifest,MAX_EXPORT_BYTES,planExport,safeName,type ExportOptions} from '../src/export/plan';
 import {writeExport} from '../src/export/files';
 import {importContainer,releaseContainer} from '../src/storage/containers';
-import {exportOriginalFile} from '../src/comics/application/export-service';
+import {exportDocument,exportOriginalFile} from '../src/comics/application/export-service';
 import type {Job} from '../src/types';
+import {translationCache} from '../src/storage/translations';
+import {loadResultBlob,resultBlobKey} from '../src/storage/translations/results';
 vi.mock('../src/comics/pages/service',()=>({acquirePage:vi.fn(),materializationId:(ref:{contentId:string;pageId:string;renderProfileId:string})=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId])}));
+const scope={key:'selected-channel'};
 const options:ExportOptions={format:'cbz',images:'original',mode:'classic',language:'zh-Hans'};
 const image=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,1,2,3,4])],{type:'image/png'});
 async function sample(count=3){
@@ -17,13 +20,32 @@ async function sample(count=3){
   const pages=Array.from({length:count},(_,ordinal)=>({contentId,pageId:'page-'+ordinal,ordinal,name:String(ordinal),formatLocator:'entry:'+ordinal,locator:{entry:ordinal,url:'https://private.example/?token=secret'}}));
   await catalog.putPages(id,contentId,pages,1);return {id,contentId,pages};
 }
-const job=(id:string,changes:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:'private-result',status:'succeeded',mode:'classic',target_language:'zh-Hans',version:1,phase:'done',quota_pages:0,cache_hit:false,created_at:'2026-09-22',...changes});
+const job=(id:string,changes:Partial<Job>={}):Job=>({id,input_asset_id:'input',output_asset_id:'private-result',result:{key:'private-result',recoverable:true},status:'succeeded',mode:'classic',target_language:'zh-Hans',version:1,phase:'done',quota_pages:0,cache_hit:false,created_at:'2026-09-22',...changes});
 async function bind(s:Awaited<ReturnType<typeof sample>>,jobs:Job[],outputBlobs:Record<string,string>={}){
   const identity={id:JSON.stringify([s.contentId,'page-0',RENDER_PROFILE]),contentId:s.contentId,pageId:'page-0',renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),byteSize:12,mime:'image/png',width:100,height:100,updatedAt:Date.now()};
   expect(await catalog.putMaterialization(identity,1)).toBe(true);
-  await catalog.put('translationBindings',{id:JSON.stringify(['https://api.example','alice',identity.imageSha256]),apiOrigin:'https://api.example',userId:'alice',imageSha256:identity.imageSha256,payload:{ownerId:'alice',apiOrigin:'https://api.example',jobs,outputBlobs},updatedAt:Date.now()});
+  await catalog.put('translationBindings',{id:JSON.stringify([scope.key,identity.imageSha256]),scope:scope.key,imageSha256:identity.imageSha256,payload:{translationScope:scope.key,jobs,outputBlobs},updatedAt:Date.now()});
 }
 describe('document export through page leases',()=>{
+  it('exports through the injected channel reader and reuses existing result bytes without network access',async()=>{
+    const s=await sample(1),result=job('export-cached');await bind(s,[result]);
+    await translationCache.put(resultBlobKey(scope,result),image(),{owner:scope.key});
+    const download=vi.fn(async()=>{throw Error('unexpected network');}),readResult=vi.fn((job:Job)=>loadResultBlob({scope,job,download,isCurrent:()=>true}));
+    vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:100,height:100,close(){}})));
+    try{const exported=await exportDocument(s.id,{...options,images:'translation'},{scope,readResult,isCurrent:()=>true,signal:new AbortController().signal});
+      expect(exported.blob).toBeInstanceOf(Blob);expect(readResult).toHaveBeenCalledOnce();expect(download).not.toHaveBeenCalled();
+    }finally{vi.unstubAllGlobals();}
+  });
+  it('exports only cached local results without account identities or remote assets',async()=>{
+    const s=await sample(1),local=job('local',{output_asset_id:null,result:{key:crypto.randomUUID(),recoverable:false}});
+    await bind(s,[local]);
+    expect((await planExport(s.id,{...options,images:'translation'},scope)).pages[0].kind).toBe('fallback');
+    await translationCache.put(resultBlobKey(scope,local),image(),{owner:scope.key});
+    const plan=await planExport(s.id,{...options,images:'translation'},scope);
+    expect(plan.pages[0]).toMatchObject({kind:'translation',job:{id:'local',output_asset_id:null}});
+    await translationCache.delete(resultBlobKey(scope,local));
+    expect((await planExport(s.id,{...options,images:'translation'},scope)).pages[0].kind).toBe('fallback');
+  });
   it('plans source descriptors without reading image bytes and keeps a frozen revision',async()=>{
     const sampleData=await sample(105),plan=await planExport(sampleData.id,options);
     expect(plan.pages).toHaveLength(105);expect(plan.pages.map(page=>page.ordinal)).toEqual(Array.from({length:105},(_,i)=>i));
@@ -31,18 +53,18 @@ describe('document export through page leases',()=>{
   });
   it('only uses the selected account’s latest delivered translation; missing pages remain explicit original fallbacks',async()=>{
     const s=await sample();await bind(s,[job('older'),job('latest',{version:2}),job('running',{version:3,status:'running'})],{latest:'result-cache-key'});
-    const plan=await planExport(s.id,{...options,images:'translation'},{userId:'alice',origin:'https://api.example'});
+    const plan=await planExport(s.id,{...options,images:'translation'},scope);
     expect(plan.pages.map(page=>page.kind)).toEqual(['translation','fallback','fallback']);expect(plan.pages[0].job?.id).toBe('latest');
-    const other=await planExport(s.id,{...options,images:'translation'},{userId:'bob',origin:'https://api.example'});
+    const other=await planExport(s.id,{...options,images:'translation'},{key:'other-channel'});
     expect(other.pages.every(page=>page.kind==='fallback')).toBe(true);
     await bind(s,[job('old'),job('expired',{version:2,output_asset_id:null,result_expired:true})],{old:'older-cache'});
-    expect((await planExport(s.id,{...options,images:'translation'},{userId:'alice',origin:'https://api.example'})).pages[0].kind).toBe('fallback');
+    expect((await planExport(s.id,{...options,images:'translation'},scope)).pages[0].kind).toBe('fallback');
   });
   it('requires explicit partial export and emits a credential-free manifest',async()=>{
     const s=await sample();await catalog.patch('entries',s.id,{discoveryComplete:false,knownTotal:8});
     await expect(planExport(s.id,options)).rejects.toThrow('尚未全部发现');
     await bind(s,[job('translated')]);
-    const plan=await planExport(s.id,{...options,allowIncomplete:true,images:'translation'},{userId:'alice',origin:'https://api.example'});
+    const plan=await planExport(s.id,{...options,allowIncomplete:true,images:'translation'},scope);
     const manifest=JSON.stringify(exportManifest(plan));expect(JSON.parse(manifest).complete).toBe(false);
     for(const secret of ['private.example','token','secret','alice','api.example','private-result','sourceUrl','cacheKey'])expect(manifest).not.toContain(secret);
   });

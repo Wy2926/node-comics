@@ -1,7 +1,7 @@
 import {Sha256} from '../src/importers/hash';
 import {vi} from 'vitest';
 import {Api} from '../src/api';
-import {TranslationCoordinator} from '../src/translation/coordinator';
+import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {emptyPage} from '../src/reader/model';
 import type {Entitlements,Job,TranslationSnapshot,TranslationInput} from '../src/types';
 export const origin='https://api.example';
@@ -9,7 +9,7 @@ export const entitlement=(plus=false):Entitlements=>({plan:plus?'plus':'free',pl
 export const originalBytes=(n:number)=>new Blob(['png'+n],{type:'image/png'});
 const originalSha=(n:number)=>new Sha256().update(new TextEncoder().encode('png'+n)).digest();
 export const target=(n:number)=>({entryId:'book',mode:'classic' as const,page:{...emptyPage(n+'.png',800,1200),id:'page-'+n,fileHash:'a'.repeat(64),pageIndex:n,imageSha256:originalSha(n),imageByteSize:originalBytes(n).size,imageMime:'image/png',blobKey:'blob-'+n}});
-export const job=(n:number,extra:Partial<Job>={}):Job=>({id:'job-'+n,input_asset_id:'original-'+n,output_asset_id:null,status:'queued',phase:'queued',mode:'classic',target_language:'zh-Hans',created_at:'2026-09-19T00:00:00Z',version:1,quota_pages:1,cache_hit:false,file_hash:'a'.repeat(64),page_index:n,image_sha256:originalSha(n),...extra});
+export const job=(n:number,extra:Partial<Job>={}):Job=>({id:'job-'+n,input_asset_id:'original-'+n,output_asset_id:null,status:'queued',phase:'queued',mode:'classic',target_language:'zh-Hans',created_at:'2026-09-19T00:00:00Z',version:1,quota_pages:1,cache_hit:false,file_hash:'a'.repeat(64),page_index:n,image_sha256:originalSha(n),result:extra.status==='succeeded'&&extra.output_asset_id?{key:extra.output_asset_id,recoverable:true}:undefined,...extra});
 export const snapshot=(id:string,body:TranslationInput,extra:Partial<TranslationSnapshot>={}):TranslationSnapshot=>({id,state:'queued',mode:'image' in body?body.mode:'classic',target_language:'image' in body?body.target_language:'zh-Hans',image_sha256:'image' in body?body.image.sha256:undefined,created_at:new Date().toISOString(),...extra});
 export function fixture(){
  const api=new Api(origin),userId=crypto.randomUUID(),rights=entitlement(),onJobs=vi.fn(async(_jobs:Job[])=>{});

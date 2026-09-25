@@ -1,11 +1,12 @@
 import 'fake-indexeddb/auto';
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {ApiError} from '../src/api';
-import {TranslationCoordinator} from '../src/translation/coordinator';
-import {readOperation,saveOperation} from '../src/translation/store';
-import {operationId} from '../src/translation/automatic';
+import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
+import {readOperation,saveOperation,readSync} from '../src/translation/channels/adapters/nodelane/store';
+import {operationId} from '../src/translation/channels/adapters/nodelane/operations';
 import {fixture,target,snapshot,entitlement} from './translation-fixture';
 afterEach(()=>vi.restoreAllMocks());
+function controlledClock(){let wall=Date.now(),monotonic=performance.now();vi.spyOn(Date,'now').mockImplementation(()=>wall);vi.spyOn(performance,'now').mockImplementation(()=>monotonic);return (milliseconds:number)=>{wall+=milliseconds;monotonic+=milliseconds;};}
 describe('independent translation resources',()=>{
  it('submits only newly entered pages and promotes a prefetch once',async()=>{
   const f=fixture();await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledTimes(4);
@@ -16,6 +17,12 @@ describe('independent translation resources',()=>{
   const f=fixture(),missing={...target(1),page:{...target(1).page,imageSha256:undefined,imageByteSize:undefined,blobKey:undefined}};
   await f.core.submit([target(0),missing,target(2)]);expect(f.submit).toHaveBeenCalledTimes(2);expect(f.submit.mock.calls[0][1]).toMatchObject({image:{sha256:target(0).page.imageSha256}});
  });
+ it('releases inline input after server acceptance without making cleanup failure an uncertain request',async()=>{
+  const f=fixture(),onInputConsumed=vi.fn(async()=>{throw Error('cache cleanup failed');}),core=new TranslationCoordinator({...f.core.options,onInputConsumed});
+  await core.submit([target(0)]);expect(onInputConsumed).toHaveBeenCalledWith('blob-0');
+  const saved=await readOperation(operationId(core.scope,'zh-Hans',target(0)));expect(saved?.state).toBe('accepted');expect(saved?.result?.state).toBe('queued');
+  await core.submit([target(0)]);expect(f.submit).toHaveBeenCalledOnce();
+ });
  it('uses a durable UUID after response loss and reopens no server session',async()=>{
   const f=fixture();f.submit.mockRejectedValueOnce(new ApiError('offline'));await f.core.submit([target(1)]);
   const record=(await readOperation(operationId(f.core.scope,'zh-Hans',target(1))))!;record.retryAt=0;await saveOperation(record);
@@ -23,8 +30,31 @@ describe('independent translation resources',()=>{
   expect(f.api.translations).toHaveBeenCalledWith([record.requestId],expect.anything());expect(f.submit.mock.calls[1][0]).toBe(record.requestId);
  });
  it('does not retry abandoned local pages',async()=>{const f=fixture();await f.core.submit([target(1)],()=>false);await f.core.submit([target(2)]);expect(f.submit).toHaveBeenCalledOnce();});
- it('keeps a rate-denied UUID and permits a new page to attempt reuse once',async()=>{
-  const f=fixture();f.submit.mockRejectedValueOnce(new ApiError('wait','IMAGE_RATE_LIMITED',429,null,20));await f.core.submit([target(0)]);const id=f.submit.mock.calls[0][0];await f.core.submit([target(0)]);expect(f.submit).toHaveBeenCalledOnce();await f.core.submit([target(1)]);expect(f.submit).toHaveBeenCalledTimes(2);expect((await readOperation(operationId(f.core.scope,'zh-Hans',target(0))))?.requestId).toBe(id);
+ it('gates the remaining prefetches and new windows until the image deadline, then reuses the denied UUID',async()=>{
+  const advance=controlledClock(),f=fixture();f.submit.mockRejectedValueOnce(new ApiError('wait','IMAGE_RATE_LIMITED',429,null,20));
+  await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledOnce();const deniedId=f.submit.mock.calls[0][0];
+  await f.core.submit([4,5,6,7].map(target));expect(f.submit).toHaveBeenCalledOnce();expect(f.core.retryDelay).toBe(20000);
+  advance(19999);await f.core.submit([4,5,6,7].map(target));expect(f.submit).toHaveBeenCalledOnce();expect(f.core.retryDelay).toBe(1);
+  advance(1);await f.core.submit([4,5,6,7].map(target));expect(f.submit).toHaveBeenCalledTimes(5);
+  await f.core.submit([target(0)]);expect(f.submit.mock.calls.at(-1)?.[0]).toBe(deniedId);
+ });
+ it('keeps the image admission deadline when an accepted request completes',async()=>{
+  controlledClock();const f=fixture();await f.core.submit([target(0)]);const [id,body]=f.submit.mock.calls[0];
+  f.submit.mockRejectedValueOnce(new ApiError('wait','IMAGE_RATE_LIMITED',429,null,20));await f.core.submit([1,2,3,0].map(target));expect(f.submit).toHaveBeenCalledTimes(2);
+  const deadline=(await readSync(f.core.scope))!.imageRetryAt;
+  vi.mocked(f.api.translations).mockResolvedValue({unchanged:false,items:[snapshot(id,body,{state:'succeeded',result:{kind:'no_text'}})],missing_ids:[],etag:'"completed"'});
+  await f.core.wait(new AbortController().signal);expect((await readSync(f.core.scope))!.imageRetryAt).toBe(deadline);
+  await f.core.submit([4,5,6,7].map(target));expect(f.submit).toHaveBeenCalledTimes(2);expect(f.core.retryDelay).toBe(20000);
+ });
+ it('shares image admission backpressure across reopened coordinators while allowing accepted promotion and recovery',async()=>{
+  controlledClock();const f=fixture();await f.core.submit([target(0),target(1)]);const [prefetchId,prefetchBody]=f.submit.mock.calls[1];
+  f.submit.mockRejectedValueOnce(new ApiError('wait','IMAGE_RATE_LIMITED',429,null,20));await f.core.submit([target(2)]);const deadline=(await readSync(f.core.scope))!.imageRetryAt;
+  vi.mocked(f.api.translations).mockResolvedValue({unchanged:false,items:[snapshot(prefetchId,prefetchBody,{state:'needs_input'})],missing_ids:[],etag:'"upload"'});
+  const upload=vi.spyOn(f.api,'translationInput').mockImplementation(async(id)=>snapshot(id,prefetchBody));
+  const reopened=new TranslationCoordinator(f.core.options);await reopened.submit([target(1),target(3)]);await reopened.finishUploads();
+  expect(f.api.translations).toHaveBeenCalledWith([prefetchId],expect.anything());expect(upload).toHaveBeenCalledOnce();
+  expect(f.submit).toHaveBeenCalledTimes(4);expect(f.submit.mock.calls[3]).toMatchObject([prefetchId,{priority:'current'}]);
+  expect((await readSync(f.core.scope))!.imageRetryAt).toBe(deadline);expect(reopened.retryDelay).toBe(20000);
  });
  it('restores denied quota with the same unaccepted UUID',async()=>{
   const f=fixture();f.submit.mockRejectedValueOnce(new ApiError('quota','DAILY_QUOTA_EXHAUSTED',403));await f.core.submit([target(0)]);await f.core.refreshEntitlements(entitlement(true));await f.core.submit([target(0)]);expect(f.submit.mock.calls[1][0]).toBe(f.submit.mock.calls[0][0]);

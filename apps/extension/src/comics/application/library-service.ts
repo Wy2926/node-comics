@@ -11,11 +11,12 @@ import {downloadStore} from '../../storage/downloads';
 import type {LibraryViewModel,SourceCatalog} from './types';
 import {mergeJobs} from '../../reader/jobs';
 import {sourceCoverOwner} from './cover-access';
+import type {TranslationScope} from '../../translation/channels/contracts';
 export {coverReference} from './cover-access';
 
-type TranslationPayload=Pick<Page,'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
+type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
 const savedPages=new WeakMap<Page,string>();
-const payload=(page:Page):TranslationPayload=>({ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
+const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
 export async function continueEntry(comicId:string):Promise<Entry|undefined> {
   const comic=await catalog.get('comics',comicId);if(!comic)return;
@@ -36,17 +37,17 @@ function readingEntry(entry:Entry,pages:Page[]=[],position?:{contentId:string;pa
     pageId:position?.contentId===entry.contentId?position.pageId:pages[0]?.id??'',relativeOffset:position?.contentId===entry.contentId?position.relativeOffset:0,
     discoveryComplete:entry.discoveryComplete??false,knownTotal:entry.knownTotal??entry.pageCount};
 }
-export async function loadEntry(id:string,account?:{userId:string;origin:string}):Promise<ReadingEntry> {
+export async function loadEntry(id:string,scope?:TranslationScope):Promise<ReadingEntry> {
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
   const [descriptors,position,comic]=await Promise.all([catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
   const pages=await Promise.all(descriptors.map(async descriptor=>{
     const identity=await catalog.get('materializations',materializationId({entryId:id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:RENDER_PROFILE}));
     const page=descriptorView(entry,descriptor,identity);
-    if(account&&identity){
-      const saved=await catalog.get('translationBindings',JSON.stringify([account.origin,account.userId,identity.imageSha256]));
-      if(saved&&saved.userId===account.userId&&saved.apiOrigin===account.origin){
+    if(scope&&identity){
+      const saved=await catalog.get('translationBindings',JSON.stringify([scope.key,identity.imageSha256]));
+      if(saved?.scope===scope.key){
         const value=saved.payload as TranslationPayload;
-        page.ownerId=account.userId;page.apiOrigin=account.origin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];page.assetId=value.assetId;page.assetExpiresAt=value.assetExpiresAt;
+        page.translationScope=scope.key;page.ownerId=value.ownerId;page.apiOrigin=value.apiOrigin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];page.assetId=value.assetId;page.assetExpiresAt=value.assetExpiresAt;
       }
     }
     savedPages.set(page,JSON.stringify(payload(page)));return page;
@@ -65,11 +66,11 @@ export async function comicDirectory(comicId:string,currentId?:string):Promise<R
   return {comicId,title:comic.title,sourceUrl:comic.sourceUrl,groups,related:source?.entries.filter(entry=>entry.related).map(({id,title,url})=>({id,title,url})),entries:entries.map(entry=>({id:entry.id,title:entry.title,tags:source?.entries.find(item=>item.id===entry.sourceEntryId)?.rawTypes??[],current:entry.id===currentId,read:!!entry.readAt,total:entry.knownTotal??entry.pageCount,status:entry.error??(entry.indexState==='ready'?'可以阅读':'按需载入'),error:entry.error}))};
 }
 /** Only one adapter-declared sequence may be read continuously. Other groups remain explicit navigation. */
-export async function readerSequence(entryId:string,account?:{userId:string;origin:string}):Promise<{copies:ReadingEntry[];directory:ReadingDirectory}> {
+export async function readerSequence(entryId:string,scope?:TranslationScope):Promise<{copies:ReadingEntry[];directory:ReadingDirectory}> {
   const entry=await catalog.get('entries',entryId);if(!entry)throw Error('漫画已移除。');
   const entries=entry.sequenceId?(await catalog.listEntries(entry.comicId)).filter(item=>item.sequenceId===entry.sequenceId&&(!item.sourceRemoved||item.id===entryId)):[entry];
   const at=entries.findIndex(item=>item.id===entryId);
-  const copies=await Promise.all(entries.map((item,index)=>Math.abs(index-at)<=1?loadEntry(item.id,account):Promise.resolve(readingEntry(item))));
+  const copies=await Promise.all(entries.map((item,index)=>Math.abs(index-at)<=1?loadEntry(item.id,scope):Promise.resolve(readingEntry(item))));
   return {copies,directory:await comicDirectory(entry.comicId,entryId)};
 }
 export async function saveReaderState(copy:ReadingEntry) {
@@ -77,14 +78,14 @@ export async function saveReaderState(copy:ReadingEntry) {
   const entry=await catalog.get('entries',copy.id);if(!entry||entry.contentId!==copy.contentId||entry.comicId!==copy.comicId)return;
   if(copy.pageId&&copy.lastReadAt!==undefined)await catalog.savePosition({id:copy.id,comicId:copy.comicId,entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,relativeOffset:Math.max(0,Math.min(1,copy.relativeOffset)),updatedAt:copy.lastReadAt});
   for(const page of copy.pages){
-    if(!page.ownerId||!page.apiOrigin||!page.imageSha256||!page.jobs.length&&!page.assetId)continue;
+    if(!page.translationScope||!page.imageSha256||!page.jobs.length&&!page.assetId)continue;
     const incoming=payload(page),signature=JSON.stringify(incoming);if(savedPages.get(page)===signature)continue;
-    const id=JSON.stringify([page.apiOrigin,page.ownerId,page.imageSha256]);
+    const id=JSON.stringify([page.translationScope,page.imageSha256]);
     await catalog.editTranslationBinding(id,previous=>{
       const old=previous?.payload as TranslationPayload|undefined,jobs=mergeJobs(old?.jobs??[],incoming.jobs);
       const merged:TranslationPayload={...incoming,jobs,assetId:incoming.assetId??old?.assetId,assetExpiresAt:incoming.assetId?incoming.assetExpiresAt:old?.assetExpiresAt};
       if(previous&&JSON.stringify(old)===JSON.stringify(merged))return undefined;
-      return {id,apiOrigin:page.apiOrigin!,userId:page.ownerId!,imageSha256:page.imageSha256!,payload:merged,updatedAt:Date.now()};
+      return {id,scope:page.translationScope!,imageSha256:page.imageSha256!,payload:merged,updatedAt:Date.now()};
     });
     savedPages.set(page,signature);
   }

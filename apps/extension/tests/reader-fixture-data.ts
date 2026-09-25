@@ -16,7 +16,7 @@ export async function seedReaderFixture(origin:string,scenario:string|null,makeJ
   const imageOrdinals:Record<string,number>={};
   if(await catalog.count('comics')&&!await catalog.get('metadata',marker))throw Error('This origin contains non-fixture data. Use a new browser profile.');
   await catalog.put('metadata',{id:marker,synthetic:true});
-  const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'};
+  const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'},scope={key:JSON.stringify([origin,scenario?'fixture-'+scenario:'fixture-reader'])};
   const titles=scenario?['自动翻译 · '+scenario]:['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'];
   const existing=await catalog.list('metadata',{range:IDBKeyRange.bound(marker+':',marker+':\uffff'),limit:10});
   const ids:string[]=[];
@@ -47,13 +47,13 @@ export async function seedReaderFixture(origin:string,scenario:string|null,makeJ
       const lease=await acquirePage({entryId:doc.id,contentId:doc.contentId,pageId:page.pageId,renderProfileId:RENDER_PROFILE});
       try {
         const seed=makeJob(index,states[index]);
-        const job={...seed,id:bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,image_sha256:lease.identity.imageSha256};
-        await catalog.put('translationBindings',{id:JSON.stringify([origin,account.userId,lease.identity.imageSha256]),apiOrigin:origin,userId:account.userId,imageSha256:lease.identity.imageSha256,updatedAt:Date.now(),payload:{ownerId:account.userId,apiOrigin:origin,assetId:job.input_asset_id,jobs:[job]}});
+        const job={...seed,result:seed.status==='succeeded'&&seed.output_asset_id?{key:seed.output_asset_id,recoverable:true}:undefined,id:bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,image_sha256:lease.identity.imageSha256};
+        await catalog.put('translationBindings',{id:JSON.stringify([scope.key,lease.identity.imageSha256]),scope:scope.key,imageSha256:lease.identity.imageSha256,updatedAt:Date.now(),payload:{translationScope:scope.key,ownerId:account.userId,apiOrigin:origin,assetId:job.input_asset_id,jobs:[job]}});
       } finally {lease.release();}
     }
     await catalog.put('metadata',{id,entryId:doc.id,imageOrdinals});ids.push(doc.id);
   }
-  const copies=await Promise.all(ids.map(id=>loadEntry(id,account)));
+  const copies=await Promise.all(ids.map(id=>loadEntry(id,scope)));
   const ordinals:Record<string,number>={};for(const copy of copies)copy.pages.forEach((page,index)=>{ordinals[page.id]=index;});
   unregisterLocal();
   return {copies,ordinals,imageOrdinals};

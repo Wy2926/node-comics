@@ -4,7 +4,7 @@ React / TypeScript / WXT Manifest V3 漫画阅读器，翻译由后端执行。�
 
 产品行为见[单来源阅读](../../docs/SIMPLE_COMIC_READING_DESIGN.md)，存储采用 `node-comics-reading-v2-*` 空库基线，不迁移或兼容旧书架。界面验收以桌面浏览器为目标。新客户端需要重新导入漫画；旧本机数据库保留但不读取。
 
-翻译使用逐图 UUID、按需原图上传和批量快照，上传自动启动；本地页面键为固定 64 字符 SHA-256。没有阅读会话续租或旧 API 回退，客户端与后端须使用相同的新[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md)。
+翻译提供 NodeLane 官方与 manga-translator-ui 两种[渠道适配器](../../docs/TRANSLATION_CHANNELS.md)，在“外观与偏好 → 翻译渠道”选择。MTU 连接用户自己的服务，不需要 NodeLane 账号。官方使用逐图 UUID、按需原图上传和批量快照，客户端与后端须使用相同的[官方翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md)。
 
 ## 运行与构建
 
@@ -20,7 +20,7 @@ npm run build:web    # dist-web
 npm run zip
 ```
 
-Chrome / Edge 在扩展管理页打开开发者模式，加载 `.output/chrome-mv3`。稳定扩展 ID 为 `aiajdjliifeeaogpalejpggkiccjbneo`；更新构建后需重新加载。产品服务由 [service.ts](src/service.ts) 固定为 `https://comics.nodelane.net`，本地 Vite 不会自动切到本地 API，用户界面不提供服务地址或供应商配置。
+Chrome / Edge 在扩展管理页打开开发者模式，分别加载 `.output/chrome-mv3` / `.output/edge-mv3`。固定公钥生成的 ID 分别为 `aiajdjliifeeaogpalejpggkiccjbneo` / `haelhcdomcfllhpfjdpbejccbjcdeaig`；更新构建后需重新加载。官方产品服务由 [service.ts](src/service.ts) 固定为 `https://comics.nodelane.net`，本地 Vite 不会自动切到本地 API。MTU 渠道独立配置其服务地址和登录凭据。
 
 独立沙盒可在构建前设置 `$env:VITE_API_BASE='https://<沙盒域名>'`，客户端及精确 host permission 同步生成；沙盒须使用独立数据库、支付配置并允许实际扩展来源。正式构建前用 `Remove-Item Env:VITE_API_BASE -ErrorAction SilentlyContinue` 清除此覆盖。Drive 的 HTTPS 连接页及两类 OAuth client 配置见 [drive-connect](../drive-connect/README.md)。
 
@@ -31,7 +31,7 @@ npm run zip -- --browser firefox --mv3
 npx --no-install web-ext lint --source-dir .output/firefox-mv3
 ```
 
-Edge 商店提交包：运行 `npm run zip:edge`，产物为 `.output/node-comicsextension-<版本>-edge.zip`。此构建不包含 Chrome 固定扩展 ID 使用的 `manifest.key`；不要将带有该字段的 Chrome 包提交到 Edge 商店。
+手动安装包：Chrome 使用 `npm run zip`，Edge 使用 `npm run zip:edge`，分别包含各平台固定公钥。商店提交使用 `npm run zip:chrome:store` / `npm run zip:edge:store`，产物在 `.output/store/node-comicsextension-<版本>-<chrome|edge>.zip`，不含 `manifest.key`。不要将官网下载的手动安装包提交商店。统一入口 `node scripts/package-extension.mjs <chrome|edge> <download|store> [输出目录]` 可指定独立产物目录。
 
 Edge 的 Google Drive 构建须设置 `$env:VITE_DRIVE_CONNECT_URL='https://comics.nodelane.net/drive-connect/index.html'`。网页连接在同一授权窗口跳转 Google 完成选文件后返回，需同步发布新版 `apps/drive-connect/connect.js`，并在 Google Web OAuth 客户端登记该完整地址为 Authorized redirect URI。Chrome 托管连接保持原有模式；细节及真实授权验收边界见 [Drive 配置](../drive-connect/README.md)。
 
@@ -43,12 +43,12 @@ Edge 的 Google Drive 构建须设置 `$env:VITE_DRIVE_CONNECT_URL='https://comi
 | --- | --- |
 | 网站适配 | [精简开发规范](../../docs/SITE_ADAPTERS.md)，站点代码与说明在 `src/sources/sites/<id>/` |
 | 来源、页面和缓存 | [来源架构](../../docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式约束](../../docs/IMPORT_FORMATS_AND_CACHE.md) |
-| 阅读翻译与恢复 | [翻译接口契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
+| 阅读翻译与恢复 | [客户端渠道](../../docs/TRANSLATION_CHANNELS.md)、[官方接口契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
 | 账户、额度和支付 | [身份](../../docs/PRODUCTION_IDENTITY.md)、[会员规则](../../docs/MEMBERSHIP_AND_QUOTAS.md)、[订阅](../../docs/STRIPE_BILLING.md) |
 | UI 与文案 | [共享视觉令牌](../../docs/POPUP_AND_THEME.md)、[16 种界面语言](../../docs/UI_INTERNATIONALIZATION.md) |
 | 匿名适配申请与插件反馈 | [后台接口与边界](../../docs/ADMIN_CONSOLE.md#匿名网站申请与插件反馈) |
 
-新漫画默认原图，查看方式按漫画保存；明确选择翻译后自动处理当前页与后三页。逐页保存操作编号，响应丢失先核实；已有原图无需重传。后端持久任务继续执行，客户端按账户增量同步状态并按需下载译图。来源 Cookie／令牌不上传，未登录可读本地原图。
+新漫画默认原图，查看方式按漫画保存；明确选择翻译后自动处理当前页与后三页。官方逐页保存操作编号，响应丢失先核实；MTU 持有本地执行回执，连接中断后只能手动重试。译图按渠道隔离；官方缓存缺失可下载，MTU 缓存缺失需重译。来源 Cookie／令牌不上传，未登录可读本地原图及使用已连接的 MTU 渠道。
 
 网站目录只读，更新能力由适配器显式声明；同步不下载新章节图片，失败保留旧目录和位置。账户列表由文件来源驱动提供，不由 UI 判断具体供应商。品牌素材随 `public/brand` 和 `src/assets/brand` 打包，构建不依赖 `output/`。
 
@@ -59,6 +59,7 @@ Edge 的 Google Drive 构建须设置 `$env:VITE_DRIVE_CONNECT_URL='https://comi
 | 夹具 | 启动与检查 |
 | --- | --- |
 | 阅读计划 | `npm run dev -- --port 5176`，打开 `/tests/reader-fixture.html`；`?plus`、`?redrawOutcome=success` 或 `failure` 控制模拟响应 |
+| 翻译渠道 | 同一隔离端口打开 `/tests/channel-fixture.html#settings`；根目录运行 `scripts/verify_translation_channels.mjs`，扩展宿主验收见 `scripts/verify_translation_channel_host.mjs` |
 | 登录生命周期 | `npm run dev -- --port 5187`，打开 `/tests/auth-lifecycle-fixture.html?login=oidc#account`；Alt+E 模拟失败、Alt+S 模拟成功；`login=config-error/loading/development` 检查其他状态 |
 | 订阅焦点恢复 | `npm run dev -- --port 5192`，打开 `/tests/billing-focus-fixture.html`，点击运行回归检查 |
 

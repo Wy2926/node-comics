@@ -117,10 +117,17 @@ export function openMobiDocument(source: RandomAccessSource): DocumentSession {
       if (textRecords >= count || u32(first, 4) > MAX_TEXT) fail('MOBI 正文超过安全限制。');
       const firstImage = u32(first, 108);
       if (firstImage >= count) fail('MOBI 中没有可读取的漫画图片。');
+      if (firstImage <= textRecords) fail('MOBI 记录表范围或顺序无效。');
       const flags = first.length > 243 && u32(first, 20) >= 228 ? u16(first, 242) : 0;
+      // Text records are contiguous. Fetch their exact span once instead of paying
+      // a remote round trip (and version checks) for every small PalmDOC record.
+      // The index budget is checked before the read; no image records are included.
+      const textStart = offsets[1];
+      const body = textRecords ? await read(textStart, offsets[textRecords + 1] - textStart, signal) : new Uint8Array();
       let text = '', expanded = 0;
       for (let index = 1; index <= textRecords; index++) {
-        const bytes = withoutTrailers(await record(index), flags);
+        throwIfAborted(signal);
+        const bytes = withoutTrailers(body.subarray(offsets[index] - textStart, offsets[index + 1] - textStart), flags);
         const part = compression === 2 ? decompressPalmDoc(bytes, MAX_TEXT - expanded) : bytes;
         expanded += part.length;
         if (expanded > MAX_TEXT) fail('MOBI 正文展开超过安全限制。');

@@ -1,21 +1,23 @@
-import type {PageReference} from '../comics/pages/identity';
-import {hashFile} from '../importers/hash';
-import {registerOriginal} from '../comics/originals';
-import {msg} from '../i18n/runtime';
-import {Api,ApiError} from '../api';
-import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../concurrency';
-import {mergeJobs} from '../reader/jobs';
-import {pageTranslation} from '../reader/presentation';
-import type {Entitlements,Job,TranslationSnapshot} from '../types';
-import {makeOperation,operationId,quotaErrors,type ReadingTarget} from './automatic';
+import type {PageReference} from '../../../../comics/pages/identity';
+import {hashFile} from '../../../../importers/hash';
+import {registerOriginal} from '../../../../comics/originals';
+import {msg} from '../../../../i18n/runtime';
+import {Api,ApiError} from '../../../../api';
+import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
+import {mergeJobs} from '../../../../reader/jobs';
+import {pageTranslation} from '../../../../reader/presentation';
+import type {Entitlements,Job,TranslationSnapshot} from '../../../../types';
+import type {ReadingTarget} from '../../../automatic';
+import {makeOperation,operationId,quotaErrors} from './operations';
 import {readOperation,readOperations,readSync,saveOperation,saveSync,translationScope,withTranslationLock,type LocalOperation,type SyncState} from './store';
 
-interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
+interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;onInputConsumed?:(blobKey:string)=>Promise<void>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
 const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!r.result&&['needs_input','queued','running','needs_attention'].includes(r.result.state);
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
 export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperation):Job{
   const unavailable=snapshot.error?.code==='TRANSLATION_UNAVAILABLE';
-  return {id:snapshot.id,input_asset_id:snapshot.input_asset_id??null,output_asset_id:snapshot.result?.asset_id??null,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
+  const result=snapshot.state==='succeeded'&&snapshot.result?.asset_id&&!unavailable?{key:snapshot.result.asset_id,recoverable:true}:undefined;
+  return {id:snapshot.id,input_asset_id:snapshot.input_asset_id??null,output_asset_id:snapshot.result?.asset_id??null,result,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
 }
 /** Current plus three pages is local scheduling, never a server reading session. */
 export class TranslationCoordinator {
@@ -31,7 +33,12 @@ export class TranslationCoordinator {
   private remaining(key:'imageRetryAt'|'controlRetryAt'){return this.delay(key,this.state[key]??0);}
   private recordDelay(record:LocalOperation){return this.delay('retry:'+record.requestId,record.retryAt??0);}
   get controlDelay(){return this.remaining('controlRetryAt');}
-  get retryDelay(){const waits=this.records.filter(r=>this.wanted.has(r.id)&&['uncertain','local','deferred'].includes(r.state)||this.wanted.has(r.id)&&r.result?.state==='needs_input').map(r=>this.recordDelay(r)).filter(n=>n>0);return Math.max(this.controlDelay,waits.length?Math.min(...waits):0);}
+  get retryDelay(){
+    const imageDelay=this.remaining('imageRetryAt');
+    const waits=this.records.filter(r=>this.wanted.has(r.id)&&(['uncertain','local','deferred'].includes(r.state)||r.result?.state==='needs_input'))
+      .map(r=>Math.max(this.recordDelay(r),r.state==='local'||r.state==='deferred'?imageDelay:0)).filter(n=>n>0);
+    return Math.max(this.controlDelay,waits.length?Math.min(...waits):0);
+  }
   get waitingIds(){return this.records.filter(r=>this.wanted.has(r.id)&&r.state==='accepted'&&active(r)&&this.recordDelay(r)<=0).map(r=>r.requestId).sort();}
   get hasPending(){return this.waitingIds.length>0;}
   private async save(record:LocalOperation){this.current();const saved=await readOperation(record.id);if(saved&&saved.requestId!==record.requestId)return;await saveOperation(record);this.records=this.records.filter(r=>r.id!==record.id).concat(record);this.options.onChange();}
@@ -43,6 +50,8 @@ export class TranslationCoordinator {
     await this.options.onJobs([job]);
     if(result.input_asset_id)await registerOriginal(new URL(this.options.api.base).origin,this.options.userId,record.image.sha256,result.input_asset_id);
     if(result.state==='needs_input'&&this.wanted.has(record.id))this.upload(record);
+    // Cache cleanup cannot turn a durable server receipt into an uncertain submission.
+    if(record.blobKey&&result.state!=='needs_input')await this.options.onInputConsumed?.(record.blobKey).catch(()=>{});
     if(result.state==='failed'&&previous?.state!=='failed')await this.refreshEntitlements();
   }
   private upload(record:LocalOperation){
@@ -80,8 +89,11 @@ export class TranslationCoordinator {
       try{await withTranslationLock(id,async()=>{
         let record=await readOperation(id);
         if(!record){record=await makeOperation(target,this.scope,this.options.language,this.options.getBlob);await saveOperation(record);this.records=this.records.concat(record);}
+        this.state=await readSync(this.scope)??this.state;
         const promote=index===0&&record.priority==='prefetch'&&record.state==='accepted'&&['needs_input','queued','running'].includes(record.result?.state??'');
-        if(record.state==='blocked'||record.state==='accepted'&&!promote||record.state==='uncertain'||this.recordDelay(record)>0||record.state==='deferred'&&this.remaining('imageRetryAt')>0)return;
+        // Image admission backpressure covers every new page in this scope, including a new window.
+        // Accepted requests may still be promoted, recovered and supplied with their original bytes.
+        if(record.state==='blocked'||record.state==='accepted'&&!promote||record.state==='uncertain'||this.recordDelay(record)>0||!promote&&this.remaining('imageRetryAt')>0)return;
         if(!requestCurrent())return;
         record.state='uncertain';await this.save(record);
         try{const priority=index===0?'current':'prefetch';const result=await this.options.api.translate(record.requestId,{...record.request,priority});record.priority=priority;this.refreshed.add(record.requestId);await this.receive(record,result);}
@@ -90,9 +102,9 @@ export class TranslationCoordinator {
     }
   }
   async manual(target:ReadingTarget,requestCurrent=()=>true){
-    await this.init();const id=operationId(this.scope,this.options.language,target),origin=new URL(this.options.api.base).origin;
+    await this.init();const id=operationId(this.scope,this.options.language,target);
     await withTranslationLock(id,async()=>{
-      const previous=await readOperation(id),latest=pageTranslation(target.page,target.mode,this.options.language,this.options.userId,origin);
+      const previous=await readOperation(id),latest=pageTranslation(target.page,target.mode,this.options.language,this.scope);
       if(previous?.state==='uncertain'||previous&&active(previous)||latest.pending||latest.latest?.status==='unknown_released')throw Error(msg('原请求结果待核实，暂不能重复翻译。'));
       const source=previous?.result?.id??latest.latest?.id,state=previous?.result?.state??latest.latest?.status;
       if(previous?.state==='blocked'&&!previous.result){previous.state='local';previous.error=undefined;previous.retryAt=undefined;await saveOperation(previous);return;}
