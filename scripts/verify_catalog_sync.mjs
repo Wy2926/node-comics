@@ -9,6 +9,7 @@ import {createServer as createHttpServer} from 'node:http';
 import {createServer as createHttpsServer} from 'node:https';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {catalogKeyScript,catalogResponse} from '../apps/extension/src/sources/sites/mangacopy/tests/http-fixture.mjs';
 const root=process.cwd(),out=path.join(root,'artifacts/catalog-sync');await mkdir(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const extension=await mkdtemp(path.join(out,'extension-')),profile=await mkdtemp(path.join(out,'profile-'));
@@ -33,18 +34,20 @@ const chapterId=n=>chapter.slice(0,-1)+n;
 const html=url=>{
  const slug=url.pathname.split('/')[2];
  if(url.pathname.includes('/chapter/'))return `<title>${title(slug)} 第1话</title><span class="comicCount">2</span><ul class="comicContent-list"><li><img data-src="${origin}/${slug}/1.png"></li><li><img data-src="${origin}/${slug}/2.png"></li></ul>`;
- catalogRequests.push(slug);if(failures.has(slug))return '<title>暂不可用</title><div class="upLoop"><p class="wargin">目录尚未载入</p></div>';
- const links=Array.from({length:counts[slug]},(_,n)=>`<a href="/comic/${slug}/chapter/${chapterId(n)}">第${n+1}话</a>`);
- const group=(id,label,items,type='话')=>`<span>${label}</span><div class="table-default"><div class="tab-pane" id="${id}全部">${items}</div><div class="tab-pane" id="${id}${type}">${items}</div></div>`;
- const categories=[['default','默認'],['custom_translation','其它汉化版'],['arbitrary_fanwork','同人漫画'],['another_series','其他系列'],['new_category_2026','新分类 · 彩色短篇']];
- const directory=slug==='first'?group('default','默认',links.join('')):links.map((link,n)=>group(slug==='choose'?'choice_'+n:categories[n][0],slug==='choose'?'自由分类 '+(n+1):categories[n][1],link,n===4?'彩色短篇':'话')).join('');
- return `<title>${title(slug)}</title><div class="comicParticulars-title-right"><h6>${title(slug)}</h6></div><div class="upLoop">${directory}</div>`;
+ if(!url.pathname.startsWith('/comicdetail/'))catalogRequests.push(slug);if(failures.has(slug))return '<title>暂不可用</title><div class="upLoop"><p class="wargin">目录尚未载入</p></div>';
+ if(url.pathname.startsWith('/comicdetail/')){
+  const categories=[['default','默認'],['custom_translation','其它汉化版'],['arbitrary_fanwork','同人漫画'],['another_series','其他系列'],['new_category_2026','新分类 · 彩色短篇']];
+  const chapters=Array.from({length:counts[slug]},(_,n)=>({id:chapterId(n),title:'第'+(n+1)+'话',type:slug!=='first'&&n===4?'彩色短篇':'话'}));
+  return catalogResponse(slug,slug==='first'?[{id:'default',title:'默认',chapters}]:chapters.map((chapter,n)=>({id:slug==='choose'?'choice_'+n:categories[n][0],title:slug==='choose'?'自由分类 '+(n+1):categories[n][1],chapters:[chapter]})));
+ }
+ return `${catalogKeyScript}<title>${title(slug)}</title><div class="comicParticulars-title-right"><h6>${title(slug)}</h6></div>`;
 };
 const site=createHttpsServer({key:await readFile(path.join(profile,'fixture-key.pem')),cert:await readFile(path.join(profile,'fixture-cert.pem'))},(request,response)=>{response.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});response.end(html(new URL(request.url,'https://www.mangacopy.com')));});
 await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
 const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.TEST_CHROMIUM,locale:'zh-CN',ignoreHTTPSErrors:true,viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--ignore-certificate-errors','--no-proxy-server','--host-resolver-rules=MAP www.mangacopy.com 127.0.0.1:'+site.address().port+', MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
 context.setDefaultTimeout(20000);context.setDefaultNavigationTimeout(20000);
-context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
+let createdTabs=0;
+context.on('page',page=>{createdTabs++;page.on('pageerror',error=>errors.push(error.message));});
 await context.route('https://**.nodelane.net/**',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
 const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
 const readerUrl=new URL('reader.html',worker.url()).href;
@@ -69,7 +72,8 @@ async function openReader(){reader=await context.newPage();await reader.goto(rea
 async function importComic(slug){
  console.log('Import '+slug);
  const source=await context.newPage();await source.goto('https://www.mangacopy.com/comic/'+slug);
- const created=context.waitForEvent('page',{predicate:async page=>{try{await page.waitForURL(/reader\.html\?catalog=/,{timeout:10000});return true;}catch{return false;}}});await source.getByRole('button',{name:'NodeLane Comics · 开始阅读',exact:true}).click();reader=await created;if(slug==='choose')await reader.getByRole('region',{name:'选择开始阅读的位置'}).waitFor();else await rendered();await source.close();
+ const button=source.getByRole('button',{name:'NodeLane Comics · 导入/管理漫画',exact:true});await button.waitFor();
+ const created=context.waitForEvent('page',{predicate:async page=>{try{await page.waitForURL(/reader\.html\?catalog=/,{timeout:10000});return true;}catch{return false;}}});await button.click();reader=await created;if(slug==='choose')await reader.getByRole('region',{name:'选择开始阅读的位置'}).waitFor();else await rendered();await source.close();
 }
 try{
  console.log('Importing two adapted comics in an isolated profile');
@@ -81,7 +85,8 @@ try{
  assert.equal(await reader.locator('.nc-card-update').count(),0);await reader.close();
  await importComic('second');await shelf();await reader.close();
  counts.first=3;counts.second=3;await makeDue();const imageCount=extensionImageReads,requestCount=catalogRequests.length;
- await openReader();await waitFor(value=>value.comics.length===2&&value.comics.every(comic=>comic.catalogUpdates?.count===1));
+ const tabsBeforeSync=createdTabs;await openReader();await waitFor(value=>value.comics.length===2&&value.comics.every(comic=>comic.catalogUpdates?.count===1));
+ assert.equal(createdTabs,tabsBeforeSync+1,'Only the reader tab may be created during HTTP catalog checks');
  await card('first').locator('.nc-card-update').waitFor();await card('second').locator('.nc-card-update').waitFor();
  assert.equal(extensionImageReads,imageCount);assert.equal(catalogRequests.length-requestCount,2);
  assert.deepEqual((await state()).positions.find(value=>value.comicId===first.id),position);

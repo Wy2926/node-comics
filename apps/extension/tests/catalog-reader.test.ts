@@ -1,6 +1,9 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {readSourceCatalog, recoverCatalogTabs} from '../src/sources/runtime/catalog-reader';
 
+// Exercise the generic DOM fallback independently of sites adding HTTP support.
+vi.mock('../src/sources/registry/networks', () => ({sourceNetworks: {}}));
+
 const url='https://www.copy4000.com/comic/fixture';
 const snapshot={id:'mangacopy:fixture',sourceId:'mangacopy',url,title:'Fixture',observedAt:1,complete:true,note:'',entries:[],groups:[]};
 function browser() {

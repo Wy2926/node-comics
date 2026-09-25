@@ -1,11 +1,21 @@
 # MangaCopy
 
-专门封面取自 `.comicParticulars-title-left img`，优先 `data-src`，其次 `src`；CDN `*.mangafunb.fun` 按操作申请可选权限。
+支持 `mangacopy.com`／`copy4000.com` 的目录导入、12 小时更新、网页章节发现和原位翻译。站点身份、权限与入口在 `definition.ts`／`installation.json`；目录更新提示、缓存和阅读位置由公共应用层管理。
 
-标签页原位翻译使用 `.comicContent-list img`，仅识别已解码的正文图片，短切片和重复 URL 的独立元素均保留；不扫描目录、广告和推荐图。2026-09-24 补上未加载／失败图片过滤，并通过隔离 MV3 的懒加载、换图、原图恢复和位置保持检查。定向运行：配置公共浏览器环境后，设置 `INLINE_SITE_ONLY=mangacopy` 并执行 `node scripts/verify_inline_translation.mjs`。此回归使用合成网页和模拟译图，不代表本次已重验真实图片 CDN 或模型效果。
+## HTTP 目录
 
-`definition.ts` 持有主站／copy4000 镜像的严格 HTTPS 主机、作品／章节身份、目录引用和原有安装权限。`catalog.ts` 动态读取当前 DOM 的分组 ID、名称、隐藏条目和原始标签，不设分类白名单、不映射标准类型。仅源站 `default` 分组确定默认入口；“同人漫画”“其他系列”等分类中的当前漫画章节均可阅读，不按名称标记关联作品。不同分组／标签保持独立阅读序列。`pages.ts` 保留容器中的页槽；`data.ts` 解码页面已有的 AES-CBC 数据并交叉核对页序，不执行页面脚本。
+`network.ts` 先请求 `/comic/<slug>`，读取专门标题、封面和内联 `ccz` 字面量，再请求同主机的 `/comicdetail/<slug>/chapters`。响应 `results` 前 16 个字符为 UTF-8 IV，其余为 AES-CBC 十六进制密文；使用网页给出的公开 `ccz` 本地解码，不下载或执行源站脚本，不创建目录标签页，也不回退到 DOM。协议依据：[源站目录脚本](https://s3.mangafunb.fun/static/websitefree/js20190704/comic_detail_pass202508141558.js)。
 
-目录和章节可有限等待完整清单；不自动滚动、翻章或处理登录挑战。缺少页槽保持部分结果，数据校验失败不退回通用图片发现。`tests/` 覆盖镜像、伪造域名、目录等待、清单解码、重复 URL、取消和暂停；`tests/catalog.test.ts` 覆盖两部示例漫画的分类结构、任意新增 ID／名称／标签、默认入口与重复分组引用。隔离浏览器验收使用仓库根目录 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`。2026-09-23 真实浏览器核对 copy4000 的 grandblue／laizishenyuan 目录为 116／100 项，确认分类来自动态页面；此计数仅为当日样本，不代表章节图片下载或翻译已验收。
+漫画 slug 来自详情页路径，章节 UUID 来自 `groups[*].chapters[*].id`。插件拼接 `mangacopy:<slug>:<UUID>`，不生成源站 ID。核对 `build.path_word`、分组 ID／数量、组内唯一章节和末章归属；空目录、缺项、重复、解码失败或取消均不覆盖旧目录。完整目录出现新章节 ID 才触发更新提示。
 
-`catalogSync.intervalMinutes = 720` 开启自动目录更新。持久记录上次检查与同步时间，仅每 12 小时检查到期作品，重新打开不提前检查；后台读取非活动详情页，复用本站完整目录解析，最多等待 20 秒。不完整目录不覆盖已有结果，不请求章节图片。更新检测、阅读后清除封面提示和任务恢复属于公共应用层，本站不访问书库或浏览器 API。`scripts/verify_catalog_sync.mjs` 使用本机合成 MangaCopy 页面验证该流程，不代表当日真实站点可用性。
+分组和类型名称取自 `groups`／`build.type`，不设分类白名单。仅 `default` 分组确定默认入口；同人、其他系列等当前漫画条目仍可阅读，不同分组／标签保持独立阅读序列。封面取自 `.comicParticulars-title-left img`，优先 `data-src`，其次 `src`；`*.mangafunb.fun` 仅申请可选权限。
+
+## 章节与原位翻译
+
+章节仍使用网页会话。`pages.ts` 保留正文页槽，`data.ts` 解码页面已有图片清单并核对页序；缺页保持部分结果，不自动滚动、翻章或处理登录挑战。原位翻译仅识别 `.comicContent-list img` 中已解码图片，保留短切片和重复 URL 的独立元素；不扫描目录、广告或推荐图。
+
+## 验证
+
+插件目录运行 `npm test -- src/sources/sites/mangacopy/tests tests/catalog-sync.test.ts tests/catalog-reader.test.ts`。按[脚本说明](../../../../../../scripts/README.md)配置隔离浏览器并构建后，运行根目录的 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`、`scripts/verify_source_covers.mjs`；覆盖 HTTP 目录、零目录标签页、后台 alarm、更新／失败保留、封面和阅读位置。原位回归设置 `INLINE_SITE_ONLY=mangacopy` 后运行 `scripts/verify_inline_translation.mjs`，使用合成网页和模拟译图。
+
+2026-09-25 真实 HTTP 样本 `hzpyszbsdekadjxzqmzmdwqglsytm` 最初返回 16 项，捕获响应通过新解析器回放；随后直接请求及源站网页请求均返回空目录，原因未确认，真实 MV3 在线验收未通过。隔离样本验证不能证明当前源站、图片 CDN 或翻译模型可用性。

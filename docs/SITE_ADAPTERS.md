@@ -61,7 +61,7 @@ npm run build
 
 | 适配器 | 能力与说明 |
 | --- | --- |
-| [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | DOM 目录与 HTTP 图片；动态只读分类、完整性核对、12 小时目录同步 |
+| [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | HTTP 完整目录、网页章节发现与 HTTP 图片；动态只读分类、完整性核对、12 小时无目录标签页同步 |
 | [Comix](../apps/extension/src/sources/sites/comix/README.md) | HTTP 目录／章节、图片还原、12 小时目录同步；已加载正文图片／还原画布的原位翻译，授权后在详情页与章节页嵌入导入／管理入口 |
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；授权后嵌入导入／管理按钮，章节 Referer；网页正文图片原位翻译 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；授权后嵌入导入／管理入口；网页正文切片原位翻译 |

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {catalogKeyScript,catalogResponse} from '../apps/extension/src/sources/sites/mangacopy/tests/http-fixture.mjs';
 const root=process.cwd(),live=process.env.RUN_LIVE_COVERS==='1',output=path.join(root,'artifacts/source-covers');
 await mkdir(output,{recursive:true});const out=await mkdtemp(path.join(output,live?'live-':'fixture-')),extension=path.join(out,'extension');
 await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
@@ -15,8 +16,7 @@ await writeFile(probe,`export {catalog} from '${source}/comics/repositories/inde
 export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';
 export {importCatalog} from '${source}/comics/application/import-service.ts';
 export {applyCatalogRefresh} from '${source}/comics/application/catalog-service.ts';
-export {thumbnailCache} from '${source}/storage/thumbnails/index.ts';
-export {discoverMangaCopyCatalog} from '${source}/sources/sites/mangacopy/catalog.ts';`);
+export {thumbnailCache} from '${source}/storage/thumbnails/index.ts';`);
 const {build}=createRequire(path.join(root,'apps/extension/package.json'))('vite');
 await build({configFile:false,root:path.join(root,'apps/extension'),logLevel:'error',build:{outDir:extension,emptyOutDir:false,lib:{entry:probe,formats:['es'],fileName:()=> 'verify-covers.js'}}});
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -34,7 +34,7 @@ const fixtures={
   naver:{url:'https://comic.naver.com/webtoon/list?titleId=123',cover:'https://image-comic.pstatic.net/cover.jpg'},
   comicpash:{url:'https://comicpash.jp/series/coverfixture',cover:'https://cdn-public.comici.jp/series/cover.jpg'},
 };
-const mangaHtml=`<h6>MangaCopy cover</h6><div class="comicParticulars-title-left"><img data-src="${fixtures.mangacopy.cover}"></div><div class="upLoop"><span>默认</span><div class="table-default"><div class="tab-pane" id="default全部"><a href="/comic/coverfixture/chapter/${chapter}">Chapter</a></div></div></div>`;
+const mangaHtml=`${catalogKeyScript}<div class="comicParticulars-title-left"><img data-src="${fixtures.mangacopy.cover}"></div><div class="comicParticulars-title-right"><h6>MangaCopy cover</h6></div>`;
 const liveUrls={mangacopy:'https://www.copy4000.com/comic/grandblue',comix:'https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation',
   dm5:'https://www.dm5.com/manhua-yaoshenji/',naver:'https://comic.naver.com/webtoon/list?titleId=758037',comicpash:'https://comicpash.jp/series/1fafeeae328df'};
 await context.route('https://*.nodelane.net/**',route=>route.fulfill({status:503,body:'Isolated cover acceptance'}));
@@ -45,6 +45,9 @@ if(!live)await context.route('https://**/*',route=>{
     return route.fulfill({status:failCover?503:200,contentType:'image/png',body:failCover?'Offline':url.pathname==='/changed-cover.jpg'?changedArtwork:artwork});
   }
   if(url.hostname==='image-comic.pstatic.net')return route.fulfill({contentType:'image/png',body:bodyImage});
+  if(url.hostname==='www.copy4000.com')return url.pathname.startsWith('/comicdetail/')
+    ?route.fulfill({contentType:'application/json',body:catalogResponse('coverfixture',[{id:'default',title:'默认',chapters:[{id:chapter,title:'Chapter'}]}])})
+    :route.fulfill({contentType:'text/html; charset=utf-8',body:mangaHtml});
   if(url.hostname==='comix.to')return url.pathname.startsWith('/api/')?route.fulfill({json:{status:'ok',result:{items:[{id:20,number:1,mangaId:2188,language:'en',isOfficial:true,url:'/title/rrzm-coverfixture/20-chapter-1'}],meta:{total:1,lastPage:1,page:1,hasNext:false}}}})
     :route.fulfill({contentType:'text/html; charset=utf-8',body:`<script id="initial-data">${JSON.stringify({queries:{'["manga","detail","rrzm"]':{id:2188,hid:'rrzm',url:fixtures.comix.url,title:'Comix cover',poster:{large:fixtures.comix.cover}}}})}</script>`});
   if(url.hostname==='www.dm5.com')return route.fulfill({contentType:'text/html; charset=utf-8',body:`<script>var DM5_COMIC_MID=98761;var DM5_COMIC_URL='/manhua-coverfixture/';var DM5_COMIC_MNAME='DM5 cover';var DM5_COMIC_SORT=1;</script><div class="banner_detail_form"><div class="cover"><img src="${fixtures.dm5.cover}"></div></div><div class="detail-list-title"><a onclick="titleSelect(this,'detail-list-select','detail-list-select-1')">连载（1）</a></div><ul id="detail-list-select-1"><a href="/m1836194/">Chapter</a></ul>`});
@@ -70,11 +73,11 @@ try{
   const imported=[];
   for(const [site,item] of Object.entries(fixtures)){
     console.log('Checking '+site+' cover');
-    const value=await reader.evaluate(async ({url,html})=>{
+    const value=await reader.evaluate(async url=>{
       const api=await import(chrome.runtime.getURL('verify-covers.js'));
-      const snapshot=html?api.discoverMangaCopyCatalog(new DOMParser().parseFromString(html,'text/html'),url):await api.readSourceCatalog(url);if(!snapshot.cover)throw Error('Adapter did not supply a cover');
+      const snapshot=await api.readSourceCatalog(url);if(!snapshot.cover)throw Error('Adapter did not supply a cover');
       const comic=await api.importCatalog(snapshot);return{id:comic.id,title:comic.title,site:snapshot.sourceId};
-    },{url:live?liveUrls[site]:item.url,html:!live&&site==='mangacopy'?mangaHtml:undefined});
+    },live?liveUrls[site]:item.url);
     imported.push(value);
     const image=reader.locator(`[data-comic-id="${value.id}"] .nc-thumbnail img`);await image.waitFor({timeout:60000});
     assert(await image.evaluate(element=>element.naturalWidth===240));

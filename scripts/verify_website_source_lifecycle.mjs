@@ -10,6 +10,7 @@ import {createServer as createHttpServer} from 'node:http';
 import {createServer as createHttpsServer} from 'node:https';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {catalogKeyScript,catalogResponse} from '../apps/extension/src/sources/sites/mangacopy/tests/http-fixture.mjs';
 const root=process.cwd(),out=path.join(root,'artifacts/source-architecture/website');await mkdir(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const extension=await mkdtemp(path.join(out,'extension-')),profile=await mkdtemp(path.join(out,'profile-'));
@@ -28,8 +29,20 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 p=pathlib.Path(sys.argv[1]); key=rsa.generate_private_key(public_exponent=65537,key_size=2048); name=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'www.mangacopy.com')]); now=datetime.datetime.now(datetime.timezone.utc)
 cert=x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(days=1)).not_valid_after(now+datetime.timedelta(days=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName('www.mangacopy.com')]),False).sign(key,hashes.SHA256())
 (p/'fixture-key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())); (p/'fixture-cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))`,profile]);
-const html=url=>{if(url.pathname==='/comic/navigation')return `<title>只读分类验收</title><div class="comicParticulars-title-right"><h6>只读分类验收</h6></div><div class="upLoop"><h4>站点自定义分类</h4><div class="table-default"><div class="tab-pane" id="custom全部"><a href="/comic/navigation/chapter/${chapter}">内容 A</a><a href="/comic/navigation/chapter/724f819b-5306-11ea-b7ea-024352452ce1">内容 B</a></div><div class="tab-pane" id="custom特别企划"><a href="/comic/navigation/chapter/${chapter}">内容 A</a></div></div></div>`;const slug=url.pathname.split('/')[2],title=slug==='retained'?'网站离线验收':'网站按需验收';return url.pathname.includes('/chapter/')?`<title>${title} 第1话</title><span class="comicCount">2</span><ul class="comicContent-list"><li><img data-src="${origin}/${slug}/1.png"></li><li><img data-src="${origin}/${slug}/2.png"></li></ul>`:`<title>${title}</title><div class="comicParticulars-title-right"><h6>${title}</h6></div><div class="upLoop"><h4>默认</h4><div class="table-default"><div class="tab-pane" id="default全部"><a href="/comic/${slug}/chapter/${chapter}">第1话</a></div></div></div>`;};
-const site=createHttpsServer({key:await readFile(path.join(profile,'fixture-key.pem')),cert:await readFile(path.join(profile,'fixture-cert.pem'))},(request,response)=>{response.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});response.end(html(new URL(request.url,'https://www.mangacopy.com')));});await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
+const html=url=>{
+ const slug=url.pathname.split('/')[2],title=slug==='navigation'?'只读分类验收':slug==='retained'?'网站离线验收':'网站按需验收';
+ return url.pathname.includes('/chapter/')
+  ?`<title>${title} 第1话</title><span class="comicCount">2</span><ul class="comicContent-list"><li><img data-src="${origin}/${slug}/1.png"></li><li><img data-src="${origin}/${slug}/2.png"></li></ul>`
+  :`<title>${title}</title><div class="comicParticulars-title-right"><h6>${title}</h6></div>`;
+};
+const responseFor=url=>{
+ const slug=url.pathname.split('/')[2];
+ if(url.pathname.startsWith('/comicdetail/'))return catalogResponse(slug,slug==='navigation'
+  ?[{id:'custom',title:'站点自定义分类',chapters:[{id:chapter,title:'内容 A',type:'特别企划'},{id:'724f819b-5306-11ea-b7ea-024352452ce1',title:'内容 B',type:'其他'}]}]
+  :[{id:'default',title:'默认',chapters:[{id:chapter,title:'第1话'}]}]);
+ return (url.pathname.includes('/chapter/')?'':catalogKeyScript)+html(url);
+};
+const site=createHttpsServer({key:await readFile(path.join(profile,'fixture-key.pem')),cert:await readFile(path.join(profile,'fixture-cert.pem'))},(request,response)=>{response.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});response.end(responseFor(new URL(request.url,'https://www.mangacopy.com')));});await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
 const options={headless:true,executablePath:process.env.TEST_CHROMIUM,locale:'zh-CN',ignoreHTTPSErrors:true,viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--ignore-certificate-errors','--no-proxy-server','--host-resolver-rules=MAP www.mangacopy.com 127.0.0.1:'+site.address().port+', MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']};
 let context=await chromium.launchPersistentContext(profile,options);
 async function routes(){

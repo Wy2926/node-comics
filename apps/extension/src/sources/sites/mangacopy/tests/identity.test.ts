@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { sameSourcePage, sourcePageIdentity } from '../../../index';
+import { sameSourcePage, sourceFor, sourcePageIdentity } from '../../../index';
 import { discoverDocument } from '../../../page';
-import { discoverMangaCopyCatalog } from '../catalog';
 import { isMangaCopyUrl, mangaCopyLocation } from '../definition';
 describe('shared MangaCopy domains', () => {
   it.each(['mangacopy.com', 'www.mangacopy.com', 'copy4000.com', 'www.copy4000.com'])(
@@ -26,13 +25,8 @@ describe('shared MangaCopy domains', () => {
         discoveryComplete: true,
         knownTotal: 1,
       });
-      const catalogDoc = {
-        title: '样本',
-        querySelector: () => null,
-        querySelectorAll: () => [],
-      } as unknown as Document;
-      expect(discoverMangaCopyCatalog(catalogDoc, `https://${host}/comic/sample`)).toMatchObject({
-        id: 'mangacopy:sample',
+      expect(sourceFor(`https://${host}/comic/sample`).location.catalog).toEqual({
+        key: 'mangacopy:sample',
         url: `https://${host}/comic/sample`,
       });
     },

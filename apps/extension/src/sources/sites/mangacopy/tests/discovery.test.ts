@@ -3,7 +3,6 @@ import { grantDownloads } from '../../../../comics/acquisition';
 import { pollSourceDiscovery } from '../../../core/discovery';
 import { createSourceNavigation, discoverDocument } from '../../../page';
 import { sourceFailure } from '../../../runtime/diagnostics';
-import { discoverMangaCopyCatalog } from '../catalog';
 import { readMangaCopyData } from '../data';
 
 afterEach(() => {
@@ -56,19 +55,6 @@ async function sourceData(value: unknown) {
 }
 
 describe('MangaCopy source discovery', () => {
-  it('does not mark an empty directory skeleton complete before links arrive', () => {
-    const panel = { id: 'default全部', querySelectorAll: () => [] };
-    const table = { previousElementSibling: { textContent: '默认' }, querySelectorAll: () => [panel] };
-    const doc = {
-      title: 'Sample',
-      querySelector: () => null,
-      querySelectorAll: () => [table],
-    } as unknown as Document;
-    expect(discoverMangaCopyCatalog(doc, 'https://www.mangacopy.com/comic/sample')).toMatchObject({
-      complete: false,
-      entries: [],
-    });
-  });
   it('keeps missing lazy slots partial and preserves the prefix page order', () => {
     const result = discoverDocument(
       documentFixture(['https://images.example/1', '', 'https://images.example/3'], 3),
