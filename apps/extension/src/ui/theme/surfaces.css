@@ -17,11 +17,11 @@
 .nc-app .icon-button { border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface); }
 .nc-app .icon-button:hover { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
 .nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])),
-.nc-app textarea, .nc-app .field :is(input, textarea) { border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line)); border-radius: var(--comic-control-radius); box-shadow: none; }
+.nc-app textarea, .nc-app .field :is(input, textarea) { border: var(--comic-input-border); border-radius: var(--comic-control-radius); box-shadow: none; }
 .nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])):focus,
 .nc-app textarea:focus, .nc-app .field :is(input, textarea):focus { outline: none; border-color: var(--accent); box-shadow: none; }
 .nc-app input::placeholder, .nc-app textarea::placeholder { color: var(--muted); opacity: .8; }
-.nc-app .nc-search { border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line)); border-radius: var(--comic-control-radius); background: var(--surface); padding: 0 12px; }
+.nc-app .nc-search { border: var(--comic-input-border); border-radius: var(--comic-control-radius); background: var(--surface); padding: 0 12px; }
 .nc-app .nc-search:focus-within { border-color: var(--accent); }
 .nc-app .nc-search input, .nc-app .nc-search input:focus { border: 0; min-width: 0; box-shadow: none; outline: none; }
 .nc-app .segmented { border: var(--comic-border); border-radius: var(--comic-control-radius); gap: 5px; padding: 4px; }
@@ -51,7 +51,7 @@
 .nc-account-button { padding: 4px 10px 4px 4px; border: 0; border-radius: var(--comic-control-radius); font-size: .8125rem; font-weight: 650; color: var(--muted); }
 .nc-account-button:hover, .nc-account-button[aria-current=page] { box-shadow: none; background: var(--accent-soft); color: var(--accent); }
 .nc-avatar { border-radius: var(--comic-control-radius); }
-.nc-main { max-width: 1380px; padding-top: 32px; }
+.nc-main { max-width: var(--page-max-width); padding: 32px var(--page-gutter) 60px; }
 
 /* A page opens like a comic cover: masthead, large title, perforated edge. */
 .nc-page-heading, .nc-app .page-title { position: relative; padding: var(--comic-panel-padding); border: var(--comic-border); border-radius: var(--comic-panel-radius); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); box-shadow: var(--comic-shadow); margin-bottom: 30px; }
@@ -103,7 +103,7 @@
 .nc-app :is(.nc-more-menu>summary, .nc-catalog-work-option, .nc-catalog-save-options>button, .nc-import-item, .nc-image-choice, .nc-web-import details, .nc-web-import .nc-insert-summary) { border-radius: var(--comic-control-radius); }
 .nc-app .nc-image-choice { border-width: 2px; }
 .nc-app .nc-image-choice.is-selected { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
-.nc-app :is(.nc-count-pill, .nc-status-badge, .nc-plan-badge) { border: 1px solid var(--ink); border-radius: 2px; }
+.nc-app :is(.nc-count-pill, .nc-status-badge, .nc-plan-badge) { border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); }
 
 /* Settings and account use the passport's paper panels and perforated sections. */
 .nc-preferences { max-width: 1120px; margin: 0 auto; counter-reset: preference; }

@@ -12,7 +12,7 @@ export function SearchResultCover({hit,cache}:{hit:SourceSearchResult;cache:Map<
   useEffect(()=>{
     const element=ref.current;if(!element||!hit.cover)return;
     if(typeof IntersectionObserver==='undefined'){setVisible(true);return;}
-    const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{root:element.closest('.nc-search-body'),rootMargin:'80px'});
+    const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{root:element.closest('[data-search-scroll]'),rootMargin:'80px'});
     observer.observe(element);return()=>observer.disconnect();
   },[key]);
   useEffect(()=>{
@@ -23,12 +23,12 @@ export function SearchResultCover({hit,cache}:{hit:SourceSearchResult;cache:Map<
     void covers.run(async()=>{
       controller.signal.throwIfAborted();
       const blob=await readSearchCover(hit,controller.signal);controller.signal.throwIfAborted();
-      const bitmap=await createImageBitmap(blob,{resizeWidth:144,resizeQuality:'medium'});
+      const bitmap=await createImageBitmap(blob,{resizeWidth:224,resizeQuality:'medium'});
       let thumbnail:Blob;
       try{
-        const height=Math.min(216,bitmap.height),canvas=new OffscreenCanvas(144,height),drawing=canvas.getContext('2d');
+        const height=Math.min(336,bitmap.height),canvas=new OffscreenCanvas(224,height),drawing=canvas.getContext('2d');
         if(!drawing)throw new Error('Canvas unavailable');
-        drawing.drawImage(bitmap,0,0,144,bitmap.height);thumbnail=await canvas.convertToBlob({type:'image/webp',quality:.8});
+        drawing.drawImage(bitmap,0,0,224,bitmap.height);thumbnail=await canvas.convertToBlob({type:'image/webp',quality:.8});
       }finally{bitmap.close();}
       controller.signal.throwIfAborted();
       const local=URL.createObjectURL(thumbnail);

@@ -1,6 +1,6 @@
 import { validUiLanguage } from '../../i18n/locales';
 import { mirrorReader } from '../../inline/settings';
-import { defaults, type Settings } from '../../types';
+import { defaults, languageLabels, type Settings } from '../../types';
 
 function known(value: Partial<Settings>): Settings {
   return Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,value?.[key as keyof Settings]??fallback])) as unknown as Settings;
@@ -21,8 +21,10 @@ export async function saveSettings(value: Settings) {
 
 /** Search preference does not change image translation or persisted reading choices. */
 export function readSearchLanguage(fallback:string):string {
-  try{const saved=localStorage.getItem('nc-search-language');return saved?new Intl.Locale(saved).baseName:fallback;}catch{return fallback;}
+  const defaultLanguage=Object.hasOwn(languageLabels,fallback)?fallback:defaults.language;
+  try{const saved=localStorage.getItem('nc-search-language');return saved&&Object.hasOwn(languageLabels,saved)?saved:defaultLanguage;}catch{return defaultLanguage;}
 }
 export function saveSearchLanguage(language:string) {
-  try{localStorage.setItem('nc-search-language',new Intl.Locale(language).baseName);}catch{/* Preference storage is optional. */}
+  if(!Object.hasOwn(languageLabels,language))return;
+  try{localStorage.setItem('nc-search-language',language);}catch{/* Preference storage is optional. */}
 }

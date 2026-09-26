@@ -1,7 +1,7 @@
 import type {ComicTitleTranslation} from '../../../api';
 import {msg} from '../../../i18n/runtime';
 import type {SourceSearchResults} from '../../../sources';
-import {requestedTitleLanguage,resolveComicTitle,titleFailure,validateSearchQuery} from './title-resolver';
+import {resolveComicTitle,titleFailure,validateSearchQuery} from './title-resolver';
 import type {ComicSearchDependencies,ComicSearchSnapshot,SearchFailure,SearchSeed,SearchSiteState} from './types';
 
 export const COMIC_SEARCH_CONCURRENCY=3;
@@ -40,7 +40,7 @@ export class ComicSearchSession {
 
   constructor(readonly seed:SearchSeed,private readonly deps:ComicSearchDependencies,defaultLanguage:string){
     this.now=deps.now??Date.now;
-    this.snapshot={sourceTitle:seed.title,requestedTitleLanguage:defaultLanguage||'zh',query:'',phase:'idle',titleState:'idle',results:[],revision:0,
+    this.snapshot={sourceTitle:seed.title,requestedTitleLanguage:defaultLanguage||'zh-Hans',query:'',phase:'idle',titleState:'idle',results:[],revision:0,
       sites:deps.listSites().map(site=>({site,selected:true,status:'idle',resultCount:0,resultKeys:[]}))};
   }
   getSnapshot=()=>this.snapshot;
@@ -76,7 +76,7 @@ export class ComicSearchSession {
       this.emit({phase:'needs-query',titleState:'error',titleError:{kind:'invalid',message:msg('漫画名称需为 1–60 个字符，且不能包含控制字符。')}});return;
     }
     const generation=this.generation,controller=new AbortController();this.nameController=controller;
-    const language=requestedTitleLanguage(this.snapshot.requestedTitleLanguage),key=JSON.stringify([title,language]);
+    const language=this.snapshot.requestedTitleLanguage,key=JSON.stringify([title,language]);
     this.emit({phase:'resolving-name',titleState:'resolving'});
     try{
       const result=this.titleCache.get(key)??await resolveComicTitle(()=>this.deps.translateTitle(title,language,controller.signal),controller.signal);

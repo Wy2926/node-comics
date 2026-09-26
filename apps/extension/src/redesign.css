@@ -141,7 +141,7 @@ a {
   display: flex;
   align-items: center;
   gap: 40px;
-  padding: 0 max(28px,calc((100% - 1440px)/2));
+  padding: 0 max(var(--page-gutter),calc((100% - var(--page-max-width))/2 + var(--page-gutter)));
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -1251,7 +1251,7 @@ a {
   overflow: auto;
 }
 .nc-app .modal::backdrop {
-  background: #101c32a0;
+  background: var(--dialog-backdrop);
   backdrop-filter: blur(3px);
 }
 .nc-app .modal-spark {

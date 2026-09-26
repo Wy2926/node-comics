@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { defaults } from '../src/types';
-import { saveSettings, settings } from '../src/comics/application/preferences';
+import { readSearchLanguage, saveSearchLanguage, saveSettings, settings } from '../src/comics/application/preferences';
 
 beforeEach(() => {
   const data = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) });
 });
 afterEach(() => vi.unstubAllGlobals());
+it('accepts only listed search languages without converting unsupported values', () => {
+  saveSearchLanguage('zh-Hant'); expect(readSearchLanguage('en')).toBe('zh-Hant');
+  saveSearchLanguage('zh'); expect(localStorage.getItem('nc-search-language')).toBe('zh-Hant');
+  localStorage.setItem('nc-search-language', 'zh'); expect(readSearchLanguage('en')).toBe('en');
+  expect(localStorage.getItem('nc-search-language')).toBe('zh');
+});
 it('keeps known preferences while discarding old concurrency and backend overrides', async () => {
   localStorage.setItem('nc-settings', JSON.stringify({ requestConcurrency: 1, autoTranslate: true, apiBase: 'https://wrong.example', language: 'en' }));
   await saveSettings(settings());

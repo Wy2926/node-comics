@@ -33,8 +33,8 @@
 .nc-site-request-success>svg { color: var(--success); }
 .nc-site-request-success p { font-size: .875rem; color: var(--muted); }
 .nc-site-request-success code { font-size: .6875rem; overflow-wrap: anywhere; max-width: 100%; }
-.nc-site-link-import {margin-bottom:24px;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--surface);}
+.nc-site-link-import {margin-bottom:24px;padding:20px;border:var(--comic-border);border-radius:var(--comic-card-radius);box-shadow:var(--comic-shadow-small);background:var(--surface);}
 .nc-site-link-import label {display:block;font-weight:700;margin-bottom:10px;}
 .nc-site-link-import > div {display:flex;gap:12px;}
-.nc-site-link-import input {flex:1;min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:inherit;}
+.nc-site-link-import input {flex:1;min-width:0;padding:12px;background:var(--surface);color:inherit;}
 .nc-site-link-import p {margin:10px 0 0;color:var(--muted);font-size:13px;}

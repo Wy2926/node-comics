@@ -8,7 +8,6 @@ export function validateSearchQuery(value:string):string {
   if(!query||[...query].length>SEARCH_QUERY_MAX_CODE_POINTS||/[\p{Cc}\p{Cf}]/u.test(query))throw new ApiError(msg('请输入 1–160 个字符的搜索名称。'),'INVALID_SEARCH_QUERY',422);
   return query;
 }
-export const requestedTitleLanguage=(language:string)=>language==='zh'?'zh-Hans':language;
 export function titleFailure(error:unknown,now:number):SearchFailure {
   const apiError=error instanceof ApiError?error:undefined;
   const retryAt=apiError?.retryAfterSeconds?now+apiError.retryAfterSeconds*1000:undefined;

@@ -16,6 +16,9 @@
   --danger: #af3845;
   --danger-soft: #fff0f1;
   --shadow: 0 12px 40px #233c6010;
+  --dialog-backdrop: #101c32a0;
+  --page-max-width: 1440px;
+  --page-gutter: 36px;
   --pink: var(--accent);
   --pink-dark: var(--accent-hover);
   --pink-light: var(--accent-soft);
@@ -110,8 +113,12 @@
   --comic-shadow-color: var(--ink);
   --comic-shadow-disabled-color: var(--line);
   --comic-border: 2px solid var(--comic-stroke);
+  --comic-input-border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line));
+  --comic-badge-border: 1px solid var(--comic-stroke);
+  --comic-badge-radius: 2px;
   --comic-control-radius: 5px;
   --comic-panel-radius: 8px 24px 24px 24px;
+  --comic-sheet-radius: 24px 24px 0 0;
   --comic-card-radius: 5px 16px 16px 16px;
   --comic-cover-radius: 3px 14px 0 0;
   --comic-shadow-small: 2px 2px 0 var(--comic-shadow-color);

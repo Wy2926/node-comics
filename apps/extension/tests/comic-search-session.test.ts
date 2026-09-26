@@ -11,7 +11,7 @@ const hit=(id:string,name=id):SourceSearchResult=>({sourceId:id,siteId:id,key:JS
 const page=(id:string,name=id):SourceSearchResults=>({items:[hit(id,name)]});
 function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site('b')]){
   const deps={translateTitle:vi.fn().mockResolvedValue({name:'中文名',target_language:'zh-Hans'}),listSites:vi.fn().mockReturnValue(sites),search:vi.fn().mockImplementation(async(id:string)=>page(id)),release:vi.fn(),...options};
-  const session=new ComicSearchSession({title:'日本語名'},deps,'zh');sessions.push(session);return {session,deps};
+  const session=new ComicSearchSession({title:'日本語名'},deps,'zh-Hans');sessions.push(session);return {session,deps};
 }
 const sessions:ComicSearchSession[]=[];
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
@@ -45,10 +45,12 @@ describe('comic search session',()=>{
   it('sends the selected language only to name translation and searches with the returned name, caching name resolution',async()=>{
     const search=vi.fn<ComicSearchDependencies['search']>(async id=>page(id));const {session,deps}=setup({translateTitle:vi.fn().mockResolvedValue({name:'English Name',target_language:'en'}),search});
     await session.searchWithTranslatedTitle();await flush();
-    expect(session.getSnapshot()).toMatchObject({requestedTitleLanguage:'zh',resolvedTitleLanguage:'en',query:'English Name'});
+    expect(session.getSnapshot()).toMatchObject({requestedTitleLanguage:'zh-Hans',resolvedTitleLanguage:'en',query:'English Name'});
     expect(deps.translateTitle).toHaveBeenCalledWith('日本語名','zh-Hans',expect.any(AbortSignal));
     expect(search.mock.calls.map(call=>call[1])).toEqual([{siteId:'a',query:'English Name'},{siteId:'b',query:'English Name'}]);
     await session.searchWithTranslatedTitle();await flush();expect(deps.translateTitle).toHaveBeenCalledTimes(1);
+    session.setTargetLanguage('zh-Hant');await session.searchWithTranslatedTitle();await flush();
+    expect(deps.translateTitle).toHaveBeenLastCalledWith('日本語名','zh-Hant',expect.any(AbortSignal));expect(deps.translateTitle).toHaveBeenCalledTimes(2);
   });
   it('keeps all returned content languages as optional display data without filtering or inferring missing languages',async()=>{
     const {session,deps}=setup({search:vi.fn(async id=>({items:[{...hit(id,'japanese'),contentLanguages:['ja']},{...hit(id,'english'),contentLanguages:['en']},hit(id,'unknown')]}))},[site('a',['zh'])]);
