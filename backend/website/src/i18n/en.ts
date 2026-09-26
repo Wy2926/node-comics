@@ -2,6 +2,11 @@ import type { Dictionary } from './types';
 
 export default {
   "ui": {
+    "seoChangelogTitle": "Manga Translator Extension Release Notes",
+    "seoAboutTitle": "About Our Manga Translator & Comic Reader",
+    "seoHelpTitle": "Manga Translation & Extension Troubleshooting",
+    "seoFaqTitle": "Manga Translator FAQ: Installation, Files & Limits",
+    "seoGuidesTitle": "Manga Translation & CBZ, PDF Reader Guides",
     "features": "Features",
     "pricing": "Pricing",
     "guides": "Guides",
@@ -37,8 +42,8 @@ export default {
     "heroCaption": "Original AI artwork for NodeLane Comics",
     "heroAlt": "Original manga: a traveler waits on a seaside railway platform",
     "nextStop": "NEXT STOP / A NEW WORLD",
-    "featureHeading": "Less interruption. More story.",
-    "featureDescription": "From finding a new manga to losing yourself in its pages. We take care of the little things in between.",
+    "featureHeading": "Translate manga. Read and compare originals.",
+    "featureDescription": "Translate supported web comics and local files page by page, compare originals and keep your reading position. Explore classic translation, AI redraw and CBZ, CBR, PDF and DRM-free MOBI reading.",
     "featureTitles": [
       "Translation follows your reading",
       "Two ways to read the same page",
@@ -67,8 +72,8 @@ export default {
     "ctaTitle": "Good stories deserve to be understood.",
     "ctaDescription": "Leave the translation to NodeLane Comics. Save your attention for the next page.",
     "ctaButton": "Start your reading journey",
-    "pricingTitle": "Start with a story. Read more when you want.",
-    "pricingDescription": "Everyday reading starts free. Explore more with PLUS when it suits you.",
+    "pricingTitle": "Read for free. Choose your translation plan.",
+    "pricingDescription": "Compare Free and PLUS manga translation allowances, AI redraw pages and monthly or annual subscriptions. Current offers define prices, trial eligibility and benefits.",
     "freePlan": "Free",
     "freePlanDescription": "For a little reading every day",
     "plusDescription": "For the “just one more page” days",
@@ -92,10 +97,10 @@ export default {
     "trialNote": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
     "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Unlimited totals remain subject to short-term rate, image and service-capacity limits; no completion speed is guaranteed.",
     "viewPlus": "Sign in to explore PLUS",
-    "downloadTitle": "Your browser. Your next story.",
-    "downloadDescription": "Choose your desktop browser and keep a manga reader and translator in your toolbar.",
+    "downloadTitle": "Install your manga translator extension",
+    "downloadDescription": "Get NodeLane Comics for Chrome, Edge or Firefox. Open the Chrome Web Store or Firefox Add-ons, or download a browser package. The Edge store listing is under review.",
     "storeDescription": "Open your next story in the browser you already enjoy.",
-    "storeUnavailable": "Download link has not been configured",
+    "storeUnavailable": "Store review pending",
     "directDownloadTitle": "Download the extension directly",
     "directDownloadDescription": "Download the package from your browser’s card, extract it, then follow these steps.",
     "downloadZip": "Download ZIP",
@@ -106,39 +111,39 @@ export default {
     "manualUpdateNote": "Manual installations do not update automatically. Download the new version, replace the files in the original folder, then click Reload on the extensions page. Keep the installation folder in place.",
     "downloadXpi": "Download signed XPI",
     "storeHeading": "Browser store links",
-    "storeNote": "If a store listing is unavailable, download the ZIP for your browser. Feedback:",
-    "guidesTitle": "Make reading a little easier.",
-    "guidesDescription": "Practical guides to translation modes, local formats, troubleshooting and where your data goes.",
+    "storeNote": "The Edge listing is under review; use the Edge ZIP package for now. Install Firefox from its store or with the signed XPI. Feedback:",
+    "guidesTitle": "Manga translation & local comic reading guides",
+    "guidesDescription": "Learn to translate manga in your browser, open CBZ, CBR, PDF and MOBI files, compare Japanese originals, troubleshoot translation and understand image privacy.",
     "contents": "On this page",
     "editor": "NodeLane Comics editorial team",
     "updated": "Updated",
     "related": "Read next",
-    "faqTitle": "Questions? There is a page for that.",
-    "faqDescription": "Useful answers about reading, translation and your account.",
-    "helpTitle": "Stuck on a page? Let’s take a look.",
-    "helpDescription": "Find a guide or tell us what happened. Your feedback helps make the next reading session smoother.",
+    "faqTitle": "Manga translator extension FAQ",
+    "faqDescription": "Answers about Chrome, Edge and Firefox installation, free manga translation, CBZ and PDF files, supported sites, local translation, image privacy and cancellation.",
+    "helpTitle": "Manga translation & extension help",
+    "helpDescription": "Troubleshoot manga image loading, stalled translations, permissions and sign-in. Find installation and local comic guides or contact NodeLane Comics support.",
     "contactTitle": "Every piece of feedback deserves a careful read.",
     "contactDescription": "Use the per-page feedback option in the extension for translation quality. For other issues, email us with your browser, extension version, steps and error message. Do not send passwords, tokens, payment-card details, signed URLs or full comics you are not entitled to share.",
     "emailButton": "Send an email",
-    "aboutTitle": "Because we love stories, we want to understand them.",
-    "aboutDescription": "A look, a line of dialogue, an unexpected turn. Language should not keep those moments out of reach.",
+    "aboutTitle": "About NodeLane Comics",
+    "aboutDescription": "NodeLane Comics is a manga translator and comic reader extension for Chrome, Edge and Firefox, with web and local reading and original comparison. It does not host a manga catalog.",
     "aboutBody": "NodeLane Comics brings image translation, local reading and web-image discovery into one browser extension. We want fewer window switches and more attention on the work itself. AI can make mistakes, so access to originals, clear rules and respect for creators matter. We do not supply a comic catalog, sell comic works or bypass paywalls, sign-in requirements or DRM. Only use content you have the right to access and process.",
-    "changelogTitle": "Every update turns a new page.",
-    "changelogDescription": "A record of improvements to the reading experience. Store review and staged updates may take time; your installed version determines availability.",
+    "changelogTitle": "NodeLane Comics release notes",
+    "changelogDescription": "Follow manga translator updates, new site support, browser compatibility and reading fixes. Chrome, Edge and Firefox store approvals may differ; check your installed version.",
     "rss": "Follow updates via RSS",
     "accountTitle": "My account",
     "accountDescription": "Manage your account and membership. Read and translate in the browser extension.",
     "callbackTitle": "Opening your reader pass.",
     "callbackDescription": "You will return to your account when sign-in is complete.",
     "noscript": "JavaScript is required for account sign-in. Product pages, pricing and guides work without it.",
-    "seoHomeTitle": "NodeLane Comics — AI Manga Translator & Comic Reader",
+    "seoHomeTitle": "AI Manga Translator & Comic Reader Extension | NodeLane Comics",
     "heroLines": [
       "Beyond words.",
       "Into the story."
     ],
-    "seoFeaturesTitle": "Manga translation & reader features",
-    "seoPricingTitle": "Subscription plans and pricing",
-    "seoDownloadTitle": "Download the manga translator — Chrome, Edge & Firefox",
+    "seoFeaturesTitle": "Manga Translation & Comic Reader Features",
+    "seoPricingTitle": "Free Manga Translation & PLUS Plans",
+    "seoDownloadTitle": "Manga Translator for Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "One page too far.",
     "notFoundDescription": "This page does not exist or its address has changed. Your next story is still waiting on the homepage."
@@ -179,7 +184,7 @@ export default {
         "slug": "translation-modes",
         "minutes": 5,
         "title": "Classic translation or AI redraw: which should you choose?",
-        "description": "Understand the workflow, visual trade-offs and page allowances of the two manga translation modes.",
+        "description": "Compare classic OCR manga translation with AI redraw, check originals and learn how to connect a local manga-translator-ui service. Choose the mode and service for your reading.",
         "category": "Translation tips",
         "sections": [
           {
@@ -202,8 +207,15 @@ export default {
               "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility.",
               "Different modes and languages have separate results. You can keep a valid classic result while a redraw waits or fails, and return to the original whenever details matter."
             ]
+          },
+          {
+            "title": "Use a local manga translation service",
+            "paragraphs": [
+              "Connect your own manga-translator-ui service by adding and selecting a local translation channel in extension settings. This does not require a NodeLane account or official translation allowances. You must run the service yourself; network requirements, available modes and image handling depend on that service."
+            ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "local-comics",
@@ -229,11 +241,12 @@ export default {
           {
             "title": "Local import is not offline translation",
             "paragraphs": [
-              "Parsing and organizing the local library happen in the browser. When you request translation, the relevant page images are uploaded to the backend and results are stored privately.",
+              "Local comic parsing and original reading happen in the browser. Official translation uploads selected page images for processing and stores results privately. You can instead choose your own manga-translator-ui service; its configuration determines network access and image handling.",
               "The library and reading position stay local. Reimporting the same content under the same account can match valid existing results. This is not automatic synchronization of your whole library or source files."
             ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "japanese-manga",
@@ -446,36 +459,82 @@ export default {
     },
     "faqs": [
       {
+        "id": "overview",
         "question": "What is NodeLane Comics?",
-        "answer": "A browser extension with a comic reader, web-image discovery and local import. Translation has classic and AI redraw modes, with originals always available. Reading happens in the extension; this website provides downloads, guides and account management."
+        "answer": "A browser extension with a comic reader, web-image discovery and local import. Translation has classic and AI redraw modes, with originals always available. Reading happens in the extension; this website provides downloads, guides and account management.",
+        "relatedPath": "/guides/manga-translation/"
       },
       {
-        "question": "What does Free include?",
-        "answer": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
+        "id": "browsers",
+        "question": "Does the manga translator work in Chrome, Edge and Firefox?",
+        "answer": "Yes, on desktop Chrome, Microsoft Edge and Firefox. Chrome and Firefox have store installation links. The Edge store listing is under review; get the Edge ZIP package from the download page in the meantime.",
+        "relatedPath": "/download/"
       },
       {
+        "id": "installation",
+        "question": "How do I install the manga translator extension or ZIP package?",
+        "answer": "Use the official Chrome or Firefox store links on the download page. For manual Chrome or Edge installation, download and extract the matching ZIP, enable Developer mode in the extensions manager and select Load unpacked. Firefox uses its store listing or the signed XPI. See the download page for instructions.",
+        "relatedPath": "/download/"
+      },
+      {
+        "id": "free-plan",
+        "question": "Is manga translation free, and what does PLUS include?",
+        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic translation pages per day. PLUS removes the daily and monthly classic page cap, with rate and capacity limits still applying. AI redraw requires a valid allowance. Check current plans for prices, pages, trials and monthly or annual billing.",
+        "relatedPath": "/pricing/"
+      },
+      {
+        "id": "translation-modes",
+        "question": "Should I use classic manga translation or AI redraw?",
+        "answer": "Classic translation detects text, translates it and places it back with local background repair. AI redraw uses an image model and can change artwork details. Choose classic for everyday reading, compare results with the original, and try redraw when appropriate. Results from the two modes are kept separately.",
+        "relatedPath": "/guides/translation-modes/"
+      },
+      {
+        "id": "file-formats",
         "question": "Which files can I import?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF and supported DRM-free MOBI6/MOBI6+KF8 comics. Standalone KF8/AZW3, EPUB and encrypted books are not supported. Loose images cannot be imported. Website imports require a dedicated adapter."
+        "answer": "CBZ/ZIP, CBR/RAR, PDF and supported DRM-free MOBI6/MOBI6+KF8 comics. Standalone KF8/AZW3, EPUB and encrypted books are not supported. Loose images cannot be imported. Website imports require a dedicated adapter.",
+        "relatedPath": "/guides/local-comics/"
       },
       {
+        "id": "website-permissions",
+        "question": "Does the extension upload website cookies or browsing history?",
+        "answer": "Source website cookies, login tokens and browsing history are not uploaded to the translation backend. Website and image permissions are requested when needed. Official translation sends selected images and required task data for processing; see the privacy guide for details.",
+        "relatedPath": "/guides/comic-reader-privacy/"
+      },
+      {
+        "id": "image-privacy",
         "question": "Are images uploaded or retained?",
-        "answer": "Translation requires uploading selected page images to the backend and relevant providers. Originals and final images are retained privately by default. Deleting your record revokes access but does not guarantee physical deletion of shared objects. Source cookies, login tokens and browsing history are not uploaded."
+        "answer": "Translation requires uploading selected page images to the backend and relevant providers. Originals and final images are retained privately by default. Deleting your record revokes access but does not guarantee physical deletion of shared objects. Source cookies, login tokens and browsing history are not uploaded.",
+        "relatedPath": "/privacy/"
       },
       {
+        "id": "translation-failed",
         "question": "Do failed translations use pages?",
-        "answer": "Pages may be reserved first and settled on successful delivery. Explicit failures release the reservation, as do classic results confirmed to have no text or partial recognition with original text retained. Unknown redraw results are verified first and may keep pages reserved temporarily."
+        "answer": "Pages may be reserved first and settled on successful delivery. Explicit failures release the reservation, as do classic results confirmed to have no text or partial recognition with original text retained. Unknown redraw results are verified first and may keep pages reserved temporarily.",
+        "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
+        "id": "plus-limits",
         "question": "Does unlimited mean there are no restrictions?",
-        "answer": "PLUS classic has no daily/monthly total page cap. Image, capacity and short-term rate limits still apply: up to 100 new translation images per rolling 60 seconds across a PLUS account, or 10 for Free. This is not a completion-speed guarantee."
+        "answer": "PLUS classic has no daily/monthly total page cap. Image, capacity and short-term rate limits still apply: up to 100 new translation images per rolling 60 seconds across a PLUS account, or 10 for Free. This is not a completion-speed guarantee.",
+        "relatedPath": "/pricing/"
       },
       {
+        "id": "cancel-subscription",
         "question": "How do I cancel?",
-        "answer": "Use the website or extension account entry to manage the subscription. Cancel before the next renewal or trial expiry; uninstalling does not cancel. Existing benefits follow the expiry displayed in your account. For billing help, email comics@nodelane.net."
+        "answer": "Use the website or extension account entry to manage the subscription. Cancel before the next renewal or trial expiry; uninstalling does not cancel. Existing benefits follow the expiry displayed in your account. For billing help, email comics@nodelane.net.",
+        "relatedPath": "/refund/"
       },
       {
+        "id": "supported-sites",
         "question": "Does it work on every site and language?",
-        "answer": "Availability depends on site structure, permissions, image access and adapters. Language support can differ by translation mode; use the list in the extension. We do not guarantee every site, language or file."
+        "answer": "Availability depends on site structure, permissions, image access and adapters. Language support can differ by translation mode; use the list in the extension. We do not guarantee every site, language or file.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "local-translation",
+        "question": "Can I translate manga with a local service without a NodeLane account?",
+        "answer": "Yes. Connect your own manga-translator-ui service by adding and selecting a local translation channel in extension settings. This does not require a NodeLane account or official translation allowances. You must run the service yourself; network requirements, available modes and image handling depend on that service.",
+        "relatedPath": "/guides/translation-modes/"
       }
     ],
     "releases": [

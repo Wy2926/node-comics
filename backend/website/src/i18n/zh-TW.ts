@@ -2,6 +2,11 @@ import type { Dictionary } from './types';
 
 export default {
   "ui": {
+    "seoChangelogTitle": "漫畫翻譯擴充功能版本更新紀錄",
+    "seoAboutTitle": "關於我們的漫畫閱讀與翻譯擴充功能",
+    "seoHelpTitle": "漫畫翻譯失敗、安裝與帳號支援",
+    "seoFaqTitle": "漫畫翻譯擴充功能常見問題：安裝、格式與額度",
+    "seoGuidesTitle": "漫畫翻譯與 CBZ、PDF 閱讀教學",
     "features": "功能",
     "pricing": "定價",
     "guides": "閱讀指南",
@@ -37,8 +42,8 @@ export default {
     "heroCaption": "NodeLane 漫譯 原創 AI 插畫",
     "heroAlt": "原創漫畫：藍髮旅人在海邊站臺等待下一段旅程",
     "nextStop": "下一站 · 新的世界",
-    "featureHeading": "少一點打斷，多一點入戲。",
-    "featureDescription": "從遇見一部漫畫，到捨不得停下。把閱讀路上的小麻煩，交給我們。",
+    "featureHeading": "漫畫翻譯與閱讀，一個擴充功能完成",
+    "featureDescription": "在支援的漫畫網站或本機檔案中逐頁翻譯，切換原圖與譯圖，保留閱讀位置。支援一般翻譯、AI 重繪，以及 CBZ、CBR、PDF 和無 DRM MOBI 閱讀。",
     "featureTitles": [
       "翻譯，跟著你翻頁",
       "兩種模式，各有拿手戲",
@@ -67,8 +72,8 @@ export default {
     "ctaTitle": "好故事，值得讀懂。",
     "ctaDescription": "把翻譯交給 NodeLane 漫譯，把注意力留給下一頁。",
     "ctaButton": "開始你的閱讀旅程",
-    "pricingTitle": "先讀起來，再決定多讀一點。",
-    "pricingDescription": "日常閱讀，從免費開始。想探索更多畫面與故事，就讓 PLUS 陪你繼續。",
+    "pricingTitle": "免費閱讀，按需選擇翻譯方案",
+    "pricingDescription": "比較 NodeLane 漫譯一般帳號與 PLUS：每日一般翻譯額度、AI 重繪頁數及月繳或年繳訂閱。價格、試用與權益以目前方案為準。",
     "freePlan": "普通賬戶",
     "freePlanDescription": "給每天的一點閱讀時光",
     "plusDescription": "把“再看一頁”變成日常",
@@ -92,10 +97,10 @@ export default {
     "trialNote": "訂閱支援月付與年付，價格、試用與頁數依所選報價，並按所選週期自動續訂。調價僅影響新訂閱；現有訂閱保留原價格及權益版本。可在續訂前取消。",
     "quotaNote": "每張原圖在指定模式與語言下成功生成一個新版本，計 1 頁。重複請求和有效結果複用不重複結算；主動重譯生成新版本按當前權益計量。不限累計頁數仍受短時速率、圖片規格和服務容量約束，不是完成速度承諾。",
     "viewPlus": "登錄並查看 PLUS",
-    "downloadTitle": "故事，從你的瀏覽器開始。",
-    "downloadDescription": "選擇正在使用的桌面瀏覽器。安裝插件，把翻譯和閱讀器一起放進工具欄。",
+    "downloadTitle": "為你的瀏覽器安裝漫畫翻譯擴充功能",
+    "downloadDescription": "下載 NodeLane 漫譯 Chrome、Edge、Firefox 擴充功能。前往 Chrome Web Store、Firefox Add-ons，或取得安裝套件；Edge 商店版本正在審核。",
     "storeDescription": "在熟悉的瀏覽器裡，打開下一段故事。",
-    "storeUnavailable": "下載鏈接尚未配置",
+    "storeUnavailable": "商店審核中",
     "directDownloadTitle": "直接下載安裝包",
     "directDownloadDescription": "請在對應瀏覽器卡片下下載安裝包，解壓縮後依下列步驟安裝。",
     "downloadZip": "下載 ZIP 安裝包",
@@ -106,39 +111,39 @@ export default {
     "manualUpdateNote": "手動安裝版本不會自動更新。更新時下載新版，覆蓋原資料夾中的檔案，再到擴充功能管理頁點選「重新載入」；請勿刪除安裝資料夾。",
     "downloadXpi": "下載已簽署 XPI",
     "storeHeading": "瀏覽器商店入口",
-    "storeNote": "商店入口尚未開放時，可下載對應瀏覽器的 ZIP 安裝包。回饋與建議：",
-    "guidesTitle": "讀漫畫，也可以更順手。",
-    "guidesDescription": "一些具體、有用的小指南。幫你選對翻譯方式，打開本地藏書，也理解自己的數據會去哪裡。",
+    "storeNote": "Edge 商店版本正在審核，可先下載 Edge ZIP 安裝套件；Firefox 可從商店安裝或使用已簽署 XPI。回饋與建議：",
+    "guidesTitle": "漫畫翻譯與本機閱讀指南",
+    "guidesDescription": "從瀏覽器漫畫翻譯、CBZ / CBR / PDF / MOBI 匯入，到日漫原圖對照、翻譯失敗排查與圖片隱私，依閱讀情境找到操作教學。",
     "contents": "本頁目錄",
     "editor": "NodeLane 漫譯 編輯團隊",
     "updated": "更新日期",
     "related": "接著讀",
-    "faqTitle": "你的疑問，這裡有一頁答案。",
-    "faqDescription": "關於閱讀、翻譯與賬戶，先看看這些常見問題。",
-    "helpTitle": "卡在某一頁？我們一起看看。",
-    "helpDescription": "先找對應指南，或者直接告訴我們發生了什麼。你的反饋會幫助下一次閱讀更順暢。",
+    "faqTitle": "漫畫翻譯擴充功能常見問題",
+    "faqDescription": "解答 Chrome、Edge、Firefox 安裝、免費翻譯額度、CBZ / PDF 格式、支援網站、本機翻譯服務、圖片隱私與取消訂閱問題。",
+    "helpTitle": "漫畫翻譯與擴充功能使用支援",
+    "helpDescription": "排查漫畫圖片讀取失敗、翻譯持續等待、權限與登入問題；查看安裝及本機匯入指南，或聯絡 NodeLane 漫譯支援。",
     "contactTitle": "每一條反饋，都值得被認真讀完。",
     "contactDescription": "翻譯質量問題可使用插件中的逐頁反饋。其他問題歡迎郵件聯繫。請說明瀏覽器、插件版本、操作步驟與錯誤提示；不要發送密碼、令牌、銀行卡信息、簽名地址或無權分享的漫畫全文。",
     "emailButton": "發送郵件",
-    "aboutTitle": "因為喜歡，所以想讀懂。",
-    "aboutDescription": "一個表情、一段對白、一個意想不到的轉折。我們希望語言不會讓這些感動停在門外。",
+    "aboutTitle": "關於 NodeLane 漫譯",
+    "aboutDescription": "NodeLane 漫譯是適用於 Chrome、Edge、Firefox 的漫畫閱讀與翻譯擴充功能，支援網頁漫畫、本機檔案與原圖對照；不提供漫畫內容庫。",
     "aboutBody": "NodeLane 漫譯 將圖片翻譯、本地閱讀與網頁圖片發現放在同一個瀏覽器插件中。我們希望減少窗口切換，讓你把注意力留給作品。AI 翻譯仍會有偏差，因此原圖、清晰的使用規則和對創作者的尊重始終重要。我們不提供漫畫內容庫，不出售漫畫作品，也不繞過付費、登錄或 DRM 限制。請使用你有權訪問和處理的內容。",
-    "changelogTitle": "每一次更新，都是新的一頁。",
-    "changelogDescription": "記錄閱讀體驗的持續打磨。商店審核與分批更新可能存在時間差，請以已安裝版本為準。",
+    "changelogTitle": "NodeLane 漫譯版本更新紀錄",
+    "changelogDescription": "查看漫畫翻譯擴充功能的新功能、網站支援、瀏覽器相容性與閱讀修正。各商店審核進度可能不同，請以已安裝版本為準。",
     "rss": "通過 RSS 訂閱更新",
     "accountTitle": "我的帳戶",
     "accountDescription": "管理帳戶與會員訂閱。閱讀與翻譯，請使用瀏覽器擴充功能。",
     "callbackTitle": "正在打開你的讀者通行證。",
     "callbackDescription": "登錄完成後自動返回賬戶頁面。",
     "noscript": "賬戶登錄需要啟用 JavaScript。產品介紹、定價和閱讀指南無需 JavaScript 即可閱讀。",
-    "seoHomeTitle": "NodeLane 漫譯 — AI 漫畫翻譯擴充功能與漫畫閱讀器",
+    "seoHomeTitle": "AI 漫畫翻譯擴充功能與本機漫畫閱讀器 | NodeLane 漫譯",
     "heroLines": [
       "翻過語言，",
       "走進故事裡。"
     ],
-    "seoFeaturesTitle": "漫畫翻譯與閱讀器功能",
-    "seoPricingTitle": "訂閱方案與定價",
-    "seoDownloadTitle": "漫畫翻譯擴充功能下載 — Chrome、Edge、Firefox",
+    "seoFeaturesTitle": "漫畫翻譯、原圖對照與本機閱讀功能",
+    "seoPricingTitle": "漫畫翻譯免費額度與 PLUS 訂閱價格",
+    "seoDownloadTitle": "漫畫翻譯擴充功能下載：Chrome、Edge、Firefox",
     "brandName": "NodeLane 漫譯",
     "notFoundTitle": "好像翻過頭了。",
     "notFoundDescription": "這個頁面不存在，可能連結已變更。故事還在，回到首頁接著看。"
@@ -337,7 +342,7 @@ export default {
       {
         "slug": "translation-modes",
         "title": "常規翻譯與 AI 重繪，讀漫畫時怎麼選？",
-        "description": "對比文字識別嵌字與圖片模型重繪的流程、畫面差異和適用場景，找到適合當前漫畫頁面的翻譯方式。",
+        "description": "了解一般 OCR 翻譯與 AI 重繪的差異、原圖對照，以及如何連接本機 manga-translator-ui 服務。依畫面保真需求和翻譯管道選擇模式。",
         "category": "翻譯技巧",
         "minutes": 5,
         "sections": [
@@ -368,8 +373,15 @@ export default {
               "你可以把常規翻譯作為日常起點，在需要時切換模式。兩種模式和不同語言的譯圖獨立保存；AI 重繪等待或失敗時，有效常規譯圖仍可繼續使用。",
               "不論選擇哪種模式，都建議保留隨時看原圖的習慣。翻譯是輔助理解的工具，角色語氣、文化語境和畫面信息最終仍需要結合原作判斷。"
             ]
+          },
+          {
+            "title": "使用本機漫畫翻譯服務",
+            "paragraphs": [
+              "可以連接自行部署的 manga-translator-ui 服務。在擴充功能設定中新增並選擇本機翻譯管道，無需登入 NodeLane 帳號，也不使用官方翻譯額度。服務需自行部署與執行；網路需求、可用模式及圖片處理範圍由所選服務決定。"
+            ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "local-comics",
@@ -407,11 +419,12 @@ export default {
           {
             "title": "本地導入，不等於翻譯完全離線",
             "paragraphs": [
-              "本地文件的解析和書架管理在瀏覽器端完成；需要翻譯時，相關頁面圖片會上傳至後端處理。原圖與最終譯圖在私有存儲中保留，具體範圍見隱私政策。",
+              "本機漫畫解析與原圖閱讀在瀏覽器中進行。使用官方翻譯時，選取的頁面圖片會傳送至後端處理，結果私密保存。也可選擇自行部署的 manga-translator-ui；網路需求與圖片處理範圍取決於該服務。",
               "書架和閱讀位置是本地數據。同一賬戶重新導入相同內容時，可匹配仍有效的已有譯圖；文件名變化不一定妨礙圖片內容匹配，但這不等於原始文件或整套書架自動在設備間同步。"
             ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "japanese-manga",
@@ -539,44 +552,82 @@ export default {
     ],
     "faqs": [
       {
+        "id": "overview",
         "question": "NodeLane 漫譯 是什麼？",
-        "answer": "NodeLane 漫譯 是帶有漫畫閱讀器的瀏覽器插件。你可以從網頁發現圖片，或導入本地漫畫，在閱讀時使用常規翻譯或 AI 重繪，隨時切換回原圖。官網用於下載、查看指南和管理賬戶，閱讀與翻譯在插件中進行。"
+        "answer": "NodeLane 漫譯 是帶有漫畫閱讀器的瀏覽器插件。你可以從網頁發現圖片，或導入本地漫畫，在閱讀時使用常規翻譯或 AI 重繪，隨時切換回原圖。官網用於下載、查看指南和管理賬戶，閱讀與翻譯在插件中進行。",
+        "relatedPath": "/guides/manga-translation/"
       },
       {
-        "question": "免費版和 PLUS 有什麼區別？",
-        "answer": "訂閱支援月付與年付，價格、試用與頁數依所選報價，並按所選週期自動續訂。調價僅影響新訂閱；現有訂閱保留原價格及權益版本。可在續訂前取消。"
+        "id": "browsers",
+        "question": "漫畫翻譯擴充功能支援 Chrome、Edge 和 Firefox 嗎？",
+        "answer": "支援桌面版 Chrome、Microsoft Edge 和 Firefox。Chrome 與 Firefox 可從各自商店安裝；Edge 商店版本正在審核，可先在下載頁取得 Edge ZIP 安裝套件。",
+        "relatedPath": "/download/"
       },
       {
+        "id": "installation",
+        "question": "如何安裝漫畫翻譯擴充功能與手動安裝套件？",
+        "answer": "Chrome 與 Firefox 可透過下載頁的官方商店入口安裝。Chrome / Edge 手動安裝時，下載並解壓縮對應 ZIP，在擴充功能管理頁開啟開發人員模式，再載入解壓縮的擴充功能。Firefox 使用商店版本或已簽署 XPI；詳細步驟見下載頁。",
+        "relatedPath": "/download/"
+      },
+      {
+        "id": "free-plan",
+        "question": "漫畫翻譯免費嗎？免費版和 PLUS 有何差異？",
+        "answer": "本機原圖閱讀免費且無需帳號。使用官方翻譯需登入，一般帳號每日有 30 頁一般翻譯額度；PLUS 一般翻譯沒有每日或每月累計頁數上限，但仍有速率和容量限制。AI 重繪需有效額度，價格、頁數、試用及月繳或年繳條件以目前方案為準。",
+        "relatedPath": "/pricing/"
+      },
+      {
+        "id": "translation-modes",
         "question": "常規翻譯和 AI 重繪應該怎麼選？",
-        "answer": "常規模式通過文字識別、文本翻譯、局部抹字和嵌字生成譯圖，適合日常連續閱讀。AI 重繪由圖片模型處理畫面，可能改變細節，適合願意嘗試另一種呈現的頁面。兩種模式的結果獨立保存，都可以切回原圖。"
+        "answer": "常規模式通過文字識別、文本翻譯、局部抹字和嵌字生成譯圖，適合日常連續閱讀。AI 重繪由圖片模型處理畫面，可能改變細節，適合願意嘗試另一種呈現的頁面。兩種模式的結果獨立保存，都可以切回原圖。",
+        "relatedPath": "/guides/translation-modes/"
       },
       {
+        "id": "file-formats",
         "question": "支持哪些本地漫畫格式？",
-        "answer": "支持 CBZ／ZIP、CBR／RAR、PDF，以及支持版本的無 DRM MOBI 漫畫。獨立 KF8／AZW3、EPUB 和加密文件不在當前支持範圍內。格式、壓縮方式與文件大小限制見本地導入指南。 不支援散圖；網站必須專門適配才能匯入。"
+        "answer": "支持 CBZ／ZIP、CBR／RAR、PDF，以及支持版本的無 DRM MOBI 漫畫。獨立 KF8／AZW3、EPUB 和加密文件不在當前支持範圍內。格式、壓縮方式與文件大小限制見本地導入指南。 不支援散圖；網站必須專門適配才能匯入。",
+        "relatedPath": "/guides/local-comics/"
       },
       {
+        "id": "website-permissions",
         "question": "會上傳源站的 Cookie 或瀏覽歷史嗎？",
-        "answer": "不會上傳源站 Cookie、登錄令牌或瀏覽歷史。你主動發現圖片時，插件按需請求對應網站的訪問權限；需要翻譯的圖片及必要任務信息會發送到後端，並由翻譯服務處理。詳細的數據範圍見隱私政策。"
+        "answer": "不會上傳源站 Cookie、登錄令牌或瀏覽歷史。你主動發現圖片時，插件按需請求對應網站的訪問權限；需要翻譯的圖片及必要任務信息會發送到後端，並由翻譯服務處理。詳細的數據範圍見隱私政策。",
+        "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
+        "id": "image-privacy",
         "question": "原圖和譯圖會保存多久？刪除後會怎樣？",
-        "answer": "用於翻譯的原圖和最終譯圖默認在私有對象存儲中長期保留，以支持恢復和複用。刪除記錄會撤銷你的訪問授權；相同內容可能共用存儲對象，因此刪除個人記錄不等於立即物理刪除共享圖片。已經簽發的下載地址可能在短暫有效期內繼續可用。"
+        "answer": "用於翻譯的原圖和最終譯圖默認在私有對象存儲中長期保留，以支持恢復和複用。刪除記錄會撤銷你的訪問授權；相同內容可能共用存儲對象，因此刪除個人記錄不等於立即物理刪除共享圖片。已經簽發的下載地址可能在短暫有效期內繼續可用。",
+        "relatedPath": "/privacy/"
       },
       {
+        "id": "translation-failed",
         "question": "翻譯失敗會扣頁數嗎？",
-        "answer": "新任務可能先預佔對應額度，成功交付後才結算。明確失敗會釋放預佔；常規模式確認無字或部分文字未識別、保留原文時也會釋放。AI 重繪結果未知時先核實，期間可能暫佔額度，不會直接再次調用生成。"
+        "answer": "新任務可能先預佔對應額度，成功交付後才結算。明確失敗會釋放預佔；常規模式確認無字或部分文字未識別、保留原文時也會釋放。AI 重繪結果未知時先核實，期間可能暫佔額度，不會直接再次調用生成。",
+        "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
+        "id": "plus-limits",
         "question": "PLUS 的“不限量”是否有限制？",
-        "answer": "PLUS 常規翻譯沒有每日或每月累計頁數上限。仍有合理的圖片尺寸、服務容量和短時速率限制：同一賬戶跨設備、模式和語言，每滾動 60 秒最多新增 100 張翻譯圖片，普通賬戶為 10 張。這不是每分鐘完成速度的承諾。"
+        "answer": "PLUS 常規翻譯沒有每日或每月累計頁數上限。仍有合理的圖片尺寸、服務容量和短時速率限制：同一賬戶跨設備、模式和語言，每滾動 60 秒最多新增 100 張翻譯圖片，普通賬戶為 10 張。這不是每分鐘完成速度的承諾。",
+        "relatedPath": "/pricing/"
       },
       {
+        "id": "cancel-subscription",
         "question": "如何取消訂閱？",
-        "answer": "登錄官網賬戶頁或在插件賬戶入口管理訂閱。取消會停止下一次自動續費，已取得的權益以賬戶顯示的到期時間為準。符合條件的首次試用需要綁卡；如不希望轉為付費，請在試用結束前取消。賬單問題可郵件聯繫 comics@nodelane.net。"
+        "answer": "登錄官網賬戶頁或在插件賬戶入口管理訂閱。取消會停止下一次自動續費，已取得的權益以賬戶顯示的到期時間為準。符合條件的首次試用需要綁卡；如不希望轉為付費，請在試用結束前取消。賬單問題可郵件聯繫 comics@nodelane.net。",
+        "relatedPath": "/refund/"
       },
       {
+        "id": "supported-sites",
         "question": "是否支持所有漫畫網站與所有語言？",
-        "answer": "網頁可用性取決於網站結構、圖片訪問限制及插件的站點適配，不保證所有網站均可使用。不同翻譯模式的目標語言範圍可能不同，請以插件實際可選列表為準。發現來源失敗時可以在擁有使用權的前提下嘗試本地導入。"
+        "answer": "網頁可用性取決於網站結構、圖片訪問限制及插件的站點適配，不保證所有網站均可使用。不同翻譯模式的目標語言範圍可能不同，請以插件實際可選列表為準。發現來源失敗時可以在擁有使用權的前提下嘗試本地導入。",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "local-translation",
+        "question": "可以使用本機漫畫翻譯服務，不登入 NodeLane 帳號嗎？",
+        "answer": "可以連接自行部署的 manga-translator-ui 服務。在擴充功能設定中新增並選擇本機翻譯管道，無需登入 NodeLane 帳號，也不使用官方翻譯額度。服務需自行部署與執行；網路需求、可用模式及圖片處理範圍由所選服務決定。",
+        "relatedPath": "/guides/translation-modes/"
       }
     ],
     "releases": [

@@ -2,6 +2,11 @@ import type { Dictionary } from './types';
 
 export default {
   "ui": {
+    "seoChangelogTitle": "漫画翻訳拡張機能の更新履歴",
+    "seoAboutTitle": "漫画翻訳とビューアについて",
+    "seoHelpTitle": "漫画翻訳の失敗・拡張機能のトラブル対処",
+    "seoFaqTitle": "漫画翻訳のよくある質問：導入・形式・利用枠",
+    "seoGuidesTitle": "漫画翻訳と CBZ・PDF 閲覧ガイド",
     "features": "機能",
     "pricing": "料金",
     "guides": "ガイド",
@@ -37,8 +42,8 @@ export default {
     "heroCaption": "NodeLane Comics オリジナル AI イラスト",
     "heroAlt": "海辺の駅で次の旅を待つ人物を描いたオリジナル漫画",
     "nextStop": "次の駅 / 新しい世界",
-    "featureHeading": "中断を減らして、物語に夢中。",
-    "featureDescription": "新しい漫画との出会いから、ページをめくる手が止まらなくなるまで。小さな手間を減らします。",
+    "featureHeading": "漫画を翻訳し、原文と比べて読む",
+    "featureDescription": "対応サイトやローカルファイルをページごとに翻訳し、原文と訳文を切り替えても読書位置を保持。通常翻訳、AI 再描画、CBZ・CBR・PDF・DRM なし MOBI の閲覧に対応します。",
     "featureTitles": [
       "読むペースに合わせて翻訳",
       "二つのモードで読み比べ",
@@ -67,8 +72,8 @@ export default {
     "ctaTitle": "良い物語を、わかる言葉で。",
     "ctaDescription": "翻訳は NodeLane Comics に任せて、気持ちは次のページへ。",
     "ctaButton": "読書の旅を始める",
-    "pricingTitle": "まずは無料で。もっと読みたくなったら。",
-    "pricingDescription": "毎日の読書は無料から。もっと楽しみたいときには PLUS を。",
+    "pricingTitle": "無料で読む。翻訳プランを選ぶ。",
+    "pricingDescription": "無料アカウントと PLUS の漫画翻訳枠、AI 再描画のページ数、月払い・年払いを比較。料金、試用条件、特典は現在のプランをご確認ください。",
     "freePlan": "無料アカウント",
     "freePlanDescription": "毎日のちょっとした読書に",
     "plusDescription": "「あと一ページ」を楽しむあなたへ",
@@ -92,10 +97,10 @@ export default {
     "trialNote": "月払いと年払いに対応しています。料金、試用、ページ数は選択したプランに従い、その周期で自動更新されます。料金変更は新規購読に適用され、既存の購読は元の料金と特典を維持します。更新前に解約できます。",
     "quotaNote": "画像を指定モード・言語で正常に新規生成すると1ページとして計上します。重複リクエストや有効な結果の再利用は二重計上しません。明示的な再翻訳は現在の利用枠を使います。累計上限なしでも短時間の頻度、画像仕様、サービス容量の制限があり、完了速度を保証するものではありません。",
     "viewPlus": "ログインして PLUS を確認",
-    "downloadTitle": "いつものブラウザーから、次の物語へ。",
-    "downloadDescription": "デスクトップブラウザーを選び、翻訳と漫画リーダーをツールバーに追加しましょう。",
+    "downloadTitle": "ブラウザーに漫画翻訳拡張機能を追加",
+    "downloadDescription": "Chrome・Edge・Firefox 用 NodeLane Comics をダウンロード。Chrome Web Store、Firefox Add-ons または配布パッケージから導入できます。Edge ストア版は審査中です。",
     "storeDescription": "使い慣れたブラウザーで、新しい物語を開きましょう。",
-    "storeUnavailable": "ダウンロードリンクは未設定です",
+    "storeUnavailable": "ストア審査中",
     "directDownloadTitle": "拡張機能を直接ダウンロード",
     "directDownloadDescription": "お使いのブラウザーのカードからZIPをダウンロードし、展開して次の手順でインストールしてください。",
     "downloadZip": "ZIP をダウンロード",
@@ -106,39 +111,39 @@ export default {
     "manualUpdateNote": "手動インストール版は自動更新されません。新版をダウンロードして元のフォルダー内のファイルを置き換え、拡張機能の管理画面で再読み込みしてください。インストール先フォルダーは削除しないでください。",
     "downloadXpi": "署名済み XPI をダウンロード",
     "storeHeading": "ブラウザーストアへのリンク",
-    "storeNote": "ストアが未公開の場合は、対応するブラウザーのZIPをダウンロードしてください。ご意見：",
-    "guidesTitle": "漫画を、もっと読みやすく。",
-    "guidesDescription": "翻訳モード、ローカルファイル、トラブル解決、データの扱いについての実用ガイドです。",
+    "storeNote": "Edge ストア版は審査中です。現在は Edge ZIP パッケージをご利用ください。Firefox はストアまたは署名済み XPI から導入できます。お問い合わせ：",
+    "guidesTitle": "漫画翻訳とローカル閲覧のガイド",
+    "guidesDescription": "ブラウザーでの漫画翻訳、CBZ・CBR・PDF・MOBI の読み込み、日本語原文との比較、翻訳失敗の対処、画像のプライバシーを解説します。",
     "contents": "このページの内容",
     "editor": "NodeLane Comics 編集チーム",
     "updated": "更新日",
     "related": "あわせて読む",
-    "faqTitle": "気になることに、一ページの答えを。",
-    "faqDescription": "読書、翻訳、アカウントについてよくある質問をまとめました。",
-    "helpTitle": "ページの途中で困ったら、一緒に確認しましょう。",
-    "helpDescription": "ガイドを探すか、起きたことをお知らせください。フィードバックが次の読書を快適にします。",
+    "faqTitle": "漫画翻訳拡張機能のよくある質問",
+    "faqDescription": "Chrome・Edge・Firefox への導入、漫画翻訳の無料枠、CBZ・PDF 形式、対応サイト、ローカル翻訳、画像の扱い、解約について回答します。",
+    "helpTitle": "漫画翻訳と拡張機能のヘルプ",
+    "helpDescription": "漫画画像の読み込み失敗、翻訳の待機、権限やログインの問題を確認。インストールとローカル読み込みのガイド、サポート窓口を案内します。",
     "contactTitle": "一つひとつの声を、大切に読みます。",
     "contactDescription": "翻訳品質は拡張機能のページ別フィードバックからご連絡ください。その他はブラウザー、拡張機能のバージョン、操作手順とエラーをメールでお送りください。パスワード、トークン、カード情報、署名付き URL、共有権限のない漫画全文は送らないでください。",
     "emailButton": "メールを送る",
-    "aboutTitle": "好きだから、理解したい。",
-    "aboutDescription": "表情、セリフ、思いがけない展開。言葉の違いで、その感動を逃してほしくありません。",
+    "aboutTitle": "NodeLane Comics について",
+    "aboutDescription": "NodeLane Comics は Chrome・Edge・Firefox 用の漫画翻訳・ビューア拡張機能です。対応サイトや手元のファイルを読み、原文と比較できます。漫画作品の配信は行いません。",
     "aboutBody": "NodeLane Comics は画像翻訳、ローカル読書、ウェブ画像の検出を一つの拡張機能にまとめています。画面を切り替える手間を減らし、作品に集中してもらうことが目標です。AI は間違えることがあるため、原画像、わかりやすい利用ルール、創作者への敬意を大切にしています。漫画の配信・販売や、有料壁・ログイン・DRM の回避は行いません。アクセスと処理の権利がある内容をご利用ください。",
-    "changelogTitle": "更新のたびに、新しい一ページ。",
-    "changelogDescription": "読書体験の改善を記録しています。ストア審査や段階配信により反映時期が異なります。インストール済みバージョンをご確認ください。",
+    "changelogTitle": "NodeLane Comics の更新履歴",
+    "changelogDescription": "漫画翻訳の新機能、対応サイト、ブラウザー互換性、閲覧機能の修正を確認できます。各ストアの審査時期は異なるため、導入済みバージョンをご確認ください。",
     "rss": "RSS で更新を読む",
     "accountTitle": "マイアカウント",
     "accountDescription": "アカウントと購読を管理。読書と翻訳にはブラウザー拡張機能をご利用ください。",
     "callbackTitle": "読者パスを開いています。",
     "callbackDescription": "ログイン完了後、アカウントページに戻ります。",
     "noscript": "アカウントへのログインには JavaScript が必要です。機能紹介、料金、ガイドは JavaScript なしでも読めます。",
-    "seoHomeTitle": "NodeLane Comics — AI 漫画翻訳と漫画リーダー",
+    "seoHomeTitle": "漫画翻訳・漫画ビューアのブラウザー拡張機能 | NodeLane Comics",
     "heroLines": [
       "言葉を越えて、",
       "物語の中へ。"
     ],
-    "seoFeaturesTitle": "漫画翻訳・リーダーの機能",
-    "seoPricingTitle": "購読プランと料金",
-    "seoDownloadTitle": "漫画翻訳拡張機能 — Chrome・Edge・Firefox",
+    "seoFeaturesTitle": "漫画翻訳・原文比較・ローカル閲覧の機能",
+    "seoPricingTitle": "漫画翻訳の無料枠と PLUS 料金プラン",
+    "seoDownloadTitle": "Chrome・Edge・Firefox 用漫画翻訳拡張機能",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "ページをめくりすぎたようです。",
     "notFoundDescription": "このページは存在しないか、アドレスが変わりました。ホームに戻って、次の物語を探しましょう。"
@@ -179,7 +184,7 @@ export default {
         "slug": "translation-modes",
         "minutes": 5,
         "title": "通常翻訳と AI リドロー、どちらを選ぶ？",
-        "description": "二つの翻訳方式の処理、画面の違い、利用枠を理解して、そのページに合った方法を選びましょう。",
+        "description": "通常の OCR 漫画翻訳と AI 再描画の違い、原文比較、ローカルの manga-translator-ui 接続を解説。画面の再現性と翻訳サービスに合わせて選べます。",
         "category": "翻訳のヒント",
         "sections": [
           {
@@ -202,8 +207,15 @@ export default {
               "再描画枠は毎月付与され、繰り越しはありません。年払いでも年間分を一度に利用することはできません。対象の初回アカウントはプランに応じたカード登録試用を利用できます。再購読や別プランへの変更で試用資格は復活しません。",
               "モードと言語ごとに結果は別々に保存されます。リドローの待機・失敗中も有効な通常翻訳を利用でき、いつでも原画像に戻れます。"
             ]
+          },
+          {
+            "title": "ローカルの漫画翻訳サービスを使う",
+            "paragraphs": [
+              "自分で動かしている manga-translator-ui を、拡張機能の設定でローカル翻訳チャンネルとして追加して選択できます。NodeLane へのログインや公式翻訳の利用枠は不要です。サービスの構築と実行は利用者が行い、ネット接続の要否、対応モード、画像の扱いはそのサービスに依存します。"
+            ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "local-comics",
@@ -229,11 +241,12 @@ export default {
           {
             "title": "ローカル読み込みとオフライン翻訳は別",
             "paragraphs": [
-              "ファイルの解析と本棚の管理はブラウザー内で行います。翻訳を依頼すると対象のページ画像をバックエンドへ送り、結果を非公開ストレージに保存します。",
+              "ローカル漫画の解析と原文閲覧はブラウザー内で行います。公式翻訳では選択したページ画像をバックエンドへ送信し、結果を非公開で保存します。自分の manga-translator-ui を選ぶこともでき、接続の要否や画像処理はサービスの設定に依存します。",
               "本棚と読書位置はローカルです。同じアカウントで同じ内容を再読み込みすると有効な既存結果を照合できますが、本棚全体や元ファイルの自動同期ではありません。"
             ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "japanese-manga",
@@ -446,36 +459,82 @@ export default {
     },
     "faqs": [
       {
+        "id": "overview",
         "question": "NodeLane Comics は何ですか？",
-        "answer": "漫画リーダーを備えたブラウザー拡張機能です。ウェブ画像の検出とローカル読み込みに対応し、通常翻訳と AI リドローを選べます。原画像はいつでも確認可能です。読書は拡張機能、入手先・ガイド・アカウント管理は公式サイトで利用します。"
+        "answer": "漫画リーダーを備えたブラウザー拡張機能です。ウェブ画像の検出とローカル読み込みに対応し、通常翻訳と AI リドローを選べます。原画像はいつでも確認可能です。読書は拡張機能、入手先・ガイド・アカウント管理は公式サイトで利用します。",
+        "relatedPath": "/guides/manga-translation/"
       },
       {
-        "question": "無料と PLUS の違いは？",
-        "answer": "月払いと年払いに対応しています。料金、試用、ページ数は選択したプランに従い、その周期で自動更新されます。料金変更は新規購読に適用され、既存の購読は元の料金と特典を維持します。更新前に解約できます。"
+        "id": "browsers",
+        "question": "漫画翻訳拡張機能は Chrome・Edge・Firefox に対応していますか？",
+        "answer": "デスクトップ版 Chrome、Microsoft Edge、Firefox に対応しています。Chrome と Firefox は各ストアから導入できます。Edge ストア版は審査中のため、現在はダウンロードページの Edge ZIP パッケージをご利用ください。",
+        "relatedPath": "/download/"
       },
       {
+        "id": "installation",
+        "question": "漫画翻訳拡張機能や ZIP パッケージをインストールするには？",
+        "answer": "Chrome と Firefox はダウンロードページの公式ストアリンクから導入できます。Chrome / Edge に手動で導入する場合は、対応 ZIP を展開し、拡張機能の管理画面でデベロッパーモードを有効にして展開済みフォルダーを読み込みます。Firefox はストア版または署名済み XPI を使います。",
+        "relatedPath": "/download/"
+      },
+      {
+        "id": "free-plan",
+        "question": "漫画翻訳は無料ですか？PLUS との違いは？",
+        "answer": "ローカルの原文閲覧は無料で、アカウントも不要です。公式翻訳にはログインが必要で、無料アカウントは通常翻訳を毎日 30 ページ利用できます。PLUS は通常翻訳の日・月の累計上限がなくなりますが、短時間の制限と容量制限は残ります。AI 再描画には有効な利用枠が必要です。料金、ページ数、試用、月払い・年払いの条件は現在のプランで確認してください。",
+        "relatedPath": "/pricing/"
+      },
+      {
+        "id": "translation-modes",
+        "question": "通常の漫画翻訳と AI 再描画はどう選べばよいですか？",
+        "answer": "通常翻訳は文字の検出と翻訳を行い、局所的な背景修復と文字入れで訳文を配置します。AI 再描画は画像モデルを使うため、絵の細部が変わることがあります。普段は通常翻訳から始め、原文と比較しながら必要に応じて再描画を試してください。結果はモードごとに保持されます。",
+        "relatedPath": "/guides/translation-modes/"
+      },
+      {
+        "id": "file-formats",
         "question": "対応するファイル形式は？",
-        "answer": "CBZ/ZIP、CBR/RAR、PDF、対応する DRM なし MOBI6/MOBI6+KF8 です。独立 KF8/AZW3、EPUB、暗号化された書籍には対応していません。 単独画像は取り込めません。Web サイトの取り込みには専用アダプターが必要です。"
+        "answer": "CBZ/ZIP、CBR/RAR、PDF、対応する DRM なし MOBI6/MOBI6+KF8 です。独立 KF8/AZW3、EPUB、暗号化された書籍には対応していません。 単独画像は取り込めません。Web サイトの取り込みには専用アダプターが必要です。",
+        "relatedPath": "/guides/local-comics/"
       },
       {
+        "id": "website-permissions",
+        "question": "拡張機能はサイトの Cookie や閲覧履歴を送信しますか？",
+        "answer": "元サイトの Cookie、ログイントークン、閲覧履歴を翻訳バックエンドへ送信することはありません。サイトと画像へのアクセス権限は必要なときに求めます。公式翻訳では選択した画像と必要なタスク情報を処理先へ送信します。詳細はプライバシーガイドをご覧ください。",
+        "relatedPath": "/guides/comic-reader-privacy/"
+      },
+      {
+        "id": "image-privacy",
         "question": "画像は送信・保存されますか？",
-        "answer": "翻訳では対象ページをバックエンドや必要な翻訳提供者へ送ります。原画像と完成画像は既定で非公開保存されます。記録削除はアクセス取り消しであり、共有オブジェクトの物理削除を保証しません。元サイトの Cookie、トークン、閲覧履歴は送信しません。"
+        "answer": "翻訳では対象ページをバックエンドや必要な翻訳提供者へ送ります。原画像と完成画像は既定で非公開保存されます。記録削除はアクセス取り消しであり、共有オブジェクトの物理削除を保証しません。元サイトの Cookie、トークン、閲覧履歴は送信しません。",
+        "relatedPath": "/privacy/"
       },
       {
+        "id": "translation-failed",
         "question": "失敗してもページ数を消費しますか？",
-        "answer": "最初に一時確保し、正常提供で精算します。明確な失敗や、通常翻訳で文字なし・一部認識できず原文を残した場合は確保分を解放します。リドローの結果不明は先に確認するため、一時確保が続く場合があります。"
+        "answer": "最初に一時確保し、正常提供で精算します。明確な失敗や、通常翻訳で文字なし・一部認識できず原文を残した場合は確保分を解放します。リドローの結果不明は先に確認するため、一時確保が続く場合があります。",
+        "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
+        "id": "plus-limits",
         "question": "上限なしに制限はありますか？",
-        "answer": "PLUS 通常翻訳は日・月の累計上限がありません。画像仕様、容量、短期頻度の制限はあり、直近60秒の新規翻訳画像はアカウント全体で PLUS 100枚、無料10枚までです。完了速度の保証ではありません。"
+        "answer": "PLUS 通常翻訳は日・月の累計上限がありません。画像仕様、容量、短期頻度の制限はあり、直近60秒の新規翻訳画像はアカウント全体で PLUS 100枚、無料10枚までです。完了速度の保証ではありません。",
+        "relatedPath": "/pricing/"
       },
       {
+        "id": "cancel-subscription",
         "question": "解約方法は？",
-        "answer": "公式サイトまたは拡張機能のアカウントで管理し、次回更新・試用終了前に解約します。アンインストールでは解約されません。有効期限はアカウント表示に従います。支払いの相談は comics@nodelane.net へ。"
+        "answer": "公式サイトまたは拡張機能のアカウントで管理し、次回更新・試用終了前に解約します。アンインストールでは解約されません。有効期限はアカウント表示に従います。支払いの相談は comics@nodelane.net へ。",
+        "relatedPath": "/refund/"
       },
       {
+        "id": "supported-sites",
         "question": "すべてのサイト・言語で使えますか？",
-        "answer": "サイト構造、権限、画像アクセス、アダプターに左右されます。言語はモードごとに異なる場合があり、拡張機能の選択肢を確認してください。すべてのサイト、言語、ファイルへの対応は保証しません。"
+        "answer": "サイト構造、権限、画像アクセス、アダプターに左右されます。言語はモードごとに異なる場合があり、拡張機能の選択肢を確認してください。すべてのサイト、言語、ファイルへの対応は保証しません。",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "local-translation",
+        "question": "NodeLane アカウントなしでローカルの漫画翻訳サービスを使えますか？",
+        "answer": "はい。自分で動かしている manga-translator-ui を、拡張機能の設定でローカル翻訳チャンネルとして追加して選択できます。NodeLane へのログインや公式翻訳の利用枠は不要です。サービスの構築と実行は利用者が行い、ネット接続の要否、対応モード、画像の扱いはそのサービスに依存します。",
+        "relatedPath": "/guides/translation-modes/"
       }
     ],
     "releases": [

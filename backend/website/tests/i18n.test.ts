@@ -29,7 +29,13 @@ test('five independent dictionaries cover all public content and account message
     assert.deepEqual(value.documents.guides.map(item=>item.slug),reference.documents.guides.map(item=>item.slug),locale);
     assert.deepEqual(Object.keys(value.documents.policies).sort(),Object.keys(reference.documents.policies).sort(),locale);
     for(const item of value.documents.guides)assert.ok(item.sections.length>=3 && item.sections.every(section=>section.paragraphs.length>0));
-    assert.ok(value.documents.faqs.length>=8);
+    assert.deepEqual(value.documents.faqs.map(item=>item.id),reference.documents.faqs.map(item=>item.id),locale);
+    assert.equal(new Set(value.documents.faqs.map(item=>item.id)).size,value.documents.faqs.length,locale);
+    for(const faq of value.documents.faqs){
+      assert.match(faq.id,/^[a-z]+(?:-[a-z]+)*$/);
+      assert.ok(faq.question.trim() && faq.answer.trim(),`${locale}: empty FAQ`);
+      assert.ok(publicPaths.includes(faq.relatedPath),`${locale}: missing related page ${faq.relatedPath}`);
+    }
   }
 });
 test('language switching preserves pages and round-trips all public routes',()=>{

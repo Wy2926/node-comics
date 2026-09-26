@@ -1,0 +1,28 @@
+---
+import { dictionaries, localPath, type Locale } from '../i18n';
+import type { Faq } from '../i18n/types';
+interface Props { locale: Locale; items: Faq[]; headingLevel?: 'h2' | 'h3' }
+const { locale, items, headingLevel: Heading = 'h3' } = Astro.props;
+const { ui, documents } = dictionaries[locale];
+function relatedTitle(path: string) {
+  return documents.guides.find(guide => path === `/guides/${guide.slug}/`)?.title
+    ?? ({ '/download/': ui.download, '/pricing/': ui.pricing, '/privacy/': ui.privacy, '/refund/': ui.refund }[path])
+    ?? ui.help;
+}
+---
+<div class="faq-list">
+  {items.map((item, i) => <details class="faq-item" id={item.id} open={i === 0}>
+    <summary><Heading>{item.question}</Heading></summary>
+    <p class="faq-answer">{item.answer}</p>
+    <a class="text-link faq-related" href={localPath(item.relatedPath, locale)}>{relatedTitle(item.relatedPath)} <span aria-hidden="true">→</span></a>
+  </details>)}
+</div>
+<script>
+  // A shared FAQ link must expose its answer on entry and on in-page navigation.
+  function openLinkedAnswer() {
+    const item = document.getElementById(location.hash.slice(1));
+    if (item instanceof HTMLDetailsElement && item.classList.contains('faq-item')) item.open = true;
+  }
+  openLinkedAnswer();
+  window.addEventListener('hashchange', openLinkedAnswer);
+</script>

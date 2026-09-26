@@ -1,6 +1,6 @@
 export type Locale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko';
 export interface GuideSection {title:string;paragraphs:string[];steps?:string[]}
-export interface Guide {slug:string;title:string;description:string;category:string;minutes:number;sections:GuideSection[]}
+export interface Guide {slug:string;title:string;description:string;category:string;minutes:number;updated?:string;sections:GuideSection[]}
 export interface Policy {title:string;description:string;sections:GuideSection[]}
 export interface UI {
   brandName:string;
@@ -11,6 +11,11 @@ export interface UI {
   seoFeaturesTitle:string;
   seoPricingTitle:string;
   seoDownloadTitle:string;
+  seoGuidesTitle:string;
+  seoFaqTitle:string;
+  seoHelpTitle:string;
+  seoAboutTitle:string;
+  seoChangelogTitle:string;
   features: string;
   pricing: string;
   guides: string;
@@ -116,4 +121,5 @@ export interface UI {
   callbackDescription: string;
   noscript: string;
 }
-export interface Dictionary {ui:UI;documents:{guides:Guide[];policies:Record<string,Policy>;faqs:{question:string;answer:string}[];releases:{id?:string;date:string;title:string;items:string[]}[]};account?:Record<string,string>}
+export interface Faq {id:string;question:string;answer:string;relatedPath:string}
+export interface Dictionary {ui:UI;documents:{guides:Guide[];policies:Record<string,Policy>;faqs:Faq[];releases:{id?:string;date:string;title:string;items:string[]}[]};account?:Record<string,string>}

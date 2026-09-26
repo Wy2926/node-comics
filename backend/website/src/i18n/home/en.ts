@@ -3,12 +3,12 @@ import type { HomeCopy } from './types';
 const copy: HomeCopy = {
   comparison: { title: 'One page. Many languages.', group: 'Translation examples', labels: ['Japanese original', 'Chinese', 'English', 'Korean'], loading: 'Loading image…', error: 'The image could not be loaded.', retry: 'Try again', caption: 'Recorded standard-translation results' },
   eyebrow: 'YOUR STORIES. YOUR PACE.',
-  title: ['Read the story.', 'In your language.'],
-  description: 'A comic reader with optional translation for supported websites and your own comic files.',
+  title: ["Read & translate manga.","Right in your browser."],
+  description: "Read manga with AI translation in Chrome, Edge and Firefox. Open supported websites or your own CBZ, CBR, PDF and DRM-free MOBI files, and compare every translated page with its original.",
   install: 'Get the extension', seeReader: 'Explore the reader',
   desktop: 'Made for desktop reading', popupAlt: 'NodeLane Comics toolbar popup with English selected and the Translate current tab button.',
   popupCaption: 'A new chapter starts in your toolbar.',
-  trust: ['Read local originals without an account.', 'Translation is online, with plan allowances.'],
+  trust: ["Read local originals for free, without an account.","Use official translation allowances or connect a local service."],
   stepsTitle: 'Start from your toolbar.', stepsIntro: 'One place to choose your language and get back to the story.',
   steps: [
     ['Choose your language', 'Set the language you want to read in from the extension popup.'],
@@ -38,7 +38,7 @@ const copy: HomeCopy = {
   ],
   controlNote: 'New comics open in the original view. Choose a translation mode when you are ready.',
   privacyTitle: 'Know what happens to your pages.',
-  privacyBody: 'Translation sends comic images to the service and uses online processing. Originals and translated results are stored privately for reuse. Check the privacy policy and plan allowances before translating.',
+  privacyBody: "Official translation sends selected comic images to the service and stores originals and results privately for reuse. You can also connect your own translation service; its configuration determines how images are handled.",
   privacy: 'Privacy policy', pricing: 'Plans & allowances',
   ctaTitle: 'Ready for your next page?', ctaBody: 'Get the extension, open a comic, and make yourself comfortable.',
 };

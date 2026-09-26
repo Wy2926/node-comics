@@ -97,3 +97,10 @@
 .store-icon{width:48px;height:48px;object-fit:contain}
 
 .store-card{display:flex;flex-direction:column}.store-actions{margin-top:auto}.platform-download{margin-top:16px}.store-card .package-meta{margin:12px 0 0;font-size:.76rem}.store-card .package-unavailable{margin:16px 0 0;font-size:.78rem}.download-install{margin-bottom:24px}.download-install h2{margin-bottom:16px}.download-install .note{margin-bottom:0}
+.faq-topics { display:flex;flex-wrap:wrap;gap:10px;max-width:840px;margin:0 auto 32px; }
+.faq-topics a { padding:7px 12px;border:1px solid var(--line);border-radius:6px;font-size:.8rem;background:var(--surface); }
+.faq-item,.store-card { scroll-margin-top:110px; }
+.faq-item summary h2,.faq-item summary h3 { display:inline;font-size:1rem;line-height:1.6;letter-spacing:normal; }
+.faq-item .faq-related { display:inline-block;font-size:.86rem;margin:0 0 20px; }
+.faq-contact { max-width:840px;margin:28px auto 0; }
+.store-pending { color:var(--muted);font-size:.88rem;padding-block:12px; }

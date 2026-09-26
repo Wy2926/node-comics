@@ -2,6 +2,11 @@ import type { Dictionary } from './types';
 
 export default {
   "ui": {
+    "seoChangelogTitle": "만화 번역 확장 프로그램 업데이트 내역",
+    "seoAboutTitle": "만화 번역기와 뷰어 소개",
+    "seoHelpTitle": "만화 번역 실패 및 확장 프로그램 문제 해결",
+    "seoFaqTitle": "만화 번역 FAQ: 설치·파일 형식·이용량",
+    "seoGuidesTitle": "만화 번역 및 CBZ·PDF 뷰어 사용 가이드",
     "features": "기능",
     "pricing": "요금",
     "guides": "읽기 가이드",
@@ -37,8 +42,8 @@ export default {
     "heroCaption": "NodeLane Comics 오리지널 AI 일러스트",
     "heroAlt": "바닷가 기차역에서 다음 여행을 기다리는 인물의 오리지널 만화",
     "nextStop": "다음 역 / 새로운 세계",
-    "featureHeading": "방해는 줄이고, 이야기에 더 깊이.",
-    "featureDescription": "새 만화를 발견한 순간부터 손을 멈출 수 없는 순간까지. 그 사이의 작은 번거로움을 덜어 드립니다.",
+    "featureHeading": "만화 번역부터 원본 비교까지",
+    "featureDescription": "지원 사이트와 로컬 파일을 페이지별로 번역하고, 원본과 번역본을 전환해도 읽던 위치를 유지하세요. 일반 번역, AI 다시 그리기, CBZ·CBR·PDF·DRM 없는 MOBI 읽기를 지원합니다.",
     "featureTitles": [
       "읽는 속도를 따라오는 번역",
       "한 페이지, 두 가지 번역 방식",
@@ -67,8 +72,8 @@ export default {
     "ctaTitle": "좋은 이야기는 이해할 가치가 있어요.",
     "ctaDescription": "번역은 NodeLane Comics에 맡기고, 다음 페이지에 집중하세요.",
     "ctaButton": "읽기 여정 시작",
-    "pricingTitle": "먼저 읽고, 더 읽고 싶을 때 선택하세요.",
-    "pricingDescription": "일상적인 읽기는 무료로 시작하세요. 더 많은 이야기가 필요할 때 PLUS를 만나 보세요.",
+    "pricingTitle": "무료로 읽고, 번역 요금제를 선택하세요",
+    "pricingDescription": "무료 계정과 PLUS의 만화 번역 이용량, AI 다시 그리기 페이지 수, 월간·연간 구독을 비교하세요. 가격, 체험 조건 및 혜택은 현재 상품을 기준으로 합니다.",
     "freePlan": "무료 계정",
     "freePlanDescription": "매일 조금씩 즐기는 독서",
     "plusDescription": "“한 장만 더” 읽고 싶은 날에",
@@ -92,10 +97,10 @@ export default {
     "trialNote": "월간 또는 연간 결제를 지원합니다. 가격, 체험 및 페이지 수는 선택한 요금제를 따르며 해당 주기로 자동 갱신됩니다. 가격 변경은 신규 구독에 적용되며 기존 구독은 원래 가격과 혜택을 유지합니다. 갱신 전에 취소할 수 있습니다.",
     "quotaNote": "선택한 모드와 언어로 이미지의 새 버전을 성공적으로 생성하면 1페이지로 계산합니다. 중복 요청이나 유효한 결과 재사용은 중복 차감하지 않습니다. 직접 재번역하면 현재 이용량이 적용됩니다. 누적 무제한에도 단기 속도, 이미지 규격, 서비스 용량 제한은 적용되며 완료 속도를 보장하지 않습니다.",
     "viewPlus": "로그인하고 PLUS 확인",
-    "downloadTitle": "익숙한 브라우저에서, 다음 이야기로.",
-    "downloadDescription": "사용 중인 데스크톱 브라우저를 선택하고 도구 모음에 만화 번역과 리더를 추가하세요.",
+    "downloadTitle": "브라우저에 만화 번역 확장 프로그램 설치",
+    "downloadDescription": "Chrome·Edge·Firefox용 NodeLane Comics를 받으세요. Chrome 웹 스토어, Firefox Add-ons 또는 브라우저별 설치 파일을 이용하세요. Edge 스토어 등록은 심사 중입니다.",
     "storeDescription": "즐겨 쓰는 브라우저에서 새로운 이야기를 열어 보세요.",
-    "storeUnavailable": "다운로드 링크가 설정되지 않았습니다",
+    "storeUnavailable": "스토어 심사 중",
     "directDownloadTitle": "확장 프로그램 직접 다운로드",
     "directDownloadDescription": "사용 중인 브라우저 카드에서 ZIP을 내려받고 압축을 푼 다음 아래 단계에 따라 설치하세요.",
     "downloadZip": "ZIP 다운로드",
@@ -106,39 +111,39 @@ export default {
     "manualUpdateNote": "수동 설치 버전은 자동 업데이트되지 않습니다. 새 버전을 다운로드하여 기존 폴더의 파일을 교체하고 확장 프로그램 관리 페이지에서 새로고침하세요. 설치 폴더를 삭제하지 마세요.",
     "downloadXpi": "서명된 XPI 다운로드",
     "storeHeading": "브라우저 스토어 링크",
-    "storeNote": "스토어가 아직 열리지 않았다면 해당 브라우저의 ZIP을 내려받으세요. 의견 보내기:",
-    "guidesTitle": "만화 읽기를 조금 더 편하게.",
-    "guidesDescription": "번역 모드, 로컬 파일, 문제 해결, 데이터 처리에 관한 실용적인 가이드입니다.",
+    "storeNote": "Edge 스토어 등록은 심사 중입니다. 현재는 Edge ZIP 설치 파일을 이용하세요. Firefox는 스토어 또는 서명된 XPI로 설치할 수 있습니다. 의견 보내기:",
+    "guidesTitle": "만화 번역 및 로컬 읽기 가이드",
+    "guidesDescription": "브라우저에서 만화 번역하기, CBZ·CBR·PDF·MOBI 가져오기, 일본어 원본 비교, 번역 오류 해결 및 이미지 개인정보 처리를 안내합니다.",
     "contents": "이 페이지의 내용",
     "editor": "NodeLane Comics 편집팀",
     "updated": "업데이트",
     "related": "이어서 읽기",
-    "faqTitle": "궁금한 점에 답하는 한 페이지.",
-    "faqDescription": "읽기, 번역, 계정에 관한 자주 묻는 질문을 확인하세요.",
-    "helpTitle": "어떤 페이지에서 막혔나요? 함께 살펴봐요.",
-    "helpDescription": "가이드를 찾아보거나 어떤 일이 있었는지 알려 주세요. 여러분의 의견이 다음 읽기를 더 편하게 만듭니다.",
+    "faqTitle": "만화 번역 확장 프로그램 자주 묻는 질문",
+    "faqDescription": "Chrome·Edge·Firefox 설치, 무료 만화 번역 이용량, CBZ·PDF 형식, 지원 사이트, 로컬 번역, 이미지 개인정보 및 구독 취소에 답합니다.",
+    "helpTitle": "만화 번역 및 확장 프로그램 도움말",
+    "helpDescription": "만화 이미지 로딩 실패, 번역 대기, 권한 및 로그인 문제를 해결하세요. 설치와 로컬 파일 가이드를 확인하거나 NodeLane Comics 지원팀에 문의하세요.",
     "contactTitle": "모든 의견을 꼼꼼히 읽겠습니다.",
     "contactDescription": "번역 품질 문제는 확장 프로그램의 페이지별 피드백을 이용하세요. 그 외에는 브라우저, 확장 프로그램 버전, 작업 순서와 오류 메시지를 이메일로 알려 주세요. 비밀번호, 토큰, 카드 정보, 서명된 URL 또는 공유 권한이 없는 만화 전체는 보내지 마세요.",
     "emailButton": "이메일 보내기",
-    "aboutTitle": "좋아하기에, 이해하고 싶습니다.",
-    "aboutDescription": "표정 하나, 대사 한 줄, 뜻밖의 전개. 언어 때문에 그 감동을 놓치지 않았으면 합니다.",
+    "aboutTitle": "NodeLane Comics 소개",
+    "aboutDescription": "NodeLane Comics는 Chrome·Edge·Firefox용 만화 번역기이자 뷰어입니다. 지원 사이트와 로컬 파일 읽기, 원본 비교를 제공하며 만화 콘텐츠를 배포하지 않습니다.",
     "aboutBody": "NodeLane Comics는 이미지 번역, 로컬 읽기, 웹 이미지 찾기를 하나의 확장 프로그램에 담았습니다. 창을 오가는 시간을 줄이고 작품에 집중할 수 있도록 돕습니다. AI는 실수할 수 있기에 원본 확인, 명확한 이용 규칙, 창작자 존중을 중요하게 생각합니다. 만화 목록을 제공하거나 작품을 판매하지 않으며, 유료벽·로그인·DRM 제한을 우회하지 않습니다. 접근하고 처리할 권한이 있는 콘텐츠만 사용해 주세요.",
-    "changelogTitle": "업데이트마다 새로운 한 페이지.",
-    "changelogDescription": "읽기 경험의 개선을 기록합니다. 스토어 심사와 순차 배포에 따라 반영 시점이 다를 수 있으니 설치된 버전을 확인하세요.",
+    "changelogTitle": "NodeLane Comics 업데이트 내역",
+    "changelogDescription": "만화 번역 신기능, 지원 사이트, 브라우저 호환성 및 읽기 오류 수정을 확인하세요. 스토어 심사 일정은 다를 수 있으므로 설치된 버전을 확인하세요.",
     "rss": "RSS로 업데이트 읽기",
     "accountTitle": "내 계정",
     "accountDescription": "계정과 멤버십을 관리하세요. 읽기와 번역은 브라우저 확장 프로그램에서 이용하세요.",
     "callbackTitle": "독자 패스를 여는 중입니다.",
     "callbackDescription": "로그인이 완료되면 계정 페이지로 돌아갑니다.",
     "noscript": "계정 로그인에는 JavaScript가 필요합니다. 기능 소개, 요금, 가이드는 JavaScript 없이 읽을 수 있습니다.",
-    "seoHomeTitle": "NodeLane Comics — AI 만화 번역 확장 프로그램과 리더",
+    "seoHomeTitle": "AI 만화 번역기 & 만화 뷰어 확장 프로그램 | NodeLane Comics",
     "heroLines": [
       "언어를 넘어,",
       "이야기 속으로."
     ],
-    "seoFeaturesTitle": "만화 번역 및 리더 기능",
-    "seoPricingTitle": "구독 요금제 및 가격",
-    "seoDownloadTitle": "만화 번역 확장 프로그램 — Chrome, Edge, Firefox",
+    "seoFeaturesTitle": "만화 번역·원본 비교·로컬 읽기 기능",
+    "seoPricingTitle": "무료 만화 번역 이용량 및 PLUS 요금제",
+    "seoDownloadTitle": "Chrome·Edge·Firefox 만화 번역 확장 다운로드",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "한 페이지 더 넘겼네요.",
     "notFoundDescription": "페이지가 없거나 주소가 변경되었습니다. 홈으로 돌아가 다음 이야기를 찾아보세요."
@@ -179,7 +184,7 @@ export default {
         "slug": "translation-modes",
         "minutes": 5,
         "title": "일반 번역과 AI 리드로, 무엇을 선택할까요?",
-        "description": "두 가지 번역 방식의 처리 과정, 그림 변화와 이용량을 이해하고 페이지에 맞게 선택하세요.",
+        "description": "일반 OCR 만화 번역과 AI 다시 그리기의 차이, 원본 비교 및 로컬 manga-translator-ui 연결 방법을 알아보세요. 그림 보존과 번역 서비스에 맞춰 선택할 수 있습니다.",
         "category": "번역 팁",
         "sections": [
           {
@@ -202,8 +207,15 @@ export default {
               "다시 그리기 한도는 매월 제공되며 이월되지 않습니다. 연간 요금제도 한 번에 연간 한도를 제공하지 않습니다. 자격이 있는 최초 계정은 요금제에 따른 카드 등록 체험을 이용할 수 있습니다. 재구독이나 다른 요금제 선택으로 체험 자격이 초기화되지 않습니다.",
               "모드와 언어별 결과는 따로 저장됩니다. 리드로가 대기하거나 실패해도 유효한 일반 번역을 계속 볼 수 있고, 언제든 원본으로 돌아갈 수 있습니다."
             ]
+          },
+          {
+            "title": "로컬 만화 번역 서비스 사용하기",
+            "paragraphs": [
+              "직접 실행하는 manga-translator-ui 서비스를 확장 프로그램 설정에서 로컬 번역 채널로 추가하고 선택하세요. NodeLane 로그인이나 공식 번역 이용량이 필요하지 않습니다. 서비스는 직접 설치하고 실행해야 하며, 네트워크 요구 사항, 지원 모드 및 이미지 처리는 해당 서비스에 따라 달라집니다."
+            ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "local-comics",
@@ -229,11 +241,12 @@ export default {
           {
             "title": "로컬 가져오기는 오프라인 번역과 다릅니다",
             "paragraphs": [
-              "파일 해석과 책장 관리는 브라우저에서 이루어집니다. 번역을 요청하면 필요한 페이지 이미지를 백엔드로 보내고 결과를 비공개 저장소에 보관합니다.",
+              "로컬 만화 분석과 원본 읽기는 브라우저에서 이루어집니다. 공식 번역은 선택한 페이지 이미지를 백엔드로 보내 처리하고 결과를 비공개로 보관합니다. 직접 실행하는 manga-translator-ui를 선택할 수도 있으며 네트워크 사용과 이미지 처리는 해당 서비스 설정에 따릅니다.",
               "책장과 읽기 위치는 로컬 데이터입니다. 같은 계정으로 같은 내용을 다시 가져오면 유효한 결과와 연결할 수 있지만, 전체 책장이나 원본 파일이 자동으로 동기화되는 것은 아닙니다."
             ]
           }
-        ]
+        ],
+        "updated": "2026-09-26"
       },
       {
         "slug": "japanese-manga",
@@ -446,36 +459,82 @@ export default {
     },
     "faqs": [
       {
+        "id": "overview",
         "question": "NodeLane Comics는 무엇인가요?",
-        "answer": "만화 리더가 포함된 브라우저 확장 프로그램입니다. 웹 이미지 찾기와 로컬 가져오기를 지원하고 일반 번역과 AI 리드로를 선택할 수 있습니다. 원본은 언제든 확인할 수 있습니다. 읽기는 확장 프로그램에서, 다운로드·가이드·계정 관리는 공식 사이트에서 합니다."
+        "answer": "만화 리더가 포함된 브라우저 확장 프로그램입니다. 웹 이미지 찾기와 로컬 가져오기를 지원하고 일반 번역과 AI 리드로를 선택할 수 있습니다. 원본은 언제든 확인할 수 있습니다. 읽기는 확장 프로그램에서, 다운로드·가이드·계정 관리는 공식 사이트에서 합니다.",
+        "relatedPath": "/guides/manga-translation/"
       },
       {
-        "question": "무료와 PLUS는 어떻게 다른가요?",
-        "answer": "월간 또는 연간 결제를 지원합니다. 가격, 체험 및 페이지 수는 선택한 요금제를 따르며 해당 주기로 자동 갱신됩니다. 가격 변경은 신규 구독에 적용되며 기존 구독은 원래 가격과 혜택을 유지합니다. 갱신 전에 취소할 수 있습니다."
+        "id": "browsers",
+        "question": "만화 번역기는 Chrome·Edge·Firefox를 지원하나요?",
+        "answer": "데스크톱 Chrome, Microsoft Edge, Firefox를 지원합니다. Chrome과 Firefox는 각 공식 스토어에서 설치할 수 있습니다. Edge 스토어 등록은 심사 중이므로 현재는 다운로드 페이지의 Edge ZIP 설치 파일을 이용하세요.",
+        "relatedPath": "/download/"
       },
       {
+        "id": "installation",
+        "question": "만화 번역 확장 프로그램이나 ZIP 파일은 어떻게 설치하나요?",
+        "answer": "Chrome과 Firefox는 다운로드 페이지의 공식 스토어 링크로 설치하세요. Chrome / Edge에 수동 설치하려면 해당 ZIP을 다운로드해 압축을 풀고, 확장 관리 화면에서 개발자 모드를 켠 다음 압축 해제된 확장 프로그램을 로드하세요. Firefox는 스토어 버전 또는 서명된 XPI를 사용합니다.",
+        "relatedPath": "/download/"
+      },
+      {
+        "id": "free-plan",
+        "question": "만화 번역은 무료인가요? PLUS와는 어떻게 다른가요?",
+        "answer": "로컬 원본 읽기는 무료이며 계정이 필요 없습니다. 공식 번역은 로그인이 필요하고, 무료 계정에는 하루 30페이지의 일반 번역이 제공됩니다. PLUS는 일반 번역의 일간·월간 누적 한도가 없지만 속도와 처리 용량 제한은 적용됩니다. AI 다시 그리기에는 유효한 이용량이 필요합니다. 가격, 페이지 수, 체험 및 월간·연간 결제 조건은 현재 요금제를 확인하세요.",
+        "relatedPath": "/pricing/"
+      },
+      {
+        "id": "translation-modes",
+        "question": "일반 만화 번역과 AI 다시 그리기는 어떻게 선택하나요?",
+        "answer": "일반 번역은 글자를 인식하고 번역한 뒤 주변 배경을 복원해 번역문을 넣습니다. AI 다시 그리기는 이미지 모델을 사용하므로 그림의 세부 요소가 바뀔 수 있습니다. 평소에는 일반 번역을 사용하고 원본과 비교하면서 필요할 때 다시 그리기를 시도하세요. 두 모드의 결과는 따로 보관됩니다.",
+        "relatedPath": "/guides/translation-modes/"
+      },
+      {
+        "id": "file-formats",
         "question": "어떤 파일을 지원하나요?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF와 지원되는 DRM 없는 MOBI6/MOBI6+KF8입니다. 독립 KF8/AZW3, EPUB, 암호화된 책은 지원하지 않습니다. 개별 이미지는 가져올 수 없습니다. 웹사이트에서 가져오려면 전용 어댑터가 필요합니다."
+        "answer": "CBZ/ZIP, CBR/RAR, PDF와 지원되는 DRM 없는 MOBI6/MOBI6+KF8입니다. 독립 KF8/AZW3, EPUB, 암호화된 책은 지원하지 않습니다. 개별 이미지는 가져올 수 없습니다. 웹사이트에서 가져오려면 전용 어댑터가 필요합니다.",
+        "relatedPath": "/guides/local-comics/"
       },
       {
+        "id": "website-permissions",
+        "question": "확장 프로그램이 사이트 쿠키나 방문 기록을 업로드하나요?",
+        "answer": "원본 사이트의 쿠키, 로그인 토큰, 방문 기록은 번역 백엔드로 업로드하지 않습니다. 사이트와 이미지 접근 권한은 필요할 때 요청합니다. 공식 번역은 선택한 이미지와 필요한 작업 정보를 처리 서비스로 전송합니다. 자세한 내용은 개인정보 가이드를 확인하세요.",
+        "relatedPath": "/guides/comic-reader-privacy/"
+      },
+      {
+        "id": "image-privacy",
         "question": "이미지가 업로드되거나 보관되나요?",
-        "answer": "번역하려면 대상 페이지를 백엔드와 필요한 제공자에 보냅니다. 원본과 최종 이미지는 기본적으로 비공개 보관합니다. 기록 삭제는 접근 권한 철회이며 공유 객체의 물리 삭제를 보장하지 않습니다. 원본 사이트 Cookie, 토큰, 방문 기록은 업로드하지 않습니다."
+        "answer": "번역하려면 대상 페이지를 백엔드와 필요한 제공자에 보냅니다. 원본과 최종 이미지는 기본적으로 비공개 보관합니다. 기록 삭제는 접근 권한 철회이며 공유 객체의 물리 삭제를 보장하지 않습니다. 원본 사이트 Cookie, 토큰, 방문 기록은 업로드하지 않습니다.",
+        "relatedPath": "/privacy/"
       },
       {
+        "id": "translation-failed",
         "question": "실패해도 페이지가 차감되나요?",
-        "answer": "먼저 예약한 뒤 성공적으로 제공하면 정산합니다. 명확한 실패, 일반 번역에서 글자 없음 또는 일부 미인식으로 원문을 남긴 결과는 예약을 해제합니다. 리드로 결과 미확인은 먼저 조사하므로 예약이 잠시 유지될 수 있습니다."
+        "answer": "먼저 예약한 뒤 성공적으로 제공하면 정산합니다. 명확한 실패, 일반 번역에서 글자 없음 또는 일부 미인식으로 원문을 남긴 결과는 예약을 해제합니다. 리드로 결과 미확인은 먼저 조사하므로 예약이 잠시 유지될 수 있습니다.",
+        "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
+        "id": "plus-limits",
         "question": "무제한에도 제한이 있나요?",
-        "answer": "PLUS 일반 번역에는 일별·월별 누적 상한이 없습니다. 이미지, 용량, 단기 속도 제한은 유지됩니다. 최근 60초의 새 번역 이미지는 계정 전체 기준 PLUS 100장, 무료 10장까지이며 완료 속도를 보장하지 않습니다."
+        "answer": "PLUS 일반 번역에는 일별·월별 누적 상한이 없습니다. 이미지, 용량, 단기 속도 제한은 유지됩니다. 최근 60초의 새 번역 이미지는 계정 전체 기준 PLUS 100장, 무료 10장까지이며 완료 속도를 보장하지 않습니다.",
+        "relatedPath": "/pricing/"
       },
       {
+        "id": "cancel-subscription",
         "question": "어떻게 취소하나요?",
-        "answer": "공식 사이트 또는 확장 프로그램 계정에서 다음 갱신·체험 종료 전에 취소하세요. 프로그램 삭제는 취소가 아닙니다. 혜택 만료는 계정 표시에 따르며 결제 문의는 comics@nodelane.net으로 보내 주세요."
+        "answer": "공식 사이트 또는 확장 프로그램 계정에서 다음 갱신·체험 종료 전에 취소하세요. 프로그램 삭제는 취소가 아닙니다. 혜택 만료는 계정 표시에 따르며 결제 문의는 comics@nodelane.net으로 보내 주세요.",
+        "relatedPath": "/refund/"
       },
       {
+        "id": "supported-sites",
         "question": "모든 사이트와 언어를 지원하나요?",
-        "answer": "사이트 구조, 권한, 이미지 접근과 어댑터에 따라 다릅니다. 언어는 번역 모드별로 다를 수 있으니 확장 프로그램의 선택 목록을 확인하세요. 모든 사이트, 언어, 파일을 보장하지는 않습니다."
+        "answer": "사이트 구조, 권한, 이미지 접근과 어댑터에 따라 다릅니다. 언어는 번역 모드별로 다를 수 있으니 확장 프로그램의 선택 목록을 확인하세요. 모든 사이트, 언어, 파일을 보장하지는 않습니다.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "local-translation",
+        "question": "NodeLane 계정 없이 로컬 만화 번역 서비스를 쓸 수 있나요?",
+        "answer": "네. 직접 실행하는 manga-translator-ui 서비스를 확장 프로그램 설정에서 로컬 번역 채널로 추가하고 선택하세요. NodeLane 로그인이나 공식 번역 이용량이 필요하지 않습니다. 서비스는 직접 설치하고 실행해야 하며, 네트워크 요구 사항, 지원 모드 및 이미지 처리는 해당 서비스에 따라 달라집니다.",
+        "relatedPath": "/guides/translation-modes/"
       }
     ],
     "releases": [

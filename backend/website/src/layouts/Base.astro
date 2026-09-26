@@ -21,12 +21,14 @@ const href=(target:string)=>localPath(target,locale);
 const navigation=[{href:href('/features/'),label:t.features},{href:href('/pricing/'),label:t.pricing},{href:href('/guides/'),label:t.guides},{href:href('/help/'),label:t.help}];
 const canonical = absolute(path);
 const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
+const pageSchema = schema.find(item => item['@id'] === canonical);
+const ogLocales = {'zh-CN':'zh_CN','zh-TW':'zh_TW',en:'en_US',ja:'ja_JP',ko:'ko_KR'};
 const graph = [
   { '@type': 'Organization', '@id': absolute('/#organization'), name: site.name, url: site.url, email: site.email, logo: absolute('/icon-128.png'), contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: site.email } },
-  { '@type': 'WebSite', '@id': absolute('/#website'), url: site.url, name: site.name, inLanguage: locale, publisher: { '@id': absolute('/#organization') } },
-  { '@type': 'WebPage', '@id': canonical, url: canonical, name: pageTitle, description, inLanguage: locale, isPartOf: { '@id': absolute('/#website') } },
+  { '@type': 'WebSite', '@id': absolute('/#website'), url: site.url, name: site.name, alternateName: ['NodeLane 漫译', 'NodeLane 漫譯'], inLanguage: locales, publisher: { '@id': absolute('/#organization') } },
+  { '@type': 'WebPage', '@id': canonical, url: canonical, name: pageTitle, description, inLanguage: locale, isPartOf: { '@id': absolute('/#website') }, ...pageSchema },
   ...(route !== '/' ? [{ '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: t.home, item: absolute(href('/')) }, ...(route.startsWith('/guides/') && route !== '/guides/' ? [{ '@type': 'ListItem', position: 2, name: t.guides, item: absolute(href('/guides/')) }] : []), { '@type': 'ListItem', position: route.startsWith('/guides/') && route !== '/guides/' ? 3 : 2, name: title, item: canonical }] }] : []),
-  ...schema,
+  ...schema.filter(item => item !== pageSchema),
 ];
 ---
 <!doctype html>
@@ -49,13 +51,16 @@ const graph = [
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta property="og:locale" content={{'zh-CN':'zh_CN','zh-TW':'zh_TW',en:'en_US',ja:'ja_JP',ko:'ko_KR'}[locale]} />
+    <meta property="og:locale" content={ogLocales[locale]} />
+    {locales.filter(language => language !== locale).map(language => <meta property="og:locale:alternate" content={ogLocales[language]} />)}
     <meta property="og:image" content={absolute(image)} />
     <meta property="og:image:alt" content={t.ogAlt} />
+    {image === '/social-cover.webp' && <><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:type" content="image/webp" /></>}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={absolute(image)} />
+    <meta name="twitter:image:alt" content={t.ogAlt} />
     <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')} />
   </head>
   <body>

@@ -12,12 +12,18 @@ export const site = {
   language: 'zh-CN',
   updated: '2026-09-20',
   extensionPackages,
-  // Fill with the exact listing URLs; empty values render accessible disabled buttons.
+  // Only verified listing URLs. Edge is awaiting store review; offer its package instead.
   stores: {
-    chrome: 'https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo?utm_source=item-share-cb',
+    chrome: 'https://chromewebstore.google.com/detail/aiajdjliifeeaogpalejpggkiccjbneo',
     edge: '',
     firefox: 'https://addons.mozilla.org/firefox/addon/nodelane-comics/',
   },
 } as const;
+
+export const browserStores = [
+  { id: 'chrome', name: 'Google Chrome', label: 'Chrome Web Store', icon: '/browsers/chrome.svg', url: site.stores.chrome },
+  { id: 'edge', name: 'Microsoft Edge', label: 'Edge Add-ons', icon: '/browsers/edge.png', url: site.stores.edge },
+  { id: 'firefox', name: 'Mozilla Firefox', label: 'Firefox Add-ons', icon: '/browsers/firefox.svg', url: site.stores.firefox },
+] as const;
 
 export const absolute = (path: string) => new URL(path, site.url).href;

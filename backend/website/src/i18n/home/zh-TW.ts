@@ -2,11 +2,11 @@ import type { HomeCopy } from './types';
 
 const copy: HomeCopy = {
   comparison: { title: '同一頁，多種語言。', group: '翻譯效果對照', labels: ['日文原圖', '中文', '英文', '韓文'], loading: '正在載入圖片…', error: '圖片載入失敗。', retry: '重新載入', caption: '已記錄的一般翻譯實測效果' },
-    eyebrow: '你的故事，你的節奏', title: ['讀進故事裡。', '用熟悉的語言。'],
-    description: '為漫畫而生的閱讀器，支援適配網站和自己的漫畫檔案，需要時再開啟翻譯。',
+    eyebrow: '你的故事，你的節奏', title: ["漫畫閱讀與翻譯，","在瀏覽器裡完成。"],
+    description: "使用 NodeLane 漫譯，在 Chrome、Edge、Firefox 中邊看漫畫邊翻譯。支援適配網站及 CBZ、CBR、PDF、無 DRM MOBI 檔案，隨時對照原圖。",
     install: '取得擴充功能', seeReader: '看看閱讀器', desktop: '為桌面閱讀設計',
     popupAlt: 'NodeLane Comics 擴充功能彈窗，已選擇英語，顯示翻譯目前分頁按鈕。', popupCaption: '下一章，從瀏覽器工具列開始。',
-    trust: ['閱讀本機原圖，無需帳戶。', '翻譯需要連網，並使用方案額度。'],
+    trust: ["本機原圖閱讀免費，無需帳號。","官方翻譯使用帳號額度，也可連接本機服務。"],
     stepsTitle: '從工具列開始閱讀。', stepsIntro: '選擇語言，然後回到故事裡。',
     steps: [['選擇閱讀語言', '在擴充功能彈窗中設定你希望使用的翻譯語言。'], ['翻譯目前頁面', '在支援的漫畫頁面上，需要時開啟頁面翻譯。'], ['收藏你的下一本', '開啟「我的漫畫」，匯入檔案或繼續上次的閱讀。']],
     compareEyebrow: '看清每一頁', compareTitle: '看懂譯文，也保留原圖。',
@@ -23,7 +23,7 @@ const copy: HomeCopy = {
     modesEyebrow: '需要時，再翻譯', modesTitle: '兩種翻譯方式，接近更多故事。',
     modes: [['一般翻譯', '辨識文字、翻譯，再透過局部背景修復與嵌字將譯文放回頁面。'], ['AI 重繪', '透過圖片模型翻譯並重新繪製頁面，畫面細節也可能發生變化。']],
     controlNote: '新漫畫預設顯示原圖。準備好時，再選擇翻譯模式。',
-    privacyTitle: '瞭解漫畫圖片如何處理。', privacyBody: '翻譯會將漫畫圖片傳送到服務端線上處理。原圖與翻譯結果私密保存，以便重用。開始翻譯前，可以查看隱私政策和方案額度。',
+    privacyTitle: '瞭解漫畫圖片如何處理。', privacyBody: "使用官方翻譯時，選取的漫畫圖片會傳送到伺服器處理，原圖與譯圖私密保存以便重用。也可連接自行部署的翻譯服務，圖片處理範圍由該服務決定。",
     privacy: '隱私政策', pricing: '方案與額度', ctaTitle: '準備好翻開下一頁了嗎？', ctaBody: '取得擴充功能，開啟漫畫，找到舒服的閱讀節奏。',
   };
 

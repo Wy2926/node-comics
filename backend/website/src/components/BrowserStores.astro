@@ -1,0 +1,18 @@
+---
+import { browserStores } from '../data/site';
+import { dictionaries, localPath, type Locale } from '../i18n';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = dictionaries[locale].ui;
+---
+<nav class="hero-stores" aria-label={t.storeHeading}>
+  {browserStores.map(store => <a class="hero-store" data-browser={store.id}
+    href={store.url || `${localPath('/download/', locale)}#${store.id}`}
+    target={store.url ? '_blank' : undefined} rel={store.url ? 'noopener noreferrer' : undefined}>
+    <img src={store.icon} alt={store.name} width="40" height="40" />
+    <span><strong>{store.name.replace('Google ', '').replace('Microsoft ', '').replace('Mozilla ', '')}</strong>
+      <span class="hero-store-label">{store.url ? store.label : t.downloadZip} <span aria-hidden="true">{store.url ? '↗' : '↓'}</span></span>
+    </span>
+  </a>)}
+</nav>
+{browserStores.filter(store => !store.url).map(store => <p class="hero-store-status">{store.name} · {t.storeUnavailable}</p>)}
