@@ -46,6 +46,8 @@ def initialize():
     from . import admin_audit  # noqa: F401
     from . import feedback_review_models  # noqa: F401
     from . import support_requests  # noqa: F401
+    from . import comic_title_cache  # noqa: F401
+    from . import comic_title_limits  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

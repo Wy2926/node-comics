@@ -2,7 +2,7 @@
 from .config import settings
 from .adapters.text import PROMPT_VERSION
 from .errors import problem
-from .translation_providers import selected_provider, text_profile
+from .translation_providers import selected_provider, provider_profile
 
 
 def enabled(db):
@@ -13,7 +13,7 @@ def snapshot(db, provider_id=None):
     cfg = settings()
     if not cfg.classic_enabled:
         problem('CLASSIC_NOT_CONFIGURED', '常规翻译引擎尚未启用', 503)
-    text = text_profile(db, provider_id)
+    text = provider_profile(db, provider_id)
     return {"mode": "classic", "prompt_version": PROMPT_VERSION,
             "provider": {"id": text["provider_id"], "timeout_seconds": cfg.classic_timeout_seconds},
             "engine": {"version": cfg.classic_engine_version, "protocol_version": 2},

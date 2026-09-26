@@ -1,5 +1,6 @@
 import pytest
-from app.adapters.text import messages, parse_translations, TextError
+from app.adapters.llm import TextError
+from app.adapters.text import messages, parse_translations
 from app.adapters.toon_text import table
 
 

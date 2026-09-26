@@ -9,7 +9,8 @@ from sqlalchemy import delete, event, select
 from sqlalchemy.exc import IntegrityError
 from app import classic, workers
 from app.adapters import openai_text
-from app.adapters.text import TextError, TextResponse, TranslationConfig, call_text
+from app.adapters.llm import LLMConfig, TextError, TextResponse
+from app.adapters.text import call_text, messages
 from app.classic_config import snapshot
 from app.config import Settings, settings
 from app.db import engine, session_factory
@@ -83,6 +84,47 @@ def test_admin_only_and_secret_validation(admin_case):
     assert client.get(PATH, headers=auth).json()['items'] == []
 
 
+def test_connection_config_excludes_body_policy_and_preserves_existing_versions(admin_case):
+    from pydantic import ValidationError
+    from app.adapters.text import TextPolicy
+    assert not (set(TextPolicy.model_fields) & set(openai_text.OpenAITextConfig.model_fields))
+    with pytest.raises(ValidationError):
+        openai_text.OpenAITextConfig(model='test', group_bytes=512)
+    with pytest.raises(ValidationError):
+        TextPolicy(model='test')
+    created = create(admin_case, body(group_bytes=512, input_rate=9, max_attempts=2))
+    assert created['config']['group_bytes'] == 512 and created['config']['input_rate'] == 9
+    client, auth = admin_case
+    response = client.put(PATH + '/' + created['id'], headers=auth, json={
+        'name': 'Renamed', 'channel': 'openai', 'enabled': True, 'config': created['config']})
+    assert response.status_code == 200
+    assert response.json()['revision_id'] == created['revision_id']
+    assert response.json()['config'] == created['config']
+
+
+def test_credentials_load_key_with_revision_but_admin_reads_remain_deferred(admin_case):
+    from app.translation_providers import provider_profile, resolve_credentials
+    provider = create(admin_case)
+    with session_factory()() as db:
+        profile = provider_profile(db, provider['id'])
+    statements = []
+    def track(connection, cursor, statement, parameters, context, executemany):
+        if statement.startswith('SELECT'):
+            statements.append(statement)
+    event.listen(engine(), 'before_cursor_execute', track)
+    try:
+        assert resolve_credentials(profile) == 'isolated-new-key'
+        assert len(statements) == 2  # Current enablement, then revision and key together.
+        assert 'translation_provider_revisions.api_key' in statements[1]
+        statements.clear()
+        client, auth = admin_case
+        response = client.get(PATH, headers=auth)
+        assert response.status_code == 200 and 'isolated-new-key' not in response.text
+        assert not any('translation_provider_revisions.api_key' in statement for statement in statements)
+    finally:
+        event.remove(engine(), 'before_cursor_execute', track)
+
+
 def test_multiple_suppliers_default_routing_and_secret_free_snapshots(admin_case):
     client, auth = admin_case
     first, second = create(admin_case), create(admin_case, body('OpenAI B', protocol='responses'))
@@ -137,19 +179,81 @@ def test_revision_changes_pin_old_endpoint_key_and_cache_identity(admin_case, mo
     assert len(seen) == 2
 
 
+def test_title_and_body_defaults_are_independent_and_admin_only(admin_case):
+    from app.translation_providers import provider_profile
+    from fastapi import HTTPException
+    client, auth = admin_case
+    first, second = create(admin_case), create(admin_case, body('Title supplier', model='title-model'))
+    assert first['is_default'] and not first['is_title_default'] and not second['is_title_default']
+    with session_factory()() as db:
+        with pytest.raises(HTTPException) as unavailable:
+            provider_profile(db, purpose='comic_title')
+        assert unavailable.value.status_code == 503
+    path = PATH + '/' + second['id'] + '/title-default'
+    assert client.post(path).status_code == 401
+    assert client.post(path, headers=login(client, 'reader')).status_code == 403
+    assert client.post(PATH + '/missing/title-default', headers=auth).status_code == 404
+    selected = client.post(path, headers=auth)
+    assert selected.status_code == 200 and selected.json()['is_title_default']
+    assert selected.json()['revision_id'] == second['revision_id']
+    with session_factory()() as db:
+        assert provider_profile(db)['provider_id'] == first['id']
+        assert provider_profile(db, purpose='comic_title')['provider_id'] == second['id']
+    # Selecting the same row for both roles is allowed and does not create a revision.
+    assert client.post(PATH + '/' + first['id'] + '/title-default', headers=auth).status_code == 200
+    assert client.post(PATH + '/' + second['id'] + '/default', headers=auth).status_code == 200
+    with session_factory()() as db:
+        assert provider_profile(db)['provider_id'] == second['id']
+        assert provider_profile(db, purpose='comic_title')['provider_id'] == first['id']
+    assert client.patch(PATH + '/' + first['id'], headers=auth, json={'enabled': False}).status_code == 200
+    assert client.post(PATH + '/' + first['id'] + '/title-default', headers=auth).status_code == 409
+    with session_factory()() as db:
+        assert provider_profile(db)['provider_id'] == second['id']
+        with pytest.raises(HTTPException):
+            provider_profile(db, purpose='comic_title')
+    items = client.get(PATH, headers=auth).json()['items']
+    assert sum(p['is_title_default'] for p in items) == sum(p['is_default'] for p in items) == 1
+
+
+def test_title_requests_use_selected_supplier_and_preserve_shared_cache(admin_case, monkeypatch):
+    from app import comic_titles
+    client, auth = admin_case
+    first = create(admin_case, body('Body supplier'))
+    second = create(admin_case, body('Title supplier', model='title-model'))
+    third = create(admin_case, body('New body supplier'))
+    assert client.post(PATH + '/' + second['id'] + '/title-default', headers=auth).status_code == 200
+    profiles = []
+    def call(messages, profile):
+        profiles.append(profile)
+        return TextResponse('{"name":null,"target_language":null}', None, None)
+    monkeypatch.setattr(comic_titles, 'call_messages', call)
+    query = {'name': '虚构作品', 'target_language': 'ja'}
+    title_url = '/v1/comic-titles/translate'
+    assert client.post(title_url, headers=auth, json=query).status_code == 200
+    assert client.post(PATH + '/' + third['id'] + '/default', headers=auth).status_code == 200
+    assert client.patch(PATH + '/' + third['id'], headers=auth, json={'enabled': False}).status_code == 200
+    assert client.post(title_url, headers=auth, json={**query, 'target_language': 'en'}).status_code == 200
+    assert [p['provider_id'] for p in profiles] == [second['id'], second['id']]
+    assert client.post(PATH + '/' + first['id'] + '/title-default', headers=auth).status_code == 200
+    assert client.post(title_url, headers=auth, json=query).status_code == 200
+    assert len(profiles) == 2  # Even negative caches are shared across supplier changes.
+    assert client.post(title_url, headers=auth, json={**query, 'target_language': 'fr'}).status_code == 200
+    assert profiles[-1]['provider_id'] == first['id']
+
+
 def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_case, monkeypatch):
     from app.translation_channels import CHANNELS, TranslationChannel
     seen = []
-    def translate(segments, language, profile, api_key):
-        seen.append((segments, language, profile['channel'], api_key))
+    def call(messages, profile, api_key):
+        seen.append((messages, profile['channel'], api_key))
         return TextResponse('translations[0]{id,text}:', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
-    monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', TranslationConfig, (), translate))
+    monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', LLMConfig, (), call))
     provider = create(admin_case, {'name': 'Second source', 'channel': 'synthetic',
                                   'config': {'model': 'test'}, 'api_key': 'isolated-new-key'})
     with session_factory()() as db:
         profile = snapshot(db, provider['id'])['text']
     assert call_text([], 'en', profile).request_id == 'synthetic'
-    assert seen == [([], 'en', 'synthetic', 'isolated-new-key')]
+    assert seen == [(messages([], 'en'), 'synthetic', 'isolated-new-key')]
 
 
 def test_disabled_supplier_pauses_before_request_without_metering(text_case):

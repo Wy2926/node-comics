@@ -10,12 +10,12 @@ from uuid import uuid4
 import pytest
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import login, png_variant, submit_asset, upload
+from conftest import login, png_variant, upload
 from app import classic
-from app.adapters.text import TextResponse
+from app.adapters.llm import TextResponse
 from app.config import settings
 from app.db import session_factory
-from app.models import ClassicState, Job, Ledger, TextCall, now
+from app.models import Job, TextCall, now
 from app.providers import digest
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import claim_stage

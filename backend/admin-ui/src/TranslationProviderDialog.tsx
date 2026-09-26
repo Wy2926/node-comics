@@ -92,7 +92,7 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
     <div className="dialog-content">
       <p id="provider-dialog-description" className="provider-description muted">{provider ?
         '修改参数或密钥会产生独立的新版本；已提交任务继续使用原版本。' :
-        '每个供应商独立配置地址、模型和密钥，可创建多个 OpenAI 供应商。首个供应商自动成为默认。'}</p>
+        '每个供应商独立配置地址、模型和密钥。首个自动用于正文，漫画名需在列表中单独选择。'}</p>
       {provider && <div className="provider-revision"><span>当前版本 <code>{provider.revision_id}</code></span>
         <span>创建于 {time(provider.created_at)} · 更新于 {time(provider.updated_at)}</span></div>}
       <form ref={form} noValidate autoComplete="off" className="provider-form" onSubmit={event => {event.preventDefault(); void save();}} aria-busy={busy}>
@@ -132,11 +132,11 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
               {type: 'password', required: !provider, autoComplete: 'new-password', spellCheck: false, autoCapitalize: 'none', placeholder: provider ? '留空保留现有密钥' : '输入供应商 API 密钥'})}
             <label className="provider-enabled"><input type="checkbox" checked={draft.enabled} onChange={event => setDraft({...draft, enabled: event.target.checked})}
               aria-describedby="provider-enabled-help"/>启用供应商</label>
-            <p className="muted" id="provider-enabled-help">停用会暂停该供应商排队中的文本阶段；重新启用后恢复。{provider?.is_default && ' 此供应商为默认，停用后常规翻译暂不可提交新任务。可重新启用或切换默认供应商。'}</p>
+            <p className="muted" id="provider-enabled-help">停用会暂停该供应商排队中的文本阶段；重新启用后恢复。{provider?.is_default && ' 此供应商用于正文，停用后常规翻译暂不可提交新任务。'}{provider?.is_title_default && ' 此供应商用于漫画名，停用后漫画名仅可返回已有缓存。'}</p>
           </section>
           {(['requests', 'pricing'] as const).map(group => <section className="config-section provider-section" key={group} aria-labelledby={`provider-${group}-title`}>
             <h3 id={`provider-${group}-title`}>{group === 'requests' ? '请求与分组' : '成本计量'}</h3>
-            {group === 'pricing' && <p className="muted">单价仅用于成本计量，不作为调用预算上限；请求次数、时限和速率限制仍生效。</p>}
+            {group === 'pricing' && <p className="muted">单价仅用于正文翻译的成本计量，不作为调用预算上限；漫画名查询不计入此账本。</p>}
             <div className="settings-fields">{numericFields.filter(item => item.group === group).map(item => field(item.key, `${item.title}（${item.unit}）`,
               `${item.help} 范围 ${item.min}–${item.max}${item.integer ? '，整数' : ''}。`, {type: 'number', min: item.min, max: item.max, step: item.integer ? 1 : 'any'}))}
               {group === 'pricing' && field('pricing_version', '计价版本', '记录当前单价的来源或估算口径，与供应商配置版本分别管理。', {spellCheck: false})}

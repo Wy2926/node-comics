@@ -10,6 +10,8 @@ from app import billing_models
 from app import admin_audit
 from app import feedback_review_models
 from app import support_requests
+from app import comic_title_cache
+from app import comic_title_limits
 
 if context.is_offline_mode():
     from app.config import settings

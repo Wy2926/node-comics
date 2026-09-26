@@ -6,7 +6,8 @@ import math
 import time
 from PIL import Image
 from sqlalchemy import func, or_, select
-from .adapters.text import TextError, call_text, groups, input_bound, parse_translations
+from .adapters.llm import TextError
+from .adapters.text import call_text, groups, input_bound, parse_translations
 from .assets import available
 from .db import session_factory
 from .errors import ProcessingError

@@ -6,8 +6,8 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "translations_0001"
-NEW_TABLES = {"translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
+HEAD = "comic_titles_0002"
+NEW_TABLES = {"comic_title_admissions", "comic_title_cache", "translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests", "image_admissions", "control_admissions"}
 
@@ -80,3 +80,54 @@ def test_old_database_is_rejected_without_mutation(isolated_migration_database):
         db.initialize()
     with isolated_migration_database.connect() as connection:
         assert connection.scalar(text('SELECT id FROM users')) == 'preserve-existing-data'
+
+
+def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration_database):
+    from datetime import datetime
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from app import db
+    from app.models import User
+    from app.translation_requests import ControlAdmission
+    at = datetime(2026, 1, 1)
+    leases = [{'id': 'preserve-control-token', 'until': '2026-01-01T00:00:30'}]
+    db.initialize()
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.downgrade(config, 'translations_0001')
+        connection.execute(User.__table__.insert().values(id='preserved-user', subject='existing-user', name='Existing'))
+        connection.execute(ControlAdmission.__table__.insert().values(owner_id='preserved-user',
+            scope='translation', tokens=2.5, refilled_at=at, leases=leases))
+    db.initialize()
+    with isolated_migration_database.connect() as connection:
+        assert connection.scalar(text('SELECT name FROM users WHERE id = :id'), {'id': 'preserved-user'}) == 'Existing'
+    with db.session_factory()() as session:
+        control = session.get(ControlAdmission, ('preserved-user', 'translation'))
+        assert control.tokens == 2.5 and control.leases == leases
+    assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_title_supplier_upgrade_preserves_body_default_without_implicit_selection(isolated_migration_database):
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from app import db
+    db.initialize()
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.downgrade(config, 'translations_0001')
+        connection.execute(text("INSERT INTO translation_providers "
+            "(id, name, channel, enabled, is_default, revision_id, requests_per_minute, created_at, updated_at) "
+            "VALUES ('existing', 'Existing body supplier', 'openai', true, true, 'existing-revision', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"))
+    db.initialize()
+    with isolated_migration_database.connect() as connection:
+        row = connection.execute(text('SELECT * FROM translation_providers')).mappings().one()
+        assert row['is_default'] and not row['is_title_default']
+        assert row['revision_id'] == 'existing-revision' and row['requests_per_minute'] == 30

@@ -382,6 +382,65 @@
         }
       }
     },
+    "/v1/comic-titles/translate": {
+      "post": {
+        "tags": [
+          "comic-titles"
+        ],
+        "summary": "Translate Title",
+        "description": "共享持久缓存支持输入名、输出别名和跨语言复用，仅记录生成结果的用户 ID；无合适名称的 null 结果按目标语言缓存。未命中才调用独立选择的漫画名 LLM。不扣页数额度，无每日或累计次数限制，命中缓存与模型失败均计入每用户限速。",
+        "operationId": "translate_title_v1_comic_titles_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleTranslationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TitleTranslationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "429": {
+            "description": "每用户滚动 60 秒内最多 30 次"
+          },
+          "502": {
+            "description": "模型调用失败或返回无效译文"
+          },
+          "503": {
+            "description": "查询容量已满、缓存查询正在进行、执行租约失效或未配置可用的漫画名供应商"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/internal/compute/v2/nodes/register": {
       "post": {
         "tags": [
@@ -5313,6 +5372,51 @@
         }
       }
     },
+    "/v1/admin/translation-providers/{provider_id}/title-default": {
+      "post": {
+        "tags": [
+          "translation-providers"
+        ],
+        "summary": "Title Default Provider",
+        "operationId": "title_default_provider_v1_admin_translation_providers__provider_id__title_default_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/translation-providers/{provider_id}/revisions": {
       "get": {
         "tags": [
@@ -9220,6 +9324,71 @@
           "values"
         ],
         "title": "SystemSettingsUpdate"
+      },
+      "TitleTranslationRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "description": "漫画名，最多 60 个 Unicode 字符"
+          },
+          "target_language": {
+            "type": "string",
+            "maxLength": 35,
+            "minLength": 2,
+            "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+            "title": "Target Language",
+            "description": "目标语言代码，原样交给 LLM 选择适合的译名及实际语言"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "target_language"
+        ],
+        "title": "TitleTranslationRequest"
+      },
+      "TitleTranslationResponse": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "target_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "minLength": 2,
+                "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Language",
+            "description": "LLM 选择的实际语言代码；无合适名称时与 name 同为 null"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "target_language"
+        ],
+        "title": "TitleTranslationResponse"
       },
       "TranslationHistoryResponse": {
         "properties": {

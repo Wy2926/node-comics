@@ -1,6 +1,5 @@
 """Operator history is atomic, deduplicated and free of supplier secrets."""
 from datetime import timedelta
-import json
 
 from sqlalchemy import func, select
 
@@ -147,6 +146,7 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     changed = client.put(f'{path}/{provider["id"]}', headers=admin, json=changed_body)
     assert changed.status_code == 200
     assert client.post(f'{path}/{provider["id"]}/default', headers=admin).status_code == 200
+    assert client.post(f'{path}/{provider["id"]}/title-default', headers=admin).status_code == 200
     with session_factory()() as db:
         assert configuration(db, 'classic', 'en')['text']['model'] == 'model-two'
     assert client.patch(f'{path}/{provider["id"]}', headers=admin, json={'enabled': False}).status_code == 200
@@ -159,7 +159,7 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     assert older.json()['items'][0]['config']['max_output_tokens'] == 4096
     assert client.get(f'{path}/{provider["id"]}/revisions', headers=login(client, 'reader')).status_code == 403
     audit = client.get('/v1/admin/audit', headers=admin, params={'target_type': 'translation_provider', 'target_id': provider['id']})
-    assert {row['action'] for row in audit.json()['items']} == {'text_provider.create', 'text_provider.update', 'text_provider.default', 'text_provider.toggle'}
+    assert {row['action'] for row in audit.json()['items']} == {'text_provider.create', 'text_provider.update', 'text_provider.default', 'text_provider.title_default', 'text_provider.toggle'}
     for response in (rows, older, audit):
         assert 'PRIVATE_TEST_TEXT_KEY' not in response.text and 'PRIVATE_ROTATED_TEXT_KEY' not in response.text
     update = next(row for row in audit.json()['items'] if row['action'] == 'text_provider.update')

@@ -6,7 +6,7 @@ export type TranslationProviderConfig = {
   input_rate: number; output_rate: number; pricing_version: string; requests_per_minute: number;
 };
 export type TranslationProvider = {
-  id: string; name: string; channel: string; enabled: boolean; is_default: boolean;
+  id: string; name: string; channel: string; enabled: boolean; is_default: boolean; is_title_default: boolean;
   revision_id: string; credential_configured: boolean; config: TranslationProviderConfig;
   created_at: string; updated_at: string;
 };

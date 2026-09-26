@@ -352,7 +352,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['translations_0001']
+            assert revisions == ['comic_titles_0002']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0
@@ -366,7 +366,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
 
 def test_postgres_classic_metering_has_no_cost_cap(pg):
     from app.classic import reserve_call
-    from app.adapters.text import TextError
+    from app.adapters.llm import TextError
     from app.db import session_factory
     from app.jobs import create_job
     from app.models import Asset, TextCall, User
@@ -433,3 +433,200 @@ with psycopg.connect(os.environ['DATABASE_URL'].replace('postgresql+psycopg:', '
         asyncio.run(run())
     finally:
         listener.close()
+
+
+def test_shared_cache_single_flight_across_processes(pg):
+    from app.db import session_factory
+    from app.comic_title_cache import TitleRecord
+    script = '''
+import sys, time
+from app.comic_title_cache import lookup_or_claim, save_result
+from app.comic_titles import TitleTranslationResponse
+cached, claim = lookup_or_claim('known title', 'en')
+if claim:
+    time.sleep(0.5)
+    save_result(sys.argv[1], claim, TitleTranslationResponse(name='Existing Title', target_language='en'))
+    print('MODEL')
+else:
+    assert cached == {'name':'Existing Title', 'target_language':'en'}
+    print('CACHE')
+'''
+    processes = [subprocess.Popen([sys.executable, '-c', script, pg['owner_id']],
+        cwd=Path(__file__).resolve().parents[1], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for _ in range(6)]
+    try:
+        outputs = []
+        for process in processes:
+            stdout, stderr = process.communicate(timeout=30)
+            assert process.returncode == 0, 'Isolated cache child process failed'
+            outputs.append(stdout.strip())
+        assert outputs.count('MODEL') == 1
+        assert outputs.count('CACHE') == 5
+        with session_factory()() as db:
+            result = db.scalar(select(TitleRecord))
+            assert result.ready and result.name == 'Existing Title'
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
+
+def test_title_admission_concurrency_preserves_window_and_user_isolation(pg, monkeypatch):
+    from fastapi import HTTPException
+    from app import comic_title_limits as limits
+    from app.db import session_factory
+    from app.models import User, now, uid
+    from app.translation_requests import ControlAdmission
+
+    at = now()
+    monkeypatch.setattr(limits, 'server_now', lambda db: at)
+    barrier = threading.Barrier(8)
+
+    def admit(_):
+        barrier.wait(timeout=10)
+        try:
+            limits.admit_title(pg['owner_id'])
+            return 200
+        except HTTPException as error:
+            assert error.detail['code'] == 'COMIC_TITLE_RATE_LIMITED'
+            assert error.headers == {'Retry-After': '60'}
+            return error.status_code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(admit, range(40)))
+    assert statuses.count(200) == 30
+    assert statuses.count(429) == 10
+    with session_factory()() as db:
+        assert limits.title_budget(db, pg['owner_id'])['remaining'] == 0
+        assert db.scalar(select(func.count()).select_from(ControlAdmission)) == 0
+        other_id = uid()
+        db.add(User(id=other_id, subject='title-limit:' + other_id, name='Isolated reader'))
+        db.commit()
+    limits.admit_title(other_id)
+    with session_factory()() as db:
+        assert limits.title_budget(db, other_id)['used'] == 1
+        assert limits.title_budget(db, pg['owner_id'])['used'] == 30
+
+    at += timedelta(seconds=60)
+    limits.admit_title(pg['owner_id'])
+    with session_factory()() as db:
+        budget = limits.title_budget(db, pg['owner_id'])
+        assert (budget['used'], budget['remaining'], budget['retry_after_seconds']) == (1, 29, 0)
+        assert len(db.get(limits.TitleAdmission, pg['owner_id']).request_times) == 1
+
+
+def test_title_supplier_concurrent_selection_keeps_one_default_and_body_choice(pg):
+    from app.db import session_factory
+    from app.translation_models import TranslationProvider
+    from app.translation_providers import set_default_provider, provider_profile
+    from sqlalchemy.exc import IntegrityError
+    with session_factory()() as db:
+        original = provider_profile(db)['provider_id']
+        candidates = [configure_text_provider(db).id for _ in range(2)]
+    barrier = threading.Barrier(2)
+    def choose(provider_id):
+        with session_factory()() as db:
+            barrier.wait(timeout=5)
+            return set_default_provider(db, provider_id, pg['owner_id'], purpose='comic_title')['id']
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert set(pool.map(choose, candidates)) == set(candidates)
+    with session_factory()() as db:
+        assert provider_profile(db)['provider_id'] == original
+        selected = provider_profile(db, purpose='comic_title')['provider_id']
+        assert selected in candidates
+        assert db.scalar(select(func.count()).select_from(TranslationProvider).where(TranslationProvider.is_title_default)) == 1
+        # The database enforces uniqueness even if a writer omits the selection lock.
+        other = next(key for key in candidates if key != selected)
+        db.get(TranslationProvider, other).is_title_default = True
+        with pytest.raises(IntegrityError):
+            db.flush()
+        db.rollback()
+
+
+def test_title_cache_reads_use_indexes_without_locks_or_user_filters(pg):
+    from app import comic_title_cache as cache
+    from app.comic_titles import TitleTranslationResponse
+    from app.db import engine, session_factory
+    owner = pg['owner_id']
+    _, claim = cache.lookup_or_claim('known title', 'en')
+    cache.save_result(owner, claim, TitleTranslationResponse(name='Existing Title', target_language='en'))
+    with session_factory()() as db:
+        db.execute(cache.TitleRecord.__table__.insert(), [
+            {'input_key': cache.name_key('sample-' + str(n)), 'language': 'en', 'input_name': 'sample-' + str(n),
+             'created_by': owner, 'ready': True, 'name': 'Sample result ' + str(n),
+             'output_key': cache.name_key('Sample result ' + str(n)), 'actual_language': 'en'} for n in range(5000)])
+        db.execute(text('ANALYZE comic_title_cache'))
+        db.commit()
+        def indexes(node):
+            return ({node['Index Name']} if 'Index Name' in node else set()).union(
+                *(indexes(child) for child in node.get('Plans', [])))
+        plan = db.scalar(text('EXPLAIN (FORMAT JSON) SELECT * FROM comic_title_cache WHERE input_key = :key AND language = :language'),
+            {'language': 'en', 'key': cache.name_key('known title')})
+        assert 'comic_title_cache_pkey' in indexes(plan[0]['Plan'])
+        stmt = cache.related_results(cache.name_key('Existing Title'), 'en')
+        sql = str(stmt.compile(dialect=engine().dialect, compile_kwargs={'literal_binds': True}))
+        plan = db.scalar(text('EXPLAIN (FORMAT JSON) ' + sql))
+        used = indexes(plan[0]['Plan'])
+        assert {'comic_title_cache_pkey', 'ix_comic_title_cache_output_key'} <= used
+    statements = []
+    def track(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+    event.listen(engine(), 'before_cursor_execute', track)
+    try:
+        assert cache.lookup_or_claim('known title', 'en')[0]['name'] == 'Existing Title'
+        assert len(statements) == 1
+        statements.clear()
+        assert cache.lookup_or_claim('Existing Title', 'en')[0]['name'] == 'Existing Title'
+        assert len(statements) == 2
+    finally:
+        event.remove(engine(), 'before_cursor_execute', track)
+    assert all(sql.lstrip().upper().startswith(('SELECT', 'WITH')) for sql in statements)
+    print('Cache hits are read-only: direct 1 SQL, output-name 2 SQL; primary/output indexes used with 5000 records.')
+
+
+def test_title_cache_heartbeat_keeps_slow_process_claim_exclusive(pg, monkeypatch):
+    from fastapi import HTTPException
+    from app import comic_title_cache as cache
+    from app.db import session_factory
+    script = '''
+import sys, time
+from app import comic_title_cache as cache
+from app.comic_titles import TitleTranslationResponse
+cache.LEASE_SECONDS = 2
+cache.HEARTBEAT_SECONDS = 0.05
+_, claim = cache.lookup_or_claim('slow title', 'en')
+with cache.maintain_claim(claim):
+    print('RUNNING', flush=True)
+    time.sleep(4)
+    assert cache.save_result(sys.argv[1], claim, TitleTranslationResponse(name='Existing Title', target_language='en'))
+print('DONE', flush=True)
+'''
+    process = subprocess.Popen([sys.executable, '-c', script, pg['owner_id']],
+        cwd=Path(__file__).resolve().parents[1], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        with session_factory()() as db:
+            def running():
+                db.expire_all()
+                return db.scalar(select(cache.TitleRecord.lease_until).where(cache.TitleRecord.input_key == cache.name_key('slow title')))
+            wait_until(running)
+            first_expiry = running()
+        # Wait past the initial lease using the database clock, not the host clock.
+        def renewed_past_initial_expiry():
+            with session_factory()() as db:
+                at = cache.server_now(db)
+                expiry = db.scalar(select(cache.TitleRecord.lease_until).where(cache.TitleRecord.input_key == cache.name_key('slow title')))
+                return at > first_expiry and expiry is not None and expiry > at
+        wait_until(renewed_past_initial_expiry, timeout=3)
+        monkeypatch.setattr(cache, 'WAIT_SECONDS', 0)
+        with pytest.raises(HTTPException) as pending:
+            cache.lookup_or_claim('slow title', 'en')
+        assert pending.value.detail['code'] == 'COMIC_TITLE_PENDING'
+        stdout, stderr = process.communicate(timeout=8)
+        assert process.returncode == 0, 'Isolated cache heartbeat child process failed'
+        assert stdout.splitlines() == ['RUNNING', 'DONE']
+        assert cache.lookup_or_claim('slow title', 'en')[0] == {'name': 'Existing Title', 'target_language': 'en'}
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)

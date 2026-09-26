@@ -2,13 +2,13 @@
 import base64
 from datetime import timedelta
 from io import BytesIO
-import json
 import pytest
 from PIL import Image
 from sqlalchemy import func, select
 
 from app import classic
-from app.adapters.text import TextError, TextResponse, parse_translations
+from app.adapters.llm import TextError, TextResponse
+from app.adapters.text import parse_translations
 from app.config import settings
 from app.db import Base, engine, session_factory
 from app.models import Asset, Attempt, ClassicState, Job, TextCall, User, now, uid

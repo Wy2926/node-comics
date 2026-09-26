@@ -1,6 +1,6 @@
 import httpx
 import pytest
-from app.adapters import openai_text, text
+from app.adapters import llm, openai_text, text
 from app.classic_config import snapshot
 from app.config import settings
 from app.db import session_factory
@@ -53,6 +53,26 @@ def test_responses_protocol(profile, monkeypatch):
         return httpx.Response(200, json={'status': 'completed', 'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': '{}'}]}], 'usage': {'input_tokens': 9, 'output_tokens': 3}})
     install(monkeypatch, handler)
     assert text.call_text([], 'en', revised).usage['output_tokens'] == 3
+
+
+@pytest.mark.parametrize('protocol', ['chat_completions', 'responses'])
+def test_generic_messages_are_passed_unchanged_without_business_parsing(profile, monkeypatch, protocol):
+    import json
+    with session_factory()() as db:
+        configure_text_provider(db, profile['provider_id'], protocol=protocol)
+        revised = snapshot(db)['text']
+    messages = [{'role': 'system', 'content': 'Return a color.'},
+                {'role': 'user', 'content': 'Sky'}, {'role': 'assistant', 'content': 'Blue'},
+                {'role': 'user', 'content': 'Grass'}]
+    def handler(request):
+        data = json.loads(request.content)
+        assert data['messages' if protocol == 'chat_completions' else 'input'] == messages
+        result = {'choices': [{'message': {'content': 'Green'}, 'finish_reason': 'stop'}]} if protocol == 'chat_completions' else {
+            'status': 'completed', 'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': 'Green'}]}]}
+        return httpx.Response(200, json=result, headers={'x-request-id': 'generic-request'})
+    install(monkeypatch, handler)
+    response = llm.call_messages(messages, revised)
+    assert response.content == 'Green' and response.request_id == 'generic-request' and response.usage is None
 
 
 @pytest.mark.parametrize('status,retryable', [(401, False), (403, False), (400, False), (404, False), (429, True), (500, True), (503, True), (302, False)])

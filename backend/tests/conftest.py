@@ -41,7 +41,9 @@ def client(tmp_path, monkeypatch):
     from translation_fixtures import configure_text_provider
     with TestClient(app) as test_client:
         with session_factory()() as db:
-            configure_text_provider(db)
+            provider = configure_text_provider(db)
+            provider.is_title_default = True  # Explicit isolated setup; production has no title fallback.
+            db.commit()
         yield test_client
     engine().dispose()
     engine.cache_clear()

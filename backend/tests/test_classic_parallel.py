@@ -6,7 +6,7 @@ from threading import Event
 import pytest
 from sqlalchemy import func, select
 from app import classic
-from app.adapters.text import TextError, TextResponse
+from app.adapters.llm import TextError
 from app.db import session_factory
 from app.models import ClassicState, Job, TextCall, now
 from app.queue_models import ExecutionLease, JobStage

@@ -170,6 +170,7 @@ def test_user_admissions_and_service_health_explain_current_state(operations):
     assert data['upload_active'] == 1
     assert 'policy_revision' not in data and 'sessions' not in data
     assert data['controls'][0]['active_leases'] == 1 and data['feedback']['daily_receipts'] == 3
+    assert data['comic_title_budget']['used'] == 0 and data['comic_title_budget']['remaining'] == 30
     assert case['client'].get(ROOT + '/users/missing', headers=case['admin']).status_code == 404
     health = case['client'].get(ROOT + '/health', headers=case['admin']).json()
     assert {row['instance_id']: row['status'] for row in health['items']} == {'good-worker': 'healthy', 'stale-maintenance': 'unhealthy'}

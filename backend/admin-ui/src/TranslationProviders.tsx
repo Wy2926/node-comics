@@ -13,13 +13,14 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<TranslationProvider | 'new'>();
-  const [pending, setPending] = useState<{id: string; kind: 'toggle' | 'default'}>();
+  const [pending, setPending] = useState<{id: string; kind: 'toggle' | 'default' | 'title-default'}>();
   const loadController = useRef<AbortController | undefined>(undefined);
   const actionController = useRef<AbortController | undefined>(undefined);
   const busy = loading || !!pending;
   const blocked = busy || !!loadError || !!actionError;
   const canCreate = !!data && channelProtocols(data.channels, 'openai').length > 0;
   const defaultProvider = data?.items.find(provider => provider.is_default);
+  const titleProvider = data?.items.find(provider => provider.is_title_default);
 
   const reload = useCallback(async (clearNotice = true) => {
     const controller = new AbortController();
@@ -44,18 +45,19 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
     return () => {loadController.current?.abort(); loadController.current = undefined; actionController.current?.abort();};
   }, [reload]);
 
-  async function act(provider: TranslationProvider, kind: 'toggle' | 'default') {
+  async function act(provider: TranslationProvider, kind: 'toggle' | 'default' | 'title-default') {
     if (blocked || actionController.current || loadController.current) return;
     const controller = new AbortController(); actionController.current = controller;
     setPending({id: provider.id, kind}); setNotice(''); setActionError('');
     try {
       const path = `${providerEndpoint}/${encodeURIComponent(provider.id)}`;
-      await sendRequest(kind === 'default' ? `${path}/default` : path, kind === 'default' ?
+      await sendRequest(kind !== 'toggle' ? `${path}/${kind}` : path, kind !== 'toggle' ?
         {method: 'POST', signal: controller.signal} :
         {method: 'PATCH', signal: controller.signal, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !provider.enabled})});
       if (controller.signal.aborted) return;
-      setNotice(kind === 'default' ? `已将「${provider.name}」设为默认，仅影响后续任务。` :
-        provider.enabled ? `已停用「${provider.name}」，其排队中的文本阶段将暂停。` : `已启用「${provider.name}」，其暂停的排队文本阶段将恢复。`);
+      setNotice(kind === 'default' ? `已将「${provider.name}」设为正文默认，仅影响后续正文任务。` :
+        kind === 'title-default' ? `已将「${provider.name}」设为漫画名默认，后续未命中缓存时使用。` :
+        provider.enabled ? `已停用「${provider.name}」，其排队中的正文翻译将暂停。${provider.is_title_default ? '漫画名新查询仅可使用缓存。' : ''}` : `已启用「${provider.name}」。`);
       await reload(false);
     } catch (failure) {
       if (controller.signal.aborted) return;
@@ -68,15 +70,15 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
 
   return <main id="main" tabIndex={-1} className="translation-providers">
     <div className="page-heading"><div><p className="eyebrow">TRANSLATION PROVIDERS</p><h1>翻译供应商</h1>
-      <p className="muted">管理文本翻译的来源渠道、模型与独立供应商配置。</p></div>
+      <p className="muted">管理 LLM 供应商，分别选择正文翻译与漫画名查询使用的模型。</p></div>
       <div className="provider-actions"><button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新列表'}</button>
         <button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => {setNotice(''); setEditing('new');}}>＋ 新建供应商</button></div></div>
     <div className="sync-line"><span role="status">{pending ? '正在更新供应商…' : loading ? '正在读取供应商…' : loadError || actionError ? '请刷新列表核实最新状态' : `已更新 ${time(loadedAt)}`}</span>
       <span>时间按浏览器本地时区显示</span></div>
     <section className="panel provider-guide" aria-label="供应商生效规则">
-      <p><strong>独立配置，按任务保留版本</strong></p>
-      <p>文本翻译使用这里创建的供应商，不依赖旧配置。可创建多个 OpenAI 供应商；首个自动成为默认，切换默认仅影响后续任务。</p>
-      <p>修改参数或密钥会产生新版本，已提交任务保持原版本。停用会暂停该供应商排队中的文本阶段，重新启用后恢复。</p>
+      <p><strong>正文与漫画名分别选择供应商</strong></p>
+      <p>首个供应商自动用于正文；漫画名需单独选择。两者可选同一供应商，也可新建不同配置，切换互不影响。</p>
+      <p>修改参数或密钥会产生新版本，已提交的正文任务保持原版本。漫画名在未命中缓存时使用当前选择的配置；切换不清除已有缓存。</p>
     </section>
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {loadError && <div className="error" role="alert">{loadError} {data ? '当前列表可能已过时，操作暂不可用。' : '暂时无法读取供应商。'}
@@ -84,19 +86,23 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
     {actionError && <div className="error" role="alert">{actionError}<button type="button" className="text-link" disabled={busy} onClick={() => void reload()}>刷新列表</button></div>}
     {data && !loadError && !loading && !canCreate && <p className="provider-warning" role="status">当前没有可配置的 OpenAI 渠道或支持的协议。请检查服务端渠道配置后刷新列表。</p>}
     {data && !loadError && !loading && data.items.length > 0 && (!defaultProvider || !defaultProvider.enabled || !defaultProvider.credential_configured) &&
-      <p className="provider-warning" role="status">{!defaultProvider ? '尚未设置默认供应商，请为后续任务选择默认供应商。' :
-        !defaultProvider.enabled ? `默认供应商「${defaultProvider.name}」已停用。常规翻译暂不可提交新任务。可重新启用或切换默认供应商。` :
-          `默认供应商「${defaultProvider.name}」尚未配置密钥，请编辑并补充密钥。`}</p>}
+      <p className="provider-warning" role="status">{!defaultProvider ? '尚未设置正文默认供应商，请为后续任务选择供应商。' :
+        !defaultProvider.enabled ? `正文供应商「${defaultProvider.name}」已停用。常规翻译暂不可提交新任务。可重新启用或切换供应商。` :
+          `正文供应商「${defaultProvider.name}」尚未配置密钥，请编辑并补充密钥。`}</p>}
+    {data && !loadError && !loading && data.items.length > 0 && (!titleProvider || !titleProvider.enabled || !titleProvider.credential_configured) &&
+      <p className="provider-warning" role="status">{!titleProvider ? '尚未选择漫画名供应商，请点击“用于漫画名”。' :
+        !titleProvider.enabled ? `漫画名供应商「${titleProvider.name}」已停用，请启用或重新选择。` :
+          `漫画名供应商「${titleProvider.name}」尚未配置密钥，请编辑并补充密钥。`}漫画名目前仅可返回已有缓存。</p>}
     <section className="panel list-panel provider-list" aria-label="翻译供应商列表" aria-busy={busy}>
       {!data ? <div className="loading" role="status">{loading ? '正在读取翻译供应商…' : '暂时无法读取列表，请刷新重试。'}</div> :
         !data.items.length ? <div className="empty"><span aria-hidden="true">⇄</span><h3>尚未创建翻译供应商</h3>
-          <p>添加供应商并填写模型与密钥后，即可配置文本翻译。首个供应商自动成为默认。</p>
+          <p>添加供应商并填写模型与密钥。首个自动用于正文，漫画名需单独选择。</p>
           <button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => setEditing('new')}>新建翻译供应商</button></div> :
           <Table heads={['供应商 / 渠道', '模型 / 接口', '状态 / 密钥', '版本 / 最近更新', '操作']}>
             {data.items.map(provider => {
               const current = pending?.id === provider.id ? pending.kind : undefined;
               return <tr key={provider.id}>
-                <td><div className="provider-name"><b>{provider.name}</b>{provider.is_default && <span className="badge accent">默认</span>}</div>
+                <td><div className="provider-name"><b>{provider.name}</b>{provider.is_default && <span className="badge accent">正文默认</span>}{provider.is_title_default && <span className="badge accent">漫画名默认</span>}</div>
                   <small>{data.channels.find(channel => channel.id === provider.channel)?.label ?? provider.channel}</small>
                   <small>ID <code>{provider.id}</code></small></td>
                 <td><b>{provider.config.model}</b><small>{protocolLabels[provider.config.protocol] ?? provider.config.protocol}</small>
@@ -109,9 +115,11 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
                   <button type="button" className="text-link" disabled={blocked || provider.channel !== 'openai'} aria-label={`编辑 ${provider.name}`} onClick={() => {setNotice(''); setEditing(provider);}}>编辑</button>
                   <button type="button" className="text-link" disabled={blocked} aria-label={`${provider.enabled ? '停用' : '启用'} ${provider.name}`} onClick={() => void act(provider, 'toggle')}>
                     {current === 'toggle' ? '正在更新…' : provider.enabled ? '停用' : '启用'}</button>
-                  <button type="button" className="text-link" disabled={blocked || provider.is_default || !provider.enabled} aria-label={`将 ${provider.name} 设为默认`} onClick={() => void act(provider, 'default')}>
-                    {current === 'default' ? '正在切换…' : provider.is_default ? '当前默认' : '设为默认'}</button>
-                </div>{!provider.enabled && !provider.is_default && <small>先启用再设为默认</small>}{provider.channel !== 'openai' && <small>此渠道暂未支持编辑</small>}</td>
+                  <button type="button" className="text-link" disabled={blocked || provider.is_default || !provider.enabled} aria-label={`将 ${provider.name} 用于正文`} onClick={() => void act(provider, 'default')}>
+                    {current === 'default' ? '正在切换…' : provider.is_default ? '当前正文' : '用于正文'}</button>
+                  <button type="button" className="text-link" disabled={blocked || provider.is_title_default || !provider.enabled} aria-label={`将 ${provider.name} 用于漫画名`} onClick={() => void act(provider, 'title-default')}>
+                    {current === 'title-default' ? '正在切换…' : provider.is_title_default ? '当前漫画名' : '用于漫画名'}</button>
+                </div>{!provider.enabled && <small>启用后可选择用途</small>}{provider.channel !== 'openai' && <small>此渠道暂未支持编辑</small>}</td>
               </tr>;
             })}
           </Table>}
@@ -119,6 +127,6 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
     {data && <p className="footnote provider-footnote">共 {data.items.length} 个供应商 · {data.items.filter(provider => provider.enabled).length} 个已启用。密钥仅显示配置状态。</p>}
     {editing && data && <TranslationProviderDialog provider={editing === 'new' ? undefined : editing} channels={data.channels} onUnauthorized={onUnauthorized}
       onClose={() => setEditing(undefined)} onRefresh={() => {setEditing(undefined); void reload(); requestAnimationFrame(() => document.getElementById('main')?.focus());}}
-      onSaved={() => {setNotice(editing === 'new' ? '供应商已创建。首个供应商自动成为默认，最新状态以列表为准。' : '供应商已保存，已提交任务仍保持原版本。'); setEditing(undefined); void reload(false); requestAnimationFrame(() => document.getElementById('main')?.focus());}}/>}
+      onSaved={() => {setNotice(editing === 'new' ? '供应商已创建。首个自动用于正文，漫画名需单独选择。' : '供应商已保存，已提交的正文任务仍保持原版本。'); setEditing(undefined); void reload(false); requestAnimationFrame(() => document.getElementById('main')?.focus());}}/>}
   </main>;
 }

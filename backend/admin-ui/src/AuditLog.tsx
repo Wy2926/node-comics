@@ -5,7 +5,8 @@ import {ResourceError, useAdminResource, type DataPage} from './AdminResource';
 const actions: Record<string, string> = {
   'node.create': '添加节点', 'node.configure': '修改节点配置', 'node.rotate_credential': '轮换节点凭据',
   'system_settings.update': '修改系统设置', 'text_provider.create': '添加文本供应商',
-  'text_provider.update': '修改文本供应商', 'text_provider.toggle': '启停文本供应商', 'text_provider.default': '切换默认文本供应商',
+  'text_provider.update': '修改文本供应商', 'text_provider.toggle': '启停文本供应商', 'text_provider.default': '切换正文供应商',
+  'text_provider.title_default': '切换漫画名供应商',
   'image_provider.save': '保存图片供应商', 'image_provider.toggle': '启停图片供应商', 'image_provider.test': '提交图片测试',
   'job.reconcile': '核实翻译结果', 'feedback.review': '处理翻译反馈',
   'membership.extend': '开通或续期运营会员', 'membership.expire': '提前结束运营会员',

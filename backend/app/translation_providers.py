@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import Field, SecretStr, field_validator, model_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-from .adapters.text import TextError
+from sqlalchemy.orm import Session, undefer
+from .adapters.llm import TextError
+from .adapters.text import TextPolicy
 from .auth import admin
 from .admin_audit import record_audit, sanitize
 from .db import get_db, session_factory
@@ -18,6 +19,7 @@ from .translation_channels import CHANNELS
 from .translation_models import TranslationProvider, TranslationProviderRevision
 
 router = APIRouter(prefix='/v1/admin/translation-providers', tags=['translation-providers'])
+DEFAULT_FLAGS = {'text': TranslationProvider.is_default, 'comic_title': TranslationProvider.is_title_default}
 
 
 class ProviderWrite(RequestBody):
@@ -48,7 +50,10 @@ class ProviderWrite(RequestBody):
         channel = CHANNELS.get(self.channel)
         if channel is None:
             raise ValueError('Unsupported translation channel')
-        self.config = channel.config_type.model_validate(self.config).model_dump()
+        connection = {key: value for key, value in self.config.items() if key not in TextPolicy.model_fields}
+        policy = {key: value for key, value in self.config.items() if key in TextPolicy.model_fields}
+        self.config = {**channel.config_type.model_validate(connection).model_dump(),
+                       **TextPolicy.model_validate(policy).model_dump()}
         return self
 
 
@@ -60,23 +65,25 @@ def provider_json(db, provider):
     revision = db.get(TranslationProviderRevision, provider.revision_id)
     return {'id': provider.id, 'name': provider.name, 'channel': provider.channel,
             'enabled': provider.enabled, 'is_default': provider.is_default,
+            'is_title_default': provider.is_title_default,
             'revision_id': provider.revision_id, 'credential_configured': revision is not None,
             'config': revision.config if revision else {},
             'created_at': provider.created_at.isoformat() + 'Z',
             'updated_at': provider.updated_at.isoformat() + 'Z'}
 
 
-def selected_provider(db, provider_id=None):
+def selected_provider(db, provider_id=None, *, purpose='text'):
     query = select(TranslationProvider).where(TranslationProvider.enabled.is_(True))
-    query = query.where(TranslationProvider.id == provider_id) if provider_id else query.where(TranslationProvider.is_default.is_(True))
+    query = query.where(TranslationProvider.id == provider_id) if provider_id else query.where(DEFAULT_FLAGS[purpose].is_(True))
     return db.scalar(query)
 
 
-def text_profile(db, provider_id=None):
-    provider = selected_provider(db, provider_id)
+def provider_profile(db, provider_id=None, *, purpose='text'):
+    provider = selected_provider(db, provider_id, purpose=purpose)
     revision = db.get(TranslationProviderRevision, provider.revision_id) if provider else None
     if not revision or revision.channel not in CHANNELS:
-        problem('TRANSLATION_PROVIDER_UNAVAILABLE', '请在管理后台创建并启用默认翻译供应商', 503)
+        label = '漫画名' if purpose == 'comic_title' else '正文'
+        problem('TRANSLATION_PROVIDER_UNAVAILABLE', f'请在管理后台选择并启用{label}默认供应商', 503)
     return {'provider_id': provider.id, 'revision_id': revision.id, 'channel': revision.channel, **revision.config}
 
 
@@ -92,7 +99,8 @@ def require_enabled(db, profile):
 def resolve_credentials(profile):
     with session_factory()() as db:
         require_enabled(db, profile)
-        revision = db.get(TranslationProviderRevision, profile['revision_id'])
+        revision = db.get(TranslationProviderRevision, profile['revision_id'],
+                          options=[undefer(TranslationProviderRevision.api_key)])
         if (not revision or revision.provider_id != profile['provider_id'] or
                 profile != {'provider_id': revision.provider_id, 'revision_id': revision.id,
                             'channel': revision.channel, **revision.config}):
@@ -187,14 +195,26 @@ def toggle_provider(provider_id: str, body: ProviderToggle, user: User = Depends
 
 @router.post('/{provider_id}/default')
 def default_provider(provider_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
+    return set_default_provider(db, provider_id, user.id, purpose='text')
+
+
+@router.post('/{provider_id}/title-default')
+def title_default_provider(provider_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
+    return set_default_provider(db, provider_id, user.id, purpose='comic_title')
+
+
+def set_default_provider(db, provider_id, user_id, *, purpose):
+    flag = DEFAULT_FLAGS[purpose]
     with provider_transaction(db):
         provider = get_provider(db, provider_id)
         if not provider.enabled:
             problem('TRANSLATION_PROVIDER_DISABLED', '请先启用此供应商', 409)
-        previous = db.scalar(select(TranslationProvider.id).where(TranslationProvider.is_default.is_(True)))
-        db.execute(update(TranslationProvider).where(TranslationProvider.is_default.is_(True)).values(is_default=False, updated_at=now()))
-        provider.is_default, provider.updated_at = True, now()
-        record_audit(db, user.id, 'text_provider.default', 'translation_provider', provider.id,
+        previous = db.scalar(select(TranslationProvider.id).where(flag.is_(True)))
+        db.execute(update(TranslationProvider).where(flag.is_(True)).values({flag.key: False, 'updated_at': now()}))
+        setattr(provider, flag.key, True)
+        provider.updated_at = now()
+        action = 'text_provider.title_default' if purpose == 'comic_title' else 'text_provider.default'
+        record_audit(db, user_id, action, 'translation_provider', provider.id,
                      before={'default_provider': previous}, after={'default_provider': provider.id})
     return provider_json(db, provider)
 

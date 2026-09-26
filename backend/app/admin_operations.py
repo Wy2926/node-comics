@@ -11,8 +11,9 @@ from .errors import problem
 from .models import Asset, Job, TextCall, User, now
 from .health import queue_alerts
 from .health_models import ServiceHeartbeat
-from .translation_requests import ControlAdmission, ImageAdmission, TranslationRequest
+from .translation_requests import ControlAdmission, TranslationRequest
 from .translation_limits import image_budget
+from .comic_title_limits import title_budget
 from .feedback_models import FeedbackAdmission
 from .results import ResultAccess, TranslationResult, valid_asset_sql
 from .file_pages import FilePage
@@ -69,6 +70,7 @@ def user_diagnostics(owner_id: str, db: Session = Depends(get_db)):
     feedback = db.get(FeedbackAdmission, owner_id)
     return {'owner_id': owner_id, 'owner_name': user.name, 'generated_at': at,
         'image_budget': image_budget(db, user, at),
+        'comic_title_budget': title_budget(db, owner_id),
         'upload_active': db.scalar(select(func.count()).select_from(UploadIngressLease).where(
             UploadIngressLease.owner_id == owner_id, UploadIngressLease.expires_at > at)),
         'controls': [{'scope': row.scope, 'recorded_tokens': row.tokens, 'refilled_at': row.refilled_at,
