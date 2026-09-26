@@ -5,6 +5,8 @@
   <img src="apps/extension/src/assets/brand/logo-horizontal-zh-light.webp" width="460" alt="NodeLane 漫译 · NodeLane Comics">
 </picture>
 
+**简体中文** | [English](README_EN.md)
+
 **在浏览器里阅读漫画，边看边译，随时对照原图。**
 
 [![官网与下载](https://img.shields.io/badge/官网-下载插件-1769B3?style=for-the-badge)](https://comics.nodelane.net/)
