@@ -9,7 +9,7 @@
 .nc-search-sheet[open] { display:flex; flex-direction:column; animation:nc-search-rise .28s cubic-bezier(.22,.8,.3,1); }
 .nc-search-sheet::backdrop { background:var(--dialog-backdrop); backdrop-filter:blur(3px); }
 .nc-search-sheet .nc-search-header { flex:none; margin:0; padding:24px var(--page-gutter); border:0; border-bottom:var(--comic-border); border-radius:0; box-shadow:none; }
-.nc-search-sheet .nc-search-body { overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:28px var(--page-gutter) 36px; flex:1; }
+.nc-search-sheet .nc-search-body { overflow:auto; overscroll-behavior:contain; padding:28px var(--page-gutter) 36px; flex:1; }
 .nc-search-header { display:flex; align-items:center; justify-content:space-between; gap:24px; }
 .nc-search-header>div { display:flex; align-items:center; gap:22px; }
 .nc-search-header-context { min-width:0; }
@@ -117,7 +117,7 @@
 .nc-search-result-author { font-size:.75rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:7px 0 6px; }
 .nc-search-result-tags { display:flex; align-items:center; gap:8px; min-height:22px; }
 .nc-search-library-tag { font-size:.625rem; padding:2px 6px; border:var(--comic-badge-border); border-radius:var(--comic-badge-radius); background:var(--surface-soft); color:var(--muted); white-space:nowrap; flex:none; }
-.nc-search-result-languages { display:flex; align-items:center; gap:7px; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.nc-search-result-languages { display:flex; align-items:center; gap:7px; min-width:0; overflow-x:auto; }
 .nc-search-result-languages>span { display:inline-flex; align-items:center; height:22px; flex:none; }
 .nc-search-result-chapter { font-size:.6875rem; line-height:1.5; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:6px 0 12px; }
 .nc-search-result-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:auto; padding-top:10px; border-top:var(--comic-perforation); }

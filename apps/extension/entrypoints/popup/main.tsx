@@ -16,6 +16,7 @@ import { AutoTranslateTabs } from '../../src/ui/AutoTranslateTabs';
 import { BrandLogo } from '../../src/ui/BrandLogo';
 import { TargetLanguage, withTargetLanguage } from '../../src/ui/TargetLanguage';
 import './popup.css';
+import {Scrollbars} from '../../src/ui/Scrollbars';
 
 type Discovery={kind:'catalog';id:string;catalog:SourceCatalog}|{kind:'pages';id:string;manifest:PageManifest};
 function Popup({initialError=''}:{initialError?:string}){
@@ -69,7 +70,7 @@ function Popup({initialError=''}:{initialError?:string}){
  }
  async function open(){if(disabled)return;setOpening(true);try{await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html')});window.close();}catch(e){setError((e as Error).message);}finally{setOpening(false);}}
  async function openSettings(){try{await chrome.runtime.openOptionsPage();window.close();}catch{setError(msg("设置未能打开，请重试。"));}}
- return <main className="nc-app nc-popup">
+ return <main className="nc-app nc-popup"><Scrollbars/>
   <header className="nc-popup-header"><button className="nc-popup-brand" disabled={disabled} onClick={()=>void open()} aria-label={msg('打开我的漫画')}><BrandLogo/></button><button className="nc-popup-settings" aria-label={msg("设置")} title={msg("设置")} disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={19}/></button></header>
   <div className="nc-popup-scroll">
    <section className="nc-popup-cover nc-comic-paper">

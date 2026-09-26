@@ -1,0 +1,52 @@
+/* Applied only to extension-owned scroll containers; source websites are untouched. */
+.nc-scrollbar-viewport { scrollbar-width: none !important; scrollbar-gutter: auto !important; }
+.nc-scrollbar-viewport::-webkit-scrollbar { display: none; }
+html.nc-scrollbar-viewport { scroll-padding-top: calc(var(--nc-header-height, 0px) + 16px); }
+html:not(.nc-scrollbars-measuring) .nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved],
+html.nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved]:not(.nc-scrollbars-measuring) {
+  padding-right: calc(var(--nc-scrollbar-padding-right, 0px) + var(--nc-scrollbar-reserve-y, 0px)) !important;
+  padding-bottom: calc(var(--nc-scrollbar-padding-bottom, 0px) + var(--nc-scrollbar-reserve-x, 0px)) !important;
+}
+.nc-scrollbar-layer[popover] {
+  position: fixed; inset: auto; margin: 0; padding: 0; border: 0;
+  box-sizing: border-box; background: transparent; color: var(--ink);
+  overflow: visible; pointer-events: none; max-width: none; max-height: none;
+}
+.nc-scrollbar-layer::backdrop { display: none; }
+.nc-scrollbar-layer[data-mode=reserved]::before, .nc-scrollbar-layer[data-mode=reserved]::after {
+  content: ''; position: absolute; background: var(--nc-scrollbar-background); pointer-events: none;
+}
+.nc-scrollbar-layer[data-mode=reserved]::before { right: 0; top: 0; bottom: 0; width: var(--nc-scrollbar-reserve-y); }
+.nc-scrollbar-layer[data-mode=reserved]::after { left: 0; right: 0; bottom: 0; height: var(--nc-scrollbar-reserve-x); }
+.nc-scrollbar {
+  position: absolute; z-index: 1; box-sizing: border-box; pointer-events: auto;
+  touch-action: none; user-select: none; cursor: pointer;
+  border-radius: var(--comic-control-radius);
+}
+.nc-scrollbar[hidden] { display: none; }
+.nc-scrollbar-y { right: 2px; top: 8px; width: 20px; }
+.nc-scrollbar-x { left: 8px; bottom: 2px; height: 20px; }
+.nc-scrollbar::before { content: ''; position: absolute; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
+.nc-scrollbar-y::before { inset: 0 7px; }
+.nc-scrollbar-x::before { inset: 7px 0; }
+.nc-scrollbar-thumb { position: absolute; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); cursor: grab; }
+.nc-scrollbar-y>.nc-scrollbar-thumb { top: 0; left: 4px; width: 10px; }
+.nc-scrollbar-x>.nc-scrollbar-thumb { top: 4px; left: 0; height: 10px; }
+.nc-scrollbar-layer[data-compact=true] .nc-scrollbar-x { bottom: 0; height: 12px; }
+.nc-scrollbar-layer[data-compact=true] .nc-scrollbar-x::before { inset: 5px 0 3px; }
+.nc-scrollbar-layer[data-compact=true] .nc-scrollbar-x>.nc-scrollbar-thumb { height: 6px; }
+.nc-scrollbar:hover .nc-scrollbar-thumb, .nc-scrollbar:focus-visible .nc-scrollbar-thumb { background: var(--accent-hover); }
+.nc-scrollbar[data-dragging=true], .nc-scrollbar[data-dragging=true] .nc-scrollbar-thumb { cursor: grabbing; }
+.nc-scrollbar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The reader's page selector is a range input, but shares the same visual vocabulary. */
+.nc-reader-navigation .nc-reader-progress { appearance: none; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.nc-reader-progress::-webkit-slider-runnable-track { width: 6px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
+.nc-reader-progress::-webkit-slider-thumb { appearance: none; width: 12px; height: 24px; margin-left: -4px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
+.nc-reader-progress::-moz-range-track { width: 6px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
+.nc-reader-progress::-moz-range-thumb { width: 12px; height: 24px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
+@media (forced-colors: active) {
+  .nc-scrollbar::before { background: Canvas; border-color: CanvasText; }
+  .nc-scrollbar .nc-scrollbar-thumb, .nc-scrollbar:is(:hover,:focus-visible) .nc-scrollbar-thumb { background: ButtonText; border-color: Canvas; forced-color-adjust: none; }
+  .nc-scrollbar:focus-visible { outline-color: Highlight; }
+}
+@media print { .nc-scrollbar-layer { display: none !important; } }

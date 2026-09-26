@@ -1,3 +1,4 @@
+import {Scrollbars} from '../src/ui/Scrollbars';
 /** Development-only, synthetic data on a dedicated origin. Never calls a supplier or cloud API. */
 import {useCallback,useState} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -24,7 +25,7 @@ function Fixture(){
  const noop=useCallback(()=>{},[]),mark=useCallback(async()=>{},[]);
  const active=useCallback((value:string)=>setId(value),[]);
  const navigate=(value:string,pageId?:string)=>{if(pageId)setCopies(previous=>previous.map(item=>item.id===value?{...item,pageId,relativeOffset:0}:item));setId(value);};
- return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}>
+ return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:8,display:'flex',gap:12,alignItems:'center',background:'#fff',zIndex:20}}><strong>隔离阅读器验收</strong><span>{copy.title}</span><button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(29,Number(id.split('-').at(-1))+1)}`)}>切下一章</button><output aria-label="保存位置">{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
   {mounted&&<Reader key={mounted?'reader':'closed'} viewKey="isolated-window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={()=>setStatus('本地样本导入入口')} notify={setStatus} onReadingWindow={noop} api={api} busy={false} onAcquire={noop} onPauseAcquire={noop}/>}
  </div>;

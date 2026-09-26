@@ -88,7 +88,7 @@ export function Select({value, onChange, children, disabled, id, name, className
     function position() {
       if (!button || !list) return;
       const rect = button.getBoundingClientRect(), gap = 6, margin = 8;
-      // The stable scrollbar gutter is outside the popover's usable viewport.
+      // Stay inside the document viewport, including embedded extension surfaces.
       const root = document.documentElement;
       const viewportWidth = Math.min(root.clientWidth, root.getBoundingClientRect().width);
       const width = Math.min(Math.max(rect.width, 180), viewportWidth - margin * 2);
@@ -114,7 +114,7 @@ export function Select({value, onChange, children, disabled, id, name, className
   }, [expanded]);
 
   useLayoutEffect(() => {
-    const list = listRef.current, option = list?.children[activeIndex] as HTMLElement | undefined;
+    const list = listRef.current, option = list?.querySelectorAll<HTMLElement>('.nc-select-option')[activeIndex];
     if (!expanded || !list || !option) return;
     // scrollIntoView would also move the reader/dialog behind the list.
     const item = option.getBoundingClientRect(), viewport = list.getBoundingClientRect();

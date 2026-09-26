@@ -137,6 +137,9 @@ a {
   white-space: pre-wrap;
 }
 .nc-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   height: 84px;
   display: flex;
   align-items: center;
@@ -719,7 +722,6 @@ a {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   overflow-anchor: none;
 }
@@ -1697,7 +1699,6 @@ a {
 /* Full-width thumbnails keep their aspect ratio; variable rows remain virtualized. */
 .nc-thumb-list {
   padding: 0 12px;
-  scrollbar-gutter: stable;
 }
 .nc-thumb-row {
   display: block;
@@ -1772,13 +1773,6 @@ a {
   }
 }
 
-.nc-reading-viewport {
-  scrollbar-width: none;
-  scrollbar-gutter: auto;
-}
-.nc-reading-viewport::-webkit-scrollbar {
-  display: none;
-}
 .nc-page-versions {
   display: inline-flex;
   align-items: center;
@@ -1842,7 +1836,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
 /* Side tools keep the full viewport height and stay outside the image canvas. */
 .nc-reader {--reader-gutter:92px}
 .nc-reader .nc-reading-viewport {margin-inline:var(--reader-gutter)}
-.nc-reader-rail {position:absolute;top:50%;transform:translateY(-50%);z-index:31;width:72px;max-height:calc(100% - 24px);overflow:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:8px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:0 4px 20px #13213512;transition:opacity .2s}
+.nc-reader-rail {position:absolute;top:50%;transform:translateY(-50%);z-index:31;width:72px;max-height:calc(100% - 24px);overflow:auto;display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:8px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:0 4px 20px #13213512;transition:opacity .2s}
 .nc-reader-rail.left {left:10px}
 .nc-reader-rail.right {right:10px}
 .nc-reader-rail button {position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px;width:100%;padding:7px 2px;border-radius:9px;font-size:11px;line-height:1.3;color:var(--muted)}

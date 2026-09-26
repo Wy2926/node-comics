@@ -1,3 +1,4 @@
+import {Scrollbars} from '../src/ui/Scrollbars';
 /** Synthetic long directory; uses only local image bytes on the isolated fixture origin. */
 import {useCallback,useMemo,useState} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -25,7 +26,7 @@ function Fixture(){
  const update=useCallback((next:ReadingEntry)=>setCopies(previous=>previous.map(item=>item.id===next.id?next:item)),[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async()=>{},[]);
  const navigate=useCallback((value:string)=>setId(value),[]);
- return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}>
+ return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:8,display:'flex',gap:12,background:'white',zIndex:20}}>
    <button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭阅读器':'重开阅读器'}</button>
    <button onClick={()=>setGrouped(value=>!value)}>切换分组</button>

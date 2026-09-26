@@ -385,7 +385,6 @@
   min-height: 0;
   margin: 24px 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
 .nc-discovery-detail-facts {

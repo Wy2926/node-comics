@@ -1,5 +1,4 @@
 .nc-library{min-width:0}
-html:has(.nc-library){scrollbar-gutter:stable}
 .nc-library button:focus-visible,.nc-library summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .nc-library button:disabled{cursor:not-allowed}
 .nc-library .button.small{padding:8px 12px;min-height:36px;font-size:.82rem}

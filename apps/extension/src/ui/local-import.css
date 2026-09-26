@@ -1,11 +1,11 @@
 .nc-app .modal.nc-local-import-modal{width:900px;padding:26px 28px;overflow:hidden;display:flex;flex-direction:column}
 .nc-local-import-modal>.modal-spark{display:none}
 .nc-app .nc-local-import-modal>.modal-subtitle{margin:8px 0 16px;font-size:.82rem;flex-shrink:0}
-.nc-local-import{min-height:0;overflow:auto;scrollbar-width:thin;padding-right:3px}
+.nc-local-import{min-height:0;overflow:auto;padding-right:3px}
 .nc-local-import progress,.nc-import-dock progress{display:block;width:100%;height:6px;accent-color:var(--accent);border:0;border-radius:8px;overflow:hidden;background:var(--line)}
 .nc-local-import progress::-webkit-progress-bar,.nc-import-dock progress::-webkit-progress-bar{background:var(--line)}
 .nc-local-import progress::-webkit-progress-value,.nc-import-dock progress::-webkit-progress-value{background:var(--accent);border-radius:8px}
-.nc-import-list{max-height:330px;min-height:88px;overflow:auto;scrollbar-width:thin;padding-right:4px}
+.nc-import-list{max-height:330px;min-height:88px;overflow:auto;padding-right:4px}
 .nc-import-item{padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:8px}
 .nc-import-item.importing{border-color:var(--accent);background:var(--accent-soft)}
 .nc-import-item.failed{border-color:var(--warning,#bd6836)}

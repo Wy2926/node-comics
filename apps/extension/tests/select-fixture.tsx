@@ -1,5 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import {Scrollbars} from '../src/ui/Scrollbars';
+import {useContextMenu} from '../src/ui/ContextMenu';
 import {Select, type SelectChangeEvent} from '../src/ui/Select';
 import {TargetLanguage} from '../src/ui/TargetLanguage';
 import {InterfaceLanguage} from '../src/ui/InterfaceLanguage';
@@ -10,6 +12,7 @@ import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
 
 function Fixture() {
+  const context = useContextMenu(), [menuSelection, setMenuSelection] = useState('');
   const [value, setValue] = useState('apple'), [label, setLabel] = useState('作品');
   const [disabled, setDisabled] = useState(false), [empty, setEmpty] = useState(false);
   const [changes, setChanges] = useState<SelectChangeEvent[]>([]);
@@ -25,7 +28,7 @@ function Fixture() {
     <optgroup label="Unavailable" disabled><option value="date">Date</option></optgroup>
     <option value="hidden" hidden>Hidden</option></>;
   function change(event: SelectChangeEvent) { setChanges(previous => [...previous, event]); setValue(event.currentTarget.value); }
-  return <main className="nc-app" style={{display: 'block', padding: 48}}>
+  return <main className="nc-app" style={{display: 'block', padding: 48}}><Scrollbars/>
     <h1>Select 键盘与弹层测试</h1>
     <form id="select-form" style={{maxWidth: 380, marginTop: 24}}>
       <button type="button" id="before">Before</button>
@@ -38,6 +41,8 @@ function Fixture() {
       <Select aria-label="空选项" value="" onChange={change}/>
     </form>
     <output id="changes">{JSON.stringify(changes)}</output>
+    <button onClick={event => context.open(event.currentTarget, 'Long menu', Array.from({length: 30}, (_, index) => ({label: `Action ${index}`, onSelect: () => setMenuSelection(String(index))})))}>Long menu</button>
+    <output id="menu-selection">{menuSelection}</output>{context.menu}
     <div style={{display: 'flex', gap: 16, margin: '24px 0'}}>
       <button onClick={() => setValue('cherry')}>External value</button>
       <button onClick={() => setLabel('Work')}>Translate label</button>
