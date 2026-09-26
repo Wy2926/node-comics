@@ -2,6 +2,8 @@
 
 面向 Chrome、Edge、Firefox 的漫画阅读与翻译插件，支持本地漫画文件、Google Drive 和专门适配的网站，提供常规翻译与 AI 重绘。
 
+支持本地翻译，可连接本地部署的 [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) 服务。
+
 ## 开始开发
 
 | 模块 | 用途与入口 |
