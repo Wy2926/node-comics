@@ -17,7 +17,7 @@ import './comic-search.css';
 
 export interface ComicSearchPanelProps {
   open:boolean;
-  presentation?:'page'|'sheet';
+  presentation?:'page'|'sheet'|'embedded';
   seed:SearchSeed;
   api:Api;
   defaultLanguage:string;
@@ -41,16 +41,17 @@ function stateLabel(state:SearchSiteState){
   }
 }
 
-/** Two presentations share one search workflow. Keep mounted while hidden to retain local results. */
+/** All presentations share one search workflow. Keep mounted while hidden to retain local results. */
 export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLanguage,onClose,onLogin,onImportHit,existingSourceKeys,currentIdentity,onLanguageChange}:ComicSearchPanelProps){
   const [session]=useState(()=>new ComicSearchSession(seed,{translateTitle:(name,language,signal)=>api.translateComicTitle(name,language,signal),listSites:listSearchSites,search:searchSource,release:releaseSourceSearchSession},defaultLanguage,readSearchSiteSelection()));
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot);
   const dialog=useRef<HTMLDialogElement>(null),closeRef=useRef<HTMLButtonElement>(null),queryRef=useRef<HTMLInputElement>(null),sourceRef=useRef<HTMLInputElement>(null),scrollRef=useRef<HTMLDivElement>(null);
   const coverCache=useRef(new Map<string,string>()),titleId=useId(),queryId=useId(),sourceId=useId();
-  const [query,setQuery]=useState(snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='page'?'direct':'translate');
+  const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
   const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
-  useEffect(()=>setQuery(snapshot.query),[snapshot.query]);
+  const lastQuery=useRef(snapshot.query);
+  useEffect(()=>{if(lastQuery.current!==snapshot.query){lastQuery.current=snapshot.query;setQuery(snapshot.query);}},[snapshot.query]);
   useEffect(()=>{
     if(!open)return;
     const restore=()=>{const saved=readSearchSiteSelection();for(const state of session.getSnapshot().sites)session.setSelected(state.site.key,saved[state.site.key]??true);};
@@ -116,6 +117,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
             <button type="button" className={!translating?'active':undefined} aria-pressed={!translating} disabled={!!importing} onClick={()=>changeMode('direct')}><Icon name="book" size={17}/>{msg('直接搜索')}</button>
             <button type="button" className={translating?'active':undefined} aria-pressed={translating} disabled={!!importing} onClick={()=>changeMode('translate')}><Icon name="globe" size={17}/>{msg('翻译名称搜索')}</button>
           </div>
+          {!!seed.titles?.length&&<div className="nc-search-title-options" role="group" aria-label={msg('作品别名')}>{seed.titles.map(title=><button type="button" key={title} className="button secondary small" disabled={!!importing} onClick={()=>{session.stop();if(translating)session.setSourceTitle(title);setQuery(title);}}>{title}</button>)}</div>}
           <form className="nc-search-form" onSubmit={event=>{event.preventDefault();if(translating)automatic();else submitManual();}}>
             <div className="nc-search-fields">
               <label className="nc-search-name" htmlFor={translating?sourceId:queryId}><span>{translating?msg('原作品名称'):msg('搜索名称')}</span>
@@ -156,5 +158,5 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
       </section>:<div className="nc-search-empty nc-search-intro"><span className="nc-search-intro-icon"><Icon name="book" size={32}/></span><h2>{msg('按名称发现更多来源')}</h2><p>{msg('获取漫画名后，同时搜索所选网站；有结果就会立即显示。')}</p></div>}
     </div>
   </>;
-  return sheet?<dialog ref={dialog} className="nc-comic-search nc-search-sheet" aria-labelledby={titleId} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={keyDown} onClick={event=>{if(event.target===event.currentTarget){const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();}}}>{content}</dialog>:<section className="nc-comic-search nc-search-page" aria-labelledby={titleId}>{content}</section>;
+  return sheet?<dialog ref={dialog} className="nc-comic-search nc-search-sheet" aria-labelledby={titleId} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={keyDown} onClick={event=>{if(event.target===event.currentTarget){const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();}}}>{content}</dialog>:<section className={`nc-comic-search nc-search-${presentation}`} aria-labelledby={titleId}>{content}</section>;
 }

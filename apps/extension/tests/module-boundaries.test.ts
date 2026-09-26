@@ -21,6 +21,12 @@ const source = (name: string, code: string) => {mkdirSync(path.dirname(path.join
 const run = () => spawnSync(process.execPath, [script, root], {encoding: 'utf8'});
 
 describe('module boundary check', () => {
+  it.each(['ui/ComicSites', 'comics/application/import-service', 'sources/index', 'api'])('keeps discovery metadata independent of %s', target => {
+    source('entrypoints/main.ts', "import '../src/discovery/session';");
+    source('src/discovery/session.ts', `import '../${target}';`);
+    source(`src/${target}.ts`, 'export {};');
+    expect(run().stderr).toContain('Discovery boundary');
+  });
   it.each(['src/ui/ComicSites.ts','src/App.tsx','src/comics/pages/service.ts'])('rejects source runtime and registry shortcuts from %s',name=>{
     source('entrypoints/main.ts',`import '../${name.replace(/\.tsx?$/,'')}';`);
     const target='src/sources/registry/networks.ts',relative=path.posix.relative(path.posix.dirname(name),target).replace(/\.ts$/,'');

@@ -3,6 +3,25 @@
   background-image: var(--comic-dot-pattern);
   background-size: var(--comic-dot-size);
 }
+.nc-comic-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: var(--comic-badge-border);
+  border-radius: var(--comic-badge-radius);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: var(--text-caption);
+  font-weight: 650;
+  line-height: 1.5;
+}
+.nc-comic-tag.is-soft {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--comic-control-radius);
+}
 .nc-app button.button.nc-comic-action {
   border: var(--comic-border);
   border-radius: var(--comic-control-radius);

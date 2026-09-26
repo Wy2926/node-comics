@@ -138,3 +138,17 @@
   .nc-search-sheet[open],.nc-search-status-dot { animation:none!important; }
   .nc-search-result { transition:none; }
 }
+.nc-search-title-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  max-height: 144px;
+  overflow: auto;
+  padding: 2px 6px 6px 2px;
+}
+.nc-search-title-options .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

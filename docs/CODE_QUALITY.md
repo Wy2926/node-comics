@@ -8,6 +8,7 @@
 | --- | --- |
 | 应用协调 | `apps/extension/src/App.tsx` 管理账户、书架和翻译提交，子组件通过 props 接收操作，不反向导入 App |
 | 公共 UI | `src/ui/components.tsx` 提供 Modal、PageTitle、Stat、SettingRow；不依赖业务页面 |
+| 作品发现 | `src/discovery/` 只读作品资料与会话，`src/ui/discovery/` 负责呈现；资料 ID 不参与书架来源匹配，导入仍经现有搜索服务 |
 | 偏好页面 | `src/ui/Preferences.tsx` 管理阅读、语言与外观偏好；不提供用户队列设置 |
 | 阅读目录 | `src/reader/ThumbnailDirectory.tsx` 管理缩略图虚拟列表；主阅读器保留图片窗口、导航和阅读位置 |
 | 任务状态 | `src/reader/jobs.ts` 统一状态优先级、排序、合并；恢复、轮询和 IndexedDB 写入共用，不允许旧快照恢复失效译图 |

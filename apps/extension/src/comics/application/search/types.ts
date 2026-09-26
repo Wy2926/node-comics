@@ -3,6 +3,8 @@ import type {SourceSearchOptions,SourceSearchRequest,SourceSearchResult,SourceSe
 
 export interface SearchSeed {
   title:string;
+  /** Optional provider-supplied alternate names; choosing one never submits a search. */
+  titles?:readonly string[];
   origin?:{sourceId:string;catalogId:string;url:string};
   cover?:{url:string};
   coverKey?:string;

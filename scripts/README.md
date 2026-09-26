@@ -32,6 +32,7 @@ node scripts/verify_simple_reading.mjs
 | 工具 | 检查范围 |
 | --- | --- |
 | `verify_comic_search.mjs` | 跨语言查找三入口、逐站结果／重试、镜像去重、导入和阅读位置；网站／名称接口为隔离夹具，真实HTTP见各站README |
+| `verify_discovery.mjs` | 生产 MV3 发现／详情／来源导入、返回位置、分页失败／限流及主题的隔离 HTTP 夹具；加 `--live` 只检查真实 AniList 公共列表和详情 |
 | `verify_simple_reading.mjs` / `verify_source_database_baseline.mjs` | 单来源导入、格式、书架、批量移除、新库和重启恢复 |
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
 | `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |

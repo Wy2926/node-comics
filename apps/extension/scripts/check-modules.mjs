@@ -58,6 +58,9 @@ for (const filename of modules) {
     ).resolvedModule;
     if (!resolved) return; // CSS, WASM and other Vite-managed assets are not TS modules.
     const target = normalize(resolved.resolvedFileName);
+    if (/^src\/discovery\//.test(relative(filename)) &&
+        (/^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/)/.test(relative(target)) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target)))
+      importErrors.push(`Discovery boundary (metadata must not depend on UI, account, reading or source services): ${relative(filename)} -> ${relative(target)}`);
     const targetAdapter = channelAdapter(target), adapter = channelAdapter(filename);
     if (targetAdapter && adapter !== targetAdapter &&
         !(relative(filename) === channelRegistry && relative(target) === `src/translation/channels/adapters/${targetAdapter}/definition.ts`))
