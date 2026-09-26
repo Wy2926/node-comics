@@ -177,7 +177,7 @@ export function App(){
  useEffect(()=>{
    if(!channel)return;
    let stopped=false;
-   void Promise.all(copiesRef.current.map(copy=>readEntry(copy.id,channel.scope))).then(loaded=>{
+   void Promise.all(copiesRef.current.filter(copy=>copy.pages.length).map(copy=>readEntry(copy.id,channel.scope))).then(loaded=>{
      if(stopped||!channel.isCurrent())return;
      setCopies(values=>values.map(copy=>{const next=loaded.find(item=>item.id===copy.id&&item.contentId===copy.contentId);return next?{...next,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:copy;}));
    }).catch(()=>{});

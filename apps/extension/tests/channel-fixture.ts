@@ -5,14 +5,29 @@ import {seedReaderFixture} from './reader-fixture-data';
 import {readAuth} from '../src/auth/storage';
 import {listChannels,selectChannel} from '../src/translation/channels';
 import {clearStorage} from '../src/comics/application/source-lifecycle';
+import {catalog} from '../src/comics/repositories';
+import {retainContainer} from '../src/storage/containers';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a fresh profile on the isolated fixture origin.');
 await saveSettings({...defaults,uiLanguage:'zh-CN',appearance:'light'});
-await seedReaderFixture(API_ORIGIN,'local',()=>{throw Error('Local fixture must not seed official jobs.');});
+const {copies}=await seedReaderFixture(API_ORIGIN,'local',()=>{throw Error('Local fixture must not seed official jobs.');});
+const first=(await catalog.get('entries',copies[0].id))!,pages=await catalog.listPages(first.contentId,{limit:2});
+const chapterContentIds=[first.contentId],pageReads:string[]=[];
+await catalog.patch('entries',first.id,{sequenceId:'channel-fixture'});
+// All chapters have a real local index; only the current reading window should load it.
+for(let order=1;order<100;order++){
+  const id=first.id+':chapter:'+order,contentId=first.contentId+':chapter:'+order;
+  const chapterPages=pages.map(page=>({...page,contentId,pageId:page.pageId+':chapter:'+order}));
+  await retainContainer(first.containerId!,contentId);
+  await catalog.put('entries',{...first,id,contentId,order,sequenceId:'channel-fixture',title:'合成章节 '+(order+1),pageCount:chapterPages.length,knownTotal:chapterPages.length,coverPageId:chapterPages[0].pageId});
+  await catalog.putPages(id,contentId,chapterPages,first.generation);chapterContentIds.push(contentId);
+}
+const listPages=catalog.listPages;
+catalog.listPages=(contentId,options)=>{pageReads.push(contentId);return listPages(contentId,options);};
 const originalFetch=window.fetch.bind(window);
 const output=await (await originalFetch('/samples/starlight-bookshop.png')).blob();
 const state={loginCount:0,requests:[] as {language:string;token:boolean;hasImage:boolean}[],officialTranslations:0,fail:false,
-  listChannels,selectChannel,readAuth,clearCache:()=>clearStorage('translations')};
+  listChannels,selectChannel,readAuth,chapterContentIds,pageReads,clearCache:()=>clearStorage('translations')};
 Object.assign(window,{channelFixture:state});
 window.fetch=async(input,init={})=>{
   const url=new URL(String(input),location.origin);

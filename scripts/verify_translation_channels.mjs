@@ -11,7 +11,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.TE
 const page=await browser.newPage({viewport:{width:1360,height:960}}),checks=[],errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
-const read=()=>page.evaluate(async()=>({requests:window.channelFixture.requests,official:window.channelFixture.officialTranslations,auth:!!(await window.channelFixture.readAuth()).session,channels:await window.channelFixture.listChannels()}));
+const read=()=>page.evaluate(async()=>({requests:window.channelFixture.requests,official:window.channelFixture.officialTranslations,auth:!!(await window.channelFixture.readAuth()).session,channels:await window.channelFixture.listChannels(),pageReads:window.channelFixture.pageReads,chapterContentIds:window.channelFixture.chapterContentIds}));
 async function openBook(){await page.getByRole('button',{name:'开始阅读',exact:true}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
@@ -43,6 +43,7 @@ try{
   await page.screenshot({path:path.join(out,'local-reading.png')});
   check('local classic translation sends image/config/token for current +3 with no official calls');
   const localId=current.channels.activeId;
+  await page.evaluate(()=>{window.channelFixture.pageReads.length=0;});
   await page.evaluate(()=>window.channelFixture.selectChannel('nodelane'));
   await page.getByRole('button',{name:'登录后翻译',exact:true}).first().waitFor();
   await page.getByRole('button',{name:'AI 重绘',exact:true}).click();
@@ -53,6 +54,10 @@ try{
   assert.equal((await read()).requests.length,4);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   check('switching channels preserves reading position, isolates official login, and reuses local results');
+  current=await read();
+  assert.equal(current.chapterContentIds.length,100);
+  assert.deepEqual([...new Set(current.pageReads)].sort(),current.chapterContentIds.slice(0,2).sort(),'channel switching must only reload the two loaded chapters, not the full 100-chapter sequence');
+  check('channel switching reads only the loaded chapters in a fully indexed 100-chapter sequence');
   await page.evaluate(()=>{location.hash='settings';});
   await page.getByRole('button',{name:'重新连接',exact:true}).click();
   assert.equal(await page.getByLabel('密码',{exact:true}).inputValue(),'');
@@ -73,6 +78,14 @@ try{
   await page.getByLabel('跳转页码',{exact:true}).fill('10');
   await page.waitForFunction(()=>window.channelFixture.requests.length===9);
   check('an Internet-offline status does not block an accessible local translation service');
+  await page.getByRole('button',{name:'原图',exact:true}).click();
+  await page.getByRole('button',{name:'打开目录',exact:true}).click();
+  await page.getByRole('button').filter({hasText:'合成章节 100'}).click();
+  await page.waitForFunction(()=>window.channelFixture.pageReads.includes(window.channelFixture.chapterContentIds[99]));
+  await page.waitForFunction(()=>{const image=document.querySelector('.nc-stream-chapter[data-copy-id$=":chapter:99"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
+  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  await page.screenshot({path:path.join(out,'distant-chapter.png')});
+  check('an unloaded distant chapter remains readable when explicitly opened');
   assert.deepEqual(errors,[]);
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,liveProvider:false},null,2));
 }catch(error){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,state:await read().catch(()=>null)},null,2));throw error;}
