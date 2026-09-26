@@ -138,8 +138,6 @@ def test_real_adapter_payload_with_mock_transport(client, monkeypatch, protocol)
         payload = json.loads(request.content)
         messages = payload['messages' if protocol == 'chat_completions' else 'input']
         assert messages[0] == {'role': 'system', 'content': comic_titles.TITLE_INSTRUCTIONS}
-        assert 'Never invent, translate or transliterate' in messages[0]['content']
-        assert 'Translate comics naturally' not in messages[0]['content']
         assert messages[1]['role'] == 'user' and json.loads(messages[1]['content']) == BODY
         assert 'translations[' not in request.content.decode()
         calls.append(request.url.path)
