@@ -89,11 +89,20 @@
       "sha256": "f40ca3fe2567f84ceb45cdd27b963f425e9e7910698eb850a83812df74966cc7",
       "bytes": 7605228,
       "path": "/downloads/node-comics-0.5.0-edge.zip"
+    },
+    {
+      "version": "0.5.0",
+      "browser": "firefox",
+      "filename": "node-comics-0.5.0-firefox.xpi",
+      "sha256": "4fe6044c3d23e180a358a063a75053b3c27545df50dffcc8904b548a18e4d68c",
+      "bytes": 7724392,
+      "path": "/downloads/node-comics-0.5.0-firefox.xpi",
+      "content_type": "application/x-xpinstall"
     }
   ],
   "current_by_browser": {
     "chrome": "0.5.0",
     "edge": "0.5.0",
-    "firefox": "0.3.0"
+    "firefox": "0.5.0"
   }
 }

@@ -488,7 +488,7 @@ export default {
           "Search multiple sites in parallel, with results appearing progressively and interleaved by source. Check each site’s status, retry failures, load more results and import a title to read.",
           "Search language and site choices are remembered. Changing site selections keeps the current results. Search screens now share a consistent design and show site language labels.",
           "Fixed DM5 search encoding for keywords containing spaces. Switching translation channels now refreshes only loaded chapters, reducing unnecessary reader updates.",
-          "Chrome and Edge 0.5.0 downloads are available. The Firefox download remains the AMO-signed 0.3.0; store versions depend on review completion."
+          "Chrome, Edge and Firefox 0.5.0 downloads are available. Firefox uses the AMO-signed XPI; store versions depend on review completion."
         ]
       },
       {
