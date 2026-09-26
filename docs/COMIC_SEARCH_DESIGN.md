@@ -82,7 +82,7 @@
 
 ## 当前适配与验证
 
-当前可搜索：DM5、瓜子漫画、MangaCopy（含已声明镜像）与 MangaDex。各自查询编码、空结果、分页、字段和真实 HTTP 复跑入口见站点 README；其他站仍可作为查找起点。MangaDex只按名称搜索，并展示实际章节语言列表；没有返回语言的站点省略语言标签。
+全部八个专用站点适配器均提供搜索：DM5、瓜子漫画、MangaCopy（含已声明镜像）、MangaDex、MangaDot、Comix、NAVER Webtoon 与 Comic PASH!。各自查询编码、空结果、分页、字段和真实 HTTP 复跑入口见站点 README。MangaDex 展示实际章节语言列表；没有返回内容语言的站点省略语言标签。通用原位翻译适配器不提供作品搜索。
 
 - `npm --prefix apps/extension run check`：类型、依赖边界、能力一致性与字典。
 - `npm --prefix apps/extension test`：语言、候选／游标／权限、会话并发／取消、API回退、作品种子与多语言导入回归。

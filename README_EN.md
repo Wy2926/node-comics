@@ -19,7 +19,7 @@
 [![WXT](https://img.shields.io/badge/Extension-WXT-475569?style=flat-square)](apps/extension/README.md)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square)](backend/README.md)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-4169E1?style=flat-square)](backend/README.md)
-[![Compute module licenses](https://img.shields.io/badge/Compute_modules-GPL--3.0-64748B?style=flat-square)](#licenses)
+[![License](https://img.shields.io/badge/License-GPL--3.0--only-64748B?style=flat-square)](LICENSE)
 
 </div>
 
@@ -106,6 +106,6 @@ See [AGENTS.md](AGENTS.md) for collaboration guidelines. Product rules are maint
 
 ## Licenses
 
-The [compute node](services/compute-node/LICENSE) and [image engine](services/classic-engine/LICENSE) include GPL-3.0 licenses. The repository root does not currently declare a single license for the entire project; these module licenses do not establish a repository-wide license.
+Except for third-party content with explicit separate licensing, the NodeLane Comics project code is licensed under the **GNU General Public License v3.0 only (SPDX: `GPL-3.0-only`)**. See [LICENSE](LICENSE) for the full terms. This software comes without any warranty, as detailed in the license.
 
-Third-party code, models, and fonts remain subject to their accompanying licenses. Source and license information is retained in the corresponding modules.
+Third-party code, models, and fonts remain subject to their accompanying licenses, with their original copyright and license notices retained. See the image engine's [THIRD_PARTY.md](services/classic-engine/THIRD_PARTY.md) for provenance. The software license does not grant rights to comic content, covers, or user data.

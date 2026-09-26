@@ -1,26 +1,13 @@
-import type {SourceNetwork,SourceNetworkContext} from '../../contracts/network';
+import type {SourceNetwork} from '../../contracts/network';
 import type {SourceCatalogSnapshot,SourceEntry,SourceSnapshot} from '../../contracts/source';
 import {safeImageUrl} from '../../shared/urls';
 import {sourceCover} from '../../shared/cover';
 import {comixLocation} from './definition';
-import {encodeRequest,decodeResponse} from './protocol';
-
-type RecordValue=Record<string,unknown>;
-function object(value:unknown):RecordValue {
-  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Comix 返回的数据格式已变化。');
-  return value as RecordValue;
-}
+import {api,object} from './api';
+import {search} from './search';
 function text(value:unknown){if(typeof value!=='string'||!value.trim()||value.length>2048)throw Error('Comix 文本字段无效。');return value;}
 function integer(value:unknown){if(!Number.isSafeInteger(value)||Number(value)<0)throw Error('Comix 数量字段无效。');return Number(value);}
 function location(url:string){const value=comixLocation(new URL(url));if(!value)throw Error('Comix 来源地址无效。');return value;}
-async function api(path:string,context:SourceNetworkContext,params:Record<string,string>={}){
-  const pairs=Object.keys(params).sort().map(key=>key+'='+params[key]).join('&');
-  const query=new URLSearchParams(params);query.set('_',encodeRequest(path+(pairs?'?'+pairs:'')));
-  const raw=object(JSON.parse(await context.request('https://comix.to/api/v1'+path+'?'+query)));
-  const body=typeof raw.e==='string'?object(JSON.parse(decodeResponse(raw.e))):raw;
-  if(body.status!=='ok')throw Error('Comix 接口未返回有效内容。');
-  return object(body.result);
-}
 interface Chapter {id:number;number:number;url:string;official:boolean;group:string;name:string;}
 function chapter(value:unknown,hid:string,mangaId:number):Chapter{
   const row=object(value),url=new URL(text(row.url),'https://comix.to').href,loc=location(url);
@@ -29,6 +16,7 @@ function chapter(value:unknown,hid:string,mangaId:number):Chapter{
   return {id,number,url,official:row.isOfficial===true,group:row.group?text(object(row.group).name):'未标注来源',name:typeof row.name==='string'?row.name:''};
 }
 export const network={
+  search,
   async catalog(url,context){
     const loc=location(url);if(loc.chapterId)throw Error('请使用 Comix 漫画详情页链接。');
     const html=await context.request(url),match=/<script\b[^>]*\bid=["']initial-data["'][^>]*>([\s\S]*?)<\/script>/i.exec(html);

@@ -19,7 +19,7 @@
 [![WXT](https://img.shields.io/badge/Extension-WXT-475569?style=flat-square)](apps/extension/README.md)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square)](backend/README.md)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-4169E1?style=flat-square)](backend/README.md)
-[![计算模块许可证](https://img.shields.io/badge/计算模块-GPL--3.0-64748B?style=flat-square)](#许可证)
+[![许可证](https://img.shields.io/badge/License-GPL--3.0--only-64748B?style=flat-square)](LICENSE)
 
 </div>
 
@@ -104,6 +104,6 @@
 
 ## 许可证
 
-[计算节点](services/compute-node/LICENSE)与[图像引擎](services/classic-engine/LICENSE)包含 GPL-3.0 许可证。仓库根目录当前未声明统一许可证，这些模块的许可不代表整个仓库采用相同协议。
+除另有明确声明的第三方内容外，NodeLane Comics 的项目代码采用 **GNU General Public License v3.0 only（SPDX：`GPL-3.0-only`）**，完整条款见 [LICENSE](LICENSE)。本软件不提供任何担保，具体以许可证条款为准。
 
-第三方代码、模型与字体按各自随附的许可使用，来源与许可信息保留在对应模块中。
+第三方代码、模型与字体按各自随附的许可使用，原有版权与许可声明继续保留；图像引擎的来源说明见 [THIRD_PARTY.md](services/classic-engine/THIRD_PARTY.md)。漫画内容、封面与用户数据不因本项目的软件许可证而获得授权。

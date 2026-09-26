@@ -4,6 +4,7 @@ import {catalogUrl, comicpashLocation, episodeUrl, origin} from './definition';
 import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
 import {parseProcessing} from './images';
 import {sourceCover} from '../../shared/cover';
+import {search} from './search';
 
 const changed = () => Error('Comic PASH 目录或阅读协议已变化，请回源确认后重试。');
 function location(url: string) {
@@ -97,6 +98,7 @@ export function parseContents(raw: string, viewerId: string) {
   return {total: body.totalPages, direction: body.scrollDirection === '縦' ? 'ltr' as const : 'rtl' as const, items};
 }
 export const network = {
+  search,
   async resolveCatalog(url,context){
     const loc=location(url);
     if(!loc.episodeId)throw changed();

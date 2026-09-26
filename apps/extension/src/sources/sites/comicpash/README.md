@@ -9,7 +9,9 @@
 - 标签页翻译：读取 Comici 正文容器内已渲染 canvas，排除广告、空白、点赞和结束页。窗口快照保持部分状态；完整章节导入使用独立网络通道。尺寸、画布替换／重绘、viewer 身份和导航变化使旧读取失效。
 - 来源网站、正文 `viewer.comicpash.jp` 与图片 CDN 遵循[公共权限规则](../../../../../../docs/SITE_ADAPTERS.md#必须保持的约束)，不逐站弹授权；浏览器撤权后取消页面入口登记。
 
-作品页可作为跨语言查找起点：`describeWork` 核对 canonical 的系列身份后读取 `og:title`；章节标题不代替作品名。本站未声明目标搜索能力。
+作品页可作为跨语言查找起点：`describeWork` 核对 canonical 的系列身份后读取 `og:title`；章节标题不代替作品名。
+
+名称搜索由 `search.ts` 读取 `GET /api/search?q=<名称>&page=<页码>&size=12`。仅解析 `searchResult.series` 的名称匹配作品，不混入 `seriesByAuthor` 作者匹配或 `episode` 章节结果；按该集合总数分页，返回稳定系列 ID、作者和作品封面，不获取候选目录或推断内容语言。协议依据[搜索页](https://comicpash.jp/search)的公开前端模块与 HTTP 响应；请求限定本站，取消、结构变化或不完整页均拒绝发布。
 
 ## 来源协议
 
@@ -29,8 +31,11 @@ $env:RUN_LIVE_COMICPASH = '1'
 node scripts/verify_comicpash.mjs
 Remove-Item Env:RUN_LIVE_COMICPASH
 node scripts/verify_inline_translation.mjs
+node apps/extension/src/sources/sites/comicpash/tests/verify-search-http.mjs
 ```
 
 `verify_comicpash` 默认使用隔离目录／接口和自制 tile 图片，检查站内入口、完整导入、实际像素还原、关闭源站取图、重开位置恢复、来源失败及目录重试。真实开关仅读取公开来源，模型和产品 API 不参与；截图和脱敏报告在忽略目录 `artifacts/comicpash-validation/`。
+
+`verify-search-http.mjs` 独立检查真实搜索、空结果及下一页，报告在 `artifacts/comicpash/search-http/`；不证明目录导入、受限内容、浏览器权限或模型效果。
 
 浏览器使用隔离 profile；安装权限与撤权恢复、Firefox 现场运行、受限章节和真实翻译模型效果未验证。通过公开样本不代表所有作品及未来协议均已覆盖。

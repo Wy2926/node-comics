@@ -9,7 +9,7 @@ export function comixLocation(url:URL) {
 }
 export const definition:SourceDefinition={
   id:'comix',name:'Comix',
-  sites:[{id:'comix',name:'Comix',url:'https://comix.to/',icon:icon, primaryLanguages: ['en'] }],
+  sites:[{id:'comix',name:'Comix',url:'https://comix.to/',icon:icon, primaryLanguages: ['en'], search: {requestOrigins: ['https://comix.to/*']} }],
   capabilities:{importable:true,pages:true,inline:true,catalog:true,completePageList:true},
   catalogSync:{intervalMinutes:720},
   installation,

@@ -3,6 +3,7 @@ import type {SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {catalogUrl, episodeUrl, naverLocation, origin, levels, type Section} from './definition';
 import {attributes, inertHtml} from '../../shared/html';
 import {sourceCover} from '../../shared/cover';
+import {search} from './search';
 
 type RecordValue = Record<string, unknown>;
 function object(value: unknown): RecordValue {
@@ -64,6 +65,7 @@ export function parsePages(html: string, url: string): SourceSnapshot {
 }
 
 export const network = {
+  search,
   async catalog(url, context) {
     const loc = location(url);
     if (loc.no) throw Error('请使用 NAVER Webtoon 作品详情页链接。');

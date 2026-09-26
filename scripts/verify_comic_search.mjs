@@ -106,6 +106,9 @@ try{
   const optionsLayout=await panel().locator('.nc-search-site-options').evaluate(element=>({columns:getComputedStyle(element).gridTemplateColumns.split(' ').length,icons:element.querySelectorAll('img').length}));assert.equal(optionsLayout.columns,3);assert.equal(optionsLayout.icons,await siteInputs.count());
   const sheetBounds=await panel().boundingBox();assert(sheetBounds.width>1300);assert.equal(Math.round(sheetBounds.y+sheetBounds.height),1120);assert((await language.boundingBox()).width<=190);
   await panel().screenshot({path:path.join(out,'search-sites.png')});
+  // Keep this suite's fixed HTTP fixtures independent of newly discovered search adapters.
+  const fixtureSites=new Set(['动漫屋 DM5','瓜子漫画','拷贝漫画','MangaCopy','MangaDex']);
+  for(const option of await panel().locator('.nc-search-site-option').all())if(!fixtureSites.has(await option.locator('b').innerText()))await option.locator('input').uncheck();
   const mirrorOption=panel().locator('.nc-search-site-option').filter({hasText:'MangaCopy'});await mirrorOption.locator('input').uncheck();
 
   await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();

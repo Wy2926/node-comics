@@ -2,7 +2,9 @@
 
 支持 `https://comic.naver.com/` 的 `webtoon`、`bestChallenge`、`challenge`：`list?titleId=...` 与 `detail?titleId=...&no=...`。提供 HTTP 导入、完整公开目录、12 小时更新、封面和原位翻译。
 
-作品页可作为跨语言查找起点：`describeWork` 核对移动版 canonical 的分类／作品ID，再读取 `og:title`；章节页没有可靠作品名则手填。本站未声明目标搜索能力。
+作品页可作为跨语言查找起点：`describeWork` 核对移动版 canonical 的分类／作品ID，再读取 `og:title`；章节页没有可靠作品名则手填。
+
+名称搜索由 `search.ts` 读取 `/api/search/webtoon`、`/api/search/bestChallenge`、`/api/search/challenge`，按[源站](https://comic.naver.com/search)客户端方式预编码 `keyword` 再序列化查询。一次操作各取一页，每栏 10 条；游标只携带下一页及未结束栏目，最多返回 30 个候选。核对栏目、作品 ID、总数和页码，不混入 Naver Series 漫画或小说，不读取候选目录、不推断内容语言。任一请求失败或取消时不发布部分结果。
 
 ## 实现约定
 
@@ -21,6 +23,9 @@
 ```powershell
 node apps/extension/src/sources/sites/naver/tests/verify-browser.mjs
 node apps/extension/src/sources/sites/naver/tests/verify-import-navigation.mjs
+node apps/extension/src/sources/sites/naver/tests/verify-search-http.mjs
 ```
 
-前者访问公开作品；后者使用合成页面检查 SPA 首次导入、失败与恢复。原位回归设置 `INLINE_SITE_ONLY=naver` 后运行 `verify_inline_translation.mjs`。隔离配置与模拟译图不代替浏览器安装权限、撤权恢复、受限内容或模型效果验收。
+`verify-browser.mjs` 访问公开作品；`verify-import-navigation.mjs` 使用合成页面检查 SPA 首次导入、失败与恢复。原位回归设置 `INLINE_SITE_ONLY=naver` 后运行 `verify_inline_translation.mjs`。隔离配置与模拟译图不代替浏览器安装权限、撤权恢复、受限内容或模型效果验收。
+
+`verify-search-http.mjs` 检查真实三栏目搜索、空结果及仅剩栏目翻页，报告在 `artifacts/naver/search-http/`；不涉及目录导入、浏览器安装权限或名称模型。
