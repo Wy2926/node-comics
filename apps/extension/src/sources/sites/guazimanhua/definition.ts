@@ -19,7 +19,7 @@ export const catalogUrl = (id: string) => `${origin}/comic.php?id=${id}`;
 export const chapterUrl = (id: string, comicId?: string) => `${origin}/chapter.php?id=${id}${comicId ? '#nodelane-guazimanhua=' + comicId : ''}`;
 export const definition: SourceDefinition = {
   id: 'guazimanhua', name: '瓜子漫画',
-  sites: [{id: 'guazimanhua', name: '瓜子漫画', url: origin + '/', icon}],
+  sites: [{id: 'guazimanhua', name: '瓜子漫画', url: origin + '/', icon, primaryLanguages: ['zh-Hans'] }],
   capabilities: {importable: true, pages: true, inline: false, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {

@@ -2,6 +2,8 @@ import { msg } from '../i18n/runtime';
 import { Icon } from '../icons';
 import { listSupportedSites } from '../sources';
 import { SupportRequestForm } from './SupportRequestForm';
+import { LanguageFlag } from './LanguageFlag';
+import { languageLabel } from '../types';
 import './comic-sites.css';
 import {useState} from 'react';
 
@@ -19,9 +21,9 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
     <div className="nc-sites-layout">
       <section aria-labelledby="nc-sites-title">
         <div className="nc-section-heading nc-sites-section-heading"><h2 id="nc-sites-title">{msg('已适配 {0} 个网站', { '0': sites.length })}</h2><span className="nc-muted"><Icon name="external" size={15}/>{msg('在新标签页打开')}</span></div>
-        <ul className="nc-sites-grid">{sites.map((site, index) => <li key={site.key}>
+        <ul className="nc-sites-grid">{sites.map(site => <li key={site.key}>
           <a className="nc-site-card" href={site.url} target="_blank" rel="noopener noreferrer" aria-label={`${site.name} · ${msg('在新标签页打开')}`}>
-            <div className="nc-site-card-top"><span className="nc-site-monogram" aria-hidden="true"><img src={site.icon} alt="" width={44} height={44} onError={event => { event.currentTarget.hidden = true; }}/><Icon name="globe" size={27}/></span><span className="nc-site-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span></div>
+            <div className="nc-site-card-top"><span className="nc-site-monogram" aria-hidden="true"><img src={site.icon} alt="" width={44} height={44} onError={event => { event.currentTarget.hidden = true; }}/><Icon name="globe" size={27}/></span><span className="nc-site-languages">{site.primaryLanguages.map(language => <span key={language} role="img" aria-label={languageLabel(language)} title={languageLabel(language)}><LanguageFlag language={language}/></span>)}</span></div>
             <h3>{site.name}</h3><span className="nc-site-domain">{new URL(site.url).hostname.replace(/^www\./, '')}</span>
             <div className="nc-site-card-footer"><span><Icon name="check" size={15}/>{msg('已适配')}</span><Icon name="external" size={18}/></div>
           </a>

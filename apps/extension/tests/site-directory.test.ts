@@ -7,8 +7,8 @@ describe('adapter-owned website directory', () => {
   it('flattens multiple sites from one adapter without coupling the view to its id', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites = listSupportedSites([{...adapter, id: 'custom-adapter', sites: [
-      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg'},
-      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg'},
+      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg', primaryLanguages: ['en', 'ja']},
+      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg', primaryLanguages: ['ko']},
     ]}]);
     expect(sites.map(site => [site.key, site.name, site.icon])).toEqual([
       ['custom-adapter:one', 'One', '/one.svg'], ['custom-adapter:two', 'Two', '/two.svg'],

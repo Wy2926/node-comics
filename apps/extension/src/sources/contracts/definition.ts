@@ -11,6 +11,8 @@ export interface SourceSite {
   url: string;
   /** Packaged icon URL; no third-party image requests when opening the directory. */
   icon: string;
+  /** Main content languages (BCP 47), in display order; not an exhaustive catalog filter. */
+  primaryLanguages: readonly string[];
 }
 /** Pure metadata: safe in build tools, UI and the service worker. */
 export interface SourceDefinition {
