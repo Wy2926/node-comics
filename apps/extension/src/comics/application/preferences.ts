@@ -28,3 +28,14 @@ export function saveSearchLanguage(language:string) {
   if(!Object.hasOwn(languageLabels,language))return;
   try{localStorage.setItem('nc-search-language',language);}catch{/* Preference storage is optional. */}
 }
+
+export function readSearchSiteSelection():Record<string,boolean> {
+  try{
+    const saved:unknown=JSON.parse(localStorage.getItem('nc-search-sites')??'{}');
+    if(!saved||typeof saved!=='object'||Array.isArray(saved))return {};
+    return Object.fromEntries(Object.entries(saved).filter((entry):entry is [string,boolean]=>typeof entry[1]==='boolean'));
+  }catch{return {};}
+}
+export function saveSearchSiteSelection(key:string,selected:boolean) {
+  try{localStorage.setItem('nc-search-sites',JSON.stringify({...readSearchSiteSelection(),[key]:selected}));}catch{/* Preference storage is optional. */}
+}

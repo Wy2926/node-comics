@@ -10,7 +10,8 @@ export function searchUrl(request: SourceSearchRequest) {
   const page = request.cursor === undefined ? 1 : /^page:[1-9]\d{0,3}$/.test(request.cursor) ? Number(request.cursor.slice(5)) : NaN;
   if (!Number.isSafeInteger(page)) throw invalid();
   const url = new URL('/search', origin);
-  url.search = new URLSearchParams({title: request.query, page: String(page)}).toString();
+  // Match the site's encodeURIComponent search action, including %20 for spaces.
+  url.search = `title=${encodeURIComponent(request.query)}&page=${page}`;
   return {url: url.href, page};
 }
 function hit(markup: string, heading: 'p' | 'h2'): SourceSearchHit {

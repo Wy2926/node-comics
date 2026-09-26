@@ -9,9 +9,9 @@ const deferred=<T>()=>{let resolve!:(value:T)=>void,reject!:(reason?:unknown)=>v
 const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adapterId:id,key:id+':'+id,search:{requestOrigins:[`https://${id}.example/*`]}});
 const hit=(id:string,name=id):SourceSearchResult=>({sourceId:id,siteId:id,key:JSON.stringify([id,name]),catalogId:name,catalogUrl:`https://${id}.example/comic/${name}`,title:name});
 const page=(id:string,name=id):SourceSearchResults=>({items:[hit(id,name)]});
-function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site('b')]){
+function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site('b')],selection:Record<string,boolean>={}){
   const deps={translateTitle:vi.fn().mockResolvedValue({name:'中文名',target_language:'zh-Hans'}),listSites:vi.fn().mockReturnValue(sites),search:vi.fn().mockImplementation(async(id:string)=>page(id)),release:vi.fn(),...options};
-  const session=new ComicSearchSession({title:'日本語名'},deps,'zh-Hans');sessions.push(session);return {session,deps};
+  const session=new ComicSearchSession({title:'日本語名'},deps,'zh-Hans',selection);sessions.push(session);return {session,deps};
 }
 const sessions:ComicSearchSession[]=[];
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
@@ -32,7 +32,38 @@ describe('comic search session',()=>{
     session.setSelected('english:english',true);expect(session.getSnapshot().sites.every(state=>state.selected)).toBe(true);
     expect(deps.listSites).toHaveBeenCalledTimes(1);
   });
-  it('streams arrival order with no more than three concurrent sites and preserves same-name cross-site candidates',async()=>{
+  it('restores saved site choices while selecting newly available sites by default',()=>{
+    const {session,deps}=setup({},[site('a'),site('b'),site('new')],{'a:a':false,'b:b':false,'removed:removed':true});
+    expect(session.getSnapshot().sites.map(state=>state.selected)).toEqual([false,false,true]);
+    expect(deps.search).not.toHaveBeenCalled();
+  });
+  it('keeps this round, pagination and retries intact when the scope changes, then uses the new scope on submit',async()=>{
+    const slow=deferred<SourceSearchResults>();let bCalls=0;
+    const search=vi.fn<ComicSearchDependencies['search']>((id,request)=>id==='b'&&++bCalls===1?slow.promise:Promise.resolve(id==='a'?{items:[hit('a',request.cursor?'second':'first')],nextCursor:request.cursor?undefined:'next'}:page(id)));
+    const {session,deps}=setup({search},[site('a'),site('b'),site('c')],{'c:c':false});
+    session.searchManual('first query');await flush();
+    const before=session.getSnapshot(),signal=search.mock.calls[1][2].signal;
+    session.setSelected('a:a',false);session.setSelected('b:b',false);session.setSelected('c:c',true);
+    expect(session.getSnapshot()).toMatchObject({query:before.query,searchedAt:before.searchedAt,phase:'searching',results:before.results});
+    expect(signal?.aborted).toBe(false);expect(deps.release).not.toHaveBeenCalled();expect(search).toHaveBeenCalledTimes(2);
+    session.loadMore('a:a');await flush();expect(session.getSnapshot().results.map(result=>result.catalogId)).toEqual(['first','second']);
+    slow.reject(new Error('temporary'));await flush();session.retrySite('b:b');await flush();
+    expect(session.getSnapshot().results.map(result=>result.catalogId)).toEqual(['first','b','second']);
+    session.searchManual('next query');await flush();
+    expect(search.mock.calls.at(-1)?.slice(0,2)).toEqual(['c',{siteId:'c',query:'next query'}]);
+    expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['c']);
+    expect(session.getSnapshot().sites.map(state=>state.status)).toEqual(['idle','idle','ready']);
+  });
+  it('uses the submitted scope even when choices change while the title is being resolved',async()=>{
+    const name=deferred<{name:string;target_language:string}>();
+    const search=vi.fn<ComicSearchDependencies['search']>(async id=>page(id));
+    const {session}=setup({translateTitle:()=>name.promise,search},[site('a'),site('b')],{'b:b':false});
+    const pending=session.searchWithTranslatedTitle();session.setSelected('a:a',false);session.setSelected('b:b',true);
+    name.resolve({name:'translated',target_language:'en'});await pending;await flush();
+    expect(search.mock.calls.map(call=>call[0])).toEqual(['a']);
+    await session.searchWithTranslatedTitle();await flush();expect(search.mock.calls.map(call=>call[0])).toEqual(['a','b']);
+  });
+  it('streams first results with no more than three concurrent sites and preserves same-name cross-site candidates',async()=>{
     const pending=new Map<string,ReturnType<typeof deferred<SourceSearchResults>>>();let running=0,max=0;
     const {session}=setup({search:vi.fn((id)=>{running++;max=Math.max(max,running);const request=deferred<SourceSearchResults>();pending.set(id,request);return request.promise.finally(()=>running--);})},['a','b','c','d','e'].map(id=>site(id)));
     session.searchManual('共同名称');await flush();expect([...pending.keys()]).toEqual(['a','b','c']);
@@ -41,6 +72,16 @@ describe('comic search session',()=>{
     pending.get('a')!.resolve(page('a','same'));await flush();expect(pending.has('e')).toBe(true);
     pending.get('e')!.resolve(page('e'));pending.get('d')!.resolve(page('d'));pending.get('c')!.resolve(page('c'));await flush();
     expect(max).toBe(3);expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['b','a','e','d','c']);expect(session.getSnapshot().phase).toBe('settled');
+  });
+  it('interleaves uneven site batches and later pages without duplicating hits or changing each site order',async()=>{
+    const pending=new Map(['a','b','c'].map(id=>[id,deferred<SourceSearchResults>()]));
+    const {session}=setup({search:vi.fn((id,request)=>request.cursor?Promise.resolve({items:[hit('b','b1'),hit('b','b3')]}):pending.get(id)!.promise)},[site('a'),site('b'),site('c')]);
+    const order=()=>session.getSnapshot().results.map(result=>result.catalogId);
+    session.searchManual('same');pending.get('a')!.resolve({items:['a1','a2','a3'].map(name=>hit('a',name))});await flush();expect(order()).toEqual(['a1','a2','a3']);
+    pending.get('b')!.resolve({items:['b1','b2'].map(name=>hit('b',name)),nextCursor:'next'});await flush();expect(order()).toEqual(['a1','b1','a2','b2','a3']);
+    pending.get('c')!.resolve(page('c','c1'));await flush();expect(order()).toEqual(['a1','b1','c1','a2','b2','a3']);
+    session.loadMore('b:b');await flush();expect(order()).toEqual(['a1','b1','c1','a2','b2','a3','b3']);
+    expect(session.getSnapshot().sites.map(state=>state.resultCount)).toEqual([3,3,1]);
   });
   it('sends the selected language only to name translation and searches with the returned name, caching name resolution',async()=>{
     const search=vi.fn<ComicSearchDependencies['search']>(async id=>page(id));const {session,deps}=setup({translateTitle:vi.fn().mockResolvedValue({name:'English Name',target_language:'en'}),search});
@@ -88,7 +129,7 @@ describe('comic search session',()=>{
     expect(session.getSnapshot().sites[1].status).toBe('running');expect(search.mock.calls.filter(call=>call[0]==='b')).toHaveLength(1);
     session.loadMore('a:a');await flush();expect(session.getSnapshot().results.map(result=>result.catalogId)).toEqual(['a','second']);expect(session.getSnapshot().results[0].authors).toEqual(['Updated']);
     expect(search.mock.calls.at(-1)?.[1].cursor).toBe('bound-cursor');expect(deps.translateTitle).toHaveBeenCalledTimes(1);
-    slow.resolve(page('b'));await flush();expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['a','a','b']);
+    slow.resolve(page('b'));await flush();expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['a','b','a']);
   });
   it('retains the first mirror destination and tracks each site hit independently while enriching optional fields',async()=>{
     const mirror={...site('mirror'),adapterId:'a'},slow=deferred<SourceSearchResults>();

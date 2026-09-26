@@ -2,13 +2,25 @@ import type {ComicTitleTranslation} from '../../../api';
 import {msg} from '../../../i18n/runtime';
 import type {SourceSearchResults} from '../../../sources';
 import {resolveComicTitle,titleFailure,validateSearchQuery} from './title-resolver';
-import type {ComicSearchDependencies,ComicSearchSnapshot,SearchFailure,SearchSeed,SearchSiteState} from './types';
+import type {ComicSearchDependencies,ComicSearchSnapshot,SearchCandidate,SearchFailure,SearchSeed,SearchSiteState} from './types';
 
 export const COMIC_SEARCH_CONCURRENCY=3;
 const sessionPrefix=()=>globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const comicSearchSourceKey=(sourceId:string,catalogId:string)=>JSON.stringify([sourceId,catalogId]);
 type Job={key:string;cursor?:string;attempt:number;generation:number};
 type RunningJob={job:Job;controller:AbortController};
+
+function interleaveResults(results:readonly SearchCandidate[]):SearchCandidate[] {
+  const groups=new Map<string,SearchCandidate[]>();
+  for(const hit of results){
+    const key=JSON.stringify([hit.sourceId,hit.siteId]);
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key)!.push(hit);
+  }
+  const ordered:SearchCandidate[]=[];
+  for(let index=0;ordered.length<results.length;index++)for(const group of groups.values())if(group[index])ordered.push(group[index]);
+  return ordered;
+}
 
 function siteFailure(error:unknown,now:number):SearchFailure {
   const detail=error as {code?:string;retryAfter?:number;retryAfterSeconds?:number;status?:number};
@@ -38,10 +50,10 @@ export class ComicSearchSession {
   private readonly prefix=sessionPrefix();
   private readonly now:()=>number;
 
-  constructor(readonly seed:SearchSeed,private readonly deps:ComicSearchDependencies,defaultLanguage:string){
+  constructor(readonly seed:SearchSeed,private readonly deps:ComicSearchDependencies,defaultLanguage:string,siteSelection:Readonly<Record<string,boolean>>={}){
     this.now=deps.now??Date.now;
     this.snapshot={sourceTitle:seed.title,requestedTitleLanguage:defaultLanguage||'zh-Hans',query:'',phase:'idle',titleState:'idle',results:[],revision:0,
-      sites:deps.listSites().map(site=>({site,selected:true,status:'idle',resultCount:0,resultKeys:[]}))};
+      sites:deps.listSites().map(site=>({site,selected:siteSelection[site.key]??true,status:'idle',resultCount:0,resultKeys:[]}))};
   }
   getSnapshot=()=>this.snapshot;
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>{this.listeners.delete(listener);};};
@@ -64,12 +76,13 @@ export class ComicSearchSession {
   }
   setSourceTitle(value:string){if(value===this.snapshot.sourceTitle)return;this.prepare();this.emit({sourceTitle:value});}
   setTargetLanguage(value:string){if(value===this.snapshot.requestedTitleLanguage)return;this.prepare();this.emit({requestedTitleLanguage:value});}
-  setSelected(key:string,selected:boolean){const state=this.current(key);if(!state)return;this.prepare();this.patchSite(key,{selected});}
+  setSelected(key:string,selected:boolean){const state=this.current(key);if(!state||state.selected===selected)return;this.patchSite(key,{selected});}
   private selected(){return this.snapshot.sites.filter(state=>state.selected);}
   private noSites(){if(this.selected().length)return false;this.emit({phase:'needs-query',titleError:{kind:'invalid',message:msg('请先选择至少一个可搜索的网站。')}});return true;}
   async searchWithTranslatedTitle(){
     if(this.snapshot.titleRetryAt&&this.snapshot.titleRetryAt>this.now())return;
     if(this.noSites())return;
+    const siteKeys=this.selected().map(state=>state.site.key);
     const title=this.snapshot.sourceTitle.trim();
     this.prepare();
     if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title)){
@@ -86,22 +99,22 @@ export class ComicSearchSession {
       if(!result.name){this.emit({phase:'needs-query',titleState:'missing',query:''});return;}
       this.emit({query:result.name,resolvedTitleLanguage:result.target_language??undefined,titleState:'resolved'});
       try{validateSearchQuery(result.name);}catch(error){this.emit({phase:'needs-query',titleError:titleFailure(error,this.now())});return;}
-      this.beginSites(result.name.trim());
+      this.beginSites(result.name.trim(),siteKeys);
     }catch(error){if(this.disposed||generation!==this.generation)return;const failure=titleFailure(error,this.now());this.emit({phase:'needs-query',titleState:'error',titleError:failure,titleRetryAt:failure.retryAt});}
   }
   searchManual(value:string){
     if(this.noSites())return;
     let query:string;
     try{query=validateSearchQuery(value);}catch(error){this.emit({titleError:titleFailure(error,this.now())});return;}
-    this.prepare();this.emit({query,titleState:'manual'});this.beginSites(query);
+    this.prepare();this.emit({query,titleState:'manual'});this.beginSites(query,this.selected().map(state=>state.site.key));
   }
-  private beginSites(query:string){
+  private beginSites(query:string,siteKeys:readonly string[]){
     this.searchId=`${this.prefix}:${this.generation}`;
     this.emit({query,phase:'searching',searchedAt:this.now(),titleError:undefined});
-    for(const state of this.selected()){
-      const backoff=this.backoffs.get(state.site.key);
-      if(backoff?.retryAt&&backoff.retryAt>this.now())this.patchSite(state.site.key,{status:'error',error:backoff});
-      else this.enqueue(state.site.key,undefined);
+    for(const key of siteKeys){
+      const backoff=this.backoffs.get(key);
+      if(backoff?.retryAt&&backoff.retryAt>this.now())this.patchSite(key,{status:'error',error:backoff});
+      else this.enqueue(key,undefined);
     }
     this.pump();
   }
@@ -155,12 +168,12 @@ export class ComicSearchSession {
       }
     }
     const resultKeys=[...new Set([...this.current(job.key)!.resultKeys,...page.items.map(hit=>hit.key)])],resultCount=resultKeys.length;
-    this.emit({results:result});
+    this.emit({results:interleaveResults(result)});
     this.patchSite(job.key,{status:resultCount?'ready':'empty',resultCount,resultKeys,nextCursor:page.nextCursor,requestCursor:undefined,error:undefined});
   }
   retrySite(key:string){
     const state=this.current(key);
-    if(!state||!state.selected||!this.searchId||!this.snapshot.query||state.status==='running'||state.status==='queued'||state.error?.retryAt&&state.error.retryAt>this.now())return;
+    if(!state||state.status==='idle'||!this.searchId||!this.snapshot.query||state.status==='running'||state.status==='queued'||state.error?.retryAt&&state.error.retryAt>this.now())return;
     this.emit({phase:'searching'});this.enqueue(key,state.requestCursor);this.pump();
   }
   loadMore(key:string){

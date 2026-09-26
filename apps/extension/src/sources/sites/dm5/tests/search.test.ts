@@ -10,6 +10,7 @@ const html = (rows = card) => `<a id="btnSearch" href="${href(1)}">搜索</a><h1
   <div class="page-pagination pull-right"><a class="active" href="${href(1)}">1</a>${rows ? `<a href="${href(2)}">2</a>` : ''}</div>`;
 describe('DM5 search', () => {
   it('encodes keywords, preserves site identities, and does not invent content languages', () => {
+    expect(new URL(searchUrl(request).url).search).toBe('?title=%E6%B5%B7%20%26%20Love&page=1');
     expect(new URL(searchUrl(request).url).searchParams.get('title')).toBe(request.query);
     expect(new URL(searchUrl(request).url).searchParams.has('language')).toBe(false);
     const result = parseSearch(html(), request);
@@ -19,6 +20,14 @@ describe('DM5 search', () => {
     expect(result.nextCursor).toBe('page:2');
     expect(parseSearch(html(''), request)).toEqual({items: []});
     expect(parseSearch(html().replaceAll('&language=1', ''), request)).toEqual(result);
+  });
+  it('encodes spaces as %20 and literal plus/percent signs without changing the query or page', () => {
+    for(const query of ['One Piece','海 + Love','100% 漫画']){
+      const first=new URL(searchUrl({...request,query}).url),next=new URL(searchUrl({...request,query,cursor:'page:2'}).url);
+      expect(first.search).not.toContain('+');expect(first.search).toContain('%20');
+      expect(first.searchParams.get('title')).toBe(query);expect(next.searchParams.get('title')).toBe(query);
+      expect(next.searchParams.get('page')).toBe('2');
+    }
   });
   it('rejects foreign results, unrelated query/pagination, challenge pages and arbitrary cursors', () => {
     expect(() => parseSearch(html().replace('/manhua-sample/', 'https://evil.test/manhua-sample/'), request)).toThrow();

@@ -17,12 +17,13 @@ const requests=[];
 const context={request:async target=>{
   const url=new URL(target);
   assert(!url.searchParams.has('language'));
+  assert(!url.search.includes('+'),'DM5 queries must encode spaces as %20');
   requests.push({origin:url.origin,path:url.pathname});
   const response=await fetch(target,{signal:AbortSignal.timeout(15000)});
   assert(response.ok,'Public source HTTP '+response.status);
   return response.text();
 }};
-const cases=[{siteId:'dm5',query:'海贼王'}, {siteId:'dm5',query:'zzzznodelanesearchzzzz'}], results=[];
+const cases=[{siteId:'dm5',query:'海贼王'}, {siteId:'dm5',query:'One Piece'}, {siteId:'dm5',query:'海贼 王'}, {siteId:'dm5',query:'zzzznodelanesearchzzzz'}], results=[];
 for(const {empty,...query} of cases){
   const first=await network.search(query,context);
   assert(first.items.length<=50);

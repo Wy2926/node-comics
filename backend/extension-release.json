@@ -1,5 +1,5 @@
 {
-  "current": "0.4.0",
+  "current": "0.5.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -73,11 +73,27 @@
       "sha256": "2e7567251e5b4ac9d9f3d6b422988bfd02e7b79fd0f68adf36c9e21512647fa7",
       "bytes": 7537896,
       "path": "/downloads/node-comics-0.4.0-edge.zip"
+    },
+    {
+      "version": "0.5.0",
+      "browser": "chrome",
+      "filename": "node-comics-0.5.0-chrome.zip",
+      "sha256": "48228f1212f926e737daa6c4a566d8702e59fce841ad40151b7a6df6c9872a43",
+      "bytes": 7605229,
+      "path": "/downloads/node-comics-0.5.0-chrome.zip"
+    },
+    {
+      "version": "0.5.0",
+      "browser": "edge",
+      "filename": "node-comics-0.5.0-edge.zip",
+      "sha256": "f40ca3fe2567f84ceb45cdd27b963f425e9e7910698eb850a83812df74966cc7",
+      "bytes": 7605228,
+      "path": "/downloads/node-comics-0.5.0-edge.zip"
     }
   ],
   "current_by_browser": {
-    "chrome": "0.4.0",
-    "edge": "0.4.0",
+    "chrome": "0.5.0",
+    "edge": "0.5.0",
     "firefox": "0.3.0"
   }
 }

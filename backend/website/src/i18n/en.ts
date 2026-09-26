@@ -480,6 +480,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.5.0",
+        "date": "2026-09-26",
+        "title": "0.5.0: Find manga across languages and sites",
+        "items": [
+          "New dedicated manga search page, with search also available from the library, reader and webpage. Sign in to look up existing manga names in other languages, or enter a keyword manually.",
+          "Search multiple sites in parallel, with results appearing progressively and interleaved by source. Check each site’s status, retry failures, load more results and import a title to read.",
+          "Search language and site choices are remembered. Changing site selections keeps the current results. Search screens now share a consistent design and show site language labels.",
+          "Fixed DM5 search encoding for keywords containing spaces. Switching translation channels now refreshes only loaded chapters, reducing unnecessary reader updates.",
+          "Chrome and Edge 0.5.0 downloads are available. The Firefox download remains the AMO-signed 0.3.0; store versions depend on review completion."
+        ]
+      },
+      {
         "id": "0.4.0",
         "date": "2026-09-25",
         "title": "0.4.0: More manga sources, smoother reading",

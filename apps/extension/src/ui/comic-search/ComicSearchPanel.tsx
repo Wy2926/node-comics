@@ -6,6 +6,7 @@ import {fallbackLanguages,languageLabel} from '../../types';
 import {Thumbnail} from '../../reader/Images';
 import {listSearchSites,releaseSourceSearchSession,searchSource,type SourceSearchResult} from '../../sources';
 import {ComicSearchSession,comicSearchSourceKey} from '../../comics/application/search/session';
+import {readSearchSiteSelection,saveSearchSiteSelection} from '../../comics/application/preferences';
 import type {SearchSeed,SearchSiteState} from '../../comics/application/search/types';
 import {Select,SelectOption} from '../Select';
 import {LanguageFlag} from '../LanguageFlag';
@@ -42,7 +43,7 @@ function stateLabel(state:SearchSiteState){
 
 /** Two presentations share one search workflow. Keep mounted while hidden to retain local results. */
 export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLanguage,onClose,onLogin,onImportHit,existingSourceKeys,currentIdentity,onLanguageChange}:ComicSearchPanelProps){
-  const [session]=useState(()=>new ComicSearchSession(seed,{translateTitle:(name,language,signal)=>api.translateComicTitle(name,language,signal),listSites:listSearchSites,search:searchSource,release:releaseSourceSearchSession},defaultLanguage));
+  const [session]=useState(()=>new ComicSearchSession(seed,{translateTitle:(name,language,signal)=>api.translateComicTitle(name,language,signal),listSites:listSearchSites,search:searchSource,release:releaseSourceSearchSession},defaultLanguage,readSearchSiteSelection()));
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot);
   const dialog=useRef<HTMLDialogElement>(null),closeRef=useRef<HTMLButtonElement>(null),queryRef=useRef<HTMLInputElement>(null),sourceRef=useRef<HTMLInputElement>(null),scrollRef=useRef<HTMLDivElement>(null);
   const coverCache=useRef(new Map<string,string>()),titleId=useId(),queryId=useId(),sourceId=useId();
@@ -50,6 +51,13 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
   useEffect(()=>setQuery(snapshot.query),[snapshot.query]);
+  useEffect(()=>{
+    if(!open)return;
+    const restore=()=>{const saved=readSearchSiteSelection();for(const state of session.getSnapshot().sites)session.setSelected(state.site.key,saved[state.site.key]??true);};
+    const storageChanged=(event:StorageEvent)=>{if(event.key===null||event.key==='nc-search-sites')restore();};
+    restore();window.addEventListener('storage',storageChanged);
+    return()=>window.removeEventListener('storage',storageChanged);
+  },[open,session]);
   useEffect(()=>{const retained=new Set(snapshot.results.map(hit=>searchResultCoverKey(hit.coverHit??hit)));for(const [key,url] of coverCache.current)if(!retained.has(key)){URL.revokeObjectURL(url);coverCache.current.delete(key);}},[snapshot.results]);
   useEffect(()=>{if(!open)return;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);},[open]);
   useEffect(()=>()=>{session.dispose();coverCache.current.forEach(url=>URL.revokeObjectURL(url));coverCache.current.clear();},[session]);
@@ -68,11 +76,11 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   useEffect(()=>{setSiteFilter('');setImportErrors({});},[snapshot.requestedTitleLanguage,snapshot.sourceTitle]);
   if(!open)return null;
 
-  const selected=snapshot.sites.filter(state=>state.selected),filteredSite=selected.find(state=>state.site.key===siteFilter);
+  const selected=snapshot.sites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle'),filteredSite=resultSites.find(state=>state.site.key===siteFilter);
   const siteWait=waitSeconds(filteredSite?.error?.retryAt,clock),titleWait=waitSeconds(snapshot.titleRetryAt,clock);
   const siteBusy=filteredSite?.status==='running'||filteredSite?.status==='queued',siteRetry=filteredSite?.status==='error'||filteredSite?.status==='stopped';
-  const returned=selected.filter(state=>state.status==='ready'||state.status==='empty').length,failed=selected.filter(state=>state.status==='error').length;
-  const permissionError=selected.find(state=>state.error?.kind==='permission')?.error;
+  const returned=resultSites.filter(state=>state.status==='ready'||state.status==='empty').length,failed=resultSites.filter(state=>state.status==='error').length;
+  const permissionError=resultSites.find(state=>state.error?.kind==='permission')?.error;
   const active=snapshot.phase==='searching'||snapshot.phase==='resolving-name',translating=mode==='translate';
   const results=snapshot.results.filter(hit=>!filteredSite||filteredSite.resultKeys.includes(hit.key));
   const showResolved=translating&&(snapshot.titleState==='resolved'||snapshot.titleState==='missing'||snapshot.titleState==='error'||snapshot.titleState==='manual');
@@ -123,15 +131,15 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
         </div>
         <aside className="nc-search-sites" aria-label={msg('搜索范围')}>
           <div className="nc-search-sites-heading"><h2>{msg('搜索范围')}</h2><span>{msg('已选 {0} 个网站',{'0':selected.length})}</span></div>
-          <div className="nc-search-site-options">{snapshot.sites.map(state=><label className="nc-search-site-option" key={state.site.key}><input type="checkbox" checked={state.selected} disabled={!!importing} onChange={event=>{setReopened(false);setSiteFilter('');session.setSelected(state.site.key,event.target.checked);}}/><SearchSiteIcon icon={state.site.icon}/><b title={state.site.name}>{state.site.name}</b></label>)}</div>
+          <div className="nc-search-site-options">{snapshot.sites.map(state=><label className="nc-search-site-option" key={state.site.key}><input type="checkbox" checked={state.selected} disabled={!!importing} onChange={event=>{session.setSelected(state.site.key,event.target.checked);saveSearchSiteSelection(state.site.key,event.target.checked);}}/><SearchSiteIcon icon={state.site.icon}/><b title={state.site.name}>{state.site.name}</b></label>)}</div>
           <p>{msg('各网站仅按搜索名称查询，不按内容语言筛选。')}</p>
           {!selected.length&&<p className="nc-search-notice" role="status">{msg('请先选择至少一个可搜索的网站。')}</p>}
           {permissionError&&<p className="nc-search-notice" role="alert">{permissionError.message}</p>}
         </aside>
       </section>
       {snapshot.searchedAt?<section className="nc-search-results">
-        <div className="nc-search-result-heading"><h2>{msg('搜索结果')}</h2><div className="nc-search-progress" role="status"><span title={reopened?msg('上次查找：{0}',{'0':formatDate(snapshot.searchedAt,true)}):undefined}>{snapshot.phase==='stopped'?msg('已停止'):msg('{0}/{1} 个网站已返回',{'0':returned,'1':selected.length})}</span>{failed>0&&<span className="nc-search-failed-count">{msg('{0} 个网站失败',{'0':failed})}</span>}<span className="nc-search-candidate-count">{msg('{0} 个候选',{'0':results.length})}</span>{active&&<button className="nc-search-text-button" onClick={()=>session.stop()}>{msg('停止查找')}</button>}</div></div>
-        <div className="nc-search-status-list">{selected.map(state=><button type="button" key={state.site.key} className={'nc-search-status is-'+state.status} aria-pressed={filteredSite?.site.key===state.site.key} title={state.site.name+' · '+msg('查看此网站结果')} onClick={()=>setSiteFilter(value=>value===state.site.key?'':state.site.key)}><SearchSiteIcon icon={state.site.icon}/><b>{state.site.name}</b><span className="nc-search-site-state"><i className="nc-search-status-dot"/>{stateLabel(state)}</span></button>)}</div>
+        <div className="nc-search-result-heading"><h2>{msg('搜索结果')}</h2><div className="nc-search-progress" role="status"><span title={reopened?msg('上次查找：{0}',{'0':formatDate(snapshot.searchedAt,true)}):undefined}>{snapshot.phase==='stopped'?msg('已停止'):msg('{0}/{1} 个网站已返回',{'0':returned,'1':resultSites.length})}</span>{failed>0&&<span className="nc-search-failed-count">{msg('{0} 个网站失败',{'0':failed})}</span>}<span className="nc-search-candidate-count">{msg('{0} 个候选',{'0':results.length})}</span>{active&&<button className="nc-search-text-button" onClick={()=>session.stop()}>{msg('停止查找')}</button>}</div></div>
+        <div className="nc-search-status-list">{resultSites.map(state=><button type="button" key={state.site.key} className={'nc-search-status is-'+state.status} aria-pressed={filteredSite?.site.key===state.site.key} title={state.site.name+' · '+msg('查看此网站结果')} onClick={()=>setSiteFilter(value=>value===state.site.key?'':state.site.key)}><SearchSiteIcon icon={state.site.icon}/><b>{state.site.name}</b><span className="nc-search-site-state"><i className="nc-search-status-dot"/>{stateLabel(state)}</span></button>)}</div>
         {filteredSite&&<section className={'nc-search-status-detail is-'+filteredSite.status} aria-label={filteredSite.site.name}>
           <div className="nc-search-detail-summary"><SearchSiteIcon icon={filteredSite.site.icon}/><div className="nc-search-detail-copy" aria-live="polite">
             <div className="nc-search-detail-title"><h3>{filteredSite.site.name}</h3><span className="nc-search-detail-state">{stateLabel(filteredSite)}</span></div>

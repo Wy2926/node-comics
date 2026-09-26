@@ -19,6 +19,7 @@ export interface SearchCandidate extends SourceSearchResult {
 }
 export interface SearchSiteState {
   site:SourceSearchSite;
+  /** Scope for the next search; does not remove this round's results or requests. */
   selected:boolean;
   status:SearchSiteStatus;
   resultCount:number;
