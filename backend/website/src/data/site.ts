@@ -9,6 +9,7 @@ export const site = {
   name: 'NodeLane Comics',
   url: 'https://comics.nodelane.net',
   email: 'comics@nodelane.net',
+  github: 'https://github.com/Wy2926/node-comics',
   language: 'zh-CN',
   updated: '2026-09-20',
   extensionPackages,

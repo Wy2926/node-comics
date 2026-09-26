@@ -80,7 +80,7 @@ const graph = [
         <div><a class="brand" href={href('/')}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={220} format="webp" loading="lazy" /></a><p>{t.footerStory}</p><a class="email" href={`mailto:${site.email}`}>{site.email} ↗</a></div>
         <div><strong>{t.startReading}</strong><a href={href('/features/')}>{t.features}</a><a href={href('/download/')}>{t.download}</a><a href={href('/pricing/')}>{t.pricing}</a><a href={href('/account/')}>{t.account}</a></div>
         <div><strong>{t.support}</strong><a href={href('/guides/')}>{t.guides}</a><a href={href('/faq/')}>{t.faq}</a><a href={href('/help/')}>{t.help}</a><a href={href('/changelog/')}>{t.changelog}</a></div>
-        <div><strong>{t.company}</strong><a href={href('/about/')}>{t.about}</a><a href={href('/privacy/')}>{t.privacy}</a><a href={href('/terms/')}>{t.terms}</a><a href={href('/refund/')}>{t.refund}</a></div>
+        <div><strong>{t.company}</strong><a href={href('/about/')}>{t.about}</a><a href={site.github} target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a><a href={href('/privacy/')}>{t.privacy}</a><a href={href('/terms/')}>{t.terms}</a><a href={href('/refund/')}>{t.refund}</a></div>
       </div>
       <div class="container footer-bottom"><span>© {new Date().getFullYear()} {t.brandName}. {t.copyright}</span><span>{t.artNote}</span><a href={href('/feed.xml')}>RSS ↗</a></div>
     </footer>
