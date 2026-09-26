@@ -1,12 +1,18 @@
-import {useState,type HTMLAttributes,type MouseEvent} from 'react';
+import {useEffect,useState,type HTMLAttributes,type MouseEvent} from 'react';
 import {formatDate,msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
-import {coverReference,type Comic} from '../comics/application/library-service';
+import {coverReference,shelfReadingProgress,type Comic} from '../comics/application/library-service';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
 export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
  const lastRead=comic.lastReadAt&&Number.isFinite(comic.lastReadAt)?comic.lastReadAt:undefined;
+ const [progress,setProgress]=useState(0);
+ useEffect(()=>{
+  let active=true;
+  void shelfReadingProgress(comic).then(value=>{if(active)setProgress(value);}).catch(()=>{if(active)setProgress(0);});
+  return()=>{active=false;};
+ },[comic]);
  const coverKey=coverReference(comic),[coverFailure,setCoverFailure]=useState<{key:string;error:unknown}>(),[retry,setRetry]=useState(0);
  const failedCover=coverFailure?.key===coverKey?coverFailure:undefined;
  const retryLabel=msg('重试');
@@ -18,6 +24,7 @@ export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOp
    <span className="nc-card-source">{comic.sourceName}</span>
    <span className="nc-card-reading-time"><Icon name="clock" size={14}/>{lastRead?<time dateTime={new Date(lastRead).toISOString()} title={formatDate(lastRead,true)}>{formatDate(lastRead,true)}</time>:<span>{msg('还没阅读')}</span>}</span>
   </button>
+  <div className="nc-card-progress" role="progressbar" aria-label={msg('阅读进度')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} title={`${msg('阅读进度')} · ${Math.round(progress)}%`}><span style={{width:`${progress}%`}}/></div>
   {failedCover&&!selection&&<button className="button secondary small nc-cover-retry" onClick={retryCover}
    aria-label={msg('{0}封面',{'0':comic.title})+' · '+retryLabel}
    title={failedCover.error instanceof Error?failedCover.error.message:msg('图片暂不可用')}>{retryLabel}</button>}

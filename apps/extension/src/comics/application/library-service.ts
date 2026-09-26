@@ -20,6 +20,16 @@ type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs
 const savedPages=new WeakMap<Page,string>();
 const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
+/** Match directory chapter grouping without loading page descriptors or image data. */
+export async function shelfReadingProgress(comic:Comic):Promise<number> {
+  if(!comic.lastReadAt||!comic.lastEntryId)return 0;
+  const slots=readingSlots(await catalog.listEntries(comic.id));
+  const current=slots.findIndex(slot=>slot.entries.some(entry=>entry.id===comic.lastEntryId));
+  if(current<0)return 0;
+  const fraction=slots.length>1?(current+1)/slots.length
+    :comic.lastPageCount&&comic.lastPage?comic.lastPage/comic.lastPageCount:0;
+  return Number.isFinite(fraction)?Math.max(0,Math.min(100,fraction*100)):0;
+}
 export async function continueEntry(comicId:string,targetLanguage?:string):Promise<Entry|undefined> {
   const comic=await catalog.get('comics',comicId);if(!comic)return;
   const [allEntries,preferences]=await Promise.all([catalog.listEntries(comicId),readReadingPreferences(comic)]);

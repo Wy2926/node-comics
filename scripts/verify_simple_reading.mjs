@@ -46,6 +46,11 @@ try{
  checks.push('单本自动开始阅读，新库只有单来源漫画与只读条目，120 页仅完整容器和索引');await screenshot('reading');
  await jump(100);await rendered(99);assert(await page.locator('.nc-manga-page').count()<=11);await screenshot('page-100');await shelf();
  await page.locator('.nc-card-reading-time time').waitFor();value=await state();assert.equal(value.positions[0].pageId,value.pages.find(p=>p.ordinal===99).pageId);assert(value.materials.length<20);assert.equal(await page.locator('.nc-cover-reading').count(),0);checks.push('跳第 100 页、有限图片窗口，书架保存阅读位置但不显示页数标签');
+ const progress=page.getByRole('progressbar',{name:'阅读进度'});await progress.waitFor();
+ await page.waitForFunction(()=>document.querySelector('.nc-card-progress')?.getAttribute('aria-valuenow')==='83');
+ const progressPlacement=await progress.evaluate(bar=>{const cover=bar.previousElementSibling.getBoundingClientRect(),rect=bar.getBoundingClientRect();return {gap:rect.top-cover.bottom,width:rect.width,coverWidth:cover.width};});
+ assert(Math.abs(progressPlacement.gap)<1);assert(Math.abs(progressPlacement.width-progressPlacement.coverWidth)<1);
+ await screenshot('shelf-reading-progress');checks.push('单话第 100 / 120 页显示 83% 进度条，位于封面下方且等宽');
  await closeResult();await context.close();context=await chromium.launchPersistentContext(profile,options);await boot();await page.getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(99);checks.push('真实关闭并重启浏览器，直接恢复第 100 页');await screenshot('resumed');await shelf();
  await importFile('另一个名字.cbz',archive);await rendered(99);assert.equal((await state()).comics.length,1);checks.push('相同文件改名重导入复用同一本，保留进度');await shelf();await closeResult();
  await page.locator('input[type=file]').setInputFiles([{name:'散图.png',mimeType:'image/png',buffer:sample},{name:'第二张.jpg',mimeType:'image/jpeg',buffer:sample},{name:'第二本.cbz',mimeType:'application/zip',buffer:await readFile(path.join(root,'artifacts/import-validation/pages.cbz'))}]);
