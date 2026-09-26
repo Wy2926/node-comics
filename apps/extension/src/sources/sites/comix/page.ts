@@ -3,6 +3,7 @@ import {canvasImage} from '../../shared/canvas';
 import {renderedImages} from '../../shared/dom-images';
 import {MAX_COMIC_IMAGES} from '../../shared/geometry';
 import {imageSession} from '../../shared/session';
+import {comixLocation} from './definition';
 
 const catalogAnchor = '.mpage__actions';
 const readerAnchor = '.rpage-floatctl';
@@ -74,6 +75,18 @@ export const createPage: CreateSourcePage = context => {
   });
   return {
     ...session,
+    describeWork() {
+      const catalog=context.location.catalog,loc=comixLocation(new URL(context.location.url));
+      if(context.location.kind!=='catalog'||!catalog||!loc)return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      try{
+        const initial=JSON.parse(context.document.querySelector('#initial-data')?.textContent??'');
+        const work=initial?.queries?.[JSON.stringify(['manga','detail',loc.hid])];
+        const found=typeof work?.url==='string'?comixLocation(new URL(work.url,'https://comix.to')):null;
+        if(work?.hid!==loc.hid||!found||found.hid!==loc.hid||found.chapterId||typeof work.title!=='string'||!work.title.trim())
+          return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+        return {status:'ready',value:{title:work.title.trim(),catalogId:catalog.key,catalogUrl:catalog.url}};
+      }catch{return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};}
+    },
     direction: 'ltr',
     async discoverPages() { session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'}; },
     observe(changed) {

@@ -15,6 +15,8 @@ export function mountSourceImportButton(parent: Element) {
   const disconnectTheme = connectInlineTheme(surface);
   const button = document.createElement('button');
   button.type = 'button';
+  const searchButton=document.createElement('button');
+  searchButton.type='button';searchButton.className='search';
   const status = document.createElement('span');
   status.className = 'status';
   status.id = 'import-status';
@@ -22,9 +24,11 @@ export function mountSourceImportButton(parent: Element) {
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
   button.setAttribute('aria-describedby', status.id);
+  searchButton.setAttribute('aria-describedby',status.id);
   const resetLabel = () => {
     button.textContent = 'NodeLane Comics · '+msg('导入/管理漫画');
     button.setAttribute('aria-label', button.textContent);
+    searchButton.textContent=msg('寻找其他语言');
     status.textContent = '';
   };
   resetLabel();
@@ -34,6 +38,7 @@ export function mountSourceImportButton(parent: Element) {
     status.textContent = message;
   };
   button.onclick = () => {
+    if(button.disabled||searchButton.disabled)return;
     resetLabel();
     button.disabled = true;
     button.setAttribute('aria-busy', 'true');
@@ -49,7 +54,14 @@ export function mountSourceImportButton(parent: Element) {
         button.removeAttribute('aria-busy');
       });
   };
-  surface.append(button, status);
+  searchButton.onclick=()=>{
+    if(button.disabled||searchButton.disabled)return;
+    resetLabel();searchButton.disabled=true;searchButton.setAttribute('aria-busy','true');
+    void chrome.runtime.sendMessage({type:'NC_SEARCH_CURRENT'}).then(response=>{
+      if(!response?.ok)status.textContent=typeof response?.error==='string'?response.error:msg('请通过插件弹窗重试');
+    }).catch(()=>{status.textContent=msg('请通过插件弹窗重试');}).finally(()=>{searchButton.disabled=false;searchButton.removeAttribute('aria-busy');});
+  };
+  surface.append(button, searchButton, status);
   shadow.append(style, surface);
   parent.append(host);
   return () => {

@@ -4,6 +4,7 @@ import {sourceCover} from '../../shared/cover';
 import {catalogUrl, chapterUrl, guaziLocation, origin} from './definition';
 import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
 import {object, one, structuredData, text} from './html';
+import {search} from './search';
 
 function location(url: string) {
   const loc = guaziLocation(new URL(url));
@@ -102,6 +103,7 @@ async function request(url: string, context: SourceNetworkContext) {
   return html;
 }
 export const network = {
+  search,
   async catalog(url, context) {
     const loc = location(url);
     if (!loc.comicId || loc.chapterId) throw Error('请使用瓜子漫画作品详情页链接。');

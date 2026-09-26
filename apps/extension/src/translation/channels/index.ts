@@ -1,4 +1,5 @@
 import {msg} from '../../i18n/runtime';
+import {requireHostAccess} from '../../host-permissions';
 import {channelDefinition,channelDefinitions} from './registry';
 import {channelSettingsKey,defaultChannel,deleteChannelSecrets,readChannelSecrets,readChannelSettings,subscribeChannelSettings,writeChannelSecrets,updateChannelSettings} from './configuration';
 import type {ChannelConnection,ChannelConnectionInput,ChannelProfile} from './contracts';
@@ -12,8 +13,7 @@ export async function removeChannel(id:string){if(id===defaultChannel.id)throw E
 export async function connectChannel(adapterId:string,name:string,input:ChannelConnectionInput,id?:string):Promise<ChannelProfile>{
   const definition=channelDefinition(adapterId);if(!definition.configurable||!definition.connect)throw Error(msg('此渠道无需配置'));
   const origins=definition.permissionOrigins?.(input)??[];
-  // Called directly from the Save/Connect click so optional permission has user activation.
-  if(origins.length&&typeof chrome!=='undefined'&&chrome.permissions&&!(await chrome.permissions.request({origins})))throw Error(msg('未获得翻译服务的访问权限'));
+  if(origins.length)await requireHostAccess(origins);
   const connected=await definition.connect(input);let profile!:ChannelProfile;
   await updateChannelSettings(async value=>{
     const previous=id?value.profiles.find(p=>p.id===id):undefined;

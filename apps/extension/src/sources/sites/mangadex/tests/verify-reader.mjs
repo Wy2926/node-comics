@@ -1,4 +1,4 @@
-// Isolated, preauthorized MV3 reader. Never opens a MangaDex website tab.
+// Isolated MV3 reader using the built manifest host access. Never opens a MangaDex website tab.
 // Default: synthetic API/images. RUN_LIVE_MANGADEX=1: public API and image hosts.
 import {createRequire} from 'node:module';
 import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
@@ -11,12 +11,10 @@ await mkdir(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const extension=await mkdtemp(path.join(out,'extension-')),profile=await mkdtemp(path.join(out,'profile-'));
 await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
-const installation=JSON.parse(await readFile(path.join(root,'apps/extension/src/sources/sites/mangadex/installation.json'),'utf8'));
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
-assert.deepEqual(installation.requiredOrigins,[]);
-for(const origin of installation.optionalOrigins)assert(manifest.optional_host_permissions.includes(origin)||manifest.optional_host_permissions.includes('https://*/*'));
-manifest.host_permissions=[...new Set([...manifest.host_permissions,...installation.optionalOrigins])];
-await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
+assert(manifest.host_permissions?.includes('http://*/*'));
+assert(manifest.host_permissions?.includes('https://*/*'));
+assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const source=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=path.join(extension,'probe.js');
 await writeFile(probe,`export {catalog} from '${source}/comics/repositories/index.ts';
 export {readWebsiteCatalog} from '${source}/comics/application/website-catalog.ts';

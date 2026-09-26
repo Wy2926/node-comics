@@ -77,7 +77,7 @@ beforeEach(() => {
     storage: {local: storage(local), session: storage(session), onChanged: event()},
     alarms: {get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:event()},
     contextMenus: {onClicked: event(), update: vi.fn(async () => {})},
-    permissions: {onRemoved: event(), contains: vi.fn(async () => false)},
+    permissions: {onRemoved: event(), contains: vi.fn(async () => false), request: vi.fn(async () => true)},
     scripting: {executeScript: vi.fn(async () => [])},
     windows: {
       create: async ({url}:{url:string}) => {const tab={id:7,url};tabs.set(tab.id,tab);return {id:1,tabs:[tab]};},
@@ -99,13 +99,8 @@ beforeEach(() => {
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
 describe('production background listeners share the runtime message channel', () => {
-  it('requests menu permission during the click and starts a manual session with automatic tabs disabled', async () => {
-    let clicking = true;
-    const request = vi.fn(() => {
-      if (!clicking) throw Error('Permission request lost its user gesture');
-      return Promise.resolve(true);
-    });
-    Object.assign(chrome.permissions, {request});
+  it('uses installed host access without a prompt and starts a manual session with automatic tabs disabled', async () => {
+    vi.mocked(chrome.permissions.contains).mockImplementation(async()=>true);
     vi.stubGlobal('navigator', {locks: {request: async (_name:string, run:()=>Promise<unknown>) => run()}});
     const tab = {id: 42, url: 'https://example.test/comic'};
     tabs.set(tab.id, tab);
@@ -114,22 +109,22 @@ describe('production background listeners share the runtime message channel', ()
       ? {url:tab.url,navigationId:'navigation-42'} : {ok:true});
     const click = vi.mocked(chrome.contextMenus.onClicked.addListener).mock.calls[0][0];
     const pending = click({menuItemId:'nc-translate-page',editable:false},tab as chrome.tabs.Tab);
-    clicking = false;
-    expect(request).toHaveBeenCalledExactlyOnceWith({origins:['https://*/*','http://*/*']});
     await pending;
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+    expect(chrome.permissions.contains).toHaveBeenCalledWith({origins:['https://*/*','http://*/*']});
     expect(session['nc-inline:42']).toMatchObject({url:tab.url,automatic:false,navigationId:'navigation-42'});
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(42,{type:'NC_INLINE_START',automatic:false},expect.anything());
     expect(local['nc-reader-settings']).toMatchObject({autoTranslateTabs:false});
   });
 
-  it.each(['denied','rejected'])('handles %s menu permission without starting translation', async outcome => {
-    Object.assign(chrome.permissions, {request:vi.fn(() => outcome === 'denied'
-      ? Promise.resolve(false) : Promise.reject(Error('Permission request failed')))});
+  it.each(['revoked','rejected'])('handles %s host access without prompting or starting translation', async outcome => {
+    vi.mocked(chrome.permissions.contains).mockImplementation(async()=>{if(outcome==='rejected')throw Error('Permission check failed');return false;});
     const click = vi.mocked(chrome.contextMenus.onClicked.addListener).mock.calls[0][0];
     await click({menuItemId:'nc-translate-page',editable:false},{id:42} as chrome.tabs.Tab);
     expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
     expect(session['nc-inline:42']).toBeUndefined();
-    expect(tabs.get(7)?.url).toBe(outcome==='rejected' ? `chrome-extension://${extensionId}/reader.html#settings` : undefined);
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+    expect(tabs.get(7)?.url).toBe(`chrome-extension://${extensionId}/reader.html#settings`);
   });
 
   it('keeps the whole Drive connection, selection, token and disconnect flow out of source routing', async () => {

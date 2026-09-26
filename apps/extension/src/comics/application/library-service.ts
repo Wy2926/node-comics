@@ -14,7 +14,7 @@ import {sourceCoverOwner} from './cover-access';
 import type {TranslationScope} from '../../translation/channels/contracts';
 import {readReadingPreferences, readingSelectionKey, readingSlots, chooseReadingEntry, resolveReadingSequence, entryReadable, entryRetained, sourceOrder} from './reading-preferences';
 export {coverReference} from './cover-access';
-export {selectReadingEntry} from './reading-preferences';
+export {selectReadingEntry,setSourceLanguagePreference} from './reading-preferences';
 
 type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
 const savedPages=new WeakMap<Page,string>();
@@ -69,7 +69,7 @@ export async function loadEntry(id:string,scope?:TranslationScope):Promise<Readi
 export interface DirectoryEntry {id:string;title:string;tags:string[];current:boolean;read:boolean;readable:boolean;total?:number;status:string;error?:string;contentLanguage?:string;sourceRemoved?:boolean}
 export interface DirectoryGroup {id:string;title:string;entryIds:string[];parentId?:string}
 export interface DirectoryChapter {id:string;title:string;entryIds:string[];selectedEntryId:string;groupIds:string[];current:boolean;readable:boolean}
-export interface ReadingDirectory {comicId?:string;title:string;entries:DirectoryEntry[];chapters:DirectoryChapter[];groups:DirectoryGroup[];sourceUrl?:string;related?:{id:string;title:string;url:string}[]}
+export interface ReadingDirectory {comicId?:string;title:string;entries:DirectoryEntry[];chapters:DirectoryChapter[];groups:DirectoryGroup[];sourceUrl?:string;sourceLanguagePreference?:string;related?:{id:string;title:string;url:string}[]}
 export async function comicDirectory(comicId:string,currentId?:string,targetLanguage?:string):Promise<ReadingDirectory> {
   const comic=await catalog.get('comics',comicId);if(!comic)throw Error('漫画已移除。');
   const slots=readingSlots(await catalog.listEntries(comicId)).map(slot=>{
@@ -88,7 +88,7 @@ export async function comicDirectory(comicId:string,currentId?:string,targetLang
     return {id:slot.id,title:selected.title,entryIds:slot.entries.map(entry=>entry.id),selectedEntryId:selected.id,
       groupIds:[...new Set(slot.entries.flatMap(entry=>sourceEntries.get(entry.sourceEntryId??'')?.groupIds??[]))],current:!!current,readable:available(selected)};
   });
-  return {comicId,title:comic.title,sourceUrl:comic.sourceUrl,groups,chapters,
+  return {comicId,title:comic.title,sourceUrl:comic.sourceUrl,sourceLanguagePreference:preferences.sourceLanguagePreference,groups,chapters,
     related:source?.entries.filter(entry=>entry.related).map(({id,title,url})=>({id,title,url})),entries:entries.map(entry=>({id:entry.id,title:entry.title,tags:sourceEntries.get(entry.sourceEntryId??'')?.rawTypes??[],current:entry.id===currentId,read:!!entry.readAt,readable:available(entry),total:entry.knownTotal??entry.pageCount,
       contentLanguage:entry.contentLanguage,sourceRemoved:entry.sourceRemoved,
       status:!available(entry)?'该话暂无可读内容。':entry.sourceRemoved?'源站已移除':entry.error??(entry.indexState==='ready'?'可以阅读':'按需载入'),error:!available(entry)?'该话暂无可读内容。':entry.error}))};

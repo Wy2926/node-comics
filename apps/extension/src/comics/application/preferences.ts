@@ -18,3 +18,11 @@ export async function saveSettings(value: Settings) {
   await mirrorReader({settings:known(value)});
   if(typeof chrome!=='undefined'&&chrome.storage?.local)await chrome.storage.local.set({preferences:{language:value.language,direction:value.direction,layout:value.layout,fit:value.fit}});
 }
+
+/** Search preference does not change image translation or persisted reading choices. */
+export function readSearchLanguage(fallback:string):string {
+  try{const saved=localStorage.getItem('nc-search-language');return saved?new Intl.Locale(saved).baseName:fallback;}catch{return fallback;}
+}
+export function saveSearchLanguage(language:string) {
+  try{localStorage.setItem('nc-search-language',new Intl.Locale(language).baseName);}catch{/* Preference storage is optional. */}
+}

@@ -1,6 +1,5 @@
 import { defineConfig } from 'wxt';
 import { importAssets } from './import-assets';
-import { sourceInstallation } from './source-installation';
 import { writeStoreLocales } from './store-locales';
 import { unrarCsp } from './unrar-csp';
 import { extensionIdentity } from './extension-identity';
@@ -8,7 +7,6 @@ writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
-  // WXT loads .env files after importing this config; resolve permissions afterwards.
   manifest: ({browser}) => ({
     ...(browser === 'firefox' ? {browser_specific_settings: {
       gecko: {
@@ -26,10 +24,7 @@ export default defineConfig({
     default_locale: 'en', short_name: 'NodeLane', homepage_url: 'https://comics.nodelane.net/',
     icons: {16:'brand/icon-16.png',32:'brand/icon-32.png',48:'brand/icon-48.png',128:'brand/icon-128.png'},
     permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity', 'alarms', 'declarativeNetRequestWithHostAccess', 'webRequest'],
-    optional_host_permissions: ['https://*/*', 'http://*/*'],
-    host_permissions: ['https://*.nodelane.net/*',...sourceInstallation.requiredOrigins,
-      ...(process.env.VITE_DRIVE_CONNECT_URL ? ['https://www.googleapis.com/*', new URL(process.env.VITE_DRIVE_CONNECT_URL).origin+'/*'] : []),
-      ...(process.env.VITE_API_BASE ? [new URL(process.env.VITE_API_BASE).origin+'/*'] : [])],
+    host_permissions: ['https://*/*', 'http://*/*'],
     action: { default_title: '__MSG_actionTitle__', default_icon: {16:'brand/icon-16.png',24:'brand/icon-24.png',32:'brand/icon-32.png'} },
     content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';" },
   }),

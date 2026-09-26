@@ -3,6 +3,7 @@ import type { CreateSourcePage, PageImage } from '../../contracts/page';
 import { canvasImage } from '../../shared/canvas';
 import { MAX_COMIC_IMAGES } from '../../shared/geometry';
 import { imageSession } from '../../shared/session';
+import {comicpashLocation} from './definition';
 
 const pageSelector = '#comici-viewer #xCVPages > .-cv-page:not(.mode-empty)';
 const pageElements = (doc: Document) =>
@@ -112,6 +113,15 @@ export const createPage: CreateSourcePage = (context) => {
   });
   return {
     ...session,
+    describeWork() {
+      const catalog=context.location.catalog,doc=context.document;
+      if(context.location.kind!=='catalog'||!catalog)return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      const canonical=doc.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href;
+      const title=doc.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
+      if(!canonical||comicpashLocation(new URL(canonical))?.seriesId!==comicpashLocation(new URL(catalog.url))?.seriesId||!title)
+        return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      return {status:'ready',value:{title,catalogId:catalog.key,catalogUrl:catalog.url}};
+    },
     // Full import uses HTTP; the snapshot above describes only the currently rendered inline window.
     async discoverPages() { session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'}; },
     importAnchor() {

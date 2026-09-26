@@ -32,7 +32,7 @@ beforeEach(()=>{
   vi.resetModules();protocol.connect.mockReset().mockImplementation(async(value:ChannelConnectionInput)=>result(value));protocol.open.mockReset();
   vi.stubGlobal('indexedDB',new IDBFactory());vi.stubGlobal('IDBKeyRange',IDBKeyRange);
   metadata={};changes=new Set();permission=vi.fn(async()=>true);installLocks(true);
-  vi.stubGlobal('chrome',{permissions:{request:permission},storage:{local:{
+  vi.stubGlobal('chrome',{runtime:{id:'test-extension'},permissions:{contains:permission,request:vi.fn(async()=>true)},storage:{local:{
     get:vi.fn(async(key:string)=>({[key]:structuredClone(metadata[key])})),
     set:vi.fn(async(values:Record<string,unknown>)=>{
       const event:Record<string,unknown>={};
@@ -93,10 +93,11 @@ describe('channel configuration and connection',()=>{
     pending.resolve(result(input(undefined,'late-password')));await expect(reconnect).rejects.toThrow('已移除');
     expect((await listChannels()).profiles.map(item=>item.id)).toEqual(['nodelane']);expect(await readChannelSecrets(profile.id)).toEqual({});
   });
-  it('does not log in or save a profile when host permission is denied',async()=>{
+  it('does not prompt, log in or save a profile when browser host access is revoked',async()=>{
     permission.mockResolvedValue(false);const {connectChannel,listChannels}=await import('../src/translation/channels');
     await expect(connectChannel('fixture','Denied',input())).rejects.toThrow('访问权限');
     expect(permission).toHaveBeenCalledWith({origins:['http://127.0.0.1:8000/*']});expect(protocol.connect).not.toHaveBeenCalled();
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect((await listChannels()).profiles.map(profile=>profile.id)).toEqual(['nodelane']);expect(metadata).toEqual({});
   });
 });

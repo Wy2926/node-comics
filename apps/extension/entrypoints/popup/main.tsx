@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initializeUiLanguage } from '../../src/i18n/load';
 import { msg } from '../../src/i18n/runtime';
+import { requireHostAccess } from '../../src/host-permissions';
 import { Icon } from '../../src/icons';
 import { connectReaderSettings } from '../../src/inline/settings';
 import { saveSettings, settings } from '../../src/comics/application/preferences';
@@ -28,9 +29,17 @@ function Popup({initialError=''}:{initialError?:string}){
  const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
  async function readSource(){
   if(!source?.url||!importable||disabled)return;lock.current=true;setBusy(true);setDiscoveryError('');
-  try{if(!await chrome.permissions.request({origins:[...new Set([new URL(source.url).origin+'/*',...(resolved?.definition.installation.optionalOrigins??[])])]}))throw Error(msg('未取得本站权限，可再次授权后发现。'));
+  try{await requireHostAccess();
    const discovered=await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:source.id});
    await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
+  }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
+ }
+ async function findComic(){
+  if(!source?.url||source.id==null||!importable||disabled)return;
+  lock.current=true;setBusy(true);setDiscoveryError('');
+  try{
+   await requireHostAccess();
+   await sourceMessage({type:'NC_SEARCH_TAB',tabId:source.id,url:source.url});window.close();
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{
@@ -52,8 +61,7 @@ function Popup({initialError=''}:{initialError?:string}){
   if(source?.id==null||lock.current||openLock.current||saveLock.current)return;
   openLock.current=true;setTranslating(true);setError('');
   try{
-   // Keep permission acquisition inside the click gesture, matching the context menu.
-   if(!await chrome.permissions.request({origins:['https://*/*','http://*/*']}))throw Error(msg("未获得网页与图片访问权限，可再次点击翻译并授权。"));
+   await requireHostAccess();
    await saveSettings(settings());
    await sourceMessage({type:'NC_TRANSLATE_TAB',tabId:source.id,url:source.url});window.close();
   }catch(e){setError((e as Error).message);}
@@ -78,6 +86,7 @@ function Popup({initialError=''}:{initialError?:string}){
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
    <section className="nc-popup-import" aria-label={msg('漫画阅读')}>
+    {importable&&<button className="button secondary full" disabled={disabled} onClick={()=>void findComic()}><Icon name="globe"/>{msg('寻找其他语言')}</button>}
     {importable?<button className="button secondary full" disabled={disabled} onClick={()=>void readSource()}><Icon name="book"/>{busy?msg('正在打开漫画'):msg('开始阅读')}</button>:<p className="nc-popup-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
     {discoveryError&&<div className="nc-popup-error" role="alert">{discoveryError}</div>}
    </section>

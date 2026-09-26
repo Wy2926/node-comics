@@ -2,6 +2,8 @@
 
 支持 `https://comic.naver.com/` 的 `webtoon`、`bestChallenge`、`challenge`：`list?titleId=...` 与 `detail?titleId=...&no=...`。提供 HTTP 导入、完整公开目录、12 小时更新、封面和原位翻译。
 
+作品页可作为跨语言查找起点：`describeWork` 核对移动版 canonical 的分类／作品ID，再读取 `og:title`；章节页没有可靠作品名则手填。本站未声明目标搜索能力。
+
 ## 实现约定
 
 - 作品信息使用 `/api/article/list/info`，目录使用 `/api/article/list` 的 ASC 分页；核对分类、作品、页码、总数和唯一话 ID，结束后复查第一页。分类分别命名空间，不推断晋级后的来源等价。
@@ -21,4 +23,4 @@ node apps/extension/src/sources/sites/naver/tests/verify-browser.mjs
 node apps/extension/src/sources/sites/naver/tests/verify-import-navigation.mjs
 ```
 
-前者访问公开作品；后者使用合成页面检查 SPA 首次导入、失败与恢复。原位回归设置 `INLINE_SITE_ONLY=naver` 后运行 `verify_inline_translation.mjs`。预授权与模拟译图不代替原生权限、受限内容或模型效果验收。
+前者访问公开作品；后者使用合成页面检查 SPA 首次导入、失败与恢复。原位回归设置 `INLINE_SITE_ONLY=naver` 后运行 `verify_inline_translation.mjs`。隔离配置与模拟译图不代替浏览器安装权限、撤权恢复、受限内容或模型效果验收。

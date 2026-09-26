@@ -108,7 +108,7 @@ describe('NAVER Webtoon', () => {
   ])('rejects incomplete or foreign readers', value => expect(() => parsePages(value, reader)).toThrow());
   it('runs import, refresh and page discovery without opening any source tab; aborts never publish', async () => {
     const records: Record<string, unknown> = {}, create = vi.fn(() => {throw Error('must not open a tab');});
-    vi.stubGlobal('chrome', {runtime: {id: 'test'}, tabs: {create}, storage: {local: {
+    vi.stubGlobal('chrome', {runtime: {id: 'test'}, permissions:{contains:vi.fn(async()=>true)}, tabs: {create}, storage: {local: {
       get: async (key: string) => ({[key]: records[key]}), set: async (values: object) => Object.assign(records, values),
     }}});
     const context = fixture();

@@ -101,7 +101,7 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
     }
     ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:ctx.settings.translationMode});
    }catch(error){ctx.sourceErrors.set(pageKey(request,image),error instanceof ImagePermissionsRequired
-     ?{kind:'error',message:msg('图片域名未获授权，请重新右键选择“翻译当前页面”完成授权。'),retryable:false}
+     ?{kind:'error',message:error.message,retryable:false}
      :{kind:'error',message:(error as Error).message});}
   }
   return targets;

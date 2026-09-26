@@ -21,13 +21,13 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
-assert(!manifest.host_permissions.includes('http://*/*'),'Broad source access must remain optional');
+assert(manifest.host_permissions.includes('http://*/*')&&manifest.host_permissions.includes('https://*/*'));
+assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 assert(!manifest.content_scripts.some(s=>s.js.includes('content-scripts/inline.js')),'No automatic page injection');
-// The fixture grants optional origins without a native permission dialog. Dispatch the actual
-// registered menu callback; only this temporary copy exposes its listener and installed menu titles.
-manifest.host_permissions.push('http://*/*','https://*/*');await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
+// Dispatch the actual registered menu callback. Only this temporary copy exposes its listener
+// and installed menu titles; required host access must never cause a runtime permission request.
 const background=path.join(extension,'background.js');
-await writeFile(background,`let fixtureGesture=false;chrome.permissions.request=permissions=>{if(!fixtureGesture)throw Error('Permission request lost its user gesture');return chrome.permissions.contains(permissions)};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=(...args)=>{fixtureGesture=true;try{return listener(...args)}finally{fixtureGesture=false}};return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
+await writeFile(background,`globalThis.fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.fixturePermissionRequests++;throw Error('Unexpected host permission request')};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
 const requests=[],sourceRequests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
@@ -114,6 +114,9 @@ const web=createServer((req,res)=>{
   res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><html><head><title>网页漫画翻译验收</title><style>body{margin:0;background:#edf2f8;font:16px system-ui;color:#20304b}header{padding:16px 28px;background:white}main{width:min(600px,90vw);margin:auto}img.comic{display:block;width:100%;height:auto;margin:24px 0}button{padding:10px}footer{height:800px}#thumb{width:80px;height:110px}#banner{width:900px;height:120px}#hidden{display:none}#third{aspect-ratio:1/1;object-fit:cover}</style></head><body><header><b>原网站 · 漫画阅读页</b>　<button id=site-button>网站按钮</button><a id=site-link href=#bottom>原有链接</a></header><main><img id=thumb src=${api}/source/1.png><p>下方漫画完成后原位显示，链接和滚动应保持正常。</p><picture><source srcset="${api}/source/1.png"><img id=first class=comic src=${api}/source/1.png></picture><img id=second class=comic src=${api}/source/2.png><img id=third class=comic src=${api}/source/3.png><img id=lazy class=comic><img id=hidden class=comic src=${api}/source/4.png></main><footer id=bottom>原网站页尾</footer></body></html>`);
 });await new Promise(resolve=>web.listen(0,'127.0.0.1',resolve));site=`http://127.0.0.1:${web.address().port}`;
 const browser=await chromium.launchPersistentContext(path.join(out,'profile'),{channel:'chromium',headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
+let permissionRequests=0;
+await browser.exposeBinding('fixturePermissionRequest',()=>{permissionRequests++;});
+await browser.addInitScript(()=>{if(location.protocol==='chrome-extension:')chrome.permissions.request=()=>{void window.fixturePermissionRequest();throw Error('Unexpected host permission request');};});
 const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));
 const worker=browser.serviceWorkers()[0]??await browser.waitForEvent('serviceworker');
 const extensionId=new URL(worker.url()).hostname;
@@ -141,7 +144,7 @@ try{
   const menus=await worker.evaluate(()=>fixtureMenus);assert(menus.some(m=>m.id==='nc-translate-page'&&m.title==='翻译当前页面'));check('build registers page menu and does not inject on its own');
   await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:20000});
   assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'].autoTranslateTabs),false);
-  check('manual menu activation requests permission synchronously with automatic tabs explicitly disabled');
+  check('manual menu activation uses installed host access with automatic tabs explicitly disabled');
   assert(sourceRequests.every(request=>request.referer===site+'/'));
   check('generic inline images pass cross-origin Referer checks without CORS response headers or a site adapter');
   assert.deepEqual(await geometry(),before);assert.equal(await page.locator('#thumb').evaluate(i=>i.style.content),'');assert.equal(await page.locator('#hidden').evaluate(i=>i.style.content),'');
@@ -158,7 +161,7 @@ try{
   await page.screenshot({path:path.join(out,'translated-desktop.png')});
   await page.waitForFunction(()=>document.querySelector('#second').style.content.includes('blob:'),{},{timeout:15000});assert.equal(createdJobs,1);assert.equal(uploads.size,1);check('next page submits, uploads verified bytes and displays completion; failed page does not loop');
   await activate();await page.waitForTimeout(900);assert.equal(createdJobs,1);check('repeated page activation creates no duplicate submissions');
-  const readsBeforeDenied=sourceRequests.length;
+  const readsBeforeDenied=sourceRequests.length,jobsBeforeDenied=createdJobs;
   await worker.evaluate(origin=>{
     globalThis.fixturePermissionContains=chrome.permissions.contains.bind(chrome.permissions);
     chrome.permissions.contains=permissions=>permissions.origins?.includes(origin+'/*')?Promise.resolve(false):globalThis.fixturePermissionContains(permissions);
@@ -167,12 +170,16 @@ try{
   await page.waitForFunction(()=>[...document.querySelectorAll('img.comic')].every(image=>!image.style.content));
   await page.waitForTimeout(800);
   assert.equal(sourceRequests.length,readsBeforeDenied);
-  const permissionTree=await cdp.send('Accessibility.getFullAXTree');assert(permissionTree.nodes.some(node=>node.name?.value==='等待图片授权'));
+  const permissionTree=await cdp.send('Accessibility.getFullAXTree');
+  assert(permissionTree.nodes.some(node=>node.name?.value==='网站访问受限'));
+  assert(permissionTree.nodes.some(node=>node.description?.value==='网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。'));
+  assert.equal(createdJobs,jobsBeforeDenied);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);
   await page.screenshot({path:path.join(out,'source-permission-required.png')});
-  check('missing image permission reports an actionable notice before downloading; native permission UI is not simulated as verified');
+  check('simulated revoked image access blocks downloads and new jobs, explains extension settings recovery and never requests permission');
   await worker.evaluate(()=>{chrome.permissions.contains=globalThis.fixturePermissionContains;delete globalThis.fixturePermissionContains;});
   await activate();await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),null,{timeout:15000});
-  check('manual authorization recovery resumes the same page and restores its translation');
+  assert.equal(createdJobs,jobsBeforeDenied);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);
+  check('restoring the simulated browser access check resumes the same page and translation without new jobs or permission requests');
   const displayed=await page.locator('#first').evaluate(i=>i.style.content);
   for(const style of ['opacity: 0.95', 'content: normal; aspect-ratio: auto; opacity: 0.95']){
     await page.locator('#first').evaluate((i,style)=>{i.setAttribute('style',style);i.classList.add('site-rendered');},style);
@@ -344,6 +351,8 @@ try{
     const result=await verifyInline({browser,page,activate,button,source:images.get(2),out,check});
     liveSource ||= !!result?.liveSource;
   }
+  assert.equal(permissionRequests,0);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);
+  check('inline activation and image reads never request host access at runtime');
   assert.equal(errors.length,0,errors.join('\n'));
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);

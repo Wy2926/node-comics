@@ -57,3 +57,13 @@
 .nc-directory-empty{padding:28px 10px;color:var(--muted);font-size:.8rem}
 @media(max-width:760px){.nc-reader-drawer.left{width:min(420px,calc(100% - 20px))}.nc-comic-directory-heading{padding:12px 16px}.nc-directory-search{padding:10px 14px}.nc-chapter-entry{padding:11px 10px}.nc-directory-tabs button{padding:11px 0}.nc-chapter-list{padding-inline:10px}}
 @media(prefers-reduced-motion:reduce){.nc-directory-chapter,.nc-chapter-expand>svg,.nc-source-group>summary>svg{transition:none}}
+.nc-source-language-choice {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.nc-source-language-choice select {
+  width: 100%;
+}

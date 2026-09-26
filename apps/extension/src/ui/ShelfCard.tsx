@@ -3,21 +3,14 @@ import {formatDate,msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
 import {coverReference,type Comic} from '../comics/application/library-service';
-import {ImagePermissionsRequired,requestImagePermissions} from '../sources';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
 export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
  const lastRead=comic.lastReadAt&&Number.isFinite(comic.lastReadAt)?comic.lastReadAt:undefined;
- const coverKey=coverReference(comic),[coverFailure,setCoverFailure]=useState<{key:string;error:unknown}>(),[retry,setRetry]=useState(0),[retrying,setRetrying]=useState(false);
+ const coverKey=coverReference(comic),[coverFailure,setCoverFailure]=useState<{key:string;error:unknown}>(),[retry,setRetry]=useState(0);
  const failedCover=coverFailure?.key===coverKey?coverFailure:undefined;
- const permission=failedCover?.error instanceof ImagePermissionsRequired?failedCover.error:undefined;
- const retryLabel=permission?msg('授权并继续'):msg('重试');
- const retryCover=()=>{
-  setRetrying(true);
-  const authorization=permission?requestImagePermissions(permission.origins):Promise.resolve();
-  void authorization.then(()=>{setCoverFailure(undefined);setRetry(value=>value+1);})
-   .catch(error=>setCoverFailure({key:coverKey!,error:permission??error})).finally(()=>setRetrying(false));
- };
+ const retryLabel=msg('重试');
+ const retryCover=()=>{setCoverFailure(undefined);setRetry(value=>value+1);};
  return <article className={'nc-book'+(selection?.checked?' is-selected':'')+(selection?' is-managing':'')} data-comic-id={comic.id} {...(!selection?menu:{})}>
   {selection&&<input className="nc-card-select" type="checkbox" aria-label={selectLabel} checked={selection.checked} disabled={selection.disabled} onChange={selection.onToggle}/>}
   <button className="nc-book-cover" aria-label={selection?selectLabel:msg('打开漫画 {0}',{'0':comic.title})} aria-pressed={selection?.checked} disabled={selection?.disabled} onClick={action}>
@@ -25,7 +18,7 @@ export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOp
    <span className="nc-card-source">{comic.sourceName}</span>
    <span className="nc-card-reading-time"><Icon name="clock" size={14}/>{lastRead?<time dateTime={new Date(lastRead).toISOString()} title={formatDate(lastRead,true)}>{formatDate(lastRead,true)}</time>:<span>{msg('还没阅读')}</span>}</span>
   </button>
-  {failedCover&&!selection&&<button className="button secondary small nc-cover-retry" disabled={retrying} onClick={retryCover}
+  {failedCover&&!selection&&<button className="button secondary small nc-cover-retry" onClick={retryCover}
    aria-label={msg('{0}封面',{'0':comic.title})+' · '+retryLabel}
    title={failedCover.error instanceof Error?failedCover.error.message:msg('图片暂不可用')}>{retryLabel}</button>}
    {!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates.count})}>

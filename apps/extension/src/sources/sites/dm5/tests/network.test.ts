@@ -189,7 +189,7 @@ describe('DM5 HTTP adapter', () => {
   });
   it('uses the common network path with zero source tabs', async () => {
     const storage: Record<string, unknown> = {}, tabs = {create: vi.fn(() => {throw Error('must not create a tab');})};
-    vi.stubGlobal('chrome', {runtime: {id: 'fixture', getURL: () => 'chrome-extension://fixture/'}, tabs,
+    vi.stubGlobal('chrome', {runtime: {id: 'fixture', getURL: () => 'chrome-extension://fixture/'}, permissions:{contains:vi.fn(async()=>true)}, tabs,
       storage: {local: {get: async (key: string) => ({[key]: storage[key]}), set: async (value: object) => Object.assign(storage, value)}}});
     vi.stubGlobal('fetch', vi.fn(async (target: string) => new Response(await request(String(target)))));
     const source = await readSourceCatalog(url); expect(source.entries).toHaveLength(2);

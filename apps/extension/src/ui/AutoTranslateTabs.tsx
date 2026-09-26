@@ -2,7 +2,7 @@ import {msg} from '../i18n/runtime';
 import {useId,useRef,useState} from 'react';
 import {settings,saveSettings} from '../comics/application/preferences';
 import type {Settings} from '../types';
-import {inlineOrigins} from '../inline/auto-tabs';
+import {requireHostAccess} from '../host-permissions';
 import './auto-translate-tabs.css';
 
 export function AutoTranslateTabs({enabled,onSaved,disabled=false}:{enabled:boolean;onSaved:(value:Settings)=>void;disabled?:boolean}){
@@ -13,8 +13,7 @@ export function AutoTranslateTabs({enabled,onSaved,disabled=false}:{enabled:bool
     try{
       if(typeof chrome==='undefined'||!chrome.runtime?.id)throw Error(msg("请在浏览器插件中开启标签页自动翻译。"));
       const next=!enabled;
-      // Request inside the user's click, before any other asynchronous operation.
-      if(next&&!await chrome.permissions.request({origins:[...inlineOrigins]}))throw Error(msg("未获得网站访问权限，自动翻译未开启。可再次点击授权。"));
+      if(next)await requireHostAccess();
       const previous=settings(),value={...previous,autoTranslateTabs:next};
       try{await saveSettings(value);}catch(error){await saveSettings(previous).catch(()=>{});throw error;}
       onSaved(value);

@@ -2,6 +2,7 @@ import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network'
 import type {SourceCatalogSnapshot, SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {apiOrigin, catalogUrl, chapterUrl, mangaDexLocation} from './definition';
 import {chapterData, chapterTitle, compareLabel, count, entity, id, list, object, relationships, response, text, type Chapter, type JsonObject} from './protocol';
+import {search} from './search';
 
 const pageSize = 100;
 const ratings = ['safe', 'suggestive', 'erotica', 'pornographic'];
@@ -121,6 +122,7 @@ async function readChapter(url: string, context: SourceNetworkContext) {
   return chapterData(data, loc.mangaId);
 }
 export const network = {
+  search,
   async catalog(url, context) {
     const loc = location(url);
     if (!loc.mangaId || loc.chapterId) throw Error('请使用 MangaDex 作品详情页链接。');

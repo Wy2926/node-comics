@@ -10,8 +10,8 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const out=path.resolve('artifacts/popup-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
-// Native permission prompts are not covered: pregrant only this copied test extension.
-manifest.host_permissions.push('http://*/*','https://*/*');await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
+assert(manifest.host_permissions.includes('http://*/*')&&manifest.host_permissions.includes('https://*/*'));
+assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 await writeFile(path.join(extension,'popup-fixture.js'),`
 const request=chrome.runtime.sendMessage.bind(chrome.runtime);
 chrome.runtime.sendMessage=async message=>{
@@ -21,10 +21,11 @@ chrome.runtime.sendMessage=async message=>{
  if(message.type==='NC_DISCOVER_TAB')await new Promise(resolve=>setTimeout(resolve,250));
  return request(message);
 };
-chrome.permissions.request=permissions=>globalThis.fixtureDenyPermission?Promise.resolve(false):chrome.permissions.contains(permissions);
+const contains=chrome.permissions.contains.bind(chrome.permissions);
+chrome.permissions.contains=permissions=>globalThis.fixtureDenyPermission?Promise.resolve(false):contains(permissions);
 `);
 const htmlPath=path.join(extension,'popup.html');await writeFile(htmlPath,(await readFile(htmlPath,'utf8')).replace('<head>','<head><script src="/popup-fixture.js"></script>'));
-const bgPath=path.join(extension,'background.js');await writeFile(bgPath,`chrome.permissions.request=p=>chrome.permissions.contains(p);const register=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=fn=>{globalThis.fixtureMenu=fn;register(fn)};\n`+await readFile(bgPath,'utf8'));
+const bgPath=path.join(extension,'background.js');await writeFile(bgPath,`globalThis.fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.fixturePermissionRequests++;throw Error('Unexpected host permission request')};const register=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=fn=>{globalThis.fixtureMenu=fn;register(fn)};\n`+await readFile(bgPath,'utf8'));
 let image;
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/image.png')){res.setHeader('Content-Type','image/png');res.end(image);return;}
@@ -33,6 +34,9 @@ const server=createServer((req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const site=`http://127.0.0.1:${server.address().port}`;
 const context=await chromium.launchPersistentContext(path.join(out,'profile'),{headless:true,channel:'chromium',...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),viewport:{width:1200,height:900},args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
 context.setDefaultTimeout(15000);context.setDefaultNavigationTimeout(15000);
+let permissionRequests=0;
+await context.exposeBinding('fixturePermissionRequest',()=>{permissionRequests++;});
+await context.addInitScript(()=>{if(location.protocol==='chrome-extension:')chrome.permissions.request=()=>{void window.fixturePermissionRequest();throw Error('Unexpected host permission request');};});
 const checks=[],errors=[];context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const origin='chrome-extension://'+new URL(worker.url()).hostname;
@@ -48,7 +52,8 @@ async function openPopup(target=source){
  await popup.waitForFunction(()=>!document.body.textContent.includes('正在读取当前标签页'));
  return popup;
 }
-const messages=()=>worker.evaluate(async()=>(await chrome.storage.session.get('fixtureMessages')).fixtureMessages??[]);
+const messages=()=>worker.evaluate(async()=>((await chrome.storage.session.get('fixtureMessages')).fixtureMessages??[])
+ .filter(message=>['NC_DISCOVER_TAB','NC_TRANSLATE_TAB','NC_SEARCH_TAB'].includes(message.type)));
 const preferences=()=>worker.evaluate(async()=>(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings']);
 const screenshot=async name=>{await popup.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{}))));await popup.screenshot({path:path.join(out,name+'.png'),clip:{x:0,y:0,width:420,height:Math.min(600,await popup.locator('main').evaluate(el=>el.offsetHeight))}});};
 try{
@@ -63,7 +68,7 @@ try{
  await popup.waitForFunction(()=>JSON.parse(localStorage.getItem('nc-settings')).translationMode==='redraw');await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'fr');
  await popup.waitForFunction(()=>{const trigger=document.querySelector('[role="combobox"][aria-label="默认目标语言"]');return trigger&&!trigger.matches(':disabled,[aria-disabled="true"]');});const saved=await preferences();assert.equal(saved.translationMode,'classic');assert.equal(saved.direction,'ltr');assert.equal(saved.cacheLimitMb,512);check('新增语言回退常规模式，保留其他设置');
  await popup.close();await openPopup();assert.equal(await popup.getByRole('combobox').getAttribute('data-value'),'fr');assert.equal((await messages()).length,0);check('重新打开保留语言且仍不自动发现');
- await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'未获得'}).waitFor();assert.equal((await messages()).length,0);await screenshot('popup-permission-denied');check('权限拒绝保留 Popup 和可重试提示');
+ await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'网站访问权限已被浏览器关闭'}).waitFor();assert.equal((await messages()).length,0);await screenshot('popup-permission-denied');check('模拟网站访问受限阻止启动，保留 Popup 和扩展设置提示');
  await popup.evaluate(()=>{globalThis.fixtureDenyPermission=false;globalThis.fixtureTranslateFailure=true;});await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'不允许注入'}).waitFor();check('启动失败保留语言和重试入口');
  await popup.evaluate(()=>globalThis.fixtureTranslateFailure=false);const scrollBefore=await source.evaluate(()=>scrollY);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');
  await source.waitForFunction(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));assert.equal(await source.evaluate(()=>scrollY),scrollBefore);check('Popup 启动真实网页翻译入口并关闭，原网页滚动位置保持');
@@ -86,7 +91,7 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await popup.close();await source.goto(site+'/automatic');await openPopup();
  const autoSwitch=page=>page.getByRole('switch',{name:'标签页自动翻译',exact:true});
  assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');
- await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await autoSwitch(popup).click();await popup.getByRole('alert').filter({hasText:'自动翻译未开启'}).waitFor();assert.equal((await preferences()).autoTranslateTabs,false);check('自动翻译拒绝授权后保持关闭');
+ await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await autoSwitch(popup).click();await popup.getByRole('alert').filter({hasText:'网站访问权限已被浏览器关闭'}).waitFor();assert.equal((await preferences()).autoTranslateTabs,false);check('模拟网站访问受限时自动翻译保持关闭');
  await popup.evaluate(()=>globalThis.fixtureDenyPermission=false);await autoSwitch(popup).click();await reader.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="标签页自动翻译"]').getAttribute('aria-checked')==='true');await source.bringToFront();
  const hostVisible=()=>source.waitForFunction(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
  const hostHidden=()=>source.waitForFunction(()=>![...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
@@ -107,5 +112,6 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await autoSwitch(reader).click();await popup.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="标签页自动翻译"]').getAttribute('aria-checked')==='false');await hostHidden();check('设置关闭同步 Popup，并停止已自动启动的网页');
  await source.reload();assert.equal(await source.evaluate(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646')),false);
  await popup.close();await openPopup();assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');await hostVisible();check('关闭自动翻译后，手动翻译按钮仍可使用');
- assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,scope:'Built MV3 in isolated Chromium; permission pregrant and no live translation provider'},null,2));console.log('Artifacts: '+out);
+ assert.equal(permissionRequests,0);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);check('Popup、设置和后台全流程没有申请网站访问权限');
+ assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,permissionRequests,scope:'Built MV3 in isolated Chromium; required host access, simulated access restrictions and no live translation provider'},null,2));console.log('Artifacts: '+out);
 }finally{await context.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}

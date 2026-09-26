@@ -29,8 +29,10 @@ export const definition: SourceDefinition = {
   id: 'mangacopy',
   name: 'MangaCopy',
   sites: [
-    { id: 'copy4000', name: '拷贝漫画', url: 'https://www.copy4000.com/', icon: '/site-icons/mangacopy.svg', primaryLanguages: ['zh-Hans'] },
-    { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg', primaryLanguages: ['zh-Hans'] },
+    { id: 'copy4000', name: '拷贝漫画', url: 'https://www.copy4000.com/', icon: '/site-icons/mangacopy.svg', primaryLanguages: ['zh-Hans'],
+      search: {requestOrigins: ['https://www.copy4000.com/*']} },
+    { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg', primaryLanguages: ['zh-Hans'],
+      search: {requestOrigins: ['https://www.mangacopy.com/*']} },
   ],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
   catalogSync: { intervalMinutes: 720 },

@@ -191,6 +191,7 @@ describe('OIDC public-client boundaries', () => {
     const authorizations: URL[] = [];
     if (platform === 'extension') {
       vi.stubGlobal('chrome', {
+        runtime: { id: 'test-extension' },
         permissions: { contains: vi.fn(async () => true) },
         identity: {
           getRedirectURL: () => 'https://test-extension.chromiumapp.org/oidc',
@@ -233,12 +234,14 @@ describe('OIDC public-client boundaries', () => {
     });
     const permissions = vi.fn(async () => true);
     vi.stubGlobal('chrome', {
-      permissions: { contains: vi.fn(async () => false), request: permissions },
+      runtime: { id: 'test-extension' },
+      permissions: { contains: permissions, request: vi.fn() },
       identity: { getRedirectURL: () => redirect, launchWebAuthFlow: launch },
     });
     successfulResponses();
     expect(await startOidc(config, API)).toMatchObject({ token: TOKEN, user, apiOrigin: API });
     expect(permissions).toHaveBeenCalledWith({ origins: ['https://identity.example.test/*'] });
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect(launch).toHaveBeenCalledOnce();
     expect(assigned).not.toHaveBeenCalled();
     expect(entries.has(KEY)).toBe(false);

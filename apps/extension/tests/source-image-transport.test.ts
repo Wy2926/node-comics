@@ -21,7 +21,8 @@ describe('common image request context',()=>{
   it('checks permission at every redirect hop, before requesting the next host',async()=>{
     const fetch=vi.fn(async()=>new Response(null,{status:302,headers:{location:'https://ungranted.test/next.png'}}));vi.stubGlobal('fetch',fetch);
     vi.mocked(chrome.permissions.contains).mockImplementation(async permission=>!permission.origins?.includes('https://ungranted.test/*'));
-    await expect(fetchSourceImage(image)).rejects.toMatchObject({origins:['https://ungranted.test/*']});
+    await expect(fetchSourceImage(image)).rejects.toBeInstanceOf(ImagePermissionsRequired);
+    expect(chrome.permissions.contains).toHaveBeenLastCalledWith({origins:['https://ungranted.test/*']});
     expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('does not forward adapter headers to a different redirect origin',async()=>{

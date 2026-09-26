@@ -25,7 +25,7 @@ describe('explicit chapter import language and entry intent',()=>{
     const snapshot=source();
     vi.mocked(readWebsiteCatalog).mockResolvedValue(snapshot);
     const permissions=vi.fn(async()=>true);
-    vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{request:permissions}});
+    vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{contains:permissions}});
     const comic=await importWebsiteLink(snapshot.url),entries=await catalog.listEntries(comic.id);
     const chinese=entries.find(entry=>entry.title==='zh-HK-1')!;
     await selectReadingEntry(chinese.id);
@@ -51,7 +51,7 @@ describe('explicit chapter import language and entry intent',()=>{
   });
   it('rejects a missing chapter even when its URL already identifies the work',async()=>{
     const snapshot=source();vi.mocked(readWebsiteCatalog).mockResolvedValue(snapshot);
-    vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{request:vi.fn(async()=>true)}});
+    vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{contains:vi.fn(async()=>true)}});
     await expect(importWebsiteLink(snapshot.url+'/chapter/'+crypto.randomUUID())).rejects.toThrow('源站目录未包含指定章节');
     expect(await catalog.count('comics')).toBe(0);
   });

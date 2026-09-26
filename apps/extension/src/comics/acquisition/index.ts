@@ -4,7 +4,7 @@ import { publishWebsiteManifest } from '../application/import-service';
 import { acquirePage } from '../pages/service';
 import { RENDER_PROFILE } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
-import { discoverEntry, discoverPage, ImagePermissionsRequired, requestImagePermissions } from '../../sources';
+import { discoverEntry, discoverPage, ImagePermissionsRequired } from '../../sources';
 import type { PageManifest } from '../../sources';
 
 const taskId = (entryId: string) => 'download:' + entryId;
@@ -68,10 +68,6 @@ export async function pauseDownloads(ids: string[]): Promise<void> {
     });
     await downloadStore.invalidateOwner(id);
   }
-}
-/** Pass origins prepared during rendering; permission requests must stay in the click call stack. */
-export async function grantDownloads(ids: string[], preparedOrigins: string[] = []): Promise<void> {
-  await requestImagePermissions(preparedOrigins); await queueDownloads(ids);
 }
 export async function listDownloads(): Promise<DownloadTask[]> { return await catalog.list('tasks', { limit: 1000 }) as DownloadTask[]; }
 

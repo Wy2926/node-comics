@@ -1,5 +1,6 @@
 import {catalog, type CatalogMutation} from '../repositories';
 import type {CatalogRecord, Comic, Entry} from '../domain';
+import {msg} from '../../i18n/runtime';
 
 export const readingPreferencesId = (comicId:string) => 'reading-preferences:' + comicId;
 export const readingSelectionKey = (entry:Pick<Entry,'sequenceId'|'readingSlotId'|'id'>) =>
@@ -11,13 +12,25 @@ export interface ReadingPreferences extends CatalogRecord {
   selections:Record<string,string>;
   lastEntryId?:string;
   selectedAt?:number;
+  sourceLanguagePreference?:string;
 }
 
 export async function readReadingPreferences(comic:Comic, tx:Pick<CatalogMutation,'get'>=catalog):Promise<ReadingPreferences> {
   const id=readingPreferencesId(comic.id),saved=await tx.get('metadata',id) as ReadingPreferences|undefined;
   const current=saved?.comicId===comic.id&&saved.sourceGeneration===comic.source.generation?saved:undefined;
   return {id,comicId:comic.id,sourceGeneration:comic.source.generation,selections:current?.selections??{},
-    lastEntryId:current?.lastEntryId,selectedAt:current?.selectedAt};
+    lastEntryId:current?.lastEntryId,selectedAt:current?.selectedAt,sourceLanguagePreference:current?.sourceLanguagePreference};
+}
+
+/** A source-content preference belongs to this book, independently of image translation. */
+export async function setSourceLanguagePreference(comicId:string,value:string|undefined) {
+  let normalized:string|undefined;
+  if(value){try{normalized=new Intl.Locale(value).baseName;}catch{throw Error(msg('内容语言无效。'));}}
+  const owner=await catalog.get('comics',comicId);if(!owner)throw Error(msg('漫画已移除。'));
+  await catalog.mutate(['comics','connections','metadata'],async tx=>{
+    const comic=await requireActiveComic(tx,comicId,owner.source.generation),saved=await readReadingPreferences(comic,tx);
+    await tx.put('metadata',{...saved,sourceLanguagePreference:normalized});
+  });
 }
 
 async function requireActiveComic(tx:CatalogMutation, comicId:string, generation:number) {
@@ -64,14 +77,27 @@ export function languageMatches(candidate:string|undefined,target:string|undefin
   const a=language(candidate),b=language(target);
   return !!a&&!!b&&a.language===b.language&&a.script===b.script;
 }
+export function sourceLanguageMatches(candidate:string|undefined,target:string|undefined):boolean {
+  if(!candidate||!target)return false;
+  try{
+    const parts=(value:string)=>{
+      const locale=new Intl.Locale(value);
+      const chineseScript=locale.language==='zh'&&locale.region?
+        ({CN:'Hans',SG:'Hans',TW:'Hant',HK:'Hant',MO:'Hant'} as Record<string,string>)[locale.region]:undefined;
+      return {language:locale.language,script:locale.script??chineseScript};
+    };
+    const a=parts(candidate),b=parts(target);
+    return a.language===b.language&&(!b.script||a.script===b.script);
+  }catch{return false;}
+}
 
 /** Every slot independently resolves hand-picked, target-language, English, then source order. */
 export function chooseReadingEntry(slot:ReadingSlot,preferences:ReadingPreferences,targetLanguage?:string):Entry {
   const candidates=slot.entries.filter(entryReadable);
   const chosen=candidates.find(entry=>entry.id===preferences.selections[slot.id]);if(chosen)return chosen;
-  const target=language(targetLanguage);
-  return candidates.find(entry=>target&&language(entry.contentLanguage)?.tag===target.tag)
-    ??candidates.find(entry=>languageMatches(entry.contentLanguage,targetLanguage))
+  const preferred=preferences.sourceLanguagePreference??targetLanguage,target=language(preferred);
+  return (preferences.sourceLanguagePreference==='zh'?undefined:candidates.find(entry=>target&&language(entry.contentLanguage)?.tag===target.tag))
+    ??candidates.find(entry=>preferences.sourceLanguagePreference?sourceLanguageMatches(entry.contentLanguage,preferred):languageMatches(entry.contentLanguage,preferred))
     ??candidates.find(entry=>languageMatches(entry.contentLanguage,'en'))
     ??candidates[0]??slot.entries[0];
 }

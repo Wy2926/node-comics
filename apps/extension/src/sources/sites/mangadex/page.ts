@@ -1,5 +1,6 @@
 import type {CreateSourcePage} from '../../contracts/page';
 import {imageSession} from '../../shared/session';
+import {describeWork} from './work';
 
 /** The page hosts only the import action. Public API responses supply every catalog and reading page. */
 export const createPage: CreateSourcePage = context => {
@@ -11,6 +12,7 @@ export const createPage: CreateSourcePage = context => {
     targets: () => [],
   });
   return {...session,
+    describeWork() {session.snapshot(); return describeWork(context.document, context.location.url);},
     async discoverPages() {session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'};},
     importAnchor() {
       session.snapshot();

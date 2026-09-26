@@ -5,8 +5,7 @@ import {validateCatalog} from '../core/catalog';
 import {validatePages} from '../core/pages';
 import {registerManifest} from './manifests';
 import type {PageManifest,PageSnapshot,SourceCatalogSnapshot} from '../contracts/source';
-import {withImageHeaders} from './image-headers';
-import {safeImageUrl} from '../shared/urls';
+import {createSourceNetworkContext as networkContext} from './http';
 import {importResponseLimits,rememberImportResponses,takeImportResponses,type ImportResponse} from './import-responses';
 
 /** Select each operation independently; failures never switch transports implicitly. */
@@ -15,26 +14,6 @@ export function networkOperation<K extends 'catalog'|'pages'>(url:string,operati
   if(!definition.capabilities.importable||!definition.capabilities[operation]||location.kind!==(operation==='catalog'?'catalog':'reader'))throw Error('SOURCE_OPERATION_UNSUPPORTED');
   return sourceNetworks[definition.id]?.[operation];
 }
-function networkContext(sourceUrl:string,signal?:AbortSignal,replay:ImportResponse[]=[]){return {signal,async request(url:string,options?:{referer:string}){
-  signal?.throwIfAborted();
-  if(safeImageUrl(url,url)!==url)throw Error('来源请求地址无效。');
-  if(options && (safeImageUrl(options.referer,options.referer)!==options.referer || new URL(options.referer).origin!==new URL(url).origin ||
-    resolveSource(options.referer,definitions).definition.id!==resolveSource(sourceUrl,definitions).definition.id))throw Error('来源请求头归属无效。');
-  const cached=replay.findIndex(response=>response.url===url&&response.referer===options?.referer);
-  if(cached>=0)return replay.splice(cached,1)[0].body;
-  const lifetime=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(30_000)]);
-  return withImageHeaders(url,options?{referer:options.referer}:undefined,lifetime,async()=>{
-  const response=await fetch(url,{credentials:'include',redirect:'error',headers:{Accept:'application/json, text/html'},
-    signal:lifetime});
-  if(!response.ok)throw Error(`来源请求失败（HTTP ${response.status}），请稍后重试或在源站完成验证。`);
-  if(!response.body)throw Error('来源响应为空。');
-  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let length=0;
-  try{while(true){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>8*1024*1024)throw Error('来源响应超过限制。');chunks.push(value);}}
-  catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}
-  const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-  return new TextDecoder().decode(bytes);
-  });
-}};}
 /** Resolve missing parent identity through the owning adapter, without opening a source tab. */
 export async function resolveNetworkCatalog(url:string,signal?:AbortSignal):Promise<string|undefined>{
   const {definition,location}=resolveSource(url,definitions);

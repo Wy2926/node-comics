@@ -3,7 +3,9 @@ import { renderedImages } from '../../shared/dom-images';
 import { imageSession } from '../../shared/session';
 import { readMangaCopyData } from './data';
 import { discoverMangaCopyDocument } from './pages';
+import { describeWork } from './work';
 export const createPage: CreateSourcePage = (context) => ({
+  describeWork() {context.signal.throwIfAborted(); return describeWork(context.document, context.location.url);},
   ...imageSession(context, {
     containers: '.comicParticulars-title-right',
     snapshot: () => discoverMangaCopyDocument(context.document, context.location.url),

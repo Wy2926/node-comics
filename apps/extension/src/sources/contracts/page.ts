@@ -8,6 +8,7 @@ export interface PageImage {
 
 import type { SourceLocation } from './definition';
 import type { SourceCatalogSnapshot, SourceSnapshot } from './source';
+import type {SourceWorkReference} from './work';
 export type Discovery<T> =
   | { status: 'ready'; value: T }
   | { status: 'not-ready'; code: string; partial?: T }
@@ -23,6 +24,7 @@ export interface SourcePageSession {
   snapshot(): SourceSnapshot;
   discoverPages(): Promise<Discovery<SourceSnapshot>>;
   discoverCatalog?(): Discovery<SourceCatalogSnapshot>;
+  describeWork?(): Discovery<SourceWorkReference>;
   inlineTargets(): PageImage[];
   observe?(changed: () => void): () => void;
   importAnchor?(): Element | null;

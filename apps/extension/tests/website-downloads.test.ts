@@ -5,9 +5,9 @@ import type { Entry, PageDescriptor } from '../src/comics/domain';
 import type { PageManifest } from '../src/sources/contracts/source';
 import { downloadKey, downloadStore } from '../src/storage/downloads';
 
-const mocks = vi.hoisted(() => ({ acquire: vi.fn(), discover: vi.fn(), permissions: vi.fn() }));
+const mocks = vi.hoisted(() => ({ acquire: vi.fn(), discover: vi.fn() }));
 vi.mock('../src/comics/pages/service', () => ({ acquirePage: mocks.acquire }));
-vi.mock('../src/sources', () => ({ discoverEntry: mocks.discover, requestImagePermissions: mocks.permissions, ImagePermissionsRequired: class ImagePermissionsRequired extends Error {} }));
+vi.mock('../src/sources', () => ({ discoverEntry: mocks.discover, ImagePermissionsRequired: class ImagePermissionsRequired extends Error {} }));
 vi.mock('../src/comics/application/import-service', () => ({
   publishWebsiteManifest: async (document: Entry, manifest: PageManifest) => {
     const { catalog } = await import('../src/comics/repositories');
@@ -15,11 +15,10 @@ vi.mock('../src/comics/application/import-service', () => ({
     await catalog.patch('entries', document.id, { discoveryComplete: manifest.discoveryComplete, pageCount: manifest.items.length });
   },
 }));
-import { discoverEntryContent, grantDownloads, listDownloads, pauseDownloads, queueDownloads, runDownloads, stopDownloads } from '../src/comics/acquisition';
+import { discoverEntryContent, listDownloads, pauseDownloads, queueDownloads, runDownloads, stopDownloads } from '../src/comics/acquisition';
 
 beforeEach(async () => {
-  stopDownloads(); mocks.acquire.mockReset(); mocks.discover.mockReset(); mocks.permissions.mockReset();
-  mocks.permissions.mockResolvedValue(undefined);
+  stopDownloads(); mocks.acquire.mockReset(); mocks.discover.mockReset();
   for (const task of await catalog.list('tasks', { limit: 10000 })) await catalog.remove('tasks', task.id);
   mocks.acquire.mockImplementation(async () => ({ blob: new Blob(['image']), release: vi.fn(), identity: {} }));
 });
@@ -109,12 +108,5 @@ describe('explicit website download intents', () => {
     expect((await listDownloads())[0]).toMatchObject({ status: 'complete', completed: 3 });
     expect(mocks.acquire).toHaveBeenCalledTimes(4);
   });
-  it('requests prepared image origins in the click stack before writing download intent', async () => {
-    const f = await fixture(); let resolve!: () => void;
-    mocks.permissions.mockImplementation(() => new Promise<void>(done => { resolve = done; }));
-    const granted = grantDownloads([f.document.id], ['https://cdn.example/*']);
-    expect(mocks.permissions).toHaveBeenCalledWith(['https://cdn.example/*']);
-    expect(await listDownloads()).toEqual([]); resolve(); await granted;
-    expect((await listDownloads())[0].status).toBe('queued');
-  });
+
 });

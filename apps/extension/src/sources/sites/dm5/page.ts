@@ -1,6 +1,7 @@
 import type {CreateSourcePage} from '../../contracts/page';
 import {renderedImages} from '../../shared/dom-images';
 import {imageSession} from '../../shared/session';
+import {describeWork} from './work';
 
 const catalogAnchor = '.banner_detail_form .info .bottom';
 // Both desktop layouts use cp_image. Exclude loading icons, ads and cp_image2 overlays.
@@ -15,6 +16,7 @@ export const createPage: CreateSourcePage = context => {
       .filter(({element}) => 'naturalWidth' in element && element.complete && element.naturalWidth > 0 && element.naturalHeight > 0),
   });
   return {...session, direction: 'ltr',
+    describeWork() {session.snapshot(); return describeWork(context.document, context.location.url);},
     async discoverPages() { session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'}; },
     importAnchor() { session.snapshot(); return context.location.kind === 'catalog' ? context.document.querySelector(catalogAnchor) : null; },
   };

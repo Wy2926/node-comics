@@ -2,6 +2,8 @@
 
 支持 `https://comix.to/title/<hid>-<slug>` 及其章节地址，提供 HTTP 完整目录、章节读取、12 小时更新、封面、站内导入和原位翻译。
 
+作品页可作为跨语言查找起点：`describeWork` 从 `initial-data` 核对当前 HID 与作品URL后取标题；章节名不代替作品名。本站未声明目标搜索能力。
+
 ## 实现约定
 
 - `definition.ts` 定义 URL、HID 身份与权限；`network.ts` 读取 initial-data 和签名 API，核对分页、总数、上传 ID 与归属。章节按话号去重，保留 0 和小数话；优先保留已有上传，首次选择官方上传后取最小 ID。
@@ -21,4 +23,4 @@
 | `verify-boundaries.mjs` | 合成目录、错误恢复、请求头隔离与清理 |
 | `verify-chapter.mjs` / `verify-reader.mjs` | 真实章节逐图还原、构建版物化、显示和位置恢复 |
 
-原位翻译运行 `node scripts/verify_inline_translation.mjs`，可设 `INLINE_SITE_ONLY=comix`、`RUN_LIVE_COMIX=1`、`COMIX_INLINE_URL`。译图仍为模拟响应；原生权限和真实模型单独验收。
+原位翻译运行 `node scripts/verify_inline_translation.mjs`，可设 `INLINE_SITE_ONLY=comix`、`RUN_LIVE_COMIX=1`、`COMIX_INLINE_URL`。译图仍为模拟响应；浏览器安装权限、撤权恢复和真实模型单独验收。

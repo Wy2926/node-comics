@@ -12,7 +12,7 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,tran
     </div>
     <span className="nc-rail-divider"/>
     <button className="nc-translation-trigger" aria-label={translationLabel} title={translationLabel} aria-expanded={panel==='translation'} aria-controls="nc-translation-settings" aria-haspopup="dialog" onClick={()=>onPanel('translation')}><Icon name="globe"/><span>{msg("翻译设置")}</span></button>
-    <button aria-label={msg("阅读设置")} title={msg("阅读设置")} aria-expanded={panel==='settings'} onClick={()=>onPanel('settings')}><Icon name="settings"/><span>{msg("阅读设置")}</span></button>
+    <button data-reader-settings-trigger="true" aria-label={msg("阅读设置")} title={msg("阅读设置")} aria-expanded={panel==='settings'} onClick={()=>onPanel('settings')}><Icon name="settings"/><span>{msg("阅读设置")}</span></button>
     {allowsFeedback&&shownJob&&<button aria-label={msg("译图有问题")} title={msg("译图有问题")} onClick={onFeedback}><Icon name="info"/><span>{msg("反馈")}</span></button>}
   </nav>;
 }

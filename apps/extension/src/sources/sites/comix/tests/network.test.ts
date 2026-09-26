@@ -67,7 +67,7 @@ describe('Comix network adapter',()=>{
  });
  it('reads catalogs and chapters with zero tab creation and retains a durable image recipe',async()=>{
    const storage:Record<string,unknown>={},tabs={create:vi.fn(()=>{throw Error('must not create tab')})},context=fixture();
-   vi.stubGlobal('chrome',{runtime:{id:'fixture'},tabs,storage:{local:{get:async(k:string)=>({[k]:storage[k]}),set:async(v:object)=>Object.assign(storage,v)}}});
+   vi.stubGlobal('chrome',{runtime:{id:'fixture'},permissions:{contains:vi.fn(async()=>true)},tabs,storage:{local:{get:async(k:string)=>({[k]:storage[k]}),set:async(v:object)=>Object.assign(storage,v)}}});
    vi.stubGlobal('fetch',vi.fn(async(target:string)=>new Response(await context.request(String(target)))));
    const source=await readSourceCatalog(url),progress=vi.fn(),signal=new AbortController().signal;
    const manifest=await discoverEntry(source,source.entries[0].id,signal,progress);
@@ -78,7 +78,7 @@ describe('Comix network adapter',()=>{
  });
  it('a rejected refresh cannot replace the library upload choice used by the next read',async()=>{
    const first=await network.catalog(url,fixture()),comic=await importCatalog(first);
-   vi.stubGlobal('chrome',{runtime:{id:'fixture'}});
+   vi.stubGlobal('chrome',{runtime:{id:'fixture'},permissions:{contains:vi.fn(async()=>true)}});
    let context=fixture([row(20,0),row(5,1,true),row(40,1.5)]);
    vi.stubGlobal('fetch',vi.fn(async(target:string)=>new Response(await context.request(String(target)))));
    const rejected=await readWebsiteCatalog(url);expect(rejected.entries[1].remoteId).toBe('5');

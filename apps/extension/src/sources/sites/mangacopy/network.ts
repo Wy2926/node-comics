@@ -3,6 +3,7 @@ import type {SourceNetwork} from '../../contracts/network';
 import type {SourceCatalogSnapshot, SourceEntry} from '../../contracts/source';
 import {sourceCover} from '../../shared/cover';
 import {mangaCopyLocation} from './definition';
+import {search} from './search';
 
 const invalid = () => Error(msg('目录未完整加载，请打开来源页处理后重试。'));
 function object(value: unknown): Record<string, unknown> {
@@ -114,6 +115,7 @@ function directory(data: Record<string, unknown>, slug: string, url: string, met
 }
 
 export const network: SourceNetwork = {
+  search,
   async catalog(url, context) {
     const loc = mangaCopyLocation(url);
     if (!loc || loc.chapterId) throw Error(msg('请从 MangaCopy 漫画详情页导入作品。'));

@@ -8,9 +8,9 @@ const root=process.cwd(),live=process.env.RUN_LIVE_COVERS==='1',output=path.join
 await mkdir(output,{recursive:true});const out=await mkdtemp(path.join(output,live?'live-':'fixture-')),extension=path.join(out,'extension');
 await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
-manifest.host_permissions.push('https://comic.naver.com/*','https://image-comic.pstatic.net/*','https://comicpash.jp/*','https://cdn-public.comici.jp/*',
-  'https://www.dm5.com/*','https://*.cdndm5.com/*','https://comix.to/*','https://static.comix.to/*','https://*.mangafunb.fun/*');
-await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
+assert(manifest.host_permissions?.includes('http://*/*'));
+assert(manifest.host_permissions?.includes('https://*/*'));
+assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const source=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=path.join(extension,'probe.js');
 await writeFile(probe,`export {catalog} from '${source}/comics/repositories/index.ts';
 export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';
@@ -24,6 +24,12 @@ const context=await chromium.launchPersistentContext(path.join(out,'profile'),{h
   viewport:{width:1600,height:1100},args:['--disable-extensions-except='+extension,'--load-extension='+extension,
     ...(!live?['--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']:[])]});
 context.setDefaultTimeout(30000);
+const permissionRequests=[];
+await context.exposeBinding('__fixturePermissionRequest',(_,request)=>{permissionRequests.push(request);});
+await context.addInitScript(()=>{
+  if(location.protocol!=='chrome-extension:')return;
+  chrome.permissions.request=request=>{void window.__fixturePermissionRequest(request);throw Error('Unexpected permission request with required host access');};
+});
 const errors=[],checks=[];let coverRequests=0,failCover=false,artwork,bodyImage,changedArtwork;
 context.on('page',page=>page.on('pageerror',error=>{if(page.url().startsWith('chrome-extension:'))errors.push(error.message);}));
 const chapter='724f819b-5306-11ea-b7ea-024352452ce0';
@@ -38,6 +44,7 @@ const mangaHtml=`${catalogKeyScript}<div class="comicParticulars-title-left"><im
 const liveUrls={mangacopy:'https://www.copy4000.com/comic/grandblue',comix:'https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation',
   dm5:'https://www.dm5.com/manhua-yaoshenji/',naver:'https://comic.naver.com/webtoon/list?titleId=758037',comicpash:'https://comicpash.jp/series/1fafeeae328df'};
 await context.route('https://*.nodelane.net/**',route=>route.fulfill({status:503,body:'Isolated cover acceptance'}));
+if(!live)await context.route('http://**/*',route=>route.abort());
 if(!live)await context.route('https://**/*',route=>{
   const url=new URL(route.request().url());
   if(Object.values(fixtures).some(item=>url.href===item.cover)||url.pathname==='/changed-cover.jpg'){
@@ -62,6 +69,7 @@ if(!live)await context.route('https://**/*',route=>{
 let reader;
 try{
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),home=new URL('reader.html',worker.url()).href;
+  await worker.evaluate(()=>{globalThis.__fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.__fixturePermissionRequests++;throw Error('Unexpected background permission request with required host access');};});
   reader=await context.newPage();await reader.goto(home);await reader.locator('.nc-library').waitFor();
   await reader.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));
   if(!live){
@@ -118,22 +126,31 @@ try{
       const c=document.createElement('canvas');c.width=240;c.height=360;const ctx=c.getContext('2d');ctx.drawImage(img,0,0);return ctx.getImageData(5,5,1,1).data[1]>150;
     },naver.id);
     assert.equal(await card(naver.id).locator('.nc-card-update').count(),0);checks.push('Catalog artwork changes refresh the shelf without a false new-chapter badge');
+    const beforeRestrictedCover=coverRequests;
     await reader.evaluate(async id=>{
-      // Simulate a denied-then-granted optional permission; native browser prompts are not covered.
-      const contains=chrome.permissions.contains.bind(chrome.permissions);let allowed=false;
-      chrome.permissions.contains=async query=>query.origins?.includes('https://image-comic.pstatic.net/*')&&!allowed?false:contains(query);
-      chrome.permissions.request=async()=>{allowed=true;return true;};
+      // Model browser site-access restrictions without revoking installation-required permissions.
+      const contains=chrome.permissions.contains.bind(chrome.permissions);window.__fixtureCoverAccessAllowed=false;
+      chrome.permissions.contains=async query=>query.origins?.includes('https://image-comic.pstatic.net/*')&&!window.__fixtureCoverAccessAllowed?false:contains(query);
       const {catalog,applyCatalogRefresh}=await import(chrome.runtime.getURL('verify-covers.js')),comic=await catalog.get('comics',id),source=await catalog.get('catalogs',comic.source.providerItemId);
       await applyCatalogRefresh(id,comic.source.generation,{...source,observedAt:source.observedAt+1,cover:{url:'https://image-comic.pstatic.net/changed-cover.jpg?permission=1'}});
     },naver.id);
-    await card(naver.id).getByRole('button',{name:naver.title+'封面 · 授权并继续',exact:true}).waitFor();
-    await card(naver.id).getByRole('button',{name:naver.title+'封面 · 授权并继续',exact:true}).click();
+    const restrictedRetry=card(naver.id).getByRole('button',{name:naver.title+'封面 · 重试',exact:true});
+    await restrictedRetry.waitFor();
+    assert.match(await restrictedRetry.getAttribute('title'),/网站访问权限已被浏览器关闭/);
+    assert.equal(coverRequests,beforeRestrictedCover,'Restricted cover access must fail before an HTTP request');
+    assert.equal(await reader.getByRole('button',{name:/授权并继续/}).count(),0);
+    await reader.evaluate(()=>{window.__fixtureCoverAccessAllowed=true;});
+    await restrictedRetry.click();
     await card(naver.id).locator('.nc-thumbnail img').waitFor();
-    checks.push('A simulated missing host permission exposes authorization and retries on approval');
+    assert.equal(await card(naver.id).locator('.nc-cover-retry').count(),0);
+    checks.push('Simulated restricted site access shows retry only; restoring access recovers without requesting permission');
     await reader.screenshot({path:path.join(out,'recovered-cover.png')});
   }
+  const backgroundPermissionRequests=await worker.evaluate(()=>globalThis.__fixturePermissionRequests);
+  assert.deepEqual(permissionRequests,[]);assert.equal(backgroundPermissionRequests,0);
+  checks.push('The unchanged manifest requires HTTP/HTTPS access; cover reads and retries never request permissions');
   assert.deepEqual(errors,[]);
-  await writeFile(path.join(out,'results.json'),JSON.stringify({live,checks,errors,sites:imported.map(({site})=>site)},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({live,checks,errors,permissionRequests,backgroundPermissionRequests,sites:imported.map(({site})=>site)},null,2));
   console.log(JSON.stringify({out,live,checks,errors}));
 }catch(error){await reader?.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});throw error;}
 finally{await context.close();}

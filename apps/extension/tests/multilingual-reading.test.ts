@@ -4,7 +4,7 @@ import {catalog} from '../src/comics/repositories';
 import {importCatalog,importManifest} from '../src/comics/application/import-service';
 import {applyCatalogRefresh} from '../src/comics/application/catalog-service';
 import {comicDirectory,continueEntry,loadEntry,readerSequence,selectReadingEntry} from '../src/comics/application/library-service';
-import {languageMatches,readingPreferencesId} from '../src/comics/application/reading-preferences';
+import {languageMatches,readingPreferencesId,readReadingPreferences,setSourceLanguagePreference,sourceLanguageMatches} from '../src/comics/application/reading-preferences';
 import {validateSourceCatalog,type SourceCatalogSnapshot,type SourceEntry} from '../src/sources';
 
 function snapshot():SourceCatalogSnapshot {
@@ -32,6 +32,42 @@ async function pages(source:SourceCatalogSnapshot,title:string,total:number){
 afterEach(async()=>{vi.restoreAllMocks();for(const comic of await catalog.list('comics',{limit:10000}))await catalog.deleteComic(comic.id);});
 
 describe('automatic per-chapter language selection',()=>{
+  it('persists a per-book source preference across first opening, directory and sequence without changing other books',async()=>{
+    const first=await setup(),second=await setup();
+    await setSourceLanguagePreference(first.comic.id,'ZH-hant');
+    expect(await continueEntry(first.comic.id,'en')).toMatchObject({id:first.entry('zh-1').id});
+    expect(await continueEntry(second.comic.id,'en')).toMatchObject({id:second.entry('en-1-b').id});
+    expect((await comicDirectory(first.comic.id,undefined,'en')).sourceLanguagePreference).toBe('zh-Hant');
+    await setSourceLanguagePreference(first.comic.id,'fr');
+    expect((await readerSequence(first.entry('en-1-b').id,undefined,'zh-Hans')).copies.map(copy=>copy.id))
+      .toEqual(['en-1-b','fr-2','fr-3','es-4'].map(title=>first.entry(title).id));
+    await setSourceLanguagePreference(first.comic.id,undefined);
+    expect(await continueEntry(first.comic.id,'zh-Hans')).toMatchObject({id:first.entry('zh-simple-1').id});
+    expect((await readReadingPreferences(first.comic)).sourceLanguagePreference).toBeUndefined();
+  });
+  it('matches Chinese scripts conservatively and uses source order for an unrestricted Chinese preference',async()=>{
+    expect(sourceLanguageMatches('zh-HK','zh-Hant')).toBe(true);
+    expect(sourceLanguageMatches('zh-CN','zh-Hans')).toBe(true);
+    expect(sourceLanguageMatches('zh','zh-Hans')).toBe(false);
+    expect(sourceLanguageMatches('zh','zh-Hant')).toBe(false);
+    expect(sourceLanguageMatches('zh-Hans','zh')).toBe(true);
+    const source=snapshot();source.entries.find(entry=>entry.title==='zh-simple-1')!.contentLanguage='zh';
+    const comic=await importCatalog(source);
+    await setSourceLanguagePreference(comic.id,'zh');
+    expect(await continueEntry(comic.id,'en')).toMatchObject({title:'zh-1'});
+  });
+  it('fences language preference writes against generation changes and revoked sources',async()=>{
+    const {comic}=await setup();
+    await expect(setSourceLanguagePreference(comic.id,'not_a_language')).rejects.toThrow();
+    const mutate=catalog.mutate.bind(catalog),intercept=vi.spyOn(catalog,'mutate').mockImplementationOnce(async(tables,edit)=>{
+      intercept.mockRestore();await catalog.patch('comics',comic.id,{source:{...comic.source,generation:2}});return mutate(tables,edit);
+    });
+    await expect(setSourceLanguagePreference(comic.id,'fr')).rejects.toThrow('来源已断开');
+    expect(await catalog.get('metadata',readingPreferencesId(comic.id))).toBeUndefined();
+    await catalog.patch('connections',comic.source.connectionId,{status:'revoked'});
+    await expect(setSourceLanguagePreference(comic.id,'fr')).rejects.toThrow('来源已断开');
+    await catalog.patch('connections',comic.source.connectionId,{status:'connected'});
+  });
   it('accepts cross-language sequences and validates slot order and readable flags',()=>{
     const source=snapshot();source.entries.find(entry=>entry.title==='zh-1')!.contentLanguage='zh-hk';
     expect(validateSourceCatalog(source).entries.find(entry=>entry.title==='zh-1')?.contentLanguage).toBe('zh-HK');

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { grantDownloads } from '../../../../comics/acquisition';
 import { pollSourceDiscovery } from '../../../core/discovery';
 import { createSourceNavigation, discoverDocument } from '../../../page';
 import { sourceFailure } from '../../../runtime/diagnostics';
@@ -181,13 +180,5 @@ describe('MangaCopy source discovery', () => {
     controller.abort(Error('停止'));
     await assertion;
   });
-  it('requests known source and image permissions synchronously from the click', async () => {
-    const request = vi.fn(async () => false);
-    vi.stubGlobal('chrome', { runtime: { id: 'extension' }, permissions: { request } });
-    const result = grantDownloads(['sample'], ['https://www.mangacopy.com/*', 'https://images.example/*']);
-    expect(request).toHaveBeenCalledWith({
-      origins: ['https://www.mangacopy.com/*', 'https://images.example/*'],
-    });
-    await expect(result).rejects.toThrow('未获授权');
-  });
+
 });

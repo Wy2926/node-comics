@@ -17,6 +17,8 @@ npm run build        # .output/chrome-mv3
 
 Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页预览不能替代扩展权限、后台和登录验证。
 
+插件在安装配置中声明 HTTP／HTTPS 网站访问权限，使用时不逐站申请。浏览器手动限制访问后，需在扩展设置恢复所有网站访问；运行时仍检查访问范围。站点声明与校验规则见[网站适配](../../docs/SITE_ADAPTERS.md#必须保持的约束)。
+
 官方 API 默认由 [service.ts](src/service.ts) 指向产品服务；本地预览沿用该地址。使用隔离后端时，在启动或构建前设置 `VITE_API_BASE`，结束后清除。Drive 构建需要 `VITE_DRIVE_CONNECT_URL`，配置见[连接页](../drive-connect/README.md)。
 
 | 产物 | 命令 |

@@ -45,12 +45,21 @@ export function installSourceContent() {
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
-    if (!['NC_NAVIGATION', 'NC_CATALOG_SNAPSHOT', 'NC_PAGE_IMAGE', 'NC_DISCOVER'].includes(message?.type))
+    if (!['NC_NAVIGATION', 'NC_CATALOG_SNAPSHOT', 'NC_PAGE_IMAGE', 'NC_DISCOVER', 'NC_DESCRIBE_WORK'].includes(message?.type))
       return;
     const page = current(),
       { navigationId, session, controller } = page;
     if (message?.type === 'NC_NAVIGATION') {
       respond({ navigationId, url: location.href });
+      return;
+    }
+    if(message.type==='NC_DESCRIBE_WORK'){
+      try{
+        const described=session.describeWork?.(),catalog=described?.status==='ready'?undefined:session.discoverCatalog?.();
+        const value=catalog?.status==='ready'?catalog.value:catalog?.status==='not-ready'?catalog.partial:undefined;
+        const work=described?.status==='ready'?described.value:value?{title:value.title,catalogId:value.id,catalogUrl:value.url,cover:value.cover}:undefined;
+        respond({url:location.href,work});
+      }catch{respond({url:location.href});}
       return;
     }
     if (message?.type === 'NC_CATALOG_SNAPSHOT') {

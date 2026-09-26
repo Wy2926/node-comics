@@ -1,5 +1,6 @@
 import { registerLocaleBackground } from '../../i18n/background';
 import { msg } from '../../i18n/runtime';
+import { requireHostAccess } from '../../host-permissions';
 import { sourceFailure } from './diagnostics';
 
 import { activateInline, registerInlineBackground } from '../../inline/background';
@@ -21,9 +22,12 @@ import {sourceImages} from '../registry/images';
 import {recoverImageHeaders} from './image-headers';
 import {registerDocumentManifest} from './manifests';
 import {readSourceCatalog} from './catalog-reader';
+import {openSearchFromTab} from './search-entry';
 import type {DocumentSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 const sourceMessageTypes = new Set([
   'NC_IMPORT_CURRENT',
+  'NC_SEARCH_CURRENT',
+  'NC_SEARCH_TAB',
   'NC_TRANSLATE_TAB',
   'NC_DISCOVER_TAB',
   'NC_OPEN_PAGE',
@@ -102,9 +106,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === 'nc-translate-page' && tab?.id != null) {
       try {
-        // Request before any await: loading locale/storage can lose the menu's user gesture.
-        const granted = await chrome.permissions.request({ origins: ['https://*/*', 'http://*/*'] });
-        if (!granted) return;
+        await requireHostAccess();
         await localeReady();
         await activateInline(tab.id);
       } catch {
@@ -118,7 +120,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     // Other background protocols share this event. Returning true or responding to
     // an unowned message would race their reply, even for a trusted extension page.
     if (!sourceMessageTypes.has(message?.type)) return;
-    if (message.type === 'NC_IMPORT_CURRENT') {
+    if (message.type === 'NC_IMPORT_CURRENT'||message.type==='NC_SEARCH_CURRENT') {
       // Chrome can retain the document's original sender.url after pushState.
       // Authenticate the source here; discover validates the current tab's page and origin.
       const fromSourcePage =
@@ -128,6 +130,10 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
         !!sourceLocation(sender.url ?? '') &&
         sourceFor(sender.url??'').definition.capabilities.importable;
       if (!fromSourcePage) return;
+      if(message.type==='NC_SEARCH_CURRENT'){
+        void openSearchFromTab(sender.tab!.id!,undefined,sender.url).then(()=>respond({ok:true})).catch(error=>respond({ok:false,error:error instanceof Error?error.message:msg('插件通信失败，请重新打开阅读器。')}));
+        return true;
+      }
       void discover(sender.tab!.id!,readCatalog,sender.url)
         .then((result) =>
           chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
@@ -139,6 +145,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     if (!trusted(sender)) return;
     (async () => {
       await localeReady();
+      if(message.type==='NC_SEARCH_TAB'){await openSearchFromTab(message.tabId,message.url);return true;}
       if (message?.type === 'NC_TRANSLATE_TAB') {
         if (!Number.isInteger(message.tabId) || message.tabId < 0)
           throw Error(msg('当前标签页不可用，请重新打开插件。'));

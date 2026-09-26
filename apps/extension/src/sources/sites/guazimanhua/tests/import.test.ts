@@ -19,6 +19,7 @@ it.each(['valid', 'missing-chapter', 'foreign-parent', 'failed-request'])('resol
   vi.stubGlobal('chrome', {
     runtime: {id: 'test', getURL: (path: string) => 'chrome-extension://test' + path,
       onInstalled: {addListener() {}}, onMessage: {addListener(fn: typeof listener) {listener = fn;}}},
+    permissions: {contains: vi.fn(async () => true)},
     contextMenus: {onClicked: {addListener() {}}}, storage: {local: {set}},
     tabs: {get: async () => ({id: 7, url: reader}), create},
   });
@@ -49,7 +50,7 @@ it.each(['valid', 'missing-chapter', 'foreign-parent', 'failed-request'])('resol
 
 it.each([true,false])('reuses the same work and reading position across link/catalog and chapter entry points (chapter first: %s)',async chapterFirst=>{
   const permissions=vi.fn(async()=>true),fetcher=vi.fn(async(target:string)=>new Response(target.includes('chapter.php')?readerHtml():catalogHtml()));
-  vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{request:permissions},storage:{local:{set:vi.fn()}}});
+  vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{contains:permissions},storage:{local:{set:vi.fn()}}});
   vi.stubGlobal('fetch',fetcher);
   const first=await importWebsiteLink(chapterFirst?reader:url);
   expect(permissions.mock.invocationCallOrder[0]).toBeLessThan(fetcher.mock.invocationCallOrder[0]);
@@ -66,7 +67,7 @@ it.each([true,false])('reuses the same work and reading position across link/cat
 });
 
 it.each(['permission','parent','catalog'])('does not create a work when link import fails at %s',async failure=>{
-  vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{request:vi.fn(async()=>failure!=='permission')}});
+  vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{contains:vi.fn(async()=>failure!=='permission')}});
   const fetcher=vi.fn(async(target:string)=>new Response(target.includes('chapter.php')?(failure==='parent'?readerHtml().replaceAll(url,'https://evil.test/comic.php?id=123'):readerHtml()):catalogHtml(['7'])));
   vi.stubGlobal('fetch',fetcher);
   await expect(importWebsiteLink(reader)).rejects.toThrow();

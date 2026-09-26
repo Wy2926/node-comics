@@ -1,4 +1,4 @@
-// Explicit live HTTP acceptance in a fresh, preauthorized MV3 profile. No product API/model calls.
+// Explicit live HTTP acceptance in a fresh MV3 profile using the built manifest host access. No product API/model calls.
 // From repository root, after building: node apps/extension/src/sources/sites/guazimanhua/tests/verify-browser.mjs
 import {createRequire} from 'node:module';
 import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
@@ -11,10 +11,9 @@ const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE 
 const extension = await mkdtemp(path.join(out, 'extension-')), profile = await mkdtemp(path.join(out, 'profile-'));
 await cp(path.join(root, 'apps/extension/.output/chrome-mv3'), extension, {recursive: true});
 const manifest = JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8'));
-const installation = JSON.parse(await readFile(path.join(root, 'apps/extension/src/sources/sites/guazimanhua/installation.json'), 'utf8'));
-assert(installation.optionalOrigins.every(origin => manifest.optional_host_permissions.includes(origin) || manifest.optional_host_permissions.includes('https://*/*') || manifest.optional_host_permissions.includes('http://*/*')));
-manifest.host_permissions.push(...installation.optionalOrigins);
-await writeFile(path.join(extension, 'manifest.json'), JSON.stringify(manifest));
+assert(manifest.host_permissions?.includes('http://*/*'));
+assert(manifest.host_permissions?.includes('https://*/*'));
+assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const bgPath=path.join(extension,'background.js');
 await writeFile(bgPath,`globalThis.sourceRequests=[];chrome.webRequest.onBeforeRequest.addListener(details=>{if(details.initiator?.startsWith('chrome-extension://'))globalThis.sourceRequests.push(details.url);},{urls:['https://www.guazimanhua.com/*']});\n`+await readFile(bgPath,'utf8'));
 const source = path.join(root, 'apps/extension/src').replaceAll('\\', '/'), probe = path.join(extension, 'probe.js');

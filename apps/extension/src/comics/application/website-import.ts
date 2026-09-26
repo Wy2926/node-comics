@@ -1,4 +1,4 @@
-import {authorizeCatalogImport,readImportCatalog,sameSourcePage,sourceFor,validateSourceCatalog,type SourceCatalogSnapshot} from '../../sources';
+import {prepareCatalogImport,readImportCatalog,sameSourcePage,sourceFor,validateSourceCatalog,type SourceCatalogSnapshot} from '../../sources';
 import {catalog} from '../repositories';
 import {readWebsiteCatalog} from './website-catalog';
 import {importCatalog} from './import-service';
@@ -23,7 +23,7 @@ export async function importWebsiteCatalog(snapshot:SourceCatalogSnapshot, selec
 }
 
 export async function importWebsiteLink(url:string) {
-  const sourceUrl=await authorizeCatalogImport(url);
+  const sourceUrl=await prepareCatalogImport(url);
   const source=await readImportCatalog(sourceUrl,readWebsiteCatalog);
   const selectedEntryId=sourceFor(sourceUrl).location.kind==='reader'
     ?source.entries.find(entry=>!entry.related&&sameSourcePage(entry.url,sourceUrl))?.id:undefined;

@@ -9,7 +9,7 @@ import { createSourceNavigation, PageImageRegistry, type CreateSourcePage } from
 import { definitions } from '../src/sources/registry/definitions';
 import { pageFactories } from '../src/sources/registry/pages';
 import { sourceNetworks } from '../src/sources/registry/networks';
-import { sourceInstallation as buildInstallation } from '../source-installation';
+import {validateSearchCapability} from '../src/sources/core/search';
 const chapter = '724f819b-5306-11ea-b7ea-024352452ce0';
 const sourceUrl = 'https://www.mangacopy.com/comic/sample/chapter/' + chapter;
 const testDefinition: SourceDefinition = {
@@ -53,9 +53,12 @@ const testCatalog: SourceCatalogSnapshot = {
   ],
 };
 describe('source composition and identity', () => {
-  it('uses the same site-local installation metadata in the build and runtime',()=>{
-    expect([...buildInstallation.requiredOrigins].sort()).toEqual([...sourceInstallation.requiredOrigins].sort());
-    expect([...buildInstallation.autoContentMatches].sort()).toEqual([...sourceInstallation.autoContentMatches].sort());
+  it('aligns optional search implementations, site coverage and declared operation permissions', () => {
+    for (const definition of definitions) {
+      const searchable = (definition.sites ?? []).filter(site => site.search);
+      expect(!!sourceNetworks[definition.id]?.search).toBe(searchable.length > 0);
+      for (const site of searchable) expect(() => validateSearchCapability(definition, site)).not.toThrow();
+    }
   });
   it('cancels a discovery message that has not responded', async () => {
     const controller = new AbortController(),
@@ -101,11 +104,7 @@ describe('source composition and identity', () => {
     ).toThrow('CONFLICT');
     expect(() => sourceFor('https://user:secret@example.test')).toThrow('INVALID_SOURCE_URL');
   });
-  it('retains only the existing required permissions', () => {
-    expect(sourceInstallation.requiredOrigins).toEqual([
-      'https://*.mangacopy.com/*',
-      'https://*.copy4000.com/*',
-    ]);
+  it('keeps automatic script matches distinct from global host access', () => {
     expect(sourceInstallation.autoContentMatches).toEqual([
       'https://*.mangacopy.com/comic/*',
       'https://*.copy4000.com/comic/*',

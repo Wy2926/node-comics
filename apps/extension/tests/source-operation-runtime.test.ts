@@ -14,7 +14,7 @@ import {readSourceCatalog} from '../src/sources/runtime/catalog-reader';
 import {discoverEntry,discoverPage} from '../src/sources/runtime/client';
 vi.mock('../src/sources/runtime/image-headers',()=>({withImageHeaders:async(_url:unknown,_headers:unknown,_signal:unknown,read:()=>Promise<unknown>)=>read()}));
 import {readSourceImage} from '../src/sources/runtime/source-image';
-import {authorizeCatalogImport,readImportCatalog} from '../src/sources/runtime/import';
+import {prepareCatalogImport,readImportCatalog} from '../src/sources/runtime/import';
 import {registerDocumentManifest} from '../src/sources/runtime/manifests';
 
 const book='https://fixture.test/book',url='https://fixture.test/1';
@@ -32,6 +32,20 @@ beforeEach(()=>{
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('independent discovery operations and common manifest authority',()=>{
+  it('blocks catalog, chapter and parent-resolution HTTP after browser access is revoked',async()=>{
+    const fetcher=vi.fn(async()=>new Response('source'));vi.stubGlobal('fetch',fetcher);
+    fixture.networks.fixture={
+      catalog:async(target,context)=>{await context.request(target);return source();},
+      pages:async(target,context)=>{await context.request(target);return pages();},
+      resolveCatalog:async(target,context)=>{await context.request(target);return book;},
+    };
+    vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
+    for(const operation of [()=>readSourceCatalog(book),()=>readNetworkPages(url),()=>resolveNetworkCatalog('https://fixture.test/unbound')])
+      await expect(operation()).rejects.toMatchObject({kind:'permission-required'});
+    expect(chrome.permissions.contains).toHaveBeenCalledWith({origins:['https://fixture.test/*']});
+    expect(fetcher).not.toHaveBeenCalled();expect(chrome.permissions.request).not.toHaveBeenCalled();
+    expect(chrome.tabs.create).not.toHaveBeenCalled();expect(set).not.toHaveBeenCalled();
+  });
   it('resolves missing parent identity only through the owning HTTP adapter and validates the target',async()=>{
     const unbound='https://fixture.test/unbound';
     expect(await resolveNetworkCatalog(unbound)).toBeUndefined();
@@ -111,8 +125,9 @@ describe('independent discovery operations and common manifest authority',()=>{
     const previous=source(),read=vi.fn<NonNullable<SourceNetwork['catalog']>>(async()=>source());fixture.networks.fixture={catalog:read};saved['nc-source:fixture:book']={invalid:'unaccepted'};
     await readNetworkCatalog(book,{previous});expect(read.mock.calls[0][1].previous).toEqual(previous);expect(set).not.toHaveBeenCalled();
   });
-  it('requests link permissions in the user gesture without requiring a network implementation',async()=>{
-    const promise=authorizeCatalogImport(book);expect(chrome.permissions.request).toHaveBeenCalledWith({origins:['https://fixture.test/*']});
+  it('validates installation access without requesting per-site permissions or a network implementation',async()=>{
+    const promise=prepareCatalogImport(book);expect(chrome.permissions.contains).toHaveBeenCalledWith({origins:['https://*/*','http://*/*']});
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect(await promise).toBe(book);expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
   it('rejects cross-origin and foreign-source Referers before issuing a request',async()=>{
@@ -187,7 +202,7 @@ describe('source image facade',()=>{
     const fetch=vi.fn();vi.stubGlobal('fetch',fetch);send.mockResolvedValue({ok:true,data:{url:'https://other.test/1.png'}});
     await expect(readSourceImage(ref)).rejects.toThrow('来源已变化');
     send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url}});vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
-    await expect(readSourceImage(ref)).rejects.toThrow('授权');expect(fetch).not.toHaveBeenCalled();
+    await expect(readSourceImage(ref)).rejects.toThrow('网站访问权限已被浏览器关闭');expect(fetch).not.toHaveBeenCalled();
   });
   it('resolves dynamic image headers only after URL and permission authorization',async()=>{
     const headers=vi.fn(()=>({}));fixture.images.fixture={headers};

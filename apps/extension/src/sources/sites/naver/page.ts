@@ -1,6 +1,7 @@
 import type {CreateSourcePage} from '../../contracts/page';
 import {imageSession} from '../../shared/session';
 import {renderedImages} from '../../shared/dom-images';
+import {naverLocation} from './definition';
 
 const catalogAnchor = '[class*="EpisodeListInfo__info_area--"]';
 const readerAnchor = '#viewerHeader';
@@ -19,6 +20,19 @@ export const createPage: CreateSourcePage = context => {
   });
   return {
     ...session,
+    describeWork() {
+      const catalog=context.location.catalog,doc=context.document;
+      if(context.location.kind!=='catalog'||!catalog)return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      const canonical=doc.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href;
+      const title=doc.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
+      if(!canonical||!title)return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      const url=new URL(canonical);
+      // NAVER's desktop work page publishes a mobile canonical URL for the same work.
+      if(url.hostname==='m.comic.naver.com')url.hostname='comic.naver.com';
+      const found=naverLocation(url),expected=naverLocation(new URL(catalog.url));
+      if(!found||found.no||found.titleId!==expected?.titleId||found.section!==expected.section)return {status:'not-ready',code:'WORK_METADATA_UNAVAILABLE'};
+      return {status:'ready',value:{title,catalogId:catalog.key,catalogUrl:catalog.url}};
+    },
     direction: 'ltr',
     async discoverPages() { session.snapshot(); return {status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'}; },
     importAnchor() {

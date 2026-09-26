@@ -4,6 +4,7 @@ import {parseCatalog} from './catalog';
 import {catalogUrl, chapterUrl, dm5Location} from './definition';
 import {assignment, attribute, positive, scripts, text} from './parsing';
 import {EmptyImageListError, imageUrls} from './protocol';
+import {search} from './search';
 
 function readerIdentity(html:string,url:string){
   const loc=dm5Location(new URL(url));
@@ -16,6 +17,7 @@ function readerIdentity(html:string,url:string){
   return {data,slug:parent.slug};
 }
 export const network: SourceNetwork = {
+  search,
   async resolveCatalog(url,context){
     const loc=dm5Location(new URL(url));
     if(!loc?.chapterId)throw Error('DM5 章节地址无效。');

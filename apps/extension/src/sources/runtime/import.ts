@@ -1,6 +1,6 @@
 import {resolveSource} from '../core/resolve';
 import {definitions} from '../registry/definitions';
-import {requestImagePermissions} from './permissions';
+import {requireHostAccess} from '../../host-permissions';
 import {resolveNetworkCatalog} from './network';
 import {readSourceCatalog} from './catalog-reader';
 import {sameSource} from '../core/identity';
@@ -27,10 +27,10 @@ export async function readImportCatalog(url:string,readCatalog:(url:string)=>Pro
   }catch(error){await forgetImportResponses(location);throw error;}
 }
 
-/** Call directly from the user gesture; permission requests must precede storage/network awaits. */
-export async function authorizeCatalogImport(url:string) {
+/** Validate a catalog entry and installation access before reading source data. */
+export async function prepareCatalogImport(url:string) {
   const {definition,location}=resolveSource(url,definitions);
   if(!definition.capabilities.importable||!definition.capabilities.catalog||location.kind==='other')throw Error('请粘贴已适配网站的漫画详情页或章节链接。');
-  await requestImagePermissions([new URL(location.url).origin+'/*',...(definition.installation.optionalOrigins??[])]);
+  await requireHostAccess();
   return location.url;
 }

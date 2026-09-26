@@ -5,6 +5,7 @@ import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
 import type {Authorization} from './auth/session';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
+export interface ComicTitleTranslation {name:string|null;target_language:string|null}
 function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
   return Number.isFinite(seconds)&&seconds>0?Math.ceil(seconds):undefined;
@@ -45,6 +46,13 @@ export class Api {
   authConfig() { return this.request<AuthConfig>('/v1/auth/config'); }
   login(username: string) { return this.request<{access_token: string; expires_in:number; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
   capabilities() { return this.request<Capabilities>('/v1/capabilities'); }
+  async translateComicTitle(name:string,targetLanguage:string,signal?:AbortSignal):Promise<ComicTitleTranslation> {
+    const title=name.trim();
+    if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title))throw new ApiError(msg('漫画名称需为 1–60 个字符，且不能包含控制字符。'),'INVALID_COMIC_TITLE',422);
+    const result=await this.request<ComicTitleTranslation>('/v1/comic-titles/translate',{method:'POST',body:JSON.stringify({name:title,target_language:targetLanguage}),signal});
+    if(!result||!((result.name===null&&result.target_language===null)||(typeof result.name==='string'&&!!result.name.trim()&&typeof result.target_language==='string'&&!!result.target_language.trim())))throw new ApiError(msg('名称服务返回了无效结果，请手动输入搜索名称。'),'INVALID_COMIC_TITLE_RESPONSE');
+    return result;
+  }
   entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}

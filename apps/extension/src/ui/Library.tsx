@@ -9,8 +9,8 @@ import {Modal} from './components';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
 import './shelf.css';
-type Props={library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+type Props={onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
@@ -23,6 +23,7 @@ export function Library({library,onOpen,onImport,onSource,sourceActions,onChange
  const actions=(comic:Comic)=>[
   {label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
   ...(comic.sourceUrl?[{label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
+  ...(onFind?[{label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
  ];

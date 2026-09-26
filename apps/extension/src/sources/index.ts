@@ -7,18 +7,22 @@ import { definitions } from './registry/definitions';
 import { comicSize } from './shared/dimensions';
 export type * from './contracts/definition';
 export type * from './contracts/source';
+export type * from './contracts/search';
+export type * from './contracts/work';
+export {consumeSearchSeed} from './runtime/search-entry';
+export {SourceSearchError} from './contracts/search';
+export {normalizeSearchLanguage, sourceSearchLimits} from './core/search';
+export {listSearchSites, searchSource, readSearchCover, releaseSourceSearchSession} from './runtime/search';
 export { pollSourceDiscovery } from './core/discovery';
 export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
-export {authorizeCatalogImport,readImportCatalog} from './runtime/import';
+export {prepareCatalogImport,readImportCatalog} from './runtime/import';
 export {listSupportedSites} from './registry/sites';
 export {readSourceImage,readInlineSourceImage,readSourceCover} from './runtime/source-image';
 export {recoverCatalogTabs} from './runtime/catalog-reader';
 export { sourceImage } from './runtime/image-fetch';
 export {
-  copyOrigins,
   imageOrigins,
   ImagePermissionsRequired,
-  requestImagePermissions,
   requireImagePermissions,
 } from './runtime/permissions';
 export { imageDataUrl, maxInlineBytes } from './shared/bytes';
@@ -53,7 +57,6 @@ export const sourceCatalogReference = (url: string) => sourceLocation(url)?.cata
 export const sameSourcePage = service.samePage;
 export const sourceName = (id: string) => definitions.find((d) => d.id === id)?.name || msg('网页图片');
 export const sourceInstallation = {
-  requiredOrigins: [...new Set(definitions.flatMap((d) => d.installation.requiredOrigins))],
   autoContentMatches: [...new Set(definitions.flatMap((d) => d.installation.autoContentMatches))],
 };
 export const validateSourceCatalog = service.validateCatalog;

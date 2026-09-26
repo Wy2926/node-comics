@@ -10,7 +10,11 @@
 
 原始图片由 `/at-home/server/<chapter UUID>` 的 `data` 数组决定页序，保留重复文件在不同页槽。目录中的章节页数与返回清单必须相等。每页 `contentKey` 使用章节 UUID、图片 hash 和文件名；临时图片节点变更不改变内容身份。只接受 HTTPS `uploads.mangadex.org` 与单层 `*.mangadex.network` 节点，不固定猜测服务器或使用 `dataSaver` 替代原图。外链、不可用及空页发布条目在打开时明确报错，不替换其他发布条目。
 
-首次安装不请求这些主机权限。授权后的网页会挂载一个页面级导入／管理入口，使用自有固定位置容器并随导航／销毁清理；该入口不依赖 MangaDex 的专属 DOM 选择器。真实页面布局与 SPA 中入口可见性须在源站网页单独验收，隔离页面测试不能替代。
+网站访问遵循[公共权限规则](../../../../../../docs/SITE_ADAPTERS.md#必须保持的约束)，不逐站申请。具备浏览器访问权限的网页会挂载一个页面级导入／管理入口，使用自有固定位置容器并随导航／销毁清理；该入口不依赖 MangaDex 的专属 DOM 选择器。真实页面布局与 SPA 中入口可见性须在源站网页单独验收，隔离页面测试不能替代。
+
+搜索只用公开 `/manga` 列表的 `title` 查询，每页 12 项，按相关度排序；不发送 `availableTranslatedLanguage[]`、`originalLanguage[]` 等语言筛选。结果有 `availableTranslatedLanguages` 时将其规范化为可选语言标签，缺失时不补齐；原作语言或书名语言不代替本站章节语言，也不影响作品是否返回。搜索采用 API 默认内容分级范围（`safe`、`suggestive`、`erotica`），源站分页上限为 10000 项。
+
+网页种子要求作品页 `og:url` 与当前作品身份一致，再读取 `og:title` 的已知站点后缀；SPA 残留旧身份或章节页没有可靠作品名时不返回种子。OpenGraph 分享图不冒充作品封面。
 
 协议来源：[MangaDex OpenAPI](https://api.mangadex.org/docs/static/api.yaml)、[公开 API 文档](https://api.mangadex.org/docs/)。本地图标为项目自绘的书本标识，不包含下载的第三方图标。没有使用源站脚本、账号令牌或 Cookie 转发。
 
@@ -22,6 +26,7 @@ npx vitest run src/sources/sites/mangadex/tests/network.test.ts src/sources/site
 
 # 仓库根目录：真实公开 API、章节归属、英文/繁体中文页数及首图传输
 node apps/extension/src/sources/sites/mangadex/tests/verify-http.mjs
+node apps/extension/src/sources/sites/mangadex/tests/verify-search-http.mjs
 
 # 仓库根目录，先构建 Chrome MV3：隔离浏览器及合成 API/图片
 node apps/extension/src/sources/sites/mangadex/tests/verify-reader.mjs
@@ -31,4 +36,6 @@ $env:RUN_LIVE_MANGADEX = '1'
 node apps/extension/src/sources/sites/mangadex/tests/verify-reader.mjs
 ```
 
-浏览器脚本使用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM` 指定已有环境，产物写入忽略的 `artifacts/mangadex/`。HTTP 探针只证明协议和图片传输；浏览器脚本使用预授权隔离配置，不能证明原生权限弹窗或真实源站页面。均不调用翻译模型，不能证明翻译效果。
+浏览器脚本使用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM` 指定已有环境，产物写入忽略的 `artifacts/mangadex/`。HTTP 探针只证明协议和图片传输；浏览器脚本使用隔离配置，不能证明浏览器安装权限、撤权恢复或真实源站页面。均不调用翻译模型，不能证明翻译效果。
+
+搜索 HTTP 探针独立验证名称命中、分页和空结果，报告在 `artifacts/mangadex/search-http/`；`search.test.ts` 覆盖查询编码、无语言过滤、可选内容语言、身份、取消和作品种子。搜索 HTTP 结果不代表浏览器权限、搜索 UI 或导入已通过验收。

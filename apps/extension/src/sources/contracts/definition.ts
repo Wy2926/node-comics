@@ -1,3 +1,4 @@
+import type {SourceSearchCapability} from './search';
 export interface SourceLocation {
   sourceId: string;
   pageKey: string;
@@ -13,6 +14,7 @@ export interface SourceSite {
   icon: string;
   /** Main content languages (BCP 47), in display order; not an exhaustive catalog filter. */
   primaryLanguages: readonly string[];
+  search?: SourceSearchCapability;
 }
 /** Pure metadata: safe in build tools, UI and the service worker. */
 export interface SourceDefinition {
