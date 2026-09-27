@@ -57,7 +57,7 @@ async function imports(slug,offline){
   const created=context.waitForEvent('page');await button.click();reader=await created;await reader.waitForURL(/reader\.html\?catalog=/);
   await rendered();
   if(offline){
-    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.getByRole('button',{name:'更多操作 · 网站离线验收',exact:true}).click();
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.getByRole('button',{name:'打开漫画 网站离线验收',exact:true}).click({button:'right'});
     assert.equal(await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).count(),0);
     await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();await reader.getByRole('button',{name:'离线缓存',exact:true}).click();await reader.locator('.nc-download-center').waitFor();
   }
@@ -96,7 +96,7 @@ try{
   await reader.locator('.setting-row').filter({has:reader.getByText('缩略图',{exact:true})}).getByRole('button',{name:'清理',exact:true}).click();
   assert.equal(await cacheCount('source-pages'),0);assert.equal(await cacheCount('downloads'),2);checks.push('Clearing automatic source pages and thumbnails preserves both explicit downloads');
   await context.close();imagesOffline=true;context=await chromium.launchPersistentContext(profile,options);await routes();worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');reader=await context.newPage();await reader.goto(new URL('reader.html',worker.url()).href);
-  const beforeReads=imageRequests.filter(url=>url.startsWith('/retained/')).length;const card=reader.locator('article.nc-book').filter({has:reader.getByRole('button',{name:'打开漫画 网站离线验收',exact:true})});await card.getByRole('button',{name:'继续阅读',exact:true}).click();await rendered();
+  const beforeReads=imageRequests.filter(url=>url.startsWith('/retained/')).length;const card=reader.locator('article.nc-book').filter({has:reader.getByRole('button',{name:'打开漫画 网站离线验收',exact:true})});await card.getByRole('button',{name:/^打开漫画 /}).click();await rendered();
   assert.equal(imageRequests.filter(url=>url.startsWith('/retained/')).length,beforeReads);assert((await state()).tasks.some(task=>task.entryId===retainedId&&task.status==='complete'));await reader.screenshot({path:path.join(out,'retained-offline-after-restart.png')});checks.push('Browser restart reads retained pages while source responses fail, without another retained-source fetch');
   assert.deepEqual(errors,[]);await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,extensionImageReads,originalBytes:original.length,liveSites:false,browser:context.browser()?.version()},null,2));console.log(JSON.stringify({checks,errors,extensionImageReads},null,2));
 }catch(error){if(reader&&!reader.isClosed()){await reader.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.txt'),await reader.locator('body').innerText());await writeFile(path.join(out,'failure.json'),JSON.stringify({error:String(error),errors,state:await state().catch(String),runtime:await reader.evaluate(async()=>({session:await chrome.storage.session.get(null),tabs:await chrome.tabs.query({}),manifests:Object.keys(await chrome.storage.local.get(null)).filter(key=>key.startsWith('manifest:'))})),pages:await Promise.all(context.pages().map(async page=>({url:page.url(),body:await page.locator('body').innerText().catch(String)})))},null,2));}throw error;}finally{await context.close();await Promise.all([new Promise(resolve=>site.close(resolve)),new Promise(resolve=>images.close(resolve))]);}

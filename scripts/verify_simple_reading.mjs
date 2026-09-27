@@ -9,7 +9,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const {ZipWriter,Uint8ArrayWriter,Uint8ArrayReader}=createRequire(path.join(root,'apps/extension/package.json'))('@zip.js/zip.js');
 const label=process.env.TEST_BROWSER_NAME||'chromium-extension';
 const output=path.join(root,'artifacts/simple-reading',label);await mkdir(output,{recursive:true});
-const profile=await mkdtemp(path.join(output,'profile-')),extension=path.join(root,'apps/extension/.output/chrome-mv3');
+const profile=await mkdtemp(path.join(output,'profile-')),extension=process.env.TEST_EXTENSION_DIR||path.join(root,'apps/extension/.output/chrome-mv3');
 const options={headless:true,executablePath:process.env.TEST_CHROMIUM,viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension]};
 const sample=await readFile(path.join(root,'artifacts/import-validation/1.png')),writer=new ZipWriter(new Uint8ArrayWriter());
 for(let n=0;n<120;n++)await writer.add(`${String(n).padStart(3,'0')}.png`,new Uint8ArrayReader(sample),{level:0});
@@ -51,7 +51,7 @@ try{
  const progressPlacement=await progress.evaluate(bar=>{const cover=bar.previousElementSibling.getBoundingClientRect(),rect=bar.getBoundingClientRect();return {gap:rect.top-cover.bottom,width:rect.width,coverWidth:cover.width};});
  assert(Math.abs(progressPlacement.gap)<1);assert(Math.abs(progressPlacement.width-progressPlacement.coverWidth)<1);
  await screenshot('shelf-reading-progress');checks.push('单话第 100 / 120 页显示 83% 进度条，位于封面下方且等宽');
- await closeResult();await context.close();context=await chromium.launchPersistentContext(profile,options);await boot();await page.getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(99);checks.push('真实关闭并重启浏览器，直接恢复第 100 页');await screenshot('resumed');await shelf();
+ await closeResult();await context.close();context=await chromium.launchPersistentContext(profile,options);await boot();await page.getByRole('button',{name:/^打开漫画 /}).click();await rendered(99);checks.push('真实关闭并重启浏览器，直接恢复第 100 页');await screenshot('resumed');await shelf();
  await importFile('另一个名字.cbz',archive);await rendered(99);assert.equal((await state()).comics.length,1);checks.push('相同文件改名重导入复用同一本，保留进度');await shelf();await closeResult();
  await page.locator('input[type=file]').setInputFiles([{name:'散图.png',mimeType:'image/png',buffer:sample},{name:'第二张.jpg',mimeType:'image/jpeg',buffer:sample},{name:'第二本.cbz',mimeType:'application/zip',buffer:await readFile(path.join(root,'artifacts/import-validation/pages.cbz'))}]);
  const panel=page.locator('.nc-local-import-modal');await panel.locator('.nc-import-item.failed').first().waitFor({timeout:60000});await panel.locator('.nc-import-item.created').waitFor();assert.equal(await panel.locator('.nc-import-item.failed').count(),2);assert.equal((await state()).comics.length,2);assert.equal(await page.locator('.nc-reader').count(),0);checks.push('混合批量自动导入：两张散图分别拒绝，合法漫画独立入库，失败不阻塞');await screenshot('batch');await closeResult();
@@ -63,13 +63,13 @@ try{
  }
  await importFile('broken-image.cbz',await readFile(path.join(root,'artifacts/import-validation/broken-image.cbz')));await rendered(0);await jump(2);await page.locator('[data-page-index="1"] .nc-image-failure').waitFor();await screenshot('failed-page');
  value=await state();assert.equal(value.entries.find(e=>e.title==='broken-image')?.readAt,undefined);await jump(1);await rendered(0);checks.push('损坏图片有重试入口，其他页仍可读，失败不误记已读');await shelf();await closeResult();
- const card=page.locator('.nc-book').filter({has:page.getByRole('button',{name:'长篇漫画',exact:true})});await card.getByRole('button',{name:'更多操作 · 长篇漫画',exact:true}).click();
+ const card=page.locator('.nc-book').filter({has:page.getByRole('button',{name:'长篇漫画',exact:true})});await card.getByRole('button',{name:'打开漫画 长篇漫画',exact:true}).click({button:'right'});
  assert.equal(await page.getByRole('menuitem',{name:/编辑|版本|归属|添加来源/}).count(),0);await screenshot('comic-menu');await page.keyboard.press('Escape');
  const time=card.locator('time');assert.equal(Date.parse(await time.getAttribute('datetime')),(await state()).comics.find(c=>c.title==='长篇漫画').lastReadAt);assert(!(await time.innerText()).includes('最近阅读'));
  const placement=await card.evaluate(card=>{const cover=card.querySelector('.nc-book-cover').getBoundingClientRect(),tag=card.querySelector('.nc-card-reading-time').getBoundingClientRect();return {inside:tag.top>=cover.top&&tag.left>=cover.left&&tag.right<=cover.right&&tag.bottom<=cover.bottom,topGap:cover.top-card.getBoundingClientRect().top};});assert(placement.inside);assert(placement.topGap<=3);
  await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await screenshot('desktop-shelf');await screenshot('desktop-shelf-top');assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
- await card.getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(99);await screenshot('desktop-reader');checks.push('桌面卡片显示真实最近阅读时间，直接续读恢复位置，书架无顶部下载区块');
- await shelf();await card.getByRole('button',{name:'更多操作 · 长篇漫画',exact:true}).click();await page.getByRole('menuitem',{name:'移除漫画',exact:true}).click();await page.getByRole('dialog',{name:'移除漫画'}).getByRole('button',{name:'移除漫画',exact:true}).click();await card.waitFor({state:'detached'});value=await state();assert(!value.comics.some(c=>c.title==='长篇漫画'));checks.push('移除漫画同时移除其本地阅读记录');
+ await card.getByRole('button',{name:/^打开漫画 /}).click();await rendered(99);await screenshot('desktop-reader');checks.push('桌面卡片显示真实最近阅读时间，直接续读恢复位置，书架无顶部下载区块');
+ await shelf();await card.getByRole('button',{name:'打开漫画 长篇漫画',exact:true}).click({button:'right'});await page.getByRole('menuitem',{name:'移除漫画',exact:true}).click();await page.getByRole('dialog',{name:'移除漫画'}).getByRole('button',{name:'移除漫画',exact:true}).click();await card.waitFor({state:'detached'});value=await state();assert(!value.comics.some(c=>c.title==='长篇漫画'));checks.push('移除漫画同时移除其本地阅读记录');
  // Actual extension UI, isolated catalog fixtures; no real account or cloud requests.
  await page.evaluate(async()=>{
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('node-comics-reading-v2-catalog');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
@@ -99,13 +99,13 @@ try{
  const storage=page.locator('.settings-card').filter({has:page.getByRole('heading',{name:'本机资料与独立缓存',exact:true})});
  await page.getByText('reader@example.test',{exact:true}).waitFor();
  assert.equal(await storage.getByRole('link').count(),0);assert.equal(await page.getByText('管理漫画',{exact:true}).count(),0);assert.equal(await page.getByText('管理下载',{exact:true}).count(),0);
- const boxes=await page.locator('.nc-preferences>.settings-card').evaluateAll(cards=>cards.map(card=>{const r=card.getBoundingClientRect();return {x:r.x,width:r.width};}));assert.equal(boxes.length,5);assert(boxes.every(box=>box.x===boxes[0].x&&box.width===boxes[0].width));
+ const boxes=await page.locator('.nc-preferences>.settings-card').evaluateAll(cards=>cards.map(card=>{const r=card.getBoundingClientRect();return {x:r.x,width:r.width};}));assert.equal(boxes.length,6);assert(boxes.every(box=>box.x===boxes[0].x&&box.width===boxes[0].width));
  assert((await page.locator('.nc-source-account').innerText()).includes('fixture-account'));assert((await page.locator('.nc-source-account').innerText()).includes('已连接'));
  assert((await page.locator('.nc-source-account').boundingBox()).height<110,'Cloud account should use a compact horizontal row');
  await storage.scrollIntoViewIfNeeded();await screenshot('settings-storage-accounts');
  await page.locator('.nc-source-accounts').scrollIntoViewIfNeeded();await screenshot('source-account');
  await storage.getByRole('button',{name:'清理',exact:true}).first().click();await page.waitForFunction(()=>![...document.querySelectorAll('.settings-card button')].some(button=>button.textContent==='清理'&&button.disabled));
- assert.equal((await state()).comics.length,value.comics.length);checks.push('五个设置卡片宽度与左边缘一致，管理快捷按钮移除，账户显示来源/名称/邮箱/标识/状态，清缓存保留漫画');
+ assert.equal((await state()).comics.length,value.comics.length);checks.push('六个设置卡片宽度与左边缘一致，管理快捷按钮移除，账户显示来源/名称/邮箱/标识/状态，清缓存保留漫画');
  // An external source lifecycle change must update the account without reopening settings.
  assert.equal((await page.evaluate(()=>chrome.runtime.sendMessage({type:'NC_DRIVE_DISCONNECT',accountId:'fixture-account'}))).ok,true);
  await page.getByText('已断开连接',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'断开连接',exact:true}).count(),0);checks.push('账户在其他上下文断开后，设置自动更新状态并保留只读资料');

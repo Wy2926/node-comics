@@ -135,14 +135,14 @@ try{
   },{imageOrigin});
   await reader.reload();await shelf().waitFor();
   await center();await reader.getByRole('heading',{name:'离线中心',exact:true}).waitFor();assert.equal(await reader.locator('.nc-download-book').count(),0);
-  await library();await button('更多操作 · 静谧小镇 · 单语言').click();
+  await library();await button('打开漫画 静谧小镇 · 单语言').click({button:'right'});
   assert.equal(await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).count(),0);await reader.keyboard.press('Escape');
-  await button('更多操作 · 星光书店 · 多语言离线').click();await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).click();
+  await button('打开漫画 星光书店 · 多语言离线').click({button:'right'});await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).click();
   const chooser=await languageChooser();await chooser.getByRole('checkbox',{name:/日本語/}).uncheck();
   assert(await chooser.getByRole('checkbox',{name:/English/}).isChecked());assert.equal(await chooser.getByRole('checkbox',{checked:true}).count(),2);
   await snapshot('languages-light');await chooser.getByRole('button',{name:'保存选择',exact:true}).click();await chooser.waitFor({state:'hidden'});
   const languagePreference=(await state()).metadata.find(value=>value.id==='download-languages:fixture-book');
-  await button('更多操作 · 星光书店 · 多语言离线').click();await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).click();
+  await button('打开漫画 星光书店 · 多语言离线').click({button:'right'});await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).click();
   const dismissed=await languageChooser();await dismissed.getByRole('checkbox',{name:/English/}).uncheck();await reader.keyboard.press('Escape');await dismissed.waitFor({state:'hidden'});
   assert.deepEqual((await state()).metadata.find(value=>value.id==='download-languages:fixture-book'),languagePreference);
   checks.push('右上角进入整页空离线中心；单语言漫画隐藏缓存语言，多语言默认全选并独立保存中英文选择');
@@ -153,7 +153,7 @@ try{
   await button('阅读设置').click();assert.equal(await button('下载原图').count(),0);await button('关闭面板').click();
   let contents=await directory();assert.equal(await contents.locator('[data-cache-status]').count(),0);assert.equal(await contents.getByRole('button',{name:/^(缓存整本|离线缓存|当前全部目录已缓存|所选语言已缓存)$/}).count(),0);
   await contents.getByRole('searchbox').fill('第 1');await button('关闭面板').click();await library();
-  delay=500;await button('更多操作 · 星光书店 · 多语言离线').click();await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
+  delay=500;await button('打开漫画 星光书店 · 多语言离线').click({button:'right'});await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
   await waitState(s=>s.plan?.status==='running');await reader.waitForFunction(()=>document.querySelector('[data-downloads-trigger]')?.textContent.trim()==='1');await noShelfCache();await snapshot('shelf-caching-no-badge');
   await center();await compactCard();
   const activeMenu=await bookMenu({rightClick:true});await activeMenu.getByRole('menuitem',{name:'取消缓存',exact:true}).waitFor();
@@ -231,7 +231,7 @@ try{
   const cleared=await state();assert.equal(cleared.comics.length,2);assert.deepEqual(cleared.positions.find(value=>value.entryId==='entry:7'),position);await snapshot('cleared');
   checks.push('复用对话框确认清理，移除漫画离线计划、子任务和原图，保留两本漫画与阅读位置');
   await context.setOffline(false);offline=false;delay=800;await library();
-  await button('更多操作 · 星光书店 · 多语言离线').click();await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
+  await button('打开漫画 星光书店 · 多语言离线').click({button:'right'});await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
   await waitState(s=>s.plan?.status==='running'&&s.saved.length>0);await center();await cachedBook().getByRole('button',{name:'暂停缓存',exact:true}).click();
   await waitState(s=>s.plan?.status==='paused');assert((await state()).saved.length>0);assert.equal(await cachedBook().count(),1);assert.equal(await cachedBook().getByRole('button',{name:'停止缓存',exact:true}).count(),0);
   await bookAction('取消缓存');const cancelDialog=reader.getByRole('dialog',{name:'取消缓存',exact:true});await cancelDialog.waitFor();
@@ -241,7 +241,7 @@ try{
   await waitState(s=>!s.plan&&s.tasks.length===0&&s.saved.length===0);await cachedBook().waitFor({state:'hidden'});
   await reader.reload();await reader.locator('.nc-download-center').waitFor();await new Promise(resolve=>setTimeout(resolve,1500));
   const canceled=await state();assert.equal(canceled.plan,undefined);assert.equal(canceled.tasks.length,0);assert.equal(canceled.saved.length,0);assert.equal(await reader.locator('.nc-download-book').count(),0);assert.equal(canceled.comics.length,2);assert.deepEqual(canceled.positions.find(value=>value.entryId==='entry:7'),position);
-  delay=0;await library();await button('更多操作 · 星光书店 · 多语言离线').click();await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
+  delay=0;await library();await button('打开漫画 星光书店 · 多语言离线').click({button:'right'});await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();
   await waitState(s=>s.plan?.status==='complete'&&s.saved.length>0);await center();await cachedBook().locator('.nc-download-status[data-state="complete"]').waitFor();
   checks.push('暂停保留任务和原图；取消确认可撤回，确认后删除计划/任务/原图；重开插件无已停止记录或任务复活，可重新缓存');
   await library();await button('外观与设置').click();assert.equal(await reader.getByText('离线原图',{exact:true}).count(),0);checks.push('设置页移除离线原图管理行');

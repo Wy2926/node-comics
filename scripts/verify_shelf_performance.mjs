@@ -53,7 +53,10 @@ await context.addInitScript(()=>{
 });
 const snapshot=()=>page.evaluate(()=>{const value=window.__shelfPerf;return {...value,elapsed:performance.now()-value.start,workMs:value.last-value.start,uniqueEntryComics:Object.keys(value.entryComics).length,renderedCards:document.querySelectorAll('.nc-book').length};});
 const settle=()=>page.waitForFunction(()=>window.__shelfPerf.pending===0&&performance.now()-window.__shelfPerf.last>200,null,{timeout:60000});
+const waitForCovers=()=>page.waitForFunction(()=>{const covers=window.__visibleShelfCovers();return covers.length>0&&covers.every(({image})=>image?.complete&&image.naturalWidth>0);});
 const nav=name=>page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true});
+// Sticky navigation is already visible; locator.click may scroll the document before the click.
+const clickNav=async name=>{const box=await nav(name).boundingBox();assert(box&&box.y>=0&&box.y+box.height<=page.viewportSize().height);await page.mouse.click(box.x+box.width/2,box.y+box.height/2);};
 const measure=async(name,action)=>{
  await page.evaluate(()=>window.__resetShelfPerf());await action();await page.locator('.nc-book').first().waitFor();
  const firstPaintMs=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(performance.now()-window.__shelfPerf.start)))));
@@ -103,9 +106,9 @@ try{
  await measure('initial',()=>page.reload());
  if(!baseline)assert.equal(await page.evaluate(()=>document.documentElement.style.overflowAnchor),'none','Active shelf owns manual document scroll restoration');
  for(let n=1;n<=3;n++){
-  await nav('漫画网站').click();await page.locator('.nc-library').waitFor({state:'hidden'});await settle();
+  await clickNav('漫画网站');await page.locator('.nc-library').waitFor({state:'hidden'});await settle();
   if(!baseline)assert.equal(await page.evaluate(()=>document.documentElement.style.overflowAnchor),'','Leaving the shelf restores the previous document anchoring policy');
-  await measure('return-'+n,()=>nav('我的漫画').click());
+  await measure('return-'+n,()=>clickNav('我的漫画'));
   if(!baseline)assert.equal(await page.evaluate(()=>document.documentElement.style.overflowAnchor),'none');
  }
  for(const result of rounds){assert(result.renderedCards>0&&result.renderedCards<=Math.min(count,30),'Shelf must render a bounded card window');if(!baseline){
@@ -117,18 +120,18 @@ try{
  const visited=new Set();
  for(let top=0;;top+=600){
   const maximum=await page.evaluate(top=>{window.scrollTo(0,top);return Math.max(0,document.documentElement.scrollHeight-innerHeight);},top);
-  await settle();await page.waitForFunction(()=>window.__visibleShelfCovers().every(({image})=>image?.complete&&image.naturalWidth>0));
+  await settle();await waitForCovers();
   for(const id of await page.evaluate(()=>window.__visibleShelfCovers().map(({id})=>id)))visited.add(id);
   if(top>=maximum)break;
  }
  assert.equal(visited.size,count,'Every fixture cover was visited and decoded before the warm-navigation comparison');
- await page.evaluate(()=>window.scrollTo(0,0));await settle();await page.waitForFunction(()=>window.__visibleShelfCovers().every(({image})=>image?.complete&&image.naturalWidth>0));
+ await page.evaluate(()=>window.scrollTo(0,0));await settle();await waitForCovers();
  for(let n=1;n<=3;n++){
   const before=await page.evaluate(()=>{window.__savedShelfImages=new Map(window.__visibleShelfCovers().map(({id,image})=>[id,{image,src:image.src}]));window.__resetShelfPerf();return [...window.__savedShelfImages].map(([id,{src}])=>({id,src}));});
-  await nav('漫画网站').click();await page.locator('.nc-library').waitFor({state:'hidden'});await settle();
-  await nav('我的漫画').click();await page.locator('.nc-library').waitFor();
+  await clickNav('漫画网站');await page.locator('.nc-library').waitFor({state:'hidden'});await settle();
+  await clickNav('我的漫画');await page.locator('.nc-library').waitFor();
   const firstReturnFrame=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(window.__visibleShelfCovers().map(({id,image})=>({id,decoded:!!image?.complete&&image.naturalWidth>0,sameNode:image===window.__savedShelfImages.get(id)?.image,sameURL:image?.src===window.__savedShelfImages.get(id)?.src})))))));
-  await settle();await page.waitForFunction(()=>window.__visibleShelfCovers().every(({image})=>image?.complete&&image.naturalWidth>0));
+  await settle();await waitForCovers();
   const after=await page.evaluate(()=>window.__visibleShelfCovers().map(({id,image})=>({id,src:image.src,sameNode:image===window.__savedShelfImages.get(id)?.image,sameURL:image.src===window.__savedShelfImages.get(id)?.src})));
   const stats=await snapshot(),result={round:n,visited:visited.size,before,firstReturnFrame,after,thumbnailReads:stats.thumbnailReads,thumbnailBlobReads:stats.thumbnailBlobReads,objectURLsCreated:stats.objectURLsCreated,objectURLsRevoked:stats.objectURLsRevoked};thumbnailChecks.push(result);
   console.log(JSON.stringify({thumbnailRound:n,visibleCovers:after.length,sameNodes:after.filter(value=>value.sameNode).length,sameURLs:after.filter(value=>value.sameURL).length,thumbnailReads:stats.thumbnailReads,thumbnailBlobReads:stats.thumbnailBlobReads}));
@@ -139,34 +142,34 @@ try{
  for(const requested of [600,1800]){
   const target=await page.evaluate(top=>Math.min(top,Math.max(0,document.documentElement.scrollHeight-innerHeight)),requested);
   await page.evaluate(top=>window.scrollTo(0,top),target);await page.waitForFunction(top=>Math.abs(window.scrollY-top)<2,target);await settle();const before=await page.evaluate(()=>window.scrollY);
-  await nav('漫画网站').click();await page.locator('.nc-library').waitFor({state:'hidden'});await settle();await nav('我的漫画').click();await page.locator('.nc-book').first().waitFor();await settle();const after=await page.evaluate(()=>window.scrollY);
+  await clickNav('漫画网站');await page.locator('.nc-library').waitFor({state:'hidden'});await settle();await clickNav('我的漫画');await page.locator('.nc-book').first().waitFor();await settle();const after=await page.evaluate(()=>window.scrollY);
   scrollChecks.push({requested,before,after,restored:Math.abs(after-before)<2});
   if(!baseline)assert(Math.abs(after-before)<2,`Shelf scroll must be restored: ${before} -> ${after}`);
  }
  await page.screenshot({path:path.join(out,'shelf-restored.png')});checks.push('记录 600px 与 1800px 书架切换前后滚动实值（见 scrollChecks）');
  if(!baseline){
   await page.evaluate(()=>window.scrollTo(0,600));await settle();const before=await page.evaluate(()=>window.scrollY);
-  await nav('漫画网站').click();await page.locator('.nc-library').waitFor({state:'hidden'});await page.evaluate(()=>window.scrollTo(0,300));await settle();const otherPageScroll=await page.evaluate(()=>window.scrollY);assert(otherPageScroll>0,'The other page must actually scroll while the library is hidden');
-  await nav('我的漫画').click();await page.locator('.nc-library').waitFor();await settle();const after=await page.evaluate(()=>window.scrollY);scrollChecks.push({scenario:'other-page-scroll',before,otherPageScroll,after,restored:Math.abs(after-before)<2});assert(Math.abs(after-before)<2,'Scrolling another page must not overwrite the hidden shelf position');
+  await clickNav('漫画网站');await page.locator('.nc-library').waitFor({state:'hidden'});await page.evaluate(()=>window.scrollTo(0,300));await settle();const otherPageScroll=await page.evaluate(()=>window.scrollY);assert(otherPageScroll>0,'The other page must actually scroll while the library is hidden');
+  await clickNav('我的漫画');await page.locator('.nc-library').waitFor();await settle();const after=await page.evaluate(()=>window.scrollY);scrollChecks.push({scenario:'other-page-scroll',before,otherPageScroll,after,restored:Math.abs(after-before)<2});assert(Math.abs(after-before)<2,'Scrolling another page must not overwrite the hidden shelf position');
   await page.evaluate(()=>window.scrollTo(0,0));await settle();await page.getByRole('combobox',{name:'排序',exact:true}).click();await page.locator('.nc-library .nc-select-list:popover-open').waitFor();
-  await nav('漫画网站').click();await page.locator('.nc-library').waitFor({state:'hidden'});assert.equal(await page.locator('.nc-library :popover-open').count(),0,'Hidden shelf must not retain a visible sorting popover');await nav('我的漫画').click();await settle();assert.equal(await page.locator('.nc-library :popover-open').count(),0);
+  await clickNav('漫画网站');await page.locator('.nc-library').waitFor({state:'hidden'});assert.equal(await page.locator('.nc-library :popover-open').count(),0,'Hidden shelf must not retain a visible sorting popover');await clickNav('我的漫画');await settle();assert.equal(await page.locator('.nc-library :popover-open').count(),0);
   checks.push('隐藏书架时滚动漫画网站不会覆盖书架位置；打开排序后切页无残留popover');
  }
  await page.evaluate(()=>window.scrollTo(0,0));await page.waitForFunction(()=>!!document.querySelector('[data-comic-id="perf-book-0"]'));await settle();
- await page.getByRole('button',{name:'更多操作 · 性能夹具 001 · 单语言',exact:true}).click();await settle();
+ await page.getByRole('button',{name:'打开漫画 性能夹具 001 · 单语言',exact:true}).click({button:'right'});await settle();
  assert.equal(await page.getByRole('menuitem',{name:'缓存语言',exact:true}).count(),0);await page.keyboard.press('Escape');
- await page.getByRole('button',{name:'更多操作 · 性能夹具 000 · 多语言',exact:true}).click();await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();
+ await page.getByRole('button',{name:'打开漫画 性能夹具 000 · 多语言',exact:true}).click({button:'right'});await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();
  await page.getByRole('menuitem',{name:'缓存语言',exact:true}).click();await page.getByRole('dialog',{name:'缓存语言',exact:true}).waitFor();
  await page.getByRole('checkbox',{name:/English/}).waitFor();assert.equal(await page.getByRole('checkbox').count(),3);await page.screenshot({path:path.join(out,'cache-languages.png')});
  if(!baseline){
   await page.evaluate(()=>{location.hash='sites';});await page.locator('.nc-library').waitFor({state:'hidden'});await page.getByRole('dialog',{name:'缓存语言',exact:true}).waitFor({state:'hidden'});
-  await nav('我的漫画').click();await page.locator('.nc-library').waitFor();await settle();assert.equal(await page.getByRole('dialog',{name:'缓存语言',exact:true}).count(),0,'Language popover must stay closed after hash navigation away and back');
+  await clickNav('我的漫画');await page.locator('.nc-library').waitFor();await settle();assert.equal(await page.getByRole('dialog',{name:'缓存语言',exact:true}).count(),0,'Language popover must stay closed after hash navigation away and back');
   checks.push('缓存语言弹层打开时通过hash直接离开（无pointerdown），弹层关闭且返回不复活');
  }else await page.keyboard.press('Escape');
  checks.push('单语言菜单隐藏缓存语言；多语言菜单按需打开并显示两种语言');
  const multi=page.locator('[data-comic-id="perf-book-0"]');
  await multi.click({button:'right'});await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();await page.keyboard.press('Escape');
- await multi.getByRole('button',{name:'更多操作 · 性能夹具 000 · 多语言',exact:true}).focus();await page.keyboard.press('Shift+F10');await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();await page.keyboard.press('Escape');
+ await multi.getByRole('button',{name:'打开漫画 性能夹具 000 · 多语言',exact:true}).focus();await page.keyboard.press('Shift+F10');await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();await page.keyboard.press('Escape');
  if(!baseline){
   await page.evaluate(()=>{
    const original=IDBObjectStore.prototype.get;window.__scopeFixture='delay';
@@ -176,7 +179,7 @@ try{
     const request=original.apply(this,args);Object.defineProperty(request,'onsuccess',{set(callback){request.addEventListener('success',event=>{window.__shelfPerf.pending++;setTimeout(()=>{callback.call(request,event);window.__shelfPerf.pending--;window.__shelfPerf.last=performance.now();},350);});}});return request;
    };
   });
-  await multi.getByRole('button',{name:'更多操作 · 性能夹具 000 · 多语言',exact:true}).click();await page.getByRole('menu').waitFor();await page.keyboard.press('Escape');await settle();assert.equal(await page.getByRole('menu').count(),0,'Delayed language result must not reopen a closed menu');
+  await multi.getByRole('button',{name:'打开漫画 性能夹具 000 · 多语言',exact:true}).click({button:'right'});await page.getByRole('menu').waitFor();await page.keyboard.press('Escape');await settle();assert.equal(await page.getByRole('menu').count(),0,'Delayed language result must not reopen a closed menu');
   await page.evaluate(()=>{window.__scopeFixture='fail';});await multi.click({button:'right'});await settle();assert.equal(await page.getByRole('menuitem',{name:'缓存语言',exact:true}).count(),0);await page.getByRole('menuitem',{name:'继续阅读',exact:true}).waitFor();await page.keyboard.press('Escape');
   await multi.click({button:'right'});await page.getByRole('menuitem',{name:'缓存语言',exact:true}).waitFor();await page.keyboard.press('Escape');
   checks.push('右键和 Shift+F10 显示语言菜单；关闭菜单后迟到结果不重开；目录读取失败不影响其他操作，重新打开可恢复');

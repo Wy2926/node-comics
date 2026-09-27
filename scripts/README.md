@@ -20,14 +20,16 @@
 
 ```powershell
 python scripts/generate_import_fixtures.py
+$env:VITE_DRIVE_CONNECT_URL = 'https://drive-fixture.test/connect'
 npm --prefix apps/extension run build
+Remove-Item Env:VITE_DRIVE_CONNECT_URL
 $env:PLAYWRIGHT_MODULE = '<已安装 playwright 模块的绝对路径>'
 $env:TEST_CHROMIUM = '<支持加载解压扩展的浏览器可执行文件>'
 $env:TEST_BROWSER_NAME = 'chrome-extension'
 node scripts/verify_simple_reading.mjs
 ```
 
-未设置路径时使用脚本默认 Playwright／浏览器。原位翻译脚本使用 `CHROMIUM_PATH`；各脚本支持的变量以源码为准。默认使用隔离 profile 和自制样本，真实网络工具在表中单列。
+`verify_simple_reading.mjs` 包含模拟 Drive 账户断开验收，因此构建时需设置上面的夹具连接地址以启用后台消息处理；该地址仅用于测试构建，真实发布使用生产配置。可用 `TEST_EXTENSION_DIR` 指向单独的验收构建。未设置路径时使用脚本默认 Playwright／浏览器。原位翻译脚本使用 `CHROMIUM_PATH`；各脚本支持的变量以源码为准。默认使用隔离 profile 和自制样本，真实网络工具在表中单列。
 
 | 工具 | 检查范围 |
 | --- | --- |

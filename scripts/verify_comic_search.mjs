@@ -89,7 +89,7 @@ try{
   const imported=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));const rows=[];for(const url of ['https://comic.naver.com/webtoon/list?titleId=123','https://www.guazimanhua.com/comic.php?id=123']){const comic=await probe.importCatalog(await probe.readSourceCatalog(url));rows.push({id:comic.id,title:comic.title});}return rows;});
   const card=id=>reader.locator(`[data-comic-id="${id}"]`),panel=()=>reader.locator('dialog.nc-comic-search[open]');
   const seed=imported.find(row=>row.title==='星あかりの本屋');assert(seed);
-  const openShelf=async()=>{await card(seed.id).getByRole('button',{name:'更多操作 · '+seed.title,exact:true}).click();await reader.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click();await panel().waitFor();};
+  const openShelf=async()=>{await card(seed.id).getByRole('button',{name:'打开漫画 '+seed.title,exact:true}).click({button:'right'});await reader.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click();await panel().waitFor();};
   await card(seed.id).locator('.nc-thumbnail img').waitFor();await openShelf();
   assert.equal(requests.length,0,'Opening must not query sites or the title service');
   await panel().locator('.nc-search-origin-cover img').waitFor();check('Production shelf entry opens with existing cover and performs no title/site search');
@@ -184,7 +184,7 @@ try{
     return {id,page};
   };
   const replacement=await delayedSeedPage();
-  await replacement.page.locator(`[data-comic-id="${seed.id}"]`).getByRole('button',{name:'更多操作 · '+seed.title,exact:true}).click();await replacement.page.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click();await replacement.page.locator('dialog.nc-comic-search[open]').waitFor();
+  await replacement.page.locator(`[data-comic-id="${seed.id}"]`).getByRole('button',{name:'打开漫画 '+seed.title,exact:true}).click({button:'right'});await replacement.page.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click();await replacement.page.locator('dialog.nc-comic-search[open]').waitFor();
   await replacement.page.evaluate(()=>{const url=new URL(location.href);url.searchParams.set('kept','newer-query');history.replaceState(null,'',url);});
   await reader.evaluate(()=>window.__releaseSearchSeed());await waitUntil(async()=>!new URL(replacement.page.url()).searchParams.has('search'));
   assert.equal(await replacement.page.getByPlaceholder('请输入漫画作品名称').inputValue(),seed.title);assert.equal(new URL(replacement.page.url()).searchParams.get('kept'),'newer-query');await replacement.page.close();check('A delayed website seed cannot replace a newer bookshelf search; consumed-handle cleanup preserves newer query parameters');
@@ -231,5 +231,5 @@ try{
   assert.deepEqual(errors,[]);
   const result={evidence:'Production MV3/App with isolated HTTP fixtures; no live model/source traffic; unmodified required HTTP/HTTPS manifest and zero runtime permission requests',out,checks,errors,permissionRequests,requests:requests.map(request=>request.kind==='title'?{kind:request.kind,targetLanguage:request.body.target_language}:{kind:request.kind,site:request.site,...(request.parameters?{parameters:request.parameters}:{})})};
   await writeFile(path.join(out,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
-}catch(error){if(reader){await reader.getByRole('button',{name:'更多操作 · 星あかりの本屋',exact:true}).click({timeout:1_000}).then(()=>reader.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click({timeout:1_000})).catch(()=>{});await writeFile(path.join(out,'failure-state.json'),JSON.stringify({errors,requests,text:await reader.locator('body').innerText()},null,2)).catch(()=>{});}await reader?.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
+}catch(error){if(reader){await reader.getByRole('button',{name:'打开漫画 星あかりの本屋',exact:true}).click({button:'right',timeout:1_000}).then(()=>reader.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click({timeout:1_000})).catch(()=>{});await writeFile(path.join(out,'failure-state.json'),JSON.stringify({errors,requests,text:await reader.locator('body').innerText()},null,2)).catch(()=>{});}await reader?.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
 finally{await context.close();}

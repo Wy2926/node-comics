@@ -32,7 +32,7 @@ page.on('response',async r=>{if(r.request().method()==='PUT'&&/^\/v1\/translatio
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 try{
   await page.goto(web);await page.locator('input[type=file]').setInputFiles(path.join(fixture,'cluster-eight.cbz'));await completeLocalImport(page);
-  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^(继续阅读|开始阅读)$/}).click();
+  await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'AI 重绘',exact:true}).click();
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:45000});
   assert(translations.some(p=>p.status===202));assert(translations.every(p=>[200,202].includes(p.status)),JSON.stringify(translations));
@@ -42,7 +42,7 @@ try{
   await page.waitForTimeout(3500);
   const operations=await request('/v1/translations?limit=100',reader);
   const jobIds=new Set(operations.items.map(i=>i.id));assert(jobIds.size>=6,`expected current + 3 across both windows, got ${jobIds.size}`);
-  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^(继续阅读|开始阅读)$/}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'4');
+  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'4');
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:15000});
   const restored=await request('/v1/translations?limit=100',reader);assert.equal(new Set(restored.items.map(i=>i.id)).size,jobIds.size);
   check('new reader reload restores the current page and existing result without an extra translation');

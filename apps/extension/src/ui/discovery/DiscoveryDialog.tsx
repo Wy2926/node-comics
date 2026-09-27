@@ -1,9 +1,10 @@
 import {useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import type {SearchSeed} from '../../comics/application/search/types';
-import type {DiscoveryDetail, DiscoveryError, DiscoveryWork} from '../../discovery/types';
+import type {DiscoveryDetail, DiscoveryError, DiscoveryWork, PublicationStatus} from '../../discovery/types';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
 import {DiscoveryCover} from './DiscoveryCard';
+import {DiscoveryBadge, DiscoveryGenreBadge} from './DiscoveryBadge';
 import {DiscoveryNotice} from './DiscoveryNotice';
 import {formatLabels, statusLabels} from './labels';
 
@@ -23,6 +24,8 @@ interface Props {
   renderSearch: (context: DiscoverySearchContext) => ReactNode;
 }
 type Pane = 'details' | 'sources';
+const statusIcons: Record<PublicationStatus, string> = {releasing: 'bolt', finished: 'check', upcoming: 'clock', hiatus: 'stop', cancelled: 'close'};
+const ratingOutline = 'm14 14 37 2 6-10 20 8 80-5-3 25 15 8-10 20 2 56-35-2-11 13-16-12-87 6 4-39-10-10 10-13Z';
 /** Owns only the details/search presentation. The host supplies the source-search workflow. */
 export function DiscoveryDialog({active, work, detail, loading, error, onRetry, onClose, renderSearch}: Props) {
   const dialog = useRef<HTMLDialogElement>(null), closeButton = useRef<HTMLButtonElement>(null);
@@ -88,25 +91,32 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
             <div className="nc-discovery-detail-identity">
               <h2>{value.title}</h2>
               <div className="nc-discovery-detail-facts">
-                {value.year && <div className="nc-discovery-detail-year"><span>{msg('年份')}</span><time dateTime={String(value.year)}>{value.year}</time></div>}
+                {value.year && <div className="nc-discovery-detail-year"><span><Icon name="calendar" size={16}/>{msg('年份')}</span><time dateTime={String(value.year)}>{value.year}</time></div>}
                 <div className="nc-discovery-publication-types">
-                  {value.status && <span className="nc-comic-tag nc-discovery-publication" data-status={value.status}>
-                    {value.status === 'releasing' ? <i aria-hidden="true"/> : <Icon name={value.status === 'finished' ? 'check' : value.status === 'cancelled' ? 'close' : 'clock'} size={16}/>}
+                  {value.status && <DiscoveryBadge kind="status" className={`is-${value.status}`} icon={statusIcons[value.status]}>
                     {statusLabels()[value.status]}
-                  </span>}
-                  {value.format && <span className="nc-comic-tag is-soft nc-discovery-format">{formatLabels()[value.format]}</span>}
+                  </DiscoveryBadge>}
+                  {value.format && <DiscoveryBadge kind="format" icon={value.format === 'oneshot' ? 'page-unread' : 'book'} className="nc-discovery-format">{formatLabels()[value.format]}</DiscoveryBadge>}
                 </div>
               </div>
             </div>
-            {value.score !== undefined && <div className="nc-discovery-detail-rating" aria-label={msg('AniList 评分 {0}/100', {'0': value.score})}><b>{value.score}</b><small>/100</small></div>}
+            {value.score !== undefined && <div className="nc-discovery-detail-rating" aria-label={msg('AniList 评分 {0}/100', {'0': value.score})}>
+              <svg className="nc-discovery-rating-paper" viewBox="0 0 180 136" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                <path className="nc-discovery-rating-shadow" d={ratingOutline} transform="translate(3 3)"/>
+                <path className="nc-discovery-rating-outline" d={ratingOutline} vectorEffect="non-scaling-stroke"/>
+                <path className="nc-discovery-rating-hatch" d="m22 101 10-10m-8 18 18-18m-8 19 9-9m93-70 9-9m-1 17 7-7" vectorEffect="non-scaling-stroke"/>
+              </svg>
+              <Icon className="nc-discovery-rating-spark" name="spark" size={32}/>
+              <b>{value.score}</b><small>/100</small>
+            </div>}
           </header>
-          {value.genres.length > 0 && <div className="nc-discovery-detail-tags">{value.genres.map(genre => <span className="nc-comic-tag" key={genre}>{genre}</span>)}</div>}
-          {detail && detail.contributors.length > 0 && <dl className="nc-discovery-contributors">{detail.contributors.map((person, index) => <div key={index}><dt>{person.role}</dt><dd>{person.name}</dd></div>)}</dl>}
+          {value.genres.length > 0 && <div className="nc-discovery-detail-tags">{value.genres.map(genre => <DiscoveryGenreBadge genre={genre} key={genre}/>)}</div>}
+          {detail && detail.contributors.length > 0 && <dl className="nc-discovery-contributors">{detail.contributors.map((person, index) => <div key={index}><dt><Icon name="user" size={16}/>{person.role}</dt><dd>{person.name}</dd></div>)}</dl>}
           <div ref={detailBody} className="nc-discovery-detail-body" tabIndex={0}>
             {loading && <p role="status">{msg('正在加载作品资料…')}</p>}
             {error && <DiscoveryNotice error={error} onRetry={onRetry}/>}
             {detail?.description && <div className="nc-discovery-description"><p className={expanded ? undefined : 'is-collapsed'}>{detail.description}</p><button className="nc-search-text-button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? msg('收起简介') : msg('展开简介')}</button></div>}
-            {value.titles.length > 1 && <details className="nc-discovery-aliases"><summary>{msg('作品别名')}</summary><div>{value.titles.filter(title => title !== value.title).map(title => <span className="nc-comic-tag is-soft" key={title}>{title}</span>)}</div></details>}
+            {value.titles.length > 1 && <details className="nc-discovery-aliases"><summary>{msg('作品别名')}</summary><div>{value.titles.filter(title => title !== value.title).map(title => <DiscoveryBadge kind="alias" icon="message" key={title}>{title}</DiscoveryBadge>)}</div></details>}
           </div>
           <footer className="nc-discovery-detail-footer">
             <button className="button primary nc-comic-action" onClick={startSearch}>{msg('查找阅读来源')}<Icon name="arrow" size={19}/></button>

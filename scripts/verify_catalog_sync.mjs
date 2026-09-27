@@ -94,9 +94,9 @@ try{
  await reader.screenshot({path:path.join(out,'updated-covers.png')});checks.push('到达12小时间隔后检查全部支持漫画，新增内容显示封面提示，仅同步目录且保留第2页位置');
  console.log('Verified cover badges and automatic updates for both comics');
  await card('first').click({button:'right'});assert.equal(await reader.getByRole('menuitem',{name:'目录',exact:true}).count(),0);await reader.screenshot({path:path.join(out,'card-context-menu.png')});await reader.keyboard.press('Escape');
- await card('first').getByRole('button',{name:'更多操作 · '+title('first'),exact:true}).click();assert.equal(await reader.getByRole('menuitem',{name:'目录',exact:true}).count(),0);await reader.keyboard.press('Escape');
- assert.equal(await reader.getByRole('dialog').count(),0);assert.equal(await card('first').locator('.nc-card-update').count(),1);checks.push('卡片右键及更多菜单均无目录项，不弹出目录弹框');
- await card('first').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(1);
+ await card('first').getByRole('button',{name:'打开漫画 '+title('first'),exact:true}).press('Shift+F10');assert.equal(await reader.getByRole('menuitem',{name:'目录',exact:true}).count(),0);await reader.keyboard.press('Escape');
+ assert.equal(await reader.getByRole('dialog').count(),0);assert.equal(await card('first').locator('.nc-card-update').count(),1);checks.push('卡片右键及键盘菜单均无目录项，不弹出目录弹框');
+ await card('first').getByRole('button',{name:/^打开漫画 /}).click();await rendered(1);
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();await reader.getByText('第3话',{exact:true}).waitFor();await reader.screenshot({path:path.join(out,'synced-directory.png')});await reader.getByRole('button',{name:'关闭面板',exact:true}).click();
  await shelf();await card('first').locator('.nc-card-update').waitFor({state:'detached'});
  assert.equal(await card('second').locator('.nc-card-update').count(),1);checks.push('成功续读恢复第2页后清除该漫画提示，其余漫画提示保留');
@@ -115,12 +115,12 @@ try{
  await waitFor(value=>value.entries.filter(entry=>entry.comicId===first.id).length===5);checks.push('关闭阅读器后仍由真实扩展 alarm 自动同步；周期参数为720分钟');
  const beforeOpen=catalogRequests.length;await openReader();await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}));await new Promise(resolve=>setTimeout(resolve,1000));assert.equal(catalogRequests.length,beforeOpen);checks.push('再次打开插件与重复唤醒不触发未到12小时的来源请求');await card('first').locator('.nc-card-update').waitFor();await reader.screenshot({path:path.join(out,'background-update.png')});
  const managed=await worker.evaluate(async()=>Object.keys(await chrome.storage.session.get(null)).filter(key=>key.startsWith('nc-catalog-tab:')));assert.deepEqual(managed,[]);
- await card('first').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered(1);counts.first=6;
+ await card('first').getByRole('button',{name:/^打开漫画 /}).click();await rendered(1);counts.first=6;
  await makeDue();await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}));await waitFor(value=>value.entries.filter(entry=>entry.comicId===first.id).length===6);await rendered(1);
  assert.equal(await reader.getByRole('spinbutton',{name:'跳转页码'}).inputValue(),'2');
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();await reader.getByText('第6话',{exact:true}).waitFor();await reader.screenshot({path:path.join(out,'live-directory-preserves-position.png')});
  await reader.getByRole('button',{name:'关闭面板',exact:true}).click();await shelf();await card('first').locator('.nc-card-update').waitFor();checks.push('阅读中同步新增目录立即可见，停留在第2页，新到达提示不会被旧阅读确认清除');
- await card('second').getByRole('button',{name:'继续阅读',exact:true}).click();await rendered();
+ await card('second').getByRole('button',{name:/^打开漫画 /}).click();await rendered();
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();
  const readerDirectory=reader.getByRole('complementary',{name:'漫画目录'});
  const fanEntry=(await state()).entries.find(entry=>entry.comicId!==first.id&&entry.title==='第3话');

@@ -19,7 +19,7 @@ try{
  await page.locator('input[type=file]').setInputFiles({name:'主题验收.cbz',mimeType:'application/zip',buffer:await readFile('artifacts/import-validation/pages.cbz')});
  await page.locator('.nc-page-image').first().waitFor({timeout:60000});await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await page.locator('.nc-book img').waitFor();await shot('library-light');
  const search=page.getByRole('searchbox',{name:'搜索漫画'});await search.focus();await shot('library-input-focus');await search.blur();
- await page.getByRole('button',{name:'更多操作 · 主题验收',exact:true}).click();await shot('comic-menu');await page.getByRole('menuitem',{name:'导出漫画',exact:true}).click();await page.getByRole('dialog').getByRole('combobox').first().click();await shot('export-dropdown');await page.keyboard.press('Escape');await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();checks.push('单来源书架、简短菜单与导出弹窗');
+ await page.getByRole('button',{name:'打开漫画 主题验收',exact:true}).click({button:'right'});await shot('comic-menu');await page.getByRole('menuitem',{name:'导出漫画',exact:true}).click();await page.getByRole('dialog').getByRole('combobox').first().click();await shot('export-dropdown');await page.keyboard.press('Escape');await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();checks.push('单来源书架、简短菜单与导出弹窗');
  await page.getByRole('button',{name:'外观与设置',exact:true}).click();
  const scrollbar=page.getByRole('scrollbar',{name:'页面滚动',exact:true});
  await scrollbar.waitFor();
@@ -73,7 +73,7 @@ try{
  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'搜索漫画',exact:true}).click();await noOverflow();await shot('search-large-text');await page.getByRole('button',{name:'外观与设置',exact:true}).click();checks.push('6种主题色×亮暗外观、搜索与设置共用面板及输入令牌、大字体、下拉键盘取消与焦点');
  await selectOption(page.getByRole('combobox',{name:'界面文字大小',exact:true}),'1');await selectOption(page.getByRole('combobox',{name:'亮暗外观',exact:true}),'light');
  await page.getByRole('button',{name:'我的账户',exact:true}).click();await shot('account-guest');await page.getByRole('button',{name:'登录账户',exact:true}).first().click();await page.getByRole('dialog').waitFor();await shot('login-light');await page.getByRole('button',{name:'关闭登录',exact:true}).click();
- await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await page.getByRole('button',{name:'继续阅读',exact:true}).click();await page.locator('.nc-page-image').first().waitFor();await shot('reader-light');
+ await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await page.getByRole('button',{name:'打开漫画 主题验收',exact:true}).click();await page.locator('.nc-page-image').first().waitFor();await shot('reader-light');
  const geometry=()=>page.locator('.nc-reading-viewport').evaluate(el=>({width:el.clientWidth,scroll:el.scrollTop})),before=await geometry();await page.getByRole('button',{name:'阅读设置',exact:true}).click();await shot('reader-settings');assert.deepEqual(await geometry(),before);checks.push('阅读设置浮层保留视口宽度与位置');
  await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await noOverflow();checks.push('桌面书架返回及布局无水平溢出');
  assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,liveProvider:false},null,2));console.log(JSON.stringify({checks,errors},null,2));

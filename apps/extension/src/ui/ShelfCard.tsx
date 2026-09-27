@@ -1,10 +1,10 @@
-import {useEffect,useRef,useState,type HTMLAttributes,type MouseEvent} from 'react';
+import {useEffect,useRef,useState,type HTMLAttributes} from 'react';
 import {formatDate,msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
 import {coverReference,hasCatalogUpdates,shelfReadingProgress,type Comic} from '../comics/application/library-service';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
-export function ShelfCard({active,comic,onOpen,onMore,menu,selection}:{active:boolean;comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
+export function ShelfCard({active,comic,onOpen,menu,selection}:{active:boolean;comic:Comic;onOpen:()=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
  const lastRead=comic.lastReadAt&&Number.isFinite(comic.lastReadAt)?comic.lastReadAt:undefined;
  const [progress,setProgress]=useState(0),progressComic=useRef<Comic>(undefined);
@@ -32,6 +32,6 @@ export function ShelfCard({active,comic,onOpen,onMore,menu,selection}:{active:bo
    {hasCatalogUpdates(comic)&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates?.count??0})}>
     <Icon name="new" size={92}/>
    </span>}
-  <div className="nc-library-card-body"><h2 className="nc-card-title"><button disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><div className="nc-library-card-actions"><button className={'button small '+(selection&&!selection.checked?'secondary':'primary')} disabled={selection?.disabled} aria-pressed={selection?.checked} onClick={action}>{selection?(selection.checked?<><Icon name="check" size={16}/>{msg('已选择')}</>:msg('选择')):comic.lastReadAt?msg('继续阅读'):msg('开始阅读')}</button>{!selection&&<button className="icon-button" aria-label={msg('更多操作 · {0}',{'0':comic.title})} aria-haspopup="menu" onClick={onMore}><Icon name="more" size={18}/></button>}</div></div>
+  <div className="nc-library-card-body"><h2 className="nc-card-title"><button disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2></div>
  </article>;
 }

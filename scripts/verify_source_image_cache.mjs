@@ -105,7 +105,7 @@ try {
   online = false;
   await reader.reload();
   await reader.locator('article.nc-book').filter({has: reader.getByRole('button', {name: '打开漫画 图片缓存重试验收', exact: true})})
-    .getByRole('button', {name: /^(开始阅读|继续阅读)$/}).click();
+    .getByRole('button',{name:/^打开漫画 /}).click();
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth === 800);
   assert.equal(requests.length, successfulReads, 'Validated application cache should avoid another source request');
   checks.push('重开阅读器复用已校验的应用图片缓存，源站不可用也无需再下载');

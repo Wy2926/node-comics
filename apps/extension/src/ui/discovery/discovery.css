@@ -361,22 +361,62 @@
   min-width: 0;
 }
 .nc-discovery-detail-rating {
+  position: relative;
+  isolation: isolate;
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  color: var(--muted);
+  width: 9.75rem;
+  height: 8rem;
+  color: var(--icon-comic-ink);
+}
+.nc-discovery-rating-paper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+.nc-discovery-rating-shadow {
+  fill: var(--comic-shadow-color);
+}
+.nc-discovery-rating-outline {
+  fill: color-mix(in srgb, var(--icon-comic-yellow) 55%, var(--icon-comic-paper));
+  stroke: var(--icon-comic-ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.nc-discovery-rating-hatch {
+  fill: none;
+  stroke: var(--icon-comic-ink);
+  stroke-width: 1;
+  opacity: .25;
+}
+.nc-discovery-rating-spark {
+  position: absolute;
+  top: -8px;
+  right: -2px;
+  transform: rotate(12deg);
 }
 .nc-discovery-detail-rating b {
   font-size: calc(var(--comic-heading-size) * 1.8);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -.06em;
-  color: var(--accent);
+  text-shadow: 2px 2px 0 var(--icon-comic-paper);
+  transform: skew(-6deg);
   font-variant-numeric: tabular-nums;
 }
 .nc-discovery-detail-rating small {
-  margin-left: 8px;
-  font-size: var(--text-small);
+  margin-top: 2px;
+  font-size: var(--text-caption);
+  font-weight: 800;
+  letter-spacing: .08em;
 }
 .nc-discovery-detail-copy {
   display: flex;
@@ -407,52 +447,79 @@
   gap: 4px;
 }
 .nc-discovery-detail-year span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   color: var(--muted);
   font-size: var(--text-caption);
 }
 .nc-discovery-detail-year time {
   color: var(--ink);
   font-size: calc(var(--comic-heading-size) * .75);
-  font-weight: 750;
+  font-weight: 850;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .nc-discovery-publication-types {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.nc-comic-tag.nc-discovery-format,
-.nc-comic-tag.nc-discovery-publication {
-  padding: 7px 12px;
+.nc-discovery-badge {
+  --badge-color: var(--icon-comic-yellow);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 7px 14px 10px 12px;
+  color: var(--ink);
   font-size: var(--text-small);
+  font-weight: 750;
   line-height: 1.4;
 }
-.nc-comic-tag.nc-discovery-publication {
-  gap: 10px;
-  color: var(--accent);
-  background: color-mix(in srgb, currentColor 8%, var(--surface));
-  border-color: color-mix(in srgb, currentColor 32%, var(--surface));
-  border-radius: var(--comic-control-radius);
+.nc-discovery-badge > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.nc-discovery-publication[data-status=releasing],
-.nc-discovery-publication[data-status=finished] {
-  color: var(--success);
+.nc-discovery-badge-paper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
-.nc-discovery-publication[data-status=hiatus] {
-  color: var(--warning);
+.nc-discovery-badge-shadow {
+  fill: var(--comic-shadow-color);
 }
-.nc-discovery-publication[data-status=cancelled] {
-  color: var(--danger);
+.nc-discovery-badge-outline {
+  fill: color-mix(in srgb, var(--badge-color) 16%, var(--surface));
+  stroke: var(--comic-stroke);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
 }
-.nc-discovery-publication i {
-  width: 7px;
-  height: 7px;
-  margin: 0 2px;
-  flex: none;
-  background: currentColor;
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent);
+.nc-discovery-badge.is-status {
+  --badge-color: var(--icon-comic-mint);
+}
+.nc-discovery-badge:is(.is-format, .is-upcoming) {
+  --badge-color: var(--icon-comic-blue);
+}
+.nc-discovery-badge.is-cancelled {
+  --badge-color: var(--icon-comic-pink);
+}
+.nc-discovery-badge.is-hiatus {
+  --badge-color: var(--icon-comic-yellow);
+}
+.nc-discovery-badge.is-alias {
+  --badge-color: var(--icon-comic-purple);
+  padding-bottom: 12px;
+  font-size: var(--text-caption);
+  font-weight: 650;
 }
 .nc-discovery-detail h2 {
   margin: 0;
@@ -466,7 +533,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
   margin-top: 24px;
 }
 .nc-discovery-contributors {
@@ -481,16 +548,17 @@
   font-weight: 750;
 }
 .nc-discovery-contributors dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: var(--text-caption);
 }
 .nc-discovery-contributors > div {
   display: flex;
   flex-direction: column-reverse;
-  padding: 8px 12px;
-  border: var(--comic-badge-border);
-  border-radius: var(--comic-control-radius);
-  background: var(--surface-soft);
+  padding: 0 16px 0 0;
+  overflow-wrap: anywhere;
 }
 .nc-discovery-description {
   line-height: 1.8;
