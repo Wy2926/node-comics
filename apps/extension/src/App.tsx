@@ -259,7 +259,7 @@ export function App(){
   {comicSearch&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:${comicSearch.key}`} open={comicSearch.open} seed={comicSearch.seed} onClose={()=>setComicSearch(value=>value?{...value,open:false}:value)} onImportHit={openSearchHit} currentIdentity={comicSearch.seed.origin}/> }
   {exporting&&<DocumentExport document={exporting} channel={channel} settings={settings} onClose={()=>setExporting(undefined)}/>}
   {feedbackOpen&&<Modal title={msg('插件反馈')} subtitle={msg('使用中遇到问题或有建议？无需登录，欢迎告诉我们。')} onClose={()=>setFeedbackOpen(false)}><SupportRequestForm kind="plugin"/></Modal>}
-  <Login login={login}/><LocalImport reading={!!current} queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onAdd={beginImport} onOpen={id=>void openEntry(id)}/>
+  <Login login={login}/><LocalImport reading={!!current} queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onOpen={id=>void openEntry(id)}/>
 
  </div>;
 }

@@ -106,7 +106,7 @@
 .nc-app .nc-detail-action-list>button.nc-danger-text::after { color: var(--danger); }
 .nc-app .nc-detail-action-list>button.nc-danger-text:hover:not(:disabled) { background: var(--danger-soft); }
 .nc-app .nc-detail-action-list>button:disabled { box-shadow: none; opacity: .5; }
-.nc-app :is(.nc-more-menu>summary, .nc-catalog-work-option, .nc-catalog-save-options>button, .nc-import-item, .nc-image-choice, .nc-web-import details, .nc-web-import .nc-insert-summary) { border-radius: var(--comic-control-radius); }
+.nc-app :is(.nc-more-menu>summary, .nc-catalog-work-option, .nc-catalog-save-options>button, .nc-image-choice, .nc-web-import details, .nc-web-import .nc-insert-summary) { border-radius: var(--comic-control-radius); }
 .nc-app .nc-image-choice { border-width: 2px; }
 .nc-app .nc-image-choice.is-selected { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
 .nc-app :is(.nc-count-pill, .nc-status-badge, .nc-plan-badge) { border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); }
