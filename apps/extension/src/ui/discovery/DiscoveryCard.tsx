@@ -2,7 +2,7 @@ import {useState} from 'react';
 import type {DiscoveryWork} from '../../discovery/types';
 import {Icon} from '../../icons';
 import {msg} from '../../i18n/runtime';
-import {statusLabels} from './labels';
+import {genreLabel, statusLabels} from './labels';
 
 export function DiscoveryCover({work}: {work: DiscoveryWork}) {
   const [failed, setFailed] = useState<string>();
@@ -20,7 +20,7 @@ export function DiscoveryCard({work, onOpen}: {work: DiscoveryWork; onOpen: () =
       </div>
       <div className="nc-discovery-poster-bottom">
         {work.year && <span className="nc-discovery-year">{work.year}</span>}
-        <span className="nc-discovery-genres">{work.genres.slice(0, 2).join(' / ')}</span>
+        <span className="nc-discovery-genres">{work.genres.slice(0, 2).map(genreLabel).join(' / ')}</span>
       </div>
     </div>
     <h2 title={work.title}>{work.title}</h2>

@@ -3,7 +3,7 @@ import type {DiscoveryQuery, DiscoveryRanking} from '../../discovery/types';
 import {defaultDiscoveryQuery} from '../../discovery/types';
 import {msg} from '../../i18n/runtime';
 import {Select, SelectOption} from '../Select';
-import {formatLabels, rankingLabels, statusLabels} from './labels';
+import {formatLabels, genreLabel, rankingLabels, statusLabels} from './labels';
 import {Icon} from '../../icons';
 
 interface Props {
@@ -24,7 +24,7 @@ export function DiscoveryControls({query, genres, count, loading, refreshDisable
   const rankings = rankingLabels(), currentYear = new Date().getFullYear();
   const countries: Record<string, string> = {JP: msg('日本'), KR: msg('韩国'), CN: msg('中国'), TW: msg('台湾')};
   const fields: {key: 'genre' | 'status' | 'year' | 'country' | 'format'; label: string; values: Record<string, string>}[] = [
-    {key: 'genre', label: msg('题材'), values: Object.fromEntries(genres.map(value => [value, value]))},
+    {key: 'genre', label: msg('题材'), values: Object.fromEntries(genres.map(value => [value, genreLabel(value)]))},
     {key: 'status', label: msg('连载状态'), values: statusLabels()},
     {key: 'year', label: msg('年份'), values: Object.fromEntries(Array.from({length: currentYear - 1939}, (_, index) => {const year = String(currentYear - index); return [year, year];}))},
     {key: 'country', label: msg('地区'), values: countries},

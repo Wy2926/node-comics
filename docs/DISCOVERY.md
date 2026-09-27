@@ -24,7 +24,7 @@
 | `src/ui/comic-search/` | 复用搜索会话，提供 page／sheet／embedded 三种显示；可选别名是通用搜索输入，不识别 AniList |
 | `src/App.tsx` | 导航及注入现有导入动作；检查操作所属视图仍有效后打开阅读器 |
 
-客户端仅按需加载列表和选中作品详情。列表缓存最多 20 页、有效期 5 分钟，详情缓存最多 40 项，均仅驻留当前页面内存；不建立 AniList 镜像库。外部简介始终作为文本渲染，链接与图片地址由 provider 校验。视觉沿用[共享令牌](POPUP_AND_THEME.md)，界面文案遵循[国际化规范](UI_INTERNATIONALIZATION.md)，题材与作品资料保持来源语言。
+客户端仅按需加载列表和选中作品详情。列表缓存最多 20 页、有效期 5 分钟，详情缓存最多 40 项，均仅驻留当前页面内存；不建立 AniList 镜像库。外部简介始终作为文本渲染，链接与图片地址由 provider 校验。视觉沿用[共享令牌](POPUP_AND_THEME.md)，界面文案遵循[国际化规范](UI_INTERNATIONALIZATION.md)。已知题材在筛选、已选条件、卡片与详情中跟随界面语言，由 UI 层的受类型约束映射统一翻译；筛选值、会话缓存与图标匹配保留原始题材值，未知题材回退原文。作品名、简介与创作者资料保持来源语言。
 
 公开查询认证规则见 [AniList Authentication](https://docs.anilist.co/guide/auth/)，商业使用按 [AniList Terms of Use](https://docs.anilist.co/guide/terms-of-use)处理；当前实现不包含个人书单授权或同步。
 

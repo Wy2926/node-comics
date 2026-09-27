@@ -1,11 +1,12 @@
 import type {ReactNode} from 'react';
 import {Icon} from '../../icons';
+import {genreLabel} from './labels';
 
 const illustratedGenres = new Set(['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological', 'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller']);
 
 export function DiscoveryGenreBadge({genre}: {genre: string}) {
   const icon = illustratedGenres.has(genre) ? `genre-${genre.toLowerCase().replaceAll(' ', '-')}` : 'bookmark';
-  return <DiscoveryBadge kind="genre" icon={icon}>{genre}</DiscoveryBadge>;
+  return <DiscoveryBadge kind="genre" icon={icon}>{genreLabel(genre)}</DiscoveryBadge>;
 }
 
 /** Stretch the paper, not its outline or the readable text. */
