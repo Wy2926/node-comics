@@ -15,7 +15,7 @@ export class SourceHttpError extends Error {
   }
 }
 
-function retryAfter(value: string | null): number | undefined {
+export function sourceRetryAfter(value: string | null): number | undefined {
   if (!value) return undefined;
   const seconds = /^\d+$/.test(value.trim()) ? Number(value) : (Date.parse(value) - Date.now()) / 1000;
   return Number.isFinite(seconds) ? Math.min(3600, Math.max(1, Math.ceil(seconds))) : undefined;
@@ -47,7 +47,7 @@ export function createSourceNetworkContext(sourceUrl: string, signal?: AbortSign
       if (!response.ok && !(response.status >= 400 && response.status <= 599 && options?.acceptStatuses?.includes(response.status))) {
         await response.body?.cancel();
         throw new SourceHttpError('http', `来源请求失败（HTTP ${response.status}），请稍后重试或在源站完成验证。`,
-          {status: response.status, retryAfter: retryAfter(response.headers.get('retry-after'))});
+          {status: response.status, retryAfter: sourceRetryAfter(response.headers.get('retry-after'))});
       }
       if (!response.body) throw new SourceHttpError('http', '来源响应为空。');
       const reader = response.body.getReader(), chunks: Uint8Array[] = [];

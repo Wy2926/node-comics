@@ -39,9 +39,18 @@ describe('explicit website download intents', () => {
     const f = await fixture(0, false);
     const manifest = { id: 'snapshot', title: 'Test', url: 'https://example.org/comic', items: [{ id: 'source-page', url: 'https://example.org/image.png', width: 10, height: 20, order: 0 }], discoveryComplete: true } as PageManifest;
     mocks.discover.mockImplementation(async (_catalog, _entry, _signal, update) => { await update(manifest); return manifest; });
-    await discoverEntryContent(f.document.id);
+    const writes=vi.spyOn(catalog,'putPages');
+    try{await discoverEntryContent(f.document.id);expect(writes).toHaveBeenCalledTimes(1);}finally{writes.mockRestore();}
     expect((await catalog.listPages(f.document.contentId)).length).toBe(1);
     expect(mocks.acquire).not.toHaveBeenCalled(); expect(await listDownloads()).toEqual([]);
+  });
+  it('publishes final completion when the page count stays unchanged after a partial snapshot',async()=>{
+    const f=await fixture(0,false);
+    const partial={id:'snapshot',title:'Test',url:'https://example.org/comic',items:[{id:'source-page',url:'https://example.org/image.png',width:10,height:20,order:0}],discoveryComplete:false} as PageManifest;
+    mocks.discover.mockImplementation(async(_catalog,_entry,_signal,update)=>{await update(partial);return {...partial,discoveryComplete:true};});
+    await discoverEntryContent(f.document.id);
+    expect(await catalog.get('entries',f.document.id)).toMatchObject({discoveryComplete:true,pageCount:1});
+    expect(mocks.acquire).not.toHaveBeenCalled();
   });
   it('deduplicates queue submissions and skips already saved pages on retry', async () => {
     const f = await fixture();

@@ -99,7 +99,7 @@ export const catalog = {
         tx.objectStore(table).put(record); writes.set(table, [...writes.get(table) ?? [], key]);
       },
       async remove(table, id) {
-        tx.objectStore(table).delete(id); if(table!=='catalogs')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
+        tx.objectStore(table).delete(id); if(table!=='catalogs'&&table!=='tombstones')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
         writes.set(table, [...writes.get(table) ?? [], id]);
       },
     };
@@ -253,6 +253,8 @@ export const catalog = {
       }
       for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);
       await tx.remove('metadata', 'reading-preferences:' + comicId);
+      await tx.remove('metadata', 'book-download:' + comicId);
+      await tx.remove('metadata', 'download-languages:' + comicId);
       await tx.remove('comics', comicId); return entries;
     });
   },

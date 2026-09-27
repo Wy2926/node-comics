@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useRef,useState,type RefObject} from 'react';
 import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
-import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
+import {continueEntry,hasCatalogUpdates,removeComics,subscribeLibrary,type Comic,type Entry} from '../comics/application/library-service';
+import {readDownloadScope} from '../comics/acquisition/books';
 import type {LibraryViewModel} from '../comics/application/types';
 import {useContextMenu} from './ContextMenu';
 import {Select} from './Select';
@@ -9,13 +10,29 @@ import {Modal} from './components';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
 import {ShelfUpdates} from './ShelfUpdates';
+import type {BookDownloadsController} from './downloads/useBookDownloads';
 import './shelf.css';
-type Props={onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+type Props={downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
  const [updatesOnly,setUpdatesOnly]=useState(shelfView.current.updatesOnly);
+ const [cacheLanguageCounts,setCacheLanguageCounts]=useState<Record<string,number>>({});
+ const downloadsEnabled=!!downloads,websiteScopeKey=JSON.stringify(library.comics.filter(comic=>comic.source.connectionId.startsWith('website:')).map(comic=>comic.id).sort());
+ useEffect(()=>{
+  if(!downloadsEnabled)return;
+  const ids=JSON.parse(websiteScopeKey) as string[];let epoch=0;
+  const refresh=async()=>{
+   const request=++epoch;
+   const counts=await Promise.all(ids.map(async id=>[id,await readDownloadScope(id).then(scope=>scope.languages.length).catch(()=>0)] as const));
+   if(request===epoch)setCacheLanguageCounts(Object.fromEntries(counts));
+  };
+  void refresh();
+  // Language choices follow catalog metadata, never per-page download progress.
+  const unsubscribe=subscribeLibrary(change=>{if(change.table==='catalogs')void refresh();});
+  return()=>{epoch++;unsubscribe();};
+ },[downloadsEnabled,websiteScopeKey]);
  const updatedCount=useMemo(()=>library.comics.filter(hasCatalogUpdates).length,[library.comics]),filterUpdates=updatesOnly&&updatedCount>0;
  useEffect(()=>{
   if(updatedCount||!updatesOnly)return;
@@ -31,6 +48,7 @@ export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,o
  const actions=(comic:Comic)=>[
   {icon:'book',label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
   ...(comic.sourceUrl?[{icon:'external',label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
+  ...(downloads?[{icon:'download',label:comic.source.connectionId==='local'?msg('已保存在本机'):!comic.source.connectionId.startsWith('website:')?msg('此来源暂不支持整本缓存'):downloads.books.some(book=>book.comic.id===comic.id)?msg('查看缓存进度'):msg('缓存整本'),disabled:!comic.source.connectionId.startsWith('website:'),onSelect:()=>downloads.books.some(book=>book.comic.id===comic.id)?downloads.open(comic.id):void downloads.start(comic.id)},...((cacheLanguageCounts[comic.id]??0)>1?[{icon:'globe',label:msg('缓存语言'),onSelect:()=>downloads.open(comic.id,true)}]:[])]:[]),
   ...(onFind?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {icon:'download',label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
@@ -66,7 +84,7 @@ export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,o
   {!!removing?.length&&<Modal title={msg('移除漫画')} onClose={()=>{if(!busy)setRemoving(undefined);}}>
    <p>{removing.length===1?msg('从书架移除《{0}》及其阅读记录？',{'0':removing[0].title}):msg('从书架移除选中的 {0} 部漫画及其阅读记录？',{'0':removing.length})}</p>
    {removing.length>1&&<ul className="nc-removal-list">{removing.slice(0,5).map(comic=><li key={comic.id}>{comic.title}</li>)}{removing.length>5&&<li>…</li>}</ul>}
-   <p className="nc-muted">{msg('来源网站和云盘中的文件不会删除。')}</p>
+   <p className="nc-muted">{msg('离线内容和阅读记录会移除，来源网站和云盘中的文件不会删除。')}</p>
    <div className="nc-inline"><button className="button secondary" disabled={busy} onClick={()=>setRemoving(undefined)}>{msg('取消')}</button><button className="button danger" disabled={busy} onClick={()=>void confirmRemoval()}>{busy?msg('正在移除作品'):msg('移除漫画')}</button></div>
   </Modal>}
  </div>;

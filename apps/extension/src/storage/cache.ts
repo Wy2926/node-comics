@@ -39,6 +39,25 @@ export class ByteCache {
     const db = await this.open(), value = await request(db.transaction('state').objectStore('state').get('usage')) as UsageRecord | undefined;
     return { bytes: value?.bytes ?? 0, reservedBytes: value?.reservedBytes ?? 0, count: value?.count ?? 0, budgetBytes: this.budget() };
   }
+  /** Inspect retained coverage without decoding Blobs. Verification checks the object keys too. */
+  async inventory(owners: string[], verify = false): Promise<CacheMeta[]> {
+    if (!owners.length) return [];
+    const db = await this.open(), tx = db.transaction(['metadata', 'objects', 'state']), done = completed(tx), missing:string[]=[];
+    const batches = await Promise.all([...new Set(owners)].map(async owner => {
+      const [scope, entries] = await Promise.all([
+        request(tx.objectStore('state').get('owner:' + owner)) as Promise<ScopeRecord | undefined>,
+        request(tx.objectStore('metadata').index('owner').getAll(owner)) as Promise<CacheMeta[]>,
+      ]);
+      if (scope?.blocked) return [];
+      if (!verify) return entries;
+      const keys = await Promise.all(entries.map(entry => request(tx.objectStore('objects').getKey(entry.key))));
+      entries.forEach((entry,index)=>{if(keys[index]===undefined)missing.push(entry.key);});
+      return entries.filter((_, index) => keys[index] !== undefined);
+    }));
+    await done;
+    for(const key of missing)await this.get(key);
+    return batches.flat();
+  }
   async token(owner?: string): Promise<CacheToken> {
     const db = await this.open(), state = db.transaction('state').objectStore('state');
     const [usage, scope] = await Promise.all([request(state.get('usage')) as Promise<UsageRecord | undefined>, owner ? request(state.get('owner:' + owner)) as Promise<ScopeRecord | undefined> : undefined]);

@@ -1,6 +1,10 @@
 import {msg} from './i18n/runtime';
 
 export const websiteOrigins = ['https://*/*', 'http://*/*'] as const;
+export async function openHostAccessSettings(){
+  if(typeof chrome==='undefined'||!chrome.runtime?.id)return;
+  await chrome.tabs.create({url:navigator.userAgent.includes('Firefox/')?'about:addons':'chrome://extensions/?id='+chrome.runtime.id});
+}
 
 /** Installation grants host access; browser restrictions are checked, never re-requested per site. */
 export async function requireHostAccess(origins: readonly string[] = websiteOrigins): Promise<void> {

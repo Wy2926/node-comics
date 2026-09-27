@@ -56,7 +56,11 @@ async function imports(slug,offline){
   await source.screenshot({path:path.join(out,slug+'-embedded.png')});
   const created=context.waitForEvent('page');await button.click();reader=await created;await reader.waitForURL(/reader\.html\?catalog=/);
   await rendered();
-  if(offline){await reader.getByRole('button',{name:'阅读设置',exact:true}).click();await reader.getByRole('button',{name:'下载原图',exact:true}).click();await reader.getByRole('button',{name:'关闭面板',exact:true}).click();}
+  if(offline){
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.getByRole('button',{name:'更多操作 · 网站离线验收',exact:true}).click();
+    assert.equal(await reader.getByRole('menuitem',{name:'缓存语言',exact:true}).count(),0);
+    await reader.getByRole('menuitem',{name:'缓存整本',exact:true}).click();await reader.getByRole('button',{name:'离线缓存',exact:true}).click();await reader.locator('.nc-download-center').waitFor();
+  }
   await source.close();checks.push('适配网站按钮直接阅读，自动登记唯一来源'+(offline?'，显式保存原图':''));
 }
 async function waitDocument(predicate){for(let n=0;n<100;n++){const value=await state();if(predicate(value))return value;await new Promise(resolve=>setTimeout(resolve,100));}throw Error('Document state timed out: '+JSON.stringify(await state()));}
@@ -70,11 +74,15 @@ try{
   const warm=await context.newPage();await warm.goto(new URL('reader.html',worker.url()).href);await warm.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await warm.close();
   const navigationSource=await context.newPage();await navigationSource.goto('https://www.mangacopy.com/comic/navigation');
   const opened=context.waitForEvent('page');await navigationSource.getByRole('button',{name:'NodeLane Comics · 导入/管理漫画',exact:true}).click();reader=await opened;
-  const navigation=reader.getByRole('region',{name:'选择开始阅读的位置'});await navigation.waitFor();assert.equal(await reader.getByRole('dialog').count(),0);assert.equal((await state()).pages.length,0);
-  await navigation.locator('summary').filter({hasText:'站点自定义分类'}).click();assert.equal(await navigation.getByRole('button',{name:/编辑|归属|版本/}).count(),0);await navigation.getByText('特别企划',{exact:true}).waitFor();
+  await rendered();await reader.getByRole('button',{name:'打开目录',exact:true}).click();
+  const navigation=reader.getByRole('complementary',{name:'漫画目录'});await navigation.waitFor();assert.equal(await reader.getByRole('dialog').count(),0);
+  const initial=await state();assert.equal(initial.tasks.length,0);assert.equal(initial.documents.filter(doc=>doc.discoveryComplete).length,1);
+  const custom=navigation.locator('summary').filter({hasText:'站点自定义分类'});if(!await custom.evaluate(element=>element.parentElement.open))await custom.click();
+  assert.equal(await navigation.getByRole('button',{name:/编辑|归属|版本/}).count(),0);assert(initial.documents.find(doc=>doc.title==='内容 A').sequenceId.includes('特别企划'));
+  await navigation.getByRole('searchbox').fill('内容');
   await navigation.getByRole('button',{name:'正序',exact:true}).click();assert((await navigation.locator('.nc-chapter-entry').first().innerText()).includes('内容 B'));
   await reader.screenshot({path:path.join(out,'readonly-directory.png')});assert(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  await navigation.getByRole('button',{name:/内容 A/}).click();await rendered();assert.equal((await state()).documents.length,2);await navigationSource.close();await reader.close();checks.push('无默认入口时显示只读自定义目录，标签和倒序可用，选择直接阅读，无全本预抓取');
+  await navigation.getByRole('button',{name:/内容 A/}).click();await rendered();assert.equal((await state()).documents.length,2);await navigationSource.close();await reader.close();checks.push('导入后按需阅读当前章节，只读自定义目录、搜索和倒序可用，不预抓整本');
   await imports('ondemand',false);let value=await state();assert.equal(value.tasks.length,0);
   value=await waitDocument(value=>value.documents.some(doc=>doc.discoveryComplete&&doc.pageCount===2));assert.equal(value.tasks.length,0);assert.deepEqual(await noManagedTabs(),[]);
   const pageLocator=value.pages[0].locator;assert(pageLocator.manifestId);const trusted=await reader.evaluate(async locator=>chrome.runtime.sendMessage({type:'NC_SOURCE_IMAGE',manifestId:locator.manifestId,pageId:locator.sourceId}),pageLocator);assert.equal(trusted.ok,true);assert.equal(trusted.data.url,pageLocator.url);
@@ -83,6 +91,7 @@ try{
   const retainedId=value.tasks.find(task=>task.status==='complete').entryId;checks.push('Explicit download discovers and retains both pages after the managed source tab closes');
   await reader.screenshot({path:path.join(out,'retained-download.png')});
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.getByRole('button',{name:'外观与设置',exact:true}).click();
+  assert.equal(await reader.getByText('离线原图',{exact:true}).count(),0,'Offline content is managed only in the offline center');
   await reader.locator('.setting-row').filter({has:reader.getByText('原图页缓存',{exact:true})}).getByRole('button',{name:'清理',exact:true}).click();
   await reader.locator('.setting-row').filter({has:reader.getByText('缩略图',{exact:true})}).getByRole('button',{name:'清理',exact:true}).click();
   assert.equal(await cacheCount('source-pages'),0);assert.equal(await cacheCount('downloads'),2);checks.push('Clearing automatic source pages and thumbnails preserves both explicit downloads');

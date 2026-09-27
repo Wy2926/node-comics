@@ -31,6 +31,9 @@
 .nc-chapter-state.current>svg{fill:color-mix(in srgb,var(--accent) 16%,transparent)}
 .nc-chapter-state.current>span{text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--accent) 28%,transparent);text-decoration-thickness:3px;text-underline-offset:4px}
 .nc-chapter-state.read>svg{color:var(--success)}
+.nc-chapter-cached{display:inline-flex;align-items:center;gap:3px;color:var(--success);font-size:.65625rem;line-height:1.5;white-space:nowrap}
+.nc-chapter-cached>svg{flex:none}
+.nc-release-heading .nc-chapter-cached{flex:none}
 .nc-chapter-expand{position:absolute;inset-inline-end:5px;top:9px;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:44px;min-height:32px;padding:5px 7px;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--muted);font-size:.6875rem;font-weight:650;font-variant-numeric:tabular-nums}
 .nc-chapter-expand:hover,.nc-chapter-expand[aria-expanded=true]{color:var(--accent)}
 .nc-chapter-expand:hover>span{text-decoration:underline;text-underline-offset:3px}
@@ -44,8 +47,8 @@
 .nc-release-flag{display:inline-flex;align-items:center;height:20px;flex:none}
 .nc-chapter-releases .nc-chapter-info b{font-size:.78125rem;font-weight:600}
 .nc-release-heading{display:flex;align-items:baseline;gap:8px;min-width:0}
-.nc-release-heading>b{flex:1;min-width:0}
-.nc-release-pages{flex:none;white-space:nowrap;font-size:.65625rem;font-variant-numeric:tabular-nums;font-weight:400;color:var(--muted)}
+.nc-release-heading>b{min-width:0}
+.nc-release-pages{margin-inline-start:auto;flex:none;white-space:nowrap;font-size:.65625rem;font-variant-numeric:tabular-nums;font-weight:400;color:var(--muted)}
 .nc-source-group{padding:4px 0}
 .nc-source-group>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:11px 3px;margin-bottom:4px;color:var(--muted);font-size:.75rem;font-weight:650}
 .nc-source-group>summary::-webkit-details-marker{display:none}

@@ -6,4 +6,6 @@ export const emptyLibrary=():LibraryViewModel=>({comics:[]});
 export interface DownloadTask {
   id:string;entryId:string;status:'queued'|'running'|'paused'|'failed'|'complete';
   generation:number;completed:number;total?:number;error?:string;updatedAt:number;[key:string]:unknown;
+  contentId?:string;entryGeneration?:number;bookId?:string;bookGeneration?:number;
+  bytes?:number;pageErrors?:Record<string,string>;reason?:'network'|'permission'|'source'|'space'|'changed'|'interrupted';
 }

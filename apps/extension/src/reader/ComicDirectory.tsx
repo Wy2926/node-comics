@@ -3,6 +3,7 @@ import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} 
 import type {ReadingDirectory,DirectoryEntry,DirectoryChapter,DirectoryGroup} from '../comics/application/library-service';
 import {Icon} from '../icons';
 import {LanguageFlag} from '../ui/LanguageFlag';
+import {useCachedEntries} from './useCachedEntries';
 import './directory.css';
 
 export function contentLanguageLabel(language:string){try{return new Intl.DisplayNames([language],{type:'language'}).of(language)??language;}catch{return language;}}
@@ -15,6 +16,8 @@ export function matchesDirectoryChapter(chapter:DirectoryChapter,entries:Map<str
 /** A source reading position is one row; its publications remain explicit, secondary choices. */
 export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode}){
  const directoryId=useId();
+ const cached=useCachedEntries(directory.comicId,directory.entries.map(entry=>entry.id));
+ const cacheState=(entry:DirectoryEntry)=>cached.has(entry.id)&&<span className="nc-chapter-cached" data-cache-status="complete"><Icon name="check" size={13}/>{msg('已缓存')}</span>;
  const [tab,setTab]=useState<'contents'|'pages'>(directory.entries.length===1&&pageCount?'pages':'contents'),[search,setSearch]=useState(''),[descending,setDescending]=useState(false),[limit,setLimit]=useState(200);
  const [expanded,setExpanded]=useState(()=>new Set(directory.chapters.filter(chapter=>chapter.current).map(chapter=>chapter.id))),[searchCollapsed,setSearchCollapsed]=useState(new Set<string>());
  const singleFile=!directory.sourceUrl&&directory.entries.length===1;
@@ -40,6 +43,7 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{
      <span className="nc-chapter-info"><b>{chapter.title}</b>
       <span className="nc-chapter-meta">
        {selected.contentLanguage&&<span className="nc-chapter-language"><LanguageFlag language={selected.contentLanguage}/><span>{contentLanguageLabel(selected.contentLanguage)}</span></span>}
+       {cacheState(selected)}
        {state(selected,chapter.current)}
       </span>
       {problem(selected)&&<small className="nc-chapter-error">{problem(selected)}</small>}
@@ -50,6 +54,7 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{
    {open&&<div className="nc-chapter-releases" id={releasesId}>{candidates.map(entry=><button key={entry.id} className="nc-chapter-entry" data-entry-id={entry.id} data-release-choice="true" disabled={!entry.readable} aria-pressed={entry.id===chapter.selectedEntryId} title={entry.title} onClick={()=>onNavigate(entry.id,undefined,true)}>
     {entry.contentLanguage&&<span className="nc-release-flag"><LanguageFlag language={entry.contentLanguage}/></span>}
     <span className="nc-chapter-info"><span className="nc-release-heading"><b>{entry.contentLanguage?contentLanguageLabel(entry.contentLanguage):entry.tags.join(' · ')||entry.title}</b>
+     {cacheState(entry)}
      {!problem(entry)&&entry.total!=null&&<span className="nc-release-pages">{msg('{0} 页',{'0':entry.total})}</span>}
     </span>
      {entry.contentLanguage&&!!entry.tags.length&&<small className="nc-release-tags">{entry.tags.join(' · ')}</small>}

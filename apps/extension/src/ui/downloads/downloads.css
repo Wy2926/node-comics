@@ -1,0 +1,82 @@
+.nc-download-center {min-width:0}
+.nc-download-center .nc-page-heading {display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:18px}
+.nc-download-center .nc-page-heading h1 {margin-top:0}
+.nc-download-lifetime {display:flex;gap:8px;align-items:flex-start;font-size:var(--text-small);color:var(--muted);margin:0 0 24px}
+.nc-download-lifetime svg {flex-shrink:0;margin-top:2px}
+.nc-download-books {display:grid;gap:18px}
+.nc-download-book {display:grid;grid-template-columns:88px minmax(0,1fr) minmax(160px,200px);gap:24px;align-items:start;padding:22px;border:var(--comic-border);border-radius:var(--comic-card-radius);background:var(--surface);box-shadow:var(--comic-shadow-small);scroll-margin:100px}
+.nc-download-book:focus {outline:2px solid var(--accent);outline-offset:4px}
+.nc-download-cover {display:block;width:88px;height:124px;padding:0;background:var(--canvas);border:1px solid var(--line);border-radius:var(--comic-cover-radius);overflow:hidden;cursor:pointer}
+.nc-download-cover .nc-thumbnail {display:flex;width:100%;height:100%;align-items:center;justify-content:center}
+.nc-download-cover img {width:100%;height:100%;object-fit:cover}
+.nc-download-info {min-width:0}
+.nc-download-title {display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap}
+.nc-download-title h2 {min-width:0;margin:0;font-size:var(--text-title);line-height:1.4;overflow-wrap:anywhere}
+.nc-download-title h2 button {border:0;padding:0;background:transparent;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.nc-download-status {display:inline-flex;gap:5px;align-items:center;max-width:100%;padding:4px 8px;border:var(--comic-border);border-radius:var(--comic-control-radius);box-shadow:2px 2px 0 var(--comic-shadow-color);font-size:var(--text-caption);font-weight:750;line-height:1.4;background:var(--surface-soft);color:var(--muted)}
+.nc-download-status svg {flex:none}
+.nc-download-status[data-tone=active] {color:var(--accent);background:var(--accent-soft)}
+.nc-download-status[data-tone=complete] {color:var(--success);background:color-mix(in srgb,var(--success) 10%,var(--surface))}
+.nc-download-status[data-tone=attention] {color:var(--warning);background:color-mix(in srgb,var(--warning) 10%,var(--surface))}
+.nc-download-meta {display:flex;flex-wrap:wrap;gap:8px 16px;color:var(--muted);font-size:var(--text-small);margin:10px 0 16px}
+.nc-download-meta>span {display:inline-flex;align-items:center;gap:5px}
+.nc-download-meta svg {flex-shrink:0}
+.nc-download-progress {display:grid;grid-template-columns:1fr auto;gap:8px;font-size:var(--text-small)}
+.nc-download-progress>span:nth-child(2) {font-variant-numeric:tabular-nums;color:var(--muted)}
+.nc-download-progress progress {grid-column:1/-1;display:block;width:100%;height:6px;accent-color:var(--accent);border:0;border-radius:8px;overflow:hidden}
+.nc-download-progress progress::-webkit-progress-bar {background:var(--line)}
+.nc-download-progress progress::-webkit-progress-value {background:var(--accent)}
+.nc-download-progress progress::-moz-progress-bar {background:var(--accent)}
+.nc-download-feedback {font-size:var(--text-small);color:var(--muted);margin:10px 0 0;overflow-wrap:anywhere}
+.nc-download-feedback[role=alert] {color:var(--danger)}
+.nc-download-actions {display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;align-self:stretch;gap:18px;min-width:0}
+.nc-download-controls {display:flex;align-items:center;justify-content:flex-end;gap:10px;max-width:100%}
+.nc-download-controls .icon-button {flex:none}
+.nc-download-size {display:grid;gap:3px;text-align:right}
+.nc-download-size>span {display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:var(--text-caption);color:var(--muted)}
+.nc-download-size strong {font-size:var(--text-title);font-weight:750;font-variant-numeric:tabular-nums;line-height:1.3;white-space:nowrap;color:var(--ink)}
+.nc-cache-actions {display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap}
+.nc-download-languages {padding:4px 0 12px;margin:12px 0;border-bottom:1px dashed var(--line)}
+.nc-download-languages label {display:flex;gap:10px;align-items:center;padding:9px 0;cursor:pointer}
+.nc-download-languages input {width:18px;height:18px;accent-color:var(--accent)}
+.nc-download-languages label small {margin-left:auto;color:var(--muted)}
+.nc-download-language-popover {position:fixed;inset:auto;margin:0;box-sizing:border-box;padding:16px;border:var(--comic-border);border-radius:var(--comic-panel-radius);background:var(--surface);color:var(--ink);box-shadow:var(--comic-shadow);overflow:visible;font-size:var(--text-small)}
+.nc-download-language-popover::backdrop {background:transparent}
+.nc-download-language-popover::before {content:"";position:absolute;width:10px;height:10px;background:var(--surface);border:var(--comic-border);transform:rotate(45deg);pointer-events:none}
+.nc-download-language-popover[data-side=left]::before {right:-7px;top:calc(var(--pointer-offset) - 5px);border-left:0;border-bottom:0}
+.nc-download-language-popover[data-side=below]::before {top:-7px;left:calc(var(--pointer-offset) - 5px);border-right:0;border-bottom:0}
+.nc-download-language-popover[data-side=above]::before {bottom:-7px;left:calc(var(--pointer-offset) - 5px);border-left:0;border-top:0}
+.nc-download-language-content {max-height:calc(100dvh - 64px);overflow:auto;overscroll-behavior:contain}
+.nc-download-language-popover h3 {margin:0;font-size:var(--text-title)}
+.nc-download-language-title {margin:8px 0 0;overflow-wrap:anywhere}
+.nc-download-language-popover .nc-download-languages {max-height:260px;overflow:auto;padding:8px 0;margin:12px 0}
+.nc-download-language-popover .nc-download-languages label {gap:10px;padding:10px 6px;border-radius:var(--comic-control-radius)}
+.nc-download-language-popover .nc-download-languages label:hover {background:var(--accent-soft)}
+.nc-download-language-popover .nc-download-languages input {flex:none;margin:0}
+.nc-download-language-popover .nc-download-languages label>span {min-width:0;overflow-wrap:anywhere}
+.nc-download-language-popover .nc-download-languages small {white-space:nowrap}
+.nc-download-language-popover .nc-cache-actions {margin-top:18px}
+.nc-download-source {padding:4px 8px;border:1px solid var(--line);border-radius:var(--comic-control-radius);background:var(--surface-soft);color:var(--ink);font-size:var(--text-caption)}
+.nc-download-source .nc-search-site-icon {display:grid;position:relative;place-items:center;width:20px;height:20px;flex:none}
+.nc-download-source .nc-search-site-icon img {position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.nc-download-meta>.nc-download-flags {gap:10px}
+.nc-download-flags>span {display:inline-flex;align-items:center}
+.nc-download-flags .nc-flag-icon,.nc-download-languages .nc-flag-icon {width:28px;height:21px}
+.nc-download-flags .nc-language-globe,.nc-download-languages .nc-language-globe {width:28px;height:24px}
+.nc-download-trigger {position:relative}
+.nc-download-trigger small {position:absolute;right:-6px;top:-6px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px;box-sizing:border-box;border-radius:10px;background:var(--accent);color:var(--accent-on);font-size:11px;font-weight:750;line-height:1}
+.nc-download-trigger[aria-current=page] {background:var(--accent-soft);border-color:var(--accent)}
+@media(max-width:1000px) {
+ .nc-download-book {grid-template-columns:76px minmax(0,1fr);gap:16px}
+ .nc-download-cover {width:76px;height:108px;grid-row:1/3}
+ .nc-download-actions {grid-column:2;flex-direction:row;align-items:center;gap:12px}
+ .nc-download-controls {justify-content:flex-start}
+}
+@media(max-width:560px) {
+ .nc-download-center .nc-page-heading {align-items:flex-start;flex-direction:column;gap:14px}
+ .nc-download-book {padding:16px;grid-template-columns:60px minmax(0,1fr);gap:14px}
+ .nc-download-cover {width:60px;height:86px;grid-row:1}
+ .nc-download-actions {grid-column:1/-1}
+ .nc-download-meta {gap:8px;margin:8px 0 12px}
+ .nc-download-title h2 {font-size:var(--text-body)}
+}
