@@ -4,8 +4,8 @@ import type {SourceSearchPage, SourceSearchRequest} from './search';
 export interface SourceNetworkContext {
   signal?: AbortSignal;
   previous?: SourceCatalogSnapshot;
-  /** Optional same-origin Referer, applied by the runtime to this exact request only. */
-  request(url:string, options?:{referer:string}):Promise<string>;
+  /** Same-origin Referer and explicitly parseable error statuses apply only to this request. */
+  request(url:string, options?:{referer:string; acceptStatuses?:readonly number[]}):Promise<string>;
 }
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {

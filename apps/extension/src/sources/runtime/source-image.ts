@@ -29,8 +29,10 @@ export async function readInlineSourceImage(url:string,pageUrl:string,signal?:Ab
     throw Error('SOURCE_RESOURCE_EXPIRED');
   const adapter=sourceImages[definition.id];
   const headers=typeof adapter?.headers==='function'?adapter.headers(url):adapter?.headers;
-  // Canvas targets already supply decoded pixels through their document-bound read callback.
-  return (await fetchSourceImage(url,signal,headers,{pageUrl,referrerPolicy})).blob;
+  const response=await fetchSourceImage(url,signal,headers,{pageUrl,referrerPolicy});
+  const blob=adapter?.decodeInline?await adapter.decodeInline(response.blob,response.headers,url,signal):response.blob;
+  signal?.throwIfAborted();
+  return blob;
 }
 
 /** The application sees a resource reference and decoded bytes, never a site's image recipe. */

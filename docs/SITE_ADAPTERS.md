@@ -12,7 +12,7 @@
 | `installation.json`（必需） | 站点主机与内容脚本范围；由定义引用，供来源边界校验及内容脚本登记 |
 | `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理；可选 `describeWork` 提供可靠作品名与定位 |
 | `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages`、`search` HTTP 解析操作；章节 URL 缺少作品身份时可提供 `resolveCatalog` |
-| `image.ts`（按需） | 导出 `image`：图片请求头或解码；不依赖是否实现网络目录 |
+| `image.ts`（按需） | 导出 `image`：图片请求头、正文解码或原位 HTTP 原图解码；不依赖是否实现网络目录 |
 | `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与协议来源、脱敏夹具和站点测试 |
 
 先检查真实站点的目录、页序、懒加载、图片与权限，再声明能力。选择 DOM、HTTP 或混合通道；纯网络站点不创建空 `page.ts`。公共接口缺少必要能力时修改契约及通用实现，不向核心添加站点分支。
@@ -42,6 +42,8 @@ HTTP 页面可提供源站证明的 `contentKey`，用于内容不变而临时�
 归属解析期间的成功 HTTP 响应可通过 `storage.session` 一次性交给阅读器复用：按来源、章节、作品绑定，读取时重新检查主机权限，并精确匹配请求 URL 与 Referer。有效期 30 秒，过期后不再复用，存储内容在下一次交接操作时清理；最多 4 组、合计 4 MiB，每组限额统一为 2 MiB／8 个响应，导入失败或目录归属不符时清理对应记录。此机制不保存目录快照，不影响更新请求的新鲜度；交接不可用时照常 HTTP 读取。无站点语义的 HTML 属性、文本和惰性标记清理集中在 `shared/html.ts`，结构及协议校验留在各站目录。
 
 HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅读器由受信扩展页面请求，均先检查实际图片域名权限，再根据已校验的来源页生成 Referer。原位入口传递图片属性／meta 中的显式引用策略，缺省为 `strict-origin-when-cross-origin`；仅 HTTP 响应头声明的页面策略未回溯读取。站点 `image.headers` 只覆盖必要差异，不再为普通来源 Referer 增加专用适配。Blob／Data／Canvas 保留页面读取与导航版本校验。
+
+展示画布无法导出但有可靠原图映射时，站点可返回 HTTP 原位目标，并通过 `image.decodeInline` 解码公共取图管线返回的字节；该钩子负责核对本站图片范围。网络解析器可按单次请求声明 `acceptStatuses` 以读取源站使用错误状态承载的结构化响应，仍须验证响应结构；权限、请求范围、响应大小和取消检查不变。
 
 原位正文筛选由 `inlineTargets()` 负责：未知站点的大图启发式只在 `generic` 适配器执行，显示层统一检查渲染状态。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
 
@@ -77,4 +79,5 @@ npm run build
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | HTTP 完整分页目录／章节、图片还原、12 小时更新；嵌入作品导入入口；网页已渲染 canvas 原位翻译 |
 | [MangaDex](../apps/extension/src/sources/sites/mangadex/README.md) | HTTP 多语言目录与章节、同话候选、作品封面、12 小时更新；章节 UUID 独立身份，图片内容标识不依赖临时服务器地址 |
 | [MangaDot](../apps/extension/src/sources/sites/mangadot/README.md) | HTTP 名称搜索、多语言目录、普通／上传章节与整卷、封面和 12 小时更新；同话候选、网页导入与已加载正文原位翻译 |
+| [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

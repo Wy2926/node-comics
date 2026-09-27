@@ -42,7 +42,9 @@ export function createSourceNetworkContext(sourceUrl: string, signal?: AbortSign
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
       const response = await fetch(url, {credentials: 'include', redirect: 'error', headers: {Accept: 'application/json, text/html'}, signal: lifetime});
-      if (!response.ok) {
+      // Some sources return a structured empty result with a non-success status.
+      // Only explicitly requested error responses reach the owning parser.
+      if (!response.ok && !(response.status >= 400 && response.status <= 599 && options?.acceptStatuses?.includes(response.status))) {
         await response.body?.cancel();
         throw new SourceHttpError('http', `来源请求失败（HTTP ${response.status}），请稍后重试或在源站完成验证。`,
           {status: response.status, retryAfter: retryAfter(response.headers.get('retry-after'))});

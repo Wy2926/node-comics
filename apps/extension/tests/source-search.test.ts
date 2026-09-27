@@ -162,6 +162,16 @@ describe('single-site search runtime', () => {
 });
 
 describe('shared source HTTP transport', () => {
+  it('reads explicitly accepted error bodies without relaxing other statuses or body limits', async () => {
+    const context = createSourceNetworkContext('https://fixture.test/book/one');
+    const options = {referer: 'https://fixture.test/book/one', acceptStatuses: [404]};
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('empty result', {status: 404}));
+    await expect(context.request('https://fixture.test/search', options)).resolves.toBe('empty result');
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('denied', {status: 403}));
+    await expect(context.request('https://fixture.test/search', options)).rejects.toMatchObject({details: {status: 403}});
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(new Uint8Array(8 * 1024 * 1024 + 1), {status: 404}));
+    await expect(context.request('https://fixture.test/search', options)).rejects.toMatchObject({kind: 'invalid-response'});
+  });
   it('rechecks actual request hosts without an operation allowlist and preserves denied replay data', async () => {
     const context = createSourceNetworkContext('https://fixture.test/book/one', undefined,
       [{url: 'https://api.fixture.test/catalog', body: 'retained'}]);
