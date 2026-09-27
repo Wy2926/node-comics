@@ -66,6 +66,10 @@ function changed(table: CatalogTable, ids: IDBValidKey[]) {
 async function cursorValues<T>(source: IDBObjectStore | IDBIndex, options: ListOptions, matches?: (value: T) => boolean): Promise<T[]> {
   const offset = Math.max(0, options.offset ?? 0), limit = Math.max(0, options.limit ?? 100);
   if (!limit) return [];
+  // Bulk reads avoid one IndexedDB callback per record for whole chapter directories.
+  if (!matches && !offset && (!options.direction || options.direction === 'next')) {
+    return idbRequest(source.getAll(options.range, Math.min(Math.ceil(limit), 0xffffffff))) as Promise<T[]>;
+  }
   return new Promise((resolve, reject) => {
     const values: T[] = []; let skipped = false, matched = 0;
     const request = source.openCursor(options.range, options.direction ?? 'next');

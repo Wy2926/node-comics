@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState,type RefObject} from 'react';
 import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
-import {continueEntry,hasCatalogUpdates,removeComics,subscribeLibrary,type Comic,type Entry} from '../comics/application/library-service';
+import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
 import {readDownloadScope} from '../comics/acquisition/books';
 import type {LibraryViewModel} from '../comics/application/types';
 import {useContextMenu} from './ContextMenu';
@@ -12,32 +12,18 @@ import {ShelfCard} from './ShelfCard';
 import {ShelfUpdates} from './ShelfUpdates';
 import type {BookDownloadsController} from './downloads/useBookDownloads';
 import './shelf.css';
-type Props={downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
- const menu=useContextMenu(),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
+type Props={active:boolean;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({active,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+ const menu=useContextMenu(active),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
  const [updatesOnly,setUpdatesOnly]=useState(shelfView.current.updatesOnly);
- const [cacheLanguageCounts,setCacheLanguageCounts]=useState<Record<string,number>>({});
- const downloadsEnabled=!!downloads,websiteScopeKey=JSON.stringify(library.comics.filter(comic=>comic.source.connectionId.startsWith('website:')).map(comic=>comic.id).sort());
- useEffect(()=>{
-  if(!downloadsEnabled)return;
-  const ids=JSON.parse(websiteScopeKey) as string[];let epoch=0;
-  const refresh=async()=>{
-   const request=++epoch;
-   const counts=await Promise.all(ids.map(async id=>[id,await readDownloadScope(id).then(scope=>scope.languages.length).catch(()=>0)] as const));
-   if(request===epoch)setCacheLanguageCounts(Object.fromEntries(counts));
-  };
-  void refresh();
-  // Language choices follow catalog metadata, never per-page download progress.
-  const unsubscribe=subscribeLibrary(change=>{if(change.table==='catalogs')void refresh();});
-  return()=>{epoch++;unsubscribe();};
- },[downloadsEnabled,websiteScopeKey]);
+ useEffect(()=>{if(!active){setManaging(false);setSelected(new Set());setRemoving(undefined);downloads?.close(false);}},[active,downloads?.close]);
  const updatedCount=useMemo(()=>library.comics.filter(hasCatalogUpdates).length,[library.comics]),filterUpdates=updatesOnly&&updatedCount>0;
  useEffect(()=>{
-  if(updatedCount||!updatesOnly)return;
+  if(!active||updatedCount||!updatesOnly)return;
   shelfView.current.updatesOnly=false;shelfView.current.scrollTop=0;setUpdatesOnly(false);window.scrollTo({top:0,behavior:'instant'});
- },[updatedCount,updatesOnly,shelfView]);
+ },[active,updatedCount,updatesOnly,shelfView]);
  const matching=useMemo(()=>library.comics.filter(value=>(!filterUpdates||hasCatalogUpdates(value))&&value.title.normalize('NFKC').toLocaleLowerCase().includes(search.trim().normalize('NFKC').toLocaleLowerCase())).sort((a,b)=>(sort==='title'?a.title.localeCompare(b.title,undefined,{numeric:true}):sort==='recent'?(b.lastReadAt??b.createdAt)-(a.lastReadAt??a.createdAt):b.updatedAt-a.updatedAt)||a.id.localeCompare(b.id)),[library.comics,search,sort,filterUpdates]);
  const selectedComics=useMemo(()=>library.comics.filter(comic=>selected.has(comic.id)),[library.comics,selected]);
  const changeSearch=(value:string)=>{shelfView.current.search=value;shelfView.current.scrollTop=0;setSearch(value);window.scrollTo({top:0,behavior:'instant'});};
@@ -48,7 +34,7 @@ export function Library({downloads,onFind,library,onOpen,onImport,onSource,sourc
  const actions=(comic:Comic)=>[
   {icon:'book',label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
   ...(comic.sourceUrl?[{icon:'external',label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
-  ...(downloads?[{icon:'download',label:comic.source.connectionId==='local'?msg('已保存在本机'):!comic.source.connectionId.startsWith('website:')?msg('此来源暂不支持整本缓存'):downloads.books.some(book=>book.comic.id===comic.id)?msg('查看缓存进度'):msg('缓存整本'),disabled:!comic.source.connectionId.startsWith('website:'),onSelect:()=>downloads.books.some(book=>book.comic.id===comic.id)?downloads.open(comic.id):void downloads.start(comic.id)},...((cacheLanguageCounts[comic.id]??0)>1?[{icon:'globe',label:msg('缓存语言'),onSelect:()=>downloads.open(comic.id,true)}]:[])]:[]),
+  ...(downloads?[{icon:'download',label:comic.source.connectionId==='local'?msg('已保存在本机'):!comic.source.connectionId.startsWith('website:')?msg('此来源暂不支持整本缓存'):downloads.books.some(book=>book.comic.id===comic.id)?msg('查看缓存进度'):msg('缓存整本'),disabled:!comic.source.connectionId.startsWith('website:'),onSelect:()=>downloads.books.some(book=>book.comic.id===comic.id)?downloads.open(comic.id):void downloads.start(comic.id)},...(comic.source.connectionId.startsWith('website:')?[{icon:'globe',label:msg('缓存语言'),visible:async()=>(await readDownloadScope(comic.id)).languages.length>1,onSelect:()=>downloads.open(comic.id,true)}]:[])]:[]),
   ...(onFind?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {icon:'download',label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
@@ -71,7 +57,7 @@ export function Library({downloads,onFind,library,onOpen,onImport,onSource,sourc
   <div className="nc-page-heading"><div><span className="nc-eyebrow">{msg('YOUR STORIES, YOUR PACE')}</span><h1 className="nc-shelf-title"><span>{msg('我的漫画')}</span><span className="nc-profile-avatar nc-shelf-count">{library.comics.length}</span><ShelfUpdates count={updatedCount} active={filterUpdates} onToggle={changeUpdatesOnly}/></h1><p>{msg('保存喜欢的故事，随时继续上次阅读。')}</p></div><div className="nc-inline"><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('导入漫画')}</button>{!!sourceActions.length&&<button className="button secondary" aria-haspopup="menu" onClick={e=>menu.open(e.currentTarget,msg('云盘'),sourceActions.map(action=>({icon:'cloud',label:action.label,onSelect:()=>onSource(action.id)})))}><Icon name="cloud"/>{msg('云盘')}</button>}</div></div>
   <div className="nc-library-tools nc-shelf-tools">
    <label className="nc-search"><Icon name="search" size={18}/><input type="search" aria-label={msg('搜索漫画')} placeholder={msg('搜索漫画')} value={search} onChange={e=>changeSearch(e.target.value)}/></label>
-   <label className="nc-sort-label">{msg('排序')}<Select aria-label={msg('排序')} value={sort} onChange={e=>changeSort(e.target.value)}><option value="recent">{msg('最近阅读')}</option><option value="updated">{msg('最近更新')}</option><option value="title">{msg('按名称')}</option></Select></label>
+   <label className="nc-sort-label">{msg('排序')}<Select key={String(active)} aria-label={msg('排序')} value={sort} onChange={e=>changeSort(e.target.value)}><option value="recent">{msg('最近阅读')}</option><option value="updated">{msg('最近更新')}</option><option value="title">{msg('按名称')}</option></Select></label>
    {!!library.comics.length&&<button className="button secondary" aria-pressed={managing} disabled={busy} onClick={()=>{setManaging(value=>!value);setSelected(new Set());}}><Icon name={managing?'check':'layers'} size={18}/>{managing?msg('完成管理'):msg('批量管理')}</button>}
   </div>
   {managing&&!!library.comics.length&&<div className="nc-batch-toolbar" role="region" aria-label={msg('批量管理')}>
@@ -79,9 +65,9 @@ export function Library({downloads,onFind,library,onOpen,onImport,onSource,sourc
    <div className="nc-inline"><button className="button secondary small" disabled={busy||!matching.length||matching.every(comic=>selected.has(comic.id))} onClick={()=>setSelected(previous=>new Set([...previous,...matching.map(comic=>comic.id)]))}>{msg('全选 {0} 部',{'0':matching.length})}</button><button className="text-link" disabled={busy||!selectedComics.length} onClick={()=>setSelected(new Set())}>{msg('取消选择')}</button></div>
    <button className="button danger small" disabled={busy||!selectedComics.length} onClick={()=>setRemoving(selectedComics)}><Icon name="trash" size={18}/>{msg('移除漫画')}</button>
   </div>}
-  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol"><Icon name="book" size={56}/></span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><Icon name="search" size={36}/><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard key={comic.id} comic={comic} onOpen={()=>open(comic.id)} onMore={e=>menu.open(e.currentTarget,comic.title,actions(comic))} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
+  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol"><Icon name="book" size={56}/></span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><Icon name="search" size={36}/><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid active={active} key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard active={active} key={comic.id} comic={comic} onOpen={()=>open(comic.id)} onMore={e=>menu.open(e.currentTarget,comic.title,actions(comic))} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
   {menu.menu}
-  {!!removing?.length&&<Modal title={msg('移除漫画')} onClose={()=>{if(!busy)setRemoving(undefined);}}>
+  {active&&!!removing?.length&&<Modal title={msg('移除漫画')} onClose={()=>{if(!busy)setRemoving(undefined);}}>
    <p>{removing.length===1?msg('从书架移除《{0}》及其阅读记录？',{'0':removing[0].title}):msg('从书架移除选中的 {0} 部漫画及其阅读记录？',{'0':removing.length})}</p>
    {removing.length>1&&<ul className="nc-removal-list">{removing.slice(0,5).map(comic=><li key={comic.id}>{comic.title}</li>)}{removing.length>5&&<li>…</li>}</ul>}
    <p className="nc-muted">{msg('离线内容和阅读记录会移除，来源网站和云盘中的文件不会删除。')}</p>

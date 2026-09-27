@@ -7,6 +7,35 @@ describe('single-source catalog and stale-write protection',()=>{
  it('paginates page metadata and retains stable page identity on index retries',async()=>{
   const {entry,page}=await seedComic();await catalog.putPages(entry.id,entry.contentId,Array.from({length:205},(_,i)=>page(i)),1);expect(await catalog.listPages(entry.contentId)).toHaveLength(100);expect((await catalog.listPages(entry.contentId,{offset:100}))[0].ordinal).toBe(100);await catalog.putPages(entry.id,entry.contentId,[{...page(20),pageId:'incorrect-new-id',width:800}],1);expect(await catalog.get('pageDescriptors',[entry.contentId,page(20).pageId])).toMatchObject({width:800});expect(await catalog.count('pageDescriptors',{index:'contentId',range:entry.contentId})).toBe(205);
  });
+ it('reads bounded chapter directories in index order with finite and unbounded limits',async()=>{
+  const {comic,entry}=await seedComic();
+  for(const order of [3,1,2])await catalog.put('entries',{...entry,id:entry.id+':'+order,contentId:entry.contentId+':'+order,order});
+  await seedComic();
+  const options={index:'comicOrder',range:IDBKeyRange.bound([comic.id,1],[comic.id,3])};
+  expect((await catalog.list('entries',options)).map(item=>item.order)).toEqual([1,2,3]);
+  expect((await catalog.list('entries',{...options,direction:'next',limit:2})).map(item=>item.order)).toEqual([1,2]);
+  expect((await catalog.listEntries(comic.id,{limit:Number.MAX_SAFE_INTEGER})).map(item=>item.order)).toEqual([0,1,2,3]);
+  expect(await catalog.list('entries',{...options,limit:0})).toEqual([]);
+ });
+ it('preserves reverse, unique, offset and filtered cursor semantics',async()=>{
+  const {comic,entry}=await seedComic();
+  for(const [index,order] of [3,1,2,2].entries())await catalog.put('entries',{...entry,id:entry.id+':'+index,contentId:entry.contentId+':'+index,order});
+  const options={index:'comicOrder',range:IDBKeyRange.bound([comic.id,0],[comic.id,3])};
+  expect((await catalog.list('entries',{...options,direction:'prev',limit:3})).map(item=>item.order)).toEqual([3,2,2]);
+  expect((await catalog.list('entries',{...options,direction:'nextunique'})).map(item=>item.order)).toEqual([0,1,2,3]);
+  expect((await catalog.list('entries',{...options,direction:'prevunique'})).map(item=>item.order)).toEqual([3,2,1,0]);
+  expect((await catalog.list('entries',{...options,offset:2,limit:2})).map(item=>item.order)).toEqual([2,2]);
+  expect((await catalog.search('entries',item=>item.order>0&&item.order!==2,{...options,offset:1,limit:1})).map(item=>item.order)).toEqual([3]);
+ });
+ it('reads pending writes in the same mutation before committing',async()=>{
+  const prefix=crypto.randomUUID()+':',range=IDBKeyRange.bound(prefix,prefix+'\uffff');
+  await catalog.mutate(['metadata'],async tx=>{
+   await tx.put('metadata',{id:prefix+'b',value:2});await tx.put('metadata',{id:prefix+'a',value:1});
+   expect(await tx.list('metadata',{range,limit:Number.MAX_SAFE_INTEGER})).toEqual([{id:prefix+'a',value:1},{id:prefix+'b',value:2}]);
+   await tx.put('metadata',{id:prefix+'c',value:3});
+  });
+  expect((await catalog.list('metadata',{range})).map(item=>item.value)).toEqual([1,2,3]);
+ });
  it('updates only one comic entry and broadcasts committed changes',async()=>{const a=await seedComic(),b=await seedComic(),listener=vi.fn(),stop=catalog.subscribe(listener);await catalog.patch('entries',a.entry.id,{error:'source unavailable'});expect(await catalog.get('entries',b.entry.id)).toEqual(b.entry);expect(await catalog.listEntries(a.comic.id)).toHaveLength(1);expect(listener).toHaveBeenCalledWith({table:'entries',ids:[a.entry.id]});stop();});
  it('rejects late page and materialization writes after content changes or deletion',async()=>{
   const {entry,page,comic}=await seedComic();await catalog.putPages(entry.id,entry.contentId,[page(0)],1);const value={id:'materialized:'+entry.id,pageId:page(0).pageId,contentId:entry.contentId,renderProfileId:'original-v1',imageSha256:'a'.repeat(64),width:20,height:30,byteSize:40,mime:'image/png',updatedAt:1};expect(await catalog.putMaterialization(value,1)).toBe(true);await catalog.patch('entries',entry.id,{generation:2});await expect(catalog.putPages(entry.id,entry.contentId,[page(1)],1)).rejects.toThrow('已变化');expect(await catalog.putMaterialization(value,1)).toBe(false);await catalog.deleteComic(comic.id);expect(await catalog.putMaterialization(value,2)).toBe(false);await expect(catalog.put('entries',entry)).rejects.toThrow('已变化');expect(await catalog.listPages(entry.contentId)).toEqual([]);

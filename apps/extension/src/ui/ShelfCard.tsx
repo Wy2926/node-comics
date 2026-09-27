@@ -1,18 +1,19 @@
-import {useEffect,useState,type HTMLAttributes,type MouseEvent} from 'react';
+import {useEffect,useRef,useState,type HTMLAttributes,type MouseEvent} from 'react';
 import {formatDate,msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
 import {coverReference,hasCatalogUpdates,shelfReadingProgress,type Comic} from '../comics/application/library-service';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
-export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
+export function ShelfCard({active,comic,onOpen,onMore,menu,selection}:{active:boolean;comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
  const lastRead=comic.lastReadAt&&Number.isFinite(comic.lastReadAt)?comic.lastReadAt:undefined;
- const [progress,setProgress]=useState(0);
+ const [progress,setProgress]=useState(0),progressComic=useRef<Comic>(undefined);
  useEffect(()=>{
-  let active=true;
-  void shelfReadingProgress(comic).then(value=>{if(active)setProgress(value);}).catch(()=>{if(active)setProgress(0);});
-  return()=>{active=false;};
- },[comic]);
+  if(!active||progressComic.current===comic)return;
+  let current=true;
+  void shelfReadingProgress(comic).then(value=>{if(current){progressComic.current=comic;setProgress(value);}}).catch(()=>{if(current)setProgress(0);});
+  return()=>{current=false;};
+ },[active,comic]);
  const coverKey=coverReference(comic),[coverFailure,setCoverFailure]=useState<{key:string;error:unknown}>(),[retry,setRetry]=useState(0);
  const failedCover=coverFailure?.key===coverKey?coverFailure:undefined;
  const retryLabel=msg('重试');
@@ -20,7 +21,7 @@ export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOp
  return <article className={'nc-book'+(selection?.checked?' is-selected':'')+(selection?' is-managing':'')} data-comic-id={comic.id} {...(!selection?menu:{})}>
   {selection&&<input className="nc-card-select" type="checkbox" aria-label={selectLabel} checked={selection.checked} disabled={selection.disabled} onChange={selection.onToggle}/>}
   <button className="nc-book-cover" aria-label={selection?selectLabel:msg('打开漫画 {0}',{'0':comic.title})} aria-pressed={selection?.checked} disabled={selection?.disabled} onClick={action}>
-   <Thumbnail blobKey={coverKey} alt={msg('{0}封面',{'0':comic.title})} retryKey={retry} onError={comic.sourceCover?error=>setCoverFailure({key:coverKey!,error}):undefined}/>
+   <Thumbnail key={comic.source.generation+':'+comic.source.status} blobKey={comic.source.status==='active'?coverKey:undefined} alt={msg('{0}封面',{'0':comic.title})} retryKey={retry} onError={comic.sourceCover?error=>setCoverFailure({key:coverKey!,error}):undefined}/>
    <span className="nc-card-source">{comic.sourceName}</span>
    <span className="nc-card-reading-time"><Icon name="clock" size={14}/>{lastRead?<time dateTime={new Date(lastRead).toISOString()} title={formatDate(lastRead,true)}>{formatDate(lastRead,true)}</time>:<span>{msg('还没阅读')}</span>}</span>
   </button>
