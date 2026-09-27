@@ -1,12 +1,11 @@
 import { catalog } from '../repositories';
 import type {Entry} from '../domain';
-import type { DownloadTask, SourceCatalog } from '../application/types';
-import { publishWebsiteManifest } from '../application/import-service';
+import type { DownloadTask } from '../application/types';
+import {discoverWebsiteContent,websiteContentError} from '../application/website-content';
 import { acquirePage } from '../pages/service';
 import { RENDER_PROFILE } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
-import { discoverEntry, discoverPage, ImagePermissionsRequired } from '../../sources';
-import type { PageManifest } from '../../sources';
+import { ImagePermissionsRequired } from '../../sources';
 import {bookDownloadId,downloadTaskId as taskId,bookTaskActive,suspendBook,listBookPlans,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan} from './book-model';
 
 const controllers = new Map<string, AbortController>();
@@ -14,7 +13,7 @@ const sameTask=(current:DownloadTask|undefined,expected:DownloadTask)=>current?.
 const LEASE_MS = 90_000;
 let running: Promise<void> | undefined;
 let runController: AbortController | undefined;
-export const downloadErrorMessage = (error: unknown) => (error instanceof Error ? error.message : '原图下载失败，请重试。').replace(/https?:\/\/\S+/g,'[来源地址]');
+export const downloadErrorMessage = websiteContentError;
 const message=downloadErrorMessage;
 const aborted = () => new DOMException('下载已暂停或文档已移除。', 'AbortError');
 type DiscoveryOptions={reload?:boolean;refreshResources?:boolean};
@@ -29,7 +28,7 @@ export async function discoverEntryContent(id: string, signal?: AbortSignal, opt
   await discoverContent(document,signal,options);
 }
 async function discoverContent(document:Entry,signal:AbortSignal|undefined,{reload=false,refreshResources=false}:DiscoveryOptions,saved?:Awaited<ReturnType<typeof retainedPages>>):Promise<void>{
-  const id=document.id;
+  if(!reload&&!refreshResources&&document.discoveryComplete)return;
   if(!reload&&document.discoveryComplete&&document.pageCount){
     if(isEntryFullyCached(document,(saved??await retainedPages(document)).length))return;
   }
@@ -39,24 +38,7 @@ async function discoverContent(document:Entry,signal:AbortSignal|undefined,{relo
     const pages=await catalog.listPages(document.contentId,{limit:1500});
     if(!pages.some(page=>typeof page.locator.contentKey==='string'))return;
   }
-  const comic=await catalog.get('comics',document.comicId);
-  const source=typeof comic?.source.locator.catalogId==='string'?await catalog.get('catalogs',comic.source.locator.catalogId) as unknown as SourceCatalog|undefined:undefined;
-  if(!document.sourceUrl)throw Error('来源地址不可用。');
-  const assertActive = async () => {
-    signal?.throwIfAborted(); const current = await catalog.get('entries', id);
-    if (!current || current.generation !== document.generation || current.contentId !== document.contentId) throw aborted();
-  };
-  let published:PageManifest|undefined;
-  const update = async (manifest: PageManifest) => { await assertActive(); await publishWebsiteManifest(document, manifest); published=manifest; };
-  try {
-    const lifetime=signal??new AbortController().signal;
-    const progress=reload?async()=>{}:update;
-    const manifest=source&&document.sourceEntryId?await discoverEntry(source,document.sourceEntryId,lifetime,progress,assertActive):await discoverPage(document.sourceUrl,lifetime,progress,assertActive);
-    await assertActive();if(manifest!==published)await publishWebsiteManifest(document,manifest,reload);
-  } catch (error) {
-    await catalog.patch('entries', id, { error: message(error), indexState: 'failed' }, { expectedGeneration: document.generation }).catch(() => {});
-    throw error;
-  }
+  await discoverWebsiteContent(document,signal,reload);
 }
 
 /** Idempotent intent registration. It does not start network work or grant permissions. */

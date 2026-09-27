@@ -26,6 +26,7 @@ async function fixture(pageCount = 2, complete = true, id: string = crypto.rando
   const contentId = id + ':revision';
   const document: Entry = { id, title: 'Website test', comicId:id+':comic',order:0,sourceUrl:'https://example.org/comic', format: 'website', contentId, generation: 1, indexState: 'ready', discoveryComplete: complete, pageCount, sourceEntryId: id + ':entry', createdAt: 1, updatedAt: 1 };
   await catalog.commit([
+    {table:'connections',value:{id:'website:test',provider:'website',displayName:'Website',status:'connected',generation:1,createdAt:1,updatedAt:1}},
     { table: 'entries', value: document },
     {table:'comics',value:{id:id+':comic',title:'Test',sourceName:'Website',sourceKey:id,source:{connectionId:'website:test',providerItemId:id,locator:{catalogId:id+':catalog'},generation:1,status:'active'},createdAt:1,updatedAt:1}},
     { table: 'catalogs', value: { id: id + ':catalog', sourceId: 'test', url: 'https://example.org/comic', title: 'Test', entries: [], groups: [], complete: true } },

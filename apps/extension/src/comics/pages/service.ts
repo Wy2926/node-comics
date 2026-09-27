@@ -4,13 +4,14 @@ import { getSourceDriver } from '../sources/registry';
 import { openDocument } from '../formats';
 import type { ComicFormat, IndexedPage } from '../formats/contracts';
 import { prepareComicPage } from './normalize';
-import { readSourceImage } from '../../sources';
+import { ImagePermissionsRequired, readSourceImage } from '../../sources';
+import {refreshWebsitePage} from '../application/website-content';
 import { sourcePageCache } from '../../storage/source-pages';
 import { downloadStore } from '../../storage/downloads';
 import { SourceDatabaseSchemaError } from '../../storage/database';
 import { originalReplica } from '../originals';
 import { RENDER_PROFILE, pageReference, type PageReference } from './identity';
-import type { PageMaterialization } from '../domain';
+import type { PageDescriptor, PageMaterialization } from '../domain';
 
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
@@ -50,9 +51,22 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   if(!blob){
     try{
       if(doc.format==='website'){
-        const {url,manifestId,sourceId}=descriptor.locator;
-        if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
-        blob=await readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
+        const readImage=(page:PageDescriptor)=>{
+          const {url,manifestId,sourceId}=page.locator;
+          if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
+          return readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
+        };
+        try{blob=await readImage(descriptor);}
+        catch(error){
+          const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
+          if(signal.aborted||error instanceof ImagePermissionsRequired||error instanceof SourceDatabaseSchemaError||
+            error instanceof DOMException&&error.name==='AbortError'||(error as {kind?:string})?.kind==='permission-required'||
+            details?.status===429||details?.retryAfter||typeof descriptor.locator.contentKey!=='string')throw error;
+          await assertSourceCurrent();
+          const renewed=await refreshWebsitePage(doc,descriptor,signal);
+          await assertSourceCurrent();
+          blob=await readImage(renewed);
+        }
       }else{
         const containerId=doc.containerId;
         const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});

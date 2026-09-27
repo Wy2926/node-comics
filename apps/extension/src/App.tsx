@@ -104,7 +104,7 @@ export function App(){
  const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));},[]);
  const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false)=>{
    const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>request===readingEpoch.current&&api.isCurrent();setReadingBusy(true);setError('');
-   try{await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;try{await discoverEntryContent(id,undefined,{refreshResources:true});}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readSequence(id);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
+   try{await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readSequence(id);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
  },[api]);
  function activateEntry(id:string){
    const request=++readingEpoch.current;currentRef.current=id;setCurrentId(id);setReadingBusy(false);
@@ -114,7 +114,7 @@ export function App(){
    const request=readingLoadEpoch.current,isCurrent=()=>request===readingLoadEpoch.current&&api.isCurrent();
    try{
      const entry=await getEntry(id);if(!isCurrent())return;
-     try{if(entry&&entry.readable!==false&&!entry.sourceRemoved)await discoverEntryContent(id,undefined,{refreshResources:true});}catch(error){if(isCurrent())setError((error as Error).message);}
+     try{if(entry&&entry.readable!==false&&!entry.sourceRemoved)await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}
      if(!isCurrent())return;const loaded=await readEntry(id,channelRef.current?.scope);if(!isCurrent())return;
      setCopies(values=>values.map(copy=>copy.id!==id?copy:copy.contentId===loaded.contentId&&loaded.pages.some(page=>page.id===copy.pageId)?{...loaded,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:loaded));
    }catch(error){if(isCurrent())setError((error as Error).message);}

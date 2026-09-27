@@ -19,20 +19,23 @@ const source=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=pat
 await writeFile(probe,`export {catalog} from '${source}/comics/repositories/index.ts';
 export {readWebsiteCatalog} from '${source}/comics/application/website-catalog.ts';
 export {applyCatalogRefresh} from '${source}/comics/application/catalog-service.ts';
-export {readerSequence,comicDirectory} from '${source}/comics/application/library-service.ts';`);
+export {readerSequence,comicDirectory} from '${source}/comics/application/library-service.ts';
+export {sourcePageCache} from '${source}/storage/source-pages/index.ts';
+export {pageReference,RENDER_PROFILE} from '${source}/comics/pages/identity.ts';`);
 const {build}=createRequire(path.join(root,'apps/extension/package.json'))('vite');
 await build({configFile:false,root:path.join(root,'apps/extension'),logLevel:'error',build:{outDir:extension,emptyOutDir:false,lib:{entry:probe,formats:['es'],fileName:()=> 'verify-source.js'}}});
 const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.TEST_CHROMIUM,
   locale:'zh-CN',viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension]});
 context.setDefaultTimeout(30000);context.setDefaultNavigationTimeout(30000);
-const errors=[],checks=[],created=[],chapterReads=[],networkFailures=[],scrollDiagnostics=[];
+const errors=[],checks=[],created=[],chapterReads=[],chapterMetadataReads=[],imageReads=[],cacheDiagnostics=[],networkFailures=[],scrollDiagnostics=[];
 context.on('page',page=>{created.push(page);page.on('pageerror',error=>errors.push(error.message));});
 context.on('requestfailed',request=>networkFailures.push({host:new URL(request.url()).hostname,error:request.failure()?.errorText}));
 await context.route('https://**.nodelane.net/**',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
 const uuid=n=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const manga=live?'42f40118-dff5-4f23-acbf-e54e89f026bd':uuid(1);
 const ids={empty:uuid(9),en1:uuid(11),zh1:uuid(12),en2a:uuid(21),en2b:uuid(22),en3:uuid(31),zh3:uuid(32),vi4:uuid(41)};
-let removeChosen=false,failFeed=false,server='first-fixture.mangadex.network';
+let removeChosen=false,failFeed=false,failChapterApi=false,server='first-fixture.mangadex.network';
+const blockedImageHosts=new Set();
 function rows(){return [[ids.empty,'0','en',0,'Unavailable preface','Group Zero'],[ids.en1,'1','en',3,'English one','Group One'],[ids.zh1,'1','zh-hk',5,'中文第一话','中文组'],
   [ids.en2a,'2','en',2,'English two A','Group A'],[ids.en2b,'2','en',4,'English two B','Group B'],[ids.en3,'3','en',2,'English three','Group Three'],
   [ids.zh3,'3','zh-hk',3,'中文第三话','中文组'],[ids.vi4,'4','vi',2,'Vietnamese four','Group Four']]
@@ -55,15 +58,22 @@ if(!live){
       value={result:'ok',response:'collection',data:all.slice(offset,offset+limit),limit,offset,total:all.length};
     }else if(parts[1]==='manga'&&parts[3]==='aggregate')value=aggregate();
     else if(parts[1]==='manga')value={result:'ok',response:'entity',data:{id:manga,type:'manga',attributes:{title:{en:'MangaDex multilingual fixture'},originalLanguage:'ja'},relationships:[{id:uuid(2),type:'cover_art',attributes:{fileName:'fixture-cover.png'}}]}};
-    else if(parts[1]==='chapter'){const chapter=rows().find(row=>row.id===parts[2]);value={result:'ok',response:'entity',data:chapter};}
-    else if(parts[1]==='at-home'){const chapter=rows().find(row=>row.id===parts[3]);chapterReads.push(parts[3]);value={result:'ok',baseUrl:'https://'+server,chapter:{hash:'a'.repeat(32),data:Array.from({length:chapter.attributes.pages},(_,n)=>`${chapter.id}-${n}.png`)}};}
+    else if(parts[1]==='chapter'){chapterMetadataReads.push(parts[2]);if(failChapterApi===true)return route.fulfill({status:503,body:'Unavailable'});const chapter=rows().find(row=>row.id===parts[2]);value={result:'ok',response:'entity',data:chapter};}
+    else if(parts[1]==='at-home'){chapterReads.push(parts[3]);if(failChapterApi)return route.fulfill({status:503,body:'Unavailable'});const chapter=rows().find(row=>row.id===parts[3]);value={result:'ok',baseUrl:'https://'+server,chapter:{hash:'a'.repeat(32),data:Array.from({length:chapter.attributes.pages},(_,n)=>`${chapter.id}-${n}.png`)}};}
     else throw Error('Unexpected fixture API route: '+url.pathname);
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)});
   });
-  for(const host of ['https://*.mangadex.network/**','https://uploads.mangadex.org/**'])await context.route(host,route=>route.fulfill({status:200,contentType:'image/png',body:bytes}));
+  for(const host of ['https://*.mangadex.network/**','https://uploads.mangadex.org/**'])await context.route(host,route=>{
+    const url=new URL(route.request().url());imageReads.push({host:url.hostname,path:url.pathname});
+    return blockedImageHosts.has(url.hostname)?route.fulfill({status:503,body:'Expired image node'}):route.fulfill({status:200,contentType:'image/png',body:bytes});
+  });
 }
 let reader,activeEntryId,targetLanguage='zh-Hans';
-const state=()=>reader.evaluate(async()=>{const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));return {comics:await catalog.list('comics'),entries:await catalog.list('entries',{limit:10000}),positions:await catalog.list('positions'),pages:await catalog.list('pageDescriptors',{limit:1500})};});
+const state=()=>reader.evaluate(async()=>{const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));return {comics:await catalog.list('comics'),entries:await catalog.list('entries',{limit:10000}),positions:await catalog.list('positions'),pages:await catalog.list('pageDescriptors',{limit:1500}),materializations:await catalog.list('materializations',{limit:1500})};});
+const apiCounts=remote=>({chapter:chapterMetadataReads.filter(id=>id===remote).length,atHome:chapterReads.filter(id=>id===remote).length});
+function pageIdentity(snapshot,entry){return {contentId:snapshot.entries.find(item=>item.id===entry.id).contentId,
+  pageIds:snapshot.pages.filter(page=>page.contentId===entry.contentId).sort((a,b)=>a.ordinal-b.ordinal).map(page=>page.pageId),
+  images:snapshot.materializations.filter(page=>page.contentId===entry.contentId).map(page=>({pageId:page.pageId,imageSha256:page.imageSha256})).sort((a,b)=>a.pageId.localeCompare(b.pageId))};}
 async function image(index=0){await reader.waitForFunction(({index,id})=>document.querySelector(`${id?`[data-copy-id="${id}"] `:''}[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth>0,{index,id:activeEntryId},{timeout:60000});}
 const remoteId=entry=>entry.sourceEntryId.split(':').at(-1);
 async function entryFor(remote){const entry=(await state()).entries.find(entry=>remoteId(entry)===remote);assert(entry,'Missing stored release '+remote);return entry;}
@@ -177,19 +187,50 @@ try{
     checks.push('Changing translation target preserves the current page; continuous reading chooses English fallback, Chinese again on chapter 3, then the first Vietnamese release on chapter 4');
     await chooseRelease(ids.en1,3);await scrollToRelease(ids.en2b);await jump(3,ids.en2b);
     checks.push('Returning to chapter 1 and continuing remembers the manually selected scanlation group for chapter 2');
-    const before=await state(),chosen=before.entries.find(entry=>entry.sourceEntryId.endsWith(ids.en2b)),chosenPosition=before.positions.find(position=>position.entryId===chosen.id);
-    server='second-fixture.mangadex.network';await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
+    const chosen=await entryFor(ids.en2b);
+    await reader.waitForFunction(async({id,count})=>{const {sourcePageCache}=await import(chrome.runtime.getURL('verify-source.js'));return (await sourcePageCache.inventory([id],true)).length===count;},{id:chosen.id,count:chosen.pageCount});
+    const before=await state(),chosenPosition=before.positions.find(position=>position.entryId===chosen.id),chosenIdentity=pageIdentity(before,chosen),beforeCachedOpen=apiCounts(ids.en2b);
+    server='second-fixture.mangadex.network';failChapterApi=true;
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
+    const openedAt=Date.now();await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitEntry(ids.en2b,3);
+    const elapsedMs=Date.now()-openedAt,reopened=await state();assert(elapsedMs<5000,`Cached reopen took ${elapsedMs}ms`);
+    assert.deepEqual(apiCounts(ids.en2b),beforeCachedOpen,'A cached shelf reopen must not request chapter metadata or an at-home server');
+    assert.deepEqual(pageIdentity(reopened,chosen),chosenIdentity);assert.equal(reopened.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
+    assert(reopened.pages.filter(page=>page.contentId===chosen.contentId).every(page=>new URL(page.locator.url).hostname==='first-fixture.mangadex.network'));
+    cacheDiagnostics.push({scenario:'cached-shelf-reopen-with-unavailable-api',elapsedMs,requests:apiCounts(ids.en2b)});
+    checks.push('A fully cached shelf reopen displays the selected release at page 3 within five seconds with zero chapter/at-home requests, even when both APIs are unavailable; page and image identities remain unchanged');
+    const beforeNeighborOpen=apiCounts(ids.en2b);await chooseRelease(ids.en1,3);
+    await reader.waitForFunction(id=>document.querySelector(`[data-copy-id="${id}"] [data-page-index="0"] img.nc-page-image`)?.naturalWidth>0,chosen.id);
+    assert.deepEqual(apiCounts(ids.en2b),beforeNeighborOpen,'Preloading an indexed adjacent chapter must not refresh its image manifest');
+    await scrollToRelease(ids.en2b);await jump(3,ids.en2b);
+    assert.deepEqual(apiCounts(ids.en2b),beforeNeighborOpen,'Scrolling into a cached adjacent chapter must not refresh its image manifest');
+    checks.push('An already cached adjacent chapter preloads and becomes active through continuous scrolling without chapter/at-home requests');
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
+    await reader.evaluate(async id=>{const {sourcePageCache}=await import(chrome.runtime.getURL('verify-source.js'));await sourcePageCache.deleteOwner(id);if((await sourcePageCache.inventory([id],true)).length)throw Error('Selected chapter cache was not cleared');},chosen.id);
+    failChapterApi=false;blockedImageHosts.add('first-fixture.mangadex.network');const beforeExpiredOpen=apiCounts(ids.en2b),imageReadStart=imageReads.length;
     await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitEntry(ids.en2b,3);
-    const reopened=await state();assert.equal(reopened.entries.find(entry=>entry.id===chosen.id).contentId,chosen.contentId);
-    assert.equal(reopened.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
-    assert(reopened.pages.filter(page=>page.contentId===chosen.contentId).every(page=>new URL(page.locator.url).hostname===server));
-    checks.push('Reopen keeps selected release and page 3 while renewing a changed CDN host without replacing content identity');
-    server='third-fixture.mangadex.network';const priorNeighborReads=chapterReads.filter(id=>id===ids.en2b).length;
-    await chooseRelease(ids.en1,3);
-    await reader.waitForFunction(async({contentId,server})=>{const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));const pages=await catalog.listPages(contentId);return pages.length>0&&pages.every(page=>new URL(page.locator.url).hostname===server);},{contentId:chosen.contentId,server});
-    assert(chapterReads.filter(id=>id===ids.en2b).length>priorNeighborReads);
-    await scrollToRelease(ids.en2b);await jump(3,ids.en2b);await chooseRelease(ids.en1,3);
-    checks.push('Continuous scrolling renews an already indexed adjacent chapter before reading its pages');
+    await reader.waitForFunction(async({id,count})=>{const {sourcePageCache}=await import(chrome.runtime.getURL('verify-source.js'));return (await sourcePageCache.inventory([id],true)).length===count;},{id:chosen.id,count:chosen.pageCount});
+    assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeExpiredOpen.chapter+1,atHome:beforeExpiredOpen.atHome+1},'Concurrent missing pages must share one manifest refresh after the old image node fails');
+    const recovered=await state(),retriedImages=imageReads.slice(imageReadStart).filter(item=>item.path.includes(ids.en2b));
+    assert(retriedImages.some(item=>item.host==='first-fixture.mangadex.network'),'The saved image URL must be tried before refreshing');
+    assert(retriedImages.some(item=>item.host===server),'The refreshed image node must actually supply image bytes');
+    assert(recovered.pages.filter(page=>page.contentId===chosen.contentId).every(page=>new URL(page.locator.url).hostname===server));
+    assert.deepEqual(pageIdentity(recovered,chosen),chosenIdentity);assert.equal(recovered.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
+    cacheDiagnostics.push({scenario:'expired-node-cache-miss',requests:apiCounts(ids.en2b),images:retriedImages});
+    checks.push('After deleting ordinary image cache, failed saved image URLs trigger one shared chapter/at-home refresh; the replacement node supplies images without changing release, page 3, content IDs or image hashes');
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
+    await reader.evaluate(async({entryId,contentId,pageId})=>{const {sourcePageCache,pageReference,RENDER_PROFILE}=await import(chrome.runtime.getURL('verify-source.js'));await sourcePageCache.delete(pageReference({entryId,contentId,pageId,renderProfileId:RENDER_PROFILE}));},{entryId:chosen.id,contentId:chosen.contentId,pageId:chosenPosition.pageId});
+    blockedImageHosts.add(server);server='third-fixture.mangadex.network';failChapterApi='at-home';const beforeFailedRefresh=apiCounts(ids.en2b);
+    await reader.getByRole('button',{name:'继续阅读',exact:true}).click();
+    const failedPage=reader.locator(`[data-copy-id="${chosen.id}"] [data-page-index="2"] .nc-image-failure`);await failedPage.waitFor();
+    assert.equal(await reader.getByLabel('跳转页码',{exact:true}).inputValue(),'3');await image(0);
+    assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeFailedRefresh.chapter+1,atHome:beforeFailedRefresh.atHome+1},'A failed at-home refresh must not loop');
+    const failedRefresh=await state();assert.deepEqual(pageIdentity(failedRefresh,chosen),chosenIdentity);assert.equal(failedRefresh.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
+    await reader.screenshot({path:path.join(out,'expired-node-refresh-failure.png')});
+    checks.push('If an uncached page cannot renew its image node, only that page shows an error; other cached pages decode and the selected page and content identities remain intact');
+    failChapterApi=false;await failedPage.getByRole('button',{name:'重试',exact:true}).click();await image(2);
+    assert.deepEqual(pageIdentity(await state(),chosen),chosenIdentity);await chooseRelease(ids.en1,3);
+    checks.push('Retrying the failed page after API recovery displays the original image with the same page identity');
     const priorRemoval=await state(),savedChoicePosition=priorRemoval.positions.find(position=>position.entryId===chosen.id);
     removeChosen=true;assert.equal(await refresh(),7);
     const remaining=await sequence(ids.en1),alternate=await entryFor(ids.en2a);assert(remaining.some(copy=>copy.id===alternate.id));assert(!remaining.some(copy=>copy.id===chosen.id));
@@ -212,7 +253,7 @@ try{
   assert(created.every(page=>!page.url().startsWith('https://mangadex.org')),'Acceptance never opens the source website');
   assert.deepEqual(errors,[]);
   await reader.screenshot({path:path.join(out,'final.png')});
-  await writeFile(path.join(out,'results.json'),JSON.stringify({status:'passed',live,checks,errors,networkFailures,scrollDiagnostics,sourceWebsiteOpened:false,nativePermissionPromptTested:false},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({status:'passed',live,checks,errors,chapterMetadataReads,chapterReads,cacheDiagnostics,networkFailures,scrollDiagnostics,sourceWebsiteOpened:false,nativePermissionPromptTested:false},null,2));
   console.log(JSON.stringify({out,live,checks,errors}));
-}catch(error){await writeFile(path.join(out,'results.json'),JSON.stringify({status:'failed',live,checks,errors,networkFailures,scrollDiagnostics,error:error.message,sourceWebsiteOpened:false,nativePermissionPromptTested:false},null,2));if(reader&&!reader.isClosed()){await reader.screenshot({path:path.join(out,'failure.png')});console.log((await reader.locator('body').innerText()).slice(-2200));}console.log(JSON.stringify({networkFailures}));throw error;}
+}catch(error){await writeFile(path.join(out,'results.json'),JSON.stringify({status:'failed',live,checks,errors,chapterMetadataReads,chapterReads,cacheDiagnostics,networkFailures,scrollDiagnostics,error:error.message,sourceWebsiteOpened:false,nativePermissionPromptTested:false},null,2));if(reader&&!reader.isClosed()){await reader.screenshot({path:path.join(out,'failure.png')});console.log((await reader.locator('body').innerText()).slice(-2200));}console.log(JSON.stringify({networkFailures}));throw error;}
 finally{await context.close();}
