@@ -132,6 +132,21 @@ test('reserved mode allocates a stable gutter, while overlay mode retains the fu
   assert.deepEqual(await geometry('reserved'),{width:260,content:240,padding:'20px'});
 });
 
+test('hidden mode removes rails and gutters while preserving scrolling and the saved offset', async () => {
+  await fillFixture('<div id="hidden-scroll" data-scrollbar-mode="hidden" style="width:260px;height:180px;overflow:auto"><div style="height:650px">Hidden rails</div></div>');
+  await page.waitForFunction(() => document.getElementById('hidden-scroll').dataset.ncScrollbarMode === 'hidden');
+  await nativeGutter('hidden-scroll');assert.equal(await rail('hidden-scroll').isVisible(),false);
+  assert.equal(await page.locator('#hidden-scroll').evaluate(element=>getComputedStyle(element).paddingRight),'0px');
+  const box=await page.locator('#hidden-scroll').boundingBox();await page.mouse.move(box.x+50,box.y+50);await page.mouse.wheel(0,200);
+  await page.waitForFunction(() => document.getElementById('hidden-scroll').scrollTop > 0);
+  const offset=await page.locator('#hidden-scroll').evaluate(element=>element.scrollTop);
+  await page.locator('#hidden-scroll').evaluate(element=>element.dataset.scrollbarMode='reserved');await rail('hidden-scroll').waitFor();
+  assert.equal(await page.locator('#hidden-scroll').evaluate(element=>element.scrollTop),offset);
+  await page.locator('#hidden-scroll').evaluate(element=>element.dataset.scrollbarMode='hidden');
+  await page.waitForFunction(() => !document.querySelector('.nc-scrollbar-y[aria-controls="hidden-scroll"]').checkVisibility());
+  assert.equal(await page.locator('#hidden-scroll').evaluate(element=>element.scrollTop),offset);
+});
+
 test('page scrollbar modes keep the masthead full width and reserve space only in the workspace', async () => {
   await page.goto(origin);await page.locator('input[type=file]').waitFor({state:'attached'});
   const header = page.locator('.nc-app-header'), actions = page.locator('.nc-header-actions');

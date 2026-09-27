@@ -1842,6 +1842,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
 .nc-reader-rail button {position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px;width:100%;padding:7px 2px;border-radius:9px;font-size:11px;line-height:1.3;color:var(--muted)}
 .nc-reader-rail button:hover,.nc-reader-rail button[aria-expanded=true] {background:var(--accent-soft);color:var(--accent)}
 .nc-reader-rail button:focus-visible {outline:2px solid var(--accent);outline-offset:-2px}
+.nc-reader-rail button.nc-reader-language {border:0;text-align:center}
 .nc-rail-notice {position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .nc-rail-divider {height:1px;margin:3px 4px;background:var(--line);flex-shrink:0}
 .nc-reader-rail .nc-page-versions {display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:0;border:0}
@@ -1850,7 +1851,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
 .nc-reader-navigation label {display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .nc-reader-navigation input[type=number] {width:48px;min-height:32px;padding:4px 0;text-align:center;font-size:14px;appearance:textfield}
 .nc-reader-navigation input::-webkit-inner-spin-button {appearance:none}
-.nc-reader-navigation .nc-reader-progress {writing-mode:vertical-lr;direction:ltr;width:28px;height:clamp(50px,17dvh,160px);min-height:0;padding:0;accent-color:var(--accent);cursor:pointer}
+.nc-reader-navigation .nc-reader-progress {writing-mode:vertical-lr;direction:ltr;width:28px;height:clamp(50px,26dvh,240px);min-height:0;padding:0;accent-color:var(--accent);cursor:pointer}
 .nc-reader.controls-hidden .nc-reader-rail {opacity:0;pointer-events:none}
 .nc-reader.controls-hidden .nc-reader-rail:focus-within {opacity:1;pointer-events:auto}
 .nc-reader .nc-reader-drawer {top:12px;bottom:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;max-width:calc(100% - var(--reader-gutter) - 12px)}

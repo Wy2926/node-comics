@@ -37,6 +37,18 @@ try{
  await page.getByLabel('搜索目录').fill('不存在');await page.getByText('没有匹配的内容',{exact:true}).waitFor();
  await page.getByLabel('搜索目录').fill('');await centered();
  await page.getByRole('button',{name:'切换分组',exact:true}).click();await centered();
+ const groupTitles=selector=>list.locator(selector).allTextContents();
+ assert.deepEqual(await groupTitles(':scope > .nc-source-group > summary .nc-source-group-title'),['后续分类','来源分类']);
+ assert.deepEqual(await groupTitles(':scope > .nc-source-group:first-child > .nc-source-group > summary .nc-source-group-title'),['分组 7','分组 6','分组 5']);
+ assert.equal(await list.locator('[data-chapter-main] b').first().textContent(),'第 620 章');
+ await page.getByRole('button',{name:'倒序',exact:true}).click();await centered();
+ await page.getByRole('button',{name:'显示更多',exact:true}).click();
+ assert.deepEqual(await groupTitles(':scope > .nc-source-group > summary .nc-source-group-title'),['来源分类','后续分类']);
+ assert.deepEqual(await groupTitles(':scope > .nc-source-group:first-child > .nc-source-group > summary .nc-source-group-title'),['分组 1','分组 2','分组 3','分组 4']);
+ assert.equal(await list.locator('[data-chapter-main] b').first().textContent(),'第 1 章');
+ await page.getByRole('button',{name:'正序',exact:true}).click();await centered();
+ assert.equal(await position(),before);
+ checks.push('Reversing orders top-level groups, nested groups and chapters together while preserving the reading position');
  assert.equal(await current.evaluate(el=>{let closed=0;for(let node=el.parentElement;node;node=node.parentElement)if(node.tagName==='DETAILS'&&!node.open)closed++;return closed;}),0);
  await page.screenshot({path:path.join(out,'nested-directory.png')});
  checks.push('Search reset locates the chapter and nested source groups open automatically');

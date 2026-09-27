@@ -3,7 +3,6 @@ import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} 
 import type {ReadingDirectory,DirectoryEntry,DirectoryChapter,DirectoryGroup} from '../comics/application/library-service';
 import {Icon} from '../icons';
 import {LanguageFlag} from '../ui/LanguageFlag';
-import {Select} from '../ui/Select';
 import './directory.css';
 
 export function contentLanguageLabel(language:string){try{return new Intl.DisplayNames([language],{type:'language'}).of(language)??language;}catch{return language;}}
@@ -14,7 +13,7 @@ export function matchesDirectoryChapter(chapter:DirectoryChapter,entries:Map<str
 }
 
 /** A source reading position is one row; its publications remain explicit, secondary choices. */
-export function ComicDirectory({directory,index,pageCount,onNavigate,onSourceLanguageChange,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;onSourceLanguageChange?:(language:string|undefined)=>void;children?:ReactNode}){
+export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode}){
  const directoryId=useId();
  const [tab,setTab]=useState<'contents'|'pages'>(directory.entries.length===1&&pageCount?'pages':'contents'),[search,setSearch]=useState(''),[descending,setDescending]=useState(false),[limit,setLimit]=useState(200);
  const [expanded,setExpanded]=useState(()=>new Set(directory.chapters.filter(chapter=>chapter.current).map(chapter=>chapter.id))),[searchCollapsed,setSearchCollapsed]=useState(new Set<string>());
@@ -22,6 +21,7 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,onSourceLan
  const list=useRef<HTMLDivElement>(null),query=search.trim().toLocaleLowerCase();
  const entries=useMemo(()=>new Map(directory.entries.map(entry=>[entry.id,entry])),[directory.entries]);
  const visible=useMemo(()=>{const chapters=directory.chapters.filter(chapter=>matchesDirectoryChapter(chapter,entries,query));return descending?chapters.reverse():chapters;},[directory.chapters,entries,query,descending]);
+ const groups=useMemo(()=>descending?[...directory.groups].reverse():directory.groups,[directory.groups,descending]);
  const currentIndex=visible.findIndex(chapter=>chapter.current),currentId=visible[currentIndex]?.id,currentEntryId=directory.entries.find(entry=>entry.current)?.id;
  const shownLimit=Math.max(limit,Math.ceil((currentIndex+1)/200)*200),shown=visible.slice(0,shownLimit);
  useEffect(()=>{if(currentId)setExpanded(previous=>previous.has(currentId)?previous:new Set([...previous,currentId]));},[currentId,currentEntryId]);
@@ -58,7 +58,7 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,onSourceLan
    </button>)}</div>}
   </div>;
  };
- const group=(item:DirectoryGroup,depth=0):ReactNode=>{if(depth>8)return null;const children=directory.groups.filter(group=>group.parentId===item.id).map(child=>group(child,depth+1)).filter(Boolean),chapters=shown.filter(chapter=>chapter.groupIds.includes(item.id));if(!chapters.length&&!children.length)return null;return <details key={item.id} className="nc-source-group"><summary><Icon name="chevron" size={15}/><span className="nc-source-group-title">{item.title}</span><span className="nc-source-group-count">{directory.chapters.filter(chapter=>chapter.groupIds.includes(item.id)).length}</span></summary>{chapters.map(row)}{children}</details>;};
+ const group=(item:DirectoryGroup,depth=0):ReactNode=>{if(depth>8)return null;const children=groups.filter(group=>group.parentId===item.id).map(child=>group(child,depth+1)).filter(Boolean),chapters=shown.filter(chapter=>chapter.groupIds.includes(item.id));if(!chapters.length&&!children.length)return null;return <details key={item.id} className="nc-source-group"><summary><Icon name="chevron" size={15}/><span className="nc-source-group-title">{item.title}</span><span className="nc-source-group-count">{directory.chapters.filter(chapter=>chapter.groupIds.includes(item.id)).length}</span></summary>{chapters.map(row)}{children}</details>;};
  const groupLayout=JSON.stringify(directory.groups),currentExpanded=!!currentId&&expanded.has(currentId);
  useLayoutEffect(()=>{
   const container=list.current,active=container?.querySelector<HTMLElement>('[aria-current="true"]');if(!container||!active||tab!=='contents')return;
@@ -66,10 +66,9 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,onSourceLan
   const bounds=container.getBoundingClientRect(),row=active.getBoundingClientRect();container.scrollTop+=row.top-bounds.top-container.clientTop-(container.clientHeight-row.height)/2;
  },[tab,currentId,currentEntryId,currentIndex,query,descending,groupLayout,currentExpanded]);
  return <><div className="nc-comic-directory-heading"><h3>{directory.title}</h3>{directory.sourceUrl&&<a className="text-link nc-directory-source" href={directory.sourceUrl} target="_blank" rel="noreferrer">{msg('打开来源')}</a>}
-  {onSourceLanguageChange&&directory.entries.some(entry=>entry.contentLanguage)&&<label className="nc-source-language-choice">{msg('内容语言偏好')}<Select aria-label={msg('内容语言偏好')} value={directory.sourceLanguagePreference??''} onChange={event=>onSourceLanguageChange(event.target.value||undefined)}><option value="">{msg('跟随翻译目标')}</option>{[...new Set(['zh',...directory.entries.flatMap(entry=>entry.contentLanguage?[entry.contentLanguage]:[]),...(directory.sourceLanguagePreference?[directory.sourceLanguagePreference]:[])])].map(language=><option key={language} value={language}>{language==='zh'?msg('中文（不限简繁）'):contentLanguageLabel(language)}</option>)}</Select></label>}
   </div>
   {!!pageCount&&!singleFile&&<div className="nc-directory-tabs" role="tablist" aria-label={msg('目录')}><button role="tab" aria-selected={tab==='contents'} onClick={()=>setTab('contents')}>{msg('目录')}<span>{directory.chapters.length}</span></button><button role="tab" aria-selected={tab==='pages'} onClick={()=>setTab('pages')}>{msg('页面')}<span>{pageCount}</span></button></div>}
-  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={event=>{setSearch(event.target.value);setSearchCollapsed(new Set());setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(value=>!value)}><Icon name={descending?'sort-desc':'sort-asc'} size={16}/>{descending?msg('倒序'):msg('正序')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?shown.map(row):<>{directory.groups.filter(group=>!group.parentId).map(item=>group(item))}{shown.filter(chapter=>!chapter.groupIds.length).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>shownLimit&&<button className="button secondary" onClick={()=>setLimit(shownLimit+200)}>{msg('显示更多')}</button>}</div></>}
+  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={event=>{setSearch(event.target.value);setSearchCollapsed(new Set());setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(value=>!value)}><Icon name={descending?'sort-desc':'sort-asc'} size={16}/>{descending?msg('倒序'):msg('正序')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?shown.map(row):<>{groups.filter(group=>!group.parentId).map(item=>group(item))}{shown.filter(chapter=>!chapter.groupIds.length).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>shownLimit&&<button className="button secondary" onClick={()=>setLimit(shownLimit+200)}>{msg('显示更多')}</button>}</div></>}
   {!!directory.related?.length&&<div className="nc-directory-footer">{directory.related.map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noreferrer">{item.title} <Icon name="external" size={14}/></a></p>)}</div>}
  </>;
 }

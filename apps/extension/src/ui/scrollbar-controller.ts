@@ -160,7 +160,7 @@ export function installScrollbars(scope: HTMLElement) {
       const page = target === root, style = getComputedStyle(target);
       const parent = page ? scope : target.closest<HTMLElement>('dialog,[popover]:not(.nc-scrollbar-layer)') ?? scope;
       if (layer.parentElement !== parent) parent.append(layer);
-      let visible = target.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}) && !target.closest('[inert]') && (!modal || modal.contains(target));
+      let visible = target.dataset.ncScrollbarMode !== 'hidden' && target.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}) && !target.closest('[inert]') && (!modal || modal.contains(target));
       const bounds = target.getBoundingClientRect();
       let left = page ? 0 : bounds.left + target.clientLeft, top = page ? headerHeight : bounds.top + target.clientTop;
       let right = page ? root.clientWidth : left + target.clientWidth, bottom = page ? root.clientHeight : top + target.clientHeight;

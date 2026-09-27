@@ -11,6 +11,10 @@ export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'de
   value: string | number;
   onChange: (event: SelectChangeEvent) => void;
   children?: ReactNode;
+  /** Custom button content; option labels still drive selection and type-ahead. */
+  trigger?: ReactNode;
+  placement?: 'auto' | 'left';
+  menuWidth?: number;
 };
 type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode};
 type Option = {value: string; label: string; disabled: boolean; icon?: ReactNode};
@@ -34,7 +38,7 @@ function readOptions(children: ReactNode, disabled = false): Option[] {
 }
 
 /** Single selection. Focus stays on the button; Escape cancels, Enter/Tab commit. */
-export function Select({value, onChange, children, disabled, id, name, className = '', onKeyDown, onClick, onBlur, ...props}: SelectProps) {
+export function Select({value, onChange, children, trigger, placement = 'auto', menuWidth = 180, disabled, id, name, className = '', onKeyDown, onClick, onBlur, ...props}: SelectProps) {
   const generatedId = useId(), buttonId = id ?? `nc-select-${generatedId}`, listId = `${buttonId}-list`;
   const buttonRef = useRef<HTMLButtonElement>(null), listRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false), [active, setActive] = useState(-1);
@@ -91,9 +95,17 @@ export function Select({value, onChange, children, disabled, id, name, className
       // Stay inside the document viewport, including embedded extension surfaces.
       const root = document.documentElement;
       const viewportWidth = Math.min(root.clientWidth, root.getBoundingClientRect().width);
-      const width = Math.min(Math.max(rect.width, 180), viewportWidth - margin * 2);
+      const availableWidth = placement === 'left' ? rect.left - gap - margin : viewportWidth - margin * 2;
+      const width = Math.max(0, Math.min(Math.max(rect.width, menuWidth), availableWidth));
       const below = window.innerHeight - rect.bottom - gap - margin, above = rect.top - gap - margin;
       list.style.width = `${width}px`;
+      if (placement === 'left') {
+        list.style.maxHeight = `${Math.max(0, Math.min(320, window.innerHeight - margin * 2))}px`;
+        const height = list.getBoundingClientRect().height;
+        list.style.left = `${Math.max(margin, rect.left - gap - width)}px`;
+        list.style.top = `${Math.max(margin, Math.min(rect.top + (rect.height - height) / 2, window.innerHeight - height - margin))}px`;
+        return;
+      }
       const upwards = below < Math.min(list.scrollHeight + 4, 320) && above > below;
       list.style.maxHeight = `${Math.max(0, Math.min(320, upwards ? above : below))}px`;
       list.style.left = `${Math.max(margin, Math.min(rect.left, viewportWidth - width - margin))}px`;
@@ -111,7 +123,7 @@ export function Select({value, onChange, children, disabled, id, name, className
       document.removeEventListener('scroll', scroll, true);
       if (list.matches(':popover-open')) list.hidePopover();
     };
-  }, [expanded]);
+  }, [expanded, placement, menuWidth]);
 
   useLayoutEffect(() => {
     const list = listRef.current, option = list?.querySelectorAll<HTMLElement>('.nc-select-option')[activeIndex];
@@ -168,8 +180,8 @@ export function Select({value, onChange, children, disabled, id, name, className
       aria-expanded={expanded} aria-controls={listId} aria-activedescendant={expanded && activeIndex !== undefined ? `${listId}-${activeIndex}` : undefined}
       onKeyDown={keyDown} onBlur={event => { close(); onBlur?.(event); }}
       onClick={event => { onClick?.(event); if (!event.defaultPrevented) { if (expanded) close(); else show(); } }}>
-      <span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value">{options[selected]?.label ?? String(value)}</span></span>
-      <Icon name="chevron" size={16} className="nc-select-chevron"/>
+      {trigger ?? <><span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value">{options[selected]?.label ?? String(value)}</span></span>
+      <Icon name="chevron" size={16} className="nc-select-chevron"/></>}
     </button>
     {name && <input type="hidden" name={name} value={value} disabled={unavailable} form={props.form}/>}
     <span ref={listRef} id={listId} popover="auto" role="listbox" className="nc-select-list"
