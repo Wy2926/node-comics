@@ -2,7 +2,7 @@ import {useEffect,useState,type HTMLAttributes,type MouseEvent} from 'react';
 import {formatDate,msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
-import {coverReference,shelfReadingProgress,type Comic} from '../comics/application/library-service';
+import {coverReference,hasCatalogUpdates,shelfReadingProgress,type Comic} from '../comics/application/library-service';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
 export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOpen:()=>void;onMore:(event:MouseEvent<HTMLButtonElement>)=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
@@ -28,7 +28,7 @@ export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOp
   {failedCover&&!selection&&<button className="button secondary small nc-cover-retry" onClick={retryCover}
    aria-label={msg('{0}封面',{'0':comic.title})+' · '+retryLabel}
    title={failedCover.error instanceof Error?failedCover.error.message:msg('图片暂不可用')}>{retryLabel}</button>}
-   {!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates.count})}>
+   {hasCatalogUpdates(comic)&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates?.count??0})}>
     <svg viewBox="0 0 104 92" aria-hidden="true" focusable="false">
      <path d="m53 7 10 10 17-4 1 15 16 8-10 14 8 16-18 2-5 17-16-7-14 9-9-14-18-1 4-18L7 42l15-9-1-16 18 2Z" fill="#17233b" transform="translate(1 3)"/>
      <path d="m53 7 10 10 17-4 1 15 16 8-10 14 8 16-18 2-5 17-16-7-14 9-9-14-18-1 4-18L7 42l15-9-1-16 18 2Z" fill="#ffe45e" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>

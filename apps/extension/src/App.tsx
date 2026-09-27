@@ -54,7 +54,7 @@ const directSearchSeed:SearchSeed={title:''};
 function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='sites'||value==='search'||value==='discover'||value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
 export function App(){
  const [library,setLibrary]=useState(emptyLibrary),[copies,setCopies]=useState<ReadingEntry[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
- const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent'});
+ const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent',updatesOnly:false});
  const copiesRef=useRef(copies);copiesRef.current=copies;
  const [currentId,setCurrentId]=useState<string>(),current=copies.find(c=>c.id===currentId),[navigationKey,setNavigationKey]=useState(0);
  const currentRef=useRef(currentId);currentRef.current=currentId;

@@ -1,7 +1,7 @@
 import {useLayoutEffect,useRef,useState,type ReactNode,type RefObject} from 'react';
 import type {Comic} from '../comics/domain';
 
-export type ShelfView={scrollTop:number;search:string;sort:string};
+export type ShelfView={scrollTop:number;search:string;sort:string;updatesOnly:boolean};
 type Geometry={columns:number;stride:number;gap:number;top:number;scroll:number;height:number;measured:boolean};
 
 /** Only the visible rows and two neighboring rows own card state, source metadata and image URLs. */

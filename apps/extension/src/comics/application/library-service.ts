@@ -20,6 +20,7 @@ type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs
 const savedPages=new WeakMap<Page,string>();
 const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
+export const hasCatalogUpdates=(comic:Comic)=>!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision;
 /** Match directory chapter grouping without loading page descriptors or image data. */
 export async function shelfReadingProgress(comic:Comic):Promise<number> {
   if(!comic.lastReadAt||!comic.lastEntryId)return 0;

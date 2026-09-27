@@ -1,23 +1,31 @@
-import {useMemo,useRef,useState,type RefObject} from 'react';
+import {useEffect,useMemo,useRef,useState,type RefObject} from 'react';
 import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
-import {continueEntry,removeComics,type Comic,type Entry} from '../comics/application/library-service';
+import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
 import type {LibraryViewModel} from '../comics/application/types';
 import {useContextMenu} from './ContextMenu';
 import {Select} from './Select';
 import {Modal} from './components';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
+import {ShelfUpdates} from './ShelfUpdates';
 import './shelf.css';
 type Props={onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
 export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
- const matching=useMemo(()=>library.comics.filter(value=>value.title.normalize('NFKC').toLocaleLowerCase().includes(search.trim().normalize('NFKC').toLocaleLowerCase())).sort((a,b)=>(sort==='title'?a.title.localeCompare(b.title,undefined,{numeric:true}):sort==='recent'?(b.lastReadAt??b.createdAt)-(a.lastReadAt??a.createdAt):b.updatedAt-a.updatedAt)||a.id.localeCompare(b.id)),[library.comics,search,sort]);
+ const [updatesOnly,setUpdatesOnly]=useState(shelfView.current.updatesOnly);
+ const updatedCount=useMemo(()=>library.comics.filter(hasCatalogUpdates).length,[library.comics]),filterUpdates=updatesOnly&&updatedCount>0;
+ useEffect(()=>{
+  if(updatedCount||!updatesOnly)return;
+  shelfView.current.updatesOnly=false;shelfView.current.scrollTop=0;setUpdatesOnly(false);window.scrollTo({top:0,behavior:'instant'});
+ },[updatedCount,updatesOnly,shelfView]);
+ const matching=useMemo(()=>library.comics.filter(value=>(!filterUpdates||hasCatalogUpdates(value))&&value.title.normalize('NFKC').toLocaleLowerCase().includes(search.trim().normalize('NFKC').toLocaleLowerCase())).sort((a,b)=>(sort==='title'?a.title.localeCompare(b.title,undefined,{numeric:true}):sort==='recent'?(b.lastReadAt??b.createdAt)-(a.lastReadAt??a.createdAt):b.updatedAt-a.updatedAt)||a.id.localeCompare(b.id)),[library.comics,search,sort,filterUpdates]);
  const selectedComics=useMemo(()=>library.comics.filter(comic=>selected.has(comic.id)),[library.comics,selected]);
  const changeSearch=(value:string)=>{shelfView.current.search=value;shelfView.current.scrollTop=0;setSearch(value);window.scrollTo({top:0,behavior:'instant'});};
  const changeSort=(value:string)=>{shelfView.current.sort=value;shelfView.current.scrollTop=0;setSort(value);window.scrollTo({top:0,behavior:'instant'});};
+ const changeUpdatesOnly=()=>{shelfView.current.updatesOnly=!filterUpdates;shelfView.current.scrollTop=0;setUpdatesOnly(!filterUpdates);window.scrollTo({top:0,behavior:'instant'});};
  const open=(id:string)=>{shelfView.current.scrollTop=window.scrollY;onOpen(id);};
  const toggle=(id:string)=>setSelected(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;});
  const actions=(comic:Comic)=>[
@@ -42,7 +50,7 @@ export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,o
   finally{removalRunning.current=false;setBusy(false);}
  }
  return <div className="nc-library">
-  <div className="nc-page-heading"><div><span className="nc-eyebrow">{msg('YOUR STORIES, YOUR PACE')}</span><h1 className="nc-shelf-title"><span>{msg('我的漫画')}</span><span className="nc-profile-avatar nc-shelf-count">{library.comics.length}</span></h1><p>{msg('保存喜欢的故事，随时继续上次阅读。')}</p></div><div className="nc-inline"><button className="button primary" onClick={onImport}><Icon name="plus"/>{msg('导入漫画')}</button>{!!sourceActions.length&&<button className="button secondary" aria-haspopup="menu" onClick={e=>menu.open(e.currentTarget,msg('云盘'),sourceActions.map(action=>({label:action.label,onSelect:()=>onSource(action.id)})))}>{msg('云盘')}</button>}</div></div>
+  <div className="nc-page-heading"><div><span className="nc-eyebrow">{msg('YOUR STORIES, YOUR PACE')}</span><h1 className="nc-shelf-title"><span>{msg('我的漫画')}</span><span className="nc-profile-avatar nc-shelf-count">{library.comics.length}</span><ShelfUpdates count={updatedCount} active={filterUpdates} onToggle={changeUpdatesOnly}/></h1><p>{msg('保存喜欢的故事，随时继续上次阅读。')}</p></div><div className="nc-inline"><button className="button primary" onClick={onImport}><Icon name="plus"/>{msg('导入漫画')}</button>{!!sourceActions.length&&<button className="button secondary" aria-haspopup="menu" onClick={e=>menu.open(e.currentTarget,msg('云盘'),sourceActions.map(action=>({label:action.label,onSelect:()=>onSource(action.id)})))}>{msg('云盘')}</button>}</div></div>
   <div className="nc-library-tools nc-shelf-tools">
    <label className="nc-search"><Icon name="book" size={18}/><input type="search" aria-label={msg('搜索漫画')} placeholder={msg('搜索漫画')} value={search} onChange={e=>changeSearch(e.target.value)}/></label>
    <label className="nc-sort-label">{msg('排序')}<Select aria-label={msg('排序')} value={sort} onChange={e=>changeSort(e.target.value)}><option value="recent">{msg('最近阅读')}</option><option value="updated">{msg('最近更新')}</option><option value="title">{msg('按名称')}</option></Select></label>
@@ -53,7 +61,7 @@ export function Library({onFind,library,onOpen,onImport,onSource,sourceActions,o
    <div className="nc-inline"><button className="button secondary small" disabled={busy||!matching.length||matching.every(comic=>selected.has(comic.id))} onClick={()=>setSelected(previous=>new Set([...previous,...matching.map(comic=>comic.id)]))}>{msg('全选 {0} 部',{'0':matching.length})}</button><button className="text-link" disabled={busy||!selectedComics.length} onClick={()=>setSelected(new Set())}>{msg('取消选择')}</button></div>
    <button className="button danger small" disabled={busy||!selectedComics.length} onClick={()=>setRemoving(selectedComics)}>{msg('移除漫画')}</button>
   </div>}
-  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol">✦</span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid key={search+'|'+sort} comics={matching} view={shelfView}>{comic=><ShelfCard key={comic.id} comic={comic} onOpen={()=>open(comic.id)} onMore={e=>menu.open(e.currentTarget,comic.title,actions(comic))} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
+  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol">✦</span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard key={comic.id} comic={comic} onOpen={()=>open(comic.id)} onMore={e=>menu.open(e.currentTarget,comic.title,actions(comic))} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
   {menu.menu}
   {!!removing?.length&&<Modal title={msg('移除漫画')} onClose={()=>{if(!busy)setRemoving(undefined);}}>
    <p>{removing.length===1?msg('从书架移除《{0}》及其阅读记录？',{'0':removing[0].title}):msg('从书架移除选中的 {0} 部漫画及其阅读记录？',{'0':removing.length})}</p>
