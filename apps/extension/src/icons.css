@@ -1,0 +1,18 @@
+.nc-icon { flex-shrink: 0; vertical-align: middle; }
+.nc-icon[data-compact] { --icon-shadow: transparent; }
+
+/* Solid accent controls and semantic notices keep readable, contextual icon colors. */
+:where(
+  .button.primary, .segmented button.active, .nc-comic-action,
+  .button.danger, .nc-danger-text, .global-error, .nc-error, .nc-action-feedback.error, .nc-image-translation.error,
+  button:disabled, [aria-disabled=true], .nc-card-reading-time, .nc-discovery-poster
+) .nc-icon {
+  --icon-paper: transparent;
+  --icon-soft: transparent;
+  --icon-accent: currentColor;
+  --icon-shadow: transparent;
+}
+:where(.button.primary, .segmented button.active, .nc-comic-action) .nc-icon { --icon-on: var(--accent); }
+:where(.button.danger, .nc-danger-text, .global-error, .nc-error, .nc-action-feedback.error, .nc-image-translation.error) .nc-icon {
+  --icon-on: var(--danger-soft);
+}

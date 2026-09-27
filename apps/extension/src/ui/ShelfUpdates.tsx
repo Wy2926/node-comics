@@ -1,7 +1,8 @@
 import {msg} from '../i18n/runtime';
 
 export function ShelfUpdates({count,active,onToggle}:{count:number;active:boolean;onToggle:()=>void}){
- return <button className="nc-shelf-updates" type="button" aria-pressed={active} disabled={!count} onClick={onToggle}>
+ if(count===0)return null;
+ return <button className="nc-shelf-updates" type="button" aria-pressed={active} onClick={onToggle}>
   <svg className="nc-shelf-updates-frame" viewBox="0 0 160 60" preserveAspectRatio="none" aria-hidden="true" focusable="false">
    <path className="nc-shelf-updates-shadow" d="m9 7 142-3 5 10-4 34-24 1-9 9-6-9-107 2Z" transform="translate(3 3)"/>
    <path className="nc-shelf-updates-paper" d="m9 7 142-3 5 10-4 34-24 1-9 9-6-9-107 2Z" vectorEffect="non-scaling-stroke"/>

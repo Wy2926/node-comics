@@ -39,6 +39,6 @@ export function ShelfCard({comic,onOpen,onMore,menu,selection}:{comic:Comic;onOp
      <circle cx="18" cy="8" r="3" fill="#ed277a" stroke="#fff" strokeWidth="1.5"/>
     </svg>
    </span>}
-  <div className="nc-library-card-body"><h2 className="nc-card-title"><button disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><div className="nc-library-card-actions"><button className={'button small '+(selection&&!selection.checked?'secondary':'primary')} disabled={selection?.disabled} aria-pressed={selection?.checked} onClick={action}>{selection?(selection.checked?msg('✓ 已选择'):msg('选择')):comic.lastReadAt?msg('继续阅读'):msg('开始阅读')}</button>{!selection&&<button className="icon-button" aria-label={msg('更多操作 · {0}',{'0':comic.title})} aria-haspopup="menu" onClick={onMore}><Icon name="more" size={18}/></button>}</div></div>
+  <div className="nc-library-card-body"><h2 className="nc-card-title"><button disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><div className="nc-library-card-actions"><button className={'button small '+(selection&&!selection.checked?'secondary':'primary')} disabled={selection?.disabled} aria-pressed={selection?.checked} onClick={action}>{selection?(selection.checked?<><Icon name="check" size={16}/>{msg('已选择')}</>:msg('选择')):comic.lastReadAt?msg('继续阅读'):msg('开始阅读')}</button>{!selection&&<button className="icon-button" aria-label={msg('更多操作 · {0}',{'0':comic.title})} aria-haspopup="menu" onClick={onMore}><Icon name="more" size={18}/></button>}</div></div>
  </article>;
 }

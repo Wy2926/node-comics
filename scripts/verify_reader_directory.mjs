@@ -31,7 +31,7 @@ try{
  assert.doesNotMatch(await list.innerText(),/状态已刷新/);assert.equal(await list.evaluate(el=>el.scrollTop),0);
  checks.push('Status refresh preserves manual directory scrolling');
  await closePanel();await openPanel();await centered();assert.equal(await position(),before);
- await page.getByRole('button',{name:'正序 ↑',exact:true}).click();await centered();assert.equal(await position(),before);
+ await page.getByRole('button',{name:'正序',exact:true}).click();await centered();assert.equal(await position(),before);
  await page.getByRole('button',{name:'显示更多',exact:true}).click();assert.equal(await page.locator('.nc-chapter-entry').count(),600);
  checks.push('Reopening and reversing locate the same chapter without moving the reading viewport; load more still advances');
  await page.getByLabel('搜索目录').fill('不存在');await page.getByText('没有匹配的内容',{exact:true}).waitFor();

@@ -1,7 +1,8 @@
 import {useEffect,useLayoutEffect,useRef,useState,type HTMLAttributes} from 'react';
+import {Icon} from '../icons';
 import './context-menu.css';
 
-type Action={label:string;onSelect:()=>void;disabled?:boolean;danger?:boolean};
+type Action={label:string;icon?:string;onSelect:()=>void;disabled?:boolean;danger?:boolean};
 type Menu={x:number;y:number;label:string;actions:Action[];target:HTMLElement};
 
 export function useContextMenu(){
@@ -55,5 +56,5 @@ function ContextMenu({menu,onClose}:{menu:Menu;onClose:()=>void}){
   if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
   event.preventDefault();const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
   const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();
- }}>{menu.actions.map(action=><button key={action.label} role="menuitem" disabled={action.disabled} className={action.danger?'nc-danger-text':undefined} onClick={()=>{restoreFocus();onClose();action.onSelect();}}>{action.label}</button>)}</div>;
+ }}>{menu.actions.map(action=><button key={action.label} role="menuitem" disabled={action.disabled} className={action.danger?'nc-danger-text':undefined} onClick={()=>{restoreFocus();onClose();action.onSelect();}}>{action.icon&&<Icon name={action.icon} size={18}/>}<span>{action.label}</span></button>)}</div>;
 }

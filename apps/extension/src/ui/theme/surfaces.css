@@ -36,6 +36,7 @@
 
 /* The app masthead pairs the brand artwork with stamped navigation. */
 .nc-app-header { height: 80px; border-bottom: var(--comic-border); gap: 30px; }
+.nc-app-header .nc-icon { width: 24px; height: 24px; color: var(--ink); }
 .nc-app-header nav { gap: 12px; }
 .nc-app-header nav>button { height: 42px; border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 0 14px; }
 .nc-app-header nav>button[aria-current=page] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
@@ -60,7 +61,7 @@
 .nc-page-heading p, .nc-app .page-title p { font-size: .875rem; margin: 12px 0 0; color: var(--muted); max-width: 50em; }
 .nc-eyebrow, .nc-app .page-title .eyebrow { color: var(--accent); font-size: .625rem; font-weight: 800; letter-spacing: .14em; }
 .nc-app .page-title { padding-right: 95px; }
-.nc-heading-star { position: absolute; right: 32px; top: 28px; font-size: 3.25rem; color: var(--accent); transform: rotate(12deg); }
+.nc-heading-star { position: absolute; right: 32px; top: 28px; color: var(--accent); transform: rotate(12deg); }
 .nc-title-count { align-self: center; color: var(--ink); background: var(--surface); border: var(--comic-border); border-radius: 2px; transform: rotate(-5deg); padding: 4px 10px; font-size: .875rem; }
 .nc-section-heading h2, .nc-shelf-heading h2 { font-weight: 800; letter-spacing: -.02em; }
 .nc-shelf-heading, .nc-recent-reading>.nc-section-heading { padding-bottom: 14px; border-bottom: var(--comic-perforation); }

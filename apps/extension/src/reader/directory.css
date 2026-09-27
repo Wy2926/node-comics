@@ -67,3 +67,4 @@
 .nc-source-language-choice select {
   width: 100%;
 }
+.nc-directory-search .text-link, .nc-directory-footer a { display: inline-flex; align-items: center; gap: 6px; }

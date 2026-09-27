@@ -42,7 +42,7 @@ export function DiscoveryControls({query, genres, count, loading, refreshDisable
     <div className="nc-discovery-toolbar">
       <div className="nc-discovery-overview">
         <div className="nc-discovery-rankings" role="group" aria-label={msg('榜单')}>
-          {(Object.keys(rankings) as DiscoveryRanking[]).map(key => <button key={key} type="button" aria-pressed={query.ranking === key} className={query.ranking === key ? 'active' : undefined} onClick={() => onChange({...query, ranking: key})}>{rankings[key]}</button>)}
+          {(Object.keys(rankings) as DiscoveryRanking[]).map(key => <button key={key} type="button" aria-pressed={query.ranking === key} className={query.ranking === key ? 'active' : undefined} onClick={() => onChange({...query, ranking: key})}><Icon name={{trending:'bolt',popular:'chart',score:'crown',newest:'spark'}[key]} size={20}/>{rankings[key]}</button>)}
         </div>
         <div className="nc-discovery-count" role="status"><strong>{loading ? msg('加载中…') : msg('{0} 部作品', {'0': count})}</strong></div>
       </div>

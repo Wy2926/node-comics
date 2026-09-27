@@ -31,13 +31,13 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
     <div className="nc-login-spread">
       <div className="nc-login-cover nc-comic-paper" aria-hidden="true">
         <div className="nc-login-masthead"><Icon name="spark" size={18}/><span>NODELANE COMICS</span><span>{msg("漫译通行证")}</span></div>
-        <div className="nc-login-cover-title">{msg("翻过语言")}<br/><em>{msg("这一页。")}</em><span className="nc-login-star">✳</span></div>
+        <div className="nc-login-cover-title">{msg("翻过语言")}<br/><em>{msg("这一页。")}</em><span className="nc-login-star"><Icon name="burst" size={52}/></span></div>
         <div className="nc-login-panels">
           <div className="nc-login-panel original"><span className="nc-login-panel-label">{msg("01 / 原文")}</span><span className="nc-login-letter">あ</span><span className="nc-login-bubble">えっ？</span></div>
           <div className="nc-login-panel translated"><span className="nc-login-panel-label">{msg("02 / 读懂")}</span><span className="nc-login-letter">{msg("啊")}</span><span className="nc-login-bubble">{failed?msg("再试一次！"):pending?msg("连接中…"):msg("原来如此！")}</span></div>
           <span className="nc-login-panel-arrow"><Icon name="arrow" size={26}/></span>
         </div>
-        <div className="nc-login-cover-bottom"><span>{msg("每个故事，都值得读懂。")}</span><span>{msg("READ")}<br/>{msg("BEYOND WORDS \u2197")}</span></div>
+        <div className="nc-login-cover-bottom"><span>{msg("每个故事，都值得读懂。")}</span><span>{msg("READ")}<br/>{msg("BEYOND WORDS")} <Icon name="external" size={12}/></span></div>
       </div>
       <div className="nc-login-content">
         <span className="nc-login-kicker"><span/> {msg('YOUR NEXT CHAPTER')}</span>

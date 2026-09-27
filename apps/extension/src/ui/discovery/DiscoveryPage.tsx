@@ -1,6 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
 import {createAniListProvider} from '../../discovery/anilist';
 import {DiscoverySession} from '../../discovery/session';
+import {Icon} from '../../icons';
 import {msg} from '../../i18n/runtime';
 import {DiscoveryCard} from './DiscoveryCard';
 import {DiscoveryControls} from './DiscoveryControls';
@@ -49,7 +50,7 @@ export function DiscoveryPage({active, renderSearch, onSearchSites}: {
       {state.works.map(work => <DiscoveryCard key={work.id} work={work} onOpen={() => {void session.select(work);}}/>)}
       {state.loading && !state.works.length && Array.from({length: 12}, (_, index) => <div key={index} className="nc-discovery-skeleton" aria-hidden="true"/>)}
     </div>
-    {!state.loading && !state.error && !state.works.length && <div className="nc-search-empty"><h2>{msg('没有符合条件的作品')}</h2><p>{msg('试试原名、英文名，或清空筛选。')}</p><button className="button secondary" onClick={onSearchSites}>{msg('搜索漫画')}</button></div>}
+    {!state.loading && !state.error && !state.works.length && <div className="nc-search-empty"><Icon name="search" size={36}/><h2>{msg('没有符合条件的作品')}</h2><p>{msg('试试原名、英文名，或清空筛选。')}</p><button className="button secondary" onClick={onSearchSites}><Icon name="comic-search"/>{msg('搜索漫画')}</button></div>}
     {state.hasMore && <div ref={loadMore} className="nc-discovery-pagination">
       {paginationError ? notice : state.loading && <span role="status">{msg('加载中…')}</span>}
     </div>}

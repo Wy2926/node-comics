@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {msg} from '../i18n/runtime';
 import {availableChannelProtocols,connectChannel,listChannels,removeChannel,selectChannel,subscribeChannels,type ChannelProfile} from '../translation/channels';
+import {Icon} from '../icons';
 import {Select} from './Select';
 import {Modal,SettingRow} from './components';
 
@@ -22,7 +23,7 @@ export function TranslationChannels(){
   }
   async function remove(profile:ChannelProfile){setBusy(true);setError('');try{await removeChannel(profile.id);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   return <section className="settings-card">
-    <h3>{msg('翻译渠道')}</h3>
+    <h3><Icon name="translate"/>{msg('翻译渠道')}</h3>
     <SettingRow title={msg('当前渠道')} description={msg('阅读器与网页原位翻译使用同一渠道；本地服务无需 NodeLane 账号。')}>
       <Select aria-label={msg('当前渠道')} value={active} disabled={busy} onChange={e=>{setError('');void selectChannel(e.target.value).catch(e=>setError(e.message));}}>
         {profiles.map(profile=><option key={profile.id} value={profile.id}>{profile.name}</option>)}
@@ -31,7 +32,7 @@ export function TranslationChannels(){
     {profiles.filter(profile=>protocols.some(p=>p.id===profile.adapterId)).map(profile=><SettingRow key={profile.id} title={profile.name} description={protocols.find(p=>p.id===profile.adapterId)?.label??''}>
       <div className="nc-inline"><button className="button secondary small" disabled={busy} onClick={()=>edit(profile)}>{msg('重新连接')}</button><button className="button secondary small" disabled={busy} onClick={()=>void remove(profile)}>{msg('移除')}</button></div>
     </SettingRow>)}
-    <button className="button secondary" disabled={busy} onClick={()=>edit()}>{msg('添加翻译渠道')}</button>
+    <button className="button secondary" disabled={busy} onClick={()=>edit()}><Icon name="plus" size={18}/>{msg('添加翻译渠道')}</button>
     {error&&editing===undefined&&<p role="alert" className="error">{error}</p>}
     {editing!==undefined&&<Modal title={editing?msg('重新连接翻译渠道'):msg('添加翻译渠道')} onClose={()=>{if(!busy){setValues({});setEditing(undefined);}}}>
       <form className="nc-stack" onSubmit={e=>{e.preventDefault();void save();}}>

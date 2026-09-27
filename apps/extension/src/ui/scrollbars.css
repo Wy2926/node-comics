@@ -2,10 +2,14 @@
 .nc-scrollbar-viewport { scrollbar-width: none !important; scrollbar-gutter: auto !important; }
 .nc-scrollbar-viewport::-webkit-scrollbar { display: none; }
 html.nc-scrollbar-viewport { scroll-padding-top: calc(var(--nc-header-height, 0px) + 16px); }
-html:not(.nc-scrollbars-measuring) .nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved],
-html.nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved]:not(.nc-scrollbars-measuring) {
+html:not(.nc-scrollbars-measuring) .nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved] {
   padding-right: calc(var(--nc-scrollbar-padding-right, 0px) + var(--nc-scrollbar-reserve-y, 0px)) !important;
   padding-bottom: calc(var(--nc-scrollbar-padding-bottom, 0px) + var(--nc-scrollbar-reserve-x, 0px)) !important;
+}
+/* Page rails start below the masthead; reserve their space in the workspace only. */
+html.nc-scrollbar-viewport[data-nc-scrollbar-mode=reserved]:not(.nc-scrollbars-measuring) .nc-workspace {
+  padding-right: var(--nc-scrollbar-reserve-y, 0px);
+  padding-bottom: var(--nc-scrollbar-reserve-x, 0px);
 }
 .nc-scrollbar-layer[popover] {
   position: fixed; inset: auto; margin: 0; padding: 0; border: 0;

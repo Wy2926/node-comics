@@ -132,14 +132,20 @@ test('reserved mode allocates a stable gutter, while overlay mode retains the fu
   assert.deepEqual(await geometry('reserved'),{width:260,content:240,padding:'20px'});
 });
 
-test('only the four main navigation pages use document overlay mode', async () => {
+test('page scrollbar modes keep the masthead full width and reserve space only in the workspace', async () => {
   await page.goto(origin);await page.locator('input[type=file]').waitFor({state:'attached'});
+  const header = page.locator('.nc-app-header'), actions = page.locator('.nc-header-actions');
+  const initialHeader = await header.boundingBox(), initialActions = await actions.boundingBox();
   for (const label of ['我的漫画','发现','搜索漫画','漫画网站']) {
     await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:label,exact:true}).click();
     await page.waitForFunction(() => document.documentElement.dataset.ncScrollbarMode==='overlay' && getComputedStyle(document.documentElement).paddingRight==='0px');
   }
   for (const label of ['外观与设置','我的账户']) {
     await page.getByRole('button',{name:label,exact:true}).click();
-    await page.waitForFunction(() => document.documentElement.dataset.ncScrollbarMode==='reserved' && getComputedStyle(document.documentElement).paddingRight==='20px');
+    await page.waitForFunction(() => document.documentElement.dataset.ncScrollbarMode==='reserved' && getComputedStyle(document.querySelector('.nc-workspace')).paddingRight==='20px');
+    assert.deepEqual(await header.boundingBox(), initialHeader);
+    assert.deepEqual(await actions.boundingBox(), initialActions);
+    assert.equal(await page.evaluate(() => document.querySelector('.nc-app-header').getBoundingClientRect().right),1280);
+    await nativeGutter('nc-workspace');
   }
 });

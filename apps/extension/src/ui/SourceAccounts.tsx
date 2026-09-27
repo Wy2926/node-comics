@@ -24,7 +24,7 @@ export function SourceAccounts({onNotice,onChanged}:{onNotice:(message:string)=>
  };
  const states={connected:msg('已连接'),offline:msg('离线'),'reauth-required':msg('需要重新连接'),disconnected:msg('已断开连接'),revoked:msg('授权已撤销')};
  const errors=[...(error?[error]:[]),...(value?.errors.map(item=>`${item.providerLabel}: ${item.error}`)??[])];
- return <section className="settings-card nc-source-accounts"><h3><Icon name="user"/>{msg('云盘账户')}</h3>
+ return <section className="settings-card nc-source-accounts"><h3><Icon name="cloud"/>{msg('云盘账户')}</h3>
   {!value&&!error&&<p role="status" className="nc-muted">{msg('正在读取云盘账户…')}</p>}
   {!!errors.length&&<div className="nc-inline" role="alert"><div>{errors.map((message,index)=><p key={index}>{message}</p>)}</div><button className="button secondary small" disabled={busy} onClick={()=>void reload()}>{msg('重试')}</button></div>}
   {value&&!value.accounts.length&&!errors.length&&<p className="nc-muted">{msg('暂无云盘账户，可从「我的漫画」连接云盘。')}</p>}

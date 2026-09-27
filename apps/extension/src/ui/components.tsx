@@ -13,18 +13,19 @@ export function Modal({ title, subtitle, children, onClose, className='', closeL
   useEffect(() => { ref.current?.showModal(); }, []);
   return <dialog ref={ref} className={'modal '+className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
     <button className="modal-close icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
-    <span className="modal-spark">✦</span>
+    <span className="modal-spark"><Icon name="spark" size={24}/></span>
     <h2>{title}</h2>
     {subtitle && <p className="modal-subtitle">{subtitle}</p>}
     {children}
   </dialog>;
 }
-export function PageTitle({ eyebrow, title, description }: {
+export function PageTitle({ eyebrow, title, description, icon='spark' }: {
+  icon?: string;
   eyebrow: string;
   title: string;
   description: string;
 }) {
-  return <div className="page-title"><span className="eyebrow muted">{eyebrow}</span><h1>{title}</h1><p>{description}</p><span className="nc-heading-star" aria-hidden="true">✦</span></div>;
+  return <div className="page-title"><span className="eyebrow muted">{eyebrow}</span><h1>{title}</h1><p>{description}</p><span className="nc-heading-star"><Icon name={icon} size={48}/></span></div>;
 }
 export function Stat({ label, value, suffix }: {
   label: string;

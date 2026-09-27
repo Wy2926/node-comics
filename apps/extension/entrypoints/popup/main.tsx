@@ -76,7 +76,7 @@ function Popup({initialError=''}:{initialError?:string}){
    <section className="nc-popup-cover nc-comic-paper">
     <div className="nc-popup-kicker"><Icon name="spark" size={14}/>{msg("YOUR NEXT CHAPTER")}<span>{msg("随读随译")}</span></div>
     <h1>{msg("好故事，")}<br/><em>{msg("用你的语言继续。")}</em></h1>
-    <span className="nc-popup-star" aria-hidden="true">✳</span>
+    <span className="nc-popup-star"><Icon name="burst" size={38}/></span>
     <div className="nc-popup-source"><Icon name="globe" size={16}/><div><b title={source?.title}>{source?.title||msg("当前标签页")}</b><span>{source?.url?new URL(source.url).hostname:sourceNotice}</span></div></div>
    </section>
    <section className="nc-popup-translation" aria-label={msg("网页翻译")}>
@@ -87,7 +87,7 @@ function Popup({initialError=''}:{initialError?:string}){
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
    <section className="nc-popup-import" aria-label={msg('漫画阅读')}>
-    {importable&&<button className="button secondary full" disabled={disabled} onClick={()=>void findComic()}><Icon name="globe"/>{msg('寻找其他语言')}</button>}
+    {importable&&<button className="button secondary full" disabled={disabled} onClick={()=>void findComic()}><Icon name="translate"/>{msg('寻找其他语言')}</button>}
     {importable?<button className="button secondary full" disabled={disabled} onClick={()=>void readSource()}><Icon name="book"/>{busy?msg('正在打开漫画'):msg('开始阅读')}</button>:<p className="nc-popup-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
     {discoveryError&&<div className="nc-popup-error" role="alert">{discoveryError}</div>}
    </section>
