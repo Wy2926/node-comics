@@ -539,6 +539,19 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.6.0",
+        "date": "2026-09-27",
+        "title": "0.6.0: Discover manga and cache whole books for offline reading",
+        "items": [
+          "Discover manga with AniList trending, popular, top-rated and new releases. Filter by genre and more, then find a website source from the details and import it to read.",
+          "Cache entire website manga for offline reading, including complete catalogs and chapters. Select multiple source languages, track progress, pause and resume, and retry failed pages.",
+          "Added support for MangaDot, Sunday Webry, international WEBTOON and Baozimh, with improvements to website search, covers and image loading.",
+          "Added reading progress, update counts and filters to the library; improved cover reuse and scroll restoration when switching pages.",
+          "Improved reader cache reuse, recovery from expired image URLs and chapter sorting, with consistent comic-style icons, account badges and import results.",
+          "Chrome, Edge and Firefox 0.6.0 download packages are available. Firefox uses the AMO-signed XPI."
+        ]
+      },
+      {
         "id": "0.5.0",
         "date": "2026-09-26",
         "title": "0.5.0: Find manga across languages and sites",
