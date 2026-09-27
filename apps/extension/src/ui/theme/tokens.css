@@ -23,6 +23,13 @@
   --dialog-backdrop: #101c32a0;
   --cover-overlay-ink: #fff;
   --cover-overlay-base: #101823;
+  --icon-comic-ink: #25314b;
+  --icon-comic-paper: #fffaf0;
+  --icon-comic-blue: #64c5f5;
+  --icon-comic-pink: #ff83a6;
+  --icon-comic-yellow: #ffda65;
+  --icon-comic-mint: #72dfbb;
+  --icon-comic-purple: #b9a0f5;
   --page-max-width: 1440px;
   --page-gutter: 36px;
   --pink: var(--accent);

@@ -1,52 +1,312 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-  <symbol id="search" viewBox="0 0 24 24"><path d="M16 11a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><circle cx="9.5" cy="10" r="6.5" fill="var(--icon-soft,var(--accent-soft))"/><path d="m14 14 7 5-2 2-5-7Z" fill="var(--icon-accent,var(--accent))"/><path d="M6 9a4 4 0 0 1 3-3" stroke-width="1.3"/></symbol>
-  <symbol id="filter" viewBox="0 0 24 24"><path d="M3 7h18M3 17h18"/><circle cx="15" cy="7" r="3" fill="var(--icon-accent,var(--accent))"/><circle cx="8" cy="17" r="3" fill="var(--icon-soft,var(--accent-soft))"/></symbol>
-  <symbol id="github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-4.3 1.3-4.3-2.5-6-3m12 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.9a5.4 5.4 0 0 0-1.5-3.7 5 5 0 0 0-.1-3.7s-1.2-.4-3.9 1.4a13.4 13.4 0 0 0-7 0C5.1.8 3.9 1.2 3.9 1.2a5 5 0 0 0-.1 3.7 5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.2 6.6 6.2 6.9a3.4 3.4 0 0 0-.9 2.6V22" transform="translate(1 0)"/></g></symbol>
-  <symbol id="book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="M3 6 11 7l2 2 9-3v14l-9 3-3-2-7-1Z"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="M2 4.5 9 5q3 .3 3 2.5V21q-1.5-2.4-5-2.5L2 18Z"/><path style="fill:var(--icon-paper,var(--surface))" d="m12 7 3-2 6-1v14l-6 1q-2 .4-3 2Z"/><path style="fill:var(--icon-accent,var(--accent))" d="m16 5 2-.4v6l-1-.6-1 1Z" stroke-width="1.1"/><path d="m5 9 4 .4m-4 3 3 .3" stroke-width="1.25"/></g></symbol>
-  <symbol id="bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M5 2h12v18l-6-4-6 4Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M8 2h6v7l-3-2-3 2Z" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="page-unread" viewBox="0 0 24 24"><path d="M5 2h9l5 5v14H5Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M4 2h9l5 5v13H4Z" fill="var(--icon-paper,var(--surface))"/><path d="M13 2v5h5" fill="var(--icon-soft,var(--accent-soft))"/><path d="M7 11h8M7 15h5" stroke-width="1.3"/></symbol>
-  <symbol id="page-read" viewBox="0 0 24 24"><path d="M4 2h9l5 5v6l-8 7H4Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M13 2v5h5" fill="var(--icon-paper,var(--surface))"/><path d="m10 17 3 3 8-9" stroke-width="2.2"/><path d="M7 11h5" stroke-width="1.3"/></symbol>
-  <symbol id="home" viewBox="0 0 24 24"><path d="m2 10 9-8 9 8v11H3Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M4 9v11h15V9" fill="var(--icon-soft,var(--accent-soft))"/><path d="m2 10 9-8 10 8" fill="var(--icon-paper,var(--surface))"/><path d="M9 20v-7h5v7" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="folder" viewBox="0 0 24 24"><path d="M2 5h7l3 3h9v12H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 4h7l3 3h8v12H2Z" fill="var(--icon-accent,var(--accent))"/><path d="m2 9 20-1-3 12H2Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M6 15h7" stroke-width="1.3"/></symbol>
-  <symbol id="spark" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="m10 3 3.2 7L20 12l-6.5 3L11 22l-3-6.5L2 13l6-3Z" transform="translate(1 1)"/><path style="fill:var(--icon-accent,var(--accent))" d="m9 2 3.2 7L19 11l-6.5 3L10 21l-3-6.5L1 12l6-3Z"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="m20 2 .9 2.1L23 5l-2.1.9L20 8l-.9-2.1L17 5l2.1-.9Z" stroke-width="1.15"/><path d="m19 18 2 2" stroke-width="1.4"/></g></symbol>
-  <symbol id="upload" viewBox="0 0 24 24"><path d="M3 14v7h18v-7" fill="var(--icon-soft,var(--accent-soft))"/><path d="M7 14V9H3l9-8 9 8h-4v5Z" fill="var(--icon-accent,var(--accent))"/><path d="M8 18h8" stroke-width="1.3"/></symbol>
-  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
-  <symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
-  <symbol id="clock" viewBox="0 0 24 24"><path d="M20 11a9 9 0 1 1-18 0 9 9 0 0 1 18 0" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><circle cx="11" cy="11" r="9" fill="var(--icon-soft,var(--accent-soft))"/><path d="M11 4v7l5 3" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="settings" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z" transform="translate(1 1)"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="M9 2h5l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z"/><circle style="fill:var(--icon-accent,var(--accent))" cx="11.5" cy="11" r="3.4"/><path style="stroke:var(--icon-on,var(--accent-on))" d="m10.3 10.4 1.6-1" stroke-width="1.1"/></g></symbol>
-  <symbol id="user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="M6 22v-3a7 7 0 0 1 14 0v3Z"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="M4 21v-3a7 7 0 0 1 14 0v3Z"/><path style="fill:var(--icon-accent,var(--accent))" d="m8 12 3 4 3-4"/><circle style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" cx="12" cy="6.7" r="4"/><circle style="fill:var(--icon-paper,var(--surface))" cx="11" cy="6" r="4"/></g></symbol>
-  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
-  <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
-  <symbol id="check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
-  <symbol id="globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" cx="13" cy="13" r="9"/><circle style="fill:var(--icon-soft,var(--accent-soft))" cx="11.5" cy="11.5" r="9"/><path style="fill:var(--icon-accent,var(--accent))" d="M11.5 2.5q-6 9 0 18 6-9 0-18Z"/><path d="M2.5 11.5h18M4 6.7q7.5 3.5 15 0M4 16.3q7.5-3.5 15 0" fill="none" stroke-width="1.25"/></g></symbol>
-  <symbol id="layers" viewBox="0 0 24 24"><path d="m2 15 10-5 10 5-10 6Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m2 14 10 5 10-5" fill="var(--icon-paper,var(--surface))"/><path d="m2 10 10 5 10-5" fill="var(--icon-soft,var(--accent-soft))"/><path d="m2 6 10-4 10 4-10 5Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="m12 2 10 4-10 5Z" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="image" viewBox="0 0 24 24"><path d="M2 3h18v17H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 3h18v17H2Z" fill="var(--icon-paper,var(--surface))"/><path d="m2 16 5-5 4 4 4-6 5 7v4H2Z" fill="var(--icon-soft,var(--accent-soft))"/><circle cx="7" cy="7" r="1.5" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="download" viewBox="0 0 24 24"><path d="M3 15v6h18v-6" fill="var(--icon-soft,var(--accent-soft))"/><path d="M8 2h8v8h5l-9 8-9-8h5Z" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="split" viewBox="0 0 24 24"><path d="M2 4h19v16H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 3h19v17H2Z" fill="var(--icon-paper,var(--surface))"/><path d="M12 3h9v17h-9Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="m4 15 3-4 3 4m4-7h4m-4 4h3" stroke-width="1.3"/></symbol>
-  <symbol id="expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></symbol>
-  <symbol id="minus" viewBox="0 0 24 24"><path d="M4 12h16"/></symbol>
-  <symbol id="list" viewBox="0 0 24 24"><path d="M2 3h19v18H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 2h19v18H2Z" fill="var(--icon-paper,var(--surface))"/><path d="M2 2h5v18H2Z" fill="var(--icon-accent,var(--accent))"/><path d="M9 7h8M9 11h8M9 15h5" stroke-width="1.4"/></symbol>
-  <symbol id="trash" viewBox="0 0 24 24"><path d="m5 7 1 14h12l1-14Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m5 7 1 14h12l1-14Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M3 6h18M8 6V3h8v3"/><path d="M9 10v7m6-7v7" stroke-width="1.4"/></symbol>
-  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 3v6h-6" fill="var(--icon-soft,var(--accent-soft))"/><path d="M4 21v-6h6" fill="var(--icon-soft,var(--accent-soft))"/><path d="M4.5 10a7.5 7.5 0 0 1 13-5l2.5 4M4 15l2.5 4a7.5 7.5 0 0 0 13-5" stroke-width="1.9"/></symbol>
-  <symbol id="info" viewBox="0 0 24 24"><path d="m6 2 13 1 3 11-7 7-12-4-1-10Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M12 11v5m0-9v.1" stroke-width="2"/></symbol>
-  <symbol id="shield" viewBox="0 0 24 24"><path d="m11 2 9 3v6c0 5-9 10-9 10S2 16 2 11V5Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m11 2 9 3v6c0 5-9 10-9 10S2 16 2 11V5Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="m11 2 9 3v6c0 5-9 10-9 10Z" fill="var(--icon-accent,var(--accent))"/><path d="m6 11 3 3 6-7" stroke-width="2"/></symbol>
-  <symbol id="coin" viewBox="0 0 24 24"><path d="M20 11a9 9 0 1 1-18 0 9 9 0 0 1 18 0" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><circle cx="11" cy="11" r="9" fill="var(--icon-soft,var(--accent-soft))"/><circle cx="11" cy="11" r="6.2" fill="var(--icon-paper,var(--surface))"/><path d="m11 6 1.5 3.5L16 11l-3.5 1.5L11 16l-1.5-3.5L6 11l3.5-1.5Z" stroke-width="1.2" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="var(--icon-accent,var(--accent))"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" stroke-width="1.8"/></symbol>
-  <symbol id="stop" viewBox="0 0 24 24"><path d="M5 4h14v15H5Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M4 3h14v15H4Z" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="keyboard" viewBox="0 0 24 24"><path d="M2 5h19v14H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 4h19v14H2Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M6 8h.1M10 8h.1M14 8h.1M18 8h.1M6 11h.1M10 11h.1M14 11h.1M18 11h.1" stroke-width="2"/><path d="M7 15h9" stroke-width="1.8"/></symbol>
-  <symbol id="crown" viewBox="0 0 24 24"><path d="m2 7 5 4 4-8 4 8 6-4-3 12H5Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m2 6 5 4 4-8 4 8 6-4-3 12H5Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M5 16h13v3H5Z" fill="var(--icon-accent,var(--accent))"/><path d="M7 22h9"/></symbol>
-  <symbol id="external" viewBox="0 0 24 24"><path d="M14 3h7v7m0-7L10 14 M10 3H3v18h18v-7"/></symbol>
-  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 2v19h19"/><path d="M7 20V12h3v8" fill="var(--icon-soft,var(--accent-soft))"/><path d="M12 20V8h3v12" fill="var(--icon-accent,var(--accent))"/><path d="M17 20V4h3v16" fill="var(--icon-soft,var(--accent-soft))"/></symbol>
-  <symbol id="storage" viewBox="0 0 24 24"><path d="M3 2h17v19H3Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M3 2h17v19H3Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M3 8h17v7H3Z" fill="var(--icon-paper,var(--surface))"/><path d="M6 5h.1M6 11.5h.1M6 18h.1" stroke-width="2.2"/><path d="M10 5h6m-6 6.5h6M10 18h6" stroke-width="1.2"/></symbol>
-  <symbol id="message" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="m4 5 18-1-1 14-9 1-6 4v-5H4Z"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="m2 3 18-1-1 14-9 1-6 4v-5H2Z"/><path style="stroke:var(--icon-accent,var(--accent))" d="m6 7 9-.4m-9 4 6-.3" stroke-width="2"/></g></symbol>
-  <symbol id="logout" viewBox="0 0 24 24"><path d="M3 3h8v18H3Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M8 12h13m-5-5 5 5-5 5" stroke-width="1.9"/></symbol>
-  <symbol id="calendar" viewBox="0 0 24 24"><path d="M3 4h17v17H3Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M3 4h17v17H3Z" fill="var(--icon-paper,var(--surface))"/><path d="M3 4h17v5H3Z" fill="var(--icon-accent,var(--accent))"/><path d="M7 2v4m9-4v4M7 13h3m4 0h2m-9 4h3" stroke-width="1.4"/></symbol>
-  <symbol id="bolt" viewBox="0 0 24 24"><path d="m13 1-10 13h7l-1 9L21 9h-7Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m13 1-10 13h7l-1 9L21 9h-7Z" fill="var(--icon-accent,var(--accent))"/></symbol>
-  <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
-  <symbol id="comic-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path style="fill:var(--icon-shadow,var(--comic-shadow-color));stroke:none" d="M5 4h9l3 3v14H5Z"/><path style="fill:var(--icon-paper,var(--surface))" d="M3 2h9l3 3v14H3Z"/><path style="fill:var(--icon-soft,var(--accent-soft))" d="M12 2v4h3"/><path style="stroke:var(--icon-accent,var(--accent))" d="M6 6h3M6 9h2" stroke-width="1.3"/><circle style="fill:var(--icon-soft,var(--accent-soft))" cx="13" cy="12.5" r="5.3"/><path style="fill:var(--icon-accent,var(--accent))" d="m17 16.2 4.6 3.7-2 2-3.8-4.6Z"/><path d="m10.7 11.4 2.1-.5m-2.1 3 3.5-.7" stroke-width="1.1"/></g></symbol>
-  <symbol id="cloud" viewBox="0 0 24 24"><path d="M6 19a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5.5 5.5 0 0 1 1 11Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M6 18a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5.5 5.5 0 0 1 1 11Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M8 13h8m-6 3h4" stroke-width="1.3"/></symbol>
-  <symbol id="translate" viewBox="0 0 24 24"><path d="M2 3h13v13H2Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="M2 2h12v14H2Z" fill="var(--icon-paper,var(--surface))"/><path d="M10 9h12v13H10Z" fill="var(--icon-soft,var(--accent-soft))"/><path d="M5 6h6M8 4v2m-2 0q0 4 4 6m0-6q0 3-5 6" stroke-width="1.2"/><path d="m13 19 3-7 3 7m-5-2h4" stroke-width="1.3"/></symbol>
-  <symbol id="sort-asc" viewBox="0 0 24 24"><path d="M5 20V3m-3 3 3-3 3 3M11 6h4m-4 6h7m-7 6h10" stroke-width="1.8"/></symbol>
-  <symbol id="sort-desc" viewBox="0 0 24 24"><path d="M5 3v17m-3-3 3 3 3-3M11 6h10m-10 6h7m-7 6h4" stroke-width="1.8"/></symbol>
-  <symbol id="burst" viewBox="0 0 24 24"><path d="m11 2 3 5 6-2-2 6 5 3-6 2 1 6-6-3-4 4-1-7-6-2 6-3-1-6Z" stroke="none" transform="translate(1 1)" fill="var(--icon-shadow,var(--comic-shadow-color))"/><path d="m11 1 3 5 6-2-2 6 5 3-6 2 1 6-6-3-4 4-1-7-6-2 6-3-1-6Z" fill="var(--icon-accent,var(--accent))"/></symbol>
+  <!-- Shared comic artwork: fixed palette, contextual outlines, 24-unit grid. -->
+  <symbol id="search" viewBox="0 0 24 24">
+    <path d="m14.5 14.5 2.8-.1 5 5-2.9 2.9-5-5Z" fill="var(--icon-comic-pink)"/>
+    <circle cx="10" cy="10" r="7.2" fill="var(--icon-comic-blue)"/>
+    <path d="M5.6 9a4.6 4.6 0 0 1 3.6-3.7" stroke="var(--icon-comic-paper)" stroke-width="2"/>
+    <path d="m17.8 17.6 1.8 1.8" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="filter" viewBox="0 0 24 24">
+    <path d="M2 6h20M2 18h20" stroke-width="2"/>
+    <rect x="12" y="2.5" width="6" height="7" rx="1.5" fill="var(--icon-comic-pink)"/>
+    <rect x="6" y="14.5" width="6" height="7" rx="1.5" fill="var(--icon-comic-blue)"/>
+    <path d="M14 5v2m-6 10v2" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="github" viewBox="0 0 24 24">
+    <path d="m5 2 15 1q1 .1 1 2l-1 15q-.1 1-2 1L3 20q-1-.1-1-2L3 3q.1-1 2-1Z" fill="var(--icon-comic-purple)"/>
+    <path d="M9 19c-4.3 1.3-4.3-2.5-6-3m12 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.9a5.4 5.4 0 0 0-1.5-3.7 5 5 0 0 0-.1-3.7s-1.2-.4-3.9 1.4a13.4 13.4 0 0 0-7 0C5.1.8 3.9 1.2 3.9 1.2a5 5 0 0 0-.1 3.7 5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.2 6.6 6.2 6.9a3.4 3.4 0 0 0-.9 2.6V22" transform="translate(3.7 3.2) scale(.72)" stroke-width="2"/>
+    <path d="m20 15 1.1 2.3 2.2 1-2.3 1-1 2.3-1-2.3-2.3-1 2.3-1Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="book" viewBox="0 0 24 24">
+    <path d="m2 6 8 1 2 2 2-2 8-1v14l-8 1-2 1-2-1-8-1Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <path d="m2 4 7 .8Q12 5.2 12 8v12q-1.4-1.8-4-2L2 17Z" fill="var(--icon-comic-blue)"/>
+    <path d="m22 4-7 .8Q12 5.2 12 8v12q1.4-1.8 4-2l6-1Z" fill="var(--icon-comic-pink)"/>
+    <path d="m4.5 7 5 .6v5l-5-.6Z" fill="var(--icon-comic-paper)" stroke-width="1.25"/>
+    <path d="m15 8 4.5-.5v4.8l-4.5.5Z" fill="var(--icon-comic-yellow)" stroke-width="1.25"/>
+    <path d="m5 15 4 .5m6 0 4-.5" stroke-width="1.3"/>
+    <path d="m6 10 1-1 1.5 2M17 2V1m3 2 1-1" stroke-width="1.25"/>
+  </symbol>
+  <symbol id="bookmark" viewBox="0 0 24 24">
+    <path d="M6 3h13v19l-6.5-4L6 22Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <path d="M4 2h13v19l-6.5-4L4 21Z" fill="var(--icon-comic-pink)"/>
+    <path d="M7 2h7v8l-3.5-2L7 10Z" fill="var(--icon-comic-yellow)" stroke-width="1.3"/>
+    <path d="M7 13h7" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="page-unread" viewBox="0 0 24 24">
+    <path d="M5 3h10l5 5v14H5Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <path d="M3 2h10l5 5v14H3Z" fill="var(--icon-comic-paper)"/>
+    <path d="M13 2v5h5" fill="var(--icon-comic-blue)"/>
+    <path d="M6 10h9v4H6Z" fill="var(--icon-comic-mint)" stroke-width="1.2"/>
+    <path d="M6 17h6" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="page-read" viewBox="0 0 24 24">
+    <path d="M3 2h10l5 5v13H3Z" fill="var(--icon-comic-paper)"/>
+    <path d="M13 2v5h5" fill="var(--icon-comic-blue)"/>
+    <path d="M6 10h5" stroke-width="1.3"/>
+    <path d="m9 15 2.5-2.5 3 3 5.5-7 3 2.5L15 21Z" fill="var(--icon-comic-mint)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="home" viewBox="0 0 24 24">
+    <path d="M4 10v11h16V10" fill="var(--icon-comic-blue)"/>
+    <path d="m1.5 10 10.5-8 10.5 8-2 2L12 5.5 3.5 12Z" fill="var(--icon-comic-pink)"/>
+    <path d="M10 21v-7h5v7" fill="var(--icon-comic-yellow)"/>
+    <path d="M6.5 13h1" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="folder" viewBox="0 0 24 24">
+    <path d="M2 5q0-1 1-1h6l3 3h8v13H2Z" fill="var(--icon-comic-pink)"/>
+    <path d="m2 9 20-1-3 13H2Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m6 12 11-.5" stroke="var(--icon-comic-paper)" stroke-width="1.8"/>
+    <path d="M6 17h5" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="spark" viewBox="0 0 24 24">
+    <path d="m10 3 3.1 6.4 6.6 2.7-6.3 3.2-2.8 6.7-3.2-6.3L1 12.6l6.3-3Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none" transform="translate(1 1)"/>
+    <path d="m10 2 3.1 6.4 6.6 2.7-6.3 3.2-2.8 6.7-3.2-6.3L1 11.6l6.3-3Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m10 6 .7 3.5-3.6 1.7 2-.2 2.2 4 .2-4.8Z" fill="var(--icon-comic-paper)" stroke="none"/>
+    <path d="m19 1.5 1.1 2.7 2.4 1.1-2.5 1.1L19 9l-1.1-2.6-2.5-1.1 2.5-1.1Z" fill="var(--icon-comic-pink)" stroke-width="1.2"/>
+    <path d="m19 17 2 2m-3 1 .5 2" stroke="var(--icon-comic-blue)" stroke-width="1.8"/>
+  </symbol>
+  <symbol id="upload" viewBox="0 0 24 24">
+    <path d="m3 15-1 5q0 1 1 1h18q1 0 1-1l-1-5Z" fill="var(--icon-comic-blue)"/>
+    <path d="M9 16V9H5l7-7 7 7h-4v7Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M11.3 10v3" stroke="var(--icon-comic-paper)" stroke-width="1.7"/>
+    <path d="M9 18.5h6" stroke-width="1.3"/>
+    <path d="M3 7V4m18 3V4" stroke="var(--icon-comic-pink)" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="arrow" viewBox="0 0 24 24">
+    <path d="M2 9h11V4l9 8-9 8v-5H2Z" fill="var(--icon-comic-blue)"/>
+    <path d="m13 4 9 8-9 8v-5l3-3-3-3Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M5 11h4" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="chevron" viewBox="0 0 24 24">
+    <path d="m8 3 10 9L8 21l-3-3 7-6-7-6Z" fill="var(--icon-comic-yellow)"/>
+  </symbol>
+  <symbol id="clock" viewBox="0 0 24 24">
+    <circle cx="12.7" cy="12.7" r="9.2" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <circle cx="11.4" cy="11.4" r="9.2" fill="var(--icon-comic-blue)"/>
+    <circle cx="11.4" cy="11.4" r="6.5" fill="var(--icon-comic-paper)" stroke-width="1.2"/>
+    <path d="M11.4 6.5v5l3.8 2.2" stroke-width="1.8"/>
+    <circle cx="11.4" cy="11.4" r="1.2" fill="var(--icon-comic-pink)" stroke-width="1"/>
+  </symbol>
+  <symbol id="settings" viewBox="0 0 24 24">
+    <path d="m9.5 2 .7 2.7h3.6l.7-2.7 3.4 1.4-1.4 2.4L19 8.3l2.4-1.4 1.4 3.4-2.7.7v3.6l2.7.7-1.4 3.4-2.4-1.4-2.5 2.5 1.4 2.4-3.4 1.4-.7-2.7h-3.6l-.7 2.7-3.4-1.4L7.5 20 5 17.5l-2.4 1.4-1.4-3.4 2.7-.7v-3.6l-2.7-.7 1.4-3.4L5 8.5 7.5 6 6.1 3.6Z" transform="translate(1.4 .1) scale(.88)" fill="var(--icon-comic-purple)"/>
+    <circle cx="12" cy="11.5" r="4.1" fill="var(--icon-comic-yellow)"/>
+    <path d="M10 11.2a2 2 0 0 1 2-1.8" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="user" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="var(--icon-comic-mint)"/>
+    <path d="M4.4 18.5q1.3-4.4 7.6-4.4t7.6 4.4A10 10 0 0 1 4.4 18.5Z" fill="var(--icon-comic-pink)"/>
+    <path d="m9.2 14 2.8 3 2.8-3" fill="var(--icon-comic-paper)" stroke-width="1.3"/>
+    <path d="M7.6 8.8q0-4.5 4.4-4.5t4.4 4.5v1.5a4.4 4.4 0 0 1-8.8 0Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M7.6 8.8q0-4.5 4.4-4.5 3.9 0 4.4 4-3-.1-5-1.9-1 2-3.8 2.4Z" fill="var(--icon-comic-ink)" stroke-width="1.1"/>
+    <path d="M10.5 11h0m3 0h0" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="plus" viewBox="0 0 24 24">
+    <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z" fill="var(--icon-comic-mint)"/>
+    <path d="M11 5.5v4" stroke="var(--icon-comic-paper)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="close" viewBox="0 0 24 24">
+    <path d="m6 3 6 6 6-6 3 3-6 6 6 6-3 3-6-6-6 6-3-3 6-6-6-6Z" fill="var(--icon-comic-pink)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="check" viewBox="0 0 24 24">
+    <path d="m2 12 3.5-3.5 4.8 5 9-10 3.2 3.2L10.3 20Z" fill="var(--icon-comic-mint)"/>
+  </symbol>
+  <symbol id="globe" viewBox="0 0 24 24">
+    <circle cx="10.7" cy="10.7" r="8.7" fill="var(--icon-comic-blue)"/>
+    <path d="M10.7 2q-7.5 8.7 0 17.4 7.5-8.7 0-17.4Z" fill="var(--icon-comic-mint)" stroke-width="1.3"/>
+    <path d="M2 10.7h17.4M3.6 5.8q7.1 3.8 14.2 0" stroke-width="1.3"/>
+    <path d="m14 13 8 3.2-3.2 1.4-1.4 4.4Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m20 2 1.5 1.5M22 7h.5" stroke="var(--icon-comic-pink)" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="layers" viewBox="0 0 24 24">
+    <path d="m2 15 10-5 10 5-10 7Z" fill="var(--icon-comic-pink)"/>
+    <path d="m2 10 10-5 10 5-10 7Z" fill="var(--icon-comic-blue)"/>
+    <path d="m2 6 10-4 10 4-10 6Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m6 6 6-2 4 1.6" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="image" viewBox="0 0 24 24">
+    <path d="M3 4h18v17H3Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <rect x="2" y="2" width="18" height="18" rx="1.5" fill="var(--icon-comic-blue)"/>
+    <path d="m2 15 5-5 4 4 4-6 5 6v6H2Z" fill="var(--icon-comic-mint)"/>
+    <circle cx="7" cy="6.5" r="2" fill="var(--icon-comic-yellow)" stroke-width="1.2"/>
+    <path d="m5 16 2-2 2 2" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="download" viewBox="0 0 24 24">
+    <path d="m3 15-1 5q0 1 1 1h18q1 0 1-1l-1-5Z" fill="var(--icon-comic-blue)"/>
+    <path d="M9 2h6v8h4l-7 7-7-7h4Z" fill="var(--icon-comic-mint)"/>
+    <path d="M11.3 4.8v5" stroke="var(--icon-comic-paper)" stroke-width="1.8"/>
+    <path d="M9 18.5h6" stroke-width="1.3"/>
+    <path d="M4 5v3m16-4v3" stroke="var(--icon-comic-pink)" stroke-width="1.7"/>
+  </symbol>
+  <symbol id="split" viewBox="0 0 24 24">
+    <rect x="2" y="3" width="20" height="18" rx="1.5" fill="var(--icon-comic-paper)"/>
+    <path d="M12 3h8q2 0 2 2v14q0 2-2 2h-8Z" fill="var(--icon-comic-purple)"/>
+    <path d="m4 16 3-5 3 5Z" fill="var(--icon-comic-blue)" stroke-width="1.2"/>
+    <path d="M15 8h4m-4 4h4m-4 4h2" stroke-width="1.3"/>
+    <path d="M5 7h3" stroke="var(--icon-comic-pink)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="expand" viewBox="0 0 24 24">
+    <path d="M2 9V2h7v3H5v4ZM15 2h7v7h-3V5h-4Z" fill="var(--icon-comic-blue)" stroke-width="1.4"/>
+    <path d="M2 15h3v4h4v3H2ZM19 15h3v7h-7v-3h4Z" fill="var(--icon-comic-pink)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="minus" viewBox="0 0 24 24">
+    <rect x="3" y="9" width="18" height="6" rx="1.2" fill="var(--icon-comic-yellow)"/>
+    <path d="M6 11h5" stroke="var(--icon-comic-paper)" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="list" viewBox="0 0 24 24">
+    <path d="M4 3h18v19H4Z" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <rect x="2" y="2" width="18" height="19" rx="1.2" fill="var(--icon-comic-paper)"/>
+    <path d="M2 2h5v19H2Z" fill="var(--icon-comic-blue)"/>
+    <path d="M10 7h7m-7 5h7m-7 5h5" stroke-width="1.5"/>
+    <path d="M4.4 6.7v.1m0 5v.1m0 5v.1" stroke="var(--icon-comic-paper)" stroke-width="1.8"/>
+  </symbol>
+  <symbol id="trash" viewBox="0 0 24 24">
+    <path d="m5 7 1.2 14h11.6L19 7Z" fill="var(--icon-comic-pink)"/>
+    <path d="M3 4h18v3H3Z" fill="var(--icon-comic-purple)"/>
+    <path d="M8 4V2h8v2"/>
+    <path d="M9 10v7m6-7v7" stroke="var(--icon-comic-paper)" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="refresh" viewBox="0 0 24 24">
+    <path d="M4.5 11a7.5 7.5 0 0 1 13-5L20 9" stroke-width="2"/>
+    <path d="M19.5 13a7.5 7.5 0 0 1-13 5L4 15" stroke-width="2"/>
+    <path d="M14 9h7V2Z" fill="var(--icon-comic-mint)"/>
+    <path d="M10 15H3v7Z" fill="var(--icon-comic-blue)"/>
+  </symbol>
+  <symbol id="info" viewBox="0 0 24 24">
+    <path d="m6 2 13 1 3 10-7 9-12-4-1-11Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M12 10v6" stroke-width="2.3"/>
+    <circle cx="12" cy="6.5" r="1.1" fill="var(--icon-comic-ink)" stroke="none"/>
+    <path d="m5 7 1-2 3 .2" stroke="var(--icon-comic-paper)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="shield" viewBox="0 0 24 24">
+    <path d="m12 2 9 3v6c0 5-9 11-9 11S3 16 3 11V5Z" fill="var(--icon-comic-mint)"/>
+    <path d="m12 2 9 3v6c0 5-9 11-9 11Z" fill="var(--icon-comic-blue)" stroke-width="1.2"/>
+    <path d="m7 11 3.5 3.5 6-7" stroke="var(--icon-comic-paper)" stroke-width="2.3"/>
+  </symbol>
+  <symbol id="coin" viewBox="0 0 24 24">
+    <circle cx="12.7" cy="12.7" r="9.2" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <circle cx="11.5" cy="11.5" r="9.2" fill="var(--icon-comic-yellow)"/>
+    <circle cx="11.5" cy="11.5" r="6.4" fill="var(--icon-comic-paper)" stroke-width="1.2"/>
+    <path d="m11.5 7 1.4 3 3.1 1.5-3.1 1.4-1.4 3.1-1.5-3.1L7 11.5l3-1.5Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="sun" viewBox="0 0 24 24">
+    <path d="M12 1.5v2m0 17v2m-10.5-10.5h2m17 0h2M4.5 4.5 6 6m12 12 1.5 1.5M4.5 19.5 6 18M18 6l1.5-1.5" stroke="var(--icon-comic-pink)" stroke-width="1.8"/>
+    <circle cx="12" cy="12" r="5.6" fill="var(--icon-comic-yellow)"/>
+    <path d="M9 11a3 3 0 0 1 3-2" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="stop" viewBox="0 0 24 24">
+    <rect x="5" y="5" width="17" height="17" rx="2" fill="var(--icon-shadow,var(--icon-comic-ink))" stroke="none"/>
+    <rect x="3" y="3" width="17" height="17" rx="2" fill="var(--icon-comic-pink)"/>
+    <path d="M6 9V6h4" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="keyboard" viewBox="0 0 24 24">
+    <rect x="2" y="4" width="20" height="16" rx="2" fill="var(--icon-comic-purple)"/>
+    <path d="M5 8h.2m4 0h.2m4 0h.2m4 0h.2M5 12h.2m4 0h.2m4 0h.2m4 0h.2" stroke="var(--icon-comic-paper)" stroke-width="2"/>
+    <path d="M7 16h10" stroke-width="2.2"/>
+  </symbol>
+  <symbol id="crown" viewBox="0 0 24 24">
+    <path d="m2 6 5 4 5-8 5 8 5-4-3 13H5Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M5 16h14v4H5Z" fill="var(--icon-comic-pink)"/>
+    <path d="m12 8 2 3-2 3-2-3Z" fill="var(--icon-comic-blue)" stroke-width="1.1"/>
+    <path d="M7 22h10" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="external" viewBox="0 0 24 24">
+    <path d="M10 3H3v18h18v-7" fill="var(--icon-comic-blue)"/>
+    <path d="M13 2h9v9l-3-3-8 8-3-3 8-8Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M6 16v2h3" stroke="var(--icon-comic-paper)" stroke-width="1.3"/>
+  </symbol>
+  <symbol id="chart" viewBox="0 0 24 24">
+    <path d="M3 2v19h19" stroke-width="1.8"/>
+    <path d="M6 21V13h4v8Z" fill="var(--icon-comic-pink)"/>
+    <path d="M11.5 21V8h4v13Z" fill="var(--icon-comic-blue)"/>
+    <path d="M17 21V3h4v18Z" fill="var(--icon-comic-mint)"/>
+  </symbol>
+  <symbol id="storage" viewBox="0 0 24 24">
+    <rect x="3" y="2" width="18" height="20" rx="2" fill="var(--icon-comic-purple)"/>
+    <path d="M3 8.7h18v6.6H3Z" fill="var(--icon-comic-blue)"/>
+    <path d="M7 5.3h.1m-.1 6.7h.1M7 18.7h.1" stroke="var(--icon-comic-yellow)" stroke-width="2.4"/>
+    <path d="M11 5.3h6M11 12h6m-6 6.7h6" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="message" viewBox="0 0 24 24">
+    <path d="M11 9h9q2 0 2 2v6q0 2-2 2v3l-4-3h-5q-2 0-2-2v-6q0-2 2-2Z" fill="var(--icon-comic-pink)"/>
+    <path d="m4 3 13-.5q2 0 2 2v9q0 2-2 2l-7 .5-5 4v-4H4q-2 0-2-2V5q0-2 2-2Z" fill="var(--icon-comic-yellow)"/>
+    <path d="M5 6h8" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+    <path d="M6 10h.1m4.2 0h.1m4.2 0h.1" stroke-width="2.2"/>
+  </symbol>
+  <symbol id="logout" viewBox="0 0 24 24">
+    <path d="M2 2h10v20H2Z" fill="var(--icon-comic-purple)"/>
+    <path d="m2 2 7 3v14l-7 3Z" fill="var(--icon-comic-blue)"/>
+    <path d="M12 9h4V5l6 7-6 7v-4h-4Z" fill="var(--icon-comic-pink)"/>
+    <path d="M6 11v2" stroke="var(--icon-comic-paper)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="calendar" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="18" rx="1.5" fill="var(--icon-comic-paper)"/>
+    <path d="M3 4h18v5H3Z" fill="var(--icon-comic-pink)"/>
+    <path d="M7 2v4m10-4v4" stroke-width="1.8"/>
+    <path d="M6.5 12h3v3h-3Z" fill="var(--icon-comic-blue)" stroke-width="1.1"/>
+    <path d="M14 13.5h3M7 18.5h3m4 0h3" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="bolt" viewBox="0 0 24 24">
+    <path d="M14 2 3 14h7l-1 8L21 9h-8Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m11.3 7-3.5 4H11" stroke="var(--icon-comic-paper)" stroke-width="1.5"/>
+    <path d="m3 5 1 1m15 12 2 1" stroke="var(--icon-comic-pink)" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="more" viewBox="0 0 24 24">
+    <circle cx="4" cy="12" r="2.3" fill="var(--icon-comic-pink)" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="2.3" fill="var(--icon-comic-yellow)" stroke-width="1.5"/>
+    <circle cx="20" cy="12" r="2.3" fill="var(--icon-comic-blue)" stroke-width="1.5"/>
+  </symbol>
+  <symbol id="comic-search" viewBox="0 0 24 24">
+    <path d="m14.6 14.5 2.7-.2 5 5-2.9 2.9-5-5Z" fill="var(--icon-comic-yellow)"/>
+    <circle cx="10" cy="10" r="7.3" fill="var(--icon-comic-blue)"/>
+    <path d="M5 9a5 5 0 0 1 4-4" stroke="var(--icon-comic-paper)" stroke-width="2"/>
+    <path d="m10.5 6.8 1.1 2.6 2.7 1.1-2.6 1.1-1.2 2.7-1.1-2.6-2.6-1.2 2.6-1Z" fill="var(--icon-comic-paper)" stroke-width="1.1"/>
+    <path d="m18 17.2 2 2" stroke="var(--icon-comic-paper)" stroke-width="1.4"/>
+    <path d="m3 18-1 1m5-.2-.5 2" stroke="var(--icon-comic-pink)" stroke-width="1.7"/>
+  </symbol>
+  <symbol id="cloud" viewBox="0 0 24 24">
+    <path d="M6 19a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5.5 5.5 0 0 1 1 11Z" fill="var(--icon-comic-blue)"/>
+    <path d="M8 8.5a4.5 4.5 0 0 1 7-1.7" stroke="var(--icon-comic-paper)" stroke-width="1.7"/>
+    <path d="M7 14h10v6H7Z" fill="var(--icon-comic-purple)" stroke-width="1.3"/>
+    <path d="M10 17h.1" stroke="var(--icon-comic-yellow)" stroke-width="2"/>
+    <path d="M13 17h1.5" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="translate" viewBox="0 0 24 24">
+    <path d="M2 2h13v14H2Z" fill="var(--icon-comic-blue)"/>
+    <path d="M10 9h12v13H10Z" fill="var(--icon-comic-pink)"/>
+    <path d="M4.5 6H12M8 4v2m-2 0q0 4 4.5 6m0-6q0 3-5.5 6" stroke-width="1.2"/>
+    <path d="m13 19 3-7 3 7m-5-2h4" stroke="var(--icon-comic-paper)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="sort-asc" viewBox="0 0 24 24">
+    <path d="M4 21V8H1l5-6 5 6H8v13Z" fill="var(--icon-comic-mint)" stroke-width="1.3"/>
+    <path d="M14 4h3v3h-3Z" fill="var(--icon-comic-pink)" stroke-width="1.1"/>
+    <path d="M14 10h5v3h-5Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+    <path d="M14 16h8v3h-8Z" fill="var(--icon-comic-blue)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="sort-desc" viewBox="0 0 24 24">
+    <path d="M4 2v13H1l5 6 5-6H8V2Z" fill="var(--icon-comic-mint)" stroke-width="1.3"/>
+    <path d="M14 4h8v3h-8Z" fill="var(--icon-comic-blue)" stroke-width="1.1"/>
+    <path d="M14 10h5v3h-5Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+    <path d="M14 16h3v3h-3Z" fill="var(--icon-comic-pink)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="burst" viewBox="0 0 24 24">
+    <path d="m11 2 3 5 6-2-2 6 4 3-6 2 1 6-5-3-4 3-1-6-5-2 5-3-1-6Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m11 7 1.7 3.5 4 .8-3.3 2.2-.7 4-2.4-3-4 .3 2.3-3.3Z" fill="var(--icon-comic-pink)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="user-basic" viewBox="0 0 24 24">
+    <path d="M4 3h16v8c0 5-3 8.5-8 11-5-2.5-8-6-8-11Z" fill="var(--icon-comic-blue)"/>
+    <path d="M4 3h16v4H4Z" fill="var(--icon-comic-mint)"/>
+    <circle cx="12" cy="10.5" r="2.5" fill="var(--icon-comic-paper)" stroke-width="1.3"/>
+    <path d="M7.8 17q.8-3.2 4.2-3.2t4.2 3.2L12 20Z" fill="var(--icon-comic-paper)" stroke-width="1.3"/>
+    <path d="M7 5h3" stroke="var(--icon-comic-paper)" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="user-plus" viewBox="0 0 24 24">
+    <path d="m4 4 15-1 3 4-1 13-17 1-2-4Z" fill="var(--icon-comic-purple)"/>
+    <path d="M2.5 8h19v10h-19Z" fill="var(--icon-comic-yellow)" stroke-width="1.4"/>
+    <path d="M4.5 15.5V10h1.6q1.4 0 1.4 1.5T6.1 13H4.5m4.6-3v5.5h2.3M13 10v4.2q0 1.3 1.2 1.3t1.2-1.3V10m5 0h-2q-1.2 0-1.2 1.3t1.2 1.3h.6q1.2 0 1.2 1.4t-1.2 1.5h-2" stroke-width="1.05"/>
+    <path d="m11 1 1 2.2L14 4l-2 1-1 2-1-2-2-1 2-.8Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+  </symbol>
+  <symbol id="new" viewBox="0 0 24 24">
+    <path d="m12 1 3 4 5-1v5l3 3-3 4v5l-5-1-3 3-4-3-5 1v-5l-2-4 3-3V4l5 1Z" fill="var(--icon-comic-yellow)"/>
+    <path d="m3 8 18-1 1 11-18 1Z" fill="var(--icon-comic-pink)"/>
+    <path d="M5.5 15v-5l3 5v-5m4.5 0h-2.5v5H13m-2.5-2.5h2M14.5 10l1 5 1.6-3 1.5 3 1-5" stroke="var(--icon-comic-paper)" stroke-width="1.1"/>
+  </symbol>
 </svg>

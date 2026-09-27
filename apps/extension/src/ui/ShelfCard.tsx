@@ -30,15 +30,7 @@ export function ShelfCard({active,comic,onOpen,onMore,menu,selection}:{active:bo
    aria-label={msg('{0}封面',{'0':comic.title})+' · '+retryLabel}
    title={failedCover.error instanceof Error?failedCover.error.message:msg('图片暂不可用')}>{retryLabel}</button>}
    {hasCatalogUpdates(comic)&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates?.count??0})}>
-    <svg viewBox="0 0 104 92" aria-hidden="true" focusable="false">
-     <path d="m53 7 10 10 17-4 1 15 16 8-10 14 8 16-18 2-5 17-16-7-14 9-9-14-18-1 4-18L7 42l15-9-1-16 18 2Z" fill="#17233b" transform="translate(1 3)"/>
-     <path d="m53 7 10 10 17-4 1 15 16 8-10 14 8 16-18 2-5 17-16-7-14 9-9-14-18-1 4-18L7 42l15-9-1-16 18 2Z" fill="#ffe45e" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-     <path d="m30 31 48-8 9 39-52 10-12-24Z" fill="#ed277a" stroke="#17233b" strokeWidth="2.5" strokeLinejoin="round"/>
-     <path d="m30 37 45-8M40 65l37-7" stroke="#ff91c6" strokeWidth="2" strokeLinecap="round"/>
-     <text x="55" y="55" textAnchor="middle" transform="rotate(-10 55 48)" fill="#fff" stroke="#17233b" strokeWidth="3" paintOrder="stroke" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="900" letterSpacing="-1">NEW</text>
-     <path d="m89 3 2 6 6 2-6 2-2 6-2-6-6-2 6-2ZM12 68l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#ffe45e" stroke="#17233b" strokeWidth="1.5" strokeLinejoin="round"/>
-     <circle cx="18" cy="8" r="3" fill="#ed277a" stroke="#fff" strokeWidth="1.5"/>
-    </svg>
+    <Icon name="new" size={92}/>
    </span>}
   <div className="nc-library-card-body"><h2 className="nc-card-title"><button disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><div className="nc-library-card-actions"><button className={'button small '+(selection&&!selection.checked?'secondary':'primary')} disabled={selection?.disabled} aria-pressed={selection?.checked} onClick={action}>{selection?(selection.checked?<><Icon name="check" size={16}/>{msg('已选择')}</>:msg('选择')):comic.lastReadAt?msg('继续阅读'):msg('开始阅读')}</button>{!selection&&<button className="icon-button" aria-label={msg('更多操作 · {0}',{'0':comic.title})} aria-haspopup="menu" onClick={onMore}><Icon name="more" size={18}/></button>}</div></div>
  </article>;

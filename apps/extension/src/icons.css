@@ -1,18 +1,22 @@
 .nc-icon { flex-shrink: 0; vertical-align: middle; }
 .nc-icon[data-compact] { --icon-shadow: transparent; }
 
-/* Solid accent controls and semantic notices keep readable, contextual icon colors. */
+/* Failure and destructive actions retain the control's semantic color. */
 :where(
-  .button.primary, .segmented button.active, .nc-comic-action,
-  .button.danger, .nc-danger-text, .global-error, .nc-error, .nc-action-feedback.error, .nc-image-translation.error,
-  button:disabled, [aria-disabled=true], .nc-card-reading-time, .nc-discovery-poster
+  .button.danger, .nc-danger-text, .global-error, .nc-error,
+  .nc-action-feedback.error, .nc-image-translation.error
 ) .nc-icon {
-  --icon-paper: transparent;
-  --icon-soft: transparent;
-  --icon-accent: currentColor;
+  --icon-stroke: currentColor;
+  --icon-comic-ink: currentColor;
+  --icon-comic-blue: var(--danger-soft);
+  --icon-comic-pink: var(--danger-soft);
+  --icon-comic-yellow: var(--danger-soft);
+  --icon-comic-mint: var(--danger-soft);
+  --icon-comic-purple: var(--danger-soft);
   --icon-shadow: transparent;
 }
-:where(.button.primary, .segmented button.active, .nc-comic-action) .nc-icon { --icon-on: var(--accent); }
-:where(.button.danger, .nc-danger-text, .global-error, .nc-error, .nc-action-feedback.error, .nc-image-translation.error) .nc-icon {
-  --icon-on: var(--danger-soft);
+:where(button:disabled, [aria-disabled=true]) .nc-icon {
+  --icon-shadow: transparent;
+  opacity: .5;
+  filter: grayscale(.75);
 }

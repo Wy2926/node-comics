@@ -191,12 +191,6 @@ a {
   gap: 14px;
   margin-left: auto;
 }
-.nc-account-button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
 .nc-avatar {
   display: grid;
   place-items: center;
@@ -1605,9 +1599,6 @@ a {
   }
   .nc-app-header nav>button>svg {
     display: none;
-  }
-  .nc-account-button>span:last-child {
-    font-size: .875rem;
   }
 }
 @media(prefers-reduced-motion:reduce) {

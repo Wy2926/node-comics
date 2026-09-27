@@ -36,7 +36,7 @@
 
 /* The app masthead pairs the brand artwork with stamped navigation. */
 .nc-app-header { height: 80px; border-bottom: var(--comic-border); gap: 30px; }
-.nc-app-header .nc-icon { width: 24px; height: 24px; color: var(--ink); }
+.nc-app-header .nc-icon { width: 28px; height: 28px; }
 .nc-app-header nav { gap: 12px; }
 .nc-app-header nav>button { height: 42px; border: 2px solid transparent; border-radius: var(--comic-control-radius); padding: 0 14px; }
 .nc-app-header nav>button[aria-current=page] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
@@ -52,10 +52,8 @@
 }
 @media (max-width: 480px) {
   .nc-app-header .nc-header-actions { gap: 8px; }
-  .nc-app-header .nc-account-button>span { display: none; }
 }
-.nc-account-button { padding: 4px 10px 4px 4px; border: 0; border-radius: var(--comic-control-radius); font-size: .8125rem; font-weight: 650; color: var(--muted); }
-.nc-account-button:hover, .nc-account-button[aria-current=page] { box-shadow: none; background: var(--accent-soft); color: var(--accent); }
+.nc-app .nc-account-button[aria-current=page] { border-color: var(--comic-stroke); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
 .nc-avatar { border-radius: var(--comic-control-radius); }
 .nc-main { max-width: var(--page-max-width); padding: 32px var(--page-gutter) 60px; }
 
