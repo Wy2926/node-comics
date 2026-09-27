@@ -7,7 +7,7 @@
 
 **简体中文** | [English](README_EN.md)
 
-**在浏览器里阅读漫画，边看边译，随时对照原图。**
+**在浏览器里发现、整理和阅读漫画，随时接着上次的进度看。**
 
 [![官网与下载](https://img.shields.io/badge/官网-下载插件-1769B3?style=for-the-badge)](https://comics.nodelane.net/)
 [![开发文档](https://img.shields.io/badge/文档-开始开发-334155?style=for-the-badge)](#开始开发)
@@ -23,16 +23,17 @@
 
 </div>
 
-面向 Chrome、Edge、Firefox 的漫画阅读与翻译插件，支持本地漫画文件、Google Drive 和专门适配的网站，提供常规翻译与 AI 重绘。
+面向 Chrome、Edge、Firefox 的漫画阅读与整理插件。把本地漫画、Google Drive 和已适配网站中的漫画放进书架，查找想看的作品，缓存后离线阅读。
 
-支持本地翻译，可连接本地部署的 [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) 服务。
+需要翻译时，可开启常规翻译或 AI 重绘，随时对照原图；也可连接本地部署的 [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) 服务。
 
 ## 产品体验
 
 - **导入即读**：支持 CBZ / ZIP、CBR / RAR、PDF、无 DRM 的 MOBI，以及 Google Drive 和已适配网站。
-- **边看边译**：常规翻译与 AI 重绘，支持原图／译图切换、并排对照与阅读位置恢复。
+- **发现与搜索**：浏览 AniList 趋势、人气、高分和新作，使用作品名称、别名或翻译后的名称搜索已适配网站。
 - **整本离线**：缓存网站漫画的全部目录与章节，多选来源语言，查看进度、暂停继续及补齐失败页。
 - **按习惯阅读**：连续阅读、单页翻页、阅读方向、缩放与独立阅读背景。
+- **按需翻译**：常规翻译与 AI 重绘，支持原图／译图切换、并排对照与阅读位置恢复。
 - **自选翻译渠道**：使用官方服务或连接本地 manga-translator-ui；本地渠道无需 NodeLane 账号。
 - **界面随你调整**：16 种界面语言、六种主题色、亮暗外观与文字大小。
 
@@ -43,31 +44,37 @@
 ![漫画书架与阅读进度](docs/images/library.png)
 
 <details>
-<summary>查看跨语言搜索、阅读目录、网站导入与外观设置</summary>
+<summary>查看漫画发现、网站搜索、离线缓存、阅读目录与翻译对照</summary>
 
-### 寻找其他语言
+### 发现漫画
 
-翻译作品名称，在选定的网站中搜索并查看候选结果。
+浏览榜单，查看简介、评分与别名，再查找可阅读的网站来源。
 
-![翻译名称搜索、网站选择与候选漫画](docs/images/cross-language-search.png)
+![漫画发现与作品详情](docs/images/discovery.png)
+
+### 搜索漫画
+
+按作品名称或别名搜索，也可先翻译名称；选择网站、查看候选结果，确认后导入阅读。
+
+![漫画名称、网站选择与搜索结果](docs/images/cross-language-search.png)
+
+### 离线中心
+
+管理网站漫画的缓存任务，查看章节进度与空间占用，随时暂停或继续。缓存完成的章节可离线阅读。
+
+![离线缓存任务、章节进度与空间占用](docs/images/offline-center.png)
 
 ### 阅读与目录
 
-在阅读器中浏览章节目录，查看语言选项、页数与阅读状态。
+在阅读器中浏览章节目录，查看语言选项、页数、缓存和阅读状态。
 
 ![阅读器与展开的多语言章节目录](docs/images/reader-directory.png)
 
-### 漫画网站
+### 原图与译图对照
 
-粘贴已适配网站链接，读取目录并添加到书架。
+需要翻译时再开启，可并排查看原图和译图，也可切回原图继续阅读。
 
-![网站链接导入、已适配网站与适配申请入口](docs/images/supported-sites.png)
-
-### 外观与偏好
-
-选择界面语言、主题色与亮暗外观，管理翻译渠道。
-
-![外观主题、文字大小与翻译渠道设置](docs/images/preferences.png)
+![原图与中文译图并排对照](docs/images/translation-comparison.png)
 
 </details>
 

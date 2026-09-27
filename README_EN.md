@@ -7,7 +7,7 @@
 
 [简体中文](README.md) | **English**
 
-**Read comics in your browser, translate as you go, and compare with the original.**
+**Discover, organize, and read comics in your browser. Pick up where you left off.**
 
 [![Website and downloads](https://img.shields.io/badge/Website-Download-1769B3?style=for-the-badge)](https://comics.nodelane.net/)
 [![Developer documentation](https://img.shields.io/badge/Docs-Development-334155?style=for-the-badge)](#development)
@@ -23,16 +23,17 @@
 
 </div>
 
-A comic reader and translation extension for Chrome, Edge, and Firefox. Read local comic files, import from Google Drive or supported websites, and choose standard translation or AI redraw.
+A comic reading and library extension for Chrome, Edge, and Firefox. Bring comics from local files, Google Drive, and supported websites into your library, find your next read, and cache chapters for offline reading.
 
-Local translation is supported through a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
+When you need translation, enable standard translation or AI redraw and compare with the original. You can also connect to a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
 
 ## Features
 
 - **Import and read**: Open CBZ / ZIP, CBR / RAR, PDF, and DRM-free MOBI files, or import from Google Drive and supported websites.
-- **Translate as you read**: Use standard translation or AI redraw, switch between originals and translations, compare them side by side, and restore your reading position.
+- **Discover and search**: Browse trending, popular, top-rated, and new manga on AniList, then search supported websites by title, alternative title, or translated title.
 - **Read offline**: Cache every directory and chapter of a website comic, select multiple source languages, track progress, pause and resume, and retry missing pages.
 - **Read your way**: Choose continuous scrolling or single-page reading, reading direction, zoom, and a separate reading background.
+- **Translate when needed**: Use standard translation or AI redraw, switch between originals and translations, compare them side by side, and restore your reading position.
 - **Choose your translation service**: Use the official service or connect to a local manga-translator-ui instance. Local services do not require a NodeLane account.
 - **Personalize the interface**: Choose from 16 interface languages, six accent colors, light and dark modes, and adjustable text sizes.
 
@@ -43,31 +44,37 @@ Import, search, and manage comics, then pick up where you left off.
 ![Comic library and reading progress](docs/images/en/library.png)
 
 <details>
-<summary>View title translation and search, chapter navigation, website imports, and preferences</summary>
+<summary>View discovery, website search, offline caching, chapter navigation, and translation comparison</summary>
 
-### Find in another language
+### Discover comics
 
-Translate a comic title, search selected websites, and browse matching candidates.
+Browse charts, read synopses, check ratings and alternative titles, then look for a website where you can read the comic.
 
-![Title translation, website selection, and comic search results](docs/images/en/cross-language-search.png)
+![Comic discovery and title details](docs/images/en/discovery.png)
+
+### Search comics
+
+Search by title or alternative title, or translate the title first. Choose websites, review the results, and import a comic to start reading.
+
+![Comic titles, website selection, and search results](docs/images/en/cross-language-search.png)
+
+### Offline center
+
+Manage caching tasks for website comics, track chapter progress and storage use, and pause or resume. Fully cached chapters are available offline.
+
+![Offline caching task, chapter progress, and storage use](docs/images/en/offline-center.png)
 
 ### Reading and chapter navigation
 
-Browse chapters in the reader, with language options, page counts, and reading status.
+Browse chapters in the reader, with language options, page counts, cache status, and reading progress.
 
 ![Reader with an expanded multilingual chapter list](docs/images/en/reader-directory.png)
 
-### Comic websites
+### Compare originals and translations
 
-Paste a link from a supported website to load its chapter list and add the comic to your shelf.
+Enable translation when you need it. View the original and translated pages side by side, or switch back to the original to keep reading.
 
-![Import by link, supported websites, and the website support request form](docs/images/en/supported-sites.png)
-
-### Appearance and preferences
-
-Choose your interface language, accent color, and color scheme, and manage translation services.
-
-![Appearance, text size, and translation channel settings](docs/images/en/preferences.png)
+![Original page and Chinese translation side by side](docs/images/en/translation-comparison.png)
 
 </details>
 
@@ -96,10 +103,10 @@ Each module README lists its requirements and run commands. See the [scripts gui
 
 | Topic | Documentation |
 | --- | --- |
-| Product and reading | [Product design](docs/PRODUCT_DESIGN.md), [Single-source reading](docs/SIMPLE_COMIC_READING_DESIGN.md) |
+| Product and reading | [Product design](docs/PRODUCT_DESIGN.md), [Single-source reading](docs/SIMPLE_COMIC_READING_DESIGN.md), [Offline caching](docs/OFFLINE_CACHE_DESIGN.md) |
 | Architecture and data | [System architecture](docs/ARCHITECTURE.md), [Sources and caching](docs/COMIC_SOURCE_ARCHITECTURE.md) |
 | Translation and compute | [Translation contract](docs/READING_TRANSLATION_CONTRACT.md), [Compute protocol](docs/COMPUTE_PROTOCOL.md), [Cluster scheduling](docs/TRANSLATION_CLUSTER_DESIGN.md) |
-| Websites and interface | [Website adapters](docs/SITE_ADAPTERS.md), [Cross-language search](docs/COMIC_SEARCH_DESIGN.md), [Interface localization](docs/UI_INTERNATIONALIZATION.md), [Brand copy](docs/BRAND_AND_STORE_LISTING.md) |
+| Websites and interface | [Website adapters](docs/SITE_ADAPTERS.md), [Comic discovery](docs/DISCOVERY.md), [Cross-language search](docs/COMIC_SEARCH_DESIGN.md), [Interface localization](docs/UI_INTERNATIONALIZATION.md), [Brand copy](docs/BRAND_AND_STORE_LISTING.md) |
 | Accounts and operations | [Membership and quotas](docs/MEMBERSHIP_AND_QUOTAS.md), [Payments](docs/STRIPE_BILLING.md), [Admin console](docs/ADMIN_CONSOLE.md) |
 | Deployment and maintenance | [Deployment](docs/DEPLOYMENT.md), [Backup and recovery](docs/OPERATIONS.md), [Code standards](docs/CODE_QUALITY.md), [API contract](contracts/README.md) |
 
