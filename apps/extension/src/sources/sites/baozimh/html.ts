@@ -46,11 +46,12 @@ export function imageUrl(raw: string) {
       !/^[a-z0-9-]+\.bzcdn\.net$/.test(url.hostname) || !/^\/scomic\/[a-z0-9_-]+\/\d+\/[^/]+\/[^/]+\.(?:jpe?g|png|webp|avif)$/i.test(url.pathname)) throw changed();
   return url.href;
 }
-export function coverUrl(raw: string | undefined, comic: string) {
+export function coverUrl(raw: string | undefined) {
   if (!raw?.trim()) return;
   const url = new URL(raw);
   if (url.origin !== 'https://static-tw.baozimh.com' || url.username || url.password) throw changed();
   if (['/cover/unknown', '/cover/default_cover.png'].includes(url.pathname)) return;
-  if (url.pathname !== `/cover/${comic}.jpg`) throw changed();
+  // The dedicated source poster binds the cover to its work; filenames need not match the comic ID.
+  if (!/^\/cover\/[a-z0-9_-]+\.jpg$/i.test(url.pathname)) throw changed();
   return {url: url.href};
 }

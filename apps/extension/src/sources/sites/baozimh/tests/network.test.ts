@@ -38,6 +38,11 @@ describe('Baozi complete HTTP adapter', () => {
     const value = validateSourceCatalog(parseCatalog(catalogHtml().replace('/cover/example-author.jpg', '/cover/unknown'), url));
     expect(value.cover).toBeUndefined(); expect(value.entries).toHaveLength(27);
   });
+  it('uses the dedicated catalog cover even when its filename differs from the comic ID', () => {
+    const value = validateSourceCatalog(parseCatalog(catalogHtml().replace('/cover/example-author.jpg', '/cover/previous-slug.jpg'), url));
+    expect(value.id).toBe('baozimh:example-author'); expect(value.entries).toHaveLength(27);
+    expect(value.cover?.url).toBe('https://static-tw.baozimh.com/cover/previous-slug.jpg');
+  });
   it.each(['count', 'hidden', 'duplicate', 'owner', 'canonical', 'host', 'cover', 'unclosed', 'blocked'])('rejects %s catalog', mode => {
     let html = catalogHtml();
     if (mode === 'count') html = html.replace('查看全部27', '查看全部28');

@@ -23,15 +23,21 @@ function hit(markup: string, heading: 'p' | 'h2'): SourceSearchHit {
   if (!loc?.slug || loc.chapterId || !title || title.length > 500) throw invalid();
   const coverTag = tags(markup, 'p').find(a => hasClass(a, 'mh-cover'));
   const coverUrl = coverTag ? /background-image\s*:\s*url\(\s*['"]?([^'"\s)]+)['"]?\s*\)/i.exec(coverTag.style ?? '')?.[1] : tags(markup, 'img')[0]?.src;
-  const chapter = [...markup.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p\s*>/gi)].find(m => hasClass(attributes(' ' + m[1]), 'chapter'));
-  const subtitle = [...markup.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p\s*>/gi)].find(m => hasClass(attributes(' ' + m[1]), 'subtitle'));
+  const paragraphs = [...markup.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p\s*>/gi)];
+  const chapter = paragraphs.find(m => hasClass(attributes(' ' + m[1]), 'chapter'));
+  const subtitle = paragraphs.find(m => hasClass(attributes(' ' + m[1]), 'subtitle'));
   const authors = subtitle ? [...subtitle[2].matchAll(/<a\b[^>]*>([\s\S]*?)<\/a\s*>/gi)].map(m => textContent(m[1])).filter(Boolean) : [];
   return {catalogId: 'dm5:' + loc.slug, catalogUrl: catalogUrl(loc.slug), title, cover: sourceCover(coverUrl, origin),
     ...(authors.length ? {authors} : {}), ...(chapter ? {latestLabel: textContent(chapter[2])} : {})};
 }
 export function parseSearch(html: string, request: SourceSearchRequest): SourceSearchPage {
   const {page} = searchUrl(request), safe = inertHtml(html), button = tags(safe, 'a').filter(a => a.id === 'btnSearch');
-  if (button.length !== 1 || !/相近搜索结果[（(]\d+[）)]/.test(textContent(safe))) throw invalid();
+  // Empty searches use the site's missing-page template; its mh-list contains recommendations.
+  const missing = /<div\b[^>]*class="box404"[^>]*>([\s\S]*?)<\/div\s*>/i.exec(safe);
+  if (!button.length && missing && textContent(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(safe)?.[1] ?? '') === '访问页面不存在_在线漫画' &&
+      textContent(missing[1]).includes('很抱歉，您访问的页面穿越了')) return {items: []};
+  const count = /相近搜索结果[（(](\d+)[）)]/.exec(textContent(safe))?.[1];
+  if (button.length !== 1 || count === undefined) throw invalid();
   const echo = new URL(button[0].href, origin);
   // The website inserts its default language=1 in links even when the request omits it.
   if (echo.origin !== origin || echo.pathname !== '/search' || echo.searchParams.get('title') !== request.query || ![null, '1'].includes(echo.searchParams.get('language'))) throw invalid();
@@ -44,7 +50,7 @@ export function parseSearch(html: string, request: SourceSearchRequest): SourceS
     if (!tags(card[1], 'div').some(a => hasClass(a, 'mh-item'))) throw invalid();
     items.push(hit(card[1], 'h2'));
   }
-  if (items.length > 50 || !items.length && !/相近搜索结果[（(]0[）)]/.test(textContent(safe))) throw invalid();
+  if (items.length > 50 || !items.length && count !== '0') throw invalid();
   const unique = [...new Map(items.map(item => [item.catalogId, item])).values()];
   const pagination = /<div\b[^>]*class="page-pagination\b[^\"]*"[^>]*>([\s\S]*?)<\/div\s*>/i.exec(safe);
   let next = false, current = false;
@@ -60,7 +66,7 @@ export function parseSearch(html: string, request: SourceSearchRequest): SourceS
 }
 export async function search(request: SourceSearchRequest, context: SourceNetworkContext) {
   context.signal?.throwIfAborted();
-  const html = await context.request(searchUrl(request).url);
+  const html = await context.request(searchUrl(request).url, {referer: origin + '/search', acceptStatuses: [404]});
   context.signal?.throwIfAborted();
   return parseSearch(html, request);
 }

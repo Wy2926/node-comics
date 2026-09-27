@@ -25,7 +25,7 @@ export async function parseSearch(raw: string, query: SourceSearchRequest): Prom
     seen.add(loc.comic);
     const author = blocks(info[2], 'small', 'class', 'tags').map(textContent).filter(Boolean);
     const poster = one(blocks(card, 'a', 'class', 'comics-card__poster'));
-    const cover = coverUrl(tags(poster, 'amp-img')[0]?.src, loc.comic);
+    const cover = coverUrl(tags(poster, 'amp-img')[0]?.src);
     return {catalogId: catalogKey(loc.comic), catalogUrl: catalogUrl(loc.comic), title: label(info[2], 'h3', 'text-truncate'),
       ...(cover ? {cover} : {}), ...(author.length ? {authors: author} : {})};
   });

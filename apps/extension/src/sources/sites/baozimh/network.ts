@@ -37,7 +37,7 @@ export function parseCatalog(raw: string, url: string): SourceCatalogSnapshot {
   });
   const title = label(html, 'h1', 'comics-detail__title');
   const info = one(blocks(html, 'div', 'class', 'de-info__box'));
-  const cover = coverUrl(tags(info, 'amp-img')[0]?.src, loc.comic);
+  const cover = coverUrl(tags(info, 'amp-img')[0]?.src);
   return {id, sourceId: 'baozimh', url: catalogUrl(loc.comic), title, cover,
     observedAt: Date.now(), complete: true, note: '', entries,
     groups: [{id: 'chapters', title: '章节目录', entryIds: entries.map(e => e.id), complete: true}], defaultEntryId: entries[0]?.id};

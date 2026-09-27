@@ -17,6 +17,18 @@ describe('Baozi source search', () => {
     await expect(parseSearch(searchHtml('fixture', 89), {...query, cursor: first.nextCursor})).rejects.toThrow('SOURCE_SEARCH_CURSOR_EXPIRED');
     await expect(parseSearch(searchHtml('other', 90), {...query, query: 'other', cursor: first.nextCursor})).rejects.toThrow('SOURCE_SEARCH_CURSOR_EXPIRED');
   });
+  it('keeps every search page when a source poster filename differs from the comic ID', async () => {
+    const request = {...query, query: '死灵法师！我即是天灾'};
+    const html = searchHtml(request.query, 89).replaceAll('example-85', 'yulingshi-shidaimanwang2')
+      .replace('Work 85', '驭灵师')
+      .replace('/cover/yulingshi-shidaimanwang2.jpg', '/cover/yulingshi-shidaimanwang.jpg?w=285&amp;h=375&amp;q=100');
+    const first = await parseSearch(html, request);
+    expect(first.items).toHaveLength(50);
+    const last = await parseSearch(html, {...request, cursor: first.nextCursor});
+    expect(last.items).toHaveLength(39); expect(last.nextCursor).toBeUndefined();
+    expect(last.items[35]).toMatchObject({catalogId: 'baozimh:yulingshi-shidaimanwang2', title: '驭灵师',
+      cover: {url: 'https://static-tw.baozimh.com/cover/yulingshi-shidaimanwang.jpg?w=285&h=375&q=100'}});
+  });
   it.each(['unknown', 'default_cover.png'])('retains all results when a source cover is %s', async placeholder => {
     // The real search for 斗破 contains a /cover/unknown poster among 90 valid works.
     const html = searchHtml('斗破', 90).replace('/cover/example-23.jpg', '/cover/' + placeholder);
@@ -27,11 +39,12 @@ describe('Baozi source search', () => {
     expect(first.items[23].cover).toBeUndefined();
     expect(first.items[24].cover?.url).toContain('/cover/example-24.jpg');
   });
-  it('allows an absent poster image while still rejecting foreign or mismatched artwork', async () => {
+  it('allows an absent poster image while still rejecting foreign or invalid cover URLs', async () => {
     const html = searchHtml().replace(/<amp-img\b[\s\S]*<\/amp-img>/, '');
     expect((await parseSearch(html, query)).items[0].cover).toBeUndefined();
     for (const invalid of [searchHtml().replaceAll('static-tw.baozimh.com', 'evil.test'),
-      searchHtml().replace('/cover/example-author.jpg', '/cover/another-work.jpg')])
+      searchHtml().replace('/cover/example-author.jpg', '/static/example-author.jpg'),
+      searchHtml().replace('/cover/example-author.jpg', '/cover/example-author.svg')])
       await expect(parseSearch(invalid, query)).rejects.toThrow();
   });
   it.each(['query', 'count', 'owner', 'duplicate', 'html', 'cursor'])('rejects malformed %s', async mode => {

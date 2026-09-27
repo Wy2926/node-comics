@@ -14,20 +14,22 @@ await build({configFile:false,root:path.join(root,'apps/extension'),logLevel:'er
 }});
 const {network}=await import(pathToFileURL(path.join(temporary,'network.mjs')).href);
 const requests=[];
-const context={request:async target=>{
+const context={request:async (target,options)=>{
   const url=new URL(target);
   assert(!url.searchParams.has('language'));
   assert(!url.search.includes('+'),'DM5 queries must encode spaces as %20');
-  requests.push({origin:url.origin,path:url.pathname});
-  const response=await fetch(target,{signal:AbortSignal.timeout(15000)});
-  assert(response.ok,'Public source HTTP '+response.status);
+  const response=await fetch(target,{signal:AbortSignal.timeout(15000),headers:options?.referer?{Referer:options.referer}:undefined});
+  requests.push({origin:url.origin,path:url.pathname,status:response.status});
+  assert(response.ok||options?.acceptStatuses?.includes(response.status),'Public source HTTP '+response.status);
   return response.text();
 }};
-const cases=[{siteId:'dm5',query:'海贼王'}, {siteId:'dm5',query:'One Piece'}, {siteId:'dm5',query:'海贼 王'}, {siteId:'dm5',query:'zzzznodelanesearchzzzz'}], results=[];
+const cases=[{siteId:'dm5',query:'海贼王'}, {siteId:'dm5',query:'One Piece'}, {siteId:'dm5',query:'海贼 王'}, {siteId:'dm5',query:'zzzznodelanesearchzzzz'},
+  {siteId:'dm5',query:'死灵法师！我即是天灾',empty:true}], results=[];
 for(const {empty,...query} of cases){
   const first=await network.search(query,context);
   assert(first.items.length<=50);
   assert(empty?first.items.length===0:first.items.length>0);
+  if(empty){assert.equal(requests.at(-1).status,404);assert.equal(first.nextCursor,undefined);}
   assert(first.items.every(item=>item.catalogId&&item.title&&item.catalogUrl));
   const second=first.nextCursor?await network.search({...query,cursor:first.nextCursor},context):undefined;
   if(second)assert(second.items.length>0&&second.items.some(item=>!first.items.some(previous=>previous.catalogId===item.catalogId)));
