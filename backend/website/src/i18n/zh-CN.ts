@@ -1,3 +1,4 @@
+import { localTranslationGuides } from './guides/zh-CN';
 import type { Dictionary } from './types';
 
 export default {
@@ -348,6 +349,7 @@ export default {
       },
       {
         "slug": "translation-modes",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "常规翻译与 AI 重绘，读漫画时怎么选？",
         "description": "了解常规 OCR 翻译与 AI 重绘的区别、原图对照，以及如何连接本地 manga-translator-ui 服务。按画面保真需求和翻译渠道选择模式。",
         "category": "翻译技巧",
@@ -392,6 +394,7 @@ export default {
       },
       {
         "slug": "local-comics",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "CBZ、CBR、PDF、MOBI：本地漫画阅读指南",
         "description": "了解 NodeLane 漫译 支持的本地漫画格式、无 DRM MOBI 的范围、压缩包顺序，以及本地导入和云端翻译的数据边界。",
         "category": "本地阅读",
@@ -477,6 +480,7 @@ export default {
       },
       {
         "slug": "translation-troubleshooting",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "漫画翻译失败或一直等待？按这个顺序排查",
         "description": "区分图片获取失败、等待翻译、额度不足、登录过期和结果未知，找到可操作的恢复方式，避免重复提交。",
         "category": "问题排查",
@@ -555,7 +559,8 @@ export default {
             ]
           }
         ]
-      }
+      },
+      ...localTranslationGuides
     ],
     "faqs": [
       {
@@ -634,7 +639,7 @@ export default {
         "id": "local-translation",
         "question": "可以使用本地漫画翻译服务，不登录 NodeLane 账号吗？",
         "answer": "可以连接自行部署的 manga-translator-ui 服务。在插件设置中添加本地翻译渠道并选择它，无需登录 NodeLane 账号，也不使用官方翻译额度。服务需要自行部署和运行；是否联网、可用模式及图片处理范围由所选服务决定。",
-        "relatedPath": "/guides/translation-modes/"
+        "relatedPath": "/guides/local-translation/"
       }
     ],
     "releases": [

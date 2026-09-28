@@ -1,0 +1,31 @@
+---
+import type { GuideSection, Locale } from '../i18n/types';
+import { localPath } from '../i18n';
+interface Props { section: GuideSection; index: number; locale: Locale }
+const { section, index, locale } = Astro.props;
+const headingId = `section-${index + 1}`;
+---
+<section aria-labelledby={headingId}>
+  <h2 id={headingId}>{section.title}</h2>
+  {section.paragraphs.map(text => <p>{text}</p>)}
+  {section.steps && <ol>{section.steps.map(text => <li>{text}</li>)}</ol>}
+  {section.code && <pre tabindex="0" aria-labelledby={headingId}><code>{section.code}</code></pre>}
+  {section.table && <div class="table-wrap" tabindex="0" role="region" aria-labelledby={headingId}>
+    <table aria-labelledby={headingId}>
+      <thead><tr>{section.table.headers.map(header => <th scope="col">{header}</th>)}</tr></thead>
+      <tbody>{section.table.rows.map(row => <tr>{row.map((cell, column) => column === 0 ? <th scope="row">{cell}</th> : <td>{cell}</td>)}</tr>)}</tbody>
+    </table>
+  </div>}
+  {section.links && <ul class="article-links">{section.links.map(link => <li><a href={link.href.startsWith('/') ? localPath(link.href, locale) : link.href}>{link.label}</a></li>)}</ul>}
+</section>
+<style>
+  section { margin-bottom: 2.5rem; min-width: 0; overflow-wrap: anywhere; }
+  h2 { scroll-margin-top: 8rem; }
+  pre { padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); font-size: .875rem; line-height: 1.7; }
+  code { font-family: Consolas, monospace; }
+  table { min-width: 32rem; font-size: .9375rem; line-height: 1.7; }
+  th, td { vertical-align: top; padding: 1rem; }
+  th[scope="row"] { width: 25%; background: transparent; font-weight: 600; }
+  .article-links { font-size: 1rem; }
+  :is(pre, .table-wrap):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>

@@ -1,3 +1,4 @@
+import { localTranslationGuides } from './guides/zh-TW';
 import type { Dictionary } from './types';
 
 export default {
@@ -348,6 +349,7 @@ export default {
       },
       {
         "slug": "translation-modes",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "常規翻譯與 AI 重繪，讀漫畫時怎麼選？",
         "description": "了解一般 OCR 翻譯與 AI 重繪的差異、原圖對照，以及如何連接本機 manga-translator-ui 服務。依畫面保真需求和翻譯管道選擇模式。",
         "category": "翻譯技巧",
@@ -392,6 +394,7 @@ export default {
       },
       {
         "slug": "local-comics",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "CBZ、CBR、PDF、MOBI：本地漫畫閱讀指南",
         "description": "瞭解 NodeLane 漫譯 支持的本地漫畫格式、無 DRM MOBI 的範圍、壓縮包順序，以及本地導入和雲端翻譯的數據邊界。",
         "category": "本地閱讀",
@@ -477,6 +480,7 @@ export default {
       },
       {
         "slug": "translation-troubleshooting",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "title": "漫畫翻譯失敗或一直等待？按這個順序排查",
         "description": "區分圖片獲取失敗、等待翻譯、額度不足、登錄過期和結果未知，找到可操作的恢復方式，避免重複提交。",
         "category": "問題排查",
@@ -555,7 +559,8 @@ export default {
             ]
           }
         ]
-      }
+      },
+      ...localTranslationGuides
     ],
     "faqs": [
       {
@@ -634,7 +639,7 @@ export default {
         "id": "local-translation",
         "question": "可以使用本機漫畫翻譯服務，不登入 NodeLane 帳號嗎？",
         "answer": "可以連接自行部署的 manga-translator-ui 服務。在擴充功能設定中新增並選擇本機翻譯管道，無需登入 NodeLane 帳號，也不使用官方翻譯額度。服務需自行部署與執行；網路需求、可用模式及圖片處理範圍由所選服務決定。",
-        "relatedPath": "/guides/translation-modes/"
+        "relatedPath": "/guides/local-translation/"
       }
     ],
     "releases": [

@@ -1,3 +1,4 @@
+import { localTranslationGuides } from './guides/en';
 import type { Dictionary } from './types';
 
 export default {
@@ -182,6 +183,7 @@ export default {
       },
       {
         "slug": "translation-modes",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 5,
         "title": "Classic translation or AI redraw: which should you choose?",
         "description": "Compare classic OCR manga translation with AI redraw, check originals and learn how to connect a local manga-translator-ui service. Choose the mode and service for your reading.",
@@ -219,6 +221,7 @@ export default {
       },
       {
         "slug": "local-comics",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 5,
         "title": "Read CBZ, CBR, PDF and MOBI comics locally",
         "description": "Supported comic formats, import checks, DRM-free MOBI limitations and the boundary between local reading and online translation.",
@@ -280,6 +283,7 @@ export default {
       },
       {
         "slug": "translation-troubleshooting",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 4,
         "title": "Manga translation failed or still waiting?",
         "description": "Distinguish image retrieval, account access, failed jobs and unknown results before trying again.",
@@ -337,7 +341,8 @@ export default {
             ]
           }
         ]
-      }
+      },
+      ...localTranslationGuides
     ],
     "policies": {
       "privacy": {
@@ -541,7 +546,7 @@ export default {
         "id": "local-translation",
         "question": "Can I translate manga with a local service without a NodeLane account?",
         "answer": "Yes. Connect your own manga-translator-ui service by adding and selecting a local translation channel in extension settings. This does not require a NodeLane account or official translation allowances. You must run the service yourself; network requirements, available modes and image handling depend on that service.",
-        "relatedPath": "/guides/translation-modes/"
+        "relatedPath": "/guides/local-translation/"
       }
     ],
     "releases": [

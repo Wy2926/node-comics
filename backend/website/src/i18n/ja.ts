@@ -1,3 +1,4 @@
+import { localTranslationGuides } from './guides/ja';
 import type { Dictionary } from './types';
 
 export default {
@@ -182,6 +183,7 @@ export default {
       },
       {
         "slug": "translation-modes",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 5,
         "title": "通常翻訳と AI リドロー、どちらを選ぶ？",
         "description": "通常の OCR 漫画翻訳と AI 再描画の違い、原文比較、ローカルの manga-translator-ui 接続を解説。画面の再現性と翻訳サービスに合わせて選べます。",
@@ -219,6 +221,7 @@ export default {
       },
       {
         "slug": "local-comics",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 5,
         "title": "CBZ・CBR・PDF・MOBI のローカル漫画を読む",
         "description": "対応形式、読み込みの確認、DRM なし MOBI の範囲と、ローカル読書・オンライン翻訳の違いを紹介します。",
@@ -280,6 +283,7 @@ export default {
       },
       {
         "slug": "translation-troubleshooting",
+        "related": ["local-translation", "local-manga-translator", "manga-translation"],
         "minutes": 4,
         "title": "漫画翻訳が失敗・待機中のときの確認手順",
         "description": "画像取得、アカウント、失敗、結果不明を区別して、重複依頼を避けながら復旧しましょう。",
@@ -337,7 +341,8 @@ export default {
             ]
           }
         ]
-      }
+      },
+      ...localTranslationGuides
     ],
     "policies": {
       "privacy": {
@@ -541,7 +546,7 @@ export default {
         "id": "local-translation",
         "question": "NodeLane アカウントなしでローカルの漫画翻訳サービスを使えますか？",
         "answer": "はい。自分で動かしている manga-translator-ui を、拡張機能の設定でローカル翻訳チャンネルとして追加して選択できます。NodeLane へのログインや公式翻訳の利用枠は不要です。サービスの構築と実行は利用者が行い、ネット接続の要否、対応モード、画像の扱いはそのサービスに依存します。",
-        "relatedPath": "/guides/translation-modes/"
+        "relatedPath": "/guides/local-translation/"
       }
     ],
     "releases": [

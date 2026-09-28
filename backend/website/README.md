@@ -25,6 +25,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 ## 内容与规范
 
 - [src/i18n](src/i18n)：简中、繁中、英文、日文、韩文独立字典；新增页面或文案同步五语。语言由 URL 决定，切换保留当前页面；[语言偏好方案](../../docs/WEBSITE_LANGUAGE_DESIGN.md)尚待实现。
+- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；由指南列表、帮助、FAQ 和相关文章进入。正文支持步骤、命令、对照表及来源链接。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
 - [public/design-tokens.css](public/design-tokens.css)：官网与 Drive 连接页共用视觉令牌。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
 - 每页维护标题、正文、canonical、hreflang 和结构化数据；页面关键词分工、五语用词与 FAQ 规则见 [SEO 规范](SEO.md)。账户、身份回调与支付返回页不索引。构建检查站内链接、锚点、商店入口及 FAQ 正文与 SEO 数据一致性。

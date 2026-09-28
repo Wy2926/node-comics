@@ -1,6 +1,11 @@
 export type Locale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko';
-export interface GuideSection {title:string;paragraphs:string[];steps?:string[]}
-export interface Guide {slug:string;title:string;description:string;category:string;minutes:number;updated?:string;sections:GuideSection[]}
+export interface GuideSection {
+  title:string;paragraphs:string[];steps?:string[];
+  code?:string;
+  links?:{label:string;href:string}[];
+  table?:{headers:string[];rows:string[][]};
+}
+export interface Guide {slug:string;title:string;description:string;category:string;minutes:number;published?:string;updated?:string;related?:string[];sections:GuideSection[]}
 export interface Policy {title:string;description:string;sections:GuideSection[]}
 export interface UI {
   brandName:string;

@@ -18,7 +18,9 @@
 | `/about/` | NodeLane 漫译品牌与用途 | about NodeLane Comics |
 | `/changelog/` | NodeLane 漫译版本更新 | NodeLane Comics release notes |
 | `/guides/manga-translation/` | 如何在浏览器翻译漫画 | how to translate manga in a browser |
-| `/guides/translation-modes/` | 常规 OCR 翻译与 AI 重绘、本地翻译服务 | classic manga translation vs AI redraw, manga-translator-ui |
+| `/guides/translation-modes/` | 常规 OCR 翻译与 AI 重绘的选择 | classic manga translation vs AI redraw |
+| `/guides/local-translation/` | 本地翻译教程、manga-translator-ui 连接与排错 | manga-translator-ui setup, local translation tutorial |
+| `/guides/local-manga-translator/` | 本地漫画翻译工具、费用、隐私与离线条件 | local manga translator, self-hosted manga translation |
 | `/guides/local-comics/` | CBZ／CBR／PDF／MOBI 漫画阅读 | CBZ reader, CBR reader, PDF / MOBI comics |
 | `/guides/japanese-manga/` | 日语漫画翻译、原图对照 | Japanese manga translation, original comparison |
 | `/guides/translation-troubleshooting/` | 漫画翻译失败、一直等待 | manga translation failed, stuck translation |
@@ -41,10 +43,10 @@
 
 ## 元数据与可抓取内容
 
-- [src/i18n](src/i18n) 是五语内容来源。普通页面的 `seo*Title` 用于搜索标题，页面介绍用于 description 和可见正文；指南和政策使用自身的 `title`、`description`。首页摘要来自 [src/i18n/home](src/i18n/home)，标题和正文共同表明产品用途。
+- [src/i18n](src/i18n) 是五语内容来源，本地翻译的两篇文章维护在 [src/i18n/guides](src/i18n/guides)。普通页面的 `seo*Title` 用于搜索标题，页面介绍用于 description 和可见正文；指南和政策使用自身的 `title`、`description`。首页摘要来自 [src/i18n/home](src/i18n/home)，标题和正文共同表明产品用途。
 - [Base.astro](src/layouts/Base.astro) 输出每页自引用 canonical、五个互相对应的 hreflang 和简中 `x-default`；各语言保持独立可抓取 URL，不按 IP 或浏览器语言强制跳转。标题、摘要同步到 Open Graph 和 Twitter，并提供分享图和替代文本。[Google 多语言建议](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)
-- [LocalizedPage.astro](src/components/LocalizedPage.astro) 输出产品 SoftwareApplication、指南 Article 和 FAQPage；公共布局包含 Organization、WebSite、WebPage、内页面包屑。只标记真实可见内容，不编造评分、销量或价格。指南内容更新时修改该篇 `updated`，不用构建时间冒充内容更新时间。
-- [sitemap.xml.ts](src/pages/sitemap.xml.ts) 收录 18 类公开页面 × 5 语言，共 90 个 URL，并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
+- [LocalizedPage.astro](src/components/LocalizedPage.astro) 输出产品 SoftwareApplication、指南 Article 和 FAQPage；公共布局包含 Organization、WebSite、WebPage、内页面包屑。只标记真实可见内容，不编造评分、销量或价格。新指南填写实际 `published` 与 `updated` 日期，内容更新时修改该篇 `updated`，不用构建时间冒充内容更新时间。指南通过 `related` 指定相关文章；正文命令、表格和链接由 [ArticleSection.astro](src/components/ArticleSection.astro) 输出静态 HTML，站内链接随当前语言切换。
+- [sitemap.xml.ts](src/pages/sitemap.xml.ts) 收录 20 类公开页面 × 5 语言，共 100 个 URL，并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
 - 首页商店入口直接使用可抓取的链接和本地浏览器标识；Chrome、Firefox 指向商店，Edge 审核期间进入当前语言的下载安装包位置。地址统一维护在 [site.ts](src/data/site.ts)，审核通过后只需填入准确详情页地址，并更新五语状态文案。
 
 ## FAQ

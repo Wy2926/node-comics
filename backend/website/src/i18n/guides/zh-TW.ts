@@ -1,0 +1,97 @@
+import type { Guide } from '../types';
+
+export const localTranslationGuides: Guide[] = [
+  {
+    slug: 'local-translation',
+    title: '本機漫畫翻譯教學：將 manga-translator-ui 連接至 NodeLane',
+    description: '從啟動 manga-translator-ui Web 服務、填寫位址與帳號，到在瀏覽器翻譯第一張漫畫，逐步完成本機翻譯設定，並排查連線、密碼、等待及快取問題。',
+    category: '本機翻譯教學', minutes: 8, published: '2026-09-28', updated: '2026-09-28',
+    related: ['local-manga-translator', 'local-comics', 'translation-troubleshooting'],
+    sections: [
+      { title: '開始前：準備擴充功能與翻譯服務', paragraphs: [
+        'NodeLane 漫譯負責在瀏覽器閱讀漫畫，manga-translator-ui（以下簡稱 MTU）負責處理圖片。連接自己的 MTU 服務不需要 NodeLane 帳號，也不消耗官方翻譯額度；硬體、模型或第三方 API 的費用由你自行負擔。',
+        '請準備桌面瀏覽器中的最新版擴充功能、已安裝相依套件的 MTU，以及該服務的使用者名稱和密碼。本教學以同一台電腦上的 http://127.0.0.1:8000 為例，連接埠請依實際服務調整。'
+      ], links: [{label: '下載 NodeLane 漫譯擴充功能', href: '/download/'}, {label: 'MTU 官方安裝說明（Windows）', href: 'https://hgmzhn.github.io/manga-translator-ui/zh/install/windows-portable'}, {label: 'MTU 官方安裝說明（Linux / macOS）', href: 'https://hgmzhn.github.io/manga-translator-ui/zh/install/linux-and-macos'}] },
+      { title: '第一步：啟動 MTU 的 Web 服務', paragraphs: [
+        '擴充功能需要能透過 HTTP 存取的 Web 服務，只開啟 MTU 桌面視窗還不夠。完成官方安裝流程後，在 MTU 專案目錄執行以下指令，並保持服務運作。已透過 Docker 或其他方式啟動 Web 服務者可略過此指令。',
+        '此範例未啟用 GPU；已設定好支援的 GPU 環境者，可依官方說明加入 --use-gpu。模型、驅動程式及硬體需求以所安裝的 MTU 版本為準。'
+      ], code: 'uv run --no-sync python -m manga_translator web --host 127.0.0.1 --port 8000', links: [{label: 'MTU 官方 Web 啟動與存取說明', href: 'https://hgmzhn.github.io/manga-translator-ui/zh/web/launch-and-access'}] },
+      { title: '第二步：先在服務頁面完成一次翻譯', paragraphs: [
+        '用瀏覽器開啟 http://127.0.0.1:8000，完成 MTU 的帳號初始化並登入。如果服務要求變更初始密碼，請先在服務頁面修改，再連接擴充功能。此處使用 MTU 帳號，與 NodeLane 帳號分開。',
+        '在服務端設定翻譯器、模型及所需 API Key，以一張有權處理的測試圖確認能產生譯圖。擴充功能只指定目標語言，其餘參數使用服務端預設值；請確認 Web 服務已套用預期設定。不要將模型 API Key 填入擴充功能的密碼欄位。'
+      ], links: [{label: 'MTU 官方專案與使用文件', href: 'https://github.com/hgmzhn/manga-translator-ui'}] },
+      { title: '第三步：新增翻譯管道', paragraphs: [
+        '開啟擴充功能的設定頁面，找到翻譯管道區塊。連線成功後只儲存服務權杖，不儲存你輸入的密碼。以下名稱對應介面中相同用途的控制項。'
+      ], steps: [
+        '點選新增翻譯管道，確認服務類型為 manga-translator-ui；可填寫容易辨識的名稱，例如「我的電腦」。',
+        '服務位址填入 http://127.0.0.1:8000。請填服務根位址，不要加上 /auth/login、/translate/with-form/image 或管理頁面路徑。',
+        '填寫 MTU 的使用者名稱與密碼，點選連接並使用；若瀏覽器要求該位址的存取權限，請允許。',
+        '連線完成後，確認目前管道為剛新增的服務。可以儲存多個服務設定，但每次只使用目前選取的一個。'
+      ] },
+      { title: '第四步：選擇常規翻譯，閱讀第一張譯圖', paragraphs: [
+        '匯入本機漫畫，或從已支援的網站開啟閱讀器。選擇目標語言與常規翻譯，先等待目前頁面完成，再繼續閱讀。MTU 管道目前只提供常規翻譯，不提供 NodeLane 官方的 AI 重繪模式。',
+        '擴充功能優先處理目前頁面，再處理後面三頁，同一 MTU 管道逐張執行。譯圖出現後可切回原圖或並排對照，切換結果會保留閱讀位置。閱讀器與網頁原位翻譯共用目前管道，使用前請確認選擇。',
+        '若某頁失敗，先處理該頁提示的原因，再手動重試。關閉頁面或連線中斷不代表 MTU 已停止運算，服務仍忙碌時請避免重複提交。'
+      ], links: [{label: '本機漫畫匯入與格式說明', href: '/guides/local-comics/'}] },
+      { title: '連線失敗、登入失敗或一直等待，如何排查？', paragraphs: [
+        '先確認 MTU 本身能正常運作，再回到擴充功能重試。回報問題時不要分享密碼、權杖或完整私人漫畫。'
+      ], table: { headers: ['現象', '檢查與處理'], rows: [
+        ['無法開啟服務位址', '確認 Web 服務仍在執行且連接埠正確。127.0.0.1 指瀏覽器所在電腦；服務位於另一台裝置時，請使用該裝置實際可連線的位址。'],
+        ['瀏覽器能開啟，擴充功能卻無法連接', '檢查是否誤填管理頁面路徑、是否授予位址存取權限，以及 MTU 版本是否提供相容的登入與圖片翻譯介面。'],
+        ['帳密錯誤或要求變更初始密碼', '先在 MTU 頁面登入或變更初始密碼，再重新連接。使用 MTU 帳密，不使用 NodeLane 密碼或模型 API Key。'],
+        ['原本可用，現在登入失效', '在管道設定重新連接並輸入服務密碼。擴充功能不會自動重送上一次翻譯。'],
+        ['已連接但翻譯一直等待', '檢查模型下載、引擎載入、佇列、API 餘額與硬體資源；在 MTU 頁面測試相同設定。連線成功只表示登入可用。'],
+        ['中斷、逾時或回傳內容不是圖片', '檢查 MTU 任務、反向代理逾時與回傳內容，修復後手動重試失敗頁。擴充功能不會從 MTU 歷史任務自動恢復結果。']
+      ] } },
+      { title: '快取、離線與圖片去向', paragraphs: [
+        '本機管道的譯圖快取存放於目前瀏覽器的本機儲存空間。清除快取，或將譯圖快取容量設為 0 並關閉仍持有譯圖的頁面，可能使結果遺失；需要時只能手動重新翻譯，無法從 MTU 自動補回。',
+        '圖片會傳送至你選取的 MTU 服務。本機執行 MTU 不等於全程離線：若使用線上翻譯器、OCR 或圖像模型，相關文字或圖片仍可能交由供應商處理。能否離線產生新譯圖，取決於原圖、模型及完整處理流程。'
+      ], links: [{label: '本機漫畫翻譯的費用、隱私與離線條件', href: '/guides/local-manga-translator/'}] }
+    ]
+  },
+  {
+    slug: 'local-manga-translator',
+    title: '本機漫畫翻譯怎麼選？manga-translator-ui 與瀏覽器閱讀',
+    description: '想用自己的電腦翻譯日漫、韓漫或 CBZ、PDF？了解本機漫畫翻譯的流程、費用、隱私與離線條件，以及 MTU 和 NodeLane 閱讀器的分工。',
+    category: '本機翻譯指南', minutes: 6, published: '2026-09-28', updated: '2026-09-28',
+    related: ['local-translation', 'translation-modes', 'local-comics'],
+    sections: [
+      { title: '漫畫圖片翻譯需要完整的圖像處理流程', paragraphs: [
+        '漫畫對白通常畫在圖片裡，瀏覽器的網頁文字翻譯無法直接將譯文放回氣泡。常規漫畫翻譯需經過文字偵測、OCR 辨識、翻譯、清除原文字與重新排版，每個階段都會影響閱讀效果。',
+        '若你已有能執行翻譯服務的電腦，希望自行選擇引擎並連續閱讀，可以讓 manga-translator-ui 處理圖片，讓 NodeLane 漫譯負責瀏覽器閱讀。擴充功能會把目前閱讀範圍的圖片交給所選服務，再於原位置顯示譯圖。'
+      ] },
+      { title: '本機閱讀、本機服務與離線翻譯有何不同？', paragraphs: [
+        '「本機」可能指檔案位置，也可能指服務執行位置。要判斷內容如何處理，應檢查完整流程。'
+      ], table: { headers: ['使用方式', '實際含義'], rows: [
+        ['本機漫畫閱讀', '在瀏覽器匯入 CBZ / ZIP、CBR / RAR、PDF 或支援的無 DRM MOBI；閱讀原圖不必呼叫翻譯服務。'],
+        ['本機 MTU 服務', '圖片傳送至自己執行的 MTU，可使用本機模型，也可能呼叫外部 API。'],
+        ['完全離線翻譯', '原圖、模型及相依套件已備齊，且所有處理階段都不依賴線上服務；需自行驗證整條流程。']
+      ] } },
+      { title: '自架 MTU 與官方管道，分別適合誰？', paragraphs: [
+        '已部署 MTU，或願意維護模型與處理執行問題的讀者，可使用本機管道。希望減少設定與維護工作，可考慮官方管道。兩者都建議先以少量頁面檢查效果。'
+      ], table: { headers: ['比較項目', '自架 MTU 管道', 'NodeLane 官方管道'], rows: [
+        ['帳號', '使用 MTU 帳號，無需 NodeLane 登入', '需要登入 NodeLane'],
+        ['設定與維護', '自行安裝、執行及設定', '官方維護翻譯服務'],
+        ['擴充功能模式', '目前僅常規翻譯', '常規翻譯與 AI 重繪，依帳戶權益使用'],
+        ['費用', '不扣官方額度；硬體、電力及所選 API 費用自理', '依官方方案與額度規則'],
+        ['譯圖快取遺失', '需手動重新翻譯', '仍有效且可用的官方結果可重新下載']
+      ] }, links: [{label: '連接本機服務的完整教學', href: '/guides/local-translation/'}, {label: '官方價格與額度', href: '/pricing/'}] },
+      { title: '本機漫畫翻譯免費嗎？需要什麼顯示卡？', paragraphs: [
+        'MTU 管道不扣 NodeLane 官方額度，但不代表全程零成本。線上模型可能按呼叫收費，本機模型則需要硬體、儲存空間與運算時間。請先確認服務端選用的引擎，再估算成本。',
+        '無法用單一顯示記憶體數字涵蓋所有設定。模型大小、圖片解析度、OCR 及修復引擎都影響資源與耗時。依 MTU 官方文件選擇適合系統與硬體的版本，先測試一頁清晰漫畫；不保證固定速度或所有電腦皆能流暢運作。'
+      ], links: [{label: 'MTU 官方專案與安裝入口', href: 'https://github.com/hgmzhn/manga-translator-ui'}] },
+      { title: '日漫、韓漫與長條漫畫，如何評估效果？', paragraphs: [
+        '先確認原圖清晰，再檢查 OCR 是否支援來源語言。直排對白、手寫狀聲詞、複雜背景與低解析度掃描都可能漏字；大型長圖也可能增加記憶體需求與處理時間。',
+        '選擇擴充功能中可用的目標語言，先測試一兩頁並對照原圖，檢查漏譯、人名、語氣與氣泡排版。品質取決於 MTU 實際模型與設定，連接本機服務本身不會提高翻譯準確率。'
+      ] },
+      { title: '漫畫會上傳到哪裡？離線還能繼續看嗎？', paragraphs: [
+        '選擇 MTU 後，圖片由擴充功能直接傳送至該管道設定的服務，不經 NodeLane 官方翻譯服務中轉。MTU 是否再將文字或圖片傳給模型供應商，取決於啟用的引擎。',
+        '已匯入的本機漫畫與仍有快取的譯圖，可在相應內容可用時閱讀。離線產生新譯圖則需要本機服務與完整流程均可斷網執行，網站漫畫也需預先快取原圖。保留快取可減少重複運算，但快取不是永久備份。'
+      ], links: [{label: '圖片上傳與擴充功能權限說明', href: '/guides/comic-reader-privacy/'}] },
+      { title: '先從一頁開始', paragraphs: [
+        '啟動 MTU Web 服務，先在其頁面完成一次翻譯，再於 NodeLane 設定中新增服務位址與帳號。連線後選擇常規翻譯與目標語言，即可邊閱讀邊查看譯圖。',
+        '連接失敗時先檢查位址與權限；能登入卻沒有譯圖時，檢查服務端引擎設定。以少量頁面確認品質與速度，再決定是否適合日常閱讀。'
+      ], links: [{label: '開始設定：本機翻譯教學', href: '/guides/local-translation/'}, {label: '下載漫畫閱讀與翻譯擴充功能', href: '/download/'}] }
+    ]
+  }
+];
