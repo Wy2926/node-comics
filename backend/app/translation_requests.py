@@ -1,6 +1,6 @@
-"""Immutable translation requests and admission accounting."""
+"""Immutable translation requests and durable idempotency receipts."""
 from datetime import datetime
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 from .models import now
@@ -22,20 +22,3 @@ class TranslationRequest(Base):
     @property
     def entry_id(self):
         return self.job_id or self.access_id
-
-
-class ImageAdmission(Base):
-    __tablename__ = 'image_admissions'
-    job_id: Mapped[str] = mapped_column(ForeignKey('jobs.id'), primary_key=True)
-    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'))
-    admitted_at: Mapped[datetime] = mapped_column(DateTime)
-    __table_args__ = (Index('ix_image_admissions_owner_time', 'owner_id', 'admitted_at'),)
-
-
-class ControlAdmission(Base):
-    __tablename__ = 'control_admissions'
-    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    scope: Mapped[str] = mapped_column(String(24), primary_key=True)
-    tokens: Mapped[float] = mapped_column(Float)
-    refilled_at: Mapped[datetime] = mapped_column(DateTime)
-    leases: Mapped[list] = mapped_column(JSON, default=list)

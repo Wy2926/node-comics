@@ -267,18 +267,19 @@ def recover_received_uploads(limit=100):
     stage to reread and verify bytes. No database connection spans object I/O.
     """
     from .db import session_factory
-    from .upload_models import UploadIngressLease
+    from .upload_ingress import ingress_snapshot
     from .queue_models import JobStage
     from .scheduler import lock_scheduler, touch_job
-    active_ingress = select(UploadIngressLease.id).where(UploadIngressLease.upload_id == UploadReservation.id,
-        UploadIngressLease.expires_at > now())
     with session_factory()() as db:
         rows = db.execute(select(UploadReservation.id, UploadReservation.storage_backend,
             UploadReservation.expected_sha256, UploadReservation.expires_at)
-            .where(UploadReservation.status == 'awaiting_upload', UploadReservation.verified_info.is_not(None),
-                ~active_ingress.exists()).order_by(UploadReservation.created_at).limit(limit)).all()
+            .where(UploadReservation.status == 'awaiting_upload', UploadReservation.verified_info.is_not(None))
+            .order_by(UploadReservation.created_at).limit(limit)).all()
+    _, active = ingress_snapshot([row.id for row in rows])
     restored = 0
     for row in rows:
+        if active[row.id]:
+            continue
         try:
             present = get_store(row.storage_backend).exists(content_storage_key(row.expected_sha256))
         except (StorageError, OSError):
@@ -290,8 +291,7 @@ def recover_received_uploads(limit=100):
             receipt = db.get(UploadReservation, row.id)
             if not receipt or receipt.status != 'awaiting_upload':
                 continue
-            if db.scalar(select(UploadIngressLease.id).where(UploadIngressLease.upload_id == row.id,
-                    UploadIngressLease.expires_at > now())):
+            if ingress_snapshot([row.id])[1][row.id]:
                 continue
             if present:
                 job = db.get(Job, receipt.job_id)

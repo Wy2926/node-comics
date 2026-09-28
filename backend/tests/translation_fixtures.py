@@ -15,6 +15,9 @@ def configure_text_provider(db, provider_id=None, **config):
     body = ProviderWrite(
         name=provider.name if provider else 'Isolated test text provider',
         channel='openai', enabled=provider.enabled if provider else True,
+        text_weight=provider.text_weight if provider else 1,
+        title_weight=provider.title_weight if provider else 1,
+        requests_per_minute=config.pop('requests_per_minute', provider.requests_per_minute if provider else 60),
         config={**(previous.config if previous else {
             'model': 'test-model', 'base_url': 'https://text.example/v1'}), **config},
         api_key=None if previous else 'isolated-test-text-key',

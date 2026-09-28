@@ -1,19 +1,21 @@
 export type Mode = 'classic' | 'redraw';
 export type TranslationProtocol = 'chat_completions' | 'responses';
+export type TranslationReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'provider_default';
 export type TranslationProviderConfig = {
   base_url: string; model: string; protocol: TranslationProtocol; user_agent: string;
+  reasoning_effort?: TranslationReasoningEffort;
   timeout_seconds: number; max_attempts: number; max_output_tokens: number; group_bytes: number;
-  input_rate: number; output_rate: number; pricing_version: string; requests_per_minute: number;
+  input_rate: number; output_rate: number; pricing_version: string;
 };
 export type TranslationProvider = {
-  id: string; name: string; channel: string; enabled: boolean; is_default: boolean; is_title_default: boolean;
+  id: string; name: string; channel: string; enabled: boolean; text_weight: number; title_weight: number; requests_per_minute: number;
   revision_id: string; credential_configured: boolean; config: TranslationProviderConfig;
   created_at: string; updated_at: string;
 };
 export type TranslationChannel = {id: string; label: string; protocols: string[]};
 export type TranslationProviders = {items: TranslationProvider[]; channels: TranslationChannel[]};
 export type TranslationProviderInput = {
-  name: string; channel: 'openai'; enabled: boolean; config: TranslationProviderConfig; api_key?: string;
+  name: string; channel: 'openai'; enabled: boolean; text_weight: number; title_weight: number; requests_per_minute: number; config: TranslationProviderConfig; api_key?: string;
 };
 export type User = {id: string; name: string; role: string};
 export type Page<T> = {items: T[]; total: number; next_offset: number | null; generated_at: string};

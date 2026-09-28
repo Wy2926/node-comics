@@ -13,6 +13,13 @@ from test_translation_providers import (
     test_mid_page_rate_wait_releases_shared_slot,
     test_upstream_429_yields_with_durable_attempt_budget,
 )
+from test_provider_limits import (
+    test_body_and_title_share_upstream_budget,
+    test_parallel_body_and_title_cannot_overbook_supplier,
+    test_title_disabled_before_transport_reclaims_upstream_admission,
+    test_unknown_request_keeps_reservation_until_window_expires,
+    test_supplier_cleanup_does_not_change_other_supplier_window,
+)
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
     reason='Requires the dedicated nodecomics_concurrency_test database')

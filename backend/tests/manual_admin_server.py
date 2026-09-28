@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 directory = Path(tempfile.mkdtemp(prefix="nc-admin-ui-"))
 port = int(os.environ.get('ADMIN_FIXTURE_PORT', '18090'))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix()}",
+    REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE=directory.name,
     STORAGE_PATH=str(directory / "objects"), APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="admin-ui-isolated-signing-secret-0001",
     DEV_ADMIN_USERNAME="admin", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
     ADMIN_WEB_PATH="/console-test/",

@@ -10,6 +10,9 @@ import pytest
 from sqlalchemy import select
 from starlette.requests import ClientDisconnect
 
+from app import dispatcher, redis_state
+from admission_test_utils import milliseconds
+from types import SimpleNamespace
 from app import system_settings  # noqa: F401; schema registration precedes database fixtures.
 from test_upload_storage import pending, storage_db
 
@@ -42,10 +45,10 @@ def ingress_case(storage_db, png):
 
 
 def active_leases():
-    from app.db import session_factory
-    from app.upload_models import UploadIngressLease
-    with session_factory()() as db:
-        return db.scalars(select(UploadIngressLease)).all()
+    from app.models import now
+    return [SimpleNamespace(id=token, expires_at=redis_state.datetime_ms(deadline))
+        for token, deadline in redis_state.client().zrange(redis_state.key('upload-global'), 0, -1, withscores=True)
+        if deadline > milliseconds(now())]
 
 
 def configure_limits(**changes):
@@ -136,13 +139,12 @@ def test_expired_token_cannot_release_or_fail_replacement(ingress_case):
     from app.db import session_factory
     from app.models import now
     from app.upload_ingress import acquire_ingress, record_body_failure, release_ingress, renew_ingress
-    from app.upload_models import UploadIngressLease, UploadReservation
+    from app.upload_models import UploadReservation
     owner = ingress_case['owners'][0]
     upload_id = ingress_case['uploads'][owner][0]
     old = acquire_ingress(upload_id, owner)
-    with session_factory()() as db:
-        db.get(UploadIngressLease, old.id).expires_at = now() - timedelta(seconds=1)
-        db.commit()
+    redis_state.client().zadd(redis_state.key('upload-global'), {old.id: milliseconds(now() - timedelta(seconds=1))})
+    redis_state.client().zadd(redis_state.key('upload-user', owner), {old.id: milliseconds(now() - timedelta(seconds=1))})
     replacement = acquire_ingress(upload_id, owner)
     try:
         assert not renew_ingress(old)
@@ -154,6 +156,63 @@ def test_expired_token_cannot_release_or_fail_replacement(ingress_case):
             assert receipt.status == 'awaiting_upload' and receipt.error_code is None
     finally:
         release_ingress(replacement)
+
+
+def test_token_replaced_while_waiting_for_lock_cannot_fail_upload(ingress_case, monkeypatch):
+    from app import upload_ingress
+    from app.db import session_factory
+    from app.upload_models import UploadReservation
+    owner = ingress_case['owners'][0]
+    upload_id = ingress_case['uploads'][owner][0]
+    old = upload_ingress.acquire_ingress(upload_id, owner)
+    lock_current = upload_ingress._lock_current
+    replacements = []
+
+    def replace_before_lock(db, receipt):
+        # Another request takes over while this request waits for the database lock.
+        monkeypatch.setattr(upload_ingress, '_lock_current', lock_current)
+        redis_state.client().zadd(redis_state.key('upload-global'), {old.id: 0})
+        redis_state.client().zadd(redis_state.key('upload-user', owner), {old.id: 0})
+        replacements.append(upload_ingress.acquire_ingress(upload_id, owner))
+        return lock_current(db, receipt)
+
+    monkeypatch.setattr(upload_ingress, '_lock_current', replace_before_lock)
+    try:
+        upload_ingress.record_body_failure(old, HTTPException(422,
+            detail={'code': 'OLD_BAD_BODY', 'message': 'old generation'}))
+        with session_factory()() as db:
+            receipt = db.get(UploadReservation, upload_id)
+            assert receipt.status == 'awaiting_upload' and receipt.error_code is None
+        assert upload_ingress.persist_received_upload(replacements[0], ingress_case['data']) == {'status': 'verified'}
+    finally:
+        for lease in replacements:
+            upload_ingress.release_ingress(lease)
+
+
+@pytest.mark.parametrize('has_received_upload', [False, True])
+def test_redis_outage_does_not_block_upload_expiry(ingress_case, monkeypatch, has_received_upload):
+    from app.assets import inspect_image
+    from app.db import session_factory
+    from app.models import Job, now
+    from app.upload_models import UploadReservation
+    owner = ingress_case['owners'][0]
+    expired_id, received_id = ingress_case['uploads'][owner][:2]
+    with session_factory()() as db:
+        db.get(UploadReservation, expired_id).expires_at = now() - timedelta(seconds=1)
+        if has_received_upload:
+            db.get(UploadReservation, received_id).verified_info = inspect_image(ingress_case['data'])
+        db.commit()
+
+    def unavailable(*args, **kwargs):
+        raise redis_state.AdmissionUnavailable()
+    monkeypatch.setattr(redis_state, 'run', unavailable)
+    dispatcher.recover_once()
+
+    with session_factory()() as db:
+        receipt = db.get(UploadReservation, expired_id)
+        assert receipt.status == 'expired'
+        assert db.get(Job, receipt.job_id).status == 'failed'
+        assert db.get(UploadReservation, received_id).status == 'awaiting_upload'
 
 
 def test_waiting_body_releases_identity_connection_and_disconnect_releases_slot(ingress_case):
@@ -354,7 +413,6 @@ def test_settings_changes_only_affect_new_upload_timeout_and_renewal(ingress_cas
     from app.db import session_factory
     from app.models import now
     from app.upload_ingress import acquire_ingress, read_ingress_body, release_ingress, renew_ingress
-    from app.upload_models import UploadIngressLease
     owner = ingress_case['owners'][0]
     configure_limits(upload_idle_timeout_seconds=.5, upload_body_timeout_seconds=1.,
                      upload_ingress_lease_seconds=15)
@@ -367,8 +425,9 @@ def test_settings_changes_only_affect_new_upload_timeout_and_renewal(ingress_cas
         assert new.limits.upload_idle_timeout_seconds == .1
         assert renew_ingress(old) and renew_ingress(new)
         with session_factory()() as db:
-            assert 14 < (db.get(UploadIngressLease, old.id).expires_at - now()).total_seconds() <= 15
-            assert 29 < (db.get(UploadIngressLease, new.id).expires_at - now()).total_seconds() <= 30
+            deadlines = {row.id: row.expires_at for row in active_leases()}
+            assert 14 < (deadlines[old.id] - now()).total_seconds() <= 15
+            assert 29 < (deadlines[new.id] - now()).total_seconds() <= 30
 
         async def run():
             class DelayedRequest:

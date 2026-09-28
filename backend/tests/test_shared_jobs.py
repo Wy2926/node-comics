@@ -2,12 +2,13 @@
 from datetime import timedelta
 import pytest
 from sqlalchemy import func, select
+from admission_test_utils import window_count
 from conftest import create, login_plus as login, png_variant, run_job, upload, submit_asset, quota_usage, request_record, request_id
 from app.config import settings
 from app.db import session_factory
 from app.entitlement_models import QuotaPeriod
 from app.models import Asset, Job, Ledger, Provider, now
-from app.translation_requests import TranslationRequest, ImageAdmission
+from app.translation_requests import TranslationRequest
 from test_cluster_submissions import snapshot
 
 
@@ -178,7 +179,7 @@ def test_explicit_retry_only_accepts_failed_intent_and_new_uuid(client, png):
     assert client.put(route, headers=auth, json={'retry_of': original['id']}).json()['id'] == accepted.json()['id']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 2
-        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 2
+        assert window_count('image') == 2
 
 
 def test_failed_retranslation_does_not_hide_previous_result(client, png, monkeypatch):
@@ -219,4 +220,4 @@ def test_cancel_in_flight_cannot_start_duplicate_work_under_fresh_uuid(client, p
     assert request_record(client,auth,duplicate.json()['id']).job_id == job_id
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 1
-        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 1
+        assert window_count('image') == 1

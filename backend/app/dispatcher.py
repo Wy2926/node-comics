@@ -13,10 +13,10 @@ from .health import log_failure, probe_oidc, report_failure, report_progress
 from .jobs import cancel_job, settle
 from .models import Asset, Attempt, ClassicState, Job, Provider, now
 from .queue_models import ExecutionLease, JobStage
+from .redis_state import AdmissionUnavailable
 from .scheduler import lock_scheduler, release_lease, touch_job
 from .storage import get_store, StorageError
 from .uploads import expire_uploads, recover_received_uploads
-from .translation_limits import clean_admissions
 from .workers import fail_stage, finish_job
 
 def recover_lease(lease_id):
@@ -93,7 +93,11 @@ def recover_lease(lease_id):
 
 
 def recover_once():
-    recover_received_uploads()
+    try:
+        recover_received_uploads()
+    except AdmissionUnavailable as error:
+        # Upload recovery needs ingress state; SQL recovery and cleanup do not.
+        log_failure("upload-recovery", error)
     with session_factory()() as db:
         ids = list(db.scalars(select(ExecutionLease.id).where(ExecutionLease.completed_at.is_(None), ExecutionLease.expires_at <= now()).limit(100)))
     for lease_id in ids:
@@ -118,7 +122,6 @@ def recover_once():
             job.status, job.phase, job.completed_at = "unknown_released", "reconciliation_required", now()
             settle(db, job, success=False)
         expire_uploads(db)
-        clean_admissions(db)
         for job in db.scalars(select(Job).outerjoin(Provider, provider_join).where(Job.id.in_(disabled_ids), *disabled_filter)):
             finish_job(db, job, "failed", error=ProcessingError("PROVIDER_DISABLED", "图片服务已停用"))
         db.commit()

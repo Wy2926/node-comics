@@ -41,6 +41,7 @@ def run(env_file):
     for key in required:
         os.environ[key] = source[key]
     os.environ.update({"R2_KEY_PREFIX": test_prefix, "RESULT_STORAGE_BACKEND": "r2",
+        "REDIS_URL": os.environ.get("TEST_REDIS_URL", "redis://127.0.0.1:6379/0"), "REDIS_NAMESPACE": "r2-proof-" + uuid4().hex,
         "RETENTION_DAYS": "0",
         "APP_ENV": "test", "DEV_AUTH": "true", "DEV_AUTH_SECRET": uuid4().hex + uuid4().hex,
         "OPENAI_API_KEY": "isolated-smoke-placeholder-no-paid-access", "OPENAI_BASE_URL": "https://provider.invalid/v1",

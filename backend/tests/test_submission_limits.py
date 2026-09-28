@@ -6,6 +6,8 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 from conftest import login
+from admission_test_utils import window_count, state_keys, freeze_clock
+from app import redis_state
 from test_cluster_submissions import cluster, descriptor, submit
 from test_cluster_scheduler import scheduler_case
 from test_classic import text_database
@@ -14,7 +16,6 @@ from test_classic import text_database
 def test_replays_consume_control_tokens_but_not_image_budget(cluster,png):
     from app.config import settings
     from app.db import session_factory
-    from app.translation_requests import ControlAdmission, ImageAdmission
     client,_=cluster
     auth=login(client)
     settings().translation_request_burst=3
@@ -25,8 +26,8 @@ def test_replays_consume_control_tokens_but_not_image_budget(cluster,png):
         assert response.json()['error']['code']=='REQUEST_RATE_LIMITED'
         assert int(response.headers['Retry-After']) > 0
     with session_factory()() as db:
-        assert len(list(db.scalars(select(ImageAdmission))))==1
-        assert db.scalar(select(ControlAdmission)).leases==[]
+        assert window_count('image')==1
+        assert all(redis_state.client().zcard(key) == 0 for key in state_keys('control-leases'))
 
 
 def test_independent_sessions_enforce_same_account_concurrency(scheduler_case):
@@ -57,7 +58,7 @@ def test_expired_admission_lease_does_not_permanently_block_account(scheduler_ca
     settings().translation_request_concurrency=1
     first=translation_limits.acquire_control('free-user')
     later=now()+timedelta(seconds=settings().translation_request_lease_seconds+1)
-    monkeypatch.setattr(translation_limits,'now',lambda:later)
+    freeze_clock(monkeypatch, [later])
     following=translation_limits.acquire_control('free-user')
     assert following != first
     translation_limits.release_control('free-user',first)

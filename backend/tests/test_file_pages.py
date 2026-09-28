@@ -239,3 +239,73 @@ def test_classic_no_text_is_reusable_without_new_charge(client, png, monkeypatch
     result = match(client, auth, mode="classic").json()["items"][0]
     assert result["translations"][0]["result"]["kind"] == "no_text"
     assert quota_usage(client, auth)["used"] == 0
+
+
+@pytest.mark.parametrize('change', ['disable', 'revision'])
+def test_classic_batch_freezes_supplier_once_and_refreshes_next_request(client, png, monkeypatch, change):
+    from sqlalchemy import event, update
+    from app import file_pages
+    from app.config import settings
+    from app.db import engine, session_factory
+    from app.models import Asset, Job
+    from app.translation_models import TranslationProvider
+    from translation_fixtures import configure_text_provider
+
+    monkeypatch.setenv('CLASSIC_ENABLED', 'true')
+    settings.cache_clear()
+    auth = login(client)
+    source = bind(client, auth, png).json()['id']
+    job = create(client, auth, source, key='frozen-batch', mode='classic').json()
+    translation_id = request_for_job(client, auth, job['id'])
+    with session_factory()() as db:
+        saved = db.get(Job, job['id'])
+        provider_id = saved.config['text']['provider_id']
+        owner_id = db.get(Asset, source).owner_id
+        db.add_all(file_pages.FilePage(owner_id=owner_id, file_hash=FILE_HASH,
+            page_index=index, asset_id=source) for index in range(1, 100))
+        db.commit()
+        if change == 'revision':
+            provider = configure_text_provider(db, provider_id, model='next-batch-model')
+            next_revision = provider.revision_id
+            provider.revision_id = saved.config['text']['revision_id']
+            db.commit()
+
+    changed, reads = [], []
+    original_available = file_pages.available
+
+    def change_after_snapshot(asset):
+        if not changed:
+            changed.append(True)
+            # Simulate an administrator's commit after the batch read its pool.
+            values = {'enabled': False, 'text_weight': 0} if change == 'disable' else {'revision_id': next_revision}
+            with engine().begin() as connection:
+                connection.execute(update(TranslationProvider).where(
+                    TranslationProvider.id == provider_id).values(**values))
+        return original_available(asset)
+
+    def count_supplier_reads(_connection, _cursor, statement, _parameters, _context, _many):
+        sql = statement.lower()
+        if sql.lstrip().startswith('select') and 'from translation_providers' in sql:
+            reads.append(sql)
+
+    monkeypatch.setattr(file_pages, 'available', change_after_snapshot)
+    body = {'pages': [{'file_hash': FILE_HASH, 'page_index': index} for index in range(100)],
+            'mode': 'classic', 'target_language': 'zh-Hans', 'include_display': True}
+    event.listen(engine(), 'before_cursor_execute', count_supplier_reads)
+    try:
+        response = client.post('/v1/file-pages/match', headers=auth, json=body)
+    finally:
+        event.remove(engine(), 'before_cursor_execute', count_supplier_reads)
+    assert response.status_code == 200, response.text
+    assert changed and len(reads) == 1
+    pages = response.json()['items']
+    assert len(pages) == 100
+    assert all([row['id'] for row in page['translations']] == [translation_id] for page in pages)
+
+    # Only this batch is frozen. Later requests see the change while retaining
+    # access to already submitted translations through display recovery.
+    refreshed = client.post('/v1/file-pages/match', headers=auth, json=body)
+    assert refreshed.status_code == 200, refreshed.text
+    assert all(page['translations'] == [] and
+        [row['id'] for row in page['display_translations']] == [translation_id]
+        for page in refreshed.json()['items'])

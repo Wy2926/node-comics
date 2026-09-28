@@ -11,20 +11,22 @@ PRIVATE = 'PRIVATE_FIXTURE_MUST_NOT_LEAK'
 
 
 @pytest.fixture
-def operations(client):
+def operations(client, monkeypatch):
     from app.db import session_factory
     from app.models import Asset, Attempt, Job, TextCall, User, now
-    from app.translation_requests import ControlAdmission, ImageAdmission, TranslationRequest
-    from app.feedback_models import FeedbackAdmission
+    from app.translation_requests import TranslationRequest
+    from app import redis_state
+    from admission_test_utils import milliseconds, freeze_clock
     from app.results import ResultAccess, TranslationResult
     from app.file_pages import FilePage
-    from app.upload_models import UploadIngressLease, UploadReservation
+    from app.upload_models import UploadReservation
     from app.health_models import ServiceHeartbeat
     from app.billing_models import BillingEvent
     admin = login(client, 'admin')
     reader = login(client, 'reader')
     reused_reader = login(client, 'reused-reader')
     at = now().replace(microsecond=0)
+    freeze_clock(monkeypatch, [at])
     with session_factory()() as db:
         a = db.scalar(select(User).where(User.subject == 'dev:reader'))
         b = db.scalar(select(User).where(User.subject == 'dev:reused-reader'))
@@ -64,11 +66,6 @@ def operations(client):
                 descriptor={'source_url': f'https://private.example/page?token={PRIVATE}'}),
             TranslationRequest(owner_id=b.id, id='22222222-2222-4222-8222-222222222222', request_hash='y' * 64, access_id=access.id),
             FilePage(owner_id=a.id, file_hash='f' * 64, page_index=1, asset_id=source.id),
-            ControlAdmission(owner_id=a.id, scope='translation', tokens=2.5, refilled_at=at,
-                leases=[{'id': PRIVATE, 'until': (at + timedelta(seconds=30)).isoformat()}, {'id': PRIVATE, 'until': (at - timedelta(seconds=30)).isoformat()}]),
-            FeedbackAdmission(owner_id=a.id, request_tokens=4, refilled_at=at, day_started_at=at.replace(hour=0), daily_receipts=3),
-            ImageAdmission(owner_id=a.id, job_id=done.id, admitted_at=at - timedelta(seconds=10)),
-            ImageAdmission(owner_id=a.id, job_id=waiting.id, admitted_at=at - timedelta(seconds=65)),
             ServiceHeartbeat(role='control-worker', instance_id='good-worker', heartbeat_at=at, last_success_at=at),
             ServiceHeartbeat(role='maintenance', instance_id='stale-maintenance', heartbeat_at=at - timedelta(hours=1), last_success_at=at - timedelta(hours=1)),
             BillingEvent(id='pending-payment', environment='test', provider='creem', event_type='order.paid', resource_id='order-test',
@@ -79,7 +76,15 @@ def operations(client):
                 expected_size=500, mime='image/png', storage_backend='r2', status=status, expires_at=at + timedelta(seconds=40),
                 max_expires_at=at + timedelta(minutes=10), verified_info={'private': PRIVATE}))
         db.flush()
-        db.add(UploadIngressLease(upload_id='upload-waiting', owner_id=a.id, expires_at=at + timedelta(seconds=30)))
+        client_state = redis_state.client()
+        client_state.hset(redis_state.key('control', a.id + ':translation'), mapping={'tokens': 2.5, 'at': milliseconds(at)})
+        client_state.zadd(redis_state.key('control-leases', a.id + ':translation'), {PRIVATE: milliseconds(at) + 30000, 'expired': milliseconds(at) - 30000})
+        client_state.hset(redis_state.key('feedback', a.id), mapping={'tokens': 4, 'at': milliseconds(at),
+            'day': milliseconds(at.replace(hour=0, minute=0, second=0)), 'receipts': 3})
+        client_state.zadd(redis_state.key('image', a.id), {done.id: milliseconds(at) - 10000, waiting.id: milliseconds(at) - 65000})
+        client_state.set(redis_state.key('upload-token', 'upload-waiting'), PRIVATE, ex=30)
+        client_state.zadd(redis_state.key('upload-global'), {PRIVATE: milliseconds(at) + 30000})
+        client_state.zadd(redis_state.key('upload-user', a.id), {PRIVATE: milliseconds(at) + 30000})
         attempt = Attempt(job_id=done.id, provider_id='text-a', lease_expires_at=at)
         db.add(attempt); db.flush()
         for index, (provider, model, state, cost, error) in enumerate([

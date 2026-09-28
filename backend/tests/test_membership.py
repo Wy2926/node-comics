@@ -1,3 +1,4 @@
+from admission_test_utils import window_count
 from conftest import configure_system_limits
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
@@ -61,11 +62,11 @@ def test_free_cannot_create_redraw_operation_or_consume_rate(client, png):
     assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
     from app.db import session_factory
     from app.models import Job
-    from app.translation_requests import TranslationRequest, ImageAdmission
+    from app.translation_requests import TranslationRequest
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 0
         assert db.scalar(select(func.count()).select_from(TranslationRequest)) == 0
-        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 0
+        assert window_count('image') == 0
 
 
 def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):

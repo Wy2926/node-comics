@@ -1,7 +1,8 @@
-"""Isolated real API/worker UI fixture. No production env file, Redis or external AI calls.
+"""Isolated API/worker UI fixture. No production env file or external AI calls.
 
 Run: .venv/Scripts/python.exe tests/manual_ui_server.py
 Connect the reader at http://localhost:5173 to http://127.0.0.1:18089.
+Requires Redis 8 (TEST_REDIS_URL or localhost:6379), with a fresh private namespace.
 Only the supplier adapter is synthetic; jobs, receipts, storage and accounting are real.
 """
 from concurrent.futures import ThreadPoolExecutor
@@ -23,6 +24,7 @@ fixture_root.mkdir(parents=True, exist_ok=True)
 directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-", dir=fixture_root))
 port = int(os.environ.get("READER_FIXTURE_PORT", "18089"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
+    REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE=directory.name,
     APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="30", PLUS_MONTHLY_REDRAW_PAGES="300", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="", CLASSIC_ENABLED="false",
     OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
     CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5176")

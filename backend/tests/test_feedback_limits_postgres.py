@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import func, select
 from test_postgres_concurrency import pg_scope, pytestmark
 from test_feedback_limits import seed_feedback_job
+from admission_test_utils import feedback_state, state_keys, freeze_clock
 from conftest import configure_system_limits
 
 
@@ -17,7 +18,7 @@ def feedback_database(pg_scope, png, monkeypatch):
     from app.models import User, now
     initialize()
     stamp = now()
-    monkeypatch.setattr(feedback_limits, "now", lambda: stamp)
+    freeze_clock(monkeypatch, [stamp])
     with session_factory()() as db:
         db.add_all([User(id="feedback-owner", subject="isolated:feedback", name="Owner"),
                     User(id="other-owner", subject="isolated:other", name="Other")])
@@ -52,7 +53,6 @@ def race_feedback(job_id, keys, comments=None):
 def test_independent_sessions_share_feedback_limits(feedback_database, budget, expected_error):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     from app.reader_api import Feedback, FeedbackRequest, submit_feedback
     configure_system_limits(**{"feedback_request_burst": 20, budget: 3})
     job_id, other_job = feedback_database
@@ -61,8 +61,8 @@ def test_independent_sessions_share_feedback_limits(feedback_database, budget, e
     assert [code for status, code in results if status != 201] == [expected_error] * 5
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Feedback)) == 3
-        assert db.scalar(select(func.count()).select_from(FeedbackAdmission)) == 1
-        assert db.get(FeedbackAdmission, "feedback-owner").daily_receipts == 3
+        assert len(state_keys('feedback')) == 1
+        assert feedback_state("feedback-owner").daily_receipts == 3
         result = submit_feedback(other_job, FeedbackRequest(issues=["meaning"]), "other",
                                  SimpleNamespace(id="other-owner"), db)
         assert result["translation_id"] == other_job
@@ -71,7 +71,6 @@ def test_independent_sessions_share_feedback_limits(feedback_database, budget, e
 def test_concurrent_replay_creates_exactly_one_receipt(feedback_database):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     from app.reader_api import Feedback
     configure_system_limits(feedback_request_burst=1, feedback_receipts_per_day=1)
     results = race_feedback(feedback_database[0], ["shared-key"] * 8)
@@ -79,7 +78,7 @@ def test_concurrent_replay_creates_exactly_one_receipt(feedback_database):
     assert len({receipt_id for _, receipt_id in results}) == 1
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Feedback)) == 1
-        row = db.get(FeedbackAdmission, "feedback-owner")
+        row = feedback_state("feedback-owner")
         assert row.daily_receipts == 1 and row.request_tokens == 0
 
 

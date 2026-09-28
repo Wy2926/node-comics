@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
+    command: [redis-server, --save, "", --appendonly, "no"]
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 1s
+      timeout: 3s
+      retries: 30
   postgres:
     image: postgres:17.6-alpine
     environment:
@@ -23,9 +32,12 @@ services:
       TEST_PG_USER: nodecomics
       TEST_PG_PASSWORD: isolated-test-only
       TEST_PG_DATABASE: nodecomics_concurrency_test
+      TEST_REDIS_URL: redis://redis:6379/0
     volumes:
       - ../scripts:/scripts:ro
       - ../services/classic-engine:/services/classic-engine:ro
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy

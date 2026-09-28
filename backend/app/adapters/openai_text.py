@@ -15,6 +15,7 @@ from .llm import LLMConfig, Message, TextError, TextResponse
 class OpenAITextConfig(LLMConfig):
     base_url: str = Field(default='https://api.openai.com/v1', max_length=1000)
     protocol: Literal['chat_completions', 'responses'] = 'chat_completions'
+    reasoning_effort: Literal['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'provider_default'] = 'none'
     user_agent: str = Field(default='NodeComics/0.1', min_length=1, max_length=200)
 
     @field_validator('base_url')
@@ -41,6 +42,14 @@ def call_messages(messages: list[Message], profile: dict, api_key: str) -> TextR
         payload.update(messages=messages, max_completion_tokens=profile["max_output_tokens"])
     else:
         payload.update(input=messages, max_output_tokens=profile["max_output_tokens"])
+    # Previously saved revisions omit this setting; keep their original request
+    # behavior until the administrator saves a new immutable revision.
+    effort = profile.get('reasoning_effort', 'provider_default')
+    if effort != 'provider_default':
+        if chat:
+            payload['reasoning_effort'] = effort
+        else:
+            payload['reasoning'] = {'effort': effort}
     endpoint = profile["base_url"] + ("/chat/completions" if chat else "/responses")
     headers = {"Authorization": "Bearer " + api_key, "User-Agent": profile["user_agent"]}
     try:

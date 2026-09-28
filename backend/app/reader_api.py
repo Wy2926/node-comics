@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header, Query
 from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
 from sqlalchemy import CheckConstraint, ForeignKey, ForeignKeyConstraint, Index, JSON, String, UniqueConstraint, and_, cast, exists, func, literal, or_, select, union_all, update
 from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
+from sqlalchemy.exc import IntegrityError
 
 from .auth import admin, identity
 from .db import Base, get_db
@@ -21,7 +22,7 @@ from .results import ReaderEntry
 from .system_settings import get_request_limits
 from .schemas import JobResponse
 from .providers import digest
-from .feedback_limits import lock_feedback_admission, reserve_feedback_receipt
+from .feedback_limits import reserve_feedback_receipt
 from .feedback_review_models import FeedbackReview
 
 router = APIRouter(tags=["Reader"])
@@ -114,11 +115,7 @@ def submit_feedback(translation_id: UUID, body: FeedbackRequest,
                     user: User = Depends(identity), db: Session = Depends(get_db)):
     key = idem_key(idempotency_key)
     owner_id = user.id
-    # End the identity read transaction before taking the account admission lock.
-    # One connection then covers the receipt check, budget and feedback insert.
-    db.rollback()
     limits = get_request_limits(db)
-    admission = lock_feedback_admission(db, owner_id, limits=limits)
     from .translation_api import owned_translation, unavailable
     from .results import get_entry
     receipt = owned_translation(db, owner_id, translation_id)
@@ -141,12 +138,21 @@ def submit_feedback(translation_id: UUID, body: FeedbackRequest,
         result = feedback_json(previous)
         db.commit()
         return result
-    reserve_feedback_receipt(db, admission, limits=limits)
+    reserve_feedback_receipt(db, owner_id, key, limits=limits)
     row = Feedback(owner_id=owner_id, translation_id=str(translation_id), job_id=job_id if isinstance(job, Job) else None,
                    access_id=None if isinstance(job, Job) else job_id, output_asset_id=job.output_asset_id,
                    issues=body.issues, comment=body.comment, idempotency_key=key, request_hash=request_hash)
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        previous = db.scalar(select(Feedback).where(Feedback.owner_id == owner_id, Feedback.idempotency_key == key))
+        if previous:
+            if previous.request_hash != request_hash:
+                problem("IDEMPOTENCY_CONFLICT", "此反馈编号已用于其他内容", 409)
+            return feedback_json(previous)
+        raise
     return feedback_json(row)
 
 

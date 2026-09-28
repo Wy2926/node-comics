@@ -2,6 +2,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import json
 import pytest
+from admission_test_utils import milliseconds, window_count, state_keys
+from app import redis_state
 from conftest import login
 from app import comic_titles, comic_title_limits
 from app.adapters.llm import TextResponse, TextError
@@ -57,7 +59,7 @@ def test_invalid_language(client, model, code):
 
 def test_rolling_limit_isolation_and_recovery(client, model, monkeypatch):
     at = datetime(2026, 1, 1)
-    monkeypatch.setattr(comic_title_limits, 'server_now', lambda db: at)
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: milliseconds(at))
     auth = login(client)
     for _ in range(30):
         assert client.post(URL, headers=auth, json=BODY).status_code == 200
@@ -83,9 +85,8 @@ def test_concurrent_admissions_are_bounded(client, model):
 
 def test_diagnostics_separate_completed_title_requests_from_active_leases(client, model, monkeypatch):
     from app.db import session_factory
-    from app.translation_requests import ControlAdmission
     at = datetime(2026, 1, 1)
-    monkeypatch.setattr(comic_title_limits, 'server_now', lambda db: at)
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: milliseconds(at))
     auth, admin = login(client), login(client, 'admin')
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     path = '/v1/admin/operations/users/' + owner
@@ -95,16 +96,16 @@ def test_diagnostics_separate_completed_title_requests_from_active_leases(client
     response = client.get(path, headers=admin)
     assert response.status_code == 200
     data = response.json()
-    assert data['controls'] == []
+    assert data['controls'][0]['active_leases'] == 0
     assert data['comic_title_budget'] == {'window_seconds': 60, 'limit': 30, 'used': 3,
         'remaining': 27, 'retry_after_seconds': 0, 'last_request_at': '2026-01-01T00:00:02Z'}
     assert 'request_times' not in response.text
     with session_factory()() as db:
-        assert db.get(ControlAdmission, (owner, 'comic_title')) is None
+        assert not redis_state.client().exists(redis_state.key('control', owner + ':comic_title'))
     at += timedelta(seconds=60)
     cleared = client.get(path, headers=admin).json()['comic_title_budget']
     assert cleared['used'] == 0 and cleared['remaining'] == 30
-    assert cleared['last_request_at'] == '2026-01-01T00:00:02Z'
+    assert cleared['last_request_at'] is None
 
 
 @pytest.mark.parametrize('failure', ['transport', 'malformed'])
@@ -173,7 +174,7 @@ def test_missing_title_provider_never_falls_back_to_body(client, model, state):
     from app.db import session_factory
     from app.translation_models import TranslationProvider
     with session_factory()() as db:
-        db.execute(update(TranslationProvider).values(**({'enabled': False} if state == 'disabled' else {'is_title_default': False})))
+        db.execute(update(TranslationProvider).values(**({'enabled': False} if state == 'disabled' else {'title_weight': 0})))
         db.commit()
     response = client.post(URL, headers=login(client), json=BODY)
     assert response.status_code == 503 and '漫画名' in response.text
@@ -203,7 +204,6 @@ def test_slow_queries_have_bounded_capacity_and_leave_api_responsive(client, mon
     from sqlalchemy import func, select
     from app.comic_title_cache import TitleRecord
     from app.db import session_factory
-    from app.comic_title_limits import TitleAdmission
     entered, release, lock = threading.Event(), threading.Event(), threading.Lock()
     calls = []
     auths = [login(client, 'reader-a'), login(client, 'reader-b')]
@@ -237,7 +237,7 @@ def test_slow_queries_have_bounded_capacity_and_leave_api_responsive(client, mon
             assert pool.submit(client.get, '/v1/me', headers=auths[0]).result(timeout=2).status_code == 200
             with session_factory()() as db:
                 assert db.scalar(select(func.count()).select_from(TitleRecord)) == comic_titles.EXECUTION_SLOTS
-                counts = [len(row.request_times) for row in db.scalars(select(TitleAdmission))]
+                counts = [redis_state.client().zcard(key) for key in state_keys('title')]
                 assert sorted(counts) == [4, 4]  # Overload rejection does not consume account rate budget.
         finally:
             release.set()

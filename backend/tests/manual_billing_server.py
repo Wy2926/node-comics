@@ -16,6 +16,7 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 directory = Path(tempfile.mkdtemp(prefix='nc-billing-ui-'))
 os.environ.update(APP_ENV='test', DEV_AUTH='true', DEV_ADMIN_USERNAME='admin',
+    REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE=directory.name,
     DEV_AUTH_SECRET='isolated-billing-ui-secret-never-used-in-production',
     DATABASE_URL=f'sqlite:///{directory / "billing.db"}', STORAGE_PATH=str(directory / 'objects'),
     RESULT_STORAGE_BACKEND='local', STRIPE_ENABLED='true', STRIPE_ENVIRONMENT='test',

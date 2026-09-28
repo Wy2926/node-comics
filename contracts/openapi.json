@@ -388,7 +388,7 @@
           "comic-titles"
         ],
         "summary": "Translate Title",
-        "description": "共享持久缓存支持输入名、输出别名和跨语言复用，仅记录生成结果的用户 ID；无合适名称的 null 结果按目标语言缓存。未命中才调用独立选择的漫画名 LLM。不扣页数额度，无每日或累计次数限制，命中缓存与模型失败均计入每用户限速。",
+        "description": "共享持久缓存支持输入名、输出别名和跨语言复用，仅记录生成结果的用户 ID；无合适名称的 null 结果按目标语言缓存。未命中才按漫画名权重分流到 LLM。不扣页数额度，无每日或累计次数限制，命中缓存与模型失败均计入每用户限速。",
         "operationId": "translate_title_v1_comic_titles_translate_post",
         "requestBody": {
           "content": {
@@ -421,7 +421,7 @@
             "description": "模型调用失败或返回无效译文"
           },
           "503": {
-            "description": "查询容量已满、缓存查询正在进行、执行租约失效或未配置可用的漫画名供应商"
+            "description": "查询容量已满、供应商上游额度已满、缓存查询正在进行、执行租约失效或未配置可用的漫画名供应商"
           },
           "422": {
             "description": "Validation Error",
@@ -537,7 +537,7 @@
             "description": "Invalid event envelope"
           },
           "429": {
-            "description": "Process-local rate limit exceeded; see Retry-After"
+            "description": "Shared Redis rate limit exceeded; see Retry-After"
           }
         },
         "security": []
@@ -5429,96 +5429,6 @@
         }
       }
     },
-    "/v1/admin/translation-providers/{provider_id}/default": {
-      "post": {
-        "tags": [
-          "translation-providers"
-        ],
-        "summary": "Default Provider",
-        "operationId": "default_provider_v1_admin_translation_providers__provider_id__default_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/translation-providers/{provider_id}/title-default": {
-      "post": {
-        "tags": [
-          "translation-providers"
-        ],
-        "summary": "Title Default Provider",
-        "operationId": "title_default_provider_v1_admin_translation_providers__provider_id__title_default_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/admin/translation-providers/{provider_id}/revisions": {
       "get": {
         "tags": [
@@ -8999,6 +8909,27 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "text_weight": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Text Weight",
+            "default": 1
+          },
+          "title_weight": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Title Weight",
+            "default": 1
+          },
+          "requests_per_minute": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Requests Per Minute",
+            "default": 60
           },
           "config": {
             "additionalProperties": true,

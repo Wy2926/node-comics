@@ -1,3 +1,4 @@
+from admission_test_utils import window_count
 from conftest import inspect_job
 """Sharing creates caller-owned authorizations, never synthetic computation jobs."""
 from datetime import timedelta
@@ -23,7 +24,7 @@ def completed(client, png, monkeypatch):
 def test_cache_grants_do_not_create_jobs_stages_billing_or_duplicate_assets(client, png, monkeypatch):
     from app.db import session_factory
     from app.models import Asset, Job, Ledger
-    from app.translation_requests import ImageAdmission, TranslationRequest
+    from app.translation_requests import TranslationRequest
     from app.results import ResultAccess, TranslationResult
     from app.queue_models import JobStage
     _, original = completed(client, png, monkeypatch)
@@ -39,9 +40,10 @@ def test_cache_grants_do_not_create_jobs_stages_billing_or_duplicate_assets(clie
         assert client.get('/v1/me/usage', headers=auth).json()['items'] == []
     with session_factory()() as db:
         counts = {model.__name__: db.scalar(select(func.count()).select_from(model))
-                  for model in (Job, JobStage, TranslationResult, ResultAccess, Asset, ImageAdmission, Ledger, TranslationRequest)}
+                  for model in (Job, JobStage, TranslationResult, ResultAccess, Asset, Ledger, TranslationRequest)}
+        assert window_count('image') == 1
         assert counts == {'Job': 1, 'JobStage': 1, 'TranslationResult': 1, 'ResultAccess': 8,
-                          'Asset': 18, 'ImageAdmission': 1, 'Ledger': 2, 'TranslationRequest': 17}
+                          'Asset': 18, 'Ledger': 2, 'TranslationRequest': 17}
 
 
 def test_shared_result_supports_file_mapping_feedback_and_regeneration(client, png, monkeypatch):

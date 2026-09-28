@@ -301,7 +301,8 @@ def retry_event(event_id: str, body: RetryEventRequest, actor: User = Depends(ad
     at = now()
     if event.status == 'processed' or event.status == 'processing' and event.next_attempt_at > at:
         problem('BILLING_EVENT_NOT_RETRYABLE', '事件已处理或仍在处理，不能重复入队', 409)
-    if event.last_retry_at and event.last_retry_at > at - timedelta(minutes=1):
+    from .redis_state import window
+    if window('billing-retry', event.id, 1, member=actor.id + ':' + body.operation_key)['retry_after_seconds']:
         problem('BILLING_EVENT_RETRY_COOLDOWN', '一分钟内只能手动重试一次', 409)
     before = event_json(event)
     event.status, event.next_attempt_at = 'pending', at

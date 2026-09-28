@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import logging
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field, SecretStr, field_validator, model_validator
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, undefer
 from .adapters.llm import TextError
@@ -19,15 +19,28 @@ from .translation_channels import CHANNELS
 from .translation_models import TranslationProvider, TranslationProviderRevision
 
 router = APIRouter(prefix='/v1/admin/translation-providers', tags=['translation-providers'])
-DEFAULT_FLAGS = {'text': TranslationProvider.is_default, 'comic_title': TranslationProvider.is_title_default}
+PURPOSE_WEIGHTS = {'text': TranslationProvider.text_weight, 'comic_title': TranslationProvider.title_weight}
 
 
 class ProviderWrite(RequestBody):
     name: str = Field(min_length=1, max_length=100)
     channel: str = Field(min_length=1, max_length=40)
     enabled: bool = Field(default=True, strict=True)
+    text_weight: int = Field(default=1, ge=0, le=10000, strict=True)
+    title_weight: int = Field(default=1, ge=0, le=10000, strict=True)
+    requests_per_minute: int = Field(default=60, ge=1, le=10000, strict=True)
     config: dict
     api_key: SecretStr | None = Field(default=None, exclude=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def separate_legacy_limit(cls, value):
+        # Accept an old admin form without storing its upstream limit in a revision.
+        if isinstance(value, dict) and isinstance(value.get('config'), dict) and 'requests_per_minute' in value['config']:
+            config = dict(value['config'])
+            limit = config.pop('requests_per_minute')
+            return {**value, 'requests_per_minute': value.get('requests_per_minute', limit), 'config': config}
+        return value
 
     @field_validator('name')
     @classmethod
@@ -64,27 +77,44 @@ class ProviderToggle(RequestBody):
 def provider_json(db, provider):
     revision = db.get(TranslationProviderRevision, provider.revision_id)
     return {'id': provider.id, 'name': provider.name, 'channel': provider.channel,
-            'enabled': provider.enabled, 'is_default': provider.is_default,
-            'is_title_default': provider.is_title_default,
+            'enabled': provider.enabled, 'text_weight': provider.text_weight,
+            'title_weight': provider.title_weight,
+            'requests_per_minute': provider.requests_per_minute,
             'revision_id': provider.revision_id, 'credential_configured': revision is not None,
-            'config': revision.config if revision else {},
+            'config': {key: value for key, value in revision.config.items() if key != 'requests_per_minute'} if revision else {},
             'created_at': provider.created_at.isoformat() + 'Z',
             'updated_at': provider.updated_at.isoformat() + 'Z'}
 
 
-def selected_provider(db, provider_id=None, *, purpose='text'):
-    query = select(TranslationProvider).where(TranslationProvider.enabled.is_(True))
-    query = query.where(TranslationProvider.id == provider_id) if provider_id else query.where(DEFAULT_FLAGS[purpose].is_(True))
-    return db.scalar(query)
+def _provider_query(provider_id=None, *, purpose='text'):
+    weight = PURPOSE_WEIGHTS[purpose]
+    query = select(TranslationProvider.id, weight.label('weight'),
+        TranslationProviderRevision.id.label('revision_id'), TranslationProviderRevision.channel,
+        TranslationProviderRevision.config).join(TranslationProviderRevision,
+            TranslationProviderRevision.id == TranslationProvider.revision_id).where(
+        TranslationProvider.enabled.is_(True), TranslationProviderRevision.channel.in_(CHANNELS))
+    return query.where(TranslationProvider.id == provider_id) if provider_id else query.where(weight > 0)
 
 
-def provider_profile(db, provider_id=None, *, purpose='text'):
-    provider = selected_provider(db, provider_id, purpose=purpose)
-    revision = db.get(TranslationProviderRevision, provider.revision_id) if provider else None
-    if not revision or revision.channel not in CHANNELS:
+def has_provider(db, *, purpose='text'):
+    return db.scalar(_provider_query(purpose=purpose).limit(1)) is not None
+
+
+def provider_resolver(db, provider_id=None, *, purpose='text'):
+    """Freeze this request's eligible weights and secret-free revisions in one read."""
+    from .translation_routing import choose_provider
+    candidates = db.execute(_provider_query(provider_id, purpose=purpose)).all()
+    if not candidates:
         label = '漫画名' if purpose == 'comic_title' else '正文'
-        problem('TRANSLATION_PROVIDER_UNAVAILABLE', f'请在管理后台选择并启用{label}默认供应商', 503)
-    return {'provider_id': provider.id, 'revision_id': revision.id, 'channel': revision.channel, **revision.config}
+        problem('TRANSLATION_PROVIDER_UNAVAILABLE', f'请在管理后台启用至少一个{label}权重大于 0 的供应商', 503)
+    weights = {row.id: 1 if provider_id else row.weight for row in candidates}
+    profiles = {row.id: {'provider_id': row.id, 'revision_id': row.revision_id,
+                        'channel': row.channel, **row.config} for row in candidates}
+    return lambda routing_key='': profiles[choose_provider(weights, routing_key)]
+
+
+def provider_profile(db, provider_id=None, *, purpose='text', routing_key=''):
+    return provider_resolver(db, provider_id, purpose=purpose)(routing_key)
 
 
 def require_enabled(db, profile):
@@ -115,21 +145,23 @@ def write_provider(db, body, provider=None):
         problem('TRANSLATION_KEY_REQUIRED', '创建翻译供应商时必须填写 API Key', 422)
     key = body.api_key.get_secret_value() if body.api_key is not None else previous.api_key
     if provider is None:
-        first = db.scalar(select(TranslationProvider.id).limit(1)) is None
         provider = TranslationProvider(id=uid(), name=body.name, channel=body.channel,
-                                       enabled=body.enabled, is_default=first)
+                                       enabled=body.enabled, text_weight=body.text_weight)
         db.add(provider)
         db.flush()
     elif body.channel != provider.channel:
         problem('TRANSLATION_CHANNEL_IMMUTABLE', '更换渠道请新建供应商', 422)
-    if previous is None or previous.config != body.config or previous.api_key != key:
+    previous_config = {key: value for key, value in previous.config.items() if key != 'requests_per_minute'} if previous else None
+    if previous is None or previous_config != body.config or previous.api_key != key:
         revision = TranslationProviderRevision(id=uid(), provider_id=provider.id, channel=body.channel,
                                                 config=body.config, api_key=key)
         db.add(revision)
         db.flush()
         provider.revision_id = revision.id
     provider.name, provider.enabled = body.name, body.enabled
-    provider.requests_per_minute = body.config['requests_per_minute']
+    provider.text_weight = body.text_weight
+    provider.title_weight = body.title_weight
+    provider.requests_per_minute = body.requests_per_minute
     provider.updated_at = now()
     db.flush()
     return provider
@@ -190,32 +222,6 @@ def toggle_provider(provider_id: str, body: ProviderToggle, user: User = Depends
         provider.enabled, provider.updated_at = body.enabled, now()
         record_audit(db, user.id, 'text_provider.toggle', 'translation_provider', provider.id,
                      before=before, after={'enabled': provider.enabled})
-    return provider_json(db, provider)
-
-
-@router.post('/{provider_id}/default')
-def default_provider(provider_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
-    return set_default_provider(db, provider_id, user.id, purpose='text')
-
-
-@router.post('/{provider_id}/title-default')
-def title_default_provider(provider_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
-    return set_default_provider(db, provider_id, user.id, purpose='comic_title')
-
-
-def set_default_provider(db, provider_id, user_id, *, purpose):
-    flag = DEFAULT_FLAGS[purpose]
-    with provider_transaction(db):
-        provider = get_provider(db, provider_id)
-        if not provider.enabled:
-            problem('TRANSLATION_PROVIDER_DISABLED', '请先启用此供应商', 409)
-        previous = db.scalar(select(TranslationProvider.id).where(flag.is_(True)))
-        db.execute(update(TranslationProvider).where(flag.is_(True)).values({flag.key: False, 'updated_at': now()}))
-        setattr(provider, flag.key, True)
-        provider.updated_at = now()
-        action = 'text_provider.title_default' if purpose == 'comic_title' else 'text_provider.default'
-        record_audit(db, user_id, action, 'translation_provider', provider.id,
-                     before={'default_provider': previous}, after={'default_provider': provider.id})
     return provider_json(db, provider)
 
 

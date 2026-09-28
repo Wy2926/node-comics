@@ -4,6 +4,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import func, select
 from conftest import login
+from admission_test_utils import support_count, freeze_clock
 
 
 def submit(client, key=None, **values):
@@ -13,7 +14,7 @@ def submit(client, key=None, **values):
 
 def test_anonymous_submit_replay_and_admin_visibility(client):
     from app.db import session_factory
-    from app.support_requests import SupportRequest, SupportRequestAdmission
+    from app.support_requests import SupportRequest
     key = str(uuid4())
     first = submit(client, key)
     assert first.status_code == 201
@@ -29,7 +30,7 @@ def test_anonymous_submit_replay_and_admin_visibility(client):
     assert 'idempotency_key' not in page['items'][0]
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(SupportRequest)) == 1
-        assert db.scalar(select(SupportRequestAdmission)).day_count == 1
+        assert support_count() == 1
 
 
 @pytest.mark.parametrize('url', ['javascript:alert(1)', 'file:///a', 'https://user:pass@comics.example/',
@@ -50,7 +51,7 @@ def test_validation_and_body_bound(client):
 def test_rate_limits_replay_and_refill(client, monkeypatch):
     from app import support_requests
     clock = [support_requests.now()]
-    monkeypatch.setattr(support_requests, 'now', lambda: clock[0])
+    freeze_clock(monkeypatch, clock)
     key = str(uuid4())
     assert submit(client, key).status_code == 201
     for _ in range(4):
@@ -99,7 +100,7 @@ def test_plugin_feedback_contact_and_kind_isolation(client):
 def test_concurrent_replays_create_one_receipt(client):
     from concurrent.futures import ThreadPoolExecutor
     from app.db import session_factory
-    from app.support_requests import SupportRequest, SupportRequestAdmission
+    from app.support_requests import SupportRequest
     key = str(uuid4())
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(lambda _: submit(client, key), range(4)))
@@ -107,4 +108,4 @@ def test_concurrent_replays_create_one_receipt(client):
     assert len({result.json()['id'] for result in results}) == 1
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(SupportRequest)) == 1
-        assert db.scalar(select(SupportRequestAdmission)).day_count == 1
+        assert support_count() == 1

@@ -194,10 +194,10 @@ def test_default_pool_concurrent_claims_do_not_checkout_nested_connections(sched
     synchronized = Barrier(15)
     original = scheduler._preselect
 
-    def preselect(db, node, stages):
+    def preselect(db, node, stages, blocked=()):
         # Every claimant already holds its initial node-query connection.
         synchronized.wait(timeout=10)
-        return original(db, node, stages)
+        return original(db, node, stages, blocked)
 
     monkeypatch.setattr(scheduler, '_preselect', preselect)
     with ThreadPoolExecutor(max_workers=15) as executor:
@@ -313,8 +313,8 @@ def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(schedul
     from app.queue_models import UserModeQueue
     job_id = add_job(scheduler_case)
     original = scheduler._preselect
-    def changed(db, node, stages):
-        result = original(db, node, stages)
+    def changed(db, node, stages, blocked=()):
+        result = original(db, node, stages, blocked)
         assert result
         with session_factory()() as writer:
             if mutation == 'delete_source':
@@ -336,8 +336,8 @@ def test_realtime_reorder_between_snapshot_and_lock_retries_fresh_election(sched
     add_job(scheduler_case)
     promoted = add_job(scheduler_case)
     original = scheduler._preselect
-    def changed(db, node, stages):
-        result = original(db, node, stages)
+    def changed(db, node, stages, blocked=()):
+        result = original(db, node, stages, blocked)
         with session_factory()() as writer:
             writer.add(UserModeQueue(owner_id='free-user', mode='classic', version=1))
             job = writer.get(Job, promoted)
@@ -411,8 +411,8 @@ def test_provider_capacity_is_rechecked_after_snapshot(scheduler_case, monkeypat
         node.capabilities, node.engine_version = ['redraw'], 'control'
         db.commit()
     original = scheduler._preselect
-    def changed(db, node, stages):
-        result = original(db, node, stages)
+    def changed(db, node, stages, blocked=()):
+        result = original(db, node, stages, blocked)
         assert result
         with session_factory()() as writer:
             if mutation == 'disabled':

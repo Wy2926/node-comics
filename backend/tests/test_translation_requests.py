@@ -5,6 +5,8 @@ from threading import Barrier
 from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
+from admission_test_utils import window_count, window_members, state_keys, freeze_clock, milliseconds
+from app import redis_state
 from conftest import configure_system_limits, login, login_plus, submit_asset, upload, request_id, request_record
 from test_cluster_submissions import cluster, descriptor, grant_redraw, manifest, snapshot, submit
 
@@ -12,11 +14,11 @@ from test_cluster_submissions import cluster, descriptor, grant_redraw, manifest
 def counts():
     from app.db import session_factory
     from app.models import Job, Ledger
-    from app.translation_requests import ImageAdmission, TranslationRequest
+    from app.translation_requests import TranslationRequest
     from app.upload_models import UploadReservation
     with session_factory()() as db:
         return {model.__name__: db.scalar(select(func.count()).select_from(model))
-                for model in (Job, Ledger, ImageAdmission, TranslationRequest, UploadReservation)}
+                for model in (Job, Ledger, TranslationRequest, UploadReservation)} | {'ImageAdmission': window_count('image')}
 
 
 def high_control_budget():
@@ -36,7 +38,7 @@ def test_exact_rolling_limit_combines_devices_modes_and_languages(cluster, plus,
         grant_redraw(client, auth, 100)
     high_control_budget()
     clock = [now()]
-    monkeypatch.setattr(translation_limits, 'server_now', lambda db: clock[0])
+    freeze_clock(monkeypatch, clock)
     for index in range(limit):
         response = submit(client, auth, manifest(1, f'input-{index}')[0], key=f'op-{index}',
             mode='classic' if index % 2 else 'redraw', target_language='en' if index % 3 else 'zh-Hans')
@@ -125,19 +127,19 @@ def test_concurrent_devices_cannot_exceed_remaining_image_budget(cluster):
 def test_plus_downgrade_waits_for_enough_events_to_expire(cluster, monkeypatch):
     from app.db import session_factory
     from app.models import User, now
-    from app.translation_requests import ImageAdmission
     from app import translation_limits
     client, _ = cluster
     auth = login_plus(client)
     configure_system_limits(free_images_per_minute=2, plus_images_per_minute=4)
     at = now()
-    monkeypatch.setattr(translation_limits, 'server_now', lambda db: at)
+    freeze_clock(monkeypatch, [at])
     for index in range(4):
         assert submit(client, auth, manifest(1, f'p-{index}')[0], key=f'op-{index}').status_code == 202
     with session_factory()() as db:
         db.scalar(select(User).where(User.subject == 'dev:alice')).plus_expires_at = at - timedelta(seconds=1)
-        for index, row in enumerate(db.scalars(select(ImageAdmission).order_by(ImageAdmission.job_id))):
-            row.admitted_at = at - timedelta(seconds=40 - index * 10)
+        for key in state_keys('image'):
+            redis_state.client().zadd(key, {member: milliseconds(at - timedelta(seconds=40 - index * 10))
+                for index, member in enumerate(sorted(window_members('image')))})
         db.commit()
     denied = submit(client, auth, manifest(1, 'new')[0], key='new')
     assert denied.status_code == 429 and denied.headers['Retry-After'] == '40'
@@ -198,19 +200,16 @@ def test_cors_exposes_backoff_and_etag(cluster):
 def test_request_uuid_survives_admission_event_cleanup(cluster):
     from app.db import session_factory
     from app.models import now
-    from app.translation_requests import ImageAdmission, TranslationRequest
-    from app.translation_limits import clean_admissions
+    from app.translation_requests import TranslationRequest
     client, _ = cluster
     auth = login(client)
     first = submit(client, auth, manifest(1)[0], key='permanent').json()
     job_id = request_record(client, auth, first['id']).job_id
     assert client.post('/v1/translations/' + first['id'] + '/cancel', headers=auth).status_code == 200
     with session_factory()() as db:
-        db.get(ImageAdmission, job_id).admitted_at = now() - timedelta(minutes=3)
-        db.commit()
-        clean_admissions(db)
-        db.commit()
-        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 0
+        for key in state_keys('image'):
+            redis_state.client().delete(key)  # Model TTL expiry, preserving durable receipts.
+        assert window_count('image') == 0
         assert db.scalar(select(func.count()).select_from(TranslationRequest)) == 1
     replay = submit(client, auth, manifest(1)[0], key='permanent')
     assert replay.status_code == 200 and replay.json()['state'] == 'failed'
@@ -231,7 +230,7 @@ def test_batch_snapshot_is_bounded_and_handles_missing_ids_per_item(cluster):
     assert client.get('/v1/translations/'+missing,headers=auth).status_code == 404
 
 
-def test_internal_admission_failure_rolls_back_uuid_quota_and_minute_charge(cluster, monkeypatch):
+def test_internal_failure_rolls_back_durable_quota_but_keeps_conservative_minute_reservation(cluster, monkeypatch):
     from app import translation_api
     client, _ = cluster
     auth = login(client)
@@ -242,11 +241,13 @@ def test_internal_admission_failure_rolls_back_uuid_quota_and_minute_charge(clus
     monkeypatch.setattr(translation_api,'create_job',fail_after_reservation)
     with pytest.raises(RuntimeError,match='isolated admission rollback'):
         submit(client,auth,manifest(1)[0])
-    assert all(value == 0 for value in counts().values())
+    assert counts()['ImageAdmission'] == 1
+    assert all(value == 0 for name, value in counts().items() if name != 'ImageAdmission')
     assert client.get('/v1/me/entitlements',headers=auth).json()['modes']['classic']['quota']['reserved'] == 0
     monkeypatch.setattr(translation_api,'create_job',actual)
     assert submit(client,auth,manifest(1)[0]).status_code == 202
-    assert all(value == 1 for value in counts().values())
+    assert counts()['ImageAdmission'] == 2
+    assert all(value == 1 for name, value in counts().items() if name != 'ImageAdmission')
 
 
 def test_same_uuid_is_account_scoped_and_never_an_authorization_credential(cluster):

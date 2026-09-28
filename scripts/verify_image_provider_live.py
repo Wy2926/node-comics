@@ -39,6 +39,7 @@ def main():
     if not key:
         parser.error('private key file must define NC_REAL_IMAGE_API_KEY')
     os.environ.update(APP_ENV='test', DEV_AUTH='true', DEV_AUTH_SECRET=secrets.token_urlsafe(40), DEV_ADMIN_USERNAME='admin',
+        REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE='image-proof-' + secrets.token_hex(16),
         DATABASE_URL=f"sqlite:///{(run_dir / 'task.sqlite').as_posix()}", STORAGE_PATH=str(run_dir / 'objects'),
         RESULT_STORAGE_BACKEND='local', R2_ENDPOINT_URL='', STRIPE_ENABLED='false', CREEM_ENABLED='false',
         CLASSIC_ENABLED='false', OPENAI_API_KEY='', PROVIDERS_JSON='', ADMIN_WEB_PATH='/console-image-verification/',

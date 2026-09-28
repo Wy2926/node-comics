@@ -1,5 +1,5 @@
 """Anonymous plugin feedback and adapter requests. URLs are never fetched."""
-from datetime import datetime, timedelta
+from datetime import datetime
 from hashlib import sha256
 from ipaddress import ip_address
 from typing import Annotated, Literal
@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import Index, String, delete, func, select
+from sqlalchemy import Index, String, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -18,6 +18,7 @@ from .errors import problem
 from .models import User, now, uid
 from .providers import digest
 from .request_models import RequestBody
+from . import redis_state
 
 router = APIRouter(tags=['Support requests'])
 
@@ -34,15 +35,6 @@ class SupportRequest(Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=now)
     __table_args__ = (Index('ix_support_requests_kind_created', 'kind', 'created_at', 'id'),)
-
-
-class SupportRequestAdmission(Base):
-    __tablename__ = 'support_request_admissions'
-    client_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    minute_started_at: Mapped[datetime] = mapped_column()
-    minute_count: Mapped[int] = mapped_column(default=0)
-    day_started_at: Mapped[datetime] = mapped_column(index=True)
-    day_count: Mapped[int] = mapped_column(default=0)
 
 
 class SupportRequestBody(RequestBody):
@@ -113,33 +105,13 @@ def submit_support_request(body: SupportRequestBody, request: Request,
     if previous:
         return replay(previous, request_hash)
     db.rollback()
-    at = now()
     # Trust only ASGI's peer address (proxy trust is configured by the server).
     client_hash = sha256(('support-request:' + (request.client.host if request.client else 'unknown')).encode()).hexdigest()
-    if db.get_bind().dialect.name == 'postgresql':
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        from sqlalchemy.dialects.sqlite import insert
-    db.execute(delete(SupportRequestAdmission).where(SupportRequestAdmission.day_started_at < at - timedelta(days=2)))
-    db.execute(insert(SupportRequestAdmission).values(client_hash=client_hash, minute_started_at=at,
-        minute_count=0, day_started_at=at.replace(hour=0, minute=0, second=0, microsecond=0), day_count=0
-    ).on_conflict_do_nothing(index_elements=['client_hash']))
-    admission = db.scalar(select(SupportRequestAdmission).where(SupportRequestAdmission.client_hash == client_hash).with_for_update())
-    previous = db.scalar(select(SupportRequest).where(SupportRequest.idempotency_key == key))
-    if previous:
-        result = replay(previous, request_hash)
-        db.commit()
-        return result
-    if at >= admission.minute_started_at + timedelta(seconds=60):
-        admission.minute_started_at, admission.minute_count = at, 0
-    if at.date() > admission.day_started_at.date():
-        admission.day_started_at, admission.day_count = at.replace(hour=0, minute=0, second=0, microsecond=0), 0
-    if admission.minute_count >= 5 or admission.day_count >= 20:
-        reset = admission.day_started_at + timedelta(days=1) if admission.day_count >= 20 else admission.minute_started_at + timedelta(seconds=60)
-        delay = max(1, int((reset - at).total_seconds()) + 1)
-        raise HTTPException(429, detail={'code': 'SUPPORT_REQUEST_RATE_LIMITED', 'message': '提交较频繁，请稍后重试', 'retry_after_seconds': delay}, headers={'Retry-After': str(delay)})
-    admission.minute_count += 1
-    admission.day_count += 1
+    delay = redis_state.run('support', [redis_state.key('support', client_hash),
+        redis_state.key('support-receipts', client_hash)], key)
+    if delay:
+        raise HTTPException(429, detail={'code': 'SUPPORT_REQUEST_RATE_LIMITED', 'message': '提交较频繁，请稍后重试',
+            'retry_after_seconds': delay}, headers={'Retry-After': str(delay)})
     row = SupportRequest(**body.model_dump(), idempotency_key=key, request_hash=request_hash)
     db.add(row)
     try:

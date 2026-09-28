@@ -1,13 +1,11 @@
 """Bounded, best-effort relay for consented extension analytics, never business facts."""
 import asyncio
-from collections import OrderedDict
 import hashlib
 import hmac
 import json
 import logging
 import re
 import secrets
-from threading import Lock
 import time
 from typing import Any
 
@@ -15,6 +13,8 @@ from fastapi import APIRouter, HTTPException, Request, Response
 import httpx
 from pydantic import Field, ValidationError
 
+from . import redis_state
+from starlette.concurrency import run_in_threadpool
 from .config import settings
 from .request_models import RequestBody
 
@@ -108,66 +108,37 @@ def clean_params(event: Event) -> dict[str, str | int]:
 
 
 class RelayGuard:
-    """Per-process limits. No account identifiers, persistence, or raw IP retention."""
-    max_buckets = 4096
+    """Redis limits shared by replicas; no account identity, event body or raw IP is stored."""
     max_seen = 20_000
     dedupe_seconds = 24 * 60 * 60
     max_in_flight = 8
 
-    def __init__(self):
-        self.lock = Lock()
-        self.salt = secrets.token_bytes(32)
-        self.buckets: OrderedDict[str, tuple[float, float]] = OrderedDict()
-        self.seen: OrderedDict[tuple[str, str], float] = OrderedDict()
-        self.in_flight = 0
+    def admit(self, batch: EventBatch, ip: str, now: float):
+        salt = secrets.token_hex(32)
+        salt = redis_state.command('set', redis_state.key('analytics-salt'), salt, nx=True, get=True) or salt
+        ip_hash = hmac.new(salt.encode(), ip.encode(), hashlib.sha256).hexdigest()
+        client_hash = hashlib.sha256(batch.client_id.encode()).hexdigest()
+        eligible = [event for event in batch.events if event.name in EVENT_PARAMS
+            and now - MAX_AGE_SECONDS <= event.timestamp_micros / 1_000_000 <= now + 300]
+        token = secrets.token_hex(16)
+        result = redis_state.run('analytics', [
+            redis_state.key('analytics-ip', ip_hash), redis_state.key('analytics-client', client_hash),
+            redis_state.key('analytics-events', client_hash), redis_state.key('analytics-global'),
+            redis_state.key('analytics-seen'), redis_state.key('analytics-slots')],
+            token, len(batch.events), self.max_in_flight, self.max_seen, self.dedupe_seconds * 1000,
+            *[hashlib.sha256((batch.client_id + ':' + event.event_id).encode()).hexdigest() for event in eligible])
+        if result[0] == -1:
+            raise HTTPException(429, detail={'code': 'ANALYTICS_RATE_LIMITED', 'message': '分析请求过于频繁'},
+                headers={'Retry-After': '10'})
+        if result[0] <= 0:
+            return [], None
+        return [eligible[index - 1] for index in result[1:]], token
 
-    def _take(self, key: str, capacity: int, refill: float, cost: int, now: float) -> bool:
-        tokens, at = self.buckets.pop(key, (float(capacity), now))
-        tokens = min(float(capacity), tokens + max(0, now - at) * refill)
-        allowed = tokens >= cost
-        self.buckets[key] = (tokens - cost if allowed else tokens, now)
-        while len(self.buckets) > self.max_buckets:
-            self.buckets.popitem(last=False)
-        return allowed
-
-    def admit(self, batch: EventBatch, ip: str, now: float) -> list[Event] | None:
-        ip_key = hmac.new(self.salt, ip.encode(), hashlib.sha256).hexdigest()
-        with self.lock:
-            # Charge even unknown/stale/replayed events; rotating client IDs cannot evade IP limits.
-            # Rejected clients must not consume other clients' global delivery budget.
-            for key, capacity, refill, cost in (
-                ('ip:' + ip_key, 120, 2, 1),
-                ('client:' + batch.client_id, 30, .5, 1),
-                ('events:' + batch.client_id, 300, 5, len(batch.events)),
-                ('global', 600, 100, len(batch.events)),
-            ):
-                if not self._take(key, capacity, refill, cost, now):
-                    raise HTTPException(
-                        429,
-                        detail={'code': 'ANALYTICS_RATE_LIMITED', 'message': '分析请求过于频繁'},
-                        headers={'Retry-After': '10'},
-                    )
-            if self.in_flight >= self.max_in_flight:
-                return None
-            while self.seen and next(iter(self.seen.values())) <= now - self.dedupe_seconds:
-                self.seen.popitem(last=False)
-            accepted = []
-            for event in batch.events:
-                at = event.timestamp_micros / 1_000_000
-                key = (batch.client_id, event.event_id)
-                if event.name not in EVENT_PARAMS or not now - MAX_AGE_SECONDS <= at <= now + 300 or key in self.seen:
-                    continue
-                self.seen[key] = now
-                accepted.append(event)
-            while len(self.seen) > self.max_seen:
-                self.seen.popitem(last=False)
-            if accepted:
-                self.in_flight += 1
-            return accepted
-
-    def release(self):
-        with self.lock:
-            self.in_flight -= 1
+    def release(self, token):
+        try:
+            redis_state.command('zrem', redis_state.key('analytics-slots'), token)
+        except redis_state.AdmissionUnavailable:
+            pass
 
 
 guard = RelayGuard()
@@ -226,7 +197,7 @@ async def send_events(batch: EventBatch, events: list[Event]):
     responses={204: {'description': 'Best-effort processing finished; also returned when analytics is disabled'},
         408: {'description': 'Request body timeout'}, 413: {'description': 'Request exceeds 16 KiB'},
         415: {'description': 'JSON content type required'}, 422: {'description': 'Invalid event envelope'},
-        429: {'description': 'Process-local rate limit exceeded; see Retry-After'}},
+        429: {'description': 'Shared Redis rate limit exceeded; see Retry-After'}},
     openapi_extra={'security': [], 'requestBody': {'required': True,
         'content': {'application/json': {'schema': BATCH_SCHEMA}}}})
 async def collect(request: Request):
@@ -251,11 +222,14 @@ async def collect(request: Request):
     now = time.time()
     if batch.session_id > now + 300:
         raise HTTPException(422, detail={'code': 'ANALYTICS_INVALID', 'message': '分析会话时间无效'})
-    events = guard.admit(batch, request.client.host if request.client else '', now)
+    try:
+        events, token = await run_in_threadpool(guard.admit, batch, request.client.host if request.client else '', now)
+    except redis_state.AdmissionUnavailable:
+        return Response(status_code=204)  # Best-effort telemetry is dropped when admission is unavailable.
     if events:
         try:
             await send_events(batch, events)
         finally:
-            guard.release()
+            await run_in_threadpool(guard.release, token)
     # No durable queue or GA delivery acknowledgement. A 204 is only best-effort acceptance.
     return Response(status_code=204)

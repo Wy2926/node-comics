@@ -38,7 +38,7 @@ def initialize():
     from . import translation_models  # noqa: F401
     from . import models  # noqa: F401
     from . import health_models  # noqa: F401
-    from . import system_settings, feedback_models  # noqa: F401
+    from . import system_settings  # noqa: F401
     from . import queue_models  # noqa: F401
     from . import translation_requests  # noqa: F401
     from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
@@ -47,7 +47,6 @@ def initialize():
     from . import feedback_review_models  # noqa: F401
     from . import support_requests  # noqa: F401
     from . import comic_title_cache  # noqa: F401
-    from . import comic_title_limits  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

@@ -3,6 +3,7 @@ from datetime import timedelta
 import hashlib
 import pytest
 from sqlalchemy import func, select
+from admission_test_utils import window_count
 from conftest import login, login_plus, request_id, request_record
 from storage_fakes import MemoryS3
 
@@ -119,7 +120,7 @@ def test_http_input_automatically_queues_without_complete(cluster, png):
 def test_missing_input_replay_and_alias_reserve_only_once(cluster, png):
     from app.db import session_factory
     from app.models import Job, Ledger
-    from app.translation_requests import TranslationRequest, ImageAdmission
+    from app.translation_requests import TranslationRequest
     client, _ = cluster
     auth = login(client)
     first = submit(client, auth, descriptor(png))
@@ -130,7 +131,8 @@ def test_missing_input_replay_and_alias_reserve_only_once(cluster, png):
     changed = submit(client, auth, descriptor(b'changed'), key='device-two')
     assert changed.status_code == 409 and changed.json()['error']['code'] == 'IDEMPOTENCY_CONFLICT'
     with session_factory()() as db:
-        for model in (Job, Ledger, ImageAdmission):
+        assert window_count('image') == 1
+        for model in (Job, Ledger):
             assert db.scalar(select(func.count()).select_from(model)) == 1
         assert db.scalar(select(func.count()).select_from(TranslationRequest)) == 3
 
@@ -152,7 +154,6 @@ def test_expired_input_releases_quota_without_reviving_uuid(cluster, png):
     from app.db import session_factory
     from app.models import now
     from app.upload_models import UploadReservation
-    from app.translation_requests import ImageAdmission
     from app.dispatcher import recover_once
     client, _ = cluster
     auth = login(client)
@@ -166,7 +167,7 @@ def test_expired_input_releases_quota_without_reviving_uuid(cluster, png):
     assert repeat.json()['error']['code'] == 'INPUT_EXPIRED'
     assert client.get('/v1/me/entitlements', headers=auth).json()['modes']['classic']['quota']['reserved'] == 0
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(ImageAdmission)) == 1
+        assert window_count('image') == 1
     assert client.put('/v1/translations/' + first['id'] + '/input', headers=auth, content=png).status_code == 410
 
 

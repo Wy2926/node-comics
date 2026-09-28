@@ -89,8 +89,8 @@ def initialize_providers(db: Session):
     db.commit()
 
 
-def configuration(db: Session, mode: str, language: str, provider_id=None):
-    cfg = settings()
+def configuration_resolver(db: Session, mode: str, language: str, provider_id=None):
+    """Read current suppliers once, then resolve every page against that snapshot."""
     if language not in LANGUAGES or (mode == 'redraw' and language not in REDRAW_LANGUAGES):
         problem("LANGUAGE_UNSUPPORTED", "此目标语言尚未开放", 422)
     if mode == "redraw":
@@ -102,13 +102,21 @@ def configuration(db: Session, mode: str, language: str, provider_id=None):
         if not provider:
             problem("PROVIDER_CAPABILITY_UNSUPPORTED", "管理员尚未配置可用的图片编辑供应商", 503)
         config = {"mode": mode, "provider": provider.config, "prompt_version": PROMPT_VERSION}
+        resolve = lambda _: config
     elif mode == "classic":
-        from .classic_config import snapshot
-        config = snapshot(db, provider_id)
+        from .classic_config import snapshot_resolver
+        resolve = snapshot_resolver(db, provider_id)
     else:
         problem("MODE_UNSUPPORTED", "不支持此翻译方式", 422)
-    config["version"] = digest(config)
-    return config
+
+    def configured(source_sha256=''):
+        config = resolve(digest([source_sha256, language]))
+        return {**config, 'version': digest(config)}
+    return configured
+
+
+def configuration(db: Session, mode: str, language: str, provider_id=None, *, source_sha256=''):
+    return configuration_resolver(db, mode, language, provider_id)(source_sha256)
 
 
 def validate_input(asset, config):

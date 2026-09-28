@@ -3,11 +3,12 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 from sqlalchemy import event, func, select
 from test_postgres_concurrency import pg, pg_scope, pytestmark, new_job, assert_single_charge
+from admission_test_utils import window_count
 from conftest import run_job
 from app.db import engine, session_factory
 from app.entitlement_models import QuotaPeriod
 from app.models import Asset, Job, Ledger, User
-from app.translation_requests import TranslationRequest, ImageAdmission
+from app.translation_requests import TranslationRequest
 from app.translation_api import TranslationInput, translate
 from conftest import request_id
 from uuid import UUID
@@ -42,6 +43,7 @@ def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
     assert len({row[1] for row in results}) == 1
     job_id = results[0][1]
     with session_factory()() as db:
+        assert window_count('image') == 1
         for model in (Job, Ledger):
             assert db.scalar(select(func.count()).select_from(model)) == 1
         for model in (TranslationRequest,):

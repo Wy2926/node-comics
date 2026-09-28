@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用私有 R2、OIDC 和 `translations_0001` 数据库基线；安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用私有 R2、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `redis_admission_0004`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 控制服务与官网
 
@@ -21,6 +21,18 @@ curl --fail https://comics.nodelane.net/health/ready
 反向代理使用 [OpenResty 模板](../deploy/openresty.comics.conf)，保留 API／私有后台路由优先级、缓存和 CSP；关闭图片磁盘缓冲与包含授权参数的访问日志。API 端口仅绑定宿主机回环地址，基础设施局域网只允许可信控制服务，API 信任该边界内的代理头。OpenResty 仅信任 Cloudflare 官方公布的 IPv4／IPv6 网段，通过 `real_ip_header CF-Connecting-IP` 恢复客户端地址，再用 `$remote_addr` 覆盖外部传入的 `X-Forwarded-For` 和 `X-Real-IP`；来自其他地址的请求不能借这些头伪造来源。Cloudflare 网段变更时复核信任清单，更新后检查代理配置并重载。OIDC 回调配置见[身份规范](PRODUCTION_IDENTITY.md)。GA4 中继与隐私政策先于插件上线，依赖与顺序见[分析规范](ANALYTICS.md#中继与发布)。
 
 官网纯静态更新仍由 API 镜像中的 `app/website_dist` 提供。若单独更新官网，以实际运行 API 镜像为基础，仅替换该目录并保留后端、安装包目录与后台；核对目标 Compose 后只重建 API。失败时恢复原镜像配置。公开 HTML 可能被 CDN 注入，验收使用内容、资源与交互，不只比较 HTML 哈希。
+
+## Redis 与准入迁移
+
+根 Compose 和服务器 Compose 均提供 Redis 8.2 服务，不发布公网端口。服务器部署使用专用内部网络，只允许本项目控制服务访问。Redis 开启 AOF、每秒刷盘、默认 256 MiB 内存上限和 `noeviction`；可通过 Compose 的 `REDIS_MAX_MEMORY` 调整容量。数据卷必须保留，不能使用淘汰策略随意删除仍有效的并发令牌。AOF 每秒刷盘仍可能在异常断电时丢失最近一秒短期状态，用户页数与结算始终以 PostgreSQL 为准。
+
+Compose 固定 Docker 官方 `redis:8.2-alpine` 镜像摘要，包含 Redis 8.2.10；摘要保留在三个 Compose 文件中。来源为 [Redis](https://github.com/redis/redis)，Redis 8 提供 AGPLv3／RSALv2／SSPLv1 三种许可选择，参见[官方许可](https://redis.io/legal/licenses/)。Python 客户端 redis-py 8.1.0 使用 MIT，fakeredis 2.38.0 仅用于测试并使用 BSD-3-Clause；版本、来源和发行摘要保留在依赖文件中。
+
+`REDIS_URL` 为 redis-py 直接连接的 `redis://` 或 `rediss://` 地址，服务器模板默认 `redis://redis:6379/0`。API、control-worker、maintenance 必须连接同一实例、数据库编号和 `REDIS_NAMESPACE`；生产、测试及沙箱使用不同实例或命名空间。外部 Redis 需通过私网、凭据或 TLS 限制访问，地址和密钥仅保留在后端环境配置。
+
+从数据库准入切换时，先停止新流量，等待在途上传完成，再停止全部旧 API、worker 和 maintenance。准备 Redis 及持久卷，使用新镜像执行数据库迁移后统一启动全部控制服务；不能新旧版本混跑。`redis_admission_0004` 删除分钟计数、反馈／公开申请限流及上传门禁表；持久任务、上传回执、漫画名缓存、审计、额度和调用成本不变。首次切换的短期窗口和当日反馈／公开申请计数从空 Redis 开始；正常服务重启保留 Redis 卷，不能反复清空以绕过限制。
+
+数据库备份不包含 Redis。恢复或回退时先停止流量并排空正在执行的短期请求，再处理对应版本的数据库与 Redis；旧二进制不能直接运行在已删除准入表的新结构上。通过 `/health/ready` 的 `redis` 项核实连接，然后验收不同 API 副本之间的限流、上传续租和故障恢复。算法及异常语义见[请求保护](SUBMISSION_SCHEDULING.md)。
 
 ## 插件安装包
 

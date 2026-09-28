@@ -12,6 +12,7 @@ from .assets import available
 from .db import session_factory
 from .errors import ProcessingError
 from .models import Asset, ClassicState, Job, TextCall, now, uid
+from .translation_provider_limits import reserve_request, release_unstarted_request
 
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 MAX_IMAGE_BYTES = 24 * 1024 * 1024
@@ -95,14 +96,6 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
                                                       TextCall.execution_lease_id == lease_id, TextCall.completed_at.is_(None)))
         if pending:
             raise TextError('TEXT_CALL_IN_FLIGHT', '当前文本组已经在执行')
-        from datetime import timedelta
-        cutoff = now() - timedelta(seconds=60)
-        recent = db.scalars(select(TextCall.started_at).where(TextCall.provider_id == provider.id,
-                                                              or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED'),
-                                                              TextCall.started_at > cutoff).order_by(TextCall.started_at)).all()
-        if len(recent) >= provider.requests_per_minute:
-            delay = max(0.1, 60 - (now() - recent[0]).total_seconds())
-            raise TextError('TEXT_RATE_LIMITED', '文本服务已达到本分钟调用上限', retryable=True, retry_after=delay)
         count, sequence = db.execute(select(
             func.count().filter(or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED')),
             func.coalesce(func.max(TextCall.sequence), 0)).where(TextCall.job_id == job_id, TextCall.group_index == group_index)).one()
@@ -112,6 +105,7 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
                         group_index=group_index, sequence=sequence + 1,
                         provider_id=profile['provider_id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)
+        reserve_request(provider, call.id)
         db.add(call)
         db.commit()  # Intent and full unknown-cost reservation must exist before any request.
         return call.id, profile, count + 1
@@ -127,6 +121,7 @@ def complete_call(call_id, lease_id, response=None, error=None, translations=Non
         usage = response.usage if response else getattr(error, 'usage', None)
         call.request_id = response.request_id if response else getattr(error, 'request_id', None)
         call.error_code = getattr(error, 'code', None)
+        release_unstarted_request(call.provider_id, call_id, error)
         call.completed_at = now()
         job = db.scalar(select(Job).where(Job.id == call.job_id).with_for_update(key_share=True))
         if usage is not None:

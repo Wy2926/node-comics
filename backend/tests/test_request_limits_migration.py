@@ -6,10 +6,10 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "comic_titles_0002"
-NEW_TABLES = {"comic_title_admissions", "comic_title_cache", "translation_results", "result_accesses", "upload_ingress_mutex", "upload_ingress_leases", "feedback_admissions", "system_settings",
+HEAD = "redis_admission_0004"
+NEW_TABLES = {"comic_title_cache", "translation_results", "result_accesses", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
-              "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests", "image_admissions", "control_admissions"}
+              "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
 
 
 @pytest.fixture
@@ -89,7 +89,6 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
     from alembic.config import Config
     from app import db
     from app.models import User
-    from app.translation_requests import ControlAdmission
     at = datetime(2026, 1, 1)
     leases = [{'id': 'preserve-control-token', 'until': '2026-01-01T00:00:30'}]
     db.initialize()
@@ -100,14 +99,14 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
         config.attributes['connection'] = connection
         command.downgrade(config, 'translations_0001')
         connection.execute(User.__table__.insert().values(id='preserved-user', subject='existing-user', name='Existing'))
-        connection.execute(ControlAdmission.__table__.insert().values(owner_id='preserved-user',
-            scope='translation', tokens=2.5, refilled_at=at, leases=leases))
+        connection.execute(text("INSERT INTO control_admissions VALUES ('preserved-user', 'translation', 2.5, :at, :leases)"),
+            {'at': at, 'leases': __import__('json').dumps(leases)})
     db.initialize()
     with isolated_migration_database.connect() as connection:
         assert connection.scalar(text('SELECT name FROM users WHERE id = :id'), {'id': 'preserved-user'}) == 'Existing'
-    with db.session_factory()() as session:
-        control = session.get(ControlAdmission, ('preserved-user', 'translation'))
-        assert control.tokens == 2.5 and control.leases == leases
+        assert not {'control_admissions', 'comic_title_admissions', 'image_admissions', 'feedback_admissions',
+            'support_request_admissions', 'upload_ingress_leases', 'upload_ingress_mutex',
+            'translation_provider_requests'} & set(inspect(connection).get_table_names())
     assert_current_schema_matches_models(isolated_migration_database)
 
 
@@ -129,5 +128,40 @@ def test_title_supplier_upgrade_preserves_body_default_without_implicit_selectio
     db.initialize()
     with isolated_migration_database.connect() as connection:
         row = connection.execute(text('SELECT * FROM translation_providers')).mappings().one()
-        assert row['is_default'] and not row['is_title_default']
+        assert row['text_weight'] == 1 and row['title_weight'] == 0
+        assert 'is_default' not in row and 'is_title_default' not in row
         assert row['revision_id'] == 'existing-revision' and row['requests_per_minute'] == 30
+
+
+def test_weighted_upgrade_preserves_independent_choices_and_immutable_revisions(isolated_migration_database):
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from app import db
+    from app.translation_models import TranslationProviderRevision
+    db.initialize()
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.downgrade(config, 'comic_titles_0002')
+        for provider_id in ['body', 'title', 'unused']:
+            connection.execute(text('INSERT INTO translation_providers '
+                '(id, name, channel, enabled, is_default, is_title_default, revision_id, requests_per_minute, created_at, updated_at) '
+                'VALUES (:id, :id, \'openai\', :enabled, :body, :title, :revision, 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'),
+                {'id': provider_id, 'enabled': provider_id != 'title', 'body': provider_id == 'body',
+                 'title': provider_id == 'title', 'revision': provider_id + '-revision'})
+            connection.execute(TranslationProviderRevision.__table__.insert().values(
+                id=provider_id + '-revision', provider_id=provider_id, channel='openai',
+                config={'model': 'legacy-model'}, api_key='isolated-preserved-key'))
+        revisions = connection.execute(text('SELECT * FROM translation_provider_revisions ORDER BY id')).all()
+    db.initialize()
+    with isolated_migration_database.connect() as connection:
+        rows = connection.execute(text('SELECT id, text_weight, title_weight, enabled FROM translation_providers ORDER BY id')).all()
+        assert rows == [('body', 1, 0, True), ('title', 0, 1, False), ('unused', 0, 0, True)]
+        assert revisions == connection.execute(text('SELECT * FROM translation_provider_revisions ORDER BY id')).all()
+    # Startup is repeatable and does not normalize or rewrite existing revisions.
+    db.initialize()
+    with isolated_migration_database.connect() as connection:
+        assert revisions == connection.execute(text('SELECT * FROM translation_provider_revisions ORDER BY id')).all()

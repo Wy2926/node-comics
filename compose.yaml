@@ -7,6 +7,8 @@ x-backend: &backend
   environment: &backend-env
     APP_ENV: "${APP_ENV:-production}"
     DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics_cluster}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    REDIS_NAMESPACE: ${REDIS_NAMESPACE:-node-comics}
     RESULT_STORAGE_BACKEND: r2
     STORAGE_PATH: /data/images
     DEV_AUTH: "${DEV_AUTH:-false}"
@@ -16,9 +18,20 @@ x-backend: &backend
     - /data/images:uid=10001,gid=10001,mode=0700,size=32m
   depends_on:
     postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
   restart: unless-stopped
 
 services:
+  redis:
+    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAX_MEMORY:-256mb}", --maxmemory-policy, noeviction]
+    volumes: [nodes_redis:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
   postgres:
     image: postgres:17.6-alpine
     environment:
@@ -64,3 +77,4 @@ services:
       start_period: 60s
 volumes:
   nodes_postgres:
+  nodes_redis:

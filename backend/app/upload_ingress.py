@@ -1,19 +1,16 @@
 """Cross-replica ingress leases; no database transaction spans client or R2 I/O."""
 import asyncio
 from dataclasses import dataclass
-from datetime import timedelta
 import hashlib
 from fastapi import HTTPException
-from sqlalchemy import delete, select, update
 from starlette.concurrency import run_in_threadpool
 from .assets import owned_asset, inspect_image, content_storage_key
 from .db import session_factory
 from .errors import problem
-from .models import now, uid
-from .scheduler import lock_scheduler
+from .models import uid
+from . import redis_state
 from .storage import get_store
 from .system_settings import RequestLimits, get_request_limits
-from .upload_models import UploadIngressLease, UploadIngressMutex
 from .uploads import _active_locked, _lock_current, fail_upload, owned_upload, read_upload_stream, accept_verified_upload
 
 
@@ -45,53 +42,46 @@ def acquire_ingress(upload_id, owner_id):
             return response_for(receipt)
         expected_size = receipt.expected_size
         db.commit()
-    # Never hold the ingress mutex while waiting for scheduler/job locks.
-    with session_factory()() as db:
-        if db.get_bind().dialect.name == "postgresql":
-            from sqlalchemy.dialects.postgresql import insert
-        else:
-            from sqlalchemy.dialects.sqlite import insert
-        db.execute(insert(UploadIngressMutex).values(id=1).on_conflict_do_nothing(index_elements=["id"]))
-        db.scalar(select(UploadIngressMutex).where(UploadIngressMutex.id == 1).with_for_update())
-        at = now()
-        db.execute(delete(UploadIngressLease).where(UploadIngressLease.expires_at <= at))
-        active = db.execute(select(UploadIngressLease.upload_id, UploadIngressLease.owner_id)).all()
-        if (any(row.upload_id == upload_id for row in active)
-                or sum(row.owner_id == owner_id for row in active) >= cfg.upload_user_concurrency
-                or len(active) >= cfg.upload_global_concurrency):
-            raise HTTPException(429, detail={"code": "UPLOAD_BUSY", "message": "上传连接已满，请稍后重试", "retry_after_seconds": 2},
-                                headers={"Retry-After": "2"})
-        lease = Ingress(uid(), upload_id, owner_id, expected_size, cfg)
-        db.add(UploadIngressLease(id=lease.id, upload_id=upload_id, owner_id=owner_id,
-                                 expires_at=at + timedelta(seconds=cfg.upload_ingress_lease_seconds)))
-        db.commit()
-        return lease
+    lease = Ingress(uid(), upload_id, owner_id, expected_size, cfg)
+    if not _ingress('acquire', lease):
+        raise HTTPException(429, detail={'code': 'UPLOAD_BUSY', 'message': '上传连接已满，请稍后重试',
+            'retry_after_seconds': 2}, headers={'Retry-After': '2'})
+    return lease
+
+
+def _ingress(operation, lease):
+    return bool(redis_state.run('ingress', [redis_state.key('upload-global'),
+        redis_state.key('upload-user', lease.owner_id), redis_state.key('upload-token', lease.upload_id)],
+        operation, lease.id, lease.limits.upload_ingress_lease_seconds * 1000,
+        lease.limits.upload_global_concurrency, lease.limits.upload_user_concurrency))
+
+
+def ingress_snapshot(upload_ids=(), owner_id=None):
+    global_key = redis_state.key('upload-global')
+    values = redis_state.run('ingress_snapshot', [global_key,
+        redis_state.key('upload-user', owner_id) if owner_id else global_key,
+        *(redis_state.key('upload-token', upload_id) for upload_id in upload_ids)])
+    return values[0], {upload_id: redis_state.datetime_ms(value) if value else None
+        for upload_id, value in zip(upload_ids, values[1:])}
 
 
 def renew_ingress(lease):
-    with session_factory()() as db:
-        at = now()
-        changed = db.execute(update(UploadIngressLease).where(UploadIngressLease.id == lease.id,
-            UploadIngressLease.expires_at > at).values(expires_at=at + timedelta(seconds=lease.limits.upload_ingress_lease_seconds)))
-        db.commit()
-        return changed.rowcount == 1
+    return _ingress('renew', lease)
 
 
 def release_ingress(lease):
-    with session_factory()() as db:
-        # Token, not upload ID: an old handler cannot release a replacement.
-        db.execute(delete(UploadIngressLease).where(UploadIngressLease.id == lease.id))
-        db.commit()
+    try:
+        _ingress('release', lease)
+    except redis_state.AdmissionUnavailable:
+        pass  # The token expires; never turn a completed upload into a failed receipt.
 
 
 def current_receipt(db, lease):
-    lock_scheduler(db)
-    current = db.scalar(select(UploadIngressLease).where(UploadIngressLease.id == lease.id,
-        UploadIngressLease.upload_id == lease.upload_id, UploadIngressLease.owner_id == lease.owner_id,
-        UploadIngressLease.expires_at > now()).with_for_update())
-    if current is None:
+    receipt = _lock_current(db, owned_upload(db, lease.upload_id, lease.owner_id))
+    # The token may have expired or been replaced while waiting for these locks.
+    if not _ingress('check', lease):
         problem("UPLOAD_LEASE_EXPIRED", "上传连接已失效，请重试", 409)
-    return _lock_current(db, owned_upload(db, lease.upload_id, lease.owner_id))
+    return receipt
 
 
 def record_body_failure(lease, error):
@@ -177,8 +167,8 @@ async def begin_ingress(upload_id, owner_id):
     try:
         return await asyncio.shield(task)
     except asyncio.CancelledError:
-        # A cancellation may arrive after the admission COMMIT but before the
-        # handler receives its token. Finish that short transaction and release.
+        # A cancellation may arrive after Redis admits the request but before
+        # the handler receives its token. Finish that operation and release.
         while not task.done():
             try:
                 await asyncio.shield(task)

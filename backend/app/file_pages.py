@@ -16,7 +16,7 @@ from .errors import problem
 from .jobs import job_json, locked_user
 from .models import Asset
 from .results import ReaderEntry as Job
-from .providers import configuration, digest
+from .providers import configuration_resolver, digest
 from .schemas import AssetResponse, TranslationResponse
 
 
@@ -103,11 +103,11 @@ def upload_file_page(db, owner_id: str, data: bytes, source: FilePageIdentity):
 
 def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
     try:
-        config = configuration(db, body.mode, body.target_language)
+        resolve_config = configuration_resolver(db, body.mode, body.target_language)
     except HTTPException as error:
-        if not body.include_display or error.detail.get("code") not in {"PROVIDER_CAPABILITY_UNSUPPORTED", "CLASSIC_NOT_CONFIGURED", "CLASSIC_CONFIG_INVALID"}:
+        if not body.include_display or error.detail.get("code") not in {"PROVIDER_CAPABILITY_UNSUPPORTED", "CLASSIC_NOT_CONFIGURED", "CLASSIC_CONFIG_INVALID", "TRANSLATION_PROVIDER_UNAVAILABLE"}:
             raise
-        config = None  # Reading existing images does not require an enabled supplier.
+        resolve_config = None  # Reading existing images does not require an enabled supplier.
     identities = {(page.file_hash, page.page_index) for page in body.pages}
     mappings = db.scalars(select(FilePage).where(
         FilePage.owner_id == owner_id,
@@ -154,9 +154,10 @@ def match_file_pages(db, owner_id: str, body: FilePageMatchRequest):
                 display_sources[identity] = display_by_content[content_hash]
 
     for identity, asset in sources.items():
-        if config:
+        if resolve_config:
+            page_config = resolve_config(asset.sha256)
             cache_keys[identity] = digest({"hash": asset.sha256,
-                "mode": body.mode, "language": body.target_language, "config_version": config["version"]})
+                "mode": body.mode, "language": body.target_language, "config_version": page_config["version"]})
     jobs_by_key = {}
     if cache_keys:
         candidates = db.scalars(select(Job).where(

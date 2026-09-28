@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .assets import access_json, delete_asset_object, object_path, owned_asset, record_user_access
 from .storage import StorageError
 from .errors import ProcessingError
+from .redis_state import AdmissionUnavailable
 from .scheduler import lock_scheduler, touch_job
 from .translation_api import router as translation_router
 from .comic_titles import TitleExecutor, router as comic_titles_router
@@ -134,6 +135,12 @@ async def api_error(request, exc):
 @app.exception_handler(StorageError)
 async def storage_error(request, exc):
     return JSONResponse(status_code=503, content={"error": {"code": "STORAGE_UNAVAILABLE", "message": "图片存储暂时不可用，请稍后重试", "request_id": request.state.request_id}})
+
+
+@app.exception_handler(AdmissionUnavailable)
+async def admission_error(request, exc):
+    return JSONResponse(status_code=503, headers={'Retry-After': '2'}, content={'error': {
+        'code': exc.code, 'message': '请求准入服务暂时不可用，请稍后重试', 'request_id': request.state.request_id}})
 
 
 class DevLogin(RequestBody):

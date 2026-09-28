@@ -141,6 +141,11 @@ def readiness(*, role=None, instance=None):
     except Exception as error:
         log_failure("readiness", error)
         checks["database"] = "unavailable"
+    from .redis_state import command, AdmissionUnavailable
+    try:
+        checks['redis'] = 'ready' if command('ping') else 'unavailable'
+    except AdmissionUnavailable:
+        checks['redis'] = 'unavailable'
     ready = all(value == "ready" for value in checks.values())
     return {"status": "ready" if ready else "unavailable", "checks": checks, "alerts": alerts}, ready
 

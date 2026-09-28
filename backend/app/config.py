@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 import re
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore", hide_input_in_errors=True)
     app_env: Literal["production", "development", "test"] = "production"
     database_url: str = "sqlite:///./node-comics.db"
+    redis_url: SecretStr = SecretStr('redis://127.0.0.1:6379/0')
+    redis_namespace: str = Field(default='node-comics', pattern=r'^[A-Za-z0-9_-]{1,80}$')
+
+    @field_validator('redis_url')
+    @classmethod
+    def valid_redis_url(cls, value):
+        try:
+            parsed = urlsplit(value.get_secret_value())
+            valid = parsed.scheme in {'redis', 'rediss'} and bool(parsed.hostname) and parsed.port != 0
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError('REDIS_URL must be a redis:// or rediss:// server URL')
+        return value
     storage_path: Path = Path("./private-data")
     result_storage_backend: Literal["local", "r2"] = "local"
     r2_endpoint_url: str = ""

@@ -15,7 +15,8 @@ from pydantic import SecretStr
 import pytest
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app import analytics
+from app import analytics, redis_state
+from admission_test_utils import state_keys
 
 
 URL = '/v1/analytics/events'
@@ -185,6 +186,7 @@ def test_client_request_limit_and_refill(relay, monkeypatch):
     client, requests, _ = relay
     now = time.time()
     monkeypatch.setattr(analytics.time, 'time', lambda: now)
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: int(now * 1000))
     body = batch()
     for _ in range(30):
         assert client.post(URL, json=body).status_code == 204
@@ -199,6 +201,7 @@ def test_proxy_ip_limit_cannot_be_bypassed_by_rotating_forwarded_headers_and_cli
     client, requests, _ = relay
     now = time.time()
     monkeypatch.setattr(analytics.time, 'time', lambda: now)
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: int(now * 1000))
     template = (Path(__file__).resolve().parents[2] / 'deploy/openresty.comics.conf').read_text(encoding='utf-8')
     api_location = re.search(r'location\s+/\s*\{([^{}]*)\}', template)
     assert api_location, 'API proxy location changed; update the forwarding test'
@@ -225,20 +228,22 @@ def test_proxy_ip_limit_cannot_be_bypassed_by_rotating_forwarded_headers_and_cli
         assert post('203.0.113.11', '198.51.100.122').status_code == 204
 
     assert len(requests) == 121
-    assert analytics.guard.in_flight == 0
-    assert '203.0.113.10' not in repr(analytics.guard.buckets)
+    assert redis_state.client().zcard(redis_state.key('analytics-slots')) == 0
+    assert '203.0.113.10' not in repr(state_keys('analytics-ip'))
 
 
-def test_rate_limited_client_does_not_exhaust_other_clients_global_budget():
+def test_rate_limited_client_does_not_exhaust_other_clients_global_budget(monkeypatch):
     guard = analytics.RelayGuard()
     now = time.time()
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: int(now * 1000))
     client_id = str(uuid4())
     for _ in range(15):
         body = batch(*[event('reader_open') for _ in range(20)])
         body['client_id'] = client_id
         request = analytics.EventBatch.model_validate(body)
-        assert guard.admit(request, '203.0.113.10', now)
-        guard.release()
+        accepted, token = guard.admit(request, '203.0.113.10', now)
+        assert accepted
+        guard.release(token)
 
     # This client's event budget is exhausted, while the shared budget still
     # has capacity. Repeated rejected requests must preserve that capacity.
@@ -248,25 +253,32 @@ def test_rate_limited_client_does_not_exhaust_other_clients_global_budget():
         assert failure.value.status_code == 429
 
     other_client = analytics.EventBatch.model_validate(batch())
-    assert guard.admit(other_client, '203.0.113.11', now)
-    guard.release()
+    accepted, token = guard.admit(other_client, '203.0.113.11', now)
+    assert accepted
+    guard.release(token)
 
 
-def test_guard_cache_and_in_flight_capacity_are_bounded():
+def test_guard_cache_and_in_flight_capacity_are_bounded(monkeypatch):
     guard = analytics.RelayGuard()
-    guard.max_buckets = 10
     guard.max_seen = 3
     now = time.time()
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: int(now * 1000))
+    tokens = []
     for index in range(8):
-        assert guard.admit(analytics.EventBatch.model_validate(batch()), str(index), now)
-    assert guard.admit(analytics.EventBatch.model_validate(batch()), 'next', now) is None
-    assert len(guard.buckets) <= 10 and len(guard.seen) <= 3 and guard.in_flight == 8
-    for _ in range(8):
-        guard.release()
-    assert guard.in_flight == 0
-    assert guard.admit(analytics.EventBatch.model_validate(batch()), 'after', now + guard.dedupe_seconds + 1)
-    assert len(guard.seen) == 1
-    guard.release()
+        accepted, token = guard.admit(analytics.EventBatch.model_validate(batch()), str(index), now)
+        assert accepted
+        tokens.append(token)
+    assert guard.admit(analytics.EventBatch.model_validate(batch()), 'next', now) == ([], None)
+    assert redis_state.client().zcard(redis_state.key('analytics-seen')) == 3
+    assert redis_state.client().zcard(redis_state.key('analytics-slots')) == 8
+    assert all(0 < redis_state.client().pttl(key) <= 60000 for key in state_keys('analytics-ip'))
+    for token in tokens:
+        guard.release(token)
+    assert redis_state.client().zcard(redis_state.key('analytics-slots')) == 0
+    now += guard.dedupe_seconds + 1
+    accepted, token = guard.admit(analytics.EventBatch.model_validate(batch()), 'after', now)
+    assert accepted and redis_state.client().zcard(redis_state.key('analytics-seen')) == 1
+    guard.release(token)
 
 
 @pytest.mark.parametrize('failure', ['transport', 'timeout', 'status', 'success'])
@@ -284,7 +296,7 @@ def test_transport_outcomes_never_log_secret_query_or_private_payload(relay, mon
     with caplog.at_level(logging.INFO):
         response = client.post(URL, json=batch(event('reader_open')))
     assert response.status_code == 204
-    assert analytics.guard.in_flight == 0
+    assert redis_state.client().zcard(redis_state.key('analytics-slots')) == 0
     assert SECRET not in caplog.text and 'api_secret' not in caplog.text and 'private' not in caplog.text
     assert SECRET not in response.text and not response.content
 

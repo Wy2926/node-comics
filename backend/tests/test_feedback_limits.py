@@ -2,6 +2,7 @@
 from datetime import timedelta
 import pytest
 from sqlalchemy import func, select
+from admission_test_utils import feedback_state, state_keys, freeze_clock
 from conftest import configure_system_limits, login
 
 
@@ -44,14 +45,13 @@ def feedback_case(client, png, monkeypatch):
     owner_id = client.get("/v1/me", headers=auth).json()["user"]["id"]
     job_id = seed_feedback_job(owner_id, png)
     clock = [now()]
-    monkeypatch.setattr(feedback_limits, "now", lambda: clock[0])
+    freeze_clock(monkeypatch, clock)
     return client, auth, owner_id, job_id, clock
 
 
 def test_new_keys_cannot_create_unbounded_feedback(feedback_case):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     from app.models import Ledger
     from app.reader_api import Feedback
     client, auth, owner_id, job_id, _ = feedback_case
@@ -64,8 +64,8 @@ def test_new_keys_cannot_create_unbounded_feedback(feedback_case):
         assert response.json()["error"]["retry_after_seconds"] == 60
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Feedback)) == 3
-        assert db.scalar(select(func.count()).select_from(FeedbackAdmission)) == 1
-        assert db.get(FeedbackAdmission, owner_id).daily_receipts == 3
+        assert len(state_keys('feedback')) == 1
+        assert feedback_state(owner_id).daily_receipts == 3
         assert db.scalar(select(func.count()).select_from(Ledger)) == 0
 
 
@@ -87,7 +87,6 @@ def test_token_refill_and_clock_rollback(feedback_case):
 def test_replay_and_conflict_are_stable_when_both_budgets_are_exhausted(feedback_case):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     from app.reader_api import Feedback
     client, auth, owner_id, job_id, _ = feedback_case
     configure_system_limits(feedback_request_burst=1, feedback_receipts_per_day=1)
@@ -100,7 +99,7 @@ def test_replay_and_conflict_are_stable_when_both_budgets_are_exhausted(feedback
     conflict = send_feedback(client, auth, job_id, "stable", "不同内容")
     assert conflict.status_code == 409 and conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
     with session_factory()() as db:
-        row = db.get(FeedbackAdmission, owner_id)
+        row = feedback_state(owner_id)
         assert row.daily_receipts == 1 and row.request_tokens == 0
         assert db.scalar(select(func.count()).select_from(Feedback)) == 1
 
@@ -108,7 +107,6 @@ def test_replay_and_conflict_are_stable_when_both_budgets_are_exhausted(feedback
 def test_daily_limit_resets_on_utc_day_and_replay_does_not_count_again(feedback_case):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     client, auth, owner_id, job_id, clock = feedback_case
     configure_system_limits(feedback_receipts_per_day=2)
     assert send_feedback(client, auth, job_id, "first").status_code == 201
@@ -121,13 +119,12 @@ def test_daily_limit_resets_on_utc_day_and_replay_does_not_count_again(feedback_
     assert send_feedback(client, auth, job_id, "first").status_code == 201
     assert send_feedback(client, auth, job_id, "third").status_code == 201
     with session_factory()() as db:
-        assert db.get(FeedbackAdmission, owner_id).daily_receipts == 1
+        assert feedback_state(owner_id).daily_receipts == 1
 
 
 def test_account_budgets_and_receipts_remain_private(feedback_case, png):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     client, auth, owner_id, job_id, _ = feedback_case
     configure_system_limits(feedback_receipts_per_day=1)
     assert send_feedback(client, auth, job_id, "same-key").status_code == 201
@@ -139,30 +136,28 @@ def test_account_budgets_and_receipts_remain_private(feedback_case, png):
     assert send_feedback(client, other, other_job, "same-key").status_code == 201
     assert client.get("/v1/me/feedback", headers=other).json()["total"] == 1
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(FeedbackAdmission)) == 2
-        assert db.get(FeedbackAdmission, owner_id).daily_receipts == 1
-        assert db.get(FeedbackAdmission, other_id).daily_receipts == 1
+        assert len(state_keys('feedback')) == 2
+        assert feedback_state(owner_id).daily_receipts == 1
+        assert feedback_state(other_id).daily_receipts == 1
 
 
 def test_feedback_budget_is_independent_of_submission_and_page_quotas(feedback_case):
     from app.config import settings
     from app.db import session_factory
     from app.models import Ledger
-    from app.translation_requests import ControlAdmission
     client, auth, _, job_id, _ = feedback_case
     settings().translation_request_burst = 1
     settings().free_daily_pages = 0
     for index in range(3):
         assert send_feedback(client, auth, job_id, str(index)).status_code == 201
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(ControlAdmission)) == 0
+        assert len(state_keys('control')) == 0
         assert db.scalar(select(func.count()).select_from(Ledger)) == 0
 
 
 def test_admin_settings_apply_to_new_feedback_without_resetting_usage(feedback_case):
     from app.config import settings
     from app.db import session_factory
-    from app.feedback_models import FeedbackAdmission
     client, auth, owner_id, job_id, clock = feedback_case
     configure_system_limits(feedback_request_burst=1, feedback_requests_per_minute=1, feedback_receipts_per_day=1)
     assert send_feedback(client, auth, job_id, "before-setting").status_code == 201
@@ -179,4 +174,4 @@ def test_admin_settings_apply_to_new_feedback_without_resetting_usage(feedback_c
     clock[0] += timedelta(seconds=60)
     assert send_feedback(client, auth, job_id, "after-setting").status_code == 201
     with session_factory()() as db:
-        assert db.get(FeedbackAdmission, owner_id).daily_receipts == 2
+        assert feedback_state(owner_id).daily_receipts == 2

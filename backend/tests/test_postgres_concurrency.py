@@ -352,7 +352,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['comic_titles_0002']
+            assert revisions == ['redis_admission_0004']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0
@@ -477,10 +477,11 @@ def test_title_admission_concurrency_preserves_window_and_user_isolation(pg, mon
     from app import comic_title_limits as limits
     from app.db import session_factory
     from app.models import User, now, uid
-    from app.translation_requests import ControlAdmission
+    from app import redis_state
+    from admission_test_utils import milliseconds, state_keys, window_count
 
     at = now()
-    monkeypatch.setattr(limits, 'server_now', lambda db: at)
+    monkeypatch.setattr(redis_state, '_clock_ms', lambda: milliseconds(at))
     barrier = threading.Barrier(8)
 
     def admit(_):
@@ -499,7 +500,7 @@ def test_title_admission_concurrency_preserves_window_and_user_isolation(pg, mon
     assert statuses.count(429) == 10
     with session_factory()() as db:
         assert limits.title_budget(db, pg['owner_id'])['remaining'] == 0
-        assert db.scalar(select(func.count()).select_from(ControlAdmission)) == 0
+        assert len(state_keys('control')) == 0
         other_id = uid()
         db.add(User(id=other_id, subject='title-limit:' + other_id, name='Isolated reader'))
         db.commit()
@@ -513,35 +514,38 @@ def test_title_admission_concurrency_preserves_window_and_user_isolation(pg, mon
     with session_factory()() as db:
         budget = limits.title_budget(db, pg['owner_id'])
         assert (budget['used'], budget['remaining'], budget['retry_after_seconds']) == (1, 29, 0)
-        assert len(db.get(limits.TitleAdmission, pg['owner_id']).request_times) == 1
+        assert window_count('title', pg['owner_id']) == 1
 
 
-def test_title_supplier_concurrent_selection_keeps_one_default_and_body_choice(pg):
+def test_supplier_concurrent_weight_updates_preserve_body_choice_and_revisions(pg):
     from app.db import session_factory
     from app.translation_models import TranslationProvider
-    from app.translation_providers import set_default_provider, provider_profile
-    from sqlalchemy.exc import IntegrityError
+    from app.translation_providers import ProviderWrite, provider_json, provider_profile, provider_transaction, write_provider
     with session_factory()() as db:
         original = provider_profile(db)['provider_id']
-        candidates = [configure_text_provider(db).id for _ in range(2)]
+        db.get(TranslationProvider, original).title_weight = 0
+        db.commit()
+        candidates = [provider_json(db, configure_text_provider(db)) for _ in range(2)]
     barrier = threading.Barrier(2)
-    def choose(provider_id):
+    def choose(pair):
+        index, provider = pair
         with session_factory()() as db:
             barrier.wait(timeout=5)
-            return set_default_provider(db, provider_id, pg['owner_id'], purpose='comic_title')['id']
+            with provider_transaction(db):
+                updated = write_provider(db, ProviderWrite(name=provider['name'], channel=provider['channel'],
+                    config=provider['config'], text_weight=0, title_weight=1 + index * 2),
+                    db.get(TranslationProvider, provider['id']))
+                assert updated.revision_id == provider['revision_id']
+            return updated.id
     with ThreadPoolExecutor(max_workers=2) as pool:
-        assert set(pool.map(choose, candidates)) == set(candidates)
+        assert set(pool.map(choose, enumerate(candidates))) == {p['id'] for p in candidates}
     with session_factory()() as db:
         assert provider_profile(db)['provider_id'] == original
-        selected = provider_profile(db, purpose='comic_title')['provider_id']
-        assert selected in candidates
-        assert db.scalar(select(func.count()).select_from(TranslationProvider).where(TranslationProvider.is_title_default)) == 1
-        # The database enforces uniqueness even if a writer omits the selection lock.
-        other = next(key for key in candidates if key != selected)
-        db.get(TranslationProvider, other).is_title_default = True
-        with pytest.raises(IntegrityError):
-            db.flush()
-        db.rollback()
+        selected = [provider_profile(db, purpose='comic_title', routing_key=str(i))['provider_id'] for i in range(40)]
+        assert set(selected) == {p['id'] for p in candidates}
+        assert [db.get(TranslationProvider, p['id']).title_weight for p in candidates] == [1, 3]
+    with session_factory()() as db:
+        assert selected == [provider_profile(db, purpose='comic_title', routing_key=str(i))['provider_id'] for i in range(40)]
 
 
 def test_title_cache_reads_use_indexes_without_locks_or_user_filters(pg):

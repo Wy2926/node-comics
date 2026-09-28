@@ -7,9 +7,10 @@ from .assets import available
 from .config import settings
 from .entitlements import is_plus
 from .errors import ProcessingError
-from .models import Asset, Attempt, ClassicState, Job, Provider, TextCall, User, now, uid
+from .models import Asset, Attempt, ClassicState, Job, Provider, User, now, uid
 from .queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage, SchedulerMutex, UserModeQueue
 from .translation_models import TranslationProvider
+from .translation_provider_limits import unavailable_providers
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
 IMAGE_STAGES = {"page"}
@@ -100,7 +101,7 @@ def _estimate(db, pool, stage, records=None):
     return max(0.05, min(120, record.service if record else {"validate_upload": 1, "page": 30, "text": 10, "redraw": 60}[stage.name]))
 
 
-def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
+def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, blocked_providers=()):
     """Elect in SQL before materializing: <= two owners per pool and class.
 
     Eligibility precedes ranking, so an arbitrarily deep unsupported
@@ -132,14 +133,9 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True):
     if stage_ids is not None:
         eligible = eligible.where(JobStage.id.in_(stage_ids))
     if "text" in stages:
-        recent = (select(TextCall.provider_id, func.count().label('calls'))
-            .where(TextCall.started_at > at - timedelta(minutes=1),
-                   or_(TextCall.error_code.is_(None), TextCall.error_code != 'TEXT_PROVIDER_DISABLED'))
-            .group_by(TextCall.provider_id).subquery())
         eligible = (eligible.outerjoin(TranslationProvider, TranslationProvider.id == Job.config['text']['provider_id'].as_string())
-            .outerjoin(recent, recent.c.provider_id == TranslationProvider.id)
             .where(or_(JobStage.name != 'text', and_(TranslationProvider.enabled.is_(True),
-                func.coalesce(recent.c.calls, 0) < TranslationProvider.requests_per_minute))))
+                TranslationProvider.id.not_in(blocked_providers)))))
     if "redraw" in stages:
         running_job, unknown_job = aliased(Job), aliased(Job)
         provider_id = Job.config["provider"]["id"].as_string()
@@ -172,7 +168,7 @@ def _candidate_signature(stage, job, queue_version):
     return stage.generation, job.priority_rank, job.realtime_until, queue_version
 
 
-def _preselect(db, node, allowed_stages):
+def _preselect(db, node, allowed_stages, blocked_providers=()):
     # Reuse the caller's connection, including its uncommitted nodes/pages.
     # A second Session can deadlock a full pool while every claimant holds its
     # first connection. PostgreSQL READ COMMITTED rechecks after the mutex;
@@ -181,7 +177,7 @@ def _preselect(db, node, allowed_stages):
     stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
     if not node.enabled or not stages:
         return {}
-    rows = _election_rows(db, node, stages, now(), materialize=False)
+    rows = _election_rows(db, node, stages, now(), materialize=False, blocked_providers=blocked_providers)
     return {row[0]: tuple(row[1:]) for row in rows}
 
 
@@ -192,7 +188,9 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
         with db.no_autoflush:
             lock_scheduler(db)
     observed_node = db.get(ComputeNode, node_id)
-    candidates_before_lock = _preselect(db, observed_node, allowed_stages) if observed_node else {}
+    blocked = unavailable_providers(db.scalars(select(TranslationProvider).where(TranslationProvider.enabled.is_(True))).all()) \
+        if observed_node and 'text' in (set(observed_node.capabilities) & set(allowed_stages or observed_node.capabilities)) else []
+    candidates_before_lock = _preselect(db, observed_node, allowed_stages, blocked) if observed_node else {}
     lock_scheduler(db)
     node = db.get(ComputeNode, node_id, populate_existing=True)
     at = now()
@@ -209,7 +207,7 @@ def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_ve
     stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
     # The full election ran without the mutex. Recheck only this bounded set
     # under the lock, using current queue/provider/asset/node and stage state.
-    candidates = [(stage, job) for stage, job, version in _election_rows(db, node, stages, at, stage_ids=candidates_before_lock)
+    candidates = [(stage, job) for stage, job, version in _election_rows(db, node, stages, at, stage_ids=candidates_before_lock, blocked_providers=blocked)
         if _candidate_signature(stage, job, version) == candidates_before_lock[stage.id]]
     if not candidates:
         return None

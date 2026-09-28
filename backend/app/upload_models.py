@@ -26,16 +26,3 @@ class UploadReservation(Base):
     error_message: Mapped[str | None] = mapped_column(String(300))
     verified_info: Mapped[dict | None] = mapped_column(JSON)
     __table_args__ = (CheckConstraint("expected_size > 0"),)
-
-
-class UploadIngressMutex(Base):
-    __tablename__ = "upload_ingress_mutex"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-
-class UploadIngressLease(Base):
-    __tablename__ = "upload_ingress_leases"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    upload_id: Mapped[str] = mapped_column(ForeignKey("upload_reservations.id"), unique=True)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)

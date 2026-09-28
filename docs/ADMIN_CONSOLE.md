@@ -9,7 +9,7 @@
 | 运行概览 | 当前在途、排队等待、有效执行租约、近 24 小时完成和失败；常规／重绘分别按上传、排队、运行、待核实统计；实时／预存、阶段积压、用户和资源概况 |
 | 翻译任务 | 任务／用户名搜索、模式／状态／优先级／用户／节点筛选；执行履历、文本计量、分页供应商调用；未知结果确认失败、关联已有结果、补交译图 |
 | 计算节点 | 图像计算节点与控制资源池、设备、引擎版本、能力、启停状态、心跳、执行位占用、过期租约，以及近 24 小时阶段次数／耗时；跳转参与任务 |
-| 翻译供应商 | 文本 LLM 创建、配置、密钥替换、启停、默认切换及独立 RPM；版本历史位于运行诊断 |
+| 翻译供应商 | 文本 LLM 创建、配置、思考程度、密钥替换、启停、正文／漫画名分流权重及供应商上游 RPM；版本历史位于运行诊断 |
 | 图片供应商 | AI 重绘连接、模型、环境密钥引用、白名单与输入限制；启停、验证状态、真实图片测试及测试任务关联 |
 | 用户管理 | 用户与当前权益；运营会员开通／续期／提前结束、限时赠送、当期补偿；历史额度桶、账本、预占任务和操作人／原因分页 |
 | 系统设置 | 每日／会员默认额度、普通／PLUS 调度权重、滚动分钟准入、上传并发／超时／占位及反馈预算；版本冲突保护和变更审计 |
@@ -37,7 +37,7 @@
 - **最近提交**表示最近任务创建时间；系统未记录用户最后登录或当前在线状态，后台不会据此推断。
 - 时间按浏览器本地时区显示。监控列表默认每 15 秒刷新，可暂停；后台标签页隐藏或详情打开时停止监控列表定时刷新。产品和订单页面手动刷新。请求失败保留上次数据并标记可能过时，支持重试；产品数据读取失败时禁用修改，刷新成功后恢复。
 
-`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，`#image-providers` 管理图片重绘，二者配置与测试分别执行。文本配置说明见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[初始迁移](../backend/migrations/versions/0001_translations.py)和模型为准，不另维护表数／字段数快照。
+`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，分别显示正文与漫画名的权重及预计分配比例；编辑时可调整两种用途的权重，设为 0 停止该用途的新分配。停用供应商还会暂停其已有正文任务。上游 RPM 独立于模型参数和用户业务限流，由两种用途的实际调用共享，修改不生成模型版本。思考程度默认 `none`，模型支持范围和版本规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。`#image-providers` 管理图片重绘，二者配置与测试分别执行。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[数据库迁移](../backend/migrations/versions/)和模型为准，不另维护表数／字段数快照。
 
 ### 处理操作与恢复
 
@@ -84,7 +84,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 
-容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库仅保留 `translations_0001` 全新空库基线，包含翻译请求、审计、反馈处理、退款和争议结构，不升级旧库。API 与工作进程应使用同版本代码。
+容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库从 `translations_0001` 全新空库基线迁移至 `redis_admission_0004`；已有该基线数据库可保留业务数据升级，基线之前的旧库不支持。供应商权重迁移规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md#api-与部署)。API、管理后台与工作进程应使用同版本代码。
 
 ### 登录
 
@@ -134,7 +134,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 - `POST /v1/support-requests`：`kind=website|plugin`，UUID `Idempotency-Key`；网站申请要求名称与公开 HTTP(S) 地址，插件反馈要求正文。名称／URL／说明／联系方式上限分别为 100／2048／1000／200 字符，联系方式可选且不限定邮箱。请求体最多 16 KiB。
 - 网站地址拒绝凭据和本地地址，去除 query／fragment；服务端只保存，不抓取。重复原请求不新增记录，同编号改内容为 409。未知回包冻结原草稿与编号重试，已知拒绝允许修改。
 - `GET /v1/admin/support-requests?kind=website|plugin&offset=0&limit=25` 仅管理员可读，按时间和 ID 倒序分页。两类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
-- `support_requests` 与 `support_request_admissions` 属空库初始基线。正文、联系方式、原网络地址不写默认日志；公开回执仅含 `id` 与 `created_at`。
+- `support_requests` 持久保存回执；限流与短期幂等计数保存在 Redis，到期自动回收。正文、联系方式、原网络地址不写默认日志；公开回执仅含 `id` 与 `created_at`。
 
 契约回归在 `backend/tests/test_support_requests.py`；隔离预览按后端运行文档准备 Python 依赖后，在 `backend` 执行 `python tests/support_preview.py --lose-first-response`，在插件目录以 `VITE_API_BASE=http://127.0.0.1:18089` 启动 Vite 5191。访问插件 `/#sites` 和后台 `/console-fixture/`（测试用户名 admin）；夹具创建临时库并模拟首次回包丢失，不访问外部服务。正式构建前清除 `VITE_API_BASE`。
 

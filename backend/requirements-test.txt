@@ -1,0 +1,4 @@
+-r requirements.txt
+# https://pypi.org/project/fakeredis/2.38.0/ (BSD-3-Clause)
+# fakeredis-2.38.0-py3-none-any.whl sha256: d9fb0518c4eaa35f1f2c94df6b4a4c97ff3ca9f43d6cc8112317a9037d244301
+fakeredis[lua]==2.38.0

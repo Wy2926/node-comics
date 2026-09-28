@@ -11,7 +11,9 @@ x-server: &server
     DEV_AUTH_SECRET: ""
     RESULT_STORAGE_BACKEND: r2
     STORAGE_PATH: /data/images
-  networks: [infrastructure]
+  networks: [infrastructure, admission]
+  depends_on:
+    redis: {condition: service_healthy}
   read_only: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
@@ -26,6 +28,17 @@ x-server: &server
       max-file: "3"
 
 services:
+  redis:
+    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAX_MEMORY:-256mb}", --maxmemory-policy, noeviction]
+    networks: [admission]
+    volumes: [admission_redis:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
   api:
     <<: *server
     # Proxy headers are trusted only within this private control-plane boundary.
@@ -59,6 +72,11 @@ services:
       start_period: 60s
 
 networks:
+  admission:
+    internal: true
   infrastructure:
     external: true
     name: ${INFRA_NETWORK:-1panel-network}
+
+volumes:
+  admission_redis:

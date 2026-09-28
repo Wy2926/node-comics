@@ -124,7 +124,7 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     existing = job_for_request(db, user.id, operation, key, request_hash)
     if existing:
         return existing
-    config = config or configuration(db, mode, language)
+    config = config or configuration(db, mode, language, source_sha256=sha)
     if asset:
         validate_input(asset, config)
     cached = None if force else find_reusable(db, user, sha, mode, language, config)

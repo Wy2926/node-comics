@@ -11,7 +11,40 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def isolated_identity_environment(monkeypatch):
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("ADMIN_WEB_PATH", "/console-test/")
+    monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
+
+
+@pytest.fixture(autouse=True)
+def redis_client(monkeypatch, isolated_identity_environment):
+    """One isolated namespace per test; optional real Redis also reaches subprocesses."""
+    import os
+    from uuid import uuid4
+    from app import redis_state
+    from app.config import settings
+    cached_client = redis_state.client
+    namespace = 'test-' + uuid4().hex
+    monkeypatch.setenv('REDIS_NAMESPACE', namespace)
+    url = os.environ.get('TEST_REDIS_URL')
+    if url:
+        monkeypatch.setenv('REDIS_URL', url)
+    settings.cache_clear()
+    cached_client.cache_clear()
+    if url:
+        connection = redis_state.client()
+        connection.ping()
+    else:
+        from fakeredis import FakeRedis
+        connection = FakeRedis(decode_responses=True)
+        monkeypatch.setattr(redis_state, 'client', lambda: connection)
+    yield connection
+    if url:
+        keys = list(connection.scan_iter(match=namespace + ':*', count=1000))
+        if keys:
+            connection.delete(*keys)
+        cached_client.cache_clear()
+    connection.close()
+    settings.cache_clear()
 
 
 @pytest.fixture
@@ -41,8 +74,7 @@ def client(tmp_path, monkeypatch):
     from translation_fixtures import configure_text_provider
     with TestClient(app) as test_client:
         with session_factory()() as db:
-            provider = configure_text_provider(db)
-            provider.is_title_default = True  # Explicit isolated setup; production has no title fallback.
+            configure_text_provider(db)
             db.commit()
         yield test_client
     engine().dispose()

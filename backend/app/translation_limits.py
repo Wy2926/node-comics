@@ -1,12 +1,9 @@
-"""Exact rolling image admission and independent HTTP request protection."""
-from datetime import timedelta
-from math import ceil
+"""Redis image admission and independent HTTP request protection."""
 from fastapi import HTTPException
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import text
 from .config import settings
-from .db import session_factory
 from .models import now, uid
-from .translation_requests import ControlAdmission, ImageAdmission
+from . import redis_state
 
 
 def server_now(db):
@@ -23,49 +20,30 @@ def image_limit(db, user):
 
 
 def image_budget(db, user, at=None):
-    at = at or server_now(db)
-    limit = image_limit(db, user)
-    events = list(db.scalars(select(ImageAdmission.admitted_at).where(
-        ImageAdmission.owner_id == user.id, ImageAdmission.admitted_at > at - timedelta(seconds=60),
-        ImageAdmission.admitted_at <= at)
-        .order_by(ImageAdmission.admitted_at)))
-    delay = max(1, ceil((events[len(events) - limit] + timedelta(seconds=60) - at).total_seconds())) if len(events) >= limit else 0
-    return {'window_seconds': 60, 'limit': limit, 'remaining': max(0, limit - len(events)), 'retry_after_seconds': delay}
+    budget = redis_state.window('image', user.id, image_limit(db, user))
+    return {key: budget[key] for key in ['window_seconds', 'limit', 'remaining', 'retry_after_seconds']}
 
 
 def admit_image(db, user, job_id):
-    at = server_now(db)
-    budget = image_budget(db, user, at)
-    if not budget['remaining']:
+    budget = redis_state.window('image', user.id, image_limit(db, user), member=job_id)
+    retry = budget['retry_after_seconds']
+    if retry:
         raise HTTPException(429, detail={'code': 'IMAGE_RATE_LIMITED', 'message': '本分钟新增翻译图片已达上限',
-            'scope': 'new_translation', 'retry_after_seconds': budget['retry_after_seconds']},
-            headers={'Retry-After': str(budget['retry_after_seconds'])})
-    db.add(ImageAdmission(owner_id=user.id, job_id=job_id, admitted_at=at))
-    db.flush()
+            'scope': 'new_translation', 'retry_after_seconds': retry}, headers={'Retry-After': str(retry)})
+
+
+def control_budget(owner_id, scope='translation', *, member=''):
+    cfg = settings()
+    return redis_state.bucket('control', owner_id + ':' + scope, cfg.translation_requests_per_minute,
+        cfg.translation_request_burst, member=member, concurrency=cfg.translation_request_concurrency,
+        lease_seconds=cfg.translation_request_lease_seconds)
 
 
 def acquire_control(owner_id, scope='translation'):
-    cfg, at, token = settings(), now(), uid()
-    with session_factory()() as db:
-        if db.get_bind().dialect.name == 'postgresql':
-            from sqlalchemy.dialects.postgresql import insert
-        else:
-            from sqlalchemy.dialects.sqlite import insert
-        db.execute(insert(ControlAdmission).values(owner_id=owner_id, scope=scope,
-            tokens=cfg.translation_request_burst, refilled_at=at, leases=[]).on_conflict_do_nothing())
-        row = db.scalar(select(ControlAdmission).where(ControlAdmission.owner_id == owner_id,
-            ControlAdmission.scope == scope).with_for_update())
-        row.tokens = min(cfg.translation_request_burst, row.tokens + max(0, (at - row.refilled_at).total_seconds()) * cfg.translation_requests_per_minute / 60)
-        row.refilled_at = max(at, row.refilled_at)
-        row.leases = [entry for entry in row.leases if entry['until'] > at.isoformat()]
-        busy = len(row.leases) >= cfg.translation_request_concurrency
-        denied = busy or row.tokens < 1
-        retry = 1 if busy else max(1, ceil((1 - row.tokens) * 60 / cfg.translation_requests_per_minute))
-        if not denied:
-            row.tokens -= 1
-            row.leases = [*row.leases, {'id': token, 'until': (at + timedelta(seconds=cfg.translation_request_lease_seconds)).isoformat()}]
-        db.commit()
-    if denied:
+    token = uid()
+    budget = control_budget(owner_id, scope, member=token)
+    if not budget['allowed']:
+        retry = budget['retry_after_seconds']
         raise HTTPException(429, detail={'code': 'REQUEST_RATE_LIMITED',
             'message': '请求过于频繁，请稍后重试', 'scope': 'control_request', 'retry_after_seconds': retry},
             headers={'Retry-After': str(retry)})
@@ -73,15 +51,7 @@ def acquire_control(owner_id, scope='translation'):
 
 
 def release_control(owner_id, token, scope='translation'):
-    with session_factory()() as db:
-        db.execute(update(ControlAdmission).where(ControlAdmission.owner_id == owner_id,
-            ControlAdmission.scope == scope).values(tokens=ControlAdmission.tokens))
-        row = db.scalar(select(ControlAdmission).where(ControlAdmission.owner_id == owner_id,
-            ControlAdmission.scope == scope).with_for_update())
-        if row:
-            row.leases = [entry for entry in row.leases if entry['id'] != token]
-            db.commit()
-
-
-def clean_admissions(db):
-    db.execute(delete(ImageAdmission).where(ImageAdmission.admitted_at <= now() - timedelta(minutes=2)))
+    try:
+        redis_state.command('zrem', redis_state.key('control-leases', owner_id + ':' + scope), token)
+    except redis_state.AdmissionUnavailable:
+        pass  # Expiring token cannot block the account permanently.

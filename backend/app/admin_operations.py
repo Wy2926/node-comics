@@ -11,13 +11,14 @@ from .errors import problem
 from .models import Asset, Job, TextCall, User, now
 from .health import queue_alerts
 from .health_models import ServiceHeartbeat
-from .translation_requests import ControlAdmission, TranslationRequest
-from .translation_limits import image_budget
+from .translation_requests import TranslationRequest
+from .translation_limits import image_budget, control_budget
 from .comic_title_limits import title_budget
-from .feedback_models import FeedbackAdmission
+from .feedback_limits import feedback_budget
 from .results import ResultAccess, TranslationResult, valid_asset_sql
 from .file_pages import FilePage
-from .upload_models import UploadIngressLease, UploadReservation
+from .upload_models import UploadReservation
+from .upload_ingress import ingress_snapshot
 from .billing_models import BillingEvent, BillingOrder
 from .admin_monitor import duration_sql
 
@@ -66,30 +67,31 @@ def user_diagnostics(owner_id: str, db: Session = Depends(get_db)):
     if user is None:
         problem('NOT_FOUND', '用户不存在', 404)
     at = now()
-    admissions = db.scalars(select(ControlAdmission).where(ControlAdmission.owner_id == owner_id))
-    feedback = db.get(FeedbackAdmission, owner_id)
+    controls = [{'scope': scope, **control_budget(owner_id, scope)} for scope in ('translation', 'snapshot', 'history')]
+    feedback = feedback_budget(db, owner_id)
     return {'owner_id': owner_id, 'owner_name': user.name, 'generated_at': at,
         'image_budget': image_budget(db, user, at),
         'comic_title_budget': title_budget(db, owner_id),
-        'upload_active': db.scalar(select(func.count()).select_from(UploadIngressLease).where(
-            UploadIngressLease.owner_id == owner_id, UploadIngressLease.expires_at > at)),
-        'controls': [{'scope': row.scope, 'recorded_tokens': row.tokens, 'refilled_at': row.refilled_at,
-            'active_leases': sum(entry.get('until', '') > at.isoformat() for entry in row.leases)} for row in admissions],
-        'feedback': {'recorded_tokens': feedback.request_tokens, 'refilled_at': feedback.refilled_at,
-            'day_started_at': feedback.day_started_at, 'daily_receipts': feedback.daily_receipts} if feedback else None}
+        'upload_active': ingress_snapshot(owner_id=owner_id)[0],
+        'controls': [{name: control[name] for name in (
+            'scope', 'recorded_tokens', 'refilled_at', 'active_leases')} for control in controls],
+        'feedback': {name: feedback[name] for name in (
+            'recorded_tokens', 'refilled_at', 'day_started_at', 'daily_receipts')}}
 
 
 @router.get('/uploads')
 def uploads(owner_id: str | None = Query(None, max_length=36), job_id: str | None = Query(None, max_length=36),
         status: str | None = Query(None, max_length=24), offset: int = Query(0, ge=0),
         limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(UploadReservation, 'id job_id owner_id mode expected_sha256 expected_size mime status asset_id created_at expires_at max_expires_at completed_at error_code error_message'),
-        UploadIngressLease.expires_at.label('ingress_expires_at')).outerjoin(UploadIngressLease,
-        UploadIngressLease.upload_id == UploadReservation.id)
+    query = select(*columns(UploadReservation, 'id job_id owner_id mode expected_sha256 expected_size mime status asset_id created_at expires_at max_expires_at completed_at error_code error_message'))
     for col, value in ((UploadReservation.owner_id, owner_id), (UploadReservation.job_id, job_id), (UploadReservation.status, status)):
         if value:
             query = query.where(col == value)
-    return page(db, query.order_by(UploadReservation.created_at.desc(), UploadReservation.id), offset, limit)
+    result = page(db, query.order_by(UploadReservation.created_at.desc(), UploadReservation.id), offset, limit)
+    _, deadlines = ingress_snapshot([row['id'] for row in result['items']])
+    for row in result['items']:
+        row['ingress_expires_at'] = deadlines[row['id']]
+    return result
 
 
 @router.get('/requests')

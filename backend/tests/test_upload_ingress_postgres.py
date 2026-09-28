@@ -8,6 +8,8 @@ from test_upload_ingress import (
     test_shared_owner_global_and_same_upload_limits,
     test_parallel_replicas_cannot_overbook_global_or_owner_limit,
     test_expired_token_cannot_release_or_fail_replacement,
+    test_token_replaced_while_waiting_for_lock_cannot_fail_upload,
+    test_redis_outage_does_not_block_upload_expiry,
     test_waiting_body_releases_identity_connection_and_disconnect_releases_slot,
     test_cancelled_waiting_body_releases_slot_and_preserves_retry,
     test_cancel_during_r2_put_keeps_slot_and_heartbeat_until_thread_finishes,

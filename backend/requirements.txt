@@ -17,3 +17,6 @@ s3transfer==0.19.2
 jmespath==1.1.0
 urllib3==2.7.0
 stripe==15.6.1
+# https://pypi.org/project/redis/8.1.0/ (MIT)
+# redis-8.1.0-py3-none-any.whl sha256: a4fe1aac3d3b3cc791d4b3d5931c5a956045dc951ee74d1c913ee3ac4d2ee9fb
+redis==8.1.0

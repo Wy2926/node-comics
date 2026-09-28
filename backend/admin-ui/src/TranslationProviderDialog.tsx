@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState, type InputHTMLAttributes} from 'react';
 import {ApiError, authError, errorText, sendRequest} from './api';
 import type {TranslationChannel, TranslationProvider} from './types';
-import {channelProtocols, numericFields, protocolLabels, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
+import {channelProtocols, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
 import {time} from './ui';
 
 export function TranslationProviderDialog({provider, channels, onClose, onSaved, onRefresh, onUnauthorized}: {
@@ -17,7 +17,7 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
   const [error, setError] = useState('');
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const errors = attempted ? validateProvider(draft, channels, !provider) : {};
-  const dirty = JSON.stringify(draft) !== JSON.stringify(providerDraft(provider));
+  const dirty = (!!provider && provider.config.reasoning_effort === undefined) || JSON.stringify(draft) !== JSON.stringify(providerDraft(provider));
   const protocols = channelProtocols(channels, draft.channel);
 
   useEffect(() => {
@@ -91,8 +91,8 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
       <button type="button" className="secondary" disabled={busy} onClick={close} aria-label="关闭供应商配置">关闭 ×</button></div>
     <div className="dialog-content">
       <p id="provider-dialog-description" className="provider-description muted">{provider ?
-        '修改参数或密钥会产生独立的新版本；已提交任务继续使用原版本。' :
-        '每个供应商独立配置地址、模型和密钥。首个自动用于正文，漫画名需在列表中单独选择。'}</p>
+        '修改模型参数或密钥会产生新版本；分流权重和上游限额独立生效，已有任务保持原模型版本。' :
+        '每个供应商独立配置地址、模型、密钥，以及正文与漫画名的分流权重。'}</p>
       {provider && <div className="provider-revision"><span>当前版本 <code>{provider.revision_id}</code></span>
         <span>创建于 {time(provider.created_at)} · 更新于 {time(provider.updated_at)}</span></div>}
       <form ref={form} noValidate autoComplete="off" className="provider-form" onSubmit={event => {event.preventDefault(); void save();}} aria-busy={busy}>
@@ -115,6 +115,11 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
                 </select>{hint('channel', '当前支持 OpenAI 渠道，可为不同兼容服务分别创建供应商。')}</div>
               {field('base_url', 'API 基础地址', '填写包含版本路径的 HTTPS 基础地址，例如 https://api.openai.com/v1。密钥请填写在下方独立字段。', {type: 'url', spellCheck: false})}
               {field('model', '模型', '填写该供应商实际提供的文本模型标识。', {placeholder: '填写模型 ID', spellCheck: false})}
+              <div className="settings-field"><label htmlFor="provider-reasoning_effort">思考程度 <span className="provider-required">必填</span></label>
+                <select required {...accessibility('reasoning_effort')} value={draft.reasoning_effort} onChange={event => update('reasoning_effort', event.target.value)}>
+                  {Object.entries(reasoningLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                </select>{hint('reasoning_effort', '默认关闭思考，优先速度；适用于正文与漫画名。请按模型支持的档位选择，不支持此参数时选“供应商默认”。')}
+                {provider && provider.config.reasoning_effort === undefined && <p className="muted">当前配置尚未指定思考程度，本次保存会应用所选档位并生成模型新版本。</p>}</div>
               <div className="settings-field"><label htmlFor="provider-protocol">接口协议 <span className="provider-required">必填</span></label>
                 <select required {...accessibility('protocol')} value={draft.protocol} onChange={event => update('protocol', event.target.value)}>
                   {!protocols.some(protocol => protocol === draft.protocol) && <option value={draft.protocol} disabled>{draft.protocol || '请选择协议'}（当前不可用）</option>}
@@ -122,6 +127,19 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
                 </select>{hint('protocol', 'Chat Completions 使用 /chat/completions；Responses 使用 /responses。')}</div>
               {field('user_agent', 'User-Agent', '随文本请求发送的客户端标识。', {spellCheck: false})}
             </div>
+          </section>
+          <section className="config-section provider-section" aria-labelledby="provider-routing-title">
+            <h3 id="provider-routing-title">按比例分流</h3>
+            <p className="muted">两种用途独立计算比例，例如权重 3:1 约为 75%:25%。修改权重只影响后续分配，不改变已有正文任务或漫画名缓存。</p>
+            <div className="settings-fields">{routingFields.map(({key, label}) => field(key, `${label}分流权重`,
+              `0 表示不参与${label}分流；大于 0 时按启用供应商的权重比例分配。范围 0–10000，整数。`, {type: 'number', min: 0, max: 10000, step: 1}))}</div>
+          </section>
+          <section className="config-section provider-section" aria-labelledby="provider-upstream-title">
+            <h3 id="provider-upstream-title">上游调用保护</h3>
+            <p className="muted">按供应商实际配额设置，正文与漫画名共用。用户提交限流由业务层独立管理；修改此限额不生成模型版本。</p>
+            {field(upstreamLimit.key, '上游 RPM 上限（次 / 分钟）',
+              '此供应商在滚动 60 秒内允许的调用次数；缓存命中不占用。范围 1–10000，整数。',
+              {type: 'number', min: upstreamLimit.min, max: upstreamLimit.max, step: 1})}
           </section>
           <section className="config-section provider-section" aria-labelledby="provider-credential-title">
             <h3 id="provider-credential-title">访问密钥与状态</h3>
@@ -132,7 +150,7 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
               {type: 'password', required: !provider, autoComplete: 'new-password', spellCheck: false, autoCapitalize: 'none', placeholder: provider ? '留空保留现有密钥' : '输入供应商 API 密钥'})}
             <label className="provider-enabled"><input type="checkbox" checked={draft.enabled} onChange={event => setDraft({...draft, enabled: event.target.checked})}
               aria-describedby="provider-enabled-help"/>启用供应商</label>
-            <p className="muted" id="provider-enabled-help">停用会暂停该供应商排队中的文本阶段；重新启用后恢复。{provider?.is_default && ' 此供应商用于正文，停用后常规翻译暂不可提交新任务。'}{provider?.is_title_default && ' 此供应商用于漫画名，停用后漫画名仅可返回已有缓存。'}</p>
+            <p className="muted" id="provider-enabled-help">停用会移出两种用途的分流，并暂停该供应商已有正文任务的文本阶段；重新启用后恢复。仅停止接新请求请将对应用途的权重设为 0。</p>
           </section>
           {(['requests', 'pricing'] as const).map(group => <section className="config-section provider-section" key={group} aria-labelledby={`provider-${group}-title`}>
             <h3 id={`provider-${group}-title`}>{group === 'requests' ? '请求与分组' : '成本计量'}</h3>

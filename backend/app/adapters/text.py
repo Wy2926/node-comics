@@ -12,14 +12,13 @@ SYSTEM = ('Translate comics naturally and faithfully; preserve tone/names and us
 
 
 class TextPolicy(BaseModel):
-    """Body translation grouping, retries, rate limits and cost estimates."""
+    """Body translation grouping, retries and cost estimates."""
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True, hide_input_in_errors=True)
     max_attempts: int = Field(default=3, ge=1, le=3, strict=True)
     group_bytes: int = Field(default=1800, ge=128, le=16000, strict=True)
     input_rate: int = Field(default=5, ge=0, le=1000, strict=True)
     output_rate: int = Field(default=30, ge=0, le=5000, strict=True)
     pricing_version: str = Field(default='operator-estimate-v1', min_length=1, max_length=100)
-    requests_per_minute: int = Field(default=60, ge=1, le=10000, strict=True)
 
 
 def messages(segments, language):

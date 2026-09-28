@@ -141,14 +141,12 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     first = client.post(path, headers=admin, json=body)
     assert first.status_code == 201, first.text
     provider = first.json()
-    changed_body = {**body, 'api_key': 'PRIVATE_ROTATED_TEXT_KEY',
+    changed_body = {**body, 'api_key': 'PRIVATE_ROTATED_TEXT_KEY', 'text_weight': 3, 'title_weight': 0,
         'config': {**body['config'], 'model': 'model-two', 'max_output_tokens': 2048}}
     changed = client.put(f'{path}/{provider["id"]}', headers=admin, json=changed_body)
     assert changed.status_code == 200
-    assert client.post(f'{path}/{provider["id"]}/default', headers=admin).status_code == 200
-    assert client.post(f'{path}/{provider["id"]}/title-default', headers=admin).status_code == 200
     with session_factory()() as db:
-        assert configuration(db, 'classic', 'en')['text']['model'] == 'model-two'
+        assert configuration(db, 'classic', 'en', provider['id'])['text']['model'] == 'model-two'
     assert client.patch(f'{path}/{provider["id"]}', headers=admin, json={'enabled': False}).status_code == 200
     rows = client.get(f'{path}/{provider["id"]}/revisions?limit=1', headers=admin)
     assert rows.status_code == 200 and rows.json()['total'] == 2 and rows.json()['next_offset'] == 1
@@ -159,7 +157,7 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     assert older.json()['items'][0]['config']['max_output_tokens'] == 4096
     assert client.get(f'{path}/{provider["id"]}/revisions', headers=login(client, 'reader')).status_code == 403
     audit = client.get('/v1/admin/audit', headers=admin, params={'target_type': 'translation_provider', 'target_id': provider['id']})
-    assert {row['action'] for row in audit.json()['items']} == {'text_provider.create', 'text_provider.update', 'text_provider.default', 'text_provider.title_default', 'text_provider.toggle'}
+    assert {row['action'] for row in audit.json()['items']} == {'text_provider.create', 'text_provider.update', 'text_provider.toggle'}
     for response in (rows, older, audit):
         assert 'PRIVATE_TEST_TEXT_KEY' not in response.text and 'PRIVATE_ROTATED_TEXT_KEY' not in response.text
     update = next(row for row in audit.json()['items'] if row['action'] == 'text_provider.update')
@@ -167,6 +165,7 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     assert update['after']['revision_id'] == changed.json()['revision_id']
     assert update['before']['config']['max_output_tokens'] == 4096
     assert update['after']['config']['max_output_tokens'] == 2048
+    assert update['after']['text_weight'] == 3 and update['after']['title_weight'] == 0
 
 
 def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_existing_grants(client):

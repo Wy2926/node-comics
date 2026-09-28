@@ -77,4 +77,6 @@ Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；
 
 `probe_page_image_access.mjs` 使用临时研究扩展比较图片像素、原始字节和浏览器缓存；可选 `PROBE_DEBUGGER`、`PROBE_PAGE_CAPTURE`、`PROBE_REQUEST_CONTEXT` 仅影响实验扩展，不改变产品权限。
 
+使用真实后端的浏览器夹具和 R2／供应商验证脚本需要 Redis 8：`TEST_REDIS_URL` 指定专用测试实例，默认本机 6379；每次运行使用独立随机命名空间，不使用生产限流状态。纯静态或模拟 HTTP 的页面夹具无此依赖。
+
 `translation_client.py`、`local_import_helpers.mjs` 是脚本共享模块；`generate_import_fixtures.py` 只生成自制样本。脚本使用的数据、profile 和结果不提交仓库。
