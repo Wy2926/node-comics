@@ -1,29 +1,77 @@
 import {useEffect,useState} from 'react';
-import {billingCopy,amount,annualSavings,type BillingOffer} from '../lib/billing';
+import {billingCopy,amount,annualSavings,offerLabel,type BillingOffer} from '../lib/billing';
 import {pricingCopy} from '../lib/pricing';
+import {comparisonCopy} from '../lib/pricing-comparison';
+import {publishedPlus} from '../data/published-plus';
 import BillingCycle,{selectedInterval,type BillingInterval} from './BillingCycle';
+import PublishedPlusPricing,{PublishedPurchaseAvailability} from './PublishedPlusPricing';
 
-export default function BillingOffers({locale,accountHref,benefits}:{locale:string;accountHref:string;benefits:string[]}){
+interface Props {
+  locale:string;
+  accountHref:string;
+  downloadHref:string;
+  free:{name:string;description:string;action:string;note:string;priceLabel:string};
+  plusDescription:string;
+}
+
+export default function BillingOffers({locale,accountHref,downloadHref,free,plusDescription}:Props){
   const [offers,setOffers]=useState<BillingOffer[]>(),[error,setError]=useState(false);
   const [preferred,setPreferred]=useState<BillingInterval>('month');
-  const copy=billingCopy(locale),text=pricingCopy(locale);
-  useEffect(()=>{const controller=new AbortController();fetch('/v1/billing/catalog',{signal:controller.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error();setOffers((await r.json()).offers);}).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[]);
-  if(error)return <p className="billing-status" role="alert">{copy.error}</p>;
-  if(!offers)return <p className="billing-status" role="status">{copy.loading}</p>;
-  if(!offers.length)return <p className="billing-status" role="status">{copy.unavailable}</p>;
-  const interval=selectedInterval(offers,preferred);
-  return <><BillingCycle offers={offers} value={interval} onChange={setPreferred} locale={locale}/><div className="billing-offers" aria-live="polite">{offers.filter(p=>p.interval===interval).map(p=>{
-    const savings=annualSavings(p,offers),annual=p.interval==='year';
-    return <section className="billing-offer" key={p.id} aria-label={p.name}>
-      {p.name!=='PLUS'&&<h3 className="offer-heading">{p.name}</h3>}
-      <p className="price">{amount({...p,unit_amount:annual?p.unit_amount/12:p.unit_amount},locale)} <span>/ {copy.month}</span></p>
-      <p className="billing-total">{annual?`${text.monthly} · ${text.billed(amount(p,locale))}`:copy.renew(false)}</p>
-      {savings&&<p className="annual-saving"><span>{text.total} <s>{amount({...p,unit_amount:savings.regular},locale)}</s></span><strong>{text.saving(amount({...p,unit_amount:savings.saved},locale))}</strong></p>}
-      <div className="membership-rights"><div><span>{text.classic}</span><strong>{text.unlimited}</strong></div><div><span>{text.redraw}</span><strong>{p.monthly_redraw_pages.toLocaleString(locale)} <small>{text.pages}</small></strong></div></div>
-      <ul className="check-list">{benefits.map(item=><li key={item}>{item}</li>)}</ul>
-      <p className="membership-terms">{text.quota}</p>
-      <a className="button" href={`${accountHref}?price=${encodeURIComponent(p.id)}`}>{text.subscribe} <span aria-hidden="true">↗</span></a>
-      <p className="trial-note">{p.trial_days>0&&text.trial(p.trial_days,p.trial_redraw_pages)} {copy.renew(annual)} {text.cancel}</p>
-    </section>;
-  })}</div></>;
+  const [selectedPrice,setSelectedPrice]=useState('');
+  const copy=billingCopy(locale),text=pricingCopy(locale),comparison=comparisonCopy(locale);
+  useEffect(()=>{
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>{setError(true);controller.abort();},10000);
+    fetch('/v1/billing/catalog',{signal:controller.signal,cache:'no-store'}).then(async r=>{
+      if(!r.ok)throw Error();
+      const catalog=await r.json();
+      if(!Array.isArray(catalog.offers))throw Error();
+      setOffers(catalog.offers.filter((offer:BillingOffer)=>offer?.channels?.length>0));
+    }).catch(()=>{if(!controller.signal.aborted)setError(true);}).finally(()=>clearTimeout(timeout));
+    return()=>{clearTimeout(timeout);controller.abort();};
+  },[]);
+  const available=error?[]:offers??[];
+  const interval=selectedInterval(available,preferred);
+  const matching=available.filter(p=>p.interval===interval);
+  const offer=matching.find(p=>p.id===selectedPrice)??matching[0];
+  const savings=offer?annualSavings(offer,available):null;
+  const annual=offer?.interval==='year';
+  const rows=(['reading','classic','rate','redraw','priority','early'] as const).map(key=>({
+    key,label:comparison[key].label,free:comparison[key].free,
+    plus:key==='redraw'?comparison.redraw.plus(offer?.monthly_redraw_pages??publishedPlus.monthlyRedrawPages):comparison[key].plus,
+  }));
+  return <div className="pricing-comparison">
+    <div className="pricing-grid">
+      <article className="price-card free">
+        <div className="membership-heading"><span className="membership-icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>READ EVERY DAY</span></div>
+        <h2>{free.name}</h2><p>{free.description}</p>
+        <p className="price"><small>US$</small>0 <span>/ {free.priceLabel}</span></p>
+      </article>
+      <article className="price-card plus">
+        <div className="membership-heading"><span className="membership-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="m3 6 5 4 4-7 4 7 5-4-3 12H6L3 6Z"/><path d="M6 21h12"/></svg></span><span>{comparison.highlights}</span><b>PLUS</b></div>
+        <h2>{offer?.name??'PLUS'}</h2><p>{plusDescription}</p>
+        {offer?<>
+          <BillingCycle offers={available} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale}/>
+          {matching.length>1&&<div className="billing-plan-picker" role="group" aria-label={copy.plan}>{matching.map(price=><button className="billing-plan-card" type="button" key={price.id} aria-pressed={offer.id===price.id} onClick={()=>setSelectedPrice(price.id)}>{offerLabel(price,locale)}</button>)}</div>}
+          <div className="billing-offers" data-billing-catalog="live" aria-live="polite"><section className="billing-offer" aria-label={offer.name}>
+            <p className="price">{amount({...offer,unit_amount:annual?offer.unit_amount/12:offer.unit_amount},locale)} <span>/ {copy.month}</span></p>
+            <p className="billing-total">{annual?`${text.monthly} · ${text.billed(amount(offer,locale))}`:copy.renew(false)}</p>
+            {savings&&<p className="annual-saving"><span>{text.total} <s>{amount({...offer,unit_amount:savings.regular},locale)}</s></span><strong>{text.saving(amount({...offer,unit_amount:savings.saved},locale))}</strong></p>}
+          </section></div>
+        </>:<PublishedPlusPricing locale={locale}/>}
+      </article>
+    </div>
+    <table className="plan-comparison">
+      <thead><tr><th scope="col">{comparison.feature}</th><th scope="col">{free.name}</th><th scope="col">{offer?.name??'PLUS'}</th></tr></thead>
+      <tbody>{rows.map(row=><tr key={row.key} data-feature={row.key}><th scope="row">{row.label}</th><td>{row.free}</td><td><strong>{row.plus}</strong></td></tr>)}</tbody>
+    </table>
+    <div className="pricing-actions">
+      <div className="free-action"><a className="button secondary" href={downloadHref}>{free.action} <span aria-hidden="true">↗</span></a><p className="trial-note">{free.note}</p></div>
+      <div className="plus-action">{offer?<>
+        <a className="button" data-purchase-link href={`${accountHref}?price=${encodeURIComponent(offer.id)}`}>{text.subscribe} <span aria-hidden="true">↗</span></a>
+        <p className="trial-note">{offer.trial_days>0&&text.trial(offer.trial_days,offer.trial_redraw_pages)} {copy.renew(annual)} {text.cancel}</p>
+      </>:<PublishedPurchaseAvailability locale={locale} state={error?'error':offers?'unavailable':'loading'}/>}</div>
+    </div>
+    <p className="comparison-note">{text.quota} {comparison.note}</p>
+  </div>;
 }

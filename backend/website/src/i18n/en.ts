@@ -87,17 +87,8 @@ export default {
       "Access to your valid existing results",
       "Up to 10 new translation images per rolling 60 seconds"
     ],
-    "plusBenefits": [
-      "No daily or monthly total limit for classic translation",
-      "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility.",
-      "All Free reading features",
-      "Valid existing results remain accessible after expiry",
-      "Up to 100 new translation images per rolling 60 seconds"
-    ],
     "freeNote": "AI redraw on Free requires a valid promotional grant. Daily pages reset in Asia/Shanghai time and do not roll over.",
-    "trialNote": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
     "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Unlimited totals remain subject to short-term rate, image and service-capacity limits; no completion speed is guaranteed.",
-    "viewPlus": "Sign in to explore PLUS",
     "downloadTitle": "Install your manga translator extension",
     "downloadDescription": "Get NodeLane Comics for Chrome, Edge or Firefox. Open the Chrome Web Store or Firefox Add-ons, or download a browser package. The Edge store listing is under review.",
     "storeDescription": "Open your next story in the browser you already enjoy.",

@@ -73,6 +73,27 @@ for (const file of htmlFiles) {
       if (!store.url && !$('.hero-store-status').text().includes(dictionaries[locale].ui.storeUnavailable)) errors.push(`${label}: missing pending store status`);
     }
   }
+  if (basePath(route) === '/pricing/') {
+    const published = $('.published-plus-pricing');
+    const prices = published.find('.published-price-grid .published-price');
+    if (published.length !== 1 || prices.length !== 2) errors.push(`${label}: published monthly and yearly PLUS prices must be present in static HTML`);
+    for (const [index, expected] of ['US$9.99', 'US$99.99'].entries()) {
+      if (!prices.eq(index).text().replace(/\s/g, '').includes(expected)) errors.push(`${label}: missing published PLUS price ${expected}`);
+    }
+    const comparison = $('.pricing-comparison');
+    const table = comparison.find('table.plan-comparison');
+    if (comparison.length !== 1 || comparison.find('.pricing-grid .price-card').length !== 2 || table.length !== 1) errors.push(`${label}: pricing cards and feature comparison must share one connected frame`);
+    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 6) errors.push(`${label}: expected a three-column comparison with six feature rows`);
+    for (const feature of ['reading', 'classic', 'rate', 'redraw', 'priority', 'early']) {
+      const row = table.find(`tbody tr[data-feature="${feature}"]`);
+      if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
+    }
+    if (!table.find('[data-feature="redraw"] td').last().text().includes('300')) errors.push(`${label}: missing published monthly redraw allowance`);
+    const launch = comparison.find('.purchase-launch-date').text();
+    if (!['2026', '30', 'UTC+8'].every(part => launch.includes(part))) errors.push(`${label}: published purchase deadline must show September 30, 2026 in Beijing time`);
+    if (comparison.find('.billing-availability button[disabled]').length !== 1 || $('.billing-availability[data-state="loading"]').length !== 1) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
+    if ($('a[href*="price="]').length || $('[data-billing-catalog="live"]').length) errors.push(`${label}: static pricing must not fabricate a purchasable API offer`);
+  }
   $('img').each((_,node) => { if (!$(node).attr('alt') || !$(node).attr('width') || !$(node).attr('height')) errors.push(`${label}: image missing alt/dimensions`); });
   for (const node of $('a[href],img[src],script[src],link[rel=stylesheet]').toArray()) {
     const target = $(node).attr('href') ?? $(node).attr('src') ?? '';
@@ -105,4 +126,4 @@ for(const path of publicPaths) for(const locale of locales) if(!sitemap.includes
 for (const forbidden of ['/account/','/auth/','/payment/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
 for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/','/payment/success/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
 if (errors.length) throw Error(errors.join('\n'));
-console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, links/anchors, images and index boundaries.`);
+console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published PLUS pricing, links/anchors, images and index boundaries.`);

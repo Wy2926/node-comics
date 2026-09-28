@@ -67,7 +67,7 @@ Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；
 | 工具 | 范围 |
 | --- | --- |
 | `verify_website_download.mjs` | 五语下载页；指向公开服务时真实下载并核对摘要 |
-| `verify_website_pricing.mjs` | 模拟报价、月年付切换、加载与失败 |
+| `verify_website_pricing.mjs` | 五语无 JavaScript 公示月年价格与开放日期、双卡及六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 四种图片、切换、加载失败与恢复 |
 | `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、订阅与退出 |
 

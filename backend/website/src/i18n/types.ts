@@ -81,11 +81,8 @@ export interface UI {
   free: string;
   month: string;
   freeBenefits: string[];
-  plusBenefits: string[];
   freeNote: string;
-  trialNote: string;
   quotaNote: string;
-  viewPlus: string;
   downloadTitle: string;
   downloadDescription: string;
   storeDescription: string;
