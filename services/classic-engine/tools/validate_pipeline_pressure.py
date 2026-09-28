@@ -72,6 +72,7 @@ class SimulatedTransport:
         self.leases, self.analyses, self.results, self.done, self.receipts = {}, {}, {}, {}, {}
         self.counts, self.active, self.peak = Counter(), Counter(), Counter()
         self.events = []
+        self.claim_batches = []
         self.started = time.monotonic()
         self.claimed = self.heartbeats = self.peak_leases = 0
 
@@ -96,19 +97,42 @@ class SimulatedTransport:
             with self.lock:
                 self.active[stage] -= 1
 
+    def lease_updates(self, entries, expires=None):
+        result = []
+        for entry in entries:
+            key = entry['lease_id']
+            item = {'lease_id': key, 'status': 'active'}
+            if expires:
+                item['expires_at'] = expires
+            if key in self.done:
+                item.update(self.done[key])
+            elif key in self.analyses and entry.get('translations_revision') != '1' and (
+                    self.released.is_set() or not (
+                    self.scenario == 'text' or self.scenario == 'mixed' and key == '2')):
+                analysis = self.analyses[key]
+                item['translations'] = {'revision': '1', 'analysis_hash': digest(analysis),
+                    'language': 'en', 'translations': {s['id']: 'Translated text' for s in analysis['segments']}}
+            if expires or item['status'] != 'active' or 'translations' in item:
+                result.append(item)
+        return result
+
     def post(self, path, body):
         server, expires = self.clock()
         if path.endswith('/register'):
             return {'protocol_version': 2, 'config': self.config, 'leases': [], 'server_time': server}
         if path.endswith('/updates'):
             time.sleep(.05)
-            return {'revision': body['revision'] + 1}
+            with self.lock:
+                remaining = 8 - (len(self.leases) - len(self.done))
+                return {'revision': body['revision'] + 1,
+                        'claim_ready': bool(body['can_claim'] and remaining and self.claimed < self.total),
+                        'leases': self.lease_updates(body['leases'])}
         if path.endswith('/claim'):
             with self.lock:
                 if body['request_id'] in self.receipts:
                     return self.receipts[body['request_id']]
                 remaining = 8 - (len(self.leases) - len(self.done))
-                assert body['count'] <= remaining
+                assert 1 <= body['count'] <= min(4, remaining)
                 leases = []
                 for _ in range(min(body['count'], self.total - self.claimed)):
                     key = str(self.claimed)
@@ -125,25 +149,14 @@ class SimulatedTransport:
                     self.leases[key] = lease
                     leases.append(lease)
                 self.peak_leases = max(self.peak_leases, len(self.leases) - len(self.done))
+                self.claim_batches.append(len(leases))
                 reply = {'request_id': body['request_id'], 'server_time': server, 'leases': leases}
                 self.receipts[body['request_id']] = reply
                 return reply
         if path.endswith('/heartbeat'):
             with self.lock:
                 self.heartbeats += 1
-                entries = []
-                for entry in body['leases']:
-                    key = entry['lease_id']
-                    item = {'lease_id': key, 'status': 'active', 'expires_at': expires}
-                    if key in self.done:
-                        item.update(self.done[key])
-                    elif key in self.analyses and (self.released.is_set() or not (
-                            self.scenario == 'text' or self.scenario == 'mixed' and key == '2')):
-                        analysis = self.analyses[key]
-                        item['translations'] = {'revision': '1', 'analysis_hash': digest(analysis),
-                            'language': 'en', 'translations': {s['id']: 'Translated text' for s in analysis['segments']}}
-                    entries.append(item)
-                return {'server_time': server, 'leases': entries}
+                return {'server_time': server, 'leases': self.lease_updates(body['leases'], expires)}
         key = path.split('/')[2]
         if path.endswith('/analysis'):
             self.gate('analysis', key)
@@ -192,6 +205,23 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
     peak_reserved = 0
     snapshot = None
     started = time.monotonic()
+    spans, spans_lock = [], Lock()
+    submit, accepted = agent.pipeline.submit, agent.pipeline.accepted
+
+    def observed(page, stage, operation):
+        began = time.monotonic()
+        try:
+            return operation()
+        finally:
+            with spans_lock:
+                spans.append({'lease_id': page.lease['lease_id'], 'stage': stage,
+                              'start_s': began - started, 'end_s': time.monotonic() - started})
+
+    def observed_submit(page, pool, stage, operation):
+        return submit(page, pool, stage, lambda: observed(page, stage, operation))
+
+    agent.pipeline.submit = observed_submit
+    agent.pipeline.accepted = lambda page: observed(page, 'analysis_submit', lambda: accepted(page))
     try:
         agent.register()
         while time.monotonic() - started < timeout:
@@ -231,9 +261,11 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
         assert agent.pipeline.used == 0 and journal.leases() == {}
         assert transport.peak['upload'] <= 4 and transport.peak_leases == 8
         assert transport.counts['analysis'] == transport.counts['upload'] == transport.counts['complete'] == total
+        assert sum(transport.claim_batches) == total and max(transport.claim_batches) <= 4
         return {'scenario': scenario, 'local_pages': local_pages, 'total': total,
                 'wall_s': time.monotonic() - started, 'blocked_snapshot': snapshot,
                 'network_peak': dict(transport.peak), 'peak_reserved_bytes': peak_reserved,
+                'claim_batches': transport.claim_batches, 'stage_spans': sorted(spans, key=lambda item: item['start_s']),
                 'completed': len(transport.done), 'heartbeats': transport.heartbeats,
                 'journal_empty': True, 'passed': True}
     finally:
@@ -261,7 +293,7 @@ def main():
             with TemporaryDirectory(prefix='classic-pressure-') as directory:
                 row = exercise(directory, scenario, runtime, timeout=args.timeout, local_pages=args.local_pages)
             rows.append(row)
-            print(json.dumps(row), flush=True)
+            print(json.dumps({key: value for key, value in row.items() if key != 'stage_spans'}), flush=True)
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps({'real_image_models': bool(runtime),
                 'engine_version': runtime.version if runtime else 'fixture',

@@ -27,6 +27,20 @@ from test_cluster_scheduler import (
     test_stale_recovery_observation_cannot_end_renewed_lease,
     test_saved_late_output_recovery_preserves_existing_terminal_failure,
 )
+from test_control_dispatch import (
+    test_batch_preserves_per_page_weighted_order,
+    test_batch_elects_backlog_once_and_honors_capacity,
+    test_concurrent_batches_never_overbook_or_duplicate,
+    test_batch_rechecks_supplier_concurrency_after_each_pick,
+    test_prepared_batch_revalidates_and_does_not_repeat_full_election,
+    test_claimability_check_does_not_create_leases_or_fairness,
+    test_claimability_uses_latest_allowed_runtime_languages,
+    test_idle_delay_tracks_retry_deadline,
+    test_worker_rechecks_crossed_deadline_before_sleep_without_local_overbooking,
+    test_idle_delay_tracks_supplier_limit_without_reserving,
+    test_thread_wakeup_requires_commit,
+    test_capacity_and_supplier_changes_wake_only_after_commit,
+)
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
                                 reason='Requires the dedicated nodecomics_concurrency_test database')

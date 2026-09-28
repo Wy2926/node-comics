@@ -9853,6 +9853,41 @@
         ],
         "title": "TranslationsResponse"
       },
+      "UpdateLease": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "lease_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Lease Id"
+          },
+          "translations_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translations Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "lease_id"
+        ],
+        "title": "UpdateLease"
+      },
       "UpdatesRequest": {
         "properties": {
           "revision": {
@@ -9867,10 +9902,32 @@
             "minimum": 0.0,
             "title": "Wait Seconds",
             "default": 20
+          },
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
+          },
+          "can_claim": {
+            "type": "boolean",
+            "title": "Can Claim"
+          },
+          "leases": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateLease"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Leases"
           }
         },
         "additionalProperties": false,
         "type": "object",
+        "required": [
+          "config_version",
+          "can_claim",
+          "leases"
+        ],
         "title": "UpdatesRequest"
       },
       "UsageDay": {

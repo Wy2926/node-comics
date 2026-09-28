@@ -3,7 +3,7 @@ from .pipeline import Pipeline
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import logging
-from threading import Condition, Event
+from threading import Condition, Event, Lock
 import time
 from uuid import uuid4
 
@@ -18,6 +18,7 @@ class Page:
         self.lease = lease
         self.condition = Condition()
         self.deadline = 0
+        self.renewed_at = 0
         self.terminal = None
         self.stopped = False
         self.phase = 'queued'
@@ -33,7 +34,7 @@ class Page:
         self.translations = lease.get('translations')
         self.update(lease, server_time, sent_at)
 
-    def update(self, reply, server_time, sent_at):
+    def update(self, reply, server_time=None, sent_at=None):
         with self.condition:
             status = reply['status']
             if status == 'terminal':
@@ -45,9 +46,12 @@ class Page:
                     self.stopped = True
                     self.condition.notify_all()
                     return
-                # Account for network round-trip and never resurrect local expiry.
-                self.deadline = sent_at + max(0, timestamp(reply['expires_at']) - timestamp(server_time) - 2)
-                self.lease['expires_at'] = reply['expires_at']
+                if sent_at is not None and sent_at >= self.renewed_at:
+                    # Only registration/claim/heartbeat renew execution rights.
+                    # A long-poll update carries no expiry and never extends them.
+                    self.deadline = sent_at + max(0, timestamp(reply['expires_at']) - timestamp(server_time) - 2)
+                    self.lease['expires_at'] = reply['expires_at']
+                    self.renewed_at = sent_at
                 if reply.get('translations'):
                     self.translations = reply['translations']
             self.condition.notify_all()
@@ -63,14 +67,18 @@ class Agent:
     def __init__(self, config, runtime, transport, journal, *, stop=None, operations=None):
         self.local, self.runtime, self.transport, self.journal = config, runtime, transport, journal
         self.config = None
+        self.config_lock = Lock()
         self.pages = {}
         self.wake = Event()
         self.pipeline = Pipeline(self)
         self.next_claim = 0
-        self.control_pool = ThreadPoolExecutor(1, thread_name_prefix='heartbeat-claim')
+        self.claim_wake_version = self.claim_started_wake_version = 0
+        self.claim_retry_after = None
+        self.heartbeat_pool = ThreadPoolExecutor(1, thread_name_prefix='heartbeat')
+        self.claim_pool = ThreadPoolExecutor(1, thread_name_prefix='claim')
         self.notice_pool = ThreadPoolExecutor(1, thread_name_prefix='updates')
-        self.control_future = self.notice_future = None
-        self.control_action = 'control'
+        self.heartbeat_future = self.claim_future = self.notice_future = None
+        self.claim_generation = self.notice_claim_generation = 0
         self.revision = 0
         self.next_notice = 0
         self.stop = stop if stop is not None else Event()
@@ -90,9 +98,40 @@ class Agent:
             self.heartbeat_logged = self.heartbeat_monotonic
 
     def apply_config(self, config):
-        if config is not None:
-            self.config = config
-            self.transport.control.timeout = config['request_seconds']
+        with self.config_lock:
+            if config is not None and (self.config is None or config['version'] >= self.config['version']):
+                changed = self.config is None or config['version'] != self.config['version']
+                self.config = config
+                self.transport.control.timeout = config['request_seconds']
+                if changed:
+                    self.claim_wake_version += 1
+                    self.next_claim = 0
+                    self.wake.set()
+
+    def claim_capacity(self):
+        if not self.config['enabled'] or self.stop.is_set():
+            return 0
+        slots = min(self.config['execution_slots'], self.local['max_leases']) - len(self.pages)
+        return max(0, min(slots, self.pipeline.claim_capacity()))
+
+    def request_claim(self):
+        with self.config_lock:
+            self.claim_wake_version += 1
+            self.next_claim = 0
+        self.wake.set()
+
+    def lease_entries(self, *, phases=False):
+        entries = []
+        for key, page in list(self.pages.items()):
+            with page.condition:
+                if page.stopped or page.terminal:
+                    continue
+                item = {'lease_id': key, 'lease_token': page.lease['lease_token'],
+                        'translations_revision': page.translations['revision'] if page.translations else None}
+                if phases:
+                    item['phase'] = page.phase
+                entries.append(item)
+        return entries
 
     def adopt(self, lease, server_time, sent_at):
         key = lease['lease_id']
@@ -111,6 +150,8 @@ class Agent:
         page.completion = saved.get('completion')
         if page.stopped or page.completion:
             page.step = 'deliver'
+            if page.completion:
+                self.pipeline.resize_reservation(page, self.pipeline.delivery_reservation(page.completion))
         elif lease['config']['engine']['version'] != self.runtime.version:
             self.pipeline.error(page, NodeFailure('ENGINE_VERSION_MISMATCH'))
         self.pages[key] = page
@@ -136,14 +177,7 @@ class Agent:
         self.connected('registration')
 
     def heartbeat(self):
-        entries = []
-        for key, page in list(self.pages.items()):
-            with page.condition:
-                if page.stopped or page.terminal:
-                    continue
-                entries.append({'lease_id': key, 'lease_token': page.lease['lease_token'],
-                    'translations_revision': page.translations['revision'] if page.translations else None,
-                    'phase': page.phase})
+        entries = self.lease_entries(phases=True)
         sent_at = time.monotonic()
         response = self.transport.post(f'/nodes/{self.local["node_id"]}/heartbeat',
             {'config_version': self.config['version'], 'leases': entries})
@@ -152,12 +186,12 @@ class Agent:
             page = self.pages.get(item['lease_id'])
             if page:
                 page.update(item, response['server_time'], sent_at)
-        self.last_heartbeat = sent_at
         self.connected('heartbeat')
 
     def claim(self):
+        self.claim_retry_after = None
         pending = self.journal.get('claim')
-        count = min(self.config['execution_slots'], self.local['max_leases']) - len(self.pages)
+        count = self.claim_capacity()
         if not pending:
             if not self.config['enabled'] or count <= 0 or self.stop.is_set():
                 return
@@ -170,16 +204,23 @@ class Agent:
             if error.code == 'NODE_CONFIG_CONFLICT':
                 # The controller checks saved receipts before config conflicts.
                 self.journal.remove('claim')
-                self.heartbeat()
+                self.last_heartbeat = 0
             else:
                 raise
             return
         if response['request_id'] != pending['request_id']:
             raise NodeFailure('CONTROL_INVALID_RESPONSE')
         self.apply_config(response.get('config'))
+        retry_after = response.get('retry_after_seconds')
+        if retry_after is not None and (type(retry_after) not in (int, float)
+                or not .1 <= retry_after <= self.config['poll_seconds']):
+            raise ControlFailure('CONTROL_INVALID_RESPONSE')
         for lease in response['leases']:
             self.adopt(lease, response['server_time'], sent_at)
         self.journal.remove('claim')  # Only after every returned lease is durable.
+        if not response['leases']:
+            self.claim_retry_after = retry_after
+        return bool(response['leases'])
 
     def retry(self, page, operation):
         while True:
@@ -272,13 +313,14 @@ class Agent:
                 self.pipeline.release(page)
                 self.journal.remove('lease:' + key)
                 del self.pages[key]
-                self.next_claim = 0
+                self.request_claim()
 
     def close(self):
         self.stop.set()
         if self.operations:
             self.operations.stopping()
-        self.control_pool.shutdown(wait=True)
+        self.claim_pool.shutdown(wait=True)
+        self.heartbeat_pool.shutdown(wait=True)
         for page in list(self.pages.values()):
             page.stopped = True
         self.wake.set()
@@ -286,40 +328,65 @@ class Agent:
         self.pipeline.close()
 
     def poll_control(self):
+        if self.claim_future and self.claim_future.done():
+            try:
+                claimed = self.claim_future.result()
+                self.network_log.succeeded('claim')
+                with self.config_lock:
+                    # Preserve only a new wake, not the initial zero deadline or
+                    # a fallback that elapsed while the network request ran.
+                    awakened = self.claim_wake_version != self.claim_started_wake_version
+                    delay = self.claim_retry_after if self.claim_retry_after is not None else self.config['poll_seconds']
+                    self.next_claim = 0 if claimed or awakened else time.monotonic() + delay
+            except NodeFailure as error:
+                self.network_log.failed('claim', error)
+                self.next_claim = time.monotonic() + 1
+            self.claim_future = None
+        if self.heartbeat_future and self.heartbeat_future.done():
+            try:
+                self.heartbeat_future.result()
+                self.network_log.succeeded('heartbeat')
+            except NodeFailure as error:
+                self.network_log.failed('heartbeat', error)
+            self.heartbeat_future = None
         if self.notice_future and self.notice_future.done():
             try:
-                self.revision = self.notice_future.result()['revision']
+                response = self.notice_future.result()
+                self.revision = response['revision']
+                self.apply_config(response.get('config'))
+                for item in response.get('leases', []):
+                    page = self.pages.get(item['lease_id'])
+                    if page:
+                        page.update(item)
                 self.network_log.succeeded('updates')
-                self.last_heartbeat = 0
-                self.next_claim = 0
+                if response.get('claim_ready') and self.notice_claim_generation == self.claim_generation:
+                    self.request_claim()
             except NodeFailure as error:
                 self.network_log.failed('updates', error)
                 self.next_notice = time.monotonic() + 1
             self.notice_future = None
+        if not self.heartbeat_future and time.monotonic() - self.last_heartbeat >= self.config['heartbeat_seconds']:
+            self.last_heartbeat = time.monotonic()
+            self.heartbeat_future = self.heartbeat_pool.submit(self.heartbeat)
+            self.heartbeat_future.add_done_callback(lambda _: self.wake.set())
+        if (not self.claim_future and not self.stop.is_set() and time.monotonic() >= self.next_claim
+                and (self.journal.get('claim') or self.claim_capacity())):
+            self.claim_generation += 1
+            with self.config_lock:
+                self.claim_started_wake_version = self.claim_wake_version
+                self.next_claim = time.monotonic() + self.config['poll_seconds']
+            self.claim_future = self.claim_pool.submit(self.claim)
+            self.claim_future.add_done_callback(lambda _: self.wake.set())
         if not self.notice_future and not self.stop.is_set() and time.monotonic() >= self.next_notice:
             self.next_notice = time.monotonic() + .05
+            # Readiness observed before an in-flight claim finishes can be stale.
+            self.notice_claim_generation = self.claim_generation - bool(self.claim_future)
             self.notice_future = self.notice_pool.submit(self.transport.post,
                 f'/nodes/{self.local["node_id"]}/updates', {'revision': self.revision,
-                    'wait_seconds': min(20, max(0, self.config['request_seconds'] - 2))})
+                    'wait_seconds': min(20, max(0, self.config['request_seconds'] - 2)),
+                    'config_version': self.config['version'], 'can_claim': bool(self.claim_capacity()),
+                    'leases': self.lease_entries()})
             self.notice_future.add_done_callback(lambda _: self.wake.set())
-        if self.control_future and self.control_future.done():
-            try:
-                self.control_future.result()
-                self.network_log.succeeded(self.control_action)
-            except NodeFailure as error:
-                self.network_log.failed(self.control_action, error)
-            self.control_future = None
-        if not self.control_future:
-            if time.monotonic() - self.last_heartbeat >= self.config['heartbeat_seconds']:
-                self.last_heartbeat = time.monotonic()
-                self.control_action = 'heartbeat'
-                self.control_future = self.control_pool.submit(self.heartbeat)
-            elif not self.stop.is_set() and time.monotonic() >= self.next_claim:
-                self.next_claim = time.monotonic() + self.config['poll_seconds']
-                self.control_action = 'claim'
-                self.control_future = self.control_pool.submit(self.claim)
-            if self.control_future:
-                self.control_future.add_done_callback(lambda _: self.wake.set())
 
     def run(self):
         try:

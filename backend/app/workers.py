@@ -22,7 +22,8 @@ from .jobs import settle
 from .models import Asset, Attempt, Job, Provider, now
 from .providers import digest
 from .queue_models import ComputeNode, ExecutionLease, JobStage
-from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler, release_lease, touch_job
+from .scheduler import (claim_batch, current_lease, has_claimable_work, heartbeat_lease, lock_scheduler,
+                        next_control_delay, release_lease, touch_job)
 from .storage import StorageError, get_store
 
 
@@ -293,52 +294,96 @@ def run_control_stage(lease_id):
         thread.join(timeout=1)
 
 
+class ControlDispatcher:
+    """Round-robin bounded batches, with no leased work behind an executor queue."""
+
+    def __init__(self, executor, executor_id, pool_limits, wake):
+        self.executor, self.executor_id, self.wake = executor, executor_id, wake
+        self.pools = tuple(pool_limits)
+        self.maximum = sum(pool_limits.values())
+        self.cursor = 0
+        self.futures = {}
+
+    def reap(self):
+        completed = {future: lease_id for future, lease_id in self.futures.items() if future.done()}
+        for future, lease_id in completed.items():
+            del self.futures[future]
+            try:
+                future.result()
+            except Exception as error:
+                log_failure("control-stage-future", error, lease_id=lease_id)
+
+    def dispatch(self, stopping):
+        admitted = 0
+        order = self.pools[self.cursor:] + self.pools[:self.cursor]
+        self.cursor = (self.cursor + 1) % len(self.pools)
+        for name in order:
+            free = self.maximum - len(self.futures)
+            if stopping.is_set() or free <= 0:
+                break
+            with session_factory()() as db:
+                leases = claim_batch(db, 'control-' + name, [name], limit=min(4, free), executor_id=self.executor_id)
+                db.commit()
+            for lease in leases:
+                future = self.executor.submit(run_control_stage, lease.id)
+                self.futures[future] = lease.id
+                future.add_done_callback(lambda _: self.wake.set())
+            admitted += len(leases)
+        return admitted
+
+    def idle_delay(self, maximum):
+        with session_factory()() as db:
+            # A retry deadline may cross, or a prepared head may be consumed,
+            # between this round's election and waiting. Reconcile once before
+            # sleeping; local and durable capacity must both permit dispatch.
+            if len(self.futures) < self.maximum and any(has_claimable_work(db, 'control-' + name, [name])
+                    for name in self.pools):
+                return 0
+            return next_control_delay(db, maximum)
+
+
 def main():
-    stopping = Event()
+    stopping, wake = Event(), Event()
+    def stop(*_):
+        stopping.set()
+        wake.set()
     for name in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(name, lambda *_: stopping.set())
+        signal.signal(name, stop)
     initialize()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     from .control_pools import POOL_LIMITS, initialize_pools, report_pools
+    from .notifications import close_hub, hub
     executor_id = f"{socket.gethostname()}:{os.getpid()}"[:160]
     with session_factory()() as db:
         initialize_pools(db)
-    # Threads are created lazily. The database enforces live, cluster-wide limits;
-    # a process-local default must not prevent an administrator from scaling up.
-    maximum = sum(POOL_LIMITS.values())
+    notices = hub()
+    notices.start()
     next_heartbeat = 0
-    with ThreadPoolExecutor(max_workers=maximum, thread_name_prefix="translation") as executor:
-        futures = {}
-        while not stopping.is_set():
-            try:
-                completed = {future: lease_id for future, lease_id in futures.items() if future.done()}
-                for future in completed:
-                    del futures[future]
-                for future in completed:
-                    try:
-                        future.result()
-                    except Exception as error:
-                        # Never discard unobserved executor failures; recovery
-                        # still uses the durable lease and upstream call intent.
-                        log_failure("control-stage-future", error, lease_id=completed[future])
-                for name in POOL_LIMITS:
-                    if stopping.is_set() or len(futures) >= maximum:
-                        break
-                    with session_factory()() as db:
-                        lease = claim_stage(db, "control-" + name, [name], executor_id=executor_id)
-                        db.commit()
-                    if lease:
-                        futures[executor.submit(run_control_stage, lease.id)] = lease.id
-                if time.monotonic() >= next_heartbeat:
-                    with session_factory()() as db:
-                        report_pools(db)
-                    report_progress("control-worker")
-                    next_heartbeat = time.monotonic() + 5
-            except Exception as error:
-                report_failure("control-worker", error)
-                stopping.wait(1)
-            stopping.wait(.25)
-        # The executor context drains accepted stages before PID 1 exits.
+    try:
+        # Threads start lazily; live capacity remains cluster-wide in the DB.
+        with notices.subscribe_thread('compute', wake), ThreadPoolExecutor(
+                max_workers=sum(POOL_LIMITS.values()), thread_name_prefix='translation') as executor:
+            dispatch = ControlDispatcher(executor, executor_id, POOL_LIMITS, wake)
+            while not stopping.is_set():
+                wake.clear()  # Subscribe/clear before rereading state: no lost wakeup.
+                try:
+                    dispatch.reap()
+                    admitted = dispatch.dispatch(stopping)
+                    if time.monotonic() >= next_heartbeat:
+                        with session_factory()() as db:
+                            report_pools(db)
+                        report_progress('control-worker')
+                        next_heartbeat = time.monotonic() + 5
+                    if admitted:
+                        continue  # Free slots and queued work get the next fair round immediately.
+                    delay = dispatch.idle_delay(max(0, next_heartbeat - time.monotonic()))
+                    wake.wait(delay)
+                except Exception as error:
+                    report_failure('control-worker', error)
+                    stopping.wait(1)
+            # The executor drains accepted stages before PID 1 exits.
+    finally:
+        close_hub()
 
 
 if __name__ == "__main__":

@@ -34,8 +34,12 @@ services:
       TEST_PG_DATABASE: nodecomics_concurrency_test
       TEST_REDIS_URL: redis://redis:6379/0
     volumes:
-      - ../scripts:/scripts:ro
-      - ../services/classic-engine:/services/classic-engine:ro
+      - ../scripts:/workspace/scripts:ro
+      - ../services/classic-engine:/workspace/services/classic-engine:ro
+      - ../contracts:/workspace/contracts:ro
+      - ./openresty.comics.conf:/workspace/deploy/openresty.comics.conf:ro
+      - ../apps/extension/src/analytics/schema.ts:/workspace/apps/extension/src/analytics/schema.ts:ro
+      - ../apps/extension/package.json:/workspace/apps/extension/package.json:ro
     depends_on:
       redis:
         condition: service_healthy

@@ -22,7 +22,8 @@ from .node_config import NodeConfig
 from .providers import digest
 from .queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from .request_models import RequestBody
-from .scheduler import claim_stage, current_lease, heartbeat_lease, lock_scheduler, release_lease, touch_job
+from .scheduler import (claim_batch, current_lease, effective_languages, has_claimable_work, heartbeat_lease, lock_scheduler,
+                        prepare_claim_candidates, release_lease, touch_job)
 from .storage import get_store
 from .workers import fail_stage, finish_job
 
@@ -176,6 +177,8 @@ class ClaimRequest(RequestBody):
 
 @router.post('/nodes/{node_id}/claim')
 def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Session = Depends(get_db)):
+    scoped_node(db, identity, node_id)
+    prepared = prepare_claim_candidates(db, identity, ['page'], limit=body.count)
     lock_scheduler(db)
     node = scoped_node(db, identity, node_id)
     if node.runtime_report.get('protocol_version') != 2:
@@ -189,21 +192,21 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
     else:
         if body.config_version != node.config_version:
             problem('NODE_CONFIG_CONFLICT', '领取前需要同步配置', 409)
-        config = config_payload(node)
-        node.supported_languages = [lang for lang in node.runtime_report.get('languages', [])
-                                    if lang in config['allowed_languages']]
-        leases = []
-        for _ in range(body.count):
-            lease = claim_stage(db, identity, ['page'], config_version=body.config_version)
-            if not lease:
-                break
-            leases.append(lease)
-            db.flush()  # Every page runs a fresh fairness election in this transaction.
+        node.supported_languages = effective_languages(node)
+        leases = claim_batch(db, identity, ['page'], limit=body.count,
+                             config_version=body.config_version, prepared=prepared)
         db.add(ComputeClaim(node_id=identity, request_id=body.request_id,
                             request_hash=request_hash, lease_ids=[lease.id for lease in leases]))
     result = {'request_id': body.request_id, 'server_time': stamp(now()),
               'config': config_payload(node), 'leases': [lease_payload(db, lease) for lease in leases]}
     db.commit()
+    if not leases:
+        # A competing claimant may have consumed this bounded snapshot while
+        # other pages remain ready. Recheck after releasing the receipt lock;
+        # the hint authorizes no work and never changes the durable receipt.
+        with session_factory()() as ready_db:
+            if has_claimable_work(ready_db, identity, ['page'], config_version=body.config_version):
+                result['retry_after_seconds'] = .1
     return result
 
 
@@ -211,9 +214,40 @@ class LeaseRequest(RequestBody):
     lease_token: str = Field(min_length=1, max_length=64)
 
 
+class UpdateLease(LeaseRequest):
+    lease_id: str = Field(min_length=1, max_length=36)
+    translations_revision: str | None = Field(default=None, max_length=64)
+
+
 class UpdatesRequest(RequestBody):
     revision: int = Field(default=0, ge=0, strict=True)
     wait_seconds: float = Field(default=20, ge=0, le=20, allow_inf_nan=False)
+    config_version: int = Field(ge=1, strict=True)
+    can_claim: bool = Field(strict=True)
+    leases: list[UpdateLease] = Field(max_length=32)
+
+
+def lease_updates(db, identity, items):
+    """Read fenced text/terminal changes without renewing or authorizing input."""
+    replies = []
+    for item in items:
+        lease = db.get(ExecutionLease, item.lease_id)
+        stage = db.get(JobStage, lease.stage_id) if lease and lease.node_id == identity else None
+        if (not stage or stage.name != 'page' or not hmac.compare_digest(lease.token, item.lease_token)):
+            replies.append({'lease_id': item.lease_id, 'status': 'stop', 'code': 'NODE_SCOPE_MISMATCH'})
+            continue
+        if lease.completed_at:
+            replies.append(receipt(lease))
+            continue
+        try:
+            _, _, job = live_lease(db, lease.id, item.lease_token, identity)
+        except ProcessingError as error:
+            replies.append({'lease_id': lease.id, 'status': 'stop', 'code': error.code})
+            continue
+        translated = translations_payload(db, job.id)
+        if translated and translated['revision'] != item.translations_revision:
+            replies.append({'lease_id': lease.id, 'status': 'active', 'translations': translated})
+    return replies
 
 
 @router.post('/nodes/{node_id}/updates')
@@ -222,23 +256,44 @@ async def updates(node_id: str, body: UpdatesRequest, identity=Depends(node_auth
     await run_in_threadpool(db.close)
     from .notifications import hub, changed
     from .queue_models import SchedulerMutex
+    known_leases = {item.lease_id for item in body.leases}
+
     def snapshot():
         with session_factory()() as session:
-            scoped_node(session, identity, node_id)
-            return session.get(SchedulerMutex, 1).revision
+            node = scoped_node(session, identity, node_id)
+            config = config_payload(node) if node.config_version != body.config_version else None
+            claimable = bool(not config and has_claimable_work(
+                session, identity, ['page'], config_version=body.config_version))
+            result = {'revision': session.get(SchedulerMutex, 1).revision,
+                      'claim_ready': body.can_claim and claimable, 'leases': lease_updates(session, identity, body.leases)}
+            if config:
+                result['config'] = config
+            active_leases = set(session.scalars(select(ExecutionLease.id).join(
+                JobStage, JobStage.id == ExecutionLease.stage_id).where(
+                    ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None), JobStage.name == 'page')))
+            return result, active_leases != known_leases, claimable
+
     end = time.monotonic() + body.wait_seconds
+    initial_claimable = None
     with hub().subscribe('compute') as wake:
         while True:
             wake.clear()
-            revision = await run_in_threadpool(snapshot)
-            if revision != body.revision or time.monotonic() >= end:
-                return {'revision': revision}
+            result, leases_changed, claimable = await run_in_threadpool(snapshot)
+            queue_changed = initial_claimable is not None and initial_claimable != claimable
+            if (leases_changed or queue_changed or result['claim_ready'] or result['leases']
+                    or 'config' in result or time.monotonic() >= end):
+                return result
+            initial_claimable = claimable
+            # A concurrent claim can add leases after this request's snapshot;
+            # finish that poll so the node can subscribe with their tokens.
+            # A real queue edge also refreshes a stale can_claim=False snapshot
+            # after local buffers free. A steady backlog never spins that poll.
+            # A global change is only a hint to reread; unrelated work must not
+            # create an immediate heartbeat/claim round trip on every node.
             await changed(wake, end - time.monotonic())
 
 
-class HeartbeatItem(LeaseRequest):
-    lease_id: str = Field(min_length=1, max_length=36)
-    translations_revision: str | None = Field(default=None, max_length=64)
+class HeartbeatItem(UpdateLease):
     phase: Literal['queued', 'download', 'analyze', 'inpaint', 'text', 'render', 'deliver', 'stopped'] = 'queued'
 
 

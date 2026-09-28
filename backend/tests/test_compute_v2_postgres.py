@@ -16,6 +16,15 @@ from test_compute_v2 import (
     test_upload_is_scoped_frozen_bounded_and_center_never_reads_images,
     test_late_direct_upload_cannot_publish_after_cancel_or_new_generation,
 )
+from test_compute_claims import (
+    test_same_claim_receipt_concurrent_retries_allocate_one_batch,
+    test_same_claim_id_with_concurrent_changed_count_conflicts,
+    test_legacy_count32_is_bounded_and_receipt_replays_after_configuration_change,
+    test_historical_wide_claim_receipt_replays_every_lease,
+    test_empty_prepared_claim_rechecks_after_commit_and_hints_bounded_retry,
+    test_empty_receipt_retry_hint_is_dynamic_and_does_not_allocate,
+    test_prepared_claim_rechecks_intervening_changes,
+)
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
     reason='Requires the dedicated nodecomics_concurrency_test database')

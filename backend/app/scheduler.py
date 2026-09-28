@@ -1,5 +1,6 @@
 """Work-conserving weighted stage scheduling. No broker, prefetch or local counters."""
 from datetime import timedelta
+from dataclasses import dataclass
 import hmac
 from sqlalchemy import and_, case, func, literal, or_, select, text, update
 from sqlalchemy.orm import aliased
@@ -14,6 +15,7 @@ from .translation_provider_limits import unavailable_providers
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
 IMAGE_STAGES = {"page"}
+CLAIM_BATCH_LIMIT = 4
 
 
 def lock_scheduler(db):
@@ -101,12 +103,20 @@ def _estimate(db, pool, stage, records=None):
     return max(0.05, min(120, record.service if record else {"validate_upload": 1, "page": 30, "text": 10, "redraw": 60}[stage.name]))
 
 
-def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, blocked_providers=()):
-    """Elect in SQL before materializing: <= two owners per pool and class.
+def effective_languages(node):
+    if node.runtime_report.get('protocol_version') != 2:
+        return node.supported_languages
+    from .node_config import NodeConfig
+    allowed = NodeConfig.model_validate(node.desired_config).allowed_languages
+    return [language for language in dict.fromkeys(node.runtime_report.get('languages', [])) if language in allowed]
+
+
+def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, blocked_providers=(), batch_size=1):
+    """Elect in SQL before materializing a bounded set per pool and class.
 
     Eligibility precedes ranking, so an arbitrarily deep unsupported
-    backlog cannot conceal a runnable user. Two heads preserve the virtual
-    service floor after the winning account consumes its next quantum.
+    backlog cannot conceal a runnable user. An extra owner preserves the virtual
+    service floor after every winning account consumes its next quantum.
     """
     cfg = settings()
     source, account, clock = aliased(Asset), aliased(FairnessState), aliased(FairnessState)
@@ -128,7 +138,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, bl
             Job.cancel_requested.is_(False), Job.discard_output.is_(False),
             or_(JobStage.name == "validate_upload", and_(source.id.is_not(None), source.deleted_at.is_(None),
                 source.purged_at.is_(None), or_(source.expires_at.is_(None), source.expires_at > at, source.active_references > 0))),
-            or_(~image_stage, and_(Job.target_language.in_(node.supported_languages),
+            or_(~image_stage, and_(Job.target_language.in_(effective_languages(node)),
                 func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version) == node.engine_version))))
     if stage_ids is not None:
         eligible = eligible.where(JobStage.id.in_(stage_ids))
@@ -150,7 +160,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, bl
     floor = func.coalesce(clock.service, 0.0)
     service = case((account.key.is_(None), floor),
         (and_(account.updated_at < at - timedelta(seconds=60), account.service < floor), floor), else_=account.service)
-    heads = (select(pages.c.stage_id, pages.c.job_id,
+    heads = (select(pages.c.stage_id, pages.c.job_id, pages.c.owner_id, pages.c.pool, pages.c.priority_class,
         func.row_number().over(partition_by=[pages.c.pool, pages.c.priority_class],
             order_by=[service, func.coalesce(account.updated_at, at), pages.c.owner_id]).label("owner_rank"))
         .outerjoin(account, account.key == literal("user:") + pages.c.pool + ":" + pages.c.priority_class + ":" + pages.c.owner_id)
@@ -158,17 +168,26 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, bl
         .where(pages.c.page_rank == 1).subquery())
     projection = [JobStage, Job, func.coalesce(UserModeQueue.version, 0)] if materialize else [
         JobStage.id, JobStage.generation, Job.priority_rank, Job.realtime_until, func.coalesce(UserModeQueue.version, 0)]
-    return db.execute(select(*projection).join(Job, Job.id == JobStage.job_id)
-        .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode))
-        .join(heads, heads.c.stage_id == JobStage.id).where(heads.c.owner_rank <= 2)
-        .execution_options(populate_existing=True)).all()
+    elected = heads
+    if batch_size > 1:
+        # One unconsumed owner preserves the service floor after every possible
+        # winner in this batch. Each owner can supply at most batch_size pages.
+        elected = (select(pages.c.stage_id).join(heads, and_(heads.c.owner_id == pages.c.owner_id,
+            heads.c.pool == pages.c.pool, heads.c.priority_class == pages.c.priority_class))
+            .where(heads.c.owner_rank <= batch_size + 1, pages.c.page_rank <= batch_size).subquery())
+    query = (select(*projection).join(Job, Job.id == JobStage.job_id)
+        .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode)))
+    query = query.join(elected, elected.c.stage_id == JobStage.id)
+    if batch_size == 1:
+        query = query.where(heads.c.owner_rank <= 2)
+    return db.execute(query.execution_options(populate_existing=True)).all()
 
 
 def _candidate_signature(stage, job, queue_version):
     return stage.generation, job.priority_rank, job.realtime_until, queue_version
 
 
-def _preselect(db, node, allowed_stages, blocked_providers=()):
+def _preselect(db, node, allowed_stages, blocked_providers=(), *, batch_size=1):
     # Reuse the caller's connection, including its uncommitted nodes/pages.
     # A second Session can deadlock a full pool while every claimant holds its
     # first connection. PostgreSQL READ COMMITTED rechecks after the mutex;
@@ -177,33 +196,132 @@ def _preselect(db, node, allowed_stages, blocked_providers=()):
     stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
     if not node.enabled or not stages:
         return {}
-    rows = _election_rows(db, node, stages, now(), materialize=False, blocked_providers=blocked_providers)
+    rows = _election_rows(db, node, stages, now(), materialize=False, blocked_providers=blocked_providers,
+        batch_size=batch_size)
     return {row[0]: tuple(row[1:]) for row in rows}
 
 
+def _blocked_providers(db, node, allowed_stages):
+    if not node or 'text' not in (set(node.capabilities) & set(allowed_stages or node.capabilities)):
+        return []
+    return unavailable_providers(db.scalars(select(TranslationProvider).where(TranslationProvider.enabled.is_(True))).all())
+
+
+def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None):
+    """An advisory read for long-poll wakeups; claim_batch remains authoritative."""
+    with db.no_autoflush:
+        node = db.get(ComputeNode, node_id)
+        if not node or not node.enabled or (config_version is not None and config_version != node.config_version):
+            return False
+        busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(
+            ExecutionLease.node_id == node_id, ExecutionLease.completed_at.is_(None)))
+        if busy >= node.capacity:
+            return False
+        candidates = _preselect(db, node, allowed_stages, _blocked_providers(db, node, allowed_stages))
+        if not candidates:
+            return False
+        rows = db.execute(select(JobStage.name, Asset).join(Job, Job.id == JobStage.job_id)
+            .outerjoin(Asset, Asset.id == Job.input_asset_id).where(JobStage.id.in_(candidates))).all()
+        return any(name == 'validate_upload' or (asset is not None and available(asset)) for name, asset in rows)
+
+
+def next_control_delay(db, maximum=5):
+    """Bound idle reconciliation by retry deadlines and shared supplier RPM."""
+    at = now()
+    stages = ('text', 'redraw', 'validate_upload')
+    pending = (select(JobStage.available_at).join(Job, Job.id == JobStage.job_id)
+        .where(JobStage.name.in_(stages), JobStage.status == 'ready', JobStage.available_at > at,
+            Job.status.in_(['queued', 'running', 'validating_upload']),
+            Job.cancel_requested.is_(False), Job.discard_output.is_(False)))
+    first = db.scalar(pending.order_by(JobStage.available_at).limit(1))
+    delay = min(maximum, max(0, (first - at).total_seconds())) if first else maximum
+    providers = db.scalars(select(TranslationProvider).join(Job,
+        Job.config['text']['provider_id'].as_string() == TranslationProvider.id)
+        .join(JobStage, JobStage.job_id == Job.id).where(TranslationProvider.enabled.is_(True),
+            JobStage.name == 'text', JobStage.status == 'ready', JobStage.available_at <= at,
+            Job.status.in_(['queued', 'running']), Job.cancel_requested.is_(False), Job.discard_output.is_(False))
+        .distinct()).all()
+    from .redis_state import AdmissionUnavailable, window
+    try:
+        for provider in providers:
+            retry = window('provider', provider.id, provider.requests_per_minute)['retry_after_seconds']
+            if retry:
+                delay = min(delay, retry)
+    except AdmissionUnavailable:
+        delay = min(delay, 1)
+    return max(0, delay)
+
+
 def claim_stage(db, node_id, allowed_stages=None, *, executor_id=None, config_version=None):
+    leases = claim_batch(db, node_id, allowed_stages, limit=1, executor_id=executor_id, config_version=config_version)
+    return leases[0] if leases else None
+
+
+@dataclass(frozen=True)
+class ClaimCandidates:
+    node_id: str
+    stages: tuple | None
+    limit: int
+    signatures: dict
+    blocked_providers: tuple
+
+
+def prepare_claim_candidates(db, node_id, allowed_stages=None, *, limit=CLAIM_BATCH_LIMIT):
+    """A bounded, non-authoritative snapshot, usable before a receipt transaction."""
+    limit = max(0, min(CLAIM_BATCH_LIMIT, limit))
     if db.new or db.dirty or db.deleted:
         # Internal callers may bring pending changes. Acquire the mutex before
         # their first autoflush; normal read-only claimers still elect outside it.
         with db.no_autoflush:
             lock_scheduler(db)
     observed_node = db.get(ComputeNode, node_id)
-    blocked = unavailable_providers(db.scalars(select(TranslationProvider).where(TranslationProvider.enabled.is_(True))).all()) \
-        if observed_node and 'text' in (set(observed_node.capabilities) & set(allowed_stages or observed_node.capabilities)) else []
-    candidates_before_lock = _preselect(db, observed_node, allowed_stages, blocked) if observed_node else {}
-    lock_scheduler(db)
+    blocked = _blocked_providers(db, observed_node, allowed_stages)
+    candidates_before_lock = (_preselect(db, observed_node, allowed_stages, blocked) if limit == 1 else
+        _preselect(db, observed_node, allowed_stages, blocked, batch_size=limit)) if observed_node and limit else {}
+    return ClaimCandidates(node_id, tuple(sorted(allowed_stages)) if allowed_stages is not None else None,
+        limit, candidates_before_lock, tuple(blocked))
+
+
+def claim_batch(db, node_id, allowed_stages=None, *, limit=CLAIM_BATCH_LIMIT, executor_id=None,
+                config_version=None, prepared=None):
+    """Elect once outside the mutex, then dispatch a bounded fair quantum.
+
+    The caller owns commit/rollback. Every lease rechecks only the bounded
+    snapshot, so capacity and provider limits include earlier picks in this batch.
+    Receipt-based callers may prepare before acquiring their atomic receipt lock.
+    """
+    limit = max(0, min(CLAIM_BATCH_LIMIT, limit))
+    if not limit:
+        return []
+    prepared = prepared or prepare_claim_candidates(db, node_id, allowed_stages, limit=limit)
+    stages = tuple(sorted(allowed_stages)) if allowed_stages is not None else None
+    if prepared.node_id != node_id or prepared.stages != stages:
+        raise ValueError('Claim snapshot scope does not match the claimant')
+    limit = min(limit, prepared.limit)
+    candidates_before_lock, blocked = dict(prepared.signatures), prepared.blocked_providers
+    with db.no_autoflush:
+        lock_scheduler(db)
     node = db.get(ComputeNode, node_id, populate_existing=True)
     at = now()
     if not node or not node.enabled:
-        return None
+        return []
     if config_version is not None and config_version != node.config_version:
         raise ProcessingError('NODE_CONFIG_CONFLICT', '领取前需要同步配置')
     node.heartbeat_at = at
     busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
-    if busy >= node.capacity:
-        return None
-    if not candidates_before_lock:
-        return None
+    leases = []
+    for _ in range(min(limit, max(0, node.capacity - busy))):
+        if not candidates_before_lock:
+            break
+        lease = _claim_selected(db, node, allowed_stages, at, candidates_before_lock, blocked, executor_id)
+        if lease is None:
+            break
+        leases.append(lease)
+        candidates_before_lock.pop(lease.stage_id, None)
+    return leases
+
+
+def _claim_selected(db, node, allowed_stages, at, candidates_before_lock, blocked, executor_id):
     stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
     # The full election ran without the mutex. Recheck only this bounded set
     # under the lock, using current queue/provider/asset/node and stage state.

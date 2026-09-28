@@ -91,10 +91,13 @@ def node_for(v2, tmp_path, pages, runtime, lose_replies=False, lose_upload=False
     return Agent(config, runtime, transport, journal), transport, journal
 
 
-def drive(agent, jobs, timeout=15):
+def drive(agent, jobs, timeout=15, *, schedule=False):
     start = time.monotonic()
     while time.monotonic() - start < timeout:
-        agent.heartbeat()
+        if schedule:
+            agent.poll_control()
+        else:
+            agent.heartbeat()
         with session_factory()() as db:
             lease = claim_stage(db, 'control-text', ['text'])
             db.commit()
@@ -458,12 +461,21 @@ def test_eight_slots_four_blocked_uploads_then_next_admission_window(v2, tmp_pat
     with session_factory()() as db:
         node = db.get(ComputeNode, v2['node']['node_id'])
         node.capacity = 8
-        node.desired_config = {**node.desired_config, 'execution_slots': 8}
+        node.desired_config = {**node.desired_config, 'execution_slots': 8, 'request_seconds': 3}
         db.commit()
     runtime = FixtureRuntime()
     agent, transport, journal = node_for(v2, tmp_path, 8, runtime, max_leases=8)
     release, lock = Event(), Lock()
     active = peak = 0
+    batches = []
+    post = transport.post
+    def observed_post(path, body):
+        reply = post(path, body)
+        if path.endswith('/claim'):
+            assert 1 <= body['count'] <= 4
+            batches.append(len(reply['leases']))
+        return reply
+    transport.post = observed_post
     upload = transport.upload
     def blocked(*args, **kwargs):
         nonlocal active, peak
@@ -480,21 +492,21 @@ def test_eight_slots_four_blocked_uploads_then_next_admission_window(v2, tmp_pat
     try:
         agent.register()
         agent.claim()
-        assert len(agent.pages) == 8
-        first_jobs = [page.lease['job_id'] for page in agent.pages.values()]
+        assert len(agent.pages) == 4
         end = time.monotonic() + 8
         while time.monotonic() < end:
-            agent.heartbeat()
+            agent.poll_control()
             agent.reap()
-            if all(p.step == 'text' and p.cleaned is not None and p.analysis_accepted
-                   for p in agent.pages.values()):
+            if len(agent.pages) == 8 and all(p.step == 'text' and p.cleaned is not None and p.analysis_accepted
+                                            for p in agent.pages.values()):
                 break
             time.sleep(.01)
+        assert len(agent.pages) == 8 and sum(batches) == 8
         assert runtime.analyzed == 8 and runtime.rendered == 0
         assert all(p.cleaned is not None and not p.future for p in agent.pages.values())
         end = time.monotonic() + 8
         while time.monotonic() < end:
-            agent.heartbeat()
+            agent.poll_control()
             agent.reap()
             with session_factory()() as db:
                 lease = claim_stage(db, 'control-text', ['text'])
@@ -509,12 +521,11 @@ def test_eight_slots_four_blocked_uploads_then_next_admission_window(v2, tmp_pat
         assert all(p.step == 'deliver' and p.cleaned is None for p in agent.pages.values())
         agent.claim()
         assert len(agent.pages) == 8  # Delivery still occupies a whole-page lease.
+        assert sum(batches) == 8
         release.set()
-        drive(agent, first_jobs)
-        agent.claim()
-        assert len(agent.pages) == 8
-        drive(agent, jobs)
+        drive(agent, jobs, schedule=True)
         assert runtime.analyzed == runtime.rendered == 16
+        assert sum(batches) == 16 and len([count for count in batches if count]) >= 4
         assert not journal.leases() and agent.pipeline.used == 0
     finally:
         release.set()

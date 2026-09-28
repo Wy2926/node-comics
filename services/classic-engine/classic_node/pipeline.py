@@ -1,5 +1,6 @@
 """Bounded page state, with computation independent of network and text waits."""
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest
@@ -15,7 +16,44 @@ class Pipeline:
         self.delivery = ThreadPoolExecutor(cfg.get('delivery_workers', 4), thread_name_prefix='delivery')
         self.limit = cfg.get('resident_bytes', 1024 * 1024 * 1024)
         self.used = 0
+        self.memory_lock = Lock()
         self.turn = False
+
+    @staticmethod
+    def input_reservation(page):
+        metadata = page.lease.get('input') or {}
+        pixels = metadata.get('width', 0) * metadata.get('height', 0) or MAX_PIXELS
+        return pixels * 16 + MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+
+    @staticmethod
+    def delivery_reservation(body):
+        # Frozen base64, its journal serialization/readback and the PUT bytes.
+        # Keep checkpoint/translation metadata bounded even after pixels leave.
+        image = body.get('image', '')
+        decoded = body['result']['output']['byte_size'] if image else 0
+        return len(image) * 3 + decoded + MAX_CHECKPOINT_BYTES * 6
+
+    def resize_reservation(self, page, amount, *, bounded=False):
+        with self.memory_lock:
+            previous = page.reserved
+            if bounded and self.used + amount - previous > self.limit:
+                return False
+            self.used += amount - previous
+            page.reserved = amount
+        if amount < previous:
+            self.agent.request_claim()
+        return True
+
+    def claim_capacity(self):
+        pages = list(self.agent.pages.values())
+        downloading = [page for page in pages if page.step == 'download' and not page.stopped and not page.terminal]
+        # Count accepted pages before they acquire buffers, too. Their known
+        # demand must not disappear merely because they await the memory gate.
+        with self.memory_lock:
+            pending_bytes = sum(self.input_reservation(page) for page in downloading if not page.reserved)
+            available = max(0, self.limit - self.used - pending_bytes)
+        minimum = MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+        return max(0, min(4, self.agent.local.get('download_workers', 4) - len(downloading), available // minimum))
 
     def close(self):
         for pool in (self.download, self.compute, self.control, self.delivery):
@@ -64,11 +102,11 @@ class Pipeline:
         self.agent.journal.put('lease:' + key, {**saved, 'completion': body})
         page.completion = body
         page.rgb = page.cleaned = page.analysis = page.alpha = None
+        self.resize_reservation(page, self.delivery_reservation(body))
         page.step = 'deliver'
 
     def release(self, page):
-        self.used -= page.reserved
-        page.reserved = 0
+        self.resize_reservation(page, 0)
         page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.completion = None
 
     def error(self, page, error):
@@ -104,6 +142,7 @@ class Pipeline:
                 if page.step == 'download':
                     page.data, page.metadata = value
                     page.step = 'analyze'
+                    self.agent.request_claim()
                 elif page.step == 'analyze':
                     page.rgb, page.alpha, page.analysis = value
                     page.analysis_future = self.control.submit(self.accepted, page)
@@ -136,17 +175,13 @@ class Pipeline:
             if page.future or page.analysis_future or page.terminal or page.stopped:
                 continue
             if page.step == 'download' and not page.reserved:
-                metadata = page.lease.get('input') or {}
-                pixels = metadata.get('width', 0) * metadata.get('height', 0) or MAX_PIXELS
                 # Working RGB/masks plus encoded result copies; model workspace is separate.
-                reserve = pixels * 16 + MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+                reserve = self.input_reservation(page)
                 if reserve > self.limit:
                     self.error(page, NodeFailure('INPUT_INVALID'))
                     continue
-                if self.used + reserve > self.limit:
+                if not self.resize_reservation(page, reserve, bounded=True):
                     continue
-                page.reserved = reserve
-                self.used += reserve
                 self.submit(page, self.download, 'download', lambda p=page: self.agent.input_bytes(p))
             elif page.step == 'deliver':
                 self.submit(page, self.delivery, 'deliver', lambda p=page: self.agent.deliver(p, p.completion))

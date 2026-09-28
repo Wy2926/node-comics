@@ -7,10 +7,11 @@ RUN npm run build
 
 FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-WORKDIR /app
+WORKDIR /workspace/backend
 COPY requirements*.txt ./
 RUN pip install --no-cache-dir -r requirements-test.txt
 COPY app ./app
+COPY extension-release.json ./extension-release.json
 COPY --from=admin-build /app/admin_web/dist ./app/admin_web/dist
 COPY migrations ./migrations
 COPY alembic.ini ./

@@ -13,6 +13,7 @@ class Hub:
         self.bind = bind
         self.lock = RLock()
         self.waiters = {}
+        self.thread_waiters = {}
         self.stop = Event()
         self.ready = Event()
         self.thread = None
@@ -21,10 +22,26 @@ class Hub:
         if topic == 'policy':
             topic = None
         with self.lock:
+            for key, wake in tuple(self.thread_waiters.items()):
+                if topic is None or key[0] == topic:
+                    wake.set()
             for key, (loop, wake) in tuple(self.waiters.items()):
                 if topic is None or key[0] == topic:
                     if not loop.is_closed():
                         loop.call_soon_threadsafe(wake.set)
+
+    @contextmanager
+    def subscribe_thread(self, topic, wake=None):
+        """Share commit notifications with the bounded synchronous worker loop."""
+        wake = wake or Event()
+        key = (topic, id(wake))
+        with self.lock:
+            self.thread_waiters[key] = wake
+        try:
+            yield wake
+        finally:
+            with self.lock:
+                self.thread_waiters.pop(key, None)
 
     @contextmanager
     def subscribe(self, topic):
@@ -93,10 +110,12 @@ def publish(db, topic):
 
 @event.listens_for(Session, 'before_flush')
 def policy_wakeups(db, flush_context, instances):
-    """Wake on entitlement mutations; snapshots compute their durable revision."""
-    from .models import User
+    """Wake after policy/capacity commits; snapshots remain the source of truth."""
+    from .models import Provider, User
     from .entitlement_models import QuotaPeriod
     from .billing_models import BillingTerm
+    from .queue_models import ComputeNode
+    from .translation_models import TranslationProvider
     topics = set()
     for row in db.new | db.dirty:
         if isinstance(row, User):
@@ -112,6 +131,12 @@ def policy_wakeups(db, flush_context, instances):
             if row in db.new or any(state.attrs[name].history.has_changes()
                     for name in ('granted', 'starts_at', 'ends_at', 'grants_access')):
                 topics.add('user:' + row.owner_id)
+        elif isinstance(row, (ComputeNode, Provider, TranslationProvider)):
+            state = inspect(row)
+            fields = ('enabled', 'capacity', 'desired_config', 'config_version', 'credential_hash',
+                'capabilities', 'supported_languages', 'engine_version', 'config', 'requests_per_minute', 'revision_id')
+            if row in db.new or any(state.attrs[name].history.has_changes() for name in fields if name in state.attrs):
+                topics.add('compute')
     for topic in topics:
         publish(db, topic)
 
