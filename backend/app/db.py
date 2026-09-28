@@ -43,6 +43,7 @@ def initialize():
     from . import translation_requests  # noqa: F401
     from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
     from . import billing_models  # noqa: F401
+    from . import quota_campaign_models  # noqa: F401
     from . import admin_audit  # noqa: F401
     from . import feedback_review_models  # noqa: F401
     from . import support_requests  # noqa: F401

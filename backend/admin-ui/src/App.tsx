@@ -16,6 +16,7 @@ import {BillingSubscriptionsPage} from './BillingSubscriptions';
 import {AuditLogPage} from './AuditLog';
 import {OperationsPage} from './Operations';
 import {StatisticsPage} from './Statistics';
+import {QuotaCampaignsPage} from './QuotaCampaigns';
 import type {Node} from './types';
 import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
@@ -27,6 +28,7 @@ const views = {
   'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
   'image-providers': ['图片供应商', 'IMAGE PROVIDERS', '管理 AI 重绘供应商与图片测试。', '▧'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
+  'quota-campaigns': ['额度活动', 'QUOTA CAMPAIGNS', '配置自动赠送规则与发放范围。', '◇'],
   billing: ['产品与价格', 'PRODUCTS & PRICES', '管理套餐产品、月付／年付价格与支付渠道。', '◇'],
   orders: ['订单管理', 'PAYMENTS & ORDERS', '查看支付订单、订阅状态和流转记录。', '▤'],
   subscriptions: ['订阅与权益', 'SUBSCRIPTIONS', '追溯客户、订阅、账单与授权周期。', '◇'],
@@ -42,7 +44,7 @@ const views = {
 type View = keyof typeof views;
 const navigationGroups: {name: string; pages: View[]}[] = [
   {name: '翻译与运行', pages: ['overview', 'tasks', 'nodes', 'operations', 'statistics']},
-  {name: '用户与交易', pages: ['users', 'feedback', 'plugin-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
+  {name: '用户与交易', pages: ['users', 'quota-campaigns', 'feedback', 'plugin-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
   {name: '配置与审计', pages: ['translation-providers', 'image-providers', 'settings', 'audit']},
 ];
 type Target = {kind: 'tasks' | 'users'; id: string};
@@ -199,6 +201,7 @@ export function App() {
     <div className="sidebar-bottom"><span className="tiny-label">ADMINISTRATOR</span><b>{user.name}</b><button onClick={() => logout()}>退出登录 ↗</button></div>
   </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><span className="top-brand">NODE COMICS <span className="dot"/></span></header>
     {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
+      view === 'quota-campaigns' ? <QuotaCampaignsPage onUnauthorized={logout}/> :
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
       view === 'image-providers' ? <ImageProvidersPage onUnauthorized={logout}/> :
       view === 'feedback' ? <FeedbackPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :

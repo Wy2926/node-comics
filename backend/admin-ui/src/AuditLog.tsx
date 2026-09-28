@@ -11,6 +11,8 @@ const actions: Record<string, string> = {
   'job.reconcile': '核实翻译结果', 'feedback.review': '处理翻译反馈',
   'membership.extend': '开通或续期运营会员', 'membership.expire': '提前结束运营会员',
   'quota.compensate': '补偿当前额度', 'quota.grant': '赠送翻译额度',
+  'quota_campaign.create': '创建额度活动', 'quota_campaign.status': '启停额度活动',
+  'quota_campaign.duration': '调整活动期限', 'quota_campaign.correct_duration': '修正活动期限', 'quota.correct_expiry': '调整已发额度到期时间',
   'billing.event.retry': '重新处理支付事件', 'billing.order.reconcile': '核实支付订单',
   'billing.order.reconcile_failed': '支付订单核实失败', 'billing.default_provider.update': '切换默认支付渠道',
   'billing.product.create': '创建会员产品', 'billing.revision.create': '创建权益版本',
@@ -18,14 +20,15 @@ const actions: Record<string, string> = {
   'billing.binding.create': '创建渠道绑定', 'billing.binding.status': '启停渠道绑定',
 };
 const targets: Record<string, string> = {user: '用户', feedback: '翻译反馈', job: '翻译任务', image_provider: '图片供应商',
-  translation_provider: '文本供应商', compute_node: '计算节点', system_settings: '系统设置', quota_period: '额度周期',
+  translation_provider: '文本供应商', compute_node: '计算节点', system_settings: '系统设置', quota_period: '额度周期', quota_campaign: '额度活动',
   billing_order: '订单', billing_event: '支付事件', billing_settings: '支付设置', billing_plan: '会员产品',
   billing_plan_revision: '权益版本', billing_price: '价格', billing_price_binding: '渠道绑定'};
 const fieldNames: Record<string, string> = {status: '状态', enabled: '启用', name: '名称', label: '显示名称',
   version: '版本', revision_id: '配置版本', model: '模型', base_url: '服务地址', attempts: '处理次数',
   free_daily_pages: '普通每日常规页数', plus_monthly_redraw_pages: '会员默认月重绘页数',
   free_scheduler_weight: '普通调度权重', plus_scheduler_weight: 'PLUS 调度权重', granted: '授予页数',
-  used: '已使用', reserved: '预占', plus_expires_at: '会员到期', default_provider: '默认渠道'};
+  used: '已使用', reserved: '预占', plus_expires_at: '会员到期', default_provider: '默认渠道',
+  validity_days: '到账后有效天数', starts_at: '开始时间', ends_at: '结束时间', expires_at: '额度到期', pages: '赠送页数', audience: '适用用户', mode: '翻译模式'};
 const values: Record<string, string> = {received: '待处理', reviewing: '处理中', resolved: '已解决', pending: '待处理',
   processing: '处理中', processed: '已处理', active: '生效中', archived: '已停用', true: '是', false: '否', '[redacted]': '已隐藏敏感内容'};
 export function flat(value: unknown, prefix = '', depth = 0): Record<string, unknown> {

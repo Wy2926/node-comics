@@ -12,7 +12,7 @@ function QuotaCard({mode,rights,timezone}:{mode:Mode;rights:ModeEntitlement;time
     <p>{rights.unlimited?msg('当前权益内不限量使用'):!rights.allowed?msg('升级 PLUS 或领取有效赠送额度后使用'):msg('已用 {0} 页 · 处理中 {1} 页',{'0':quota?.used??0,'1':quota?.reserved??0})}</p>
     {rights.allowed&&!rights.unlimited&&quota&&quota.granted>0&&<progress className="nc-quota-meter" aria-label={title} value={Math.max(0,Math.min(quota.available,quota.granted))} max={quota.granted}/>}
     {quota?.resets_at&&!rights.unlimited&&<span className="nc-muted nc-quota-reset">{msg('下次恢复 {0}',{'0':new Date(quota.resets_at).toLocaleString(getLocale(),{timeZone:timezone,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})})} · {timezone}</span>}
-    {grants.length>0&&<details><summary>{msg('赠送额度与有效期')}</summary><ul>{grants.map(b=><li key={b.id}>{msg('剩余 {0} / {1} 页 · {2} 到期',{'0':b.available,'1':b.granted,'2':new Date(b.expires_at).toLocaleString(getLocale())})}</li>)}</ul></details>}
+    {grants.length>0&&<details><summary>{msg('赠送额度与有效期')}</summary><ul>{grants.map(b=><li key={b.id}>{b.expires_at?msg('剩余 {0} / {1} 页 · {2} 到期',{'0':b.available,'1':b.granted,'2':new Date(b.expires_at).toLocaleString(getLocale())}):<>{b.available} / {b.granted} {msg('页可用')}</>}</li>)}</ul></details>}
   </article>;
 }
 

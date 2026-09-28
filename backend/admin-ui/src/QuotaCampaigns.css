@@ -1,0 +1,118 @@
+.campaign-help {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+
+.campaign-form {
+  display: grid;
+  gap: 24px;
+}
+
+.campaign-full {
+  grid-column: 1 / -1;
+}
+
+.campaign-impact {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8f9fc;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.campaign-impact p {
+  margin: 6px 0 0;
+}
+
+.campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.campaign-row-actions {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.campaign-name {
+  min-width: 205px;
+  max-width: 310px;
+  overflow-wrap: anywhere;
+}
+
+.campaign-name small {
+  font-size: 11px;
+}
+
+.campaign-recovery {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.campaign-recovery h2 {
+  font-size: 17px;
+}
+
+.campaign-recovery p {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.campaign-record-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.campaign-awards {
+  width: min(1100px, calc(100vw - 48px));
+}
+
+.campaign-awards td:first-child {
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+
+.quota-campaigns .list-panel {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .campaign-full {
+    grid-column: auto;
+  }
+
+  .campaign-awards {
+    width: calc(100vw - 20px);
+  }
+
+  .campaign-actions > button {
+    flex: 1;
+  }
+}
+
+.campaign-existing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campaign-note {
+  display: grid;
+  gap: 8px;
+}
+
+.campaign-note textarea {
+  width: 100%;
+  font: inherit;
+}

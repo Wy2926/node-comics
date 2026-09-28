@@ -60,6 +60,9 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
         user = User(subject=subject, name=f"NodeLane_{secrets.token_hex(4)}", role=role)
         db.add(user)
         try:
+            db.flush()
+            from .quota_campaigns import award_campaigns
+            award_campaigns(db, user)
             db.commit()
         except IntegrityError:
             # Another first request may commit this same issuer/subject while we

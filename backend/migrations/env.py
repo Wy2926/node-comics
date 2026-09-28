@@ -7,6 +7,7 @@ from app import translation_requests, system_settings
 from app import reader_api
 from app import health_models, upload_models, entitlement_models
 from app import billing_models
+from app import quota_campaign_models
 from app import admin_audit
 from app import feedback_review_models
 from app import support_requests

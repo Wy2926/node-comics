@@ -9,7 +9,7 @@ export const labels: Record<string, string> = {
   released: '已释放', reported: '已报告', unknown: '待核实', estimated: '估算', active: '全部在途', attention: '需要关注',
   settled: '已结算', included: '权益内包含', free: '无需扣页',
   classic_daily: '常规每日额度', classic_unlimited: '常规不限量', redraw_monthly: '重绘月度额度', redraw_grant: '重绘赠送额度',
-  daily: '每日额度', membership: '运营会员', grant: '限时赠送', subscription: '付费订阅', reconcile: '人工核实',
+  daily: '每日额度', membership: '运营会员', grant: '赠送额度', subscription: '付费订阅', reconcile: '人工核实',
 };
 export const label = (value: string | null | undefined) => value ? labels[value] || value : '—';
 export const number = (value: number | undefined) => (value || 0).toLocaleString('zh-CN');

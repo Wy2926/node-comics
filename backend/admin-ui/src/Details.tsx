@@ -61,11 +61,11 @@ export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData
     <h3 className="detail-heading">赠送额度（按生效时间，最多 50 笔）</h3>
     {u.grants.length ? <Table heads={['类型 / 备注', '授予 / 已用 / 预占', '生效 / 到期']}>{u.grants.map(b => <tr key={b.id}>
       <td>{label(b.mode)}<small>{b.note}</small></td><td>{b.granted} / {b.used} / {b.reserved}</td>
-      <td>{time(b.starts_at)}<small>{time(b.expires_at)}</small></td></tr>)}</Table> : <Empty>暂无赠送额度</Empty>}
+      <td>{time(b.starts_at)}<small>{b.expires_at ? time(b.expires_at) : '永久有效'}</small></td></tr>)}</Table> : <Empty>暂无赠送额度</Empty>}
     <h3 className="detail-heading">当前有效额度明细</h3>
     {buckets.length ? <Table heads={['类型', '授予 / 已用 / 预占', '到期']}>{buckets.map(b => <tr key={b.id}>
       <td>{label(b.mode)} · {label(b.source)}</td>
-      <td>{b.granted} / {b.used} / {b.reserved}</td><td>{time(b.expires_at)}</td></tr>)}</Table> : <Empty>暂无有限页数额度</Empty>}
+      <td>{b.granted} / {b.used} / {b.reserved}</td><td>{b.expires_at ? time(b.expires_at) : '永久有效'}</td></tr>)}</Table> : <Empty>暂无有限页数额度</Empty>}
     <div className="care-user-links"><Jump view="tasks" params={{owner_id: u.id}}>查看该用户全部任务 ↗</Jump><Jump view="subscriptions" params={{owner_id: u.id}}>查看该用户订阅与授权期 ↗</Jump></div>
     <UserHistory userId={u.id} revision={JSON.stringify(u)} onUnauthorized={onUnauthorized}/>
   </div>;

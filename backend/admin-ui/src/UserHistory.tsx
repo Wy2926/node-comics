@@ -3,13 +3,14 @@ import {useBillingResource} from './BillingShared';
 import {Jump, label, Pagination, Table, time} from './ui';
 import './CareOperations.css';
 
-type Row = {id: string; kind?: string; mode?: string; source?: string; granted?: number; used?: number; reserved?: number; expires_at?: string; starts_at?: string; billing_term_id?: string;
+type Row = {id: string; kind?: string; mode?: string; source?: string; granted?: number; used?: number; reserved?: number; expires_at?: string | null; starts_at?: string; billing_term_id?: string;
   job_id?: string; period_id?: string; quota_kind?: string; amount?: number; note?: string; created_at?: string; operator_name?: string; operator_id?: string;
   details?: Record<string, string | number | null>; status?: string; quota_pages?: number; quota_period_id?: string};
 type Page = {items: Row[]; total: number; next_offset: number | null};
-const sources: Record<string, string> = {daily: '每日额度', membership: '运营会员', grant: '限时赠送', subscription: '付费订阅'};
+const sources: Record<string, string> = {daily: '每日额度', membership: '运营会员', grant: '赠送额度', subscription: '付费订阅'};
 const operations: Record<string, string> = {reserve: '预占', settle: '扣减', release: '释放', grant: '赠送', compensation: '补偿', compensate: '当期补偿', membership: '运营会员'};
-function HistoryTime({value, prefix}: {value?: string; prefix?: string}) {
+function HistoryTime({value, prefix}: {value?: string | null; prefix?: string}) {
+  if (value === null && prefix === '到期') return <span className="care-subtitle">永久有效</span>;
   if (!value) return <span className="care-subtitle">{prefix} —</span>;
   const date = new Date(value);
   return <time dateTime={value} className="care-history-time"><span>{prefix && <em>{prefix}</em>}{date.toLocaleDateString()}</span><small>{date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'})}</small></time>;

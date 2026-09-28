@@ -18,7 +18,7 @@ class QuotaBucketResponse(BaseModel):
     reserved: int
     available: int
     starts_at: str
-    expires_at: str
+    expires_at: str | None
     grants_access: bool
     note: str
 
@@ -32,7 +32,7 @@ class PeriodResponse(BaseModel):
     available: int
     starts_at: str
     resets_at: str | None
-    next_expiry_at: str
+    next_expiry_at: str | None
     buckets: list[QuotaBucketResponse]
 
 

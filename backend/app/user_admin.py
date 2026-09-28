@@ -39,7 +39,7 @@ def quota_history(user_id: str, offset: int = Query(0, ge=0), limit: int = Query
     at = now()
     return page(db, query.order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id.desc()), offset, limit,
                 lambda row: {**period_json(row[0]), "billing_term_id": row[0].billing_term_id,
-                             "expired": row[0].ends_at <= at})
+                             "expired": row[0].ends_at is not None and row[0].ends_at <= at})
 
 
 @router.get("/{user_id}/usage-ledger")

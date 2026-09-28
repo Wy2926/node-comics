@@ -42,6 +42,7 @@ from .file_pages import FilePageBinding, bind_translation_page, FilePageMatchReq
 from .reader_api import router as reader_router
 from .support_requests import router as support_requests_router
 from .quota_grants import router as grants_router
+from .quota_campaigns import router as campaigns_router
 from .billing_api import router as billing_router
 from .billing_admin import router as billing_admin_router
 from .billing_catalog import router as billing_catalog_router, initialize_catalog
@@ -76,6 +77,7 @@ app.include_router(compute_v2_router)
 app.include_router(reader_router)
 app.include_router(support_requests_router)
 app.include_router(grants_router)
+app.include_router(campaigns_router)
 app.include_router(billing_router)
 app.include_router(billing_admin_router)
 app.include_router(billing_catalog_router)
@@ -186,6 +188,9 @@ def dev_login(body: DevLogin, db: Session = Depends(get_db)):
         user = User(subject=subject, name=name, role="admin" if name.casefold() == cfg.dev_admin_username.casefold() else "user")
         db.add(user)
         try:
+            db.flush()
+            from .quota_campaigns import award_campaigns
+            award_campaigns(db, user)
             db.commit()
         except IntegrityError:
             db.rollback()

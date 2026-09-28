@@ -54,6 +54,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
+| `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_membership_renewal.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5192 --strictPort`；模拟赠送顺延、续费取消与回执丢失后刷新、无订阅赠送期间禁止即时购买及窄屏布局 |
 | `verify_r2_download.mjs` | 模拟 R2 下载与权限 |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2；按脚本说明配置对象范围和清理规则 |

@@ -25,8 +25,8 @@ export interface ReadingEntry {
 }
 export interface User { id: string; name: string; role: string; }
 export type QuotaKind='classic_daily'|'classic_unlimited'|'redraw_monthly'|'classic_grant'|'redraw_grant'|'unavailable';
-export interface QuotaBucket {id:string;kind:QuotaKind;mode:Mode;source:'daily'|'membership'|'grant'|'subscription';granted:number;used:number;reserved:number;available:number;starts_at:string;expires_at:string;grants_access:boolean;note:string;}
-export interface QuotaSummary {id:string;kind:QuotaKind;granted:number;used:number;reserved:number;available:number;starts_at:string;resets_at:string|null;next_expiry_at:string;buckets:QuotaBucket[];}
+export interface QuotaBucket {id:string;kind:QuotaKind;mode:Mode;source:'daily'|'membership'|'grant'|'subscription';granted:number;used:number;reserved:number;available:number;starts_at:string;expires_at:string|null;grants_access:boolean;note:string;}
+export interface QuotaSummary {id:string;kind:QuotaKind;granted:number;used:number;reserved:number;available:number;starts_at:string;resets_at:string|null;next_expiry_at:string|null;buckets:QuotaBucket[];}
 export interface ModeEntitlement {allowed:boolean;unlimited:boolean;quota_kind:QuotaKind;consent_version:string;quota:QuotaSummary|null;}
 export interface Entitlements {plan:'free'|'plus';plus_started_at:string|null;plus_expires_at:string|null;gift?:MembershipGift|null;timezone:string;image_rate_limit:ImageRateLimit;scheduler_weight:number;modes:Record<Mode,ModeEntitlement>;generated_at:string;pending_previous_period_pages:number;}
 export interface Capabilities { modes: { id: Mode; label: string; enabled: boolean; languages?:string[] }[]; languages: { id: string; label: string }[]; limits: { max_bytes: number; max_pixels: number; max_dimension: number; max_translation_ids: number }; entitlements:Entitlements|null; retention_days: number; }

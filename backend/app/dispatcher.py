@@ -157,6 +157,7 @@ def main():
     from .billing_sync import run as billing_maintenance
     Thread(target=billing_maintenance, args=(stopping,), daemon=True).start()
     next_oidc_probe = 0
+    next_campaign_scan = 0
     while not stopping.is_set():
         try:
             recover_once()
@@ -165,6 +166,10 @@ def main():
             if time.monotonic() >= next_oidc_probe:
                 probe_oidc()
                 next_oidc_probe = time.monotonic() + max(1, min(60, settings().cluster_node_timeout_seconds / 3))
+            if time.monotonic() >= next_campaign_scan:
+                from .quota_campaigns import backfill_campaigns
+                backfill_campaigns()
+                next_campaign_scan = time.monotonic() + 10
             report_progress("maintenance")
         except Exception as error:
             report_failure("maintenance", error)

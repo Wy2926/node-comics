@@ -1,9 +1,9 @@
-"""Operator-issued, time-bounded page grants; ready for future campaign callers."""
+"""Operator-issued page grants, optionally time-bounded."""
 from datetime import timezone
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header
 from pydantic import AwareDatetime, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from .auth import admin, identity
 from .db import get_db
@@ -23,7 +23,7 @@ class GrantRequest(RequestBody):
     mode: Literal["classic", "redraw"]
     pages: int = Field(ge=1, le=1_000_000, strict=True)
     starts_at: AwareDatetime | None = None
-    expires_at: AwareDatetime
+    expires_at: AwareDatetime | None = None
     note: str = Field(min_length=1, max_length=200)
 
     @model_validator(mode="after")
@@ -31,7 +31,7 @@ class GrantRequest(RequestBody):
         self.note = self.note.strip()
         if not self.note:
             raise ValueError("请填写赠送原因")
-        if self.starts_at and self.expires_at <= self.starts_at:
+        if self.starts_at and self.expires_at and self.expires_at <= self.starts_at:
             raise ValueError("Expiration must follow the start")
         return self
 
@@ -52,8 +52,8 @@ def grant_pages(db, owner_id, operator_id, key, request):
         return previous.result
     at = now()
     start = request.starts_at.astimezone(timezone.utc).replace(tzinfo=None) if request.starts_at else at
-    end = request.expires_at.astimezone(timezone.utc).replace(tzinfo=None)
-    if end <= max(at, start):
+    end = request.expires_at.astimezone(timezone.utc).replace(tzinfo=None) if request.expires_at else None
+    if end and end <= max(at, start):
         problem("INVALID_GRANT_WINDOW", "赠送额度的到期时间必须晚于现在和生效时间", 422)
     period = QuotaPeriod(id=digest(transaction_key), owner_id=user.id, kind=f"{request.mode}_grant",
         mode=request.mode, source="grant", source_key=transaction_key, starts_at=start, ends_at=end,
@@ -81,5 +81,6 @@ def issue_grant(user_id: str, body: GrantRequest, idempotency_key: Annotated[str
 @router.get('/v1/me/quota-grants')
 def my_grants(user: User = Depends(identity), db: Session = Depends(get_db)):
     return {"items": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
-        QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant", QuotaPeriod.ends_at > now())
-        .order_by(QuotaPeriod.ends_at, QuotaPeriod.id))]}
+        QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant",
+        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > now()))
+        .order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.id))]}

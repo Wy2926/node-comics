@@ -172,7 +172,7 @@ def quota_kind(user, mode, at=None, db=None):
     at = at or now()
     if db is not None and db.scalar(select(QuotaPeriod.id).where(QuotaPeriod.owner_id == user.id,
             QuotaPeriod.mode == mode, QuotaPeriod.source == "grant", QuotaPeriod.grants_access.is_(True),
-            QuotaPeriod.starts_at <= at, QuotaPeriod.ends_at > at).limit(1)):
+            QuotaPeriod.starts_at <= at, or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at)).limit(1)):
         return "redraw_grant"
     return "unavailable"
 
@@ -188,12 +188,12 @@ def available_periods(db, user, mode, kind, at):
         QuotaPeriod.mode == mode, or_(QuotaPeriod.source == "grant",
             (QuotaPeriod.source == 'subscription') & QuotaPeriod.billing_term_id.in_(
                 select(BillingTerm.id).where(BillingTerm.revoked_at.is_(None)))), QuotaPeriod.starts_at <= at,
-        QuotaPeriod.ends_at > at)))
+        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))))
     spec = period_spec(user, kind, at, db=db)
     if spec:
         # Virtual automatic periods allow side-effect-free reads before first use.
         periods.append(db.get(QuotaPeriod, spec["id"]) or QuotaPeriod(**spec, used=0, reserved=0))
-    return sorted(periods, key=lambda row: (row.ends_at, row.starts_at, row.id))
+    return sorted(periods, key=lambda row: (row.ends_at or datetime.max, row.starts_at, row.id))
 
 
 def period_json(period):

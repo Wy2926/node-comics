@@ -1,4 +1,4 @@
-"""Page allowances are immutable periods, independent of supplier cost accounting."""
+"""Page allowance records, independent of supplier cost accounting."""
 from datetime import datetime
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -18,7 +18,7 @@ class QuotaPeriod(Base):
     note: Mapped[str] = mapped_column(String(200), default="")
     grants_access: Mapped[bool] = mapped_column(Boolean, default=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime)
-    ends_at: Mapped[datetime] = mapped_column(DateTime)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime)
     granted: Mapped[int] = mapped_column(Integer)
     used: Mapped[int] = mapped_column(Integer, default=0)
     reserved: Mapped[int] = mapped_column(Integer, default=0)
@@ -28,7 +28,8 @@ class QuotaPeriod(Base):
                      CheckConstraint("source IN ('daily', 'membership', 'grant', 'subscription')"),
                      CheckConstraint("(source = 'subscription' AND billing_term_id IS NOT NULL) OR (source != 'subscription' AND billing_term_id IS NULL)"),
                      CheckConstraint("used >= 0"), CheckConstraint("reserved >= 0"),
-                     CheckConstraint("granted >= used + reserved"), CheckConstraint("ends_at > starts_at"))
+                     CheckConstraint("granted >= used + reserved"), CheckConstraint("ends_at > starts_at"),
+                     CheckConstraint("source = 'grant' OR ends_at IS NOT NULL", name="ck_quota_expiry_source"))
 
 
 class MembershipOperation(Base):

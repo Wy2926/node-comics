@@ -6,8 +6,8 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "gift_renewal_0005"
-NEW_TABLES = {"comic_title_cache", "translation_results", "result_accesses", "system_settings",
+HEAD = "quota_campaigns_0006"
+NEW_TABLES = {"quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "translation_results", "result_accesses", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
 
@@ -159,6 +159,9 @@ def test_gift_downgrade_rejects_unfinished_thirty_day_segment(isolated_migration
         config.attributes['connection'] = connection
         with pytest.raises(RuntimeError, match='Resolve thirty-day gift periods'):
             command.downgrade(config, 'redis_admission_0004')
+    # The empty campaign migration can already have been downgraded on SQLite;
+    # the membership guard must preserve its own schema and data.
+    db.initialize()
     assert_current_schema_matches_models(isolated_migration_database)
 
 

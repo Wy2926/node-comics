@@ -34,7 +34,7 @@ async def ambiguous_receipt(request, call_next):
     response = await call_next(request)
     state = json.loads(controls.read_text(encoding='utf-8'))
     pattern = state.get('lose_receipt')
-    if pattern and request.method in ('POST', 'PATCH') and fnmatch(request.url.path, pattern):
+    if pattern and request.method in ('POST', 'PUT', 'PATCH') and fnmatch(request.url.path, pattern):
         state.pop('lose_receipt')
         state['committed_status'] = response.status_code
         controls.write_text(json.dumps(state), encoding='utf-8')

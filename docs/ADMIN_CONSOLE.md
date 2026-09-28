@@ -12,6 +12,7 @@
 | 翻译供应商 | 文本 LLM 创建、配置、思考程度、密钥替换、启停、正文／漫画名分流权重及供应商上游 RPM；版本历史位于运行诊断 |
 | 图片供应商 | AI 重绘连接、模型、环境密钥引用、白名单与输入限制；启停、验证状态、真实图片测试及测试任务关联 |
 | 用户管理 | 用户与当前权益；运营会员开通／续期／提前结束、限时赠送、当期补偿；历史额度桶、账本、预占任务和操作人／原因分页 |
+| 额度活动 | 创建／复制赠送规则、启用／暂停、同一活动期限调整；模式、页数、新老用户范围、发放窗口、到账后有效天数／永久；到账人数、累计页数与分页发放记录 |
 | 系统设置 | 每日／会员默认额度、普通／PLUS 调度权重、滚动分钟准入、上传并发／超时／占位及反馈预算；版本冲突保护和变更审计 |
 | 产品与价格 | 产品权益、月付／年付价格及 Stripe／Creem 渠道绑定；验证平台商品后发布，支持草稿、发布与停售，新价仅影响新订阅 |
 | 订单管理 | 全渠道订单筛选与分页；原价格、结账、订阅、流转和通知；逐笔退款／争议及退款完整性核对；按所选历史订单定向核实 |
@@ -41,6 +42,7 @@
 
 ### 处理操作与恢复
 
+- `#quota-campaigns` 创建活动后先保持暂停，核对后启用。“调整期限”保留活动身份和领取记录，可选择仅影响后续发放或同步已到账额度；“复制新活动”会另发一份赠送，并按新创建时间划分新老用户。列表读取失败禁用配置；创建、启停和期限调整在发送前保留原编号、版本与参数，回执丢失后刷新页面仍可恢复原请求，版本冲突后重新读取并由管理员决定，退出登录清理会话内待核实操作。额度发放与有效期规则见[额度活动](MEMBERSHIP_AND_QUOTAS.md#可配置额度活动)。
 - 图片供应商保存／启停不会调用模型；真实测试会向所选供应商发送图片、产生供应商费用并使用当前管理员个人重绘权益，页面要求确认。测试请求保留原操作键与文件哈希，结果未知时先核实原任务。
 - 任务详情先展示结算影响。确认失败释放原预占；成功核实结算原预占，已释放的迟到结果不重新扣页。关联结果必须属于原用户，不能改型其他任务／文件页／复用授权引用的图片；补交只是登记已生成译图，不再次调用模型。
 - 用户权益操作均需原因。新赠送段每 30 天的重绘额度留空时采用服务端默认值；续赠保留原规则、已用与预占。已有付费／试用期时顺延赠送，等待支付渠道确认时展示待安排；未来赠送也可提前结束。结束赠送不撤销已付款权益、不提前扣款日期，独立限时页数赠送与当期补偿保持各自规则。订阅详情显示自动续费意愿和预计恢复日期。
@@ -84,7 +86,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 
-容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库从 `translations_0001` 全新空库基线迁移至 `gift_renewal_0005`；已有该基线数据库可保留业务数据升级，基线之前的旧库不支持。供应商权重迁移规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md#api-与部署)。API、管理后台与工作进程应使用同版本代码。
+容器构建 `docker build -t node-comics-backend:local backend` 自动完成前端构建并复制到最终 Python 镜像。数据库从 `translations_0001` 全新空库基线迁移至 `quota_campaigns_0006`；已有该基线数据库可保留业务数据升级，基线之前的旧库不支持。供应商权重迁移规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md#api-与部署)。API、管理后台与工作进程应使用同版本代码。
 
 ### 登录
 
@@ -112,6 +114,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 | `/v1/admin/providers` | 列表、PUT 配置、PATCH 启停、`/{id}/test` 真实图片测试 |
 | `/v1/admin/jobs/{id}` | `/attempts` 分页履历；`/reconcile` 核实；`/reconcile-image` 补交 |
 | `/v1/admin/users/{id}` | `/membership / quota-grants / quota-compensations` 业务操作；`/quota-periods / usage-ledger / membership-operations / reserved-jobs` 历史分页 |
+| `/v1/admin/quota-campaigns` | 额度活动页面使用；`PUT /{id}` 幂等创建、`PATCH /{id}` 按版本启用／暂停、`PATCH /{id}/duration` 调整期限、`GET /{id}/awards` 查看领取回执 |
 | `/v1/admin/feedback` | 列表、`/{id}` 详情／处理、`/{id}/reviews` 历史分页 |
 | `/v1/admin/billing` | `/orders` 与定向 reconcile；`/events` 及详情／retry；`/subscriptions` 及详情／invoices／terms；`/customers / accounts/{id}` |
 | `/v1/admin/operations` | `/health / users/{id} / uploads / receipts / assets / file-pages / results / accesses / statistics` |
@@ -159,6 +162,8 @@ $env:ADMIN_COMPLETION_IMAGE = '<启动时打印的 ADMIN_COMPLETION_IMAGE>'
 $env:ADMIN_FIXTURE_CONTROLS = '<启动时打印的 ADMIN_FIXTURE_CONTROLS>'
 node scripts/verify_admin_completion.mjs
 ```
+
+额度活动专项使用同一夹具，在独立重建的空库运行 `node scripts/verify_quota_campaign_admin.mjs`（支持 `PLAYWRIGHT_MODULE`）。覆盖创建与复制、启停、同一活动期限调整、审计筛选、注册赠送与记录分页、提交成功但回执丢失后的刷新恢复、版本冲突、读取失败禁用配置、键盘焦点和窄屏布局；结果写入 `artifacts/admin-quota-campaigns/`。
 
 脚本会修改合成数据，每次复验先重启夹具以重建空库。报告和截图写入已忽略的 `artifacts/admin-completion/`；`controls.json` 的 `lose_receipt` 会在业务事务成功后模拟一次 503，验证不确定回包恢复。该机制仅存在于独立验收服务。
 

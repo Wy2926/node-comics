@@ -60,7 +60,7 @@ export type Node = {
 export type Nodes = {items: Node[]; generated_at: string; timeout_seconds: number};
 export type AdminUser = User & {created_at: string; plan: string; plus_expires_at: string | null;
   last_submitted_at: string | null; jobs: Record<string, number>; active_jobs: number};
-export type Bucket = {id: string; mode: Mode; source: string; granted: number; used: number; reserved: number; expires_at: string};
+export type Bucket = {id: string; mode: Mode; source: string; granted: number; used: number; reserved: number; expires_at: string | null};
 export type UserDetail = User & {
   grants: (Bucket & {starts_at: string; note: string})[];
   created_at: string;
