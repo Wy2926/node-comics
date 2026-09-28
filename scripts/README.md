@@ -54,6 +54,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
+| `verify_membership_renewal.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5192 --strictPort`；模拟赠送顺延、续费取消与回执丢失后刷新、无订阅赠送期间禁止即时购买及窄屏布局 |
 | `verify_r2_download.mjs` | 模拟 R2 下载与权限 |
 | `verify_cluster_r2.py` / `probe_r2.py` | 真实 R2；按脚本说明配置对象范围和清理规则 |
 | `smoke_api.py` / `verify_image_provider_live.py` | API／真实图片供应商；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
@@ -69,7 +70,7 @@ Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；
 | `verify_website_download.mjs` | 五语下载页；指向公开服务时真实下载并核对摘要 |
 | `verify_website_pricing.mjs` | 五语无 JavaScript 公示月年价格与开放日期、双卡及六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 四种图片、切换、加载失败与恢复 |
-| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、订阅与退出 |
+| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、结账与退出，覆盖五语及窄屏 |
 
 完整同源账户流程见[官网 README](../backend/website/README.md)。模拟响应验证交互，真实身份、付款和模型效果分别验证。
 

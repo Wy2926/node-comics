@@ -16,7 +16,6 @@ def seed(db):
         created_at=at - timedelta(days=15-i)) for i, name in enumerate(["星野同学", "漫游读者", "绘梨", "青空"])]
     readers[0].plus_started_at = at - timedelta(days=2)
     readers[0].plus_expires_at = at + timedelta(days=28)
-    readers[0].plus_timezone = "Asia/Shanghai"
     readers[0].plus_monthly_pages = 300
     readers[0].membership_id = "fixture-membership"
     db.add_all(readers)

@@ -12,7 +12,7 @@ FastAPI + SQLAlchemy + PostgreSQL + Redis 8 控制服务。API、control-worker�
 ./scripts/bootstrap.ps1 -Start
 ```
 
-本地 API 默认 `http://127.0.0.1:18088`；环境配置位于 `deploy/.env.local`，后台路径取其中的 `ADMIN_WEB_PATH`。数据库从 `translations_0001` 空库基线迁移至 `redis_admission_0004`；首次安装准备新库，已有该基线数据库可保留业务数据升级，Redis 切换顺序见[部署规范](../docs/DEPLOYMENT.md)。
+本地 API 默认 `http://127.0.0.1:18088`；环境配置位于 `deploy/.env.local`，后台路径取其中的 `ADMIN_WEB_PATH`。数据库从 `translations_0001` 空库基线迁移至 `gift_renewal_0005`；首次安装准备新库，已有该基线数据库可保留业务数据升级，Redis 切换顺序见[部署规范](../docs/DEPLOYMENT.md)。
 
 直接运行需要 Python 3.11+、Redis 8 和 [requirements.txt](requirements.txt)，并向各进程注入数据库、Redis、身份和存储配置；`REDIS_URL` 指定直连地址（本机通常为 `redis://127.0.0.1:6379/0`），`REDIS_NAMESPACE` 隔离环境，同一环境所有 API、worker 和 maintenance 必须一致；本地调试显式设置 `APP_ENV=development`。在本目录的三个终端分别执行：
 

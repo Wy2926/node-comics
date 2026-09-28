@@ -2036,6 +2036,50 @@
         ]
       }
     },
+    "/v1/billing/cancel-renewal": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Cancel Renewal",
+        "operationId": "cancel_renewal_v1_billing_cancel_renewal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/billing/portal": {
       "post": {
         "tags": [
@@ -7300,6 +7344,16 @@
             ],
             "title": "Plus Expires At"
           },
+          "gift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GiftMembershipResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "timezone": {
             "type": "string",
             "title": "Timezone"
@@ -7334,6 +7388,7 @@
           "plan",
           "plus_started_at",
           "plus_expires_at",
+          "gift",
           "timezone",
           "image_rate_limit",
           "scheduler_weight",
@@ -7708,6 +7763,40 @@
           "items"
         ],
         "title": "FilePageMatches"
+      },
+      "GiftMembershipResponse": {
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "title": "Ends At"
+          },
+          "days": {
+            "type": "number",
+            "title": "Days"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "scheduled",
+              "active",
+              "expired"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "starts_at",
+          "ends_at",
+          "days",
+          "state"
+        ],
+        "title": "GiftMembershipResponse"
       },
       "GrantRequest": {
         "properties": {

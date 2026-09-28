@@ -23,6 +23,7 @@ class User(Base):
     plus_started_at: Mapped[datetime | None] = mapped_column(DateTime)
     plus_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     plus_timezone: Mapped[str | None] = mapped_column(String(80))
+    plus_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     plus_monthly_pages: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (CheckConstraint("plus_monthly_pages >= 0"),)

@@ -81,6 +81,8 @@ def reconcile_once():
     enabled = [p for p in ('stripe', 'creem') if provider_enabled(p)]
     if not enabled:
         return
+    from .billing_renewal import reconcile_renewals
+    reconcile_renewals(enabled)
     with session_factory()() as db:
         ids = list(db.scalars(select(BillingEvent.id).where(BillingEvent.provider.in_(enabled),
             BillingEvent.status.in_(['pending', 'processing']), BillingEvent.next_attempt_at <= now())

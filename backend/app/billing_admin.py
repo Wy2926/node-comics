@@ -318,6 +318,11 @@ SUBSCRIPTION_FIELDS = ('id', 'owner_id', 'provider', 'environment', 'checkout_id
     'next_billed_at', 'cancel_at', 'synced_at')
 
 
+def subscription_json(sub):
+    from .billing_renewal import renewal_json
+    return {**fields(sub, SUBSCRIPTION_FIELDS), **renewal_json(sub), 'renewal_error': sub.renewal_error}
+
+
 @router.get('/subscriptions')
 def subscriptions(provider: Literal['stripe', 'creem'] | None = None, environment: Literal['test', 'live'] | None = None,
         owner_id: str | None = Query(None, max_length=36), status: str | None = Query(None, max_length=24),
@@ -330,7 +335,7 @@ def subscriptions(provider: Literal['stripe', 'creem'] | None = None, environmen
             query = query.where(column == value)
     query = search_text(query, q, (BillingSubscription.id, BillingSubscription.customer_id, BillingSubscription.owner_id, User.name))
     return paged(db, query.order_by(BillingSubscription.synced_at.desc(), BillingSubscription.id.desc()), page,
-        page_size, lambda row: {**fields(row[0], SUBSCRIPTION_FIELDS), 'owner_name': row[1]})
+        page_size, lambda row: {**subscription_json(row[0]), 'owner_name': row[1]})
 
 
 def subscription_required(db, subscription_id):
@@ -345,7 +350,7 @@ def subscription_detail(subscription_id: str, db: Session = Depends(get_db)):
     sub = subscription_required(db, subscription_id)
     account = db.get(BillingAccount, sub.owner_id)
     checkout = db.get(BillingCheckout, sub.checkout_id)
-    return {'subscription': {**fields(sub, SUBSCRIPTION_FIELDS), 'owner_name': db.get(User, sub.owner_id).name},
+    return {'subscription': {**subscription_json(sub), 'owner_name': db.get(User, sub.owner_id).name},
         'price': price_json(db, db.get(BillingPrice, sub.price_id)),
         'trial_used_at': account.trial_used_at if account else None,
         'checkout': fields(checkout, ('id', 'session_id', 'trial', 'status', 'created_at', 'last_checked_at', 'error_code'))}

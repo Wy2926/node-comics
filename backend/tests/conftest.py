@@ -99,7 +99,7 @@ def login_plus(client, name="alice"):
     """Explicit PLUS fixture for supplier/lifecycle tests, without unrelated audit rows."""
     from sqlalchemy import select
     from app.db import session_factory
-    from app.entitlements import month_boundary
+    from datetime import timedelta
     from app.models import User, now, uid
     auth = login(client, name)
     with session_factory()() as db:
@@ -107,8 +107,7 @@ def login_plus(client, name="alice"):
         if not user.membership_id:
             user.membership_id = uid()
             user.plus_started_at = now()
-            user.plus_timezone = "Asia/Shanghai"
-            user.plus_expires_at = month_boundary(user.plus_started_at, 12, user.plus_timezone)
+            user.plus_expires_at = user.plus_started_at + timedelta(days=360)
             user.plus_monthly_pages = 300
             db.commit()
     return auth

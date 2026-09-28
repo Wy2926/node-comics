@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, defer
 from .auth import admin, user_json
 from .config import settings
 from .db import get_db
-from .entitlements import entitlements_json, is_plus, is_operator_plus, iso, period_json, plus_dates
+from .entitlements import entitlements_json, is_plus, iso, period_json, plus_dates
 from .billing_access import access_exists
 from .entitlement_models import QuotaPeriod
 from .errors import problem
@@ -179,7 +179,7 @@ def overview(db: Session = Depends(get_db)):
         ExecutionLease.completed_at.is_(None)).group_by(lease_status)).all()
     user_count = db.scalar(select(func.count()).select_from(User))
     plus_count = db.scalar(select(func.count()).select_from(User).where(or_(
-        and_(User.plus_started_at <= at, User.plus_expires_at > at),
+        and_(User.plus_pending.is_(False), User.plus_started_at <= at, User.plus_expires_at > at),
         access_exists(at))))
     return {"generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
         "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).where(Job.created_at >= since))},
@@ -228,7 +228,7 @@ def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | No
     if q.strip():
         query = query.where(or_(User.name.contains(q.strip(), autoescape=True), User.id.contains(q.strip(), autoescape=True)))
     if plan:
-        plus = or_(and_(User.plus_started_at.is_not(None), User.plus_expires_at.is_not(None), User.plus_started_at <= at, User.plus_expires_at > at),
+        plus = or_(and_(User.plus_pending.is_(False), User.plus_started_at.is_not(None), User.plus_expires_at.is_not(None), User.plus_started_at <= at, User.plus_expires_at > at),
                    access_exists(at))
         query = query.where(plus if plan == "plus" else ~plus)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
@@ -252,7 +252,6 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
     if not user:
         problem("NOT_FOUND", "用户不存在", 404)
     return {**user_json(user), "created_at": iso(user.created_at), "entitlements": entitlements_json(db, user),
-            "operator_membership": {"active": is_operator_plus(user), "expires_at": iso(user.plus_expires_at)},
             "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
                 QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
                 .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))]}

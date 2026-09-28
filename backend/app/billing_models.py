@@ -146,6 +146,13 @@ class BillingSubscription(Base):
     paid_ends_at: Mapped[datetime | None] = mapped_column(DateTime)
     next_billed_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancel_at: Mapped[datetime | None] = mapped_column(DateTime)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=True, server_default='1')
+    gift_membership_id: Mapped[str | None] = mapped_column(String(36))
+    gift_deferred: Mapped[bool] = mapped_column(Boolean, default=False, server_default='0')
+    resume_at: Mapped[datetime | None] = mapped_column(DateTime)
+    renewal_action: Mapped[str | None] = mapped_column(String(12))
+    renewal_action_at: Mapped[datetime | None] = mapped_column(DateTime)
+    renewal_error: Mapped[str | None] = mapped_column(String(80))
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=now, index=True)
 
 

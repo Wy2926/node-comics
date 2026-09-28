@@ -2,7 +2,7 @@
 from typing import Annotated, Literal
 from datetime import timedelta
 from hashlib import sha256
-from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, Query, UploadFile
 from pydantic import Field, field_validator
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
@@ -219,9 +219,12 @@ def admin_users(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=10
 
 
 @router.post("/v1/admin/users/{user_id}/membership")
-def admin_membership(user_id: str, body: MembershipRequest, idempotency_key: Annotated[str | None, Header()] = None,
+def admin_membership(user_id: str, body: MembershipRequest, tasks: BackgroundTasks, idempotency_key: Annotated[str | None, Header()] = None,
                      user: User = Depends(admin), db: Session = Depends(get_db)):
-    return change_membership(db, user_id, user.id, idem_key(idempotency_key), **body.model_dump())
+    result = change_membership(db, user_id, user.id, idem_key(idempotency_key), **body.model_dump())
+    from .billing_renewal import process_owner
+    tasks.add_task(process_owner, user_id)
+    return result
 
 
 @router.post("/v1/admin/users/{user_id}/quota-compensations")

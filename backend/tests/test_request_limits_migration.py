@@ -6,7 +6,7 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "redis_admission_0004"
+HEAD = "gift_renewal_0005"
 NEW_TABLES = {"comic_title_cache", "translation_results", "result_accesses", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
@@ -88,7 +88,6 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
     from alembic import command
     from alembic.config import Config
     from app import db
-    from app.models import User
     at = datetime(2026, 1, 1)
     leases = [{'id': 'preserve-control-token', 'until': '2026-01-01T00:00:30'}]
     db.initialize()
@@ -98,15 +97,68 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
     with isolated_migration_database.begin() as connection:
         config.attributes['connection'] = connection
         command.downgrade(config, 'translations_0001')
-        connection.execute(User.__table__.insert().values(id='preserved-user', subject='existing-user', name='Existing'))
+        connection.execute(text("INSERT INTO users (id, subject, name, role, created_at) VALUES ('preserved-user', 'existing-user', 'Existing', 'user', :at)"), {'at': at})
         connection.execute(text("INSERT INTO control_admissions VALUES ('preserved-user', 'translation', 2.5, :at, :leases)"),
             {'at': at, 'leases': __import__('json').dumps(leases)})
     db.initialize()
     with isolated_migration_database.connect() as connection:
         assert connection.scalar(text('SELECT name FROM users WHERE id = :id'), {'id': 'preserved-user'}) == 'Existing'
+        assert connection.scalar(text('SELECT plus_pending FROM users WHERE id = :id'), {'id': 'preserved-user'}) == 0
         assert not {'control_admissions', 'comic_title_admissions', 'image_admissions', 'feedback_admissions',
             'support_request_admissions', 'upload_ingress_leases', 'upload_ingress_mutex',
             'translation_provider_requests'} & set(inspect(connection).get_table_names())
+    assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_gift_upgrade_preserves_calendar_segment_and_used_reserved_bucket(isolated_migration_database):
+    from datetime import datetime
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy.orm import Session
+    from app import db
+    from app.entitlement_models import QuotaPeriod
+    from app.entitlements import MONTHLY, allowance_json, iso
+    from app.models import User
+    from app.providers import digest
+    db.initialize()
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    start, end = datetime(2026, 1, 31, 18), datetime(2026, 2, 28, 18)
+    period_id = digest(['calendar-user', MONTHLY, iso(start)])
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.downgrade(config, 'redis_admission_0004')
+        connection.execute(text("INSERT INTO users (id, subject, name, role, created_at, membership_id, plus_started_at, plus_expires_at, plus_timezone, plus_monthly_pages) VALUES ('calendar-user', 'calendar-user', 'Existing', 'user', :start, 'calendar-segment', :start, :end, 'America/New_York', 300)"), {'start': start, 'end': end})
+        connection.execute(QuotaPeriod.__table__.insert().values(id=period_id, owner_id='calendar-user',
+            kind=MONTHLY, mode='redraw', source='membership', source_key=f'{MONTHLY}:{iso(start)}',
+            starts_at=start, ends_at=end, granted=300, used=125, reserved=3))
+    db.initialize()
+    with Session(isolated_migration_database) as session:
+        user = session.get(User, 'calendar-user')
+        assert user.plus_timezone == 'America/New_York' and not user.plus_pending
+        quota = allowance_json(session, user, MONTHLY, datetime(2026, 2, 1))
+        assert quota['id'] == period_id
+        assert (quota['used'], quota['reserved'], quota['available']) == (125, 3, 172)
+        assert quota['resets_at'] == iso(end)
+    assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_gift_downgrade_rejects_unfinished_thirty_day_segment(isolated_migration_database):
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from app import db
+    db.initialize()
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        connection.execute(text("INSERT INTO users (id, subject, name, role, created_at, membership_id, plus_started_at, plus_expires_at, plus_monthly_pages) VALUES ('gift-user', 'gift-user', 'New gift', 'user', CURRENT_TIMESTAMP, 'gift-segment', CURRENT_TIMESTAMP, '2099-01-01', 300)"))
+        config.attributes['connection'] = connection
+        with pytest.raises(RuntimeError, match='Resolve thirty-day gift periods'):
+            command.downgrade(config, 'redis_admission_0004')
     assert_current_schema_matches_models(isolated_migration_database)
 
 

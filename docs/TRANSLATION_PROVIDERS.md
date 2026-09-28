@@ -99,7 +99,7 @@ translations[2]{id,text}:
 
 创建和完整编辑请求在顶层传入 `text_weight`、`title_weight`、`requests_per_minute`，与 `config` 内的模型参数分开；省略时两项权重均按 1、上游 RPM 按 60 处理。旧的 `/default`、`/title-default` 选择接口已移除。
 
-数据库从 `translations_0001` 空库基线迁移至 `redis_admission_0004`。`text_routing_0003` 将原正文、漫画名默认标记分别转换为对应权重 1，其余权重为 0，并删除旧标记及唯一索引；`redis_admission_0004` 删除短期限流及上传门禁表。已有供应商、不可变版本、任务和缓存保留；原来未选择漫画名供应商时，升级后需配置大于 0 的漫画名权重。全部 API、worker 和 maintenance 共用 Redis 命名空间并运行相同版本；切换前排空在途上传，首次切换短期计数重新开始，见[部署规范](DEPLOYMENT.md)。
+数据库从 `translations_0001` 空库基线迁移至 `gift_renewal_0005`。`text_routing_0003` 将原正文、漫画名默认标记分别转换为对应权重 1，其余权重为 0，并删除旧标记及唯一索引；`redis_admission_0004` 删除短期限流及上传门禁表。已有供应商、不可变版本、任务和缓存保留；原来未选择漫画名供应商时，升级后需配置大于 0 的漫画名权重。全部 API、worker 和 maintenance 共用 Redis 命名空间并运行相同版本；切换前排空在途上传，首次切换短期计数重新开始，见[部署规范](DEPLOYMENT.md)。
 
 验证入口：`backend/.venv/Scripts/python.exe -m pytest backend/tests/test_translation_providers.py backend/tests/test_text_adapter.py backend/tests/test_classic.py backend/tests/test_classic_parallel.py backend/tests/test_cluster_scheduler.py -q`；管理后台在 `backend/admin-ui` 执行 `npm run build`。测试使用隔离数据库和模拟供应商，无真实付费模型调用。
 

@@ -62,10 +62,10 @@ export type AdminUser = User & {created_at: string; plan: string; plus_expires_a
   last_submitted_at: string | null; jobs: Record<string, number>; active_jobs: number};
 export type Bucket = {id: string; mode: Mode; source: string; granted: number; used: number; reserved: number; expires_at: string};
 export type UserDetail = User & {
-  operator_membership?: {active: boolean; expires_at: string | null};
   grants: (Bucket & {starts_at: string; note: string})[];
   created_at: string;
   entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number};
+    gift: {starts_at: string; ends_at: string; days: number; state: 'pending' | 'scheduled' | 'active' | 'expired'} | null;
     modes: Record<Mode, {unlimited: boolean; allowed: boolean; quota: null | {
       available: number; used: number; reserved: number; granted: number; resets_at: string | null; buckets: Bucket[]}}>
   };

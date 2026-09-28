@@ -47,6 +47,8 @@
 .account-signout {margin-left:auto;align-self:flex-start}
 .account-signout:hover,.account-refresh:hover {color:var(--accent)}
 .account-expiry {margin-top:18px;color:var(--muted);font-size:.78rem}
+.account-gift {margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:.82rem}
+.account-gift p {margin-top:5px;color:var(--muted)}
 .account-reading-note {display:flex;justify-content:space-between;align-items:center;gap:18px;border-top:1px solid var(--line);margin-top:22px;padding-top:18px;font-size:.79rem;color:var(--muted)}
 .account-reading-note a {flex-shrink:0}
 .account-subscription {margin-top:20px}
@@ -58,7 +60,7 @@
 .subscription-facts>div {display:flex;justify-content:space-between;gap:20px}
 .subscription-facts dt {color:var(--muted);flex-shrink:0}
 .subscription-facts dd {margin:0;text-align:right}
-.account-subscription .button {margin-top:14px}
+.account-subscription .button {margin-top:14px;margin-right:10px}
 .account-upgrade {margin-top:20px;border-top:1px solid var(--line);padding-top:16px}
 .account-upgrade>summary {cursor:pointer;color:var(--accent);font-size:.85rem;font-weight:650;width:fit-content}
 .account-upgrade>label {display:flex;align-items:flex-start;gap:9px;font-size:.8rem;margin-top:20px}

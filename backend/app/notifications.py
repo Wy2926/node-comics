@@ -102,7 +102,7 @@ def policy_wakeups(db, flush_context, instances):
         if isinstance(row, User):
             state = inspect(row)
             if any(state.attrs[name].history.has_changes() for name in (
-                    'membership_id', 'plus_started_at', 'plus_expires_at', 'plus_monthly_pages') if name in state.attrs):
+                    'membership_id', 'plus_started_at', 'plus_expires_at', 'plus_monthly_pages', 'plus_pending') if name in state.attrs):
                 if row.id:
                     topics.add('user:' + row.id)
         elif isinstance(row, BillingTerm):

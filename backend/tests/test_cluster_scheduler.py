@@ -29,10 +29,11 @@ def scheduler_case(text_database):
     from app.classic_config import snapshot
     with session_factory()() as db:
         config = snapshot(db)
+        at = now()
         free = User(id='free-user', subject='isolated-free', name='free')
         plus = User(id='plus-user', subject='isolated-plus', name='plus', membership_id=uid(),
-                    plus_started_at=now() - timedelta(days=1), plus_expires_at=now() + timedelta(days=30),
-                    plus_timezone='Asia/Shanghai', plus_monthly_pages=300)
+                    plus_started_at=at - timedelta(days=1), plus_expires_at=at + timedelta(days=29),
+                    plus_monthly_pages=300)
         db.add_all([free, plus])
         db.flush()
         for owner in (free, plus):

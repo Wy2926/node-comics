@@ -49,6 +49,8 @@ CREEM_EVENTS = {'checkout.completed', 'subscription.active', 'subscription.paid'
 
 def billing_error(exc):
     messages = {'BILLING_SUBSCRIPTION_EXISTS': '已有订阅，请管理当前订阅',
+        'BILLING_GIFT_ACTIVE': '赠送会员期间不会扣款，请在赠送结束后开通订阅',
+        'SUBSCRIPTION_NOT_FOUND': '没有可管理的订阅',
         'BILLING_CHECKOUT_UNCERTAIN': '正在核实原结账结果，请稍后刷新',
         'CREEM_CHECKOUT_UNCERTAIN': '原结账请求结果待核实，为避免重复订阅暂不创建新结账，请联系支持',
         'BILLING_CHECKOUT_COMPLETED': '结账已完成，请刷新会员权益',
@@ -82,10 +84,23 @@ def checkout(body: CheckoutRequest, user: User = Depends(identity)):
 def sync(user: User = Depends(identity), db: Session = Depends(get_db)):
     try:
         sync_owner(user.id)
+        from .billing_renewal import process_owner
+        process_owner(user.id)
     except BillingError as exc:
         billing_error(exc)
     db.expire_all()
     return {'billing': billing_status(db, user), 'entitlements': entitlements_json(db, user)}
+
+
+@router.post('/v1/billing/cancel-renewal')
+def cancel_renewal(body: PortalRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
+    from .billing_renewal import cancel_renewal as cancel
+    try:
+        cancel(user.id, body.provider)
+    except BillingError as exc:
+        billing_error(exc)
+    db.expire_all()
+    return billing_status(db, user)
 
 
 @router.post('/v1/billing/portal')

@@ -115,7 +115,6 @@ def pg(pg_scope):
     from app.providers import initialize_providers
     from app.assets import create_asset
     from app.models import User, uid, now
-    from app.entitlements import month_boundary
     initialize()
     image = BytesIO()
     Image.new("RGB", (320, 480), (231, 225, 248)).save(image, "PNG")
@@ -123,9 +122,9 @@ def pg(pg_scope):
     with session_factory()() as db:
         configure_text_provider(db)
         initialize_providers(db)
-        user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", membership_id=uid(), plus_started_at=now(),
-                    plus_expires_at=month_boundary(now(), 12, "Asia/Shanghai"),
-                    plus_timezone="Asia/Shanghai", plus_monthly_pages=300)
+        at = now()
+        user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", membership_id=uid(), plus_started_at=at,
+                    plus_expires_at=at + timedelta(days=360), plus_monthly_pages=300)
         db.add(user)
         db.flush()
         asset = create_asset(db, user.id, raw)
@@ -352,7 +351,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['redis_admission_0004']
+            assert revisions == ['gift_renewal_0005']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0

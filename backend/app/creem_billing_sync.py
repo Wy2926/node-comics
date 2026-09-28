@@ -209,6 +209,8 @@ def sync_subscription(subscription_id, transaction_id=None, event_id=None):
             recover_trial(db, user, sub, row, price, revision, account, values, start, end, known is not None)
         for value in values:
             apply_transaction(db, user, sub, value, event_id)
+        from .billing_renewal import observe_renewal
+        observe_renewal(db, user, sub, subscription)
         if row.trial:
             account.trial_used_at = account.trial_used_at or now()
         record_subscription_state(db, sub, previous_status)

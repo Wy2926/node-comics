@@ -69,6 +69,7 @@ export class Api {
   billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
   startCheckout(priceId:string,provider:BillingProvider){return this.request<{checkout_url:string;trial:boolean;environment:'test'|'live';provider:BillingProvider}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId,provider})});}
   billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}
+  cancelRenewal(provider:BillingProvider){return this.request<BillingStatus>('/v1/billing/cancel-renewal',{method:'POST',body:JSON.stringify({provider})});}
   syncBilling(){return this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});}
   private remember(snapshot:TranslationSnapshot){this.snapshots.set(snapshot.id,snapshot);return snapshot;}
   async translate(id:string,body:TranslationInput){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body)}));}

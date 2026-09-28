@@ -44,10 +44,18 @@ class ModeEntitlement(BaseModel):
     quota: PeriodResponse | None
 
 
+class GiftMembershipResponse(BaseModel):
+    starts_at: str
+    ends_at: str
+    days: float
+    state: Literal['pending', 'scheduled', 'active', 'expired']
+
+
 class EntitlementsResponse(BaseModel):
     plan: str
     plus_started_at: str | None
     plus_expires_at: str | None
+    gift: GiftMembershipResponse | None
     timezone: str
     image_rate_limit: dict
     scheduler_weight: float

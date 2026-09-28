@@ -10,11 +10,11 @@ from .billing_catalog import offers, price_json, default_provider
 from .billing_orders import checkout_order, transition
 from .config import settings
 from .db import session_factory
-from .entitlements import locked_user, iso
+from .entitlements import locked_user, iso, gift_json
 from .models import now, uid
+from .billing_renewal import LIVE as LIVE_SUBSCRIPTIONS
 
 PENDING = ['creating', 'open', 'unknown']
-LIVE_SUBSCRIPTIONS = ['active', 'trialing', 'past_due', 'unpaid', 'paused', 'incomplete', 'scheduled_cancel']
 
 
 def pending_checkout_condition():
@@ -29,11 +29,18 @@ def customer_for(db, owner_id, provider):
         BillingCustomer.provider == provider, BillingCustomer.environment == provider_environment(provider)))
 
 
+def current_subscription(db, owner_id, provider=None):
+    query = select(BillingSubscription).join(BillingCheckout, BillingSubscription.checkout_id == BillingCheckout.id).where(
+        BillingSubscription.owner_id == owner_id)
+    if provider is not None:
+        query = query.where(BillingSubscription.provider == provider)
+    return db.scalar(query.order_by(BillingCheckout.created_at.desc()).limit(1))
+
+
 def billing_status(db, user):
+    from .billing_renewal import renewal_json
     account = db.get(BillingAccount, user.id)
-    sub = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == user.id)
-        .join(BillingCheckout, BillingSubscription.checkout_id == BillingCheckout.id)
-        .order_by(BillingCheckout.created_at.desc()).limit(1))
+    sub = current_subscription(db, user.id)
     pending = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == user.id,
         pending_checkout_condition()).limit(1))
     providers = [provider_config_json(p) for p in ('stripe', 'creem') if provider_enabled(p)]
@@ -48,7 +55,8 @@ def billing_status(db, user):
         'offers': offers(db), 'checkout_price': quote, 'checkout_provider': pending.provider if pending else None,
         'trial_eligible': not account or account.trial_used_at is None,
         'checkout_pending': bool(pending), 'checkout_error': pending.error_code if pending else None,
-        'subscription': None if not sub else {'provider': sub.provider, 'status': sub.status,
+        'gift': gift_json(user),
+        'subscription': None if not sub else {'provider': sub.provider, 'status': sub.status, **renewal_json(sub),
             'price': price_json(db, db.get(BillingPrice, sub.price_id)), 'next_billed_at': iso(sub.next_billed_at),
             'cancel_at': iso(sub.cancel_at), 'trial_ends_at': iso(sub.trial_ends_at), 'paid_ends_at': iso(sub.paid_ends_at)},
         'entitlement_expires_at': iso(access_dates(db, user.id)[1])}
@@ -172,6 +180,8 @@ def start_checkout(owner_id, price_id, provider):
     require(provider_enabled(provider), 'BILLING_DISABLED')
     with session_factory()() as db:
         user = locked_user(db, owner_id)
+        gift = gift_json(user)
+        require(not gift or gift['state'] == 'expired', 'BILLING_GIFT_ACTIVE')
         active = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == owner_id,
             BillingSubscription.status.in_(LIVE_SUBSCRIPTIONS)).limit(1))
         require(active is None and not active_terms(db, user.id), 'BILLING_SUBSCRIPTION_EXISTS')

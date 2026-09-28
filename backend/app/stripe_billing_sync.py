@@ -53,7 +53,7 @@ def sync_subscription(subscription_id, invoice_id=None):
             customer = BillingCustomer(owner_id=user.id, provider='stripe', environment=cfg.stripe_environment, customer_id=subscription['customer'])
             db.add(customer)
         stripe.require(customer.customer_id == subscription['customer'])
-        sub = db.get(BillingSubscription, resource_key('stripe', subscription_id))
+        sub = db.get(BillingSubscription, resource_key('stripe', subscription_id), populate_existing=True)
         previous_status = sub.status if sub else None
         if sub is None:
             sub = BillingSubscription(id=resource_key('stripe', subscription_id), provider='stripe', binding_id=row.binding_id, owner_id=user.id, checkout_id=row.id,
@@ -67,8 +67,11 @@ def sync_subscription(subscription_id, invoice_id=None):
         sub.next_billed_at = end if sub.status in ('active', 'trialing') and not sub.cancel_at else None
         # Retain the original trial dates even when the first callback arrives after conversion.
         start, trial_end = timestamp(subscription.get('trial_start')), timestamp(subscription.get('trial_end'))
-        if start and trial_end and sub.trial_starts_at is None:
-            stripe.require(row.trial and account.trial_used_at is None, 'STRIPE_TRIAL_ALREADY_USED')
+        gift_trial = sub.gift_membership_id and trial_end == sub.resume_at
+        # Later promotional deferrals leave trial dates on Stripe even after
+        # billing resumes. Only an eligible Checkout can establish our trial.
+        if row.trial and start and trial_end and sub.trial_starts_at is None and not gift_trial:
+            stripe.require(account.trial_used_at is None, 'STRIPE_TRIAL_ALREADY_USED')
             stripe.require(timedelta(0) < trial_end-start <= timedelta(days=revision.trial_days, minutes=1), 'STRIPE_TRIAL_PERIOD_INVALID')
             grant_term(db, user, sub, price, 'trial', start, trial_end)
             sub.trial_starts_at, sub.trial_ends_at = start, trial_end
@@ -86,6 +89,8 @@ def sync_subscription(subscription_id, invoice_id=None):
         order.subscription_id = sub.id
         if sub.status == 'trialing' and order.status not in ('paid', 'refunded', 'disputed'):
             transition(db, order, 'trialing', 'subscription_sync')
+        from .billing_renewal import observe_renewal
+        observe_renewal(db, user, sub, subscription)
         record_subscription_state(db, sub, previous_status)
         row.status, row.error_code, row.last_checked_at = 'completed', None, now()
         db.commit()

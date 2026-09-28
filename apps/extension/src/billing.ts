@@ -1,4 +1,5 @@
 import {msg} from './i18n/runtime';
+import type {MembershipGift} from './types';
 
 export interface BillingPrice {
   id:string;plan_id:string;plan_revision_id:string;name:string;version:number;
@@ -27,7 +28,8 @@ export interface BillingStatus {
   enabled:boolean; providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];provider:BillingProvider|null; environment:'test'|'live'; trial_eligible:boolean; checkout_pending:boolean;
   offers:BillingOffer[];checkout_price:BillingOffer|null;checkout_provider:BillingProvider|null;
   entitlement_expires_at:string|null;
-  subscription:null|{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;trial_ends_at:string|null;paid_ends_at:string|null};
+  gift:MembershipGift|null;
+  subscription:null|{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;trial_ends_at:string|null;paid_ends_at:string|null;auto_renew:boolean;can_cancel:boolean;renewal_state:'normal'|'deferring'|'deferred'|'resuming'|'canceling'|'canceled'|'attention';resume_at:string|null};
 }
 
 export function paymentUrl(value:string,provider:BillingProvider,portal=false) {

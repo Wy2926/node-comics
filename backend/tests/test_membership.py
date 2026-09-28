@@ -136,16 +136,16 @@ def test_old_day_settlement_never_changes_new_day(client, png, monkeypatch, succ
         assert period.used == int(success) and period.reserved == 0
 
 
-def test_month_end_anchor_and_yearly_monthly_allowance(client, png, monkeypatch):
+def test_gifts_use_thirty_day_periods_and_preserve_old_settlements(client, png, monkeypatch):
     freeze(monkeypatch, datetime(2026, 1, 31, 2, 0, 0))
     auth = login(client)
     assert grant(client, auth, months=12).status_code == 200
     job = submit(client, auth, upload(client, auth, png), 'redraw').json()
     first = entitlement(client, auth)['modes']['redraw']['quota']
-    assert first['resets_at'] == '2026-02-28T02:00:00Z'
-    freeze(monkeypatch, datetime(2026, 2, 28, 2, 0, 0))
+    assert first['resets_at'] == '2026-03-02T02:00:00Z'
+    freeze(monkeypatch, datetime(2026, 3, 2, 2, 0, 0))
     second = entitlement(client, auth)['modes']['redraw']['quota']
-    assert second['resets_at'] == '2026-03-31T02:00:00Z' and second['available'] == 300
+    assert second['resets_at'] == '2026-04-01T02:00:00Z' and second['available'] == 300
     finish(job['id'])
     assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 300
 

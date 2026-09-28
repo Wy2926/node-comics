@@ -11,7 +11,7 @@ import '../src/redesign.css';
 import '../src/ui/account.css';
 if(location.port!=='5192')throw Error('Use isolated port 5192.');
 window.fetch=async()=>{throw Error('No network allowed in billing fixture');};
-const status:BillingStatus={offers:[billingOffer],checkout_price:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:false,entitlement_expires_at:null,checkout_pending:false,subscription:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,paid_ends_at:'2099-01-01T00:00:00Z'}};
+const status:BillingStatus={offers:[billingOffer],checkout_price:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:false,gift:null,entitlement_expires_at:null,checkout_pending:false,subscription:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,paid_ends_at:'2099-01-01T00:00:00Z'}};
 const rights={plan:'plus',plus_expires_at:'2099-01-01T00:00:00Z'} as Entitlements;
 const counts={reads:0,syncs:0,portals:0,opened:0};
 let failPortal=false;

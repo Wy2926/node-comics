@@ -8,13 +8,14 @@ from .entitlement_models import MembershipOperation, QuotaPeriod
 from .errors import problem
 from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
-from .billing_access import active_terms, access_dates
+from .billing_access import active_terms
 from .system_settings import get_request_limits
 from .admin_audit import record_audit
 
 DAILY = "classic_daily"
 MONTHLY = "redraw_monthly"
 UNLIMITED = "classic_unlimited"
+GIFT_PERIOD = timedelta(days=30)
 
 
 def iso(value):
@@ -38,8 +39,19 @@ def lock_operation(db, transaction_key):
 
 def is_operator_plus(user, at=None):
     at = at or now()
-    return bool(user.plus_started_at and user.plus_expires_at
+    return bool(not user.plus_pending and user.plus_started_at and user.plus_expires_at
                 and user.plus_started_at <= at < user.plus_expires_at)
+
+
+def gift_json(user, at=None):
+    at = at or now()
+    if not user.membership_id or not user.plus_started_at or not user.plus_expires_at:
+        return None
+    start, end = user.plus_started_at, user.plus_expires_at
+    state = ('expired' if end <= start or (end <= at and not user.plus_pending) else
+             'pending' if user.plus_pending else 'scheduled' if at < start else 'active')
+    return {'starts_at': iso(start), 'ends_at': iso(end),
+            'days': max(0, (end - start) / timedelta(days=1)), 'state': state}
 
 
 def is_plus(db, user, at=None):
@@ -49,11 +61,17 @@ def is_plus(db, user, at=None):
 
 def plus_dates(db, user, at=None):
     at = at or now()
-    ranges = [(start, end) for start, end in ((user.plus_started_at, user.plus_expires_at),
-              access_dates(db, user.id, at)) if start and end]
-    active = [(start, end) for start, end in ranges if start <= at < end]
-    values = active or ranges
-    return (min(start for start, _ in values), max(end for _, end in values)) if values else (None, None)
+    ranges = [(term.starts_at, term.ends_at) for term in active_terms(db, user.id, at)]
+    if (not user.plus_pending and user.plus_started_at and user.plus_expires_at
+            and user.plus_started_at < user.plus_expires_at):
+        ranges.append((user.plus_started_at, user.plus_expires_at))
+    merged = []
+    for start, end in sorted(ranges):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    return next(((start, end) for start, end in merged if start <= at < end), (None, None))
 
 
 def month_boundary(anchor, offset, timezone_name):
@@ -61,6 +79,70 @@ def month_boundary(anchor, offset, timezone_name):
     year, month = divmod(local.year * 12 + local.month - 1 + offset, 12)
     value = local.replace(year=year, month=month + 1, day=min(local.day, monthrange(year, month + 1)[1]))
     return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _gift_period_spec(user, at):
+    if not (user.plus_started_at and user.plus_expires_at
+            and user.plus_started_at <= at < user.plus_expires_at):
+        return None
+    if user.plus_timezone:
+        # Existing operator segments retain their calendar cycle and bucket IDs.
+        zone = ZoneInfo(user.plus_timezone)
+        local, anchor = (value.replace(tzinfo=timezone.utc).astimezone(zone)
+                         for value in (at, user.plus_started_at))
+        index = (local.year - anchor.year) * 12 + local.month - anchor.month
+        if month_boundary(user.plus_started_at, index, user.plus_timezone) > at:
+            index -= 1
+        start = month_boundary(user.plus_started_at, index, user.plus_timezone)
+        end = month_boundary(user.plus_started_at, index + 1, user.plus_timezone)
+        key, period_id = f'{MONTHLY}:{iso(start)}', digest([user.id, MONTHLY, iso(start)])
+    else:
+        index = (at - user.plus_started_at) // GIFT_PERIOD
+        start = user.plus_started_at + index * GIFT_PERIOD
+        end = start + GIFT_PERIOD
+        key = f'{MONTHLY}:{user.membership_id}:{index}'
+        period_id = digest([user.id, key])
+    return {'id': period_id, 'owner_id': user.id, 'kind': MONTHLY,
+            'mode': 'redraw', 'source': 'membership', 'source_key': key,
+            'starts_at': start, 'ends_at': min(end, user.plus_expires_at),
+            'granted': user.plus_monthly_pages}
+
+
+def _gift_periods(db, user):
+    segment = ((QuotaPeriod.starts_at >= user.plus_started_at) & (QuotaPeriod.starts_at < user.plus_expires_at)
+               if user.plus_timezone else
+               QuotaPeriod.source_key.startswith(f'{MONTHLY}:{user.membership_id}:', autoescape=True))
+    return list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
+        QuotaPeriod.source == 'membership', segment)))
+
+
+def _sync_gift_periods(db, user):
+    if not user.plus_started_at or not user.plus_expires_at or user.plus_expires_at <= user.plus_started_at:
+        return
+    periods = _gift_periods(db, user)
+    for period in periods:
+        start = (period.starts_at if user.plus_timezone else
+                 user.plus_started_at + int(period.source_key.rsplit(':', 1)[1]) * GIFT_PERIOD)
+        spec = _gift_period_spec(user, start)
+        if spec:
+            period.starts_at, period.ends_at = spec['starts_at'], spec['ends_at']
+    if not periods:
+        db.add(QuotaPeriod(**_gift_period_spec(user, user.plus_started_at)))
+
+
+def activate_gift(db, user, start=None):
+    """Caller holds the account lock; pending gifts retain their full duration."""
+    if not user.plus_started_at or not user.plus_expires_at or user.plus_expires_at <= user.plus_started_at:
+        user.plus_pending = False
+        return
+    if start is not None and start != user.plus_started_at:
+        if (user.plus_timezone or (not user.plus_pending and user.plus_started_at < now())
+                or any(period.used or period.reserved for period in _gift_periods(db, user))):
+            problem('MEMBERSHIP_ALREADY_ACTIVE', '已生效或使用的赠送不能重新安排起点', 409)
+        duration = user.plus_expires_at - user.plus_started_at
+        user.plus_started_at, user.plus_expires_at = start, start + duration
+    user.plus_pending = False
+    _sync_gift_periods(db, user)
 
 
 def period_spec(user, kind, at=None, *, db):
@@ -72,20 +154,11 @@ def period_spec(user, kind, at=None, *, db):
         end = datetime.combine(day + timedelta(days=1), time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
         granted = get_request_limits(db).free_daily_pages
     elif kind == MONTHLY and is_operator_plus(user, at):
-        anchor = user.plus_started_at
-        zone = ZoneInfo(user.plus_timezone)
-        local = at.replace(tzinfo=timezone.utc).astimezone(zone)
-        original = anchor.replace(tzinfo=timezone.utc).astimezone(zone)
-        offset = (local.year - original.year) * 12 + local.month - original.month
-        if month_boundary(anchor, offset, user.plus_timezone) > at:
-            offset -= 1
-        start = month_boundary(anchor, offset, user.plus_timezone)
-        end = min(month_boundary(anchor, offset + 1, user.plus_timezone), user.plus_expires_at)
-        granted = user.plus_monthly_pages
+        return _gift_period_spec(user, at)
     else:
         return None
     return {"id": digest([user.id, kind, iso(start)]), "owner_id": user.id, "kind": kind,
-            "mode": "classic" if kind == DAILY else "redraw", "source": "daily" if kind == DAILY else "membership",
+            "mode": "classic", "source": "daily",
             "source_key": f"{kind}:{iso(start)}",
             "starts_at": start, "ends_at": end, "granted": granted}
 
@@ -162,7 +235,7 @@ def entitlements_json(db, user, at=None):
                        "quota": allowance_json(db, user, kind, at)}
     starts_at, expires_at = plus_dates(db, user, at)
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
-            "plus_expires_at": iso(expires_at), "timezone": settings().quota_timezone,
+            "plus_expires_at": iso(expires_at), "gift": gift_json(user, at), "timezone": settings().quota_timezone,
             "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
             "scheduler_weight": get_request_limits(db).plus_scheduler_weight if plus else get_request_limits(db).free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
@@ -251,45 +324,49 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
         return previous.result
     at = now()
     before = {"membership_id": user.membership_id, "starts_at": iso(user.plus_started_at),
-              "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages}
+              "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages,
+              "pending": user.plus_pending}
     if action == "expire":
+        if user.plus_pending or (user.plus_started_at and at < user.plus_started_at):
+            periods = _gift_periods(db, user)
+            ids = [period.id for period in periods]
+            # Only discard an entirely unused, unreferenced segment that never started.
+            if (ids and not any(period.used or period.reserved for period in periods)
+                    and not db.scalar(select(Ledger.id).where(Ledger.period_id.in_(ids)).limit(1))
+                    and not db.scalar(select(Job.id).where(Job.quota_period_id.in_(ids)).limit(1))):
+                for period in periods:
+                    db.delete(period)
         if is_operator_plus(user, at):
             spec = period_spec(user, MONTHLY, at, db=db)
             if db.get(QuotaPeriod, spec["id"]) is None:
                 db.add(QuotaPeriod(**spec))
         if user.plus_expires_at:
             user.plus_expires_at = min(user.plus_expires_at, at)
+        user.plus_pending = False
     else:
-        if is_operator_plus(user, at):
+        duration = timedelta(days=days if days is not None else months * 30)
+        if (user.plus_started_at and user.plus_expires_at
+                and user.plus_expires_at > user.plus_started_at
+                and (user.plus_pending or user.plus_expires_at > at)):
             if monthly_pages is not None and monthly_pages != user.plus_monthly_pages:
                 problem("MEMBERSHIP_TERMS_CHANGED", "续期保留本会员段的月额度；额外页数请使用周期补偿", 409)
-            if days is not None:
-                user.plus_expires_at += timedelta(days=days)
-            else:
-                offset = 1
-                while month_boundary(user.plus_started_at, offset, user.plus_timezone) < user.plus_expires_at:
-                    offset += 1
-                user.plus_expires_at = month_boundary(user.plus_started_at, offset + months, user.plus_timezone)
-            # A short gift can end mid-cycle. Extending it must reopen the same
-            # bucket with its original used/reserved values, never mint another.
-            spec = period_spec(user, MONTHLY, at, db=db)
-            period = db.get(QuotaPeriod, spec["id"])
-            if period is not None:
-                period.ends_at = spec["ends_at"]
+            user.plus_expires_at += duration
         else:
-            # Revoking and re-enabling an unexpired paid month must not grant again.
+            # Revoking and re-enabling an already started gift must not grant again.
             last = db.scalar(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id, QuotaPeriod.kind == MONTHLY,
                              QuotaPeriod.source == 'membership',
                              QuotaPeriod.ends_at > at).order_by(QuotaPeriod.starts_at.desc()))
             if last is not None:
                 problem("MEMBERSHIP_PERIOD_ACTIVE", "已有尚未结束的重绘额度周期，请在周期结束后重新开通", 409)
-            user.membership_id, user.plus_started_at = uid(), at
-            user.plus_timezone = settings().quota_timezone
+            from .billing_renewal import paid_through
+            user.membership_id, user.plus_started_at = uid(), paid_through(db, user, at)
+            user.plus_timezone = None
             user.plus_monthly_pages = monthly_pages if monthly_pages is not None else get_request_limits(db).plus_monthly_redraw_pages
-            user.plus_expires_at = at + timedelta(days=days) if days is not None else month_boundary(at, months, user.plus_timezone)
-            # Persist the initial period even when no translation is submitted.
-            spec = period_spec(user, MONTHLY, at, db=db)
-            db.add(QuotaPeriod(**spec))
+            user.plus_expires_at = user.plus_started_at + duration
+            user.plus_pending = True
+        _sync_gift_periods(db, user)
+    from .billing_renewal import schedule_gift
+    schedule_gift(db, user, at)
     db.flush()
     result = {"user_id": user.id, "entitlements": entitlements_json(db, user, at)}
     db.add(MembershipOperation(transaction_key=transaction_key, owner_id=user.id, operator_id=operator_id,
@@ -297,7 +374,8 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
                                details={"action": action, "months": months, "days": days, "monthly_pages": monthly_pages, "note": note}))
     record_audit(db, operator_id, f"membership.{action}", "user", user.id, before=before,
                  after={"membership_id": user.membership_id, "starts_at": iso(user.plus_started_at),
-                        "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages},
+                        "expires_at": iso(user.plus_expires_at), "monthly_pages": user.plus_monthly_pages,
+                        "pending": user.plus_pending},
                  note=note, operation_key=transaction_key)
     db.commit()
     return result

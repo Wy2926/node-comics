@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用私有 R2、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `redis_admission_0004`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用私有 R2、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `gift_renewal_0005`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 控制服务与官网
 
@@ -21,6 +21,8 @@ curl --fail https://comics.nodelane.net/health/ready
 反向代理使用 [OpenResty 模板](../deploy/openresty.comics.conf)，保留 API／私有后台路由优先级、缓存和 CSP；关闭图片磁盘缓冲与包含授权参数的访问日志。API 端口仅绑定宿主机回环地址，基础设施局域网只允许可信控制服务，API 信任该边界内的代理头。OpenResty 仅信任 Cloudflare 官方公布的 IPv4／IPv6 网段，通过 `real_ip_header CF-Connecting-IP` 恢复客户端地址，再用 `$remote_addr` 覆盖外部传入的 `X-Forwarded-For` 和 `X-Real-IP`；来自其他地址的请求不能借这些头伪造来源。Cloudflare 网段变更时复核信任清单，更新后检查代理配置并重载。OIDC 回调配置见[身份规范](PRODUCTION_IDENTITY.md)。GA4 中继与隐私政策先于插件上线，依赖与顺序见[分析规范](ANALYTICS.md#中继与发布)。
 
 官网纯静态更新仍由 API 镜像中的 `app/website_dist` 提供。若单独更新官网，以实际运行 API 镜像为基础，仅替换该目录并保留后端、安装包目录与后台；核对目标 Compose 后只重建 API。失败时恢复原镜像配置。公开 HTML 可能被 CDN 注入，验收使用内容、资源与交互，不只比较 HTML 哈希。
+
+赠送顺延的 `gift_renewal_0005` 只新增用户与订阅所需字段，不转换旧交易数据。既有运营会员保留 `plus_timezone`、原额度 ID 与日历月周期；新会员段使用 30 天周期。升级前停止旧 API、worker 和 maintenance，完成结构升级后统一启动同版本服务，避免旧进程忽略已安排的延期。账户、漫画、任务与历史额度保留。仍有续费延期操作或未结束的 30 天赠送时禁止回退到旧会员代码。
 
 ## Redis 与准入迁移
 

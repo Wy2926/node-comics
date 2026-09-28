@@ -59,7 +59,7 @@ with session_factory()() as db:
     initialize_catalog(db)
     admin = User(id='fixture-admin', subject='dev:admin', name='admin', role='admin',
         membership_id='fixture-admin-membership', plus_started_at=at - timedelta(days=1),
-        plus_expires_at=at + timedelta(days=30), plus_timezone='UTC', plus_monthly_pages=300)
+        plus_expires_at=at + timedelta(days=29), plus_monthly_pages=300)
     db.add(admin)
     reader = db.get(User, '20000000-0000-4000-8000-000000000000')
     config = ProviderConfig(id='fixture-image', label='隔离图片供应商', base_url='https://provider.example/v1',

@@ -49,7 +49,8 @@ def billing(monkeypatch, request):
     from app import stripe_client
     from app.models import now
     state = {'client':client, 'sessions':{}, 'invoices':{}, 'charges': {}, 'refunds': {}, 'disputes': {}, 'invoice_payments': [], 'sub':None, 'posts':[], 'requests':[],
-        'at':int(now().replace(tzinfo=timezone.utc).timestamp())-60, 'lost':False, 'fail_page':False}
+        'at':int(now().replace(tzinfo=timezone.utc).timestamp())-60, 'lost':False, 'fail_page':False,
+        'subscription_posts': [], 'subscription_update_loss': None}
     price = {'id':'price_plus', 'object':'price', 'active':True, 'livemode':False, 'product':'prod_plus',
         'currency':'usd', 'unit_amount':999, 'recurring':{'interval':'month','interval_count':1,'usage_type':'licensed'}}
     state['price'] = price
@@ -92,6 +93,25 @@ def billing(monkeypatch, request):
             elif path == '/v1/checkout/sessions':
                 data = {'object':'list','data':list(state['sessions'].values()),'has_more':False}
             elif path == '/v1/subscriptions/sub_fixture':
+                if method == 'post':
+                    state['subscription_posts'].append((headers['Idempotency-Key'], copy.deepcopy(params)))
+                    if state['subscription_update_loss'] == 'before':
+                        state['subscription_update_loss'] = None
+                        raise sdk.APIConnectionError('isolated update result unknown')
+                    if 'trial_end' in params:
+                        start = int(state['clock'].replace(tzinfo=timezone.utc).timestamp()) if 'clock' in state else state['at']
+                        end = int(params['trial_end'])
+                        assert params['proration_behavior'] == 'none' and end > start
+                        state['sub'].update(status='trialing', trial_start=start, trial_end=end)
+                        state['sub']['items']['data'][0]['current_period_end'] = end
+                        invoice(state, index=9000 + len(state['subscription_posts']), start=start, end=end,
+                                total=0, reason='subscription_update')
+                    if params.get('cancel_at_period_end') == 'true':
+                        state['sub'].update(cancel_at_period_end=True,
+                            cancel_at=state['sub']['items']['data'][0]['current_period_end'])
+                    if state['subscription_update_loss'] == 'after':
+                        state['subscription_update_loss'] = None
+                        raise sdk.APIConnectionError('isolated updated subscription response lost')
                 data = state['sub']
             elif path == '/v1/invoices':
                 rows = sorted((i for i in state['invoices'].values()
