@@ -924,5 +924,17 @@
   "取消《{0}》的缓存并删除已保存的离线原图？漫画和阅读记录会保留。": "Annuler la mise en cache de « {0} » et supprimer les originaux hors ligne enregistrés ? Le manga et la progression de lecture seront conservés.",
   "{0} 话": "{0} chapitres",
   "缓存任务已变化，请重新操作。": "La tâche de mise en cache a changé. Veuillez réessayer.",
-  "离线占用": "Espace hors ligne"
+  "离线占用": "Espace hors ligne",
+  "默认关闭；关闭后停止发送并清除本机分析标识和待发送数据。": "Désactivé par défaut. La désactivation arrête les envois et efface l’identifiant d’analyse local ainsi que les données en attente.",
+  "请在浏览器插件中管理使用情况分析。": "Gérez les statistiques d’utilisation dans l’extension du navigateur.",
+  "浏览器未允许使用情况分析，设置保持关闭。": "Le navigateur n’a pas autorisé les statistiques d’utilisation. L’option reste désactivée.",
+  "隐私政策": "Politique de confidentialité",
+  "允许发送功能使用、阅读时长和错误类别至 NodeLane 与 Google Analytics 4。使用随机标识，不包含漫画内容、标题、搜索词、文件名或网页地址。": "Autorisez l’envoi des fonctions utilisées, du temps de lecture et des catégories d’erreurs à NodeLane et Google Analytics 4. Un identifiant aléatoire est utilisé ; le contenu des mangas, les titres, les recherches, les noms de fichiers et les adresses web sont exclus.",
+  "帮助改进 NodeLane": "Aider à améliorer NodeLane",
+  "帮助改进 NodeLane（可选）": "Aider à améliorer NodeLane (facultatif)",
+  "不影响阅读和导入，之后可随时在设置中更改。": "La lecture et l’importation restent disponibles. Vous pouvez modifier ce choix à tout moment dans les paramètres.",
+  "不发送并关闭提示": "Ne pas envoyer et fermer cet avis",
+  "允许使用分析": "Autoriser les statistiques d’utilisation",
+  "不发送": "Ne pas envoyer",
+  "正在保存设置…": "Enregistrement des paramètres…"
 }

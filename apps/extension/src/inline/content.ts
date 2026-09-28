@@ -9,6 +9,9 @@ import { languageLabel, modeLabels } from '../types';
 import { imageDisplay, inlineStyles } from './display';
 import { readingImages, type InlineResponse, type InlineResult, type InlineImageResponse } from './protocol';
 import { connectInlineTheme } from './theme';
+import {track} from '../analytics';
+import {readAnalyticsPreferences} from '../analytics/client';
+import {InlineAnalytics} from './analytics';
 
 interface Candidate {
   id: string;
@@ -20,19 +23,22 @@ interface Candidate {
   display: ReturnType<typeof imageDisplay>;
   state?: InlineResult['state'];
   resultKey?: string;
+  resultMode?: InlineResult['resultMode'];
   loadError?: InlineResult['state'] & {retranslate?:boolean};
   loading?: { key: string; stamp: number };
 }
 export function installInline() {
   let navigationId: string = crypto.randomUUID(),
     initialUrl = location.href;
+  const analytics=new InlineAnalytics((name,params,startedAt)=>track(name,params,startedAt,navigationId));
+  let analyticsObservation=0;
   const lifecycle = sourceDocument(document);
   const sourcePage = () => lifecycle.current().session;
   let stopObserving: (() => void) | undefined;
   const sourcePageImages = () => sourcePage().inlineTargets();
   let automatic = false,
     dismissedUrl = '';
-  let translatedView: Pick<InlineResponse, 'mode' | 'language' | 'requiresInternet'> | undefined;
+  let translatedView: Pick<InlineResponse, 'mode' | 'language' | 'requiresInternet' | 'analyticsChannel'> | undefined;
   let enabled = false,
     paused = false,
     original = false,
@@ -140,6 +146,14 @@ export function installInline() {
     if (!enabled || paused || original) {
       for (const id of visibleBadges.keys()) removeBadge(id);
       return;
+    }
+    if(!document.hidden&&document.hasFocus()&&translatedView?.analyticsChannel){
+      for(const item of windowImages){
+        if(!item.resultKey||item.display.key!==item.resultKey)continue;
+        const rect=renderedImageRect(item.image);
+        if(!rect||rect.bottom<=0||rect.top>=innerHeight||rect.right<=0||rect.left>=innerWidth)continue;
+        analytics.shown({channel:translatedView.analyticsChannel,mode:item.resultMode??translatedView.mode,language:translatedView.language});
+      }
     }
     const visible = new Set<string>();
     for (const item of windowImages) {
@@ -348,11 +362,23 @@ export function installInline() {
       paint();
     }
   }
-  function apply(data: InlineResponse, targets: Candidate[], stamp: number) {
+  function observeAnalytics(data: Pick<InlineResponse, 'analyticsChannel'|'mode'|'language'>, observedAt: number) {
+    if (!enabled || paused || original || document.hidden || !document.hasFocus()) return;
+    const observation=++analyticsObservation, navigation=navigationId, stamp=generation;
+    // This optional read never holds up translation or image presentation.
+    void readAnalyticsPreferences(navigation).then(state=>{
+      if (observation!==analyticsObservation || navigation!==navigationId || stamp!==generation || !enabled || paused || original || document.hidden || !document.hasFocus()) return;
+      analytics.setConsent(state.enabled,state.consentedAt);
+      analytics.accepted({channel:data.analyticsChannel,mode:data.mode,language:data.language},observedAt);
+      paint();
+    }).catch(()=>{});
+  }
+  function apply(data: InlineResponse, targets: Candidate[], stamp: number, observedAt: number) {
     if (stamp !== generation || !enabled || location.href !== initialUrl) return;
     if (scope && scope !== data.scope) for (const item of tracked.values()) item.display.restore();
     scope = data.scope;
     translatedView = data;
+    observeAnalytics(data,observedAt);
     label.textContent = msg('漫译 · {0} · {1}', {
       '0': modeLabels[data.mode],
       '1': languageLabel(data.language),
@@ -361,6 +387,7 @@ export function installInline() {
       const item = targets.find((t) => t.id === result.id);
       if (!item || !item.image.isConnected || !current(item)) continue;
       item.state = result.state;
+      item.resultMode = result.resultMode;
       if (item.resultKey !== result.resultKey) {
         item.resultKey = result.resultKey;
         item.loadError = undefined;
@@ -390,7 +417,7 @@ export function installInline() {
     let retry = 0;
     try {
       while (enabled && !paused && !original && !document.hidden && windowImages.length) {
-        const stamp = generation,
+        const stamp = generation, observedAt = Date.now(),
           targets = [...windowImages];
         try {
           const value = await send('NC_INLINE_WAIT', payload(targets));
@@ -398,7 +425,7 @@ export function installInline() {
             retry = value?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++);
             break;
           }
-          if (value.data) apply(value.data, targets, stamp);
+          if (value.data) apply(value.data, targets, stamp, observedAt);
           if (!hasPending) break;
           failures = 0;
         } catch {
@@ -415,7 +442,7 @@ export function installInline() {
     if (running || !enabled || paused || original || document.hidden) return;
     scan();
     if (!windowImages.length) return;
-    const stamp = generation,
+    const stamp = generation, observedAt = Date.now(),
       targets = windowImages.slice(0, performance.now() < prefetchAt ? 1 : 4);
     running = true;
     const retry = retryId;
@@ -429,7 +456,7 @@ export function installInline() {
       }
       const data = response.data as InlineResponse | undefined;
       if (!data) return;
-      apply(data, targets, stamp);
+      apply(data, targets, stamp, observedAt);
       refreshRights = false;
       failures = 0;
     } catch (error) {
@@ -466,6 +493,8 @@ export function installInline() {
     stopObserving = lifecycle.subscribe({ changed: queueScan, invalidated: stop });
     document.addEventListener('scroll', queueScan, { passive: true, capture: true });
     window.addEventListener('resize', queueScan);
+    window.addEventListener('focus', focus);
+    window.addEventListener('pageshow', focus);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('online', visibility);
     scan();
@@ -475,6 +504,8 @@ export function installInline() {
   function stop() {
     if (!enabled) return;
     enabled = false;
+    analyticsObservation++;
+    analytics.stop();
     invalidate();
     clearTimeout(timer);
     clearTimeout(scanTimer);
@@ -485,6 +516,8 @@ export function installInline() {
     stopObserving = undefined;
     document.removeEventListener('scroll', queueScan, true);
     window.removeEventListener('resize', queueScan);
+    window.removeEventListener('focus', focus);
+    window.removeEventListener('pageshow', focus);
     document.removeEventListener('visibilitychange', visibility);
     window.removeEventListener('online', visibility);
     for (const item of tracked.values()) item.display.restore();
@@ -495,11 +528,16 @@ export function installInline() {
     badges.replaceChildren();
     visibleBadges.clear();
   }
+  function focus() {
+    queueScan();
+    if (translatedView) observeAnalytics(translatedView,Date.now());
+  }
   function visibility() {
     refreshRights = true;
     invalidate();
     scan();
     schedule();
+    if (translatedView) observeAnalytics(translatedView,Date.now());
   }
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
@@ -512,6 +550,8 @@ export function installInline() {
     if (message?.type === 'NC_INLINE_START') {
       if (enabled && initialUrl !== location.href) stop();
       automatic = message.automatic === true;
+      analyticsObservation++;
+      analytics.start(automatic);
       dismissedUrl = '';
       start();
       respond({ ok: true });
@@ -526,6 +566,8 @@ export function installInline() {
       return;
     }
     if (message?.type === 'NC_INLINE_CONFIG_CHANGED' && enabled) {
+      analyticsObservation++;
+      analytics.start(automatic);
       scope = '';
       translatedView = undefined;
       invalidate();

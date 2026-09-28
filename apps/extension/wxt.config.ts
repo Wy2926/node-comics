@@ -15,6 +15,7 @@ export default defineConfig({
         // Account sign-in/profile and user-selected images sent for translation.
         data_collection_permissions: {
           required: ['authenticationInfo', 'personallyIdentifyingInfo', 'websiteContent'],
+          optional: ['technicalAndInteraction'],
         },
       },
       gecko_android: { strict_min_version: '142.0' },

@@ -50,6 +50,11 @@ import {DiscoveryPage} from './ui/discovery/DiscoveryPage';
 import type {SearchSeed} from './comics/application/search/types';
 import {importSearchResult} from './comics/application/search-import';
 import {readSearchLanguage,saveSearchLanguage} from './comics/application/preferences';
+import {track} from './analytics';
+import {useAnalyticsPreferences} from './analytics/consent';
+import {AnalyticsPrompt} from './analytics/AnalyticsPrompt';
+import {ReaderAnalytics} from './reader/analytics';
+import {observeImport} from './comics/application/import-analytics';
 
 type View='downloads'|'library'|'sites'|'search'|'discover'|'settings'|'account';
 const directSearchSeed:SearchSeed={title:''};
@@ -72,6 +77,11 @@ export function App(){
  const sourceInProgress=useRef(false),sourceQueryHandled=useRef(false);
  const sourceActions=sourceImportOptions();
  const [view,setView]=useState<View>(viewFromHash),[accountTab,setAccountTab]=useState<AccountTab>('overview');
+ const {enabled:analyticsEnabled,consentedAt}=useAnalyticsPreferences(),analyticsScreen=current?'reader':view,previousAnalyticsScreen=useRef<string|undefined>(undefined);
+ useEffect(()=>{if(!analyticsEnabled){previousAnalyticsScreen.current=undefined;return;}const observation=consentedAt+':'+analyticsScreen;if(previousAnalyticsScreen.current!==observation){previousAnalyticsScreen.current=observation;track('page_view',{surface:'reader',screen:analyticsScreen});}},[analyticsScreen,analyticsEnabled,consentedAt]);
+ const readerAnalytics=useMemo(()=>new ReaderAnalytics(track),[current?.comicId??current?.id]);
+ const readingConnection=library.comics.find(comic=>comic.id===current?.comicId)?.source.connectionId;
+ const readingSource=readingConnection==='local'?'local':readingConnection?.startsWith('website:')?'website':readingConnection?.startsWith('drive:')?'google_drive':'unknown';
  const viewRef=useRef(view);viewRef.current=view;
  const libraryActive=!current&&view==='library';
  const [libraryVisited,setLibraryVisited]=useState(view==='library');
@@ -135,7 +145,7 @@ export function App(){
    const close=()=>{if(!isActive)setComicSearch(value=>value&&value===search?{...value,open:false}:value);};
    const existing=library.comics.find(comic=>comic.sourceKey===JSON.stringify(['website:'+hit.sourceId,hit.catalogId]));
    if(existing){const entry=await continueEntry(existing.id,settingsRef.current.language);if(!active())return;if(!entry)throw Error(msg('无法打开来源。'));close();await openEntry(entry.id);return;}
-   const result=await importSearchResult(hit,settingsRef.current.language);await reloadLibrary();
+   const result=await observeImport('website','website',()=>importSearchResult(hit,settingsRef.current.language));await reloadLibrary();
    // An authorized import may finish after the user leaves; only its original view may navigate.
    if(!active())return;
    close();
@@ -208,9 +218,9 @@ export function App(){
   sourceQueryHandled.current=true;const request=readingEpoch.current;setBusy(msg('正在打开漫画'));
   void (async()=>{
    if(manifestId){const data=await chrome.storage.local.get('manifest:'+manifestId),manifest=data['manifest:'+manifestId] as PageManifest|undefined;if(!manifest)throw Error(msg('来源清单已失效，请重新发现。'));
-    const result=await importManifest(manifest);await reloadLibrary();if(readingEpoch.current===request)await openEntry(result.id);
+    const result=await observeImport('website','website',()=>importManifest(manifest));await reloadLibrary();if(readingEpoch.current===request)await openEntry(result.id);
     if(result.catalogUrl){const catalogRequest=readingEpoch.current;try{const source=await readWebsiteCatalog(result.catalogUrl);await importCatalog(source);await reloadLibrary();if(catalogRequest===readingEpoch.current&&currentRef.current===result.id&&api.isCurrent()){await selectReadingEntry(result.id);const sequence=await readSequence(result.id);if(catalogRequest===readingEpoch.current&&currentRef.current===result.id&&api.isCurrent()){setCopies(sequence.copies);setDirectory(sequence.directory);}}}catch(e){notify((e as Error).message);}}
-   }else if(catalogId){const data=await chrome.storage.local.get('nc-import:'+catalogId),source=data['nc-import:'+catalogId] as {catalog?:SourceCatalog;selectedEntryId?:string}|undefined;if(!source?.catalog)throw Error(msg('来源清单已失效，请重新发现。'));const comic=await importWebsiteCatalog(source.catalog,source.selectedEntryId);await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);}
+   }else if(catalogId){const data=await chrome.storage.local.get('nc-import:'+catalogId),source=data['nc-import:'+catalogId] as {catalog?:SourceCatalog;selectedEntryId?:string}|undefined;if(!source?.catalog)throw Error(msg('来源清单已失效，请重新发现。'));const comic=await observeImport('website','website',()=>importWebsiteCatalog(source.catalog!,source.selectedEntryId));await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);}
   })().catch(e=>setError(e.message)).finally(()=>{setBusy('');query.delete('manifest');query.delete('catalog');history.replaceState(null,'',location.pathname+(query.size?'?'+query:'')+location.hash);});
  },[api]);
  useEffect(()=>{
@@ -229,11 +239,13 @@ export function App(){
   return()=>{live=false;};
  },[]);
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
+ const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag
+   &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  function nav(value:View,tab:AccountTab='overview'){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
  const rights=usage??caps?.entitlements;
  const searchPanelProps={api,defaultLanguage:readSearchLanguage(settings.language),onLanguageChange:saveSearchLanguage,onLogin:()=>login.setOpen(true),existingSourceKeys:existingSearchKeys};
  async function importWebsiteUrl(url:string){
-   const comic=await importWebsiteLink(url);await reloadLibrary();
+   const comic=await observeImport('website','website',()=>importWebsiteLink(url));await reloadLibrary();
    setView('library');history.replaceState(null,'',location.pathname+location.search+'#library');await openComic(comic.id);
  }
  return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(!searchOpen&&e.dataTransfer.types.includes('Files')){e.preventDefault();setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current&&!searchOpen)chooseFiles(Array.from(e.dataTransfer.files));}}>
@@ -258,13 +270,13 @@ export function App(){
   </header>}
   <Scrollbars pageMode={!current&&(view==='settings'||view==='account')?'reserved':'overlay'}/>
   <div id="nc-workspace" className="nc-workspace">{auth.reason==='expired'&&<div className="global-error" role="alert">{expiredMessage()}<button onClick={()=>login.setOpen(true)}>{msg('重新登录')}</button></div>}{error&&<div className="global-error" role="alert"><Icon name="info"/><span>{error}</span><button aria-label={msg('关闭错误提示')} onClick={()=>setError('')}><Icon name="close"/></button></div>}
-  {current?<Reader backText={view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画')} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} searchOpen={searchOpen} onFind={()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>nav('account','subscription')} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
+  {current?<Reader analyticsBlocked={login.open} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画')} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} searchOpen={searchOpen} onFind={()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});nav('account','subscription');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
   view!=='search'&&view!=='discover'&&view!=='library'?<main className="nc-main">
   {view==='downloads'&&<BookDownloads controller={downloads} onRead={id=>void openComic(id).catch(e=>setError(e.message))} onManageStorage={()=>nav('settings')}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
   {view==='settings'&&<Preferences settings={settings} setSettings={setSettings} caps={channel?.capabilities}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={updateEntitlements} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>:null}
-  <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
+  <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
   <main className="nc-main nc-search-main" hidden={!!current||view!=='search'}>{(searchPageVisited||view==='search')&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:page`} presentation="page" open={!current&&view==='search'} seed={directSearchSeed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='search')}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
   </div>

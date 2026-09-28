@@ -1,0 +1,59 @@
+.nc-analytics-prompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: var(--comic-border);
+  border-radius: var(--comic-card-radius);
+  background: var(--surface);
+  box-shadow: var(--comic-shadow-small);
+}
+
+.nc-analytics-prompt-content {
+  min-width: 0;
+}
+
+.nc-analytics-prompt h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+
+.nc-analytics-prompt p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.nc-analytics-prompt > .icon-button {
+  align-self: start;
+}
+
+.nc-analytics-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  grid-column: 1 / -1;
+}
+
+.nc-analytics-prompt-status,
+.nc-analytics-prompt-error {
+  grid-column: 1 / -1;
+}
+
+.nc-analytics-prompt p.nc-analytics-prompt-error {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .nc-analytics-prompt {
+    gap: 12px;
+    padding: 16px;
+  }
+}

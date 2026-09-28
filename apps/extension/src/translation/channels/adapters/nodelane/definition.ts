@@ -53,7 +53,7 @@ export const definition:ChannelDefinition={
       key:JSON.stringify([profile.id,profile.revision,session?.id??null]),scope,label:'NodeLane',
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
-      requiresInternet:true,allowsFeedback:true,isCurrent:live,
+      requiresInternet:true,allowsFeedback:true,analyticsCategory:'official',isCurrent:live,
       async readResult(job,signal){
         assertCurrent(live);if(!session)throw Error(msg('请先登录'));
         // Reading an existing result must never submit a new translation.

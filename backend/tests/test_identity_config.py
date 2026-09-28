@@ -22,6 +22,15 @@ def test_production_validates_complete_configuration():
     assert production(cors_origins="").extension_ids
 
 
+def test_analytics_debug_mode_defaults_off_and_is_rejected_in_production(monkeypatch):
+    monkeypatch.delenv("GA4_DEBUG_MODE", raising=False)
+    assert production().ga4_debug_mode is False
+    for environment in ("development", "test"):
+        assert production(app_env=environment, ga4_debug_mode=True).ga4_debug_mode is True
+    with pytest.raises(ValidationError, match="GA4_DEBUG_MODE"):
+        production(ga4_debug_mode=True)
+
+
 @pytest.mark.parametrize("field", ["oidc_issuer", "oidc_audience", "oidc_jwks_url", "oidc_client_id",
                                    "oidc_authorization_endpoint", "oidc_token_endpoint"])
 def test_production_rejects_missing_identity_fields(field):

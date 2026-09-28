@@ -16,6 +16,7 @@ import {sourceRangeCache} from '../../storage/source-ranges';
 import {thumbnailCache} from '../../storage/thumbnails';
 import {downloadStore} from '../../storage/downloads';
 import {reconcileCatalog} from './catalog-service';
+import {importFormat,observeImport} from './import-analytics';
 
 const digest = (value:string) => new Sha256().update(new TextEncoder().encode(value)).digest();
 export const stablePageId = (locator:unknown) => digest(JSON.stringify(locator));
@@ -94,7 +95,7 @@ async function saveLocalFile(file:File,signal?:AbortSignal,onProgress?:(label:Im
     await completeImportJournal(contentId).catch(()=>{});throw error;
   }
 }
-export const importLocalFile=(...args:Parameters<typeof saveLocalFile>)=>sourceLock(()=>saveLocalFile(...args));
+export const importLocalFile=(...args:Parameters<typeof saveLocalFile>)=>observeImport('local',importFormat(args[0].name),()=>sourceLock(()=>saveLocalFile(...args)),result=>result.created);
 export async function importSourceFiles(selection:SourceSelection,signal?:AbortSignal) {
   return sourceLock(async()=>{
     signal?.throwIfAborted();
@@ -109,11 +110,14 @@ export async function importSourceFiles(selection:SourceSelection,signal?:AbortS
         const current=await catalog.get('connections',connected.id);
         const owner='pending:'+contentId;
         try {
-          const pages=await filePages({connection:current!,source,contentId,entryId:owner,sourceSnapshot:file.snapshot,format:file.format,signal});
-          signal?.throwIfAborted();
-          const result=await registerFile({title:titleFor(file.name),format:file.format,connection:selection.connection,connectionGeneration:current!.generation,resourceId:file.id,locator:file.locator,snapshot:file.snapshot,contentId,pages});
-          const entry=await catalog.get('entries',result.id);
-          if(entry)await sourceRangeCache.adoptOwner(owner,entry.id,entry.contentId);
+          const result=await observeImport(selection.connection.provider==='google-drive'?'google_drive':'unknown',file.format,async()=>{
+            const pages=await filePages({connection:current!,source,contentId,entryId:owner,sourceSnapshot:file.snapshot,format:file.format,signal});
+            signal?.throwIfAborted();
+            const imported=await registerFile({title:titleFor(file.name),format:file.format,connection:selection.connection,connectionGeneration:current!.generation,resourceId:file.id,locator:file.locator,snapshot:file.snapshot,contentId,pages});
+            const entry=await catalog.get('entries',imported.id);
+            if(entry)await sourceRangeCache.adoptOwner(owner,entry.id,entry.contentId);
+            return imported;
+          },imported=>imported.created);
           results.push({...result,name:file.name});
         } finally {await sourceRangeCache.deleteOwner(owner,true);}
       }catch(error){if(signal?.aborted)throw error;failures.push({name:file.name,error:(error as Error).message});}

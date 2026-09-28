@@ -924,5 +924,17 @@
   "取消《{0}》的缓存并删除已保存的离线原图？漫画和阅读记录会保留。": "Anulować zapisywanie „{0}” i usunąć zapisane oryginały offline? Komiks i historia czytania zostaną zachowane.",
   "{0} 话": "{0} rozdziałów",
   "缓存任务已变化，请重新操作。": "Zadanie zapisywania uległo zmianie. Spróbuj ponownie.",
-  "离线占用": "Miejsce offline"
+  "离线占用": "Miejsce offline",
+  "默认关闭；关闭后停止发送并清除本机分析标识和待发送数据。": "Domyślnie wyłączone. Wyłączenie zatrzymuje wysyłanie oraz usuwa lokalny identyfikator analityczny i oczekujące dane.",
+  "请在浏览器插件中管理使用情况分析。": "Zarządzaj analizą użycia w rozszerzeniu przeglądarki.",
+  "浏览器未允许使用情况分析，设置保持关闭。": "Przeglądarka nie zezwoliła na analizę użycia. Opcja pozostaje wyłączona.",
+  "隐私政策": "Polityka prywatności",
+  "允许发送功能使用、阅读时长和错误类别至 NodeLane 与 Google Analytics 4。使用随机标识，不包含漫画内容、标题、搜索词、文件名或网页地址。": "Zezwól na wysyłanie informacji o używanych funkcjach, czasie czytania i kategoriach błędów do NodeLane i Google Analytics 4. Używany jest losowy identyfikator; treść komiksów, tytuły, wyszukiwane hasła, nazwy plików i adresy stron nie są wysyłane.",
+  "帮助改进 NodeLane": "Pomóż ulepszyć NodeLane",
+  "帮助改进 NodeLane（可选）": "Pomóż ulepszyć NodeLane (opcjonalnie)",
+  "不影响阅读和导入，之后可随时在设置中更改。": "Nie wpływa to na czytanie ani importowanie. Możesz zmienić ten wybór w ustawieniach w dowolnym momencie.",
+  "不发送并关闭提示": "Nie wysyłaj i zamknij powiadomienie",
+  "允许使用分析": "Zezwól na analizę użycia",
+  "不发送": "Nie wysyłaj",
+  "正在保存设置…": "Zapisywanie ustawień…"
 }

@@ -21,7 +21,8 @@ it.each([false,true])('registers Firefox import without setAccessLevel and opens
   vi.stubGlobal('chrome',{
     runtime:{id:'test-extension',getURL:(path:string)=>'moz-extension://test'+path,onInstalled:{addListener:vi.fn()},onStartup:{addListener:vi.fn()},onMessage:{addListener:(fn:typeof listeners[number])=>listeners.push(fn)}},
     alarms:{get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:{addListener:vi.fn()}},
-    storage:{local:{set},session:{get:async()=>({}),set:vi.fn(async()=>{}),remove:vi.fn(async()=>{})}},
+    storage:{local:{get:async()=>({}),set},session:{get:async()=>({}),set:vi.fn(async()=>{}),remove:vi.fn(async()=>{})}},
+    permissions:{onRemoved:{addListener:vi.fn()},contains:async()=>false},
     scripting:{executeScript:async()=>[]},
     contextMenus:{onClicked:{addListener:vi.fn()}},
     tabs:{get:async()=>({id:7,url}),sendMessage:async()=>catalog,create,onRemoved:{addListener:vi.fn()},onUpdated:{addListener:vi.fn()}},

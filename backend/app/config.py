@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
+    ga4_enabled: bool = False
+    ga4_debug_mode: bool = False
+    ga4_extension_measurement_id: str = Field(default="", pattern=r"^(G-[A-Z0-9]{4,20})?$")
+    ga4_extension_api_secret: SecretStr = SecretStr("")
     free_daily_pages: int = Field(default=30, ge=0, le=1_000_000)
     plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
     stripe_enabled: bool = False
@@ -94,6 +98,12 @@ class Settings(BaseSettings):
     classic_enabled: bool = False
     classic_engine_version: str = "external-v1"
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
+
+    @model_validator(mode="after")
+    def validate_analytics(self):
+        if self.app_env == "production" and self.ga4_debug_mode:
+            raise ValueError("GA4_DEBUG_MODE requires an isolated development/test service")
+        return self
 
     @model_validator(mode="after")
     def validate_billing(self):

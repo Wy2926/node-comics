@@ -9,6 +9,7 @@ import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
+import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
 type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
@@ -55,6 +56,7 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
         <Icon name="shield" />
         <p>{msg('图片仅发送至所选翻译渠道；译图缓存保存在本机。本地服务的译图缓存清理后需要重新翻译。')}</p>
       </div>
+      <AnalyticsConsent/>
     </section>
     {children}
   </div>;

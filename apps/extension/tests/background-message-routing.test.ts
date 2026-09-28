@@ -69,7 +69,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', request);
   vi.stubGlobal('chrome', {
     runtime: {
-      id: extensionId, getURL: (path: string) => `chrome-extension://${extensionId}/${path.replace(/^\//, '')}`,
+      id: extensionId, getURL: (path: string) => `chrome-extension://${extensionId}/${path.replace(/^\//, '')}`,getManifest:()=>({version:'0.6.0'}),
       onInstalled: event(), onStartup: event(),
       onMessage: {addListener: (listener: Listener) => listeners.push(listener)},
       sendMessage: async (message: unknown) => (await dispatch(message)).response,
@@ -93,7 +93,7 @@ beforeEach(() => {
     },
   });
   background.main();
-  expect(listeners).toHaveLength(6); // Locale, inline theme, inline reader, website sources, Drive, catalog sync.
+  expect(listeners).toHaveLength(7); // Locale, inline theme, inline reader, website sources, Drive, catalog sync, analytics.
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});

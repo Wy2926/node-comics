@@ -4,4 +4,5 @@ import {registerDriveBackground} from '../src/comics/sources/google-drive/backgr
 import {registerCatalogSyncBackground} from '../src/comics/application/catalog-sync-background';
 import {readWebsiteCatalog} from '../src/comics/application/website-catalog';
 import {registerOptionalSourceContent} from '../src/sources/runtime/optional-content';
-export default defineBackground(() => { registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); });
+import {registerAnalyticsBackground} from '../src/analytics/background';
+export default defineBackground(() => { registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); registerAnalyticsBackground(); });

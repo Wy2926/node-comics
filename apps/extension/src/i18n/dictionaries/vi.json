@@ -924,5 +924,17 @@
   "取消《{0}》的缓存并删除已保存的离线原图？漫画和阅读记录会保留。": "Hủy lưu “{0}” và xóa ảnh gốc ngoại tuyến đã lưu? Truyện và lịch sử đọc sẽ được giữ lại.",
   "{0} 话": "{0} chương",
   "缓存任务已变化，请重新操作。": "Tác vụ lưu đã thay đổi. Vui lòng thử lại.",
-  "离线占用": "Dung lượng ngoại tuyến"
+  "离线占用": "Dung lượng ngoại tuyến",
+  "默认关闭；关闭后停止发送并清除本机分析标识和待发送数据。": "Mặc định tắt. Khi tắt, việc gửi dữ liệu dừng lại, mã định danh phân tích cục bộ và dữ liệu chờ gửi sẽ được xóa.",
+  "请在浏览器插件中管理使用情况分析。": "Quản lý phân tích sử dụng trong tiện ích trình duyệt.",
+  "浏览器未允许使用情况分析，设置保持关闭。": "Trình duyệt không cho phép phân tích sử dụng. Cài đặt vẫn tắt.",
+  "隐私政策": "Chính sách quyền riêng tư",
+  "允许发送功能使用、阅读时长和错误类别至 NodeLane 与 Google Analytics 4。使用随机标识，不包含漫画内容、标题、搜索词、文件名或网页地址。": "Cho phép gửi thông tin sử dụng tính năng, thời gian đọc và nhóm lỗi đến NodeLane và Google Analytics 4. Sử dụng mã định danh ngẫu nhiên; không bao gồm nội dung truyện, tiêu đề, từ khóa tìm kiếm, tên tệp hay địa chỉ web.",
+  "帮助改进 NodeLane": "Giúp cải thiện NodeLane",
+  "帮助改进 NodeLane（可选）": "Giúp cải thiện NodeLane (không bắt buộc)",
+  "不影响阅读和导入，之后可随时在设置中更改。": "Không ảnh hưởng đến việc đọc và nhập truyện. Bạn có thể thay đổi lựa chọn này bất cứ lúc nào trong Cài đặt.",
+  "不发送并关闭提示": "Không gửi và đóng thông báo",
+  "允许使用分析": "Cho phép phân tích sử dụng",
+  "不发送": "Không gửi",
+  "正在保存设置…": "Đang lưu cài đặt…"
 }

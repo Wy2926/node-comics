@@ -5,7 +5,8 @@ import type {Comic,Entry} from '../src/comics/domain';
 import type {SourceCatalog} from '../src/comics/application/types';
 import {downloadKey,downloadStore} from '../src/storage/downloads';
 import {sourceDatabaseName} from '../src/storage/database';
-const mocks=vi.hoisted(()=>({acquire:vi.fn(),discover:vi.fn(),directory:vi.fn()}));
+const mocks=vi.hoisted(()=>({acquire:vi.fn(),discover:vi.fn(),directory:vi.fn(),track:vi.fn()}));
+vi.mock('../src/analytics',()=>({track:mocks.track}));
 vi.mock('../src/comics/pages/service',()=>({acquirePage:mocks.acquire}));
 vi.mock('../src/sources',()=>({discoverEntry:mocks.discover,ImagePermissionsRequired:class extends Error{},sourceFor:vi.fn(),validateSourceCatalog:(value:unknown)=>value}));
 vi.mock('../src/comics/application/import-service',()=>({publishWebsiteManifest:vi.fn()}));
@@ -50,11 +51,14 @@ describe('whole comic retained downloads',()=>{
     const f=await fixture(),before=await catalog.get('comics',f.comic.id);
     expect((await Promise.all([startBookDownload(f.comic.id),startBookDownload(f.comic.id)])).filter(Boolean)).toHaveLength(1);
     expect(await catalog.list('tasks')).toHaveLength(0);
+    const startedAt=(await readBookPlan(f.comic.id))!.createdAt;
     await cycle();
     expect(mocks.acquire).toHaveBeenCalledTimes(6);
     expect(await view(f.comic.id)).toMatchObject({status:'complete',completed:3,total:3,bytes:48});
     expect(await catalog.get('comics',f.comic.id)).toEqual(before);
     expect((await catalog.listEntries(f.comic.id)).every(entry=>!entry.readAt)).toBe(true);
+    expect(mocks.track).toHaveBeenCalledWith('offline_download_result',expect.objectContaining({outcome:'success',count:3}),startedAt);
+    await cycle();expect(mocks.track).toHaveBeenCalledTimes(1);
     await startBookDownload(f.comic.id);await cycle();expect(mocks.acquire).toHaveBeenCalledTimes(6);
   });
   it('remembers multiple languages independently and keeps other-language originals when changing scope',async()=>{

@@ -18,7 +18,7 @@ docker compose --env-file .env -f compose.server.yaml ps
 curl --fail https://comics.nodelane.net/health/ready
 ```
 
-反向代理使用 [OpenResty 模板](../deploy/openresty.comics.conf)，保留 API／私有后台路由优先级、缓存和 CSP；关闭图片磁盘缓冲与包含授权参数的访问日志。OIDC 回调配置见[身份规范](PRODUCTION_IDENTITY.md)。
+反向代理使用 [OpenResty 模板](../deploy/openresty.comics.conf)，保留 API／私有后台路由优先级、缓存和 CSP；关闭图片磁盘缓冲与包含授权参数的访问日志。API 端口仅绑定宿主机回环地址，基础设施网络只允许可信控制服务；API 信任该边界内的代理头，OpenResty 必须用 `$remote_addr` 覆盖外部传入的 `X-Forwarded-For`，否则按 IP 的限流可被伪造地址绕过。前置 CDN 时仅对已核实的 CDN 地址范围配置 `real_ip`，不能信任任意客户端提供的地址头；更新后检查代理配置并重载。OIDC 回调配置见[身份规范](PRODUCTION_IDENTITY.md)。GA4 中继与隐私政策先于插件上线，依赖与顺序见[分析规范](ANALYTICS.md#中继与发布)。
 
 官网纯静态更新仍由 API 镜像中的 `app/website_dist` 提供。若单独更新官网，以实际运行 API 镜像为基础，仅替换该目录并保留后端、安装包目录与后台；核对目标 Compose 后只重建 API。失败时恢复原镜像配置。公开 HTML 可能被 CDN 注入，验收使用内容、资源与交互，不只比较 HTML 哈希。
 

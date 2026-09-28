@@ -37,6 +37,8 @@ export interface ChannelRuntime {
   dispose():void;
 }
 export interface ChannelConnection {
+  /** Low-cardinality product category; never a profile name, URL or protocol ID. */
+  analyticsCategory?:'official'|'local';
   key: string;
   scope: TranslationScope;
   label: string;

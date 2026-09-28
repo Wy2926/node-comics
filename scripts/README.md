@@ -9,6 +9,7 @@
 | `bootstrap.ps1` | 本地控制服务初始化与启动，见[后端](../backend/README.md) |
 | `database_backup.py` / `verify_database_restore.py` | [备份与隔离恢复](../docs/OPERATIONS.md) |
 | `export_openapi.py` | [导出 API 契约](../contracts/README.md) |
+| `validate_analytics.py --env-file <私密配置路径>` | 用后端实际载荷格式向 GA4 验证端点严格校验全部插件事件；不调用收集端点、不写报表，不能验证 secret 或真实入库。只读指定文件的 GA4 配置（未指定时取进程环境），结果写入 `artifacts/analytics-config/validation.json` |
 | `upload_extension_release.py` | 校验、上传安装包，见[部署规范](../docs/DEPLOYMENT.md) |
 | [remove-obsolete-artifacts.ps1](remove-obsolete-artifacts.ps1) | Windows 清理旧测试、报告与重建产物；默认预览，`-Apply` 执行，保留当前发布包、营销图片与节点资料 |
 
@@ -43,6 +44,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
+| `verify_analytics.mjs` | 隔离 Chromium MV3 检查默认关闭、书架卡片拒绝／关闭不重弹、搜索与导入入口可用、12 种主题组合及窄宽大字、主动同意、跨标签同步、白名单无凭据请求、失败留队列、撤回清理与重新同意；后台及页面 HTTP(S) 全部模拟，不向真实 API 或 GA4 发送；截图写入 `artifacts/analytics/` |
 | `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节归属与完整目录 |
 | `verify_comicpash.mjs`、站点 `tests/verify-*.mjs` | 站点协议与浏览器流程，环境及网络范围见各站点 README |
 | `verify_reading_translations.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | Vite 5176 模拟阅读器、分钟退避、恢复与重试 |

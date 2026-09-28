@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState,type RefObject} from 'react';
+import {useEffect,useMemo,useRef,useState,type ReactNode,type RefObject} from 'react';
 import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
@@ -12,8 +12,8 @@ import {ShelfCard} from './ShelfCard';
 import {ShelfUpdates} from './ShelfUpdates';
 import type {BookDownloadsController} from './downloads/useBookDownloads';
 import './shelf.css';
-type Props={active:boolean;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({active,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+type Props={active:boolean;notice?:ReactNode;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({active,notice,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(active),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
@@ -60,6 +60,7 @@ export function Library({active,downloads,onFind,library,onOpen,onImport,onSourc
    <label className="nc-sort-label">{msg('排序')}<Select key={String(active)} aria-label={msg('排序')} value={sort} onChange={e=>changeSort(e.target.value)}><option value="recent">{msg('最近阅读')}</option><option value="updated">{msg('最近更新')}</option><option value="title">{msg('按名称')}</option></Select></label>
    {!!library.comics.length&&<button className="button secondary" aria-pressed={managing} disabled={busy} onClick={()=>{setManaging(value=>!value);setSelected(new Set());}}><Icon name={managing?'check':'layers'} size={18}/>{managing?msg('完成管理'):msg('批量管理')}</button>}
   </div>
+  {notice}
   {managing&&!!library.comics.length&&<div className="nc-batch-toolbar" role="region" aria-label={msg('批量管理')}>
    <span role="status">{msg('已选 {0} 部作品',{'0':selectedComics.length})}</span>
    <div className="nc-inline"><button className="button secondary small" disabled={busy||!matching.length||matching.every(comic=>selected.has(comic.id))} onClick={()=>setSelected(previous=>new Set([...previous,...matching.map(comic=>comic.id)]))}>{msg('全选 {0} 部',{'0':matching.length})}</button><button className="text-link" disabled={busy||!selectedComics.length} onClick={()=>setSelected(new Set())}>{msg('取消选择')}</button></div>

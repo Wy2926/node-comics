@@ -15,10 +15,9 @@ import { settingsKey } from './settings';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
 import {channelMode} from '../translation/channels/capabilities';
 import { registerInlineThemeBackground } from './theme';
+import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
 
-interface Activation {url:string;navigationId:string;documentId?:string;automatic?:boolean;}
 interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;currentKey?:string;waiting?:AbortController;active:boolean;}
-const activationKey=(tabId:number)=>'nc-inline:'+tabId;
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 export async function activateInline(tabId:number,automatic=false){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
@@ -119,11 +118,11 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     if(!ctx.channel.available){items.push({id:image.id,state:ctx.channel.unavailable});continue;}
     const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);if(error)items.push({id:image.id,state:error});continue;}
     const result=pageResult(ctx,page),item:InlineResult={id:image.id};
-    if(result?.result&&!ctx.missingResults.has(result.id))item.resultKey=JSON.stringify([scope,result.id,result.result.key]);
+    if(result?.result&&!ctx.missingResults.has(result.id)){item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;}
     else item.state=ctx.core?.stateFor({entryId:'inline',page,mode},true);
     items.push(item);
   }
-  return {mode,language,scope,items,requiresInternet:ctx.channel.requiresInternet,retryAfterMs:ctx.core?.retryDelay||undefined,hasPending:ctx.core?.hasPending,
+  return {mode,language,scope,items,analyticsChannel:ctx.channel.analyticsCategory,requiresInternet:ctx.channel.requiresInternet,retryAfterMs:ctx.core?.retryDelay||undefined,hasPending:ctx.core?.hasPending,
     needsSubmit:ctx.channel.available&&request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
 }
 /** A display reload can only read this page's selected result; it never enters the plan/retry path. */
@@ -182,14 +181,14 @@ export function registerInlineBackground(){
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{
-      const tabId=sender.tab!.id!,saved=await chrome.storage.session.get(activationKey(tabId)),activation=saved[activationKey(tabId)] as Activation|undefined;
-      if(!activation||activation.navigationId!==message.navigationId||activation.documentId&&activation.documentId!==sender.documentId)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
+      const tabId=sender.tab!.id!,current=await currentInlineActivation(sender,message.navigationId);
+      if(!current)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
+      const {activation,tab}=current;
       if(activation.automatic&&!await automaticTabsAllowed())throw Error(msg("标签页自动翻译已关闭。"));
       if(!Number.isSafeInteger(message.generation)||message.generation<0)throw Error(msg("阅读窗口无效。"));
       windowGenerations.set(tabId,Math.max(windowGenerations.get(tabId)??0,message.generation));
       if(message.type==='NC_INLINE_INVALIDATE'){contexts.get(tabId)?.waiting?.abort();return;}
-      const tab=await chrome.tabs.get(tabId);if(tab.url!==activation.url)throw Error(msg("网页已变化，请重新右键翻译当前页面。"));
-      if(!activation.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
+      if(!activation.documentId&&sender.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
       if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
       if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg("图片范围无效。"));
       if(message.type==='NC_INLINE_IMAGE'){

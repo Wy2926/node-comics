@@ -7,6 +7,7 @@ import {downloadStore} from '../../storage/downloads';
 import {pauseDownloads,queueDownloads,runDownloads,stopDownloads,listDownloads,blockingReason,pauseBlockedDownloads,downloadErrorMessage} from './index';
 import {msg} from '../../i18n/runtime';
 import {sourceFor} from '../../sources';
+import {track} from '../../analytics';
 import {bookDownloadId,downloadTaskId,listBookPlans,readBookPlan,selectDownloadScope,suspendBook,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan,type DownloadLanguages,type DownloadScope} from './book-model';
 export {type BookDownloadPlan,type DownloadLanguages,type DownloadScope,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,isEntryFullyCached} from './book-model';
 
@@ -182,10 +183,12 @@ async function settleBooks(){
     if(view.status!=='running')continue;
     if(view.hasPendingTasks)continue;
     const status=view.total>0&&view.completed===view.total?'complete':'partial';
-    await catalog.mutate(['metadata'],async tx=>{
+    const settled=await catalog.mutate(['metadata'],async tx=>{
       const plan=await tx.get('metadata',view.plan.id) as BookDownloadPlan|undefined;
-      if(plan?.generation===view.plan.generation&&plan.status==='running')await tx.put('metadata',{...plan,status,owner:undefined,updatedAt:Date.now()});
+      if(plan?.generation!==view.plan.generation||plan.status!=='running')return false;
+      await tx.put('metadata',{...plan,status,owner:undefined,updatedAt:Date.now()});return true;
     });
+    if(settled)track('offline_download_result',{surface:'reader',source_type:'website',outcome:status==='complete'?'success':'partial',count:Math.min(10000,view.completed),duration_ms:Math.min(86400000,Math.max(0,Date.now()-view.plan.createdAt))},view.plan.createdAt);
   }
 }
 /** A host iteration; production callers hold the book host lock for their full lifetime. */

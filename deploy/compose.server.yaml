@@ -28,6 +28,8 @@ x-server: &server
 services:
   api:
     <<: *server
+    # Proxy headers are trusted only within this private control-plane boundary.
+    # Keep the host port loopback-only; OpenResty must overwrite incoming XFF.
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
     ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
     healthcheck:

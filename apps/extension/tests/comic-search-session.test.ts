@@ -1,4 +1,6 @@
-import {afterEach,describe,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+const analytics=vi.hoisted(()=>({track:vi.fn()}));
+vi.mock('../src/analytics',()=>analytics);
 import {ApiError} from '../src/api';
 import {ComicSearchSession} from '../src/comics/application/search/session';
 import type {ComicSearchDependencies} from '../src/comics/application/search/types';
@@ -14,9 +16,35 @@ function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site
   const session=new ComicSearchSession({title:'日本語名'},deps,'zh-Hans',selection);sessions.push(session);return {session,deps};
 }
 const sessions:ComicSearchSession[]=[];
+beforeEach(()=>analytics.track.mockClear());
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
 
 describe('comic search session',()=>{
+  it('preserves the search origin through name translation and deferred site completion',async()=>{
+    let now=1700000000000;
+    const name=deferred<{name:string;target_language:string}>(),results=deferred<SourceSearchResults>();
+    const {session}=setup({now:()=>now,translateTitle:()=>name.promise,search:()=>results.promise},[site('a')]);
+    const request=session.searchWithTranslatedTitle();
+    now+=10000;name.resolve({name:'private-name',target_language:'en'});await request;
+    now+=5000;results.resolve(page('a'));await flush();
+    expect(analytics.track.mock.calls.map(call=>call[2])).toEqual([1700000000000,1700000000000]);
+    expect(analytics.track.mock.calls[1][1]).toMatchObject({duration_ms:15000,outcome:'success'});
+    expect(analytics.track.mock.calls[1][1]).not.toHaveProperty('startedAt');
+  });
+  it('reports one initial-round result without search text, even after paging and disposal',async()=>{
+    const {session}=setup({search:async(id,request)=>({items:[hit(id,request.cursor?'second-private-title':'private-title')],nextCursor:request.cursor?undefined:'private-cursor'})},[site('private-site')]);
+    session.searchManual('private-query');await flush();session.loadMore('private-site:private-site');await flush();session.dispose();
+    expect(analytics.track.mock.calls.map(([name])=>name)).toEqual(['search_started','search_result']);
+    expect(analytics.track.mock.calls[1][1]).toMatchObject({search_mode:'direct',outcome:'success',result_count:1});
+    expect(JSON.stringify(analytics.track.mock.calls)).not.toContain('private-');
+  });
+  it('records translated-name misses and explicit cancellation as separate search outcomes',async()=>{
+    const pending=deferred<SourceSearchResults>();
+    const {session}=setup({translateTitle:async()=>({name:null,target_language:null}),search:()=>pending.promise});
+    await session.searchWithTranslatedTitle();session.searchManual('private-query');session.stop();pending.resolve(page('private'));await flush();
+    expect(analytics.track.mock.calls.filter(([name])=>name==='search_result').map(([,params])=>params.outcome)).toEqual(['empty','cancelled']);
+    expect(JSON.stringify(analytics.track.mock.calls)).not.toContain('private');
+  });
   it('opening does not query names or sites, and all searchable sites are selected initially',async()=>{
     const {session,deps}=setup({},[site('a'),site('unknown',[])]);
     expect(deps.translateTitle).not.toHaveBeenCalled();expect(deps.search).not.toHaveBeenCalled();

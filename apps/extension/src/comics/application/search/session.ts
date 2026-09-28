@@ -3,6 +3,7 @@ import {msg} from '../../../i18n/runtime';
 import type {SourceSearchResults} from '../../../sources';
 import {resolveComicTitle,titleFailure,validateSearchQuery} from './title-resolver';
 import type {ComicSearchDependencies,ComicSearchSnapshot,SearchCandidate,SearchFailure,SearchSeed,SearchSiteState} from './types';
+import {track,type AnalyticsFields} from '../../../analytics';
 
 export const COMIC_SEARCH_CONCURRENCY=3;
 const sessionPrefix=()=>globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -49,6 +50,7 @@ export class ComicSearchSession {
   private disposed=false;
   private readonly prefix=sessionPrefix();
   private readonly now:()=>number;
+  private usage?:{started:number;mode:'direct'|'translated'};
 
   constructor(readonly seed:SearchSeed,private readonly deps:ComicSearchDependencies,defaultLanguage:string,siteSelection:Readonly<Record<string,boolean>>={}){
     this.now=deps.now??Date.now;
@@ -64,7 +66,20 @@ export class ComicSearchSession {
   }
   private patchSite(key:string,patch:Partial<SearchSiteState>){this.emit({sites:this.snapshot.sites.map(state=>state.site.key===key?{...state,...patch}:state)});}
   private current(key:string){return this.snapshot.sites.find(state=>state.site.key===key);}
+  private startUsage(mode:'direct'|'translated'){
+    this.usage={started:this.now(),mode};
+    track('search_started',{surface:'reader',search_mode:mode},this.usage.started);
+  }
+  private finishUsage(outcome?:AnalyticsFields['outcome']){
+    if(!this.usage)return;
+    const usage=this.usage;this.usage=undefined;
+    const failed=this.snapshot.sites.filter(site=>site.status==='error').length;
+    track('search_result',{surface:'reader',search_mode:usage.mode,
+      outcome:outcome??(failed?(this.snapshot.results.length?'partial':'failed'):this.snapshot.results.length?'success':'empty'),
+      result_count:Math.min(10000,this.snapshot.results.length),duration_ms:Math.min(86400000,Math.max(0,Math.round(this.now()-usage.started)))},usage.started);
+  }
   private invalidate(release:boolean){
+    this.finishUsage('cancelled');
     this.generation++;
     this.nameController?.abort();this.nameController=undefined;
     this.running.forEach(run=>run.controller.abort());this.running.clear();this.pending=[];
@@ -88,6 +103,7 @@ export class ComicSearchSession {
     if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title)){
       this.emit({phase:'needs-query',titleState:'error',titleError:{kind:'invalid',message:msg('漫画名称需为 1–60 个字符，且不能包含控制字符。')}});return;
     }
+    this.startUsage('translated');
     const generation=this.generation,controller=new AbortController();this.nameController=controller;
     const language=this.snapshot.requestedTitleLanguage,key=JSON.stringify([title,language]);
     this.emit({phase:'resolving-name',titleState:'resolving'});
@@ -96,17 +112,17 @@ export class ComicSearchSession {
       if(this.disposed||generation!==this.generation)return;
       this.titleCache.set(key,result);
       this.nameController=undefined;
-      if(!result.name){this.emit({phase:'needs-query',titleState:'missing',query:''});return;}
+      if(!result.name){this.emit({phase:'needs-query',titleState:'missing',query:''});this.finishUsage('empty');return;}
       this.emit({query:result.name,resolvedTitleLanguage:result.target_language??undefined,titleState:'resolved'});
-      try{validateSearchQuery(result.name);}catch(error){this.emit({phase:'needs-query',titleError:titleFailure(error,this.now())});return;}
+      try{validateSearchQuery(result.name);}catch(error){this.emit({phase:'needs-query',titleError:titleFailure(error,this.now())});this.finishUsage('failed');return;}
       this.beginSites(result.name.trim(),siteKeys);
-    }catch(error){if(this.disposed||generation!==this.generation)return;const failure=titleFailure(error,this.now());this.emit({phase:'needs-query',titleState:'error',titleError:failure,titleRetryAt:failure.retryAt});}
+    }catch(error){if(this.disposed||generation!==this.generation)return;const failure=titleFailure(error,this.now());this.emit({phase:'needs-query',titleState:'error',titleError:failure,titleRetryAt:failure.retryAt});this.finishUsage('failed');}
   }
   searchManual(value:string){
     if(this.noSites())return;
     let query:string;
     try{query=validateSearchQuery(value);}catch(error){this.emit({titleError:titleFailure(error,this.now())});return;}
-    this.prepare();this.emit({query,titleState:'manual'});this.beginSites(query,this.selected().map(state=>state.site.key));
+    this.prepare();this.startUsage('direct');this.emit({query,titleState:'manual'});this.beginSites(query,this.selected().map(state=>state.site.key));
   }
   private beginSites(query:string,siteKeys:readonly string[]){
     this.searchId=`${this.prefix}:${this.generation}`;
@@ -132,7 +148,7 @@ export class ComicSearchSession {
       const job=this.pending.shift()!;if(!this.valid(job))continue;
       const controller=new AbortController();this.running.set(job.key,{job,controller});void this.run(job,controller);
     }
-    if(this.snapshot.phase==='searching'&&!this.running.size&&!this.pending.length)this.emit({phase:'settled'});
+    if(this.snapshot.phase==='searching'&&!this.running.size&&!this.pending.length){this.emit({phase:'settled'});this.finishUsage();}
   }
   private async run(job:Job,controller:AbortController){
     const state=this.current(job.key);if(!state||!this.searchId)return;

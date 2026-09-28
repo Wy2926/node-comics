@@ -441,6 +441,108 @@
         ]
       }
     },
+    "/v1/analytics/events": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Receive consented extension analytics",
+        "description": "Public, best-effort extension telemetry only. Accepts up to 20 events and 16 KiB; unknown events, private or unrecognized parameters and stale events are discarded. No account authorization or identifiers are used. A 204 does not confirm Google Analytics ingestion.",
+        "operationId": "collect_v1_analytics_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "title": "Client Id"
+                  },
+                  "session_id": {
+                    "type": "integer",
+                    "maximum": 9999999999.0,
+                    "minimum": 1577836800.0,
+                    "title": "Session Id"
+                  },
+                  "events": {
+                    "items": {
+                      "properties": {
+                        "event_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "title": "Event Id"
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "title": "Name"
+                        },
+                        "params": {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "maxProperties": 40,
+                          "title": "Params"
+                        },
+                        "timestamp_micros": {
+                          "type": "integer",
+                          "maximum": 9007199254740991.0,
+                          "exclusiveMinimum": 0.0,
+                          "title": "Timestamp Micros"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "event_id",
+                        "name",
+                        "timestamp_micros"
+                      ],
+                      "title": "Event"
+                    },
+                    "type": "array",
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "title": "Events"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "client_id",
+                  "session_id",
+                  "events"
+                ],
+                "title": "EventBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Best-effort processing finished; also returned when analytics is disabled"
+          },
+          "408": {
+            "description": "Request body timeout"
+          },
+          "413": {
+            "description": "Request exceeds 16 KiB"
+          },
+          "415": {
+            "description": "JSON content type required"
+          },
+          "422": {
+            "description": "Invalid event envelope"
+          },
+          "429": {
+            "description": "Process-local rate limit exceeded; see Retry-After"
+          }
+        },
+        "security": []
+      }
+    },
     "/internal/compute/v2/nodes/register": {
       "post": {
         "tags": [

@@ -347,7 +347,7 @@ export default {
           {
             "title": "Scope and contact",
             "paragraphs": [
-              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated September 20, 2026. Material changes will be explained on this page and communicated appropriately."
+              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated September 28, 2026. Material changes will be explained on this page and communicated appropriately."
             ]
           },
           {
@@ -356,6 +356,13 @@ export default {
               "OIDC sign-in provides an identity identifier, display name and role for accounts, benefits and tasks. The product API validates access tokens. The website does not collect the password you enter at the identity provider.",
               "Translation processes selected page images, content hashes, file/page identifiers, mode, target language, status, results and usage records. These support delivery, matching, recovery and valid result reuse. Stripe or Creem handles checkout and full payment-card details; we retain the customer, transaction and subscription records needed for benefits, reconciliation and support.",
               "Feedback, email and necessary attachments help investigate problems. Operations involve necessary request metadata, security and error records. Default logs exclude credentials, private images, full image text and signed download URLs."
+            ]
+          },
+          {
+            "title": "Optional extension usage analytics",
+            "paragraphs": [
+              "Usage analytics is off by default. If you opt in through the extension settings, limited information about feature use, success and failure categories, active reading time, interface and target languages, source types and extension version is sent through NodeLane's backend to Google Analytics 4 to improve the product. A random identifier stored on your device distinguishes usage. It is not linked to your signed-in account or used for ad targeting. This is a pseudonymous identifier, not a promise of complete anonymity.",
+              "Analytics excludes comic titles, images and text, search terms, file names, specific reading URLs, cookies, credentials and custom translation service addresses. You can turn it off at any time to stop further collection and clear pending local analytics records and the identifier, without affecting reading or translation. Turning it off does not automatically erase data already sent to Google; contact us for requests we can identify and process. Google may process analytics data outside your region, subject to its privacy policy and our retention settings. GA4 event-level and user-level data retention is set to 14 months, without resetting user data retention on new activity; aggregate reports are not limited by this period. The website itself does not collect GA4 usage analytics."
             ]
           },
           {
