@@ -72,13 +72,15 @@ class Runtime:
         code['contract'] = file_hash(Path(__file__).with_name('protocol.py'))
         code['alphabet'] = file_hash(source / 'manhua_engine/alphabet.txt')
         dependencies = {name: package_version(name) for name in ('ncnn',
-            'onnxruntime-directml' if sys.platform == 'win32' else 'onnxruntime', 'numpy',
+            'onnxruntime-directml' if sys.platform == 'win32' else
+            ('onnxruntime-gpu' if sys.platform == 'linux' else 'onnxruntime'), 'numpy',
             'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr', 'uniseg', 'pyphen', 'fonttools')}
         self.version = 'manhua-ncnn-v1-' + digest({'code': code, 'models': model_hashes,
             'fonts': font_hashes, 'dependencies': dependencies,
             'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'ocr_workers', 'threads', 'gpu'}},
             'device_backend': 'cpu' if options['gpu'] < 0 else 'vulkan',
-            'inpainting_backend': 'cpu' if options['gpu'] < 0 or options.get('inpaint_gpu', 0) < 0 else 'directml'})[:32]
+            'inpainting_backend': 'cpu' if options['gpu'] < 0 or options.get('inpaint_gpu', 0) < 0 else
+            ('directml' if sys.platform == 'win32' else 'cuda')})[:32]
         self.engine = Engine(**options)
 
     def close(self):

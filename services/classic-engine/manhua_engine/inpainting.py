@@ -1,6 +1,7 @@
 """LaMa Large ONNX; GPU execution is mandatory unless CPU is explicit."""
 import hashlib
 import json
+import sys
 from pathlib import Path
 from threading import Lock
 
@@ -11,6 +12,15 @@ import onnxruntime as ort
 CHECKPOINT = 'lama_large_512px.ckpt'
 CHECKSUM = '11d30fbb3000fb2eceae318b75d9ced9229d99ae990a7f8b3ac35c8d31f2c935'
 ARCHITECTURE = 'lama-large-matrix-dft-512-v1'
+
+
+def gpu_provider(gpu):
+    provider = 'DmlExecutionProvider' if sys.platform == 'win32' else 'CUDAExecutionProvider'
+    settings = {'device_id': str(gpu)}
+    if provider == 'CUDAExecutionProvider':
+        settings.update(use_tf32='0', cudnn_conv_algo_search='HEURISTIC',
+                        cudnn_conv_use_max_workspace='0', arena_extend_strategy='kSameAsRequested')
+    return provider, settings
 
 
 def model_identity(models):
@@ -39,18 +49,19 @@ class Lama:
         options.enable_mem_pattern = False
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         options.add_session_config_entry('session.intra_op.allow_spinning', '0')
-        provider = 'CPUExecutionProvider' if gpu < 0 else 'DmlExecutionProvider'
+        provider, settings = ('CPUExecutionProvider', {}) if gpu < 0 else gpu_provider(gpu)
         if provider not in ort.get_available_providers():
-            raise RuntimeError('LaMa GPU requires ONNX Runtime DirectML on Windows; no automatic CPU fallback')
+            raise RuntimeError(f'LaMa GPU requires {provider}; no automatic CPU fallback')
         if gpu >= 0:
             options.add_session_config_entry('session.disable_cpu_ep_fallback', '1')
-        providers = [provider] if gpu < 0 else [(provider, {'device_id': str(gpu)})]
+        providers = [provider] if gpu < 0 else [(provider, settings)]
         self.session = ort.InferenceSession(str(Path(models) / 'lama-onnx/lama-large-512.onnx'),
                                             options, providers=providers)
         self.session.disable_fallback()
         if self.session.get_providers()[0] != provider:
             raise RuntimeError('LaMa requested provider was not activated')
-        self.backend = 'onnx-cpu-fp32' if gpu < 0 else f'onnx-directml-fp32:{gpu}'
+        backend = 'directml' if provider == 'DmlExecutionProvider' else 'cuda'
+        self.backend = 'onnx-cpu-fp32' if gpu < 0 else f'onnx-{backend}-fp32:{gpu}'
 
     def predict(self, rgb, mask):
         if (rgb.dtype != np.uint8 or rgb.ndim != 3 or rgb.shape[2] != 3

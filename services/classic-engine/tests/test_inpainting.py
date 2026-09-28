@@ -49,6 +49,27 @@ def test_gpu_never_silently_uses_cpu(tmp_path, monkeypatch):
         Lama(tmp_path, gpu=0)
 
 
+@pytest.mark.parametrize('platform,provider', [('win32', 'DmlExecutionProvider'),
+                                              ('linux', 'CUDAExecutionProvider')])
+def test_gpu_provider_preserves_fp32_and_disables_cpu_fallback(tmp_path, monkeypatch, platform, provider):
+    import manhua_engine.inpainting as module
+    monkeypatch.setattr(module.sys, 'platform', platform)
+    monkeypatch.setattr(module, 'model_identity', lambda _: {})
+    monkeypatch.setattr(module.ort, 'get_available_providers', lambda: [provider, 'CPUExecutionProvider'])
+    captured = {}
+    def session(path, options, providers):
+        captured.update(providers=providers, options=options)
+        return SimpleNamespace(disable_fallback=lambda: None, get_providers=lambda: [provider])
+    monkeypatch.setattr(module.ort, 'InferenceSession', session)
+    net = Lama(tmp_path, gpu=2)
+    assert captured['providers'][0][0] == provider
+    assert captured['providers'][0][1]['device_id'] == '2'
+    assert captured['options'].get_session_config_entry('session.disable_cpu_ep_fallback') == '1'
+    if platform == 'linux':
+        assert captured['providers'][0][1]['use_tf32'] == '0'
+        assert net.backend == 'onnx-cuda-fp32:2'
+
+
 def test_reflected_text_is_masked_in_fixed_size_padding():
     net = Lama.__new__(Lama)
     net.lock = Lock()

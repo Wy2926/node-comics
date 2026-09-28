@@ -1,4 +1,4 @@
-"""Prove final LaMa ONNX runs wholly on DirectML and compare to CPU FP32."""
+"""Prove final LaMa ONNX runs wholly on the GPU and compare to CPU FP32."""
 import argparse
 from collections import Counter
 import json
@@ -9,7 +9,7 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from manhua_engine.inpainting import model_identity
+from manhua_engine.inpainting import model_identity, gpu_provider
 
 
 def main():
@@ -29,7 +29,8 @@ def main():
     report = {'models': identity, 'onnxruntime': ort.__version__, 'gpu_device_id': args.gpu,
               'cpu_fallback_disabled': True, 'shape': [1, 3, 512, 512]}
     results = {}
-    for provider in ('DmlExecutionProvider', 'CPUExecutionProvider'):
+    selected, settings = gpu_provider(args.gpu)
+    for provider in (selected, 'CPUExecutionProvider'):
         options = ort.SessionOptions()
         options.enable_mem_pattern = False
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
@@ -38,9 +39,9 @@ def main():
         options.add_session_config_entry('session.intra_op.allow_spinning', '0')
         options.enable_profiling = True
         options.profile_file_prefix = str(args.output / provider)
-        if provider == 'DmlExecutionProvider':
+        if provider == selected:
             options.add_session_config_entry('session.disable_cpu_ep_fallback', '1')
-        providers = [(provider, {'device_id': str(args.gpu)})] if provider.startswith('Dml') else [provider]
+        providers = [(provider, settings)] if provider == selected else [provider]
         session = ort.InferenceSession(str(args.models / 'lama-onnx/lama-large-512.onnx'),
                                        options, providers=providers)
         session.disable_fallback()
@@ -58,7 +59,7 @@ def main():
         results[provider] = result
         report[provider] = {'seconds': seconds, 'profile_providers': dict(assigned)}
         del session
-    delta = np.abs(results['DmlExecutionProvider'] - results['CPUExecutionProvider'])
+    delta = np.abs(results[selected] - results['CPUExecutionProvider'])
     report['output_error'] = {'max_abs': float(delta.max()), 'mean_abs': float(delta.mean())}
     report['passed'] = float(delta.max()) < 1e-4 and float(delta.mean()) < 1e-5
     (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

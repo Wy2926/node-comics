@@ -1,6 +1,6 @@
 # Manhua Engine
 
-轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime DirectML GPU FP32 LaMa Large；默认多语言 OCR，按目标语言嵌字。安装方式优先见 [节点说明](README.md)，无需 CUDA 或 Android SDK。
+轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime GPU FP32 LaMa Large（Windows DirectML、Linux NVIDIA CUDA）；默认多语言 OCR，按目标语言嵌字。安装与 Linux GPU 环境见 [节点说明](README.md)。Windows 不需要 CUDA。
 
 ## 支持范围
 
