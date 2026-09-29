@@ -87,7 +87,7 @@ function Popup({initialError=''}:{initialError?:string}){
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
    <section className="nc-popup-import" aria-label={msg('漫画阅读')}>
-    {importable&&<button className="button secondary full" disabled={disabled} onClick={()=>void findComic()}><Icon name="translate"/>{msg('寻找其他语言')}</button>}
+    {importable&&resolved?.definition.capabilities.findAlternatives!==false&&<button className="button secondary full" disabled={disabled} onClick={()=>void findComic()}><Icon name="translate"/>{msg('寻找其他语言')}</button>}
     {importable?<button className="button secondary full" disabled={disabled} onClick={()=>void readSource()}><Icon name="book"/>{busy?msg('正在打开漫画'):msg('开始阅读')}</button>:<p className="nc-popup-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
     {discoveryError&&<div className="nc-popup-error" role="alert">{discoveryError}</div>}
    </section>

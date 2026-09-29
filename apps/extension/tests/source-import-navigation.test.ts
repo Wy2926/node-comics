@@ -59,6 +59,13 @@ describe('embedded import after same-document navigation', () => {
     expect(await send(sender(catalogUrl))).toEqual({ok: true});
     expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
   });
+  it('imports after an unclaimed artwork page navigates to a catalog on the same origin', async () => {
+    currentUrl = 'https://www.pixiv.net/users/7/artworks';
+    readCatalog.mockResolvedValueOnce({...snapshot, id: 'pixiv:user:7:all', sourceId: 'pixiv', url: currentUrl, entries: [], defaultEntryId: undefined});
+    expect(await send(sender('https://www.pixiv.net/artworks/101'))).toEqual({ok: true});
+    expect(readCatalog).toHaveBeenCalledExactlyOnceWith(currentUrl);
+    expect(create).toHaveBeenCalledOnce();
+  });
   it('rejects a URL-bound reader import when its requested chapter has been removed',async()=>{
     currentUrl=readerUrl.replace('no=2','no=3');
     readCatalog.mockResolvedValueOnce({...snapshot,defaultEntryId:'episode-2'});

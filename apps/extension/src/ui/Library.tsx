@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState,type ReactNode,type RefObject} from 'react';
 import {msg} from '../i18n/runtime';
+import {canFindAlternatives} from '../sources';
 import {Icon} from '../icons';
 import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
 import {readDownloadScope} from '../comics/acquisition/books';
@@ -35,7 +36,7 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
   {icon:'book',label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
   ...(comic.sourceUrl?[{icon:'external',label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
   ...(downloads?[{icon:'download',label:comic.source.connectionId==='local'?msg('已保存在本机'):!comic.source.connectionId.startsWith('website:')?msg('此来源暂不支持整本缓存'):downloads.books.some(book=>book.comic.id===comic.id)?msg('查看缓存进度'):msg('缓存整本'),disabled:!comic.source.connectionId.startsWith('website:'),onSelect:()=>downloads.books.some(book=>book.comic.id===comic.id)?downloads.open(comic.id):void downloads.start(comic.id)},...(comic.source.connectionId.startsWith('website:')?[{icon:'globe',label:msg('缓存语言'),visible:async()=>(await readDownloadScope(comic.id)).languages.length>1,onSelect:()=>downloads.open(comic.id,true)}]:[])]:[]),
-  ...(onFind?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
+  ...(onFind&&canFindAlternatives(comic.sourceUrl)?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {icon:'download',label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
  ];

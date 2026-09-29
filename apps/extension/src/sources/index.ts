@@ -38,11 +38,13 @@ export function createSourceService(registry: readonly SourceDefinition[]) {
 }
 const service = createSourceService(definitions);
 export const sourceFor = service.resolve;
+/** Local files and existing sources keep their search entry unless a source opts out. */
+export const canFindAlternatives = (url?: string) => !url || sourceFor(url).definition.capabilities.findAlternatives !== false;
 /** Validate against the resolved source, never a caller-supplied adapter flag. */
 export function inlineImageSize(width:number,height:number,url:string) {
   const {definition,location}=sourceFor(url);
   if(!definition.capabilities.inline||location.kind!=='reader')return false;
-  return definition.id==='generic' ? comicSize(width,height)
+  return definition.id==='generic'||definition.inlineRecognition==='generic' ? comicSize(width,height)
     : Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0;
 }
 export const sourceLocation = (url: string) => {

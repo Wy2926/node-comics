@@ -128,7 +128,8 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
         sender.tab?.id != null &&
         sender.frameId === 0 &&
         !!sourceLocation(sender.url ?? '') &&
-        sourceFor(sender.url??'').definition.capabilities.importable;
+        (sourceFor(sender.url!).definition.capabilities.importable ||
+          !!sender.tab.url && new URL(sender.tab.url).origin === new URL(sender.url!).origin && sourceFor(sender.tab.url).definition.capabilities.importable);
       if (!fromSourcePage) return;
       if(message.type==='NC_SEARCH_CURRENT'){
         void openSearchFromTab(sender.tab!.id!,undefined,sender.url).then(()=>respond({ok:true})).catch(error=>respond({ok:false,error:error instanceof Error?error.message:msg('插件通信失败，请重新打开阅读器。')}));

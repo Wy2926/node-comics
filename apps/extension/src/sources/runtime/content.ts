@@ -1,7 +1,7 @@
 import { connectContentLocale } from '../../i18n/content';
 import { msg } from '../../i18n/runtime';
 import { validatePages } from '../core/pages';
-import { validateSourceCatalog } from '../index';
+import { sourceFor, validateSourceCatalog } from '../index';
 import { PageImageRegistry, sourceDocument } from '../page';
 import { sourceFailure } from './diagnostics';
 import { mountSourceImportButton } from './import-button';
@@ -34,13 +34,15 @@ export function installSourceContent() {
       mountedAnchor = null;
     },
     changed() {
-      const anchor = current().session.importAnchor?.() ?? null;
+      const page = current(), {definition} = sourceFor(page.location.url);
+      const floating = definition.embeddedEntry === 'floating' && definition.capabilities.importable && page.location.kind !== 'other';
+      const anchor = floating ? document.body : page.session.importAnchor?.() ?? null;
       if (anchor !== mountedAnchor) {
         cleanupButton?.();
         cleanupButton = undefined;
         mountedAnchor = anchor;
       }
-      if (anchor && !cleanupButton) cleanupButton = mountSourceImportButton(anchor);
+      if (anchor && !cleanupButton) cleanupButton = mountSourceImportButton(anchor, {floating, findAlternatives: definition.capabilities.findAlternatives !== false});
     },
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {

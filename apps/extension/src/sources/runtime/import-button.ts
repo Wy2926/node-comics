@@ -3,10 +3,11 @@ import { shadowThemeStyles } from '../../inline/shadow';
 import { connectInlineTheme } from '../../inline/theme';
 import styles from './import-button.css?inline';
 
-export function mountSourceImportButton(parent: Element) {
+export function mountSourceImportButton(parent: Element, {floating = false, findAlternatives = true}: {floating?: boolean; findAlternatives?: boolean} = {}) {
   const host = document.createElement('span');
   host.style.cssText =
     'all:initial!important;display:inline-block!important;max-width:100%!important;margin:12px 0!important';
+  if (floating) host.style.cssText += 'position:fixed!important;left:16px!important;bottom:20px!important;z-index:2147483645!important;max-width:calc(100vw - 32px)!important;margin:0!important';
   const shadow = host.attachShadow({ mode: 'open' }),
     style = document.createElement('style');
   style.textContent = shadowThemeStyles(styles);
@@ -15,8 +16,8 @@ export function mountSourceImportButton(parent: Element) {
   const disconnectTheme = connectInlineTheme(surface);
   const button = document.createElement('button');
   button.type = 'button';
-  const searchButton=document.createElement('button');
-  searchButton.type='button';searchButton.className='search';
+  const searchButton = findAlternatives ? document.createElement('button') : null;
+  if (searchButton) {searchButton.type = 'button'; searchButton.className = 'search';}
   const status = document.createElement('span');
   status.className = 'status';
   status.id = 'import-status';
@@ -24,11 +25,11 @@ export function mountSourceImportButton(parent: Element) {
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
   button.setAttribute('aria-describedby', status.id);
-  searchButton.setAttribute('aria-describedby',status.id);
+  searchButton?.setAttribute('aria-describedby', status.id);
   const resetLabel = () => {
     button.textContent = 'NodeLane Comics · '+msg('导入/管理漫画');
     button.setAttribute('aria-label', button.textContent);
-    searchButton.textContent=msg('寻找其他语言');
+    if (searchButton) searchButton.textContent = msg('寻找其他语言');
     status.textContent = '';
   };
   resetLabel();
@@ -37,31 +38,31 @@ export function mountSourceImportButton(parent: Element) {
     button.textContent = message;
     status.textContent = message;
   };
-  button.onclick = () => {
-    if(button.disabled||searchButton.disabled)return;
+  let pending = false;
+  const send = (trigger: HTMLButtonElement, type: string, onError: (message: string) => void) => {
+    if (pending) return;
+    pending = true;
     resetLabel();
-    button.disabled = true;
-    button.setAttribute('aria-busy', 'true');
+    trigger.disabled = true;
+    trigger.setAttribute('aria-busy', 'true');
     void chrome.runtime
-      .sendMessage({ type: 'NC_IMPORT_CURRENT' })
+      .sendMessage({ type })
       .then((response) => {
         if (!response?.ok)
-          failed(typeof response?.error === 'string' ? response.error : msg('请通过插件弹窗重试'));
+          onError(typeof response?.error === 'string' ? response.error : msg('请通过插件弹窗重试'));
       })
-      .catch(() => failed(msg('请通过插件弹窗重试')))
+      .catch(() => onError(msg('请通过插件弹窗重试')))
       .finally(() => {
-        button.disabled = false;
-        button.removeAttribute('aria-busy');
+        pending = false;
+        trigger.disabled = false;
+        trigger.removeAttribute('aria-busy');
       });
   };
-  searchButton.onclick=()=>{
-    if(button.disabled||searchButton.disabled)return;
-    resetLabel();searchButton.disabled=true;searchButton.setAttribute('aria-busy','true');
-    void chrome.runtime.sendMessage({type:'NC_SEARCH_CURRENT'}).then(response=>{
-      if(!response?.ok)status.textContent=typeof response?.error==='string'?response.error:msg('请通过插件弹窗重试');
-    }).catch(()=>{status.textContent=msg('请通过插件弹窗重试');}).finally(()=>{searchButton.disabled=false;searchButton.removeAttribute('aria-busy');});
-  };
-  surface.append(button, searchButton, status);
+  button.onclick = () => send(button, 'NC_IMPORT_CURRENT', failed);
+  if (searchButton) searchButton.onclick = () => send(searchButton, 'NC_SEARCH_CURRENT', message => {status.textContent = message;});
+  surface.append(button);
+  if (searchButton) surface.append(searchButton);
+  surface.append(status);
   shadow.append(style, surface);
   parent.append(host);
   return () => {

@@ -31,6 +31,8 @@
 
 搜索按具体 `SourceSite.search` 可选声明，并提供 `network.search`，共用现有静态注册。搜索只按名称查询，不依据 `primaryLanguages` 或候选语言过滤；网站实际提供的语言作为可选结果字段返回，缺失时不推断。查询返回轻量候选页而非目录，游标、权限与交互遵循[跨语言搜索](COMIC_SEARCH_DESIGN.md)。网页起点与可被搜索是两个独立能力；`describeWork` 不返回章节标题，也不为查名字抓完整目录。
 
+缺少稳定网页挂载位置的站点可声明 `embeddedEntry: 'floating'`，由公共运行时在已识别的可导入页面显示浮动导入按钮。站点可通过 `capabilities.findAlternatives: false` 关闭“寻找其他语言”的网页、弹窗、书架与阅读器入口；未声明时保持现有行为。这与站点是否支持名称搜索独立。
+
 多语言目录可提供条目的 `contentLanguage` 和 `readingSlotId`。前者是实际源内容的规范语言标签；后者是适配器依据源站明确关系给出的不透明阅读位置键，同位置候选使用相同顺序。`sequenceId` 声明安全的逻辑连读范围，可以包含同话的不同语言；同一位置的多个发布条目保留各自稳定 ID，公共层负责按话合并目录、逐话自动选择及独立进度。目录直接使用条目标题，发布组等说明通过已有 `rawTypes` 提供；源站明确标注外链、不可用或无正文时使用 `readable: false`，未提供表示没有目录层不可读证据。无可信对应关系时不共享位置；无位置键时每个条目独立。相同位置候选按完整快照中的稳定顺序选择，完整目录包含全部支持语言。目标语言、手动选择和续读属于本机应用数据，选择规则见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md#网站与只读目录)。
 
 公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
@@ -45,7 +47,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 展示画布无法导出但有可靠原图映射时，站点可返回 HTTP 原位目标，并通过 `image.decodeInline` 解码公共取图管线返回的字节；该钩子负责核对本站图片范围。网络解析器可按单次请求声明 `acceptStatuses` 以读取源站使用错误状态承载的结构化响应，仍须验证响应结构；权限、请求范围、响应大小和取消检查不变。
 
-原位正文筛选由 `inlineTargets()` 负责：未知站点的大图启发式只在 `generic` 适配器执行，显示层统一检查渲染状态。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
+原位正文筛选由 `inlineTargets()` 负责：大图启发式集中在 `generic` 适配器，显示层统一检查渲染状态。网络适配器可通过 `inlineRecognition: 'generic'` 显式复用通用已加载大图识别，无需空 `page.ts`；注册表保持来源身份与通用尺寸检查，并禁止以此读取完整正文。这不是 HTTP 失败后的兜底。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
 
 目录可选提供 `cover`，必须取自作品专门封面，不能使用推荐图或章节缩略图。`readSourceCover` 校验目录归属、HTTP(S) 地址与主机权限，经公共取图管线读取；防盗链规则不同时使用 `image.coverHeaders`。新增 CDN 仍须校验地址与当前访问权限，不单独弹出授权。封面不进入正文、翻译或下载清单，缩略图沿用缓存预算与访问失效规则；换封面不触发章节更新徽章。展示行为见[单来源阅读设计](SIMPLE_COMIC_READING_DESIGN.md)。
 
@@ -82,4 +84,5 @@ npm run build
 | [MangaDex](../apps/extension/src/sources/sites/mangadex/README.md) | HTTP 多语言目录与章节、同话候选、作品封面、12 小时更新；章节 UUID 独立身份，图片内容标识不依赖临时服务器地址 |
 | [MangaDot](../apps/extension/src/sources/sites/mangadot/README.md) | HTTP 名称搜索、多语言目录、普通／上传章节与整卷、封面和 12 小时更新；同话候选、网页导入与已加载正文原位翻译 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
+| [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |
