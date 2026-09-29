@@ -121,7 +121,7 @@ def test_empty_prepared_claim_rechecks_after_commit_and_hints_bounded_retry(v2, 
     monkeypatch.setattr(compute_v2, 'has_claimable_work', ready)
     reply = claim(v2, 4, 'stale-empty')
     assert reply.status_code == 200, reply.text
-    assert reply.json()['leases'] == [] and reply.json()['retry_after_seconds'] == .1
+    assert reply.json()['leases'] == [] and .1 <= reply.json()['retry_after_seconds'] <= .3
 
 
 def test_empty_receipt_retry_hint_is_dynamic_and_does_not_allocate(v2):
@@ -131,7 +131,7 @@ def test_empty_receipt_retry_hint_is_dynamic_and_does_not_allocate(v2):
     v2['create'](4)
     replay = claim(v2, 4, 'empty-receipt')
     assert replay.status_code == 200 and replay.json()['leases'] == []
-    assert replay.json()['retry_after_seconds'] == .1
+    assert .1 <= replay.json()['retry_after_seconds'] <= .3
     with session_factory()() as db:
         assert db.get(ComputeClaim, (v2['node']['node_id'], 'empty-receipt')).lease_ids == []
         assert db.scalar(select(func.count()).select_from(ExecutionLease)) == 0

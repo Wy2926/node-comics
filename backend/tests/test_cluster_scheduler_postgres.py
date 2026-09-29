@@ -41,6 +41,12 @@ from test_control_dispatch import (
     test_thread_wakeup_requires_commit,
     test_capacity_and_supplier_changes_wake_only_after_commit,
 )
+from test_scheduler_readiness import (
+    test_readiness_filters_without_sorting_or_materializing_jobs,
+    test_local_missing_heads_do_not_hide_later_available_source,
+    test_control_readiness_respects_supplier_limits_and_upload_without_source,
+    test_text_readiness_respects_supplier_enablement_and_rpm,
+)
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
                                 reason='Requires the dedicated nodecomics_concurrency_test database')

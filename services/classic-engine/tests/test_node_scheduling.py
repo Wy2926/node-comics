@@ -217,10 +217,11 @@ def test_pre_upgrade_pending_claim_replays_original_count_and_identity(agent):
     assert requests == [pending] and agent.journal.get('claim') is None
 
 
-def test_empty_competing_claim_hint_retries_boundedly_then_returns_to_normal_wait(agent, monkeypatch):
+@pytest.mark.parametrize('hint', [.1, .237, .3])
+def test_empty_competing_claim_hint_retries_boundedly_then_returns_to_normal_wait(agent, monkeypatch, hint):
     current = [100.0]
     monkeypatch.setattr('classic_node.agent.time.monotonic', lambda: current[0])
-    replies = [{'retry_after_seconds': .1}, {}]
+    replies = [{'retry_after_seconds': hint}, {}]
 
     def post(_, body):
         server, _ = clock()
@@ -230,17 +231,17 @@ def test_empty_competing_claim_hint_retries_boundedly_then_returns_to_normal_wai
     agent.poll_control()
     agent.claim_pool.finish()
     agent.poll_control()
-    assert agent.next_claim == 100.1 and len(agent.claim_pool.calls) == 1
+    assert agent.next_claim == 100 + hint and len(agent.claim_pool.calls) == 1
     # A hint cannot bypass the node's local admission gate.
     agent.config['enabled'] = False
-    current[0] = 100.2
+    current[0] = 100.4
     agent.poll_control()
     assert len(agent.claim_pool.calls) == 1
     agent.config['enabled'] = True
     agent.poll_control()
     agent.claim_pool.finish()
     agent.poll_control()
-    assert len(agent.claim_pool.calls) == 2 and agent.next_claim == 120.2
+    assert len(agent.claim_pool.calls) == 2 and agent.next_claim == 120.4
 
 
 @pytest.mark.parametrize('hint', [0, 21, '0.1', float('nan')])

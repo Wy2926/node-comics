@@ -111,33 +111,17 @@ def effective_languages(node):
     return [language for language in dict.fromkeys(node.runtime_report.get('languages', [])) if language in allowed]
 
 
-def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, blocked_providers=(), batch_size=1):
-    """Elect in SQL before materializing a bounded set per pool and class.
-
-    Eligibility precedes ranking, so an arbitrarily deep unsupported
-    backlog cannot conceal a runnable user. An extra owner preserves the virtual
-    service floor after every winning account consumes its next quantum.
-    """
+def _eligible_stages(node, stages, at, *, stage_ids=None, blocked_providers=()):
+    """Shared admission predicates, without ordering or fairness state."""
     cfg = settings()
-    source, account, clock = aliased(Asset), aliased(FairnessState), aliased(FairnessState)
     image_stage = JobStage.name.in_(IMAGE_STAGES)
-    pool = case((image_stage, literal("image:") + func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version)),
-                (JobStage.name == "validate_upload", literal("upload")), else_=JobStage.name)
-    cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
-    page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
-        case((Job.realtime_until > at, Job.priority_rank), else_=1000000),
-        Job.created_at, Job.id, JobStage.id]
-    eligible = select(JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
-        pool.label("pool"), cls.label("priority_class"),
-        func.row_number().over(partition_by=[pool, cls, Job.owner_id], order_by=page_order).label("page_rank"))
-    eligible = (eligible.join(Job, Job.id == JobStage.job_id)
-        .outerjoin(source, source.id == Job.input_asset_id)
-        .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode))
+    eligible = (select(JobStage.id).select_from(JobStage).join(Job, Job.id == JobStage.job_id)
+        .outerjoin(Asset, Asset.id == Job.input_asset_id)
         .where(JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
             Job.status.in_(["queued", "running", "validating_upload"]),
             Job.cancel_requested.is_(False), Job.discard_output.is_(False),
-            or_(JobStage.name == "validate_upload", and_(source.id.is_not(None), source.deleted_at.is_(None),
-                source.purged_at.is_(None), or_(source.expires_at.is_(None), source.expires_at > at, source.active_references > 0))),
+            or_(JobStage.name == "validate_upload", and_(Asset.id.is_not(None), Asset.deleted_at.is_(None),
+                Asset.purged_at.is_(None), or_(Asset.expires_at.is_(None), Asset.expires_at > at, Asset.active_references > 0))),
             or_(~image_stage, and_(Job.target_language.in_(effective_languages(node)),
                 func.coalesce(Job.config["engine"]["version"].as_string(), cfg.classic_engine_version) == node.engine_version))))
     if stage_ids is not None:
@@ -156,7 +140,27 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, bl
             unknown_job.status == "outcome_unknown", unknown_job.config["provider"]["id"].as_string() == Provider.id).correlate(Provider).scalar_subquery()
         eligible = eligible.outerjoin(Provider, Provider.id == provider_id).where(or_(JobStage.name != "redraw",
             and_(Provider.enabled.is_(True), running + unknown < Provider.config["concurrency"].as_integer())))
-    pages = eligible.subquery()
+    return eligible
+
+
+def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, blocked_providers=(), batch_size=1):
+    """Rank eligible pages once, then elect a bounded set per pool and class."""
+    account, clock = aliased(FairnessState), aliased(FairnessState)
+    pool = case((JobStage.name.in_(IMAGE_STAGES), literal("image:") + func.coalesce(
+        Job.config["engine"]["version"].as_string(), settings().classic_engine_version)),
+        (JobStage.name == "validate_upload", literal("upload")), else_=JobStage.name)
+    cls = case((Job.realtime_until > at, literal("realtime")), else_=literal("preload"))
+    page_order = [case((and_(Job.created_at < at - timedelta(minutes=30), cls == "preload"), 0), else_=1),
+        case((Job.realtime_until > at, Job.priority_rank), else_=1000000),
+        Job.created_at, Job.id, JobStage.id]
+    pages = _eligible_stages(node, stages, at, stage_ids=stage_ids, blocked_providers=blocked_providers).with_only_columns(
+        JobStage.id.label("stage_id"), Job.id.label("job_id"), Job.owner_id.label("owner_id"),
+        pool.label("pool"), cls.label("priority_class"),
+        func.row_number().over(partition_by=[pool, cls, Job.owner_id], order_by=page_order).label("page_rank")).subquery()
+    if batch_size > 1:
+        # Both owner election and page selection consume the same ranked heads.
+        # Materialize only the first batch per owner, not the entire backlog.
+        pages = select(pages).where(pages.c.page_rank <= batch_size).cte('candidate_pages')
     floor = func.coalesce(clock.service, 0.0)
     service = case((account.key.is_(None), floor),
         (and_(account.updated_at < at - timedelta(seconds=60), account.service < floor), floor), else_=account.service)
@@ -174,7 +178,7 @@ def _election_rows(db, node, stages, at, *, stage_ids=None, materialize=True, bl
         # winner in this batch. Each owner can supply at most batch_size pages.
         elected = (select(pages.c.stage_id).join(heads, and_(heads.c.owner_id == pages.c.owner_id,
             heads.c.pool == pages.c.pool, heads.c.priority_class == pages.c.priority_class))
-            .where(heads.c.owner_rank <= batch_size + 1, pages.c.page_rank <= batch_size).subquery())
+            .where(heads.c.owner_rank <= batch_size + 1).subquery())
     query = (select(*projection).join(Job, Job.id == JobStage.job_id)
         .outerjoin(UserModeQueue, and_(UserModeQueue.owner_id == Job.owner_id, UserModeQueue.mode == Job.mode)))
     query = query.join(elected, elected.c.stage_id == JobStage.id)
@@ -207,22 +211,35 @@ def _blocked_providers(db, node, allowed_stages):
     return unavailable_providers(db.scalars(select(TranslationProvider).where(TranslationProvider.enabled.is_(True))).all())
 
 
+def remaining_capacity(db, node):
+    if not node or not node.enabled:
+        return 0
+    busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(
+        ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
+    return max(0, node.capacity - busy)
+
+
 def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None):
     """An advisory read for long-poll wakeups; claim_batch remains authoritative."""
     with db.no_autoflush:
         node = db.get(ComputeNode, node_id)
         if not node or not node.enabled or (config_version is not None and config_version != node.config_version):
             return False
-        busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(
-            ExecutionLease.node_id == node_id, ExecutionLease.completed_at.is_(None)))
-        if busy >= node.capacity:
+        stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
+        if not stages or not remaining_capacity(db, node):
             return False
-        candidates = _preselect(db, node, allowed_stages, _blocked_providers(db, node, allowed_stages))
-        if not candidates:
-            return False
-        rows = db.execute(select(JobStage.name, Asset).join(Job, Job.id == JobStage.job_id)
-            .outerjoin(Asset, Asset.id == Job.input_asset_id).where(JobStage.id.in_(candidates))).all()
-        return any(name == 'validate_upload' or (asset is not None and available(asset)) for name, asset in rows)
+        eligible = _eligible_stages(node, stages, now(), blocked_providers=_blocked_providers(db, node, stages))
+        remote = eligible.where(or_(JobStage.name == 'validate_upload', Asset.storage_backend != 'local'))
+        if db.scalar(select(remote.exists())):
+            return True
+        # Only the isolated local adapter needs filesystem checks. Stream without
+        # sorting or mutating jobs; missing local heads must not hide a valid page.
+        local = eligible.where(Asset.storage_backend == 'local').with_only_columns(Asset)
+        assets = db.scalars(local.execution_options(yield_per=32))
+        try:
+            return any(available(asset) for asset in assets)
+        finally:
+            assets.close()
 
 
 def next_control_delay(db, maximum=5):
@@ -275,9 +292,10 @@ def prepare_claim_candidates(db, node_id, allowed_stages=None, *, limit=CLAIM_BA
         with db.no_autoflush:
             lock_scheduler(db)
     observed_node = db.get(ComputeNode, node_id)
-    blocked = _blocked_providers(db, observed_node, allowed_stages)
+    can_prepare = bool(limit and remaining_capacity(db, observed_node))
+    blocked = _blocked_providers(db, observed_node, allowed_stages) if can_prepare else ()
     candidates_before_lock = (_preselect(db, observed_node, allowed_stages, blocked) if limit == 1 else
-        _preselect(db, observed_node, allowed_stages, blocked, batch_size=limit)) if observed_node and limit else {}
+        _preselect(db, observed_node, allowed_stages, blocked, batch_size=limit)) if can_prepare else {}
     return ClaimCandidates(node_id, tuple(sorted(allowed_stages)) if allowed_stages is not None else None,
         limit, candidates_before_lock, tuple(blocked))
 
@@ -308,9 +326,8 @@ def claim_batch(db, node_id, allowed_stages=None, *, limit=CLAIM_BATCH_LIMIT, ex
     if config_version is not None and config_version != node.config_version:
         raise ProcessingError('NODE_CONFIG_CONFLICT', '领取前需要同步配置')
     node.heartbeat_at = at
-    busy = db.scalar(select(func.count()).select_from(ExecutionLease).where(ExecutionLease.node_id == node.id, ExecutionLease.completed_at.is_(None)))
     leases = []
-    for _ in range(min(limit, max(0, node.capacity - busy))):
+    for _ in range(min(limit, remaining_capacity(db, node))):
         if not candidates_before_lock:
             break
         lease = _claim_selected(db, node, allowed_stages, at, candidates_before_lock, blocked, executor_id)

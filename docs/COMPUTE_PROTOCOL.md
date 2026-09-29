@@ -45,7 +45,7 @@ PUT 绑定长度、MIME、MD5、`If-None-Match: *` 与私有缓存策略。中�
 | 操作 | 请求字段 | 主要响应 |
 | --- | --- | --- |
 | `POST /nodes/register` | `protocol_version:2`、`engine_version`、`resource_id`、`device`、`supported_languages`、`ready` | `protocol_version`、`server_time`、`config`、该身份未释放的 `leases` |
-| `POST /nodes/{id}/claim` | `request_id`、`config_version`、`count`（容量请求，1–32） | 原 `request_id`、`server_time`、`config`、`leases`；新请求每批最多 4 页，也可少于请求值或为空；历史回执原样重放；空批仍有可领任务时可附 `retry_after_seconds:0.1` |
+| `POST /nodes/{id}/claim` | `request_id`、`config_version`、`count`（容量请求，1–32） | 原 `request_id`、`server_time`、`config`、`leases`；新请求每批最多 4 页，也可少于请求值或为空；历史回执原样重放；空批仍有可领任务时可附 `retry_after_seconds`（0.1–0.3） |
 | `POST /nodes/{id}/updates` | `revision`、`wait_seconds`（0–20）、`config_version`、`can_claim`、`leases:[{lease_id,lease_token,translations_revision}]`（最多 32 项） | `revision`、`claim_ready`、变化的 `leases`；配置版本变化时带 `config`；不续租、不领取 |
 | `POST /nodes/{id}/heartbeat` | `config_version`、`leases:[{lease_id,lease_token,translations_revision,phase}]` | `server_time`、`config`、逐项续期／停止／终态回执；译文有更新才返回正文 |
 | `POST /leases/{id}/analysis` | `lease_token`、`analysis_hash`、`analysis` | `analysis_hash`、`receipt`；有文字时为 null，无文字时为稳定终态 |
@@ -73,7 +73,11 @@ v2 `config` 仅下发版本、启停、`execution_slots`、`poll_seconds`、`hea
 
 节点先把 claim 的 `request_id`、配置版本和 `count` 一起持久化，再请求中心；未知结果的重试必须重放原内容，不能按新空位数修改原请求。`count` 保留 1–32 的容量请求范围以兼容待确认日志，新请求实际最多分配 4 页；已有回执保留原租约列表，不能截断成 4 页。同编号不同内容冲突，已回收编号返回终态，空回执也被保存；所有返回租约落入本地日志后才清除请求。非空领取完成后仍有容量可立即用新编号续领；空领取进入 `poll_seconds` 兜底等待，新就绪提示或本地资源释放可提前补领。中心当前保留 claim 回执，不自动清理它们。
 
-并发竞争可能使锁外候选在领取时失效。空批（含已存空回执重放）提交并释放调度锁后，中心可只读检查是否仍有可领任务；若有，响应附 `retry_after_seconds:0.1`。节点确认空回执后退避 100ms，再用新编号领取；新配置或资源释放可提前唤醒。该提示不领取、不预留资源、不修改已存回执，也不把全量选举移入调度锁；普通空批仍按周期与通知补偿。
+中心在选举前查找持久回执和检查节点容量；已有回执、已满载或已知配置冲突均跳过全队列排序，进入调度锁后再次核实回执、配置与容量。空回执同样持久保存，容量预查不授权任何新租约。
+
+并发竞争可能使锁外候选在领取时失效。新领取原本有候选却未得到任何租约，且节点仍有余量时，中心先提交本轮状态、释放调度锁；只读确认仍有可领任务后，才在同一请求内重选一次，并重新检查回执、配置版本与容量。只有实际分配的租约与最终回执一起原子提交；中间提交不分配租约，不保存空回执。普通空队列和容量耗尽不重选。
+
+最终空批（含已存空回执重放）提交并释放调度锁后，中心可只读检查是否仍有可领任务；若有，响应附 0.1–0.3 秒随机抖动的 `retry_after_seconds`。节点确认空回执后按提示退避，再用新编号领取；新配置或资源释放可提前唤醒。该提示不领取、不预留资源、不修改已存回执，也不把全量选举移入调度锁；普通空批仍按周期与通知补偿。
 
 分析重复不会重新开放 text；恢复页复用已经持久化的分析、运行中的 text 和成功译文。image 与 text 有各自的代次，节点失联不重复已完成文本计量。当前 `updates` 请求增加了必填租约快照和接单状态，中心与节点需配套升级；旧节点不能依赖仅发送 revision 的请求继续工作。
 

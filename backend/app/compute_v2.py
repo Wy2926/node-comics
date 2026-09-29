@@ -1,6 +1,7 @@
 """Whole-page compute leases. Image work stays on the node; text stays here."""
 from datetime import datetime, timedelta
 import hmac
+import random
 from typing import Annotated, Literal
 import time
 
@@ -23,7 +24,7 @@ from .providers import digest
 from .queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from .request_models import RequestBody
 from .scheduler import (claim_batch, current_lease, effective_languages, has_claimable_work, heartbeat_lease, lock_scheduler,
-                        prepare_claim_candidates, release_lease, touch_job)
+                        prepare_claim_candidates, release_lease, remaining_capacity, touch_job)
 from .storage import get_store
 from .workers import fail_stage, finish_job
 
@@ -177,26 +178,40 @@ class ClaimRequest(RequestBody):
 
 @router.post('/nodes/{node_id}/claim')
 def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Session = Depends(get_db)):
-    scoped_node(db, identity, node_id)
-    prepared = prepare_claim_candidates(db, identity, ['page'], limit=body.count)
-    lock_scheduler(db)
     node = scoped_node(db, identity, node_id)
-    if node.runtime_report.get('protocol_version') != 2:
-        problem('PROTOCOL_MISMATCH', '请先注册整页协议', 409)
     request_hash = digest(body.model_dump())
-    saved = db.get(ComputeClaim, (identity, body.request_id))
-    if saved:
-        if saved.request_hash != request_hash:
-            problem('CLAIM_CONFLICT', '同一领取编号不能修改内容', 409)
-        leases = [db.get(ExecutionLease, key) for key in saved.lease_ids]
-    else:
+    candidate_needed = True
+    for attempt in range(2):
+        # Receipt replay and known configuration conflicts need no queue election.
+        saved = db.get(ComputeClaim, (identity, body.request_id))
+        prepared = (prepare_claim_candidates(db, identity, ['page'], limit=body.count)
+            if candidate_needed and not saved and node.config_version == body.config_version else None)
+        lock_scheduler(db)
+        node = scoped_node(db, identity, node_id)
+        if node.runtime_report.get('protocol_version') != 2:
+            problem('PROTOCOL_MISMATCH', '请先注册整页协议', 409)
+        saved = db.get(ComputeClaim, (identity, body.request_id), populate_existing=True)
+        if saved:
+            if saved.request_hash != request_hash:
+                problem('CLAIM_CONFLICT', '同一领取编号不能修改内容', 409)
+            leases = [db.get(ExecutionLease, key) for key in saved.lease_ids]
+            break
         if body.config_version != node.config_version:
             problem('NODE_CONFIG_CONFLICT', '领取前需要同步配置', 409)
         node.supported_languages = effective_languages(node)
-        leases = claim_batch(db, identity, ['page'], limit=body.count,
-                             config_version=body.config_version, prepared=prepared)
+        leases = (claim_batch(db, identity, ['page'], limit=body.count,
+                             config_version=body.config_version, prepared=prepared) if prepared else [])
+        if not leases and prepared and prepared.signatures and attempt == 0 and remaining_capacity(db, node):
+            # Other nodes may have taken the entire bounded snapshot. Release
+            # the mutex before one fresh election, preserving any invalid-source
+            # cleanup. No lease or receipt exists for this request yet. Recheck
+            # its receipt/version next time: a concurrent replay may win meanwhile.
+            db.commit()
+            candidate_needed = has_claimable_work(db, identity, ['page'], config_version=body.config_version)
+            continue
         db.add(ComputeClaim(node_id=identity, request_id=body.request_id,
                             request_hash=request_hash, lease_ids=[lease.id for lease in leases]))
+        break
     result = {'request_id': body.request_id, 'server_time': stamp(now()),
               'config': config_payload(node), 'leases': [lease_payload(db, lease) for lease in leases]}
     db.commit()
@@ -206,7 +221,7 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
         # the hint authorizes no work and never changes the durable receipt.
         with session_factory()() as ready_db:
             if has_claimable_work(ready_db, identity, ['page'], config_version=body.config_version):
-                result['retry_after_seconds'] = .1
+                result['retry_after_seconds'] = round(random.uniform(.1, .3), 3)
     return result
 
 
