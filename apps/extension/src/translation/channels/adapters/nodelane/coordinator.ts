@@ -52,7 +52,7 @@ export class TranslationCoordinator {
     await this.options.onJobs([job]);
     if(result.state==='needs_input'&&this.wanted.has(record.id))this.upload(record);
     // Cache cleanup cannot turn a durable server receipt into an uncertain submission.
-    // The local original is required for overlay display, including after the task completes.
+    // Keep the local original available until the overlay has been materialized and cached.
     if(result.state==='failed'&&previous?.state!=='failed')await this.refreshEntitlements();
   }
   private upload(record:LocalOperation){

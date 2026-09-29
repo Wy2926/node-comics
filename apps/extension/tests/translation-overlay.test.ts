@@ -3,15 +3,19 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {hashFile} from '../src/importers/hash';
 import * as hashing from '../src/importers/hash';
 import {materializeResult} from '../src/translation/materialize';
-import {artifactBlobKey,loadDeliveredResult,resultBlobKey} from '../src/storage/translations/results';
-import {translationCache} from '../src/storage/translations';
-import {invalidateResultMemory} from '../src/storage/translations/memory';
+import {loadDeliveredResult,resultBlobKey} from '../src/storage/translations/results';
+import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
+import {invalidateResultMemory,resultInMemory} from '../src/storage/translations/memory';
 import type {Job,TranslationResult} from '../src/types';
 
 const original=new Blob(['original'],{type:'image/png'}),patch=new Blob(['overlay'],{type:'image/webp'});
 let result:TranslationResult;
 const draw=vi.fn(),close=vi.fn(),convert=vi.fn(async()=>new Blob(['composed'],{type:'image/png'}));
 let context:{drawImage:typeof draw;globalCompositeOperation:string;imageSmoothingEnabled:boolean};
+function deliveredRead(){
+  const scope={key:crypto.randomUUID()},job:Job={id:crypto.randomUUID(),result:{key:result.artifact!.sha256,recoverable:true},delivery:result,mode:'classic',target_language:'en',status:'succeeded',phase:'succeeded',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+  return {scope,job,original:vi.fn(async():Promise<Blob|undefined>=>original),download:vi.fn(async()=>patch),isCurrent:()=>true};
+}
 beforeEach(async()=>{
   result={kind:'translated',representation:'overlay-v1',normalization_version:1,input_sha256:await hashFile(original),width:8,height:12,bbox:{x:2,y:3,width:4,height:5},composite:'source-atop',artifact:{sha256:await hashFile(patch),byte_size:patch.size,mime:patch.type,path:'/v1/translations/test/result'}};
   draw.mockClear();close.mockClear();convert.mockClear();context={drawImage:draw,globalCompositeOperation:'source-over',imageSmoothingEnabled:true};
@@ -51,29 +55,54 @@ describe('official translation overlays',()=>{
     expect(await materializeResult(descriptor,original,patch)).toBe(patch);
     expect(convert).not.toHaveBeenCalled();expect(draw).not.toHaveBeenCalled();
   });
-  it('persists only the patch and can recompose from disk without another download',async()=>{
-    const scope={key:crypto.randomUUID()},job:Job={id:crypto.randomUUID(),result:{key:result.artifact!.sha256,recoverable:true},delivery:result,mode:'classic',target_language:'en',status:'succeeded',phase:'succeeded',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
-    const download=vi.fn(async()=>patch),read={scope,job,original:async()=>original,download,isCurrent:()=>true};
+  it('persists only the complete image and reopens it without the source, download, hashing or composition',async()=>{
+    const read=deliveredRead(),key=resultBlobKey(read.scope,read.job);
     const hashes=vi.spyOn(hashing,'hashFile');
     expect(await(await loadDeliveredResult(read)).text()).toBe('composed');
-    expect(hashes.mock.calls.filter(([blob])=>blob.type==='image/webp')).toHaveLength(1);
-    expect(await translationCache.get(resultBlobKey(scope,job))).toBeUndefined();
-    expect(await(await translationCache.get(artifactBlobKey(scope,job)))!.text()).toBe('overlay');
-    invalidateResultMemory();await loadDeliveredResult(read);expect(download).toHaveBeenCalledOnce();expect(convert).toHaveBeenCalledTimes(2);
-    expect(hashes.mock.calls.filter(([blob])=>blob.type==='image/webp')).toHaveLength(2);
-    invalidateResultMemory();await expect(loadDeliveredResult({...read,original:async()=>undefined})).rejects.toMatchObject({code:'ORIGINAL_UNAVAILABLE'});expect(download).toHaveBeenCalledOnce();
-  });
-  it('never caches unverified bytes and evicts corrupt artifacts before a download-only retry',async()=>{
-    const scope={key:crypto.randomUUID()},job:Job={id:crypto.randomUUID(),result:{key:result.artifact!.sha256,recoverable:true},delivery:result,mode:'classic',target_language:'en',status:'succeeded',phase:'succeeded',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
-    const bad=new Blob(['invalid'],{type:patch.type}),download=vi.fn(async()=>bad);
-    const read={scope,job,original:async()=>original,download,isCurrent:()=>true};
-    await expect(loadDeliveredResult(read)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
-    expect(await translationCache.get(artifactBlobKey(scope,job))).toBeUndefined();
-    await translationCache.put(artifactBlobKey(scope,job),bad,{owner:scope.key});
-    await expect(loadDeliveredResult(read)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
-    expect(await translationCache.get(artifactBlobKey(scope,job))).toBeUndefined();
-    download.mockResolvedValue(patch);
+    const cached=await translationCache.get(key);expect(cached?.type).toBe('image/png');expect(await cached!.text()).toBe('composed');
+    expect((await translationCache.inventory([read.scope.key])).map(item=>item.key)).toEqual([key]);
+    invalidateResultMemory();hashes.mockClear();vi.mocked(createImageBitmap).mockClear();
+    read.original.mockRejectedValue(Error('source offline'));read.download.mockRejectedValue(Error('network offline'));
     expect(await(await loadDeliveredResult(read)).text()).toBe('composed');
-    expect(download).toHaveBeenCalledTimes(2);
+    expect(read.original).toHaveBeenCalledOnce();expect(read.download).toHaveBeenCalledOnce();expect(convert).toHaveBeenCalledOnce();
+    expect(hashes).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+  });
+  it('never caches unverified bytes and retries downloading the same result',async()=>{
+    const read=deliveredRead(),key=resultBlobKey(read.scope,read.job);
+    read.download.mockResolvedValueOnce(new Blob(['invalid'],{type:patch.type}));
+    await expect(loadDeliveredResult(read)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
+    expect(await translationCache.get(key)).toBeUndefined();expect(resultInMemory(key)).toBeUndefined();
+    expect(await translationCache.inventory([read.scope.key])).toEqual([]);
+    expect(await(await loadDeliveredResult(read)).text()).toBe('composed');
+    expect(read.download).toHaveBeenCalledTimes(2);
+  });
+  it('coalesces concurrent reads into one download and composition',async()=>{
+    const read=deliveredRead();
+    const blobs=await Promise.all([loadDeliveredResult(read),loadDeliveredResult(read)]);
+    expect(blobs[0]).toBe(blobs[1]);expect(read.original).toHaveBeenCalledOnce();expect(read.download).toHaveBeenCalledOnce();expect(convert).toHaveBeenCalledOnce();
+  });
+  it('requires the source only after the complete image has been evicted',async()=>{
+    const read=deliveredRead();await loadDeliveredResult(read);
+    await translationCache.delete(resultBlobKey(read.scope,read.job));read.original.mockResolvedValue(undefined);
+    await expect(loadDeliveredResult(read)).rejects.toMatchObject({code:'ORIGINAL_UNAVAILABLE'});expect(read.download).toHaveBeenCalledOnce();
+    read.original.mockResolvedValue(original);expect(await(await loadDeliveredResult(read)).text()).toBe('composed');expect(read.download).toHaveBeenCalledTimes(2);
+  });
+  it('keeps the complete image in memory when disk caching is disabled',async()=>{
+    await setTranslationCacheLimitMb(0);
+    try{
+      const read=deliveredRead();await loadDeliveredResult(read);
+      expect(await translationCache.has(resultBlobKey(read.scope,read.job))).toBe(false);
+      read.original.mockRejectedValue(Error('source offline'));
+      expect(await(await loadDeliveredResult(read)).text()).toBe('composed');expect(read.original).toHaveBeenCalledOnce();expect(convert).toHaveBeenCalledOnce();
+    }finally{await setTranslationCacheLimitMb(1024);}
+  });
+  it.each(['clear','owner'])('does not resurrect complete images when %s invalidates an in-flight composition',async operation=>{
+    const read=deliveredRead(),key=resultBlobKey(read.scope,read.job);
+    convert.mockImplementationOnce(async()=>{
+      if(operation==='clear')await translationCache.clear();else await translationCache.deleteOwner(read.scope.key,true);
+      return new Blob(['composed'],{type:'image/png'});
+    });
+    await expect(loadDeliveredResult(read)).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
+    expect(await translationCache.has(key)).toBe(false);expect(resultInMemory(key)).toBeUndefined();
   });
 });

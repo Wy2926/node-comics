@@ -6,7 +6,7 @@ import {translationCache} from './index';
 import {SourceDatabaseSchemaError} from '../database';
 import type {CacheToken} from '../cache';
 import {resultInMemory,retainResult,readResultFromContexts} from './memory';
-import {InvalidArtifactError,materializeResult,OriginalUnavailableError,validateResult} from '../../translation/materialize';
+import {materializeResult,OriginalUnavailableError,validateResult} from '../../translation/materialize';
 export {resultInMemory} from './memory';
 
 interface ResultRequest {scope:TranslationScope;job:Job;isCurrent:()=>boolean}
@@ -17,7 +17,6 @@ export function releaseResultReaders(scope:TranslationScope){for(const [key,valu
 export async function readMaterializedResult(key:string){return readers.get(key)?.read();}
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 export const resultBlobKey=(scope:TranslationScope,job:Job)=>'result:'+JSON.stringify([scope.key,job.id,job.result?.key]);
-export const artifactBlobKey=(scope:TranslationScope,job:Job)=>'artifact:'+JSON.stringify([scope.key,job.id,job.delivery?.artifact?.sha256]);
 export class LocalResultUnavailableError extends Error {
   readonly code='RESULT_NOT_CACHED';
   constructor(){super(msg('本地译图缓存已清理，请手动重新翻译。'));this.name='LocalResultUnavailableError';}
@@ -58,7 +57,13 @@ export async function saveResultBlob(request:ResultRequest&{blob:Blob;cacheToken
 }
 /** Read a delivered result only. Missing local bytes never submit another translation. */
 export async function loadResultBlob(request:ResultRequest&{download?:()=>Promise<Blob>}):Promise<Blob>{
-  assertResult(request);const {scope,job,download,isCurrent}=request,key=resultBlobKey(scope,job);
+  return loadCachedResult({...request,load:request.download?async()=>{
+    const blob=await request.download!();assertCurrent(request.isCurrent);await validate(blob);return blob;
+  }:undefined});
+}
+/** Cache hits are complete, previously verified images; only misses run the supplied loader. */
+async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>}):Promise<Blob>{
+  assertResult(request);const {scope,job,load,isCurrent}=request,key=resultBlobKey(scope,job);
   let pending=downloads.get(key);
   if(!pending){
     const read=async()=>{
@@ -67,8 +72,8 @@ export async function loadResultBlob(request:ResultRequest&{download?:()=>Promis
       const cached=await translationCache.get(key).catch(cacheUnavailable);
       const retained=cached??resultInMemory(key,token)??(!job.result!.recoverable?await readResultFromContexts(key,token):undefined);
       if(retained)return retainCurrent(request,key,retained,token);
-      if(!job.result!.recoverable||!download)throw new LocalResultUnavailableError();
-      const blob=await download();assertCurrent(isCurrent);await validate(blob);assertCurrent(isCurrent);
+      if(!job.result!.recoverable||!load)throw new LocalResultUnavailableError();
+      const blob=await load();assertCurrent(isCurrent);
       return publish(request,blob,token);
     };
     pending=(async()=>typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-result:'+key,read):await read())();
@@ -78,48 +83,19 @@ export async function loadResultBlob(request:ResultRequest&{download?:()=>Promis
   const blob=await pending;assertCurrent(isCurrent);return blob;
 }
 
-/** Official disk cache contains only the delivered artifact; composed pages stay in bounded memory. */
+/** Compose and verify official results once, then persist the complete image for every consumer. */
 export async function loadDeliveredResult(request:ResultRequest&{download:()=>Promise<Blob>;original?:()=>Promise<Blob|undefined>}):Promise<Blob>{
-  assertResult(request);
-  const {job,scope,isCurrent}=request,result=job.delivery;
-  if(!result)throw Error(msg('翻译协议已更新，请手动重新翻译此页。'));
-  validateResult(result);
-  const key=resultBlobKey(scope,job);
-  let pending=downloads.get(key);
-  if(!pending){
-    pending=(async()=>{
-      const token=await translationCache.token(scope.key).catch(cacheUnavailable);
-      const memory=resultInMemory(key,token);
-      if(memory)return retainCurrent(request,key,memory,token);
-      let original:Blob|undefined;
-      if(result.representation!=='full-image-v1'){
-        try{original=await request.original?.();}catch(error){if(error instanceof SourceDatabaseSchemaError)throw error;throw new OriginalUnavailableError();}
-        if(!original)throw new OriginalUnavailableError();
-      }
-      let blob:Blob;
-      if(result.representation!=='original'){
-        const artifactKey=artifactBlobKey(scope,job);
-        const readAndCompose=async()=>{
-          const cached=await translationCache.get(artifactKey).catch(cacheUnavailable);
-          const bytes=cached??await request.download();
-          assertCurrent(isCurrent);
-          let composed:Blob;
-          try{composed=await materializeResult(result,original,bytes);}
-          catch(error){
-            if(cached&&error instanceof InvalidArtifactError)await translationCache.delete(artifactKey).catch(cacheUnavailable);
-            throw error;
-          }
-          assertCurrent(isCurrent);
-          if(!cached&&token)await translationCache.put(artifactKey,bytes,{owner:scope.key,token}).catch(cacheUnavailable);
-          return composed;
-        };
-        blob=typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-artifact:'+artifactKey,readAndCompose):await readAndCompose();
-      }else blob=await materializeResult(result,original);
-      assertCurrent(isCurrent);
-      return retainCurrent(request,key,blob,token);
-    })();
-    downloads.set(key,pending);
-    void pending.finally(()=>{if(downloads.get(key)===pending)downloads.delete(key);}).catch(()=>{});
-  }
-  const blob=await pending;assertCurrent(isCurrent);return blob;
+  return loadCachedResult({...request,load:async()=>{
+    const result=request.job.delivery;
+    if(!result)throw Error(msg('翻译协议已更新，请手动重新翻译此页。'));
+    validateResult(result);
+    let original:Blob|undefined;
+    if(result.representation!=='full-image-v1'){
+      try{original=await request.original?.();}catch(error){if(error instanceof SourceDatabaseSchemaError)throw error;throw new OriginalUnavailableError();}
+      if(!original)throw new OriginalUnavailableError();
+    }
+    const artifact=result.representation==='original'?undefined:await request.download();
+    assertCurrent(request.isCurrent);
+    return materializeResult(result,original,artifact);
+  }});
 }

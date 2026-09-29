@@ -8,7 +8,7 @@ import type {Capabilities} from '../../../../types';
 import {entitlement,job,target} from '../../../../../tests/translation-fixture';
 import {definition} from './definition';
 import {translationCache} from '../../../../storage/translations';
-import {artifactBlobKey} from '../../../../storage/translations/results';
+import {resultBlobKey} from '../../../../storage/translations/results';
 
 const auth=vi.hoisted(()=>({value:{session:null} as AuthState,listeners:new Set<()=>void>()}));
 vi.mock('../../../../auth/storage',()=>({
@@ -52,7 +52,7 @@ describe('NodeLane channel boundary',()=>{
   it('reads official cached results without downloading again and keeps cancellation effective',async()=>{
     auth.value={session:session()};vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
     const download=vi.spyOn(Api.prototype,'translationImage'),connection=await definition.open(profile,{},()=>true),result=job(0,{status:'succeeded',delivery:deliveredResult('job-0')});vi.stubGlobal('createImageBitmap',async()=>({width:800,height:1200,close(){}}));
-    await translationCache.put(artifactBlobKey(connection.scope,result),deliveredBytes,{owner:connection.scope.key});
+    await translationCache.put(resultBlobKey(connection.scope,result),deliveredBytes,{owner:connection.scope.key});
     expect(await(await connection.readResult(result)).text()).toBe('image');expect(download).not.toHaveBeenCalled();
     const controller=new AbortController();controller.abort();await expect(connection.readResult(result,controller.signal)).rejects.toThrow();
     auth.value={session:null};await expect(connection.readResult(result)).rejects.toThrow();expect(download).not.toHaveBeenCalled();connection.dispose();

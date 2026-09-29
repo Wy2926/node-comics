@@ -33,6 +33,14 @@ try{
     await rejects({...result,bbox:{x:3,y:1,width:2,height:2}},original,patch,'out-of-range bbox refuses composition');
     await rejects({...result,artifact:{...result.artifact,sha256:'a'.repeat(64)}},original,patch,'corrupt artifact digest refuses composition');
     for(const kind of ['no_text','translated'])assert(await materializeResult({...result,kind,representation:'original',bbox:undefined,composite:undefined,artifact:null},original)===original,kind+' original representation returns original bytes');
+    const {loadDeliveredResult,resultBlobKey}=await import('/src/storage/translations/results.ts');
+    const {translationCache}=await import('/src/storage/translations/index.ts');
+    const scope={key:'overlay-browser-cache-'+crypto.randomUUID()},job={id:crypto.randomUUID(),result:{key:result.artifact.sha256,recoverable:true},delivery:result,mode:'classic',target_language:'en',status:'succeeded',phase:'succeeded',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
+    const complete=await loadDeliveredResult({scope,job,original:async()=>original,download:async()=>patch,isCurrent:()=>true});
+    const stored=await translationCache.get(resultBlobKey(scope,job));
+    assert(stored?.type==='image/png'&&await hashFile(stored)===await hashFile(rendered),'IndexedDB stores the complete composed PNG');
+    assert((await translationCache.inventory([scope.key])).length===1,'only one complete image is persisted per result');
+    window.cachedOverlay={scope,job,sha256:await hashFile(complete)};
     const {prepareComicPage}=await import('/src/comics/pages/normalize.ts');
     const normalized=await prepareComicPage({name:'static',blob:original});assert(normalized.blob===original&&normalized.imageSha256===result.input_sha256,'static sRGB PNG preserves exact upload bytes');
     const {needsNormalization}=await import('/src/comics/pages/image-metadata.ts');
@@ -67,6 +75,17 @@ try{
     checks.push('real provider artifact decoded and materialized: '+JSON.stringify(real));
   }
   await page.screenshot({path:path.join(out,'composition.png'),fullPage:true});
+  const cachedOverlay=await page.evaluate(()=>window.cachedOverlay);
+  await page.reload();
+  await page.evaluate(async saved=>{
+    const {loadDeliveredResult}=await import('/src/storage/translations/results.ts'),{hashFile}=await import('/src/importers/hash.ts');
+    const blob=await loadDeliveredResult({...saved,isCurrent:()=>true,original:async()=>{throw Error('Original source unavailable');},download:async()=>{throw Error('Result server unavailable');}});
+    if(blob.type!=='image/png'||await hashFile(blob)!==saved.sha256)throw Error('Complete cached image changed after reload');
+    const image=document.createElement('img');image.src=URL.createObjectURL(blob);image.style='width:320px;image-rendering:pixelated';document.body.append(image);await image.decode();
+    if(image.naturalWidth!==4||image.naturalHeight!==4)throw Error('Cached image does not display at the original page dimensions');
+  },cachedOverlay);
+  checks.push('page reload displays the identical complete PNG without original source or result server');
+  await page.screenshot({path:path.join(out,'cached-reload.png'),fullPage:true});
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,realProviderArtifacts:!!process.env.REAL_TRANSLATION_INPUT},null,2));
   for(const check of checks)console.log('PASS '+check);
 }finally{await browser.close();}
