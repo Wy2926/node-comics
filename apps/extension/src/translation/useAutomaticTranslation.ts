@@ -39,7 +39,8 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   useEffect(()=>{
     setError('');jobs.current=[];
     if(!channel?.available)return;
-    let stopped=false,running=false,wakePending=false,watching=false,retry=0,watchedWindow='';
+    let stopped=false,running=false,wakePending=false,watching=false,pendingPrefetch=false,retry=0,watchedWindow='',submittedWindow='';
+    let watchedIds=new Set<string>();
     let timer:ReturnType<typeof setTimeout>|undefined,watchController=new AbortController();
     const live=()=>!stopped&&channel.isCurrent();
     const online=()=>!channel.requiresInternet||navigator.onLine!==false;
@@ -57,23 +58,25 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&online())timer=setTimeout(()=>void tick(),Math.max(0,delay));};
     async function tick(){
       if(running){wakePending=true;return;}if(!live()||document.hidden||!online())return;
-      running=true;wakePending=false;let pendingPrefetch=false;
+      running=true;wakePending=false;
       try{
         const window=windowRef.current,now=performance.now();
         if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
         const targets=window.ready().map(t=>({...t,page:copyRef.current.find(c=>c.id===t.entryId)?.pages.find(p=>p.id===t.page.id)??t.page}));
-        const generation=stamp.current,caps=channel!.capabilities;
+        const generation=stamp.current,caps=channel!.capabilities,signature=JSON.stringify(window.targets.map(t=>[t.entryId,t.page.id,t.mode]));
+        pendingPrefetch=targets.length<window.targets.length;
         await core.submit(targets.filter(t=>caps.modes.some(m=>m.id===t.mode&&m.enabled)&&supportsLanguage(caps,t.mode,language)),()=>live()&&!document.hidden&&generation===stamp.current);
-        pendingPrefetch=targets.length<window.targets.length;setError('');retry=0;void downloads();
+        if(generation===stamp.current)submittedWindow=signature;
+        setError('');retry=0;void downloads();
       }catch(e){if(live()){setError((e as Error).message);retry=Math.min(30000,Math.max(1000,retry*2));}}
-      finally{running=false;if(live()){const delay=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(pendingPrefetch||delay>0)schedule(Math.max(0,delay));else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
+      finally{running=false;if(live()){void watch();const delay=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(pendingPrefetch||delay>0)schedule(Math.max(0,delay));else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
     }
     async function watch(){
-      if(watching||document.hidden||!live()||!windowRef.current.targets.length||!core.hasPending||!online())return;
+      if(running||watching||pendingPrefetch||submittedWindow!==watchedWindow||document.hidden||!live()||!windowRef.current.targets.length||!core.hasPending||!online())return;
       watching=true;const signal=watchController.signal;let failures=0;
       try{while(live()&&!document.hidden&&windowRef.current.targets.length&&!signal.aborted){
         try{const waiting=await core.wait(signal);failures=0;if(!live()||signal.aborted)return;void downloads();if(!waiting||!core.hasPending)break;}
-        catch(e){if(!live()||signal.aborted)return;setError((e as Error).message);const delay=Math.min(30000,1000*2**failures++);await new Promise<void>(resolve=>{const done=()=>{clearTimeout(t);signal.removeEventListener('abort',done);resolve();};const t=setTimeout(done,delay);signal.addEventListener('abort',done,{once:true});});}
+        catch(e){if(!live()||signal.aborted)return;setError((e as Error).message);const delay=Math.max(core.retryDelay,Math.min(30000,1000*2**failures++));await new Promise<void>(resolve=>{const done=()=>{clearTimeout(t);signal.removeEventListener('abort',done);resolve();};const t=setTimeout(done,delay);signal.addEventListener('abort',done,{once:true});});}
       }}finally{watching=false;if(live()&&!document.hidden&&windowRef.current.targets.length&&signal!==watchController.signal)void watch();}
     }
     async function foreground(){
@@ -83,8 +86,8 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
       try{await core.refresh();if(live()){render(n=>n+1);schedule();}}catch{/* The runtime reports connection errors per image. */}
     }
     wake.current=()=>{
-      const key=JSON.stringify([windowRef.current.targets.map(t=>[t.entryId,t.page.id,t.mode]),core.waitingIds]);
-      if(key!==watchedWindow){watchedWindow=key;watchController.abort();watchController=new AbortController();}
+      const key=JSON.stringify(windowRef.current.targets.map(t=>[t.entryId,t.page.id,t.mode]));
+      if(key!==watchedWindow||core.waitingIds.some(id=>!watchedIds.has(id))){watchedWindow=key;submittedWindow='';watchedIds=new Set(core.waitingIds);watchController.abort();watchController=new AbortController();}
       void downloads();schedule();if(!windowRef.current.targets.length){watchController.abort();return;}
       if(watchController.signal.aborted)watchController=new AbortController();void watch();
     };

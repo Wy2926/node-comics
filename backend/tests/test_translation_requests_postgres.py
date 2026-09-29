@@ -14,6 +14,10 @@ pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1
     reason='Requires the dedicated nodecomics_concurrency_test database')
 from test_notifications import (
     test_nested_page_savepoints_notify_only_after_outer_commit,
-    test_reader_long_poll_is_owner_scoped_and_releases_database,
+    test_reader_snapshot_is_immediate_and_owner_scoped,
     test_snapshot_handles_lost_notification_and_auth_scoped_etag,
+)
+from test_translation_events import (
+    test_stream_only_reads_owned_requests,
+    test_idle_heartbeats_do_not_query_db_and_stream_releases_resources,
 )

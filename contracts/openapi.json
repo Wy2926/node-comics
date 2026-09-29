@@ -94,18 +94,6 @@
               "format": "uuid",
               "title": "Translation Id"
             }
-          },
-          {
-            "name": "wait_seconds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "maximum": 20,
-              "minimum": 0,
-              "default": 0,
-              "title": "Wait Seconds"
-            }
           }
         ],
         "responses": {
@@ -115,6 +103,54 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TranslationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/translations/events": {
+      "get": {
+        "tags": [
+          "translations"
+        ],
+        "summary": "Translation Event Stream",
+        "operationId": "translation_event_stream_v1_translations_events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1183,
+              "title": "Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE snapshot events containing TranslationsResponse; end signals completion or reauthentication.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -160,18 +196,6 @@
                 }
               ],
               "title": "Ids"
-            }
-          },
-          {
-            "name": "wait_seconds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "maximum": 20,
-              "minimum": 0,
-              "default": 0,
-              "title": "Wait Seconds"
             }
           },
           {

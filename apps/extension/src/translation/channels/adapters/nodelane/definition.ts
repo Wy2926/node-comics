@@ -46,7 +46,7 @@ export const definition:ChannelDefinition={
     const api=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),live,authorization);
     let caps=baselineCapabilities(),rights:Entitlements|undefined,policyError='';
     if(session){
-      try{[caps,rights]=await Promise.all([api.capabilities(),api.entitlements()]);assertCurrent(live);}
+      try{caps=await api.capabilities();rights=await api.entitlements();assertCurrent(live);}
       catch(error){assertCurrent(live);if((await readAuth()).session?.id!==session.id)throw error;policyError=(error as Error).message;}
     }
     const connection:ChannelConnection={
@@ -64,7 +64,7 @@ export const definition:ChannelDefinition={
       },
       createRuntime(options:RuntimeOptions){
         let active=true;
-        const lifetime=new AbortController(),current=()=>active&&live()&&options.isCurrent();
+        const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
         const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,onInputConsumed:options.onInputConsumed,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
@@ -72,7 +72,7 @@ export const definition:ChannelDefinition={
           async init(){assertCurrent(current);await core?.init();},
           async submit(targets,requestCurrent=()=>true){const official=requireCore();if(targets.length&&!rights)await runtime.refresh();await official.submit(targets,()=>current()&&requestCurrent());},
           async manual(target){await runtime.refresh();await requireCore().manual(target,current);},
-          async wait(signal){if(!core)return false;return core.wait(AbortSignal.any([signal,lifetime.signal]));},
+          async wait(signal){if(!core)return false;return core.wait(signal);},
           get hasPending(){return core?.hasPending??false;},
           get waitingIds(){return core?.waitingIds??[];},
           get retryDelay(){return core?.retryDelay??0;},
@@ -82,12 +82,12 @@ export const definition:ChannelDefinition={
           async refresh(){
             if(!core)return;assertCurrent(current);
             try{
-              const [capabilities,entitlements]=await Promise.all([runtimeApi.capabilities(),runtimeApi.entitlements()]);
+              const capabilities=await runtimeApi.capabilities(),entitlements=await runtimeApi.entitlements();
               assertCurrent(current);caps=capabilities;rights=entitlements;policyError='';
               await core.refreshEntitlements(rights);options.onChange();
             }catch(error){if(current()){policyError=(error as Error).message;options.onChange();}throw error;}
           },
-          dispose(){active=false;lifetime.abort();runtimes.delete(runtime);},
+          dispose(){active=false;core?.stopWatching();runtimes.delete(runtime);},
         };
         runtimes.add(runtime);return runtime;
       },

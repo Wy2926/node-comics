@@ -3,6 +3,7 @@ import {readAuth,updateSession} from './storage';
 import {RefreshUnavailable,SessionExpired,tokenLifetime,type Session} from './model';
 
 export interface Authorization {
+  readonly cacheKey?:string;
   token(rejectedToken?:string):Promise<string>;
   reject(token:string):Promise<void>;
   current():Promise<void>;
@@ -19,6 +20,7 @@ async function expire(session:Session):Promise<never>{
 }
 export function sessionAuthorization(id:string):Authorization{
   return {
+    cacheKey:id,
     current:async()=>{await currentSession(id);},
     reject:async token=>{const session=await currentSession(id);if(session.token===token)await expire(session);throw new SessionExpired();},
     token:async rejectedToken=>await navigator.locks.request('nc-auth-refresh:'+id,async()=>{

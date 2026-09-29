@@ -140,9 +140,9 @@ describe('authenticated API boundaries',()=>{
     await saveSession(renewable());request.mockResolvedValueOnce(Response.json({error:{code:'FORBIDDEN'}},{status:403}));
     await expect(bound().entitlements()).rejects.toMatchObject({status:403});expect(request).toHaveBeenCalledOnce();expect((await readAuth()).session).not.toBeNull();
   });
-  it('keeps the same session binding for the long-poll listener',async()=>{
-    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(Response.json({items:[],missing_ids:[]}));
-    await bound().translations(['1'],{wait:true,signal:new AbortController().signal});
+  it('refreshes the same session binding before opening SSE',async()=>{
+    await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(new Response('event: snapshot\ndata: {"items":[],"missing_ids":[]}\n\nevent: end\ndata: {}\n\n',{headers:{'Content-Type':'text/event-stream'}}));
+    for await(const _batch of bound().translationEvents(['1'],new AbortController().signal)){/* drain stream */}
     expect(new Headers(request.mock.calls[2][1].headers).get('Authorization')).toBe('Bearer new-access');
   });
   it('applies refresh to authenticated uploads',async()=>{

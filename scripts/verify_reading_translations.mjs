@@ -18,7 +18,9 @@ try{
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'常规翻译',exact:true}).click();
   await page.waitForFunction(()=>window.readerFixture.submitted.length===4);
+  await page.waitForFunction(()=>window.readerFixture.requests.includes('/v1/translations/events'));
   let state=await snapshot();assert.deepEqual(state.submitted,[0,1,2,3]);
+  assert.equal(state.requests.filter(p=>p==='/v1/translations/events').length,1,'current and prefetch pages share their first SSE connection');
   assert.deepEqual(state.translations.slice(0,4).map(item=>item.body.priority),['current','prefetch','prefetch','prefetch']);
   assert(state.translations.every(item=>/^[a-f0-9-]{36}$/.test(item.id)&&!('page_key' in item.body)&&!('session_id' in item.body)));
   check('current image is submitted first, followed by three independent prefetch images with short UUIDs');
@@ -26,9 +28,12 @@ try{
   await page.waitForTimeout(400);assert.equal((await snapshot()).translations.length,state.translations.length);
   check('same-image scrolling sends no duplicate translation request');
   for(const current of [2,3]){
+    const connectionsBefore=(await snapshot()).requests.filter(p=>p==='/v1/translations/events').length;
     await jump(current);await page.waitForFunction(n=>window.readerFixture.submitted.includes(n+2),current);
+    await page.waitForTimeout(300);
     const rolling=await snapshot();
     assert.equal(rolling.submitted.filter(n=>n===current+2).length,1);
+    assert.equal(rolling.requests.filter(p=>p==='/v1/translations/events').length,connectionsBefore+1,'one replacement SSE per settled reading window');
   }
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('page 2 admits page 5 and page 3 admits page 6 without waiting for the original jobs');
@@ -51,13 +56,16 @@ try{
   check('deferred current image resumes automatically at its retry deadline');
   await page.waitForFunction(()=>window.readerFixture.submitted.includes(20));
   await page.waitForTimeout(600);
-  const beforeIdle=(await snapshot()).requests.filter(p=>p==='/v1/translations').length;
+  const beforeState=await snapshot(),beforeIdle=beforeState.requests.filter(p=>p==='/v1/translations'||p==='/v1/translations/events').length;
+  const beforePolicy=beforeState.requests.filter(p=>p==='/v1/capabilities'||p==='/v1/me/entitlements').length;
+  await page.evaluate(()=>{for(let i=0;i<10;i++)window.dispatchEvent(new Event('focus'));});
   await page.waitForTimeout(22000);state=await snapshot();
-  const idleRequests=state.requests.filter(p=>p==='/v1/translations').length-beforeIdle;
-  assert(idleRequests<=2,`too many idle update requests: ${idleRequests}`);
+  const idleRequests=state.requests.filter(p=>p==='/v1/translations'||p==='/v1/translations/events').length-beforeIdle;
+  assert.equal(idleRequests,0,`unexpected idle update requests: ${idleRequests}`);
+  assert.equal(state.requests.filter(p=>p==='/v1/capabilities'||p==='/v1/me/entitlements').length,beforePolicy);
   assert(!state.requests.some(p=>p.startsWith('/v1/me/queues')||p.includes('reading-sessions')||p.includes('translation-plans')||p.includes('translation-operations')||p.includes('translation-changes')||p.startsWith('/v1/uploads')||/^\/v1\/jobs\//.test(p)));
   assert.deepEqual(errors,[]);
-  check('idle reading holds one long poll, with zero queue preflights or repeated job GETs');
+  check('idle reading reuses SSE for 22 seconds with zero repeated HTTP reads, including ten focus events');
   await jump(1);
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   await page.getByRole('button',{name:'单页阅读',exact:true}).click();

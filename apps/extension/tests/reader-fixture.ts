@@ -58,6 +58,27 @@ window.fetch=async(input,init={})=>{
     const j=jobs.get(operations.get(id)??id);if(!j)return;
     return {id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,input_asset_id:j.input_asset_id,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text'}:j.status==='succeeded'?{kind:'translated',asset_id:j.output_asset_id,width:800,height:1200,download_url:origin+'/v1/fixture-output',download_expires_at:'2099-01-01',authorization_required:true}:null};
   };
+  if(url.pathname==='/v1/translations/events'){
+    const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};
+    const stream=new ReadableStream<Uint8Array>({start(controller){
+      let old='',closed=false;const encoder=new TextEncoder();
+      close=()=>{if(closed)return;closed=true;clearInterval(timer);init.signal?.removeEventListener('abort',close);controller.close();};
+      const update=()=>{
+        for(const id of ids){const j=jobs.get(operations.get(id)??id);if(!j)continue;
+          if(['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
+            const count=(redrawPolls.get(j.id)??0)+1;redrawPolls.set(j.id,count);j.status=count<3?'running':redrawOutcome==='success'?'succeeded':'failed';
+            if(j.status==='succeeded')j.output_asset_id='output-'+j.id;
+            if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟处理失败，已有译图仍可阅读。'};
+          }
+        }
+        const items=ids.map(snapshot).filter((item):item is TranslationSnapshot=>!!item),data=JSON.stringify({items,missing_ids:ids.filter(id=>!snapshot(id))});
+        if(data!==old){old=data;controller.enqueue(encoder.encode('event: snapshot\ndata: '+data+'\n\n'));}
+        if(items.every(item=>['succeeded','failed'].includes(item.state))){controller.enqueue(encoder.encode('event: end\ndata: {"reason":"complete"}\n\n'));close();}
+      };
+      timer=setInterval(update,25);init.signal?.addEventListener('abort',close,{once:true});update();
+    },cancel(){close();}});
+    return new Response(stream,{headers:{'Content-Type':'text/event-stream'}});
+  }
   const translationPath=url.pathname.match(/^\/v1\/translations\/([^/]+)(?:\/(input))?$/);
   if(translationPath){
     const [,id,action]=translationPath;
@@ -86,8 +107,7 @@ window.fetch=async(input,init={})=>{
       }
     }
     const values=()=>({items:ids.map(snapshot).filter((x):x is TranslationSnapshot=>!!x),missing_ids:ids.filter(id=>!snapshot(id))});
-    const etag=()=>JSON.stringify(JSON.stringify(values())),old=new Headers(init.headers).get('If-None-Match'),end=performance.now()+Number(url.searchParams.get('wait_seconds')??0)*1000;
-    while(old===etag()&&performance.now()<end){if(init.signal?.aborted)throw new DOMException('Aborted','AbortError');await new Promise(r=>setTimeout(r,25));}
+    const etag=()=>JSON.stringify(JSON.stringify(values())),old=new Headers(init.headers).get('If-None-Match');
     if(old===etag())return new Response(null,{status:304,headers:{ETag:etag()}});
     return new Response(JSON.stringify(ids.length?values():{items:[...operations.keys()].map(snapshot),total:operations.size,next_offset:null}),{headers:{'Content-Type':'application/json',ETag:etag()}});
   }

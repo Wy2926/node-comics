@@ -11,14 +11,13 @@ export function AccountUsage({api,onLogin,onEntitlements}:{api:Api;onLogin:()=>v
   const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
   useEffect(()=>{
     if(!api.token)return;
-    let live=true,timer:ReturnType<typeof setTimeout>;
+    let live=true;
     setData(undefined);setError('');
     async function fetchSummary(){
-      if(!document.hidden)try{const result=await api.usageSummary(days,timezone);if(live&&api.isCurrent()){setData(result);onEntitlements(result.entitlements);setError('');}}
+      try{const result=await api.usageSummary(days,timezone,refresh>0);if(live&&api.isCurrent()){setData(result);onEntitlements(result.entitlements);setError('');}}
       catch(e){if(live&&api.isCurrent())setError((e as Error).message);}
-      if(live)timer=setTimeout(fetchSummary,30000);
     }
-    void fetchSummary();return()=>{live=false;clearTimeout(timer);};
+    void fetchSummary();return()=>{live=false;};
   },[api,days,timezone,refresh,onEntitlements]);
   const max=Math.max(1,...(data?.days.map(d=>d.delivered)??[]));
   return <div>

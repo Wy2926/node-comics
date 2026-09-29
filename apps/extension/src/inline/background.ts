@@ -153,7 +153,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
   const current=()=>ctx.active&&request.generation===(windowGenerations.get(sender.tab!.id!)??0);
   if(!current())return response(ctx,request);
   if(request.type==='NC_INLINE_WAIT'){
-    ctx.waiting?.abort();const waiting=new AbortController();ctx.waiting=waiting;
+    if(!ctx.waiting||ctx.waiting.signal.aborted)ctx.waiting=new AbortController();const waiting=ctx.waiting;
     try{await ctx.core.wait(waiting.signal);}catch(error){if(waiting.signal.aborted)return response(ctx,request);throw error;}
   }else {
     ctx.waiting?.abort();

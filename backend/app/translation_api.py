@@ -1,7 +1,6 @@
 """Per-image translation resources, immutable intents and resumable snapshots."""
 import asyncio
 from datetime import timedelta
-import time
 from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
@@ -248,29 +247,40 @@ def read_snapshot(owner_id, request_ids, expected_etag=None, *, single=False):
         return etag, payload
 
 
-async def wait_snapshot(owner_id, ids, request, wait_seconds, *, single=False):
-    from .notifications import changed, hub
+async def snapshot_response(owner_id, ids, request, *, single=False):
     expected = request.headers.get('if-none-match')
-    end = time.monotonic() + wait_seconds
     token = await run_in_threadpool(acquire_control, owner_id, "snapshot")
     try:
-        with hub().subscribe('user:' + owner_id) as wake:
-            while True:
-                wake.clear()
-                etag, payload = await run_in_threadpool(read_snapshot, owner_id, ids, expected, single=single)
-                headers = {'ETag': etag, 'Cache-Control': 'private, no-store'}
-                if etag != expected:
-                    return JSONResponse(payload, headers=headers)
-                if time.monotonic() >= end:
-                    return Response(status_code=304, headers=headers)
-                await changed(wake, end - time.monotonic())
+        etag, payload = await run_in_threadpool(read_snapshot, owner_id, ids, expected, single=single)
+        headers = {'ETag': etag, 'Cache-Control': 'private, no-store'}
+        return JSONResponse(payload, headers=headers) if etag != expected else Response(status_code=304, headers=headers)
     finally:
         await run_in_threadpool(release_control, owner_id, token, "snapshot")
 
 
+def parse_translation_ids(ids):
+    try:
+        request_ids = list(dict.fromkeys(str(UUID(value)) for value in ids.split(',')))
+    except ValueError:
+        problem('INVALID_REQUEST', '翻译编号必须为 UUID', 422, fields=[{'path': 'ids', 'code': 'uuid_parsing'}])
+    if not 1 <= len(request_ids) <= 32:
+        problem('INVALID_REQUEST', '一次最多读取 32 个翻译请求', 422, fields=[{'path': 'ids', 'code': 'too_many_items'}])
+    return request_ids
+
+
+@router.get('/v1/translations/events', response_class=Response, responses={200: {
+    'description': 'SSE snapshot events containing TranslationsResponse; end signals completion or reauthentication.',
+    'content': {'text/event-stream': {'schema': {'type': 'string'}}}}})
+async def translation_event_stream(request: Request, ids: str = Query(..., max_length=1183),
+    user: User = Depends(identity), db: Session = Depends(get_db)):
+    from .translation_events import translation_events
+    owner_id, request_ids = user.id, parse_translation_ids(ids)
+    await run_in_threadpool(db.close)
+    return await translation_events(owner_id, request_ids, request)
+
+
 @router.get('/v1/translations', response_model=TranslationsResponse | TranslationHistoryResponse)
 async def translations(request: Request, ids: str | None = Query(None, max_length=1183),
-    wait_seconds: float = Query(0, ge=0, le=20, allow_inf_nan=False),
     offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100),
     user: User = Depends(identity), db: Session = Depends(get_db)):
     owner_id = user.id
@@ -290,23 +300,17 @@ async def translations(request: Request, ids: str | None = Query(None, max_lengt
                 db.close()
                 release_control(owner_id, token, 'history')
         return await run_in_threadpool(history)
-    try:
-        request_ids = list(dict.fromkeys(str(UUID(value)) for value in ids.split(',')))
-    except ValueError:
-        problem('INVALID_REQUEST', '翻译编号必须为 UUID', 422, fields=[{'path': 'ids', 'code': 'uuid_parsing'}])
-    if not 1 <= len(request_ids) <= 32:
-        problem('INVALID_REQUEST', '一次最多读取 32 个翻译请求', 422, fields=[{'path': 'ids', 'code': 'too_many_items'}])
+    request_ids = parse_translation_ids(ids)
     await run_in_threadpool(db.close)
-    return await wait_snapshot(owner_id, request_ids, request, wait_seconds)
+    return await snapshot_response(owner_id, request_ids, request)
 
 
 @router.get('/v1/translations/{translation_id}', response_model=TranslationResponse)
 async def translation_get(translation_id: UUID, request: Request,
-    wait_seconds: float = Query(0, ge=0, le=20, allow_inf_nan=False),
     user: User = Depends(identity), db: Session = Depends(get_db)):
     owner_id = user.id
     await run_in_threadpool(db.close)
-    return await wait_snapshot(owner_id, [str(translation_id)], request, wait_seconds, single=True)
+    return await snapshot_response(owner_id, [str(translation_id)], request, single=True)
 
 
 @router.put('/v1/translations/{translation_id}/input', response_model=TranslationResponse,

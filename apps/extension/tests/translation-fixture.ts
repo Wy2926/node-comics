@@ -16,5 +16,6 @@ export function fixture(){
  const core=new TranslationCoordinator({api,userId,language:'zh-Hans',getBlob:async key=>originalBytes(Number(key.replace('blob-',''))),rights:()=>rights,onJobs,onChange:()=>{}});
  const submit=vi.spyOn(api,'translate').mockImplementation(async(id,body)=>snapshot(id,body));
  vi.spyOn(api,'translations').mockImplementation(async ids=>({items:[],missing_ids:ids,unchanged:false as const,etag:'"1"'}));
+ vi.spyOn(api,'translationEvents').mockImplementation(async function*(ids){const value=await api.translations(ids);if(!value.unchanged)yield value;});
  return {api,userId,rights,onJobs,core,submit};
 }

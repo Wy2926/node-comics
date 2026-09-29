@@ -97,7 +97,7 @@ export function App(){
  const api=useMemo(()=>new Api(API_BASE,account?.token??'',pool.current,undefined,account?sessionAuthorization(account.id):undefined),[account?.id]);
  const apiRef=useRef(api);apiRef.current=api;api.isCurrent=()=>apiRef.current===api;
  const [caps,setCaps]=useState<Capabilities>(),[usage,setUsage]=useState<Entitlements>();
- const updateEntitlements=useCallback((value:Entitlements)=>{setUsage(value);setCaps(c=>c?{...c,entitlements:value}:c);},[]);
+ const updateEntitlements=useCallback((value:Entitlements)=>{const current=apiRef.current.rememberEntitlements(value);setUsage(current);setCaps(c=>c?{...c,entitlements:current}:c);},[]);
  const notify=useCallback((message:string)=>setToast(message),[]),login=useLogin(currentId,setCurrentId,notify);
  const downloads=useBookDownloads(notify,()=>nav('downloads'));
  const activeDownloads=downloads.activeCount;
@@ -211,7 +211,7 @@ export function App(){
  useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),6000);return()=>clearTimeout(timer);},[toast]);
  useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setAccountTab(location.hash==='#account/subscription'?'subscription':'overview');leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
  useEffect(()=>()=>{readingEpoch.current++;readingLoadEpoch.current++;libraryEpoch.current++;},[]);
- useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);const refresh=async()=>{try{const value=await api.capabilities();if(live)setCaps(value);if(account){const value=await api.entitlements();if(live)setUsage(value);}}catch{/* Keep local reading available offline. */}};void refresh();window.addEventListener('focus',refresh);return()=>{live=false;window.removeEventListener('focus',refresh);};},[api]);
+ useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);void(async()=>{try{const value=await api.capabilities();if(live){setCaps(value);setUsage(value.entitlements??undefined);}}catch{/* Keep local reading available offline. */}})();return()=>{live=false;};},[api]);
  useEffect(()=>{
   if(sourceQueryHandled.current||typeof chrome==='undefined'||!chrome.storage?.local)return;
   const query=new URLSearchParams(location.search),manifestId=query.get('manifest'),catalogId=query.get('catalog');if(!manifestId&&!catalogId)return;

@@ -18,8 +18,9 @@ sequenceDiagram
     C->>A: PUT /v1/translations/{id}/input（原图字节）
     A->>W: 自动校验并排队
   end
-  C->>A: GET /v1/translations?ids=…&wait_seconds=20
-  A-->>C: 最新快照或 304
+  C->>A: GET /v1/translations/events?ids=…（SSE）
+  A-->>C: snapshot：首次快照与后续状态变化
+  A-->>C: end：本批完成，关闭连接
   C->>C: 使用 result.download_url 展示译图
 ```
 
@@ -73,16 +74,20 @@ Content-Type: application/json
 
 成功的 `result` 包含 `kind=translated|partial|no_text`、私有 `asset_id`、尺寸、`quality_flags`、`download_url`、`download_expires_at` 和 `authorization_required`。无字结果显示原图，不因滚动自动重新生成。
 
-R2 签名地址直接下载且不附带账户令牌；显式测试环境的本地授权下载按 `authorization_required` 处理。签名地址仅在内存使用，不写入 IndexedDB 或日志。下载失败保留已成功的翻译状态；重试下载可以重新 GET 同一 UUID 获取新签名，不能触发重新翻译。签名查询不发送 R2 HEAD。
+R2 签名地址直接下载且不附带账户令牌；显式测试环境的本地授权下载按 `authorization_required` 处理。签名地址仅在内存使用，不写入 IndexedDB 或日志。同一执行上下文的翻译运行时与图片显示端按登录会话共享最近 128 个快照，直接使用 SSE 返回的下载地址；地址过期或下载授权失败时才补充 GET。下载失败保留已成功的翻译状态；重试下载可以重新 GET 同一 UUID 获取新签名，不能触发重新翻译。签名查询不发送 R2 HEAD。
 
 ## 5. 查询与恢复
 
 - `GET /v1/translations/{id}`：查询一个本人请求，刷新结果授权地址。
-- `GET /v1/translations?ids=<逗号分隔 UUID>&wait_seconds=20`：最多 32 个请求的批量快照，返回 `{items, missing_ids}`。未找到的 ID 与终态失败分开表示，不暴露其他账户数据。
-- `ETag` / `If-None-Match`：未变化时最多等待 20 秒，返回 304；变化时返回最新完整快照。通知只是唤醒提示，数据库是最终状态。没有需要永久保存的事件游标。
+- `GET /v1/translations?ids=<逗号分隔 UUID>`：最多 32 个请求的批量快照，返回 `{items, missing_ids}`，用于刷新恢复和结果不确定时核实。未找到的 ID 与终态失败分开表示，不暴露其他账户数据。
+- `GET /v1/translations/events?ids=<逗号分隔 UUID>`：同样最多 32 个本人 UUID，返回 `text/event-stream`。首个 `snapshot` 事件包含完整批量快照，之后只在内容变化时推送；`end` 的 `reason=complete` 表示本批无活动任务，`reason=reconnect` 表示应重新鉴权连接。客户端用流式 fetch 的 Bearer 头鉴权，令牌不放入 URL。
+- SSE 使用数据库提交通知唤醒，合并短时间内的通知；等待时不持有数据库连接。20 秒注释心跳不查库，60 秒核实一次持久状态以补偿通知丢失。连接最多 295 秒且不越过令牌有效期，使用独立 Redis 请求预算与 300 秒并发租约；同一账户跨 API 实例合计默认最多 4 条，受 `translation_request_concurrency` 控制，超过上限返回 429 和 `Retry-After`。正常结束或客户端断开即释放，代理禁止缓冲响应。
+- `ETag` / `If-None-Match`：普通快照未变化时立即返回 304；HTTP 快照查询不挂起等待。状态等待统一使用 SSE，通知只是唤醒提示，数据库是最终状态，不保存事件游标。
 - `GET /v1/translations?offset=0&limit=50`：私有分页历史。插件不新增翻译记录页，也不通过历史接口恢复当前阅读。
 
-每个客户端协调器合并活动 UUID 的状态查询。刷新后按已保存 UUID 批量核实，不能先取回整个账户历史。终态结果退出等待集合，离开页面停止无关轮询。网络故障遵循退避，不持续进行 PUT/GET 循环。
+每个客户端协调器最多保持一个 SSE 订阅，阅读器与原位翻译都在连续等待中复用此连接。部分页完成时保留订阅供剩余页面使用；阅读窗口或新增 UUID 改变订阅时才重建。无活动任务、隐藏、暂停、断网、离开页面、账户或渠道切换均中止订阅；连续 45 秒未收到数据或心跳则释放无响应连接。刷新后按已保存 UUID 批量核实，不能先取回整个账户历史。断流使用原 UUID 重连，网络故障指数退避并遵守 `Retry-After`，不持续进行 PUT/GET 循环。
+
+配置、额度、订阅信息和用量统计在同一执行上下文内按 API 地址与登录会话共享 5 分钟内存缓存，并合并进行中的相同请求；令牌续期沿用会话缓存，退出后新会话不能读取旧账户缓存。`capabilities` 已含额度，不紧接着重复请求 `entitlements`。缓存只按需过期，不设置刷新定时器；普通点击、重试和页面获焦复用缓存。账户用量仅在进入页面、切换范围或明确刷新时读取；明确刷新权益与支付返回可强制更新，支付同步结果写回缓存。缓存展示不替代服务端受理时的权限与额度检查。
 
 ## 6. 失败重试与重新翻译
 
@@ -112,7 +117,7 @@ R2 签名地址直接下载且不附带账户令牌；显式测试环境的本�
 
 ```powershell
 cd backend
-.venv/Scripts/python.exe -m pytest -q tests/test_translation_requests.py tests/test_recovery_snapshots.py tests/test_submission_limits.py tests/test_result_cache.py
+.venv/Scripts/python.exe -m pytest -q tests/test_translation_requests.py tests/test_translation_events.py tests/test_recovery_snapshots.py tests/test_submission_limits.py tests/test_result_cache.py
 ```
 
 插件目录执行 `npm run check`、`npm test`、`npm run build`。浏览器脚本需要 Playwright 和兼容 Chromium；`PLAYWRIGHT_MODULE`、`TEST_CHROMIUM` 可以指定已安装路径。模拟图片验证交互，不能证明真实翻译效果。

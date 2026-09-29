@@ -4,6 +4,8 @@ import type { Capabilities, Entitlements, FilePageMatch, FilePageSource, Mode, U
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
 import type {Authorization} from './auth/session';
+import {cachedRequest,cacheValue,peekCached} from './api-cache';
+import {serverEvents} from './sse';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
 export interface ComicTitleTranslation {name:string|null;target_language:string|null}
 function retryDelay(body:unknown,header:string|null){
@@ -11,8 +13,7 @@ function retryDelay(body:unknown,header:string|null){
   return Number.isFinite(seconds)&&seconds>0?Math.ceil(seconds):undefined;
 }
 export class Api {
-  private snapshots=new Map<string,TranslationSnapshot>();
-  private readonly updatesPool = new RequestPool(1);
+  private static snapshots=new Map<string,TranslationSnapshot>();
   private readonly controlPool = new RequestPool(2);
   constructor(public base: string, public token = '', public pool = new RequestPool(UPLOAD_CONCURRENCY), public isCurrent = () => true, private authorization?:Authorization) { this.base = base.replace(/\/+$/, ''); }
   private async assertAuthorized(){assertCurrent(this.isCurrent);if(this.authorization)await this.authorization.current();assertCurrent(this.isCurrent);}
@@ -25,8 +26,9 @@ export class Api {
       let response:Response;
       try{response=await fetch(url,{...init,headers,credentials:'omit'});}
       catch{init.signal?.throwIfAborted();throw new ApiError(msg("暂时连接不到服务。请检查网络连接，原图仍可继续阅读。"));}
-      await this.assertAuthorized();
+      try{await this.assertAuthorized();}catch(error){await response.body?.cancel();throw error;}
       if(response.status!==401||!this.authorization)return response;
+      await response.body?.cancel();
       if(attempt===1)await this.authorization.reject(token);
       else await this.authorization.token(token);
     }
@@ -43,9 +45,24 @@ export class Api {
     if (response.status === 204) return undefined as T;
     const result=await response.json();await this.assertAuthorized();return result;
   }
-  authConfig() { return this.request<AuthConfig>('/v1/auth/config'); }
+  private cacheKey(path:string){return JSON.stringify([this.base,this.authorization?.cacheKey??this.token,path]);}
+  private async cached<T>(path:string,force=false){await this.assertAuthorized();const value=await cachedRequest(this.cacheKey(path),()=>this.request<T>(path),force);await this.assertAuthorized();return value;}
+  rememberEntitlements(value:Entitlements){
+    const key=this.cacheKey('/v1/me/entitlements'),previous=peekCached<Entitlements>(key);
+    if(previous&&(previous===value||Date.parse(previous.generated_at)>Date.parse(value.generated_at)))return previous;
+    cacheValue(key,value);return value;
+  }
+  authConfig() { return this.cached<AuthConfig>('/v1/auth/config'); }
   login(username: string) { return this.request<{access_token: string; expires_in:number; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
-  capabilities() { return this.request<Capabilities>('/v1/capabilities'); }
+  async capabilities() {
+    await this.assertAuthorized();
+    const value=await cachedRequest(this.cacheKey('/v1/capabilities'),async()=>{
+      const result=await this.request<Capabilities>('/v1/capabilities');
+      if(result.entitlements)this.rememberEntitlements(result.entitlements);
+      return result;
+    });
+    await this.assertAuthorized();return {...value,entitlements:peekCached<Entitlements>(this.cacheKey('/v1/me/entitlements'))??value.entitlements};
+  }
   async translateComicTitle(name:string,targetLanguage:string,signal?:AbortSignal):Promise<ComicTitleTranslation> {
     const title=name.trim();
     if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title))throw new ApiError(msg('漫画名称需为 1–60 个字符，且不能包含控制字符。'),'INVALID_COMIC_TITLE',422);
@@ -53,9 +70,9 @@ export class Api {
     if(!result||!((result.name===null&&result.target_language===null)||(typeof result.name==='string'&&!!result.name.trim()&&typeof result.target_language==='string'&&!!result.target_language.trim())))throw new ApiError(msg('名称服务返回了无效结果，请手动输入搜索名称。'),'INVALID_COMIC_TITLE_RESPONSE');
     return result;
   }
-  entitlements() { return this.request<Entitlements>('/v1/me/entitlements'); }
+  entitlements(force=false) { return this.cached<Entitlements>('/v1/me/entitlements',force); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
-  usageSummary(days:number,timezone:string) {return this.request<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`);}
+  usageSummary(days:number,timezone:string,force=false) {return this.cached<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`,force);}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;output_asset_id?:string|null},key:string) {return this.request<FeedbackRecord>(`/v1/translations/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/me/feedback?offset=${offset}&limit=20`);}
   async matchPages(pages: FilePageSource[], mode: Mode, target_language: string) {
@@ -65,18 +82,23 @@ export class Api {
     if (!Array.isArray(result.items) || result.items.length !== pages.length || result.items.some((item, index) => item.file_hash !== pages[index].file_hash || item.page_index !== pages[index].page_index || !Array.isArray(item.translations))) throw new ApiError(msg("服务器匹配结果与请求页标识不一致。"), 'INVALID_MATCH_RESPONSE');
     return result;
   }
-  billingCatalog(){return this.request<BillingCatalog>('/v1/billing/catalog');}
-  billingStatus(){return this.request<BillingStatus>('/v1/billing/status');}
+  billingCatalog(force=false){return this.cached<BillingCatalog>('/v1/billing/catalog',force);}
+  billingStatus(force=false){return this.cached<BillingStatus>('/v1/billing/status',force);}
   startCheckout(priceId:string,provider:BillingProvider){return this.request<{checkout_url:string;trial:boolean;environment:'test'|'live';provider:BillingProvider}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId,provider})});}
   billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}
-  cancelRenewal(provider:BillingProvider){return this.request<BillingStatus>('/v1/billing/cancel-renewal',{method:'POST',body:JSON.stringify({provider})});}
-  syncBilling(){return this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});}
-  private remember(snapshot:TranslationSnapshot){this.snapshots.set(snapshot.id,snapshot);return snapshot;}
+  async cancelRenewal(provider:BillingProvider){const result=await this.request<BillingStatus>('/v1/billing/cancel-renewal',{method:'POST',body:JSON.stringify({provider})});cacheValue(this.cacheKey('/v1/billing/status'),result);return result;}
+  async syncBilling(){const result=await this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});this.rememberEntitlements(result.entitlements);cacheValue(this.cacheKey('/v1/billing/status'),result.billing);return result;}
+  private snapshotKey(id:string){return this.cacheKey('/v1/translations/'+id);}
+  private remember(snapshot:TranslationSnapshot){
+    const key=this.snapshotKey(snapshot.id);Api.snapshots.delete(key);Api.snapshots.set(key,snapshot);
+    if(Api.snapshots.size>128)Api.snapshots.delete(Api.snapshots.keys().next().value!);
+    return snapshot;
+  }
   async translate(id:string,body:TranslationInput){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body)}));}
   async translation(id:string,signal?:AbortSignal){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{signal}));}
-  async translations(ids:string[],options:{etag?:string;wait?:boolean;signal?:AbortSignal}={}){
+  async translations(ids:string[],options:{etag?:string;signal?:AbortSignal}={}){
     if(!ids.length||ids.length>32)throw new ApiError('每次读取需提供 1–32 个翻译编号。','INVALID_TRANSLATION_COUNT');
-    const query=new URLSearchParams({ids:ids.join(',')});if(options.wait)query.set('wait_seconds','20');
+    const query=new URLSearchParams({ids:ids.join(',')});
     const fetchSnapshot=async()=>{
       const response=await this.authorizedFetch(this.base+'/v1/translations?'+query,{signal:options.signal,cache:'no-store',headers:options.etag?{'If-None-Match':options.etag}:{}});
       if(response.status===304)return {etag:response.headers.get('ETag')??options.etag,unchanged:true as const};
@@ -84,12 +106,30 @@ export class Api {
       const batch=await response.json() as TranslationBatch;await this.assertAuthorized();for(const item of batch.items)this.remember(item);
       return {etag:response.headers.get('ETag')??undefined,unchanged:false as const,...batch};
     };
-    return options.wait?this.updatesPool.run(fetchSnapshot):this.controlPool.run(fetchSnapshot);
+    return this.controlPool.run(fetchSnapshot);
+  }
+  async *translationEvents(ids:string[],signal:AbortSignal):AsyncGenerator<TranslationBatch>{
+    if(!ids.length||ids.length>32)throw new ApiError('每次读取需提供 1–32 个翻译编号。','INVALID_TRANSLATION_COUNT');
+    const response=await this.authorizedFetch(this.base+'/v1/translations/events?'+new URLSearchParams({ids:ids.join(',')}),{signal,cache:'no-store',headers:{Accept:'text/event-stream'}});
+    if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??raw.detail??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
+    if(!response.body||!response.headers.get('Content-Type')?.startsWith('text/event-stream')){await response.body?.cancel();throw new ApiError(msg('翻译服务暂不可用'),'INVALID_EVENT_STREAM');}
+    let ended=false;
+    for await(const frame of serverEvents(response.body,signal)){
+      await this.assertAuthorized();signal.throwIfAborted();
+      if(frame.event==='end'){ended=true;break;}
+      if(frame.event!=='snapshot')continue;
+      const batch=JSON.parse(frame.data) as TranslationBatch;
+      if(!Array.isArray(batch.items)||!Array.isArray(batch.missing_ids)||batch.items.some(item=>!ids.includes(item.id))||batch.missing_ids.some(id=>!ids.includes(id)))throw new ApiError(msg('翻译服务暂不可用'),'INVALID_EVENT_STREAM');
+      for(const item of batch.items)this.remember(item);
+      yield batch;
+    }
+    if(!ended&&!signal.aborted)throw new ApiError(msg('翻译服务暂不可用'),'EVENT_STREAM_CLOSED');
   }
   async translationInput(id:string,blob:Blob){return this.pool.run(async()=>this.remember(await this.fetchRequest<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}/input`,{method:'PUT',body:blob,headers:{'Content-Type':blob.type||'application/octet-stream'}})));}
   async translationImage(id:string,signal?:AbortSignal):Promise<Blob>{
     for(let attempt=0;attempt<2;attempt++){
-      const snapshot=attempt===0&&this.snapshots.get(id)?.result?.download_url?this.snapshots.get(id)!:await this.translation(id,signal);
+      const cached=Api.snapshots.get(this.snapshotKey(id));
+      const snapshot=attempt===0&&cached?.result?.download_url?cached:await this.translation(id,signal);
       const result=snapshot.result;if(snapshot.state!=='succeeded'||!result?.download_url)throw new ApiError(msg('译图已失效'),'TRANSLATION_UNAVAILABLE',410);
       const signed=result.authorization_required!==true,url=new URL(result.download_url,this.base);
       if(url.username||url.password||(signed?url.protocol!=='https:':url.origin!==new URL(this.base).origin))throw new ApiError(msg('图片访问地址无效。'),'INVALID_ASSET_ORIGIN');

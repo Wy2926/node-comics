@@ -6,7 +6,7 @@ import {Api,ApiError} from '../../../../api';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
 import {mergeJobs} from '../../../../reader/jobs';
 import {pageTranslation} from '../../../../reader/presentation';
-import type {Entitlements,Job,TranslationSnapshot} from '../../../../types';
+import type {Entitlements,Job,TranslationSnapshot,TranslationBatch} from '../../../../types';
 import type {ReadingTarget} from '../../../automatic';
 import {makeOperation,operationId,quotaErrors} from './operations';
 import {readOperation,readOperations,readSync,saveOperation,saveSync,translationScope,withTranslationLock,type LocalOperation,type SyncState} from './store';
@@ -23,9 +23,10 @@ export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperati
 export class TranslationCoordinator {
   readonly scope:string;state:SyncState;records:LocalOperation[]=[];
   private initializing?:Promise<void>;private uploads=new Map<string,Promise<void>>();private uploadPool=new RequestPool(UPLOAD_CONCURRENCY);
-  private wanted=new Set<string>();private refreshed=new Set<string>();private etag?:string;private waitKey='';
-  private monotonic=new Map<string,{wall:number;until:number}>();private imageLimit?:number;
-  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.imageLimit=options.rights()?.image_rate_limit.limit;}
+  private wanted=new Set<string>();private refreshed=new Set<string>();
+  private stream?:{ids:Set<string>;controller:AbortController;events:AsyncGenerator<TranslationBatch>;signal:AbortSignal;abort:()=>void};
+  private monotonic=new Map<string,{wall:number;until:number}>();private imageLimit?:number;private rightsKey?:string;
+  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.imageLimit=options.rights()?.image_rate_limit.limit;this.rightsKey=JSON.stringify(options.rights());}
   async init(){return this.initializing??=(async()=>{this.state=await readSync(this.scope)??this.state;this.records=await readOperations(this.scope);await this.options.onJobs(this.state.jobs);})();}
   private current(){assertCurrent(this.options.api.isCurrent);}
   private async persistState(patch:Partial<SyncState>){await withTranslationLock('sync:'+this.scope,async()=>{this.current();this.state={...await readSync(this.scope)??this.state,...patch};await saveSync(this.state);});}
@@ -67,16 +68,35 @@ export class TranslationCoordinator {
   }
   async finishUploads(){await Promise.all(this.uploads.values());}
   private async backpressure(error:unknown){if(error instanceof ApiError&&(error.status===429||error.status===503)){const key=error.code==='IMAGE_RATE_LIMITED'?'imageRetryAt':'controlRetryAt';await this.persistState({[key]:Date.now()+(error.retryAfterSeconds??2)*1000});}}
-  private async snapshots(records:LocalOperation[],signal?:AbortSignal,wait=false){
+  private async applySnapshots(records:LocalOperation[],response:TranslationBatch){
+    for(const old of records){const record=this.records.find(r=>r.id===old.id&&r.requestId===old.requestId);if(!record)continue;const snapshot=response.items.find(item=>item.id===record.requestId);if(snapshot){await this.receive(record,snapshot);this.refreshed.add(record.requestId);}else if(response.missing_ids.includes(record.requestId)){if(record.result){await this.receive(record,{id:record.requestId,state:'failed',mode:record.mode,target_language:record.language,error:{code:'TRANSLATION_UNAVAILABLE',message:msg('译图已失效')},updated_at:new Date().toISOString()});}else{record.state='local';record.retryAt=undefined;await this.save(record);}}}
+  }
+  private async snapshots(records:LocalOperation[],signal?:AbortSignal){
     if(!records.length)return;
-    const ids=records.map(r=>r.requestId).sort(),key=ids.join(',');if(key!==this.waitKey){this.waitKey=key;this.etag=undefined;}
     try{
-      const response=await this.options.api.translations(ids,{signal,wait,etag:wait?this.etag:undefined});this.current();this.etag=response.etag;
+      const response=await this.options.api.translations(records.map(r=>r.requestId).sort(),{signal});this.current();
       if(response.unchanged)return;
-      for(const record of records){const snapshot=response.items.find(item=>item.id===record.requestId);if(snapshot){await this.receive(record,snapshot);this.refreshed.add(record.requestId);}else if(response.missing_ids.includes(record.requestId)){if(record.result){await this.receive(record,{id:record.requestId,state:'failed',mode:record.mode,target_language:record.language,error:{code:'TRANSLATION_UNAVAILABLE',message:msg('译图已失效')},updated_at:new Date().toISOString()});}else{record.state='local';record.retryAt=undefined;await this.save(record);}}}
+      await this.applySnapshots(records,response);
     }catch(error){await this.backpressure(error);throw error;}
   }
-  async wait(signal:AbortSignal){await this.init();const ids=new Set(this.waitingIds),records=this.records.filter(r=>ids.has(r.requestId)).slice(0,32);await this.snapshots(records,signal,true);return records.length>0;}
+  stopWatching(){const stream=this.stream;if(!stream)return;this.stream=undefined;stream.signal.removeEventListener('abort',stream.abort);stream.controller.abort();void stream.events.return(undefined).catch(()=>{});}
+  async wait(signal:AbortSignal){
+    await this.init();signal.throwIfAborted();const ids=this.waitingIds;
+    if(!ids.length){this.stopWatching();return false;}
+    if(this.stream&&(this.stream.signal!==signal||ids.some(id=>!this.stream!.ids.has(id))))this.stopWatching();
+    if(!this.stream){
+      const controller=new AbortController(),abort=()=>this.stopWatching();
+      this.stream={ids:new Set(ids),controller,signal,abort,events:this.options.api.translationEvents(ids,controller.signal)};
+      signal.addEventListener('abort',abort,{once:true});
+    }
+    const stream=this.stream;
+    try{
+      const next=await stream.events.next();this.current();signal.throwIfAborted();
+      if(next.done){this.stopWatching();return this.hasPending;}
+      await this.applySnapshots(this.records.filter(r=>stream.ids.has(r.requestId)),next.value);
+      if(!this.hasPending)this.stopWatching();return true;
+    }catch(error){if(this.stream===stream)this.stopWatching();await this.backpressure(error);throw error;}
+  }
   async recover(){await this.init();this.state=await readSync(this.scope)??this.state;if(this.controlDelay)return;const records=(await readOperations(this.scope)).filter(r=>this.wanted.has(r.id)&&!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
   async submit(targets:ReadingTarget[],requestCurrent=()=>true){
     await this.init();const previous=[...this.wanted].join(',');this.wanted=new Set(targets.slice(0,4).map(t=>operationId(this.scope,this.options.language,t)));if(previous!==[...this.wanted].join(','))this.options.onChange();this.state=await readSync(this.scope)??this.state;
@@ -113,6 +133,9 @@ export class TranslationCoordinator {
     });await this.submit([target],requestCurrent);
   }
   async refreshEntitlements(rights?:Entitlements){
+    // Focus/manual policy reads can return the same cache. They must not reopen
+    // quota-denied automatic submissions on every click.
+    if(rights){const key=JSON.stringify(rights);if(key===this.rightsKey)return;this.rightsKey=key;}
     const changedLimit=rights&&this.imageLimit!==undefined&&this.imageLimit!==rights.image_rate_limit.limit;
     if(rights)this.imageLimit=rights.image_rate_limit.limit;
     if(changedLimit)await this.persistState({imageRetryAt:undefined});

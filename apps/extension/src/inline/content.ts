@@ -53,7 +53,7 @@ export function installInline() {
     burstAt = 0,
     scheduledAt = 0,
     failures = 0;
-  let refreshRights = true, hasPending = false;
+  let refreshRights = true, hasPending = false, pendingPrefetch = false;
   let candidates: Candidate[] = [],
     windowImages: Candidate[] = [],
     timer: ReturnType<typeof setTimeout> | undefined,
@@ -403,7 +403,7 @@ export function installInline() {
   }
   async function watch() {
     if (
-      watching ||
+      watching || running || pendingPrefetch ||
       !hasPending ||
       !enabled ||
       paused ||
@@ -416,7 +416,7 @@ export function installInline() {
     watching = true;
     let retry = 0;
     try {
-      while (enabled && !paused && !original && !document.hidden && windowImages.length) {
+      while (enabled && !paused && !original && !document.hidden && windowImages.length && (translatedView?.requiresInternet !== true || navigator.onLine !== false)) {
         const stamp = generation, observedAt = Date.now(),
           targets = [...windowImages];
         try {
@@ -444,6 +444,7 @@ export function installInline() {
     if (!windowImages.length) return;
     const stamp = generation, observedAt = Date.now(),
       targets = windowImages.slice(0, performance.now() < prefetchAt ? 1 : 4);
+    pendingPrefetch = targets.length < windowImages.length;
     running = true;
     const retry = retryId;
     retryId = undefined;
@@ -497,6 +498,7 @@ export function installInline() {
     window.addEventListener('pageshow', focus);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('online', visibility);
+    window.addEventListener('offline', visibility);
     scan();
     schedule();
 
@@ -520,6 +522,7 @@ export function installInline() {
     window.removeEventListener('pageshow', focus);
     document.removeEventListener('visibilitychange', visibility);
     window.removeEventListener('online', visibility);
+    window.removeEventListener('offline', visibility);
     for (const item of tracked.values()) item.display.restore();
     tracked.clear();
     candidates = [];

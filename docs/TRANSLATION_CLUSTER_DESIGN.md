@@ -57,7 +57,7 @@ flowchart TB
 
 当前页传 `priority=current`，邻页传 `prefetch`。后端当前页优先默认持续 90 秒，重复请求不续期；预取任务首次提升为当前页可获得优先。没有阅读会话、窗口序号、控制权接管或心跳。已经受理的旧窗口请求继续完成，后台无可见页面时客户端停止新增。
 
-限流按 `Retry-After` 恢复；任务完成不提前释放分钟预算。`GET /v1/translations?ids=…&wait_seconds=20` 合并当前关注 UUID 的快照等待；ETag 未变化返回 304，无账户游标。完成快照直接含下载地址，不再查询 image access。
+限流按 `Retry-After` 恢复；任务完成不提前释放分钟预算。当前关注 UUID 共用 SSE 状态订阅，普通批量 GET 只用于恢复核实；连接释放、重连与缓存规则见[翻译契约](READING_TRANSLATION_CONTRACT.md#5-查询与恢复)。完成快照直接含下载地址，不再查询 image access。
 
 ## 5. 按资源公平调度
 

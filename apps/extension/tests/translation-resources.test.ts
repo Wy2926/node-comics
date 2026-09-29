@@ -59,6 +59,11 @@ describe('independent translation resources',()=>{
  it('restores denied quota with the same unaccepted UUID',async()=>{
   const f=fixture();f.submit.mockRejectedValueOnce(new ApiError('quota','DAILY_QUOTA_EXHAUSTED',403));await f.core.submit([target(0)]);await f.core.refreshEntitlements(entitlement(true));await f.core.submit([target(0)]);expect(f.submit.mock.calls[1][0]).toBe(f.submit.mock.calls[0][0]);
  });
+ it('does not reopen quota-denied submissions when focus reuses unchanged cached rights',async()=>{
+  const f=fixture();f.submit.mockRejectedValueOnce(new ApiError('quota','DAILY_QUOTA_EXHAUSTED',403));await f.core.submit([target(0)]);
+  for(let i=0;i<5;i++){await f.core.refreshEntitlements(f.rights);await f.core.submit([target(0)]);}
+  expect(f.submit).toHaveBeenCalledOnce();
+ });
  it('explicit failure retry creates a UUID with only retry_of',async()=>{
   const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'failed',error:{code:'FAILED',message:'failed'}}));await f.core.submit([target(0)]);const id=f.submit.mock.calls[0][0];await f.core.manual(target(0));expect(f.submit.mock.calls[1][0]).not.toBe(id);expect(f.submit.mock.calls[1][1]).toEqual({retry_of:id,priority:'current'});
  });

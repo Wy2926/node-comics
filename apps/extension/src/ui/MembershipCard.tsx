@@ -51,8 +51,8 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notif
     refreshingRef.current=true;lastAutomaticRead.current=Date.now();returnedFromPayment.current=false;
     setRefreshing(true);setRefreshError('');
     try{
-      if(!loggedIn){const value=await api.billingCatalog();if(current===generation.current)setCatalog(value);return;}
-      const status=await api.billingStatus();
+      if(!loggedIn){const value=await api.billingCatalog(manual);if(current===generation.current)setCatalog(value);return;}
+      const status=await api.billingStatus(reconcile);
       if(current!==generation.current)return;
       setBilling(status);
 
@@ -61,7 +61,7 @@ export function MembershipCard({api,loggedIn,rights,onLogin,onEntitlements,notif
         if(current!==generation.current)return;
         setBilling(result.billing);onEntitlements(result.entitlements);
       }else if(manual){
-        const value=await api.entitlements();if(current===generation.current)onEntitlements(value);
+        const value=await api.entitlements(true);if(current===generation.current)onEntitlements(value);
       }
       if(current===generation.current&&manual)notify(msg('权益已刷新'));
     }catch{if(current===generation.current)setRefreshError(msg('暂时无法读取订阅，请重试。'));}

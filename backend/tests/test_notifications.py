@@ -1,13 +1,10 @@
 """Wakeups are commit-scoped and never hold a database session while waiting."""
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import time
 
-from sqlalchemy import select
 from app.db import engine, session_factory
 from app.models import Job
 from app.notifications import hub, publish
-from app.scheduler import touch_job
 from conftest import login, login_plus, upload, submit_asset
 
 
@@ -21,7 +18,7 @@ def wait_for_idle_subscriptions(count):
         if quiet_since and time.monotonic()-quiet_since>=.05:
             return
         time.sleep(.01)
-    raise AssertionError("Long poll did not release its database connections while waiting")
+    raise AssertionError("Subscription did not release its database connections while waiting")
 
 
 def test_commit_and_rollback_wakeups(client):
@@ -39,32 +36,19 @@ def test_commit_and_rollback_wakeups(client):
     asyncio.run(run())
 
 
-def test_reader_long_poll_is_owner_scoped_and_releases_database(client, png):
-    from conftest import request_record
+def test_reader_snapshot_is_immediate_and_owner_scoped(client, png, monkeypatch):
     auth, other = login_plus(client), login(client, 'other')
     source = upload(client, auth, png)
     created = submit_asset(client, auth, source).json()
     request_path = '/v1/translations?ids=' + created['id']
+    def unexpected(*_args):
+        raise AssertionError('Snapshot reads must never subscribe for changes')
+    monkeypatch.setattr(hub(), 'subscribe', unexpected)
     initial = client.get(request_path, headers=auth)
     foreign = client.get(request_path, headers=other)
-    def waiting(headers, etag):
-        return client.get(request_path + '&wait_seconds=2', headers={**headers, 'If-None-Match': etag})
-    with ThreadPoolExecutor(2) as pool:
-        future = pool.submit(waiting, auth, initial.headers['ETag'])
-        outsider = pool.submit(waiting, other, foreign.headers['ETag'])
-        wait_for_idle_subscriptions(2)
-        start = time.monotonic()
-        record = request_record(client, auth, created['id'])
-        with session_factory()() as db:
-            job = db.get(Job, record.job_id)
-            job.status = 'running'
-            touch_job(db, job)
-            db.commit()
-        response = future.result(timeout=1)
-        assert response.status_code == 200
-        assert [(item['id'], item['state']) for item in response.json()['items']] == [(created['id'], 'running')]
-        assert time.monotonic() - start < 1 and not outsider.done()
-        assert outsider.result(timeout=3).status_code == 304
+    assert initial.status_code == 200
+    assert foreign.json() == {'items': [], 'missing_ids': [created['id']]}
+    assert client.get(request_path, headers={**auth, 'If-None-Match': initial.headers['ETag']}).status_code == 304
     assert not hub().waiters
 
 
@@ -81,7 +65,7 @@ def test_snapshot_handles_lost_notification_and_auth_scoped_etag(client, png, mo
     with session_factory()() as db:
         db.get(Job, record.job_id).status = 'running'
         db.commit()  # Deliberately omit publish: durable snapshots remain authoritative.
-    recovered = client.get(path, headers={**auth, 'If-None-Match': first.headers['ETag']}, params={'wait_seconds': 1})
+    recovered = client.get(path, headers={**auth, 'If-None-Match': first.headers['ETag']})
     assert recovered.status_code == 200 and recovered.json()['items'][0]['state'] == 'running'
     assert client.get(path, headers=auth).json()['items'][0]['state'] == 'running'
 
@@ -120,20 +104,7 @@ def test_nested_page_savepoints_notify_only_after_outer_commit(client):
     asyncio.run(run())
 
 
-def test_wait_timeout_rechecks_persistent_state_after_notification_loss(client, png):
-    from conftest import request_record
-    auth = login_plus(client)
-    created = submit_asset(client,auth,upload(client,auth,png)).json()
-    path = '/v1/translations?ids=' + created['id']
-    initial = client.get(path,headers=auth)
-    record = request_record(client,auth,created['id'])
-    with ThreadPoolExecutor(1) as pool:
-        pending = pool.submit(client.get,path+'&wait_seconds=1',
-            headers={**auth,'If-None-Match':initial.headers['ETag']})
-        wait_for_idle_subscriptions(1)
-        with session_factory()() as db:
-            db.get(Job,record.job_id).status = 'running'
-            db.commit()  # A lost notification must not turn a changed snapshot into 304.
-        result = pending.result(timeout=3)
-    assert result.status_code == 200 and result.json()['items'][0]['state'] == 'running'
-    assert result.headers['ETag'] != initial.headers['ETag']
+def test_snapshot_contract_has_no_long_poll_parameters(client):
+    schema = client.get('/openapi.json').json()
+    for path in ['/v1/translations', '/v1/translations/{translation_id}']:
+        assert 'wait_seconds' not in {param['name'] for param in schema['paths'][path]['get']['parameters']}

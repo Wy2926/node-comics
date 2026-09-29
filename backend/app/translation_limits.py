@@ -32,16 +32,16 @@ def admit_image(db, user, job_id):
             'scope': 'new_translation', 'retry_after_seconds': retry}, headers={'Retry-After': str(retry)})
 
 
-def control_budget(owner_id, scope='translation', *, member=''):
+def control_budget(owner_id, scope='translation', *, member='', lease_seconds=None):
     cfg = settings()
     return redis_state.bucket('control', owner_id + ':' + scope, cfg.translation_requests_per_minute,
         cfg.translation_request_burst, member=member, concurrency=cfg.translation_request_concurrency,
-        lease_seconds=cfg.translation_request_lease_seconds)
+        lease_seconds=lease_seconds or cfg.translation_request_lease_seconds)
 
 
-def acquire_control(owner_id, scope='translation'):
+def acquire_control(owner_id, scope='translation', *, lease_seconds=None):
     token = uid()
-    budget = control_budget(owner_id, scope, member=token)
+    budget = control_budget(owner_id, scope, member=token, lease_seconds=lease_seconds)
     if not budget['allowed']:
         retry = budget['retry_after_seconds']
         raise HTTPException(429, detail={'code': 'REQUEST_RATE_LIMITED',

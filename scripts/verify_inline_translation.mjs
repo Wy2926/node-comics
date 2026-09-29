@@ -34,6 +34,7 @@ const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},schedule
 const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights,retention_days:0};
 let output,api,site,complete=true;
 const resultRequests=[];
+const eventStreams=new Set();
 let heldResult,releaseResult,failResult;
 const accessCount=()=>requests.filter(r=>r.path.startsWith('/v1/images/')&&r.path.endsWith('/access')).length;
 const sha=data=>createHash('sha256').update(data).digest('hex');
@@ -69,14 +70,22 @@ const server=createServer(async(req,res)=>{
     if(url.pathname==='/v1/capabilities')return json(caps);
     if(url.pathname==='/v1/me/entitlements')return json(rights);
     if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,translations:[],display_translations:[]}))});
+    if(url.pathname==='/v1/translations/events'&&req.method==='GET'){
+      const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);let previous='';
+      res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});
+      eventStreams.add(res);
+      const update=()=>{
+        refresh();const items=ids.map(translationResult).filter(Boolean),data=JSON.stringify({items,missing_ids:ids.filter(id=>!translations.has(id))});
+        if(data!==previous){previous=data;res.write('event: snapshot\ndata: '+data+'\n\n');}
+        if(items.every(item=>['succeeded','failed'].includes(item.state))){res.end('event: end\ndata: {"reason":"complete"}\n\n');}
+      };
+      const timer=setInterval(update,50);res.on('close',()=>{clearInterval(timer);eventStreams.delete(res);});update();return;
+    }
     if(url.pathname==='/v1/translations'&&req.method==='GET'){
-      const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean),until=Date.now()+Math.min(20,Number(url.searchParams.get('wait_seconds')||0))*1000;
-      while(!res.destroyed){
-        refresh();const items=ids.map(translationResult).filter(Boolean),value={items,missing_ids:ids.filter(id=>!translations.has(id))},etag='"'+sha(JSON.stringify(value))+'"';
-        if(req.headers['if-none-match']!==etag)return json(value,200,{ETag:etag});
-        if(Date.now()>=until){res.writeHead(304,{ETag:etag});res.end();return;}
-        await new Promise(resolve=>setTimeout(resolve,50));
-      }return;
+      const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);
+      const items=ids.map(translationResult).filter(Boolean),value={items,missing_ids:ids.filter(id=>!translations.has(id))},etag='"'+sha(JSON.stringify(value))+'"';
+      if(req.headers['if-none-match']!==etag)return json(value,200,{ETag:etag});
+      res.writeHead(304,{ETag:etag});res.end();return;
     }
     const route=url.pathname.match(/^\/v1\/translations\/([a-f0-9-]{36})(\/input)?$/);
     if(route){
@@ -244,6 +253,16 @@ try{
   assert([...jobs.values()].filter(j=>[7,8,9,10,11,12].some(n=>j.image_sha256===sha(images.get(n)))).every(j=>j.status!=='succeeded'));
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('scrolling to page 2 admits page 5 and page 3 admits page 6 while previous translations remain unfinished');
+  const network=online=>worker.evaluate(async({url,online})=>{
+    const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
+    await chrome.scripting.executeScript({target:{tabId:tab.id},func:online=>{
+      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>online});window.dispatchEvent(new Event(online?'online':'offline'));
+    },args:[online]});
+  },{url:page.url(),online});
+  await network(false);await page.waitForTimeout(300);assert.equal(eventStreams.size,0);
+  const offlineRequests=requests.length;await page.waitForTimeout(500);assert.equal(requests.length,offlineRequests);
+  await network(true);const onlineDeadline=Date.now()+5000;while(eventStreams.size!==1&&Date.now()<onlineDeadline)await page.waitForTimeout(50);
+  assert.equal(eventStreams.size,1);check('simulated offline closes SSE with zero further HTTP requests; returning online opens one stream');
   // Complete the whole window together, holding one neighbour's bytes indefinitely.
   await page.locator('#rolling-1').evaluate(i=>window.scrollTo(0,i.offsetTop));
   const rollingJob=n=>[...jobs.values()].find(j=>j.image_sha256===sha(images.get(n+6)));
