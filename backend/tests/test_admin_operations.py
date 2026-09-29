@@ -17,8 +17,6 @@ def operations(client, monkeypatch):
     from app.translation_requests import TranslationRequest
     from app import redis_state
     from admission_test_utils import milliseconds, freeze_clock
-    from app.results import ResultAccess, TranslationResult
-    from app.file_pages import FilePage
     from app.upload_models import UploadReservation
     from app.health_models import ServiceHeartbeat
     from app.billing_models import BillingEvent
@@ -33,7 +31,7 @@ def operations(client, monkeypatch):
 
         def asset(owner, name, kind='original', parent=None):
             row = Asset(id=name, owner_id=owner.id, sha256=('a' if kind == 'original' else 'b') * 64,
-                storage_backend='r2', storage_key=f'{PRIVATE}/{kind}', kind=kind, parent_id=parent,
+                storage_key=f'{PRIVATE}/{kind}', kind=kind, parent_id=parent,
                 mime='image/png', width=320, height=480, byte_size=500, expires_at=None)
             db.add(row); db.flush(); return row
 
@@ -56,16 +54,10 @@ def operations(client, monkeypatch):
         expired = job('expired-upload-job', 'failed', completed=at - timedelta(seconds=5))
         job('old-job', 'succeeded', created=at - timedelta(days=95), completed=at - timedelta(days=95) + timedelta(seconds=40))
         job('future-job', 'succeeded', created=at + timedelta(days=1), completed=at + timedelta(days=1, seconds=40))
-        db.add(TranslationResult(id=done.id, cache_key=done.cache_key, generated_at=done.completed_at))
-        db.flush()
-        access = ResultAccess(id='reuse-access', owner_id=b.id, result_id=done.id,
-            input_asset_id=shared_source.id, output_asset_id=shared_output.id, version=1, created_at=at - timedelta(seconds=3))
-        db.add(access); db.flush()
         db.add_all([
             TranslationRequest(owner_id=a.id, id='11111111-1111-4111-8111-111111111111', request_hash='x' * 64, job_id=done.id,
-                descriptor={'source_url': f'https://private.example/page?token={PRIVATE}'}),
-            TranslationRequest(owner_id=b.id, id='22222222-2222-4222-8222-222222222222', request_hash='y' * 64, access_id=access.id),
-            FilePage(owner_id=a.id, file_hash='f' * 64, page_index=1, asset_id=source.id),
+                descriptor={'source_url': f'https://private.example/page?token={PRIVATE}'}, created_at=at - timedelta(seconds=120)),
+            TranslationRequest(owner_id=a.id, id='22222222-2222-4222-8222-222222222222', request_hash='y' * 64, job_id=done.id, created_at=at - timedelta(seconds=3)),
             ServiceHeartbeat(role='control-worker', instance_id='good-worker', heartbeat_at=at, last_success_at=at),
             ServiceHeartbeat(role='maintenance', instance_id='stale-maintenance', heartbeat_at=at - timedelta(hours=1), last_success_at=at - timedelta(hours=1)),
             BillingEvent(id='pending-payment', environment='test', provider='creem', event_type='order.paid', resource_id='order-test',
@@ -73,7 +65,7 @@ def operations(client, monkeypatch):
         ])
         for upload_id, row, status in [('upload-waiting', waiting, 'awaiting_upload'), ('upload-expired', expired, 'expired')]:
             db.add(UploadReservation(id=upload_id, job_id=row.id, owner_id=a.id, mode='classic', expected_sha256='d' * 64,
-                expected_size=500, mime='image/png', storage_backend='r2', status=status, expires_at=at + timedelta(seconds=40),
+                expected_size=500, mime='image/png', status=status, expires_at=at + timedelta(seconds=40),
                 max_expires_at=at + timedelta(minutes=10), verified_info={'private': PRIVATE}))
         db.flush()
         client_state = redis_state.client()
@@ -98,22 +90,22 @@ def operations(client, monkeypatch):
         yield {'client': client, 'admin': admin, 'reader': reader, 'a': a.id, 'b': b.id, 'at': at}
 
 
-@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/uploads', '/requests', '/assets', '/file-pages', '/results', '/accesses', '/statistics'])
+@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/uploads', '/requests', '/assets', '/results', '/statistics'])
 def test_diagnostics_are_admin_only(client, path):
     assert client.get(ROOT + path).status_code == 401
     assert client.get(ROOT + path, headers=login(client, 'reader')).status_code == 403
 
 
 def test_metadata_views_never_touch_objects_or_expose_private_payloads(operations, monkeypatch):
-    from app.storage import LocalStore, S3Store
+    from app.storage import LocalStore
     def forbidden(*args, **kwargs):
         raise AssertionError('diagnostic metadata must not access objects')
-    for cls in (LocalStore, S3Store):
-        for name in ('read', 'put', 'exists', 'download_url', 'delete'):
+    for cls in (LocalStore,):
+        for name in ('read', 'put', 'exists', 'delete'):
             if hasattr(cls, name):
                 monkeypatch.setattr(cls, name, forbidden)
     case = operations
-    for path in ['/health', f'/users/{case["a"]}', '/uploads', '/requests', '/assets', '/file-pages', '/results', '/accesses', '/statistics']:
+    for path in ['/health', f'/users/{case["a"]}', '/uploads', '/requests', '/assets', '/results', '/statistics']:
         result = case['client'].get(ROOT + path, headers=case['admin'])
         assert result.status_code == 200, result.text
         assert PRIVATE not in result.text
@@ -131,21 +123,19 @@ def test_filters_pagination_and_reuse_relationships(operations):
     assert first['total'] == 4 and first['next_offset'] == 2
     assert len(second['items']) == 2 and not ({row['id'] for row in first['items']} & {row['id'] for row in second['items']})
     source = get('/assets?q=source-a')['items'][0]
-    assert source['file_page_count'] == 1 and source['result_access_count'] == 0
+    assert source['job_count'] == 3
     assert get('/assets?q=' + 'a' * 64)['total'] == 2
     assert get('/assets?job_id=done-job')['total'] == 2
     assert get(f'/assets?owner_id={case["b"]}')['total'] == 2
     assert get('/uploads?status=expired')['items'][0]['job_id'] == 'expired-upload-job'
     assert get('/uploads?job_id=waiting-job')['items'][0]['ingress_expires_at']
     assert get(f'/uploads?owner_id={case["b"]}')['total'] == 0
-    assert get('/requests?request_id=22222222-2222-4222-8222-222222222222')['items'][0]['access_id'] == 'reuse-access'
-    assert get('/requests?job_id=done-job')['total'] == 1
-    assert get('/file-pages?asset_id=source-a')['items'][0]['page_index'] == 1
-    assert get(f'/results?owner_id={case["b"]}')['items'][0]['access_count'] == 1
+    assert get('/requests?request_id=22222222-2222-4222-8222-222222222222')['items'][0]['job_id'] == 'done-job'
+    assert get('/requests?job_id=done-job')['total'] == 2
+    assert get('/results?q=done-job')['items'][0]['request_count'] == 2
+    assert get(f'/results?owner_id={case["b"]}')['total'] == 0
     assert get('/results?q=done-job&mode=classic')['total'] == 1
     assert get('/results?mode=redraw')['total'] == 0
-    assert get(f'/accesses?result_id=done-job&owner_id={case["b"]}')['total'] == 1
-    assert get(f'/accesses?owner_id={case["a"]}')['total'] == 0
     assert case['client'].get(ROOT + '/assets?limit=101', headers=case['admin']).status_code == 422
 
 
@@ -159,13 +149,11 @@ def test_availability_preserves_pinned_originals_but_never_deleted_access(operat
         source.active_references = 1
         db.commit()
     asset = case['client'].get(ROOT + '/assets?q=source-b', headers=case['admin']).json()['items'][0]
-    access = case['client'].get(ROOT + '/accesses?result_id=done-job', headers=case['admin']).json()['items'][0]
-    assert asset['available'] and access['available']
+    assert asset['available']
     with session_factory()() as db:
         db.get(Asset, 'source-b').deleted_at = case['at']
         db.commit()
     assert not case['client'].get(ROOT + '/assets?q=source-b', headers=case['admin']).json()['items'][0]['available']
-    assert not case['client'].get(ROOT + '/accesses?result_id=done-job', headers=case['admin']).json()['items'][0]['available']
 
 
 def test_user_admissions_and_service_health_explain_current_state(operations):
@@ -187,7 +175,7 @@ def test_statistics_separate_execution_from_grants_and_keep_unknown_cost(operati
     data = case['client'].get(ROOT + '/statistics?days=7', headers=case['admin']).json()
     assert data['timezone'] == 'UTC'
     assert sum(row['count'] for row in data['jobs']) == 2  # done + failed; no old/future/running/reuse jobs
-    assert sum(row['access_grants'] for row in data['reuse']) == 1
+    assert sum(row['requests'] for row in data['reuse']) == 1
     assert sum(row['accounted_micros'] for row in data['text_calls']) == 1400
     text = next(row for row in data['text_calls'] if row['provider_id'] == 'text-a')
     assert text['calls'] == 2 and text['unknown_calls'] == 1 and text['failed_calls'] == 1 and text['accounted_micros'] == 1000

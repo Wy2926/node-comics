@@ -1,130 +1,166 @@
-"""Unlimited originals/results with user access tracking and explicit deletion."""
-from datetime import timedelta
+"""Terminal input deletion, independent results and account-scoped references."""
+from io import BytesIO
+from uuid import uuid4
 import pytest
-from sqlalchemy import select
-from conftest import create, login, login_plus, run_job, upload
-from test_cluster_submissions import cluster
-from test_upload_storage import storage_db, remote, owner
+from PIL import Image
+from sqlalchemy import select, func
+from conftest import login_plus as login, request_record, create, upload, run_job, submit_asset, request_for_job
+from app.db import session_factory
+from app.models import Asset, Job, Ledger
+from app.assets import object_path
 
 
-def test_completed_original_and_result_survive_age_and_cleanup(cluster, png, monkeypatch):
-    import app.workers as workers
+def finished(client, png, monkeypatch):
     from app.adapters.images import TranslationOutput
-    from app.config import settings
-    from app.db import session_factory
-    from app.dispatcher import cleanup
-    from app.models import Asset, Job, now
-    settings().retention_days = 0
-    client, sdk = cluster
-    auth = login_plus(client)
-    source_id = upload(client, auth, png)
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(png))
-    job_id = create(client, auth, source_id).json()["id"]
+    import app.workers as workers
+    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    auth = login(client)
+    source = upload(client, auth, png)
+    response = create(client, auth, source)
+    assert response.status_code == 202, response.text
+    job_id = response.json()['id']
     run_job(job_id)
+    request = request_for_job(client, auth, job_id)
+    return auth, source, job_id, request
+
+
+def test_terminal_input_deleted_and_result_still_downloadable(client, png, monkeypatch):
+    auth, source, job_id, request = finished(client, png, monkeypatch)
     with session_factory()() as db:
         job = db.get(Job, job_id)
-        output_id = job.output_asset_id
-        assert job.status == "succeeded" and not job.input_pinned
-        assets = list(db.scalars(select(Asset)))
-        assert len(assets) == 2
-        for asset in assets:
-            assert asset.expires_at is None and asset.active_references == 0
-            assert asset.last_accessed_at is None  # Model I/O is not a user access.
-            asset.created_at = now() - timedelta(days=3650)
+        original = db.get(Asset, job.input_asset_id)
+        assert original.purged_at and not object_path(original.storage_key).exists()
+        assert not original.deleted_at
+    state = client.get('/v1/translations/' + request, headers=auth).json()
+    assert state['state'] == 'succeeded'
+    assert 'input_asset_id' not in state
+    result = state['result']
+    assert result['representation'] == 'full-image-v1'
+    assert result['width'] == 320 and result['height'] == 480
+    response = client.get(result['artifact']['path'], headers=auth)
+    assert response.content == png
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert client.get(result['artifact']['path'], headers={**auth, 'If-None-Match': response.headers['etag']}).status_code == 304
+    assert client.get(result['artifact']['path'], headers=login(client, 'other')).status_code == 404
+    assert client.get('/v1/images/' + source + '/content', headers=auth).status_code == 404
+
+
+def test_account_cache_survives_source_deletion_and_last_reference_gc(client, png, monkeypatch):
+    auth, source, job_id, first = finished(client, png, monkeypatch)
+    alias = submit_asset(client, auth, source, key=uuid4().hex).json()
+    assert alias['state'] == 'succeeded'
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(Job)) == 1
+        output = db.get(Asset, db.get(Job, job_id).output_asset_id)
+        path = object_path(output.storage_key)
+    assert client.delete('/v1/translations/' + first, headers=auth).status_code == 200
+    assert path.exists()
+    assert client.get(alias['result']['artifact']['path'], headers=auth).status_code == 200
+    assert client.delete('/v1/translations/' + alias['id'], headers=auth).status_code == 200
+    assert not path.exists()
+    assert client.get(alias['result']['artifact']['path'], headers=auth).status_code == 410
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'settle')) == 1
+
+
+def test_another_account_cannot_claim_known_hash(client, png, monkeypatch):
+    auth, source, _, _ = finished(client, png, monkeypatch)
+    other = login(client, 'other')
+    import hashlib
+    response = client.put('/v1/translations/' + str(uuid4()), headers=other, json={
+        'image': {'sha256': hashlib.sha256(png).hexdigest(), 'byte_size': len(png), 'content_type': 'image/png'},
+        'mode': 'redraw', 'target_language': 'zh-Hans'})
+    assert response.status_code == 202
+    assert response.json()['state'] == 'needs_input'
+
+
+def test_missing_result_keeps_success_and_never_restarts_model(client, png, monkeypatch):
+    auth, _, job_id, request = finished(client, png, monkeypatch)
+    with session_factory()() as db:
+        output = db.get(Asset, db.get(Job, job_id).output_asset_id)
+        object_path(output.storage_key).unlink()
+    state = client.get('/v1/translations/' + request, headers=auth).json()
+    assert state['state'] == 'succeeded' and state['error']['code'] == 'RESULT_UNAVAILABLE'
+    assert client.get(state['result']['artifact']['path'], headers=auth).status_code == 503
+
+
+def test_original_representation_has_dimensions_without_file(client, png):
+    from app.workers import finish_job
+    from app.config import settings
+    settings().classic_enabled = True
+    auth = login(client)
+    source = upload(client, auth, png)
+    job_id = create(client, auth, source, mode='classic').json()['id']
+    with session_factory()() as db:
+        finish_job(db, db.get(Job, job_id), 'no_text')
+        db.commit()
+    request = request_for_job(client, auth, job_id)
+    result = client.get('/v1/translations/' + request, headers=auth).json()['result']
+    assert result['representation'] == 'original' and result['artifact'] is None
+    assert result['width'] == 320 and result['height'] == 480
+    assert submit_asset(client, auth, source, key=uuid4().hex, mode='classic').json()['state'] == 'succeeded'
+
+
+def test_old_client_cannot_start_paid_work(client, png):
+    auth = login(client)
+    auth.pop('X-Translation-Protocol')
+    client.headers.pop('X-Translation-Protocol')
+    import hashlib
+    response = client.put('/v1/translations/' + str(uuid4()), headers=auth, json={
+        'image': {'sha256': hashlib.sha256(png).hexdigest(), 'byte_size': len(png), 'content_type': 'image/png'},
+        'mode': 'redraw', 'target_language': 'zh-Hans'})
+    assert response.status_code == 409 and response.json()['error']['code'] == 'CLIENT_UPGRADE_REQUIRED'
+
+
+def test_full_image_dimensions_follow_actual_output_not_input(client, png, monkeypatch):
+    from app.adapters.images import TranslationOutput
+    from app import workers
+    output = BytesIO()
+    Image.open(BytesIO(png)).resize((160, 240)).save(output, 'PNG')
+    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(output.getvalue()))
+    auth = login(client)
+    job_id = create(client, auth, upload(client, auth, png)).json()['id']
+    run_job(job_id)
+    result = client.get('/v1/translations/' + request_for_job(client, auth, job_id), headers=auth).json()['result']
+    assert result['representation'] == 'full-image-v1'
+    assert (result['width'], result['height']) == (160, 240)
+
+
+def test_open_result_stream_survives_concurrent_unlink(client, png, monkeypatch):
+    import os
+    if os.name == 'nt':
+        pytest.skip('Windows defers unlink until the open authorized response closes')
+    from app import translation_api
+    auth, _, job_id, request = finished(client, png, monkeypatch)
+    with session_factory()() as db:
+        path = object_path(db.get(Asset, db.get(Job, job_id).output_asset_id).storage_key)
+    original = translation_api.StreamingResponse
+    def unlink_before_first_chunk(*args, **kwargs):
+        path.unlink()
+        return original(*args, **kwargs)
+    monkeypatch.setattr(translation_api, 'StreamingResponse', unlink_before_first_chunk)
+    response = client.get('/v1/translations/' + request + '/result', headers=auth)
+    assert response.status_code == 200 and response.content == png
+    assert not path.exists()
+
+
+def test_orphan_cleanup_preserves_unknown_paid_recovery_then_reclaims_terminal_file(client, png, monkeypatch):
+    from datetime import timedelta
+    from app.assets import create_asset
+    from app.dispatcher import cleanup
+    from app.models import now
+    auth, _, job_id, _ = finished(client, png, monkeypatch)
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        orphan = create_asset(db, job.owner_id, png, kind='redraw', parent_id=job.input_asset_id)
+        orphan.created_at = now() - timedelta(days=1)
+        job.status = 'outcome_unknown'
+        orphan_id = orphan.id
+        path = object_path(orphan.storage_key)
         db.commit()
         cleanup(db)
-        assert all(not asset.deleted_at and not asset.purged_at for asset in db.scalars(select(Asset)))
-    assert len(sdk.objects) == 1
-    history = client.get("/v1/translations", headers=auth)
-    assert history.status_code == 200 and history.json()["items"][0]["state"] == "succeeded"
-    assert client.get(f"/v1/images/{output_id}/access", headers=auth).status_code == 200
-    deleted = client.delete(f"/v1/images/{source_id}", headers=auth)
-    assert deleted.status_code == 200
-    assert set(deleted.json()["asset_ids"]) == {source_id, output_id}
-    assert sdk.objects  # Deletion revokes personal grants; shared bytes persist.
-    for asset_id in (source_id, output_id):
-        assert client.get(f"/v1/images/{asset_id}/access", headers=auth).status_code == 410
-
-
-def test_user_download_tracks_access_without_remote_metadata_probes(cluster, png, monkeypatch):
-    import app.assets as assets
-    from app.config import settings
-    from app.db import session_factory
-    from app.models import Asset, now
-    settings().retention_days = 0
-    client, sdk = cluster
-    auth, other = login(client), login(client, "other")
-    asset_id = upload(client, auth, png)
-    with session_factory()() as db:
-        asset = db.get(Asset, asset_id)
-        assert assets.read_asset(asset) == png
-        assert asset.last_accessed_at is None
-    stamp = now()
-    monkeypatch.setattr(assets, "now", lambda: stamp)
-    calls = len(sdk.calls)
-    access = client.get(f"/v1/images/{asset_id}/access", headers=auth)
-    assert access.status_code == 200 and access.json()["expires_at"] is not None
-    assert len(sdk.calls) == calls  # R2 signatures use metadata, never HEAD.
-    with session_factory()() as db:
-        assert db.get(Asset, asset_id).last_accessed_at == stamp
-    stamp += timedelta(seconds=1)
-    assert client.get(f"/v1/images/{asset_id}/access", headers=other).status_code == 404
-    with session_factory()() as db:
-        assert db.get(Asset, asset_id).last_accessed_at == stamp - timedelta(seconds=1)
-    direct = client.get(f"/v1/images/{asset_id}/content", headers=auth, follow_redirects=False)
-    assert direct.status_code == 307 and len(sdk.calls) == calls
-    with session_factory()() as db:
-        assert db.get(Asset, asset_id).last_accessed_at == stamp
-
-
-def test_local_permanent_access_has_nullable_expiry(client, png):
-    from app.config import settings
-    from app.db import session_factory
-    from app.models import Asset
-    settings().retention_days = 0
-    auth = login(client)
-    asset_id = upload(client, auth, png)
-    access = client.get(f"/v1/images/{asset_id}/access", headers=auth)
-    assert access.status_code == 200 and access.json()["expires_at"] is None
-    assert client.get(access.json()["url"], headers=auth).content == png
-    with session_factory()() as db:
-        assert db.get(Asset, asset_id).last_accessed_at is not None
-
-
-@pytest.mark.parametrize("source_days,result_days", [(0, 7), (7, 0), (0, 0)])
-def test_parent_retention_never_shortens_unlimited_source(storage_db, remote, png, source_days, result_days):
-    from app.assets import create_asset
-    from app.config import settings
-    from app.db import session_factory
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        settings().retention_days = source_days
-        source = create_asset(db, owner_id, png)
-        settings().retention_days = result_days
-        result = create_asset(db, owner_id, png, kind="redraw", parent_id=source.id)
+        assert path.exists() and not db.get(Asset, orphan_id).deleted_at
+        job.status = 'failed'
         db.commit()
-        assert source.expires_at is None
-        assert (result.expires_at is None) == (result_days == 0)
-
-
-def test_reconciled_result_remains_permanent(cluster, png, monkeypatch):
-    import app.workers as workers
-    from app.config import settings
-    from app.db import session_factory
-    from app.errors import ProcessingError
-    from app.models import Asset
-    settings().retention_days = 0
-    client, _ = cluster
-    auth = login_plus(client)
-    source_id = upload(client, auth, png)
-    def unknown(*args):
-        raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "isolated response lost", unknown=True)
-    monkeypatch.setattr(workers, "redraw", unknown)
-    job_id = create(client, auth, source_id).json()["id"]
-    run_job(job_id)
-    response = client.post(f"/v1/admin/jobs/{job_id}/reconcile-image", headers=login(client, "admin"),
-        files={"image": ("isolated.png", png, "image/png")}, data={"note": "isolated recovered result"})
-    assert response.status_code == 200, response.text
-    assert response.json()["status"] == "succeeded"
-    with session_factory()() as db:
-        assert all(asset.expires_at is None for asset in db.scalars(select(Asset)))
+        cleanup(db)
+        assert not path.exists() and db.get(Asset, orphan_id).purged_at

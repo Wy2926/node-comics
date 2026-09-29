@@ -50,7 +50,7 @@ describe('source database baseline isolation', () => {
       expect(await request(old.transaction('sentinel').objectStore('sentinel').get('keep'))).toEqual({ id: 'keep', label: name, bytes: new Uint8Array([7, 8, 9]) });
     }
     const actual = new Set((await indexedDB.databases()).map(database => database.name));
-    for (const name of names) { expect(actual.has('node-comics-' + name)).toBe(true); expect(actual.has(sourceDatabaseName(name))).toBe(true); }
+    for (const name of names) { expect(actual.has('node-comics-' + name)).toBe(true); expect(actual.has(sourceDatabaseName(name==='translation-requests'?'translation-requests-overlay-v1':name))).toBe(true); }
   });
 
   it('rejects a partial current catalog before the first catalog transaction can throw NotFoundError', async () => {
@@ -97,7 +97,7 @@ describe('cache and complete-source baseline errors', () => {
   it('surfaces a real malformed result database through concurrent result loaders without a remote download', async () => {
     const database = await rawDatabase(sourceDatabaseName('translations'), db => db.createObjectStore('objects').put(new Blob(['saved result']), 'keep')); database.close();
     const { loadResultBlob, resultBlobKey, resultInMemory } = await import('../src/storage/translations/results');
-    const job: Job = { id: 'result-job', input_asset_id: 'original', output_asset_id: 'output', result:{key:'output',recoverable:true}, status: 'succeeded', phase: 'completed', mode: 'classic', target_language: 'zh-Hans', created_at: '2026-09-22T00:00:00Z', version: 1, quota_pages: 1, cache_hit: false };
+    const job: Job = { id: 'result-job',   result:{key:'output',recoverable:true}, status: 'succeeded', phase: 'completed', mode: 'classic', target_language: 'zh-Hans', created_at: '2026-09-22T00:00:00Z', version: 1, quota_pages: 1, cache_hit: false };
     const input = { scope:{key:JSON.stringify(['https://api.example','account'])}, job, isCurrent: () => true, download: vi.fn(async () => new Blob(['remote result'])) };
     await Promise.all([loadResultBlob(input), loadResultBlob(input)].map(pending => expect(pending).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError', message: expect.stringContaining('缺少 metadata') })));
     expect(input.download).not.toHaveBeenCalled(); expect(resultInMemory(resultBlobKey(input.scope, job))).toBeUndefined();

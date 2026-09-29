@@ -11,11 +11,11 @@ from conftest import create, login_plus as login, upload, submit_asset, png_vari
 def test_auth_private_assets_and_admin_boundaries(client, png):
     alice, bob = login(client), login(client, "bob")
     asset = upload(client, alice, png)
-    assert client.get(f"/v1/images/{asset}/content").status_code == 401
+    assert client.get(f"/v1/images/{asset}/content").status_code == 404
     assert client.get(f"/v1/images/{asset}/access", headers=bob).status_code == 404
     assert client.delete(f"/v1/images/{asset}", headers=bob).status_code == 404
     assert client.get("/v1/admin/providers", headers=alice).status_code == 403
-    assert client.get(f"/v1/images/{asset}/content", headers=alice).content == png
+    assert client.get(f"/v1/images/{asset}/content", headers=alice).status_code == 404
     assert {mode['id'] for mode in client.get('/v1/capabilities').json()['modes']} == {'classic', 'redraw'}
 
 
@@ -53,12 +53,12 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     assert len(calls) == 1
     job = inspect_job(job_id)
     assert job["status"] == "succeeded"
-    assert client.get(f"/v1/images/{job['output_asset_id']}/content", headers=auth).content == png
+    assert client.get("/v1/translations/" + request_for_job(client, auth, job_id) + "/result", headers=auth).content == png
     usage = quota_usage(client, auth)
     assert (usage["used"], usage["reserved"], usage["available"]) == (1, 0, 299)
     cached = submit_asset(client, auth, asset, key="cached").json()
     assert cached["state"] == "succeeded"
-    assert cached["result"]["asset_id"] == job["output_asset_id"]
+    assert cached["result"]["artifact"]["byte_size"] == len(png)
     rerun = create(client, auth, asset, key="explicit-rerun", regenerate=True, rerun_job_id=job_id)
     assert rerun.status_code == 202
     assert rerun.json()["version"] > job["version"]
@@ -114,7 +114,7 @@ def test_running_cancel_or_delete_discards_output_without_charge(client, png, mo
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
     def cancel_during_provider(*args):
-        response = client.delete(f"/v1/images/{asset}", headers=auth)
+        response = client.delete("/v1/translations/" + request_for_job(client, auth, job_id), headers=auth)
         assert response.status_code == 200
         return TranslationOutput(png)
     monkeypatch.setattr(workers, "redraw", cancel_during_provider)
@@ -122,10 +122,10 @@ def test_running_cancel_or_delete_discards_output_without_charge(client, png, mo
     job = inspect_job(job_id)
     assert job["status"] == "cancelled" and job["output_asset_id"] is None
     assert quota_usage(client, auth)["used"] == 0
-    assert client.get(f"/v1/images/{asset}/content", headers=auth).status_code == 410
+    assert client.get(f"/v1/images/{asset}/content", headers=auth).status_code == 404
 
 
-def test_deleted_or_expired_output_not_a_cache_hit(client, png, monkeypatch):
+def test_missing_output_does_not_silently_create_paid_work(client, png, monkeypatch):
     import app.workers as workers
     from app.adapters.images import TranslationOutput
     from app.db import session_factory
@@ -140,14 +140,15 @@ def test_deleted_or_expired_output_not_a_cache_hit(client, png, monkeypatch):
     with session_factory()() as db:
         db.get(Asset, output_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-    assert client.get(f"/v1/images/{output_id}/access", headers=auth).status_code == 410
-    history = inspect_job(job_id)
-    assert history["result_expired"] and history["output_asset_id"] is None
-    new_job = create(client, auth, asset, key="expired-cache").json()
-    assert not new_job["cache_hit"] and new_job["status"] == "queued"
+    path = '/v1/translations/' + request_for_job(client, auth, job_id)
+    assert client.get(path + '/result', headers=auth).status_code == 503
+    history = client.get(path, headers=auth).json()
+    assert history['state'] == 'succeeded' and history['error']['code'] == 'RESULT_UNAVAILABLE'
+    reused = create(client, auth, asset, key='expired-cache').json()
+    assert reused['id'] == job_id and reused['status'] == 'succeeded'
 
 
-def test_cross_user_translation_ids_are_private_and_completed_bytes_are_shared(client, png, monkeypatch):
+def test_cross_user_translation_ids_and_completed_bytes_are_private(client, png, monkeypatch):
     import app.workers as workers
     from app.adapters.images import TranslationOutput
     monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
@@ -160,7 +161,7 @@ def test_cross_user_translation_ids_are_private_and_completed_bytes_are_shared(c
     assert client.get('/v1/translations', headers=bob, params={'ids':translation_id}).json() == {
         'items':[], 'missing_ids':[translation_id]}
     reused = submit_asset(client, bob, upload(client, bob, png)).json()
-    assert reused['state'] == 'succeeded' and reused['result']['download_url']
+    assert reused['state'] == 'queued' and reused['result'] is None
     assert quota_usage(client, bob)['used'] == 0
 
 

@@ -101,7 +101,7 @@ def test_success_cache_remains_free_with_zero_spare_quota(client, png, monkeypat
         db.commit()
     cached = submit_asset(client, auth, source, key='free-cache')
     assert cached.status_code == 200 and cached.json()['state'] == 'succeeded'
-    assert cached.json()['result']['download_url']
+    assert cached.json()['result']['artifact']['path']
     assert request_record(client, auth, cached.json()['id']).job_id == first['id']
 
 

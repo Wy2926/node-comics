@@ -12,7 +12,7 @@ node.exe doctor
 node.exe run
 ```
 
-`init` 交互读取中心、R2 origin 和节点身份，凭据不回显。`doctor` 校验文件与 GPU，并输出引擎版本；中心 `CLASSIC_ENGINE_VERSION` 需与之匹配。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
+`init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 节点直接从中心读取临时原图，向中心提交无损 WebP 覆盖层；不配置对象存储。`doctor` 校验文件与 GPU，并输出引擎版本；中心 `CLASSIC_ENGINE_VERSION` 需与之匹配。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
 
 长期运行在管理员终端安装 Windows 服务：
 
@@ -28,7 +28,7 @@ node.exe status
 
 - `runtime/`、`engine/`、`models/`、`fonts/` 与 `release.json` 随程序保持完整；`licenses/`、`source/` 提供许可证和对应源码。
 - 私有状态默认保存在 `data/`；所有命令可用 `--home <路径>` 指定新的专用目录。发布包不预置身份或状态。
-- 升级先排空租约、停止节点并移除旧服务。用新包和原数据目录运行 `doctor`，核对中心版本，再安装服务；不覆盖运行中的 DLL。
+- 升级先排空租约、停止节点并移除旧服务。v2 切换到 v3 时，在新的专用数据目录执行 `init`，重新填写中心与节点身份；不复制旧配置和恢复数据库，不用旧目录直接运行 `doctor`。同一协议版本内升级可复用原数据目录。随后用新包运行 `doctor`，核对中心版本，再安装服务；不覆盖运行中的 DLL。
 - 同身份换机前停止旧宿主，复制后执行 `adopt`、`doctor` 和服务安装；`adopt` 拒绝仍有待恢复任务的状态。新增电脑使用未初始化发布包和新身份。
 
 状态、日志、恢复规则及目标机验收见[节点运维](../classic-engine/docs/NODE_OPERATIONS.md)。

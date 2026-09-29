@@ -38,8 +38,10 @@ def scheduler_case(text_database):
         db.flush()
         for owner in (free, plus):
             db.add(Asset(id=owner.id + '-image', owner_id=owner.id, sha256='a' * 64,
-                         storage_key='isolated/' + owner.id, storage_backend='r2', mime='image/png',
+                         storage_key='isolated/' + owner.id, mime='image/png',
                          width=80, height=64, byte_size=100, expires_at=now() + timedelta(days=1)))
+        for owner in (free, plus):
+            LocalStore().put('isolated/' + owner.id, b'fixture', 'image/png', kind='original')
         for index in range(4):
             db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['page'],
                                capacity=1, resource_id='physical-' + str(index), engine_version=config['engine']['version'], device='cpu'))
@@ -361,7 +363,8 @@ def test_local_missing_source_is_not_dispatched_and_pinned_source_survives_expir
     assert lease and lease.job_id == job_id
     finish_quantum(lease.id)
     with session_factory()() as db:
-        db.get(Asset, 'free-user-image').storage_backend = 'local'
+        from app.storage import get_store
+        get_store().delete(db.get(Asset, 'free-user-image').storage_key)
         db.commit()
     assert claim() is None
 
@@ -374,27 +377,38 @@ def test_missing_local_head_releases_reservation_once_and_unblocks_later_page(sc
     valid = add_job(scheduler_case)
     with session_factory()() as db:
         source = db.get(Asset, 'free-user-image')
-        source.storage_backend, source.active_references = 'local', 1
+        source.active_references = 1
         source.expires_at = None
         first = db.get(Job, missing)
         first.quota_kind, first.input_pinned = 'classic_daily', True
         reserve(db, db.get(User, 'free-user'), first, now())
         db.add(Asset(id='later-valid-source', owner_id='free-user', sha256='b' * 64,
-            storage_backend='r2', storage_key='isolated/valid-later', mime='image/png',
+            storage_key='isolated/valid-later', mime='image/png',
             width=80, height=64, byte_size=100))
         db.get(Job, valid).input_asset_id = 'later-valid-source'
         db.commit()
-    assert claim() is None  # This bounded election retires only the missing head.
+    from app.storage import get_store
+    with session_factory()() as db:
+        get_store().delete(db.get(Asset, 'free-user-image').storage_key)
+    get_store().put('isolated/valid-later', b'fixture', 'image/png', kind='original')
+    assert claim() is None  # This bounded election pauses only the missing head.
     with session_factory()() as db:
         first = db.get(Job, missing)
-        assert first.status == 'failed' and first.error_code == 'LOCAL_SOURCE_MISSING'
-        assert first.settlement == 'released' and not first.input_pinned
-        assert db.get(Asset, 'free-user-image').active_references == 0
-        assert db.scalar(select(QuotaPeriod)).reserved == 0
-        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 1
+        assert first.status == 'awaiting_upload' and first.error_code is None
+        assert first.settlement == 'reserved' and first.input_pinned
+        assert db.get(Asset, 'free-user-image').active_references == 1
+        assert db.scalar(select(QuotaPeriod)).reserved == 1
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 0
     assert claim().job_id == valid
     assert claim('node-1') is None
+    from app.upload_models import UploadReservation
+    from app.uploads import expire_uploads
     with session_factory()() as db:
+        db.scalar(select(UploadReservation).where(UploadReservation.job_id == missing)).expires_at = now() - timedelta(seconds=1)
+        expire_uploads(db)
+        db.commit()
+        expire_uploads(db)
+        db.commit()
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 1
 
 
@@ -510,14 +524,13 @@ def render_reply(version, value):
 
 
 def test_saved_late_output_recovery_preserves_existing_terminal_failure(scheduler_case, monkeypatch):
-    monkeypatch.setenv('RESULT_STORAGE_BACKEND', 'local')
     settings.cache_clear()
     job_id = add_job(scheduler_case, stage='page')
     lease = claim()
     _, reply = render_reply(scheduler_case['engine']['version'], 10)
-    from app.assets import content_storage_key
+    from app.assets import asset_storage_key
     image = base64.b64decode(reply['image'])
-    output_key = content_storage_key(hashlib.sha256(image).hexdigest())
+    output_key = asset_storage_key(lease.id, "redraw")
     LocalStore().put(output_key, image, 'image/png', kind='classic')
     with session_factory()() as db:
         job = db.get(Job, job_id)

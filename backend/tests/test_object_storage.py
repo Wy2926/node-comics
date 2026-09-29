@@ -1,168 +1,85 @@
-"""R2 contracts and durable storage lifecycle under the cluster design."""
-from datetime import timedelta
+"""Durable immutable publication and actual I/O failures."""
 from io import BytesIO
-from urllib.parse import parse_qs, urlsplit
-from botocore.response import StreamingBody
-from botocore.stub import Stubber
-from fastapi import HTTPException
 import pytest
-from storage_fakes import MemoryS3, sdk_client
-from test_upload_storage import storage_db, remote, owner, pending
+from app.storage import StorageError, get_store
+from app.config import settings
 
 
-@pytest.mark.parametrize("kind", ["classic_stage", "mask", None])
-def test_remote_storage_rejects_disposable_intermediates(storage_db, remote, png, kind):
-    from app.assets import create_asset
-    from app.db import session_factory
-    sdk, store = remote
-    with pytest.raises(ValueError, match="originals, uploads and final"):
-        store.put("fixture/disposable", png, "image/png", kind=kind)
-    with session_factory()() as db, pytest.raises(ValueError, match="disposable local"):
-        create_asset(db, "fixture", png, kind=kind, storage_backend="r2")
-    assert sdk.calls == []
+def test_immutable_file_replay_and_conflicting_bytes(client, png):
+    store = get_store()
+    store.put_file('results/aa/a', BytesIO(png), 'image/png')
+    store.put_file('results/aa/a', BytesIO(png), 'image/png')
+    with pytest.raises(StorageError, match='storage'):
+        store.put_file('results/aa/a', BytesIO(b'other'), 'image/png')
+    assert store.read('results/aa/a') == png
+    assert not list(settings().storage_path.rglob('*.part'))
 
 
-def test_signing_and_cross_account_queries_never_contact_r2(storage_db, remote, png):
-    from app.assets import access_json, create_asset, owned_asset
-    from app.db import session_factory
-    from app.models import now
-    sdk, _ = remote
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        source = create_asset(db, owner_id, png)
-        output = create_asset(db, owner_id, png, kind="redraw", parent_id=source.id)
-        db.commit()
-        sdk.calls.clear()
-        sdk.fail_head = True
-        with pytest.raises(HTTPException) as failure:
-            owned_asset(db, output.id, "other-owner")
-        assert failure.value.status_code == 404
-        receipt = access_json(owned_asset(db, output.id, owner_id))
-        assert not receipt["authorization_required"]
-        parsed = urlsplit(receipt["url"])
-        query = parse_qs(parsed.query)
-        assert parsed.hostname.endswith(".r2.cloudflarestorage.com")
-        assert parsed.path.startswith("/test-bucket/isolated/")
-        assert query["X-Amz-Expires"] == ["300"]
-        assert query["X-Amz-SignedHeaders"] == ["host"]
-        assert "/auto/s3/" in query["X-Amz-Credential"][0]
-        output.expires_at = now() + timedelta(seconds=30)
-        shorter = access_json(owned_asset(db, output.id, owner_id))
-        assert 1 <= int(parse_qs(urlsplit(shorter["url"]).query)["X-Amz-Expires"][0]) <= 30
-        sdk.objects.clear()
-        assert access_json(owned_asset(db, output.id, owner_id))["url"]
-        output.expires_at = now() - timedelta(seconds=1)
-        with pytest.raises(HTTPException) as failure:
-            owned_asset(db, output.id, owner_id)
-        assert failure.value.status_code == 410
-        assert sdk.calls == []
+def test_failed_publication_leaves_no_visible_file(client, png, monkeypatch):
+    import app.storage as module
+    monkeypatch.setattr(module.os, 'fsync', lambda _: (_ for _ in ()).throw(OSError('disk unavailable')))
+    with pytest.raises(StorageError):
+        get_store().put('results/aa/a', png, 'image/png')
+    assert not get_store().exists('results/aa/a')
+    assert not list(settings().storage_path.rglob('*.part'))
 
 
-def test_deleted_ancestor_revokes_late_result_without_head_requests(storage_db, remote, png):
-    from app.assets import create_asset, owned_asset
-    from app.db import session_factory
-    from app.models import now
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        source = create_asset(db, owner_id, png)
-        source.deleted_at = now()
-        db.commit()
-        output = create_asset(db, owner_id, png, kind="redraw", parent_id=source.id)
-        remote[0].calls.clear()
-        with pytest.raises(HTTPException) as failure:
-            owned_asset(db, output.id, owner_id)
-        assert failure.value.status_code == 410
-        assert remote[0].calls == []
+def test_full_disk_does_not_publish_or_overwrite(client, png, monkeypatch):
+    import app.storage as module
+    import errno
+    def disk_full(*args):
+        raise OSError(errno.ENOSPC, 'No space left on device')
+    monkeypatch.setattr(module.shutil, 'copyfileobj', disk_full)
+    with pytest.raises(StorageError) as failure:
+        get_store().put('inputs/a/source', png, 'image/png', kind='original')
+    assert failure.value.code == 'STORAGE_FULL'
+    assert not get_store().exists('inputs/a/source')
 
 
-def test_delete_revokes_grant_without_deleting_shared_object(storage_db, remote, png):
-    from app.assets import create_asset, delete_asset_object, owned_asset
-    from app.db import session_factory
-    from app.models import now
-    owner_id = owner(storage_db)
-    with session_factory()() as db:
-        source = create_asset(db, owner_id, png)
-        source.deleted_at = now()
-        db.commit()
-        remote[0].fail_delete = True
-        delete_asset_object(source)
-        with pytest.raises(HTTPException) as failure:
-            owned_asset(db, source.id, owner_id)
-        assert failure.value.status_code == 410
-        assert source.deleted_at and not source.purged_at
-        remote[0].fail_delete = False
-        delete_asset_object(source)
-        delete_asset_object(source)
-        source.purged_at = now()
-        db.commit()
-        assert remote[0].objects
-        assert not any(method == "DELETE" for method, _ in remote[0].calls)
+@pytest.mark.parametrize('key', ['../outside', '/absolute', 'a//b', 'C:/outside', 'a/../outside'])
+def test_server_paths_cannot_escape_volume(client, key):
+    with pytest.raises(ValueError):
+        get_store().path(key)
 
 
+@pytest.mark.parametrize('same_bytes', [True, False])
+def test_concurrent_publication_is_atomic_without_global_lock(client, png, monkeypatch, same_bytes):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    import app.storage as module
+    barrier = Barrier(2)
+    link = module.os.link
+
+    def simultaneous_link(source, target):
+        barrier.wait(timeout=5)
+        return link(source, target)
+
+    monkeypatch.setattr(module.os, 'link', simultaneous_link)
+    payloads = [png, png if same_bytes else b'different']
+
+    def publish(data):
+        try:
+            get_store().put('results/aa/concurrent', data, 'image/png')
+            return 'published'
+        except StorageError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(publish, payloads))
+    assert results.count('published') == (2 if same_bytes else 1)
+    assert results.count('STORAGE_CONFLICT') == (0 if same_bytes else 1)
+    assert get_store().read('results/aa/concurrent') in payloads
+    assert not list(settings().storage_path.rglob('*.part'))
 
 
-
-
-def test_sdk_contract_and_bounded_reads(storage_db, png):
-    from app.storage import S3Store, StorageError
-    from app.config import settings
-    sdk = sdk_client()
-    store = S3Store(sdk, 'test-bucket', 'isolated/')
-    params = {'Bucket': 'test-bucket', 'Key': 'isolated/user/result'}
-    raw = BytesIO(png)
-    body = StreamingBody(raw, len(png))
-    with Stubber(sdk) as stub:
-        stub.add_response('put_object', {}, {**params, 'Body': png, 'ContentType': 'image/png', 'CacheControl': 'private, no-store'})
-        stub.add_response('head_object', {}, params)
-        stub.add_response('get_object', {'Body': body}, params)
-        stub.add_client_error('head_object', 'NoSuchKey', http_status_code=404, expected_params=params)
-        stub.add_client_error('head_object', 'AccessDenied', http_status_code=403, expected_params=params)
-        stub.add_response('delete_object', {}, params)
-        store.put('user/result', png, 'image/png', kind='redraw')
-        assert store.exists('user/result')
-        assert store.read('user/result') == png and raw.closed
-        assert not store.exists('user/result')
-        with pytest.raises(StorageError):
-            store.exists('user/result')
-        store.delete('user/result')
-        stub.assert_no_pending_responses()
-    settings().max_upload_bytes = 8
-    raw = BytesIO(png)
-    body = StreamingBody(raw, len(png))
-    with Stubber(sdk) as stub:
-        stub.add_response('get_object', {'Body': body}, params)
-        with pytest.raises(StorageError):
-            store.read('user/result')
-        assert raw.closed
-
-
-@pytest.mark.parametrize('changes', [
-    {'r2_endpoint_url': 'https://wrong.example'}, {'r2_endpoint_url': 'http://' + 'a'*32 + '.r2.cloudflarestorage.com'},
-    {'r2_endpoint_url': 'https://' + 'a'*32 + '.r2.cloudflarestorage.com/path'}, {'r2_key_prefix': '../'},
-    {'r2_key_prefix': ''}, {'r2_bucket': 'bad/bucket'}, {'r2_secret_access_key': ''}, {'storage_url_ttl_seconds': 0},
-])
-def test_r2_configuration_rejects_invalid_targets(changes):
-    from app.config import Settings
-    from pydantic import ValidationError
-    params = dict(_env_file=None, result_storage_backend='r2', r2_endpoint_url='https://' + 'a'*32 + '.r2.cloudflarestorage.com',
-                  r2_bucket='test-bucket', r2_access_key_id='isolated-access', r2_secret_access_key='isolated-secret')
-    with pytest.raises(ValidationError):
-        Settings(**{**params, **changes})
-
-
-def test_result_put_authorization_signs_exact_payload_and_does_not_contact_r2(storage_db, png):
-    import base64
-    import hashlib
-    from app.storage import S3Store
-    sdk = sdk_client()
-    store = S3Store(sdk, 'test-bucket', 'isolated/')
-    info = {'mime': 'image/png', 'byte_size': len(png), 'md5': hashlib.md5(png).hexdigest()}
-    with Stubber(sdk):  # Any network operation fails; signing is entirely local.
-        upload = store.upload_url('objects/sha256/aa/' + 'a'*64, info, 45)
-    query = parse_qs(urlsplit(upload['url']).query)
-    assert query['X-Amz-Expires'] == ['45']
-    assert set(query['X-Amz-SignedHeaders'][0].split(';')) == {
-        'host', 'content-type', 'content-length', 'content-md5', 'cache-control', 'if-none-match'}
-    assert upload['headers'] == {'Content-Type': 'image/png', 'Content-Length': str(len(png)),
-        'Content-MD5': base64.b64encode(hashlib.md5(png).digest()).decode(),
-        'Cache-Control': 'private, no-store', 'If-None-Match': '*'}
+def test_input_cleanup_reclaims_task_directory_without_removing_shared_prefix(client, png):
+    store = get_store()
+    store.put('inputs/first/source', png, 'image/png', kind='original')
+    store.put('inputs/second/source', png, 'image/png', kind='original')
+    store.put('results/aa/result', png, 'image/png')
+    store.delete('inputs/first/source')
+    store.delete('inputs/first/source')
+    assert not store.path('inputs/first').exists()
+    assert store.read('inputs/second/source') == png
+    store.delete('results/aa/result')
+    assert store.path('results/aa').is_dir()

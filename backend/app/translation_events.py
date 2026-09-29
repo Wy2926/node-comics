@@ -91,7 +91,7 @@ async def translation_events(owner_id, ids, request):
             # Merge bursts of phase/queue commits, not one query per notification.
             await asyncio.sleep(.05)
             wake.clear()
-            next_etag, next_payload = await run_in_threadpool(read_snapshot, owner_id, ids, etag)
+            next_etag, next_payload = await run_in_threadpool(read_snapshot, owner_id, ids)
             reconcile_at = time.monotonic() + RECONCILE_SECONDS
             if next_etag != etag:
                 etag, payload = next_etag, next_payload

@@ -290,6 +290,9 @@ def settle(db, job, *, success):
         job.input_pinned = False
     from .scheduler import touch_job
     touch_job(db, job)
+    if job.status not in {"queued", "running", "awaiting_upload", "validating_upload", "outcome_unknown"}:
+        from .assets import schedule_input_cleanup
+        schedule_input_cleanup(db, job)
     if job.settlement != "reserved":
         return
     changes = {"reserved": QuotaPeriod.reserved - job.quota_pages}

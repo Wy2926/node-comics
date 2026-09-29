@@ -3,27 +3,24 @@ import re
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from pydantic import Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from .assets import access_json, delete_asset_object, object_path, owned_asset, record_user_access
 from .storage import StorageError
 from .errors import ProcessingError
 from .redis_state import AdmissionUnavailable
-from .scheduler import lock_scheduler, touch_job
 from .translation_api import router as translation_router
 from .comic_titles import TitleExecutor, router as comic_titles_router
 from .analytics import router as analytics_router
-from .compute_v2 import router as compute_v2_router
+from .compute_v3 import router as compute_v3_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
 from .db import get_db, initialize, session_factory
 from .errors import problem
-from .jobs import cancel_job
 from .entitlements import entitlements_json
-from .models import Asset, ClassicState, Job, Ledger, Provider, User, now
+from .models import Ledger, Provider, User
 from .providers import LANGUAGES, credential, initialize_providers
 from .languages import REDRAW_LANGUAGES
 from .middleware import BodyLimitMiddleware
@@ -38,7 +35,6 @@ from .request_models import RequestBody
 from .health import readiness
 from .system_settings import initialize_system_settings, router as system_settings_router
 from .translation_providers import router as translation_providers_router
-from .file_pages import FilePageBinding, bind_translation_page, FilePageMatchRequest, FilePageMatches, match_file_pages
 from .reader_api import router as reader_router
 from .support_requests import router as support_requests_router
 from .quota_grants import router as grants_router
@@ -46,7 +42,7 @@ from .quota_campaigns import router as campaigns_router
 from .billing_api import router as billing_router
 from .billing_admin import router as billing_admin_router
 from .billing_catalog import router as billing_catalog_router, initialize_catalog
-from .schemas import AccessResponse, CapabilitiesResponse, EntitlementsResponse, LoginResponse, UsageResponse
+from .schemas import CapabilitiesResponse, EntitlementsResponse, LoginResponse, UsageResponse
 
 
 @asynccontextmanager
@@ -73,7 +69,7 @@ app = FastAPI(title="Node Comics API", version="0.3.0", lifespan=lifespan, descr
 app.include_router(translation_router)
 app.include_router(comic_titles_router)
 app.include_router(analytics_router)
-app.include_router(compute_v2_router)
+app.include_router(compute_v3_router)
 app.include_router(reader_router)
 app.include_router(support_requests_router)
 app.include_router(grants_router)
@@ -93,7 +89,7 @@ origins = [value.strip() for value in cfg.cors_origins.split(",") if value.strip
 extension_ids = [value.strip() for value in cfg.extension_ids.split(",") if re.fullmatch(r"[a-p]{32}", value.strip())]
 origins.extend(f"chrome-extension://{value}" for value in extension_ids)
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=r"chrome-extension://[a-p]{32}" if cfg.dev_auth else None, allow_credentials=False,
-                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "If-None-Match"], expose_headers=["Content-Disposition", "Retry-After", "ETag", "X-Request-ID"])
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "X-Translation-Protocol", "Content-Type", "Idempotency-Key", "If-None-Match"], expose_headers=["Content-Disposition", "Retry-After", "ETag", "X-Request-ID"])
 app.add_middleware(BodyLimitMiddleware)
 
 
@@ -101,9 +97,6 @@ app.add_middleware(BodyLimitMiddleware)
 async def request_guards(request: Request, call_next):
     from .models import uid
     request.state.request_id = uid()
-    length = request.headers.get("content-length", "")
-    if length.isdigit() and int(length) > (settings().cluster_max_result_bytes if request.url.path.startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024):
-        return JSONResponse(status_code=413, content={"error": {"code": "IMAGE_TOO_LARGE", "message": "请求图片超过上传限制", "request_id": request.state.request_id}})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -136,7 +129,7 @@ async def api_error(request, exc):
 
 @app.exception_handler(StorageError)
 async def storage_error(request, exc):
-    return JSONResponse(status_code=503, content={"error": {"code": "STORAGE_UNAVAILABLE", "message": "图片存储暂时不可用，请稍后重试", "request_id": request.state.request_id}})
+    return JSONResponse(status_code=503, content={"error": {"code": exc.code, "message": "图片存储暂时不可用，请稍后重试", "request_id": request.state.request_id}})
 
 
 @app.exception_handler(AdmissionUnavailable)
@@ -218,85 +211,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_translation_ids": 32},
             "entitlements": entitlements_json(db, user) if user else None,
-            "retention_days": cfg.retention_days, "unknown_release_seconds": cfg.unknown_release_seconds}
-
-
-@app.put('/v1/file-pages/bind')
-def file_page_bind(body: FilePageBinding, user: User = Depends(identity), db: Session = Depends(get_db)):
-    return bind_translation_page(db, user.id, body)
-
-
-@app.post("/v1/file-pages/match", response_model=FilePageMatches, response_model_exclude_unset=True)
-def file_page_matches(body: FilePageMatchRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
-    return match_file_pages(db, user.id, body)
-
-
-@app.get("/v1/images/{asset_id}/access", response_model=AccessResponse)
-def image_access(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
-    asset = owned_asset(db, asset_id, user.id)
-    result = access_json(asset)
-    record_user_access(db, asset)
-    db.commit()
-    return result
-
-
-@app.get("/v1/images/{asset_id}/content")
-def image_content(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
-    asset = owned_asset(db, asset_id, user.id)
-    extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}[asset.mime]
-    if asset.storage_backend != "local":
-        result = RedirectResponse(access_json(asset)["url"], status_code=307)
-        record_user_access(db, asset)
-        db.commit()
-        return result
-    record_user_access(db, asset)
-    db.commit()
-    return FileResponse(object_path(asset.storage_key), media_type=asset.mime, filename=f"node-comics-{asset.id}.{extension}", content_disposition_type="inline")
-
-
-@app.delete("/v1/images/{asset_id}")
-def delete_image(asset_id: str, user: User = Depends(identity), db: Session = Depends(get_db)):
-    from .results import ResultAccess
-    from .translation_requests import TranslationRequest
-    from sqlalchemy import update
-    lock_scheduler(db)
-    asset = db.get(Asset, asset_id)
-    if not asset or asset.owner_id != user.id:
-        problem("NOT_FOUND", "找不到此图片", 404)
-    # Revoke this account's grants, including derived images and cached references.
-    ids = {asset.id}
-    if asset.kind == "original":
-        ids.update(db.scalars(select(Asset.id).where(Asset.owner_id == user.id, Asset.parent_id == asset.id)))
-        ids.update(value for value in db.scalars(select(Job.output_asset_id).where(Job.owner_id == user.id, Job.input_asset_id == asset.id)) if value)
-    # Lock affected jobs before assets, matching completion's job -> asset lock order.
-    affected_jobs = db.scalars(select(Job).where(Job.owner_id == user.id, or_(Job.input_asset_id.in_(ids), Job.output_asset_id.in_(ids))).order_by(Job.id).with_for_update(key_share=True)).all()
-    if asset.kind == "original":
-        ids.update(value for value in db.scalars(select(Job.output_asset_id).where(Job.owner_id == user.id, Job.input_asset_id == asset.id)) if value)
-        ids.update(db.scalars(select(Asset.id).where(Asset.owner_id == user.id, Asset.parent_id == asset.id)))
-    assets = db.scalars(select(Asset).where(Asset.id.in_(ids), Asset.owner_id == user.id).order_by(Asset.id).with_for_update(key_share=True)).all()
-    affected_accesses = select(ResultAccess.id).where(ResultAccess.owner_id == user.id,
-        or_(ResultAccess.input_asset_id.in_(ids), ResultAccess.output_asset_id.in_(ids)))
-    db.execute(update(TranslationRequest).where(TranslationRequest.owner_id == user.id,
-        or_(TranslationRequest.job_id.in_([job.id for job in affected_jobs]),
-            TranslationRequest.access_id.in_(affected_accesses))).values(revoked_at=now()))
-    for item in assets:
-        item.deleted_at = item.deleted_at or now()
-    for job in affected_jobs:
-        cancel_job(db, job)
-        touch_job(db, job)
-        if asset.kind == 'original':
-            state = db.get(ClassicState, job.id)
-            if state:
-                db.delete(state)
-    for access in db.scalars(select(ResultAccess).where(ResultAccess.owner_id == user.id,
-            or_(ResultAccess.input_asset_id.in_(ids), ResultAccess.output_asset_id.in_(ids)))):
-        touch_job(db, access)
-    db.commit()
-    for item in assets:
-        delete_asset_object(item)
-        item.purged_at = now()
-    db.commit()
-    return {"deleted": True, "asset_ids": list(ids)}
+            "unknown_release_seconds": cfg.unknown_release_seconds}
 
 
 @app.get("/v1/me/usage", response_model=UsageResponse)
@@ -317,6 +232,28 @@ app.include_router(node_admin_router)
 async def processing_error(request, exc):
     status = 503 if exc.code == 'STORAGE_UNAVAILABLE' else 409 if exc.code in {"LEASE_EXPIRED", "NODE_CONFIG_CONFLICT"} else 422
     return JSONResponse(status_code=status, content={"error": {"code": exc.code, "message": exc.message, "request_id": request.state.request_id}})
+
+
+# Describe the ASGI protocol gate on every generated translation operation,
+# including routes included lazily by FastAPI.
+_default_openapi = app.openapi
+
+
+def translation_openapi():
+    schema = _default_openapi()
+    for path, operations in schema['paths'].items():
+        if path != '/v1/translations' and not path.startswith('/v1/translations/'):
+            continue
+        for operation in operations.values():
+            parameters = [item for item in operation.get('parameters', []) if item.get('name') != 'X-Translation-Protocol']
+            operation['parameters'] = [*parameters, {
+                'name': 'X-Translation-Protocol', 'in': 'header', 'required': True,
+                'schema': {'type': 'string', 'enum': ['overlay-v1']},
+                'description': 'Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED.'}]
+    return schema
+
+
+app.openapi = translation_openapi
 
 
 # Keep this mount last: /v1, /internal, billing and the private admin entry win.

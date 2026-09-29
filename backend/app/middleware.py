@@ -16,6 +16,15 @@ class BodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        path = scope.get('path', '')
+        headers = dict(scope.get('headers', []))
+        if scope.get('method') != 'OPTIONS' and (path == '/v1/translations' or path.startswith('/v1/translations/')):
+            if headers.get(b'x-translation-protocol') != b'overlay-v1':
+                response = JSONResponse(status_code=409, content={'error': {
+                    'code': 'CLIENT_UPGRADE_REQUIRED',
+                    'message': '请更新 NodeLane 漫译插件后重试：https://comics.nodelane.net/download/',
+                    'update_url': 'https://comics.nodelane.net/download/'}})
+                return await response(scope, receive, send)
         consumed = 0
         started = False
         limit = settings().cluster_max_result_bytes if scope.get("path", "").startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024
@@ -23,8 +32,17 @@ class BodyLimitMiddleware:
             limit = settings().translation_max_body_bytes
         if scope.get('path') == '/v1/support-requests':
             limit = 16384
-        if scope.get('path', '').startswith('/internal/compute/v2/leases/') and scope['path'].endswith('/analysis'):
+        if scope.get('path', '').startswith('/internal/compute/v3/leases/') and scope['path'].endswith('/analysis'):
             limit = 4 * 1024 * 1024 + 4096
+
+        if scope.get('path', '').startswith('/internal/compute/v3/leases/') and scope['path'].endswith('/result'):
+            limit = settings().cluster_max_result_bytes + 65536 + 4096
+
+        length = headers.get(b'content-length', b'')
+        if length.isdigit() and int(length) > limit:
+            response = JSONResponse(status_code=413, content={'error': {
+                'code': 'IMAGE_TOO_LARGE', 'message': '请求超过上传限制'}})
+            return await response(scope, receive, send)
 
         async def bounded_receive():
             nonlocal consumed

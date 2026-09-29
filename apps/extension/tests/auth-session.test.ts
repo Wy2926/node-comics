@@ -1,3 +1,4 @@
+import {deliveredBytes,deliveredSnapshot} from './overlay-fixture';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {Api} from '../src/api';
 import {API_BASE} from '../src/service';
@@ -150,11 +151,10 @@ describe('authenticated API boundaries',()=>{
     await bound().translationInput('test-upload',new Blob(['bytes']));
     expect(new Headers(request.mock.calls[2][1].headers).get('Authorization')).toBe('Bearer new-access');
   });
-  it('refreshes signed image URLs without touching the login session',async()=>{
-    await saveSession(renewable());vi.stubGlobal('createImageBitmap',async()=>({close(){}}));
-    const access=()=>Response.json({url:'https://objects.example/image?signature=test',authorization_required:false,expires_at:'2099-01-01'});
-    request.mockResolvedValueOnce(access()).mockResolvedValueOnce(new Response('',{status:401})).mockResolvedValueOnce(access()).mockResolvedValueOnce(new Response('bytes'));
-    await bound().image('page');expect(request).toHaveBeenCalledTimes(4);
-    expect(new Headers(request.mock.calls[1][1].headers).has('Authorization')).toBe(false);expect((await readAuth()).session?.token).toBe('test-token');
+  it('refreshes the session for authenticated result bytes',async()=>{
+    await saveSession(renewable());
+    request.mockResolvedValueOnce(Response.json(deliveredSnapshot('page'))).mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(new Response(deliveredBytes));
+    await bound().translationImage('page');expect(request).toHaveBeenCalledTimes(4);
+    expect(new Headers(request.mock.calls[3][1].headers).get('Authorization')).toBe('Bearer new-access');
   });
 });

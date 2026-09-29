@@ -71,8 +71,10 @@ try{
   await page.getByRole('button',{name:'单页阅读',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const nextJob=await page.evaluate(()=>window.readerFixture.finishNext());assert(nextJob);
-  await page.waitForFunction(()=>window.readerFixture.requests.includes('/v1/fixture-output'));
+  await page.waitForFunction(()=>window.readerFixture.requests.some(path=>path.endsWith('/result')));
   await page.waitForFunction(()=>window.readerFixture.downloadedAt>=window.readerFixture.completedAt);
+  await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').waitFor();
+  assert.deepEqual(await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').first().evaluate(image=>[image.naturalWidth,image.naturalHeight]),[640,900]);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   check('single-page reader downloads the next completed translation while still showing page 1');
   await page.screenshot({path:path.join(out,'reading.png')});

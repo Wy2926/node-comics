@@ -1,52 +1,29 @@
-import {afterEach, expect, it, vi} from 'vitest';
+import 'fake-indexeddb/auto';
+import {afterEach,expect,it,vi} from 'vitest';
 import {Api} from '../src/api';
-
-afterEach(() => vi.unstubAllGlobals());
-const signed = {url: 'https://objects.example/bucket/page?X-Amz-Signature=test', expires_at: '2099-01-01T00:00:00Z', authorization_required: false};
-function setup(access: object, responses: (Response | Error)[] = [new Response('image')]) {
-  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({close() {}})));
-  const fetch = vi.fn(async (url: string | URL) => {
-    if (String(url).endsWith('/access')) return Response.json(access);
-    const result = responses.shift();
-    if (result instanceof Error) throw result;
-    return result;
-  });
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
+import {deliveredBytes,deliveredSnapshot} from './overlay-fixture';
+import {loadDeliveredResult} from '../src/storage/translations/results';
+import {translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
+afterEach(()=>vi.unstubAllGlobals());
+function setup(path='/v1/translations/page/result',response=new Response(deliveredBytes)){
+  const snapshot=deliveredSnapshot('page');snapshot.result!.artifact!.path=path;
+  const fetch=vi.fn().mockResolvedValueOnce(Response.json(snapshot)).mockResolvedValueOnce(response);vi.stubGlobal('fetch',fetch);
+  return {fetch,api:new Api('https://api.example',crypto.randomUUID())};
 }
-
-it('downloads signed HTTPS objects without account tokens, cookies or referrers', async () => {
-  const fetch = setup(signed);
-  await new Api('https://api.example', 'private-token').image('page');
-  expect(fetch.mock.calls[0][0]).toBe('https://api.example/v1/images/page/access');
-  expect(fetch).toHaveBeenLastCalledWith(new URL(signed.url), expect.objectContaining({headers: {}, credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error', cache: 'no-store'}));
+it('downloads only authenticated same-origin result bytes without an access/signature request',async()=>{
+  const {fetch,api}=setup();await api.translationImage('page');
+  expect(fetch).toHaveBeenCalledTimes(2);expect(String(fetch.mock.calls[1][0])).toBe('https://api.example/v1/translations/page/result');
+  expect(new Headers(fetch.mock.calls[1][1].headers).get('Authorization')).toBe('Bearer '+api.token);
+  expect(fetch.mock.calls[1][1]).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',cache:'no-store'});
 });
-
-it('keeps Bearer authentication for local same-origin images', async () => {
-  const fetch = setup({url: '/content',expires_at:null, authorization_required: true});
-  await new Api('https://api.example', 'token').image('page');
-  expect(new Headers((fetch.mock.calls.at(-1) as unknown as [URL,RequestInit])[1].headers).get('Authorization')).toBe('Bearer token');
+it.each(['https://external.example/result','//external.example/result','/v1/translations/other/result','/v1/translations/page/result?signature=x'])('rejects an invalid artifact path %s before sending tokens',async path=>{
+  const {fetch,api}=setup(path);await expect(api.translationImage('page')).rejects.toMatchObject({code:'INVALID_ASSET_ORIGIN'});expect(fetch).toHaveBeenCalledOnce();
 });
-
-it.each([
-  {url: 'https://external.example/content', authorization_required: true},
-  {url: 'https://external.example/content'},
-  {...signed, url: 'http://objects.example/page'},
-  {...signed, url: 'https://user:password@objects.example/page'},
-])('rejects unsafe download targets before sending a request: %j', async access => {
-  const fetch = setup(access);
-  await expect(new Api('https://api.example', 'token').image('page')).rejects.toMatchObject({code: 'INVALID_ASSET_ORIGIN'});
-  expect(fetch).toHaveBeenCalledTimes(1);
+it('rejects altered artifact bytes at the shared materialization boundary',async()=>{
+  const {api}=setup(undefined,new Response(new Blob(['wrong'],{type:'image/webp'})));
+  const job=translationJob(deliveredSnapshot('page'));
+  await expect(loadDeliveredResult({scope:{key:crypto.randomUUID()},job,isCurrent:()=>true,download:()=>api.translationImage('page')})).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
 });
-
-it.each([new Response('', {status: 403}), new TypeError('CORS rejected')])('renews an expired signature once, including opaque CORS failures', async failure => {
-  const fetch = setup(signed, [failure, new Response('image')]);
-  await new Api('https://api.example', 'token').image('page');
-  expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/access'))).toHaveLength(2);
-});
-
-it('bounds failures and never falls back to proxying via the API', async () => {
-  const fetch = setup(signed, [new TypeError('offline'), new TypeError('offline')]);
-  await expect(new Api('https://api.example', 'token').image('page')).rejects.toMatchObject({code: 'ASSET_DOWNLOAD_FAILED'});
-  expect(fetch).toHaveBeenCalledTimes(4);
+it('keeps a missing file as a read failure without requesting new translation',async()=>{
+  const {api,fetch}=setup(undefined,new Response('',{status:404}));await expect(api.translationImage('page')).rejects.toMatchObject({code:'ASSET_DOWNLOAD_FAILED'});expect(fetch).toHaveBeenCalledTimes(2);
 });

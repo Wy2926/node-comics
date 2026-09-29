@@ -37,14 +37,14 @@ describe('translation SSE',()=>{
   it('keeps one subscription when pages finish, closes on terminal state, and does no recovery GET',async()=>{
     const f=fixture(),signal=new AbortController().signal;await f.core.submit([target(0),target(1)]);
     const items=f.submit.mock.calls.map(([key,body])=>snapshot(key,body));const finished=vi.fn();
-    vi.mocked(f.api.translationEvents).mockImplementation(async function*(){try{yield {items:[{...items[0],state:'succeeded',result:{kind:'no_text'}},items[1]],missing_ids:[]};yield {items:items.map(item=>({...item,state:'succeeded' as const,result:{kind:'no_text' as const}})),missing_ids:[]};}finally{finished();}});
+    vi.mocked(f.api.translationEvents).mockImplementation(async function*(){try{yield {items:[{...items[0],state:'succeeded',result:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:'a'.repeat(64),width:800,height:1200}},items[1]],missing_ids:[]};yield {items:items.map(item=>({...item,state:'succeeded' as const,result:{kind:'no_text' as const,representation:'original' as const,normalization_version:1 as const,input_sha256:'a'.repeat(64),width:800,height:1200}})),missing_ids:[]};}finally{finished();}});
     await f.core.wait(signal);expect(f.core.waitingIds).toEqual([items[1].id]);
     await f.core.wait(signal);expect(f.core.hasPending).toBe(false);await f.core.wait(signal);
     expect(f.api.translationEvents).toHaveBeenCalledOnce();expect(f.api.translations).not.toHaveBeenCalled();await vi.waitFor(()=>expect(finished).toHaveBeenCalledOnce());
   });
   it('reconnects the same durable UUIDs after a stream failure without new PUTs',async()=>{
     const f=fixture();await f.core.submit([target(0)]);const [key,body]=f.submit.mock.calls[0];
-    vi.mocked(f.api.translationEvents).mockImplementationOnce(async function*(){throw Error('disconnected');}).mockImplementationOnce(async function*(){yield {items:[snapshot(key,body,{state:'succeeded',result:{kind:'no_text'}})],missing_ids:[]};});
+    vi.mocked(f.api.translationEvents).mockImplementationOnce(async function*(){throw Error('disconnected');}).mockImplementationOnce(async function*(){yield {items:[snapshot(key,body,{state:'succeeded',result:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:'a'.repeat(64),width:800,height:1200}})],missing_ids:[]};});
     const signal=new AbortController().signal;await expect(f.core.wait(signal)).rejects.toThrow('disconnected');await f.core.wait(signal);
     expect(f.api.translationEvents).toHaveBeenNthCalledWith(2,[key],expect.any(AbortSignal));expect(f.submit).toHaveBeenCalledOnce();expect(f.core.hasPending).toBe(false);
   });

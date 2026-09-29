@@ -27,11 +27,9 @@ class Pipeline:
 
     @staticmethod
     def delivery_reservation(body):
-        # Frozen base64, its journal serialization/readback and the PUT bytes.
-        # Keep checkpoint/translation metadata bounded even after pixels leave.
-        image = body.get('image', '')
-        decoded = body['result']['output']['byte_size'] if image else 0
-        return len(image) * 3 + decoded + MAX_CHECKPOINT_BYTES * 6
+        # Binary journal readback and multipart transport; no base64 copies.
+        output = body.get('result', {}).get('output')
+        return (output['byte_size'] * 2 if output else 0) + MAX_CHECKPOINT_BYTES * 6
 
     def resize_reservation(self, page, amount, *, bounded=False):
         with self.memory_lock:
@@ -95,11 +93,11 @@ class Pipeline:
     def freeze(self, page, result):
         key = page.lease['lease_id']
         # Timings are transport metadata, outside the immutable image identity.
-        body = {'lease_token': page.lease['lease_token'], **result,
+        body = {'lease_token': page.lease['lease_token'], 'result': result['result'],
                 'timings': {**page.timings, 'local_total': time.monotonic() - page.received_at}}
         saved = self.agent.journal.get('lease:' + key)
         saved.pop('analysis', None)
-        self.agent.journal.put('lease:' + key, {**saved, 'completion': body})
+        self.agent.journal.freeze('lease:' + key, {**saved, 'completion': body}, result['output_bytes'])
         page.completion = body
         page.rgb = page.cleaned = page.analysis = page.alpha = None
         self.resize_reservation(page, self.delivery_reservation(body))
@@ -116,7 +114,7 @@ class Pipeline:
             page.stopped = True
             return
         code = error.code if isinstance(error, NodeFailure) and error.code in {
-            'ENGINE_VERSION_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH', 'STORAGE_AUTH_FAILED',
+            'ENGINE_VERSION_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH',
             'STORAGE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED'
         } else 'CLASSIC_LOCAL_INTERRUPTED'
         saved = self.agent.journal.get('lease:' + page.lease['lease_id'], {})
@@ -150,7 +148,6 @@ class Pipeline:
                     page.step = 'inpaint' if page.analysis['segments'] else 'text'
                 elif page.step == 'inpaint':
                     page.cleaned = value
-                    page.rgb = None
                     page.step = 'text'
                 elif page.step == 'render':
                     self.freeze(page, value)
@@ -199,6 +196,6 @@ class Pipeline:
             elif page.step == 'inpaint':
                 operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
             else:
-                operation = lambda p=page: self.agent.runtime.render(p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
+                operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
             self.submit(page, self.compute, page.step, operation)
             running += 1

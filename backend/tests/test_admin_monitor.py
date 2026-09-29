@@ -69,7 +69,7 @@ def test_task_filter_pagination_and_no_duplicate_nodes(monitor):
 def test_overview_counts_tasks_and_nodes_without_storage(monitor, monkeypatch):
     from app.storage import get_store
     def reject(*a, **kw): raise AssertionError("admin metadata must not read object storage")
-    store = get_store("local")
+    store = get_store()
     for method in ("get", "read", "head", "exists", "access", "sign"):
         if hasattr(store, method): monkeypatch.setattr(type(store), method, reject)
     client, auth, _ = monitor

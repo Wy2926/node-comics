@@ -64,8 +64,7 @@ def test_control_worker_sigterm_drains_an_active_stage(tmp_path):
     env = {k: v for k, v in os.environ.items() if k.upper() in {
         'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'HOME', 'LANG'}}
     env.update(PYTHONPATH=str(Path(__file__).resolve().parents[1]),
-               APP_ENV='test', DEV_AUTH='true', DEV_AUTH_SECRET='isolated-signal-test-' * 3,
-               RESULT_STORAGE_BACKEND='local', R2_ENDPOINT_URL='')
+               APP_ENV='test', DEV_AUTH='true', DEV_AUTH_SECRET='isolated-signal-test-' * 3)
     result = subprocess.run([sys.executable, '-c', program], cwd=tmp_path, env=env,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr

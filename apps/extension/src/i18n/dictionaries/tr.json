@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Oturum açma süresi doldu, lütfen tekrar oturum açın.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Mevcut API hizmeti henüz bu arayüzü içermiyor. Lütfen API hizmetini güncelleyip yeniden başlatın ve tekrar deneyin.",
   "请求未完成（{0}）": "İstek eksik ({0})",
-  "每次匹配需提供 1–100 页。": "Eşleşme başına 1–100 sayfa gerekir.",
-  "服务器匹配结果与请求页标识不一致。": "Sunucu eşleştirme sonucu, istenen sayfa kimliğiyle tutarsız.",
   "图片访问地址无效。": "Görüntü erişim adresi geçersiz.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Görüntü geçici olarak indirilemiyor. Lütfen ağ veya nesne depolama alanının etki alanları arası yapılandırmasını kontrol edin.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "Görüntünün süresi dolmuş veya erişilemiyor. Lütfen yerel bir kopyayı saklayın veya tekrar yükleyin.",
-  "图片访问链接已过期，请重试。": "Resim erişim bağlantısının süresi doldu, lütfen tekrar deneyin.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "SHA-256 dosyası ve ham sayfa dizini bir çift olarak sağlanmalıdır.",
-  "图片 SHA-256 无效。": "Geçersiz görüntü SHA-256.",
   "返回我的漫画": "Çizgi romanlarıma dön",
   "主导航": "Ana navigasyon",
   "我的漫画": "Çizgi romanlarım",
@@ -953,5 +947,9 @@
   "取消自动续费": "Otomatik yenilemeyi iptal et",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "İptalden sonra ücretli ve hediye erişim hakları korunur. Başka yenileme ücreti alınmaz.",
   "确认取消续费": "İptali onayla",
-  "保留自动续费": "Otomatik yenilemeyi koru"
+  "保留自动续费": "Otomatik yenilemeyi koru",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "Özgün görüntü kullanılamıyor. Kaynağı veya yerel önbelleği geri yükleyin.",
+  "翻译文件校验失败，请重新加载。": "Çevrilmiş dosya doğrulanamadı. Yeniden yükleyin.",
+  "翻译协议已更新，请手动重新翻译此页。": "Çeviri protokolü değişti. Bu sayfayı elle yeniden çevirin.",
+  "翻译协议已更新，请更新插件。": "Çeviri protokolü değişti. Uzantıyı güncelleyin."
 }

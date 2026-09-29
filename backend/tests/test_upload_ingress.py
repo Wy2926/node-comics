@@ -1,4 +1,4 @@
-"""Bound upload resources without holding database connections across client/R2 I/O."""
+"""Bound upload resources without holding database connections across client/disk I/O."""
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -22,8 +22,6 @@ def ingress_case(storage_db, png):
     from app.config import settings
     from app.db import session_factory
     from app.models import User, uid
-    settings().result_storage_backend = 'local'
-    settings().r2_endpoint_url = ''
     owners, uploads = [], {}
     with session_factory()() as db:
         for index in range(2):
@@ -264,7 +262,7 @@ def test_cancelled_waiting_body_releases_slot_and_preserves_retry(ingress_case):
     asyncio.run(run())
 
 
-def test_cancel_during_r2_put_keeps_slot_and_heartbeat_until_thread_finishes(ingress_case, monkeypatch):
+def test_cancel_during_file_publish_keeps_slot_and_heartbeat_until_thread_finishes(ingress_case, monkeypatch):
     from app.db import engine
     from app.models import now
     from app import upload_ingress
@@ -276,11 +274,13 @@ def test_cancel_during_r2_put_keeps_slot_and_heartbeat_until_thread_finishes(ing
     entered, release = Event(), Event()
     put_connections = []
     class Store:
-        def put(self, *args, **kwargs):
+        def put_file(self, *args, **kwargs):
             put_connections.append(engine().pool.checkedout())
             entered.set()
             assert release.wait(5)
-    monkeypatch.setattr(upload_ingress, 'get_store', lambda backend: Store())
+            from app.storage import LocalStore
+            return LocalStore().put_file(*args, **kwargs)
+    monkeypatch.setattr(upload_ingress, 'get_store', lambda: Store())
 
     async def run():
         class Request:
@@ -438,7 +438,8 @@ def test_settings_changes_only_affect_new_upload_timeout_and_renewal(ingress_cas
             results = await asyncio.gather(
                 read_ingress_body(DelayedRequest(), old, asyncio.Event()),
                 read_ingress_body(DelayedRequest(), new, asyncio.Event()), return_exceptions=True)
-            assert results[0] == ingress_case['data']
+            assert results[0].read() == ingress_case['data']
+            results[0].close()
             assert isinstance(results[1], HTTPException) and results[1].status_code == 408
         asyncio.run(run())
     finally:

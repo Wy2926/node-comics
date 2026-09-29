@@ -150,7 +150,7 @@ export class DirectImageRuntime implements ChannelRuntime {
     let record: DirectOperation = {
       id: this.id(target), scope: this.scope.key, entryId: target.entryId, pageId: target.page.id,
       previousResult: previous?.job.status === 'succeeded' ? previous.job : previous?.previousResult,
-      job: {id: crypto.randomUUID(), input_asset_id: null, output_asset_id: null, image_sha256: target.page.imageSha256,
+      job: {id: crypto.randomUUID(),   image_sha256: target.page.imageSha256,
         mode: target.mode, target_language: this.options.language, status: 'running', phase: 'translating_text',
         created_at: created, updated_at: created, version: 1, quota_pages: 0, cache_hit: false},
     };

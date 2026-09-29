@@ -38,7 +38,7 @@ window.fetch=async(input)=>{
  const url=new URL(String(input),location.href),path=url.pathname;
  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
  if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
- if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights(),retention_days:0});
+ if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights()});
  const billing={offers:[monthly,annual],checkout_price:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:['free','exhausted','grants'].includes(scenario),gift:null,entitlement_expires_at:null,checkout_pending:false,subscription:['free','exhausted','grants'].includes(scenario)?null:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,cancel_at:null}};
  if(path==='/v1/billing/catalog')return Response.json({enabled:true,offers:billing.offers});
  if(path==='/v1/billing/status')return Response.json(billing);

@@ -17,7 +17,6 @@ from sqlalchemy import select
 from app.models import User, Asset, Job, Provider, now
 from app.providers import ProviderConfig
 from app.assets import create_asset
-from app.results import publish_result, ResultAccess
 from app.reader_api import Feedback
 from app.billing_catalog import initialize_catalog
 from app.billing_models import (BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingInvoice,
@@ -83,14 +82,13 @@ with session_factory()() as db:
         config={}, quota_pages=0, quota_kind='classic_unlimited', settlement='included', unknown_since=at)
     db.add_all([job, unknown])
     db.flush()
-    publish_result(db, job)
     db.add(TranslationRequest(owner_id=reader.id, id='11111111-1111-4111-8111-111111111111', job_id=job.id,
         request_hash='4' * 64, descriptor={}))
     db.flush()
     db.add(Feedback(id='fixture-feedback', owner_id=reader.id, job_id=job.id, translation_id='11111111-1111-4111-8111-111111111111', output_asset_id=output.id,
         issues=['typesetting'], comment='隔离样例：气泡文字需要调整字号。', idempotency_key='fixture-feedback', request_hash='3' * 64))
     db.add(UploadReservation(id='fixture-upload', job_id=unknown.id, owner_id=reader.id, mode='redraw',
-        expected_sha256=source.sha256, expected_size=source.byte_size, mime='image/png', storage_backend='local',
+        expected_sha256=source.sha256, expected_size=source.byte_size, mime='image/png',
         expires_at=at + timedelta(minutes=5), max_expires_at=at + timedelta(minutes=10)))
     db.add(ServiceHeartbeat(role='control-worker', instance_id='fixture-worker', heartbeat_at=at,
         last_success_at=at, consecutive_failures=0, failure_count=0))

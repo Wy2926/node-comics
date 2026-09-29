@@ -12,7 +12,7 @@ from .operations import LOG, Operations, configure_logging, report_fatal
 
 
 def main():
-    parser = argparse.ArgumentParser(description='NCNN/Vulkan whole-page compute v2 node')
+    parser = argparse.ArgumentParser(description='NCNN/Vulkan overlay compute v3 node')
     parser.add_argument('command', choices=['check', 'run', 'pending'])
     parser.add_argument('--config', default='node.local.json')
     parser.add_argument('--bundle-root')
@@ -43,7 +43,7 @@ def execute(args):
         config['engine']['font'] = list(map(str, fonts))
     if args.command == 'pending':
         from .journal import Journal
-        journal = Journal(config['state_dir'], config['journal_bytes'])
+        journal = Journal(config['state_dir'])
         try:
             return 1 if journal.leases() or journal.get('claim') else 0
         finally:
@@ -54,7 +54,7 @@ def execute(args):
         runtime = Runtime(config)
         try:
             runtime.warmup()
-            print(json.dumps({'protocol_version': 2, 'version': runtime.version,
+            print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
                 'inpainting_backend': runtime.engine.inpainter.backend}))
         finally:
@@ -68,7 +68,7 @@ def execute(args):
     from .journal import Journal
     # Own the state BEFORE loading GPU models or opening the rotating log.
     with ExitStack() as resources:
-        journal = Journal(directory, config['journal_bytes'])
+        journal = Journal(directory)
         resources.callback(journal.close)
         handler = configure_logging(directory / 'logs')
         resources.callback(handler.close)

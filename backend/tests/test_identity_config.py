@@ -7,8 +7,6 @@ from app.config import Settings
 def production(**changes):
     values = dict(_env_file=None, app_env="production", dev_auth=False,
         database_url="postgresql+psycopg://unused:unused@database.invalid/unused",
-        result_storage_backend="r2", r2_endpoint_url="https://" + "a" * 32 + ".r2.cloudflarestorage.com",
-        r2_bucket="isolated-test", r2_access_key_id="unused", r2_secret_access_key="unused",
         oidc_issuer="https://identity.example.test/oidc", oidc_audience="https://comics.example.test/api",
         oidc_jwks_url="https://identity.example.test/oidc/jwks", oidc_client_id="browser-client",
         oidc_authorization_endpoint="https://identity.example.test/oidc/auth",
@@ -73,7 +71,7 @@ def test_production_preflight_rejects_effective_development_mode(tmp_path):
     import sys
     environment = {**os.environ, "APP_ENV": "development", "DEV_AUTH": "true",
         "DEV_AUTH_SECRET": "isolated-cli-test-signature-never-product",
-        "RESULT_STORAGE_BACKEND": "local", "R2_ENDPOINT_URL": "",
+
         "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
     response = subprocess.run([sys.executable, "-m", "app.config", "--production"],
         cwd=tmp_path, env=environment, text=True, capture_output=True, timeout=10)
@@ -85,6 +83,6 @@ def test_production_preflight_rejects_effective_development_mode(tmp_path):
 def test_identity_validation_errors_do_not_disclose_configured_secrets():
     marker = "isolated-private-value-not-for-output"
     with pytest.raises(ValidationError) as failure:
-        production(dev_auth=True, dev_auth_secret=marker, r2_secret_access_key=marker,
+        production(dev_auth=True, dev_auth_secret=marker,
                    database_url=f"postgresql+psycopg://user:{marker}@database.invalid/unused")
     assert marker not in str(failure.value)

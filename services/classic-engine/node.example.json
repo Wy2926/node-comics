@@ -1,7 +1,6 @@
 {
-  "protocol_version": 2,
+  "protocol_version": 3,
   "control_url": "https://control.example.com",
-  "r2_origin": "https://ACCOUNT_ID.r2.cloudflarestorage.com",
   "node_id": "REPLACE_WITH_ADMIN_NODE_ID",
   "node_token": "REPLACE_WITH_NODE_CREDENTIAL_OR_SET_NODE_TOKEN",
   "resource_id": "machine:vulkan:0",
@@ -11,7 +10,6 @@
   "download_workers": 4,
   "delivery_workers": 4,
   "resident_bytes": 1073741824,
-  "journal_bytes": 536870912,
   "languages": ["zh-Hans", "zh-Hant", "en", "ja", "ko"],
   "engine": {
     "models": "models",

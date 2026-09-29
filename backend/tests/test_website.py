@@ -85,91 +85,30 @@ def test_unbuilt_website_does_not_break_api(tmp_path):
         assert client.get('/').status_code == 404
 
 
-def test_extension_download_only_signs_the_published_package(website, monkeypatch):
+def test_extension_download_redirects_to_published_permanent_url(website, monkeypatch):
     from app import website as module
-    calls = []
-    def sign(key, expires):
-        calls.append((key, expires))
-        return 'https://storage.example/package.zip?signed=test'
-    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
-    release = module.RELEASES[0]
-    response = website.get(release['path'] + '?key=private-image&expires=99999', follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers['location'] == 'https://storage.example/package.zip?signed=test'
-    assert response.headers['cache-control'] == 'private, no-store'
-    assert response.headers['referrer-policy'] == 'no-referrer'
-    assert calls == [(f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}', 600)]
+    releases = [dict(row, download_url='https://packages.example/' + row['filename']) for row in module.RELEASES]
+    monkeypatch.setattr(module, 'RELEASES', releases)
+    for release in releases:
+        for method in (website.get, website.head):
+            response = method(release['path'] + '?key=private-image&expires=99999', follow_redirects=False)
+            assert response.status_code == 308
+            assert response.headers['location'] == release['download_url']
+            assert response.headers['referrer-policy'] == 'no-referrer'
+        assert website.post(release['path']).status_code == 405
     assert website.get('/downloads/private-image.zip').status_code == 404
-    assert website.post(release['path']).status_code == 405
-    head = website.head(release['path'])
-    assert head.status_code == 200 and head.content == b''
-    assert head.headers['content-length'] == str(release['bytes'])
-    assert len(calls) == 1
 
 
-def test_extension_download_failure_is_retryable_and_not_cached(website, monkeypatch):
+@pytest.mark.parametrize('url', ['', 'http://packages.example/a.zip', 'https://user:secret@packages.example/a.zip',
+    'https://packages.example/a.zip?X-Amz-Signature=temporary', 'https://packages.example/a.zip#fragment'])
+def test_extension_download_rejects_unconfigured_or_non_permanent_url(website, monkeypatch, url):
     from app import website as module
-    def unavailable(backend):
-        raise module.StorageError()
-    monkeypatch.setattr(module, 'get_store', unavailable)
-    response = website.get(module.RELEASES[0]['path'])
+    release = dict(module.RELEASES[-1], download_url=url)
+    monkeypatch.setattr(module, 'RELEASES', [release])
+    response = website.get(release['path'], follow_redirects=False)
     assert response.status_code == 503
     assert response.headers['retry-after'] == '60'
     assert response.headers['cache-control'] == 'private, no-store'
-
-
-def test_platform_downloads_sign_separate_objects_and_reject_removed_shared_package(website, monkeypatch):
-    from app import website as module
-    calls = []
-    def sign(key, expires):
-        calls.append(key)
-        return 'https://storage.example/package.zip'
-    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
-    for browser in ['chrome', 'edge']:
-        release = next(item for item in module.RELEASES if item['version'] == '0.2.0' and item['browser'] == browser)
-        assert release['filename'] == f'node-comics-0.2.0-{browser}.zip'
-        response = website.get(release['path'], follow_redirects=False)
-        assert response.status_code == 302
-        assert calls[-1] == f'releases/extensions/0.2.0/{release["sha256"]}/{release["filename"]}'
-        assert website.head(release['path']).headers['content-length'] == str(release['bytes'])
-    assert len(set(calls)) == 2
-    assert website.get('/downloads/node-comics-0.2.0-chromium.zip', follow_redirects=False).status_code == 404
-
-
-def test_prior_versions_remain_downloadable(website, monkeypatch):
-    from app import website as module
-    prior = dict(module.RELEASES[0], version='0.0.9', filename='node-comics-0.0.9-chromium.zip',
-                 path='/downloads/node-comics-0.0.9-chromium.zip')
-    monkeypatch.setattr(module, 'RELEASES', [*module.RELEASES, prior])
-    calls = []
-    def sign(key, expires):
-        calls.append(key)
-        return 'https://storage.example/package.zip'
-    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
-    for release in module.RELEASES:
-        assert website.get(release['path'], follow_redirects=False).status_code == 302
-    assert '/0.0.9/' in calls[-1]
-
-
-def test_firefox_signed_download_preserves_xpi_metadata(website, monkeypatch):
-    from app import website as module
-    release = next(item for item in module.RELEASES if item['browser'] == 'firefox')
-    calls = []
-    def sign(key, expires):
-        calls.append((key, expires))
-        return 'https://storage.example/package.xpi'
-    monkeypatch.setattr(module, 'get_store', lambda backend: SimpleNamespace(download_url=sign))
-    head = website.head(release['path'])
-    assert head.status_code == 200 and head.content == b''
-    assert head.headers['content-type'] == 'application/x-xpinstall'
-    assert head.headers['content-length'] == str(release['bytes'])
-    assert head.headers['content-disposition'] == f'attachment; filename="{release["filename"]}"'
-    assert calls == []
-    response = website.get(release['path'], follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers['cache-control'] == 'private, no-store'
-    assert calls == [(f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}', 600)]
-    assert website.get(release['path'].replace('.xpi', '.zip')).status_code == 404
 
 
 def test_real_api_guard_does_not_make_private_routes_public(client, tmp_path, monkeypatch):

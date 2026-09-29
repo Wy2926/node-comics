@@ -54,10 +54,10 @@ class FixtureRuntime:
         time.sleep(.005)
         return rgb.copy()
 
-    def render(self, cleaned, analysis, translated, language, alpha):
+    def render(self, original, cleaned, analysis, translated, language, alpha):
         image = Image.fromarray(cleaned)
         image.putpixel((10, 10), (1, 2, 3))
-        return pack_result(image, self.version, analysis, translated)
+        return pack_result(image, original, alpha, self.version, analysis, translated)
 
 
 class SimulatedTransport:
@@ -119,7 +119,7 @@ class SimulatedTransport:
     def post(self, path, body):
         server, expires = self.clock()
         if path.endswith('/register'):
-            return {'protocol_version': 2, 'config': self.config, 'leases': [], 'server_time': server}
+            return {'protocol_version': 3, 'config': self.config, 'leases': [], 'server_time': server}
         if path.endswith('/updates'):
             time.sleep(.05)
             with self.lock:
@@ -144,8 +144,8 @@ class SimulatedTransport:
                         'config': {'engine': {'version': self.runtime.version}},
                         'input': {'sha256': hashlib.sha256(self.data).hexdigest(), 'byte_size': len(self.data),
                                   'width': width, 'height': height, 'mime': 'image/png',
-                                  'url': 'https://fixture.invalid/' + key,
-                                  'server_time': server, 'url_expires_at': expires}}
+                                  'path': '/internal/compute/v3/leases/' + key + '/input',
+                                  'normalization_version': 1}}
                     self.leases[key] = lease
                     leases.append(lease)
                 self.peak_leases = max(self.peak_leases, len(self.leases) - len(self.done))
@@ -163,41 +163,37 @@ class SimulatedTransport:
             with self.lock:
                 self.analyses[key] = body['analysis']
             return {'receipt': None}
-        if path.endswith('/output/authorize'):
-            self.results[key] = body['result']
-            return {'result_hash': digest(body['result']), 'key': key}
         if path.endswith('/complete'):
-            self.gate('complete', key)
-            assert 'error' not in body, body.get('error')
-            assert body['etag'] == self.results[key]['output']['md5']
-            receipt = {'status': 'terminal', 'lease_id': key}
-            with self.lock:
-                assert key not in self.done, 'Duplicate settlement'
-                self.done[key] = receipt
-            return receipt
+            raise AssertionError(body.get('error'))
         raise AssertionError('Unexpected endpoint: ' + path)
 
-    def download(self, metadata, check):
-        self.gate('download', metadata['url'].rsplit('/', 1)[-1])
+    def download(self, key, token, metadata, check):
+        self.gate('download', key)
         check()
         return self.data
 
-    def upload(self, authorization, data, info, check):
-        self.gate('upload', authorization['key'])
+    def deliver(self, key, body, data, check):
+        self.gate('upload', key)
         check()
+        info = body['result']['output']
         assert len(data) == info['byte_size']
         assert hashlib.sha256(data).hexdigest() == info['sha256']
         with Image.open(BytesIO(data)) as image:
             image.load()
             assert image.size == (info['width'], info['height'])
-        return info['md5']
+        self.gate('complete', key)
+        receipt = {'status': 'terminal', 'lease_id': key}
+        with self.lock:
+            assert key not in self.done, 'Duplicate settlement'
+            self.done[key] = receipt
+        return receipt
 
 
 def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_pages=2):
     runtime = runtime or FixtureRuntime()
     data = fixture_image()
     transport = SimulatedTransport(runtime, scenario, total, data)
-    journal = Journal(directory, 512 * 1024 * 1024)
+    journal = Journal(directory)
     config = {'node_id': 'pressure', 'resource_id': 'fixture', 'engine': {'gpu': 0},
               'max_leases': 8, 'local_pages': local_pages, 'delivery_workers': 4,
               'download_workers': 4, 'resident_bytes': 1024 * 1024 * 1024}
@@ -297,7 +293,7 @@ def main():
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps({'real_image_models': bool(runtime),
                 'engine_version': runtime.version if runtime else 'fixture',
-                'external_llm_or_r2': False, 'rows': rows}, indent=2), encoding='utf-8')
+                'external_provider': False, 'rows': rows}, indent=2), encoding='utf-8')
     finally:
         if runtime:
             runtime.close()

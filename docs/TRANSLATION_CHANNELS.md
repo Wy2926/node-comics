@@ -13,7 +13,8 @@
 | `channels/adapters/manga-translator-ui/` | MTU 登录、语言映射、表单与错误映射 |
 | `channels/transport/` | 与协议无关的直传执行、本地排程、执行回执和长请求宿主 |
 | `translation/automatic.ts`、`useAutomaticTranslation.ts` | 当前页与后三页窗口、渠道运行器调用及显示更新 |
-| `storage/translations/` | 按渠道作用域保存、校验和读取译图 |
+| `storage/translations/` | 按渠道作用域保存、校验和读取结果文件，有限内存保留合成页 |
+| `translation/materialize.ts` | 官方结果验证及原生尺寸覆盖合成，供阅读器、原位、导出共用 |
 
 `ChannelDefinition` 声明配置字段并建立连接；`ChannelConnection` 提供能力、作用域、结果读取和运行器工厂；`ChannelRuntime` 提供 `init/submit/manual/wait/stateFor/refresh/dispose`。`submit` 更新阅读窗口并启动工作，不等待整张译图。官方查询与恢复留在官方运行器内，MTU 运行器只等待一次图片 HTTP 调用的结果。
 
@@ -21,12 +22,12 @@
 
 ## 两个渠道的执行约定
 
-**NodeLane** 保留[官方翻译接口与恢复契约](READING_TRANSLATION_CONTRACT.md)：登录后受理请求、必要时补传原图、按 UUID 查询、下载完成结果。网络未知结果不能自动生成新 UUID；查询或下载失败不能触发重译。退出账号仍隔离该账号的结果。未登录时展示模式与登录入口，不发送翻译请求。
+**NodeLane** 保留[官方翻译接口与恢复契约](READING_TRANSLATION_CONTRACT.md)：登录后受理请求、必要时补传原图、按 UUID 查询、从中心鉴权读取完成结果。能力声明 `overlay-v1`，全部 translation 请求携带同一协议头；常规返回覆盖文件，重绘返回完整图片，无字／无可见变化返回 `original` 无文件。旧输入与结果不进入新账户 scope，旧 UUID 仅保留最小信息用于只读核实，具体切换行为以官方契约为准。网络未知结果不能自动生成新 UUID；查询或下载失败不能触发重译。退出账号仍隔离该账号的结果。未登录时展示模式与登录入口，不发送翻译请求。
 
 **MTU** 仅实现以下接口，对照版本为 [`hgmzhn/manga-translator-ui@2130ccb`](https://github.com/hgmzhn/manga-translator-ui/tree/2130ccb108dea055e6e105e9aa7d3cfb52f4150d)：
 
 1. `POST /auth/login`：提交用户名、密码，取得渠道 Token；密码不保存。
-2. `POST /translate/with-form/image`：`X-Session-Token` 鉴权，multipart 提交 `image` 与 JSON 字符串 `config`；`config.translator.target_lang` 使用 MTU 语言代码。完成后读取并解码验证图片。
+2. `POST /translate/with-form/image`：`X-Session-Token` 鉴权，multipart 提交 `image` 与 JSON 字符串 `config`；`config.translator.target_lang` 使用 MTU 语言代码。完成后读取并解码验证完整图片；MTU 不要求实现官方覆盖协议。
 
 MTU 首期仅提供常规翻译，使用服务端其余默认配置；不接流式接口、历史任务、远端取消、远端恢复或自动故障切换。Token 失效后在渠道设置重新连接；不会隐式重发翻译。
 
@@ -37,7 +38,8 @@ MTU 首期仅提供常规翻译，使用服务端其余默认配置；不接流�
 - 请求从后台交给宿主、或阅读器交给直传执行器时，必须等执行器实际持有请求锁后才确认接收并释放启动锁；中断判定按启动锁、请求锁的顺序原子检查，避免跨进程锁登记延迟造成误判。确认接收不等待整张图片完成。
 - 渠道切换使原上下文失效；晚到结果归属原作用域，不覆盖新渠道。MTU 是否可调用由实际连接决定，不以互联网离线状态阻止本机服务。
 - 本地作用域为配置 ID 与配置修订；官方作用域为服务与账号身份。修改服务配置改变修订；重命名、刷新 Token 不让已有译图失效。凭据不进入作用域、日志或图片回执。
-- 结果记录声明是否可从渠道重新读取。官方缓存缺失可以重新下载；MTU 缓存缺失只提示手动重译。已有译图导出只读取现有结果，不创建翻译请求。
+- `readResult(job, signal, original)` 对外始终返回可显示完整图片。官方用原图回调及 `materializeResult` 核验实际送译摘要、尺寸与覆盖描述；reader／inline／export 共用这条路径。`original` 表示原图读取回调，不是中心下载权限。
+- 官方持久缓存只保存 artifact 与任务描述，合成整页最多保留四页有界内存。覆盖层缺失可重新鉴权下载；原图只从来源缓存或同一来源恢复，缺失不自动重译。MTU 仍缓存其完整结果，缺失只提示手动重译。已有译图导出只读取现有结果，不创建翻译请求。
 - 译图预算为 0 时不持久保存译图，但允许活跃扩展上下文保留少量内存图片并相互读取；最后持有图片的上下文关闭后，本地结果需要重译。后台从共享偏好读取预算并跟随修改；清理操作同时使在途旧结果和其他上下文中的缓存失效。
 
 ## 验证
@@ -52,7 +54,7 @@ npm run build
 
 针对性检查可使用 `npm test -- tests/module-boundaries.test.ts tests/translation-resources.test.ts tests/translation-content-recovery.test.ts src/translation/channels/adapters/nodelane/definition.test.ts`；MTU 协议、直传与缓存测试位于对应模块及 `tests/result-cache.test.ts`。
 
-渠道设置与阅读器交互检查：先在 `apps/extension` 执行 `npm run dev -- --port 5176`，再在仓库根运行 `node scripts/verify_translation_channels.mjs`。它在新浏览器上下文验证失败登录、未登录使用 MTU、渠道与模式切换、阅读位置、缓存清理后的显式重译及本机服务在互联网离线标记下的调用。官方阅读窗口和原位翻译分别运行 `scripts/verify_reading_translations.mjs` 与 `scripts/verify_inline_translation.mjs`。
+渠道设置与阅读器交互检查：先在 `apps/extension` 执行 `npm run dev -- --port 5176`，再在仓库根运行 `node scripts/verify_translation_channels.mjs`。它在新浏览器上下文验证失败登录、未登录使用 MTU、渠道与模式切换、阅读位置、缓存清理后的显式重译及本机服务在互联网离线标记下的调用。官方阅读窗口和原位翻译分别运行 `scripts/verify_reading_translations.mjs` 与 `scripts/verify_inline_translation.mjs`；覆盖像素、首帧、EXIF/ICC 与摘要校验运行 `scripts/verify_translation_overlay.mjs`。
 
 MTU 宿主的浏览器检查从仓库根目录执行 `node scripts/verify_translation_channel_host.mjs`，先完成上面的 Chrome 扩展构建。需要可用的 Playwright 与支持扩展的 Chromium；非本地依赖可通过 `PLAYWRIGHT_MODULE` 指定 Playwright 模块路径，`CHROMIUM_PATH` 或 `TEST_CHROMIUM` 指定浏览器可执行文件。脚本复制构建产物到独立目录、使用新浏览器资料与合成图片，并仅在副本授予本机测试源权限；不会连接用户的 MTU 服务或使用用户资料。
 

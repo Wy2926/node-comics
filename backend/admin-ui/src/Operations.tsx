@@ -7,18 +7,14 @@ const common = [c('id', '编号'), c('owner_id', '用户')];
 const catalog = {
   uploads: {title: '上传会话', filters: ['owner_id', 'job_id', 'status'], columns: [...common, c('job_id', '任务'), c('status', '状态'),
     c('expected_size', '期望字节数'), c('expires_at', '到期', 'time'), c('ingress_expires_at', '上传占位到期', 'time'), c('error_code', '错误码'), c('error_message', '原因')]},
-  requests: {title: '翻译请求', filters: ['owner_id', 'job_id', 'request_id', 'access_id'], columns: [c('owner_id', '用户'), c('id', '请求编号'),
-    c('job_id', '真实任务'), c('access_id', '复用授权'), c('created_at', '受理时间', 'time')]},
+  requests: {title: '翻译请求', filters: ['owner_id', 'job_id', 'request_id'], columns: [c('owner_id', '用户'), c('id', '请求编号'),
+    c('job_id', '真实任务'), c('created_at', '受理时间', 'time')]},
   assets: {title: '图片记录', filters: ['owner_id', 'q', 'job_id'], columns: [...common, c('sha256', '图片哈希'), c('kind', '类型'),
-    c('available', '访问记录有效'), c('byte_size', '字节数'), c('active_references', '活跃引用'), c('result_access_count', '结果授权引用'),
-    c('file_page_count', '文件页映射'), c('last_accessed_at', '最近授权访问', 'time'), c('deleted_at', '撤销时间', 'time')]},
-  'file-pages': {title: '文件页映射', filters: ['owner_id', 'file_hash', 'asset_id'], columns: [c('owner_id', '用户'), c('file_hash', '文件哈希'), c('page_index', '原始页索引'), c('asset_id', '图片编号')]},
+    c('available', '访问记录有效'), c('byte_size', '字节数'), c('active_references', '活跃引用'), c('job_count', '任务引用'), c('deleted_at', '撤销时间', 'time')]},
   results: {title: '生成版本', filters: ['owner_id', 'q', 'mode'], columns: [...common, c('mode', '模式'), c('target_language', '目标语言'), c('version', '版本'),
-    c('status', '生成状态'), c('access_count', '复用授权数'), c('input_asset_id', '原图'), c('output_asset_id', '译图'), c('generated_at', '生成时间', 'time')]},
-  accesses: {title: '结果授权', filters: ['owner_id', 'result_id'], columns: [...common, c('result_id', '生成任务'), c('version', '版本'), c('available', '有效'),
-    c('input_asset_id', '原图访问记录'), c('output_asset_id', '译图访问记录'), c('created_at', '授权时间', 'time')]},
+    c('status', '生成状态'), c('request_count', '有效请求数'), c('input_asset_id', '原图'), c('output_asset_id', '译图'), c('generated_at', '生成时间', 'time')]},
 } as const;
-const fieldLabels: Record<string, string> = {owner_id: '用户 ID', job_id: '任务 ID', status: '状态', request_id: '请求编号', access_id: '复用授权 ID', q: '图片哈希 / 编号', mode: '翻译模式', file_hash: '文件哈希', asset_id: '图片 ID', result_id: '生成任务 ID'};
+const fieldLabels: Record<string, string> = {owner_id: '用户 ID', job_id: '任务 ID', status: '状态', request_id: '请求编号', q: '图片哈希 / 编号', mode: '翻译模式', asset_id: '图片 ID'};
 type View = 'health' | 'user' | 'provider-history' | keyof typeof catalog;
 type Health = {items: Row[]; alerts: Record<string, number>; billing_backlog: Row[]; generated_at: string};
 type UserDiagnostics = {owner_id: string; owner_name: string; image_budget: {limit: number; remaining: number; retry_after_seconds: number};

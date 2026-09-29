@@ -1,102 +1,135 @@
 # 总中心与计算节点协议
 
-常规翻译使用 v2 整页协议，中心实现为 [compute_v2.py](../backend/app/compute_v2.py)，节点为 [classic-engine](../services/classic-engine/README.md)。不兼容旧阶段 API、旧上传收据或旧节点配置；同属 v2 的持久领取与完成回执继续按原内容重放。AI 重绘使用中心独立执行池。
+本文描述仓库中的 **v3 整页计算协议**。中心实现为 [compute_v3.py](../backend/app/compute_v3.py)，节点为 [classic-engine](../services/classic-engine/README.md)。部署需配套更新中心、节点和客户端；旧节点协议不提供兼容入口。AI 重绘仍由中心独立执行池处理。
 
 ## 职责与执行位
 
-中心负责受理、公平分配、授权、文本调用、持久检查点和一次结算；可信自管节点负责图像计算、PNG／alpha 正确性及上传回执。`execution_slots` 表示未释放的整页租约数，包含等待文本和交付，不是 GPU 并发数。并发 claim 和到期未回收租约均计入容量。每个领取事务最多分配 4 页，逐页校验容量并更新公平排序；节点有接单余量时连续领取，不等待固定轮询间隔。
+中心负责受理、公平分配、租约授权、文本调用、持久检查点和一次结算；可信自管节点负责检测、OCR、抹字、固定字体嵌字及无损覆盖输出。节点质量声明不等于中心已验收模型效果。
 
-缩容与停用只约束新领取，用户取消要求节点停止并确认。节点按已确认的租约截止停止启动工作；短租约与整页／文本等待／交付时限分别有界。配置默认值与语言能力见[节点配置](NODE_CONFIGURATION.md)。
+`execution_slots` 是未释放整页租约数，下载、等待文本、交付均占租约；GPU 计算并发由节点的 `local_pages` 控制。新 claim 每批最多分配 4 页，并发 claim 和到期未回收租约均计入容量。缩容、停用只限制新领取；取消要求停止本地工作并确认。配置默认值与语言能力见[节点配置](NODE_CONFIGURATION.md)。
 
 ```mermaid
 sequenceDiagram
     participant N as 图像节点
     participant C as 中心与文本池
-    participant S as 私有 R2
+    participant F as 中心私有磁盘
     N->>C: 注册、claim 整页租约
-    C-->>N: 输入摘要、短期 GET 授权、检查点
-    N->>S: 下载原图并核对摘要
+    C-->>N: 当前租约、相对输入路径、摘要、检查点
+    N->>C: GET input，节点身份 + 租约令牌
+    C->>F: 读取任务临时原图
+    C-->>N: 有界图片字节
     N->>C: analysis 幂等检查点
-    Note over N,C: 中心翻译文本，节点可并行抹字
-    N->>C: updates 长轮询租约与译文变化
+    Note over N,C: 中心翻译文本，节点并行抹字
+    N->>C: 独立 updates 长轮询
     C-->>N: 持久译文或停止状态
-    Note over N,C: 独立 heartbeat 续租，claim 按本地余量补领
-    N->>N: 嵌字、冻结 PNG 与摘要
-    N->>C: output/authorize
-    C-->>N: 限定对象与元数据的 PUT 授权
-    N->>S: 上传并保存 ETag
-    N->>C: complete 元数据与回执
-    C->>C: 核对租约、版本、摘要，登记并结算
-    C-->>N: 持久终态回执
+    N->>N: 嵌字，冻结覆盖文件与完成描述
+    N->>C: 一次 PUT result，metadata + output
+    C->>F: 耐久发布不可变结果
+    C->>C: 复核租约与版本，提交成功和一次结算
+    C-->>N: 稳定终态回执
+    Note over N,C: 中心清理临时原图，节点清理冻结结果
 ```
 
-## 存储与信任边界
+## 传输与信任边界
 
-授权只覆盖当前租约的原图 GET 或冻结结果 PUT，最长 60 秒且不晚于执行授权截止。已经签出的 URL 在剩余有效期内可能仍可使用；取消或凭据轮换立即阻止后续签发与提交，不能撤销 R2 已签链接。
+所有路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；节点只接受当前租约的精确相对输入路径，不接受外部 URL、任意跳转或源站凭据。原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。
 
-节点使用独立无控制凭据的 R2 客户端，仅接受配置的精确 HTTPS 端点，禁止任意跳转；按上限读取并核对摘要。403 有限续签，404／摘要或内容错误有界失败。缓存不延长执行权。签名响应不缓存，默认日志不写 URL、原始异常、图片或 OCR 全文。
+原图 GET 额外携带 `X-Lease-Token`，中心核对节点、租约令牌、代次、取消状态和期限后直接返回字节。已经开始的流式读取有界完成或被客户端中断；取消立即阻止后续读取和交付，不能召回已经下载的字节。节点验证长度与 SHA-256，缓存不延长执行权。
 
-PUT 绑定长度、MIME、MD5、`If-None-Match: *` 与私有缓存策略。中心完成接口只核对元数据和 ETag，不 GET／HEAD 原图或译图、不做像素验收或结果 PUT；该协议不用于证明不可信公开节点的产物。响应丢失时继续同一冻结对象，412 表示不可变对象已存在；中心回执丢失只重交元数据。
+JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False)` 的 SHA-256；文件摘要直接散列字节。默认日志不写图片、OCR 全文、令牌或原始异常。
 
-## 具体消息
+## 消息
 
-所有路径以前缀 `/internal/compute/v2` 开始，请求头携带 `Authorization: Bearer <node_token>` 与 `X-Node-Id`。控制 URL 和 R2 URL 的客户端隔离；节点对 R2 不发送控制凭据。摘要统一为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'))` 的 SHA-256；图片摘要直接散列原始字节。禁止 NaN／Infinity。
-
-| 操作 | 请求字段 | 主要响应 |
+| 操作 | 请求 | 响应 |
 | --- | --- | --- |
-| `POST /nodes/register` | `protocol_version:2`、`engine_version`、`resource_id`、`device`、`supported_languages`、`ready` | `protocol_version`、`server_time`、`config`、该身份未释放的 `leases` |
-| `POST /nodes/{id}/claim` | `request_id`、`config_version`、`count`（容量请求，1–32） | 原 `request_id`、`server_time`、`config`、`leases`；新请求每批最多 4 页，也可少于请求值或为空；历史回执原样重放；空批仍有可领任务时可附 `retry_after_seconds`（0.1–0.3） |
-| `POST /nodes/{id}/updates` | `revision`、`wait_seconds`（0–20）、`config_version`、`can_claim`、`leases:[{lease_id,lease_token,translations_revision}]`（最多 32 项） | `revision`、`claim_ready`、变化的 `leases`；配置版本变化时带 `config`；不续租、不领取 |
-| `POST /nodes/{id}/heartbeat` | `config_version`、`leases:[{lease_id,lease_token,translations_revision,phase}]` | `server_time`、`config`、逐项续期／停止／终态回执；译文有更新才返回正文 |
-| `POST /leases/{id}/analysis` | `lease_token`、`analysis_hash`、`analysis` | `analysis_hash`、`receipt`；有文字时为 null，无文字时为稳定终态 |
-| `POST /leases/{id}/input/authorize` | `lease_token` | 新下载授权和输入元数据，绝不返回图片字节 |
-| `POST /leases/{id}/output/authorize` | `lease_token`、`result` 元数据 | 临时 PUT `url`、必须原样发送的 `headers`、有效期、`result_hash`；已完成返回 `receipt` |
-| `POST /leases/{id}/complete` | `lease_token`、`result`＋`etag` 或 `error:{code}`，二选一；可带独立 `timings` | 稳定 `terminal` 回执 |
+| `POST /nodes/register` | `protocol_version:3`、引擎版本、资源 ID、设备、语言、ready | 协议版本、server_time、config、该身份未释放的 leases |
+| `POST /nodes/{id}/claim` | request_id、config_version、count（1–32） | 原 request_id、server_time、config、leases；新分配最多 4 页；空批可带短退避提示 |
+| `POST /nodes/{id}/updates` | revision、wait_seconds（0–20）、config_version、can_claim、最多 32 项 leases 快照 | revision、claim_ready、变化的 leases；配置变化时带 config；不续租、不领取 |
+| `POST /nodes/{id}/heartbeat` | config_version、leases 中的 lease_id、lease_token、translations_revision、phase | server_time、config、逐项续期／停止／终态；只返回更新的译文 |
+| `POST /leases/{id}/analysis` | lease_token、analysis_hash、analysis | analysis_hash、receipt；有文字时 receipt 为 null，无文字时为稳定终态 |
+| `GET /leases/{id}/input` | 节点头与 X-Lease-Token | 原图二进制；不跳转、不签名 |
+| `PUT /leases/{id}/result` | multipart：一个 metadata 字符串字段、最多一个 output 文件 | 稳定 terminal 回执本体 |
+| `POST /leases/{id}/complete` | lease_token、error:{code}，可带 timings | 错误或停止确认的稳定 terminal 回执；不接受结果图片 |
 
-活动 lease 包含 `lease_id`、`lease_token`、`job_id`、`generation`、`status:active`、`expires_at`、`limits`、`input`、`config.engine`、`language`、已有 `analysis`／`analysis_hash`／`translations`。`input` 包含 `url`、`url_expires_at`、`server_time`、`sha256`、`byte_size`、`mime`、`width`、`height`。GET 授权最多 60 秒，且早于已确认租约截止；签名不访问远端对象。每次授权、成功心跳记录原图授权访问时间。
+活动 lease 含 lease_id、lease_token、job_id、generation、status:active、expires_at、limits、input、config.engine、language，以及已有 analysis／analysis_hash／translations。输入描述固定为：
 
-译文包为 `{analysis_hash, language, translations:{segment_id:text}, revision}`，`revision` 是前三项组成对象的摘要。只有 text 工作成功后才发送完整译文。`updates` 的活动增量为 `{lease_id,status:active,translations}`，不包含 `expires_at`、输入授权或图片；相同译文 revision 不重复返回。中心逐项校验节点、令牌、代次、取消状态和期限，失效项返回 `stop`，已完成项返回终态回执。节点直接应用这些增量，独立心跳默认每 10 秒续租；长轮询响应不能延长本地执行截止，迟到的活动响应不能恢复已停止或已终结页面。
+```json
+{
+  "path": "/internal/compute/v3/leases/<lease-id>/input",
+  "sha256": "<实际送译字节摘要>",
+  "byte_size": 12345,
+  "mime": "image/png",
+  "width": 1600,
+  "height": 2400,
+  "normalization_version": 1
+}
+```
 
-最终 `result` 包含 `version`、`input_hash`、`analysis_hash`、`translations_revision` 和 `output:{sha256,md5,byte_size,width,height,mime}`，必须绑定当前分析和完整译文；`mime` 固定为 `image/png`。结果图片不经过中心，旧图片／掩膜字段被拒绝。
+输入必须已规范化为静态单帧和 sRGB：EXIF 方向为 1／缺省；带 ICC 的源图必须先完成颜色转换，再移除 ICC，节点拒绝仍带 ICC 的输入。节点不变换已绑定摘要的输入。当前节点接受 PNG、JPEG、WebP，最多 2400 万像素、单边 8192；中心另执行请求实际字节上限。
 
-分析的 `regions` 保留 manhua-engine 的分组几何和排版参数，同时提供中心要求的四点 `lines`；`segments` 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。分析不超过 4 MiB。节点保留原图 alpha、编码最终 PNG，并在申请上传授权前冻结最终字节与摘要；中心只核对元数据尺寸、长度和版本，不验收像素。R2 签名 PUT 绑定固定长度、MIME、MD5 与禁止覆盖条件，中心完成接口只接受登记元数据及 ETag。
+analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 4 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。相同分析重复提交不会重新打开文本任务。
 
-`status:stop` 携带固定 `code`；节点必须先停止／排空本地工作，再用 `error:{code:LEASE_STOPPED}` 确认。已结束 lease 返回 `status:terminal`，包含 `outcome`、`job_status`、`result_hash`、`completed_at`。一个失效／错误令牌不影响同批其他租约。
+译文为 `{analysis_hash, language, translations:{segment_id:text}, revision}`，revision 是前三项组成对象的摘要。只有 text 成功后才发送完整译文。updates 增量为 `{lease_id,status:active,translations}`，不带输入或 expires_at；相同 revision 不重发正文。长轮询不延长执行截止，迟到的活动响应不能恢复已停止页面。
 
-节点失败仅上传固定代码，不上传原始异常或图片文字。允许的错误包括 `ENGINE_UNAVAILABLE`、`CLASSIC_LOCAL_INTERRUPTED`、`INPUT_INVALID`、`INPUT_HASH_MISMATCH`、`STORAGE_AUTH_FAILED`、`STORAGE_UNAVAILABLE`、`CLASSIC_ANALYZE_FAILED`、`CLASSIC_INPAINT_FAILED`、`CLASSIC_RENDER_FAILED`、`ENGINE_VERSION_MISMATCH`、`TEXT_DEADLINE_EXCEEDED`、`DELIVERY_DEADLINE_EXCEEDED`、`PAGE_DEADLINE_EXCEEDED` 和 `LEASE_STOPPED`。
+## 覆盖结果与一次提交
+
+节点在原图 RGB 上完成抹字和嵌字，只编码有可见变化的像素；裁剪到最小整数 bbox，变化位置保存最终 RGB、alpha=255，其他位置为透明。文件是单帧无损 WebP。原图 alpha 为 0 的隐藏 RGB 不扩张 bbox；有文字但最终无可见变化时使用 original 表示，不附文件。检测或嵌字失败不能伪装成成功。
+
+客户端在原生尺寸底图上以整数坐标 1:1 使用 `source-atop`，保留底图 alpha，之后整体缩放。规范化、原图身份、缓存和导出统一见[集群设计](TRANSLATION_CLUSTER_DESIGN.md#3-覆盖层格式与客户端合成)。
+
+metadata 是 JSON 文本：
+
+```json
+{
+  "lease_token": "<当前租约令牌>",
+  "result": {
+    "version": "<引擎版本>",
+    "input_hash": "<送译摘要>",
+    "analysis_hash": "<分析摘要>",
+    "translations_revision": "<译文版本>",
+    "representation": "overlay-v1",
+    "normalization_version": 1,
+    "width": 1600,
+    "height": 2400,
+    "bbox": {"x": 80, "y": 120, "width": 1300, "height": 1900},
+    "output": {
+      "sha256": "<WebP字节摘要>",
+      "byte_size": 48320,
+      "width": 1300,
+      "height": 1900,
+      "mime": "image/webp"
+    }
+  },
+  "timings": {}
+}
+```
+
+result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bbox 不得越界。original 的 bbox/output 均为 null，并省略 output 文件。metadata 最多 64 KiB，output 受中心 `cluster_max_result_bytes` 约束，与原图 `max_upload_bytes` 分开；节点编码和传输上限为 88 MiB，与中心默认值一致。这是单文件协议限制，不作为磁盘容量准入。未知字段、多余文件或重复字段均被拒绝。timings 不参与 result 摘要。
+
+中心先冻结提交摘要和交付意图，在调度锁外检查文件长度、SHA-256、解码尺寸和二值 alpha。校验完成后再次检查租约及最早截止，在短事务中持久化受理时间与截止快照，然后耐久发布文件。最终事务与崩溃恢复共用同一规则：必须有及时受理记录、当前执行代次、对应分析/译文版本且未取消，才能提交 Job 结果描述、产物关联、任务成功、一次结算和稳定回执。无文件 original 也必须完成请求校验后才能受理。恢复与清理规则以[文件存储](OBJECT_STORAGE.md#文件发布与恢复)为准。
+
+节点在发请求前，以同一 SQLite 事务将 completion JSON 和覆盖字节 BLOB 写入本地恢复数据库；不存结果 base64，也不另建文件确认流程。响应丢失时重交相同描述与二进制，中心返回原回执。只保留未完成领取和未确认租约，终态后同事务清除记录与字节，SQLite 自动回收空闲页；不为恢复数据库设置容量领取门槛，也不按时间清除未确认交付。同租约不同摘要冲突，旧代次不能覆盖新结果。中心文件已耐久发布而最终事务未提交时，maintenance 可复核当前代次恢复交付，不重新调用文本模型。
+
+无字仍通过 analysis 的终态回执完成。stop 携带固定 code；节点排空本地工作后发送 `error:{code:LEASE_STOPPED}`。terminal 含 lease_id、outcome、job_status、result_hash、completed_at。一个错误令牌不影响同批其他租约。失败只传固定代码，不传异常正文；允许代码以 [NodeError](../backend/app/compute_v3.py) 为准。
 
 ## 配置、幂等与恢复
 
-v2 `config` 仅下发版本、启停、`execution_slots`、`poll_seconds`、`heartbeat_seconds`、`request_seconds`、`page_seconds`、`text_wait_seconds`、`delivery_seconds`、`allowed_languages`。中心不再接受旧阶段、引擎线程和缓存覆盖字段，节点本地实现参数见[节点配置](NODE_CONFIGURATION.md)。
+节点先持久化 claim 的 request_id、config_version 和 count，未知结果重放原内容；全部返回租约落入日志后才清除请求。同编号不同内容冲突，空回执也保存。非空批后仍有余量可立即补领；空批等待 poll_seconds、新就绪提示或资源释放。中心在全量排序前预查回执、配置和容量，进入调度锁后复核。
 
-整页处理时限默认 900 秒，首次分析后的文本等待默认 600 秒，首次申请结果上传授权后的交付窗口默认 120 秒；中心把有效期限制在最早截止之前，心跳不能无限占位。每个 lease 保留接单时限快照，普通配置调整直接约束后续领取，既有页继续完成；恢复次数使用现有 `CLUSTER_STAGE_ATTEMPTS`。文本首次调用的处理时限和自动重试仍由中心独立管理。
+并发竞争导致候选失效时，中心提交并释放锁后最多重选一次；最终空批仍有可领取工作时可附 0.1–0.3 秒随机退避提示。提示不分配、不预留执行权，不改持久回执。
 
-节点先把 claim 的 `request_id`、配置版本和 `count` 一起持久化，再请求中心；未知结果的重试必须重放原内容，不能按新空位数修改原请求。`count` 保留 1–32 的容量请求范围以兼容待确认日志，新请求实际最多分配 4 页；已有回执保留原租约列表，不能截断成 4 页。同编号不同内容冲突，已回收编号返回终态，空回执也被保存；所有返回租约落入本地日志后才清除请求。非空领取完成后仍有容量可立即用新编号续领；空领取进入 `poll_seconds` 兜底等待，新就绪提示或本地资源释放可提前补领。中心当前保留 claim 回执，不自动清理它们。
+整页时限默认 900 秒，首次分析后文本等待 600 秒，首次冻结结果交付意图后交付窗口 120 秒；以最早截止为准，心跳不能无限延长。既有租约使用领取时快照，中心配置只控制执行位、语言和期限，本地模型与线程由节点配置。节点失联后可从中心临时原图重建，复用已持久化分析和成功译文；原图丢失进入同请求补传，不能重复计费。
 
-中心在选举前查找持久回执和检查节点容量；已有回执、已满载或已知配置冲突均跳过全队列排序，进入调度锁后再次核实回执、配置与容量。空回执同样持久保存，容量预查不授权任何新租约。
-
-并发竞争可能使锁外候选在领取时失效。新领取原本有候选却未得到任何租约，且节点仍有余量时，中心先提交本轮状态、释放调度锁；只读确认仍有可领任务后，才在同一请求内重选一次，并重新检查回执、配置版本与容量。只有实际分配的租约与最终回执一起原子提交；中间提交不分配租约，不保存空回执。普通空队列和容量耗尽不重选。
-
-最终空批（含已存空回执重放）提交并释放调度锁后，中心可只读检查是否仍有可领任务；若有，响应附 0.1–0.3 秒随机抖动的 `retry_after_seconds`。节点确认空回执后按提示退避，再用新编号领取；新配置或资源释放可提前唤醒。该提示不领取、不预留资源、不修改已存回执，也不把全量选举移入调度锁；普通空批仍按周期与通知补偿。
-
-分析重复不会重新开放 text；恢复页复用已经持久化的分析、运行中的 text 和成功译文。image 与 text 有各自的代次，节点失联不重复已完成文本计量。当前 `updates` 请求增加了必填租约快照和接单状态，中心与节点需配套升级；旧节点不能依赖仅发送 revision 的请求继续工作。
-
-结果在网络请求前冻结到本地日志，中心签发 PUT URL 前冻结其摘要。同结果重交返回原回执，不同结果冲突。上传成功先持久化 ETag，再向中心登记；中心事务中断时，节点只重交元数据。永久失联或租约失效后重新领取，复用分析与译文；中心不从 R2 读取旧页产物。迟到旧代次不能覆盖新代次，抹字图无需跨节点保存。
+multipart 请求体接收受 `upload_body_timeout_seconds` 总时限约束，持续发送少量字节也不能延长；超时关闭临时文件并返回 408。及时受理后，中心为本地落盘保留固定宽限：取受理前租约到期与受理时间加该总时限的较晚值；心跳和重放不延长它。宽限不授权节点继续计算，只避免维护程序在已校验文件尚未落盘时抢先重试。处理截止后落盘仍可成功；没有及时受理记录的文件不能通过维护恢复发布。
 
 ## 分阶段流水线与通知
 
-节点用独立下载、分析提交、有限计算、交付池调度页面；页面等待文本时只有状态和缓冲，不占计算线程。控制请求分为 heartbeat、claim、updates 三个独立通道，各最多一个在途请求；慢领取或长轮询不阻塞续租。计算并发、接单与内存限制见[节点本地配置](NODE_CONFIGURATION.md#节点本地配置)。取消先排空本地步骤，再异步确认停止。
+节点使用独立下载、分析提交、计算和交付池；等待文本、传输和回执不占计算线程。heartbeat、claim、updates 各最多一个在途请求。PostgreSQL NOTIFY 仅唤醒，持久状态从数据库重读；订阅后复查、5 秒内部重查及最长 20 秒响应负责断线补偿。
 
-PostgreSQL 提交事务发送 `NOTIFY`，API 进程用独立 `LISTEN` 连接唤醒节点与对应用户的长轮询。回滚不通知；等待不持有业务数据库连接。订阅后重读数据库避免丢失窗口，5 秒内部重查和最长 20 秒响应负责断线补偿；通知内容只有用户标识／计算主题，无图片或 OCR 内容。
-
-全局通知只是重查提示，无关任务变化不会立即结束节点长轮询。`claim_ready` 仅在请求允许接单且数据库中确有匹配容量与任务时为 true；它不预留执行权，最终仍以 claim 为准。本节点活动租约集合变化，或只读可领取状态从无到有／从有到无时，可返回空增量，让节点重建租约与 `can_claim` 快照；持续积压不会使 `can_claim:false` 的订阅反复立即返回。配置变化或具体租约变化直接返回。节点不因空增量强制心跳，并忽略早于最近领取尝试的旧就绪提示。
-
-中心文本、重绘和上传恢复执行池按提交通知与完成回调唤醒，采用小批连续领取；公平排序、容量和空闲兜底规则见[集群调度](TRANSLATION_CLUSTER_DESIGN.md#5-按资源公平调度)。阅读器保持单独的等待请求池，完成后按持久请求 UUID 同步快照并下载译图。
-
-后台将整页租约标记为“整页执行与交付”，另外列出下载、计算等待、OCR、抹字、分析提交、等译文、嵌字编码、上传授权、节点 R2 PUT 与中心登记结算。`timings` 不参与冻结的结果摘要；不同环节可重叠，不能相加当作 GPU 用时。
+无关全局通知不立即结束长轮询；配置、租约集合、具体租约或真实可领取状态变化可触发增量。claim_ready 只是提示，节点忽略早于最新领取尝试的旧提示。中心文本、重绘和上传恢复池继续独立有界，调度规则见[集群设计](TRANSLATION_CLUSTER_DESIGN.md#5-按资源公平调度)。
 
 ## 验证边界
 
-协议回归：[中心](../backend/tests/test_compute_v2.py)、[长轮询增量](../backend/tests/test_compute_updates.py)、[节点联调](../backend/tests/test_compute_node_v2.py)、[节点调度](../services/classic-engine/tests/test_node_scheduling.py)、[PostgreSQL](../backend/tests/test_compute_v2_postgres.py)、[节点传输](../services/classic-engine/tests/test_node_transport.py)。运行环境见[后端验证](../backend/README.md#验证)和[节点验证](../services/classic-engine/README.md#验证)。覆盖容量、公平性、取消、截止、断线通知、丢回执、冻结结果恢复、文本复用、旧代次与凭据隔离。
+回归入口：[中心](../backend/tests/test_compute_v3.py)、[长轮询](../backend/tests/test_compute_updates.py)、[节点联调](../backend/tests/test_compute_node_v3.py)、[PostgreSQL](../backend/tests/test_compute_v3_postgres.py)、[节点调度](../services/classic-engine/tests/test_node_scheduling.py)、[节点传输](../services/classic-engine/tests/test_node_transport.py)。
 
-隔离对象存储与固定文本验证协议行为；真实 R2、目标设备、文本服务和吞吐量分别在部署环境验收。
+模拟文本和隔离中心验证协议、并发、丢回执、终态清理及恢复；真实 GPU 的检测/抹字/覆盖像素、真实文本服务、公网吞吐与目标机 Windows 服务另行验收。通过本地单一样图不能推断所有页面的压缩率或翻译效果。

@@ -35,7 +35,7 @@ describe('content identity and recoverable source references',()=>{
   await core.submit([target(0)]);await core.finishUploads();expect(upload).not.toHaveBeenCalled();const saved=await readOperation(record.id);expect(saved?.state).toBe('blocked');expect(saved?.requestId).toBe(record.requestId);expect(saved?.result?.id).toBe(record.requestId);
  });
  it('disabling result cache still delivers memory bytes without regenerating',async()=>{
-  await setTranslationCacheLimitMb(0);const scope={key:JSON.stringify([origin,'no-cache'])},result=job(9,{id:crypto.randomUUID(),status:'succeeded',output_asset_id:'output'}),blob=new Blob(['result']),download=vi.fn(async()=>blob);
+  await setTranslationCacheLimitMb(0);const scope={key:JSON.stringify([origin,'no-cache'])},result=job(9,{id:crypto.randomUUID(),status:'succeeded'}),blob=new Blob(['result']),download=vi.fn(async()=>blob);
   vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:800,height:1200,close(){}})));
   try{await loadResultBlob({scope,job:result,download,isCurrent:()=>true});const key=resultBlobKey(scope,result);expect(await translationCache.get(key)).toBeUndefined();expect(resultInMemory(key)).toBe(blob);expect(download).toHaveBeenCalledOnce();}finally{await setTranslationCacheLimitMb(1024);vi.unstubAllGlobals();}
  });

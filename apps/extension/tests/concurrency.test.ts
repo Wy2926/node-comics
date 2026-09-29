@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Api} from '../src/api';
+import {deliveredBytes,deliveredSnapshot} from './overlay-fixture';
 import {normalizeConcurrency, RequestPool, StaleOperation} from '../src/concurrency';
 
 const pause = () => new Promise<void>(resolve => setTimeout(resolve, 1));
@@ -27,13 +28,13 @@ describe('front-end request concurrency', () => {
     vi.stubGlobal('createImageBitmap', async () => ({close: () => {}}));
     vi.stubGlobal('fetch', async (url: string | URL) => {
       const path = String(url);
-      if (path.endsWith('/access')) {accesses++;await gate;return Response.json({url:'/result',expires_at:null});}
+
       if (path.endsWith('/input')) {uploads++;await gate;return Response.json({id:'upload',state:'queued'});}
-      downloads++;await gate;return new Response(new Blob(['image']));
+      downloads++;await gate;return new Response(deliveredBytes);
     });
-    const api = new Api('https://api.example');
+    const api = new Api('https://api.example');vi.spyOn(api,'translation').mockImplementation(async id=>{accesses++;return deliveredSnapshot(id);});
     const pendingUploads = Array.from({length:12}, () => api.translationInput('upload',new Blob(['a'])));
-    const pendingDownloads = Array.from({length:12}, (_, i) => api.image('image-'+i));
+    const pendingDownloads = Array.from({length:12}, (_, i) => api.translationImage('image-'+i));
     await pause();
     try {expect(uploads).toBe(5);expect(accesses).toBe(12);} finally {release();}
     await Promise.all([...pendingUploads,...pendingDownloads]);
@@ -46,11 +47,11 @@ describe('front-end request concurrency', () => {
     const occupied = pool.run(() => gate);
     vi.stubGlobal('createImageBitmap', async () => ({close: () => {}}));
     vi.stubGlobal('fetch', async (url: string | URL) => {
-      if(String(url).endsWith('/access'))return Response.json({url:'/result',expires_at:null});
-      downloads++;await gate;return new Response(new Blob(['image']));
+      void url;
+      downloads++;await gate;return new Response(deliveredBytes);
     });
-    const api = new Api('https://api.example','',pool);
-    const images = Array.from({length:12}, (_,i) => api.image('image-'+i));
+    const api = new Api('https://api.example','',pool);vi.spyOn(api,'translation').mockImplementation(async id=>deliveredSnapshot(id));
+    const images = Array.from({length:12}, (_,i) => api.translationImage('image-'+i));
     await pause();
     try {expect(downloads).toBe(12);} finally {release();}
     await Promise.all([occupied,...images]);

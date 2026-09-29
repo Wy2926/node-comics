@@ -104,7 +104,7 @@ def _estimate(db, pool, stage, records=None):
 
 
 def effective_languages(node):
-    if node.runtime_report.get('protocol_version') != 2:
+    if node.runtime_report.get('protocol_version') != 3:
         return node.supported_languages
     from .node_config import NodeConfig
     allowed = NodeConfig.model_validate(node.desired_config).allowed_languages
@@ -229,12 +229,12 @@ def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None)
         if not stages or not remaining_capacity(db, node):
             return False
         eligible = _eligible_stages(node, stages, now(), blocked_providers=_blocked_providers(db, node, stages))
-        remote = eligible.where(or_(JobStage.name == 'validate_upload', Asset.storage_backend != 'local'))
-        if db.scalar(select(remote.exists())):
+        # Files are shared only inside this center; missing inputs are paused
+        # by claim/recovery, never mistaken for a remote object's existence.
+        if db.scalar(select(eligible.where(JobStage.name == 'validate_upload').exists())):
             return True
-        # Only the isolated local adapter needs filesystem checks. Stream without
-        # sorting or mutating jobs; missing local heads must not hide a valid page.
-        local = eligible.where(Asset.storage_backend == 'local').with_only_columns(Asset)
+
+        local = eligible.with_only_columns(Asset)
         assets = db.scalars(local.execution_options(yield_per=32))
         try:
             return any(available(asset) for asset in assets)
@@ -352,14 +352,13 @@ def _claim_selected(db, node, allowed_stages, at, candidates_before_lock, blocke
     failed_jobs = set()
     for stage, job in candidates:
         source = assets.get(job.input_asset_id)
-        if (stage.name != "validate_upload" and source and source.storage_backend == "local"
+        if (stage.name != "validate_upload" and source
                 and not available_sources[source.id] and job.id not in failed_jobs):
             # SQL cannot test the isolated local filesystem. Retiring this
             # bounded invalid head lets the next election reach later pages;
             # silently skipping it would select the same missing head forever.
-            from .workers import finish_job
-            finish_job(db, job, "failed", error=ProcessingError("LOCAL_SOURCE_MISSING", "本地原图已丢失，请重新导入后重试"))
-            stage.status, stage.completed_at = "failed", at
+            from .uploads import pause_missing_input
+            pause_missing_input(db, job)
             failed_jobs.add(job.id)
     candidates = [(stage, job) for stage, job in candidates if job.id not in failed_jobs
         and (stage.name == "validate_upload" or available_sources.get(job.input_asset_id, False))]
@@ -433,7 +432,7 @@ def _claim_selected(db, node, allowed_stages, at, candidates_before_lock, blocke
     if not job.attempt_id:
         job.attempt_id = uid()
         db.add(Attempt(id=job.attempt_id, job_id=job.id, provider_id=job.config["provider"]["id"],
-                       lease_expires_at=at + timedelta(seconds=cfg.cluster_lease_seconds), output_storage_backend=cfg.result_storage_backend))
+                       lease_expires_at=at + timedelta(seconds=cfg.cluster_lease_seconds)))
     job.status, job.phase = "running", "analyze" if stage.name == "page" else stage.name
     stage.status, stage.generation, stage.attempts = "running", stage.generation + 1, stage.attempts + 1
     lease = ExecutionLease(id=uid(), stage_id=stage.id, job_id=job.id, node_id=node.id, owner_id=job.owner_id,

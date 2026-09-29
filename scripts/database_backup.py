@@ -155,18 +155,23 @@ def verified_backup(directory):
 
 
 def object_references(execute, tables):
-    """Inventory from the restored snapshot, without touching object storage."""
+    """Required results and recoverable temporary inputs, without reading files."""
     references = []
     if "assets" in tables:
-        for backend, key, sha256, mime in execute("SELECT DISTINCT storage_backend, storage_key, sha256, mime FROM assets WHERE deleted_at IS NULL"):
-            references.append({"backend": backend, "key": key, "sha256": sha256, "mime": mime, "kind": "asset"})
-    if "execution_leases" in tables and "attempts" in tables and "jobs" in tables:
-        for backend, key in execute("SELECT DISTINCT a.output_storage_backend, l.output_key FROM execution_leases l JOIN jobs j ON j.id = l.job_id JOIN attempts a ON a.id = j.attempt_id WHERE l.output_key IS NOT NULL AND l.completed_at IS NULL"):
-            references.append({"backend": backend, "key": key, "kind": "pending-output"})
+        for key, sha256, mime, kind in execute("SELECT DISTINCT storage_key, sha256, mime, kind FROM assets WHERE deleted_at IS NULL AND purged_at IS NULL"):
+            references.append({"key": key, "sha256": sha256, "mime": mime,
+                "kind": "temporary-input" if kind == "original" else "result", "required": kind != "original"})
+    if "execution_leases" in tables:
+        for (key,) in execute("SELECT DISTINCT output_key FROM execution_leases WHERE output_key IS NOT NULL AND completed_at IS NULL"):
+            references.append({"key": key, "kind": "pending-output", "required": False})
     if "upload_reservations" in tables:
-        for backend, sha256, mime in execute("SELECT DISTINCT storage_backend, expected_sha256, mime FROM upload_reservations WHERE completed_at IS NULL AND verified_info IS NOT NULL"):
-            key = f"objects/sha256/{sha256[:2]}/{sha256}"
-            references.append({"backend": backend, "key": key, "sha256": sha256, "mime": mime, "kind": "pending-upload"})
+        for reservation_id, sha256, mime, info in execute("SELECT id, expected_sha256, mime, verified_info FROM upload_reservations WHERE completed_at IS NULL AND verified_info IS NOT NULL"):
+            if isinstance(info, str):
+                info = json.loads(info)
+            if not info or not info.get('sha256'):
+                continue
+            references.append({"key": f"inputs/{reservation_id}/source", "sha256": sha256, "mime": mime,
+                "kind": "pending-upload", "required": False})
     return references
 
 

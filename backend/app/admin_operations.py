@@ -2,7 +2,7 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 
 from .auth import admin
 from .config import settings
@@ -15,8 +15,6 @@ from .translation_requests import TranslationRequest
 from .translation_limits import image_budget, control_budget
 from .comic_title_limits import title_budget
 from .feedback_limits import feedback_budget
-from .results import ResultAccess, TranslationResult, valid_asset_sql
-from .file_pages import FilePage
 from .upload_models import UploadReservation
 from .upload_ingress import ingress_snapshot
 from .billing_models import BillingEvent, BillingOrder
@@ -96,11 +94,11 @@ def uploads(owner_id: str | None = Query(None, max_length=36), job_id: str | Non
 
 @router.get('/requests')
 def requests(owner_id: str | None = Query(None, max_length=36), request_id: str | None = Query(None, max_length=36),
-        job_id: str | None = Query(None, max_length=36), access_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
+        job_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
         limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(TranslationRequest, 'owner_id id job_id access_id created_at revoked_at'))
+    query = select(*columns(TranslationRequest, 'owner_id id job_id created_at revoked_at'))
     for col, value in ((TranslationRequest.owner_id, owner_id), (TranslationRequest.id, request_id),
-                       (TranslationRequest.job_id, job_id), (TranslationRequest.access_id, access_id)):
+                       (TranslationRequest.job_id, job_id)):
         if value:
             query = query.where(col == value)
     return page(db, query.order_by(TranslationRequest.created_at.desc(), TranslationRequest.owner_id,
@@ -111,13 +109,12 @@ def requests(owner_id: str | None = Query(None, max_length=36), request_id: str 
 def assets(owner_id: str | None = Query(None, max_length=36), q: str | None = Query(None, max_length=64),
         job_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
         limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    at = now()
-    access_count = select(func.count()).select_from(ResultAccess).where(or_(ResultAccess.input_asset_id == Asset.id,
-        ResultAccess.output_asset_id == Asset.id)).correlate(Asset).scalar_subquery()
-    page_count = select(func.count()).select_from(FilePage).where(FilePage.asset_id == Asset.id).correlate(Asset).scalar_subquery()
-    valid = valid_asset_sql(Asset)
-    query = select(*columns(Asset, 'id owner_id sha256 kind parent_id storage_backend mime width height byte_size active_references created_at expires_at last_accessed_at deleted_at purged_at'),
-        valid.label('available'), access_count.label('result_access_count'), page_count.label('file_page_count'))
+    valid = and_(Asset.deleted_at.is_(None), Asset.purged_at.is_(None),
+        or_(Asset.expires_at.is_(None), Asset.expires_at > now(), Asset.active_references > 0))
+    job_count = select(func.count()).select_from(Job).where(or_(Job.input_asset_id == Asset.id,
+        Job.output_asset_id == Asset.id)).correlate(Asset).scalar_subquery()
+    query = select(*columns(Asset, 'id owner_id sha256 kind parent_id mime width height byte_size active_references created_at expires_at deleted_at purged_at'),
+        valid.label('available'), job_count.label('job_count'))
     if owner_id:
         query = query.where(Asset.owner_id == owner_id)
     if q:
@@ -128,50 +125,22 @@ def assets(owner_id: str | None = Query(None, max_length=36), q: str | None = Qu
     return page(db, query.order_by(Asset.created_at.desc(), Asset.id), offset, limit)
 
 
-@router.get('/file-pages')
-def file_pages(owner_id: str | None = Query(None, max_length=36), file_hash: str | None = Query(None, max_length=64),
-        asset_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
-        limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(FilePage, 'owner_id file_hash page_index asset_id'))
-    for col, value in ((FilePage.owner_id, owner_id), (FilePage.file_hash, file_hash), (FilePage.asset_id, asset_id)):
-        if value:
-            query = query.where(col == value)
-    return page(db, query.order_by(FilePage.owner_id, FilePage.file_hash, FilePage.page_index), offset, limit)
-
-
 @router.get('/results')
 def results(owner_id: str | None = Query(None, max_length=36), q: str | None = Query(None, max_length=64),
         mode: str | None = Query(None, max_length=20), offset: int = Query(0, ge=0),
         limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    access_count = select(func.count()).select_from(ResultAccess).where(ResultAccess.result_id == TranslationResult.id).correlate(TranslationResult).scalar_subquery()
-    query = select(TranslationResult.id, TranslationResult.generated_at,
-        *columns(Job, 'owner_id source_sha256 mode target_language version status input_asset_id output_asset_id'),
-        access_count.label('access_count')).join(Job, Job.id == TranslationResult.id)
+    request_count = select(func.count()).select_from(TranslationRequest).where(
+        TranslationRequest.job_id == Job.id, TranslationRequest.owner_id == Job.owner_id,
+        TranslationRequest.revoked_at.is_(None)).correlate(Job).scalar_subquery()
+    query = select(*columns(Job, 'id owner_id source_sha256 mode target_language version status input_asset_id output_asset_id'),
+        Job.completed_at.label('generated_at'), request_count.label('request_count')).where(Job.status.in_(['succeeded', 'no_text']))
     if q:
         query = query.where(or_(Job.id == q, Job.source_sha256 == q))
     if owner_id:
-        query = query.where(or_(Job.owner_id == owner_id, select(ResultAccess.id).where(
-            ResultAccess.owner_id == owner_id, ResultAccess.result_id == TranslationResult.id).exists()))
+        query = query.where(Job.owner_id == owner_id)
     if mode:
         query = query.where(Job.mode == mode)
-    return page(db, query.order_by(TranslationResult.generated_at.desc(), TranslationResult.id), offset, limit)
-
-
-@router.get('/accesses')
-def accesses(result_id: str | None = Query(None, max_length=36), owner_id: str | None = Query(None, max_length=36),
-        offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    source, output = aliased(Asset), aliased(Asset)
-    at = now()
-    def valid(asset):
-        return valid_asset_sql(asset)
-    query = select(*columns(ResultAccess, 'id owner_id result_id input_asset_id output_asset_id version created_at changed_at'),
-        and_(valid(source), or_(ResultAccess.output_asset_id.is_(None), valid(output))).label('available')).join(
-        source, source.id == ResultAccess.input_asset_id).outerjoin(output, output.id == ResultAccess.output_asset_id)
-    if result_id:
-        query = query.where(ResultAccess.result_id == result_id)
-    if owner_id:
-        query = query.where(ResultAccess.owner_id == owner_id)
-    return page(db, query.order_by(ResultAccess.created_at.desc(), ResultAccess.id), offset, limit)
+    return page(db, query.order_by(Job.completed_at.desc(), Job.id), offset, limit)
 
 
 @router.get('/statistics')
@@ -195,9 +164,12 @@ def statistics(days: int = Query(7, ge=1, le=90), provider_id: str | None = Quer
     if model:
         calls = calls.where(TextCall.model == model)
     calls = calls.group_by(text_day, TextCall.provider_id, TextCall.model).order_by(text_day, TextCall.provider_id, TextCall.model)
-    reuse_day = func.date(ResultAccess.created_at)
-    reuse = db.execute(select(reuse_day.label('day'), func.count().label('access_grants')).where(
-        ResultAccess.created_at >= since, ResultAccess.created_at <= at).group_by(reuse_day).order_by(reuse_day))
+    reuse_day = func.date(TranslationRequest.created_at)
+    reuse = db.execute(select(reuse_day.label('day'), func.count().label('requests')).join(
+        Job, Job.id == TranslationRequest.job_id).where(
+            TranslationRequest.owner_id == Job.owner_id, TranslationRequest.created_at > Job.completed_at,
+            Job.status.in_(['succeeded', 'no_text']), TranslationRequest.created_at >= since,
+            TranslationRequest.created_at <= at).group_by(reuse_day).order_by(reuse_day))
     payment_day = func.date(BillingOrder.created_at)
     payments = db.execute(select(payment_day.label('day'), BillingOrder.provider, BillingOrder.environment, BillingOrder.currency,
         BillingOrder.status, func.count().label('orders'), func.sum(BillingOrder.total).label('order_amount'))

@@ -5,22 +5,21 @@ import pytest
 from sqlalchemy import func, select
 from admission_test_utils import window_count
 from conftest import login, login_plus, request_id, request_record
-from storage_fakes import MemoryS3
 
 
 @pytest.fixture
 def cluster(client, monkeypatch):
     from app.config import settings
-    from app.storage import S3Store
-    import app.storage as storage
-    cfg = settings()
-    cfg.classic_enabled = True
-    cfg.result_storage_backend = "r2"
-    cfg.r2_endpoint_url = "https://" + "a" * 32 + ".r2.cloudflarestorage.com"
-    sdk = MemoryS3()
-    store = S3Store(sdk, "test-bucket", "isolated/")
-    monkeypatch.setattr(storage, "r2_store", lambda *args: store)
-    return client, sdk
+    from app.storage import LocalStore
+    from types import SimpleNamespace
+    settings().classic_enabled = True
+    tracker = SimpleNamespace(calls=[])
+    original_put = LocalStore.put_file
+    def record(self, key, data, mime, **kwargs):
+        tracker.calls.append(('PUT', key))
+        return original_put(self, key, data, mime, **kwargs)
+    monkeypatch.setattr(LocalStore, 'put_file', record)
+    return client, tracker
 
 
 def descriptor(data, **extra):
@@ -109,7 +108,7 @@ def test_http_input_automatically_queues_without_complete(cluster, png):
     with session_factory()() as db:
         job = db.get(Job, record.job_id)
         source = db.get(Asset, job.input_asset_id)
-        assert source.storage_backend == 'r2' and source.active_references == 1
+        assert source.active_references == 1
         assert {s.name: s.status for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))} == {
             'page': 'ready', 'text': 'waiting'}
     assert upload_and_enqueue(client, auth, translated, png)['state'] == 'queued'

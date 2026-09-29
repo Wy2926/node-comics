@@ -31,7 +31,7 @@ await writeFile(background,`globalThis.fixturePermissionRequests=0;chrome.permis
 const requests=[],sourceRequests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},scheduler_weight:1,timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic','redraw'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:m==='classic'?'classic_unlimited':'redraw_grant',consent_version:'fixture',quota:null}]))};
-const caps={modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights,retention_days:0};
+const caps={result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']},{id:'redraw',enabled:true,label:'AI 重绘',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights};
 let output,api,site,complete=true;
 const resultRequests=[];
 const eventStreams=new Set();
@@ -43,10 +43,8 @@ const translationResult=id=>{
   const entry=translations.get(id);if(!entry)return;
   const job=jobs.get(entry.jobId),state=job.status==='awaiting_upload'?'needs_input':job.status;
   return {id,state,mode:job.mode,target_language:job.target_language,image_sha256:job.image_sha256,
-    input_asset_id:job.input_asset_id,created_at:job.created_at,updated_at:job.updated_at??job.created_at,
-    input_expires_at:state==='needs_input'?'2100-01-01T00:00:00Z':null,
-    result:state==='succeeded'?{kind:'translated',asset_id:job.output_asset_id,width:900,height:900,
-      download_url:api+'/result.png?id='+encodeURIComponent(job.output_asset_id),download_expires_at:null,authorization_required:true}:null,
+    created_at:job.created_at,updated_at:job.updated_at??job.created_at,
+    result:state==='succeeded'?{kind:'translated',representation:'overlay-v1',input_sha256:job.image_sha256,normalization_version:1,width:job.width??800,height:job.height??1100,bbox:{x:40,y:40,width:512,height:192},composite:'source-atop',artifact:{sha256:sha(output),byte_size:output.length,mime:'image/webp',path:'/v1/translations/'+id+'/result'}}:null,
     error:state==='failed'?{code:'FIXTURE_FAILED',message:'示例翻译失败'}:null};
 };
 const server=createServer(async(req,res)=>{
@@ -59,17 +57,17 @@ const server=createServer(async(req,res)=>{
       if(req.headers.referer!==site+'/'){res.writeHead(403,{'Cache-Control':'no-store'});res.end();return;}
       const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;
     }
-    if(url.pathname==='/result.png'){
-      const id=url.searchParams.get('id');resultRequests.push(id);
+    if(/^\/v1\/translations\/[^/]+\/result$/.test(url.pathname)){
+      assert(req.headers.authorization,'result requires bearer authentication');
+      const entry=translations.get(url.pathname.split('/')[3]),id='output-'+entry.jobId;resultRequests.push(id);
       if(id===heldResult)await new Promise(resolve=>{releaseResult=resolve;});
       if(id===failResult){failResult=undefined;res.writeHead(503);res.end();return;}
-      res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(output);return;
+      res.writeHead(200,{'Content-Type':'image/webp','Cache-Control':'no-store'});res.end(output);return;
     }
     requests.push({method:req.method,path:url.pathname,authorization:!!req.headers.authorization});refresh();
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
     if(url.pathname==='/v1/capabilities')return json(caps);
     if(url.pathname==='/v1/me/entitlements')return json(rights);
-    if(url.pathname==='/v1/file-pages/match')return json({items:body.pages.map(source=>({...source,asset:null,translations:[],display_translations:[]}))});
     if(url.pathname==='/v1/translations/events'&&req.method==='GET'){
       const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);let previous='';
       res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});
@@ -92,23 +90,23 @@ const server=createServer(async(req,res)=>{
       const [,id,input]=route;
       if(input&&req.method==='PUT'){
         const entry=translations.get(id);assert(entry,'input requires an accepted request');const job=jobs.get(entry.jobId);
-        assert.equal(sha(body),job.image_sha256);uploads.set(id,body);
+        assert.equal(sha(body),job.image_sha256);uploads.set(id,body);job.width=body.readUInt32BE(16);job.height=body.readUInt32BE(20);
         if(job.status==='awaiting_upload')Object.assign(job,{status:'queued',updated_at:new Date().toISOString()});
         return json(translationResult(id),202);
       }
       if(req.method==='GET')return translations.has(id)?json(translationResult(id)):json({error:{code:'NOT_FOUND'}},404);
       if(req.method==='PUT'){
+        assert.equal(req.headers['x-translation-protocol'],'overlay-v1');
         const {priority,...intent}=body,fingerprint=sha(JSON.stringify(intent));
         if(translations.has(id)){assert.equal(translations.get(id).fingerprint,fingerprint);return json(translationResult(id));}
         const previousId=body.retry_of??body.regenerate_of,previous=previousId&&translations.get(previousId),source=previous&&jobs.get(previous.jobId);
         if(previousId)assert(source,'explicit generation must reference a translation owned by the reader');
         const image=body.image??{sha256:source.image_sha256},requestedMode=body.mode??source.mode,requestedLanguage=body.target_language??source.target_language;
         let job=!previousId&&[...jobs.values()].filter(j=>j.image_sha256===image.sha256&&j.mode===requestedMode&&j.target_language===requestedLanguage).at(-1);
-        if(!job){const jobId=randomUUID();job={id:jobId,input_asset_id:'original-'+image.sha256,output_asset_id:null,mode:requestedMode,target_language:requestedLanguage,status:source?'queued':'awaiting_upload',created_at:new Date().toISOString(),image_sha256:image.sha256};jobs.set(jobId,job);createdJobs++;}
+        if(!job){const jobId=randomUUID();job={id:jobId,input_asset_id:'original-'+image.sha256,output_asset_id:null,mode:requestedMode,target_language:requestedLanguage,status:source?'queued':'awaiting_upload',width:source?.width,height:source?.height,created_at:new Date().toISOString(),image_sha256:image.sha256};jobs.set(jobId,job);createdJobs++;}
         translations.set(id,{jobId:job.id,fingerprint});return json(translationResult(id),job.status==='succeeded'?200:202);
       }
     }
-    if(url.pathname.startsWith('/v1/images/'))return json({url:api+'/result.png?id='+encodeURIComponent(url.pathname.split('/')[3]),authorization_required:true,expires_at:null});
     return json({error:{message:'fixture missing '+url.pathname}},404);
   }catch(error){errors.push(error.message);res.writeHead(500);res.end('fixture failure');}
 });
@@ -139,13 +137,13 @@ async function button(name){
 const activate=()=>worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(t=>t.url===url);await globalThis.fixtureMenu({menuItemId:'nc-translate-page',pageUrl:url},tab);},page.url());
 const geometry=()=>page.locator('#first').evaluate(i=>({width:i.getBoundingClientRect().width,height:i.getBoundingClientRect().height,src:i.getAttribute('src'),srcset:i.parentElement.querySelector('source').getAttribute('srcset'),scroll:scrollY,clicks:window.fixtureClicks??0}));
 try{
-  // Generate public synthetic test panels, deliberately changing output aspect ratio.
+  // Generate public synthetic test panels plus one compact overlay used at native page coordinates.
   await page.setContent('<body style="margin:0;width:800px;height:1100px;background:#fff5df;font:42px system-ui"><div style="margin:50px;border:6px solid #20304b;height:880px;padding:35px">Original comic panel<br><br>HELLO!<br><br>READ THE STORY</div></body>');
   const source=await page.screenshot({clip:{x:0,y:0,width:800,height:1100},captureBeyondViewport:true});
+  console.log(`Fixture input ${source.readUInt32BE(16)}x${source.readUInt32BE(20)}`);
   for(let n=1;n<=14;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
-  await page.setContent('<body style="margin:0;width:900px;height:900px;background:#e3f3ff;font:42px system-ui"><div style="margin:50px;border:6px solid #224560;height:650px;padding:35px">译文效果示例<br><br>你好！<br><br>继续阅读故事</div></body>');
-  output=await page.screenshot({clip:{x:0,y:0,width:900,height:900},captureBeyondViewport:true});
-  const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
+  output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
+  const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',translationMode:'classic',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
   if(!selectedSite) {
   await page.goto(site);await page.locator('#first').evaluate(i=>i.decode());await page.evaluate(()=>{window.fixtureClicks=0;document.querySelector('#site-button').addEventListener('click',()=>window.fixtureClicks++);});
@@ -315,7 +313,7 @@ try{
   assert.equal(requests.slice(beforeReloadRetry).filter(r=>r.method==='PUT'&&/^\/v1\/translations\/[^/]+$/.test(r.path)).length,0);
   check('download failure retry only reads the result and creates no translation');
   assert.equal(requests.filter(r=>/translation-plans|translation-operations|reading-sessions|translation-changes|\/v1\/uploads/.test(r.path)).length,0,'removed reading control endpoints must never be requested');
-  assert.equal(accessCount(),0,'completed snapshots directly supply the download URL');
+  assert.equal(accessCount(),0,'completed snapshots directly supply the authenticated artifact path');
   check('single-image requests and snapshots use no reading lease, plan, completion or separate result-access calls');
   // Match the real Comic PASH canvas structure with synthetic pixels and the same API fixture.
   complete=true;
@@ -375,5 +373,5 @@ try{
   assert.equal(errors.length,0,errors.join('\n'));
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
-}catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
+}catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests,resultRequests,accessibility:await cdp.send('Accessibility.getFullAXTree').then(v=>v.nodes.filter(n=>n.role?.value==='button').map(n=>({name:n.name?.value,description:n.description?.value}))).catch(()=>[])},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
 finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

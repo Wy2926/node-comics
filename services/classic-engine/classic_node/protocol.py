@@ -7,6 +7,7 @@ import json
 from PIL import Image
 
 MAX_IMAGE_BYTES = 24 * 1024 * 1024
+MAX_RESULT_BYTES = 88 * 1024 * 1024
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 MAX_PIXELS = 24_000_000
 
@@ -31,14 +32,35 @@ def png64(image, limit=MAX_IMAGE_BYTES):
     return base64.b64encode(out.getvalue()).decode('ascii')
 
 
-def pack_result(image, version, analysis, translated):
-    encoded = png64(image)
-    data = base64.b64decode(encoded)
-    return {'image': encoded, 'result': {
+def pack_result(image, original, alpha, version, analysis, translated):
+    """Final RGB replacement pixels; the browser preserves source alpha with source-atop."""
+    import numpy as np
+    final = np.asarray(image.convert('RGB'))
+    changed = np.any(final != original, axis=2)
+    if alpha is not None:
+        changed &= np.asarray(alpha) > 0
+    result = {
         'version': version, 'input_hash': analysis['input_hash'],
         'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision'],
-        'output': {'sha256': hashlib.sha256(data).hexdigest(), 'md5': hashlib.md5(data, usedforsecurity=False).hexdigest(),
-                   'byte_size': len(data), 'width': image.width, 'height': image.height, 'mime': 'image/png'}}}
+        'representation': 'original', 'normalization_version': 1,
+        'width': image.width, 'height': image.height, 'bbox': None, 'output': None}
+    if not changed.any():
+        return {'output_bytes': None, 'result': result}
+    ys, xs = np.flatnonzero(changed.any(axis=1)), np.flatnonzero(changed.any(axis=0))
+    x, y, right, bottom = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+    mask = changed[y:bottom, x:right]
+    patch = np.zeros((bottom - y, right - x, 4), dtype=np.uint8)
+    patch[..., :3][mask] = final[y:bottom, x:right][mask]
+    patch[..., 3][mask] = 255
+    stream = BytesIO()
+    Image.fromarray(patch).save(stream, format='WEBP', lossless=True, method=4, exact=False)
+    data = stream.getvalue()
+    if len(data) > MAX_RESULT_BYTES:
+        raise NodeFailure('CLASSIC_RENDER_FAILED')
+    result.update(representation='overlay-v1', bbox={'x': x, 'y': y, 'width': right - x, 'height': bottom - y},
+        output={'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data),
+                'width': right - x, 'height': bottom - y, 'mime': 'image/webp'})
+    return {'output_bytes': data, 'result': result}
 
 
 def mask_image(value, size):

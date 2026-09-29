@@ -111,8 +111,7 @@ def test_failure_reconciliation_replays_and_records_actor_once(client, png):
 def test_image_reconciliation_replays_without_duplicate_delivery_or_charge(client, png, settlement):
     from app.admin_audit import AdminAudit
     from app.db import session_factory
-    from app.models import Asset, Ledger
-    from app.results import TranslationResult
+    from app.models import Asset, Job, Ledger
     _, job_id, _ = unknown_job(client, png, settlement=settlement)
     admin = login(client, 'admin')
     url = f'/v1/admin/jobs/{job_id}/reconcile-image'
@@ -126,8 +125,8 @@ def test_image_reconciliation_replays_without_duplicate_delivery_or_charge(clien
     assert client.post(url, headers=admin, files={'image': ('changed.png', png_variant(png, 4), 'image/png')},
                        data={'note': 'verified supplier output'}).status_code == 409
     with session_factory()() as db:
-        assert db.scalar(select(func.count()).select_from(Asset)) == 2
-        assert db.get(TranslationResult, job_id)
+        assert db.scalar(select(func.count()).select_from(Asset)) == 3
+        assert db.get(Job, job_id).status == "succeeded"
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'settle')) == (1 if settlement == 'reserved' else 0)
         assert db.scalar(select(func.count()).select_from(AdminAudit).where(AdminAudit.target_id == job_id)) == 1
 
@@ -142,7 +141,9 @@ def test_reconciliation_rejects_cross_owner_and_referenced_input(client, png):
     url = f'/v1/admin/jobs/{job_id}/reconcile'
     assert client.post(url, headers=admin, json={'resolution': 'succeeded', 'output_asset_id': foreign, 'note': 'case checked'}).status_code == 404
     referenced = upload(client, owner, png_variant(png, 3))
-    assert create(client, owner, referenced, key='second').status_code == 202
+    created = create(client, owner, referenced, key='second')
+    assert created.status_code == 202
+    referenced = created.json()['input_asset_id']
     response = client.post(url, headers=admin, json={'resolution': 'succeeded', 'output_asset_id': referenced, 'note': 'case checked'})
     assert response.status_code == 422 and response.json()['error']['code'] == 'INVALID_PROVIDER_OUTPUT'
     with session_factory()() as db:

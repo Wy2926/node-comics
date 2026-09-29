@@ -29,7 +29,8 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   const downloadResult=useCallback(async(job:Job,current=()=>channel?.isCurrent()===true)=>{
     assertCurrent(current);if(!channel)return;
     const key=resultBlobKey(channel.scope,job);
-    await channel.readResult(job);assertCurrent(current);
+    const page=copyRef.current.flatMap(copy=>copy.pages).find(page=>page.translationScope===channel.scope.key&&page.jobs.some(value=>value.id===job.id));
+    await channel.readResult(job,undefined,async()=>page?.blobKey?readImage(page.blobKey):undefined);assertCurrent(current);
     for(const copy of copyRef.current){let changed=false;const pages=copy.pages.map(page=>{
       if(page.translationScope!==channel.scope.key||!page.jobs.some(j=>j.id===job.id))return page;
       changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};

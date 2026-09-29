@@ -41,7 +41,7 @@ def initialize():
     from . import system_settings  # noqa: F401
     from . import queue_models  # noqa: F401
     from . import translation_requests  # noqa: F401
-    from . import upload_models, entitlement_models, file_pages, reader_api  # noqa: F401
+    from . import upload_models, entitlement_models, reader_api  # noqa: F401
     from . import billing_models  # noqa: F401
     from . import quota_campaign_models  # noqa: F401
     from . import admin_audit  # noqa: F401
@@ -70,3 +70,5 @@ def initialize():
                         billing_models.BillingPrice.environment != provider_environment(provider)).limit(1)):
                     raise RuntimeError('Payment catalog environment does not match this database; use an isolated database')
     settings().storage_path.mkdir(parents=True, exist_ok=True)
+    for directory in ("inputs", "results", "staging"):
+        (settings().storage_path / directory).mkdir(mode=0o700, parents=True, exist_ok=True)

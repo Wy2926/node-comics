@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import func, select
 from conftest import create, login_plus as login, upload, request_for_job, request_record, submit_asset
-from test_file_pages import complete
+from conftest import complete
 
 
 def fixture_feedback(client, png, monkeypatch):
@@ -18,23 +18,22 @@ def fixture_feedback(client, png, monkeypatch):
 def test_feedback_filters_link_reused_version_and_do_not_expose_private_keys(client, png, monkeypatch):
     auth, job, feedback = fixture_feedback(client, png, monkeypatch)
     other, admin = login(client, 'other'), login(client, 'admin')
-    reused = submit_asset(client, other, upload(client, other, png)).json()
-    access_id = request_record(client, other, reused['id']).access_id
-    assert access_id and reused['state'] == 'succeeded'
-    assert client.post(f"/v1/translations/{reused['id']}/feedback", headers={**other, 'Idempotency-Key': 'reuse'},
+    reused = submit_asset(client, auth, upload(client, auth, png), key='same-owner-reuse').json()
+    assert request_record(client, auth, reused['id']).job_id == job['id']
+    assert reused['state'] == 'succeeded'
+    assert client.post(f"/v1/translations/{reused['id']}/feedback", headers={**auth, 'Idempotency-Key': 'reuse'},
         json={'issues': ['typesetting']}).status_code == 201
     path = '/v1/admin/feedback'
     assert client.get(path, headers=auth).status_code == 403
     page = client.get(path + f"?job_id={job['id']}&limit=1", headers=admin).json()
     assert page['total'] == 2 and page['next_offset'] == 1
     all_rows = client.get(path + f"?job_id={job['id']}", headers=admin).json()['items']
-    assert {row['actual_job_id'] for row in all_rows} == {job['id']}
-    assert {row['access_id'] for row in all_rows} == {None, access_id}
+    assert {row['job_id'] for row in all_rows} == {job['id']}
     assert all(row['result_version'] == 1 and 'request_hash' not in row and 'idempotency_key' not in row for row in all_rows)
     assert client.get(path + '?issue=meaning&status=received', headers=admin).json()['total'] == 1
     assert client.get(path + '?issue=other', headers=admin).json()['total'] == 0
     owner = client.get('/v1/me', headers=other).json()['user']['id']
-    assert client.get(path + f'?owner_id={owner}', headers=admin).json()['total'] == 1
+    assert client.get(path + f'?owner_id={owner}', headers=admin).json()['total'] == 0
 
 
 def test_review_requires_note_and_fresh_version_and_replays_original_receipt(client, png, monkeypatch):

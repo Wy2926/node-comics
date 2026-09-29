@@ -25,7 +25,7 @@ def test_exporter_ignores_service_configuration_and_matches_checked_in_contract(
         "DATABASE_URL": "postgresql+psycopg://unused:unused@database.invalid/unused",
         "GA4_DEBUG_MODE": "true",
         "GA4_EXTENSION_API_SECRET": marker,
-        "R2_ENDPOINT_URL": "invalid-inherited-storage",
+
         "PROVIDERS_JSON": "invalid-inherited-providers",
     }
     # An accidental dotenv read, startup migration, worker or external request is

@@ -1,10 +1,9 @@
-from datetime import timedelta
 from contextlib import contextmanager
 import hashlib
 from io import BytesIO
 import warnings
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import or_, select, update
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 from .config import settings
 from .errors import problem, ProcessingError
@@ -54,175 +53,147 @@ def inspect_image(data: bytes, *, output=False):
         return info
 
 
+def inspect_image_file(handle, *, output=False):
+    """Inspect bounded file bytes without materializing a second image buffer."""
+    cfg = settings()
+    handle.seek(0, 2)
+    length = handle.tell()
+    handle.seek(0)
+    maximum = cfg.cluster_max_result_bytes if output else cfg.max_upload_bytes
+    if not 0 < length <= maximum:
+        problem('IMAGE_TOO_LARGE', '图片字节数超过限制', 413)
+    sha = hashlib.file_digest(handle, 'sha256').hexdigest()
+    handle.seek(0)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(handle) as image:
+                width, height = image.size
+                mime = MIMES.get(image.format)
+                if not mime or getattr(image, 'n_frames', 1) != 1:
+                    raise ValueError('format')
+                if width * height > cfg.max_pixels or max(width, height) > cfg.max_dimension:
+                    problem('IMAGE_TOO_LARGE', '图片尺寸超过限制', 413)
+                if not output and (image.info.get('icc_profile') or image.getexif().get(274, 1) != 1):
+                    problem('INPUT_NOT_NORMALIZED', '请先规范化原图方向和色彩', 422)
+                image.load()
+    except (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        problem('UNSUPPORTED_IMAGE', '图片无法正常解码', 422)
+    finally:
+        handle.seek(0)
+    return {'width': width, 'height': height, 'mime': mime, 'byte_size': length, 'sha256': sha}
+
+
 def object_path(key: str):
     return LocalStore().path(key)
 
 
-def write_object(key: str, data: bytes):
-    LocalStore().put(key, data, "application/octet-stream")
+def asset_storage_key(asset_id, kind):
+    return f"inputs/{asset_id}/source" if kind == 'original' else f"results/{asset_id[:2]}/{asset_id}"
 
 
-def retention_deadline():
-    days = settings().retention_days
-    return now() + timedelta(days=days) if days else None
-
-
-def extend_original_retention(db, original, deadline):
-    """A result cannot outlive its source; NULL means unlimited retention."""
-    condition = Asset.expires_at.is_not(None) if deadline is None else Asset.expires_at < deadline
-    db.execute(update(Asset).where(Asset.id == original.id, condition).values(expires_at=deadline))
-
-
-def content_storage_key(sha256):
-    return f"objects/sha256/{sha256[:2]}/{sha256}"
-
-
-def grant_asset(db, owner_id, source, *, parent_id=None):
-    """Create an account-local reference without copying shared image bytes."""
-    if source.owner_id == owner_id and source.parent_id == parent_id:
-        return source
-    from .results import valid_asset_sql
-    existing = db.scalar(select(Asset).where(Asset.owner_id == owner_id,
-        Asset.kind == source.kind, Asset.storage_backend == source.storage_backend,
-        Asset.storage_key == source.storage_key, Asset.parent_id == parent_id,
-        valid_asset_sql(Asset)).limit(1))
-    if existing:
-        return existing
-    asset = Asset(owner_id=owner_id, kind=source.kind, parent_id=parent_id,
-        storage_key=source.storage_key, storage_backend=source.storage_backend,
-        sha256=source.sha256, mime=source.mime, width=source.width, height=source.height,
-        byte_size=source.byte_size, expires_at=retention_deadline())
-    db.add(asset)
-    db.flush()
-    if parent_id:
-        extend_original_retention(db, db.get(Asset, parent_id), asset.expires_at)
-    return asset
-
-
-def find_shared_original(db, owner_id, sha256, *, byte_size=None, mime=None):
-    """A submitted content digest can claim a verified shared original.
-
-    Object sharing is explicit product behavior. Asset IDs, jobs and file names
-    remain private to each account; no remote I/O is needed for this lookup.
-    """
-    query = select(Asset).where(Asset.kind == "original", Asset.sha256 == sha256,
-        Asset.deleted_at.is_(None), Asset.purged_at.is_(None),
-        or_(Asset.expires_at.is_(None), Asset.expires_at > now(), Asset.active_references > 0))
-    # Separate indexed probes avoid sorting every user's grant of a popular page.
-    source = db.scalar(query.where(Asset.owner_id == owner_id).limit(1)) or db.scalar(query.limit(1))
-    if available(source):
-        if byte_size is not None and source.byte_size != byte_size:
-            problem("UPLOAD_SIZE_MISMATCH", "图片大小与已验证内容不一致", 422)
-        if mime not in (None, "application/octet-stream", source.mime):
-            problem("UPLOAD_MIME_MISMATCH", "图片格式与已验证内容不一致", 422)
-        return grant_asset(db, owner_id, source)
-    return None
+def descriptor_available(asset):
+    return bool(asset and not asset.deleted_at)
 
 
 def create_asset(db: Session, owner_id: str, data: bytes, *, kind="original", parent_id=None, stable_id=None,
-                 storage_backend=None, prewritten=False, verified_info=None):
-    # Internal control-service callers may prewrite a validated buffer outside
-    # scheduler locks, then finalize metadata in a short transaction. Neither
-    # prewritten nor verified_info is accepted from a public API request.
+                 prewritten=False, verified_info=None, representation=None,
+                 bbox=None, normalization_version=1, storage_key=None):
     info = verified_info if verified_info is not None else inspect_image(data, output=kind != "original")
     if verified_info is not None and not prewritten:
-        raise ValueError("Prevalidated metadata requires a prewritten object")
+        raise ValueError("Prevalidated metadata requires a prewritten file")
     asset_id = stable_id or uid()
-    is_result = kind in {"classic", "redraw"}
-    is_durable = is_result or kind == "original"
-    key = content_storage_key(info["sha256"]) if is_durable else f"{owner_id}/{asset_id}"
-    if not is_durable and storage_backend not in (None, "local"):
-        raise ValueError("Intermediate images must use disposable local storage")
-    backend = (storage_backend or settings().result_storage_backend) if is_durable else "local"
-    if is_durable and backend == "local" and not settings().dev_auth:
-        raise ValueError("Production originals and results require private R2 storage")
-    expires_at = retention_deadline() if is_durable else now() + timedelta(days=1)
-    parent = None
-    if parent_id:
-        parent = db.get(Asset, parent_id)
-        if not parent or parent.owner_id != owner_id:
-            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果原图的访问归属无效")
-        if not is_result and parent.expires_at is not None:
-            expires_at = min(expires_at, parent.expires_at)
+    key = storage_key or asset_storage_key(asset_id, kind)
+    parent = db.get(Asset, parent_id) if parent_id else None
+    if parent_id and (not parent or parent.owner_id != owner_id):
+        raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果输入描述的访问归属无效")
+    representation = representation or ('original' if kind == 'original' else 'full-image-v1')
     existing = db.get(Asset, asset_id)
     if existing:
-        if (existing.owner_id != owner_id or existing.sha256 != info["sha256"]
-                or existing.kind != kind or existing.parent_id != parent_id):
-            raise ProcessingError("ASSET_ID_CONFLICT", "图片写入编号已被其他内容使用")
+        if (existing.owner_id != owner_id or existing.sha256 != info['sha256'] or existing.kind != kind
+                or existing.parent_id != parent_id or existing.storage_key != key
+                or existing.representation != representation or existing.bbox != bbox):
+            raise ProcessingError('ASSET_ID_CONFLICT', '文件编号已绑定其他结果')
         return existing
     if not prewritten:
-        # Metadata hits avoid even sending a repeated PUT; the store also fences
-        # concurrent first writes with an immutable content-addressed key.
-        existing_object = db.scalar(select(Asset).where(Asset.storage_backend == backend,
-            Asset.storage_key == key, Asset.deleted_at.is_(None), Asset.purged_at.is_(None)).limit(1))
-        if not existing_object or not available(existing_object):
-            get_store(backend).put(key, data, info["mime"], kind=kind)
-    if parent is not None and is_result:
-        # Conditional UPDATE avoids shortening retention when different nodes
-        # finish translations of one original concurrently. Do it after object
-        # PUT so no parent write lock spans the remote transfer.
-        extend_original_retention(db, parent, expires_at)
-    asset = Asset(id=asset_id, owner_id=owner_id, storage_key=key, storage_backend=backend, kind=kind, parent_id=parent_id, expires_at=expires_at, **info)
+        get_store().put(key, data, info['mime'], kind=kind)
+    if not get_store().exists(key):
+        raise ProcessingError('STORAGE_UNAVAILABLE', '文件尚未耐久保存')
+    asset = Asset(id=asset_id, owner_id=owner_id, storage_key=key, kind=kind,
+        parent_id=parent_id, representation=representation, bbox=bbox, normalization_version=normalization_version,
+        expires_at=None, **info)
     db.add(asset)
     db.flush()
     return asset
 
 
 def available(asset: Asset | None):
-    # Routine job queries/cache matching must not issue remote HEAD requests.
-    # Database tombstones/expiry remain authoritative; the signed GET discovers
-    # missing objects. Local existence checks are cheap and retained.
     return bool(asset and not asset.deleted_at and not asset.purged_at
-                and (asset.expires_at is None or asset.expires_at > now() or getattr(asset, "active_references", 0) > 0)
-                and (asset.storage_backend != "local" or get_store(asset.storage_backend).exists(asset.storage_key)))
+        and (asset.expires_at is None or asset.expires_at > now() or asset.active_references > 0)
+        and get_store().exists(asset.storage_key))
 
 
 def read_asset(asset: Asset):
-    return get_store(asset.storage_backend).read(asset.storage_key)
+    return get_store().read(asset.storage_key)
 
-
-def delete_asset_object(asset: Asset):
-    # A user deletes their grant, not the shared physical image. Durable objects
-    # are retained even with no DB references (including after DB restoration).
-    if asset.kind not in {"original", "classic", "redraw"}:
-        get_store(asset.storage_backend).delete(asset.storage_key)
-
-
-def access_json(asset: Asset):
-    if asset.storage_backend == "local":
-        return {"url": f"/v1/images/{asset.id}/content", "expires_at": asset.expires_at.isoformat() + "Z" if asset.expires_at else None, "authorization_required": True}
-    current = now().replace(microsecond=0)
-    ttl = settings().storage_url_ttl_seconds
-    if asset.expires_at is not None and not getattr(asset, "active_references", 0):
-        ttl = min(ttl, int((asset.expires_at - now()).total_seconds()) - 1)
-    if ttl < 1:
-        problem("ASSET_EXPIRED", "图片已过期", 410)
-    return {"url": get_store(asset.storage_backend).download_url(asset.storage_key, ttl),
-            "expires_at": (current + timedelta(seconds=ttl)).isoformat() + "Z", "authorization_required": False}
-
-
-def record_user_access(db, asset):
-    # Signing/downloading in the product is a user access. Worker reads and
-    # metadata polling intentionally do not affect future inactivity policies.
-    stamp = now()
-    db.execute(update(Asset).where(Asset.id == asset.id,
-        or_(Asset.last_accessed_at.is_(None), Asset.last_accessed_at < stamp)).values(last_accessed_at=stamp))
 
 
 def owned_asset(db: Session, asset_id: str, owner_id: str):
     asset = db.get(Asset, asset_id)
     if not asset or asset.owner_id != owner_id:
         problem("NOT_FOUND", "找不到此图片", 404)
-    if not available(asset) or (asset.parent_id and not available(db.get(Asset, asset.parent_id))):
+    if not available(asset):
         problem("ASSET_EXPIRED", "图片已删除或过期，请重新上传本地原图", 410)
     return asset
 
-
-def asset_json(asset: Asset):
-    return {"id": asset.id, "width": asset.width, "height": asset.height, "mime": asset.mime, "sha256": asset.sha256, "byte_size": asset.byte_size, "kind": asset.kind, "expires_at": asset.expires_at.isoformat() + "Z" if asset.expires_at else None}
 
 
 async def upload_bytes(image):
     data = await image.read(settings().max_upload_bytes + 1)
     await image.close()
     return data
+
+
+def schedule_input_cleanup(db, job):
+    """Revoke execution access in the terminal transaction; unlink only after commit."""
+    if not job.input_asset_id:
+        return
+    source = db.get(Asset, job.input_asset_id)
+    if source and source.kind == 'original':
+        source.expires_at = now()
+        db.info.setdefault('cleanup_inputs', set()).add(source.id)
+
+
+def cleanup_inputs(asset_ids):
+    from .db import session_factory
+    from .models import Job
+    from .scheduler import ACTIVE
+    for asset_id in asset_ids:
+        with session_factory()() as db:
+            source = db.get(Asset, asset_id)
+            if not source or source.kind != 'original' or source.purged_at:
+                continue
+            if db.scalar(select(Job.id).where(Job.input_asset_id == asset_id, Job.status.in_(ACTIVE)).limit(1)):
+                continue
+            try:
+                get_store().delete(source.storage_key)
+            except OSError:
+                continue
+            source.purged_at = now()
+            db.commit()
+
+
+@event.listens_for(Session, 'after_commit')
+def _cleanup_after_commit(session):
+    ids = session.info.pop('cleanup_inputs', set())
+    if ids:
+        try:
+            cleanup_inputs(ids)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning('Deferred input file cleanup')
+
+
+@event.listens_for(Session, 'after_rollback')
+def _discard_uncommitted_cleanup(session):
+    session.info.pop('cleanup_inputs', None)

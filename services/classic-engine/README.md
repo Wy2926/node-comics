@@ -21,7 +21,7 @@ Linux NVIDIA 需要 Vulkan 驱动、CUDA 12.8、cuDNN 9 和 Noto 字体。执行
 
 ## 连接中心
 
-在后台创建独立节点，复制 [node.example.json](node.example.json) 为 `node.local.json`，配置中心 HTTPS 地址、R2 精确 origin、身份、资源 ID、模型和字体路径：
+在后台创建独立节点，复制 [node.example.json](node.example.json) 为 `node.local.json`，配置中心 HTTPS 地址、身份、资源 ID、模型和字体路径：
 
 ```powershell
 .\.venv-lama\Scripts\python.exe -m classic_node check --config node.local.json
@@ -29,6 +29,8 @@ Linux NVIDIA 需要 Vulkan 驱动、CUDA 12.8、cuDNN 9 和 Noto 字体。执行
 ```
 
 `check` 校验本地模型并输出引擎版本；将中心 `CLASSIC_ENGINE_VERSION` 配为该值，配置文本供应商并启用常规翻译。`run` 才注册和领取任务，以中心心跳确认在线。
+
+节点使用 v3：凭当前租约从中心读取规范化临时原图，提交裁剪后的无损 WebP 覆盖层。覆盖 alpha 仅为 0/255，客户端用 `source-atop` 保留原图透明度；无可见变化返回原图表示而不上传文件。冻结结果以 SQLite 二进制 BLOB 与完成记录一起耐久保存，丢回执可复交，终态后清除；不编码或上传整页 PNG，不配置对象存储。
 
 节点身份与语言见[节点配置](../../docs/NODE_CONFIGURATION.md)，执行、日志与恢复见[节点运维](docs/NODE_OPERATIONS.md)，消息与交付见[计算协议](../../docs/COMPUTE_PROTOCOL.md)。
 
@@ -39,7 +41,7 @@ Linux NVIDIA 需要 Vulkan 驱动、CUDA 12.8、cuDNN 9 和 Noto 字体。执行
 本目录运行 `.\.venv-lama\Scripts\python.exe -m pytest -q`。中心联调从仓库根目录使用已安装后端依赖的 Python：
 
 ```powershell
-python -m pytest backend/tests/test_compute_v2.py backend/tests/test_compute_node_v2.py -q
+python -m pytest backend/tests/test_compute_v3.py backend/tests/test_compute_node_v3.py -q
 ```
 
-真实 GPU 集成需将 `CLASSIC_TEST_MODELS` 指向模型目录，并使用引擎与后端依赖齐备的环境运行 `test_compute_node_v2.py -k real_vulkan`。文本和对象存储仍为隔离适配器；效果、性能与公网接入分别验证，工具见 [ENGINE.md](ENGINE.md#性能与验证)。
+真实 GPU 集成需将 `CLASSIC_TEST_MODELS` 指向模型目录，并使用引擎与后端依赖齐备的环境运行 `test_compute_node_v3.py -k real_vulkan`。文本和中心传输仍为隔离适配器；效果、性能与公网接入分别验证，工具见 [ENGINE.md](ENGINE.md#性能与验证)。

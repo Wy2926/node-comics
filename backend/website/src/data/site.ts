@@ -2,6 +2,12 @@ import extensionReleases from '../../../extension-release.json';
 const extensionPackages = Object.fromEntries((['chrome', 'edge', 'firefox'] as const).map(browser => {
   const release = extensionReleases.releases.find(item => item.version === extensionReleases.current_by_browser[browser] && item.browser === browser);
   if (!release) throw new Error('Missing current extension package: ' + browser);
+  if (release.download_url) {
+    const url = new URL(release.download_url);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+      throw new Error('Extension downloads require a permanent public HTTPS URL: ' + browser);
+    }
+  }
   return [browser, release];
 }));
 // Public, build-time configuration only. Never put credentials in this project.
@@ -11,7 +17,7 @@ export const site = {
   email: 'comics@nodelane.net',
   github: 'https://github.com/Wy2926/node-comics',
   language: 'zh-CN',
-  updated: '2026-09-20',
+  updated: '2026-09-29',
   extensionPackages,
   // Only verified listing URLs. Edge is awaiting store review; offer its package instead.
   stores: {

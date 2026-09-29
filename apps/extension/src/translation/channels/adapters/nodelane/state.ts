@@ -20,7 +20,7 @@ export function translationState({page,mode,language,userId,origin,active,caps,r
   if(operation?.state==='local'||operation?.state==='deferred')return {kind:'waiting',message:msg("等待翻译")};
   if(t.latest?.status==='failed')return {kind:'error',message:t.latest.error?.message??msg("翻译失败"),retryable:t.latest.error?.code!=='TRANSLATION_UNAVAILABLE'};
   if(t.ready)return;
-  if(t.result?.output_asset_id&&!t.expired)return {kind:page.translationError?'error':'translating',message:page.translationError??msg("正在读取译图"),retryLabel:msg("点击重新加载")};
+  if(t.result?.result&&!t.expired)return {kind:page.translationError?'error':'translating',message:page.translationError??msg("正在读取译图"),retryLabel:msg("点击重新加载")};
   if(t.latest?.status==='no_text')return;
   if(t.latest)return {kind:'error',message:t.expired?msg("译图已失效"):t.latest.error?.message??msg("翻译已停止")};
   if(!active)return;

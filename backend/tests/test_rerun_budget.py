@@ -25,7 +25,7 @@ def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client,
     auth = login(client)
     original = done(client, auth, png, monkeypatch)
     first = regenerate(client, auth, original)
-    assert first.status_code == 202 and first.json()['state'] == 'queued'
+    assert first.status_code == 202 and first.json()['state'] == 'needs_input'
     original_job = request_record(client, auth, original['id']).job_id
     revised_job = request_record(client, auth, first.json()['id']).job_id
     with session_factory()() as db:

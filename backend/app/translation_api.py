@@ -4,22 +4,22 @@ from datetime import timedelta
 from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
-from .assets import access_json, available, find_shared_original, record_user_access
+from .assets import available, object_path
 from .auth import identity
 from .config import settings
 from .db import get_db, session_factory
 from .errors import problem
 from .jobs import cancel_job, create_job
 from .languages import Language
-from .models import Asset, ClassicState, Job, User, now
+from .models import Asset, Attempt, ClassicState, Job, Ledger, TextCall, User, now
+from .queue_models import ExecutionLease
 from .providers import digest
 from .request_models import RequestBody
-from .results import ReaderEntry, get_entry
 from .scheduler import ACTIVE, lock_scheduler, queue_for, touch_job
 from .schemas import TranslationHistoryResponse, TranslationResponse, TranslationsResponse
 from .translation_limits import acquire_control, release_control
@@ -34,6 +34,7 @@ class ImageDescriptor(RequestBody):
     sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     byte_size: int = Field(gt=0, strict=True)
     content_type: Literal['image/png', 'image/jpeg', 'image/webp', 'application/octet-stream']
+    normalization_version: Literal[1] = 1
 
 
 class TranslationInput(RequestBody):
@@ -72,45 +73,59 @@ def unavailable(db, row, entry, assets=None):
     if row.revoked_at or entry is None:
         return True
     lookup = (lambda key: assets.get(key)) if assets is not None else (lambda key: db.get(Asset, key))
-    if entry.input_asset_id and not available(lookup(entry.input_asset_id)):
-        return True
-    return bool(entry.output_asset_id and not available(lookup(entry.output_asset_id)))
+    source = lookup(entry.input_asset_id) if entry.input_asset_id else None
+    output = lookup(entry.output_asset_id) if entry.output_asset_id else None
+    return bool((source and source.deleted_at) or (output and output.deleted_at))
 
 
 def snapshot_context(db, rows):
-    entries = {entry.id: entry for entry in db.scalars(select(ReaderEntry).where(
-        ReaderEntry.id.in_({row.entry_id for row in rows})))} if rows else {}
+    entries = {entry.id: entry for entry in db.scalars(select(Job).where(
+        tuple_(Job.owner_id, Job.id).in_({(row.owner_id, row.job_id) for row in rows if row.job_id})))} if rows else {}
     asset_ids = {asset_id for entry in entries.values()
         for asset_id in (entry.input_asset_id, entry.output_asset_id) if asset_id}
     assets = {asset.id: asset for asset in db.scalars(select(Asset).where(Asset.id.in_(asset_ids)))} if asset_ids else {}
     awaiting = {entry.id for entry in entries.values() if entry.status == 'awaiting_upload'}
     uploads = {upload.job_id: upload for upload in db.scalars(select(UploadReservation).where(
         UploadReservation.job_id.in_(awaiting)))} if awaiting else {}
-    return entries, assets, uploads
+    withdrawn = {row.job_id for row in rows if row.job_id in entries and
+        unavailable(db, row, entries[row.job_id], assets)}
+    resolved = resolved_execution_ids(db, {key: entries[key] for key in withdrawn})
+    return entries, assets, uploads, resolved
 
 
-def translation_page(db, rows, *, sign=True):
+def resolved_execution_ids(db, entries):
+    """A withdrawn result may expose only its owner's verified terminal verdict."""
+    candidates = {key for key, entry in entries.items() if entry.status in
+        {'succeeded', 'no_text', 'failed', 'cancelled'} and entry.completed_at and
+        entry.settlement in {'settled', 'released'}}
+    if not candidates:
+        return set()
+    reconciled = select(Ledger.id).where(Ledger.job_id == Job.id, Ledger.owner_id == Job.owner_id,
+        Ledger.kind == 'reconcile', Ledger.transaction_key == Job.id + ':reconcile').exists()
+    live_lease = select(ExecutionLease.id).where(ExecutionLease.job_id == Job.id,
+        ExecutionLease.completed_at.is_(None)).exists()
+    live_text = select(TextCall.id).where(TextCall.job_id == Job.id, TextCall.completed_at.is_(None)).exists()
+    unknown_image = select(Attempt.id).where(Attempt.job_id == Job.id, Attempt.call_started_at.is_not(None),
+        or_(Attempt.completed_at.is_(None), Attempt.cost_state.not_in({'reported', 'estimated'}))).exists()
+    unknown_text = select(TextCall.id).where(TextCall.job_id == Job.id,
+        TextCall.cost_state.not_in({'reported', 'estimated'})).exists()
+    attempt_exists = select(Attempt.id).where(Attempt.job_id == Job.id, Attempt.id == Job.attempt_id).exists()
+    never_started = and_(Job.attempt_id.is_(None), Job.status.in_({'failed', 'cancelled', 'no_text'}))
+    return set(db.scalars(select(Job.id).where(Job.id.in_(candidates), ~live_lease, ~live_text,
+        or_(reconciled, and_(~unknown_image, ~unknown_text, or_(attempt_exists, never_started))))))
+
+
+def translation_page(db, rows):
     rows = list(rows)
     context = snapshot_context(db, rows)
-    items = [translation_json(db, row, sign=sign, context=context) for row in rows]
-    if sign:
-        record_snapshot_access(db, items, context)
-    return items
+    return [translation_json(db, row, context=context) for row in rows]
 
 
-def record_snapshot_access(db, items, context):
-    # Batches may request the same images in opposite orders. Take all image
-    # update locks in one global order, including their shared source grants.
-    ids = {asset_id for item in items if item['state'] == 'succeeded' and item['result']['asset_id']
-        for asset_id in (item['input_asset_id'], item['result']['asset_id']) if asset_id}
-    for asset_id in sorted(ids):
-        record_user_access(db, context[1][asset_id])
-
-
-def translation_json(db, row, *, sign=True, context=None):
-    entry = context[0].get(row.entry_id) if context else get_entry(db, row.entry_id)
-    assets = context[1] if context else None
-    asset_for = (lambda key: assets.get(key)) if assets is not None else (lambda key: db.get(Asset, key))
+def translation_json(db, row, *, context=None):
+    context = context if context is not None else snapshot_context(db, [row])
+    entry = context[0].get(row.job_id)
+    assets = context[1]
+    asset_for = lambda key: assets.get(key)
     descriptor = row.descriptor or {}
     state = ('needs_input' if entry.status == 'awaiting_upload' else
         'needs_attention' if entry.status in {'outcome_unknown', 'unknown_released'} else
@@ -118,37 +133,44 @@ def translation_json(db, row, *, sign=True, context=None):
         'failed' if entry.status in {'failed', 'cancelled'} else
         'running' if entry.status == 'running' and entry.phase != 'validate_upload' else 'queued') if entry else 'failed'
     error = ({'code': entry.error_code, 'message': entry.error_message or '翻译失败'} if entry and entry.error_code else None)
-    if unavailable(db, row, entry, assets):
-        state, error = 'failed', {'code': 'TRANSLATION_UNAVAILABLE', 'message': '翻译访问已撤销或过期'}
+    withdrawn = unavailable(db, row, entry, assets)
+    if withdrawn:
+        state, error = 'failed', {'code': 'TRANSLATION_UNAVAILABLE', 'message': '翻译访问已撤销'}
     elif state == 'failed' and error is None:
         error = {'code': 'TRANSLATION_CANCELLED', 'message': '翻译已取消'}
-    upload = (context[2].get(row.job_id) if context else db.scalar(select(UploadReservation).where(UploadReservation.job_id == row.job_id))) if state == 'needs_input' else None
+    upload = context[2].get(row.job_id) if state == 'needs_input' else None
     result = None
     if state == 'succeeded':
         output = asset_for(entry.output_asset_id) if entry.output_asset_id else None
+        source = asset_for(entry.input_asset_id) if entry.input_asset_id else None
+        description = entry.result_description or {}
+        representation = output.representation if output else 'original'
         result = {'kind': 'no_text' if entry.status == 'no_text' else 'partial' if 'unrecognized_regions' in (entry.quality_flags or []) else 'translated',
-            'asset_id': output.id if output else None, 'width': output.width if output else None,
-            'height': output.height if output else None, 'download_url': None, 'download_expires_at': None,
-            'authorization_required': False, 'quality_flags': entry.quality_flags or []}
-        if sign and output:
-            access = access_json(output)
-            result.update(download_url=access['url'], download_expires_at=access['expires_at'],
-                authorization_required=access['authorization_required'])
-            if context is None:
-                for asset in sorted((output, asset_for(entry.input_asset_id)), key=lambda value: value.id):
-                    record_user_access(db, asset)
+            'representation': representation, 'input_sha256': entry.source_sha256,
+            'normalization_version': source.normalization_version if source else 1,
+            'width': output.width if representation == 'full-image-v1' else description.get('width') or (source.width if source else None),
+            'height': output.height if representation == 'full-image-v1' else description.get('height') or (source.height if source else None),
+            'artifact': None, 'quality_flags': entry.quality_flags or []}
+        if output:
+            result['artifact'] = {'sha256': output.sha256, 'byte_size': output.byte_size, 'mime': output.mime,
+                'path': f'/v1/translations/{row.id}/result'}
+            if representation == 'overlay-v1':
+                result.update(bbox=output.bbox, composite='source-atop')
+            if not available(output):
+                error = {'code': 'RESULT_UNAVAILABLE', 'message': '结果文件暂不可用，请稍后重试'}
     return {'id': row.id, 'state': state,
+        'execution_resolved': bool(withdrawn and (entry and entry.id in context[3] or
+            row.job_id is None and row.revoked_at and row.legacy_execution_resolved)),
         'mode': entry.mode if entry else descriptor['mode'],
         'target_language': entry.target_language if entry else descriptor['target_language'],
         'image_sha256': entry.source_sha256 if entry else descriptor['image']['sha256'],
-        'input_asset_id': entry.input_asset_id if entry and state != 'failed' else None,
         'input_expires_at': iso(upload.expires_at) if upload else None,
         'result': result, 'error': error, 'created_at': iso(row.created_at),
         'updated_at': iso(row.revoked_at or (entry.changed_at if entry else row.created_at))}
 
 
 def apply_priority(db, job, priority):
-    if not isinstance(job, Job) or job.status not in ACTIVE - {'outcome_unknown'}:
+    if job is None or job.status not in ACTIVE - {'outcome_unknown'}:
         return
     desired = 0 if priority == 'current' else 1
     # Initial hint and the one-way prefetch promotion each have a bounded lifetime.
@@ -166,7 +188,7 @@ def accept_translation(db, user, request_id, body):
     if old:
         if old.request_hash != signature:
             problem('IDEMPOTENCY_CONFLICT', '请求编号已绑定其他翻译内容', 409)
-        entry = get_entry(db, old.entry_id)
+        entry = db.get(Job, old.job_id) if old.job_id else None
         if unavailable(db, old, entry):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
         apply_priority(db, entry, body.priority)
@@ -175,7 +197,7 @@ def accept_translation(db, user, request_id, body):
     previous_id = body.retry_of or body.regenerate_of
     if previous_id:
         previous = owned_translation(db, user.id, previous_id)
-        entry = get_entry(db, previous.entry_id)
+        entry = db.get(Job, previous.job_id) if previous.job_id else None
         if unavailable(db, previous, entry):
             problem('TRANSLATION_UNAVAILABLE', '来源翻译访问已撤销或过期', 410)
         unknown = entry.status in {'outcome_unknown', 'unknown_released'}
@@ -189,7 +211,7 @@ def accept_translation(db, user, request_id, body):
         mode, language = entry.mode, entry.target_language
     if image.byte_size > settings().max_upload_bytes:
         problem('IMAGE_TOO_LARGE', '图片大小超过限制', 413)
-    asset = find_shared_original(db, user.id, image.sha256, byte_size=image.byte_size, mime=image.content_type)
+    asset = None  # Inputs are private to each actual job, never claimed by hash.
     entry = create_job(db, user, asset, mode, language, request_id, operation='translation',
         force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature)
     row = db.get(TranslationRequest, (user.id, request_id))
@@ -197,7 +219,7 @@ def accept_translation(db, user, request_id, body):
         'retry_of': str(body.retry_of) if body.retry_of else None,
         'regenerate_of': str(body.regenerate_of) if body.regenerate_of else None,
         'acknowledge_unknown_cost': body.acknowledge_unknown_cost}
-    if isinstance(entry, Job) and entry.status == 'awaiting_upload':
+    if entry.status == 'awaiting_upload':
         create_upload(db, entry, {'sha256': image.sha256, 'byte_size': image.byte_size, 'mime': image.content_type})
     apply_priority(db, entry, body.priority)
     db.flush()
@@ -210,40 +232,33 @@ def response_status(payload):
 
 @router.put('/v1/translations/{translation_id}', response_model=TranslationResponse,
     responses={202: {'model': TranslationResponse}})
-def translate(translation_id: UUID, body: TranslationInput, user: User = Depends(identity), db: Session = Depends(get_db)):
+def translate(translation_id: UUID, body: TranslationInput, request: Request, user: User = Depends(identity), db: Session = Depends(get_db)):
     owner_id = user.id
     db.rollback()
     token = acquire_control(owner_id)
     try:
         lock_scheduler(db)
         row = accept_translation(db, db.get(User, owner_id), str(translation_id), body)
-        # Commit admission before generating delivery URLs; URL errors must not
-        # lose an already accepted request or its frozen configuration.
+        # Persist admission before building the client snapshot.
         db.commit()
         result = translation_json(db, row)
-        db.commit()
         return JSONResponse(result, status_code=response_status(result))
     finally:
         db.rollback()
         release_control(owner_id, token)
 
 
-def read_snapshot(owner_id, request_ids, expected_etag=None, *, single=False):
+def read_snapshot(owner_id, request_ids, *, single=False):
     with session_factory()() as db:
         rows = {row.id: row for row in db.scalars(select(TranslationRequest).where(
             TranslationRequest.owner_id == owner_id, TranslationRequest.id.in_(request_ids)))}
         if single and not rows:
             problem('NOT_FOUND', '找不到此翻译请求', 404)
         context = snapshot_context(db, list(rows.values()))
-        items = [translation_json(db, rows[key], sign=False, context=context) for key in request_ids if key in rows]
+        items = [translation_json(db, rows[key], context=context) for key in request_ids if key in rows]
         missing = [key for key in request_ids if key not in rows]
         payload = items[0] if single else {'items': items, 'missing_ids': missing}
         etag = '"' + digest({'owner': owner_id, 'ids': request_ids, 'snapshot': payload}) + '"'
-        if expected_etag != etag:
-            items = [translation_json(db, rows[key], context=context) for key in request_ids if key in rows]
-            payload = items[0] if single else {'items': items, 'missing_ids': missing}
-            record_snapshot_access(db, items, context)
-            db.commit()
         return etag, payload
 
 
@@ -251,7 +266,7 @@ async def snapshot_response(owner_id, ids, request, *, single=False):
     expected = request.headers.get('if-none-match')
     token = await run_in_threadpool(acquire_control, owner_id, "snapshot")
     try:
-        etag, payload = await run_in_threadpool(read_snapshot, owner_id, ids, expected, single=single)
+        etag, payload = await run_in_threadpool(read_snapshot, owner_id, ids, single=single)
         headers = {'ETag': etag, 'Cache-Control': 'private, no-store'}
         return JSONResponse(payload, headers=headers) if etag != expected else Response(status_code=304, headers=headers)
     finally:
@@ -294,7 +309,6 @@ async def translations(request: Request, ids: str | None = Query(None, max_lengt
                 rows = db.scalars(query.order_by(TranslationRequest.created_at.desc(), TranslationRequest.id).offset(offset).limit(limit))
                 result = {'items': translation_page(db, rows), 'total': total,
                     'next_offset': offset + limit if offset + limit < total else None}
-                db.commit()
                 return result
             finally:
                 db.close()
@@ -323,7 +337,7 @@ async def translation_input(translation_id: UUID, request: Request,
     owner_id, key = user.id, str(translation_id)
     def find_input():
         row = owned_translation(db, owner_id, key)
-        entry = get_entry(db, row.entry_id)
+        entry = db.get(Job, row.job_id) if row.job_id else None
         if unavailable(db, row, entry):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
         receipt = db.scalar(select(UploadReservation).where(UploadReservation.job_id == row.job_id)) if row.job_id else None
@@ -336,6 +350,7 @@ async def translation_input(translation_id: UUID, request: Request,
     if isinstance(admission, Ingress):
         stopped, lost = asyncio.Event(), asyncio.Event()
         heartbeat = asyncio.create_task(keep_ingress_alive(admission, stopped, lost))
+        data = None
         try:
             try:
                 data = await read_ingress_body(request, admission, lost)
@@ -346,12 +361,14 @@ async def translation_input(translation_id: UUID, request: Request,
                 problem('UPLOAD_LEASE_EXPIRED', '上传连接已失效，请重试', 409)
             await finish_thread(persist_received_upload, admission, data)
         finally:
+            if data is not None:
+                data.close()
             stopped.set()
             try:
                 await asyncio.shield(heartbeat)
             finally:
                 await finish_thread(release_ingress, admission)
-    _, payload = await run_in_threadpool(read_snapshot, owner_id, [key], None, single=True)
+    _, payload = await run_in_threadpool(read_snapshot, owner_id, [key], single=True)
     return JSONResponse(payload, status_code=response_status(payload))
 
 
@@ -363,24 +380,89 @@ def translation_cancel(translation_id: UUID, user: User = Depends(identity), db:
         cancel_job(db, db.get(Job, row.job_id))
     db.commit()
     result = translation_json(db, row)
-    db.commit()
     return result
 
 
 @router.get('/v1/translations/{translation_id}/classic')
 def classic_details(translation_id: UUID, user: User = Depends(identity), db: Session = Depends(get_db)):
     row = owned_translation(db, user.id, translation_id)
-    entry = get_entry(db, row.entry_id)
+    entry = db.get(Job, row.job_id) if row.job_id else None
     if unavailable(db, row, entry):
         problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
     if entry.mode != 'classic':
         problem('MODE_UNSUPPORTED', '此翻译没有常规翻译数据', 422)
     if not entry.input_asset_id:
         problem('INPUT_NOT_READY', '原图尚未上传，请等待服务器受理', 409)
-    # Cached grants never reveal another account's private OCR text.
     state = db.get(ClassicState, row.job_id) if row.job_id else None
     if not state:
         return {'segments': [], 'translations': {}, 'artifacts': {}, 'timings': {}}
     return {'segments': (state.analysis or {}).get('segments', []), 'translations': state.translations,
         'unrecognized_regions': (state.analysis or {}).get('unrecognized_regions', []),
         'artifacts': {}, 'timings': state.timings}
+
+
+@router.get('/v1/translations/{translation_id}/result', response_class=Response, responses={
+    200: {'description': 'Authenticated immutable result bytes; original representation has no file.',
+        'content': {mime: {'schema': {'type': 'string', 'format': 'binary'}} for mime in ('image/webp', 'image/png', 'image/jpeg')}},
+    304: {'description': 'Authorized If-None-Match matches the result SHA-256 ETag.'},
+    409: {'description': 'Result is not ready or uses original representation.'},
+    410: {'description': 'This translation authorization has been revoked.'},
+    503: {'description': 'Committed result file is temporarily unavailable; no model call is restarted.'}})
+def translation_result(translation_id: UUID, request: Request, user: User = Depends(identity), db: Session = Depends(get_db)):
+    row = owned_translation(db, user.id, translation_id)
+    entry = db.get(Job, row.job_id) if row.job_id else None
+    if unavailable(db, row, entry):
+        problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销', 410)
+    if entry.status != 'succeeded' or not entry.output_asset_id:
+        problem('RESULT_NOT_AVAILABLE', '此翻译没有结果文件', 409)
+    output = db.get(Asset, entry.output_asset_id)
+    if not available(output) or output.owner_id != user.id:
+        problem('RESULT_UNAVAILABLE', '结果文件暂不可用', 503)
+    try:
+        handle = object_path(output.storage_key).open('rb')
+        import os
+        if os.fstat(handle.fileno()).st_size != output.byte_size:
+            handle.close()
+            problem('RESULT_UNAVAILABLE', '结果文件完整性异常', 503)
+    except OSError:
+        problem('RESULT_UNAVAILABLE', '结果文件暂不可用', 503)
+    headers = {'ETag': '"' + output.sha256 + '"', 'Cache-Control': 'private, no-store',
+        'Content-Length': str(output.byte_size), 'X-Content-Type-Options': 'nosniff'}
+    try:
+        db.commit()
+    except BaseException:
+        handle.close()
+        raise
+    if request.headers.get('if-none-match') == headers['ETag']:
+        handle.close()
+        return Response(status_code=304, headers={key: value for key, value in headers.items() if key != 'Content-Length'})
+    def chunks():
+        try:
+            while chunk := handle.read(256 * 1024):
+                yield chunk
+        finally:
+            handle.close()
+    from starlette.background import BackgroundTask
+    return StreamingResponse(chunks(), media_type=output.mime, headers=headers, background=BackgroundTask(handle.close))
+
+
+@router.delete('/v1/translations/{translation_id}')
+def translation_delete(translation_id: UUID, user: User = Depends(identity), db: Session = Depends(get_db)):
+    lock_scheduler(db)
+    row = owned_translation(db, user.id, translation_id)
+    row.revoked_at = row.revoked_at or now()
+    db.flush()
+    other = db.scalar(select(TranslationRequest.id).where(TranslationRequest.owner_id == user.id,
+        TranslationRequest.job_id == row.job_id, TranslationRequest.revoked_at.is_(None)).limit(1)) if row.job_id else None
+    if not other and row.job_id:
+        job = db.get(Job, row.job_id)
+        cancel_job(db, job)
+        if job.output_asset_id:
+            output = db.get(Asset, job.output_asset_id)
+            output.deleted_at = output.deleted_at or now()
+        touch_job(db, job)
+    db.commit()
+    # Durable tombstones make interrupted unlink recoverable by maintenance.
+    from .dispatcher import cleanup
+    cleanup(db)
+    return {'deleted': True, 'id': str(translation_id)}

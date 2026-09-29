@@ -15,6 +15,7 @@ from app.translation_api import TranslationInput, translate
 from app.translation_requests import TranslationRequest
 from conftest import request_id
 from uuid import UUID
+from starlette.requests import Request
 from app.quota_grants import GrantRequest, grant_pages
 
 
@@ -39,7 +40,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
             try:
                 response = translate(UUID(key), TranslationInput(image={
                     'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime},
-                    mode='classic',target_language='zh-Hans'), user=user, db=db)
+                    mode='classic',target_language='zh-Hans'), Request({'type':'http','headers':[(b'x-translation-protocol',b'overlay-v1')]}), user=user, db=db)
             except HTTPException as error:
                 assert error.status_code == 403 and error.detail['code'] == 'DAILY_QUOTA_EXHAUSTED'
                 return None

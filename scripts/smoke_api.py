@@ -14,7 +14,7 @@ from pathlib import Path
 
 import httpx
 from PIL import Image
-from translation_client import submit_page, body_for, download
+from translation_client import PROTOCOL_HEADERS, submit_page, body_for, download
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,7 +51,7 @@ def main():
             record["checks"].append(name)
 
     save()
-    with httpx.Client(base_url=args.api, timeout=60, trust_env=False) as client:
+    with httpx.Client(base_url=args.api, headers=PROTOCOL_HEADERS, timeout=60, trust_env=False) as client:
         auth = checked(client.post("/v1/auth/dev", json={"username": record["username"]}))
         client.headers["Authorization"] = "Bearer " + auth["access_token"]
         record["user_id"] = auth["user"]["id"]
@@ -82,20 +82,17 @@ def main():
         assert conflict.status_code == 409
         assert conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
         passed("idempotency_key_rejects_changed_payload")
-        with httpx.Client(base_url=args.api, timeout=30, trust_env=False) as stranger:
+        with httpx.Client(base_url=args.api, headers=PROTOCOL_HEADERS, timeout=30, trust_env=False) as stranger:
             other = checked(stranger.post("/v1/auth/dev", json={"username": record["username"] + "-other"}))
             stranger.headers["Authorization"] = "Bearer " + other["access_token"]
             assert stranger.get(f"/v1/translations/{record['translation_id']}").status_code == 404
-            if result.get("input_asset_id"):
-                assert stranger.get(f"/v1/images/{result['input_asset_id']}/content").status_code == 404
-            passed("another_user_cannot_read_job_or_original")
+            passed("another_user_cannot_read_translation")
         deadline = time.monotonic() + (1200 if args.wait else 0)
         while True:
             job = checked(client.get(f"/v1/translations/{record['translation_id']}"))
             record["translation"] = {key: value for key, value in job.items() if key != 'result'}
             if job.get('result'):
-                record["translation"]["result"] = {key: value for key, value in job['result'].items()
-                    if key not in ('download_url', 'download_expires_at')}
+                record["translation"]["result"] = job['result']
             record["usage"] = checked(client.get("/v1/me/usage"))
             save()
             print(json.dumps({"translation_id": job["id"], "mode": args.mode, "state": job["state"],
@@ -104,7 +101,7 @@ def main():
                 break
             time.sleep(5)
         if job["state"] == "succeeded" and job['result']['kind'] != 'no_text':
-            output = download(client, job)
+            output = download(client, job, original=sample)
             picture = Image.open(io.BytesIO(output))
             picture.load()
             assert picture.width > 0 and picture.height > 0

@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .assets import content_storage_key, create_asset, extend_original_retention, inspect_image, owned_asset, read_asset, retention_deadline, upload_bytes
+from .assets import asset_storage_key, create_asset, inspect_image, owned_asset, read_asset, upload_bytes
 from .storage import get_store
 from .auth import admin, user_json
 from .config import settings
@@ -16,7 +16,7 @@ from .db import get_db
 from .errors import problem
 from .jobs import create_job, idem_key, job_for_request, job_json, settle
 from .entitlements import change_membership, compensate, entitlements_json
-from .models import Asset, Attempt, Job, Ledger, Provider, TextCall, User, now
+from .models import Asset, Attempt, Job, Ledger, Provider, TextCall, User, now, uid
 from .scheduler import lock_scheduler
 from .queue_models import ComputeNode, ExecutionLease
 from .providers import ProviderConfig, configuration, credential, digest
@@ -135,7 +135,7 @@ async def provider_test(provider_id: str, image: Annotated[UploadFile, File()], 
     def submit():
         key = idem_key(idempotency_key)
         request_hash = digest(["provider-test", provider_id, sha256(data).hexdigest(), target_language])
-        previous = job_for_request(db, user.id, f"provider-test:{provider_id}", key, request_hash)
+        previous = job_for_request(db, user.id, key, request_hash)
         if previous:
             return job_json(db, previous)
         unresolved = db.scalar(select(Job).where(Job.owner_id == user.id, Job.operation == f"provider-test:{provider_id}",
@@ -148,23 +148,22 @@ async def provider_test(provider_id: str, image: Annotated[UploadFile, File()], 
         # Concurrent submissions can safely PUT the same content key; only the
         # winner of the locked receipt check may create its access metadata.
         info = inspect_image(data)
-        backend = settings().result_storage_backend
-        get_store(backend).put(content_storage_key(info['sha256']), data, info['mime'], kind='original')
+        input_id = uid()
+        get_store().put(asset_storage_key(input_id, "original"), data, info["mime"], kind="original")
         lock_scheduler(db)
         from .translation_requests import TranslationRequest
-        from .results import get_entry
         from .jobs import request_identifier
         receipt = db.get(TranslationRequest, (user.id, request_identifier(key)), populate_existing=True)
         if receipt:
             if receipt.request_hash != request_hash:
                 problem("IDEMPOTENCY_CONFLICT", "此操作编号已用于其他图片或参数", 409)
-            return job_json(db, get_entry(db, receipt.entry_id))
+            return job_json(db, db.get(Job, receipt.job_id))
         unresolved = db.scalar(select(Job.id).where(Job.owner_id == user.id, Job.operation == f"provider-test:{provider_id}",
             Job.source_sha256 == info['sha256'], Job.target_language == target_language,
             Job.status.in_({"outcome_unknown", "unknown_released"})).limit(1))
         if unresolved:
             problem("PROVIDER_TEST_OUTCOME_UNKNOWN", "同一图片的测试结果仍待核实，请先处理原测试任务", 409, job_id=unresolved)
-        asset = create_asset(db, user.id, data, storage_backend=backend, prewritten=True, verified_info=info)
+        asset = create_asset(db, user.id, data, stable_id=input_id, prewritten=True, verified_info=info)
         job = create_job(db, user, asset, "redraw", target_language, key, operation=f"provider-test:{provider_id}",
                          force=True, config=config, request_hash_override=request_hash)
         record_audit(db, user.id, "image_provider.test", "image_provider", provider_id,
@@ -260,23 +259,22 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         if not body.output_asset_id:
             problem("INVALID_REQUEST", "成功核实必须提供已上传且属于原用户的结果图片", 422)
         output = owned_asset(db, body.output_asset_id, job.owner_id)
-        source = owned_asset(db, job.input_asset_id, job.owner_id)
+        source = db.get(Asset, job.input_asset_id)
+        if not source or source.owner_id != job.owner_id or source.deleted_at:
+            problem("TRANSLATION_UNAVAILABLE", "输入描述已撤销", 410)
         if output.id == source.id:
             problem("INVALID_PROVIDER_OUTPUT", "核实图片必须是单独上传的结果版本", 422)
-        from .file_pages import FilePage
-        from .results import ResultAccess
         if output.kind not in {"original", job.mode} or output.parent_id not in {None, source.id} or db.scalar(
-            select(Job.id).where(Job.id != job.id, (Job.input_asset_id == output.id) | (Job.output_asset_id == output.id)).limit(1)) or db.scalar(
-            select(FilePage.asset_id).where(FilePage.asset_id == output.id).limit(1)) or db.scalar(
-            select(ResultAccess.id).where((ResultAccess.input_asset_id == output.id) | (ResultAccess.output_asset_id == output.id)).limit(1)):
+            select(Job.id).where(Job.id != job.id, (Job.input_asset_id == output.id) | (Job.output_asset_id == output.id)).limit(1)):
             problem("INVALID_PROVIDER_OUTPUT", "该图片已关联其他任务，请单独补交本任务的译图", 422)
         ratio = (output.width / output.height) / (source.width / source.height)
         if not 0.8 <= ratio <= 1.25:
             problem("INVALID_PROVIDER_OUTPUT", "核实结果宽高比偏离原图", 422)
         job.output_asset_id = output.id
         output.kind, output.parent_id = job.mode, source.id
-        output.expires_at = retention_deadline()
-        extend_original_retention(db, source, output.expires_at)
+        output.expires_at = None
+        output.representation = "full-image-v1"
+        job.result_description = {"representation": "full-image-v1", "input_hash": source.sha256, "normalization_version": source.normalization_version, "width": output.width, "height": output.height}
         job.status, job.phase = "succeeded", "completed"
         settle(db, job, success=True)
     else:
@@ -285,8 +283,6 @@ def reconcile(job_id: str, body: ReconcileRequest, user: User = Depends(admin), 
         job.status, job.phase = "failed", "failed"
         settle(db, job, success=False)
     job.completed_at, job.error_code, job.error_message = now(), None, None
-    from .results import publish_result
-    publish_result(db, job)
     db.add(Ledger(owner_id=job.owner_id, job_id=job.id, transaction_key=f"{job.id}:reconcile", kind="reconcile", amount=0, note=body.note))
     record_audit(db, user.id, "job.reconcile", "job", job.id, before=before,
                  after={"status": job.status, "settlement": job.settlement, "output_asset_id": job.output_asset_id},

@@ -12,7 +12,7 @@ from test_upload_ingress import (
     test_redis_outage_does_not_block_upload_expiry,
     test_waiting_body_releases_identity_connection_and_disconnect_releases_slot,
     test_cancelled_waiting_body_releases_slot_and_preserves_retry,
-    test_cancel_during_r2_put_keeps_slot_and_heartbeat_until_thread_finishes,
+    test_cancel_during_file_publish_keeps_slot_and_heartbeat_until_thread_finishes,
     test_body_timeout_is_bounded_and_reservation_remains_retryable,
     test_lost_ingress_stops_waiting_for_client_body,
     test_verified_receipt_replay_is_bounded_and_checks_immutable_bytes,
@@ -53,7 +53,7 @@ def test_two_http_replicas_share_limits_and_leave_single_connection_pool_free(in
     with session_factory()() as db:
         tokens = {owner: token_for(db.get(User, owner)) for owner in case['owners']}
     environment = {**os.environ, 'PYTHONPATH': str(root), 'PYTHONUNBUFFERED': '1',
-                   'APP_ENV': 'test', 'RESULT_STORAGE_BACKEND': 'local', 'R2_ENDPOINT_URL': '',
+                   'APP_ENV': 'test',
                    'UPLOAD_USER_CONCURRENCY': '2', 'UPLOAD_GLOBAL_CONCURRENCY': '3',
                    'UPLOAD_IDLE_TIMEOUT_SECONDS': '15', 'UPLOAD_BODY_TIMEOUT_SECONDS': '30'}
     children, outputs, sockets = [], [], []
@@ -74,13 +74,15 @@ def test_two_http_replicas_share_limits_and_leave_single_connection_pool_free(in
         path = f"/v1/translations/{case['uploads'][owner][index]}/input"
         headers = (f'PUT {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
                    f'Authorization: Bearer {tokens[owner]}\r\nContent-Type: image/png\r\n'
+                   'X-Translation-Protocol: overlay-v1\r\n'
                    f"Content-Length: {len(case['data'])}\r\nConnection: close\r\n\r\n")
         connection.sendall(headers.encode() + case['data'][:1])
         return connection
 
     def rejected(port, owner, index):
         path = f"http://127.0.0.1:{port}/v1/translations/{case['uploads'][owner][index]}/input"
-        response = httpx.put(path, headers={'Authorization': 'Bearer ' + tokens[owner]},
+        response = httpx.put(path, headers={'Authorization': 'Bearer ' + tokens[owner],
+                                          'X-Translation-Protocol': 'overlay-v1'},
                              content=case['data'], timeout=3, trust_env=False)
         assert response.status_code == 429
         assert response.json()['error']['code'] == 'UPLOAD_BUSY'

@@ -6,13 +6,13 @@ import {job,origin,target} from './translation-fixture';
 describe('local reading timing',()=>{
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
-  expect(window.ready(150).map(t=>t.page.pageIndex)).toEqual([0,1,2,3]);
+  expect(window.ready(150).map(t=>Number(t.page.id.replace('page-','')))).toEqual([0,1,2,3]);
   for(let current=1;current<=5;current++){
    const now=current*1000;window.update([current,current+1,current+2,current+3].map(target),now);
-   expect(window.ready(now+80).map(t=>t.page.pageIndex)).toEqual([current,current+1,current+2,current+3]);
+   expect(window.ready(now+80).map(t=>Number(t.page.id.replace('page-','')))).toEqual([current,current+1,current+2,current+3]);
   }
   window.update([20,21,22].map(target),7000,true);
-  expect(window.ready(7000).map(t=>t.page.pageIndex)).toEqual([20]);
+  expect(window.ready(7000).map(t=>Number(t.page.id.replace('page-','')))).toEqual([20]);
  });
  it('starts immediately, prepares the next three at 150 ms, and ignores snapshot changes',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);

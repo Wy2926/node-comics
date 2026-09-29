@@ -1,8 +1,14 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用私有 R2、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `quota_campaigns_0006`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `job_results_0008`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 控制服务与官网
+
+`local_overlay_0007` 增加覆盖层描述，`job_results_0008` 将结果统一到 Job、TranslationRequest 和 Asset，删除旧结果副本、共享授权、文件页关联和存储后端选择字段。中心、v3 节点和 overlay-v1 插件必须配套升级，全部 translation 路由对缺少或不匹配的协议头返回 409。切换前用旧系统排空或核实旧远端任务；活动任务、结果未知或已释放用户预占但仍未核实供应商成本的 `unknown_released` 任务都会阻止迁移。迁移撤销旧共享授权和远端结果对应的 UUID，保留撤销墓碑、用户、权益、调用记录与资金账本，不访问、搬运或删除 R2 历史图片。新代码不读取旧远端结果，也不滚动混跑两种协议。切换不可通过数据库降级自动恢复旧授权；回退使用切换前配套备份。
+
+此次 overlay-v1 协议从插件 0.8.0 提供。先准备并发布兼容的新客户端，填写、验证对应永久下载 URL 和商店入口，再切换中心与节点；发布清单中的旧版本不能作为升级到新协议的入口。Firefox 须等兼容版本的签名包或商店版本就绪；未就绪时延后该浏览器的官方翻译切换，或明确显示暂不可用，不能继续引导用户安装旧包并反复提示更新。清单版本只在真实安装包就绪后更新。
+
+API、control-worker、maintenance 必须挂载同一个 `translation_files` 卷，UID 10001 可写。输入和结果都位于 `/data/translation`，临时接收目录同卷，不能沿用每容器独立图片 tmpfs。部署环境保证文件卷空间；应用不配置磁盘低水位或容量预留。备份必须覆盖数据库与结果目录，详见[存储规范](OBJECT_STORAGE.md)。
 
 1. 核对目标服务、数据库、镜像和代理配置，按[运维规范](OPERATIONS.md)备份。首次部署准备专用空库；数据库不兼容时先确定数据处置，不能以镜像回退代替数据库恢复。
 2. 以 `backend/Dockerfile` 构建新的版本标签；镜像同时包含 API、官网和管理后台。保留原标签以便回退。
@@ -42,18 +48,20 @@ Compose 固定 Docker 官方 `redis:8.2-alpine` 镜像摘要，包含 Redis 8.2.
 
 1. 在 `apps/extension` 设置正式 `VITE_API_BASE`、`VITE_DRIVE_CONNECT_URL`，更新版本并完成 `npm run check`、`npm test`。
 2. 分别生成 Chrome／Edge 手动安装包与无 `manifest.key` 的商店包。Firefox 审核包运行 `npx --no-install web-ext lint --source-dir .output/firefox-mv3`；公开下载使用 AMO 已签名 XPI。
-3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小和 SHA-256；保留已有下载地址，更新 `current` 与 `current_by_browser` 中各浏览器已就绪的版本。Firefox 新版尚未取得 AMO 签名时，保留其上一已签名版本并在更新日志中说明。
-4. 使用后端 Python 依赖并注入目标 R2 配置，从仓库根目录运行：
+3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小、SHA-256 和该安装包的 `download_url`。通过外部工具将包上传到公开 R2 后，粘贴完整、永久、无签名的 HTTPS URL；不根据桶名、域名或文件名猜测地址。保留已有 `/downloads/...` 的 `path`，更新 `current` 与 `current_by_browser` 中已就绪版本。Firefox 新版尚未取得 AMO 签名时，旧包可以保留为历史下载，但此次协议切换不能将它当成兼容更新；官方翻译入口须遵循上述就绪顺序。
+4. 从仓库根目录校验本地包、清单，以及已填写下载 URL 对应的公开文件：
 
 ```powershell
-python scripts/upload_extension_release.py --browser <chrome|edge|firefox> --zip <安装包路径> --manifest backend/extension-release.json
+python scripts/verify_extension_release.py --browser <chrome|edge|firefox> --zip <安装包路径> --manifest backend/extension-release.json
 ```
 
-脚本核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；上传不可覆盖并回读核对哈希。重新部署后端与官网以更新下载目录。商店提交包不放入手动下载目录。
+脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。重新部署后端与官网以更新发行清单，商店提交包不作为手动安装包交付。
+
+官网按钮直接链接各包的 `download_url`，旧 `/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，五语官网显示暂不可下载，旧路径返回 503；填写并验真后再提供下载，不使用占位地址。
 
 ## 上线检查
 
 - 核对镜像、数据库、控制进程、节点版本与心跳，确认 `/health/ready`。
-- 实际完成 OIDC 登录、R2 授权读写、插件阅读与翻译；支付按配置渠道独立验证。R2 公开入口应关闭。
+- 实际完成 OIDC 登录、临时原图上传、v3 节点直读/交付、原图终态删除与中心鉴权下载；支付按配置渠道独立验证。
 - 检查五语页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
 - 运行记录保存在部署环境或忽略的产物目录；仓库文档只维护流程。

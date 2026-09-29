@@ -6,8 +6,8 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "quota_campaigns_0006"
-NEW_TABLES = {"quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "translation_results", "result_accesses", "system_settings",
+HEAD = "job_results_0008"
+NEW_TABLES = {"quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
 
@@ -90,13 +90,12 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
     from app import db
     at = datetime(2026, 1, 1)
     leases = [{'id': 'preserve-control-token', 'until': '2026-01-01T00:00:30'}]
-    db.initialize()
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
     with isolated_migration_database.begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, 'translations_0001')
+        command.upgrade(config, 'translations_0001')
         connection.execute(text("INSERT INTO users (id, subject, name, role, created_at) VALUES ('preserved-user', 'existing-user', 'Existing', 'user', :at)"), {'at': at})
         connection.execute(text("INSERT INTO control_admissions VALUES ('preserved-user', 'translation', 2.5, :at, :leases)"),
             {'at': at, 'leases': __import__('json').dumps(leases)})
@@ -121,7 +120,6 @@ def test_gift_upgrade_preserves_calendar_segment_and_used_reserved_bucket(isolat
     from app.entitlements import MONTHLY, allowance_json, iso
     from app.models import User
     from app.providers import digest
-    db.initialize()
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
@@ -129,7 +127,7 @@ def test_gift_upgrade_preserves_calendar_segment_and_used_reserved_bucket(isolat
     period_id = digest(['calendar-user', MONTHLY, iso(start)])
     with isolated_migration_database.begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, 'redis_admission_0004')
+        command.upgrade(config, 'redis_admission_0004')
         connection.execute(text("INSERT INTO users (id, subject, name, role, created_at, membership_id, plus_started_at, plus_expires_at, plus_timezone, plus_monthly_pages) VALUES ('calendar-user', 'calendar-user', 'Existing', 'user', :start, 'calendar-segment', :start, :end, 'America/New_York', 300)"), {'start': start, 'end': end})
         connection.execute(QuotaPeriod.__table__.insert().values(id=period_id, owner_id='calendar-user',
             kind=MONTHLY, mode='redraw', source='membership', source_key=f'{MONTHLY}:{iso(start)}',
@@ -150,17 +148,19 @@ def test_gift_downgrade_rejects_unfinished_thirty_day_segment(isolated_migration
     from alembic import command
     from alembic.config import Config
     from app import db
-    db.initialize()
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
     with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.upgrade(config, 'gift_renewal_0005')
         connection.execute(text("INSERT INTO users (id, subject, name, role, created_at, membership_id, plus_started_at, plus_expires_at, plus_monthly_pages) VALUES ('gift-user', 'gift-user', 'New gift', 'user', CURRENT_TIMESTAMP, 'gift-segment', CURRENT_TIMESTAMP, '2099-01-01', 300)"))
         config.attributes['connection'] = connection
         with pytest.raises(RuntimeError, match='Resolve thirty-day gift periods'):
             command.downgrade(config, 'redis_admission_0004')
-    # The empty campaign migration can already have been downgraded on SQLite;
-    # the membership guard must preserve its own schema and data.
+    # The membership guard must preserve its own schema before a later upgrade.
+    with isolated_migration_database.connect() as connection:
+        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == 'gift_renewal_0005'
     db.initialize()
     assert_current_schema_matches_models(isolated_migration_database)
 
@@ -170,13 +170,12 @@ def test_title_supplier_upgrade_preserves_body_default_without_implicit_selectio
     from alembic import command
     from alembic.config import Config
     from app import db
-    db.initialize()
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
     with isolated_migration_database.begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, 'translations_0001')
+        command.upgrade(config, 'translations_0001')
         connection.execute(text("INSERT INTO translation_providers "
             "(id, name, channel, enabled, is_default, revision_id, requests_per_minute, created_at, updated_at) "
             "VALUES ('existing', 'Existing body supplier', 'openai', true, true, 'existing-revision', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"))
@@ -194,13 +193,12 @@ def test_weighted_upgrade_preserves_independent_choices_and_immutable_revisions(
     from alembic.config import Config
     from app import db
     from app.translation_models import TranslationProviderRevision
-    db.initialize()
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
     with isolated_migration_database.begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, 'comic_titles_0002')
+        command.upgrade(config, 'comic_titles_0002')
         for provider_id in ['body', 'title', 'unused']:
             connection.execute(text('INSERT INTO translation_providers '
                 '(id, name, channel, enabled, is_default, is_title_default, revision_id, requests_per_minute, created_at, updated_at) '
@@ -220,3 +218,31 @@ def test_weighted_upgrade_preserves_independent_choices_and_immutable_revisions(
     db.initialize()
     with isolated_migration_database.connect() as connection:
         assert revisions == connection.execute(text('SELECT * FROM translation_provider_revisions ORDER BY id')).all()
+
+
+@pytest.mark.parametrize('representation,key', [('original','inputs/new/source'), ('full-image-v1','results/ne/new'), ('overlay-v1','results/ov/overlay')])
+def test_overlay_upgrade_cannot_roll_back_after_local_protocol_data(isolated_migration_database, representation, key):
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from app import db as database
+    from app.models import Asset, User
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.upgrade(config, 'local_overlay_0007')
+    with isolated_migration_database.begin() as connection:
+        connection.execute(User.__table__.insert().values(id='overlay-owner', subject='overlay-owner', name='Reader'))
+        connection.execute(Asset.__table__.insert().values(id='overlay-asset', owner_id='overlay-owner',
+            sha256='a'*64, storage_key=key, mime='image/png', width=1, height=1,
+            byte_size=10, representation=representation))
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        with pytest.raises(RuntimeError, match='previous full-image protocol'):
+            command.downgrade(config, 'quota_campaigns_0006')
+        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == 'local_overlay_0007'

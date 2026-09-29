@@ -14,7 +14,7 @@ export function FeedbackForm({api,job,pageNumber,onClose,onRerun,canRerun}:{api:
   const [sending,setSending]=useState(false);const lock=useRef(false);const [error,setError]=useState('');
   useEffect(()=>{localStorage.setItem(storageKey,JSON.stringify(draft));},[storageKey,draft]);
   async function submit(){if(lock.current)return;lock.current=true;setSending(true);setError('');const payload={...draft,locked:true};setDraft(payload);
-    try{await api.feedback(job.id,{issues:payload.issues,comment:payload.comment,output_asset_id:job.output_asset_id},payload.key);if(api.isCurrent())setDraft({...payload,submitted:true});}
+    try{await api.feedback(job.id,{issues:payload.issues,comment:payload.comment},payload.key);if(api.isCurrent())setDraft({...payload,submitted:true});}
     catch(e){if(!api.isCurrent())return;const known=e instanceof ApiError&&e.status>=400&&e.status<500;setDraft({...payload,locked:!known});setError((e as Error).message+(known?'':msg(" 可重试确认，同一份反馈不会重复保存。")));}
     finally{lock.current=false;setSending(false);}
   }

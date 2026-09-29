@@ -37,20 +37,21 @@ class Asset(Base):
     kind: Mapped[str] = mapped_column(String(20), default="original")
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
     storage_key: Mapped[str] = mapped_column(String(200))
-    storage_backend: Mapped[str] = mapped_column(String(20), default="local", server_default="local")
     mime: Mapped[str] = mapped_column(String(30))
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
     byte_size: Mapped[int] = mapped_column(Integer)
+    representation: Mapped[str] = mapped_column(String(24), default="original", server_default="original")
+    bbox: Mapped[dict | None] = mapped_column(JSON)
+    normalization_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     active_references: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
-    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (Index("ix_assets_content_lookup", "kind", "sha256"),
                      Index("ix_assets_owner_content", "owner_id", "kind", "sha256"),
-                     Index("ix_assets_storage_key", "storage_backend", "storage_key"))
+                     Index("ix_assets_storage_key", "storage_key"))
 
 
 class Job(Base):
@@ -85,6 +86,7 @@ class Job(Base):
     error_code: Mapped[str | None] = mapped_column(String(60))
     error_message: Mapped[str | None] = mapped_column(String(300))
     quality_flags: Mapped[list] = mapped_column(JSON, default=list)
+    result_description: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
@@ -92,17 +94,12 @@ class Job(Base):
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
                      Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"))
 
-    @property
-    def cache_hit(self):
-        return False  # Cache grants never enter this table.
-
 
 class Attempt(Base):
     __tablename__ = "attempts"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
     provider_id: Mapped[str] = mapped_column(String(80))
-    output_storage_backend: Mapped[str] = mapped_column(String(20), default="local", server_default="local")
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     heartbeat_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     lease_expires_at: Mapped[datetime] = mapped_column(DateTime)

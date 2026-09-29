@@ -10,9 +10,9 @@ export function mergeJobs(previous: Job[], incoming: Job[]): Job[] {
     const old = jobs.get(job.id);
     if (old && !job.result_expired && statusRank[job.status] < statusRank[old.status] && !(job.updated_at&&(!old.updated_at||job.updated_at>old.updated_at)))
       continue;
-    const tombstone = old?.result_expired || old?.status === 'succeeded' && !old.output_asset_id;
-    jobs.set(job.id, tombstone && job.output_asset_id
-      ? { ...job, output_asset_id: null, result_available: false, result_expired: true }
+    const tombstone = old?.result_expired || old?.status === 'succeeded' && !old.result;
+    jobs.set(job.id, tombstone && job.result
+      ? { ...job, result:undefined, delivery:undefined,  result_available: false, result_expired: true }
       : job);
   }
   return [...jobs.values()].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.version - b.version);

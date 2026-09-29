@@ -17,11 +17,10 @@ import { settings as readSettings, saveSettings } from './comics/application/pre
 import { discoverEntryContent } from './comics/acquisition';
 import { chooseSourceFiles, sourceImportOptions } from './comics/application/source-service';
 import { onMaterialized } from './comics/pages/service';
-import { authorizeOriginals } from './comics/originals';
 import { initializeSources } from './comics/application/source-lifecycle';
 import { Reader } from './reader/Reader';
 import { readingViewKey } from './reader/view';
-import { API_BASE, API_ORIGIN } from './service';
+import { API_BASE } from './service';
 import { inExtension, sourceFor, canFindAlternatives, consumeSearchSeed, type SourceSearchResult, type PageManifest } from './sources';
 import {readWebsiteCatalog} from './comics/application/website-catalog';
 import {importWebsiteCatalog,importWebsiteLink} from './comics/application/website-import';
@@ -207,7 +206,6 @@ export function App(){
  useEffect(()=>onMaterialized(identity=>setCopies(values=>values.map(c=>c.contentId===identity.contentId?{...c,pages:c.pages.map(p=>p.id===identity.pageId?{...p,imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime,width:identity.width,height:identity.height}:p)}:c))),[]);
  useEffect(()=>{void saveSettings(settings);},[settings]);
  useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null){const next=readSettings();setSettings(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
- useEffect(()=>{authorizeOriginals(account?{origin:API_ORIGIN,userId:account.user.id,download:id=>api.image(id),isCurrent:api.isCurrent}:undefined);return()=>authorizeOriginals(undefined);},[api,account?.user.id]);
  useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),6000);return()=>clearTimeout(timer);},[toast]);
  useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setAccountTab(location.hash==='#account/subscription'?'subscription':'overview');leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
  useEffect(()=>()=>{readingEpoch.current++;readingLoadEpoch.current++;libraryEpoch.current++;},[]);

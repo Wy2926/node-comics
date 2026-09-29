@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Il login è scaduto, effettuare nuovamente il login.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "il servizio API corrente non include ancora questa interfaccia. Aggiorna e riavvia il servizio API e riprova.",
   "请求未完成（{0}）": "Richiesta incompleta ({0})",
-  "每次匹配需提供 1–100 页。": "da 1 a 100 pagine richieste per partita.",
-  "服务器匹配结果与请求页标识不一致。": "il risultato della corrispondenza del server non è coerente con l'ID della pagina richiesta.",
   "图片访问地址无效。": "l'indirizzo di accesso all'immagine non è valido.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Impossibile scaricare temporaneamente l'immagine. Controlla la configurazione tra domini della rete o dell'archiviazione di oggetti.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "l'immagine è scaduta o è inaccessibile. Conserva una copia locale o caricala di nuovo.",
-  "图片访问链接已过期，请重试。": "il collegamento di accesso all'immagine è scaduto, riprova.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "il file SHA-256 e l'indice della pagina non elaborata devono essere forniti in coppia.",
-  "图片 SHA-256 无效。": "immagine SHA-256 non valida.",
   "返回我的漫画": "Ritorno ai miei fumetti",
   "主导航": "Navigazione principale",
   "我的漫画": "I miei fumetti",
@@ -953,5 +947,9 @@
   "取消自动续费": "Annulla rinnovo automatico",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Gli accessi pagati e in regalo rimangono validi dopo l’annullamento. Non verranno addebitati altri rinnovi.",
   "确认取消续费": "Conferma annullamento",
-  "保留自动续费": "Mantieni rinnovo automatico"
+  "保留自动续费": "Mantieni rinnovo automatico",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "L’immagine originale non è disponibile. Ripristina la fonte o la cache locale.",
+  "翻译文件校验失败，请重新加载。": "La verifica del file tradotto non è riuscita. Ricaricalo.",
+  "翻译协议已更新，请手动重新翻译此页。": "Il protocollo di traduzione è cambiato. Traduci di nuovo questa pagina manualmente.",
+  "翻译协议已更新，请更新插件。": "Il protocollo di traduzione è cambiato. Aggiorna l’estensione."
 }

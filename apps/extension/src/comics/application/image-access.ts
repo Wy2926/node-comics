@@ -1,6 +1,6 @@
 import { acquirePage, type PageLease } from '../pages/service';
 import { parsePageReference } from '../pages/identity';
-import { resultInMemory } from '../../storage/translations/results';
+import { resultInMemory,readMaterializedResult } from '../../storage/translations/results';
 import { translationCache } from '../../storage/translations';
 import { sourcePageCache } from '../../storage/source-pages';
 import { thumbnailCache } from '../../storage/thumbnails';
@@ -12,7 +12,7 @@ export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<
   const reference=parsePageReference(key);
   if(reference)return acquirePage({...reference,signal,purpose:'reading'});
   signal?.throwIfAborted();
-  const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key):resultInMemory(key)??await translationCache.get(key);
+  const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key):resultInMemory(key)??await readMaterializedResult(key)??await translationCache.get(key);
   if(!blob)throw Error('图片缓存已清理，请重新加载。');
   return {blob,release(){}};
 }

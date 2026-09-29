@@ -6,12 +6,18 @@ import {translationCache} from './index';
 import {SourceDatabaseSchemaError} from '../database';
 import type {CacheToken} from '../cache';
 import {resultInMemory,retainResult,readResultFromContexts} from './memory';
+import {InvalidArtifactError,materializeResult,OriginalUnavailableError,validateResult} from '../../translation/materialize';
 export {resultInMemory} from './memory';
 
 interface ResultRequest {scope:TranslationScope;job:Job;isCurrent:()=>boolean}
 const downloads=new Map<string,Promise<Blob>>();
+const readers=new Map<string,{owner:string;read:()=>Promise<Blob>}>();
+export function registerResultReader(scope:TranslationScope,job:Job,read:()=>Promise<Blob>){readers.set(resultBlobKey(scope,job),{owner:scope.key,read});}
+export function releaseResultReaders(scope:TranslationScope){for(const [key,value] of readers)if(value.owner===scope.key)readers.delete(key);}
+export async function readMaterializedResult(key:string){return readers.get(key)?.read();}
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 export const resultBlobKey=(scope:TranslationScope,job:Job)=>'result:'+JSON.stringify([scope.key,job.id,job.result?.key]);
+export const artifactBlobKey=(scope:TranslationScope,job:Job)=>'artifact:'+JSON.stringify([scope.key,job.id,job.delivery?.artifact?.sha256]);
 export class LocalResultUnavailableError extends Error {
   readonly code='RESULT_NOT_CACHED';
   constructor(){super(msg('本地译图缓存已清理，请手动重新翻译。'));this.name='LocalResultUnavailableError';}
@@ -66,6 +72,52 @@ export async function loadResultBlob(request:ResultRequest&{download?:()=>Promis
       return publish(request,blob,token);
     };
     pending=(async()=>typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-result:'+key,read):await read())();
+    downloads.set(key,pending);
+    void pending.finally(()=>{if(downloads.get(key)===pending)downloads.delete(key);}).catch(()=>{});
+  }
+  const blob=await pending;assertCurrent(isCurrent);return blob;
+}
+
+/** Official disk cache contains only the delivered artifact; composed pages stay in bounded memory. */
+export async function loadDeliveredResult(request:ResultRequest&{download:()=>Promise<Blob>;original?:()=>Promise<Blob|undefined>}):Promise<Blob>{
+  assertResult(request);
+  const {job,scope,isCurrent}=request,result=job.delivery;
+  if(!result)throw Error(msg('翻译协议已更新，请手动重新翻译此页。'));
+  validateResult(result);
+  const key=resultBlobKey(scope,job);
+  let pending=downloads.get(key);
+  if(!pending){
+    pending=(async()=>{
+      const token=await translationCache.token(scope.key).catch(cacheUnavailable);
+      const memory=resultInMemory(key,token);
+      if(memory)return retainCurrent(request,key,memory,token);
+      let original:Blob|undefined;
+      if(result.representation!=='full-image-v1'){
+        try{original=await request.original?.();}catch(error){if(error instanceof SourceDatabaseSchemaError)throw error;throw new OriginalUnavailableError();}
+        if(!original)throw new OriginalUnavailableError();
+      }
+      let blob:Blob;
+      if(result.representation!=='original'){
+        const artifactKey=artifactBlobKey(scope,job);
+        const readAndCompose=async()=>{
+          const cached=await translationCache.get(artifactKey).catch(cacheUnavailable);
+          const bytes=cached??await request.download();
+          assertCurrent(isCurrent);
+          let composed:Blob;
+          try{composed=await materializeResult(result,original,bytes);}
+          catch(error){
+            if(cached&&error instanceof InvalidArtifactError)await translationCache.delete(artifactKey).catch(cacheUnavailable);
+            throw error;
+          }
+          assertCurrent(isCurrent);
+          if(!cached&&token)await translationCache.put(artifactKey,bytes,{owner:scope.key,token}).catch(cacheUnavailable);
+          return composed;
+        };
+        blob=typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-artifact:'+artifactKey,readAndCompose):await readAndCompose();
+      }else blob=await materializeResult(result,original);
+      assertCurrent(isCurrent);
+      return retainCurrent(request,key,blob,token);
+    })();
     downloads.set(key,pending);
     void pending.finally(()=>{if(downloads.get(key)===pending)downloads.delete(key);}).catch(()=>{});
   }

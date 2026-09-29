@@ -108,7 +108,7 @@ func (a app) initialize(from string) error {
 	} else {
 		reader := bufio.NewReader(os.Stdin)
 		for _, field := range []struct{ key, label string }{
-			{"control_url", "Controller HTTPS origin"}, {"r2_origin", "R2 HTTPS origin"},
+			{"control_url", "Controller HTTPS origin"},
 			{"node_id", "Node ID from administrator"}, {"resource_id", "Resource ID from administrator"}, {"node_token", "Node credential"},
 		} {
 			value, err := prompt(reader, field.label, field.key == "node_token")
@@ -118,12 +118,12 @@ func (a app) initialize(from string) error {
 			config[field.key] = value
 		}
 	}
-	for _, field := range []string{"control_url", "r2_origin", "node_id", "resource_id", "node_token"} {
+	for _, field := range []string{"control_url", "node_id", "resource_id", "node_token"} {
 		value, ok := config[field].(string)
 		if !ok || strings.TrimSpace(value) == "" {
 			return fmt.Errorf("configuration requires %s", field)
 		}
-		if (field == "control_url" || field == "r2_origin") && !validOrigin(value) {
+		if field == "control_url" && !validOrigin(value) {
 			return fmt.Errorf("%s must be an HTTPS origin", field)
 		}
 	}
@@ -133,7 +133,7 @@ func (a app) initialize(from string) error {
 	if err = protectDirectory(a.home, false); err != nil {
 		return err
 	}
-	config["protocol_version"], config["state_dir"] = 2, "state"
+	config["protocol_version"], config["state_dir"] = 3, "state"
 	engine, _ := config["engine"].(map[string]any)
 	if engine == nil {
 		engine = map[string]any{}

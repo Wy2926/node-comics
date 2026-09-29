@@ -14,7 +14,7 @@ if __name__ == '__main__':
     import uvicorn
     with TemporaryDirectory(prefix='node-comics-support-') as directory:
         os.environ.update(APP_ENV='test', DATABASE_URL='sqlite:///' + (Path(directory) / 'test.db').as_posix(),
-            STORAGE_PATH=str(Path(directory) / 'objects'), RESULT_STORAGE_BACKEND='local',
+            STORAGE_PATH=str(Path(directory) / 'objects'),
             DEV_AUTH='true', DEV_AUTH_SECRET='isolated-support-preview-secret-not-for-production',
             DEV_ADMIN_USERNAME='admin', ADMIN_WEB_PATH='/console-fixture/',
             CORS_ORIGINS='http://127.0.0.1:5191', OPENAI_API_KEY='', PROVIDERS_JSON='[]',

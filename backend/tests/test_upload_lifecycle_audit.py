@@ -27,30 +27,40 @@ def test_cancel_during_input_put_cannot_publish_asset(cluster, png, monkeypatch)
     client, _ = cluster
     auth = login(client)
     item = submit(client, auth, descriptor(png)).json()
-    store = get_store('r2')
-    put = store.put
-    def racing_put(*args, **kwargs):
-        put(*args, **kwargs)
+    from app.storage import LocalStore
+    put = LocalStore.put_file
+    def racing_put(self, *args, **kwargs):
+        put(self, *args, **kwargs)
         assert client.post('/v1/translations/' + item['id'] + '/cancel', headers=auth).status_code == 200
-    monkeypatch.setattr(store, 'put', racing_put)
+    monkeypatch.setattr(LocalStore, 'put_file', racing_put)
     client.put('/v1/translations/' + item['id'] + '/input', headers=auth, content=png)
     with session_factory()() as db:
         job = db.get(Job, request_record(client, auth, item['id']).job_id)
         assert job.status == 'cancelled' and not job.input_asset_id and not job.input_pinned
 
 
-@pytest.mark.parametrize('removed', ['purged', 'expired'])
-def test_verified_input_replay_rejects_unavailable_original(cluster, png, removed):
+
+
+def test_missing_queued_input_pauses_and_repairs_without_new_charge(cluster, png):
+    from app.assets import object_path
+    from app.dispatcher import recover_once
+    from app.upload_models import UploadReservation
+    from app.models import Ledger
+    from sqlalchemy import select, func
     client, _ = cluster
     auth = login(client)
     item = submit(client, auth, descriptor(png)).json()
-    accepted = upload_and_enqueue(client, auth, item, png)
+    upload_and_enqueue(client, auth, item, png)
     with session_factory()() as db:
-        asset = db.get(Asset, accepted['input_asset_id'])
-        if removed == 'purged':
-            asset.purged_at = now()
-        else:
-            asset.active_references = 0
-            asset.expires_at = now() - timedelta(days=1)
-        db.commit()
-    assert client.put('/v1/translations/' + item['id'] + '/input', headers=auth, content=png).status_code == 410
+        job = db.get(Job, request_record(client, auth, item['id']).job_id)
+        original_id = job.input_asset_id
+        object_path(db.get(Asset, original_id).storage_key).unlink()
+    recover_once()
+    state = client.get('/v1/translations/' + item['id'], headers=auth).json()
+    assert state['state'] == 'needs_input'
+    assert upload_and_enqueue(client, auth, item, png)['state'] == 'queued'
+    with session_factory()() as db:
+        job = db.get(Job, request_record(client, auth, item['id']).job_id)
+        assert job.input_asset_id == original_id
+        assert object_path(db.get(Asset, original_id).storage_key).exists()
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'reserve')) == 1

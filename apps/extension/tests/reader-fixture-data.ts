@@ -5,18 +5,18 @@ import {importLocalFile} from '../src/comics/application/import-service';
 import {loadEntry} from '../src/comics/application/library-service';
 import {acquirePage} from '../src/comics/pages/service';
 import {RENDER_PROFILE} from '../src/comics/pages/identity';
-import type {Job,ReadingEntry} from '../src/types';
+import type {Job,ReadingEntry,TranslationResult} from '../src/types';
 import {registerSourceDriver} from '../src/comics/sources/registry';
 import {localSourceDriver} from '../src/comics/sources/local/driver';
 const unregisterLocal=registerSourceDriver(localSourceDriver);
 
 /** Synthetic image bytes go through the actual container/index/PageService pipeline. */
-export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job):Promise<{copies:ReadingEntry[];ordinals:Record<string,number>;imageOrdinals:Record<string,number>}> {
+export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job,delivery?:(id:string,sha:string)=>TranslationResult):Promise<{copies:ReadingEntry[];ordinals:Record<string,number>;imageOrdinals:Record<string,number>}> {
   const marker='reader-fixture-source-v2';
   const imageOrdinals:Record<string,number>={};
   if(await catalog.count('comics')&&!await catalog.get('metadata',marker))throw Error('This origin contains non-fixture data. Use a new browser profile.');
   await catalog.put('metadata',{id:marker,synthetic:true});
-  const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'},scope={key:JSON.stringify([origin,scenario?'fixture-'+scenario:'fixture-reader'])};
+  const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'},scope={key:JSON.stringify([origin,scenario?'fixture-'+scenario:'fixture-reader','overlay-v1'])};
   const titles=scenario?['自动翻译 · '+scenario]:['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'];
   const existing=await catalog.list('metadata',{range:IDBKeyRange.bound(marker+':',marker+':\uffff'),limit:10});
   const ids:string[]=[];
@@ -47,8 +47,8 @@ export async function seedReaderFixture(origin:string,scenario:string|null,makeJ
       const lease=await acquirePage({entryId:doc.id,contentId:doc.contentId,pageId:page.pageId,renderProfileId:RENDER_PROFILE});
       try {
         const seed=makeJob(index,states[index]);
-        const job={...seed,result:seed.status==='succeeded'&&seed.output_asset_id?{key:seed.output_asset_id,recoverable:true}:undefined,id:bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,image_sha256:lease.identity.imageSha256};
-        await catalog.put('translationBindings',{id:JSON.stringify([scope.key,lease.identity.imageSha256]),scope:scope.key,imageSha256:lease.identity.imageSha256,updatedAt:Date.now(),payload:{translationScope:scope.key,ownerId:account.userId,apiOrigin:origin,assetId:job.input_asset_id,jobs:[job]}});
+        const job={...seed,result:seed.status==='succeeded'?{key:seed.id,recoverable:true}:undefined,id:bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,image_sha256:lease.identity.imageSha256,delivery:seed.status==='succeeded'?delivery?.(bookIndex?`fixture-book-${bookIndex}-${seed.id}`:seed.id,lease.identity.imageSha256):undefined};
+        await catalog.put('translationBindings',{id:JSON.stringify([scope.key,lease.identity.imageSha256]),scope:scope.key,imageSha256:lease.identity.imageSha256,updatedAt:Date.now(),payload:{translationScope:scope.key,ownerId:account.userId,apiOrigin:origin,jobs:[job]}});
       } finally {lease.release();}
     }
     await catalog.put('metadata',{id,entryId:doc.id,imageOrdinals});ids.push(doc.id);

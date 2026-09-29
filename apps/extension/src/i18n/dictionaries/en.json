@@ -43,14 +43,8 @@
   "登录已过期，请重新登录。": "Login has expired, please log in again.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "The current API service does not yet include this interface. Please update and restart the API service and try again.",
   "请求未完成（{0}）": "Request incomplete ({0})",
-  "每次匹配需提供 1–100 页。": "1–100 pages required per match.",
-  "服务器匹配结果与请求页标识不一致。": "The server matching result is inconsistent with the requested page ID.",
   "图片访问地址无效。": "The image access address is invalid.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "The image cannot be downloaded temporarily. Please check the cross-domain configuration of the network or object storage.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "The image has expired or is inaccessible. Please keep a local copy or upload it again.",
-  "图片访问链接已过期，请重试。": "The image access link has expired, please try again.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "File SHA-256 and raw page index must be provided as a pair.",
-  "图片 SHA-256 无效。": "Invalid image SHA-256.",
   "返回我的漫画": "Back to my comics",
   "主导航": "Main navigation",
   "我的漫画": "My comics",
@@ -953,5 +947,9 @@
   "取消自动续费": "Cancel automatic renewal",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Paid and gifted access remain after cancellation. No further renewal charges.",
   "确认取消续费": "Confirm cancellation",
-  "保留自动续费": "Keep automatic renewal"
+  "保留自动续费": "Keep automatic renewal",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "The original image is unavailable. Restore its source or local cache.",
+  "翻译文件校验失败，请重新加载。": "The translated file failed validation. Reload it.",
+  "翻译协议已更新，请手动重新翻译此页。": "The translation protocol has changed. Translate this page again manually.",
+  "翻译协议已更新，请更新插件。": "The translation protocol has changed. Update the extension."
 }

@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Đăng nhập đã hết hạn, vui lòng đăng nhập lại.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Dịch vụ API hiện tại chưa có giao diện này. Vui lòng cập nhật và khởi động lại dịch vụ API rồi thử lại.",
   "请求未完成（{0}）": "Yêu cầu chưa hoàn tất ({0})",
-  "每次匹配需提供 1–100 页。": "Yêu cầu 1–100 trang mỗi trận đấu.",
-  "服务器匹配结果与请求页标识不一致。": "Kết quả khớp của máy chủ không nhất quán với ID trang được yêu cầu.",
   "图片访问地址无效。": "Địa chỉ truy cập hình ảnh không hợp lệ.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Không thể tải xuống tạm thời hình ảnh. Vui lòng kiểm tra cấu hình tên miền chéo của mạng hoặc bộ lưu trữ đối tượng.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "Hình ảnh đã hết hạn hoặc không thể truy cập được. Vui lòng giữ một bản sao cục bộ hoặc tải nó lên lại.",
-  "图片访问链接已过期，请重试。": "Liên kết truy cập hình ảnh đã hết hạn, vui lòng thử lại.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "Tệp SHA-256 và chỉ mục trang thô phải được cung cấp dưới dạng một cặp.",
-  "图片 SHA-256 无效。": "Hình ảnh SHA-256 không hợp lệ.",
   "返回我的漫画": "Quay lại truyện tranh của tôi",
   "主导航": "Điều hướng chính",
   "我的漫画": "Truyện của tôi",
@@ -953,5 +947,9 @@
   "取消自动续费": "Hủy tự động gia hạn",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Quyền truy cập đã trả phí và được tặng vẫn được giữ sau khi hủy. Không thu thêm phí gia hạn.",
   "确认取消续费": "Xác nhận hủy",
-  "保留自动续费": "Giữ tự động gia hạn"
+  "保留自动续费": "Giữ tự động gia hạn",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "Không có ảnh gốc. Hãy khôi phục nguồn hoặc bộ nhớ đệm cục bộ.",
+  "翻译文件校验失败，请重新加载。": "Không thể xác minh tệp đã dịch. Hãy tải lại.",
+  "翻译协议已更新，请手动重新翻译此页。": "Giao thức dịch đã thay đổi. Hãy dịch lại trang này theo cách thủ công.",
+  "翻译协议已更新，请更新插件。": "Giao thức dịch đã thay đổi. Hãy cập nhật tiện ích."
 }

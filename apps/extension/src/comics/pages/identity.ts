@@ -1,4 +1,4 @@
-export const RENDER_PROFILE = 'original-v1-gif-first-frame';
+export const RENDER_PROFILE = 'original-v2-static-srgb';
 export interface PageReference { entryId: string; contentId: string; pageId: string; renderProfileId: string; }
 export const pageReference = (ref:PageReference) => 'page:'+JSON.stringify([ref.entryId,ref.contentId,ref.pageId,ref.renderProfileId]);
 export function parsePageReference(value:string):PageReference|undefined {

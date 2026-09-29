@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Login wygasł, zaloguj się ponownie.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Bieżąca usługa API nie obejmuje jeszcze tego interfejsu. Zaktualizuj i uruchom ponownie usługę API, a następnie spróbuj ponownie.",
   "请求未完成（{0}）": "Żądanie niekompletne ({0})",
-  "每次匹配需提供 1–100 页。": "Wymagane jest 1–100 stron na mecz.",
-  "服务器匹配结果与请求页标识不一致。": "Wynik dopasowania serwera jest niezgodny z żądanym identyfikatorem strony.",
   "图片访问地址无效。": "Adres dostępu do obrazu jest nieprawidłowy.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Tymczasowo nie można pobrać obrazu. Sprawdź konfigurację międzydomenową sieci lub magazynu obiektowego.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "Obraz wygasł lub jest niedostępny. Zachowaj kopię lokalną lub prześlij ją ponownie.",
-  "图片访问链接已过期，请重试。": "Link dostępu do obrazu wygasł. Spróbuj ponownie.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "Plik SHA-256 i surowy indeks strony muszą być dostarczone jako para.",
-  "图片 SHA-256 无效。": "Nieprawidłowy obraz SHA-256.",
   "返回我的漫画": "Wróć do moich komiksów",
   "主导航": "Nawigacja główna",
   "我的漫画": "Moje komiksy",
@@ -953,5 +947,9 @@
   "取消自动续费": "Anuluj automatyczne odnowienie",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Opłacony i podarowany dostęp pozostaną ważne po anulowaniu. Nie będzie dalszych opłat za odnowienie.",
   "确认取消续费": "Potwierdź anulowanie",
-  "保留自动续费": "Zachowaj automatyczne odnowienie"
+  "保留自动续费": "Zachowaj automatyczne odnowienie",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "Oryginalny obraz jest niedostępny. Przywróć jego źródło lub lokalną pamięć podręczną.",
+  "翻译文件校验失败，请重新加载。": "Weryfikacja przetłumaczonego pliku nie powiodła się. Wczytaj go ponownie.",
+  "翻译协议已更新，请手动重新翻译此页。": "Protokół tłumaczenia uległ zmianie. Przetłumacz tę stronę ponownie ręcznie.",
+  "翻译协议已更新，请更新插件。": "Protokół tłumaczenia uległ zmianie. Zaktualizuj rozszerzenie."
 }

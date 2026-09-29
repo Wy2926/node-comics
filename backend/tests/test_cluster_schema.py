@@ -20,5 +20,6 @@ def test_clean_baseline_matches_models_and_removes_old_queue(client):
             c['name'] for c in inspector.get_columns('jobs'))
         columns = {c["name"]: c for c in inspector.get_columns("assets")}
         assert columns["expires_at"]["nullable"]
-        assert columns["last_accessed_at"]["nullable"]
+        assert "last_accessed_at" not in columns and "storage_backend" not in columns
+        assert not {"result_accesses", "translation_results", "file_pages"} & tables
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []

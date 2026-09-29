@@ -16,9 +16,9 @@ import {readReadingPreferences, readingSelectionKey, readingSlots, chooseReading
 export {coverReference} from './cover-access';
 export {selectReadingEntry,setSourceLanguagePreference} from './reading-preferences';
 
-type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'|'assetId'|'assetExpiresAt'>;
+type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'>;
 const savedPages=new WeakMap<Page,string>();
-const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs,assetId:page.assetId,assetExpiresAt:page.assetExpiresAt});
+const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
 export const hasCatalogUpdates=(comic:Comic)=>!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision;
 /** Match directory chapter grouping without loading page descriptors or image data. */
@@ -70,7 +70,7 @@ export async function loadEntry(id:string,scope?:TranslationScope):Promise<Readi
       const saved=await catalog.get('translationBindings',JSON.stringify([scope.key,identity.imageSha256]));
       if(saved?.scope===scope.key){
         const value=saved.payload as TranslationPayload;
-        page.translationScope=scope.key;page.ownerId=value.ownerId;page.apiOrigin=value.apiOrigin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];page.assetId=value.assetId;page.assetExpiresAt=value.assetExpiresAt;
+        page.translationScope=scope.key;page.ownerId=value.ownerId;page.apiOrigin=value.apiOrigin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];
       }
     }
     savedPages.set(page,JSON.stringify(payload(page)));return page;
@@ -120,12 +120,12 @@ export async function saveReaderState(copy:ReadingEntry) {
   const entry=await catalog.get('entries',copy.id);if(!entry||entry.contentId!==copy.contentId||entry.comicId!==copy.comicId)return;
   if(copy.pageId&&copy.lastReadAt!==undefined)await catalog.savePosition({id:copy.id,comicId:copy.comicId,entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,relativeOffset:Math.max(0,Math.min(1,copy.relativeOffset)),updatedAt:copy.lastReadAt});
   for(const page of copy.pages){
-    if(!page.translationScope||!page.imageSha256||!page.jobs.length&&!page.assetId)continue;
+    if(!page.translationScope||!page.imageSha256||!page.jobs.length)continue;
     const incoming=payload(page),signature=JSON.stringify(incoming);if(savedPages.get(page)===signature)continue;
     const id=JSON.stringify([page.translationScope,page.imageSha256]);
     await catalog.editTranslationBinding(id,previous=>{
       const old=previous?.payload as TranslationPayload|undefined,jobs=mergeJobs(old?.jobs??[],incoming.jobs);
-      const merged:TranslationPayload={...incoming,jobs,assetId:incoming.assetId??old?.assetId,assetExpiresAt:incoming.assetId?incoming.assetExpiresAt:old?.assetExpiresAt};
+      const merged:TranslationPayload={...incoming,jobs};
       if(previous&&JSON.stringify(old)===JSON.stringify(merged))return undefined;
       return {id,scope:page.translationScope!,imageSha256:page.imageSha256!,payload:merged,updatedAt:Date.now()};
     });

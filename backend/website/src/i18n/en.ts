@@ -95,6 +95,7 @@ export default {
     "storeUnavailable": "Store review pending",
     "directDownloadTitle": "Download the extension directly",
     "directDownloadDescription": "Download the package from your browser’s card, extract it, then follow these steps.",
+    "packageUnavailable": "Package download unavailable",
     "downloadZip": "Download ZIP",
     "installTitle": "Manual installation for Chrome / Edge",
     "installStepDownload": "Download and extract the ZIP. Keep the extracted folder.",
@@ -307,7 +308,7 @@ export default {
         "slug": "comic-reader-privacy",
         "minutes": 4,
         "title": "What does a manga translation extension upload?",
-        "description": "Understand website permissions, local parsing, cloud translation, private retention and deletion of shared content.",
+        "description": "Understand website permissions, local parsing, translation uploads, temporary originals, private results and deletion.",
         "category": "Privacy guide",
         "sections": [
           {
@@ -320,14 +321,14 @@ export default {
           {
             "title": "Translation and retention",
             "paragraphs": [
-              "Classic translation uses recognition, text translation, cleanup and typesetting. Redraw sends page images to an image model. Original and final images are retained in private storage by default to support recovery and result reuse.",
-              "Identical image bytes may share a storage object. Matching completed translations may be reused when content, mode, language and effective configuration agree. Personal tasks and access records remain user-scoped."
+              "Classic translation uses recognition, text translation, cleanup and typesetting. Redraw sends page images to an image model. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files; AI redraw keeps full results. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
+              "Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies."
             ]
           },
           {
             "title": "What deletion means",
             "paragraphs": [
-              "Deleting a personal record revokes that access; it does not promise immediate physical erasure of a shared object. Other valid references may remain, and an already issued short-lived URL may work until it expires.",
+              "Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
               "For access, correction or deletion requests, contact comics@nodelane.net. Identity and scope must be verified before handling another person’s data. Read the full privacy policy for details."
             ]
           }
@@ -372,21 +373,21 @@ export default {
             "title": "Service providers and transfers",
             "paragraphs": [
               "Classic processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation; redraw providers process the page image and language. Actual providers are configured on the server for the task.",
-              "Original and final images use private Cloudflare R2 storage. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
+              "Translation images use private files on the central server; recognized text, translations and necessary metadata are stored in the database. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
             ]
           },
           {
             "title": "Retention and deletion",
             "paragraphs": [
-              "Original and final images are retained indefinitely by default for recovery and reuse. They are not automatically deleted merely because translation finished, the object aged or the database currently has no reference. Servers do not keep user originals long term; compute nodes use bounded temporary caches. Recent authorized access time is recorded.",
-              "Identical bytes are deduplicated. Completed results matching content, mode, language and effective configuration can be reused across users, while individual tasks and access records remain isolated. Deleting your record revokes your access, not necessarily the shared object. Existing signed URLs may remain usable briefly until expiry.",
+              "Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files; AI redraw keeps full results. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
+              "Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
               "For account or broader deletion requests, contact us for identity and scope verification. Transaction, audit or security records may need retention for service obligations, disputes or applicable requirements. No single erasure deadline is promised for all records; the response will explain the outcome and constraints."
             ]
           },
           {
             "title": "Security, choices and minors",
             "paragraphs": [
-              "Images require authorized access and short-lived download links. Provider keys stay on the backend. Protect your account and device, and do not share tokens or signed URLs. You may decline new permissions, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
+              "The central server checks account authorization and returns result files directly, without issuing short-lived signed download links. Provider keys stay on the backend. Protect your account and device, and do not share access tokens. You may decline new permissions, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
               "Minors should use the service with appropriate guardian knowledge and guidance and obtain necessary authorization for subscriptions. Do not submit children’s sensitive personal information. Guardians may contact us to request verification and handling of inappropriate processing. Report security concerns using necessary, redacted information only; passwords and tokens are not needed."
             ]
           }
@@ -506,7 +507,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Are images uploaded or retained?",
-        "answer": "Translation requires uploading selected page images to the backend and relevant providers. Originals and final images are retained privately by default. Deleting your record revokes access but does not guarantee physical deletion of shared objects. Source cookies, login tokens and browsing history are not uploaded.",
+        "answer": "Translation sends selected page images to the backend and relevant providers. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files; AI redraw keeps full results. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them. Source cookies, login tokens and browsing history are not uploaded.",
         "relatedPath": "/privacy/"
       },
       {

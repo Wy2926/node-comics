@@ -6,8 +6,8 @@ import {emptyPage} from '../src/reader/model';
 import {needsTranslation} from '../src/translation/automatic';
 import {settings} from '../src/comics/application/preferences';
 const origin='https://api.example',scope=JSON.stringify([origin,'alice']);
-const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,input_asset_id:'source',output_asset_id:status==='succeeded'?`result-${id}`:null,result:status==='succeeded'?{key:`result-${id}`,recoverable:true}:undefined,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
-const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),fileHash:'a'.repeat(64),pageIndex:0,translationScope:scope,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
+const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,result:status==='succeeded'?{key:`result-${id}`,recoverable:true}:undefined,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
+const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),translationScope:scope,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
 afterEach(()=>vi.unstubAllGlobals());
 describe('per-page redraw display',()=>{
   it.each(['queued','running','failed','outcome_unknown','cancelled'] as const)('keeps classic while redraw is %s',status=>{
@@ -30,13 +30,13 @@ describe('per-page redraw display',()=>{
   it('never falls back across account, language, origin or an expired latest result',()=>{
     const p={...page([job('first','succeeded',1)]),blobKey:'original'};
     for(const [language,key] of [['en',scope],['zh-Hans','other-channel'],['zh-Hans','other-revision']])expect(readingImage(p,'redraw',true,language,key)).toEqual({key:'original',job:undefined});
-    p.jobs.push(job('expired','succeeded',2,{output_asset_id:null,result_expired:true}));
+    p.jobs.push(job('expired','succeeded',2,{result_expired:true}));
     expect(readingImage(p,'redraw',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
   });
 });
 describe('latest effect selection',()=>{
   it('displays local delivered bytes without a NodeLane account or asset id',()=>{
-    const local=page([job('first','succeeded',1,{output_asset_id:null,result:{key:'local-request',recoverable:false}})]);
+    const local=page([job('first','succeeded',1,{result:{key:'local-request',recoverable:false}})]);
     expect(pageTranslation(local,'classic','zh-Hans',scope)).toMatchObject({ready:true,expired:false});
     expect(readingImage(local,'classic',true,'zh-Hans',scope)).toMatchObject({key:'local-first'});
   });
@@ -49,7 +49,7 @@ describe('latest effect selection',()=>{
     expect(pageTranslation(p,'classic','zh-Hans',scope).result?.id).toBe('second');
   });
   it('does not restore an old version when the newest delivered output expires',()=>{
-    const p=page([job('first','succeeded',1),job('second','succeeded',2,{output_asset_id:null,result_expired:true})]);delete p.outputBlobs.second;
+    const p=page([job('first','succeeded',1),job('second','succeeded',2,{result_expired:true})]);delete p.outputBlobs.second;
     expect(pageTranslation(p,'classic','zh-Hans',scope)).toMatchObject({expired:true,ready:false,result:{id:'second'}});
     p.outputBlobs.second='same-latest-local-copy';expect(pageTranslation(p,'classic','zh-Hans',scope)).toMatchObject({expired:false,ready:true,blobKey:'same-latest-local-copy'});
   });

@@ -1,6 +1,5 @@
 import type {PageReference} from '../../../../comics/pages/identity';
 import {hashFile} from '../../../../importers/hash';
-import {registerOriginal} from '../../../../comics/originals';
 import {msg} from '../../../../i18n/runtime';
 import {Api,ApiError} from '../../../../api';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
@@ -10,14 +9,15 @@ import type {Entitlements,Job,TranslationSnapshot,TranslationBatch} from '../../
 import type {ReadingTarget} from '../../../automatic';
 import {makeOperation,operationId,quotaErrors} from './operations';
 import {readOperation,readOperations,readSync,saveOperation,saveSync,translationScope,withTranslationLock,type LocalOperation,type SyncState} from './store';
+import {LegacyRequestGuard} from './legacy-requests';
 
-interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;onInputConsumed?:(blobKey:string)=>Promise<void>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
+interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
 const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!r.result&&['needs_input','queued','running','needs_attention'].includes(r.result.state);
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
 export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperation):Job{
   const unavailable=snapshot.error?.code==='TRANSLATION_UNAVAILABLE';
-  const result=snapshot.state==='succeeded'&&snapshot.result?.asset_id&&!unavailable?{key:snapshot.result.asset_id,recoverable:true}:undefined;
-  return {id:snapshot.id,input_asset_id:snapshot.input_asset_id??null,output_asset_id:snapshot.result?.asset_id??null,result,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
+  const result=snapshot.state==='succeeded'&&snapshot.result&&!unavailable?{key:snapshot.result.artifact?.sha256??snapshot.id,recoverable:true}:undefined;
+  return {id:snapshot.id,result,delivery:snapshot.result??undefined,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
 }
 /** Current plus three pages is local scheduling, never a server reading session. */
 export class TranslationCoordinator {
@@ -26,7 +26,8 @@ export class TranslationCoordinator {
   private wanted=new Set<string>();private refreshed=new Set<string>();
   private stream?:{ids:Set<string>;controller:AbortController;events:AsyncGenerator<TranslationBatch>;signal:AbortSignal;abort:()=>void};
   private monotonic=new Map<string,{wall:number;until:number}>();private imageLimit?:number;private rightsKey?:string;
-  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.imageLimit=options.rights()?.image_rate_limit.limit;this.rightsKey=JSON.stringify(options.rights());}
+  private legacy:LegacyRequestGuard;
+  constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope,jobs:[]};this.imageLimit=options.rights()?.image_rate_limit.limit;this.rightsKey=JSON.stringify(options.rights());this.legacy=new LegacyRequestGuard(options.api,options.userId,options.language);}
   async init(){return this.initializing??=(async()=>{this.state=await readSync(this.scope)??this.state;this.records=await readOperations(this.scope);await this.options.onJobs(this.state.jobs);})();}
   private current(){assertCurrent(this.options.api.isCurrent);}
   private async persistState(patch:Partial<SyncState>){await withTranslationLock('sync:'+this.scope,async()=>{this.current();this.state={...await readSync(this.scope)??this.state,...patch};await saveSync(this.state);});}
@@ -49,10 +50,9 @@ export class TranslationCoordinator {
     await this.save(record);const job=translationJob(result,record);
     await withTranslationLock('sync:'+this.scope,async()=>{this.current();const saved=await readSync(this.scope)??this.state;this.state={...saved,jobs:mergeJobs(saved.jobs,[job])};await saveSync(this.state);});
     await this.options.onJobs([job]);
-    if(result.input_asset_id)await registerOriginal(new URL(this.options.api.base).origin,this.options.userId,record.image.sha256,result.input_asset_id);
     if(result.state==='needs_input'&&this.wanted.has(record.id))this.upload(record);
     // Cache cleanup cannot turn a durable server receipt into an uncertain submission.
-    if(record.blobKey&&result.state!=='needs_input')await this.options.onInputConsumed?.(record.blobKey).catch(()=>{});
+    // The local original is required for overlay display, including after the task completes.
     if(result.state==='failed'&&previous?.state!=='failed')await this.refreshEntitlements();
   }
   private upload(record:LocalOperation){
@@ -61,7 +61,7 @@ export class TranslationCoordinator {
       this.current();const lease=record.pageRef?await this.options.readOriginal?.(record.pageRef):undefined;
       let blob:Blob|undefined;try{blob=lease?.blob??(record.blobKey?await this.options.getBlob(record.blobKey):undefined);}finally{lease?.release();}
       if(!blob)throw new ApiError(msg('本地原图尚未就绪，请重新采集。'),'LOCAL_IMAGE_MISSING');
-      if(blob.size!==record.image.byte_size||await hashFile(blob)!==record.image.sha256)throw new ApiError('原图内容已变化，原翻译请求已停止。','SOURCE_CHANGED');
+      if(blob.size!==record.image.byte_size||await hashFile(blob)!==record.image.sha256)throw new ApiError(msg('原图内容已变化，请重新加载后翻译。'),'SOURCE_CHANGED');
       await this.receive(record,await this.options.api.translationInput(record.requestId,blob));
     }catch(error){if(!this.options.api.isCurrent())return;record.error=(error as Error).message;record.errorCode=error instanceof ApiError?error.code:undefined;if(record.errorCode==='SOURCE_CHANGED'){record.state='blocked';record.retryAt=undefined;}else{record.state='uncertain';record.retryAt=Date.now()+15000;}await this.save(record);}finally{this.uploads.delete(record.requestId);this.options.onChange();}});
     this.uploads.set(record.requestId,work);
@@ -108,7 +108,7 @@ export class TranslationCoordinator {
       const id=operationId(this.scope,this.options.language,target);
       try{await withTranslationLock(id,async()=>{
         let record=await readOperation(id);
-        if(!record){record=await makeOperation(target,this.scope,this.options.language,this.options.getBlob);await saveOperation(record);this.records=this.records.concat(record);}
+        if(!record){await this.legacy.check(target);record=await makeOperation(target,this.scope,this.options.language,this.options.getBlob);await saveOperation(record);this.records=this.records.concat(record);}
         this.state=await readSync(this.scope)??this.state;
         const promote=index===0&&record.priority==='prefetch'&&record.state==='accepted'&&['needs_input','queued','running'].includes(record.result?.state??'');
         // Image admission backpressure covers every new page in this scope, including a new window.
@@ -118,13 +118,14 @@ export class TranslationCoordinator {
         record.state='uncertain';await this.save(record);
         try{const priority=index===0?'current':'prefetch';const result=await this.options.api.translate(record.requestId,{...record.request,priority});record.priority=priority;this.refreshed.add(record.requestId);await this.receive(record,result);}
         catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500;record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);}
-      });}catch(error){if(!this.options.api.isCurrent())throw error;target.page.translationError=(error as Error).message;this.options.onChange();}
+      });}catch(error){if(!this.options.api.isCurrent())throw error;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
     }
   }
   async manual(target:ReadingTarget,requestCurrent=()=>true){
     await this.init();const id=operationId(this.scope,this.options.language,target);
     await withTranslationLock(id,async()=>{
       const previous=await readOperation(id),latest=pageTranslation(target.page,target.mode,this.options.language,this.scope);
+      if(!previous)await this.legacy.check(target,true);
       if(previous?.state==='uncertain'||previous&&active(previous)||latest.pending||latest.latest?.status==='unknown_released')throw Error(msg('原请求结果待核实，暂不能重复翻译。'));
       const source=previous?.result?.id??latest.latest?.id,state=previous?.result?.state??latest.latest?.status;
       if(previous?.state==='blocked'&&!previous.result){previous.state='local';previous.error=undefined;previous.retryAt=undefined;await saveOperation(previous);return;}

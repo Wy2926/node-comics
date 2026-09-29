@@ -1,13 +1,12 @@
 """One page lease from claim through acknowledged delivery, with batch heartbeats."""
 from .pipeline import Pipeline
-import base64
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from threading import Condition, Event, Lock
 import time
 from uuid import uuid4
 
-from .protocol import ControlFailure, NodeFailure, digest, timestamp
+from .protocol import ControlFailure, NodeFailure, timestamp
 from .operations import NetworkLog, utc_now
 
 LOG = logging.getLogger('classic-node')
@@ -142,7 +141,7 @@ class Agent:
             self.journal.remove('lease:' + key)
             return
         saved = self.journal.get('lease:' + key, {})
-        # Never persist signed URLs. Restart always obtains fresh authorization.
+        # Registration revalidates every input descriptor and execution lease.
         public_lease = {k: v for k, v in lease.items() if k != 'input'}
         self.journal.put('lease:' + key, {**saved, 'lease': public_lease})
         page = Page(lease, server_time, sent_at)
@@ -159,11 +158,11 @@ class Agent:
 
     def register(self):
         sent_at = time.monotonic()
-        response = self.transport.post('/nodes/register', {'protocol_version': 2,
+        response = self.transport.post('/nodes/register', {'protocol_version': 3,
             'engine_version': self.runtime.version, 'resource_id': self.local['resource_id'],
             'device': 'cpu' if self.local['engine']['gpu'] < 0 else 'vulkan:' + str(self.local['engine']['gpu']),
             'supported_languages': self.runtime.languages, 'ready': True})
-        if response['protocol_version'] != 2:
+        if response['protocol_version'] != 3:
             raise NodeFailure('PROTOCOL_MISMATCH')
         self.apply_config(response['config'])
         outstanding = {lease['lease_id'] for lease in response['leases']}
@@ -237,57 +236,20 @@ class Agent:
 
     def input_bytes(self, page):
         metadata = page.lease.get('input')
-        authorized_at = page.received_at
-        for attempt in range(3):
-            page.check()
-            # Every startup claim/registration is authorization; renew near expiry.
-            if (metadata is None or timestamp(metadata['url_expires_at']) - timestamp(metadata['server_time'])
-                    <= time.monotonic() - authorized_at + 2):
-                authorized_at = time.monotonic()
-                metadata = self.retry(page, lambda: self.transport.post(
-                    f'/leases/{page.lease["lease_id"]}/input/authorize', {'lease_token': page.lease['lease_token']}))
-            try:
-                return self.transport.download(metadata, page.check), metadata
-            except NodeFailure as error:
-                if error.code not in {'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE'} or attempt == 2:
-                    raise
-                if error.code == 'STORAGE_AUTH_FAILED':
-                    metadata = None
-        raise NodeFailure('STORAGE_UNAVAILABLE')
+        if not metadata:
+            raise ControlFailure('CONTROL_INVALID_RESPONSE')
+        data = self.retry(page, lambda: self.transport.download(page.lease['lease_id'],
+            page.lease['lease_token'], metadata, page.check))
+        return data, metadata
 
     def deliver(self, page, body):
         page.phase = 'deliver'
         key = page.lease['lease_id']
-        if 'result' in body and not body.get('etag'):
-            data = base64.b64decode(body['image'], validate=True)
-            for attempt in range(3):
-                started = time.monotonic()
-                upload = self.retry(page, lambda: self.transport.post(f'/leases/{key}/output/authorize',
-                    {'lease_token': body['lease_token'], 'result': body['result']}))
-                body['timings']['upload_authorize'] = body['timings'].get('upload_authorize', 0) + time.monotonic() - started
-                if upload.get('receipt'):
-                    return upload['receipt']
-                if upload['result_hash'] != digest(body['result']):
-                    raise ControlFailure('CONTROL_INVALID_RESPONSE')
-                started = time.monotonic()
-                try:
-                    etag = self.transport.upload(upload, data, body['result']['output'], page.check)
-                    break
-                except NodeFailure as error:
-                    if error.code not in {'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE'} or attempt == 2:
-                        raise
-                    with page.condition:
-                        page.condition.wait(.5)
-                finally:
-                    body['timings']['output_put'] = body['timings'].get('output_put', 0) + time.monotonic() - started
-            # Persist successful upload before acknowledging the center. A lost
-            # center reply now retries metadata only; signed URLs are never saved.
-            body = {k: v for k, v in body.items() if k != 'image'}
-            body['etag'] = etag
-            saved = self.journal.get('lease:' + key)
-            self.journal.put('lease:' + key, {**saved, 'completion': body})
-            page.completion = body
-        reply = self.retry(page, lambda: self.transport.post(f'/leases/{key}/complete', body))
+        if 'result' in body:
+            data = self.journal.output('lease:' + key)
+            reply = self.retry(page, lambda: self.transport.deliver(key, body, data, page.check))
+        else:
+            reply = self.retry(page, lambda: self.transport.post(f'/leases/{key}/complete', body))
         if reply.get('status') != 'terminal':
             raise ControlFailure('CONTROL_INVALID_RESPONSE')
         return reply

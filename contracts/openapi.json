@@ -28,6 +28,18 @@
               "format": "uuid",
               "title": "Translation Id"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "requestBody": {
@@ -94,6 +106,18 @@
               "format": "uuid",
               "title": "Translation Id"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -104,6 +128,62 @@
                 "schema": {
                   "$ref": "#/components/schemas/TranslationResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "translations"
+        ],
+        "summary": "Translation Delete",
+        "operationId": "translation_delete_v1_translations__translation_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "translation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Translation Id"
+            }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -142,6 +222,18 @@
               "maxLength": 1183,
               "title": "Ids"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -220,6 +312,18 @@
               "default": 30,
               "title": "Limit"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -276,6 +380,18 @@
               "format": "uuid",
               "title": "Translation Id"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -334,6 +450,18 @@
               "format": "uuid",
               "title": "Translation Id"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -382,6 +510,18 @@
               "format": "uuid",
               "title": "Translation Id"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "responses": {
@@ -392,6 +532,91 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/translations/{translation_id}/result": {
+      "get": {
+        "tags": [
+          "translations"
+        ],
+        "summary": "Translation Result",
+        "operationId": "translation_result_v1_translations__translation_id__result_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "translation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Translation Id"
+            }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated immutable result bytes; original representation has no file.",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Authorized If-None-Match matches the result SHA-256 ETag."
+          },
+          "409": {
+            "description": "Result is not ready or uses original representation."
+          },
+          "410": {
+            "description": "This translation authorization has been revoked."
+          },
+          "503": {
+            "description": "Committed result file is temporarily unavailable; no model call is restarted."
           },
           "422": {
             "description": "Validation Error",
@@ -567,13 +792,13 @@
         "security": []
       }
     },
-    "/internal/compute/v2/nodes/register": {
+    "/internal/compute/v3/nodes/register": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Register",
-        "operationId": "register_internal_compute_v2_nodes_register_post",
+        "operationId": "register_internal_compute_v3_nodes_register_post",
         "parameters": [
           {
             "name": "authorization",
@@ -640,13 +865,13 @@
         }
       }
     },
-    "/internal/compute/v2/nodes/{node_id}/claim": {
+    "/internal/compute/v3/nodes/{node_id}/claim": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Claim",
-        "operationId": "claim_internal_compute_v2_nodes__node_id__claim_post",
+        "operationId": "claim_internal_compute_v3_nodes__node_id__claim_post",
         "parameters": [
           {
             "name": "node_id",
@@ -722,13 +947,13 @@
         }
       }
     },
-    "/internal/compute/v2/nodes/{node_id}/updates": {
+    "/internal/compute/v3/nodes/{node_id}/updates": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Updates",
-        "operationId": "updates_internal_compute_v2_nodes__node_id__updates_post",
+        "operationId": "updates_internal_compute_v3_nodes__node_id__updates_post",
         "parameters": [
           {
             "name": "node_id",
@@ -804,13 +1029,13 @@
         }
       }
     },
-    "/internal/compute/v2/nodes/{node_id}/heartbeat": {
+    "/internal/compute/v3/nodes/{node_id}/heartbeat": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Heartbeat",
-        "operationId": "heartbeat_internal_compute_v2_nodes__node_id__heartbeat_post",
+        "operationId": "heartbeat_internal_compute_v3_nodes__node_id__heartbeat_post",
         "parameters": [
           {
             "name": "node_id",
@@ -886,13 +1111,13 @@
         }
       }
     },
-    "/internal/compute/v2/leases/{lease_id}/analysis": {
+    "/internal/compute/v3/leases/{lease_id}/analysis": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Analysis",
-        "operationId": "analysis_internal_compute_v2_leases__lease_id__analysis_post",
+        "operationId": "analysis_internal_compute_v3_leases__lease_id__analysis_post",
         "parameters": [
           {
             "name": "lease_id",
@@ -968,13 +1193,97 @@
         }
       }
     },
-    "/internal/compute/v2/leases/{lease_id}/input/authorize": {
-      "post": {
+    "/internal/compute/v3/leases/{lease_id}/input": {
+      "get": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
-        "summary": "Authorize",
-        "operationId": "authorize_internal_compute_v2_leases__lease_id__input_authorize_post",
+        "summary": "Read Input",
+        "operationId": "read_input_internal_compute_v3_leases__lease_id__input_get",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "x-lease-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "Current lease token; also requires the node Authorization and X-Node-Id headers.",
+              "title": "X-Lease-Token"
+            },
+            "description": "Current lease token; also requires the node Authorization and X-Node-Id headers."
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/compute/v3/leases/{lease_id}/result": {
+      "put": {
+        "tags": [
+          "compute v3"
+        ],
+        "summary": "Deliver Result",
+        "operationId": "deliver_result_internal_compute_v3_leases__lease_id__result_put",
         "parameters": [
           {
             "name": "lease_id",
@@ -1018,19 +1327,9 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LeaseRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Stable terminal receipt; replaying the same result never settles twice.",
             "content": {
               "application/json": {
                 "schema": {}
@@ -1038,7 +1337,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid metadata, file hash/size/dimensions/alpha, or processing deadline exceeded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1046,85 +1345,242 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/internal/compute/v2/leases/{lease_id}/output/authorize": {
-      "post": {
-        "tags": [
-          "compute v2"
-        ],
-        "summary": "Authorize Output",
-        "operationId": "authorize_output_internal_compute_v2_leases__lease_id__output_authorize_post",
-        "parameters": [
-          {
-            "name": "lease_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Lease Id"
-            }
           },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
+          "408": {
+            "description": "Multipart total body timeout; retry the same frozen result."
           },
-          {
-            "name": "x-node-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Node-Id"
-            }
+          "409": {
+            "description": "Lease or generation is no longer active, or the frozen result conflicts."
+          },
+          "503": {
+            "description": "Result ingress capacity or storage is unavailable; retry the same frozen result."
           }
-        ],
+        },
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/OutputRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "metadata"
+                ],
+                "properties": {
+                  "metadata": {
+                    "type": "string",
+                    "contentMediaType": "application/json",
+                    "contentSchema": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "lease_token": {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "title": "Lease Token",
+                          "type": "string"
+                        },
+                        "result": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "version": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "title": "Version",
+                              "type": "string"
+                            },
+                            "input_hash": {
+                              "pattern": "^[a-f0-9]{64}$",
+                              "title": "Input Hash",
+                              "type": "string"
+                            },
+                            "analysis_hash": {
+                              "pattern": "^[a-f0-9]{64}$",
+                              "title": "Analysis Hash",
+                              "type": "string"
+                            },
+                            "translations_revision": {
+                              "pattern": "^[a-f0-9]{64}$",
+                              "title": "Translations Revision",
+                              "type": "string"
+                            },
+                            "representation": {
+                              "enum": [
+                                "overlay-v1",
+                                "original"
+                              ],
+                              "title": "Representation",
+                              "type": "string"
+                            },
+                            "normalization_version": {
+                              "const": 1,
+                              "title": "Normalization Version",
+                              "type": "integer"
+                            },
+                            "width": {
+                              "maximum": 8192,
+                              "minimum": 1,
+                              "title": "Width",
+                              "type": "integer"
+                            },
+                            "height": {
+                              "maximum": 8192,
+                              "minimum": 1,
+                              "title": "Height",
+                              "type": "integer"
+                            },
+                            "bbox": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "minimum": 0,
+                                      "title": "X",
+                                      "type": "integer"
+                                    },
+                                    "y": {
+                                      "minimum": 0,
+                                      "title": "Y",
+                                      "type": "integer"
+                                    },
+                                    "width": {
+                                      "minimum": 1,
+                                      "title": "Width",
+                                      "type": "integer"
+                                    },
+                                    "height": {
+                                      "minimum": 1,
+                                      "title": "Height",
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "title": "BBox",
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "output": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "sha256": {
+                                      "pattern": "^[a-f0-9]{64}$",
+                                      "title": "Sha256",
+                                      "type": "string"
+                                    },
+                                    "byte_size": {
+                                      "maximum": 134217728,
+                                      "minimum": 1,
+                                      "title": "Byte Size",
+                                      "type": "integer"
+                                    },
+                                    "width": {
+                                      "maximum": 8192,
+                                      "minimum": 1,
+                                      "title": "Width",
+                                      "type": "integer"
+                                    },
+                                    "height": {
+                                      "maximum": 8192,
+                                      "minimum": 1,
+                                      "title": "Height",
+                                      "type": "integer"
+                                    },
+                                    "mime": {
+                                      "const": "image/webp",
+                                      "title": "Mime",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "sha256",
+                                    "byte_size",
+                                    "width",
+                                    "height",
+                                    "mime"
+                                  ],
+                                  "title": "OutputInfo",
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "input_hash",
+                            "analysis_hash",
+                            "translations_revision",
+                            "representation",
+                            "normalization_version",
+                            "width",
+                            "height",
+                            "bbox",
+                            "output"
+                          ],
+                          "title": "PageResult",
+                          "type": "object"
+                        },
+                        "timings": {
+                          "additionalProperties": {
+                            "maximum": 86400,
+                            "minimum": 0,
+                            "type": "number"
+                          },
+                          "propertyNames": {
+                            "enum": [
+                              "download",
+                              "download_queue",
+                              "analyze",
+                              "analyze_queue",
+                              "inpaint",
+                              "inpaint_queue",
+                              "render",
+                              "render_queue",
+                              "analysis_submit",
+                              "text_wait",
+                              "local_total",
+                              "output_put"
+                            ]
+                          },
+                          "title": "Timings",
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "lease_token",
+                        "result"
+                      ],
+                      "title": "OutputRequest",
+                      "type": "object"
+                    },
+                    "description": "JSON-encoded OutputRequest: lease_token, result and optional timings; at most 64 KiB."
+                  },
+                  "output": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Lossless WebP overlay; required for overlay-v1 and forbidden for original."
+                  }
+                }
+              },
+              "encoding": {
+                "metadata": {
+                  "contentType": "application/json"
+                },
+                "output": {
+                  "contentType": "image/webp"
                 }
               }
             }
@@ -1132,13 +1588,13 @@
         }
       }
     },
-    "/internal/compute/v2/leases/{lease_id}/complete": {
+    "/internal/compute/v3/leases/{lease_id}/complete": {
       "post": {
         "tags": [
-          "compute v2"
+          "compute v3"
         ],
         "summary": "Complete",
-        "operationId": "complete_internal_compute_v2_leases__lease_id__complete_post",
+        "operationId": "complete_internal_compute_v3_leases__lease_id__complete_post",
         "parameters": [
           {
             "name": "lease_id",
@@ -1252,6 +1708,18 @@
               ],
               "title": "Idempotency-Key"
             }
+          },
+          {
+            "name": "X-Translation-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overlay-v1"
+              ]
+            },
+            "description": "Required on every translation resource; unsupported clients receive 409 CLIENT_UPGRADE_REQUIRED."
           }
         ],
         "requestBody": {
@@ -4632,23 +5100,6 @@
             }
           },
           {
-            "name": "access_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 36
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Access Id"
-            }
-          },
-          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -4801,113 +5252,6 @@
         }
       }
     },
-    "/v1/admin/operations/file-pages": {
-      "get": {
-        "summary": "File Pages",
-        "operationId": "file_pages_v1_admin_operations_file_pages_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "owner_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 36
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Owner Id"
-            }
-          },
-          {
-            "name": "file_hash",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 64
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "File Hash"
-            }
-          },
-          {
-            "name": "asset_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 36
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Asset Id"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 25,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/admin/operations/results": {
       "get": {
         "summary": "Results",
@@ -4967,96 +5311,6 @@
                 }
               ],
               "title": "Mode"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 25,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/operations/accesses": {
-      "get": {
-        "summary": "Accesses",
-        "operationId": "accesses_v1_admin_operations_accesses_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "result_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 36
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Result Id"
-            }
-          },
-          {
-            "name": "owner_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 36
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Owner Id"
             }
           },
           {
@@ -6037,218 +6291,6 @@
         ]
       }
     },
-    "/v1/file-pages/bind": {
-      "put": {
-        "summary": "File Page Bind",
-        "operationId": "file_page_bind_v1_file_pages_bind_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FilePageBinding"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/file-pages/match": {
-      "post": {
-        "summary": "File Page Matches",
-        "operationId": "file_page_matches_v1_file_pages_match_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FilePageMatchRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FilePageMatches"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/images/{asset_id}/access": {
-      "get": {
-        "summary": "Image Access",
-        "operationId": "image_access_v1_images__asset_id__access_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "asset_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Asset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/images/{asset_id}/content": {
-      "get": {
-        "summary": "Image Content",
-        "operationId": "image_content_v1_images__asset_id__content_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "asset_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Asset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/images/{asset_id}": {
-      "delete": {
-        "summary": "Delete Image",
-        "operationId": "delete_image_v1_images__asset_id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "asset_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Asset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/me/usage": {
       "get": {
         "summary": "Usage",
@@ -7171,36 +7213,6 @@
   },
   "components": {
     "schemas": {
-      "AccessResponse": {
-        "properties": {
-          "url": {
-            "type": "string",
-            "title": "Url"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          },
-          "authorization_required": {
-            "type": "boolean",
-            "title": "Authorization Required"
-          }
-        },
-        "type": "object",
-        "required": [
-          "url",
-          "expires_at",
-          "authorization_required"
-        ],
-        "title": "AccessResponse"
-      },
       "AnalysisRequest": {
         "properties": {
           "lease_token": {
@@ -7228,61 +7240,6 @@
           "analysis"
         ],
         "title": "AnalysisRequest"
-      },
-      "AssetResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "width": {
-            "type": "integer",
-            "title": "Width"
-          },
-          "height": {
-            "type": "integer",
-            "title": "Height"
-          },
-          "mime": {
-            "type": "string",
-            "title": "Mime"
-          },
-          "sha256": {
-            "type": "string",
-            "title": "Sha256"
-          },
-          "byte_size": {
-            "type": "integer",
-            "title": "Byte Size"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "width",
-          "height",
-          "mime",
-          "sha256",
-          "byte_size",
-          "kind",
-          "expires_at"
-        ],
-        "title": "AssetResponse"
       },
       "BindingRequest": {
         "properties": {
@@ -7549,6 +7506,19 @@
       },
       "CapabilitiesResponse": {
         "properties": {
+          "result_protocol": {
+            "type": "string",
+            "const": "overlay-v1",
+            "title": "Result Protocol",
+            "default": "overlay-v1"
+          },
+          "representations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Representations"
+          },
           "modes": {
             "items": {
               "$ref": "#/components/schemas/ModeCapability"
@@ -7580,10 +7550,6 @@
               }
             ]
           },
-          "retention_days": {
-            "type": "integer",
-            "title": "Retention Days"
-          },
           "unknown_release_seconds": {
             "type": "integer",
             "title": "Unknown Release Seconds"
@@ -7595,7 +7561,6 @@
           "languages",
           "limits",
           "entitlements",
-          "retention_days",
           "unknown_release_seconds"
         ],
         "title": "CapabilitiesResponse"
@@ -7695,37 +7660,8 @@
             "minLength": 1,
             "title": "Lease Token"
           },
-          "result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PageResult"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "etag": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-f0-9]{32}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Etag"
-          },
           "error": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodeError"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/NodeError"
           },
           "timings": {
             "additionalProperties": {
@@ -7746,7 +7682,6 @@
                 "analysis_submit",
                 "text_wait",
                 "local_total",
-                "upload_authorize",
                 "output_put"
               ]
             },
@@ -7757,7 +7692,8 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "lease_token"
+          "lease_token",
+          "error"
         ],
         "title": "CompletionRequest"
       },
@@ -8062,188 +7998,6 @@
         ],
         "title": "FeedbackUpdate"
       },
-      "FilePageBinding": {
-        "properties": {
-          "file_hash": {
-            "type": "string",
-            "pattern": "^[a-fA-F0-9]{64}$",
-            "title": "File Hash"
-          },
-          "page_index": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Page Index"
-          },
-          "translation_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Translation Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "file_hash",
-          "page_index",
-          "translation_id"
-        ],
-        "title": "FilePageBinding"
-      },
-      "FilePageLookup": {
-        "properties": {
-          "file_hash": {
-            "type": "string",
-            "pattern": "^[a-fA-F0-9]{64}$",
-            "title": "File Hash"
-          },
-          "page_index": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Page Index"
-          },
-          "image_sha256": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-fA-F0-9]{64}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Sha256"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "file_hash",
-          "page_index"
-        ],
-        "title": "FilePageLookup"
-      },
-      "FilePageMatch": {
-        "properties": {
-          "file_hash": {
-            "type": "string",
-            "pattern": "^[a-fA-F0-9]{64}$",
-            "title": "File Hash"
-          },
-          "page_index": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Page Index"
-          },
-          "asset": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AssetResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "translations": {
-            "items": {
-              "$ref": "#/components/schemas/TranslationResponse"
-            },
-            "type": "array",
-            "title": "Translations"
-          },
-          "display_translations": {
-            "items": {
-              "$ref": "#/components/schemas/TranslationResponse"
-            },
-            "type": "array",
-            "title": "Display Translations"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "file_hash",
-          "page_index",
-          "asset",
-          "translations"
-        ],
-        "title": "FilePageMatch"
-      },
-      "FilePageMatchRequest": {
-        "properties": {
-          "pages": {
-            "items": {
-              "$ref": "#/components/schemas/FilePageLookup"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "minItems": 1,
-            "title": "Pages"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "classic",
-              "redraw"
-            ],
-            "title": "Mode"
-          },
-          "target_language": {
-            "type": "string",
-            "enum": [
-              "zh-Hans",
-              "zh-Hant",
-              "ja",
-              "en",
-              "ko",
-              "fr",
-              "es",
-              "pt-BR",
-              "de",
-              "it",
-              "ru",
-              "pl",
-              "uk",
-              "tr",
-              "vi",
-              "id"
-            ],
-            "title": "Target Language"
-          },
-          "include_display": {
-            "type": "boolean",
-            "title": "Include Display",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "pages",
-          "mode",
-          "target_language"
-        ],
-        "title": "FilePageMatchRequest"
-      },
-      "FilePageMatches": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/FilePageMatch"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "FilePageMatches"
-      },
       "GiftMembershipResponse": {
         "properties": {
           "starts_at": {
@@ -8442,6 +8196,12 @@
               "application/octet-stream"
             ],
             "title": "Content Type"
+          },
+          "normalization_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Normalization Version",
+            "default": 1
           }
         },
         "additionalProperties": false,
@@ -8478,17 +8238,6 @@
             "type": "string",
             "title": "Priority",
             "default": "preload"
-          },
-          "requested_asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Requested Asset Id"
           },
           "output_asset_id": {
             "anyOf": [
@@ -8552,10 +8301,6 @@
             "type": "integer",
             "title": "Version"
           },
-          "cache_hit": {
-            "type": "boolean",
-            "title": "Cache Hit"
-          },
           "reused": {
             "type": "boolean",
             "title": "Reused",
@@ -8615,7 +8360,6 @@
           "quota_period_id",
           "settlement",
           "version",
-          "cache_hit",
           "cancel_requested",
           "error",
           "quality_flags",
@@ -8641,22 +8385,6 @@
           "label"
         ],
         "title": "LanguageCapability"
-      },
-      "LeaseRequest": {
-        "properties": {
-          "lease_token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Lease Token"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "lease_token"
-        ],
-        "title": "LeaseRequest"
       },
       "LoginResponse": {
         "properties": {
@@ -8945,6 +8673,7 @@
               "CLASSIC_LOCAL_INTERRUPTED",
               "INPUT_INVALID",
               "INPUT_HASH_MISMATCH",
+              "INPUT_UNAVAILABLE",
               "STORAGE_AUTH_FAILED",
               "STORAGE_UNAVAILABLE",
               "CLASSIC_ANALYZE_FAILED",
@@ -8997,110 +8726,6 @@
           "config"
         ],
         "title": "NodeUpdate"
-      },
-      "OutputInfo": {
-        "properties": {
-          "sha256": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$",
-            "title": "Sha256"
-          },
-          "md5": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{32}$",
-            "title": "Md5"
-          },
-          "byte_size": {
-            "type": "integer",
-            "maximum": 25165824.0,
-            "minimum": 1.0,
-            "title": "Byte Size"
-          },
-          "width": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Width"
-          },
-          "height": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Height"
-          },
-          "mime": {
-            "type": "string",
-            "const": "image/png",
-            "title": "Mime"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "sha256",
-          "md5",
-          "byte_size",
-          "width",
-          "height",
-          "mime"
-        ],
-        "title": "OutputInfo"
-      },
-      "OutputRequest": {
-        "properties": {
-          "lease_token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Lease Token"
-          },
-          "result": {
-            "$ref": "#/components/schemas/PageResult"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "lease_token",
-          "result"
-        ],
-        "title": "OutputRequest"
-      },
-      "PageResult": {
-        "properties": {
-          "version": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Version"
-          },
-          "input_hash": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$",
-            "title": "Input Hash"
-          },
-          "analysis_hash": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$",
-            "title": "Analysis Hash"
-          },
-          "translations_revision": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$",
-            "title": "Translations Revision"
-          },
-          "output": {
-            "$ref": "#/components/schemas/OutputInfo"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "version",
-          "input_hash",
-          "analysis_hash",
-          "translations_revision",
-          "output"
-        ],
-        "title": "PageResult"
       },
       "PeriodResponse": {
         "properties": {
@@ -9620,7 +9245,7 @@
         "properties": {
           "protocol_version": {
             "type": "integer",
-            "const": 2,
+            "const": 3,
             "title": "Protocol Version"
           },
           "engine_version": {
@@ -10013,6 +9638,34 @@
         ],
         "title": "TitleTranslationResponse"
       },
+      "TranslationArtifactResponse": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "byte_size",
+          "mime",
+          "path"
+        ],
+        "title": "TranslationArtifactResponse"
+      },
       "TranslationHistoryResponse": {
         "properties": {
           "items": {
@@ -10163,6 +9816,11 @@
             ],
             "title": "State"
           },
+          "execution_resolved": {
+            "type": "boolean",
+            "title": "Execution Resolved",
+            "default": false
+          },
           "mode": {
             "type": "string",
             "enum": [
@@ -10178,17 +9836,6 @@
           "image_sha256": {
             "type": "string",
             "title": "Image Sha256"
-          },
-          "input_asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input Asset Id"
           },
           "input_expires_at": {
             "anyOf": [
@@ -10237,7 +9884,6 @@
           "mode",
           "target_language",
           "image_sha256",
-          "input_asset_id",
           "input_expires_at",
           "result",
           "error",
@@ -10257,65 +9903,67 @@
             ],
             "title": "Kind"
           },
-          "asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+          "representation": {
+            "type": "string",
+            "enum": [
+              "overlay-v1",
+              "full-image-v1",
+              "original"
             ],
-            "title": "Asset Id"
+            "title": "Representation"
+          },
+          "input_sha256": {
+            "type": "string",
+            "title": "Input Sha256"
+          },
+          "normalization_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Normalization Version"
           },
           "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Width"
           },
           "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Height"
           },
-          "download_url": {
+          "bbox": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Download Url"
+            "title": "Bbox"
           },
-          "download_expires_at": {
+          "composite": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "const": "source-atop"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Download Expires At"
+            "title": "Composite"
           },
-          "authorization_required": {
-            "type": "boolean",
-            "title": "Authorization Required",
-            "default": false
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslationArtifactResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "quality_flags": {
             "items": {
@@ -10327,7 +9975,13 @@
         },
         "type": "object",
         "required": [
-          "kind"
+          "kind",
+          "representation",
+          "input_sha256",
+          "normalization_version",
+          "width",
+          "height",
+          "artifact"
         ],
         "title": "TranslationResultResponse"
       },

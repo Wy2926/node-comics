@@ -26,7 +26,7 @@ def test_large_queue_lock_duration(scheduler_case, monkeypatch):
     with session_factory()() as db:
         db.execute(insert(User), [{"id": f"scale-user-{i}", "subject": f"scale:{i}", "name": "scale"} for i in range(owners)])
         db.execute(insert(Asset), [{"id": f"scale-source-{i}", "owner_id": f"scale-user-{i}", "sha256": "a" * 64,
-            "storage_key": f"scale/{i}", "storage_backend": "r2", "mime": "image/png", "width": 80, "height": 64, "byte_size": 100} for i in range(owners)])
+            "storage_key": f"scale/{i}", "mime": "image/png", "width": 80, "height": 64, "byte_size": 100} for i in range(owners)])
         db.execute(insert(UserModeQueue), [{"owner_id": f"scale-user-{i}", "mode": "classic"} for i in range(owners)])
         for start in range(0, count, 1000):
             indexes = range(start, min(count, start + 1000))
@@ -39,6 +39,9 @@ def test_large_queue_lock_duration(scheduler_case, monkeypatch):
         db.commit()
         db.execute(text("ANALYZE"))
         db.commit()
+    from app.storage import get_store
+    for index in range(owners):
+        get_store().put(f'scale/{index}', b'fixture', 'image/png', kind='original')
     lock = scheduler.lock_scheduler
     acquired = []
     def measured_lock(db):

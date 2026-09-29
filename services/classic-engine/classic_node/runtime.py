@@ -1,4 +1,4 @@
-"""Map the migrated image pipeline to recoverable analysis and final PNGs."""
+"""Recoverable analysis and sparse replacement pixels, without encoding a full page."""
 from concurrent.futures import wait
 import hashlib
 from importlib.metadata import version as package_version
@@ -90,13 +90,16 @@ class Runtime:
         self.engine.warmup()
 
     def decode(self, data, metadata):
-        if len(data) > MAX_IMAGE_BYTES or len(data) != metadata['byte_size']:
+        if (metadata.get('normalization_version') != 1
+                or len(data) > MAX_IMAGE_BYTES or len(data) != metadata['byte_size']):
             raise NodeFailure('INPUT_INVALID')
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         with Image.open(BytesIO(data)) as image:
             if (image.size != (metadata['width'], metadata['height']) or image.width * image.height > MAX_PIXELS
-                    or Image.MIME.get(image.format) != metadata['mime'] or getattr(image, 'n_frames', 1) != 1):
+                    or max(image.size) > 8192 or Image.MIME.get(image.format) != metadata['mime']
+                    or image.format not in {'PNG', 'JPEG', 'WEBP'} or getattr(image, 'n_frames', 1) != 1
+                    or image.getexif().get(274, 1) != 1 or image.info.get('icc_profile')):
                 raise NodeFailure('INPUT_INVALID')
             alpha = image.convert('RGBA').getchannel('A') if 'A' in image.getbands() or 'transparency' in image.info else None
             return np.array(image.convert('RGB')), alpha
@@ -126,7 +129,7 @@ class Runtime:
         mask = np.array(mask_image(analysis['mask'], (rgb.shape[1], rgb.shape[0])))
         return self.engine.remove(rgb, mask)[0]
 
-    def render(self, cleaned, analysis, translated, language, alpha):
+    def render(self, original, cleaned, analysis, translated, language, alpha):
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}):
             raise NodeFailure('CLASSIC_RENDER_FAILED')
@@ -143,6 +146,4 @@ class Runtime:
                 raise NodeFailure('CLASSIC_RENDER_FAILED')
         if not np.any(np.array(image) != cleaned):
             raise NodeFailure('CLASSIC_RENDER_FAILED')
-        if alpha is not None:
-            image.putalpha(alpha)
-        return pack_result(image, self.version, analysis, translated)
+        return pack_result(image, original, alpha, self.version, analysis, translated)

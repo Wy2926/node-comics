@@ -8,7 +8,7 @@ import {planExport, MAX_EXPORT_BYTES, safeName, type ExportOptions} from '../../
 import {writeExport, type ExportProgress, type ExportResult} from '../../export/files';
 export type {ExportOptions,ExportProgress,ExportResult};
 export {exportName} from '../../export/plan';
-export interface ExportContext {signal:AbortSignal;scope?:TranslationScope;readResult?:(job:Job,signal?:AbortSignal)=>Promise<Blob>;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
+export interface ExportContext {signal:AbortSignal;scope?:TranslationScope;readResult?:(job:Job,signal?:AbortSignal,original?:()=>Promise<Blob|undefined>)=>Promise<Blob>;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
 
 export async function exportDocument(entryId:string,options:ExportOptions,context:ExportContext):Promise<ExportResult>{
   const {scope,signal}=context;
@@ -25,7 +25,10 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
       return {blob:lease.blob,width:lease.identity.width,height:lease.identity.height,release:lease.release};
     }
     if(!page.job||!scope||!context.readResult)throw Error('已有译图身份缺失，请重新打开导出面板。');
-    const blob=await context.readResult(page.job,readSignal);
+    const blob=await context.readResult(page.job,readSignal,async()=>{
+      const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
+      try{return lease.blob;}finally{lease.release();}
+    });
     readSignal.throwIfAborted();await assertCurrent();return {blob,release(){}};
   }},signal,context.destination);
 }

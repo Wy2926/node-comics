@@ -1,5 +1,11 @@
 name: node-comics-nodes
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-backend: &backend
   build: ./backend
   image: node-comics-backend:cluster
@@ -9,20 +15,22 @@ x-backend: &backend
     DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodecomics_cluster}
     REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     REDIS_NAMESPACE: ${REDIS_NAMESPACE:-node-comics}
-    RESULT_STORAGE_BACKEND: r2
-    STORAGE_PATH: /data/images
+    STORAGE_PATH: /data/translation
+    TMPDIR: /data/translation/staging
     DEV_AUTH: "${DEV_AUTH:-false}"
     DEV_AUTH_SECRET: ${DEV_AUTH_SECRET:-}
     CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:18089,http://127.0.0.1:18089}"
-  tmpfs:
-    - /data/images:uid=10001,gid=10001,mode=0700,size=32m
+  volumes:
+    - translation_files:/data/translation
   depends_on:
     postgres: {condition: service_healthy}
     redis: {condition: service_healthy}
   restart: unless-stopped
+  logging: *logging
 
 services:
   redis:
+    logging: *logging
     image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
     command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAX_MEMORY:-256mb}", --maxmemory-policy, noeviction]
     volumes: [nodes_redis:/data]
@@ -33,6 +41,7 @@ services:
       retries: 20
     restart: unless-stopped
   postgres:
+    logging: *logging
     image: postgres:17.6-alpine
     environment:
       POSTGRES_USER: nodecomics
@@ -78,3 +87,4 @@ services:
 volumes:
   nodes_postgres:
   nodes_redis:
+  translation_files:

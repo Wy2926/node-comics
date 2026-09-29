@@ -135,7 +135,7 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.result?.key]);
   if(!job?.result||key!==request.resultKey)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
   let blob:Blob;
-  try{blob=await ctx.channel.readResult(job);}catch(error){
+  try{blob=await ctx.channel.readResult(job,undefined,async()=>page?.blobKey?ctx.originals.read(page.blobKey):undefined);}catch(error){
     if((error as {code?:string}).code==='RESULT_NOT_CACHED'&&current()&&page){ctx.missingResults.add(job.id);ctx.pages.set(pageKey(request,request.images[0]),{...page,translationError:(error as Error).message});}
     throw error;
   }

@@ -6,21 +6,19 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
-from sqlalchemy import CheckConstraint, ForeignKey, ForeignKeyConstraint, Index, JSON, String, UniqueConstraint, and_, cast, exists, func, literal, or_, select, union_all, update
-from sqlalchemy.orm import Mapped, Session, aliased, mapped_column
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, Index, JSON, String, UniqueConstraint, cast, func, select, update
+from sqlalchemy.orm import Mapped, Session, mapped_column
 from sqlalchemy.exc import IntegrityError
 
 from .auth import admin, identity
 from .db import Base, get_db
 from .request_models import RequestBody
 from .errors import problem
-from .jobs import idem_key, job_json, owned_job
+from .jobs import idem_key
 from .entitlements import entitlements_json
 from .schemas import EntitlementsResponse
-from .models import Asset, Job, Ledger, User, now, uid
-from .results import ReaderEntry
+from .models import Job, Ledger, User, now, uid
 from .system_settings import get_request_limits
-from .schemas import JobResponse
 from .providers import digest
 from .feedback_limits import reserve_feedback_receipt
 from .feedback_review_models import FeedbackReview
@@ -32,8 +30,7 @@ class Feedback(Base):
     __tablename__ = "translation_feedback"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"))
-    access_id: Mapped[str | None] = mapped_column(ForeignKey("result_accesses.id"))
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"))
     translation_id: Mapped[str] = mapped_column(String(36))
     output_asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"))
     issues: Mapped[list] = mapped_column(JSON)
@@ -45,7 +42,6 @@ class Feedback(Base):
     updated_at: Mapped[datetime] = mapped_column(default=now)
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
                      ForeignKeyConstraint(["owner_id", "translation_id"], ["translation_requests.owner_id", "translation_requests.id"]),
-                     CheckConstraint('(job_id IS NOT NULL AND access_id IS NULL) OR (job_id IS NULL AND access_id IS NOT NULL)'),
                      Index("ix_feedback_owner_created", "owner_id", "created_at"),
                      Index("ix_feedback_job", "job_id"))
 
@@ -117,9 +113,8 @@ def submit_feedback(translation_id: UUID, body: FeedbackRequest,
     owner_id = user.id
     limits = get_request_limits(db)
     from .translation_api import owned_translation, unavailable
-    from .results import get_entry
     receipt = owned_translation(db, owner_id, translation_id)
-    job = get_entry(db, receipt.entry_id)
+    job = db.get(Job, receipt.job_id) if receipt.job_id else None
     if unavailable(db, receipt, job):
         problem("TRANSLATION_UNAVAILABLE", "翻译访问已撤销或过期", 410)
     job_id = job.id
@@ -139,8 +134,7 @@ def submit_feedback(translation_id: UUID, body: FeedbackRequest,
         db.commit()
         return result
     reserve_feedback_receipt(db, owner_id, key, limits=limits)
-    row = Feedback(owner_id=owner_id, translation_id=str(translation_id), job_id=job_id if isinstance(job, Job) else None,
-                   access_id=None if isinstance(job, Job) else job_id, output_asset_id=job.output_asset_id,
+    row = Feedback(owner_id=owner_id, translation_id=str(translation_id), job_id=job_id, output_asset_id=job.output_asset_id,
                    issues=body.issues, comment=body.comment, idempotency_key=key, request_hash=request_hash)
     db.add(row)
     try:
@@ -173,17 +167,13 @@ def my_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=10
 
 
 def admin_feedback_json(db, row):
-    from .results import ResultAccess
-    access = db.get(ResultAccess, row.access_id) if row.access_id else None
-    actual_job_id = row.job_id or (access.result_id if access else None)
-    job = db.get(Job, actual_job_id) if actual_job_id else None
+    job = db.get(Job, row.job_id)
     owner = db.get(User, row.owner_id)
     review = db.scalar(select(FeedbackReview).where(FeedbackReview.feedback_id == row.id).order_by(
         FeedbackReview.created_at.desc(), FeedbackReview.id.desc()).limit(1))
     actor = db.get(User, review.actor_id) if review else None
-    return {**feedback_json(row), "job_id": row.job_id or row.access_id, "owner_id": row.owner_id, "owner_name": owner.name if owner else row.owner_id,
-            "actual_job_id": actual_job_id, "access_id": row.access_id,
-            "result_version": access.version if access else job.version if job else None,
+    return {**feedback_json(row), "job_id": row.job_id, "owner_id": row.owner_id, "owner_name": owner.name if owner else row.owner_id,
+            "result_version": job.version if job else None,
             "mode": job.mode if job else None, "target_language": job.target_language if job else None,
             "reviewer_id": review.actor_id if review else None, "reviewer_name": actor.name if actor else None,
             "review_note": review.note if review else None, "reviewed_at": review.created_at.isoformat() + "Z" if review else None}
@@ -195,7 +185,6 @@ def admin_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le
                    issue: Literal["missing_text", "meaning", "typesetting", "art_changed", "other"] | None = None,
                    owner_id: str | None = Query(None, max_length=36), job_id: str | None = Query(None, max_length=36),
                    user: User = Depends(admin), db: Session = Depends(get_db)):
-    from .results import ResultAccess
     query = select(Feedback)
     if status:
         query = query.where(Feedback.status == status)
@@ -204,8 +193,7 @@ def admin_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le
     if owner_id:
         query = query.where(Feedback.owner_id == owner_id)
     if job_id:
-        query = query.where(or_(Feedback.job_id == job_id, Feedback.access_id == job_id,
-            Feedback.access_id.in_(select(ResultAccess.id).where(ResultAccess.result_id == job_id))))
+        query = query.where(Feedback.job_id == job_id)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(query.order_by(Feedback.created_at.desc(), Feedback.id.desc()).offset(offset).limit(limit))
     return {"items": [admin_feedback_json(db, row) for row in rows], "total": total,

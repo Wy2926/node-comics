@@ -12,7 +12,7 @@ from threading import Event, Thread
 import time
 from sqlalchemy import select
 from .adapters.images import redraw
-from .assets import available, content_storage_key, create_asset, inspect_image, read_asset
+from .assets import available, asset_storage_key, create_asset, inspect_image, read_asset
 from .classic import run_text_stage
 from .config import settings
 from .db import initialize, session_factory
@@ -21,7 +21,7 @@ from .health import log_failure, report_failure, report_progress
 from .jobs import settle
 from .models import Asset, Attempt, Job, Provider, now
 from .providers import digest
-from .queue_models import ComputeNode, ExecutionLease, JobStage
+from .queue_models import ExecutionLease, JobStage
 from .scheduler import (claim_batch, current_lease, has_claimable_work, heartbeat_lease, lock_scheduler,
                         next_control_delay, release_lease, touch_job)
 from .storage import StorageError, get_store
@@ -52,8 +52,6 @@ def finish_job(db, job, status, *, error=None):
     if job.attempt_id:
         db.get(Attempt, job.attempt_id).completed_at = now()
     settle(db, job, success=status == "succeeded" and "unrecognized_regions" not in (job.quality_flags or []))
-    from .results import publish_result
-    publish_result(db, job)
 
 
 def complete_stage(lease_id, result, *, token=None, node_id=None):
@@ -71,10 +69,9 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         lease.result_hash = result_hash
         name, owner_id, input_id, attempt_id, mode = stage.name, job.owner_id, job.input_asset_id, job.attempt_id, job.mode
         source = db.get(Asset, input_id) if input_id else None
-        backend = db.get(Attempt, attempt_id).output_storage_backend
         db.commit()
     # Only center-owned redraw results carry image bytes. Page results are
-    # committed directly by compute_v2 after the node's R2 upload acknowledgement.
+    # committed directly by compute_v3 after durable local result publication.
     image = base64.b64decode(result["image"], validate=True) if name == "redraw" else None
     info = None
     if image is not None:
@@ -84,13 +81,14 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
             raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")
         # Persist the immutable content key before PUT so a crashed worker can
         # recover its exact bytes. A late generation cannot overwrite a result.
-        output_key = content_storage_key(info["sha256"])
+        output_key = asset_storage_key(lease_id, mode)
         with session_factory()() as db:
             lock_scheduler(db)
             lease, _, _ = current_lease(db, lease_id, token)
             lease.output_key = output_key
+            lease.limits = {**lease.limits, "output_info": info}
             db.commit()
-        get_store(backend).put(output_key, image, info["mime"], kind=mode)
+        get_store().put(output_key, image, info["mime"], kind=mode)
     with session_factory()() as db:
         lock_scheduler(db)
         if _finished(db, lease_id, token, node_id, result_hash):
@@ -100,8 +98,9 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
             if not available(db.get(Asset, input_id)):
                 raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
             output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
-                stable_id=lease_id, storage_backend=backend, prewritten=True, verified_info=info)
+                stable_id=lease_id, prewritten=True, verified_info=info, representation="full-image-v1")
             job.output_asset_id = output.id
+            job.result_description = {"representation": "full-image-v1", "input_hash": source.sha256, "normalization_version": source.normalization_version, "width": info["width"], "height": info["height"]}
             job.quality_flags = result.get("quality_flags", [])
             if abs(ratio - 1) > .03:
                 job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]

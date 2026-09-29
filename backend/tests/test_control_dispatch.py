@@ -135,7 +135,7 @@ def test_claimability_uses_latest_allowed_runtime_languages(scheduler_case):
     with session_factory()() as db:
         node = db.get(ComputeNode, 'node-0')
         node.supported_languages = ['en']
-        node.runtime_report = {'protocol_version': 2, 'languages': ['en', 'zh-Hans']}
+        node.runtime_report = {'protocol_version': 3, 'languages': ['en', 'zh-Hans']}
         node.desired_config = {**node.desired_config, 'allowed_languages': ['en', 'zh-Hans']}
         db.commit()
         assert scheduler.has_claimable_work(db, 'node-0', ['page'])

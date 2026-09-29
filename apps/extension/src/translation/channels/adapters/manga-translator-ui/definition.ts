@@ -10,7 +10,7 @@ function capabilities(): Capabilities {
   return {modes: [{id: 'classic', label: msg('常规翻译'), enabled: true, languages: Object.keys(languages)}],
     languages: fallbackLanguages.filter(language => language.id in languages),
     limits: {max_bytes: 32 * 1024 * 1024, max_pixels: 40_000_000, max_dimension: 30000, max_translation_ids: 4},
-    entitlements: null, retention_days: 0};
+    entitlements: null};
 }
 
 export const definition: ChannelDefinition = {

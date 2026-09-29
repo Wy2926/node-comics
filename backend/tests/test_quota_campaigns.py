@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import func, select
 from conftest import configure_system_limits, login, png_variant, upload
 from test_membership import entitlement, finish, grant, submit
+from test_request_limits_migration import isolated_migration_database
 from app.db import session_factory
 from app.entitlement_models import QuotaPeriod
 from app.models import Ledger, User, now
@@ -215,22 +216,22 @@ def test_oidc_concurrent_first_requests_get_one_user_and_award(client, monkeypat
         assert db.scalar(select(func.count()).select_from(QuotaCampaignAward)) == 1
 
 
-def test_upgrade_keeps_referenced_quota_and_ledger(client):
+def verify_quota_upgrade(database):
     from pathlib import Path
     from datetime import timedelta
     from alembic import command
     from alembic.config import Config
-    from sqlalchemy import func, inspect, select
-    from app.db import engine, initialize, session_factory
+    from sqlalchemy import func, inspect, select, text
+    from sqlalchemy.orm import Session
     from app.models import Ledger, User, now
     from app.entitlement_models import QuotaPeriod
     root = Path(__file__).resolve().parents[1]
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'migrations'))
-    with engine().begin() as connection:
+    with database.begin() as connection:
         config.attributes['connection'] = connection
-        command.downgrade(config, 'gift_renewal_0005')
-    with session_factory()() as db:
+        command.upgrade(config, 'gift_renewal_0005')
+    with Session(database) as db:
         db.add(User(id='preserve', subject='preserve', name='Preserved'))
         db.flush()
         db.add(QuotaPeriod(id='preserved-quota', owner_id='preserve', kind='classic_grant',
@@ -240,12 +241,22 @@ def test_upgrade_keeps_referenced_quota_and_ledger(client):
         db.add(Ledger(owner_id='preserve', period_id='preserved-quota', quota_kind='classic_grant',
                       transaction_key='preserved-ledger', kind='grant', amount=500))
         db.commit()
-    initialize()
-    initialize()
-    with session_factory()() as db:
+    with database.begin() as connection:
+        before = {table: connection.execute(text('SELECT * FROM ' + table)).all()
+                  for table in ('quota_periods', 'usage_ledger')}
+        config.attributes['connection'] = connection
+        command.upgrade(config, 'head')
+        command.upgrade(config, 'head')
+        for table, rows in before.items():
+            assert connection.execute(text('SELECT * FROM ' + table)).all() == rows
+    with Session(database) as db:
         period = db.get(QuotaPeriod, 'preserved-quota')
         assert (period.granted, period.used, period.reserved) == (500, 17, 2)
         assert db.scalar(select(func.count()).select_from(Ledger)
                          .where(Ledger.transaction_key == 'preserved-ledger')) == 1
         checks = inspect(db.connection()).get_check_constraints('quota_periods')
         assert len(checks) == 8
+
+
+def test_upgrade_keeps_referenced_quota_and_ledger(isolated_migration_database):
+    verify_quota_upgrade(isolated_migration_database)

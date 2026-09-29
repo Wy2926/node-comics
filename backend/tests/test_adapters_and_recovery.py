@@ -140,11 +140,12 @@ def test_saved_output_is_recovered_after_crash_before_database_commit(client, pn
         attempt.call_started_at = now() - timedelta(hours=1)
         db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
         db.commit()
-        from app.assets import content_storage_key, inspect_image
+        from app.assets import asset_storage_key, inspect_image
         lease = db.get(ExecutionLease, lease_id)
-        lease.output_key = content_storage_key(inspect_image(png)["sha256"])
+        lease.output_key = asset_storage_key(lease.id, "redraw")
+        lease.limits = {**lease.limits, "output_info": inspect_image(png)}
         db.commit()
-        get_store(attempt.output_storage_backend).put(lease.output_key, png, "image/png", kind="redraw")
+        get_store().put(lease.output_key, png, "image/png", kind="redraw")
     recover_lease(lease_id)
     recover_lease(lease_id)
     with session_factory()() as db:
@@ -175,27 +176,7 @@ def test_cleanup_advances_past_200_tombstones(client, png):
         cleanup(db)
         db.commit()
         assert db.scalar(select(func.count()).select_from(Asset).where(Asset.purged_at.is_not(None))) == 205
-        assert all(object_path(db.get(Asset, asset_id).storage_key).exists() for asset_id in ids)
-
-
-def test_late_child_of_deleted_original_is_inaccessible_and_purged(client, png):
-    from app.assets import create_asset, object_path
-    from app.db import session_factory
-    from app.dispatcher import cleanup
-    from app.models import Asset
-    auth = login(client)
-    owner = client.get("/v1/me", headers=auth).json()["user"]["id"]
-    original = upload(client, auth, png)
-    assert client.delete(f"/v1/images/{original}", headers=auth).status_code == 200
-    with session_factory()() as db:
-        output = create_asset(db, owner, png, kind="redraw", parent_id=original)
-        db.commit()
-        output_id, path = output.id, object_path(output.storage_key)
-    assert client.get(f"/v1/images/{output_id}/content", headers=auth).status_code == 410
-    with session_factory()() as db:
-        cleanup(db)
-        db.commit()
-        assert db.get(Asset, output_id).purged_at is not None and path.exists()
+        assert all(not object_path(db.get(Asset, asset_id).storage_key).exists() for asset_id in ids)
 
 
 def test_ready_stage_survives_reinitialization_without_recreating_job(client, png):
@@ -294,3 +275,49 @@ def test_checked_transport_streams_real_http_multipart_to_isolated_server(client
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_expired_cancelled_page_releases_slot_after_input_was_purged(client, png):
+    from app.config import settings
+    from app.db import session_factory
+    from app.models import Asset, Job, now
+    from app.queue_models import ComputeNode, JobStage, ExecutionLease
+    from app.scheduler import claim_stage
+    from app.jobs import cancel_job
+    from app.dispatcher import recover_lease
+    from conftest import create, login_plus, upload
+    from datetime import timedelta
+    settings().classic_enabled = True
+    auth = login_plus(client)
+    job_id = create(client, auth, upload(client, auth, png), mode='classic').json()['id']
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        stage = db.scalar(select(JobStage).where(JobStage.job_id == job_id))
+        db.add(ComputeNode(id='cancelled-page', name='cancelled page', resource_id='cancelled-page',
+            capabilities=['page'], capacity=1, engine_version=job.config['engine']['version'],
+            supported_languages=['zh-Hans'], device='cpu'))
+        db.flush()
+        stage.status, stage.generation = 'running', 1
+        from app.models import Attempt
+        attempt = Attempt(job_id=job_id, provider_id=job.config['text']['provider_id'], lease_expires_at=now()+timedelta(minutes=1))
+        db.add(attempt)
+        db.flush()
+        job.attempt_id = attempt.id
+        job.status = 'running'
+        lease = ExecutionLease(job_id=job_id, stage_id=stage.id, node_id='cancelled-page', owner_id=job.owner_id,
+            generation=1, resource_pool='page', mode='classic', priority_class='preload',
+            weight=1, estimated_seconds=10, expires_at=now()-timedelta(seconds=1),
+            limits={'deadline_at': (now()+timedelta(minutes=1)).isoformat()+'Z'})
+        db.add(lease)
+        db.flush()
+        lease_id = lease.id
+        cancel_job(db, job)
+        from app.assets import object_path
+        source = db.get(Asset, job.input_asset_id)
+        object_path(source.storage_key).unlink()
+        source.purged_at = now()
+        db.commit()
+    recover_lease(lease_id)
+    with session_factory()() as db:
+        assert db.get(ExecutionLease, lease_id).completed_at
+        assert db.get(Job, job_id).status == 'cancelled'

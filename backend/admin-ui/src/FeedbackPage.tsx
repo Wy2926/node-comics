@@ -6,7 +6,7 @@ import './CareOperations.css';
 
 const statuses: Record<string, string> = {received: '待处理', reviewing: '处理中', resolved: '已解决'};
 const issues: Record<string, string> = {missing_text: '漏译', meaning: '译文含义', typesetting: '排版', art_changed: '画面变化', other: '其他'};
-type Feedback = {id: string; owner_id: string; owner_name: string; job_id: string; actual_job_id: string; access_id: string | null; output_asset_id: string;
+type Feedback = {id: string; owner_id: string; owner_name: string; job_id: string; output_asset_id: string;
   issues: string[]; comment: string; status: string; created_at: string; updated_at: string; result_version: number; mode: string; target_language: string;
   reviewer_id: string | null; reviewer_name: string | null; review_note: string | null; reviewed_at: string | null};
 type Review = {id: string; actor_id: string; actor_name: string; from_status: string; to_status: string; note: string; created_at: string};
@@ -47,8 +47,8 @@ function FeedbackDetail({id, onClose, onChanged, onUnauthorized}: {id: string; o
         <div className="care-section-heading"><div><h3 id="feedback-issue-title">用户问题</h3><p className="care-subtitle"><Jump view="users" params={{q: data.owner_id}}>{data.owner_name}</Jump><span>提交于 {time(data.created_at)}</span></p></div><Status value={data.status}/></div>
         <div className="care-issue-tags" aria-label="问题类型">{data.issues.length ? data.issues.map(value => <span key={value}>{issues[value] || value}</span>) : <span>补充说明</span>}</div>
         <div className="care-user-comment"><span className="care-label">用户说明</span><p>{data.comment || '用户未填写补充说明。'}</p></div>
-        <dl className="care-result-context"><div><dt>关联任务</dt><dd><Jump view="tasks" params={{q: data.actual_job_id}}><code>{data.actual_job_id}</code></Jump></dd></div><div><dt>结果版本</dt><dd>{label(data.mode)} · {data.target_language} · 第 {data.result_version} 版{data.access_id && <span className="care-inline-tag">复用结果</span>}</dd></div>
-          <div><dt>具体译图</dt><dd><code>{data.output_asset_id}</code></dd></div>{data.access_id && <div><dt>复用授权</dt><dd><code>{data.access_id}</code></dd></div>}</dl>
+        <dl className="care-result-context"><div><dt>关联任务</dt><dd><Jump view="tasks" params={{q: data.job_id}}><code>{data.job_id}</code></Jump></dd></div><div><dt>结果版本</dt><dd>{label(data.mode)} · {data.target_language} · 第 {data.result_version} 版</dd></div>
+          <div><dt>具体译图</dt><dd><code>{data.output_asset_id}</code></dd></div></dl>
       </section>
       {notice && <p className="settings-notice" role="status">{notice}</p>}{actionError && <p className="error" role="alert">{actionError}</p>}
       <section className="care-operation-panel" aria-labelledby="feedback-action-title">
@@ -80,13 +80,13 @@ export function FeedbackPage({params, onNavigate, onUnauthorized}: {params: URLS
     <section className="filters"><form className="filter-form" key={params.toString()} onSubmit={event => {event.preventDefault(); const values = Object.fromEntries([...new FormData(event.currentTarget)].map(([key, value]) => [key, String(value).trim()]).filter(([, value]) => value)); onNavigate(values);}}>
       <label>状态<select name="status" defaultValue={params.get('status') || ''}><option value="">全部状态</option>{Object.entries(statuses).map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>
       <label>问题类型<select name="issue" defaultValue={params.get('issue') || ''}><option value="">全部问题</option>{Object.entries(issues).map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>
-      <label>用户 ID<input name="owner_id" maxLength={36} defaultValue={params.get('owner_id') || ''}/></label><label>任务 / 复用授权 ID<input name="job_id" maxLength={36} defaultValue={params.get('job_id') || ''}/></label>
+      <label>用户 ID<input name="owner_id" maxLength={36} defaultValue={params.get('owner_id') || ''}/></label><label>任务 ID<input name="job_id" maxLength={36} defaultValue={params.get('job_id') || ''}/></label>
       <button className="primary">筛选</button><button type="button" className="secondary" onClick={() => onNavigate({})}>重置</button></form></section>
     {error && <p className="error" role="alert">{error}</p>}
     <section className="panel list-panel" aria-busy={loading}>{!data ? <p role="status">{loading ? '正在读取反馈…' : '无法读取反馈，请刷新重试。'}</p> : <>
       {!data.items.length ? <Empty>暂无符合条件的反馈</Empty> : <Table heads={['用户 / 提交时间', '问题 / 说明', '任务与版本', '状态 / 处理人', '操作']}>{data.items.map(row => <tr key={row.id}>
         <td><Jump view="users" params={{q: row.owner_id}}>{row.owner_name}</Jump><small className="care-table-time">{time(row.created_at)}</small></td><td className="care-feedback-list-comment"><strong>{row.issues.map(value => issues[value] || value).join('、') || '补充说明'}</strong><small>{row.comment.slice(0, 100) || '未填写补充说明'}{row.comment.length > 100 ? '…' : ''}</small></td>
-        <td><Jump view="tasks" params={{q: row.actual_job_id}}><code>{row.actual_job_id}</code></Jump><small>{label(row.mode)} · 第 {row.result_version} 版{row.access_id ? ' · 复用' : ''}</small></td><td><Status value={row.status}/><small>{row.reviewer_name || '尚未处理'}</small></td><td><button className="text-link" onClick={() => setDetail(row.id)}>查看 / 处理</button></td></tr>)}</Table>}
+        <td><Jump view="tasks" params={{q: row.job_id}}><code>{row.job_id}</code></Jump><small>{label(row.mode)} · 第 {row.result_version} 版</small></td><td><Status value={row.status}/><small>{row.reviewer_name || '尚未处理'}</small></td><td><button className="text-link" onClick={() => setDetail(row.id)}>查看 / 处理</button></td></tr>)}</Table>}
       <Pagination total={data.total} count={data.items.length} offset={Number(params.get('offset') || 0)} next={data.next_offset} onPage={offset => onNavigate({...Object.fromEntries(params), offset: String(offset)})}/>
     </>}</section>
     {detail && <FeedbackDetail key={detail} id={detail} onClose={() => setDetail(undefined)} onChanged={reload} onUnauthorized={onUnauthorized}/>}

@@ -17,8 +17,8 @@ def provision(client, resource='machine:cuda:0'):
 
 
 def register(client, auth, resource='machine:cuda:0', **extra):
-    return client.post('/internal/compute/v2/nodes/register', headers=auth, json={
-        'protocol_version': 2, 'engine_version': 'test-v2', 'ready': True,
+    return client.post('/internal/compute/v3/nodes/register', headers=auth, json={
+        'protocol_version': 3, 'engine_version': 'test-v2', 'ready': True,
         'supported_languages': ['en'], 'device': 'cuda:0', 'resource_id': resource, **extra})
 
 
@@ -52,11 +52,11 @@ def test_server_owns_capacity_enablement_and_versions(client):
     current = client.get(path, headers=admin).json()
     assert current['name'] == 'new name' and not current['enabled']
     assert current['config']['execution_slots'] == 3 and current['applied_version'] == 2
-    response = client.post(f"/internal/compute/v2/nodes/{node['node_id']}/claim", headers=auth,
+    response = client.post(f"/internal/compute/v3/nodes/{node['node_id']}/claim", headers=auth,
                            json={'request_id': 'disabled', 'count': 1, 'config_version': 2})
     assert response.status_code == 200 and response.json()['leases'] == []
     # The former registration contract is explicitly rejected, never interpreted.
-    assert client.post('/internal/compute/v2/nodes/register', headers=auth, json={
+    assert client.post('/internal/compute/v3/nodes/register', headers=auth, json={
         'id': node['node_id'], 'name': 'rogue', 'capacity': 32,
         'capabilities': ['analyze'], 'engine_version': 'test-v1', 'device': 'cuda:0',
         'resource_id': 'machine:cuda:0'}).status_code == 422

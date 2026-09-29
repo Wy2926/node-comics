@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Die Anmeldung ist abgelaufen. Bitte melden Sie sich erneut an.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Der aktuelle API-Dienst enthält diese Schnittstelle noch nicht. Bitte aktualisieren und starten Sie den API-Dienst neu und versuchen Sie es erneut.",
   "请求未完成（{0}）": "Anfrage unvollständig ({0})",
-  "每次匹配需提供 1–100 页。": "1–100 Seiten pro Spiel erforderlich.",
-  "服务器匹配结果与请求页标识不一致。": "Das Ergebnis des Serverabgleichs stimmt nicht mit der angeforderten Seiten-ID überein.",
   "图片访问地址无效。": "Die Bildzugriffsadresse ist ungültig.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Das Bild kann vorübergehend nicht heruntergeladen werden. Bitte überprüfen Sie die domänenübergreifende Konfiguration des Netzwerks bzw. Objektspeichers.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "Das Bild ist abgelaufen oder es kann nicht darauf zugegriffen werden. Bitte bewahren Sie eine lokale Kopie auf oder laden Sie sie erneut hoch.",
-  "图片访问链接已过期，请重试。": "Der Bildzugriffslink ist abgelaufen. Bitte versuchen Sie es erneut.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "Datei SHA-256 und Rohseitenindex müssen als Paar bereitgestellt werden.",
-  "图片 SHA-256 无效。": "Ungültiges Bild SHA-256.",
   "返回我的漫画": "Zurück zu meinen Comics",
   "主导航": "Hauptnavigation",
   "我的漫画": "Meine Comics",
@@ -953,5 +947,9 @@
   "取消自动续费": "Automatische Verlängerung kündigen",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Bezahlter und geschenkter Zugang bleiben nach der Kündigung erhalten. Es fallen keine weiteren Verlängerungsgebühren an.",
   "确认取消续费": "Kündigung bestätigen",
-  "保留自动续费": "Automatische Verlängerung behalten"
+  "保留自动续费": "Automatische Verlängerung behalten",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "Das Originalbild ist nicht verfügbar. Stelle die Quelle oder den lokalen Cache wieder her.",
+  "翻译文件校验失败，请重新加载。": "Die übersetzte Datei konnte nicht validiert werden. Lade sie erneut.",
+  "翻译协议已更新，请手动重新翻译此页。": "Das Übersetzungsprotokoll wurde geändert. Übersetze diese Seite erneut manuell.",
+  "翻译协议已更新，请更新插件。": "Das Übersetzungsprotokoll wurde geändert. Aktualisiere die Erweiterung."
 }

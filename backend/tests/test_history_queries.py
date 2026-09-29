@@ -34,7 +34,7 @@ def test_history_paginates_every_operation_without_object_storage(client,png,mon
     import app.assets as assets
     auth,_,_,keys=seed_history(client,png)
     from app.storage import get_store
-    store = get_store('local')
+    store = get_store()
     monkeypatch.setattr(type(store), 'read', lambda *args:pytest.fail('History downloaded object bytes'))
     first=client.get('/v1/translations?limit=12',headers=auth)
     assert first.status_code==200,first.text
@@ -58,8 +58,12 @@ def test_history_never_exposes_expired_result_as_ready(client,png,target,field):
         setattr(db.get(Asset,source if target=='source' else output),field,now()-timedelta(seconds=1))
         db.commit()
     item=client.get('/v1/translations',headers=auth).json()['items'][0]
-    assert item['state']=='failed'
-    assert item['result'] is None
+    if field == 'deleted_at':
+        assert item['state']=='failed' and item['result'] is None
+    else:
+        assert item['state']=='succeeded' and item['result'] is not None
+        if target == 'output':
+            assert item['error']['code'] == 'RESULT_UNAVAILABLE'
 
 
 def test_alias_operations_share_job_without_changing_settlement(client,png):
@@ -74,7 +78,7 @@ def test_alias_operations_share_job_without_changing_settlement(client,png):
             job_id=job.id,descriptor=original.descriptor))
         db.commit()
     data=client.get('/v1/translations',headers=auth).json()
-    assert data['total']==2 and len({item['result']['asset_id'] for item in data['items']})==1
+    assert data['total']==2 and len({item['result']['artifact']['sha256'] for item in data['items']})==1
     assert all(item['state']=='succeeded' for item in data['items'])
 
 

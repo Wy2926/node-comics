@@ -20,7 +20,7 @@ describe('single-file comic imports',()=>{
  it('restores channel bindings independently while preserving source bytes and reading position',async()=>{
   const input=file(),created=await importLocalFile(input),copy=await loadEntry(created.id),page=copy.pages[0],sha='c'.repeat(64);
   await catalog.putMaterialization({id:JSON.stringify([copy.contentId,page.id,RENDER_PROFILE]),contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE,imageSha256:sha,width:800,height:1200,byteSize:10,mime:'image/png',updatedAt:Date.now()},copy.generation);
-  const delivered=(id:string):Job=>({id,status:'succeeded',result:{key:id,recoverable:false},input_asset_id:null,output_asset_id:null,mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:0});
+  const delivered=(id:string):Job=>({id,status:'succeeded',result:{key:id,recoverable:false},mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:0});
   for(const channel of ['local-a','local-b'])await saveReaderState({...copy,pageId:page.id,lastReadAt:100,relativeOffset:.3,pages:[{...page,imageSha256:sha,translationScope:channel,jobs:[delivered(channel)]}]});
   for(const channel of ['local-a','local-b']){
    const restored=await loadEntry(copy.id,{key:channel});expect(restored.pages[0]).toMatchObject({translationScope:channel,jobs:[{id:channel}],outputBlobs:{}});expect(restored.pages[0].ownerId).toBeUndefined();expect(restored.relativeOffset).toBe(.3);
@@ -66,7 +66,7 @@ describe('single-file comic imports',()=>{
  });
  it('merges concurrent translation results without persisting runtime URLs or regressing terminal jobs',async()=>{
   const result=await importLocalFile(file()),copy=await loadEntry(result.id),page=copy.pages[0],sha='d'.repeat(64);
-  const job=(id:string,status:Job['status']='succeeded'):Job=>({id,status,input_asset_id:'asset',output_asset_id:status==='succeeded'?id+'-out':null,mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:1});
+  const job=(id:string,status:Job['status']='succeeded'):Job=>({id,status,mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:1});
   const first={...page,imageSha256:sha,translationScope:'local-channel',jobs:[job('one')],outputBlobs:{one:'runtime-output'}},second={...first,jobs:[job('two')],outputBlobs:{two:'other-output'}};
   await Promise.all([saveReaderState({...copy,pages:[first]}),saveReaderState({...copy,pages:[second]})]);const binding=(await catalog.get('translationBindings',JSON.stringify(['local-channel',sha])))!;expect((binding.payload as {jobs:Job[]}).jobs.map(j=>j.id)).toEqual(['one','two']);expect(binding.payload).not.toHaveProperty('outputBlobs');
   await saveReaderState({...copy,pages:[first],lastReadAt:123,pageId:page.id,relativeOffset:.4});expect(await catalog.get('positions',copy.id)).toMatchObject({relativeOffset:.4,updatedAt:123});

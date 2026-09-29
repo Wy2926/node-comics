@@ -2,8 +2,8 @@
 import os
 import pytest
 from test_postgres_concurrency import pg_scope
-from test_compute_v2 import (
-    v2,
+from test_compute_v3 import (
+    v3,
     test_claim_receipt_capacity_fairness_shrink_and_restart,
     test_concurrent_claims_never_exceed_capacity,
     test_no_text_checkpoint_is_terminal_idempotent_and_never_calls_llm,
@@ -11,10 +11,20 @@ from test_compute_v2 import (
     test_mixed_heartbeat_cancellation_and_stopped_ack,
     test_recovery_reuses_analysis_and_running_text_without_duplicate_call,
     test_deadline_cannot_be_extended_by_heartbeats,
-    test_version_languages_and_r2_authorization_do_not_probe_objects,
+    test_version_languages_and_direct_input_access,
     test_result_written_before_lost_commit_is_recovered,
-    test_upload_is_scoped_frozen_bounded_and_center_never_reads_images,
+    test_upload_is_scoped_frozen_and_validates_pixels,
     test_late_direct_upload_cannot_publish_after_cancel_or_new_generation,
+    test_cancellation_during_file_publish_never_settles,
+    test_verification_finishing_after_deadline_is_never_recovered,
+    test_timely_received_result_can_publish_or_recover_after_deadline,
+    test_invalid_identity_file_has_no_accepted_receipt_to_recover,
+    test_identity_receipt_survives_crash_before_final_commit,
+    test_accepted_publish_grace_is_fixed_and_stop_cannot_revoke_it,
+    test_result_multipart_total_timeout_closes_partial_file,
+    test_result_ingress_full_rejects_before_reading_multipart,
+    test_overlay_limit_is_independent_of_original_upload_limit,
+    test_overlay_larger_than_cluster_result_limit_is_rejected,
 )
 from test_compute_claims import (
     test_same_claim_receipt_concurrent_retries_allocate_one_batch,

@@ -17,7 +17,7 @@ class ResultChannel {
 beforeEach(async () => { stubAuthLocks();vi.stubGlobal('BroadcastChannel',ResultChannel); vi.stubGlobal("createImageBitmap",vi.fn(async()=>({width:800,height:1200,close:vi.fn()}))); await setTranslationCacheLimitMb(1024); });
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 const request = () => ({ scope:{key:crypto.randomUUID()},
-  job: job(1, {status: 'succeeded', output_asset_id: 'output-1'}),
+  job: job(1, {status: 'succeeded'}),
   download: vi.fn(async () => new Blob(['translated'])), isCurrent: () => true });
 
 it('coalesces concurrent readers and retains bytes after the display is released', async () => {
@@ -121,7 +121,7 @@ it('reports schema errors during result persistence instead of marking the resul
 });
 
 it('stores local results without an account or server asset and never downloads after local cache removal',async()=>{
-  const input=request();input.job={...input.job,output_asset_id:null,result:{key:crypto.randomUUID(),recoverable:false}};
+  const input=request();input.job={...input.job,result:{key:crypto.randomUUID(),recoverable:false}};
   await saveResultBlob({...input,blob:new Blob(['local translation'])});
   expect(await(await loadResultBlob(input)).text()).toBe('local translation');
   expect(input.download).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ it('stores local results without an account or server asset and never downloads 
 
 it('keeps local results readable with disk cache disabled, then honors an explicit cache clear',async()=>{
   await setTranslationCacheLimitMb(0);
-  const input=request();input.job={...input.job,output_asset_id:null,result:{key:crypto.randomUUID(),recoverable:false}};
+  const input=request();input.job={...input.job,result:{key:crypto.randomUUID(),recoverable:false}};
   await saveResultBlob({...input,blob:new Blob(['session result'])});
   expect(await translationCache.has(resultBlobKey(input.scope,input.job))).toBe(false);
   expect(await(await loadResultBlob(input)).text()).toBe('session result');
@@ -166,7 +166,7 @@ it('rejects results completed after a clear using the token captured before the 
 
 it('hands off memory-only local results across module contexts and rejects old bytes after clearing',async()=>{
   await setTranslationCacheLimitMb(0);
-  const input=request();input.job={...input.job,output_asset_id:null,result:{key:crypto.randomUUID(),recoverable:false}};
+  const input=request();input.job={...input.job,result:{key:crypto.randomUUID(),recoverable:false}};
   await saveResultBlob({...input,blob:new Blob(['cross-context image'])});
   vi.resetModules();
   const other=await import('../src/storage/translations/results'),otherCache=await import('../src/storage/translations');
@@ -181,7 +181,7 @@ it('hands off memory-only local results across module contexts and rejects old b
 it('removes one channel from memory without evicting another channel',async()=>{
   await setTranslationCacheLimitMb(0);
   const first=request(),second=request();
-  for(const input of [first,second]){input.job={...input.job,output_asset_id:null,result:{key:crypto.randomUUID(),recoverable:false}};await saveResultBlob({...input,blob:new Blob([input.scope.key])});}
+  for(const input of [first,second]){input.job={...input.job,result:{key:crypto.randomUUID(),recoverable:false}};await saveResultBlob({...input,blob:new Blob([input.scope.key])});}
   await translationCache.deleteOwner(first.scope.key);
   await expect(loadResultBlob(first)).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
   expect(await(await loadResultBlob(second)).text()).toBe(second.scope.key);

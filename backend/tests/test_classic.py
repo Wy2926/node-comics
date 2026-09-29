@@ -67,7 +67,7 @@ def text_case(text_database, monkeypatch):
         db.add(User(id=owner_id, subject='isolated-stage-user', name='reader'))
         db.flush()
         db.add(Asset(id=asset_id, owner_id=owner_id, sha256='a' * 64, storage_key='isolated-original',
-                     storage_backend='r2', mime='image/png', width=80, height=64, byte_size=100,
+                     mime='image/png', width=80, height=64, byte_size=100,
                      expires_at=now() + timedelta(days=1)))
         db.add(ComputeNode(id='text-node', name='text pool', capabilities=['text'], capacity=4,
                            resource_id='isolated:text', engine_version='none', device='http'))
@@ -85,6 +85,8 @@ def text_case(text_database, monkeypatch):
                               generation=1, resource_pool='text:' + provider_id, mode='classic', priority_class='preload',
                               weight=1, estimated_seconds=10, expires_at=now() + timedelta(minutes=5)))
         db.commit()
+    from app.storage import get_store
+    get_store().put('isolated-original', b'fixture', 'image/png', kind='original')
     def text(*args):
         return TextResponse('translations[1]{id,text}:\n  b001,你好！',
                             {'input_tokens': 100, 'output_tokens': 20}, 'isolated-request')

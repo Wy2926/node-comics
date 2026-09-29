@@ -52,9 +52,6 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "objects"))
-    monkeypatch.setenv("RESULT_STORAGE_BACKEND", "local")
-    monkeypatch.setenv("RETENTION_DAYS", "7")
-    monkeypatch.setenv("R2_ENDPOINT_URL", "")
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
     monkeypatch.setenv("OPENAI_API_KEY", "isolated-test-provider-key")
@@ -72,7 +69,7 @@ def client(tmp_path, monkeypatch):
     from app.main import app
     from app.db import session_factory
     from translation_fixtures import configure_text_provider
-    with TestClient(app) as test_client:
+    with TestClient(app, headers={'X-Translation-Protocol': 'overlay-v1'}) as test_client:
         with session_factory()() as db:
             configure_text_provider(db)
             db.commit()
@@ -92,7 +89,7 @@ def png():
 def login(client, name="alice"):
     response = client.post("/v1/auth/dev", json={"username": name})
     assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+    return {"Authorization": f"Bearer {response.json()['access_token']}", "X-Translation-Protocol": "overlay-v1"}
 
 
 def login_plus(client, name="alice"):
@@ -158,7 +155,7 @@ def request_for_job(client, headers, job_id):
     with session_factory()() as db:
         return db.scalar(select(TranslationRequest.id).where(
             TranslationRequest.owner_id == owner,
-            (TranslationRequest.job_id == job_id) | (TranslationRequest.access_id == job_id)))
+            TranslationRequest.job_id == job_id))
 
 
 def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="redraw", **fields):
@@ -174,7 +171,21 @@ def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans
         assert source is not None, "Explicit retry/regeneration fixture requires its source"
         body = {action + "_of": request_for_job(client, headers, source)}
     body.update(fields)
-    return client.put("/v1/translations/" + request_id(key), headers=headers, json=body)
+    response = client.put("/v1/translations/" + request_id(key), headers=headers, json=body)
+    if response.status_code < 300 and response.json().get('state') == 'needs_input':
+        from app.assets import read_asset, available
+        with session_factory()() as db:
+            source = db.get(Asset, asset_id)
+            # Client fixtures retain their local originals; the server job copy
+            # is intentionally purged when an earlier version completes.
+            if not available(source):
+                from sqlalchemy import select
+                source = next(item for item in db.scalars(select(Asset).where(
+                    Asset.owner_id == source.owner_id, Asset.sha256 == source.sha256,
+                    Asset.kind == 'original')) if available(item))
+            data = read_asset(source)
+        response = client.put('/v1/translations/' + request_id(key) + '/input', headers=headers, content=data)
+    return response
 
 
 def internal_job_response(client, headers, response):
@@ -260,3 +271,13 @@ def configure_system_limits(**values):
         row.version += 1
         row.updated_at = now()
         db.commit()
+
+
+def complete(client, auth, asset, png, monkeypatch, key="first"):
+    """Complete one isolated redraw generation for result/feedback tests."""
+    import app.workers as workers
+    from app.adapters.images import TranslationOutput
+    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    job = create(client, auth, asset, key=key).json()
+    run_job(job['id'])
+    return inspect_job(job['id'])

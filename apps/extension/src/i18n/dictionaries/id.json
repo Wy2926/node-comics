@@ -9,14 +9,8 @@
   "登录已过期，请重新登录。": "Login sudah kadaluarsa, silahkan login kembali.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "Layanan API saat ini belum menyertakan antarmuka ini. Harap perbarui dan mulai ulang layanan API dan coba lagi.",
   "请求未完成（{0}）": "Permintaan tidak lengkap ({0})",
-  "每次匹配需提供 1–100 页。": "Diperlukan 1–100 halaman per pertandingan.",
-  "服务器匹配结果与请求页标识不一致。": "Hasil pencocokan server tidak sesuai dengan ID halaman yang diminta.",
   "图片访问地址无效。": "Alamat akses gambar tidak valid.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "Gambar tidak dapat diunduh sementara. Silakan periksa konfigurasi lintas domain dari jaringan atau penyimpanan objek.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "Gambar telah kedaluwarsa atau tidak dapat diakses. Harap simpan salinan lokal atau unggah lagi.",
-  "图片访问链接已过期，请重试。": "Tautan akses gambar telah kedaluwarsa, silakan coba lagi.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "File SHA-256 dan indeks halaman mentah harus disediakan sebagai pasangan.",
-  "图片 SHA-256 无效。": "Gambar SHA-256 tidak valid.",
   "返回我的漫画": "Kembali ke komikku",
   "主导航": "Navigasi utama",
   "我的漫画": "Komik saya",
@@ -953,5 +947,9 @@
   "取消自动续费": "Batalkan perpanjangan otomatis",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "Akses berbayar dan hadiah tetap berlaku setelah pembatalan. Tidak ada lagi tagihan perpanjangan.",
   "确认取消续费": "Konfirmasi pembatalan",
-  "保留自动续费": "Pertahankan perpanjangan otomatis"
+  "保留自动续费": "Pertahankan perpanjangan otomatis",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "Gambar asli tidak tersedia. Pulihkan sumber atau cache lokalnya.",
+  "翻译文件校验失败，请重新加载。": "Validasi berkas terjemahan gagal. Muat ulang berkas.",
+  "翻译协议已更新，请手动重新翻译此页。": "Protokol terjemahan telah berubah. Terjemahkan ulang halaman ini secara manual.",
+  "翻译协议已更新，请更新插件。": "Protokol terjemahan telah berubah. Perbarui ekstensi."
 }

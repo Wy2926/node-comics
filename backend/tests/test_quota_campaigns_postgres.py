@@ -11,7 +11,7 @@ from test_quota_campaign_duration import (
     test_status_recovery_requires_the_same_actor_and_original_receipt,
 )
 from test_quota_campaigns import (
-    test_upgrade_keeps_referenced_quota_and_ledger,
+    verify_quota_upgrade,
     test_backfill_existing_and_registration_share_once_only_receipts,
     test_configuration_is_private_immutable_and_explicitly_enabled,
     test_audience_boundary_pause_resume_and_no_regrant,
@@ -22,6 +22,11 @@ from test_quota_campaigns import (
     test_concurrent_delivery_is_exactly_once,
     test_oidc_concurrent_first_requests_get_one_user_and_award,
 )
+
+
+def test_upgrade_keeps_referenced_quota_and_ledger(pg_scope):
+    from app.db import engine
+    verify_quota_upgrade(engine())
 
 
 @pytest.fixture

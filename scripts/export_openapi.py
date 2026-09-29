@@ -24,7 +24,6 @@ def export_schema(target: Path):
         dev_auth=True,
         dev_auth_secret="openapi-export-only-not-a-runtime-signing-key",
         database_url="sqlite:///:memory:",
-        result_storage_backend="local",
         admin_web_path="",
     )
     # Imports below use the real routes, but never the caller's cached settings.

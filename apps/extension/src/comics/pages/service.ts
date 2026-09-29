@@ -9,7 +9,6 @@ import {refreshWebsitePage} from '../application/website-content';
 import { sourcePageCache } from '../../storage/source-pages';
 import { downloadStore } from '../../storage/downloads';
 import { SourceDatabaseSchemaError } from '../../storage/database';
-import { originalReplica } from '../originals';
 import { RENDER_PROFILE, pageReference, type PageReference } from './identity';
 import type { PageDescriptor, PageMaterialization } from '../domain';
 
@@ -49,38 +48,36 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   // These repositories contain already-normalized output from this service, keyed by current content identity/profile.
   const trustedCache=!!blob;
   if(!blob){
-    try{
-      if(doc.format==='website'){
-        const readImage=(page:PageDescriptor)=>{
-          const {url,manifestId,sourceId}=page.locator;
-          if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
-          return readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
-        };
-        try{blob=await readImage(descriptor);}
-        catch(error){
-          const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
-          if(signal.aborted||error instanceof ImagePermissionsRequired||error instanceof SourceDatabaseSchemaError||
-            error instanceof DOMException&&error.name==='AbortError'||(error as {kind?:string})?.kind==='permission-required'||
-            details?.status===429||details?.retryAfter||typeof descriptor.locator.contentKey!=='string')throw error;
-          await assertSourceCurrent();
-          const renewed=await refreshWebsitePage(doc,descriptor,signal);
-          await assertSourceCurrent();
-          blob=await readImage(renewed);
-        }
-      }else{
-        const containerId=doc.containerId;
-        const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});
-        try{
-          const session=await openDocument(doc.format as ComicFormat,source,signal);
-          try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
-        }finally{await source.close();}
+    if(doc.format==='website'){
+      const readImage=(page:PageDescriptor)=>{
+        const {url,manifestId,sourceId}=page.locator;
+        if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
+        return readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
+      };
+      try{blob=await readImage(descriptor);}
+      catch(error){
+        const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
+        if(signal.aborted||error instanceof ImagePermissionsRequired||error instanceof SourceDatabaseSchemaError||
+          error instanceof DOMException&&error.name==='AbortError'||(error as {kind?:string})?.kind==='permission-required'||
+          details?.status===429||details?.retryAfter||typeof descriptor.locator.contentKey!=='string')throw error;
+        await assertSourceCurrent();
+        const renewed=await refreshWebsitePage(doc,descriptor,signal);
+        await assertSourceCurrent();
+        blob=await readImage(renewed);
       }
-    }catch(error){if(signal.aborted||error instanceof SourceDatabaseSchemaError)throw error;blob=known&&await originalReplica(known.imageSha256);if(!blob)throw error;}
+    }else{
+      const containerId=doc.containerId;
+      const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});
+      try{
+        const session=await openDocument(doc.format as ComicFormat,source,signal);
+        try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
+      }finally{await source.close();}
+    }
   }
   signal.throwIfAborted();
   const prepared=trustedCache&&known&&known.byteSize===blob.size&&known.mime===blob.type&&known.width>0&&known.height>0
     ? {blob,width:known.width,height:known.height,imageSha256:known.imageSha256}
-    : await prepareComicPage({name:descriptor.name,pageIndex:descriptor.ordinal,blob},signal);
+    : await prepareComicPage({name:descriptor.name,blob},signal);
   const identity:PageMaterialization={id,pageId:request.pageId,contentId:request.contentId,renderProfileId:request.renderProfileId,imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
   if(known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新载入当前内容。');
   signal.throwIfAborted();

@@ -77,29 +77,12 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 
-class AssetResponse(BaseModel):
-    id: str
-    width: int
-    height: int
-    mime: str
-    sha256: str
-    byte_size: int
-    kind: str
-    expires_at: str | None
-
-
-class AccessResponse(BaseModel):
-    url: str
-    expires_at: str | None
-    authorization_required: bool
-
 
 class JobResponse(BaseModel):
     id: str
     input_asset_id: str | None
     image_sha256: str
     priority: str = "preload"
-    requested_asset_id: str | None = None
     output_asset_id: str | None
     result_available: bool
     result_expired: bool
@@ -112,7 +95,6 @@ class JobResponse(BaseModel):
     quota_period_id: str | None
     settlement: str
     version: int
-    cache_hit: bool
     reused: bool = False
     cancel_requested: bool
     error: ErrorInfo | None
@@ -161,32 +143,42 @@ class LanguageCapability(BaseModel):
 
 
 class CapabilitiesResponse(BaseModel):
+    result_protocol: Literal["overlay-v1"] = "overlay-v1"
+    representations: list[str] = Field(default_factory=lambda: ["overlay-v1", "full-image-v1", "original"])
     modes: list[ModeCapability]
     languages: list[LanguageCapability]
     limits: dict[str, int]
     entitlements: EntitlementsResponse | None
-    retention_days: int
     unknown_release_seconds: int
+
+
+class TranslationArtifactResponse(BaseModel):
+    sha256: str
+    byte_size: int
+    mime: str
+    path: str
 
 
 class TranslationResultResponse(BaseModel):
     kind: Literal['translated', 'no_text', 'partial']
-    asset_id: str | None = None
-    width: int | None = None
-    height: int | None = None
-    download_url: str | None = None
-    download_expires_at: str | None = None
-    authorization_required: bool = False
+    representation: Literal['overlay-v1', 'full-image-v1', 'original']
+    input_sha256: str
+    normalization_version: Literal[1]
+    width: int
+    height: int
+    bbox: dict[str, int] | None = None
+    composite: Literal['source-atop'] | None = None
+    artifact: TranslationArtifactResponse | None
     quality_flags: list[str] = Field(default_factory=list)
 
 
 class TranslationResponse(BaseModel):
     id: str
     state: Literal['needs_input', 'queued', 'running', 'succeeded', 'failed', 'needs_attention']
+    execution_resolved: bool = False
     mode: Literal['classic', 'redraw']
     target_language: str
     image_sha256: str
-    input_asset_id: str | None
     input_expires_at: str | None
     result: TranslationResultResponse | None
     error: ErrorInfo | None

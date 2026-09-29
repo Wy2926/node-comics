@@ -1,6 +1,6 @@
 # 生产身份配置与验证
 
-后端默认 `APP_ENV=production`。生产启动校验要求 `DEV_AUTH=false`、PostgreSQL、完整 OIDC 配置、私有 R2，以及明确的网页来源或固定扩展 ID。任何一项缺失会在连接数据库、迁移和启动服务之前失败。免密码开发管理员登录仅在显式 `APP_ENV=development` / `test` 且配置至少 32 字符签名密钥时可用。
+后端默认 `APP_ENV=production`。生产启动校验要求 `DEV_AUTH=false`、PostgreSQL、完整 OIDC 配置、可写的私有文件目录，以及明确的网页来源或固定扩展 ID。任何一项缺失会在连接数据库、迁移和启动服务之前失败。免密码开发管理员登录仅在显式 `APP_ENV=development` / `test` 且配置至少 32 字符签名密钥时可用。
 
 生产配置使用 [deploy/.env.production.example](../deploy/.env.production.example)；复制为被忽略的 `deploy/.env.production` 后填写真实值。`scripts/bootstrap.ps1 -Production -Start` 选择这份文件，先构建后端并执行无外部访问的配置预检，再启动服务。未传 `-Production` 的引导命令为本地开发入口，会显式标记 `APP_ENV=development`。直接调用 Compose 时需设置 `COMICS_ENV_FILE=deploy/.env.production` 并传入相同的 `--env-file`；否则容器仍默认读取本地环境文件。
 
@@ -9,7 +9,7 @@ $env:COMICS_ENV_FILE = 'deploy/.env.production'
 docker compose --env-file .env --env-file deploy/.env.production --project-name node-comics-production run --rm --no-deps api python -m app.config --production
 ```
 
-此预检只验证配置格式，不代表数据库、R2、身份服务可达，也不代表身份服务已经登记正确的资源授权与回调。Compose 的 `config --quiet` 同样不能替代身份校验。
+此预检只验证配置格式，不代表数据库、文件卷、身份服务可用，也不代表身份服务已经登记正确的资源授权与回调。Compose 的 `config --quiet` 同样不能替代身份校验。
 
 生产引导固定选择独立 Compose 项目，并要求最终生效的 `APP_ENV` 为 production；shell 中残留的开发模式覆盖值会让预检失败，不能通过环境文件表面配置绕过。
 
@@ -43,7 +43,7 @@ docker compose --env-file .env --env-file deploy/.env.production --project-name 
 - 活跃阅读器在令牌到期前最多 60 秒自动续期（短令牌取有效期的 10%）；恢复前台和发起带账户认证的请求时同样检查。关闭页面后不依赖常驻定时器，扩展后台下次工作时按需续期。开发测试会话依照后端 `expires_in=43200` 到期，不能自动重新签发开发身份。
 - 通过同 origin 的 Web Locks 合并多页面／后台的续期。刷新请求携带原 client ID 与 API resource；先持久保存轮换后的凭据，再发送业务请求。独立写锁允许用户在续期期间退出或切换账户，迟到结果按会话 ID 和已使用令牌核对，不恢复旧账户。
 - 产品 API、需认证的原图上传、同源图片下载与状态长轮询统一处理 401：最多续期一次并以原请求体、原幂等键重试一次；仍为 401，或身份服务明确拒绝续期，清除会话和续期凭据，通知所有阅读器及网页翻译上下文停止旧账户请求。页面显示重新登录入口，图内显示登录操作；保留原图、阅读位置和服务端持久任务。
-- 断网、15 秒续期超时、身份服务 429 或 5xx 保留会话，并共享 30 秒续期冷却。仍有效的访问令牌可继续使用；已过期的令牌不会发给业务接口，显示可重试的连接错误。业务 403 不登出。R2 签名 URL 的 401/403 只按原图片授权逻辑更新签名，不触发账户续期或退出。
+- 断网、15 秒续期超时、身份服务 429 或 5xx 保留会话，并共享 30 秒续期冷却。仍有效的访问令牌可继续使用；已过期的令牌不会发给业务接口，显示可重试的连接错误。业务 403 不登出。结果下载携带同一中心的账户授权，不使用签名 URL；下载失败保留任务成功状态。
 - 登录可持续多久由实际访问令牌、Logto 刷新令牌及 grant 生命周期共同决定，不在插件内假定固定天数；续期不能保证无限登录。后台 JWT 签名和到期校验继续生效。
 
 客户端验证命令：

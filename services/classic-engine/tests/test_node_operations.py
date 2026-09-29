@@ -17,16 +17,16 @@ from classic_node.transport import Transport
 
 def make_agent(tmp_path, handler):
     config = {'node_id': 'node-test', 'node_token': 'private-token',
-              'control_url': 'https://control.example.test', 'r2_origin': 'https://r2.example.test',
+              'control_url': 'https://control.example.test',
               'resource_id': 'test:cpu', 'engine': {'gpu': -1}, 'local_pages': 1, 'max_leases': 1}
     transport = Transport(config, control_transport=httpx.MockTransport(handler))
-    journal = Journal(tmp_path, 64 * 1024 * 1024)
+    journal = Journal(tmp_path)
     agent = Agent(config, SimpleNamespace(version='test-v2', languages=['en']), transport, journal)
     return agent, transport, journal
 
 
 def registration():
-    return {'protocol_version': 2, 'leases': [], 'server_time': '2026-01-01T00:00:00Z',
+    return {'protocol_version': 3, 'leases': [], 'server_time': '2026-01-01T00:00:00Z',
             'config': {'version': 1, 'request_seconds': 30, 'execution_slots': 1, 'enabled': True,
                        'heartbeat_seconds': 10, 'poll_seconds': 20}}
 
@@ -212,8 +212,8 @@ def test_status_publish_retries_windows_reader_sharing_violation(tmp_path, monke
 def test_single_owner_prevents_second_runtime_before_model_loading(tmp_path, monkeypatch):
     from classic_node import __main__ as cli
     import sys
-    journal = Journal(tmp_path, 64 * 1024 * 1024)
-    monkeypatch.setattr(cli, 'load', lambda _: {'state_dir': str(tmp_path), 'journal_bytes': 64 * 1024 * 1024})
+    journal = Journal(tmp_path)
+    monkeypatch.setattr(cli, 'load', lambda _: {'state_dir': str(tmp_path)})
     monkeypatch.setattr(sys, 'argv', ['classic_node', 'run', '--config', str(tmp_path / 'node.json')])
     try:
         assert cli.main() == 1
@@ -264,14 +264,14 @@ def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypat
 @pytest.mark.parametrize('key,value', [('lease:1', {'phase': 'deliver'}), ('claim', {'request_id': 'unknown-reply'})])
 def test_adoption_check_retains_pending_work(tmp_path, monkeypatch, key, value):
     from classic_node import __main__ as cli
-    config = {'state_dir': str(tmp_path), 'journal_bytes': 64 * 1024 * 1024}
+    config = {'state_dir': str(tmp_path)}
     monkeypatch.setattr(cli, 'load', lambda _: config)
     args = SimpleNamespace(command='pending', config='fixture')
-    journal = Journal(tmp_path, config['journal_bytes'])
+    journal = Journal(tmp_path)
     journal.put(key, value)
     journal.close()
     assert cli.execute(args) == 1
-    journal = Journal(tmp_path, config['journal_bytes'])
+    journal = Journal(tmp_path)
     assert journal.get(key) == value
     journal.remove(key)
     journal.close()

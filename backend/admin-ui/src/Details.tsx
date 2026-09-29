@@ -8,13 +8,13 @@ import {UserHistory} from './UserHistory';
 export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
   return <>
-    <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {j.target_language}{j.cache_hit && ' · 缓存命中'}</p></div><Badge value={j.status}/></div>
+    <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {j.target_language}</p></div><Badge value={j.status}/></div>
     <div className="detail-stats"><Stat title="总耗时" value={duration(j.elapsed_seconds)} note="从创建到结束 / 当前"/>
       <Stat title="首次等待" value={duration(j.initial_wait_seconds)} note="创建至首次领取"/>
       <Stat title="执行占用" value={duration(j.execution_seconds)} note="并行阶段合并"/>
       <Stat title="非执行时间" value={duration(j.non_execution_seconds)} note="上传、排队与阶段间等待"/></div>
     <dl className="detail-meta"><dt>创建时间</dt><dd>{time(j.created_at)}</dd><dt>结束时间</dt><dd>{time(j.completed_at)}</dd>
-      <dt>交付节点</dt><dd>{final?.name || (j.cache_hit ? '缓存复用，无新增执行' : '—')}</dd>
+      <dt>交付节点</dt><dd>{final?.name || '—'}</dd>
       <dt>交付执行机 / 进程</dt><dd>{final ? final.executor_id || '未记录' : '—'}</dd>
       <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.id || '—'}</dd></dl>
     {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
@@ -28,13 +28,13 @@ export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; 
         <td>{e.node_name}<small>{e.executor_id || '执行机未记录'}</small></td>
         <td>{time(e.started_at)}<small>{e.completed_at ? time(e.completed_at) : e.outcome === 'expired' ? `过期于 ${time(e.expires_at)}` : '尚未结束'}</small></td>
         <td className="numeric">{duration(e.seconds)}</td><td><Badge value={e.outcome}/></td></tr>)}
-    </Table> : <Empty>{j.cache_hit ? '此任务复用已有结果' : '尚无执行记录'}</Empty>}
+    </Table> : <Empty>尚无执行记录</Empty>}
     <p className="panel-note">阶段占用来自持久化租约，包含执行期间的网络与存储操作。多阶段并行时，各阶段之和 {duration(j.worker_seconds)} 可大于合并后的执行占用。</p>
     {(j.timings?.node || j.timings?.delivery) && <><h3 className="detail-heading">计算与交付耗时</h3>
       <Table heads={['环节', '耗时', '来源']}>{[
         ...Object.entries(j.timings.node ?? {}).map(([key, seconds]) => ({key, seconds, source: '节点'})),
         ...Object.entries(j.timings.delivery ?? {}).map(([key, seconds]) => ({key, seconds, source: '中心'}))
-      ].map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{({download: '原图下载', download_queue: '下载等待', analyze: '检测 / OCR', analyze_queue: '分析等待', inpaint: '抹字', inpaint_queue: '抹字等待', render: '嵌字与编码', render_queue: '嵌字等待', analysis_submit: '分析提交', text_wait: '等待译文', local_total: '领取至结果冻结', upload_authorize: '申请上传授权', output_put: '节点上传 R2', total: '中心登记与结算'} as Record<string, string>)[key] ?? key}</td><td className="numeric">{seconds < 1 ? `${Math.round(seconds * 1000)} 毫秒` : duration(seconds)}</td><td>{source}</td></tr>)}</Table>
+      ].map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{({download: '原图下载', download_queue: '下载等待', analyze: '检测 / OCR', analyze_queue: '分析等待', inpaint: '抹字', inpaint_queue: '抹字等待', render: '嵌字与编码', render_queue: '嵌字等待', analysis_submit: '分析提交', text_wait: '等待译文', local_total: '领取至结果冻结', output_put: '结果提交', total: '中心登记与结算'} as Record<string, string>)[key] ?? key}</td><td className="numeric">{seconds < 1 ? `${Math.round(seconds * 1000)} 毫秒` : duration(seconds)}</td><td>{source}</td></tr>)}</Table>
       <p className="panel-note">节点耗时用于观测；抹字、文本和网络可并行，分项不能直接相加。整页租约占用不代表 GPU 计算时间。</p></>}
     {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ¥{(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。成本仅计量，不限制文本调用；次数、时限与限流仍生效。</p>
       <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>

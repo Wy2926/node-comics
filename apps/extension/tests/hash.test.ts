@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {describe, expect, it, vi} from 'vitest';
-import {hashFile, imageIdentity, Sha256} from '../src/importers/hash';
+import {hashFile, Sha256} from '../src/importers/hash';
 
 const reference = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 describe('bounded SHA-256 identities', () => {
@@ -24,13 +24,5 @@ describe('bounded SHA-256 identities', () => {
     expect(wholeRead).not.toHaveBeenCalled();expect(slice).toHaveBeenCalledTimes(4);
     expect(slice.mock.calls.every(([start, end]) => end! - start! <= 1024 * 1024)).toBe(true);
     expect(progress).toHaveBeenLastCalledWith(bytes.length, bytes.length);
-  });
-  it('identifies independently imported and website images by their own bytes + zero, regardless of name/order', async () => {
-    const first = await imageIdentity(new File(['original bytes'], '2.png'));
-    const renamed = await imageIdentity(new File(['original bytes'], 'renamed.png'));
-    const fromWebsite = await imageIdentity(new Blob(['original bytes']));
-    expect(first).toEqual({fileHash: reference('original bytes'),imageSha256:reference('original bytes'), pageIndex: 0});
-    expect(renamed).toEqual(first);expect(fromWebsite).toEqual(first);
-    expect((await imageIdentity(new File(['different'], '2.png'))).fileHash).not.toBe(first.fileHash);
   });
 });

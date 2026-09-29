@@ -1,105 +1,117 @@
-"""Separate credentialed control and credential-free, origin-pinned R2 clients."""
+"""Credentialed, origin-pinned control and binary transfers to the same center."""
 import hashlib
+import json
 import re
 import ssl
 import httpx
-from .config import origin
-from .protocol import ControlFailure, MAX_IMAGE_BYTES, NodeFailure
+from .protocol import ControlFailure, MAX_IMAGE_BYTES, MAX_RESULT_BYTES, NodeFailure
 
-PREFIX = '/internal/compute/v2'
+PREFIX = '/internal/compute/v3'
 
 
 class Transport:
-    def __init__(self, config, *, control_transport=None, storage_transport=None):
+    def __init__(self, config, *, control_transport=None):
         self.node_id = config['node_id']
-        self.r2_origin = origin(config['r2_origin'])
         verify = ssl.create_default_context(cafile=config['control_ca']) if config.get('control_ca') else True
         self.control = httpx.Client(base_url=config['control_url'], trust_env=False, follow_redirects=False,
             timeout=30, verify=verify, transport=control_transport, headers={'Authorization': 'Bearer ' + config['node_token'],
                                                            'X-Node-Id': self.node_id})
-        self.storage = httpx.Client(trust_env=False, follow_redirects=False, timeout=30, transport=storage_transport)
 
     def close(self):
         self.control.close()
-        self.storage.close()
 
-    def post(self, path, body):
-        try:
-            response = self.control.post(PREFIX + path, json=body)
-        except httpx.HTTPError as error:
-            failure = ControlFailure('CONTROL_UNAVAILABLE')
-            failure.cause = type(error).__name__
-            raise failure from None
+    @staticmethod
+    def checked(response):
         if response.status_code >= 300:
             code = 'CONTROL_REJECTED'
             try:
                 candidate = response.json().get('error', {}).get('code', '')
                 if re.fullmatch(r'[A-Z_]{1,80}', candidate):
                     code = candidate
-            except (ValueError, AttributeError, TypeError):
+            except (ValueError, AttributeError, TypeError, httpx.ResponseNotRead):
                 pass
             raise ControlFailure(code, response.status_code)
+        return response
+
+    @staticmethod
+    def network_error(error):
+        failure = ControlFailure('CONTROL_UNAVAILABLE')
+        failure.cause = type(error).__name__
+        return failure
+
+    @classmethod
+    def reply(cls, response):
+        cls.checked(response)
         try:
             return response.json()
         except ValueError:
             raise ControlFailure('CONTROL_INVALID_RESPONSE') from None
 
-    def download(self, metadata, check=lambda: None):
-        url = httpx.URL(metadata['url'])
-        expected = httpx.URL(self.r2_origin)
-        if (url.scheme != 'https' or url.host != expected.host or url.port != expected.port
-                or url.username or url.password or url.fragment):
-            raise NodeFailure('STORAGE_AUTH_FAILED')
+    def post(self, path, body):
+        try:
+            return self.reply(self.control.post(PREFIX + path, json=body))
+        except httpx.HTTPError as error:
+            raise self.network_error(error) from None
+
+    @staticmethod
+    def lease_path(lease_id, operation):
+        if not isinstance(lease_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', lease_id):
+            raise NodeFailure('INPUT_INVALID')
+        return f'{PREFIX}/leases/{lease_id}/{operation}'
+
+    def download(self, lease_id, token, metadata, check=lambda: None):
+        path = self.lease_path(lease_id, 'input')
+        # A relative exact route prevents a compromised descriptor forwarding credentials.
+        if metadata.get('path') != path:
+            raise NodeFailure('INPUT_INVALID')
         limit = metadata['byte_size']
-        if not isinstance(limit, int) or not 0 < limit <= MAX_IMAGE_BYTES:
+        if type(limit) is not int or not 0 < limit <= MAX_IMAGE_BYTES:
             raise NodeFailure('INPUT_INVALID')
         try:
             check()
-            with self.storage.stream('GET', url, headers={'Accept-Encoding': 'identity'}) as response:
-                if response.status_code in (401, 403):
-                    raise NodeFailure('STORAGE_AUTH_FAILED')
-                if response.status_code == 404 or 300 <= response.status_code < 500:
-                    raise NodeFailure('INPUT_INVALID')
+            with self.control.stream('GET', path, headers={'Accept-Encoding': 'identity', 'X-Lease-Token': token}) as response:
+                if response.status_code >= 300:
+                    # Read only bounded error bytes so lease expiry still fences local work.
+                    raw = bytearray()
+                    for chunk in response.iter_bytes(4096):
+                        raw.extend(chunk)
+                        if len(raw) > 8192:
+                            break
+                    self.checked(httpx.Response(response.status_code, content=bytes(raw[:8192])))
                 if response.status_code != 200:
-                    raise NodeFailure('STORAGE_UNAVAILABLE')
+                    raise ControlFailure('CONTROL_INVALID_RESPONSE')
                 data = bytearray()
                 for chunk in response.iter_bytes(64 * 1024):
                     check()
                     data.extend(chunk)
                     if len(data) > limit:
                         raise NodeFailure('INPUT_INVALID')
-        except httpx.HTTPError:
-            raise NodeFailure('STORAGE_UNAVAILABLE') from None
+        except httpx.HTTPError as error:
+            raise self.network_error(error) from None
         if len(data) != limit:
             raise NodeFailure('INPUT_INVALID')
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         return bytes(data)
 
-    def upload(self, authorization, data, info, check=lambda: None):
-        url, expected = httpx.URL(authorization['url']), httpx.URL(self.r2_origin)
-        if (url.scheme != 'https' or url.host != expected.host or url.port != expected.port
-                or url.username or url.password or url.fragment):
-            raise NodeFailure('STORAGE_AUTH_FAILED')
-        if (not 0 < len(data) <= MAX_IMAGE_BYTES or len(data) != info['byte_size']
-                or hashlib.sha256(data).hexdigest() != info['sha256']
-                or hashlib.md5(data, usedforsecurity=False).hexdigest() != info['md5']):
+    def deliver(self, lease_id, body, data, check=lambda: None):
+        path = self.lease_path(lease_id, 'result')
+        result = body['result']
+        info = result.get('output')
+        if result.get('representation') == 'original':
+            if data is not None or info is not None or result.get('bbox') is not None:
+                raise NodeFailure('INPUT_INVALID')
+        elif (result.get('representation') != 'overlay-v1' or not isinstance(data, bytes) or not info
+                or not 0 < len(data) <= MAX_RESULT_BYTES or len(data) != info['byte_size']
+                or hashlib.sha256(data).hexdigest() != info['sha256'] or info['mime'] != 'image/webp'):
             raise NodeFailure('INPUT_INVALID')
-        headers = authorization['headers']
-        if {key.lower() for key in headers} != {'content-type', 'content-length', 'content-md5', 'cache-control', 'if-none-match'}:
-            raise NodeFailure('STORAGE_AUTH_FAILED')
+        files = {'metadata': (None, json.dumps(body, allow_nan=False), 'application/json')}
+        if data is not None:
+            files['output'] = ('overlay.webp', data, 'image/webp')
         try:
             check()
-            response = self.storage.put(url, headers=headers, content=data)
-        except httpx.HTTPError:
-            raise NodeFailure('STORAGE_UNAVAILABLE') from None
-        check()
-        if response.status_code == 412:
-            # A prior identical PUT may have committed before its reply was lost.
-            # The signed content-addressed key can never be overwritten.
-            return info['md5']
-        if response.status_code in (401, 403):
-            raise NodeFailure('STORAGE_AUTH_FAILED')
-        if response.status_code != 200 or response.headers.get('etag', '').strip('"') != info['md5']:
-            raise NodeFailure('STORAGE_UNAVAILABLE')
-        return info['md5']
+            response = self.control.put(path, files=files)
+            # A stable terminal receipt is valid even if the local timer expires in transit.
+            return self.reply(response)
+        except httpx.HTTPError as error:
+            raise self.network_error(error) from None

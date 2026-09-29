@@ -38,7 +38,7 @@ def main():
         with psycopg.connect(**params, dbname="postgres", autocommit=True) as admin:
             admin.execute(sql.SQL("CREATE DATABASE {} TEMPLATE template0").format(sql.Identifier(source)))
             created.add(source)
-        os.environ.update(APP_ENV="test", DEV_AUTH="true", RESULT_STORAGE_BACKEND="local", R2_ENDPOINT_URL="",
+        os.environ.update(APP_ENV="test", DEV_AUTH="true",
                           DEV_AUTH_SECRET="isolated-restore-proof-no-production-access",
                           DATABASE_URL=base.set(database=source).render_as_string(hide_password=False),
                           STORAGE_PATH=str(output / "synthetic-objects"))
@@ -69,7 +69,7 @@ def main():
                          reference_output=output / "object-references.json")
         assert result["table_rows"]["public.users"] == 2
         assert result["table_rows"]["public.assets"] == 2
-        assert result["object_references"] == 1
+        assert result["object_references"] == 2
         with psycopg.connect(**params, dbname=target) as restored:
             assert restored.execute("SELECT version_num FROM alembic_version").fetchone() == ("subscription_0001",)
         try:
@@ -82,8 +82,8 @@ def main():
                   "snapshot_sha256": manifest["sha256"], "snapshot_bytes": manifest["size"],
                   "restored_users": result["table_rows"]["public.users"], "restored_asset_grants": result["table_rows"]["public.assets"],
                   "schema_revision": "subscription_0001",
-                  "shared_object_references": result["object_references"], "overwrite_rejected": True,
-                  "post_backup_write_excluded": True, "r2_accessed": False, "production_accessed": False}
+                  "private_file_references": result["object_references"], "overwrite_rejected": True,
+                  "post_backup_write_excluded": True, "production_accessed": False}
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report))
     finally:

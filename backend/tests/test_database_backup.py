@@ -46,7 +46,7 @@ def test_modified_backup_is_rejected_before_creating_restore_target(tmp_path):
     assert not target.exists()
 
 
-def test_backup_with_current_schema_exports_shared_keys_once(client, png, tmp_path):
+def test_backup_exports_private_task_files_separately(client, png, tmp_path):
     from conftest import login, upload
     from app.config import settings
     upload(client, login(client, "alice"), png)
@@ -58,8 +58,28 @@ def test_backup_with_current_schema_exports_shared_keys_once(client, png, tmp_pa
     result = backup_tool.restore(destination, sqlite_target=tmp_path / "restore-application.db", reference_output=inventory)
     assert result["table_rows"]["assets"] == 2
     objects = json.loads(inventory.read_text())["objects"]
-    assert len(objects) == 1 and objects[0]["kind"] == "asset"
+    assert len(objects) == 2 and all(item["kind"] == "temporary-input" and not item["required"] for item in objects)
+    assert objects[0]["key"] != objects[1]["key"]
     assert result["objects_verified"] is False
+
+
+def test_inventory_excludes_purged_originals_and_uses_reservation_paths():
+    with sqlite3.connect(':memory:') as database:
+        database.executescript('''
+            CREATE TABLE assets (storage_key TEXT, sha256 TEXT, mime TEXT, kind TEXT, deleted_at TEXT, purged_at TEXT);
+            CREATE TABLE upload_reservations (id TEXT, expected_sha256 TEXT, mime TEXT, verified_info TEXT, completed_at TEXT);
+        ''')
+        database.execute('INSERT INTO assets VALUES (?, ?, ?, ?, NULL, ?)',
+            ('inputs/finished/source', 'a' * 64, 'image/png', 'original', '2026-09-29'))
+        database.execute('INSERT INTO assets VALUES (?, ?, ?, ?, NULL, NULL)',
+            ('results/aa/artifact', 'b' * 64, 'image/webp', 'classic'))
+        database.execute('INSERT INTO upload_reservations VALUES (?, ?, ?, ?, NULL)',
+            ('reservation-id', 'c' * 64, 'image/png', json.dumps({'sha256': 'c' * 64})))
+        database.execute('INSERT INTO upload_reservations VALUES (?, ?, ?, ?, NULL)',
+            ('no-bytes', 'd' * 64, 'image/png', 'null'))
+        inventory = backup_tool.object_references(database.execute, {'assets', 'upload_reservations'})
+    assert {row['key'] for row in inventory} == {'results/aa/artifact', 'inputs/reservation-id/source'}
+    assert [row['key'] for row in inventory if row['required']] == ['results/aa/artifact']
 
 
 def test_postgres_restore_refuses_product_database_before_connecting(tmp_path, monkeypatch):

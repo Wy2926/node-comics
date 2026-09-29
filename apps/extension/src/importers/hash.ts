@@ -72,4 +72,3 @@ export async function hashFile(file: Blob, onProgress?: (done: number, total: nu
   }
   return hash.digest();
 }
-export async function imageIdentity(blob: Blob) { const hash=await hashFile(blob);return {fileHash:hash,imageSha256:hash,pageIndex:0}; }

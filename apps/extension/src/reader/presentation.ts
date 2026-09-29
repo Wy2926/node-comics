@@ -23,7 +23,7 @@ export function latestResults(jobs:Job[]){const seen=new Set<string>();return ne
 export function pageTranslation(page:Page,mode:Mode,language:string,scopeKey?:string){
   const jobs=scopeKey&&page.translationScope===scopeKey?newestFirst(page.jobs.filter(j=>j.mode===mode&&j.target_language===language)):[];
   const latest=jobs[0];
-  // Keep the latest delivered identity even when its URL has expired. Never fall back to older versions.
+  // Keep the latest delivered identity after revocation. Never fall back to older versions.
   const result=jobs.find(j=>j.status==='succeeded');
   const pending=jobs.find(j=>pendingStatuses.has(j.status));
   const blobKey=result?page.outputBlobs[result.id]:undefined;

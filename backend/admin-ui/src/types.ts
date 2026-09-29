@@ -30,7 +30,7 @@ export type Overview = {
 };
 export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
-  status: string; phase: string; priority: string | null; cache_hit: boolean;
+  status: string; phase: string; priority: string | null;
   created_at: string; completed_at: string | null; settlement: string;
   quota_pages: number; error_code: string | null; cancel_requested: boolean; discard_output: boolean;
   elapsed_seconds: number; execution_seconds: number; non_execution_seconds: number;

@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({records: new Map<string, unknown>(), cache: new Map<string, Blob>(),
   sourceImage: vi.fn(), refresh:vi.fn(), prepare: vi.fn(), put: vi.fn(),
-  token: vi.fn(), cacheGet: vi.fn(), cachePut: vi.fn(), downloadGet:vi.fn(), openContainer:vi.fn(), originalReplica:vi.fn(),
+  token: vi.fn(), cacheGet: vi.fn(), cachePut: vi.fn(), downloadGet:vi.fn(), openContainer:vi.fn(),
 }));
 vi.mock('../repositories', () => ({catalog: {
   get: async (table: string, id: unknown) => mocks.records.get(JSON.stringify([table,id])),
@@ -12,7 +12,6 @@ vi.mock('../application/website-content',()=>({refreshWebsitePage:mocks.refresh}
 vi.mock('./normalize', () => ({prepareComicPage: mocks.prepare}));
 vi.mock('../sources/local', () => ({openContainer: mocks.openContainer}));
 vi.mock('../formats', () => ({openDocument: vi.fn()}));
-vi.mock('../originals', () => ({originalReplica: mocks.originalReplica}));
 vi.mock('../../storage/downloads', () => ({downloadStore: {get: mocks.downloadGet}}));
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
@@ -36,7 +35,6 @@ beforeEach(() => {
   mocks.token.mockResolvedValue({epoch:1});mocks.cacheGet.mockImplementation(async(key:string)=>mocks.cache.get(key));
   mocks.cachePut.mockImplementation(async(key:string,blob:Blob)=>{mocks.cache.set(key,blob);return true;});
   mocks.downloadGet.mockResolvedValue(undefined);
-  mocks.originalReplica.mockResolvedValue(undefined);
   put('entries','document',{id:'document',comicId:'comic',contentId:'revision',generation:1,format:'website'});
 
   put('pageDescriptors',['revision','page'],{name: '1', ordinal: 0, locator: {url: 'https://image.example/page.png', sourceId: 'source-page', manifestId: 'manifest', kind: 'image'}});
@@ -151,9 +149,8 @@ describe('page leases and trusted source routing', () => {
     put('connections','connection',{id:'connection',generation:1,provider:'local',status:'connected'});
 
     put('materializations',JSON.stringify(['revision','page',RENDER_PROFILE]),{imageSha256:'a'.repeat(64)});
-    mocks.originalReplica.mockResolvedValue(new Blob(['remote replica']));
     const error=new SourceDatabaseSchemaError('container-bytes','缺少 references');mocks.openContainer.mockRejectedValueOnce(error);
-    await expect(acquirePage(request)).rejects.toBe(error);expect(mocks.originalReplica).not.toHaveBeenCalled();
+    await expect(acquirePage(request)).rejects.toBe(error);
   });
   it('rechecks source access before sharing an already completed page lease',async()=>{
     const lease=await acquirePage(request);

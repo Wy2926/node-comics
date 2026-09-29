@@ -1,6 +1,6 @@
 """Opt-in Windows release acceptance: real GPU, isolated local HTTPS controller.
 
-No image task, production credential, R2 request or external provider is used.
+No image task, production credential or external provider is used.
 Requires cryptography in the developer's test environment, not in the node.
 """
 import argparse
@@ -55,7 +55,7 @@ def verify(release, work):
             if self.path.endswith('/heartbeat'):
                 requests['heartbeats'] += 1
             failed = outage.is_set() or (registration and requests['registrations'] <= 2)
-            response = {'protocol_version': 2, 'leases': [], 'server_time': datetime.now(timezone.utc).isoformat(),
+            response = {'protocol_version': 3, 'leases': [], 'server_time': datetime.now(timezone.utc).isoformat(),
                         'revision': 1, 'config': {'version': 1, 'request_seconds': 5, 'execution_slots': 1,
                             'enabled': False, 'heartbeat_seconds': 1, 'poll_seconds': 1}}
             if self.path.endswith('/updates'):
@@ -72,9 +72,9 @@ def verify(release, work):
     tls.load_cert_chain(work / 'ca.pem', work / 'key.pem')
     server.socket = tls.wrap_socket(server.socket, server_side=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    config = {'protocol_version': 2, 'node_id': 'isolated-release-node', 'node_token': 'isolated-fixture-token',
+    config = {'protocol_version': 3, 'node_id': 'isolated-release-node', 'node_token': 'isolated-fixture-token',
               'resource_id': 'isolated-vulkan:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
-              'control_ca': 'ca.pem', 'r2_origin': 'https://storage.example.test',
+              'control_ca': 'ca.pem',
               'languages': ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id']}
     source = work / 'fixture.json'
     source.write_text(json.dumps(config), encoding='utf-8')

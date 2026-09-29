@@ -18,8 +18,8 @@ function statusMarkup(page:Page){
  return renderToStaticMarkup(<Status/>);
 }
 function fixture(status:Job['status']):Page{
- const delivered:Job={id:'delivered',input_asset_id:'input',output_asset_id:'output',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
- return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',output_asset_id:null,result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
+ const delivered:Job={id:'delivered',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
+ return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader','overlay-v1']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
 describe('in-image retry status',()=>{
  it('explicitly names a new translation when local result bytes cannot be recovered',()=>{
@@ -32,7 +32,7 @@ describe('in-image retry status',()=>{
  });
  it('exposes a failed rerun even while the previous translation remains readable',()=>{
   const page=fixture('failed');
-  expect(readingImage(page,'classic',true,'zh-Hans',JSON.stringify([origin,'reader'])).key).toBe('translated');
+  expect(readingImage(page,'classic',true,'zh-Hans',JSON.stringify([origin,'reader','overlay-v1'])).key).toBe('translated');
   const html=statusMarkup(page);
   expect(html).toContain('<button');expect(html).toContain('翻译失败 · 重试');expect(html).not.toContain('点击重新生成');
  });

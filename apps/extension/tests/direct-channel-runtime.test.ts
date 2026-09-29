@@ -47,7 +47,7 @@ it('returns from submit before completion, uses one slot and replaces only the u
   expect(await driver.start.mock.calls[0][1].text()).toBe('original-a');
   expect(await driver.start.mock.calls[1][1].text()).toBe('original-x');
   expect(consumed).toHaveBeenCalledWith('original-a');
-  expect([...jobs.values()].find(job => job.status === 'succeeded')?.output_asset_id).toBeNull();
+  expect([...jobs.values()].find(job => job.status === 'succeeded')?.result?.recoverable).toBe(false);
   responses[1](new Response(new Blob(['translated-x'], {type: 'image/png'})));
   runtime.dispose();
 });
@@ -59,7 +59,7 @@ it('restores the same completed local result without an account, remote asset id
   first.runtime.dispose();
   const second = setup(first.scope); await second.runtime.init(); await second.runtime.submit([page]);
   const job = [...second.jobs.values()].find(job => job.status === 'succeeded')!;
-  expect(job.result).toEqual({key: job.id, recoverable: false}); expect(job.output_asset_id).toBeNull();
+  expect(job.result).toEqual({key: job.id, recoverable: false});
   expect(await (await loadResultBlob({scope: second.scope, job, isCurrent: () => true})).text()).toBe('translated');
   expect(fetcher).toHaveBeenCalledTimes(1);
 });

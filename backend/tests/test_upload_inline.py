@@ -52,4 +52,4 @@ def test_written_original_recovers_without_browser_confirmation(cluster, png, mo
     validate_next()
     current = client.get('/v1/translations/' + item['id'], headers=auth)
     assert current.json()['state'] == 'queued', current.text
-    assert [method for method, _ in sdk.calls] == ['PUT', 'HEAD', 'GET']
+    assert [method for method, _ in sdk.calls] == ['PUT']

@@ -4,7 +4,7 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
 if (-not (Test-Path -LiteralPath '.env')) {
     Copy-Item -LiteralPath '.env.example' -Destination '.env'
-    Write-Host '已创建 .env；请先填写私有 R2 配置，再按需填写文本与图片供应商配置。'
+    Write-Host '已创建 .env；请检查本地文件存储容量，再按需填写图片供应商配置；文本供应商在管理后台设置。'
 }
 $environmentFile = if ($Production) { 'deploy/.env.production' } else { 'deploy/.env.local' }
 $localConfig = Join-Path $projectRoot $environmentFile

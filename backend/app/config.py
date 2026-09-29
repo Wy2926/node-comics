@@ -27,14 +27,6 @@ class Settings(BaseSettings):
             raise ValueError('REDIS_URL must be a redis:// or rediss:// server URL')
         return value
     storage_path: Path = Path("./private-data")
-    result_storage_backend: Literal["local", "r2"] = "local"
-    r2_endpoint_url: str = ""
-    r2_bucket: str = ""
-    r2_access_key_id: SecretStr = SecretStr("")
-    r2_secret_access_key: SecretStr = SecretStr("")
-    r2_key_prefix: str = "node-comics/"
-    storage_url_ttl_seconds: int = Field(default=300, ge=1, le=3600)
-    storage_timeout_seconds: int = Field(default=30, ge=1, le=120)
     dev_auth: bool = False
     dev_auth_secret: str = ""
     dev_admin_username: str = "admin"
@@ -68,7 +60,6 @@ class Settings(BaseSettings):
     creem_webhook_secret: SecretStr = SecretStr('')
     creem_return_url: str = ''
     quota_timezone: str = "Asia/Shanghai"
-    retention_days: int = Field(default=0, ge=0)
     max_upload_bytes: int = 20 * 1024 * 1024
     max_pixels: int = 24_000_000
     max_dimension: int = 8192
@@ -99,6 +90,7 @@ class Settings(BaseSettings):
     cluster_text_slots: int = Field(default=4, ge=1, le=100)
     cluster_upload_slots: int = Field(default=2, ge=1, le=32)
     cluster_redraw_slots: int = Field(default=4, ge=1, le=100)
+    cluster_result_ingress_concurrency: int = Field(default=4, ge=1, le=64)
     cluster_max_result_bytes: int = Field(default=88 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
     unknown_release_seconds: int = 3600
     dispatch_interval_seconds: int = 2
@@ -197,19 +189,7 @@ class Settings(BaseSettings):
     def validate_storage(self):
         from zoneinfo import ZoneInfo
         ZoneInfo(self.quota_timezone)
-        if not self.dev_auth and self.result_storage_backend != "r2":
-            raise ValueError("Public deployment requires RESULT_STORAGE_BACKEND=r2 for originals and results")
-        if self.result_storage_backend == "r2" or self.r2_endpoint_url:
-            url = urlsplit(self.r2_endpoint_url)
-            if (url.scheme != "https" or not re.fullmatch(r"[a-f0-9]{32}(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com", url.netloc)
-                    or url.path not in ("", "/") or url.query or url.fragment):
-                raise ValueError("R2_ENDPOINT_URL must be the HTTPS R2 S3 account endpoint")
-            if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", self.r2_bucket):
-                raise ValueError("R2_BUCKET must be a valid bucket name")
-            if not self.r2_access_key_id.get_secret_value() or not self.r2_secret_access_key.get_secret_value():
-                raise ValueError("R2 credentials are required")
-            if not re.fullmatch(r"(?:[A-Za-z0-9_-]+/)+", self.r2_key_prefix):
-                raise ValueError("R2_KEY_PREFIX must be a nonempty directory prefix ending in /")
+
         return self
 
 
@@ -219,7 +199,7 @@ def settings() -> Settings:
 
 
 if __name__ == "__main__":
-    # Configuration-only deployment preflight: no database, R2 or provider calls.
+    # Configuration-only deployment preflight: no database, file storage or provider calls.
     from argparse import ArgumentParser
     parser = ArgumentParser(description="Validate backend configuration without external calls")
     parser.add_argument("--production", action="store_true", help="Require the effective environment to be production")

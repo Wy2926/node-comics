@@ -50,7 +50,7 @@ export interface ChannelConnection {
   isCurrent: ()=>boolean;
   createRuntime(options:RuntimeOptions):ChannelRuntime;
   /** Read/validate/cache delivered bytes; never starts a translation. Safe for reader, inline and export. */
-  readResult(job:Job,signal?:AbortSignal):Promise<Blob>;
+  readResult(job:Job,signal?:AbortSignal,original?:()=>Promise<Blob|undefined>):Promise<Blob>;
   dispose():void;
 }
 export interface ChannelDefinition {

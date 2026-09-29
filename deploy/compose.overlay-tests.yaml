@@ -1,0 +1,86 @@
+name: node-comics-overlay-live
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Isolated full-stack validation. Credentials are configured through the test API,
+# never copied from a production database. The GPU node runs on the host.
+x-center: &center
+  image: node-comics-backend:overlay-test
+  build: ../backend
+  environment:
+    APP_ENV: test
+    DEV_AUTH: "true"
+    DEV_AUTH_SECRET: ${OVERLAY_AUTH_SECRET:?Set an isolated signing secret}
+    DEV_ADMIN_USERNAME: admin
+    DATABASE_URL: postgresql+psycopg://overlay:isolated-overlay-only@postgres:5432/overlay
+    REDIS_URL: redis://redis:6379/0
+    REDIS_NAMESPACE: overlay-live-test
+    STORAGE_PATH: /data/translation
+    TMPDIR: /data/translation/staging
+    CLASSIC_ENABLED: "true"
+    CLASSIC_ENGINE_VERSION: ${OVERLAY_ENGINE_VERSION:?Set the actual node engine version}
+    ADMIN_WEB_PATH: /console-overlay-test/
+    OPENAI_API_KEY: ""
+    STRIPE_ENABLED: "false"
+    CREEM_ENABLED: "false"
+  volumes:
+    - translation_files:/data/translation
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  read_only: true
+  tmpfs: [/tmp]
+  logging: *logging
+
+services:
+  postgres:
+    logging: *logging
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: overlay
+      POSTGRES_PASSWORD: isolated-overlay-only
+      POSTGRES_DB: overlay
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U overlay -d overlay"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    logging: *logging
+    image: redis:8.2-alpine
+    command: [redis-server, --save, "", --appendonly, "no"]
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  api:
+    <<: *center
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log,
+              --ssl-keyfile, /run/overlay-tls/server.key, --ssl-certfile, /run/overlay-tls/server.pem]
+    ports: ["127.0.0.1:${OVERLAY_API_PORT:-18493}:8000"]
+    volumes:
+      - translation_files:/data/translation
+      - ${OVERLAY_TLS_DIRECTORY:?Set the isolated TLS directory}:/run/overlay-tls:ro
+    healthcheck:
+      # The host GPU registers after the API starts; full readiness is then checked by the verifier.
+      test: [CMD, python, -c, "import ssl,urllib.request; urllib.request.urlopen('https://localhost:8000/health/live', context=ssl.create_default_context(cafile='/run/overlay-tls/ca.pem'), timeout=5)"]
+      interval: 5s
+      timeout: 7s
+      retries: 20
+  control-worker:
+    <<: *center
+    command: [python, -m, app.workers]
+  maintenance:
+    <<: *center
+    command: [python, -m, app.dispatcher]
+
+volumes:
+  postgres_data:
+  translation_files:

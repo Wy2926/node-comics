@@ -1,10 +1,10 @@
-"""Cross-replica ingress leases; no database transaction spans client or R2 I/O."""
+"""Cross-replica ingress leases; no database transaction spans client or filesystem I/O."""
 import asyncio
 from dataclasses import dataclass
 import hashlib
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
-from .assets import owned_asset, inspect_image, content_storage_key
+from .assets import owned_asset, inspect_image_file, asset_storage_key
 from .db import session_factory
 from .errors import problem
 from .models import uid
@@ -34,7 +34,7 @@ def acquire_ingress(upload_id, owner_id):
         cfg = get_request_limits(db)
         receipt = owned_upload(db, upload_id, owner_id)
         if receipt.status == "verified":
-            owned_asset(db, receipt.asset_id, owner_id)
+            pass  # Stable upload receipt survives terminal input cleanup.
         elif receipt.status not in {'awaiting_upload', 'validating'}:
             return response_for(receipt)
         elif not _active_locked(db, _lock_current(db, receipt)):
@@ -110,16 +110,23 @@ def persist_received_upload(lease, data):
             db.commit()
             return response_for(receipt)
         expected_hash = receipt.expected_sha256
-        backend, mime = receipt.storage_backend, receipt.mime
+        mime = receipt.mime
         db.commit()
-    if len(data) != lease.expected_size or hashlib.sha256(data).hexdigest() != expected_hash:
+    from io import BytesIO
+    handle = BytesIO(data) if isinstance(data, bytes) else data
+    handle.seek(0, 2)
+    actual_size = handle.tell()
+    handle.seek(0)
+    actual_hash = hashlib.file_digest(handle, 'sha256').hexdigest()
+    handle.seek(0)
+    if actual_size != lease.expected_size or actual_hash != expected_hash:
         error = HTTPException(422, detail={"code": "UPLOAD_HASH_MISMATCH", "message": "实际图片摘要与提交清单不一致"})
         record_body_failure(lease, error)
         raise error
     if replay:
         return response_for(receipt)
     try:
-        info = inspect_image(data)
+        info = inspect_image_file(handle)
         if mime not in {'application/octet-stream', info['mime']}:
             problem('UPLOAD_MIME_MISMATCH', '实际图片格式与提交清单不一致', 422)
     except HTTPException as error:
@@ -132,13 +139,12 @@ def persist_received_upload(lease, data):
             return response_for(receipt)
         receipt.verified_info = info
         db.commit()  # Recover an uncertain PUT using this validated immutable identity.
-    # Only immutable scalar metadata survives into network I/O. No pooled
-    # connection remains checked out while Boto3 uploads the received bytes.
-    get_store(backend).put(content_storage_key(info['sha256']), data, info['mime'], kind="original")
+    # No pooled database connection remains checked out during file publication.
+    get_store().put_file(asset_storage_key(lease.upload_id, "original"), handle, info['mime'], kind="original")
     with session_factory()() as db:
         receipt = current_receipt(db, lease)
         if receipt.status == 'awaiting_upload':
-            accept_verified_upload(db, receipt, data, info)
+            accept_verified_upload(db, receipt, b"", info)
         db.commit()
         return response_for(receipt)
 
@@ -188,15 +194,20 @@ async def begin_ingress(upload_id, owner_id):
 async def read_ingress_body(request, lease, lost):
     body = asyncio.create_task(read_upload_stream(request, lease.expected_size, limits=lease.limits))
     lost_wait = asyncio.create_task(lost.wait())
+    delivered = False
     try:
         await asyncio.wait((body, lost_wait), return_when=asyncio.FIRST_COMPLETED)
         if lost.is_set():
             problem("UPLOAD_LEASE_EXPIRED", "上传连接已失效，请重试", 409)
-        return await body
+        result = await body
+        delivered = True
+        return result
     finally:
         body.cancel()
         lost_wait.cancel()
         await asyncio.gather(body, lost_wait, return_exceptions=True)
+        if not delivered and body.done() and not body.cancelled() and body.exception() is None:
+            body.result().close()
 
 
 async def keep_ingress_alive(lease, stopped, lost):

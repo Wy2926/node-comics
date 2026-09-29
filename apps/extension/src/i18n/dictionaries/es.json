@@ -43,14 +43,8 @@
   "登录已过期，请重新登录。": "El inicio de sesión ha caducado, inicie sesión nuevamente.",
   "当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。": "El servicio API actual aún no incluye esta interfaz. Actualice y reinicie el servicio API e inténtelo de nuevo.",
   "请求未完成（{0}）": "Solicitud incompleta ({0})",
-  "每次匹配需提供 1–100 页。": "se requieren de 1 a 100 páginas por partido.",
-  "服务器匹配结果与请求页标识不一致。": "El resultado de la coincidencia del servidor no coincide con el ID de la página solicitada.",
   "图片访问地址无效。": "La dirección de acceso a la imagen no es válida.",
-  "暂时无法下载图片，请检查网络或对象存储的跨域配置。": "La imagen no se puede descargar temporalmente. Verifique la configuración entre dominios de la red o el almacenamiento de objetos.",
   "图片已过期或无法访问，请保留本地副本或重新上传。": "La imagen ha caducado o es inaccesible. Guarde una copia local o cárguela nuevamente.",
-  "图片访问链接已过期，请重试。": "El enlace de acceso a la imagen ha caducado, inténtelo de nuevo.",
-  "文件 SHA-256 与原始页索引必须成对提供。": "El archivo SHA-256 y el índice de página sin formato deben proporcionarse como un par.",
-  "图片 SHA-256 无效。": "Imagen no válida SHA-256.",
   "返回我的漫画": "Volver a mis cómics",
   "主导航": "Navegación principal",
   "我的漫画": "Mis cómics",
@@ -953,5 +947,9 @@
   "取消自动续费": "Cancelar la renovación automática",
   "取消后保留已付款及赠送权益，到期后不再扣款。": "El acceso pagado y regalado se conserva tras cancelar. No se cobrarán más renovaciones.",
   "确认取消续费": "Confirmar cancelación",
-  "保留自动续费": "Mantener la renovación automática"
+  "保留自动续费": "Mantener la renovación automática",
+  "原图不可用，请恢复所属来源或本地原图缓存。": "La imagen original no está disponible. Restaura su fuente o la caché local.",
+  "翻译文件校验失败，请重新加载。": "No se pudo validar el archivo traducido. Vuelve a cargarlo.",
+  "翻译协议已更新，请手动重新翻译此页。": "El protocolo de traducción ha cambiado. Vuelve a traducir esta página manualmente.",
+  "翻译协议已更新，请更新插件。": "El protocolo de traducción ha cambiado. Actualiza la extensión."
 }

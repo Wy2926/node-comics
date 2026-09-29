@@ -7,11 +7,11 @@ export function Tasks({items, onTask}: {items: Task[]; onTask: (id: string) => v
     {items.map(j => <tr key={j.id}>
       <td><code title={j.id}>{j.id.slice(0, 8)}</code><small>{time(j.created_at)}</small></td>
       <td><Jump view="tasks" params={{owner_id: j.owner_id}}>{j.owner_name}</Jump></td>
-      <td>{label(j.mode)}<small>{j.cache_hit ? '缓存命中' : label(j.priority)}</small></td>
+      <td>{label(j.mode)}<small>{label(j.priority)}</small></td>
       <td><Badge value={j.status}/><small>{label(j.phase)}{j.expired_leases > 0 && ' · 租约待回收'}</small></td>
       <td className="numeric">{duration(j.elapsed_seconds)}<small>执行 {duration(j.execution_seconds)}</small></td>
       <td>{j.completed_by?.name || j.running_nodes.join('、') || j.nodes.map(n => n.name).join('、') || '—'}
-        <small>{j.completed_by ? '交付节点' : j.running_nodes.length ? '当前执行' : j.nodes.length ? '曾参与执行' : j.cache_hit ? '缓存复用' : '尚无执行记录'}</small></td>
+        <small>{j.completed_by ? '交付节点' : j.running_nodes.length ? '当前执行' : j.nodes.length ? '曾参与执行' : '尚无执行记录'}</small></td>
       <td><button className="text-link" onClick={() => onTask(j.id)}>查看详情</button></td>
     </tr>)}
   </Table>;

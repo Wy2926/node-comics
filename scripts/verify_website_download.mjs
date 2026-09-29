@@ -16,15 +16,20 @@ try{
   await page.goto(origin+'/'+locale+'download/');
   for(const release of releases){
    const card=page.locator(`[data-browser="${release.browser}"]`),link=card.locator('.package-download');
-   assert.equal(new URL(await link.getAttribute('href'),origin).href,new URL(release.path,'https://comics.nodelane.net').href);
+   if(!release.download_url){
+    assert.equal(await link.count(),0);
+    assert.equal(await card.locator('.package-download-unavailable').getAttribute('aria-disabled'),'true');
+    continue;
+   }
+   assert.equal(await link.getAttribute('href'),release.download_url);
    assert.equal(await link.getAttribute('download'),release.filename);
    assert.ok((await card.innerText()).includes('v'+release.version));
    const storeBox=await card.locator('.store-link').boundingBox(),downloadBox=await link.boundingBox();
    assert(downloadBox.y>=storeBox.y+storeBox.height,'Package download must appear below its own store button');
   }
   assert.equal(await page.locator('[data-browser="firefox"] .store-link').getAttribute('href'),'https://addons.mozilla.org/firefox/addon/nodelane-comics/');
-  assert.equal(await page.locator('[data-browser="firefox"] .package-download').count(),1);
-  assert.equal(await page.locator('.package-download').count(),3);
+  assert.equal(await page.locator('[data-browser="firefox"] .package-download').count(),Number(!!releases.find(r=>r.browser==='firefox').download_url));
+  assert.equal(await page.locator('.package-download').count(),releases.filter(r=>r.download_url).length);
   assert.equal(await page.locator('.direct-download').count(),0);
   assert.equal(await page.locator('.install-steps li').count(),3);
   const logos=page.locator('.store-card img.store-icon');
@@ -38,7 +43,7 @@ try{
  }
  if(!origin.includes('127.0.0.1')){
   await page.goto(origin+'/download/');
-  for(const release of releases){
+  for(const release of releases.filter(r=>r.download_url)){
    const promise=page.waitForEvent('download');await page.locator(`[data-browser="${release.browser}"] .package-download`).click();
    const download=await promise;assert.equal(download.suggestedFilename(),release.filename);
    const path=output+'/'+release.filename;await download.saveAs(path);

@@ -2,7 +2,7 @@
 import os
 import pytest
 from test_postgres_concurrency import pg_scope
-from test_compute_v2_postgres import client
+from test_compute_v3_postgres import client
 from test_cluster_submissions import cluster
 from test_translation_requests import (
     test_concurrent_same_uuid_accepts_exactly_once,

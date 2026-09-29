@@ -1,5 +1,11 @@
 name: node-comics-production
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 # Only the control plane. PostgreSQL is an existing external service;
 # image engines and compute agents run on the operator's own machines.
 x-server: &server
@@ -9,8 +15,8 @@ x-server: &server
     APP_ENV: production
     DEV_AUTH: "false"
     DEV_AUTH_SECRET: ""
-    RESULT_STORAGE_BACKEND: r2
-    STORAGE_PATH: /data/images
+    STORAGE_PATH: /data/translation
+    TMPDIR: /data/translation/staging
   networks: [infrastructure, admission]
   depends_on:
     redis: {condition: service_healthy}
@@ -19,16 +25,14 @@ x-server: &server
   security_opt: [no-new-privileges:true]
   tmpfs:
     - /tmp:uid=10001,gid=10001,mode=0700,size=32m
-    - /data/images:uid=10001,gid=10001,mode=0700,size=32m
+  volumes:
+    - translation_files:/data/translation
   restart: unless-stopped
-  logging:
-    driver: json-file
-    options:
-      max-size: "10m"
-      max-file: "3"
+  logging: *logging
 
 services:
   redis:
+    logging: *logging
     image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
     command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAX_MEMORY:-256mb}", --maxmemory-policy, noeviction]
     networks: [admission]
@@ -80,3 +84,4 @@ networks:
 
 volumes:
   admission_redis:
+  translation_files:

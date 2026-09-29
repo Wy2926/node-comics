@@ -12,6 +12,7 @@ from app.translation_requests import TranslationRequest
 from app.translation_api import TranslationInput, translate
 from conftest import request_id
 from uuid import UUID
+from starlette.requests import Request
 import json
 
 
@@ -23,7 +24,7 @@ def submit_existing(pg, key, asset_ids=None):
             body = TranslationInput(mode='redraw',target_language='zh-Hans',image={
                 'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime})
             identifier = request_id(key if not asset_ids else f'{key}:{index}')
-            response = translate(UUID(identifier),body,user=user,db=db)
+            response = translate(UUID(identifier),body,Request({'type':'http','headers':[(b'x-translation-protocol',b'overlay-v1')]}),user=user,db=db)
             assert response.status_code in {200,202}
             rows.append(db.get(TranslationRequest,(user.id,identifier)))
     return rows
@@ -49,6 +50,15 @@ def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
         for model in (TranslationRequest,):
             assert db.scalar(select(func.count()).select_from(model)) == 2
         assert db.scalar(select(QuotaPeriod.reserved).where(QuotaPeriod.owner_id == pg["owner_id"])) == 1
+    from app.upload_models import UploadReservation
+    from app.upload_ingress import acquire_ingress, persist_received_upload, release_ingress
+    with session_factory()() as db:
+        receipt_id = db.scalar(select(UploadReservation.id).where(UploadReservation.job_id == job_id))
+    upload_lease = acquire_ingress(receipt_id, pg['owner_id'])
+    try:
+        persist_received_upload(upload_lease, pg['png'])
+    finally:
+        release_ingress(upload_lease)
     calls = []
     def provider(*args):
         calls.append(1)

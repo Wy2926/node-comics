@@ -10,14 +10,14 @@ import {TranslationCoordinator} from './coordinator';
 import {operationId} from './operations';
 import {translationState} from './state';
 import {translationScope} from './store';
-import {loadResultBlob} from '../../../../storage/translations/results';
+import {loadDeliveredResult,registerResultReader,releaseResultReaders} from '../../../../storage/translations/results';
 
 // These baseline choices keep sign-in and cached views reachable without a network request.
 // New requests still require a successful policy refresh; the server enforces its actual limits.
 const baselineCapabilities=():Capabilities=>({modes:[
   {id:'classic',label:modeLabels.classic,enabled:true,languages:fallbackLanguages.map(language=>language.id)},
   {id:'redraw',label:modeLabels.redraw,enabled:true,languages:['zh-Hans','zh-Hant','en','ja','ko']},
-],languages:fallbackLanguages,limits:{max_bytes:20*1024*1024,max_pixels:24_000_000,max_dimension:8192,max_translation_ids:32},entitlements:null,retention_days:0});
+],languages:fallbackLanguages,limits:{max_bytes:20*1024*1024,max_pixels:24_000_000,max_dimension:8192,max_translation_ids:32},entitlements:null});
 
 export const definition:ChannelDefinition={
   id:'nodelane',label:'NodeLane',configurable:false,fields:[],
@@ -54,19 +54,20 @@ export const definition:ChannelDefinition={
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
       requiresInternet:true,allowsFeedback:true,analyticsCategory:'official',isCurrent:live,
-      async readResult(job,signal){
+      async readResult(job,signal,original){
         assertCurrent(live);if(!session)throw Error(msg('请先登录'));
         // Reading an existing result must never submit a new translation.
         signal?.throwIfAborted();
         await authorization!.current();
-        const blob=await loadResultBlob({scope,job,download:()=>api.translationImage(job.id,signal),isCurrent:()=>live()&&!signal?.aborted});
+        registerResultReader(scope,job,()=>connection.readResult(job,undefined,original));
+        const blob=await loadDeliveredResult({scope,job,original,download:()=>api.translationImage(job.id,signal),isCurrent:()=>live()&&!signal?.aborted});
         await authorization!.current();assertCurrent(live);return blob;
       },
       createRuntime(options:RuntimeOptions){
         let active=true;
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,onInputConsumed:options.onInputConsumed,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},
@@ -91,7 +92,7 @@ export const definition:ChannelDefinition={
         };
         runtimes.add(runtime);return runtime;
       },
-      dispose(){disposed=true;for(const runtime of runtimes)runtime.dispose();runtimes.clear();},
+      dispose(){disposed=true;releaseResultReaders(scope);for(const runtime of runtimes)runtime.dispose();runtimes.clear();},
     };
     return connection;
   },

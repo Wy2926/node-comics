@@ -76,8 +76,6 @@ def pg_scope(tmp_path, monkeypatch):
     })
     monkeypatch.setenv("DATABASE_URL", url.render_as_string(hide_password=False))
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "images"))
-    monkeypatch.setenv("RESULT_STORAGE_BACKEND", "local")
-    monkeypatch.setenv("R2_ENDPOINT_URL", "")
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-postgres-test-auth-key-not-used-for-product")
     monkeypatch.setenv("OPENAI_API_KEY", "postgres-test-placeholder-no-paid-access")
@@ -270,7 +268,9 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
     from app.assets import object_path, owned_asset
     from app.db import engine, session_factory
     from app.jobs import job_json
-    from app.main import delete_image
+    from app.translation_api import translation_delete
+    from app.translation_requests import TranslationRequest
+    from uuid import UUID
     from app.models import Asset, Job, User
     from fastapi import HTTPException
     job_id = new_job(pg)
@@ -288,7 +288,8 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
 
     def delete():
         with session_factory()() as db:
-            return delete_image(pg["asset_id"], user=db.get(User, pg["owner_id"]), db=db)
+            receipt = db.scalar(select(TranslationRequest).where(TranslationRequest.job_id == job_id))
+            return translation_delete(UUID(receipt.id), user=db.get(User, pg["owner_id"]), db=db)
 
     monkeypatch.setattr(workers, "create_asset", pause_finalization)
     monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(pg["png"], usage={"total_tokens": 9}))
@@ -309,11 +310,13 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
     with session_factory()() as db:
         job = db.get(Job, job_id)
         assert job.status == "succeeded", job.error_code
-        assert job.output_asset_id in deleted["asset_ids"]
+        assert deleted["deleted"] is True
         for asset_id in (pg["asset_id"], job.output_asset_id):
             asset = db.get(Asset, asset_id)
-            assert asset.deleted_at and asset.purged_at
-            assert object_path(asset.storage_key).exists()  # Shared bytes survive grant revocation.
+            assert asset.purged_at
+            assert not object_path(asset.storage_key).exists()
+            if asset_id == job.output_asset_id:
+                assert asset.deleted_at
             with pytest.raises(HTTPException) as rejected:
                 owned_asset(db, asset_id, pg["owner_id"])
             assert rejected.value.status_code == 410
@@ -351,7 +354,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['quota_campaigns_0006']
+            assert revisions == ['job_results_0008']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0

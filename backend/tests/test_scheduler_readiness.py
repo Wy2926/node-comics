@@ -70,10 +70,9 @@ def test_local_missing_heads_do_not_hide_later_available_source(scheduler_case):
     valid = add_job(scheduler_case)
     with session_factory()() as db:
         missing = db.get(Asset, 'free-user-image')
-        missing.storage_backend = 'local'
+        LocalStore().delete(missing.storage_key)
         source = db.get(Asset, 'plus-user-image')
-        source.storage_backend = 'local'
-        LocalStore().put(source.storage_key, b'test-existence-only', 'image/png')
+        assert LocalStore().exists(source.storage_key)
         db.get(Job, valid).input_asset_id = source.id
         db.commit()
         assert scheduler.has_claimable_work(db, 'node-0', ['page'])

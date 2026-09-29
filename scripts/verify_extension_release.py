@@ -1,7 +1,7 @@
-"""Upload one verified extension ZIP or AMO-signed XPI to immutable R2 storage.
+"""Verify a release package and its configured permanent public download URL.
 
-Run with the backend dependencies and production R2 environment. No bucket
-permissions are changed; output contains public package metadata only.
+No upload credentials or application dependencies are used.
+The release catalog contains the full public URL supplied by the operator.
 """
 import argparse
 import base64
@@ -12,8 +12,6 @@ import sys
 import zipfile
 from urllib.request import urlopen
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
-sys.path.insert(0, '/app')
 
 
 def main():
@@ -22,8 +20,6 @@ def main():
     parser.add_argument('--manifest', required=True, type=Path)
     parser.add_argument('--browser', required=True, choices=['chrome', 'edge', 'firefox'])
     args = parser.parse_args()
-    from app.storage import get_store
-    from botocore.exceptions import ClientError
     catalog = json.loads(args.manifest.read_text(encoding='utf-8'))
     version = catalog.get('current_by_browser', {}).get(args.browser, catalog['current'])
     matches = [item for item in catalog['releases'] if item['version'] == version and item['browser'] == args.browser]
@@ -60,30 +56,24 @@ def main():
             assert 'browser_specific_settings' not in manifest
         assert 'https://comics.nodelane.net' in archive.read('background.js').decode()
         assert not any(name.endswith(('.map', '.pem')) or '/.env' in name for name in archive.namelist())
-    key = f'releases/extensions/{release["version"]}/{release["sha256"]}/{release["filename"]}'
-    store = get_store('r2')
-    params = store._params(key)
-    try:
-        store.client.put_object(**params, Body=data, ContentType=content_type,
-            ContentDisposition=f'attachment; filename="{release["filename"]}"',
-            CacheControl='private, no-store', Metadata={'sha256': release['sha256']}, IfNoneMatch='*')
-    except ClientError as error:
-        if error.response.get('ResponseMetadata', {}).get('HTTPStatusCode') != 412:
-            raise
-    obj = store.client.get_object(**params)
-    try:
-        assert hashlib.sha256(obj['Body'].read()).hexdigest() == release['sha256']
-        assert obj['ContentType'] == content_type
-        assert obj['ContentDisposition'] == f'attachment; filename="{release["filename"]}"'
-    finally:
-        obj['Body'].close()
-    print(json.dumps({'uploaded_and_verified': True, **release}))
+    url = release.get('download_url', '')
+    if url:
+        from urllib.parse import urlsplit
+        parsed = urlsplit(url)
+        assert parsed.scheme == 'https' and parsed.hostname
+        assert not (parsed.username or parsed.password or parsed.query or parsed.fragment)
+        with urlopen(url, timeout=60) as response:
+            published = response.read(release['bytes'] + 1)
+        assert len(published) == release['bytes']
+        assert hashlib.sha256(published).hexdigest() == release['sha256']
+    print(json.dumps({'package_verified': True, 'public_download_verified': bool(url), **release}))
+
 
 
 if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        # SDK diagnostics may contain signed URLs or private configuration.
+        # Diagnostics may contain private paths or configuration.
         print(json.dumps({'error_type': type(error).__name__}), file=sys.stderr)
         raise SystemExit(1) from None

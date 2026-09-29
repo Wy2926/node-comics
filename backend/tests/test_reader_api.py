@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 
 from conftest import create, login_plus as login, submit_asset, run_job, upload, png_variant, request_for_job, request_id
-from test_file_pages import FILE_HASH, bind, complete
+from conftest import complete
 
 
 def rerun(client, auth, job, asset=None, key="rerun-latest"):
@@ -50,64 +50,38 @@ def test_feedback_exact_result_private_idempotent_and_free(client, png, monkeypa
         assert db.scalar(select(func.count()).select_from(Feedback)) == 1
 
 
-def test_latest_effect_survives_pending_and_failure_but_never_expired_fallback(client, png, monkeypatch):
+def test_history_keeps_each_uuid_and_never_restores_revoked_results(client, png, monkeypatch):
     from app.db import session_factory
-    from app.jobs import settle
-    from app.models import Asset, Job, Provider, now
+    from app.models import Asset, Job, now
     auth = login(client)
-    asset = bind(client, auth, png).json()['id']
-    first = complete(client, auth, asset, png, monkeypatch)
+    first = complete(client, auth, upload(client, auth, png), png, monkeypatch)
     second = rerun(client, auth, first)
+    run_job(second['id'])
     first_id = request_for_job(client, auth, first['id'])
     second_id = request_for_job(client, auth, second['id'])
-    def projected():
-        response = client.post('/v1/file-pages/match', headers=auth, json={
-            'pages': [{'file_hash': FILE_HASH, 'page_index': 0}], 'mode': 'redraw',
-            'target_language': 'zh-Hans', 'include_display': True})
-        assert response.status_code == 200, response.text
-        return response.json()['items'][0]
-    assert {j['id'] for j in projected()['display_translations']} == {first_id, second_id}
-    run_job(second['id'])
-    third = rerun(client, auth, second, key='failed-third')
-    third_id = request_for_job(client, auth, third['id'])
     with session_factory()() as db:
-        job = db.get(Job, third['id'])
-        job.status, job.completed_at = 'failed', now()
-        settle(db, job, success=False)
         db.get(Asset, db.get(Job, second['id']).output_asset_id).deleted_at = now()
         db.commit()
-    display = projected()['display_translations']
-    assert {j['id'] for j in display} == {second_id, third_id}
-    removed = next(j for j in display if j['id'] == second_id)
-    assert removed['state'] == 'failed' and removed['error']['code'] == 'TRANSLATION_UNAVAILABLE'
-    assert removed['result'] is None
-    history = client.get('/v1/translations?offset=0&limit=2', headers=auth).json()
-    assert history['total'] == 3 and history['next_offset'] == 2
-    assert [j['id'] for j in history['items']] == [third_id, second_id]
-    with session_factory()() as db:
-        db.get(Asset, asset).expires_at = now() - timedelta(days=1)
-        for provider in db.scalars(select(Provider)):
-            provider.enabled = False
-        db.commit()
-    assert projected()['asset'] is None
-    assert {j['id'] for j in projected()['display_translations']} == {second_id, third_id}
-    other = login(client, 'bob')
-    assert client.get('/v1/translations/' + first_id, headers=other).status_code == 404
-    assert client.get('/v1/translations', headers=other).json()['total'] == 0
+    history = client.get('/v1/translations', headers=auth).json()
+    assert history['total'] == 2
+    newest = next(item for item in history['items'] if item['id'] == second_id)
+    assert newest['state'] == 'failed' and newest['result'] is None
+    assert client.get('/v1/translations/' + first_id, headers=login(client, 'other')).status_code == 404
 
 
 def test_revoked_source_cannot_be_regenerated_or_resurrected(client, png, monkeypatch):
     from app.db import session_factory
     from app.models import Asset, now
     auth = login(client)
-    old_asset = bind(client, auth, png).json()['id']
+    old_asset = upload(client, auth, png)
     first = complete(client, auth, old_asset, png, monkeypatch)
     first_id = request_for_job(client, auth, first['id'])
     with session_factory()() as db:
         db.get(Asset, old_asset).expires_at = now() - timedelta(days=1)
         db.commit()
-    new_asset = bind(client, auth, png).json()['id']
+    new_asset = upload(client, auth, png)
     assert old_asset != new_asset
+    assert client.delete('/v1/translations/' + first_id, headers=auth).status_code == 200
     response = client.put('/v1/translations/' + request_id('restore-rerun'), headers=auth,
         json={'regenerate_of': first_id})
     assert response.status_code == 410

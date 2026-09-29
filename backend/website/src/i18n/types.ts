@@ -89,6 +89,7 @@ export interface UI {
   storeUnavailable: string;
   directDownloadTitle: string;
   directDownloadDescription: string;
+  packageUnavailable: string;
   downloadZip: string;
   installTitle: string;
   installStepDownload: string;

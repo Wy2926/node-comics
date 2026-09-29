@@ -189,40 +189,38 @@ def test_upgrade_drops_transient_tables_without_rewriting_durable_calls(isolated
     from pathlib import Path
     from alembic import command
     from alembic.config import Config
-    from sqlalchemy import text
-    from app import db as database
-    from app.models import Attempt, User
-    from translation_fixtures import configure_text_provider
-    database.initialize()
+    from sqlalchemy import MetaData, inspect, text
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
     at = now()
-    with session_factory()() as db:
-        provider = configure_text_provider(db)
-        db.add(User(id='migration-owner', subject='migration-owner', name='Isolated'))
-        db.flush()
-        db.add(Job(id='migration-job', owner_id='migration-owner', mode='classic', target_language='en',
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.upgrade(config, 'comic_titles_0002')
+        old = MetaData()
+        old.reflect(connection, only=['users', 'jobs', 'attempts', 'text_calls'])
+        connection.execute(old.tables['users'].insert().values(id='migration-owner',
+            subject='migration-owner', name='Isolated', role='user', created_at=at))
+        connection.execute(old.tables['jobs'].insert().values(id='migration-job', owner_id='migration-owner',
+            mode='classic', target_language='en', input_pinned=False, source_sha256='', priority_rank=1000000,
+            changed_at=at, status='queued', phase='queued', entitlement={}, settlement='reserved', version=1,
+            cancel_requested=False, discard_output=False, quality_flags=[], created_at=at,
             idempotency_key='isolated-migration', operation='translate', request_hash='r' * 64,
             cache_key='c' * 64, config={}, quota_pages=0, quota_kind='unlimited'))
-        db.flush()
-        db.add(Attempt(id='migration-attempt', job_id='migration-job', provider_id=provider.id,
+        connection.execute(old.tables['attempts'].insert().values(id='migration-attempt',
+            job_id='migration-job', provider_id='isolated-provider', started_at=at, heartbeat_at=at,
+            cost_state='unknown', recovered=False,
             lease_expires_at=at + timedelta(minutes=1)))
-        db.flush()
         for index, (name, error, started) in enumerate([
                 ('recent-call', None, at), ('upstream-429', 'TEXT_RATE_LIMITED', at),
                 ('old-call', None, at - timedelta(minutes=2)),
                 ('disabled-call', 'TEXT_PROVIDER_DISABLED', at)]):
-            db.add(TextCall(id=name, job_id='migration-job', attempt_id='migration-attempt',
-                provider_id=provider.id, model='isolated', group_index=0, sequence=index + 1,
+            connection.execute(old.tables['text_calls'].insert().values(id=name,
+                job_id='migration-job', attempt_id='migration-attempt', provider_id='isolated-provider',
+                model='isolated', group_index=0, sequence=index + 1, cost_state='unknown',
                 reserved_micros=0, accounted_micros=0, error_code=error, started_at=started))
-        db.commit()
-    root = Path(__file__).resolve().parents[1]
-    config = Config(str(root / 'alembic.ini'))
-    config.set_main_option('script_location', str(root / 'migrations'))
-    with isolated_migration_database.begin() as connection:
-        config.attributes['connection'] = connection
-        command.downgrade(config, 'comic_titles_0002')
         before = connection.execute(text('SELECT * FROM text_calls ORDER BY id')).all()
         command.upgrade(config, 'head')
         assert connection.execute(text('SELECT * FROM text_calls ORDER BY id')).all() == before
-        from sqlalchemy import inspect
         assert 'translation_provider_requests' not in inspect(connection).get_table_names()
         assert window_count('provider') == 0

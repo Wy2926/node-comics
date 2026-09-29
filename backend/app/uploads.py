@@ -1,18 +1,19 @@
 """Bounded authenticated uploads and immutable validated original images.
 
 The control API accepts an actual bounded byte stream, rather than relying on a
-client Content-Length or a presigned PUT that could store an oversized object.
-Ingress validates one bounded buffer and writes the immutable original once.
+client Content-Length alone. Ingress validates a temporary file and publishes
+the immutable original once.
 Recovery rereads only that validated original after an uncertain write/commit.
 All functions leave transaction ownership to the API/scheduler.
 """
 from datetime import timedelta
 import asyncio
+import errno
 import hashlib
 import re
 from fastapi import HTTPException
 from sqlalchemy import select
-from .assets import available, content_storage_key, create_asset, inspect_image
+from .assets import available, asset_storage_key, create_asset, inspect_image
 from .config import settings
 from .errors import problem, ProcessingError
 from .models import Asset, Job, now, uid
@@ -47,14 +48,10 @@ def create_upload(db, job, descriptor):
         if existing.expected_sha256 != expected_hash or existing.expected_size != expected_size:
             problem("IDEMPOTENCY_CONFLICT", "上传任务已绑定其他图片", 409)
         return existing
-    backend = settings().result_storage_backend
-    if backend != "r2" and not settings().dev_auth:
-        raise ValueError("Production originals require private R2 storage")
     stamp, reservation_id = now(), uid()
     reservation = UploadReservation(
         id=reservation_id, job_id=job.id, owner_id=job.owner_id, mode=job.mode,
         expected_sha256=expected_hash, expected_size=expected_size, mime=mime,
-        storage_backend=backend,
         status="awaiting_upload", created_at=stamp,
         expires_at=stamp + timedelta(seconds=min(settings().upload_session_ttl_seconds,
                                                 settings().upload_session_max_lifetime_seconds)),
@@ -75,37 +72,51 @@ def owned_upload(db, upload_id, owner_id, *, lock=False):
 
 
 async def read_upload_stream(request, expected_size, *, limits=None):
-    """Count bytes including chunked requests; never trust a declared length."""
+    """Bounded streaming ingress into the center volume, never a page-sized bytearray."""
+    from tempfile import NamedTemporaryFile
+    from starlette.concurrency import run_in_threadpool
+    cfg = limits or settings()
     maximum = min(settings().max_upload_bytes, expected_size)
     if not 0 < maximum <= settings().max_upload_bytes:
-        problem("IMAGE_TOO_LARGE", "图片字节数超过上传限制", 413)
-    length = request.headers.get("content-length")
+        problem('IMAGE_TOO_LARGE', '图片字节数超过限制', 413)
+    length = request.headers.get('content-length')
     if length is not None and (not length.isdigit() or int(length) > maximum):
-        problem("IMAGE_TOO_LARGE", "上传字节数超过预留限制", 413)
-    data = bytearray()
-    loop = asyncio.get_running_loop()
-    cfg = limits or settings()
-    deadline = loop.time() + cfg.upload_body_timeout_seconds
-    idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
-    stream = request.stream().__aiter__()
-    while True:
-        remaining = min(deadline, idle_deadline) - loop.time()
-        if remaining <= 0:
-            problem("UPLOAD_TIMEOUT", "上传接收超时，请重试", 408)
-        try:
-            chunk = await asyncio.wait_for(anext(stream), timeout=remaining)
-        except StopAsyncIteration:
-            break
-        except TimeoutError:
-            problem("UPLOAD_TIMEOUT", "上传接收超时，请重试", 408)
-        if len(data) + len(chunk) > maximum:
-            problem("IMAGE_TOO_LARGE", "上传字节数超过预留限制", 413)
-        data.extend(chunk)
-        if chunk:
-            idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
-    if len(data) != expected_size:
-        problem("UPLOAD_SIZE_MISMATCH", "实际图片大小与提交清单不一致", 422)
-    return bytes(data)
+        problem('IMAGE_TOO_LARGE', '上传字节数超过预留限制', 413)
+    root = settings().storage_path
+    (root / 'staging').mkdir(mode=0o700, parents=True, exist_ok=True)
+    handle = NamedTemporaryFile(mode='w+b', prefix='input-', suffix='.part', dir=root / 'staging')
+    try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + cfg.upload_body_timeout_seconds
+        idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
+        stream, received = request.stream().__aiter__(), 0
+        while True:
+            remaining = min(deadline, idle_deadline) - loop.time()
+            if remaining <= 0:
+                problem('UPLOAD_TIMEOUT', '上传接收超时，请重试', 408)
+            try:
+                chunk = await asyncio.wait_for(anext(stream), timeout=remaining)
+            except StopAsyncIteration:
+                break
+            except TimeoutError:
+                problem('UPLOAD_TIMEOUT', '上传接收超时，请重试', 408)
+            received += len(chunk)
+            if received > maximum:
+                problem('IMAGE_TOO_LARGE', '上传字节数超过预留限制', 413)
+            await run_in_threadpool(handle.write, chunk)
+            if chunk:
+                idle_deadline = loop.time() + cfg.upload_idle_timeout_seconds
+        if received != expected_size:
+            problem('UPLOAD_SIZE_MISMATCH', '实际图片大小与提交清单不一致', 422)
+        handle.flush()
+        handle.seek(0)
+        return handle
+    except OSError as error:
+        handle.close()
+        raise StorageError('STORAGE_FULL' if error.errno == errno.ENOSPC else 'STORAGE_UNAVAILABLE') from None
+    except BaseException:
+        handle.close()
+        raise
 
 
 def _owned(reservation, owner):
@@ -186,8 +197,8 @@ def _check_validation_lease(db, reservation, lease_id, lease_token, *, refresh=F
 
 def _verified_asset(db, reservation):
     asset = db.get(Asset, reservation.asset_id)
-    if not available(asset):
-        raise ProcessingError("ASSET_EXPIRED", "原图已删除或过期")
+    if not asset or asset.deleted_at:
+        raise ProcessingError("ASSET_EXPIRED", "输入描述已删除或过期")
     return asset
 
 
@@ -207,8 +218,8 @@ def complete_upload(db, reservation, owner, *, lease_id=None, lease_token=None):
         return None
     if reservation.status != "validating" or not reservation.verified_info:
         problem("UPLOAD_INCOMPLETE", "请先完成图片上传", 409)
-    store = get_store(reservation.storage_backend)
-    key = content_storage_key(reservation.expected_sha256)
+    store = get_store()
+    key = asset_storage_key(reservation.id, "original")
     db.commit()  # Release the pooled connection during object I/O.
     data = store.read(key)
     if len(data) != reservation.expected_size or hashlib.sha256(data).hexdigest() != reservation.expected_sha256:
@@ -234,8 +245,9 @@ def accept_verified_upload(db, reservation, data, info, *, lease_id=None, lease_
     if not _active_locked(db, reservation):
         return None
     asset = create_asset(db, reservation.owner_id, data, stable_id=reservation.id,
-                         storage_backend=reservation.storage_backend, prewritten=True, verified_info=info)
+                         prewritten=True, verified_info=info)
     job = db.get(Job, reservation.job_id)
+    asset.purged_at, asset.expires_at = None, None
     job.input_asset_id, job.status, job.phase = asset.id, "queued", "queued"
     if not job.input_pinned:
         asset.active_references += 1
@@ -251,7 +263,7 @@ def expire_uploads(db, *, limit=100):
     lock_scheduler(db)
     reservations = db.scalars(select(UploadReservation).join(Job, Job.id == UploadReservation.job_id).where(
         UploadReservation.status == "awaiting_upload", UploadReservation.expires_at <= now(),
-        Job.status == "awaiting_upload", UploadReservation.verified_info.is_(None))
+        Job.status == "awaiting_upload", UploadReservation.verified_info["sha256"].as_string().is_(None))
         .order_by(UploadReservation.expires_at, UploadReservation.id).limit(limit)
         .with_for_update(skip_locked=True)).all()
     for reservation in reservations:
@@ -271,9 +283,9 @@ def recover_received_uploads(limit=100):
     from .queue_models import JobStage
     from .scheduler import lock_scheduler, touch_job
     with session_factory()() as db:
-        rows = db.execute(select(UploadReservation.id, UploadReservation.storage_backend,
+        rows = db.execute(select(UploadReservation.id,
             UploadReservation.expected_sha256, UploadReservation.expires_at)
-            .where(UploadReservation.status == 'awaiting_upload', UploadReservation.verified_info.is_not(None))
+            .where(UploadReservation.status == 'awaiting_upload', UploadReservation.verified_info["sha256"].as_string().is_not(None))
             .order_by(UploadReservation.created_at).limit(limit)).all()
     _, active = ingress_snapshot([row.id for row in rows])
     restored = 0
@@ -281,7 +293,7 @@ def recover_received_uploads(limit=100):
         if active[row.id]:
             continue
         try:
-            present = get_store(row.storage_backend).exists(content_storage_key(row.expected_sha256))
+            present = get_store().exists(asset_storage_key(row.id, "original"))
         except (StorageError, OSError):
             continue
         if not present and row.expires_at > now():
@@ -308,3 +320,28 @@ def recover_received_uploads(limit=100):
                 _fail_locked(db, receipt, 'INPUT_EXPIRED', '原图输入已过期，请手动重试', status='expired')
             db.commit()
     return restored
+
+
+def pause_missing_input(db, job):
+    """Preserve admission/settlement and checkpoints while the client repairs input."""
+    receipt = db.scalar(select(UploadReservation).where(UploadReservation.job_id == job.id))
+    if receipt is None:
+        from .assets import descriptor_available
+        source = db.get(Asset, job.input_asset_id)
+        if not descriptor_available(source):
+            return False
+        receipt = create_upload(db, job, {'sha256': source.sha256, 'byte_size': source.byte_size, 'mime': source.mime})
+        receipt.asset_id = source.id
+    source = db.get(Asset, job.input_asset_id) if job.input_asset_id else None
+    if source:
+        # Keep the immutable descriptor but use this reservation's private path.
+        source.storage_key = asset_storage_key(receipt.id, 'original')
+        source.purged_at, source.expires_at = None, None
+    receipt.status, receipt.verified_info, receipt.error_code, receipt.error_message = 'awaiting_upload', None, None, None
+    receipt.completed_at = None
+    receipt.expires_at = now() + timedelta(seconds=settings().upload_session_ttl_seconds)
+    receipt.max_expires_at = receipt.expires_at
+    job.status, job.phase = 'awaiting_upload', 'restore_input'
+    from .scheduler import touch_job
+    touch_job(db, job)
+    return True

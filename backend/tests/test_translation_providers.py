@@ -221,20 +221,18 @@ def test_reasoning_update_creates_revision_without_changing_existing_profile(adm
     assert seen == [None, 'none', None]
 
 
-def test_weight_changes_preserve_existing_jobs_and_file_page_matching(admin_case, png):
+def test_weight_changes_preserve_existing_jobs_and_request_reuse(admin_case, png):
     from conftest import create as submit, request_for_job
-    from test_file_pages import bind, match, FILE_HASH
+    from conftest import upload
     client, auth = admin_case
     settings().classic_enabled = True
     providers = {p['id']: p for p in [create(admin_case), create(admin_case, body('Second'))]}
-    asset = bind(client, auth, png).json()['id']
+    asset = upload(client, auth, png)
     first = submit(client, auth, asset, mode='classic', key='routing-first').json()
     with session_factory()() as db:
         pinned = dict(db.get(Job, first['id']).config)
     selected = providers[pinned['text']['provider_id']]
     other = next(p for p in providers.values() if p['id'] != selected['id'])
-    matched = match(client, auth, mode='classic').json()['items'][0]['translations']
-    assert [t['id'] for t in matched] == [request_for_job(client, auth, first['id'])]
     # The same input still deduplicates while the routing configuration is unchanged.
     duplicate = submit(client, auth, asset, mode='classic', key='routing-duplicate').json()
     assert duplicate['id'] == first['id']
@@ -248,15 +246,7 @@ def test_weight_changes_preserve_existing_jobs_and_file_page_matching(admin_case
         assert db.get(Job, fresh['id']).config['text']['provider_id'] == other['id']
         from app.translation_providers import resolve_credentials
         assert resolve_credentials(pinned['text']) == 'isolated-new-key'
-    matched = match(client, auth, mode='classic').json()['items'][0]['translations']
-    assert [t['id'] for t in matched] == [request_for_job(client, auth, fresh['id'])]
     set_weight(admin_case, other, 0)
-    response = client.post('/v1/file-pages/match', headers=auth, json={
-        'mode': 'classic', 'target_language': 'zh-Hans', 'include_display': True,
-        'pages': [{'file_hash': FILE_HASH, 'page_index': 0}]})
-    assert response.status_code == 200, response.text
-    assert response.json()['items'][0]['translations'] == []
-    assert response.json()['items'][0]['display_translations']
 
 
 def test_title_selection_and_body_weights_are_independent_and_admin_only(admin_case):

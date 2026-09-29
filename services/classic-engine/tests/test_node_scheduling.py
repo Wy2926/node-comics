@@ -47,7 +47,7 @@ def agent(tmp_path):
     local = {'node_id': 'fixture', 'resource_id': 'fixture', 'engine': {'gpu': -1},
              'max_leases': 8, 'local_pages': 2, 'download_workers': 4, 'delivery_workers': 4}
     transport = SimpleNamespace(control=SimpleNamespace(timeout=30), post=lambda *_: None)
-    journal = Journal(tmp_path, 512 * 1024 * 1024)
+    journal = Journal(tmp_path)
     value = Agent(local, SimpleNamespace(version='fixture'), transport, journal)
     value.apply_config({'version': 1, 'execution_slots': 8, 'enabled': True,
                         'request_seconds': 30, 'heartbeat_seconds': 10, 'poll_seconds': 20})
@@ -277,19 +277,21 @@ def test_freeze_returns_peak_budget_but_keeps_delivery_buffers_accounted(agent):
     agent.pipeline.resize_reservation(page, initial)
     page.rgb = page.cleaned = page.analysis = page.alpha = object()
     agent.next_claim = time.monotonic() + 20
-    result = {'image': 'a' * 4096, 'result': {'output': {'byte_size': 3072}}}
+    result = {'output_bytes': b'a' * 3072, 'result': {'output': {'byte_size': 3072}}}
     agent.pipeline.freeze(page, result)
     assert page.rgb is page.cleaned is page.analysis is page.alpha is None
     assert 0 < page.reserved == agent.pipeline.used < initial
-    assert page.reserved >= len(result['image']) * 3 + 3072
+    assert page.reserved >= 3072 * 2
+    assert agent.journal.output('lease:0') == result['output_bytes']
+    assert 'output_bytes' not in agent.journal.get('lease:0')['completion']
     assert agent.next_claim == 0
     agent.pipeline.release(page)
     assert agent.pipeline.used == page.reserved == 0
 
 
 def test_restored_frozen_completion_is_included_in_resident_budget(agent):
-    completion = {'image': 'a' * 4096, 'result': {'output': {'byte_size': 3072}}}
-    agent.journal.put('lease:0', {'completion': completion})
+    completion = {'result': {'output': {'byte_size': 3072}}}
+    agent.journal.freeze('lease:0', {'completion': completion}, b'a' * 3072)
     page = add_page(agent)
     assert page.step == 'deliver' and page.completion == completion
     assert page.reserved == agent.pipeline.used == agent.pipeline.delivery_reservation(completion)
