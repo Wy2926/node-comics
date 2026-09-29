@@ -35,6 +35,7 @@ const views = {
   'billing-events': ['支付事件', 'PAYMENT EVENTS', '排查支付通知、处理失败与积压。', '↻'],
   feedback: ['翻译反馈', 'READER FEEDBACK', '处理读者反馈并记录处理过程。', '✎'],
   'plugin-feedback': ['插件反馈', 'PLUGIN FEEDBACK', '查看匿名提交的插件问题与建议。', '✉'],
+  'uninstall-feedback': ['卸载反馈', 'UNINSTALL FEEDBACK', '查看用户自愿提交的卸载原因与建议。', '✉'],
   'site-requests': ['网站适配申请', 'WEBSITE REQUESTS', '查看匿名提交的网站兼容申请。', '↗'],
   operations: ['运行诊断', 'DIAGNOSTICS', '查看服务健康、图片授权与受理记录。', '⌕'],
   statistics: ['用量与成本', 'USAGE & COST', '查看调用计量与业务统计。', '▥'],
@@ -44,7 +45,7 @@ const views = {
 type View = keyof typeof views;
 const navigationGroups: {name: string; pages: View[]}[] = [
   {name: '翻译与运行', pages: ['overview', 'tasks', 'nodes', 'operations', 'statistics']},
-  {name: '用户与交易', pages: ['users', 'quota-campaigns', 'feedback', 'plugin-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
+  {name: '用户与交易', pages: ['users', 'quota-campaigns', 'feedback', 'plugin-feedback', 'uninstall-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
   {name: '配置与审计', pages: ['translation-providers', 'image-providers', 'settings', 'audit']},
 ];
 type Target = {kind: 'tasks' | 'users'; id: string};
@@ -205,7 +206,7 @@ export function App() {
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
       view === 'image-providers' ? <ImageProvidersPage onUnauthorized={logout}/> :
       view === 'feedback' ? <FeedbackPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
-      view === 'site-requests' || view === 'plugin-feedback' ? <SupportRequestsPage key={view} kind={view === 'site-requests' ? 'website' : 'plugin'} onUnauthorized={logout}/> :
+      view === 'site-requests' || view === 'plugin-feedback' || view === 'uninstall-feedback' ? <SupportRequestsPage key={view} kind={view === 'site-requests' ? 'website' : view === 'uninstall-feedback' ? 'uninstall' : 'plugin'} onUnauthorized={logout}/> :
       view === 'billing-events' ? <BillingEventsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       view === 'subscriptions' ? <BillingSubscriptionsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       view === 'audit' ? <AuditLogPage onUnauthorized={logout}/> :

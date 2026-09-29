@@ -5,13 +5,13 @@ import {Empty, Pagination, Table, time} from './ui';
 type SiteRequest = {id: string; site_name: string; url: string; comment: string; contact: string; created_at: string};
 type Page = {items: SiteRequest[]; total: number; next_offset: number | null};
 
-export function SupportRequestsPage({kind, onUnauthorized}: {kind: 'website' | 'plugin'; onUnauthorized: (message: string) => void}) {
-  const title = kind === 'website' ? '网站适配申请' : '插件反馈';
+export function SupportRequestsPage({kind, onUnauthorized}: {kind: 'website' | 'plugin' | 'uninstall'; onUnauthorized: (message: string) => void}) {
+  const title = kind === 'website' ? '网站适配申请' : kind === 'uninstall' ? '卸载反馈' : '插件反馈';
   const [offset, setOffset] = useState(0);
   const {data, loading, error, reload} = useBillingResource<Page>(`/v1/admin/support-requests?kind=${kind}&offset=${offset}&limit=25`, onUnauthorized);
   useEffect(() => {document.title = `${title} · Node Comics 管理后台`;}, [title]);
   return <main id="main" tabIndex={-1}>
-    <div className="page-heading"><div><p className="eyebrow">{kind === 'website' ? 'WEBSITE REQUESTS' : 'PLUGIN FEEDBACK'}</p><h1>{title}</h1><p className="muted">查看读者匿名提交的内容与选填联系方式，按提交时间倒序排列。</p></div><button className="secondary" disabled={loading} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新'}</button></div>
+    <div className="page-heading"><div><p className="eyebrow">{kind === 'website' ? 'WEBSITE REQUESTS' : kind === 'uninstall' ? 'UNINSTALL FEEDBACK' : 'PLUGIN FEEDBACK'}</p><h1>{title}</h1><p className="muted">查看读者匿名提交的内容与选填联系方式，按提交时间倒序排列。</p></div><button className="secondary" disabled={loading} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新'}</button></div>
     {error && <p className="error" role="alert">{error} 请刷新重试。</p>}
     {loading && <p className="loading" role="status">正在读取反馈…</p>}
     {data && <section className="panel list-panel" aria-busy={loading}>

@@ -80,21 +80,35 @@ def test_admin_pagination(client):
     assert len({row['id'] for row in first['items'] + second['items']}) == 3
 
 
-def test_plugin_feedback_contact_and_kind_isolation(client):
+@pytest.mark.parametrize('kind', ['plugin', 'uninstall'])
+def test_plugin_feedback_contact_and_kind_isolation(client, kind):
     key = str(uuid4())
-    body = {'kind': 'plugin', 'comment': '合成反馈：按钮不响应', 'contact': ' 任意联系方法：fixture QQ / 微信 / email@example.test '}
+    body = {'kind': kind, 'comment': '合成反馈：按钮不响应', 'contact': ' 任意联系方法：fixture QQ / 微信 / email@example.test '}
     first = client.post('/v1/support-requests', headers={'Idempotency-Key': key}, json=body)
     assert first.status_code == 201 and 'contact' not in first.json()
     assert client.post('/v1/support-requests', headers={'Idempotency-Key': key}, json=body).json() == first.json()
     assert client.post('/v1/support-requests', headers={'Idempotency-Key': str(uuid4())}, json={**body, 'comment': ' '}).status_code == 422
     assert submit(client, contact='test-only arbitrary handle').status_code == 201
     auth = login(client, 'admin')
-    plugin = client.get('/v1/admin/support-requests?kind=plugin', headers=auth).json()
+    plugin = client.get(f'/v1/admin/support-requests?kind={kind}', headers=auth).json()
     websites = client.get('/v1/admin/support-requests?kind=website', headers=auth).json()
     assert plugin['total'] == websites['total'] == 1
     assert plugin['items'][0]['contact'] == body['contact'].strip()
     assert websites['items'][0]['contact'] == 'test-only arbitrary handle'
-    assert client.get('/v1/admin/support-requests?kind=plugin').status_code == 401
+    assert client.get(f'/v1/admin/support-requests?kind={kind}').status_code == 401
+    other = 'uninstall' if kind == 'plugin' else 'plugin'
+    assert client.get(f'/v1/admin/support-requests?kind={other}', headers=auth).json()['total'] == 0
+
+
+def test_uninstall_validation_and_conflicting_replay(client):
+    key = str(uuid4())
+    body = {'kind': 'uninstall', 'comment': '暂时不需要了'}
+    assert client.post('/v1/support-requests', headers={'Idempotency-Key': key}, json=body).status_code == 201
+    assert client.post('/v1/support-requests', headers={'Idempotency-Key': key}, json={**body, 'comment': '其他原因'}).status_code == 409
+    for fields in [{'comment': ' '}, {'comment': 'a' * 1001}, {'site_name': 'unexpected'}, {'url': 'https://example.com'}]:
+        assert client.post('/v1/support-requests', headers={'Idempotency-Key': str(uuid4())}, json={**body, **fields}).status_code == 422
+    auth = login(client, 'admin')
+    assert client.get('/v1/admin/support-requests?kind=uninstall', headers=auth).json()['total'] == 1
 
 
 def test_concurrent_replays_create_one_receipt(client):

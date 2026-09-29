@@ -130,14 +130,16 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 统计取最近 1–90 天并按 UTC 日期汇总。供应商／模型筛选仅作用于文本调用表；最多返回 2000 个分组并显式标记截断。文本金额含估算／未知消耗预占，不是已对账费用；新增复用授权不是阅读浏览次数；订单原金额按币种分列，不作为净收入。服务健康只提供当前实例与积压，历史告警和消息通知未建设。
 
-## 匿名网站申请与插件反馈
+## 匿名网站申请、插件与卸载反馈
 
-插件漫画网站页和通用反馈窗无需登录，网站入口来自适配器注册元数据与随包图标。管理员分别查看网站申请和插件反馈，不公开联系方式。
+插件漫画网站页和通用反馈窗无需登录，网站入口来自适配器注册元数据与随包图标。管理员分别查看网站申请、插件反馈和卸载反馈，不公开联系方式。
 
-- `POST /v1/support-requests`：`kind=website|plugin`，UUID `Idempotency-Key`；网站申请要求名称与公开 HTTP(S) 地址，插件反馈要求正文。名称／URL／说明／联系方式上限分别为 100／2048／1000／200 字符，联系方式可选且不限定邮箱。请求体最多 16 KiB。
+- `POST /v1/support-requests`：`kind=website|plugin|uninstall`，UUID `Idempotency-Key`；网站申请要求名称与公开 HTTP(S) 地址，插件与卸载反馈要求正文。名称／URL／说明／联系方式上限分别为 100／2048／1000／200 字符，联系方式可选且不限定邮箱。请求体最多 16 KiB。
 - 网站地址拒绝凭据和本地地址，去除 query／fragment；服务端只保存，不抓取。重复原请求不新增记录，同编号改内容为 409。未知回包冻结原草稿与编号重试，已知拒绝允许修改。
-- `GET /v1/admin/support-requests?kind=website|plugin&offset=0&limit=25` 仅管理员可读，按时间和 ID 倒序分页。两类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
+- `GET /v1/admin/support-requests?kind=website|plugin|uninstall&offset=0&limit=25` 仅管理员可读，按时间和 ID 倒序分页。三类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
 - `support_requests` 持久保存回执；限流与短期幂等计数保存在 Redis，到期自动回收。正文、联系方式、原网络地址不写默认日志；公开回执仅含 `id` 与 `created_at`。
+
+卸载后通过浏览器 `runtime.setUninstallURL` 打开官网 `/uninstall/`，按插件界面语言选择简中、繁中、英文、日文或韩文页面，其他语言回退英文。地址不附带账号、安装标识或阅读记录。反馈自愿且无需登录，可跳过或直接关闭；选一个主要原因、选填最多 800 字说明，只有主动提交才创建记录。原因统一为中文文案与说明一起保存到 `comment`，`kind=uninstall`；不采集卸载统计，不发送 GA4 事件。页面不索引；当前标签页保存草稿和原始请求，未知回包时锁定内容，用同一个 UUID 重试，成功后显示已收到。上线需先部署后端、官网与管理后台，再发布含卸载入口的插件。
 
 契约回归在 `backend/tests/test_support_requests.py`；隔离预览按后端运行文档准备 Python 依赖后，在 `backend` 执行 `python tests/support_preview.py --lose-first-response`，在插件目录以 `VITE_API_BASE=http://127.0.0.1:18089` 启动 Vite 5191。访问插件 `/#sites` 和后台 `/console-fixture/`（测试用户名 admin）；夹具创建临时库并模拟首次回包丢失，不访问外部服务。正式构建前清除 `VITE_API_BASE`。
 

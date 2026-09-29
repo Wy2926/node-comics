@@ -38,7 +38,7 @@ class SupportRequest(Base):
 
 
 class SupportRequestBody(RequestBody):
-    kind: Literal['website', 'plugin']
+    kind: Literal['website', 'plugin', 'uninstall']
     site_name: str = Field(default='', max_length=100)
     url: str = Field(default='', max_length=2048)
     comment: str = Field(default='', max_length=1000)
@@ -77,7 +77,7 @@ class SupportRequestBody(RequestBody):
     def meaningful(self):
         if self.kind == 'website' and (not self.site_name or not self.url):
             raise ValueError('请填写网站名称和地址')
-        if self.kind == 'plugin' and (not self.comment or self.site_name or self.url):
+        if self.kind in ('plugin', 'uninstall') and (not self.comment or self.site_name or self.url):
             raise ValueError('请填写插件反馈内容')
         return self
 
@@ -126,7 +126,7 @@ def submit_support_request(body: SupportRequestBody, request: Request,
 
 
 @router.get('/v1/admin/support-requests')
-def list_support_requests(kind: Literal['website', 'plugin'], offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
+def list_support_requests(kind: Literal['website', 'plugin', 'uninstall'], offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
                        user: User = Depends(admin), db: Session = Depends(get_db)):
     query = select(SupportRequest).where(SupportRequest.kind == kind)
     total = db.scalar(select(func.count()).select_from(query.subquery()))

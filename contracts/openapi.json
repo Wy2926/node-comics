@@ -1778,7 +1778,8 @@
             "schema": {
               "enum": [
                 "website",
-                "plugin"
+                "plugin",
+                "uninstall"
               ],
               "type": "string",
               "title": "Kind"
@@ -9849,7 +9850,8 @@
             "type": "string",
             "enum": [
               "website",
-              "plugin"
+              "plugin",
+              "uninstall"
             ],
             "title": "Kind"
           },

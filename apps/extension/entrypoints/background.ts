@@ -5,4 +5,5 @@ import {registerCatalogSyncBackground} from '../src/comics/application/catalog-s
 import {readWebsiteCatalog} from '../src/comics/application/website-catalog';
 import {registerOptionalSourceContent} from '../src/sources/runtime/optional-content';
 import {registerAnalyticsBackground} from '../src/analytics/background';
-export default defineBackground(() => { registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); registerAnalyticsBackground(); });
+import {registerUninstallFeedback} from '../src/uninstall';
+export default defineBackground(() => { registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); registerAnalyticsBackground(); registerUninstallFeedback(); });
