@@ -1,7 +1,7 @@
 import {msg} from '../i18n/runtime';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {ReadingEntry,Settings} from '../types';
-import {anchorFor} from './model';
+import {scrollAnchorFor} from './model';
 import {completePageList} from '../comics/application/library-service';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
 import {ChapterResourceWindow} from './chapter-resources';
@@ -18,7 +18,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  const viewport=useRef<HTMLDivElement>(null),cells=useRef(new Map<string,HTMLDivElement>()),ends=useRef(new Map<string,HTMLDivElement>()),stacks=useRef(new Map<string,HTMLDivElement>());
  const geometry=useRef(new Map<string,ChapterWindow>());
  const copyRef=useRef(copy),indexRef=useRef(index);copyRef.current=copy;indexRef.current=index;
- const anchor=useRef({entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset});
+ const anchor=useRef<{entryId:string;pageId:string;relativeOffset:number;edgeOffset?:number}>({entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset});
+ const restoredGeometry=useRef(''),restorePending=useRef(true);
  const suppressScroll=useRef(false),lastScrollTop=useRef(0),saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),restoreFrame=useRef<number|undefined>(undefined);
  const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
  const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
@@ -33,7 +34,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  }
  function preserve(){
   const chapter=copyRef.current,n=indexRef.current,page=chapter.pages[n],p=position(chapter,n),v=viewport.current;
-  if(page&&p&&v)anchor.current={entryId:chapter.id,pageId:page.id,relativeOffset:anchorFor(p.top,p.height,v.scrollTop)};
+  if(page&&p&&v)anchor.current={entryId:chapter.id,pageId:page.id,...scrollAnchorFor(p.top,p.height,v.scrollTop)};
  }
  function persist(){
   clearTimeout(saveTimer.current);const chapter=copyRef.current;
@@ -43,7 +44,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  function restore(){
   const chapter=copyRef.current,v=viewport.current,n=chapter.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(chapter,n);
   if(!v||!p||anchor.current.entryId!==chapter.id)return;
-  const desired=Math.max(0,Math.min(v.scrollHeight-v.clientHeight,p.top+p.height*anchor.current.relativeOffset));
+  const desired=Math.max(0,Math.min(v.scrollHeight-v.clientHeight,p.top+p.height*anchor.current.relativeOffset+(anchor.current.edgeOffset??0)));
   if(Math.abs(v.scrollTop-desired)<.5)return;
   suppressScroll.current=true;v.scrollTop=desired;lastScrollTop.current=v.scrollTop;
   if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);
@@ -80,6 +81,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  }
  function jump(n:number){
   navigationReason.current='direct';const chapter=copyRef.current;if(!Number.isFinite(n)||!chapter.pages.length)return;
+  restorePending.current=true;
   if(n>=chapter.pages.length&&completeManifest(chapter)){
    const destination=nextOf(chapter);
    if(destination){markRead(chapter);persist();anchor.current={entryId:destination.id,pageId:destination.pages[0]?.id??'',relativeOffset:0};activate(destination,0);return;}
@@ -91,7 +93,12 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  useLayoutEffect(()=>{
   if(anchor.current.entryId!==copy.id){anchor.current={entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset};setActive({entryId:copy.id,index:initialIndex});}
   if(!anchor.current.pageId&&copy.pages.length){anchor.current.pageId=copy.pages[0].id;setActive({entryId:copy.id,index:0});}
-  restore();
+  const v=viewport.current,n=copy.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(copy,n);
+  if(!v||!p)return;
+  const signature=JSON.stringify([copy.id,anchor.current.pageId,layout,p.top,p.height,v.clientHeight,v.scrollHeight]);
+  // Status/image updates must not replay a stale anchor while a native scroll event is pending.
+  if(restorePending.current||restoredGeometry.current!==signature)restore();
+  restoredGeometry.current=signature;restorePending.current=false;
  });
  useEffect(()=>{
   resources.prepare(stream,onLoadEntry,()=>setResourceVersion(value=>value+1));
