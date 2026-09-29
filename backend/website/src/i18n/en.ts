@@ -542,6 +542,19 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.7.0",
+        "date": "2026-09-29",
+        "title": "0.7.0: Import Pixiv artists and series",
+        "items": [
+          "Import Pixiv artist homepages with both illustrations and manga, choose either category, or import only works under a specific tag.",
+          "Import Pixiv series links directly. Each collection becomes one book and each artwork one chapter, with every original image available in multipage works.",
+          "Imported Pixiv books support periodic update checks and library update badges. Importing the same collection again keeps your existing book and reading progress.",
+          "Added an import/manage button to Pixiv artist, category, tag and series pages. Pixiv entries omit the alternative-language search action.",
+          "Pixiv artwork pages use the existing webpage image translation experience, with switching between original and translated images.",
+          "Chrome and Edge 0.7.0 packages are available. Firefox remains on the signed 0.6.0 release and does not yet include these new features."
+        ]
+      },
+      {
         "id": "0.6.0",
         "date": "2026-09-27",
         "title": "0.6.0: Discover manga and cache whole books for offline reading",

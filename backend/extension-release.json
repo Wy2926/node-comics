@@ -1,5 +1,5 @@
 {
-  "current": "0.6.0",
+  "current": "0.7.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -123,11 +123,27 @@
       "bytes": 7855127,
       "path": "/downloads/node-comics-0.6.0-firefox.xpi",
       "content_type": "application/x-xpinstall"
+    },
+    {
+      "version": "0.7.0",
+      "browser": "chrome",
+      "filename": "node-comics-0.7.0-chrome.zip",
+      "sha256": "689567fb2b4150a7788eb7a6402b517f70ef15b0f12087fbdd959017caddc963",
+      "bytes": 7779888,
+      "path": "/downloads/node-comics-0.7.0-chrome.zip"
+    },
+    {
+      "version": "0.7.0",
+      "browser": "edge",
+      "filename": "node-comics-0.7.0-edge.zip",
+      "sha256": "caae091595ebdc432e700bc8cbbfee1977663cc7e2c908a7a8bb46da5da2a287",
+      "bytes": 7779887,
+      "path": "/downloads/node-comics-0.7.0-edge.zip"
     }
   ],
   "current_by_browser": {
-    "chrome": "0.6.0",
-    "edge": "0.6.0",
+    "chrome": "0.7.0",
+    "edge": "0.7.0",
     "firefox": "0.6.0"
   }
 }
