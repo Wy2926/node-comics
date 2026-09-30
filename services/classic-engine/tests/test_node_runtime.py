@@ -89,7 +89,54 @@ def test_result_encoding_uses_its_own_byte_limit(monkeypatch):
     packed = pack_result(final, rgb, alpha, runtime.version, analysis, translated)
     assert len(packed['output_bytes']) > protocol.MAX_IMAGE_BYTES
     monkeypatch.setattr(protocol, 'MAX_RESULT_BYTES', len(packed['output_bytes']) - 1)
-    with pytest.raises(NodeFailure, match='CLASSIC_RENDER_FAILED'):
+    with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
+        pack_result(final, rgb, alpha, runtime.version, analysis, translated)
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_all_removed_text_still_completes_with_cleaned_pixels(monkeypatch, changed):
+    import classic_node.runtime as module
+    runtime, data, metadata, analysis, translated = fixture()
+    translated['translations']['0'] = '\U0010FFFF'
+    rgb, alpha = runtime.decode(data, metadata)
+    cleaned = rgb.copy()
+    if changed:
+        cleaned[1, 1] = (10, 20, 30)
+    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
+    result = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
+    assert result['result']['representation'] == ('overlay-v1' if changed else 'original')
+
+
+def test_removed_segment_does_not_block_following_text(monkeypatch):
+    import classic_node.runtime as module
+    runtime, data, metadata, analysis, translated = fixture()
+    analysis['regions'][0]['dir'] = 'h'
+    analysis['regions'].append({'bbox': [0, 0, 80, 64], 'dir': 'h'})
+    analysis['segments'].append({'id': '1'})
+    translated.update(analysis_hash=digest(analysis), translations={'0': '\U0010FFFF', '1': 'Hello'})
+    rgb, alpha = runtime.decode(data, metadata)
+    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None, None])
+    result = runtime.render(rgb, rgb.copy(), analysis, translated, 'en', alpha)
+    assert result['result']['representation'] == 'overlay-v1'
+
+
+def test_render_checkpoint_mismatch_has_specific_error():
+    runtime, data, metadata, analysis, translated = fixture()
+    translated['language'] = 'ja'
+    rgb, alpha = runtime.decode(data, metadata)
+    with pytest.raises(NodeFailure, match='CLASSIC_RENDER_MISMATCH'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+
+
+def test_output_encoding_error_is_not_a_local_interruption(monkeypatch):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    final = Image.fromarray(rgb)
+    final.putpixel((1, 1), (10, 20, 30))
+    def fail(*args, **kwargs):
+        raise OSError('encoder failed')
+    monkeypatch.setattr(Image.Image, 'save', fail)
+    with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_ENCODE_FAILED'):
         pack_result(final, rgb, alpha, runtime.version, analysis, translated)
 
 

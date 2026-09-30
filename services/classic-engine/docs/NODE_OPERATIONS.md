@@ -18,6 +18,7 @@
 - 原生宿主使用 Job Object 清理子进程，计算进程退出后按 1、2、4…60 秒退避恢复；网络断开由计算进程重连，避免反复加载 GPU。
 - 看门狗独立检查状态新鲜度与主循环进展，超过阈值后恢复计算进程。人工停止保留恢复日志，最长等待 75 秒；正常停止不触发自启。
 - `supervisor.json`、`state/status.json` 提供状态；`logs/supervisor.log`、`state/logs/node.log` 在 10 MiB 时轮转，各自保留当前文件及最多 5 份备份。诊断日志不保存令牌、正文或图片；私有恢复数据库按上一项单独保护。
+- 单页失败记录 `event=page_failed`、租约 ID、阶段、错误码、异常类型及文件／函数／行号，不记录原始异常消息、源码行或局部变量。嵌字区分 `CLASSIC_FONT_FAILED`、`CLASSIC_REGION_INVALID`、`CLASSIC_LAYOUT_OVERFLOW`、`CLASSIC_RENDER_EMPTY`、`CLASSIC_RENDER_MISMATCH`；输出区分 `CLASSIC_OUTPUT_ENCODE_FAILED` 和 `CLASSIC_OUTPUT_TOO_LARGE`。这些确定性错误不自动重试；未知异常保留当前阶段的通用错误码。
 
 ## 升级与验收
 

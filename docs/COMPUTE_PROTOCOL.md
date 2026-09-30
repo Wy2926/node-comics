@@ -51,6 +51,8 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 | `PUT /leases/{id}/result` | multipart：一个 metadata 字符串字段、最多一个 output 文件 | 稳定 terminal 回执本体 |
 | `POST /leases/{id}/complete` | lease_token、error:{code}，可带 timings | 错误或停止确认的稳定 terminal 回执；不接受结果图片 |
 
+`error.code` 为 1–60 位大写字母、数字或下划线，首位必须为字母；不要求中心枚举节点诊断码。中心仅对停止确认、临时故障重试等已有调度码执行特殊逻辑，其他码作为通用失败结束并释放预占额度，保留原码供后台和客户端展示。错误负载不接受任意异常正文。新增诊断码无需再次升级中心；从严格枚举的旧中心升级时须先发布中心再更新节点。
+
 活动 lease 含 lease_id、lease_token、job_id、generation、status:active、expires_at、limits、input、config.engine、language，以及已有 analysis／analysis_hash／translations。输入描述固定为：
 
 ```json

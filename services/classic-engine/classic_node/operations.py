@@ -37,6 +37,14 @@ def report_fatal(error):
     LOG.error('event=fatal type=%s stack=%s', type(error).__name__, locations)
 
 
+def report_page_failure(lease_id, stage, code, error):
+    cause = error.__cause__ or error
+    frames = traceback.extract_tb(cause.__traceback__)
+    locations = ','.join(f'{Path(f.filename).name}:{f.lineno}:{f.name}' for f in frames[-8:])
+    LOG.error('event=page_failed lease_id=%s stage=%s code=%s type=%s stack=%s',
+              lease_id, stage, code, type(cause).__name__, locations)
+
+
 class NetworkLog:
     def __init__(self):
         self.failures = {}

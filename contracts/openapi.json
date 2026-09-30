@@ -8610,23 +8610,9 @@
         "properties": {
           "code": {
             "type": "string",
-            "enum": [
-              "LEASE_STOPPED",
-              "ENGINE_UNAVAILABLE",
-              "CLASSIC_LOCAL_INTERRUPTED",
-              "INPUT_INVALID",
-              "INPUT_HASH_MISMATCH",
-              "INPUT_UNAVAILABLE",
-              "STORAGE_AUTH_FAILED",
-              "STORAGE_UNAVAILABLE",
-              "CLASSIC_ANALYZE_FAILED",
-              "CLASSIC_INPAINT_FAILED",
-              "CLASSIC_RENDER_FAILED",
-              "PROTOCOL_MISMATCH",
-              "TEXT_DEADLINE_EXCEEDED",
-              "DELIVERY_DEADLINE_EXCEEDED",
-              "PAGE_DEADLINE_EXCEEDED"
-            ],
+            "maxLength": 60,
+            "minLength": 1,
+            "pattern": "^[A-Z][A-Z0-9_]*$",
             "title": "Code"
           }
         },

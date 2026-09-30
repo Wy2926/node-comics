@@ -19,6 +19,42 @@ from manhua_engine.quality import detection_windows, unique_quads
 from manhua_engine.engine import group
 
 
+@pytest.mark.parametrize('source,expected', [
+    ('Test❤', 'Test♥'), ('Test❤️', 'Test♥'), ('♥\n❤', '♥\n♥'),
+    ('A\U0010FFFFB', 'AB'), ('\U0010FFFF', ''), ('Cafe\u0301', 'Cafe\u0301'),
+])
+def test_missing_characters_are_replaced_then_removed(monkeypatch, source, expected):
+    import manhua_engine.layout as layout
+    cmap = frozenset(map(ord, 'TestABCafe♥\u0301'))
+    monkeypatch.setattr(layout, 'coverage', lambda _: cmap)
+    monkeypatch.setattr(layout, 'combined_coverage', lambda _: cmap)
+    assert layout.supported_text(source, ('fixture',)) == expected
+
+
+def test_supported_characters_are_never_replaced(monkeypatch):
+    import manhua_engine.layout as layout
+    text = 'Test❤️'
+    monkeypatch.setattr(layout, 'coverage', lambda _: frozenset(map(ord, text)))
+    assert layout.supported_text(text, ('fixture',)) is text
+
+
+def test_missing_replacement_is_also_removed(monkeypatch):
+    import manhua_engine.layout as layout
+    monkeypatch.setattr(layout, 'coverage', lambda _: frozenset(map(ord, 'AB')))
+    monkeypatch.setattr(layout, 'combined_coverage', lambda _: frozenset(map(ord, 'AB')))
+    assert layout.supported_text('A❤B', ('fixture',)) == 'AB'
+
+
+def test_mixed_font_text_does_not_repeat_grapheme_segmentation(monkeypatch):
+    import manhua_engine.layout as layout
+    maps = {'latin': frozenset(map(ord, 'abc')), 'cjk': frozenset(map(ord, '中文'))}
+    monkeypatch.setattr(layout, 'coverage', maps.__getitem__)
+    monkeypatch.setattr(layout, 'combined_coverage', lambda _: frozenset().union(*maps.values()))
+    monkeypatch.setattr(layout, 'grapheme_clusters', lambda _: pytest.fail('cleanup repeated layout segmentation'))
+    text = '中文abc' * 400
+    assert layout.supported_text(text, tuple(maps)) is text
+
+
 @pytest.mark.parametrize('name,expected',[('Japanese','ja'),('en-US','en'),('Korean','ko'),('中文','zh'),('Japanese and Chinese (mixed)','ja')])
 def test_language_aliases(name,expected):
     assert language_code(name)==expected
@@ -83,6 +119,34 @@ def test_unicode_breaks_keep_punctuation_and_combining_sequences():
 
 
 FONT_TESTS = pytest.mark.skipif(not Path('C:/Windows/Fonts/malgun.ttf').is_file(),reason='Windows multilingual font fixture')
+
+
+@FONT_TESTS
+def test_missing_glyph_cleanup_runs_once_before_font_size_probes(monkeypatch):
+    import manhua_engine.layout as layout
+    original = layout.supported_text
+    calls = []
+    def clean(text, paths):
+        calls.append(text)
+        return original(text, paths)
+    monkeypatch.setattr(layout, 'supported_text', clean)
+    region = {'bbox': [5, 5, 230, 155], 'dir': 'h'}
+    expected = Image.new('RGB', (240, 160), 'white')
+    actual = expected.copy()
+    draw_region(expected, 'Hello world', region, target='en')
+    result = draw_region(actual, 'Hello\U0010FFFF world', region, target='en')
+    assert result['rendered'] and actual.tobytes() == expected.tobytes()
+    assert len(calls) == 2
+
+
+@FONT_TESTS
+def test_layout_errors_distinguish_geometry_and_overflow():
+    from manhua_engine.layout import LayoutError
+    for bbox, code in [([1, 1, 1, 30], 'CLASSIC_REGION_INVALID'),
+                       ([1, 1, 3, 3], 'CLASSIC_LAYOUT_OVERFLOW')]:
+        with pytest.raises(LayoutError, match=code):
+            draw_region(Image.new('RGB', (40, 40)), 'LongUnbreakable123456789',
+                        {'bbox': bbox, 'dir': 'h'}, target='en')
 
 
 @FONT_TESTS

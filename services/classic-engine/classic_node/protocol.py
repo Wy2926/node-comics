@@ -53,10 +53,13 @@ def pack_result(image, original, alpha, version, analysis, translated):
     patch[..., :3][mask] = final[y:bottom, x:right][mask]
     patch[..., 3][mask] = 255
     stream = BytesIO()
-    Image.fromarray(patch).save(stream, format='WEBP', lossless=True, method=4, exact=False)
+    try:
+        Image.fromarray(patch).save(stream, format='WEBP', lossless=True, method=4, exact=False)
+    except (OSError, ValueError) as error:
+        raise NodeFailure('CLASSIC_OUTPUT_ENCODE_FAILED') from error
     data = stream.getvalue()
     if len(data) > MAX_RESULT_BYTES:
-        raise NodeFailure('CLASSIC_RENDER_FAILED')
+        raise NodeFailure('CLASSIC_OUTPUT_TOO_LARGE')
     result.update(representation='overlay-v1', bbox={'x': x, 'y': y, 'width': right - x, 'height': bottom - y},
         output={'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data),
                 'width': right - x, 'height': bottom - y, 'mime': 'image/webp'})

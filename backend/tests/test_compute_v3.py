@@ -260,6 +260,48 @@ def test_deadline_cannot_be_extended_by_heartbeats(v3):
     assert reply.json()['job_status'] == 'failed'
 
 
+@pytest.mark.parametrize('code', ['CLASSIC_LAYOUT_OVERFLOW', 'FUTURE_NODE_ERROR_123'])
+def test_node_diagnostic_codes_fail_once_and_remain_visible(v3, code):
+    from app.models import Ledger
+    v3['create']()
+    lease = claim(v3).json()['leases'][0]
+    body = {'lease_token': lease['lease_token'], 'error': {'code': code}}
+    url = f'/leases/{lease["lease_id"]}/complete'
+    response = request(v3, url, body)
+    assert response.status_code == 200, response.text
+    assert response.json()['job_status'] == 'failed'
+    assert request(v3, url, body).json() == response.json()
+    with session_factory()() as db:
+        job = db.get(Job, lease['job_id'])
+        assert job.error_code == code and code in job.error_message
+        assert job.settlement == 'released'
+        stage = db.get(JobStage, db.get(ExecutionLease, lease['lease_id']).stage_id)
+        assert stage.status == 'failed' and stage.attempts == 1
+        assert db.scalar(select(func.count()).select_from(Ledger).where(
+            Ledger.job_id == job.id, Ledger.kind == 'release')) == 1
+
+
+def test_known_transient_node_error_still_retries(v3):
+    v3['create']()
+    lease = claim(v3).json()['leases'][0]
+    response = request(v3, f'/leases/{lease["lease_id"]}/complete',
+                       {'lease_token': lease['lease_token'], 'error': {'code': 'STORAGE_UNAVAILABLE'}})
+    assert response.status_code == 200, response.text
+    with session_factory()() as db:
+        job = db.get(Job, lease['job_id'])
+        assert job.status == 'running' and job.settlement == 'reserved'
+        stage = db.get(JobStage, db.get(ExecutionLease, lease['lease_id']).stage_id)
+        assert stage.status == 'ready'
+
+
+@pytest.mark.parametrize('code', ['', 'A' * 61, 'bad code', 'ERROR\n', '<script>', '错误'])
+def test_node_error_code_rejects_unbounded_or_unsafe_text(code):
+    from pydantic import ValidationError
+    from app.compute_v3 import NodeError
+    with pytest.raises(ValidationError):
+        NodeError(code=code)
+
+
 def test_version_languages_and_direct_input_access(v3):
     v3['create']()
     with session_factory()() as db:

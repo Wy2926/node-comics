@@ -7,7 +7,7 @@ import pytest
 
 from classic_node.agent import Agent, Page
 from classic_node.journal import Journal
-from classic_node.protocol import ControlFailure
+from classic_node.protocol import ControlFailure, NodeFailure
 
 
 class PendingPool:
@@ -63,6 +63,16 @@ def add_page(agent, key=0, **kwargs):
     server, _ = clock()
     agent.adopt(lease(key, **kwargs), server, time.monotonic())
     return agent.pages[str(key)]
+
+
+@pytest.mark.parametrize('error,expected', [(NodeFailure('FUTURE_RENDER_DETAIL'), 'FUTURE_RENDER_DETAIL'),
+                                          (ValueError('private text'), 'CLASSIC_RENDER_FAILED')])
+def test_page_failure_preserves_diagnostic_codes_and_identifies_stage(agent, error, expected):
+    page = add_page(agent)
+    page.step = 'render'
+    agent.pipeline.error(page, error)
+    assert page.step == 'deliver' and page.completion['error']['code'] == expected
+    assert agent.journal.get('lease:0')['completion']['error'] == {'code': expected}
 
 
 def test_updates_apply_translation_without_renewal_and_never_revive_expiry(agent):

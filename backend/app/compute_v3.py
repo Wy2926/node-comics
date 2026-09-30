@@ -421,14 +421,10 @@ def read_input(lease_id: str, x_lease_token: str = Header(max_length=64,
                              headers={'Content-Length': str(size), 'Cache-Control': 'private, no-store'})
 
 
-ErrorCode = Literal['LEASE_STOPPED', 'ENGINE_UNAVAILABLE', 'CLASSIC_LOCAL_INTERRUPTED',
-    'INPUT_INVALID', 'INPUT_HASH_MISMATCH', 'INPUT_UNAVAILABLE', 'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE',
-    'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED',
-    'PROTOCOL_MISMATCH', 'TEXT_DEADLINE_EXCEEDED', 'DELIVERY_DEADLINE_EXCEEDED', 'PAGE_DEADLINE_EXCEEDED']
-
-
 class NodeError(RequestBody):
-    code: ErrorCode
+    # Only codes with scheduling semantics are interpreted by the controller.
+    # Other node versions may add diagnostic codes without a center release.
+    code: str = Field(min_length=1, max_length=60, pattern=r'^[A-Z][A-Z0-9_]*$')
 
 
 class OutputInfo(RequestBody):
@@ -782,7 +778,8 @@ def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)
         from .dispatcher import recover_lease
         recover_lease(lease_id)
     else:
-        fail_stage(lease_id, ProcessingError(body.error.code, '计算节点未能完成此页'), token=body.lease_token, node_id=identity)
+        fail_stage(lease_id, ProcessingError(body.error.code, f'计算节点未能完成此页（{body.error.code}）'),
+                   token=body.lease_token, node_id=identity)
     with session_factory()() as db:
         lease = scoped_lease(db, lease_id, body.lease_token, identity)
         if not lease.completed_at:

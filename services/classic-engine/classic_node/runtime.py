@@ -9,10 +9,11 @@ import sys
 
 import numpy as np
 from PIL import Image
+from fontTools.ttLib import TTLibError
 from manhua_engine.engine import Engine, group
 from manhua_engine.quality import conservative_mask
 from manhua_engine.bubbles import lettering_areas
-from manhua_engine.layout import coverage, draw_region, font_paths, resolve_colors
+from manhua_engine.layout import LayoutError, coverage, draw_region, font_paths, resolve_colors
 from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest, mask_image, png64, pack_result
 
 LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫畫', 'ja': '日本語あいうアイウ',
@@ -137,18 +138,29 @@ class Runtime:
     def render(self, original, cleaned, analysis, translated, language, alpha):
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}):
-            raise NodeFailure('CLASSIC_RENDER_FAILED')
+            raise NodeFailure('CLASSIC_RENDER_MISMATCH')
+        if len(analysis['segments']) != len(analysis['regions']):
+            raise NodeFailure('CLASSIC_RENDER_MISMATCH')
         image = Image.fromarray(cleaned)
         areas = lettering_areas(cleaned, analysis['regions'])
+        rendered = False
         for segment, region, area in zip(analysis['segments'], analysis['regions'], areas):
             text = translated['translations'][segment['id']]
             if not isinstance(text, str) or not text.strip():
-                raise NodeFailure('CLASSIC_RENDER_FAILED')
+                raise NodeFailure('CLASSIC_RENDER_MISMATCH')
             fg, bg = resolve_colors(cleaned, region['bbox'])
-            layout = draw_region(image, text, region, self.engine.font, fg, bg,
-                                 target=language, direction=self.engine.direction, area=area)
+            try:
+                layout = draw_region(image, text, region, self.engine.font, fg, bg,
+                                     target=language, direction=self.engine.direction, area=area)
+            except LayoutError as error:
+                raise NodeFailure(error.code) from error
+            except (OSError, TTLibError) as error:
+                raise NodeFailure('CLASSIC_FONT_FAILED') from error
             if not layout['rendered']:
-                raise NodeFailure('CLASSIC_RENDER_FAILED')
-        if not np.any(np.array(image) != cleaned):
-            raise NodeFailure('CLASSIC_RENDER_FAILED')
+                if layout.get('reason') == 'unsupported characters':
+                    continue
+                raise NodeFailure('CLASSIC_RENDER_EMPTY')
+            rendered = True
+        if rendered and not np.any(np.array(image) != cleaned):
+            raise NodeFailure('CLASSIC_RENDER_EMPTY')
         return pack_result(image, original, alpha, self.version, analysis, translated)

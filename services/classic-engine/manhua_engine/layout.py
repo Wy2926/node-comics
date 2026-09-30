@@ -16,12 +16,39 @@ FONT = 'C:/Windows/Fonts/msyh.ttc'
 VERTICAL = str.maketrans({'…':'︙','‥':'︰','（':'︵','）':'︶','「':'﹁','」':'﹂','『':'﹃','』':'﹄','ー':'丨','—':'︱','–':'︱','－':'︱'})
 PUNCTUATION = str.maketrans({'⁉':'!?','‼':'!!','⁇':'??','⁈':'?!'})
 LATIN = str.maketrans({chr(i+0xfee0):chr(i) for i in range(0x21,0x7f) if chr(i).isalnum()})
+MISSING_GLYPH_REPLACEMENTS = {'❤': '♥', '❥': '♥', '❣': '♥', '♡': '♥'}
+
+
+class LayoutError(ValueError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
+def supported_text(text, paths):
+    """Substitute known missing symbols, then omit unsupported codepoints once."""
+    cmaps = tuple(coverage(path) for path in paths)
+    required = {ord(c) for c in set(text) if not c.isspace() and unicodedata.category(c) != 'Cf'}
+    if any(required <= cmap for cmap in cmaps):
+        return text
+    available = combined_coverage(paths)
+    missing = required - available
+    replacements = {code: ''.join(c for c in MISSING_GLYPH_REPLACEMENTS.get(chr(code), '')
+                                  if ord(c) in available) for code in missing}
+    if replacements:
+        text = text.translate(replacements)
+    return text
 
 
 @lru_cache(maxsize=32)
 def coverage(path):
     with TTFont(path, fontNumber=0, lazy=True) as font:
         return frozenset(font.getBestCmap())
+
+
+@lru_cache(maxsize=16)
+def combined_coverage(paths):
+    return frozenset().union(*(coverage(path) for path in paths))
 
 
 @lru_cache(maxsize=16)
@@ -287,6 +314,8 @@ def draw_bubble(image, text, paths, area, fill, stroke, minimum):
     alpha[area['mask']==0] = 0
     layer.putalpha(Image.fromarray(alpha))
     ink = layer.getbbox()
+    if ink is None:
+        raise LayoutError('CLASSIC_RENDER_EMPTY')
     image.paste(layer,(x0,y0),layer)
     return {'rendered':True,'font_px':size/2,'direction':'h','lines':[value for value,_ in plan],
             'fonts':list(dict.fromkeys(p for p,_ in font_runs(text,paths))),
@@ -299,10 +328,14 @@ def draw_region(image,text,region,font_path=None,fill=(0,0,0),stroke=(255,255,25
     language = language_code(target) or target
     custom = (str(font_path),) if isinstance(font_path,(str,Path)) else tuple(font_path or ())
     paths = font_paths(custom,language)
+    text = supported_text(text, paths)
+    if not any(not c.isspace() and unicodedata.category(c) != 'Cf' for c in text):
+        return {'rendered': False, 'reason': 'unsupported characters'}
     x0,y0,x1,y1 = map(int,region['bbox'])
     x0,y0 = max(0,x0),max(0,y0); x1,y1 = min(image.width,x1),min(image.height,y1)
     bw,bh = x1-x0,y1-y0
-    if bw<2 or bh<2 or not text.strip(): return {'rendered':False,'reason':'empty region'}
+    if bw<2 or bh<2:
+        raise LayoutError('CLASSIC_REGION_INVALID')
     vertical = direction=='vertical' or (direction=='auto' and language in ('zh','ja') and region['dir']=='v')
     angle = region.get('angle',0.); scale = 2
     width = max(2,round((region.get('boxW',bw) if abs(angle)>=3 else bw)*scale))
@@ -318,7 +351,7 @@ def draw_region(image,text,region,font_path=None,fill=(0,0,0),stroke=(255,255,25
         result = draw_bubble(image,text,paths,area,fill,stroke,best[0]/scale if best else 2)
         if result is not None:
             return result
-    if best is None: raise ValueError('Text cannot fit without breaking words or graphemes')
+    if best is None: raise LayoutError('CLASSIC_LAYOUT_OVERFLOW')
     size,(lines,advance) = best
     layer = Image.new('RGBA',(width,height)); fill,stroke = tuple(fill),tuple(stroke)
     if vertical:
@@ -339,6 +372,8 @@ def draw_region(image,text,region,font_path=None,fill=(0,0,0),stroke=(255,255,25
     if abs(angle)>=3: layer = layer.rotate(-angle,Image.Resampling.BICUBIC,expand=True)
     ratio = min(bw/layer.width,bh/layer.height)
     layer = layer.resize((max(1,round(layer.width*ratio)),max(1,round(layer.height*ratio))),Image.Resampling.LANCZOS)
+    if layer.getbbox() is None:
+        raise LayoutError('CLASSIC_RENDER_EMPTY')
     px,py = x0+(bw-layer.width)//2,y0+(bh-layer.height)//2
     image.paste(layer,(px,py),layer)
     return {'rendered':True,'font_px':round(size*ratio,2),'direction':'v' if vertical else 'h',

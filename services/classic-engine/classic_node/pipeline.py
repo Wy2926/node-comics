@@ -1,9 +1,11 @@
 """Bounded page state, with computation independent of network and text waits."""
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+import re
 import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest
+from .operations import report_page_failure
 
 
 class Pipeline:
@@ -113,10 +115,11 @@ class Pipeline:
         if isinstance(error, NodeFailure) and error.code == 'LEASE_STOPPED':
             page.stopped = True
             return
-        code = error.code if isinstance(error, NodeFailure) and error.code in {
-            'PROTOCOL_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH',
-            'STORAGE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED'
-        } else 'CLASSIC_LOCAL_INTERRUPTED'
+        code = error.code if isinstance(error, NodeFailure) and re.fullmatch(r'[A-Z][A-Z0-9_]{0,59}', error.code) else {
+            'analyze': 'CLASSIC_ANALYZE_FAILED', 'inpaint': 'CLASSIC_INPAINT_FAILED',
+            'render': 'CLASSIC_RENDER_FAILED',
+        }.get(page.step, 'CLASSIC_LOCAL_INTERRUPTED')
+        report_page_failure(page.lease['lease_id'], page.step, code, error)
         saved = self.agent.journal.get('lease:' + page.lease['lease_id'], {})
         page.completion = saved.get('completion') or {'lease_token': page.lease['lease_token'], 'error': {'code': code}}
         self.agent.journal.put('lease:' + page.lease['lease_id'], {**saved, 'completion': page.completion})

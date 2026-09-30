@@ -10,8 +10,8 @@ import pytest
 
 from classic_node.agent import Agent
 from classic_node.journal import Journal
-from classic_node.operations import LOG, NetworkLog, Operations, configure_logging, report_fatal
-from classic_node.protocol import ControlFailure
+from classic_node.operations import LOG, NetworkLog, Operations, configure_logging, report_fatal, report_page_failure
+from classic_node.protocol import ControlFailure, NodeFailure
 from classic_node.transport import Transport
 
 
@@ -134,10 +134,14 @@ def test_log_records_status_and_exception_type_without_payload(tmp_path):
             raise ValueError('private-token https://r2.example.test/?signature=secret OCR text')
         except ValueError as error:
             report_fatal(error)
+            wrapped = NodeFailure('CLASSIC_LAYOUT_OVERFLOW')
+            wrapped.__cause__ = error
+            report_page_failure('lease-test', 'render', wrapped.code, wrapped)
         output = (tmp_path / 'node.log').read_text(encoding='utf-8')
         assert output.count('event=connection_failed') == 1
         assert 'http_status=403' in output and 'failed_attempts=2' in output
         assert 'type=ValueError' in output and 'test_node_operations.py:' in output
+        assert 'event=page_failed lease_id=lease-test stage=render code=CLASSIC_LAYOUT_OVERFLOW' in output
         assert 'private-token' not in output and 'signature=' not in output and 'OCR text' not in output
         datetime.strptime(output.splitlines()[0].split()[0], '%Y-%m-%dT%H:%M:%SZ')
     finally:

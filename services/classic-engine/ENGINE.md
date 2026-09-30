@@ -16,7 +16,7 @@
 
 OCR 权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。识别范围对齐这个 `48px_ctc`，不等同于上游默认 `48px` 或所有可选模型能力的合集。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
 
-采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。无字体覆盖时明确报错，避免静默嵌入方框。`--direction horizontal/vertical` 可覆盖默认方向。
+采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。不支持的字符先按固定表替换（例如 `❤` → `♥`），仍不支持则移除；整段移空时跳过该段嵌字，保留抹字结果并继续其他段。只调整绘制文本，不修改中心译文。字体覆盖表有界缓存，每段在字号试探前清理一次。`--direction horizontal/vertical` 可覆盖默认方向。
 
 长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每条 OCR 最多进行一次低置信度重裁剪；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
 
