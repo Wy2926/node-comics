@@ -2,7 +2,7 @@
 
 常规漫画翻译的图像引擎和整页计算节点：NCNN Vulkan 检测／OCR、ONNX FP32 LaMa 抹字、字体嵌字。Windows 使用 DirectML，Linux NVIDIA 使用 CUDA；文本翻译由中心执行。
 
-直接部署使用 [Windows 独立节点包](../compute-node/README.md)；本目录用于引擎与节点协议开发。
+直接部署使用 [Windows 独立节点包](../compute-node/README.md)或 [Linux NVIDIA 镜像](../compute-node/linux/README.md)；本目录用于引擎与节点协议开发。
 
 ## 开发环境
 

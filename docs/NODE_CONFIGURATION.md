@@ -1,6 +1,6 @@
 # 节点配置
 
-图像节点使用整页 v3 协议，经中心读取临时原图并提交覆盖文件。部署使用 [Windows 节点包](../services/compute-node/README.md)，开发使用 [classic-engine](../services/classic-engine/README.md)。
+图像节点使用整页 v3 协议，经中心读取临时原图并提交覆盖文件。部署使用 [Windows 节点包](../services/compute-node/README.md)或 [Linux NVIDIA 镜像](../services/compute-node/linux/README.md)，开发使用 [classic-engine](../services/classic-engine/README.md)。
 
 ## 中心与本地的职责
 

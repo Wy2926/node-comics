@@ -92,7 +92,7 @@
 | [后端](backend/README.md) | API、持久任务、账户、会员与管理后台 |
 | [官网](backend/website/README.md) | 五语介绍、下载与账户页面 |
 | [Drive 连接页](apps/drive-connect/README.md) | Google 授权与文件选择 |
-| [计算节点](services/compute-node/README.md) | Windows 独立节点的安装、运行与构建 |
+| [计算节点](services/compute-node/README.md) | Windows 独立包与 Linux NVIDIA 镜像的安装、运行与构建 |
 | [图像引擎](services/classic-engine/README.md) | 检测、OCR、LaMa 抹字与嵌字开发 |
 
 各模块 README 提供环境要求和运行命令；验证工具见[脚本入口](scripts/README.md)。

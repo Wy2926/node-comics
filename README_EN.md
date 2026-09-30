@@ -94,7 +94,7 @@ The module guides and technical documents linked below are currently in Chinese.
 | [Backend](backend/README.md) | API, persistent jobs, accounts, subscriptions, and administration |
 | [Website](backend/website/README.md) | Product pages in five languages, downloads, and account pages |
 | [Drive connection page](apps/drive-connect/README.md) | Google authorization and file selection |
-| [Compute node](services/compute-node/README.md) | Install, run, and build the standalone Windows node |
+| [Compute node](services/compute-node/README.md) | Install, run, and build the Windows bundle or Linux NVIDIA image |
 | [Image engine](services/classic-engine/README.md) | Text detection, OCR, LaMa inpainting, and text rendering |
 
 Each module README lists its requirements and run commands. See the [scripts guide](scripts/README.md) for validation tools.

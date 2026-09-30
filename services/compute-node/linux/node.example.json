@@ -1,0 +1,22 @@
+{
+  "protocol_version": 3,
+  "control_url": "https://control.example.com",
+  "node_id": "REPLACE_WITH_ADMIN_NODE_ID",
+  "node_token": "REPLACE_WITH_NODE_CREDENTIAL",
+  "resource_id": "REPLACE_WITH_UNIQUE_MACHINE_GPU_RESOURCE_ID",
+  "state_dir": "/data/state",
+  "local_pages": 2,
+  "max_leases": 8,
+  "download_workers": 6,
+  "delivery_workers": 6,
+  "resident_bytes": 2147483648,
+  "engine": {
+    "gpu": 0,
+    "inpaint_gpu": 0,
+    "ocr_language": "auto",
+    "ocr_workers": 8,
+    "threads": 2,
+    "detect_size": 1280,
+    "tile": 768
+  }
+}

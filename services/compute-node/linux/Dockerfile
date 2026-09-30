@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1
+# Build from the repository root. GPU access is required only at runtime.
+FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04@sha256:ac55d124da4882b497f732d8dfd9a702d5447a5f29d08d56da6f64f0a1eb34bc AS base
+RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+    python3 python3-venv ca-certificates libvulkan1 libgl1 libegl1 libglib2.0-0 libgomp1 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONUTF8=1 \
+    UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
+
+FROM base AS assets
+COPY --from=uv /uv /usr/local/bin/uv
+WORKDIR /src/services/classic-engine
+COPY services/compute-node/build-deps/ /src/services/compute-node/build-deps/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --python /usr/bin/python3 --project ../compute-node/build-deps/ocr \
+    && uv sync --locked --no-dev --python /usr/bin/python3 --project ../compute-node/build-deps/lama
+COPY services/compute-node/toolchain.lock.json services/compute-node/assets.json services/compute-node/build_support.py /src/services/compute-node/
+COPY services/classic-engine/tools/ tools/
+COPY services/classic-engine/manhua_engine/models.json services/classic-engine/manhua_engine/alphabet.txt manhua_engine/
+COPY services/compute-node/linux/build_assets.py /src/services/compute-node/linux/build_assets.py
+RUN --mount=type=cache,target=/cache/downloads \
+    python3 ../compute-node/linux/build_assets.py --output /bundle --cache /cache/downloads
+
+FROM base AS dependencies
+COPY --from=uv /uv /usr/local/bin/uv
+WORKDIR /opt/node/engine
+COPY services/classic-engine/pyproject.toml services/classic-engine/uv.lock ./
+ENV UV_PROJECT_ENVIRONMENT=/opt/node/venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project --python /usr/bin/python3
+
+FROM base AS runtime
+ARG VERSION=development
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="Node Comics Compute" \
+    org.opencontainers.image.source="https://github.com/Wy2926/node-comics" \
+    org.opencontainers.image.licenses="GPL-3.0-only" \
+    org.opencontainers.image.version=$VERSION \
+    org.opencontainers.image.revision=$REVISION
+ENV PATH=/opt/node/venv/bin:$PATH \
+    PYTHONPATH=/opt/node/engine \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+RUN groupadd --gid 10001 node && useradd --uid 10001 --gid 10001 --no-create-home node \
+    && mkdir /data && chown 10001:10001 /data && chmod 700 /data
+COPY --from=dependencies /opt/node/venv /opt/node/venv
+COPY --from=assets /bundle/ /opt/node/
+COPY services/classic-engine/classic_node/ /opt/node/engine/classic_node/
+COPY services/classic-engine/manhua_engine/ /opt/node/engine/manhua_engine/
+COPY services/classic-engine/LICENSE services/classic-engine/THIRD_PARTY.md services/classic-engine/pyproject.toml services/classic-engine/uv.lock /opt/node/engine/
+# Keep build source and provenance alongside the runtime, without Torch/pnnx.
+COPY services/classic-engine/tools/ /opt/node/source/classic-engine/tools/
+COPY services/compute-node/build-deps/ /opt/node/source/compute-node/build-deps/
+COPY services/compute-node/build_support.py services/compute-node/toolchain.lock.json services/compute-node/assets.json /opt/node/source/compute-node/
+COPY services/compute-node/linux/ /opt/node/source/compute-node/linux/
+RUN python -m unittest discover -s /opt/node/source/compute-node/linux -p test_container.py \
+    && python /opt/node/source/compute-node/linux/verify_assets.py
+WORKDIR /data
+USER 10001:10001
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=5s --start-period=600s --retries=3 \
+    CMD ["python", "/opt/node/source/compute-node/linux/healthcheck.py"]
+ENTRYPOINT ["python", "/opt/node/source/compute-node/linux/entrypoint.py"]
+CMD []

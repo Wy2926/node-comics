@@ -34,7 +34,7 @@ uv sync --locked --extra test --extra build
 
 也可只下载所需模型，如 `download --ocr-language ko`。模型清单随包分发，支持从其他工作目录调用；下载时校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
 
-MIT OCR 与 LaMa 的完整构建统一使用 [Windows 节点构建入口](../compute-node/README.md#开发构建与验证)。它自动下载固定源码与检查点，分别创建锁定的 OCR 和 LaMa 转换环境，不依赖本机已有的 `models/` 或 `.venv-build`。构建不要求 Git 克隆上游完整应用；OCR 所需模型源码单文件以固定提交 URL 和 SHA-256 校验。
+MIT OCR 与 LaMa 的完整构建使用 [Windows 节点构建入口](../compute-node/README.md#开发构建与验证)或 [Linux NVIDIA 镜像构建](../compute-node/linux/README.md#构建)。两者复用转换器和锁文件，自动下载固定源码与检查点，分别创建锁定的 OCR 和 LaMa 转换环境，不依赖本机已有的 `models/` 或 `.venv-build`。构建不要求 Git 克隆上游完整应用；OCR 所需模型源码单文件以固定提交 URL 和 SHA-256 校验。
 
 转换器 `tools/build_ocr.py` 由构建入口传入已校验的 `--source-file`、`--archive`、`--work` 和 `--output`。它校验检查点和字典；运行只需要 `ocr-fp32/backbone.ncnn.param/bin` 和 `decoder.onnx`。构建工作目录另保留 `ocr.onnx` 与 `build.json` 供数值验证。实际推理始终关闭 FP16。
 

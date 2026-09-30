@@ -1,0 +1,36 @@
+services:
+  node:
+    image: ${NODE_IMAGE:-node-comics-compute:linux-cuda}
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 90s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_DEVICE:-0}"]
+              capabilities: [gpu]
+    volumes:
+      - node-state:/data
+      - type: bind
+        source: ./node.local.json
+        target: /data/node.json
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=268435456,mode=1777
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  node-state:

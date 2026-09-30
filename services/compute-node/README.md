@@ -1,5 +1,7 @@
 # Node Comics Node
 
+Linux NVIDIA 部署使用[GPU 容器镜像](linux/README.md)，内置 CUDA/cuDNN、模型与字体；以下为 Windows 独立包。
+
 Windows x64 独立计算节点。发布包内置原生 `node.exe`、Python 运行时、推理模型与固定字体；目标电脑需要 Windows 10/11 和 Vulkan／DirectX 12 显卡驱动。
 
 ## 安装与运行
