@@ -149,6 +149,11 @@ class ContainerTests(unittest.TestCase):
         self.assertIn('NODE_TOKEN=REPLACE_WITH_NODE_TOKEN', template['env'])
         self.assertNotIn('-p ', template['env'])
         self.assertTrue(template['private'])
+        # Vast's editor splits at ':'; tag+digest is silently truncated on save.
+        self.assertEqual(template['image'], 'vastai/base-image@sha256')
+        self.assertRegex(template['tag'], r'^[a-f0-9]{64}$')
+        self.assertIn('unset NODE_CONTROL_URL NODE_ID NODE_TOKEN NODE_RESOURCE_ID', template['onstart'])
+        self.assertNotIn('RELEASE_BOOTSTRAP_PENDING', template['onstart'])
 
 
 if __name__ == '__main__':
