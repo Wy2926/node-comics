@@ -1,7 +1,7 @@
 {
-  "name": "Node Comics GPU 0.1.1 (CUDA 12.8.1)",
-  "image": "vastai/base-image",
-  "tag": "cuda-12.8.1-auto@sha256:613382a2fd4238cadc8348389523c90201b131c530a430f46b313441d3280fbb",
+  "name": "Node Comics GPU 0.1.1 - Runtime",
+  "image": "vastai/base-image@sha256",
+  "tag": "613382a2fd4238cadc8348389523c90201b131c530a430f46b313441d3280fbb",
   "runtype": "ssh",
   "args_str": "",
   "use_ssh": true,
@@ -18,6 +18,6 @@
     "cuda_max_good": {"gte": 12.8}
   },
   "desc": "Pinned Vast CUDA base + checksummed runtime release. 2 compute, 8 in flight, 6 download, 6 delivery.",
-  "href": "https://github.com/Wy2926/node-comics/tree/compute-linux-v0.1.1/services/compute-node/linux",
+  "href": "https://github.com/Wy2926/node-comics/releases/tag/compute-linux-v0.1.1",
   "readme": "Use SSH launch mode and the supplied on-start script. Fill a NEW independent NODE_ID, NODE_TOKEN and NODE_RESOURCE_ID before renting; center execution_slots=8. Never save real credentials into the template or account-wide variables. Runtime downloads once and verifies SHA-256; subsequent starts reuse it and refuse identity changes. GPU warmup precedes registration; inspect /var/lib/node-comics/state/status.json and center heartbeat. Requires Ubuntu 24.04 x86_64, Python 3.12, CUDA 12.8/cuDNN 9 and host NVIDIA Vulkan drivers. No application inbound ports. Stop/start preserves state; recycle/destroy without a volume loses it: drain and back up first. No in-place automatic upgrades."
 }
