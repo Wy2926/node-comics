@@ -8,7 +8,7 @@
   "ssh_direct": true,
   "private": true,
   "env": "-e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics -e NODE_CONTROL_URL=https://comics.nodelane.net -e NODE_ID=REPLACE_WITH_NODE_ID -e NODE_TOKEN=REPLACE_WITH_NODE_TOKEN -e NODE_RESOURCE_ID=REPLACE_WITH_RESOURCE_ID",
-  "onstart": "RELEASE_BOOTSTRAP_PENDING",
+  "onstart": "set +x\nset -e\numask 077\nif ! printf '4f0a845dd97624839305e2a5e7f2576a6c8fdc765bfc7a1e82ca9488fc6e9e25  /opt/node-comics-bootstrap.py\\n' | sha256sum --status -c -; then\n  bootstrap_tmp=$(mktemp /tmp/node-comics-bootstrap.XXXXXX)\n  trap 'rm -f -- \"$bootstrap_tmp\"' EXIT\n  curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --retry 5 --connect-timeout 30 --max-time 120 -o \"$bootstrap_tmp\" https://github.com/Wy2926/node-comics/releases/download/compute-linux-v0.1.1/vast_bootstrap.py\n  printf '4f0a845dd97624839305e2a5e7f2576a6c8fdc765bfc7a1e82ca9488fc6e9e25  %s\\n' \"$bootstrap_tmp\" | sha256sum -c -\n  install -m 700 \"$bootstrap_tmp\" /opt/node-comics-bootstrap.py\n  rm -f -- \"$bootstrap_tmp\"\n  trap - EXIT\nfi\n/usr/bin/python3 /opt/node-comics-bootstrap.py --url https://github.com/Wy2926/node-comics/releases/download/compute-linux-v0.1.1/node-comics-runtime-0.1.1-linux-amd64.tar.gz --sha256 4a61061991a0ccd934cefd4d1f68ee1b359377e82b9478aaa7bff68e882c70d3\nunset NODE_CONTROL_URL NODE_ID NODE_TOKEN NODE_RESOURCE_ID\nexec entrypoint.sh --no-update-portal --no-update-vast",
   "recommended_disk_space": 32,
   "extra_filters": {
     "cpu_arch": {"eq": "amd64"},
