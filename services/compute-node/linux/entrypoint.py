@@ -16,6 +16,8 @@ def prepare_config(directory, environ):
     from classic_node.config import load, origin
     path = Path(directory) / 'node.json'
     supplied = {field: environ.get(env, '').strip() for env, field in IDENTITY.items()}
+    if supplied['control_url']:
+        supplied['control_url'] = origin(supplied['control_url'])
     if path.is_file():
         existing = load(path)
         # Never silently reuse recovery state for a different node/center/resource.

@@ -55,6 +55,7 @@ COPY services/compute-node/build-deps/ /opt/node/source/compute-node/build-deps/
 COPY services/compute-node/build_support.py services/compute-node/toolchain.lock.json services/compute-node/assets.json /opt/node/source/compute-node/
 COPY services/compute-node/linux/ /opt/node/source/compute-node/linux/
 RUN python -m unittest discover -s /opt/node/source/compute-node/linux -p test_container.py \
+    && python -m unittest discover -s /opt/node/source/compute-node/linux -p test_vast_bootstrap.py \
     && python /opt/node/source/compute-node/linux/verify_assets.py
 WORKDIR /data
 USER 10001:10001

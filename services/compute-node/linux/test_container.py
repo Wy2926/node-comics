@@ -118,6 +118,7 @@ class ContainerTests(unittest.TestCase):
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             before = path.read_bytes()
             self.assertEqual(entry.prepare_config(root, environ), path)
+            self.assertEqual(entry.prepare_config(root, environ | {'NODE_CONTROL_URL': 'https://example.com/'}), path)
             self.assertEqual(entry.prepare_config(root, {}), path)
             for key in environ:
                 with self.assertRaises(ValueError):
@@ -143,7 +144,7 @@ class ContainerTests(unittest.TestCase):
 
     def test_vast_template_has_no_identity_or_exposed_ports(self):
         template = json.loads((ROOT / 'vast-template.json').read_text())
-        self.assertEqual(template['runtype'], 'args')
+        self.assertEqual(template['runtype'], 'ssh')
         self.assertEqual(template['args_str'], '')
         self.assertIn('NODE_TOKEN=REPLACE_WITH_NODE_TOKEN', template['env'])
         self.assertNotIn('-p ', template['env'])

@@ -1,14 +1,15 @@
 {
-  "name": "Node Comics GPU 0.1.0 (CUDA 12.8.1)",
-  "image": "wyang9996/node-comics-compute",
-  "tag": "0.1.0-cuda12.8.1",
-  "runtype": "args",
+  "name": "Node Comics GPU 0.1.1 (CUDA 12.8.1)",
+  "image": "vastai/base-image",
+  "tag": "cuda-12.8.1-auto@sha256:613382a2fd4238cadc8348389523c90201b131c530a430f46b313441d3280fbb",
+  "runtype": "ssh",
   "args_str": "",
-  "use_ssh": false,
-  "ssh_direct": false,
+  "use_ssh": true,
+  "ssh_direct": true,
   "private": true,
   "env": "-e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics -e NODE_CONTROL_URL=https://comics.nodelane.net -e NODE_ID=REPLACE_WITH_NODE_ID -e NODE_TOKEN=REPLACE_WITH_NODE_TOKEN -e NODE_RESOURCE_ID=REPLACE_WITH_RESOURCE_ID",
-  "recommended_disk_space": 24,
+  "onstart": "RELEASE_BOOTSTRAP_PENDING",
+  "recommended_disk_space": 32,
   "extra_filters": {
     "cpu_arch": {"eq": "amd64"},
     "num_gpus": {"eq": 1},
@@ -16,7 +17,7 @@
     "cpu_ram": {"gte": 16000},
     "cuda_max_good": {"gte": 12.8}
   },
-  "desc": "Node Comics v3 GPU worker: 2 compute pages, 8 in flight, 6 downloads, 6 deliveries. No startup downloads.",
-  "href": "https://github.com/Wy2926/node-comics/tree/main/services/compute-node/linux",
-  "readme": "Choose Docker ENTRYPOINT mode. Before renting, replace NODE_ID, NODE_TOKEN and NODE_RESOURCE_ID with a newly provisioned independent identity; center execution_slots must be 8. Set NODE_CONTROL_URL if using another HTTPS center. Do not save real tokens into any template or account-wide variables. GPU warmup completes before registration. Inspect instance logs and center heartbeat to confirm readiness. No inbound ports or SSH server are provided. Keep /data for stop/start recovery; drain work and back up before recycle/destroy. Requires x86_64 and NVIDIA Vulkan/graphics drivers; CUDA visibility alone is insufficient. GPU/RAM sizing is a starting requirement, not a throughput guarantee."
+  "desc": "Pinned Vast CUDA base + checksummed runtime release. 2 compute, 8 in flight, 6 download, 6 delivery.",
+  "href": "https://github.com/Wy2926/node-comics/tree/compute-linux-v0.1.1/services/compute-node/linux",
+  "readme": "Use SSH launch mode and the supplied on-start script. Fill a NEW independent NODE_ID, NODE_TOKEN and NODE_RESOURCE_ID before renting; center execution_slots=8. Never save real credentials into the template or account-wide variables. Runtime downloads once and verifies SHA-256; subsequent starts reuse it and refuse identity changes. GPU warmup precedes registration; inspect /var/lib/node-comics/state/status.json and center heartbeat. Requires Ubuntu 24.04 x86_64, Python 3.12, CUDA 12.8/cuDNN 9 and host NVIDIA Vulkan drivers. No application inbound ports. Stop/start preserves state; recycle/destroy without a volume loses it: drain and back up first. No in-place automatic upgrades."
 }
