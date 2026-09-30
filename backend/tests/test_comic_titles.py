@@ -140,7 +140,7 @@ def test_real_adapter_payload_with_mock_transport(client, monkeypatch, protocol)
         messages = payload['messages' if protocol == 'chat_completions' else 'input']
         assert messages[0] == {'role': 'system', 'content': comic_titles.TITLE_INSTRUCTIONS}
         assert messages[1]['role'] == 'user' and json.loads(messages[1]['content']) == BODY
-        assert 'translations[' not in request.content.decode()
+        assert 'translations' not in request.content.decode()
         calls.append(request.url.path)
         content = '{"name":"Attack on Titan","target_language":"en"}'
         response = {'choices': [{'message': {'content': content}, 'finish_reason': 'stop'}]} if protocol == 'chat_completions' else {

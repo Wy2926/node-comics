@@ -32,7 +32,7 @@ def v3(client, monkeypatch, png):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     settings.cache_clear()
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        'translations[1]{id,text}:\n  "0",Hello', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
+        '{"translations":{"0":"Hello"}}', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
     node, auth, admin = provision(client, 'test:vulkan:0')
     with session_factory()() as db:
         record = db.get(ComputeNode, node['node_id'])

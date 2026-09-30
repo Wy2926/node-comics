@@ -88,16 +88,16 @@ def text_case(text_database, monkeypatch):
     from app.storage import get_store
     get_store().put('isolated-original', b'fixture', 'image/png', kind='original')
     def text(*args):
-        return TextResponse('translations[1]{id,text}:\n  b001,你好！',
+        return TextResponse('{"translations":{"b001":"你好！"}}',
                             {'input_tokens': 100, 'output_tokens': 20}, 'isolated-request')
     monkeypatch.setattr(classic, 'call_text', text)
     return job_id, lease_id
 
 
-@pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"translations":[{"id":"wrong","text":"好"}]}',
-    '{"translations":[{"id":"b001","text":""}]}', '{"translations":[{"id":"b001","text":2}]}',
-    '{"translations":[{"id":"b001","text":"好"},{"id":"b001","text":"好"}]}',
-    '{"translations":[{"id":"b001","text":"好"}],"note":"injected"}', 'not json'])
+@pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"translations":{"wrong":"好"}}',
+    '{"translations":{"b001":""}}', '{"translations":{"b001":2}}',
+    '{"translations":{"b001":"好","b001":"好"}}',
+    '{"translations":{"b001":"好"},"note":"injected"}', 'not json'])
 def test_rejects_incomplete_or_ambiguous_contract(content):
     with pytest.raises(TextError):
         parse_translations(content, SEGMENTS)
@@ -125,6 +125,22 @@ def test_format_repair_records_cost_for_every_subcall(text_case, monkeypatch):
         assert calls[0].error_code == 'TEXT_INVALID_RESPONSE'
         assert calls[0].accounted_micros == 650
         assert all(call.usage for call in calls)
+
+
+def test_invalid_json_never_saves_partial_translations_and_stops_at_attempt_limit(text_case, monkeypatch):
+    monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
+        '{"translations":{"b001":"first","b001":"second"}}',
+        {'input_tokens': 100, 'output_tokens': 5}, 'duplicate-json-id'))
+    monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
+    with pytest.raises(TextError, match='TEXT_INVALID_RESPONSE'):
+        classic.run_text_stage(*text_case)
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall)).all()
+        assert len(calls) == 3
+        assert all(call.error_code == 'TEXT_INVALID_RESPONSE' and call.accounted_micros == 650 for call in calls)
+        assert db.get(ClassicState, text_case[0]).translations == {}
+    with pytest.raises(TextError, match='TEXT_RETRY_EXHAUSTED'):
+        classic.run_text_stage(*text_case)
 
 
 def test_unknown_call_keeps_metering_without_cost_cap_and_stops_at_attempt_limit(text_case, monkeypatch):

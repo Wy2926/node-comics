@@ -170,6 +170,19 @@ def test_multiple_suppliers_weighted_routing_and_secret_free_snapshots(admin_cas
         assert not enabled(db)  # No silent fallback to a different supplier.
 
 
+def test_json_prompt_version_changes_cache_identity_without_changing_node_protocol(admin_case, monkeypatch):
+    from app import classic_config
+    create(admin_case)
+    with session_factory()() as db:
+        current = snapshot(db)
+        monkeypatch.setattr(classic_config, 'PROMPT_VERSION', 'previous-prompt')
+        previous = snapshot(db)
+    assert current['prompt_version'] == 'comic-json-v6'
+    assert current['engine'] == previous['engine'] == {'protocol_version': 3}
+    assert current['text'] == previous['text']
+    assert digest(current) != digest(previous)
+
+
 def test_revision_changes_pin_old_endpoint_key_and_cache_identity(admin_case, monkeypatch):
     client, auth = admin_case
     first = create(admin_case)
@@ -310,7 +323,7 @@ def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_cas
     seen = []
     def call(messages, profile, api_key):
         seen.append((messages, profile['channel'], api_key))
-        return TextResponse('translations[0]{id,text}:', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
+        return TextResponse('{"translations":{}}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
     monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', LLMConfig, (), call))
     provider = create(admin_case, {'name': 'Second source', 'channel': 'synthetic',
                                   'config': {'model': 'test'}, 'api_key': 'isolated-new-key'})
