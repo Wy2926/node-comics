@@ -8,10 +8,10 @@ import {fixture,target,snapshot,entitlement} from './translation-fixture';
 afterEach(()=>vi.restoreAllMocks());
 function controlledClock(){let wall=Date.now(),monotonic=performance.now();vi.spyOn(Date,'now').mockImplementation(()=>wall);vi.spyOn(performance,'now').mockImplementation(()=>monotonic);return (milliseconds:number)=>{wall+=milliseconds;monotonic+=milliseconds;};}
 describe('independent translation resources',()=>{
- it('submits only newly entered pages and promotes a prefetch once',async()=>{
+ it('submits only newly entered pages without reprioritizing accepted requests',async()=>{
   const f=fixture();await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledTimes(4);
   await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledTimes(4);
-  const id=f.submit.mock.calls[1][0];await f.core.submit([1,2,3,4].map(target));expect(f.submit).toHaveBeenCalledTimes(6);expect(f.submit.mock.calls[4]).toMatchObject([id,{priority:'current'}]);
+  await f.core.submit([1,2,3,4].map(target));expect(f.submit).toHaveBeenCalledTimes(5);expect(f.submit.mock.calls.every(([,body])=>!('priority' in body))).toBe(true);
  });
  it('starts the current request before preparing later sources and isolates a bad page',async()=>{
   const f=fixture(),missing={...target(1),page:{...target(1).page,imageSha256:undefined,imageByteSize:undefined,blobKey:undefined}};
@@ -40,14 +40,14 @@ describe('independent translation resources',()=>{
   await f.core.wait(new AbortController().signal);expect((await readSync(f.core.scope))!.imageRetryAt).toBe(deadline);
   await f.core.submit([4,5,6,7].map(target));expect(f.submit).toHaveBeenCalledTimes(2);expect(f.core.retryDelay).toBe(20000);
  });
- it('shares image admission backpressure across reopened coordinators while allowing accepted promotion and recovery',async()=>{
+ it('shares image admission backpressure across reopened coordinators while allowing accepted recovery',async()=>{
   controlledClock();const f=fixture();await f.core.submit([target(0),target(1)]);const [prefetchId,prefetchBody]=f.submit.mock.calls[1];
   f.submit.mockRejectedValueOnce(new ApiError('wait','IMAGE_RATE_LIMITED',429,null,20));await f.core.submit([target(2)]);const deadline=(await readSync(f.core.scope))!.imageRetryAt;
   vi.mocked(f.api.translations).mockResolvedValue({unchanged:false,items:[snapshot(prefetchId,prefetchBody,{state:'needs_input'})],missing_ids:[],etag:'"upload"'});
   const upload=vi.spyOn(f.api,'translationInput').mockImplementation(async(id)=>snapshot(id,prefetchBody));
   const reopened=new TranslationCoordinator(f.core.options);await reopened.submit([target(1),target(3)]);await reopened.finishUploads();
   expect(f.api.translations).toHaveBeenCalledWith([prefetchId],expect.anything());expect(upload).toHaveBeenCalledOnce();
-  expect(f.submit).toHaveBeenCalledTimes(4);expect(f.submit.mock.calls[3]).toMatchObject([prefetchId,{priority:'current'}]);
+  expect(f.submit).toHaveBeenCalledTimes(3);
   expect((await readSync(f.core.scope))!.imageRetryAt).toBe(deadline);expect(reopened.retryDelay).toBe(20000);
  });
  it('restores denied quota with the same unaccepted UUID',async()=>{
@@ -59,7 +59,7 @@ describe('independent translation resources',()=>{
   expect(f.submit).toHaveBeenCalledOnce();
  });
  it('explicit failure retry creates a UUID with only retry_of',async()=>{
-  const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'failed',error:{code:'FAILED',message:'failed'}}));await f.core.submit([target(0)]);const id=f.submit.mock.calls[0][0];await f.core.manual(target(0));expect(f.submit.mock.calls[1][0]).not.toBe(id);expect(f.submit.mock.calls[1][1]).toEqual({retry_of:id,priority:'current'});
+  const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'failed',error:{code:'FAILED',message:'failed'}}));await f.core.submit([target(0)]);const id=f.submit.mock.calls[0][0];await f.core.manual(target(0));expect(f.submit.mock.calls[1][0]).not.toBe(id);expect(f.submit.mock.calls[1][1]).toEqual({retry_of:id});
  });
  it('never automatically retries uncertain upstream results',async()=>{
   const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'needs_attention'}));await f.core.submit([target(0)]);await f.core.submit([target(0)]);await expect(f.core.manual(target(0))).rejects.toThrow('核实');expect(f.submit).toHaveBeenCalledOnce();

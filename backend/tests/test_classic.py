@@ -82,8 +82,8 @@ def text_case(text_database, monkeypatch):
         db.add(ClassicState(job_id=job_id, analysis=analysis()))
         db.flush()
         db.add(ExecutionLease(id=lease_id, job_id=job_id, stage_id=stage_id, node_id='text-node', owner_id=owner_id,
-                              generation=1, resource_pool='text:' + provider_id, mode='classic', priority_class='preload',
-                              weight=1, estimated_seconds=10, expires_at=now() + timedelta(minutes=5)))
+                              generation=1, resource_pool='text:' + provider_id, mode='classic',
+                              expires_at=now() + timedelta(minutes=5)))
         db.commit()
     from app.storage import get_store
     get_store().put('isolated-original', b'fixture', 'image/png', kind='original')

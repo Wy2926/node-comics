@@ -12,7 +12,7 @@ node.exe doctor
 node.exe run
 ```
 
-`init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 节点直接从中心读取临时原图，向中心提交无损 WebP 覆盖层；不配置对象存储。`doctor` 校验文件与 GPU，并输出引擎版本；中心 `CLASSIC_ENGINE_VERSION` 需与之匹配。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
+`init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 节点直接从中心读取临时原图，向中心提交无损 WebP 覆盖层；不配置对象存储。`doctor` 校验文件与 GPU，并输出引擎版本；构建指纹仅用于追溯；兼容的 v3 节点可直接接单，无需修改中心版本配置。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
 
 长期运行在管理员终端安装 Windows 服务：
 

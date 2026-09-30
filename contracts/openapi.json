@@ -4387,26 +4387,6 @@
             }
           },
           {
-            "name": "priority",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "realtime",
-                    "preload"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Priority"
-            }
-          },
-          {
             "name": "owner_id",
             "in": "query",
             "required": false,
@@ -7779,10 +7759,6 @@
             "type": "object",
             "title": "Image Rate Limit"
           },
-          "scheduler_weight": {
-            "type": "number",
-            "title": "Scheduler Weight"
-          },
           "modes": {
             "additionalProperties": {
               "$ref": "#/components/schemas/ModeEntitlement"
@@ -7807,7 +7783,6 @@
           "gift",
           "timezone",
           "image_rate_limit",
-          "scheduler_weight",
           "modes",
           "generated_at",
           "pending_previous_period_pages"
@@ -8234,11 +8209,6 @@
             "type": "string",
             "title": "Image Sha256"
           },
-          "priority": {
-            "type": "string",
-            "title": "Priority",
-            "default": "preload"
-          },
           "output_asset_id": {
             "anyOf": [
               {
@@ -8603,33 +8573,6 @@
             "minimum": 10.0,
             "title": "Delivery Seconds",
             "default": 120
-          },
-          "allowed_languages": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "zh-Hans",
-                "zh-Hant",
-                "ja",
-                "en",
-                "ko",
-                "fr",
-                "es",
-                "pt-BR",
-                "de",
-                "it",
-                "ru",
-                "pl",
-                "uk",
-                "tr",
-                "vi",
-                "id"
-              ]
-            },
-            "type": "array",
-            "maxItems": 16,
-            "minItems": 1,
-            "title": "Allowed Languages"
           }
         },
         "additionalProperties": false,
@@ -8679,7 +8622,7 @@
               "CLASSIC_ANALYZE_FAILED",
               "CLASSIC_INPAINT_FAILED",
               "CLASSIC_RENDER_FAILED",
-              "ENGINE_VERSION_MISMATCH",
+              "PROTOCOL_MISMATCH",
               "TEXT_DEADLINE_EXCEEDED",
               "DELIVERY_DEADLINE_EXCEEDED",
               "PAGE_DEADLINE_EXCEEDED"
@@ -9324,18 +9267,6 @@
             "minimum": 0.0,
             "title": "Plus Monthly Redraw Pages"
           },
-          "free_scheduler_weight": {
-            "type": "number",
-            "maximum": 100.0,
-            "minimum": 0.1,
-            "title": "Free Scheduler Weight"
-          },
-          "plus_scheduler_weight": {
-            "type": "number",
-            "maximum": 100.0,
-            "minimum": 0.1,
-            "title": "Plus Scheduler Weight"
-          },
           "free_images_per_minute": {
             "type": "integer",
             "maximum": 10000.0,
@@ -9402,8 +9333,6 @@
         "required": [
           "free_daily_pages",
           "plus_monthly_redraw_pages",
-          "free_scheduler_weight",
-          "plus_scheduler_weight",
           "free_images_per_minute",
           "plus_images_per_minute",
           "upload_user_concurrency",
@@ -9791,7 +9720,9 @@
               "prefetch"
             ],
             "title": "Priority",
-            "default": "current"
+            "description": "仅兼容旧插件；接收后忽略，不参与调度、持久化或请求身份。",
+            "default": "current",
+            "deprecated": true
           }
         },
         "additionalProperties": false,

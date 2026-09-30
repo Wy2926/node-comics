@@ -26,7 +26,7 @@ const labels: Record<string, PricingComparisonCopy> = {
     redraw: {label: 'AI 重绘', free: '仅限有效赠送额度', plus: pages => `${pages.toLocaleString('zh-CN')} 页 / 月`},
     priority: {label: '翻译任务响应', free: '标准调度', plus: '优先响应'},
     early: {label: '新功能体验', free: '随正式版本开放', plus: '高级功能优先体验'},
-    note: '速率按跨设备共享的滚动 60 秒计算，以账户实际限额为准；优先响应指同等任务获得更高调度份额，不承诺完成时长。新功能陆续开放，以发布说明为准。',
+    note: '速率按跨设备共享的滚动 60 秒计算，以账户实际限额为准；优先响应表示调度时优先考虑 PLUS 任务，不承诺固定份额或完成时长。新功能陆续开放，以发布说明为准。',
   },
   'zh-TW': {
     feature: '功能與權益',
@@ -37,7 +37,7 @@ const labels: Record<string, PricingComparisonCopy> = {
     redraw: {label: 'AI 重繪', free: '僅限有效贈送額度', plus: pages => `${pages.toLocaleString('zh-TW')} 頁 / 月`},
     priority: {label: '翻譯任務回應', free: '標準排程', plus: '優先回應'},
     early: {label: '新功能體驗', free: '隨正式版本開放', plus: '進階功能優先體驗'},
-    note: '速率按跨裝置共用的滾動 60 秒計算，以帳戶實際限額為準；優先回應指同等任務獲得更高排程份額，不保證完成時間。新功能陸續開放，以版本說明為準。',
+    note: '速率按跨裝置共用的滾動 60 秒計算，以帳戶實際限額為準；優先回應表示排程時優先考慮 PLUS 任務，不保證固定份額或完成時間。新功能陸續開放，以版本說明為準。',
   },
   en: {
     feature: 'Features and benefits',
@@ -48,7 +48,7 @@ const labels: Record<string, PricingComparisonCopy> = {
     redraw: {label: 'AI redraw', free: 'With active bonus pages', plus: pages => `${pages.toLocaleString('en')} pages / month`},
     priority: {label: 'Translation task response', free: 'Standard scheduling', plus: 'Priority response'},
     early: {label: 'New features', free: 'At general release', plus: 'Early access to advanced features'},
-    note: 'Rates use rolling 60-second windows shared across devices, with limits shown in your account; priority gives comparable tasks a larger scheduling share, without a completion-time guarantee. New features roll out gradually; see release notes.',
+    note: 'Rates use rolling 60-second windows shared across devices, with limits shown in your account; priority gives eligible PLUS tasks preference, without guaranteeing a fixed share or completion time. New features roll out gradually; see release notes.',
   },
   ja: {
     feature: '機能と特典',
@@ -59,7 +59,7 @@ const labels: Record<string, PricingComparisonCopy> = {
     redraw: {label: 'AI 再描画', free: '有効な特典枠のみ', plus: pages => `${pages.toLocaleString('ja')} ページ / 月`},
     priority: {label: '翻訳タスク応答', free: '通常のスケジューリング', plus: '優先応答'},
     early: {label: '新機能の利用', free: '正式公開時に利用可能', plus: '高度な機能を先行体験'},
-    note: 'レートは全端末で共有する直近 60 秒間で集計され、実際の上限はアカウントに表示されます。優先応答は同条件のタスクへの割り当て比率を高めますが、完了時間は保証しません。新機能は順次公開され、詳細はリリースノートでご案内します。',
+    note: 'レートは全端末で共有する直近 60 秒間で集計され、実際の上限はアカウントに表示されます。優先応答では PLUS のタスクを優先的に考慮しますが、固定の割り当て比率や完了時間は保証しません。新機能は順次公開され、詳細はリリースノートでご案内します。',
   },
   ko: {
     feature: '기능과 혜택',
@@ -70,7 +70,7 @@ const labels: Record<string, PricingComparisonCopy> = {
     redraw: {label: 'AI 다시 그리기', free: '유효한 증정 한도만', plus: pages => `${pages.toLocaleString('ko')}페이지 / 월`},
     priority: {label: '번역 작업 응답', free: '일반 작업 배정', plus: '우선 응답'},
     early: {label: '새 기능 체험', free: '정식 출시 후 이용', plus: '고급 기능 우선 체험'},
-    note: '한도는 기기 간 공유되는 최근 60초 기준이며 계정에서 확인할 수 있고, 우선 응답은 동등한 작업에 더 많은 자원을 배정하되 완료 시간을 보장하지 않습니다. 새 기능은 릴리스 노트에 따라 순차 공개됩니다.',
+    note: '한도는 기기 간 공유되는 최근 60초 기준이며 계정에서 확인할 수 있고, 우선 응답은 PLUS 작업을 우선적으로 고려하되 고정 배정 비율이나 완료 시간을 보장하지 않습니다. 새 기능은 릴리스 노트에 따라 순차 공개됩니다.',
   },
 };
 

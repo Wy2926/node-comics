@@ -24,7 +24,6 @@ def job_json(db, job):
             "output_asset_id": output.id if result_available else None, "image_sha256": job.source_sha256,
             "result_available": bool(result_available), "result_expired": bool(job.output_asset_id and not result_available),
             "mode": job.mode, "target_language": job.target_language, "status": job.status, "phase": job.phase,
-            "priority": "realtime" if job.realtime_until and job.realtime_until > now() else "preload",
             "quota_pages": job.quota_pages, "quota_kind": job.quota_kind, "quota_period_id": job.quota_period_id,
             "settlement": job.settlement, "version": job.version,
             "cancel_requested": job.cancel_requested,

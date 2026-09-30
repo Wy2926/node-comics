@@ -103,8 +103,8 @@ def test_live_execution_is_not_resolved_by_terminal_status_or_reconciliation(cli
         db.add(stage)
         db.flush()
         db.add(ExecutionLease(stage_id=stage.id, job_id=job_id, node_id=node_id, owner_id=owner,
-            generation=0, resource_pool='redraw', mode='redraw', priority_class='realtime',
-            weight=1, estimated_seconds=1, expires_at=now() + timedelta(seconds=60)))
+            generation=0, resource_pool='redraw', mode='redraw',
+            expires_at=now() + timedelta(seconds=60)))
         db.add(Ledger(owner_id=owner, job_id=job_id, transaction_key=job_id + ':reconcile',
             kind='reconcile', amount=0))
         db.commit()

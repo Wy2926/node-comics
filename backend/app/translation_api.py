@@ -20,7 +20,7 @@ from .models import Asset, Attempt, ClassicState, Job, Ledger, TextCall, User, n
 from .queue_models import ExecutionLease
 from .providers import digest
 from .request_models import RequestBody
-from .scheduler import ACTIVE, lock_scheduler, queue_for, touch_job
+from .scheduler import ACTIVE, lock_scheduler, touch_job
 from .schemas import TranslationHistoryResponse, TranslationResponse, TranslationsResponse
 from .translation_limits import acquire_control, release_control
 from .translation_requests import TranslationRequest
@@ -44,7 +44,8 @@ class TranslationInput(RequestBody):
     retry_of: UUID | None = None
     regenerate_of: UUID | None = None
     acknowledge_unknown_cost: bool = False
-    priority: Literal['current', 'prefetch'] = 'current'
+    priority: Literal['current', 'prefetch'] = Field(default='current', exclude=True, deprecated=True,
+        description='仅兼容旧插件；接收后忽略，不参与调度、持久化或请求身份。')
 
     @model_validator(mode='after')
     def shape(self):
@@ -169,21 +170,8 @@ def translation_json(db, row, *, context=None):
         'updated_at': iso(row.revoked_at or (entry.changed_at if entry else row.created_at))}
 
 
-def apply_priority(db, job, priority):
-    if job is None or job.status not in ACTIVE - {'outcome_unknown'}:
-        return
-    desired = 0 if priority == 'current' else 1
-    # Initial hint and the one-way prefetch promotion each have a bounded lifetime.
-    # Replaying a current request never renews its priority.
-    if job.priority_rank > desired:
-        job.priority_rank = desired
-        job.realtime_until = now() + timedelta(seconds=settings().priority_ttl_seconds)
-        queue_for(db, job.owner_id, job.mode).version += 1
-        touch_job(db, job)
-
-
 def accept_translation(db, user, request_id, body):
-    signature = digest(body.model_dump(mode='json', exclude={'priority'}))
+    signature = digest(body.model_dump(mode='json'))
     old = db.get(TranslationRequest, (user.id, request_id))
     if old:
         if old.request_hash != signature:
@@ -191,7 +179,6 @@ def accept_translation(db, user, request_id, body):
         entry = db.get(Job, old.job_id) if old.job_id else None
         if unavailable(db, old, entry):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
-        apply_priority(db, entry, body.priority)
         return old
     image, mode, language = body.image, body.mode, body.target_language
     previous_id = body.retry_of or body.regenerate_of
@@ -221,7 +208,6 @@ def accept_translation(db, user, request_id, body):
         'acknowledge_unknown_cost': body.acknowledge_unknown_cost}
     if entry.status == 'awaiting_upload':
         create_upload(db, entry, {'sha256': image.sha256, 'byte_size': image.byte_size, 'mime': image.content_type})
-    apply_priority(db, entry, body.priority)
     db.flush()
     return row
 

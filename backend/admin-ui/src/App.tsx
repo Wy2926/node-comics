@@ -90,7 +90,7 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
     <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '任务 ID / 用户名称' : '用户名称 / ID'}/></label>
     {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic', 'redraw'])}
       {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
-      {select('priority', '当前优先级', ['realtime', 'preload'])}</> :
+      </> :
       <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="plus">PLUS</option></select></label>}
     <button className="primary">筛选</button><button type="button" className="secondary" onClick={() => onChange({})}>重置</button>
   </form>
@@ -121,7 +121,7 @@ function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}
   const [detail, setDetail] = useState<Target>();
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
-  const allowed = view === 'tasks' ? ['mode', 'status', 'priority', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
+  const allowed = view === 'tasks' ? ['mode', 'status', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
   for (const key of allowed) if (params.get(key)) query.set(key, params.get(key)!);
   const {data, busy, error, reload} = useResource<OverviewData | NodesData | Page<Task> | Page<AdminUser>>(`/v1/admin/monitor/${view}?${query}`, onUnauthorized, auto && !detail);
   const page = data as Page<Task> | Page<AdminUser> | undefined;

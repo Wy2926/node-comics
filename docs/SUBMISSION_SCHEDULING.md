@@ -6,15 +6,15 @@
 
 分钟图片准入与 HTTP 保护分开。图片预算按新 Job 在 Redis 原子检查滚动 60 秒：普通 10 张、PLUS 100 张。调度锁和用户锁保护重复检查、Job、页数预占与 UUID 回执的数据库事务；复用和重传不重复计数，取消／失败不返还分钟次数。详见[翻译契约](READING_TRANSLATION_CONTRACT.md)。
 
-HTTP 保护在取得调度锁前，通过 Redis 原子脚本更新令牌桶与正在处理请求的短租约。所有 API 副本共享保护；translation、snapshot、history 分别隔离，避免提交阻断核实。长轮询等待不持有数据库连接或调度锁；内部保护不要求客户端创建或续租会话。
+HTTP 保护在取得调度锁前，通过 Redis 原子脚本更新令牌桶与正在处理请求的短租约。所有 API 副本共享保护；translation、snapshot、history、events 分别隔离，避免提交阻断核实。SSE 使用独立的 300 秒并发租约，状态等待不持有数据库连接或调度锁；内部保护不要求客户端创建或续租会话。
 
 | 环境变量 | 默认 | 含义 |
 | --- | ---: | --- |
 | `TRANSLATION_MAX_BODY_BYTES` | 65536 | ASGI 层限制翻译 JSON 字节数 |
 | `TRANSLATION_REQUESTS_PER_MINUTE` | 300 | 每账户、每类 HTTP 令牌补充速率 |
 | `TRANSLATION_REQUEST_BURST` | 30 | 请求桶突发容量 |
-| `TRANSLATION_REQUEST_CONCURRENCY` | 4 | 每类同时处理的请求数 |
-| `TRANSLATION_REQUEST_LEASE_SECONDS` | 60 | 崩溃后的内部请求占用回收期限 |
+| `TRANSLATION_REQUEST_CONCURRENCY` | 4 | 每类同时处理的请求数；SSE 连接同样受此上限约束 |
+| `TRANSLATION_REQUEST_LEASE_SECONDS` | 60 | 普通 HTTP 占用回收期限；SSE 固定为 300 秒 |
 
 `REQUEST_RATE_LIMITED` 返回 429 与 Retry-After，客户端退避控制请求；`IMAGE_RATE_LIMITED` 为独立图片分钟限制，只限制新增生成。单图请求独立受理，不再有整窗混合状态。完成结果复用无需等待图片分钟预算。PLUS 常规没有额外每日提交次数或描述符总量限制。
 
@@ -26,21 +26,23 @@ HTTP 保护在取得调度锁前，通过 Redis 原子脚本更新令牌桶与�
 
 Redis 与 SQL 不构成跨库事务。Redis 先保守预占，SQL 保存业务回执和额度结算；数据库失败或通信结果不确定时，短期次数可保留至到期，不能据此重复扣用户页数。反馈与公开申请以幂等键在 Redis 去重，数据库唯一约束永久保证回执唯一。明确未发送的供应商请求可以退回 RPM；未知是否发送则保留。
 
-Redis 不可用时，受保护请求返回 503 `ADMISSION_UNAVAILABLE` 和重试提示，文本任务保持可恢复等待，不消耗模型调用次数；分析中继丢弃事件并维持 best-effort 204。释放失败由 TTL 收回，避免已完成业务被改成失败。就绪检查包含 Redis。任务领取／公平调度、持久漫画名缓存去重、幂等和结算仍由数据库事务保证；这些业务锁不属于短期准入状态。
+Redis 不可用时，受保护请求返回 503 `ADMISSION_UNAVAILABLE` 和重试提示，文本任务保持可恢复等待，不消耗模型调用次数；分析中继丢弃事件并维持 best-effort 204。释放失败由 TTL 收回，避免已完成业务被改成失败。就绪检查包含 Redis。任务领取、持久漫画名缓存去重、幂等和结算仍由数据库事务保证；这些业务锁不属于短期准入状态。
 
 连接和读取超时均为 1 秒；不自动重试结果不确定的写操作，不把 Redis 地址、凭据或命令参数写入错误响应。部署隔离、持久化和升级顺序见[部署规范](DEPLOYMENT.md)。
 
 ## 幂等保留
 
-`translation_requests` 的用户、UUID、请求摘要及 Job 关联永久保留。重复请求不新建任务或扣量；已撤销 UUID 保留墓碑，不能重新授权。Redis 分钟事件到期自动释放，不删除请求回执。当前页优先采用一次性短时提示，重复 PUT 不续期。
+`translation_requests` 的用户、UUID、请求摘要及 Job 关联永久保留。重复请求不新建任务或扣量；已撤销 UUID 保留墓碑，不能重新授权。Redis 分钟事件到期自动释放，不删除请求回执。客户端只在本地安排当前页与有限预读，不向服务端发送阅读优先级。
 
-## 数据库候选选举
+## 数据库领取
 
-数据库先排除无效原图、未到执行时间、配置或语言不符、供应商执行位已满等候选，再按资源池、实时／预存类别和用户选出该用户最优页面，按公平服务时间选每个资源池与类别的前两名用户。仅把这些候选载入 Python，不按创建时间截断队头，因此大批量旧任务不能遮挡后到的低服务量用户。
+节点有余量时主动领取，中心按阶段 `available_at`、阶段 ID 排序；重试在退避到期后重新参与。每次最多读取最早的 32 个候选，在这批候选内优先领取有效 PLUS 账户的任务，同级保持就绪顺序，每批最多分配 4 页；不维护阅读优先级、用户服务时间、普通／PLUS 精确权重或按构建指纹拆分的队列。不同节点不要求平均分配，完成快的节点可以继续领取。
 
-全队列 SQL 窗口选举复用调用方 Session 和连接，常规只读领取在获取调度锁之前完成，只传递有界的 stage ID、执行代次和优先级／队列版本，不额外借连接或提交调用方事务。若调用方已有待写对象，先在禁止自动 flush 的作用域取得调度锁，保持 scheduler → user/job 写锁顺序。锁内以最新数据复核这些候选的阶段状态、队列、原图、节点、供应商容量和公平状态，然后分配租约。优先级或队列版本变化、阶段已被其他节点领取等竞争会放弃失效候选；本轮没有可用候选时，下轮重新选举，不沿用旧快照强行执行。
+SQL 先过滤取消／终态、输入元数据、目标语言、v3 协议和供应商限制，再使用 `ix_stage_ready(status,name,available_at,id)` 读取有限候选。领取复用调用方 Session 和连接，在调度锁外读取候选代次，锁内复核状态、节点容量和每次分配后的供应商容量。调用方已有待写对象时先取得调度锁，保持 scheduler → user/job 的锁顺序。
 
-锁内原图检查只针对候选，文件存在性检查不读取大文件。原图已丢失的候选进入同 UUID 补传，保留已有检查点和额度预占，下一轮可选后续页面，避免缺失队头长期遮挡。文本供应商 RPM 在 Redis 批量预检，发送调用前再原子预占，竞争失败时释放执行位并持久化等待。第二名用户用于更新虚拟服务时间下界。实时／预存份额、普通／PLUS 权重、空闲执行位借用、30 分钟老任务优先和页面优先提示排序沿用既定规则。锁外选举仍有随数据库规模增长的成本，应结合节点数和领取频率监控数据库 CPU。
+原图存在性仅检查有限候选，不读取图片正文。缺失原图进入同 UUID 补传，保留检查点与额度预占；后续有效候选可以继续领取。长轮询就绪提示只查询数据库存在性，不扫描整个队列的本地文件；提示不是执行授权，实际领取负责检查文件。并发竞争后的空批最多重选一次，然后短退避。
+
+图像、文本、重绘和上传恢复各自按可执行条件领取；供应商 RPM、并发和未知调用保护独立保留。租约代次、领取回执和结算幂等是数据库约束，不因排序简化而取消。全局短事务锁保留，吞吐和锁等待需在目标规模下测量。
 
 ## 验证
 
@@ -49,4 +51,12 @@ cd backend
 .venv/Scripts/python.exe -m pytest tests/test_translation_requests.py tests/test_submission_limits.py tests/test_cluster_scheduler.py -q
 ```
 
-真实 PostgreSQL 使用专用 `nodecomics_concurrency_test`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_*`，验证分钟竞争、重复操作、独立请求回滚、跨副本控制保护、事务提交后通知及公平调度。`RUN_SCHEDULER_SCALE=1` 启用 50,000 页规模测试；报告锁外选举耗时和锁内持有时间，不能用它推断生产吞吐。复验入口见[阅读契约验证](READING_TRANSLATION_CONTRACT.md#9-验证入口)。
+真实 PostgreSQL 使用专用 `nodecomics_concurrency_test`，设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_*`，验证分钟竞争、重复操作、独立请求回滚、跨副本控制保护、事务提交后通知及有界候选领取。`RUN_SCHEDULER_SCALE=1` 启用 50,000 页规模测试；报告领取耗时和锁内持有时间，不能用它推断生产吞吐。复验入口见[阅读契约验证](READING_TRANSLATION_CONTRACT.md#9-验证入口)。
+
+从仓库根目录复验领取性能（先用同一 Compose 构建测试镜像）：
+
+```sh
+docker compose -p node-comics-tests -f deploy/compose.tests.yaml run --rm -e RUN_POSTGRES_CONCURRENCY=1 -e RUN_SCHEDULER_SCALE=1 tests python -m pytest tests/test_scheduler_benchmark.py tests/test_scheduler_scale_postgres.py -q -s
+```
+
+基准覆盖 1,000／50,000 页、100 个账户（25% PLUS）、1／8／32 个并发领取节点，每批最多四页，竞争空批最多重试一次。记录端到端领取 P50／P95、空领取数和领取吞吐；不包含模型执行或图片传输。对比不同实现时顺序运行相同负载，不与其他回归或真实任务混跑。

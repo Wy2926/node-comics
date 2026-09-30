@@ -39,6 +39,12 @@ TEST_DATABASE = "nodecomics_concurrency_test"
 MIGRATION_LOCK_ID = 761349210
 
 
+def test_scheduler_upgrade_preserves_running_v3_work(pg_scope):
+    from app.db import engine
+    from test_request_limits_migration import test_fifo_upgrade_preserves_checkpoint_and_active_lease
+    test_fifo_upgrade_preserves_checkpoint_and_active_lease(engine())
+
+
 def wait_until(predicate, *, timeout=10):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -354,7 +360,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['job_results_0008']
+            assert revisions == ['simple_scheduler_0009']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0

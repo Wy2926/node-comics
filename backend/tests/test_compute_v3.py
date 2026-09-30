@@ -30,7 +30,6 @@ PREFIX = '/internal/compute/v3'
 @pytest.fixture
 def v3(client, monkeypatch, png):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
-    monkeypatch.setenv('CLASSIC_ENGINE_VERSION', 'test-v3')
     settings.cache_clear()
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
         'translations[1]{id,text}:\n  "0",Hello', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
@@ -137,7 +136,7 @@ def read_input(v3, lease, *, token=None):
         headers={**v3['auth'], 'X-Lease-Token': token or lease['lease_token']})
 
 
-def test_claim_receipt_capacity_fairness_shrink_and_restart(v3):
+def test_claim_receipt_capacity_shrink_and_restart(v3):
     v3['create'](5)
     response = claim(v3, 4, 'lost-response')
     assert response.status_code == 200, response.text
@@ -148,7 +147,7 @@ def test_claim_receipt_capacity_fairness_shrink_and_restart(v3):
     assert claim(v3).json()['leases'] == []
     with session_factory()() as db:
         owners = [db.get(ExecutionLease, lease['lease_id']).owner_id for lease in leases]
-        assert owners[0] != owners[1]
+        assert owners[0] == owners[1]  # FIFO has no per-account election.
         node = db.get(ComputeNode, v3['node']['node_id'])
         node.capacity = 1
         node.desired_config = {**node.desired_config, 'execution_slots': 1}
@@ -265,12 +264,12 @@ def test_version_languages_and_direct_input_access(v3):
     v3['create']()
     with session_factory()() as db:
         node = db.get(ComputeNode, v3['node']['node_id'])
-        node.desired_config = {**node.desired_config, 'allowed_languages': ['ko']}
+        node.supported_languages = ['ko']
         db.commit()
     assert claim(v3).json()['leases'] == []
     with session_factory()() as db:
         node = db.get(ComputeNode, v3['node']['node_id'])
-        node.desired_config = {**node.desired_config, 'allowed_languages': ['en']}
+        node.supported_languages = ['en']
         db.commit()
     lease = claim(v3).json()['leases'][0]
     response = read_input(v3, lease)

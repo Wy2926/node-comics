@@ -86,11 +86,8 @@ def test_bad_configuration_rejected_before_provisioning(client, config):
     assert response.status_code == 422
 
 
-def test_declared_languages_are_intersected_with_allowed_targets(client):
+def test_registered_languages_need_no_operator_configuration(client):
     node, auth, admin = provision(client)
-    config = NodeConfig(allowed_languages=['ja']).model_dump(exclude_none=True)
-    client.put(f"/v1/admin/compute-nodes/{node['node_id']}/config", headers=admin,
-               json={'name': 'test', 'enabled': True, 'expected_version': 1, 'config': config}).raise_for_status()
-    assert register(client, auth, supported_languages=['ja', 'en']).status_code == 200
+    assert register(client, auth, supported_languages=['ja', 'en', 'ja']).status_code == 200
     with session_factory()() as db:
-        assert db.get(ComputeNode, node['node_id']).supported_languages == ['ja']
+        assert db.get(ComputeNode, node['node_id']).supported_languages == ['ja', 'en']

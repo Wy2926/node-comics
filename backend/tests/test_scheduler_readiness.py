@@ -31,7 +31,7 @@ def test_readiness_filters_without_sorting_or_materializing_jobs(scheduler_case,
         elif mutation == 'terminal':
             job.status = 'failed'
         elif mutation == 'engine':
-            job.config = {**job.config, 'engine': {'version': 'other'}}
+            job.config = {**job.config, 'engine': {'protocol_version': 99}}
         elif mutation == 'language':
             job.target_language = 'fr'
         elif mutation == 'deleted':
@@ -64,7 +64,7 @@ def test_readiness_filters_without_sorting_or_materializing_jobs(scheduler_case,
     assert not any('row_number' in statement or 'order by' in statement or 'fairness_states' in statement for statement in statements)
 
 
-def test_local_missing_heads_do_not_hide_later_available_source(scheduler_case):
+def test_readiness_is_advisory_without_scanning_local_files(scheduler_case):
     for _ in range(35):
         add_job(scheduler_case)
     valid = add_job(scheduler_case)
@@ -77,7 +77,7 @@ def test_local_missing_heads_do_not_hide_later_available_source(scheduler_case):
         db.commit()
         assert scheduler.has_claimable_work(db, 'node-0', ['page'])
         LocalStore().delete(source.storage_key)
-        assert not scheduler.has_claimable_work(db, 'node-0', ['page'])
+        assert scheduler.has_claimable_work(db, 'node-0', ['page'])
         assert all(job.status == 'queued' for job in db.scalars(select(Job)))
 
 

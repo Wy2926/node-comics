@@ -26,7 +26,7 @@ const targets: Record<string, string> = {user: '用户', feedback: '翻译反馈
 const fieldNames: Record<string, string> = {status: '状态', enabled: '启用', name: '名称', label: '显示名称',
   version: '版本', revision_id: '配置版本', model: '模型', base_url: '服务地址', attempts: '处理次数',
   free_daily_pages: '普通每日常规页数', plus_monthly_redraw_pages: '会员默认月重绘页数',
-  free_scheduler_weight: '普通调度权重', plus_scheduler_weight: 'PLUS 调度权重', granted: '授予页数',
+  granted: '授予页数',
   used: '已使用', reserved: '预占', plus_expires_at: '会员到期', default_provider: '默认渠道',
   validity_days: '到账后有效天数', starts_at: '开始时间', ends_at: '结束时间', expires_at: '额度到期', pages: '赠送页数', audience: '适用用户', mode: '翻译模式'};
 const values: Record<string, string> = {received: '待处理', reviewing: '处理中', resolved: '已解决', pending: '待处理',

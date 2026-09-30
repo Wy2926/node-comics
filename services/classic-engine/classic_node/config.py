@@ -40,7 +40,6 @@ def load(path):
     value.setdefault('download_workers', 4)
     value.setdefault('delivery_workers', 4)
     value.setdefault('resident_bytes', 1024 * 1024 * 1024)
-    value.setdefault('languages', ['zh-Hans', 'zh-Hant', 'en', 'ja', 'ko'])
     value['state_dir'] = str((path.parent / value.get('state_dir', 'state')).resolve())
     value['engine']['models'] = str((path.parent / value['engine']['models']).resolve())
     value['engine']['font'] = [str((path.parent / font).resolve()) for font in value['engine']['font']]

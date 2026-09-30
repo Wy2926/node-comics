@@ -2,7 +2,7 @@
 from datetime import timedelta
 from app.node_config import NodeConfig
 from app.models import Attempt, ClassicState, Job, TextCall, User, now
-from app.queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
+from app.queue_models import ComputeNode, ExecutionLease, JobStage
 
 DONE_ID = "10000000-0000-4000-8000-000000000001"
 RUNNING_ID = "10000000-0000-4000-8000-000000000002"
@@ -38,7 +38,7 @@ def seed(db):
             target_language="zh-Hans", status=status, phase=status, idempotency_key=f"fixture-{i}", operation="admin-fixture",
             request_hash=f"{i:064x}", cache_key=f"{i:064x}", config={"provider": {"id": "fixture", "secret": "SHOULD_NOT_LEAK"}},
             quota_pages=1, quota_kind="classic_unlimited", settlement="reserved", created_at=at-timedelta(seconds=age),
-            realtime_until=at+timedelta(minutes=30) if i%3 == 0 else None)
+            )
         if status in {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}:
             row.completed_at = row.created_at + timedelta(seconds=120)
             row.settlement = "charged" if status == "succeeded" else "released"
@@ -54,7 +54,7 @@ def seed(db):
         lease = ExecutionLease(stage_id=stage.id, job_id=row.id, node_id=node, owner_id=row.owner_id, generation=generation,
             executor_id="control-host:1234" if node.startswith("control") else node,
             token="TOKEN_MUST_NOT_APPEAR", resource_pool="text" if name=="text" else "image", mode=row.mode,
-            priority_class="preload", weight=1, estimated_seconds=20,
+
             started_at=row.created_at+timedelta(seconds=start),
             expires_at=expiry or at+timedelta(seconds=600),
             completed_at=row.created_at+timedelta(seconds=end) if end else None, outcome=outcome if end else None)

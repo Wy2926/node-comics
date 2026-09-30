@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `job_results_0008`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `simple_scheduler_0009`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 控制服务与官网
 
@@ -31,6 +31,8 @@ curl --fail https://comics.nodelane.net/health/ready
 赠送顺延的 `gift_renewal_0005` 只新增用户与订阅所需字段，不转换旧交易数据。既有运营会员保留 `plus_timezone`、原额度 ID 与日历月周期；新会员段使用 30 天周期。升级前停止旧 API、worker 和 maintenance，完成结构升级后统一启动同版本服务，避免旧进程忽略已安排的延期。账户、漫画、任务与历史额度保留。仍有续费延期操作或未结束的 30 天赠送时禁止回退到旧会员代码。
 
 额度活动的 `quota_campaigns_0006` 新增配置与用户领取回执，并允许赠送桶没有到期时间；原有额度、已用／预占和账本保持不变。备份后停止全部旧控制进程，迁移并统一启动兼容代码，再通过管理员活动接口配置、启用和核对已发人数。迁移不自动发放。已有活动配置或无到期赠送时禁止降级；应暂停活动处理问题，不能删除回执重跑或启动旧额度代码。账户接口的 `expires_at`、`next_expiry_at` 允许 `null`，客户端不可将空值格式化为日期。
+
+`simple_scheduler_0009` 删除阅读优先级、公平状态表和精确权重，增加就绪顺序与节点活动租约索引，自动去掉人工语言白名单并归一化 v3 任务缓存身份；不修改 UUID、检查点、调用和结算。首次切换须停止旧中心进程，运行迁移并配套更新中心和节点，不能混跑旧调度代码。已有 overlay-v1 插件无需同步更新，旧请求字段的兼容规则见[翻译契约](READING_TRANSLATION_CONTRACT.md#3-创建与上传)。已有 v3 任务无需手工改表；旧程序停机后的租约由新中心恢复。之后更换兼容节点只需创建身份、启动新节点并停用旧节点的新领取，不再复制构建指纹。回退使用升级前的完整数据库备份。
 
 ## Redis 与准入迁移
 

@@ -19,7 +19,7 @@ def snapshot_resolver(db, provider_id=None):
         text = profile(routing_key)
         return {"mode": "classic", "prompt_version": PROMPT_VERSION,
                 "provider": {"id": text["provider_id"], "timeout_seconds": cfg.classic_timeout_seconds},
-                "engine": {"version": cfg.classic_engine_version, "protocol_version": 3},
+                "engine": {"protocol_version": 3},
                 "stage_attempts": cfg.cluster_stage_attempts,
                 "text": text}
     return resolve

@@ -55,15 +55,20 @@ class Runtime:
         options = config['engine']
         model_hashes = model_identity(options['models'], options['ocr_language'])
         fonts = tuple(options.get('font', []))
-        font_hashes = {}
+        font_hashes, hashes = {}, {}
         self.languages = []
-        for language in config['languages']:
+        for language in LANGUAGE_PROBES:
             paths = font_paths(fonts, language.split('-')[0])
             cmap = set().union(*(coverage(path) for path in paths))
             if not set(map(ord, LANGUAGE_PROBES[language].replace(' ', ''))) <= cmap:
-                raise ValueError(f'Fonts do not cover advertised language: {language}')
-            font_hashes[language] = [file_hash(path) for path in paths]
+                continue
+            for path in paths:
+                if path not in hashes:
+                    hashes[path] = file_hash(path)
+            font_hashes[language] = [hashes[path] for path in paths]
             self.languages.append(language)
+        if not self.languages:
+            raise ValueError('Fonts do not cover any supported target language')
         source = Path(__file__).resolve().parents[1]
         code = {str(path.relative_to(source)).replace('\\', '/'): file_hash(path)
                 for path in sorted((source / 'manhua_engine').rglob('*.py'))

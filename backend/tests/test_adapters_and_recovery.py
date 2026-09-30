@@ -294,7 +294,7 @@ def test_expired_cancelled_page_releases_slot_after_input_was_purged(client, png
         job = db.get(Job, job_id)
         stage = db.scalar(select(JobStage).where(JobStage.job_id == job_id))
         db.add(ComputeNode(id='cancelled-page', name='cancelled page', resource_id='cancelled-page',
-            capabilities=['page'], capacity=1, engine_version=job.config['engine']['version'],
+            capabilities=['page'], capacity=1, engine_version='fixture-build',
             supported_languages=['zh-Hans'], device='cpu'))
         db.flush()
         stage.status, stage.generation = 'running', 1
@@ -305,8 +305,8 @@ def test_expired_cancelled_page_releases_slot_after_input_was_purged(client, png
         job.attempt_id = attempt.id
         job.status = 'running'
         lease = ExecutionLease(job_id=job_id, stage_id=stage.id, node_id='cancelled-page', owner_id=job.owner_id,
-            generation=1, resource_pool='page', mode='classic', priority_class='preload',
-            weight=1, estimated_seconds=10, expires_at=now()-timedelta(seconds=1),
+            generation=1, resource_pool='page', mode='classic',
+            expires_at=now()-timedelta(seconds=1),
             limits={'deadline_at': (now()+timedelta(minutes=1)).isoformat()+'Z'})
         db.add(lease)
         db.flush()

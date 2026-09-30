@@ -234,7 +234,7 @@ def test_persistent_operator_stop_prevents_restart(tmp_path, monkeypatch):
 
 def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypatch):
     from classic_node import __main__ as cli
-    from classic_node import runtime
+    import sys
     bundle = tmp_path / '节点 程序'
     bundle.mkdir()
     (bundle / 'release.json').write_text(json.dumps({'fonts': ['fonts/font.otf']}))
@@ -251,7 +251,7 @@ def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypat
         def close(self):
             observed['closed'] = True
     config['engine']['gpu'] = 0
-    monkeypatch.setattr(runtime, 'Runtime', FakeRuntime)
+    monkeypatch.setitem(sys.modules, 'classic_node.runtime', SimpleNamespace(Runtime=FakeRuntime))
     assert cli.execute(SimpleNamespace(command='check', config='elsewhere/node.json', bundle_root=bundle)) == 0
     assert observed['models'] == str(bundle / 'models')
     assert observed['font'] == [str(bundle / 'fonts/font.otf')]

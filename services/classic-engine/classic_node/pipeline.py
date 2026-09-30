@@ -76,8 +76,8 @@ class Pipeline:
         rgb, alpha = self.agent.runtime.decode(page.data, page.metadata)
         page.data = None
         analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'])
-        if analysis['input_hash'] != page.metadata['sha256'] or analysis['version'] != self.agent.runtime.version:
-            raise NodeFailure('ENGINE_VERSION_MISMATCH')
+        if analysis['input_hash'] != page.metadata['sha256']:
+            raise NodeFailure('INPUT_HASH_MISMATCH')
         return rgb, alpha, analysis
 
     def accepted(self, page):
@@ -114,7 +114,7 @@ class Pipeline:
             page.stopped = True
             return
         code = error.code if isinstance(error, NodeFailure) and error.code in {
-            'ENGINE_VERSION_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH',
+            'PROTOCOL_MISMATCH', 'INPUT_INVALID', 'INPUT_HASH_MISMATCH',
             'STORAGE_UNAVAILABLE', 'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED'
         } else 'CLASSIC_LOCAL_INTERRUPTED'
         saved = self.agent.journal.get('lease:' + page.lease['lease_id'], {})

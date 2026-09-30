@@ -29,7 +29,7 @@ from .node_config import NodeConfig
 from .providers import digest
 from .queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from .request_models import RequestBody
-from .scheduler import (claim_batch, current_lease, effective_languages, has_claimable_work, heartbeat_lease, lock_scheduler,
+from .scheduler import (claim_batch, current_lease, has_claimable_work, heartbeat_lease, lock_scheduler,
                         prepare_claim_candidates, release_lease, remaining_capacity, touch_job)
 from .storage import get_store
 from .workers import fail_stage, finish_job
@@ -53,7 +53,7 @@ def parsed(value):
 def config_payload(node):
     config = NodeConfig.model_validate(node.desired_config)
     keys = ('execution_slots', 'poll_seconds', 'heartbeat_seconds',
-            'request_seconds', 'page_seconds', 'text_wait_seconds', 'delivery_seconds', 'allowed_languages')
+            'request_seconds', 'page_seconds', 'text_wait_seconds', 'delivery_seconds')
     return {'version': node.config_version, 'enabled': node.enabled,
             **{key: getattr(config, key) for key in keys}}
 
@@ -133,7 +133,7 @@ def lease_payload(db, lease):
     analysis = state.analysis if state else None
     return {'lease_id': lease.id, 'lease_token': lease.token, 'job_id': job.id, 'generation': lease.generation,
             'status': 'active', 'expires_at': stamp(lease.expires_at), 'limits': lease.limits,
-            'input': input_descriptor(db, lease, source), 'config': {'engine': job.config['engine']},
+            'input': input_descriptor(db, lease, source), 'config': {'engine': {'protocol_version': 3}},
             'language': job.target_language, 'analysis': analysis,
             'analysis_hash': digest(analysis) if analysis else None,
             'translations': translations_payload(db, job.id)}
@@ -158,8 +158,7 @@ def register(body: Registration, identity=Depends(node_auth), db: Session = Depe
         ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None))))
     node.engine_version, node.device = body.engine_version, body.device
     node.capabilities = ['page'] if body.ready else []
-    allowed = config_payload(node)['allowed_languages']
-    node.supported_languages = [lang for lang in dict.fromkeys(body.supported_languages) if lang in allowed]
+    node.supported_languages = list(dict.fromkeys(body.supported_languages))
     node.runtime_report = {'protocol_version': 3, 'ready': body.ready, 'languages': body.supported_languages}
     node.applied_config_version, node.config_error, node.heartbeat_at = node.config_version, None, now()
     result = {'protocol_version': 3, 'config': config_payload(node), 'server_time': stamp(now()),
@@ -196,7 +195,6 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
             break
         if body.config_version != node.config_version:
             problem('NODE_CONFIG_CONFLICT', '领取前需要同步配置', 409)
-        node.supported_languages = effective_languages(node)
         leases = (claim_batch(db, identity, ['page'], limit=body.count,
                              config_version=body.config_version, prepared=prepared) if prepared else [])
         if not leases and prepared and prepared.signatures and attempt == 0 and remaining_capacity(db, node):
@@ -361,8 +359,8 @@ def analysis(lease_id: str, body: AnalysisRequest, identity=Depends(node_auth), 
     source = db.get(Asset, job.input_asset_id)
     if digest(body.analysis) != body.analysis_hash:
         problem('ANALYSIS_HASH_MISMATCH', '分析摘要不匹配', 422)
-    if body.analysis.get('version') != job.config['engine']['version'] or body.analysis.get('input_hash') != source.sha256:
-        problem('ENGINE_RESULT_MISMATCH', '分析与输入或配置版本不一致', 422)
+    if body.analysis.get('input_hash') != source.sha256:
+        problem('ENGINE_RESULT_MISMATCH', '分析与输入不一致', 422)
     validate_analysis(body.analysis, source.width, source.height)  # Decode outside scheduler locks.
     db.rollback()
     lock_scheduler(db)
@@ -387,7 +385,7 @@ def analysis(lease_id: str, body: AnalysisRequest, identity=Depends(node_auth), 
             release_lease(db, lease, 'succeeded')
         else:
             text = db.scalar(select(JobStage).where(JobStage.job_id == job.id, JobStage.name == 'text'))
-            text.status = 'ready'
+            text.status, text.available_at = 'ready', now()
             job.phase = 'text'
         touch_job(db, job)
     result = {'analysis_hash': body.analysis_hash, 'receipt': receipt(lease) if lease.completed_at else None}
@@ -426,7 +424,7 @@ def read_input(lease_id: str, x_lease_token: str = Header(max_length=64,
 ErrorCode = Literal['LEASE_STOPPED', 'ENGINE_UNAVAILABLE', 'CLASSIC_LOCAL_INTERRUPTED',
     'INPUT_INVALID', 'INPUT_HASH_MISMATCH', 'INPUT_UNAVAILABLE', 'STORAGE_AUTH_FAILED', 'STORAGE_UNAVAILABLE',
     'CLASSIC_ANALYZE_FAILED', 'CLASSIC_INPAINT_FAILED', 'CLASSIC_RENDER_FAILED',
-    'ENGINE_VERSION_MISMATCH', 'TEXT_DEADLINE_EXCEEDED', 'DELIVERY_DEADLINE_EXCEEDED', 'PAGE_DEADLINE_EXCEEDED']
+    'PROTOCOL_MISMATCH', 'TEXT_DEADLINE_EXCEEDED', 'DELIVERY_DEADLINE_EXCEEDED', 'PAGE_DEADLINE_EXCEEDED']
 
 
 class NodeError(RequestBody):
@@ -506,9 +504,8 @@ def result_multipart_schema():
 
 def validate_result(db, job, result):
     source = db.get(Asset, job.input_asset_id)
-    if (result['input_hash'] != source.sha256 or result['version'] != job.config['engine']['version']
-            or result['normalization_version'] != source.normalization_version):
-        problem('ENGINE_RESULT_MISMATCH', '结果与输入或引擎版本不一致', 409)
+    if (result['input_hash'] != source.sha256 or result['normalization_version'] != source.normalization_version):
+        problem('ENGINE_RESULT_MISMATCH', '结果与输入不一致', 409)
     if ((result['width'], result['height']) != (source.width, source.height)
             or result['width'] * result['height'] > settings().max_pixels
             or max(result['width'], result['height']) > settings().max_dimension

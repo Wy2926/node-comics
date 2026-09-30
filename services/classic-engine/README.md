@@ -28,7 +28,7 @@ Linux NVIDIA 需要 Vulkan 驱动、CUDA 12.8、cuDNN 9 和 Noto 字体。执行
 .\.venv-lama\Scripts\python.exe -m classic_node run --config node.local.json
 ```
 
-`check` 校验本地模型并输出引擎版本；将中心 `CLASSIC_ENGINE_VERSION` 配为该值，配置文本供应商并启用常规翻译。`run` 才注册和领取任务，以中心心跳确认在线。
+`check` 校验本地模型并输出引擎版本；配置文本供应商并启用常规翻译。`run` 才注册和领取任务，以中心心跳确认在线。
 
 节点使用 v3：凭当前租约从中心读取规范化临时原图，提交裁剪后的无损 WebP 覆盖层。覆盖 alpha 仅为 0/255，客户端用 `source-atop` 保留原图透明度；无可见变化返回原图表示而不上传文件。冻结结果以 SQLite 二进制 BLOB 与完成记录一起耐久保存，丢回执可复交，终态后清除；不编码或上传整页 PNG，不配置对象存储。
 

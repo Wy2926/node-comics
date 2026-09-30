@@ -237,7 +237,6 @@ def entitlements_json(db, user, at=None):
     return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "gift": gift_json(user, at), "timezone": settings().quota_timezone,
             "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
-            "scheduler_weight": get_request_limits(db).plus_scheduler_weight if plus else get_request_limits(db).free_scheduler_weight,
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}

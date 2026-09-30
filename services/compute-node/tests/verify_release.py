@@ -74,8 +74,7 @@ def verify(release, work):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     config = {'protocol_version': 3, 'node_id': 'isolated-release-node', 'node_token': 'isolated-fixture-token',
               'resource_id': 'isolated-vulkan:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
-              'control_ca': 'ca.pem',
-              'languages': ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id']}
+              'control_ca': 'ca.pem'}
     source = work / 'fixture.json'
     source.write_text(json.dumps(config), encoding='utf-8')
     executable = release / 'node.exe'

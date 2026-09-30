@@ -161,7 +161,7 @@ def run_page(client, auth, other, agent, source_path, directory, ordinal, timeou
         source, image, width, height = canonical_source(source_path)
         source_name = 'source' + EXTENSIONS[image['content_type']]
         (directory / source_name).write_bytes(source)
-        body = {'image': image, 'mode': 'classic', 'target_language': 'zh-Hans', 'priority': 'current'}
+        body = {'image': image, 'mode': 'classic', 'target_language': 'zh-Hans'}
         item.update(input_bytes=len(source), input_mime=image['content_type'], input_sha256=image['sha256'],
                     width=width, height=height, source_file=source_name, state='submitting')
         save_json(directory / 'intent.json', {'request_id': item['request_id'], 'body': body})

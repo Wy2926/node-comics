@@ -184,8 +184,7 @@ def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_ex
         db.add(QuotaPeriod(**spec, used=2, reserved=0))
         db.commit()
     old = client.get('/v1/admin/system-settings', headers=admin).json()
-    values = {**old['values'], 'free_daily_pages': 17, 'plus_monthly_redraw_pages': 77,
-              'free_scheduler_weight': 1.5, 'plus_scheduler_weight': 3.5}
+    values = {**old['values'], 'free_daily_pages': 17, 'plus_monthly_redraw_pages': 77}
     changed = client.put('/v1/admin/system-settings', headers=admin, json={'expected_version': old['version'], 'values': values})
     assert changed.status_code == 200, changed.text
     with session_factory()() as db:
@@ -193,8 +192,6 @@ def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_ex
         assert allowance_json(db, user, DAILY)['granted'] == previous_pages
         assert allowance_json(db, db.get(User, fresh_id), DAILY)['granted'] == 17
         assert period_spec(user, DAILY, now() + timedelta(days=1), db=db)['granted'] == 17
-        assert entitlements_json(db, user)['scheduler_weight'] == 1.5
-        assert entitlements_json(db, db.get(User, plus_id))['scheduler_weight'] == 3.5
         assert db.get(User, plus_id).plus_monthly_pages == 300
     membership = client.post(f'/v1/admin/users/{fresh_id}/membership', headers={**admin, 'Idempotency-Key': 'new-default-membership'},
         json={'action': 'extend', 'days': 30, 'note': 'isolated new default'})

@@ -1,16 +1,9 @@
-"""Database authority for mode queues, weighted scheduling and fenced stage leases."""
+"""Database authority for compute capacity and fenced stage leases."""
 from datetime import datetime
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 from .models import now, uid
-
-
-class UserModeQueue(Base):
-    __tablename__ = "user_mode_queues"
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
-    mode: Mapped[str] = mapped_column(String(20), primary_key=True)
-    version: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class ComputeNode(Base):
@@ -44,7 +37,7 @@ class JobStage(Base):
     available_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     result: Mapped[dict] = mapped_column(JSON, default=dict)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    __table_args__ = (UniqueConstraint("job_id", "name"), Index("ix_stage_ready", "status", "name", "available_at"))
+    __table_args__ = (UniqueConstraint("job_id", "name"), Index("ix_stage_ready", "status", "name", "available_at", "id"))
 
 
 class ExecutionLease(Base):
@@ -59,9 +52,6 @@ class ExecutionLease(Base):
     generation: Mapped[int] = mapped_column(Integer)
     resource_pool: Mapped[str] = mapped_column(String(120))
     mode: Mapped[str] = mapped_column(String(20))
-    priority_class: Mapped[str] = mapped_column(String(20))
-    weight: Mapped[float] = mapped_column(Float)
-    estimated_seconds: Mapped[float] = mapped_column(Float)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
@@ -69,6 +59,8 @@ class ExecutionLease(Base):
     result_hash: Mapped[str | None] = mapped_column(String(64))
     output_key: Mapped[str | None] = mapped_column(String(200))
     limits: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (Index('ix_lease_node_active', 'node_id', 'completed_at'),)
 
 
 class ComputeClaim(Base):
@@ -79,13 +71,6 @@ class ComputeClaim(Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     lease_ids: Mapped[list] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-
-
-class FairnessState(Base):
-    __tablename__ = "fairness_states"
-    key: Mapped[str] = mapped_column(String(255), primary_key=True)
-    service: Mapped[float] = mapped_column(Float, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class SchedulerMutex(Base):

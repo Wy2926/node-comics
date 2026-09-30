@@ -151,8 +151,8 @@ class Agent:
             page.step = 'deliver'
             if page.completion:
                 self.pipeline.resize_reservation(page, self.pipeline.delivery_reservation(page.completion))
-        elif lease['config']['engine']['version'] != self.runtime.version:
-            self.pipeline.error(page, NodeFailure('ENGINE_VERSION_MISMATCH'))
+        elif lease['config']['engine']['protocol_version'] != 3:
+            self.pipeline.error(page, NodeFailure('PROTOCOL_MISMATCH'))
         self.pages[key] = page
         self.wake.set()
 

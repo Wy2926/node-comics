@@ -15,7 +15,6 @@ from .errors import problem
 from .models import User
 from .node_config import NodeConfig
 from .control_pools import POOL_LIMITS
-from .languages import LANGUAGES
 from .queue_models import ComputeNode
 from .request_models import RequestBody
 from .scheduler import lock_scheduler
@@ -64,8 +63,7 @@ def compute_node(db, node_id, *, image_only=False):
 @router.get('/config-schema')
 def config_schema(user: User = Depends(admin)):
     return {'node': NodeConfig.model_json_schema(),
-            'defaults': NodeConfig().model_dump(exclude_none=True), 'pool_limits': POOL_LIMITS,
-            'languages': [{'id': code, 'label': label} for code, label in LANGUAGES.items()]}
+            'defaults': NodeConfig().model_dump(exclude_none=True), 'pool_limits': POOL_LIMITS}
 
 
 @router.post('', status_code=201)

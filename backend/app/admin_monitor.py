@@ -15,8 +15,8 @@ from .billing_access import access_exists
 from .entitlement_models import QuotaPeriod
 from .errors import problem
 from .models import Attempt, ClassicState, Job, TextCall, User, now
-from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
-from .scheduler import ACTIVE, priority_of
+from .queue_models import ComputeNode, ExecutionLease, JobStage
+from .scheduler import ACTIVE
 
 router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
 Mode = Literal["classic", "redraw"]
@@ -39,7 +39,7 @@ def lease_rows(db, job_ids):
     # Deliberately omit lease tokens, result payloads and provider credentials.
     query = select(ExecutionLease.id, ExecutionLease.job_id, ExecutionLease.stage_id,
         ExecutionLease.node_id, ExecutionLease.executor_id, ExecutionLease.generation,
-        ExecutionLease.priority_class, ExecutionLease.started_at, ExecutionLease.expires_at,
+        ExecutionLease.started_at, ExecutionLease.expires_at,
         ExecutionLease.completed_at, ExecutionLease.outcome, JobStage.name.label("stage"),
         ComputeNode.name.label("node_name")).join(JobStage, JobStage.id == ExecutionLease.stage_id).join(
         ComputeNode, ComputeNode.id == ExecutionLease.node_id).where(ExecutionLease.job_id.in_(job_ids))
@@ -82,7 +82,6 @@ def task_json(job, owner_name, leases, at):
     completed_by = final[-1] if final else None
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
-            "priority": priority_of(job, at) if job.status in ACTIVE else (leases[-1].priority_class if leases else None),
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
             "cancel_requested": job.cancel_requested, "discard_output": job.discard_output, **timing(job, leases, at),
@@ -99,7 +98,6 @@ def task_query():
 
 @router.get("/tasks")
 def tasks(status: Status | None = None, mode: Mode | None = None,
-          priority: Literal["realtime", "preload"] | None = None,
           owner_id: str | None = Query(None, max_length=36), node_id: str | None = Query(None, max_length=80),
           q: str = Query("", max_length=120), offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
           db: Session = Depends(get_db)):
@@ -109,9 +107,6 @@ def tasks(status: Status | None = None, mode: Mode | None = None,
         query = query.where(Job.status.in_(statuses))
     if mode:
         query = query.where(Job.mode == mode)
-    if priority:
-        real = and_(Job.realtime_until.is_not(None), Job.realtime_until > at)
-        query = query.where(real if priority == "realtime" else or_(Job.realtime_until.is_(None), Job.realtime_until <= at))
     if owner_id:
         query = query.where(Job.owner_id == owner_id)
     if node_id:
@@ -137,7 +132,7 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
     stages = db.execute(select(JobStage.id, JobStage.name, JobStage.status, JobStage.attempts,
         JobStage.available_at, JobStage.completed_at).where(JobStage.job_id == job.id)).all()
     executions = [{"id": r.id, "stage": r.stage, "generation": r.generation, "node_id": r.node_id,
-        "node_name": r.node_name, "executor_id": r.executor_id, "priority": r.priority_class,
+        "node_name": r.node_name, "executor_id": r.executor_id,
         "started_at": iso(r.started_at), "completed_at": iso(r.completed_at), "expires_at": iso(r.expires_at),
         "seconds": seconds(r.started_at, lease_end(r, at)),
         "outcome": r.outcome or ("expired" if r.expires_at <= at else "running")} for r in leases]
@@ -162,11 +157,10 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
 def overview(db: Session = Depends(get_db)):
     at = now()
     since = at - timedelta(hours=24)
-    priority = case((Job.realtime_until > at, "realtime"), else_="preload")
-    groups = db.execute(select(Job.mode, Job.status, priority, func.count(), func.min(Job.created_at))
-        .where(Job.status.in_(ACTIVE)).group_by(Job.mode, Job.status, priority)).all()
-    queues = [{"mode": mode, "status": status, "priority": p, "count": count,
-               "oldest_seconds": seconds(oldest, at)} for mode, status, p, count, oldest in groups]
+    groups = db.execute(select(Job.mode, Job.status, func.count(), func.min(Job.created_at))
+        .where(Job.status.in_(ACTIVE)).group_by(Job.mode, Job.status)).all()
+    queues = [{"mode": mode, "status": status, "count": count,
+               "oldest_seconds": seconds(oldest, at)} for mode, status, count, oldest in groups]
     recent = db.execute(select(Job.mode, Job.status, func.count(),
         func.avg(duration_sql(db, Job.created_at, Job.completed_at))).where(Job.completed_at >= since).group_by(Job.mode, Job.status)).all()
     stages = db.execute(select(JobStage.name, JobStage.status, func.count()).join(Job, Job.id == JobStage.job_id).where(

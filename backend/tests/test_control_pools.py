@@ -59,7 +59,8 @@ def test_shrink_keeps_inflight_lease_and_blocks_new_claims(client, png):
         db.commit()
 
 
-def test_node_schema_lists_all_languages_and_server_defaults(client):
+def test_node_schema_has_server_defaults_without_language_whitelist(client):
     result = client.get('/v1/admin/compute-nodes/config-schema',headers=login(client,'admin')).json()
-    assert len(result['languages']) == 16
+    assert 'languages' not in result
+    assert 'allowed_languages' not in result['defaults']
     assert result['pool_limits'] == {'text':100,'redraw':100,'validate_upload':32}

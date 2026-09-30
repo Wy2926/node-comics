@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from app import scheduler, workers
 from app.db import session_factory
 from app.models import Job, Provider, now
-from app.queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage
+from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from test_cluster_scheduler import add_job, scheduler_case  # noqa: F401
 from test_classic import text_database  # noqa: F401
 
@@ -21,7 +21,7 @@ def set_capacity(capacity):
         db.commit()
 
 
-def test_batch_preserves_per_page_weighted_order(scheduler_case):
+def test_batch_preserves_simple_plus_preference(scheduler_case):
     for _ in range(8):
         add_job(scheduler_case, 'free-user')
         add_job(scheduler_case, 'plus-user')
@@ -32,7 +32,7 @@ def test_batch_preserves_per_page_weighted_order(scheduler_case):
     with session_factory()() as db:
         actual = scheduler.claim_batch(db, 'node-0')
         assert [lease.job_id for lease in actual] == expected
-        assert len({lease.owner_id for lease in actual}) == 2
+        assert {lease.owner_id for lease in actual} == {'plus-user'}
         db.rollback()
 
 
@@ -41,17 +41,25 @@ def test_batch_elects_backlog_once_and_honors_capacity(scheduler_case, monkeypat
         add_job(scheduler_case)
     set_capacity(7)
     calls = []
-    election = scheduler._election_rows
+    source_checks = []
+    available = scheduler.available
+    def observed_source(asset):
+        source_checks.append(asset.id)
+        return available(asset)
+    monkeypatch.setattr(scheduler, 'available', observed_source)
+    election = scheduler._candidate_rows
     def observed(*args, **kwargs):
         calls.append(kwargs.get('stage_ids'))
         return election(*args, **kwargs)
-    monkeypatch.setattr(scheduler, '_election_rows', observed)
+    monkeypatch.setattr(scheduler, '_candidate_rows', observed)
     with session_factory()() as db:
         first = scheduler.claim_batch(db, 'node-0', limit=100)
         db.commit()
         assert len(first) == 4
+        assert source_checks == ['free-user-image']
+        assert len(calls) == 2
         assert sum(ids is None for ids in calls) == 1
-        assert all(len(ids) <= 20 for ids in calls if ids is not None)
+        assert all(len(ids) <= scheduler.CANDIDATE_LIMIT for ids in calls if ids is not None)
         second = scheduler.claim_batch(db, 'node-0')
         db.commit()
         assert len(second) == 3
@@ -102,18 +110,18 @@ def test_prepared_batch_revalidates_and_does_not_repeat_full_election(scheduler_
             writer.get(Job, jobs[0]).cancel_requested = True
             writer.get(ComputeNode, 'node-0').capacity = 2
             writer.commit()
-        original = scheduler._election_rows
+        original = scheduler._candidate_rows
         def bounded(*args, **kwargs):
             assert kwargs.get('stage_ids') is not None
             return original(*args, **kwargs)
-        monkeypatch.setattr(scheduler, '_election_rows', bounded)
+        monkeypatch.setattr(scheduler, '_candidate_rows', bounded)
         leases = scheduler.claim_batch(db, 'node-0', prepared=prepared)
         db.commit()
         assert len(leases) == 2
         assert jobs[0] not in {lease.job_id for lease in leases}
 
 
-def test_claimability_check_does_not_create_leases_or_fairness(scheduler_case):
+def test_claimability_check_does_not_mutate_state(scheduler_case):
     job_id = add_job(scheduler_case)
     with session_factory()() as db:
         heartbeat = db.get(ComputeNode, 'node-0').heartbeat_at
@@ -122,7 +130,6 @@ def test_claimability_check_does_not_create_leases_or_fairness(scheduler_case):
         assert not scheduler.has_claimable_work(db, 'node-0', ['text'])
         assert not db.new and not db.dirty
         assert db.scalar(select(func.count()).select_from(ExecutionLease)) == 0
-        assert db.scalar(select(func.count()).select_from(FairnessState)) == 0
         assert db.get(Job, job_id).status == 'queued'
         assert db.get(ComputeNode, 'node-0').heartbeat_at == heartbeat
         scheduler.claim_stage(db, 'node-0')
@@ -130,19 +137,16 @@ def test_claimability_check_does_not_create_leases_or_fairness(scheduler_case):
         assert not scheduler.has_claimable_work(db, 'node-0', ['page'])
 
 
-def test_claimability_uses_latest_allowed_runtime_languages(scheduler_case):
+def test_claimability_uses_registered_languages(scheduler_case):
     add_job(scheduler_case)
     with session_factory()() as db:
         node = db.get(ComputeNode, 'node-0')
+        node.supported_languages = ['en', 'zh-Hans']
+        db.commit()
+        assert scheduler.has_claimable_work(db, node.id, ['page'])
         node.supported_languages = ['en']
-        node.runtime_report = {'protocol_version': 3, 'languages': ['en', 'zh-Hans']}
-        node.desired_config = {**node.desired_config, 'allowed_languages': ['en', 'zh-Hans']}
         db.commit()
-        assert scheduler.has_claimable_work(db, 'node-0', ['page'])
-        assert node.supported_languages == ['en'] and not db.dirty
-        node.desired_config = {**node.desired_config, 'allowed_languages': ['en']}
-        db.commit()
-        assert not scheduler.has_claimable_work(db, 'node-0', ['page'])
+        assert not scheduler.has_claimable_work(db, node.id, ['page'])
 
 
 def test_dispatch_refills_without_prefetch_and_rotates_pools(monkeypatch):

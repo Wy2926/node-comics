@@ -10,7 +10,6 @@
   "download_workers": 4,
   "delivery_workers": 4,
   "resident_bytes": 1073741824,
-  "languages": ["zh-Hans", "zh-Hant", "en", "ja", "ko"],
   "engine": {
     "models": "models",
     "gpu": 0,

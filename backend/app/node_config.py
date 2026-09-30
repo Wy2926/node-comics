@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import Field
 from .request_models import RequestBody
 
-from .languages import Language
 
 
 class NodeConfig(RequestBody):
@@ -15,7 +14,6 @@ class NodeConfig(RequestBody):
     page_seconds: float = Field(default=900, ge=10, le=3600, allow_inf_nan=False)
     text_wait_seconds: float = Field(default=600, ge=10, le=3600, allow_inf_nan=False)
     delivery_seconds: float = Field(default=120, ge=10, le=600, allow_inf_nan=False)
-    allowed_languages: list[Language] = Field(default_factory=lambda: ['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], min_length=1, max_length=16)
 
 
 def default_config():

@@ -38,7 +38,7 @@
 | `backend/app/comic_title_cache.py` | 共享漫画名缓存、查询去重、执行续租及结果写入校验 |
 | `backend/app/adapters/openai_text.py` | OpenAI Chat Completions／Responses 请求与响应转换 |
 | `backend/app/classic.py` | 持久调用意图、重试、检查点及逐次成本计量 |
-| `backend/app/scheduler.py` | 结合供应商上游配额的文本执行池公平调度 |
+| `backend/app/scheduler.py` | 结合供应商上游配额的文本执行池任务领取 |
 
 扩展来源时，继承 `adapters.llm.LLMConfig` 定义渠道连接配置，在注册表中加入 `TranslationChannel`。正文分组、重试与价格由 `adapters.text.TextPolicy` 单独校验；上游 RPM 属于供应商记录，不进入 `TextPolicy` 或新模型版本的配置。渠道调用函数接受消息列表（`role` / `content`）、供应商快照和后台解析的密钥，返回 `TextResponse(content, usage, request_id)` 或抛出 `TextError`。底层不构造业务提示词，不解析 TOON 或漫画名 JSON，也不负责缓存、排队与重试。正文 worker 保留有界重试；漫画名只调用一次。供应商创建与编辑不自动请求模型，因此保存不代表已验证真实翻译效果。
 

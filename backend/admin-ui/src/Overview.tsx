@@ -31,9 +31,6 @@ export function Overview({data}: {data: OverviewData}) {
           <div><h3>{label(mode)}</h3><span className="muted">{mode === 'classic' ? 'OCR → 翻译 / 修复 → 嵌字' : '图片模型编辑与交付'}</span></div></div><b>{number(total)} <small>页在途</small></b></div>
         <div className="queue-counts">{['awaiting_upload', 'validating_upload', 'queued', 'running', 'outcome_unknown'].map(status =>
           <a href={href('tasks', {mode, status})} key={status}><span>{label(status)}</span><strong>{number(sum(r => r.status === status))}</strong></a>)}</div>
-        <div className="queue-split"><span>实时 {number(sum(r => r.priority === 'realtime'))}</span>
-          <progress max={Math.max(total, 1)} value={sum(r => r.priority === 'realtime')} aria-label={`${label(mode)}实时任务占比`}/>
-          <span>预存 {number(sum(r => r.priority === 'preload'))}</span></div>
       </section>;
     })}</div>
     <div className="bottom-grid"><section className="panel"><div className="panel-heading"><div><h2>阶段积压</h2><p className="muted">待执行包含暂不可调度阶段；阶段数可多于页数。</p></div></div>

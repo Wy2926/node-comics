@@ -90,7 +90,6 @@ def test_overview_counts_tasks_and_nodes_without_storage(monitor, monkeypatch):
 def test_users_plan_search_and_read_only_entitlements(monitor):
     from app.db import session_factory
     from app.entitlement_models import QuotaPeriod
-    from app.queue_models import UserModeQueue
     from sqlalchemy import func
     client, auth, _ = monitor
     plus = client.get("/v1/admin/monitor/users?plan=plus", headers=auth).json()
@@ -98,11 +97,11 @@ def test_users_plan_search_and_read_only_entitlements(monitor):
     assert client.get("/v1/admin/monitor/users?plan=free", headers=auth).json()["total"] == 4
     assert client.get("/v1/admin/monitor/users?q=星野", headers=auth).json()["total"] == 1
     with session_factory()() as db:
-        before = [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod, UserModeQueue)]
+        before = [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod,)]
     detail = client.get("/v1/admin/monitor/users/"+plus["items"][0]["id"], headers=auth).json()
     assert detail["entitlements"]["modes"]["classic"]["unlimited"]
     with session_factory()() as db:
-        assert before == [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod, UserModeQueue)]
+        assert before == [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod,)]
     assert client.get("/v1/admin/monitor/users/missing", headers=auth).status_code == 404
     assert client.get("/v1/admin/monitor/tasks/missing", headers=auth).status_code == 404
 
@@ -121,8 +120,8 @@ def test_retries_keep_each_execution_and_cap_recovered_duration(monitor):
         stage = db.get(JobStage, lease.stage_id)
         stage.generation, stage.attempts, stage.status = 2, 2, "succeeded"
         db.add(ExecutionLease(stage_id=lease.stage_id, job_id=job.id, node_id="gpu-a", owner_id=job.owner_id,
-            executor_id="gpu-a", generation=2, resource_pool="image", mode="classic", priority_class="preload",
-            weight=1, estimated_seconds=20, started_at=data["at"]-timedelta(seconds=40),
+            executor_id="gpu-a", generation=2, resource_pool="image", mode="classic",
+            started_at=data["at"]-timedelta(seconds=40),
             expires_at=data["at"]+timedelta(seconds=50), completed_at=data["at"]-timedelta(seconds=10), outcome="succeeded"))
         db.commit()
     result=client.get("/v1/admin/monitor/tasks/"+EXPIRED_ID, headers=auth).json()

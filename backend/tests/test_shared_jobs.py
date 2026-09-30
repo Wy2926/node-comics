@@ -150,10 +150,11 @@ def test_unknown_redraw_cannot_automatically_restart_even_after_config_change(cl
     auto = submit_asset(client, auth, source, key='other-device')
     assert auto.status_code == 202 and auto.json()['state'] == 'needs_attention'
     assert request_record(client, auth, auto.json()['id']).job_id == record.job_id
-    retry = client.put('/v1/translations/' + request_id('retry'), headers=auth, json={'retry_of': original['id']})
+    retry = client.put('/v1/translations/' + request_id('retry'), headers=auth,
+        json={'retry_of': original['id'], 'priority': 'current'})
     assert retry.status_code == 409
     regenerate = client.put('/v1/translations/' + request_id('regenerate'), headers=auth,
-        json={'regenerate_of': original['id']})
+        json={'regenerate_of': original['id'], 'priority': 'current'})
     assert regenerate.status_code == 409 and regenerate.json()['error']['code'] == 'UNKNOWN_COST_ACK_REQUIRED'
     accepted = client.put('/v1/translations/' + request_id('regenerate'), headers=auth,
         json={'regenerate_of': original['id'], 'acknowledge_unknown_cost': True})
@@ -173,10 +174,11 @@ def test_explicit_retry_only_accepts_failed_intent_and_new_uuid(client, png):
         lock_scheduler(db)
         finish_job(db, db.get(Job, record.job_id), 'failed')
         db.commit()
-    accepted = client.put(route, headers=auth, json={'retry_of': original['id']})
+    accepted = client.put(route, headers=auth, json={'retry_of': original['id'], 'priority': 'prefetch'})
     assert accepted.status_code == 202
     assert request_record(client, auth, accepted.json()['id']).job_id != record.job_id
-    assert client.put(route, headers=auth, json={'retry_of': original['id']}).json()['id'] == accepted.json()['id']
+    repeated = client.put(route, headers=auth, json={'retry_of': original['id'], 'priority': 'current'})
+    assert repeated.status_code == 202 and repeated.json()['id'] == accepted.json()['id']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 2
         assert window_count('image') == 2

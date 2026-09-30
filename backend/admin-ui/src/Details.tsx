@@ -24,7 +24,7 @@ export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; 
       <div key={s.name}><b>{label(s.name)}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
     <h3 className="detail-heading">执行履历 <span>{j.executions.length} 次</span></h3>
     {j.executions.length ? <Table heads={['阶段 / 代次', '节点 / 执行机', '开始 / 结束', '占用时长', '结果']}>
-      {j.executions.map(e => <tr key={e.id}><td>{label(e.stage)}<small>第 {e.generation} 代 · {label(e.priority)}</small></td>
+      {j.executions.map(e => <tr key={e.id}><td>{label(e.stage)}<small>第 {e.generation} 代</small></td>
         <td>{e.node_name}<small>{e.executor_id || '执行机未记录'}</small></td>
         <td>{time(e.started_at)}<small>{e.completed_at ? time(e.completed_at) : e.outcome === 'expired' ? `过期于 ${time(e.expires_at)}` : '尚未结束'}</small></td>
         <td className="numeric">{duration(e.seconds)}</td><td><Badge value={e.outcome}/></td></tr>)}

@@ -23,8 +23,6 @@ class RequestLimits(RequestBody):
 
     free_daily_pages: int = Field(ge=0, le=1000000)
     plus_monthly_redraw_pages: int = Field(ge=0, le=1000000)
-    free_scheduler_weight: float = Field(ge=0.1, le=100)
-    plus_scheduler_weight: float = Field(ge=0.1, le=100)
 
     free_images_per_minute: int = Field(ge=1, le=10000)
     plus_images_per_minute: int = Field(ge=1, le=10000)

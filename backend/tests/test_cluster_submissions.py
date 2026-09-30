@@ -190,7 +190,14 @@ def test_accepted_uuid_survives_provider_configuration_change(cluster, png):
     auth = login(client)
     first = submit(client, auth, descriptor(png)).json()
     settings().classic_enabled = False
-    settings().classic_engine_version = 'changed-after-admission'
     repeat = submit(client, auth, descriptor(png))
     assert repeat.status_code == 202 and repeat.json()['id'] == first['id']
     assert len(active_jobs(client, auth)) == 1
+
+def test_unuploaded_classic_details_are_explicitly_not_ready(cluster):
+    client, _ = cluster
+    auth = login(client)
+    first = submit(client, auth, manifest(1)[0]).json()
+    response = client.get('/v1/translations/' + first['id'] + '/classic', headers=auth)
+    assert response.status_code == 409 and response.json()['error']['code'] == 'INPUT_NOT_READY'
+    assert client.get('/v1/translations/' + first['id'] + '/classic', headers=login(client, 'bob')).status_code == 404

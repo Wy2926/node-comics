@@ -58,7 +58,6 @@ class EntitlementsResponse(BaseModel):
     gift: GiftMembershipResponse | None
     timezone: str
     image_rate_limit: dict
-    scheduler_weight: float
     modes: dict[str, ModeEntitlement]
     generated_at: str
     pending_previous_period_pages: int
@@ -82,7 +81,6 @@ class JobResponse(BaseModel):
     id: str
     input_asset_id: str | None
     image_sha256: str
-    priority: str = "preload"
     output_asset_id: str | None
     result_available: bool
     result_expired: bool

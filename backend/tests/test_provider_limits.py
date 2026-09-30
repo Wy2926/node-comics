@@ -202,7 +202,7 @@ def test_upgrade_drops_transient_tables_without_rewriting_durable_calls(isolated
         connection.execute(old.tables['users'].insert().values(id='migration-owner',
             subject='migration-owner', name='Isolated', role='user', created_at=at))
         connection.execute(old.tables['jobs'].insert().values(id='migration-job', owner_id='migration-owner',
-            mode='classic', target_language='en', input_pinned=False, source_sha256='', priority_rank=1000000,
+            mode='classic', target_language='en', input_pinned=False, source_sha256='', priority_rank=1,
             changed_at=at, status='queued', phase='queued', entitlement={}, settlement='reserved', version=1,
             cancel_requested=False, discard_output=False, quality_flags=[], created_at=at,
             idempotency_key='isolated-migration', operation='translate', request_hash='r' * 64,

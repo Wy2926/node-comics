@@ -224,6 +224,51 @@ def test_restart_resubmits_frozen_result_without_recomputing(v3, tmp_path):
         journal.close()
 
 
+def test_different_build_resumes_paid_checkpoint_on_another_node(v3, tmp_path):
+    from datetime import timedelta
+    from sqlalchemy import func, select
+    from app.dispatcher import recover_lease
+    from app.models import TextCall, now
+    from app.queue_models import ExecutionLease, JobStage
+    from test_compute_v3 import analyze, claim, text
+    from test_node_management import provision
+
+    jobs = v3['create']()
+    first = claim(v3).json()['leases'][0]
+    analyze(v3, first)
+    text(first)
+    with session_factory()() as db:
+        db.get(ExecutionLease, first['lease_id']).expires_at = now() - timedelta(seconds=1)
+        db.commit()
+    recover_lease(first['lease_id'])
+    with session_factory()() as db:
+        stage = db.scalar(select(JobStage).where(JobStage.job_id == jobs[0], JobStage.name == 'page'))
+        stage.available_at = now()
+        db.commit()
+    node, auth, _ = provision(v3['client'], 'replacement:gpu:0')
+    runtime = FixtureRuntime()
+    runtime.version = 'another-os-and-dependency-build'
+    replacement = {**v3, 'node': node, 'auth': auth}
+    agent, transport, journal = node_for(replacement, tmp_path, 1, runtime)
+    agent.local['resource_id'] = 'replacement:gpu:0'
+    try:
+        agent.register()
+        agent.claim()
+        drive(agent, jobs)
+        assert runtime.analyzed == 0 and runtime.rendered == 1
+        with session_factory()() as db:
+            assert db.scalar(select(func.count()).select_from(TextCall)) == 1
+            assert db.get(Job, jobs[0]).status == 'succeeded'
+            leases = db.scalars(select(ExecutionLease).where(ExecutionLease.job_id == jobs[0],
+                ExecutionLease.resource_pool == 'image').order_by(ExecutionLease.generation)).all()
+            assert len(leases) == 2 and leases[1].node_id == node['node_id']
+            assert leases[1].generation > leases[0].generation
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
 @pytest.mark.skipif(not os.environ.get('CLASSIC_TEST_MODELS'), reason='Explicit real-model Vulkan acceptance')
 @pytest.mark.parametrize('ocr_language,source_text,font_name', [
     ('en', 'WHERE ARE YOU GOING?', 'arial.ttf'),
@@ -233,12 +278,11 @@ def test_real_vulkan_node_uploads_overlay(v3, tmp_path, ocr_language, source_tex
     from classic_node.runtime import Runtime
     from app.config import settings
     from conftest import login, submit_asset, upload
-    runtime = Runtime({'languages': ['en'], 'engine': {
+    runtime = Runtime({'engine': {
         'models': os.environ['CLASSIC_TEST_MODELS'], 'gpu': int(os.environ.get('CLASSIC_TEST_GPU', '0')), 'inpaint_gpu': int(os.environ.get('CLASSIC_TEST_INPAINT_GPU', '0')), 'ocr_workers': 8, 'threads': 2,
         'tile': 768, 'detect_size': 1280, 'ocr_language': ocr_language, 'direction': 'auto',
         'font': []}})
     runtime.warmup()
-    settings().classic_engine_version = runtime.version
     image = Image.new('RGB', (720, 600), '#777777')
     draw = ImageDraw.Draw(image)
     draw.ellipse((35, 65, 685, 535), fill='white', outline='black', width=4)

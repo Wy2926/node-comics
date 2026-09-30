@@ -15,7 +15,7 @@ from .config import settings
 from .db import session_factory
 from .health_models import ServiceHeartbeat
 from .models import Job, now
-from .queue_models import ComputeNode, ExecutionLease, JobStage, UserModeQueue
+from .queue_models import ComputeNode, ExecutionLease, JobStage
 
 ROLES = ("control-worker", "maintenance")
 REPORT_ROLES = (*ROLES, "oidc")
@@ -133,7 +133,9 @@ def readiness(*, role=None, instance=None):
                     node.heartbeat_at and node.heartbeat_at > deadline for node in pools) else "unavailable"
                 if settings().classic_enabled:
                     online = db.scalar(select(ComputeNode.id).where(ComputeNode.enabled.is_(True),
-                        ComputeNode.engine_version == settings().classic_engine_version,
+                        ComputeNode.engine_version != 'control',
+                        ComputeNode.runtime_report['protocol_version'].as_integer() == 3,
+                        ComputeNode.runtime_report['ready'].as_boolean().is_(True),
                         ComputeNode.applied_config_version == ComputeNode.config_version,
                         ComputeNode.config_error.is_(None), ComputeNode.heartbeat_at > deadline).limit(1))
                     checks["compute-nodes"] = "ready" if online else "unavailable"

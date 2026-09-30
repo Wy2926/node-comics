@@ -22,7 +22,6 @@ x-center: &center
     STORAGE_PATH: /data/translation
     TMPDIR: /data/translation/staging
     CLASSIC_ENABLED: "true"
-    CLASSIC_ENGINE_VERSION: ${OVERLAY_ENGINE_VERSION:?Set the actual node engine version}
     ADMIN_WEB_PATH: /console-overlay-test/
     OPENAI_API_KEY: ""
     STRIPE_ENABLED: "false"

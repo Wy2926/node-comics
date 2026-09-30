@@ -4,7 +4,7 @@ import pytest
 from test_postgres_concurrency import pg_scope
 from test_compute_v3 import (
     v3,
-    test_claim_receipt_capacity_fairness_shrink_and_restart,
+    test_claim_receipt_capacity_shrink_and_restart,
     test_concurrent_claims_never_exceed_capacity,
     test_no_text_checkpoint_is_terminal_idempotent_and_never_calls_llm,
     test_analysis_text_revision_and_delivery_settle_once,

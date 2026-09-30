@@ -3,11 +3,18 @@ from pathlib import Path
 from datetime import datetime
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import MetaData, inspect, select, text
+from sqlalchemy import Column, Integer, MetaData, inspect, select, text
 import os
 import pytest
 from test_postgres_concurrency import pg_scope
 from test_request_limits_migration import isolated_migration_database
+
+
+def legacy_jobs():
+    from app.models import Job
+    table = Job.__table__.to_metadata(MetaData())
+    table.append_column(Column('priority_rank', Integer, default=1))
+    return table
 
 
 def migrate(engine, revision):
@@ -34,7 +41,7 @@ def verify_legacy_cutover(engine, *, status='succeeded', cost_state='reported'):
                     sha256='a' * 64, storage_key='old/' + asset_id, mime='image/png', width=1,
                     height=1, byte_size=10, kind=kind))
         connection.execute(text("UPDATE assets SET storage_backend='r2'"))
-        connection.execute(Job.__table__.insert().values(id='paid-job', owner_id='generator',
+        connection.execute(legacy_jobs().insert().values(id='paid-job', owner_id='generator',
             input_asset_id='generator-original', output_asset_id='generator-classic', source_sha256='a' * 64,
             mode='classic', target_language='en', status=status, phase='completed',
             idempotency_key='paid-request', operation='translation', request_hash='b' * 64,
@@ -115,7 +122,7 @@ def test_unresolved_remote_job_blocks_cutover_before_any_legacy_data_changes(iso
     stamp = datetime(2026, 1, 1)
     with engine.begin() as connection:
         connection.execute(User.__table__.insert().values(id='waiting-user', subject='waiting', name='Waiting'))
-        connection.execute(Job.__table__.insert().values(id='waiting-job', owner_id='waiting-user',
+        connection.execute(legacy_jobs().insert().values(id='waiting-job', owner_id='waiting-user',
             source_sha256='a'*64, mode='classic', target_language='en', status=status,
             phase='awaiting_upload', idempotency_key='waiting', operation='translation', request_hash='b'*64,
             cache_key='c'*64, config={}, quota_pages=1, quota_kind='classic_daily', settlement=settlement))

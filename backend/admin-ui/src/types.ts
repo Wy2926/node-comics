@@ -24,13 +24,13 @@ export type Overview = {
   users: {total: number; plus: number; submitted_24h: number};
   nodes: {total: number; online_enabled: number};
   leases: {running?: number; expired?: number};
-  queues: {mode: Mode; status: string; priority: string; count: number; oldest_seconds: number}[];
+  queues: {mode: Mode; status: string;  count: number; oldest_seconds: number}[];
   stages: {name: string; status: string; count: number}[];
   completed_24h: {mode: Mode; status: string; count: number; avg_elapsed_seconds: number}[];
 };
 export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
-  status: string; phase: string; priority: string | null;
+  status: string; phase: string;
   created_at: string; completed_at: string | null; settlement: string;
   quota_pages: number; error_code: string | null; cancel_requested: boolean; discard_output: boolean;
   elapsed_seconds: number; execution_seconds: number; non_execution_seconds: number;
@@ -44,7 +44,7 @@ export type TaskDetail = Task & {
   generated_at: string; provider: {id: string; cost_state: string} | null;
   stages: {name: string; status: string; attempts: number; available_at: string; completed_at: string | null}[];
   executions: {id: string; stage: string; generation: number; node_id: string; node_name: string;
-    executor_id: string | null; priority: string; started_at: string; completed_at: string | null;
+    executor_id: string | null;  started_at: string; completed_at: string | null;
     expires_at: string; seconds: number; outcome: string}[];
   text_cost_micros: number;
   text_calls: {id: string; model: string; provider_id: string; sequence: number; group: number;

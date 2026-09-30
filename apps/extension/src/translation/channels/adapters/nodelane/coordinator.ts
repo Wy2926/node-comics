@@ -103,20 +103,19 @@ export class TranslationCoordinator {
     for(const record of this.records)if(!this.wanted.has(record.id))this.refreshed.delete(record.requestId);
     if(this.controlDelay)return;
     await this.recover();
-    for(const [index,target] of targets.slice(0,4).entries()){
+    for(const target of targets.slice(0,4)){
       if(!requestCurrent()||this.controlDelay)break;
       const id=operationId(this.scope,this.options.language,target);
       try{await withTranslationLock(id,async()=>{
         let record=await readOperation(id);
         if(!record){await this.legacy.check(target);record=await makeOperation(target,this.scope,this.options.language,this.options.getBlob);await saveOperation(record);this.records=this.records.concat(record);}
         this.state=await readSync(this.scope)??this.state;
-        const promote=index===0&&record.priority==='prefetch'&&record.state==='accepted'&&['needs_input','queued','running'].includes(record.result?.state??'');
         // Image admission backpressure covers every new page in this scope, including a new window.
-        // Accepted requests may still be promoted, recovered and supplied with their original bytes.
-        if(record.state==='blocked'||record.state==='accepted'&&!promote||record.state==='uncertain'||this.recordDelay(record)>0||!promote&&this.remaining('imageRetryAt')>0)return;
+        // Accepted requests can be recovered and supplied with their original bytes.
+        if(record.state==='blocked'||record.state==='accepted'||record.state==='uncertain'||this.recordDelay(record)>0||this.remaining('imageRetryAt')>0)return;
         if(!requestCurrent())return;
         record.state='uncertain';await this.save(record);
-        try{const priority=index===0?'current':'prefetch';const result=await this.options.api.translate(record.requestId,{...record.request,priority});record.priority=priority;this.refreshed.add(record.requestId);await this.receive(record,result);}
+        try{const result=await this.options.api.translate(record.requestId,record.request);this.refreshed.add(record.requestId);await this.receive(record,result);}
         catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500;record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);}
       });}catch(error){if(!this.options.api.isCurrent())throw error;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
     }

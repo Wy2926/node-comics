@@ -61,8 +61,6 @@ class Job(Base):
     input_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
     input_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     source_sha256: Mapped[str] = mapped_column(String(64), default="", index=True)
-    priority_rank: Mapped[int] = mapped_column(Integer, default=1000000)
-    realtime_until: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now, index=True)
     output_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
     mode: Mapped[str] = mapped_column(String(20))

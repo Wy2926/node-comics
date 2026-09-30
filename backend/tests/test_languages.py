@@ -22,7 +22,7 @@ def test_unknown_language_has_specific_code_before_admission(client):
     assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
     response = client.post('/v1/admin/compute-nodes', headers=login(client,'admin'),
         json={'name':'invalid language','resource_id':'invalid:language','config':{'allowed_languages':['xx']}})
-    assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
+    assert response.status_code == 422 and response.json()['error']['code'] == 'NODE_CONFIG_INVALID'
 
 
 def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch):
@@ -35,7 +35,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     with session_factory()() as db:
         for language in LANGUAGES:
             config = configuration(db, 'classic', language)
-            assert config['engine'] == {'version': settings().classic_engine_version, 'protocol_version': 3}
+            assert config['engine'] == {'protocol_version': 3}
         with pytest.raises(HTTPException):
             configuration(db, 'classic', 'xx')
         with pytest.raises(HTTPException):
@@ -47,7 +47,6 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
 def test_node_can_report_all_sixteen_languages(client):
     node, auth, admin = provision(client)
     from app.node_config import NodeConfig
-    client.put(f"/v1/admin/compute-nodes/{node['node_id']}/config", headers=admin, json={'name': 'all', 'enabled': True, 'expected_version': 1, 'config': NodeConfig(allowed_languages=list(LANGUAGES)).model_dump()}).raise_for_status()
     result = register(client, auth, supported_languages=list(LANGUAGES))
     assert result.status_code == 200, result.text
     with session_factory()() as db:

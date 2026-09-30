@@ -11,7 +11,7 @@ from sqlalchemy import event, insert, text
 from app import scheduler
 from app.db import engine, session_factory
 from app.models import Asset, Job, User, now
-from app.queue_models import JobStage, UserModeQueue
+from app.queue_models import JobStage
 from test_classic_parallel_postgres import text_database
 from test_cluster_scheduler import scheduler_case, claim, finish_quantum
 
@@ -27,7 +27,6 @@ def test_large_queue_lock_duration(scheduler_case, monkeypatch):
         db.execute(insert(User), [{"id": f"scale-user-{i}", "subject": f"scale:{i}", "name": "scale"} for i in range(owners)])
         db.execute(insert(Asset), [{"id": f"scale-source-{i}", "owner_id": f"scale-user-{i}", "sha256": "a" * 64,
             "storage_key": f"scale/{i}", "mime": "image/png", "width": 80, "height": 64, "byte_size": 100} for i in range(owners)])
-        db.execute(insert(UserModeQueue), [{"owner_id": f"scale-user-{i}", "mode": "classic"} for i in range(owners)])
         for start in range(0, count, 1000):
             indexes = range(start, min(count, start + 1000))
             db.execute(insert(Job), [{"id": f"scale-job-{i}", "owner_id": f"scale-user-{i // 500}",
@@ -69,4 +68,4 @@ def test_large_queue_lock_duration(scheduler_case, monkeypatch):
     print(json.dumps(report))
     if os.environ.get("SCHEDULER_SCALE_REPORT"):
         Path(os.environ["SCHEDULER_SCALE_REPORT"]).write_text(json.dumps(report, indent=2), encoding="utf-8")
-    assert max(loads) <= 2
+    assert max(loads) <= scheduler.CANDIDATE_LIMIT

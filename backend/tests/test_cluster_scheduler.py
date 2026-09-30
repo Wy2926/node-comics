@@ -1,10 +1,8 @@
-"""Durable fair scheduling and node races; virtual stage times, no model calls."""
+"""Bounded scheduling and node races, without model calls."""
 import base64
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 import hashlib
-from io import BytesIO
 from threading import Barrier, Event
 
 import pytest
@@ -13,12 +11,11 @@ from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session
 
 from app import dispatcher, scheduler, workers
-from app.assets import create_asset
 from app.config import settings
 from app.db import engine, session_factory
 from app.errors import ProcessingError
 from app.models import Asset, ClassicState, Job, User, now, uid
-from app.queue_models import ComputeNode, ExecutionLease, FairnessState, JobStage
+from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import claim_stage, current_lease, lock_scheduler, release_lease
 from app.storage import LocalStore
 from test_classic import encoded, text_database
@@ -44,19 +41,18 @@ def scheduler_case(text_database):
             LocalStore().put('isolated/' + owner.id, b'fixture', 'image/png', kind='original')
         for index in range(4):
             db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['page'],
-                               capacity=1, resource_id='physical-' + str(index), engine_version=config['engine']['version'], device='cpu'))
+                               capacity=1, resource_id='physical-' + str(index), engine_version='fixture-build', device='cpu'))
         db.commit()
     return config
 
 
-def add_job(config, owner='free-user', *, realtime=False, stage='page', suffix=None):
+def add_job(config, owner='free-user', *, stage='page', suffix=None):
     job_id = suffix or uid()
     with session_factory()() as db:
         job = Job(id=job_id, owner_id=owner, input_asset_id=owner + '-image', source_sha256='a' * 64,
                   mode='classic', target_language='zh-Hans', status='queued', quota_pages=0, quota_kind='unlimited',
                   settlement='free', config=config, operation='translate', request_hash='r' * 64,
-                  idempotency_key=uid(), cache_key=hashlib.sha256(job_id.encode()).hexdigest(),
-                  realtime_until=now() + timedelta(hours=1) if realtime else None)
+                  idempotency_key=uid(), cache_key=hashlib.sha256(job_id.encode()).hexdigest())
         db.add(job)
         db.flush()
         db.add(JobStage(job_id=job_id, name=stage, status='ready'))
@@ -86,10 +82,19 @@ def finish_quantum(lease_id, actual_seconds=1, *, rearm=True):
         db.commit()
 
 
-def test_free_realtime_precedes_member_preload(scheduler_case):
+def test_plus_preferred_within_oldest_candidate_window(scheduler_case):
+    free = add_job(scheduler_case, 'free-user')
+    plus = add_job(scheduler_case, 'plus-user')
+    assert claim().job_id == plus
+    assert claim('node-1').job_id == free
+
+
+def test_plus_preference_does_not_scan_past_candidate_window(scheduler_case):
+    oldest = add_job(scheduler_case)
+    for _ in range(scheduler.CANDIDATE_LIMIT - 1):
+        add_job(scheduler_case)
     add_job(scheduler_case, 'plus-user')
-    realtime = add_job(scheduler_case, 'free-user', realtime=True)
-    assert claim().job_id == realtime
+    assert claim().job_id == oldest
 
 
 def test_server_slot_reduction_and_pending_configuration_preserve_current_leases(scheduler_case):
@@ -120,30 +125,6 @@ def test_node_language_routing_does_not_consume_unsupported_work(scheduler_case)
     assert claim('node-1').job_id == job
 
 
-def test_realtime_continuous_load_preserves_preload_service(scheduler_case):
-    add_job(scheduler_case, 'plus-user', realtime=True)
-    add_job(scheduler_case, 'free-user')
-    counts = Counter()
-    for _ in range(100):
-        lease = claim()
-        assert lease is not None
-        counts[lease.priority_class] += 1
-        finish_quantum(lease.id)
-    assert 7 <= counts['preload'] <= 13, counts
-    assert counts['realtime'] >= 87, counts
-
-
-def test_plus_weight_two_gets_twice_service_without_preload_promotion(scheduler_case):
-    add_job(scheduler_case, 'free-user')
-    add_job(scheduler_case, 'plus-user')
-    counts = Counter()
-    for _ in range(120):
-        lease = claim()
-        counts[lease.owner_id] += 1
-        assert lease.priority_class == 'preload'
-        finish_quantum(lease.id)
-    ratio = counts['plus-user'] / counts['free-user']
-    assert 1.8 <= ratio <= 2.2, counts
 
 
 def test_one_user_can_borrow_all_real_device_slots(scheduler_case):
@@ -232,7 +213,7 @@ def test_claim_uses_one_connection_and_preserves_caller_uncommitted_writes(sched
             # stage, as create_job does, while keeping the whole transaction open.
             db.flush()
             db.add(ComputeNode(id=node_id, name='pending node', resource_id=node_id,
-                capabilities=['page'], capacity=1, engine_version=scheduler_case['engine']['version'],
+                capabilities=['page'], capacity=1, engine_version='fixture-build',
                 device='cpu', supported_languages=['zh-Hans'], applied_config_version=1))
             db.add(JobStage(id=stage_id, job_id=job_id, name='page', status='ready'))
             db.add(ClassicState(job_id=job_id, analysis={'segments': [], 'quality_flags': []}))
@@ -263,11 +244,11 @@ def test_claim_locks_scheduler_before_autoflushing_caller_job_changes(scheduler_
         # own autoflush behavior by issuing another node query.
         node = db.get(ComputeNode, 'node-0')
         job = db.get(Job, job_id)
-        job.priority_rank = 7
+        job.phase = 'pending-fixture'
         event.listen(engine(), 'before_cursor_execute', record)
         try:
             assert claim_stage(db, node.id).job_id == job_id
-            assert job.priority_rank == 7
+            assert job.phase == 'analyze'
         finally:
             event.remove(engine(), 'before_cursor_execute', record)
             db.rollback()
@@ -277,11 +258,11 @@ def test_claim_locks_scheduler_before_autoflushing_caller_job_changes(scheduler_
     assert lock < write, statements
 
 
-def test_deep_queue_is_ranked_in_database_without_loading_each_job(scheduler_case):
-    """A recently arriving low-service user is visible behind a large backlog."""
+def test_deep_queue_fetches_only_bounded_fifo_candidates(scheduler_case):
+    """Large backlogs do not expand the candidate set or global ordering work."""
     for index in range(80):
         add_job(scheduler_case, 'plus-user', suffix=f'backlog-{index:04}')
-    expected = add_job(scheduler_case, 'free-user')
+    add_job(scheduler_case, 'free-user')
     loaded = []
     def capture(job, context):
         loaded.append(job.id)
@@ -290,12 +271,11 @@ def test_deep_queue_is_ranked_in_database_without_loading_each_job(scheduler_cas
         winner = claim()
     finally:
         event.remove(Job, 'load', capture)
-    assert winner.job_id == expected
-    assert len(loaded) <= 2, len(loaded)
+    assert winner.job_id == 'backlog-0000'
+    assert len(loaded) <= scheduler.CANDIDATE_LIMIT, len(loaded)
 
 
 def test_ineligible_heads_do_not_hide_later_runnable_pages(scheduler_case):
-    from app.queue_models import UserModeQueue
     for index in range(20):
         job_id = add_job(scheduler_case, 'free-user')
         with session_factory()() as db:
@@ -313,7 +293,6 @@ def test_ineligible_heads_do_not_hide_later_runnable_pages(scheduler_case):
 
 @pytest.mark.parametrize('mutation', ['delete_source', 'cancel', 'node_language', 'node_capacity'])
 def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(scheduler_case, monkeypatch, mutation):
-    from app.queue_models import UserModeQueue
     job_id = add_job(scheduler_case)
     original = scheduler._preselect
     def changed(db, node, stages, blocked=()):
@@ -333,24 +312,6 @@ def test_snapshot_candidates_are_revalidated_after_queue_or_node_changes(schedul
     monkeypatch.setattr(scheduler, '_preselect', changed)
     assert claim() is None
 
-
-def test_realtime_reorder_between_snapshot_and_lock_retries_fresh_election(scheduler_case, monkeypatch):
-    from app.queue_models import UserModeQueue
-    add_job(scheduler_case)
-    promoted = add_job(scheduler_case)
-    original = scheduler._preselect
-    def changed(db, node, stages, blocked=()):
-        result = original(db, node, stages, blocked)
-        with session_factory()() as writer:
-            writer.add(UserModeQueue(owner_id='free-user', mode='classic', version=1))
-            job = writer.get(Job, promoted)
-            job.realtime_until, job.priority_rank = now() + timedelta(minutes=1), 0
-            writer.commit()
-        return result
-    monkeypatch.setattr(scheduler, '_preselect', changed)
-    assert claim() is None
-    monkeypatch.setattr(scheduler, '_preselect', original)
-    assert claim().job_id == promoted
 
 
 def test_local_missing_source_is_not_dispatched_and_pinned_source_survives_expiry(scheduler_case):
@@ -391,7 +352,8 @@ def test_missing_local_head_releases_reservation_once_and_unblocks_later_page(sc
     with session_factory()() as db:
         get_store().delete(db.get(Asset, 'free-user-image').storage_key)
     get_store().put('isolated/valid-later', b'fixture', 'image/png', kind='original')
-    assert claim() is None  # This bounded election pauses only the missing head.
+    accepted = claim()
+    assert accepted.job_id == valid  # Missing inputs cannot block another candidate.
     with session_factory()() as db:
         first = db.get(Job, missing)
         assert first.status == 'awaiting_upload' and first.error_code is None
@@ -399,7 +361,7 @@ def test_missing_local_head_releases_reservation_once_and_unblocks_later_page(sc
         assert db.get(Asset, 'free-user-image').active_references == 1
         assert db.scalar(select(QuotaPeriod)).reserved == 1
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 0
-    assert claim().job_id == valid
+    assert claim() is None
     assert claim('node-1') is None
     from app.upload_models import UploadReservation
     from app.uploads import expire_uploads
@@ -448,15 +410,15 @@ def test_concurrent_claims_cannot_exceed_one_node_capacity(scheduler_case):
     assert sum(lease is not None for lease in leases) == 1
 
 
-def test_wrong_engine_or_disabled_device_does_not_take_work(scheduler_case):
+def test_different_build_can_claim_but_disabled_node_cannot(scheduler_case):
     add_job(scheduler_case)
     with session_factory()() as db:
         db.get(ComputeNode, 'node-0').engine_version = 'wrong'
         db.get(ComputeNode, 'node-1').enabled = False
         db.commit()
-    assert claim('node-0') is None
+    assert claim('node-0') is not None
     assert claim('node-1') is None
-    assert claim('node-2') is not None
+    assert claim('node-2') is None
 
 
 def test_expired_image_lease_recovers_once_and_fences_old_generation(scheduler_case):
@@ -479,23 +441,6 @@ def test_expired_image_lease_recovers_once_and_fences_old_generation(scheduler_c
             current_lease(db, first.id, first.token)
         assert current_lease(db, second.id, second.token)[2].id == job
 
-
-def test_actual_work_correction_preserves_fair_resource_time(scheduler_case, monkeypatch):
-    monkeypatch.setenv('PLUS_SCHEDULER_WEIGHT', '1')
-    settings.cache_clear()
-    add_job(scheduler_case, 'free-user')
-    add_job(scheduler_case, 'plus-user')
-    served = Counter()
-    counts = Counter()
-    for _ in range(220):
-        lease = claim()
-        duration = .1 if lease.owner_id == 'free-user' else 10
-        served[lease.owner_id] += duration
-        counts[lease.owner_id] += 1
-        finish_quantum(lease.id, actual_seconds=duration)
-    # Equal-weight accounts get comparable resource time, not comparable page
-    # counts; permit one indivisible 10-second heavy stage of discrepancy.
-    assert abs(served['free-user'] - served['plus-user']) <= 11, (counts, served)
 
 
 def test_stale_recovery_observation_cannot_end_renewed_lease(scheduler_case):
@@ -527,7 +472,7 @@ def test_saved_late_output_recovery_preserves_existing_terminal_failure(schedule
     settings.cache_clear()
     job_id = add_job(scheduler_case, stage='page')
     lease = claim()
-    _, reply = render_reply(scheduler_case['engine']['version'], 10)
+    _, reply = render_reply('fixture-build', 10)
     from app.assets import asset_storage_key
     image = base64.b64decode(reply['image'])
     output_key = asset_storage_key(lease.id, "redraw")

@@ -91,14 +91,44 @@ def test_existing_original_still_counts_when_translation_is_new(cluster, png):
     assert counts()['ImageAdmission'] == counts()['Job'] == 1
 
 
+@pytest.mark.parametrize('mode', ['classic', 'redraw'])
+@pytest.mark.parametrize('initial', [{}, {'priority': 'current'}, {'priority': 'prefetch'}])
+def test_legacy_priority_is_ignored_without_repeating_admission(cluster, png, mode, initial):
+    from app.providers import digest
+    client, _ = cluster
+    auth = (login if mode == 'classic' else login_plus)(client)
+    configure_system_limits(free_images_per_minute=1, plus_images_per_minute=1)
+    image = descriptor(png)
+    first = submit(client, auth, image, mode=mode, **initial)
+    assert first.status_code == 202, first.text
+    before = counts()
+    assert all(value == 1 for value in before.values())
+    record = request_record(client, auth, first.json()['id'])
+    # Match the old server's hash, which already excluded the priority hint.
+    assert record.request_hash == digest({'image': {**image, 'normalization_version': 1},
+        'mode': mode, 'target_language': 'zh-Hans', 'retry_of': None,
+        'regenerate_of': None, 'acknowledge_unknown_cost': False})
+    assert 'priority' not in record.descriptor
+    for extra in ({'priority': 'prefetch'}, {'priority': 'current'}, {}):
+        replay = submit(client, auth, image, mode=mode, **extra)
+        assert replay.status_code == 202, replay.text
+        assert replay.json() == first.json()
+        assert counts() == before
+    conflict = submit(client, auth, descriptor(b'changed'), mode=mode, priority='current')
+    assert conflict.status_code == 409 and conflict.json()['error']['code'] == 'IDEMPOTENCY_CONFLICT'
+    assert counts() == before
+    assert client.get('/v1/me/entitlements', headers=auth).json()['modes'][mode]['quota']['reserved'] == 1
+
+
 def test_concurrent_same_uuid_accepts_exactly_once(cluster, png):
     client, _ = cluster
     auth = login(client)
     high_control_budget()
     barrier = Barrier(6)
-    def request(_):
+    def request(index):
         barrier.wait(timeout=10)
-        return submit(client, auth, descriptor(png), key='same')
+        return submit(client, auth, descriptor(png), key='same',
+            **({}, {'priority': 'current'}, {'priority': 'prefetch'})[index % 3])
     with ThreadPoolExecutor(6) as pool:
         responses = list(pool.map(request, range(6)))
     assert all(r.status_code == 202 for r in responses)
@@ -178,7 +208,7 @@ def test_legacy_control_fields_are_rejected(cluster, png):
     client, _ = cluster
     auth = login(client)
     for field in ['page_key', 'session_id', 'sequence', 'priority_epochs', 'allow_new', 'max_quota_pages']:
-        response = submit(client, auth, descriptor(png), key=field, **{field: 'legacy'})
+        response = submit(client, auth, descriptor(png), key=field, priority='current', **{field: 'legacy'})
         assert response.status_code == 422, (field, response.text)
     assert all(value == 0 for value in counts().values())
 

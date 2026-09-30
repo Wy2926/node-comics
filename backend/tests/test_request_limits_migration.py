@@ -6,7 +6,7 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "job_results_0008"
+HEAD = "simple_scheduler_0009"
 NEW_TABLES = {"quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
@@ -37,8 +37,7 @@ def assert_current_schema_matches_models(engine):
         inspector = inspect(connection)
         assert NEW_TABLES <= set(inspector.get_table_names())
         assert not {"translation_operations", "reading_sessions", "translation_policies"} & set(inspector.get_table_names())
-        queue_columns = {column['name'] for column in inspector.get_columns('user_mode_queues')}
-        assert not {'session_id', 'session_epoch', 'session_expires_at'} & queue_columns
+        assert not {'user_mode_queues', 'fairness_states'} & set(inspector.get_table_names())
         assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
         assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
@@ -48,7 +47,11 @@ def assert_current_schema_matches_models(engine):
             table = Base.metadata.tables[name]
             expected_checks = {(constraint.name, str(constraint.sqltext)) for constraint in table.constraints
                                if isinstance(constraint, CheckConstraint)}
-            assert {(constraint["name"], constraint["sqltext"]) for constraint in inspector.get_check_constraints(name)} == expected_checks
+            # PostgreSQL rewrites IN checks to typed ANY arrays and gives
+            # unnamed constraints generated names; literal SQL equality is
+            # meaningful only for the SQLite migration fixture.
+            if connection.dialect.name == 'sqlite':
+                assert {(constraint["name"], constraint["sqltext"]) for constraint in inspector.get_check_constraints(name)} == expected_checks
             assert inspector.get_pk_constraint(name)["constrained_columns"] == [column.name for column in table.primary_key]
             expected_unique = {tuple(column.name for column in constraint.columns) for constraint in table.constraints
                                if isinstance(constraint, UniqueConstraint)}
@@ -68,6 +71,69 @@ def test_fresh_startup_creates_current_request_limit_schema(isolated_migration_d
     db.initialize()
     assert_current_schema_matches_models(isolated_migration_database)
     db.initialize()
+    assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_fifo_upgrade_preserves_checkpoint_and_active_lease(isolated_migration_database):
+    from pathlib import Path
+    from datetime import timedelta
+    from alembic import command
+    from alembic.config import Config
+    import sqlalchemy as sa
+    from app import db
+    from app.models import ClassicState, Job, User, now
+    from app.queue_models import ComputeNode, ExecutionLease, JobStage
+    from app.providers import digest
+    from app.jobs import content_key
+
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'migrations'))
+    old_config = {'mode': 'classic', 'engine': {'version': 'old-platform-build', 'protocol_version': 3}}
+    old_config['version'] = digest(old_config)
+    checkpoint = {'version': 'old-platform-build', 'segments': [{'id': '0', 'source': 'hello'}]}
+
+    def values(model, **specified):
+        defaults = {c.name: c.default.arg(None) if c.default.is_callable else c.default.arg
+                    for c in model.__table__.columns if c.default is not None}
+        return defaults | specified
+
+    with isolated_migration_database.begin() as connection:
+        config.attributes['connection'] = connection
+        command.upgrade(config, 'job_results_0008')
+        tables = sa.MetaData()
+        tables.reflect(connection)
+        connection.execute(tables.tables['users'].insert(), values(User, id='fifo-owner', subject='fifo-owner', name='test'))
+        connection.execute(tables.tables['jobs'].insert(), values(Job, id='fifo-job', owner_id='fifo-owner',
+            mode='classic', target_language='en', status='running', source_sha256='a' * 64,
+            config=old_config, cache_key='old-key', operation='translation', idempotency_key='keep-uuid',
+            request_hash='b' * 64, quota_pages=1, quota_kind='classic_daily', settlement='reserved',
+            priority_rank=0, realtime_until=now() + timedelta(minutes=1)))
+        connection.execute(tables.tables['classic_states'].insert(), values(ClassicState, job_id='fifo-job',
+            analysis=checkpoint, translations={'0': 'paid translation'}))
+        connection.execute(tables.tables['compute_nodes'].insert(), values(ComputeNode, id='fifo-node',
+            name='test', resource_id='fifo-device', engine_version='old-platform-build', device='fixture',
+            capacity=4, capabilities=['page'], supported_languages=['en'],
+            desired_config={'execution_slots': 4, 'allowed_languages': ['en']},
+            runtime_report={'protocol_version': 3, 'ready': True, 'languages': ['en', 'ko']}))
+        connection.execute(tables.tables['job_stages'].insert(), values(JobStage, id='fifo-stage', job_id='fifo-job',
+            name='page', status='running', generation=2))
+        connection.execute(tables.tables['execution_leases'].insert(), values(ExecutionLease,
+            id='fifo-lease', stage_id='fifo-stage', job_id='fifo-job', node_id='fifo-node', owner_id='fifo-owner',
+            token='keep-token', generation=2, resource_pool='image:old-platform-build', mode='classic',
+            expires_at=now() + timedelta(minutes=1), priority_class='realtime', weight=2, estimated_seconds=30))
+    db.initialize()
+    db.initialize()
+    with sa.orm.Session(isolated_migration_database) as session:
+        job, lease = session.get(Job, 'fifo-job'), session.get(ExecutionLease, 'fifo-lease')
+        assert job.config['engine'] == {'protocol_version': 3}
+        assert job.cache_key == content_key('a' * 64, 'classic', 'en', job.config)
+        assert (job.status, job.settlement, job.quota_pages) == ('running', 'reserved', 1)
+        assert (lease.token, lease.generation, lease.completed_at) == ('keep-token', 2, None)
+        state = session.get(ClassicState, job.id)
+        assert state.analysis == checkpoint and state.translations == {'0': 'paid translation'}
+        node = session.get(ComputeNode, 'fifo-node')
+        assert node.supported_languages == ['en', 'ko'] and node.desired_config == {'execution_slots': 4}
     assert_current_schema_matches_models(isolated_migration_database)
 
 

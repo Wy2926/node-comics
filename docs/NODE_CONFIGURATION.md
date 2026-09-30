@@ -6,19 +6,18 @@
 
 中心按 `execution_slots` 限制节点持有的整页租约数。下载、等待文本、等待交付均占租约，但不占图像计算线程。缩容与停用只限制新领取；已接页面继续按领取时保存的处理时限完成。
 
-中心配置如下，后台表单和 JSON 使用同一 schema，拒绝未知字段：
+后台日常只需设置最大在途页数与启停；超时参数折叠在高级设置中。表单和 JSON 使用同一 schema，拒绝未知字段：
 
 | 字段 | 默认值与用途 |
 | --- | --- |
 | `schema_version` | 1 |
-| `execution_slots` | 1，范围 1–32；本机建议 8 |
+| `execution_slots` | 1，范围 1–32；按节点实测吞吐与资源预算调整 |
 | `poll_seconds` | 20 秒，范围 1–30；通知丢失时的领取兜底 |
 | `heartbeat_seconds` | 10 秒，不超过租约时长的三分之一 |
 | `request_seconds` | 30 秒，范围 1–120 |
 | `page_seconds` | 900 秒，整页处理时限 |
 | `text_wait_seconds` | 600 秒，分析提交后等待文本的上限 |
 | `delivery_seconds` | 120 秒，首次交付后的重试窗口 |
-| `allowed_languages` | 默认中简／中繁／日／英／韩，与节点声明能力取交集 |
 
 节点先预热，使用后台预建的独立凭据注册；注册不能扩容或解除停用。管理员修改配置后，新领取按新版本校验；节点通过长轮询、心跳和领取响应获取配置，迟到旧版本不会覆盖新版本。节点凭据轮换后旧凭据立即失效。全部接口与配套升级要求见 [协议实施](COMPUTE_PROTOCOL.md)。
 
@@ -53,7 +52,7 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 产品的常规翻译目标项来自 [backend/app/languages.py](../backend/app/languages.py)：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`，共 16 项。AI 重绘只开放前五项。
 
-节点注册时报告 `supported_languages`，中心仅把匹配目标语言与引擎版本的整页任务分给该节点。后台可配置语言子集；移除语言不会修改已排队任务，其阶段等待其他匹配节点。未知或该模式未开放的目标语言返回 `LANGUAGE_UNSUPPORTED`。
+节点注册时报告 `supported_languages`，节点启动时依据字体覆盖自动检测目标语言，中心直接使用注册能力；不配置目标语言白名单或默认引擎指纹。模型的源语言配置仍属于本地计算选项。未知或该模式未开放的目标语言返回 `LANGUAGE_UNSUPPORTED`。
 
 仓库包含 [classic-engine](../services/classic-engine/README.md) 源码、模型清单和测试；模型权重与字体需另行准备。产品允许选择某目标语言，不代表已有可用节点，也不代表 OCR 能可靠识别该源语言。接入引擎需要自行验证源语言 OCR、目标字体、换行、缺字和排版边界，并准确报告能力。交互与恢复见[计算协议](COMPUTE_PROTOCOL.md)。
 

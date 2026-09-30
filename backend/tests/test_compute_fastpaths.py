@@ -18,7 +18,7 @@ def test_full_node_and_replay_do_not_rank_the_queue(v3, monkeypatch):
     first = claim(v3, 4, 'saved').json()['leases']
     assert len(first) == 4
     lease_ids = [lease['lease_id'] for lease in first]
-    monkeypatch.setattr(scheduler, '_election_rows', no_election)
+    monkeypatch.setattr(scheduler, '_candidate_rows', no_election)
     assert [lease['lease_id'] for lease in claim(v3, 4, 'saved').json()['leases']] == lease_ids
     assert claim(v3, 3, 'saved').status_code == 409
     assert claim(v3, 4, 'full').json()['leases'] == []
@@ -34,7 +34,7 @@ def test_full_node_and_replay_do_not_rank_the_queue(v3, monkeypatch):
 def test_empty_replay_only_probes_existence_and_retry_hint_is_jittered(v3, monkeypatch):
     assert claim(v3, 4, 'empty').json()['leases'] == []
     v3['create'](4)
-    monkeypatch.setattr(scheduler, '_election_rows', no_election)
+    monkeypatch.setattr(scheduler, '_candidate_rows', no_election)
     def jitter(lower, upper):
         assert (lower, upper) == (.1, .3)
         return .237

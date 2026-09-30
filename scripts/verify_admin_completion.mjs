@@ -56,12 +56,10 @@ try {
 
   await page.locator('#free_daily_pages').fill('88');
   await page.locator('#plus_monthly_redraw_pages').fill('333');
-  await page.locator('#free_scheduler_weight').fill('1.5');
-  await page.locator('#plus_scheduler_weight').fill('5');
   await page.getByRole('button', {name: '保存系统设置', exact: true}).click();
   await visible(page.getByText(/系统设置已保存/));
   await shot('01-system-settings');
-  checks.push('Quota defaults and scheduler weights saved through versioned settings');
+  checks.push('Quota defaults saved through versioned settings');
 
   await nav('图片供应商');
   await page.getByRole('button', {name: '编辑', exact: true}).click();

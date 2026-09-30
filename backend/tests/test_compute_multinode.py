@@ -6,7 +6,7 @@ from threading import Barrier, Lock
 import pytest
 from sqlalchemy import func, select, text
 
-from app import compute_v3, dispatcher
+from app import compute_v3, dispatcher, scheduler
 from app.db import session_factory
 from app.models import Job, now
 from app.queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
@@ -59,7 +59,7 @@ def test_three_simultaneous_nodes_fill_slots_despite_shared_candidates(v3, monke
     leases = [item for reply in replies for item in reply.json()['leases']]
     assert len(leases) == len({item['job_id'] for item in leases}) == 3
     assert {item['job_id'] for item in leases} < jobs
-    assert sorted(calls.values()) == [1, 1, 2]
+    assert sorted(calls.values()) == [1, 1, 1]
 
 
 def test_idle_queue_has_one_election_and_repeated_invalidations_are_bounded(v3, monkeypatch):
@@ -120,6 +120,8 @@ def test_retry_preserves_missing_source_cleanup_and_releases_quota_once(v3):
 
 
 def exhaust_first_snapshot(v3, other, monkeypatch, before_retry=None):
+    # A small test window forces contention without creating 32 paid jobs.
+    monkeypatch.setattr(scheduler, 'CANDIDATE_LIMIT', 2)
     original = compute_v3.prepare_claim_candidates
     calls = []
     def prepare(db, node_id, *args, **kwargs):
@@ -128,8 +130,7 @@ def exhaust_first_snapshot(v3, other, monkeypatch, before_retry=None):
             return prepared
         calls.append(prepared)
         if len(calls) == 1:
-            # Count 1 elects one head per owner plus one fairness-floor owner.
-            for _ in range(2):
+            for _ in prepared.signatures:
                 lease = claim(other).json()['leases'][0]
                 analyze(other, lease, empty=True)
         elif len(calls) == 2:

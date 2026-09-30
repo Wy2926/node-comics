@@ -5,6 +5,7 @@ from test_postgres_concurrency import pg_scope
 from test_compute_v3_postgres import client
 from test_cluster_submissions import cluster
 from test_translation_requests import (
+    test_legacy_priority_is_ignored_without_repeating_admission,
     test_concurrent_same_uuid_accepts_exactly_once,
     test_concurrent_devices_cannot_exceed_remaining_image_budget,
     test_rejected_page_cannot_rollback_another_independent_request,

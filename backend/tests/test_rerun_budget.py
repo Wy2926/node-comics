@@ -24,7 +24,7 @@ def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client,
     from app.models import Job, Ledger, Provider, User, now
     auth = login(client)
     original = done(client, auth, png, monkeypatch)
-    first = regenerate(client, auth, original)
+    first = regenerate(client, auth, original, priority='prefetch')
     assert first.status_code == 202 and first.json()['state'] == 'needs_input'
     original_job = request_record(client, auth, original['id']).job_id
     revised_job = request_record(client, auth, first.json()['id']).job_id
@@ -33,7 +33,7 @@ def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client,
         db.get(User,db.get(Job,original_job).owner_id).plus_expires_at = now()-timedelta(seconds=1)
         db.get(Provider,'default').enabled = False
         db.commit()
-    repeat = regenerate(client,auth,original)
+    repeat = regenerate(client,auth,original,priority='current')
     assert repeat.status_code == 202 and repeat.json()['id'] == first.json()['id']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 2
@@ -68,5 +68,5 @@ def test_regeneration_rejects_mixed_intent_and_removed_controls(client,png,monke
 def test_regeneration_cannot_reference_another_account(client,png,monkeypatch):
     auth = login(client)
     original = done(client,auth,png,monkeypatch)
-    response = regenerate(client,login(client,'bob'),original)
+    response = regenerate(client,login(client,'bob'),original,priority='current')
     assert response.status_code == 404

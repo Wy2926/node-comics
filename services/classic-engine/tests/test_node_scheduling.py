@@ -38,7 +38,7 @@ def clock():
 def lease(key, *, pixels=100):
     _, expires = clock()
     return {'lease_id': str(key), 'lease_token': 'fixture-token', 'status': 'active',
-            'expires_at': expires, 'language': 'en', 'config': {'engine': {'version': 'fixture'}},
+            'expires_at': expires, 'language': 'en', 'config': {'engine': {'protocol_version': 3}},
             'input': {'width': pixels, 'height': 1}}
 
 

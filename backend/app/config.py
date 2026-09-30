@@ -78,10 +78,6 @@ class Settings(BaseSettings):
     upload_idle_timeout_seconds: float = Field(default=15, ge=0.1, le=120)
     upload_body_timeout_seconds: float = Field(default=120, ge=0.1, le=900)
     upload_ingress_lease_seconds: int = Field(default=45, ge=15, le=300)
-    free_scheduler_weight: float = Field(default=1, ge=0.1, le=100)
-    plus_scheduler_weight: float = Field(default=2, ge=0.1, le=100)
-    realtime_share: float = Field(default=0.9, ge=0.5, le=0.99)
-    priority_ttl_seconds: int = Field(default=90, ge=10, le=300)
     upload_session_ttl_seconds: int = Field(default=900, ge=30, le=3600)
     upload_session_max_lifetime_seconds: int = Field(default=3600, ge=60, le=86400)
     cluster_lease_seconds: int = Field(default=90, ge=10, le=600)
@@ -102,7 +98,6 @@ class Settings(BaseSettings):
     provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
-    classic_engine_version: str = "external-v1"
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)
 
     @model_validator(mode="after")

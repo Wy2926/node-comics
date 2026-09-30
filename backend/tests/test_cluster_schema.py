@@ -14,10 +14,11 @@ def test_clean_baseline_matches_models_and_removes_old_queue(client):
         assert not {"image_admissions", "control_admissions", "feedback_admissions", "comic_title_admissions",
             "upload_ingress_leases", "upload_ingress_mutex", "support_request_admissions", "translation_provider_requests"} & tables
         assert {"admin_audit_events", "translation_feedback_reviews", "billing_refunds", "billing_disputes"} <= tables
-        assert not {'priority_session_id','priority_epoch','window_hash','sequence'}.intersection(
-            c['name'] for c in inspector.get_columns('user_mode_queues'))
-        assert not {'file_hash','page_index','change_sequence'}.intersection(
+        assert not {'user_mode_queues', 'fairness_states'} & tables
+        assert not {'file_hash','page_index','change_sequence','priority_rank','realtime_until'}.intersection(
             c['name'] for c in inspector.get_columns('jobs'))
+        assert not {'priority_class','weight','estimated_seconds'}.intersection(
+            c['name'] for c in inspector.get_columns('execution_leases'))
         columns = {c["name"]: c for c in inspector.get_columns("assets")}
         assert columns["expires_at"]["nullable"]
         assert "last_accessed_at" not in columns and "storage_backend" not in columns
