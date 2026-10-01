@@ -1,25 +1,60 @@
 """Loopback-only browser fixture; no real identity, CAPTCHA, DB or model calls.
 
 python tests/manual_website_translation_server.py
-POST /test/reset controls failures; GET /test/state exposes synthetic counters.
+POST /__state controls failures; GET /__state exposes synthetic counters.
+Use {"reset": true} to clear tasks and counters before a scenario. Delays are
+milliseconds, capped at 30 seconds. The older /test/reset and /test/state work.
 The test-only widget is injected into HTML here, never into shipped code.
 """
 import base64
+import asyncio
 from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import Path
 
 from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from PIL import Image, ImageDraw
 from manual_website_server import app, authorized, me, state, website
 from app.languages import LANGUAGES, REDRAW_LANGUAGES
 
 app.router.routes.pop()  # Replace this fixture's final static mount only.
 tasks = {}
-state.update(guest=False, accepted=0, create_calls=0, input_calls=0, result_calls=0,
-             fail_create_response_once=False, result_failure=False, last_input=None)
+DEFAULTS = dict(guest=False, accepted=0, create_calls=0, input_calls=0, get_calls=0,
+               result_calls=0, events_calls=0, fail_create_response_once=False,
+               events_truncate_once=False, events_reconnect_once=False,
+               events_delay_ms=250, result_delay_ms=0, widget_delay_ms=25,
+               result_failure=False, result_failure_once=False, last_input=None)
+state.update(DEFAULTS, requests={})
+
+
+@app.post('/__state')
+async def configure_fixture(request: Request):
+    controls = await request.json()
+    if not isinstance(controls, dict):
+        return error('INVALID_FIXTURE_CONTROL', 400)
+    for key, value in controls.items():
+        if key not in state and key != 'reset':
+            return error('INVALID_FIXTURE_CONTROL', 400)
+        if key.endswith('_delay_ms') and (type(value) is not int or not 0 <= value <= 30000):
+            return error('INVALID_FIXTURE_CONTROL', 400)
+    if controls.pop('reset', False):
+        tasks.clear()
+        state.update(DEFAULTS, requests={})
+    state.update(controls)
+    return state
+
+
+@app.get('/__state')
+def fixture_state():
+    return state
+
+
+def count_request(key, operation):
+    state[operation + '_calls'] += 1
+    counts = state['requests'].setdefault(key, dict(create=0, input=0, get=0, result=0, events=0))
+    counts[operation] += 1
 
 
 def error(code, status=403):
@@ -49,7 +84,9 @@ def capabilities(request: Request):
 
 
 def snapshot(key):
-    return {name: value for name, value in tasks[key].items() if name in ('id','state','result')}
+    entry = tasks[key]
+    return {'id': key, 'state': entry['state'],
+            'result': entry.get('result') if entry['state'] == 'succeeded' else None}
 
 
 def can_read(request, key):
@@ -58,17 +95,48 @@ def can_read(request, key):
 
 @app.get('/v1/guest/translations/events')
 @app.get('/v1/translations/events')
-def events(request: Request, ids: str):
+async def events(request: Request, ids: str):
+    count_request(ids, 'events')
     if not can_read(request, ids):
         return error('TRANSLATION_NOT_FOUND',404)
-    tasks[ids]['state'] = 'succeeded'
-    payload = json.dumps({'items':[snapshot(ids)]})
-    return Response('event: snapshot\ndata: '+payload+'\n\nevent: end\ndata: {}\n\n', media_type='text/event-stream')
+    truncate, reconnect = state['events_truncate_once'], state['events_reconnect_once']
+    if truncate:
+        state['events_truncate_once'] = False
+    elif reconnect:
+        state['events_reconnect_once'] = False
+    delay = state['events_delay_ms'] / 1000
+
+    def frame():
+        return 'event: snapshot\ndata: ' + json.dumps({'items': [snapshot(ids)], 'missing_ids': []}) + '\n\n'
+
+    async def frames():
+        yield frame()
+        if truncate or reconnect:
+            await asyncio.sleep(delay)
+            if truncate:
+                yield 'event: snapshot\ndata: {"items":['  # EOF halfway through a frame.
+            else:
+                yield 'event: end\ndata: {"reason":"reconnect"}\n\n'
+            return
+        if tasks[ids]['state'] == 'needs_input':
+            yield 'event: end\ndata: {"reason":"reconnect"}\n\n'
+            return
+        if tasks[ids]['state'] != 'succeeded':
+            tasks[ids]['state'] = 'running'
+            yield frame()
+            await asyncio.sleep(delay)
+            tasks[ids]['state'] = 'succeeded'
+            yield frame()
+        yield 'event: end\ndata: {"reason":"complete"}\n\n'
+
+    return StreamingResponse(frames(), media_type='text/event-stream', headers={
+        'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
 
 @app.get('/v1/guest/translations/{key}')
 @app.get('/v1/translations/{key}')
 def get_task(key: str, request: Request):
+    count_request(key, 'get')
     return snapshot(key) if can_read(request,key) else error('TRANSLATION_NOT_FOUND',404)
 
 
@@ -81,7 +149,7 @@ async def create_task(key: str, request: Request):
         return error('VERIFICATION_FAILED')
     if not guest and not authorized(request):
         return error('AUTH_REQUIRED',401)
-    state['create_calls'] += 1
+    count_request(key, 'create')
     if key not in tasks:
         if guest and state['accepted'] >= 5:
             return error('GUEST_DAILY_LIMIT',429)
@@ -115,23 +183,44 @@ async def upload(key: str, request: Request):
                      'composite':'source-atop','artifact':{'sha256':sha256(artifact).hexdigest(),'byte_size':len(artifact),
                                                         'mime':'image/webp','path':str(request.url.path).removesuffix('/input')+'/result'}}
     entry['state']='queued'
-    state['input_calls']+=1
+    count_request(key, 'input')
     state['last_input']={'width':width,'height':height,'bytes':len(data),'mime':request.headers.get('Content-Type')}
     return snapshot(key)
 
 
 @app.get('/v1/guest/translations/{key}/result')
 @app.get('/v1/translations/{key}/result')
-def result(key: str, request: Request):
+async def result(key: str, request: Request):
+    count_request(key, 'result')
     if not can_read(request,key):
         return error('TRANSLATION_NOT_FOUND',404)
-    state['result_calls']+=1
-    if state['result_failure']:
+    await asyncio.sleep(state['result_delay_ms'] / 1000)
+    if state['result_failure'] or state['result_failure_once']:
+        state['result_failure_once'] = False
         return error('NETWORK_ERROR',503)
     return Response(tasks[key]['artifact'],media_type='image/webp')
 
 
-WIDGET = "window.turnstile={render:(element,options)=>{setTimeout(()=>options.callback('synthetic-proof'),25);return 'test-widget';},remove:()=>{}};"
+WIDGET = """window.turnstile=(()=>{
+  let sequence=0;const widgets=new Map();
+  return {render:(element,options)=>{
+    const id='test-widget-'+(++sequence),box=document.createElement('div');
+    const compact=options.size==='compact';
+    box.style.cssText='box-sizing:border-box;display:flex;align-items:center;justify-content:center;'+
+      'background:#fafafa;border:1px solid #d6d6d6;color:#222;font:14px sans-serif;'+
+      'width:'+(compact?150:300)+'px;height:'+(compact?140:65)+'px';
+    box.textContent='模拟验证';element.replaceChildren(box);
+    const entry={box,timer:undefined};widgets.set(id,entry);
+    fetch('/__state',{cache:'no-store'}).then(response=>response.json()).then(config=>{
+      if(!widgets.has(id))return;
+      entry.timer=setTimeout(()=>{
+        if(!widgets.has(id))return;
+        box.textContent='✓ 模拟验证';options.callback('synthetic-proof');
+      },config.widget_delay_ms);
+    }).catch(()=>{if(widgets.has(id))options['error-callback']?.();});
+    return id;
+  },remove:id=>{const entry=widgets.get(id);if(entry){clearTimeout(entry.timer);entry.box.remove();widgets.delete(id);}}};
+})();"""
 
 
 class FixtureWebsite(website.WebsiteFiles):

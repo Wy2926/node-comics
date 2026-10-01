@@ -18,7 +18,7 @@ export interface Snapshot {
 // Server completion is not local completion until the full image is durable.
 export function localSnapshotState(snapshot: Snapshot, hasResult: boolean) {
   return snapshot.state === 'succeeded' && !hasResult
-    ? 'paused'
+    ? 'receiving'
     : snapshot.state;
 }
 export interface RecordMeta {

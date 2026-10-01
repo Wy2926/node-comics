@@ -99,7 +99,7 @@
 .translation-status i { width: 6px; height: 6px; background: currentColor; flex-shrink: 0; }
 .translation-status[data-state='succeeded'] { color: var(--success); }
 .translation-status[data-state='failed'], .translation-status[data-state='needs_attention'] { color: var(--danger); background: var(--danger-soft); }
-.translation-status[data-state='queued'], .translation-status[data-state='running'], .translation-status[data-state='preparing'], .translation-status[data-state='needs_input'] { color: var(--accent); background: var(--accent-soft); }
+.translation-status[data-state='queued'], .translation-status[data-state='running'], .translation-status[data-state='preparing'], .translation-status[data-state='submitting'], .translation-status[data-state='receiving'], .translation-status[data-state='needs_input'] { color: var(--accent); background: var(--accent-soft); }
 .translation-view-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
 .translation-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
 .translation-tabs button { border: 2px solid transparent; border-radius: var(--comic-control-radius); background: transparent; padding: 7px 10px; font: inherit; font-size: .75rem; color: var(--muted); font-weight: 600; min-height: 36px; }
@@ -140,10 +140,24 @@
 .translation-alert p { font-size: .78rem; line-height: 1.7; margin-top: 2px; }
 .translation-alert .button { flex-shrink: 0; font-size: .75rem; min-height: 36px; padding: 6px 12px; box-shadow: var(--comic-shadow-small); }
 .translation-availability { padding: 14px 18px; margin-bottom: 22px; background: var(--comic-warning-paper); border: var(--comic-border); border-radius: var(--comic-card-radius); color: var(--comic-warning-ink); font-size: .85rem; }
-.translation-verification { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin: 0 0 24px; padding: 20px 24px; background: var(--comic-warning-paper); color: var(--comic-warning-ink); border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
-.translation-verification strong { font-size: .96rem; }
-.translation-verification p { font-size: .78rem; margin-top: 5px; }
-.translation-turnstile { width: 300px; max-width: 100%; flex: 0 0 auto; }
+.translation-verification-overlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: #10182866; overflow-y: auto; animation: translation-verification-enter .18s ease-out; }
+.translation-verification { position: relative; display: grid; gap: 20px; width: min(400px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; margin: 0; padding: 28px; background: var(--surface); color: var(--ink); border: var(--comic-border); border-top: 6px solid var(--accent); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-dialog-shadow); animation: translation-verification-card-enter .2s ease-out; }
+.translation-verification-copy { padding-right: 32px; }
+.translation-verification strong { display: block; font-size: 1.03rem; line-height: 1.45; }
+.translation-verification p { font-size: .82rem; line-height: 1.65; color: var(--muted); margin-top: 7px; }
+.translation-verification-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--comic-control-radius); background: transparent; color: var(--muted); cursor: pointer; }
+.translation-verification-close:hover { color: var(--ink); background: var(--surface-soft); }
+.translation-verification-close:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.translation-turnstile { display: grid; justify-items: center; gap: 12px; width: 100%; min-width: 0; padding: 16px 12px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
+.translation-turnstile-progress { display: grid; place-items: center; height: 20px; }
+.translation-turnstile-spinner { display: block; width: 20px; height: 20px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: translation-turnstile-spin .8s linear infinite; }
+.translation-turnstile[data-state='interactive'] .translation-turnstile-progress, .translation-turnstile[data-state='complete'] .translation-turnstile-progress, .translation-turnstile[data-state='failed'] .translation-turnstile-progress { visibility: hidden; }
+.translation-turnstile[data-state='interactive'] .translation-turnstile-spinner, .translation-turnstile[data-state='complete'] .translation-turnstile-spinner, .translation-turnstile[data-state='failed'] .translation-turnstile-spinner { animation: none; }
+.translation-turnstile-widget { display: flex; justify-content: center; width: 100%; min-height: 65px; }
+.translation-turnstile[data-size='compact'] .translation-turnstile-widget { min-height: 140px; }
+@keyframes translation-turnstile-spin { to { transform: rotate(360deg); } }
+@keyframes translation-verification-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes translation-verification-card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .translation-noscript { padding-block: 40px; }
 
 @media (max-width: 1050px) {
@@ -209,9 +223,10 @@
   .translation-result-actions .text-link { margin-left: 0; }
   .translation-notes { grid-template-columns: 1fr; gap: 16px; }
   .translation-empty-steps { gap: 10px 14px; font-size: .67rem; }
-  .translation-verification { padding: 18px 14px; }
-  .translation-verification > div { max-width: 100%; }
+  .translation-verification-overlay { padding: 16px; }
+  .translation-verification { padding: 22px 16px; max-height: calc(100dvh - 32px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .image-dropzone { transition: none; }
+  .translation-verification-overlay, .translation-verification, .translation-turnstile-spinner { animation: none; }
 }

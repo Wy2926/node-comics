@@ -3,10 +3,10 @@ import { test } from 'node:test';
 import { request, TranslationError, watch } from '../src/lib/translation-api';
 import { localSnapshotState } from '../src/lib/translation-store';
 
-test('a completed server task remains resumable until its full image is saved locally', () => {
+test('a completed server task is receiving until its full image is saved locally', () => {
   assert.equal(
     localSnapshotState({ id: 'test', state: 'succeeded' }, false),
-    'paused',
+    'receiving',
   );
   assert.equal(
     localSnapshotState({ id: 'test', state: 'succeeded' }, true),
@@ -90,14 +90,154 @@ test('snapshot streams tolerate network chunk boundaries and finish without anot
       ),
   );
   const seen: string[] = [];
-  await watch(
+  const reason = await watch(
     '/v1/guest/translations',
     'test',
     undefined,
     new AbortController().signal,
     async (snapshot) => {
+      await new Promise<void>((resolve) => setImmediate(resolve));
       seen.push(snapshot.state);
     },
   );
   assert.deepEqual(seen, ['succeeded']);
+  assert.equal(reason, 'complete');
+});
+
+test('SSE handles split UTF-8, CRLF and CR lines, multiple data fields and field order', async (context) => {
+  const frames = new TextEncoder().encode(
+    ': keepalive\r\n\r\n' +
+      'id: ignored\r\n' +
+      'data: {"items":[\r\n' +
+      'data: {"id":"other","state":"failed"},\r\n' +
+      'data: {"id":"test","state":"running","error":{"code":"TEST","message":"中文🙂日本語"}}\r\n' +
+      'data: ],"missing_ids":[]}\r\n' +
+      'event:snapshot\r\n\r\n' +
+      'event: end\rdata: {"reason":"reconnect"}\r\r',
+  );
+  let calls = 0;
+  context.mock.method(globalThis, 'fetch', async (_path: string, options: RequestInit) => {
+    calls++;
+    assert.equal((options.headers as Headers).get('Accept'), 'text/event-stream');
+    return new Response(new ReadableStream({
+      start(controller) {
+        for (const byte of frames) controller.enqueue(Uint8Array.of(byte));
+        controller.close();
+      },
+    }));
+  });
+  const seen: string[] = [];
+  const reason = await watch('/v1/guest/translations', 'test', undefined,
+    new AbortController().signal, async (snapshot) => {
+      seen.push(snapshot.id + ':' + snapshot.state + ':' + snapshot.error?.message);
+    });
+  assert.deepEqual(seen, ['test:running:中文🙂日本語']);
+  assert.equal(reason, 'reconnect');
+  assert.equal(calls, 1);
+});
+
+test('EOF without end preserves received state and reports a disconnect without replaying', async (context) => {
+  let calls = 0;
+  let ending = '';
+  context.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return new Response(
+      'event: snapshot\ndata: {"items":[{"id":"test","state":"running"}]}\n\n' +
+      'event: snapshot\ndata: {"items":[{"id":"test","state":"succeeded"}]}' + ending,
+    );
+  });
+  for (const separator of ['', '\n\n']) {
+    ending = separator;
+    const seen: string[] = [];
+    await assert.rejects(watch('/v1/guest/translations', 'test', undefined,
+      new AbortController().signal, async (snapshot) => { seen.push(snapshot.state); }),
+      (error) => error instanceof TranslationError && error.code === 'NETWORK_ERROR');
+    assert.deepEqual(seen, separator ? ['running', 'succeeded'] : ['running']);
+  }
+  assert.equal(calls, 2); // One connection per invocation; no internal retry.
+});
+
+test('explicit missing UUID stops the stream with the same 404 semantics as a snapshot GET', async (context) => {
+  let calls = 0;
+  context.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return new Response(
+      'event: snapshot\ndata: {"items":[],"missing_ids":["test"]}\n\n' +
+      'event: end\ndata: {"reason":"complete"}\n\n',
+    );
+  });
+  await assert.rejects(watch('/v1/guest/translations', 'test', undefined,
+    new AbortController().signal, async () => assert.fail('Missing UUID has no snapshot')),
+    (error) => error instanceof TranslationError && error.code === 'NOT_FOUND' && error.status === 404);
+  assert.equal(calls, 1);
+});
+
+test('malformed and oversized frames fail and release their reader', async (context) => {
+  let canceled = 0;
+  let frame = '';
+  context.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode(frame)); },
+    cancel() { canceled++; },
+  })));
+  for (const value of [
+    'event: snapshot\ndata: {broken}\n\n',
+    'event: snapshot\ndata: ' + 'x'.repeat(1024 * 1024) + '\n\n',
+    'event: end\ndata: {"reason":"unknown"}\n\n',
+  ]) {
+    frame = value;
+    await assert.rejects(watch('/v1/guest/translations', 'test', undefined,
+      new AbortController().signal, async () => assert.fail('Invalid frame has no snapshot')),
+      (error) => error instanceof TranslationError && error.code === 'NETWORK_ERROR');
+  }
+  assert.equal(canceled, 3);
+});
+
+test('caller abort cancels a stalled reader and remains distinct from completion or disconnect', async (context) => {
+  const abort = new AbortController();
+  let ready!: () => void;
+  const received = new Promise<void>((resolve) => { ready = resolve; });
+  let canceled = 0;
+  context.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(
+        'event: snapshot\ndata: {"items":[{"id":"test","state":"running"}]}\n\n',
+      ));
+    },
+    cancel() { canceled++; },
+  })));
+  const watching = watch('/v1/guest/translations', 'test', undefined,
+    abort.signal, async () => { ready(); });
+  await received;
+  const reason = new DOMException('User paused', 'AbortError');
+  abort.abort(reason);
+  await assert.rejects(watching, (error) => error === reason);
+  assert.equal(canceled, 1);
+});
+
+test('45 seconds without bytes cancels the subscription without creating another connection', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let ready!: () => void;
+  const received = new Promise<void>((resolve) => { ready = resolve; });
+  let calls = 0;
+  let canceled = 0;
+  context.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'event: snapshot\ndata: {"items":[{"id":"test","state":"queued"}]}\n\n',
+        ));
+      },
+      cancel() { canceled++; },
+    }));
+  });
+  const watching = watch('/v1/guest/translations', 'test', undefined,
+    new AbortController().signal, async () => { ready(); });
+  await received;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  context.mock.timers.tick(45000);
+  await assert.rejects(watching,
+    (error) => error instanceof TranslationError && error.code === 'NETWORK_ERROR');
+  assert.equal(calls, 1);
+  assert.equal(canceled, 1);
 });

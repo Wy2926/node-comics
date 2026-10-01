@@ -24,7 +24,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 
 ## 内容与规范
 
-图片翻译浏览器验收：构建后在仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_website_translation_server.py`，打开 `http://127.0.0.1:4322/`，不要同时运行上述账户夹具。服务生成 `artifacts/website-translation/sample.png`，提供模拟身份、人机验证和覆盖层；`POST /test/reset` 可控制丢失受理回执和结果下载失败。不会访问真实 Cloudflare、数据库或模型。正式匿名体验配置见[部署规范](../../docs/DEPLOYMENT.md#官网匿名图片体验)。
+图片翻译浏览器验收：构建后在仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_website_translation_server.py`，打开 `http://127.0.0.1:4322/`，不要同时运行上述账户夹具。服务生成 `artifacts/website-translation/sample.png`，提供模拟身份、人机验证和覆盖层。`POST /__state` 可设置 `fail_create_response_once`、`events_truncate_once`、`events_reconnect_once`、`result_failure_once`，以及 `widget_delay_ms`、`events_delay_ms`、`result_delay_ms`（0–30000 毫秒）；`reset: true` 清空模拟任务和计数。`GET /__state` 返回每个 UUID 的创建、上传、查询、下载与 SSE 计数，用于核实恢复不会重复提交。不会访问真实 Cloudflare、数据库或模型。正式匿名体验配置见[部署规范](../../docs/DEPLOYMENT.md#官网匿名图片体验)。
 
 - 图片工作台只接收 JPG、PNG、WebP，不导入漫画容器、远程网址或书架。送译缩放、单次 WebP 压缩、摘要和完整图合成复用 [shared/translation-images](../shared/translation-images)。像素处理按需启动单 Worker，跨标签页使用 Web Locks 串行；首页不加载像素处理模块或验证脚本。规则见[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md#官网图片工作台)。
 - 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。

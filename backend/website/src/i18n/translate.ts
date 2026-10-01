@@ -16,6 +16,8 @@ interface WorkspaceCopy {
   errorTitle: string;
   verificationHint: string;
   reload: string;
+  submitting: string;
+  receiving: string;
 }
 export const translationCopy: Record<Locale, Copy & WorkspaceCopy> = {
   en: {
@@ -23,30 +25,35 @@ export const translationCopy: Record<Locale, Copy & WorkspaceCopy> = {
     uploadTitle: 'Add your pages', settingsTitle: 'Make it your language', previewTitle: 'Read & compare',
     historyEmpty: 'Your pages and translations stay here.', localTitle: 'Saved on this browser', serverTitle: 'About the guest trial',
     errorTitle: 'This action needs attention', verificationHint: 'A quick check, then your translation continues.', reload: 'Reconnect',
+    submitting: 'Submitting request', receiving: 'Saving translation', paused: 'Sync paused — resume to check the same task', cancel: 'Pause sync',
   },
   'zh-CN': {
     ...baseCopy['zh-CN'],
     uploadTitle: '放入漫画图片', settingsTitle: '换成你的语言', previewTitle: '阅读与对照',
     historyEmpty: '你的图片与译图，会保存在这里。', localTitle: '保存在当前浏览器', serverTitle: '匿名体验须知',
     errorTitle: '操作需要处理', verificationHint: '完成这一步验证，翻译会继续进行。', reload: '重新连接',
+    submitting: '提交请求中', receiving: '接收并保存译图中', paused: '同步已暂停，恢复时核实原任务', cancel: '暂停同步',
   },
   'zh-TW': {
     ...baseCopy['zh-TW'],
     uploadTitle: '放入漫畫圖片', settingsTitle: '換成你的語言', previewTitle: '閱讀與對照',
     historyEmpty: '你的圖片與譯圖，會儲存在這裡。', localTitle: '儲存在目前瀏覽器', serverTitle: '匿名體驗須知',
     errorTitle: '操作需要處理', verificationHint: '完成這一步驗證，翻譯會繼續進行。', reload: '重新連線',
+    submitting: '提交請求中', receiving: '接收並儲存譯圖中', paused: '同步已暫停，恢復時確認原任務', cancel: '暫停同步',
   },
   ja: {
     ...baseCopy.ja,
     uploadTitle: '漫画画像を追加', settingsTitle: '読みたい言語へ', previewTitle: '読んで、比べる',
     historyEmpty: '画像と翻訳はここに保存されます。', localTitle: 'このブラウザーに保存', serverTitle: 'ゲスト体験について',
     errorTitle: '操作を確認してください', verificationHint: '認証が完了すると翻訳を続けます。', reload: '再接続',
+    submitting: 'リクエストを送信中', receiving: '翻訳画像を保存中', paused: '同期を一時停止 — 再開時に元のタスクを確認します', cancel: '同期を一時停止',
   },
   ko: {
     ...baseCopy.ko,
     uploadTitle: '만화 이미지 추가', settingsTitle: '원하는 언어로', previewTitle: '읽고 비교하기',
     historyEmpty: '이미지와 번역본이 여기에 저장됩니다.', localTitle: '현재 브라우저에 저장', serverTitle: '비회원 체험 안내',
     errorTitle: '작업을 확인해 주세요', verificationHint: '인증을 완료하면 번역이 계속됩니다.', reload: '다시 연결',
+    submitting: '요청 제출 중', receiving: '번역 이미지 저장 중', paused: '동기화 일시 정지 — 계속하면 기존 작업을 확인합니다', cancel: '동기화 일시 정지',
   },
 };
-export function translationError(code:string,t:Copy){if(code.startsWith('GUEST_')&&code.endsWith('LIMIT')||code==='GUEST_BUSY')return t.quota;if(code.includes('VERIFICATION'))return t.verifyFailed;if(code.includes('STORAGE')||code==='QuotaExceededError')return t.full;if(code==='IMAGE_DIMENSIONS_LIMIT')return t.dimensions;if(code==='IMAGE_SELECTION_LIMIT'||code==='IMAGE_FORMAT_LIMIT')return t.invalid;if(code==='AUTH_REQUIRED'||code==='TOKEN_INVALID')return t.auth;if(code==='GUEST_SESSION_EXPIRED'||code==='TRANSLATION_UNAVAILABLE')return t.expired;if(code==='GUEST_UNAVAILABLE')return t.disabled;if(code.includes('IMAGE_')||code.includes('ARTIFACT'))return t.processing;if(code==='NETWORK_ERROR'||code==='TypeError'||code==='TimeoutError')return t.network;return t.generic;}
+export function translationError(code:string,t:Copy){if(code.startsWith('GUEST_')&&code.endsWith('LIMIT')||code==='GUEST_BUSY')return t.quota;if(code.includes('VERIFICATION'))return t.verifyFailed;if(code.includes('STORAGE')||code==='QuotaExceededError')return t.full;if(code==='IMAGE_DIMENSIONS_LIMIT')return t.dimensions;if(code==='IMAGE_SELECTION_LIMIT'||code==='IMAGE_FORMAT_LIMIT')return t.invalid;if(code==='AUTH_REQUIRED'||code==='TOKEN_INVALID')return t.auth;if(code==='GUEST_SESSION_EXPIRED'||code==='TRANSLATION_UNAVAILABLE'||code==='NOT_FOUND')return t.expired;if(code==='GUEST_UNAVAILABLE')return t.disabled;if(code.includes('IMAGE_')||code.includes('ARTIFACT'))return t.processing;if(code==='NETWORK_ERROR'||code==='TypeError'||code==='TimeoutError')return t.network;return t.generic;}

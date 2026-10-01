@@ -35,6 +35,8 @@ const active = new Set([
   'queued',
   'running',
   'preparing',
+  'submitting',
+  'receiving',
   'paused',
 ]);
 const delay = (ms: number, signal: AbortSignal) =>
@@ -169,6 +171,10 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
   >(undefined);
   const controller = useRef<AbortController | undefined>(undefined);
   const running = useRef(false);
+  const resumeOnReturn = useRef(false);
+  const runningIds = useRef<string[]>([]);
+  const resumePending = useRef<() => void>(() => undefined);
+  const verificationDialog = useRef<HTMLDivElement>(null);
   const guestRef = useRef<Guest | undefined>(undefined);
   const scopes = useRef<string[]>([]);
   const [hasGuestHistory, setHasGuestHistory] = useState(false);
@@ -247,6 +253,8 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
     })();
     return () => {
       gone = true;
+      resumeOnReturn.current = false;
+      resumePending.current = () => undefined;
       controller.current?.abort();
       verification.current?.reject(Error('NETWORK_ERROR'));
     };
@@ -259,21 +267,53 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
       if (pending.length) void run(pending);
     }
   }, [ready]);
+  resumePending.current = () => {
+    if (!resumeOnReturn.current || running.current || !ready ||
+        document.hidden || !navigator.onLine) return;
+    void listRecords(scopes.current).then((found) => {
+      if (!resumeOnReturn.current || running.current || document.hidden || !navigator.onLine) return;
+      resumeOnReturn.current = false;
+      void run(found.filter((row) => runningIds.current.includes(row.id) && row.requestId && active.has(row.state)));
+    }).catch(fail);
+  };
   useEffect(() => {
-    function stop() {
+    function visibility() {
       if (document.hidden || !navigator.onLine) {
-        controller.current?.abort();
-        verification.current?.reject(Error('NETWORK_ERROR'));
-        setCheck(undefined);
-      }
+        if (running.current) {
+          resumeOnReturn.current = true;
+          controller.current?.abort(Error('BACKGROUND_PAUSED'));
+        }
+      } else resumePending.current();
     }
-    document.addEventListener('visibilitychange', stop);
-    window.addEventListener('offline', stop);
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('offline', visibility);
+    window.addEventListener('online', visibility);
     return () => {
-      document.removeEventListener('visibilitychange', stop);
-      window.removeEventListener('offline', stop);
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('offline', visibility);
+      window.removeEventListener('online', visibility);
     };
   }, []);
+  useEffect(() => {
+    if (!check) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = verificationDialog.current;
+    const close = dialog?.querySelector<HTMLButtonElement>('button');
+    close?.focus({ preventScroll: true });
+    const containFocus = (event: FocusEvent) => {
+      if (event.target instanceof Node && !dialog?.contains(event.target))
+        close?.focus({ preventScroll: true });
+    };
+    document.addEventListener('focusin', containFocus);
+    return () => {
+      document.removeEventListener('focusin', containFocus);
+      previous?.focus({ preventScroll: true });
+    };
+  }, [!!check]);
+  function pause() {
+    resumeOnReturn.current = false;
+    controller.current?.abort(Error('USER_PAUSED'));
+  }
   async function changeHistory(value: boolean) {
     setShowGuest(value);
     if (value) setMode('classic');
@@ -286,17 +326,17 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
   function challenge(action: string, signal: AbortSignal): Promise<string> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
-        reject(Error('NETWORK_ERROR'));
+        reject(signal.reason);
         return;
       }
       const finish = (token?: string, error?: Error) => {
         clearTimeout(timer);
         signal.removeEventListener('abort', cancel);
         verification.current = undefined;
-        setCheck(undefined);
+        if (error) setCheck(undefined);
         error ? reject(error) : resolve(token!);
       };
-      const cancel = () => finish(undefined, Error('NETWORK_ERROR'));
+      const cancel = () => finish(undefined, signal.reason);
       const timer = setTimeout(
         () => finish(undefined, Error('VERIFICATION_FAILED')),
         120000,
@@ -310,16 +350,24 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
     });
   }
   async function run(candidates: RecordMeta[]) {
-    if (running.current || !caps || !ready) return;
+    if (!candidates.length || running.current || !caps || !ready) return;
+    runningIds.current = candidates.map((row) => row.id);
+    if (document.hidden || !navigator.onLine) {
+      resumeOnReturn.current = candidates.some((row) => !!row.requestId);
+      return;
+    }
+    resumeOnReturn.current = false;
     running.current = true;
     setBusy(true);
     setError('');
     const abort = new AbortController();
     controller.current = abort;
+    let currentMeta: RecordMeta | undefined;
     try {
       for (const stored of candidates) {
         abort.signal.throwIfAborted();
         const meta = { ...stored };
+        currentMeta = meta;
         setSelected(meta.id);
         let data = await readImages(meta.id);
         if (!data) throw Error('LOCAL_STORAGE_UNAVAILABLE');
@@ -400,7 +448,9 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           : 'guest:' + guestRef.current!.user_id;
         if (!useAccount) setHasGuestHistory(true);
         meta.requestId ??= crypto.randomUUID();
-        meta.state = 'paused';
+        meta.state = meta.snapshot
+          ? localSnapshotState(meta.snapshot, !!data.result)
+          : 'submitting';
         await commit(meta); // Images are already durable; freeze identity before create/upload.
         const path = useAccount ? '/v1/translations' : '/v1/guest/translations';
         let snapshot: Snapshot | undefined;
@@ -444,6 +494,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
             useAccount,
           );
         }
+        setCheck(undefined);
         const receive = async (value: Snapshot) => {
           snapshot = value;
           meta.snapshot = value;
@@ -471,8 +522,9 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           ['queued', 'running', 'needs_input'].includes(snapshot.state)
         ) {
           abort.signal.throwIfAborted();
+          let reason: 'complete' | 'reconnect';
           try {
-            await watch(
+            reason = await watch(
               path,
               meta.requestId,
               useAccount,
@@ -482,10 +534,18 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
             failures = 0;
           } catch (error) {
             if (abort.signal.aborted) throw error;
+            const networkError = error instanceof TypeError ||
+              error instanceof Error && error.name === 'TimeoutError' ||
+              error instanceof TranslationError &&
+                (error.code === 'NETWORK_ERROR' || error.status === 429 || error.status >= 500);
+            if (!networkError) throw error;
+            if (!['queued', 'running', 'needs_input'].includes(snapshot.state))
+              break;
             if (
               error instanceof TranslationError &&
               (error.status === 401 ||
                 error.status === 403 ||
+                error.status === 404 ||
                 error.status === 410)
             )
               throw error;
@@ -497,6 +557,15 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
               ),
               abort.signal,
             );
+            continue;
+          }
+          if (reason === 'complete' &&
+              ['queued', 'running', 'needs_input'].includes(snapshot.state)) {
+            await receive(await json<Snapshot>(
+              path + '/' + meta.requestId, { signal: abort.signal }, useAccount,
+            ));
+            if (['queued', 'running', 'needs_input'].includes(snapshot.state))
+              throw new TranslationError('NETWORK_ERROR');
           }
           if (snapshot.state === 'needs_input') {
             await receive(
@@ -512,10 +581,9 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
               ),
             );
           }
-          if (['queued', 'running'].includes(snapshot.state))
-            await delay(1000, abort.signal);
         }
-        if (snapshot?.state === 'succeeded' && snapshot.result) {
+        if (snapshot?.state === 'succeeded') {
+          if (!snapshot.result) throw new TranslationError('NETWORK_ERROR');
           const artifact = snapshot.result.artifact
             ? await (
                 await request(
@@ -547,16 +615,24 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           setCaps(await json<Capabilities>('/v1/capabilities', {}, useAccount));
       }
     } catch (error) {
+      if (currentMeta &&
+          error instanceof Error && error.message !== 'RESULT_SAVE_FAILED' &&
+          active.has(currentMeta.state)) {
+        currentMeta.state = currentMeta.requestId ? 'paused' : 'draft';
+        await commit(currentMeta).catch(() => undefined);
+      }
       if (error instanceof Error && error.message === 'RESULT_SAVE_FAILED')
         setError(t.saveDownload);
       else if (!abort.signal.aborted) fail(error);
-      else setError(t.network);
+      else if (abort.signal.reason?.message !== 'BACKGROUND_PAUSED' &&
+               abort.signal.reason?.message !== 'USER_PAUSED') setError(t.network);
     } finally {
       verification.current?.reject(Error('NETWORK_ERROR'));
       setCheck(undefined);
       running.current = false;
       setBusy(false);
       controller.current = undefined;
+      resumePending.current();
     }
   }
   async function again(meta: RecordMeta) {
@@ -575,7 +651,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           id,
           created: Date.now(),
           updated: Date.now(),
-          state: 'paused',
+          state: 'submitting',
           requestId: crypto.randomUUID(),
           intent:
             meta.state === 'failed'
@@ -728,9 +804,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
         {busy && (
           <button
             className="button secondary"
-            onClick={() => {
-              controller.current?.abort();
-            }}
+            onClick={pause}
           >
             {t.cancel}
           </button>
@@ -738,17 +812,22 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
         </div>
       </div>
       {check && (
-        <div className="translation-verification" role="region" aria-label={t.verify}>
-          <div><strong>{t.verify}</strong><p>{t.verificationHint}</p></div>
-          <Turnstile
-            key={check.id}
-            siteKey={guest!.site_key}
-            action={check.action}
-            onToken={(token) => verification.current?.resolve(token)}
-            onError={() =>
-              verification.current?.reject(Error('VERIFICATION_FAILED'))
-            }
-          />
+        <div className="translation-verification-overlay">
+          <div ref={verificationDialog} className="translation-verification"
+            role="dialog" aria-modal="true" aria-label={t.verify}
+            onKeyDown={(event) => { if (event.key === 'Escape') pause(); }}>
+            <div className="translation-verification-copy"><strong>{t.verify}</strong><p>{t.verificationHint}</p></div>
+            <Turnstile
+              key={check.id}
+              siteKey={guest!.site_key}
+              action={check.action}
+              onToken={(token) => verification.current?.resolve(token)}
+              onError={() =>
+                verification.current?.reject(Error('VERIFICATION_FAILED'))
+              }
+            />
+            <button className="translation-verification-close" aria-label={t.cancel} onClick={pause}><span aria-hidden="true">×</span></button>
+          </div>
         </div>
       )}
       <div className="translation-layout">

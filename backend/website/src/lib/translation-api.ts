@@ -98,48 +98,105 @@ export async function watch(
   account: Account | undefined,
   signal: AbortSignal,
   onSnapshot: (value: Snapshot) => Promise<void>,
-) {
+): Promise<'complete' | 'reconnect'> {
+  signal.throwIfAborted();
   const response = await request(
     path + '/events?ids=' + encodeURIComponent(id),
-    { signal },
+    { signal, headers: { Accept: 'text/event-stream' } },
     account,
     310000,
   );
-  if (!response.body) throw Error('NETWORK_ERROR');
+  if (!response.body) throw new TranslationError('NETWORK_ERROR');
   const reader = response.body.getReader(),
-    decoder = new TextDecoder();
+    decoder = new TextDecoder('utf-8', { fatal: true });
   let buffer = '';
+  let skipLF = false;
+  let eventName = '';
+  let data: string[] = [];
+  let frameLength = 0;
+  const cancel = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal.addEventListener('abort', cancel, { once: true });
+
+  const dispatch = async (): Promise<'complete' | 'reconnect' | undefined> => {
+    const name = eventName;
+    const body = data.join('\n');
+    eventName = '';
+    data = [];
+    frameLength = 0;
+    if (!body || (name !== 'snapshot' && name !== 'end')) return;
+    let value;
+    try {
+      value = JSON.parse(body);
+    } catch {
+      throw new TranslationError('NETWORK_ERROR');
+    }
+    if (name === 'end') {
+      if (value?.reason === 'complete' || value?.reason === 'reconnect')
+        return value.reason;
+      throw new TranslationError('NETWORK_ERROR');
+    }
+    if (!Array.isArray(value?.items)) throw new TranslationError('NETWORK_ERROR');
+    if (value.missing_ids?.includes(id)) throw new TranslationError('NOT_FOUND', 404);
+    const snapshot = value.items.find((item: Snapshot) => item?.id === id);
+    if (!snapshot || typeof snapshot.state !== 'string')
+      throw new TranslationError('NETWORK_ERROR');
+    await onSnapshot(snapshot);
+    signal.throwIfAborted();
+  };
+
   try {
     while (true) {
+      signal.throwIfAborted();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const chunk = await Promise.race([
         reader.read(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
-            void reader.cancel();
-            reject(Error('NETWORK_ERROR'));
+            cancel();
+            reject(new TranslationError('NETWORK_ERROR'));
           }, 45000);
         }),
       ]).finally(() => clearTimeout(timer));
-      if (chunk.done) return;
-      buffer += decoder.decode(chunk.value, { stream: true });
-      if (buffer.length > 1024 * 1024) throw Error('NETWORK_ERROR');
-      let split;
-      while ((split = buffer.indexOf('\n\n')) >= 0) {
-        const event = buffer.slice(0, split);
-        buffer = buffer.slice(split + 2);
-        if (event.startsWith('event: snapshot')) {
-          const data = JSON.parse(
-            event
-              .split('\n')
-              .find((line) => line.startsWith('data: '))!
-              .slice(6),
-          );
-          for (const item of data.items) await onSnapshot(item);
-        } else if (event.startsWith('event: end')) return;
+      signal.throwIfAborted();
+      // EOF without an explicit end frame is a disconnect, not completion.
+      if (chunk.done) throw new TranslationError('NETWORK_ERROR');
+      try {
+        buffer += decoder.decode(chunk.value, { stream: true });
+      } catch {
+        throw new TranslationError('NETWORK_ERROR');
       }
+      if (skipLF && buffer) {
+        if (buffer[0] === '\n') buffer = buffer.slice(1);
+        skipLF = false;
+      }
+      let split;
+      while ((split = buffer.search(/[\r\n]/)) >= 0) {
+        const line = buffer.slice(0, split);
+        const cr = buffer[split] === '\r';
+        const crlf = cr && buffer[split + 1] === '\n';
+        skipLF = cr && split === buffer.length - 1;
+        buffer = buffer.slice(split + (crlf ? 2 : 1));
+        frameLength += line.length + 1;
+        if (frameLength > 1024 * 1024) throw new TranslationError('NETWORK_ERROR');
+        if (!line) {
+          const reason = await dispatch();
+          if (reason) return reason;
+          continue;
+        }
+        const colon = line.indexOf(':');
+        const field = colon < 0 ? line : line.slice(0, colon);
+        let value = colon < 0 ? '' : line.slice(colon + 1);
+        if (value.startsWith(' ')) value = value.slice(1);
+        if (field === 'event') eventName = value;
+        else if (field === 'data') data.push(value);
+      }
+      if (frameLength + buffer.length > 1024 * 1024)
+        throw new TranslationError('NETWORK_ERROR');
     }
   } finally {
+    signal.removeEventListener('abort', cancel);
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
