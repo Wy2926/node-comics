@@ -21,8 +21,8 @@ export function Users({items, onUser}: {items: AdminUser[]; onUser: (id: string)
   return <Table heads={['用户', '会员 / 角色', '当前在途', '累计任务 / 完成', '最近提交', '注册时间', '操作']}>
     {items.map(u => <tr key={u.id}>
       <td><b>{u.name}</b><small><code title={u.id}>{u.id.slice(0, 8)}</code></small></td>
-      <td><span className={`badge ${u.plan === 'plus' ? 'accent' : ''}`}>{u.plan === 'plus' ? 'PLUS' : '普通'}</span>
-        <small>{u.role === 'admin' ? '管理员' : '读者'}{u.plan === 'plus' && ` · 到期 ${time(u.plus_expires_at)}`}</small></td>
+      <td><span className={`badge ${u.plan !== 'free' ? 'accent' : ''}`}>{u.plan === 'plus' ? 'PLUS' : u.plan === 'lite' ? 'Lite' : '普通'}</span>
+        <small>{u.role === 'admin' ? '管理员' : '读者'}{u.plan !== 'free' && ` · 到期 ${time(u.plus_expires_at)}`}</small></td>
       <td><Jump view="tasks" params={{owner_id: u.id, status: 'active'}}>{number(u.active_jobs)}</Jump></td>
       <td>{number(Object.values(u.jobs).reduce((s, v) => s + v, 0))} / {number((u.jobs.succeeded || 0) + (u.jobs.no_text || 0))}<small>失败 {number(u.jobs.failed)}</small></td>
       <td>{time(u.last_submitted_at)}</td><td>{time(u.created_at)}</td>

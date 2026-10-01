@@ -1,7 +1,7 @@
 export const billingEndpoint = '/v1/admin/billing';
 export type BillingProvider = 'stripe' | 'creem';
 export type BillingEnvironment = 'test' | 'live';
-export type BillingRevision = {id: string; plan_id: string; version: number; name: string; monthly_redraw_pages: number; trial_days: number; trial_redraw_pages: number};
+export type BillingRevision = {id: string; plan_id: string; version: number; name: string; monthly_redraw_pages: number; trial_days: number; trial_redraw_pages: number; hourly_image_limit?: number | null};
 export type BillingBinding = {id: string; price_id: string; provider: BillingProvider; environment: BillingEnvironment; product_id: string; provider_price_id: string | null; trial_product_id: string | null; status: string; created_at: string};
 export type BillingPrice = BillingRevision & {plan_revision_id: string; currency: string; unit_amount: number; interval: 'month' | 'year'; environment: BillingEnvironment; status: string; bindings: BillingBinding[]};
 export type BillingProduct = {id: string; name: string; revisions: BillingRevision[]; prices: BillingPrice[]};

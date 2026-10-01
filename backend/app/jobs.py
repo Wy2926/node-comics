@@ -4,7 +4,7 @@ from .assets import available, descriptor_available
 from .translation_requests import TranslationRequest
 from .errors import problem
 from .models import Asset, Job, now, uid
-from .entitlements import locked_user, require_entitlement, reserve, settle
+from .entitlements import locked_user, membership_benefits, require_entitlement, reserve, settle
 from .providers import configuration, digest, validate_input
 from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
 
@@ -133,7 +133,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         if last and (last.status in {'failed', 'cancelled', 'unknown_released'} or
                 (last.status in ACTIVE and (last.cancel_requested or last.discard_output))):
             return remember_request(db, user.id, key, request_hash, last)
-    kind = require_entitlement(user, mode, at, db=db)
+    benefits = membership_benefits(db, user, at)
+    kind = require_entitlement(user, mode, at, db=db, benefits=benefits)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
         mode=mode, target_language=language,
@@ -143,8 +144,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     db.add(job)
     db.flush()
     from .translation_limits import admit_image
-    admit_image(db, user, job.id)
-    reserve(db, user, job, at)
+    admit_image(db, user, job.id, benefits=benefits)
+    reserve(db, user, job, at, benefits=benefits)
     if asset:
         db.execute(update(Asset).where(Asset.id == asset.id).values(active_references=Asset.active_references + 1))
         job.input_pinned = True

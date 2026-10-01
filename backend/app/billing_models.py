@@ -30,11 +30,14 @@ class BillingPlanRevision(Base):
     version: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(100))
     monthly_redraw_pages: Mapped[int] = mapped_column(Integer)
+    hourly_image_limit: Mapped[int | None] = mapped_column(Integer)
     trial_days: Mapped[int] = mapped_column(Integer)
     trial_redraw_pages: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (UniqueConstraint('plan_id', 'version'), UniqueConstraint('id', 'plan_id'),
         CheckConstraint('version > 0'), CheckConstraint('monthly_redraw_pages >= 0'),
+        CheckConstraint('hourly_image_limit IS NULL OR (hourly_image_limit > 0 AND hourly_image_limit <= 1000000)',
+            name='ck_billing_revision_hourly_image_limit'),
         CheckConstraint('trial_days >= 0 AND trial_days <= 30'), CheckConstraint('trial_redraw_pages >= 0'),
         CheckConstraint('trial_days > 0 OR trial_redraw_pages = 0'))
 

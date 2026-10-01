@@ -91,7 +91,7 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
     {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic', 'redraw'])}
       {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
       </> :
-      <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="plus">PLUS</option></select></label>}
+      <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="lite">Lite</option><option value="plus">PLUS</option></select></label>}
     <button className="primary">筛选</button><button type="button" className="secondary" onClick={() => onChange({})}>重置</button>
   </form>
     {['owner_id', 'node_id'].filter(k => params.has(k)).map(k => <span className="scope-chip" key={k}>{k === 'owner_id' ? '用户' : '节点'}：{params.get(k)}</span>)}

@@ -16,10 +16,12 @@ def administrator(state):
     return state['auth']
 
 
-def quote(state, *, key='annual', plan='plus', pages=300, amount=9990, interval='year', trial_days=7, publish=True):
+def quote(state, *, key='annual', plan='plus', pages=300, amount=9990, interval='year', trial_days=7,
+          trial_pages=None, hourly_image_limit=None, publish=True):
     client, auth = state['client'], administrator(state)
     revision = {'id':key+'-revision', 'name':plan.upper(), 'monthly_redraw_pages':pages,
-        'trial_days':trial_days, 'trial_redraw_pages':30 if trial_days else 0}
+        'trial_days':trial_days, 'trial_redraw_pages': (30 if trial_days else 0) if trial_pages is None else trial_pages,
+        'hourly_image_limit': hourly_image_limit}
     products = client.get('/v1/admin/billing/catalog', headers=auth).json()['products']
     if any(p['id'] == plan for p in products):
         response = client.post(f'/v1/admin/billing/products/{plan}/revisions', headers=auth, json=revision)
@@ -184,8 +186,8 @@ def test_multiple_plans_custom_trial_and_zero_quota_keep_classic_access(billing)
     invoice(billing,total=499)
     sync_subscription('sub_fixture')
     value=rights(billing)
-    assert value['plan']=='plus' and value['modes']['classic']['unlimited']
-    assert value['modes']['redraw']['quota']['available']==0
+    assert value['plan']=='light' and value['modes']['classic']['unlimited']
+    assert value['modes']['redraw']['allowed'] is False and value['modes']['redraw']['quota'] is None
     assert {p['plan_id'] for p in billing['client'].get('/v1/billing/catalog').json()['offers']}=={'plus','light'}
 
 

@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session, defer
 from .auth import admin, user_json
 from .config import settings
 from .db import get_db
-from .entitlements import entitlements_json, is_plus, iso, period_json, plus_dates
-from .billing_access import access_exists
+from .entitlements import entitlements_json, iso, membership_benefits, period_json, plus_dates
+from .billing_access import plan_expression
 from .entitlement_models import QuotaPeriod
 from .errors import problem
 from .models import Attempt, ClassicState, Job, TextCall, User, now
@@ -171,9 +171,8 @@ def overview(db: Session = Depends(get_db)):
     lease_counts = db.execute(select(lease_status, func.count()).where(
         ExecutionLease.completed_at.is_(None)).group_by(lease_status)).all()
     user_count = db.scalar(select(func.count()).select_from(User).where(User.kind == 'registered'))
-    plus_count = db.scalar(select(func.count()).select_from(User).where(or_(
-        and_(User.plus_pending.is_(False), User.plus_started_at <= at, User.plus_expires_at > at),
-        access_exists(at))))
+    plus_count = db.scalar(select(func.count()).select_from(User).where(
+        User.kind == 'registered', plan_expression(at) == 'plus'))
     return {"generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
         "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).join(User, User.id == Job.owner_id).where(Job.created_at >= since, User.kind == 'registered'))},
         "nodes": {"total": len(nodes), "online_enabled": online}, "leases": dict(lease_counts),
@@ -215,15 +214,13 @@ def nodes(db: Session = Depends(get_db)):
 
 
 @router.get("/users")
-def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | None = None,
+def users(q: str = Query("", max_length=120), plan: str | None = Query(None, max_length=64, pattern=r'^[a-z][a-z0-9_-]*$'),
           offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
     at, query = now(), select(User).where(User.kind == 'registered')
     if q.strip():
         query = query.where(or_(User.name.contains(q.strip(), autoescape=True), User.id.contains(q.strip(), autoescape=True)))
     if plan:
-        plus = or_(and_(User.plus_pending.is_(False), User.plus_started_at.is_not(None), User.plus_expires_at.is_not(None), User.plus_started_at <= at, User.plus_expires_at > at),
-                   access_exists(at))
-        query = query.where(plus if plan == "plus" else ~plus)
+        query = query.where(plan_expression(at) == plan)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = list(db.scalars(query.order_by(User.created_at.desc(), User.id).offset(offset).limit(limit)))
     stats = defaultdict(dict)
@@ -233,7 +230,7 @@ def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | No
         for owner, status, count in db.execute(select(Job.owner_id, Job.status, func.count()).where(Job.owner_id.in_(ids)).group_by(Job.owner_id, Job.status)):
             stats[owner][status] = count
         latest = dict(db.execute(select(Job.owner_id, func.max(Job.created_at)).where(Job.owner_id.in_(ids)).group_by(Job.owner_id)).all())
-    return {"items": [{**user_json(u), "created_at": iso(u.created_at), "plan": "plus" if is_plus(db, u, at) else "free",
+    return {"items": [{**user_json(u), "created_at": iso(u.created_at), "plan": membership_benefits(db, u, at)['plan'],
         "plus_expires_at": iso(plus_dates(db, u, at)[1]), "last_submitted_at": iso(latest.get(u.id)),
         "jobs": stats[u.id], "active_jobs": sum(stats[u.id].get(s, 0) for s in ACTIVE)} for u in rows],
         "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}

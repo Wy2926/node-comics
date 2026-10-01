@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {annualSavings,amount,selectedChannel,hasManagedSubscription,type BillingOffer} from '../src/lib/billing';
+import {annualSavings,amount,selectedChannel,hasManagedSubscription,offerBenefits,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
 import {selectedInterval} from '../src/components/BillingCycle';
 
 test('billing cycles use available quotes and preserve the chosen cadence',()=>{
@@ -48,4 +48,15 @@ test('annual savings compare the same published benefits and currency',()=>{
   for(const unit_amount of [11988,13000])assert.equal(annualSavings({...year,unit_amount},[month]),null);
   assert.deepEqual(annualSavings(year,[month,{...month,unit_amount:1099}]),annualSavings(year,[month]));
   assert.equal(amount({...year,unit_amount:year.unit_amount/12},'en'),'$8.33');
+});
+
+test('Lite benefits and annual renewal do not claim redraw pages',()=>{
+  const lite={interval:'year' as const,hourly_image_limit:1200,monthly_redraw_pages:0};
+  const plus={...lite,hourly_image_limit:null,monthly_redraw_pages:300};
+  for(const locale of ['zh-CN','zh-TW','en','ja','ko']){
+    assert.match(offerBenefits(lite,locale),/1,200/);
+    assert.doesNotMatch(trialCopy(7,0,locale),/0/);
+    assert.notEqual(renewalCopy(lite,locale),renewalCopy(plus,locale));
+    assert.match(offerBenefits(plus,locale),/300/);
+  }
 });

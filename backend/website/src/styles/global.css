@@ -90,10 +90,10 @@
 .pricing-comparison{max-width:1060px;margin:0 auto 36px;border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:0 8px 28px #17324c08;overflow:hidden}
 .pricing-comparison .pricing-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:0;max-width:none;margin:0;display:grid}
 .pricing-comparison .price-card{padding:26px 30px 24px;border:0;border-radius:0;box-shadow:none;min-width:0;background:white;position:relative}
-.pricing-comparison .price-card.plus{border-left:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));background:var(--accent-soft)}
+.pricing-comparison .price-card.paid{border-left:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));background:var(--accent-soft)}
 .pricing-comparison .membership-heading{margin-bottom:14px;gap:9px;font-size:.62rem;line-height:1.6;letter-spacing:.07em;display:flex;align-items:center;color:var(--accent);font-weight:700}
 .pricing-comparison .membership-icon{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;background:var(--surface-soft);font-size:25px}
-.pricing-comparison .plus .membership-icon{background:white}
+.pricing-comparison .paid .membership-icon{background:white}
 .pricing-comparison .price-card h2{font-size:1.6rem}
 .pricing-comparison .price-card>p{font-size:.85rem;line-height:1.7;color:var(--muted);margin:8px 0}
 .pricing-comparison .price-card .price{font-size:2.7rem;line-height:1.2;margin:20px 0 4px;color:var(--ink);font-weight:900;letter-spacing:-.04em;overflow-wrap:anywhere}
@@ -123,13 +123,12 @@
 .plan-comparison td small{display:block;margin-top:3px;font-size:.72rem;font-weight:400;color:var(--muted);line-height:1.55}
 .pricing-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
 .pricing-actions>div{padding:22px 30px 24px;min-width:0}
-.pricing-actions .plus-action{border-left:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));background:var(--accent-soft)}
+.pricing-actions .paid-action{border-left:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));background:var(--accent-soft)}
 .pricing-actions .button{width:100%;min-height:46px;margin:0;padding:10px 16px;gap:12px;font-size:.86rem;box-shadow:2px 2px 0 var(--ink)}
 .pricing-actions .button:disabled{box-shadow:none}
 .pricing-actions .trial-note,.pricing-actions .free-action>p{font-size:.74rem;color:var(--muted);line-height:1.75;margin:12px 0 0}
 .pricing-actions .billing-status{font-size:.82rem;line-height:1.6;margin:0;padding:0;font-weight:700;color:var(--ink)}
 .pricing-actions .purchase-timing{margin:7px 0 14px;font-size:.75rem;line-height:1.7;color:var(--muted)}
-.pricing-actions .purchase-launch-date{font-weight:650;color:var(--ink)}
 .pricing-comparison>.comparison-note{margin:0;padding:15px 24px;border-top:1px solid var(--line);background:var(--surface-soft);font-size:.74rem;line-height:1.7;color:var(--muted)}
 @media(max-width:760px){
   .pricing-comparison{border-radius:15px;margin-bottom:28px}
@@ -146,7 +145,7 @@
 @media(max-width:580px){
   .pricing-comparison .pricing-grid{grid-template-columns:1fr}
   .pricing-comparison .price-card{padding:21px 20px}
-  .pricing-comparison .price-card.plus{border-left:0;border-top:1px solid var(--line)}
+  .pricing-comparison .price-card.paid{border-left:0;border-top:1px solid var(--line)}
   .pricing-comparison .membership-heading{font-size:.6rem;margin-bottom:11px}
   .pricing-comparison .price-card.free .price{font-size:2.4rem;margin-top:13px}
   .pricing-comparison .published-price-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -162,7 +161,7 @@
   .plan-comparison td small{font-size:.65rem}
   .pricing-actions{grid-template-columns:1fr}
   .pricing-actions>div{padding:20px}
-  .pricing-actions .plus-action{border-left:0;border-top:1px solid var(--line)}
+  .pricing-actions .paid-action{border-left:0;border-top:1px solid var(--line)}
   .pricing-actions .trial-note,.pricing-actions .free-action>p,.pricing-actions .purchase-timing{font-size:.72rem}
   .pricing-comparison>.comparison-note{padding:14px 16px;font-size:.7rem}
 }

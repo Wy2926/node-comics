@@ -83,11 +83,11 @@ for (const file of htmlFiles) {
     if (!noindex || $('.translation-workbench').length !== 1 || $('.translation-sidebar input[type=file]').length !== 1) errors.push(`${label}: translator must be a private, usable work surface`);
   }
   if (basePath(route) === '/pricing/') {
-    const published = $('.published-plus-pricing');
+    const published = $('.published-lite-pricing');
     const prices = published.find('.published-price-grid .published-price');
-    if (published.length !== 1 || prices.length !== 2) errors.push(`${label}: published monthly and yearly PLUS prices must be present in static HTML`);
-    for (const [index, expected] of ['US$9.99', 'US$99.99'].entries()) {
-      if (!prices.eq(index).text().replace(/\s/g, '').includes(expected)) errors.push(`${label}: missing published PLUS price ${expected}`);
+    if (published.length !== 1 || prices.length !== 2) errors.push(`${label}: published monthly and yearly Lite prices must be present in static HTML`);
+    for (const [index, expected] of ['US$5.99', 'US$59.99'].entries()) {
+      if (!prices.eq(index).text().replace(/\s/g, '').includes(expected)) errors.push(`${label}: missing published Lite price ${expected}`);
     }
     const comparison = $('.pricing-comparison');
     const table = comparison.find('table.plan-comparison');
@@ -97,9 +97,8 @@ for (const file of htmlFiles) {
       const row = table.find(`tbody tr[data-feature="${feature}"]`);
       if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
     }
-    if (!table.find('[data-feature="redraw"] td').last().text().includes('300')) errors.push(`${label}: missing published monthly redraw allowance`);
-    const launch = comparison.find('.purchase-launch-date').text();
-    if (!['2026', '30', 'UTC+8'].every(part => launch.includes(part))) errors.push(`${label}: published purchase deadline must show September 30, 2026 in Beijing time`);
+    if (!table.find('[data-feature="rate"] td').last().text().replace(/\D/g,'').includes('1200')) errors.push(`${label}: missing Lite rolling hourly request limit`);
+    if (/PLUS|\b300\b/.test(comparison.text())) errors.push(`${label}: retired PLUS must not be advertised for new purchase`);
     if (comparison.find('.billing-availability button[disabled]').length !== 1 || $('.billing-availability[data-state="loading"]').length !== 1) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
     if ($('a[href*="price="]').length || $('[data-billing-catalog="live"]').length) errors.push(`${label}: static pricing must not fabricate a purchasable API offer`);
   }
@@ -139,4 +138,4 @@ for(const path of publicPaths) for(const locale of locales) if(!sitemap.includes
 for (const forbidden of ['/account/','/auth/','/payment/','/uninstall/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
 for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/','/payment/success/','/uninstall/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
 if (errors.length) throw Error(errors.join('\n'));
-console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published PLUS pricing, links/anchors, images and index boundaries.`);
+console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published Lite pricing, links/anchors, images and index boundaries.`);

@@ -58,6 +58,7 @@ class EntitlementsResponse(BaseModel):
     gift: GiftMembershipResponse | None
     timezone: str
     image_rate_limit: dict
+    hourly_image_rate_limit: dict | None = None
     modes: dict[str, ModeEntitlement]
     generated_at: str
     pending_previous_period_pages: int

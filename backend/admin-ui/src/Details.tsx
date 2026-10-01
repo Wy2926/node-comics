@@ -45,7 +45,8 @@ export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; 
 export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const e = u.entitlements;
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
-  return <div className="care-user-detail"><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : '普通'}</span></div>
+  return <div className="care-user-detail"><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : e.plan === 'lite' ? 'Lite' : '普通'}</span></div>
+    {e.hourly_image_rate_limit && <p className="muted">每滚动 60 分钟最多新受理 {e.hourly_image_rate_limit.limit} 页，跨模式、语言和设备合计。</p>}
     <dl className="detail-meta"><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
       <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>
     <div className="queue-grid">{(['classic', 'redraw'] as Mode[]).map(mode => {

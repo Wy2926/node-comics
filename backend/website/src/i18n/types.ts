@@ -77,7 +77,6 @@ export interface UI {
   pricingDescription: string;
   freePlan: string;
   freePlanDescription: string;
-  plusDescription: string;
   free: string;
   month: string;
   freeBenefits: string[];

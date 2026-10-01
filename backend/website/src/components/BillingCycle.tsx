@@ -4,11 +4,11 @@ import {pricingCopy} from '../lib/pricing';
 
 export type BillingInterval='month'|'year';
 const labels:Record<string,[string,string,string,string]>={
-  'zh-CN':['月付','年付','每月续费','每年续费 · 额度按月生效'],
-  'zh-TW':['月付','年付','每月續訂','每年續訂 · 額度按月生效'],
-  en:['Monthly','Yearly','Billed every month','Billed yearly · monthly quotas'],
-  ja:['月払い','年払い','毎月更新','毎年更新・利用枠は毎月'],
-  ko:['월간 결제','연간 결제','매월 갱신','매년 갱신 · 한도는 매월'],
+  'zh-CN':['月付','年付','每月续费','每年续费'],
+  'zh-TW':['月付','年付','每月續訂','每年續訂'],
+  en:['Monthly','Yearly','Billed every month','Billed yearly'],
+  ja:['月払い','年払い','毎月更新','毎年更新'],
+  ko:['월간 결제','연간 결제','매월 갱신','매년 갱신'],
 };
 export function selectedInterval(offers:BillingOffer[],preferred:BillingInterval):BillingInterval{
   return offers.some(p=>p.interval===preferred)?preferred:offers[0]?.interval??preferred;

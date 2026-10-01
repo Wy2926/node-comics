@@ -34,6 +34,8 @@ def grant_term(db, user, sub, price, kind, start, end, invoice_id=None):
     db.flush()
     count = 12 if kind == 'paid' and price.interval == 'year' else 1
     pages = revision.trial_redraw_pages if kind == 'trial' else revision.monthly_redraw_pages
+    if pages == 0:
+        return  # The granted term provides classic access without empty quota buckets.
     # Compute every boundary from the original anchor: Jan 31 -> Feb 28 -> Mar 31.
     # Future buckets exist durably but cannot be spent before their starts_at.
     for index in range(count):

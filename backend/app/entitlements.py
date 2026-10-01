@@ -8,7 +8,7 @@ from .entitlement_models import MembershipOperation, QuotaPeriod
 from .errors import problem
 from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
-from .billing_access import active_terms
+from .billing_access import active_benefits, active_terms
 from .system_settings import get_request_limits
 from .admin_audit import record_audit
 
@@ -57,6 +57,22 @@ def gift_json(user, at=None):
 def is_plus(db, user, at=None):
     at = at or now()
     return is_operator_plus(user, at) or bool(active_terms(db, user.id, at))
+
+
+def membership_benefits(db, user, at=None):
+    at = at or now()
+    if is_operator_plus(user, at):
+        return {'plan': 'plus', 'paid': True, 'hourly_image_limit': None, 'redraw': True}
+    benefits = active_benefits(db, user.id, at)
+    if not benefits:
+        return {'plan': 'free', 'paid': False, 'hourly_image_limit': None, 'redraw': False}
+    # Concurrent granted terms combine access: an unrestricted term keeps its
+    # access; otherwise the largest hourly allowance applies to the account.
+    revision, _ = max(benefits, key=lambda value: (value[0].hourly_image_limit is None,
+        value[0].hourly_image_limit or 0, value[0].monthly_redraw_pages, value[0].plan_id))
+    redraw = any((item.trial_redraw_pages if kind == 'trial' else item.monthly_redraw_pages) > 0
+        for item, kind in benefits)
+    return {'plan': revision.plan_id, 'paid': True, 'hourly_image_limit': revision.hourly_image_limit, 'redraw': redraw}
 
 
 def plus_dates(db, user, at=None):
@@ -163,11 +179,12 @@ def period_spec(user, kind, at=None, *, db):
             "starts_at": start, "ends_at": end, "granted": granted}
 
 
-def quota_kind(user, mode, at=None, db=None):
-    plus = is_plus(db, user, at)
+def quota_kind(user, mode, at=None, db=None, *, benefits=None):
+    benefits = benefits if benefits is not None else membership_benefits(db, user, at)
+    plus = benefits['paid']
     if mode == "classic":
         return UNLIMITED if plus else DAILY
-    if plus:
+    if plus and benefits['redraw']:
         return MONTHLY
     at = at or now()
     if db is not None and db.scalar(select(QuotaPeriod.id).where(QuotaPeriod.owner_id == user.id,
@@ -225,44 +242,48 @@ def allowance_json(db, user, kind, at=None):
 
 def entitlements_json(db, user, at=None):
     at = at or now()
-    plus = is_plus(db, user, at)
+    benefits = membership_benefits(db, user, at)
     from .translation_limits import image_limit
     modes = {}
     for mode in ("classic", "redraw"):
-        kind = quota_kind(user, mode, at, db)
+        kind = quota_kind(user, mode, at, db, benefits=benefits)
         modes[mode] = {"allowed": kind != "unavailable", "unlimited": kind == UNLIMITED,
                        "quota_kind": kind, "consent_version": entitlement_version(db, user, kind, at),
                        "quota": allowance_json(db, user, kind, at)}
     starts_at, expires_at = plus_dates(db, user, at)
-    return {"plan": "plus" if plus else "free", "plus_started_at": iso(starts_at),
+    return {"plan": benefits['plan'], "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "gift": gift_json(user, at), "timezone": settings().quota_timezone,
-            "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user)},
+            "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user, benefits=benefits)},
+            "hourly_image_rate_limit": ({"window_seconds": 3600, "limit": benefits['hourly_image_limit']}
+                if benefits['hourly_image_limit'] is not None else None),
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}
 
 
-def require_entitlement(user, mode, at=None, db=None):
+def require_entitlement(user, mode, at=None, db=None, *, benefits=None):
     if user.kind == 'guest':
         if mode != 'classic' or db is None or not db.info.get('guest_network'):
             problem('GUEST_FORBIDDEN', '匿名体验仅支持已验证的常规图片翻译', 403)
         return 'guest_trial'
-    kind = quota_kind(user, mode, at, db)
+    kind = quota_kind(user, mode, at, db, benefits=benefits)
     if kind == "unavailable":
-        problem("PLUS_REQUIRED", "AI 重绘需要有效 PLUS 会员或限时重绘赠送额度；已有译图仍可查看", 403)
+        problem("PLUS_REQUIRED", "AI 重绘需要包含重绘权益的有效会员或有效赠送额度；已有译图仍可查看", 403)
     return kind
 
 
-def reserve(db, user, job, at=None):
+def reserve(db, user, job, at=None, *, benefits=None):
     """The caller holds the user lock and has resolved cache/in-flight reuse."""
     at = at or now()
     if user.kind == 'guest':
         from .guests import reserve_guest
         reserve_guest(db, user, job, at)
         return
-    kind = require_entitlement(user, job.mode, at, db=db)
+    benefits = benefits if benefits is not None else membership_benefits(db, user, at)
+    kind = require_entitlement(user, job.mode, at, db=db, benefits=benefits)
     job.quota_kind = kind
-    job.entitlement = {"plan": "plus" if is_plus(db, user, at) else "free", "accepted_at": iso(at),
+    job.entitlement = {"plan": benefits['plan'], "accepted_at": iso(at),
+                       "hourly_image_limit": benefits['hourly_image_limit'],
                        "membership_id": user.membership_id,
                        "billing_term_ids": [term.id for term in active_terms(db, user.id, at)],
                        "version": entitlement_version(db, user, kind, at)}

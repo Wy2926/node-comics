@@ -4952,11 +4952,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "free",
-                    "plus"
-                  ],
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-z][a-z0-9_-]*$"
                 },
                 {
                   "type": "null"
@@ -8145,6 +8143,18 @@
             "type": "object",
             "title": "Image Rate Limit"
           },
+          "hourly_image_rate_limit": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Image Rate Limit"
+          },
           "modes": {
             "additionalProperties": {
               "$ref": "#/components/schemas/ModeEntitlement"
@@ -9222,6 +9232,19 @@
             "minimum": 0.0,
             "title": "Monthly Redraw Pages"
           },
+          "hourly_image_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Image Limit"
+          },
           "trial_days": {
             "type": "integer",
             "maximum": 30.0,
@@ -9698,6 +9721,24 @@
             "maximum": 10000.0,
             "minimum": 1.0,
             "title": "Feedback Receipts Per Day"
+          },
+          "guest_daily_limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Guest Daily Limit"
+          },
+          "guest_network_daily_limit": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Guest Network Daily Limit"
+          },
+          "guest_global_daily_limit": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Guest Global Daily Limit"
           }
         },
         "additionalProperties": false,
@@ -9714,7 +9755,10 @@
           "upload_ingress_lease_seconds",
           "feedback_requests_per_minute",
           "feedback_request_burst",
-          "feedback_receipts_per_day"
+          "feedback_receipts_per_day",
+          "guest_daily_limit",
+          "guest_network_daily_limit",
+          "guest_global_daily_limit"
         ],
         "title": "RequestLimits",
         "description": "One immutable operation snapshot; PUT requires every supported field."
@@ -9762,6 +9806,19 @@
             "maximum": 1000000.0,
             "minimum": 0.0,
             "title": "Monthly Redraw Pages"
+          },
+          "hourly_image_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Image Limit"
           },
           "trial_days": {
             "type": "integer",

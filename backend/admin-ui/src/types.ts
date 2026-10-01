@@ -64,7 +64,7 @@ export type Bucket = {id: string; mode: Mode; source: string; granted: number; u
 export type UserDetail = User & {
   grants: (Bucket & {starts_at: string; note: string})[];
   created_at: string;
-  entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number};
+  entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number}; hourly_image_rate_limit?: {window_seconds: number; limit: number} | null;
     gift: {starts_at: string; ends_at: string; days: number; state: 'pending' | 'scheduled' | 'active' | 'expired'} | null;
     modes: Record<Mode, {unlimited: boolean; allowed: boolean; quota: null | {
       available: number; used: number; reserved: number; granted: number; resets_at: string | null; buckets: Bucket[]}}>

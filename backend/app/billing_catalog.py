@@ -43,6 +43,7 @@ def initialize_catalog(db):
 class BenefitsRequest(RequestBody):
     name: str = Field(min_length=1, max_length=100)
     monthly_redraw_pages: int = Field(ge=0, le=1_000_000)
+    hourly_image_limit: int | None = Field(default=None, ge=1, le=1_000_000, strict=True)
     trial_days: int = Field(ge=0, le=30)
     trial_redraw_pages: int = Field(ge=0, le=1_000_000)
 
@@ -105,7 +106,7 @@ def default_provider(db):
 
 def revision_json(revision):
     return {field: getattr(revision, field) for field in ('id', 'plan_id', 'version', 'name',
-        'monthly_redraw_pages', 'trial_days', 'trial_redraw_pages')}
+        'monthly_redraw_pages', 'hourly_image_limit', 'trial_days', 'trial_redraw_pages')}
 
 
 def binding_json(binding):
@@ -119,6 +120,7 @@ def price_json(db, price):
         'name': revision.name, 'version': revision.version, 'currency': price.currency,
         'unit_amount': price.unit_amount, 'interval': price.interval,
         'monthly_redraw_pages': revision.monthly_redraw_pages,
+        'hourly_image_limit': revision.hourly_image_limit,
         'trial_days': revision.trial_days, 'trial_redraw_pages': revision.trial_redraw_pages}
 
 

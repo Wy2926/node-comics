@@ -1,24 +1,23 @@
 import {useEffect,useState} from 'react';
-import {billingCopy,amount,annualSavings,offerLabel,type BillingOffer} from '../lib/billing';
+import {billingCopy,billingBenefitCopy,amount,annualSavings,offerLabel,renewalCopy,trialCopy,type BillingOffer} from '../lib/billing';
 import {pricingCopy} from '../lib/pricing';
 import {comparisonCopy} from '../lib/pricing-comparison';
-import {publishedPlus} from '../data/published-plus';
+import {publishedLite} from '../data/published-lite';
 import BillingCycle,{selectedInterval,type BillingInterval} from './BillingCycle';
-import PublishedPlusPricing,{PublishedPurchaseAvailability} from './PublishedPlusPricing';
+import PublishedLitePricing,{PublishedPurchaseAvailability} from './PublishedLitePricing';
 
 interface Props {
   locale:string;
   accountHref:string;
   downloadHref:string;
   free:{name:string;description:string;action:string;note:string;priceLabel:string};
-  plusDescription:string;
 }
 
-export default function BillingOffers({locale,accountHref,downloadHref,free,plusDescription}:Props){
+export default function BillingOffers({locale,accountHref,downloadHref,free}:Props){
   const [offers,setOffers]=useState<BillingOffer[]>(),[error,setError]=useState(false);
   const [preferred,setPreferred]=useState<BillingInterval>('month');
   const [selectedPrice,setSelectedPrice]=useState('');
-  const copy=billingCopy(locale),text=pricingCopy(locale),comparison=comparisonCopy(locale);
+  const copy=billingCopy(locale),benefits=billingBenefitCopy(locale),text=pricingCopy(locale),comparison=comparisonCopy(locale);
   useEffect(()=>{
     const controller=new AbortController();
     const timeout=setTimeout(()=>{setError(true);controller.abort();},10000);
@@ -26,7 +25,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,plus
       if(!r.ok)throw Error();
       const catalog=await r.json();
       if(!Array.isArray(catalog.offers))throw Error();
-      setOffers(catalog.offers.filter((offer:BillingOffer)=>offer?.channels?.length>0));
+      setOffers(catalog.offers.filter((offer:BillingOffer)=>offer?.plan_id==='lite'&&offer?.channels?.length>0));
     }).catch(()=>{if(!controller.signal.aborted)setError(true);}).finally(()=>clearTimeout(timeout));
     return()=>{clearTimeout(timeout);controller.abort();};
   },[]);
@@ -38,7 +37,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,plus
   const annual=offer?.interval==='year';
   const rows=(['reading','classic','rate','redraw','priority','early'] as const).map(key=>({
     key,label:comparison[key].label,free:comparison[key].free,
-    plus:key==='redraw'?comparison.redraw.plus(offer?.monthly_redraw_pages??publishedPlus.monthlyRedrawPages):comparison[key].plus,
+    lite:key==='rate'?comparison.rate.lite(offer?.hourly_image_limit??publishedLite.hourlyImageLimit):comparison[key].lite,
   }));
   return <div className="pricing-comparison">
     <div className="pricing-grid">
@@ -47,31 +46,31 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,plus
         <h2>{free.name}</h2><p>{free.description}</p>
         <p className="price"><small>US$</small>0 <span>/ {free.priceLabel}</span></p>
       </article>
-      <article className="price-card plus">
-        <div className="membership-heading"><span className="membership-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="m3 6 5 4 4-7 4 7 5-4-3 12H6L3 6Z"/><path d="M6 21h12"/></svg></span><span>{comparison.highlights}</span><b>PLUS</b></div>
-        <h2>{offer?.name??'PLUS'}</h2><p>{plusDescription}</p>
+      <article className="price-card paid">
+        <div className="membership-heading"><span className="membership-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="m3 6 5 4 4-7 4 7 5-4-3 12H6L3 6Z"/><path d="M6 21h12"/></svg></span><span>{comparison.highlights}</span><b>Lite</b></div>
+        <h2>{offer?.name??'Lite'}</h2><p>{benefits.description}</p>
         {offer?<>
           <BillingCycle offers={available} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale}/>
           {matching.length>1&&<div className="billing-plan-picker" role="group" aria-label={copy.plan}>{matching.map(price=><button className="billing-plan-card" type="button" key={price.id} aria-pressed={offer.id===price.id} onClick={()=>setSelectedPrice(price.id)}>{offerLabel(price,locale)}</button>)}</div>}
           <div className="billing-offers" data-billing-catalog="live" aria-live="polite"><section className="billing-offer" aria-label={offer.name}>
             <p className="price">{amount({...offer,unit_amount:annual?offer.unit_amount/12:offer.unit_amount},locale)} <span>/ {copy.month}</span></p>
-            <p className="billing-total">{annual?`${text.monthly} · ${text.billed(amount(offer,locale))}`:copy.renew(false)}</p>
+            <p className="billing-total">{annual?`${text.monthly} · ${text.billed(amount(offer,locale))}`:renewalCopy(offer,locale)}</p>
             {savings&&<p className="annual-saving"><span>{text.total} <s>{amount({...offer,unit_amount:savings.regular},locale)}</s></span><strong>{text.saving(amount({...offer,unit_amount:savings.saved},locale))}</strong></p>}
           </section></div>
-        </>:<PublishedPlusPricing locale={locale}/>}
+        </>:<PublishedLitePricing locale={locale}/>}
       </article>
     </div>
     <table className="plan-comparison">
-      <thead><tr><th scope="col">{comparison.feature}</th><th scope="col">{free.name}</th><th scope="col">{offer?.name??'PLUS'}</th></tr></thead>
-      <tbody>{rows.map(row=><tr key={row.key} data-feature={row.key}><th scope="row">{row.label}</th><td>{row.free}</td><td><strong>{row.plus}</strong></td></tr>)}</tbody>
+      <thead><tr><th scope="col">{comparison.feature}</th><th scope="col">{free.name}</th><th scope="col">{offer?.name??'Lite'}</th></tr></thead>
+      <tbody>{rows.map(row=><tr key={row.key} data-feature={row.key}><th scope="row">{row.label}</th><td>{row.free}</td><td><strong>{row.lite}</strong></td></tr>)}</tbody>
     </table>
     <div className="pricing-actions">
       <div className="free-action"><a className="button secondary" href={downloadHref}>{free.action} <span aria-hidden="true">↗</span></a><p className="trial-note">{free.note}</p></div>
-      <div className="plus-action">{offer?<>
-        <a className="button" data-purchase-link href={`${accountHref}?price=${encodeURIComponent(offer.id)}`}>{text.subscribe} <span aria-hidden="true">↗</span></a>
-        <p className="trial-note">{offer.trial_days>0&&text.trial(offer.trial_days,offer.trial_redraw_pages)} {copy.renew(annual)} {text.cancel}</p>
+      <div className="paid-action">{offer?<>
+        <a className="button" data-purchase-link href={`${accountHref}?price=${encodeURIComponent(offer.id)}`}>{benefits.subscribe(offer.name)} <span aria-hidden="true">↗</span></a>
+        <p className="trial-note">{offer.trial_days>0&&trialCopy(offer.trial_days,offer.trial_redraw_pages,locale)} {renewalCopy(offer,locale)} {text.cancel}</p>
       </>:<PublishedPurchaseAvailability locale={locale} state={error?'error':offers?'unavailable':'loading'}/>}</div>
     </div>
-    <p className="comparison-note">{text.quota} {comparison.note}</p>
+    <p className="comparison-note">{comparison.note}</p>
   </div>;
 }

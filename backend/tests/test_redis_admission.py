@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from app import redis_state
 from app.adapters.llm import TextError
 from app.translation_provider_limits import reserve_request
-from admission_test_utils import freeze_clock, window_count
+from admission_test_utils import freeze_clock, milliseconds, window_count
 from conftest import login, request_id
 
 
@@ -29,6 +29,29 @@ def test_parallel_reservations_and_duplicate_token_are_atomic(redis_client):
     assert window_count('image', 'owner') == 7
     assert redis_state.window('image', 'another', 7, member=member)['remaining'] == 6
     assert 0 < redis_client.pttl(redis_state.key('image', 'owner')) <= 60000
+
+
+def test_hourly_1200_boundary_is_atomic_and_uses_earliest_expiry(redis_client, monkeypatch):
+    from datetime import timedelta
+    from app.models import now
+    clock = [now()]
+    freeze_clock(monkeypatch, clock)
+    redis_client.zadd(redis_state.key('image-hourly', 'owner'),
+        {f'accepted-{index}': milliseconds(clock[0]) for index in range(1199)})
+    barrier = Barrier(32)
+    def attempt(index):
+        barrier.wait(timeout=10)
+        return not redis_state.window('image-hourly', 'owner', 1200, member=f'parallel-{index}', seconds=3600)['retry_after_seconds']
+    with ThreadPoolExecutor(32) as pool:
+        assert sum(pool.map(attempt, range(32))) == 1
+    assert window_count('image-hourly', 'owner') == 1200
+    assert 3599000 <= redis_client.pttl(redis_state.key('image-hourly', 'owner')) <= 3600000
+    assert redis_state.window('image-hourly', 'owner', 1200, member='accepted-0', seconds=3600)['retry_after_seconds'] == 0
+    assert redis_state.window('image-hourly', 'other-owner', 1200, member='accepted-0', seconds=3600)['remaining'] == 1199
+    clock[0] += timedelta(seconds=3599, milliseconds=999)
+    assert redis_state.window('image-hourly', 'owner', 1200, member='new-page', seconds=3600)['retry_after_seconds'] == 1
+    clock[0] += timedelta(milliseconds=1)
+    assert redis_state.window('image-hourly', 'owner', 1200, member='new-page', seconds=3600)['remaining'] == 1199
 
 
 def test_different_processes_share_the_same_supplier_window(redis_client):

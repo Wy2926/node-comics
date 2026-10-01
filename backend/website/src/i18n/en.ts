@@ -74,10 +74,9 @@ export default {
     "ctaDescription": "Leave the translation to NodeLane Comics. Save your attention for the next page.",
     "ctaButton": "Start your reading journey",
     "pricingTitle": "Read for free. Choose your translation plan.",
-    "pricingDescription": "Compare Free and PLUS manga translation allowances, AI redraw pages and monthly or annual subscriptions. Current offers define prices, trial eligibility and benefits.",
+    "pricingDescription": "Compare Free and Lite manga translation: daily free pages, 1,200 new requests per rolling hour, and monthly or annual billing. Lite excludes AI redraw. Eligible first-time accounts get a 7-day trial.",
     "freePlan": "Free",
     "freePlanDescription": "For a little reading every day",
-    "plusDescription": "For the “just one more page” days",
     "free": "free",
     "month": "month",
     "freeBenefits": [
@@ -135,7 +134,7 @@ export default {
       "Into the story."
     ],
     "seoFeaturesTitle": "Manga Translation & Comic Reader Features",
-    "seoPricingTitle": "Free Manga Translation & PLUS Plans",
+    "seoPricingTitle": "Free Manga Translation & Lite Plans",
     "seoDownloadTitle": "Manga Translator for Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "One page too far.",
@@ -192,7 +191,7 @@ export default {
             "title": "Start with classic for everyday reading",
             "paragraphs": [
               "Clear dialogue and regular bubbles are a useful starting point. Handwriting, perspective, small text and sound effects may still be missed. Check partial-result messages and compare with the original.",
-              "Free includes 30 classic pages per day. PLUS has no daily or monthly total limit for classic, while short-term rate and service-capacity limits still apply."
+              "Free includes 30 classic pages per day. Lite has no daily or monthly total cap, with up to 1,200 new pages per rolling hour and no included AI redraw. Short-term rate, image and service-capacity limits still apply."
             ]
           },
           {
@@ -422,7 +421,7 @@ export default {
           {
             "title": "Benefits and subscriptions",
             "paragraphs": [
-              "Free, PLUS, trial and promotional benefits have their respective validity and page rules shown on pricing and account pages. Unlimited classic totals still have short-term rate, image and service-capacity limits.",
+              "Free, Lite, existing PLUS, trial and bonus benefits follow their respective expiry and page rules shown in your account. Lite accepts up to 1,200 new pages per rolling hour and excludes AI redraw. No daily or monthly total cap does not remove short-term rate, image or service-capacity limits.",
               "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
             ]
           },
@@ -490,8 +489,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "Is manga translation free, and what does PLUS include?",
-        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic translation pages per day. PLUS removes the daily and monthly classic page cap, with rate and capacity limits still applying. AI redraw requires a valid allowance. Check current plans for prices, pages, trials and monthly or annual billing.",
+        "question": "Is manga translation free, and what does Lite include?",
+        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic pages per day. Lite costs US$5.99 monthly or US$59.99 yearly, with no daily or monthly classic total cap and up to 1,200 new pages per rolling hour. Rate and capacity limits apply. AI redraw is not included. Eligible first-time accounts get a 7-day card-backed trial. PLUS is closed to new purchases; existing subscriptions keep their displayed benefits. Taxes and final amounts are shown at checkout.",
         "relatedPath": "/pricing/"
       },
       {
@@ -526,8 +525,8 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "Does unlimited mean there are no restrictions?",
-        "answer": "PLUS classic has no daily/monthly total page cap. Image, capacity and short-term rate limits still apply: up to 100 new translation images per rolling 60 seconds across a PLUS account, or 10 for Free. This is not a completion-speed guarantee.",
+        "question": "How do Lite translation limits work?",
+        "answer": "One account shares a limit of 100 new translation images per rolling 60 seconds and 1,200 per rolling 3,600 seconds across devices, modes and languages. Free allows 10 per rolling 60 seconds. Replaying the same request and reusing valid results are not counted again. Accepted tasks still count if they fail, are canceled or contain no text. Rejected requests or rolled-back database transactions release the reserved hourly slot. Retries follow the actual new-task admission rules. These limits do not guarantee completion speed. Lite excludes AI redraw.",
         "relatedPath": "/pricing/"
       },
       {
@@ -683,7 +682,6 @@ export default {
     "订阅状态": "Subscription status",
     "下次计费": "Next payment",
     "停止续费时间": "Renewal ends",
-    "订阅 PLUS，在插件中享受更多翻译权益。": "Subscribe to PLUS for more translation benefits in the extension.",
     "选择订阅套餐": "Choose a subscription",
     "网络连接失败，请检查连接后重试。": "Connection failed. Check your network and try again.",
     "操作暂未完成，请重试或重新登录。": "The action could not be completed. Retry or sign in again.",
