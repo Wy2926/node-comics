@@ -5,13 +5,16 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'simple_scheduler_0009'})
+SUPPORTED_SCHEMAS = frozenset({'simple_scheduler_0009', 'website_guests_0010'})
 
 
 def check_schema(connection):
     versions = set(connection.scalars(text('SELECT version_num FROM alembic_version')))
     if len(versions) != 1 or not versions <= SUPPORTED_SCHEMAS:
         raise RuntimeError('Database schema is incompatible; run the reviewed migration before startup')
+    if versions == {'website_guests_0010'} and connection.scalar(text(
+            "SELECT 1 FROM users WHERE kind = 'guest' LIMIT 1")):
+        raise RuntimeError('Schema bridge cannot run after guest identities have been created')
 
 
 def check_database():

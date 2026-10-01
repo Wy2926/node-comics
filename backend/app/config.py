@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
+    guest_enabled: bool = False
+
+    @model_validator(mode='after')
+    def reject_bridge_guests(self):
+        if self.guest_enabled:
+            raise ValueError('Schema bridge requires GUEST_ENABLED=false')
+        return self
+
     ga4_enabled: bool = False
     ga4_debug_mode: bool = False
     ga4_extension_measurement_id: str = Field(default="", pattern=r"^(G-[A-Z0-9]{4,20})?$")

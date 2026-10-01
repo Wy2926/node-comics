@@ -78,13 +78,19 @@ def initialize_system_settings(db):
                      .execution_options(populate_existing=True))
 
 
+def stored_limits(values):
+    # The bridge does not own guest budgets; reject every other unknown field.
+    guest_fields = {'guest_daily_limit', 'guest_network_daily_limit', 'guest_global_daily_limit'}
+    return RequestLimits.model_validate({name: value for name, value in values.items() if name not in guest_fields})
+
+
 def get_request_limits(db):
     """Use the supplied transaction/connection; never cache across requests."""
-    return RequestLimits.model_validate(initialize_system_settings(db).values)
+    return stored_limits(initialize_system_settings(db).values)
 
 
 def settings_json(row):
-    return {"version": row.version, "values": RequestLimits.model_validate(row.values).model_dump(),
+    return {"version": row.version, "values": stored_limits(row.values).model_dump(),
             "updated_at": row.updated_at.isoformat() + "Z", "updated_by": row.updated_by}
 
 
@@ -103,7 +109,7 @@ def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin),
     before = settings_json(previous)
     row = db.scalar(update(SystemSettings).where(SystemSettings.id == 1,
         SystemSettings.version == body.expected_version).values(
-            version=SystemSettings.version + 1, values=body.values.model_dump(),
+            version=SystemSettings.version + 1, values={**previous.values, **body.values.model_dump()},
             updated_at=now(), updated_by=user.id).returning(SystemSettings)
         .execution_options(populate_existing=True))
     if row is None:
