@@ -2,10 +2,14 @@
 import {Image} from 'astro:assets';
 import logoZh from '../assets/logo-zh.webp';
 import logoEn from '../assets/logo-en.webp';
+import GitHubMark from '../components/GitHubMark.astro';
+import LanguageFlag from '../components/LanguageFlag.astro';
 import { site, absolute } from '../data/site';
 import { dictionaries, localeFromPath, basePath, localPath, locales, languageNames } from '../i18n';
 import '../styles/global.css';
+import '../styles/controls.css';
 import '../styles/header.css';
+import '../styles/public-site.css';
 import {translationCopy} from '../i18n/translate';
 interface Props {
   title: string;
@@ -26,7 +30,7 @@ const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
 const pageSchema = schema.find(item => item['@id'] === canonical);
 const ogLocales = {'zh-CN':'zh_CN','zh-TW':'zh_TW',en:'en_US',ja:'ja_JP',ko:'ko_KR'};
 const graph = [
-  { '@type': 'Organization', '@id': absolute('/#organization'), name: site.name, url: site.url, email: site.email, logo: absolute('/icon-128.png'), contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: site.email } },
+  { '@type': 'Organization', '@id': absolute('/#organization'), name: site.name, url: site.url, email: site.email, logo: absolute('/icon-128.png'), sameAs: [site.github, site.youtube], contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: site.email } },
   { '@type': 'WebSite', '@id': absolute('/#website'), url: site.url, name: site.name, alternateName: ['NodeLane 漫译', 'NodeLane 漫譯'], inLanguage: locales, publisher: { '@id': absolute('/#organization') } },
   { '@type': 'WebPage', '@id': canonical, url: canonical, name: pageTitle, description, inLanguage: locale, isPartOf: { '@id': absolute('/#website') }, ...pageSchema },
   ...(route !== '/' ? [{ '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: t.home, item: absolute(href('/')) }, ...(route.startsWith('/guides/') && route !== '/guides/' ? [{ '@type': 'ListItem', position: 2, name: t.guides, item: absolute(href('/guides/')) }] : []), { '@type': 'ListItem', position: route.startsWith('/guides/') && route !== '/guides/' ? 3 : 2, name: title, item: canonical }] }] : []),
@@ -65,14 +69,14 @@ const graph = [
     <meta name="twitter:image:alt" content={t.ogAlt} />
     <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')} />
   </head>
-  <body>
+  <body data-page={route}>
     <a class="skip-link" href="#main">{t.skip}</a>
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href={href('/')} aria-label={t.brandName}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={240} format="webp" loading="eager" /></a>
         <nav class="desktop-nav" aria-label={t.navigation}>{navigation.map(item => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}</nav>
-        <div class="header-tools"><details class="language-menu" name="header-menu"><summary aria-label={`${t.language}: ${languageNames[locale]}`}><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg> <span>{languageNames[locale]}</span><svg class="language-chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary><nav aria-label={t.language}>{locales.map(language=><a href={localPath(route.startsWith('/404') ? '/' : route,language)} lang={language} hreflang={language} aria-current={locale===language ? "true" : undefined}>{languageNames[language]}</a>)}</nav></details>
-        <div class="header-actions"><a class="account-link" href={href('/account/')} aria-current={route === '/account/' ? 'page' : undefined}>{t.account}</a><a class="button compact" href={href('/download/')}>{t.download} <span aria-hidden="true">↗</span></a></div>
+        <div class="header-tools"><a class="github-link" href={site.github} aria-label={t.githubSource} title={t.githubSource} target="_blank" rel="noopener noreferrer"><GitHubMark/><span>GitHub</span></a><details class="language-menu" name="header-menu"><summary aria-label={`${t.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale}/><span>{languageNames[locale]}</span><svg class="language-chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary><nav aria-label={t.language}>{locales.map(language=><a href={localPath(route.startsWith('/404') ? '/' : route,language)} lang={language} hreflang={language} aria-current={locale===language ? "true" : undefined}><LanguageFlag locale={language}/><span>{languageNames[language]}</span></a>)}</nav></details>
+        <div class="header-actions"><a class="account-link" href={href('/account/')} aria-label={t.account} title={t.account} aria-current={route === '/account/' ? 'page' : undefined}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></a></div>
         <details class="mobile-nav" name="header-menu"><summary aria-label={t.menu}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h12M4 18h16"/></svg></summary><nav aria-label={t.mobileNavigation}>{navigation.map(item => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}<a href={href('/account/')} aria-current={route === '/account/' ? 'page' : undefined}>{t.account}</a><a class="mobile-download" href={href('/download/')}>{t.download} <span aria-hidden="true">↗</span></a></nav></details></div>
       </div>
     </header>
@@ -82,7 +86,7 @@ const graph = [
         <div><a class="brand" href={href('/')}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={t.brandName} width={220} format="webp" loading="lazy" /></a><p>{t.footerStory}</p><a class="email" href={`mailto:${site.email}`}>{site.email} ↗</a></div>
         <div><strong>{t.startReading}</strong><a href={href('/features/')}>{t.features}</a><a href={href('/download/')}>{t.download}</a><a href={href('/pricing/')}>{t.pricing}</a><a href={href('/account/')}>{t.account}</a></div>
         <div><strong>{t.support}</strong><a href={href('/guides/')}>{t.guides}</a><a href={href('/faq/')}>{t.faq}</a><a href={href('/help/')}>{t.help}</a><a href={href('/changelog/')}>{t.changelog}</a></div>
-        <div><strong>{t.company}</strong><a href={href('/about/')}>{t.about}</a><a href={site.github} target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a><a href={href('/privacy/')}>{t.privacy}</a><a href={href('/terms/')}>{t.terms}</a><a href={href('/refund/')}>{t.refund}</a></div>
+        <div><strong>{t.company}</strong><a href={href('/about/')}>{t.about}</a><a href={site.github} target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a><a href={site.youtube} target="_blank" rel="noopener noreferrer">YouTube <span aria-hidden="true">↗</span></a><a href={href('/privacy/')}>{t.privacy}</a><a href={href('/terms/')}>{t.terms}</a><a href={href('/refund/')}>{t.refund}</a></div>
       </div>
       <div class="container footer-bottom"><span>© {new Date().getFullYear()} {t.brandName}. {t.copyright}</span><span>{t.artNote}</span><a href={href('/feed.xml')}>RSS ↗</a></div>
     </footer>

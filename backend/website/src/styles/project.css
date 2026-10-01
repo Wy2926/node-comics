@@ -1,0 +1,35 @@
+.project-about, .project-help { padding-top: 40px; }
+.project-identity { max-width: 850px; }
+.project-identity .eyebrow { margin-bottom: 12px; }
+.project-identity h2 { font-size: clamp(1.5rem, 2.7vw, 2rem); line-height: 1.5; }
+.project-identity > p:last-child { margin-top: 16px; color: var(--muted); font-size: .96rem; }
+.project-info-grid, .project-support-grid { display: grid; gap: 18px; margin-top: 28px; }
+.project-info-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.project-support-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.project-card { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 24px; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background: var(--surface); }
+.project-card h3 { font-size: 1.08rem; line-height: 1.5; }
+.project-card p { margin: 12px 0 22px; color: var(--muted); font-size: .87rem; line-height: 1.8; }
+.project-card .text-link { margin-top: auto; font-size: .83rem; overflow-wrap: anywhere; }
+.project-contact-address { display: block; margin-top: 8px; color: var(--muted); font-size: .76rem; overflow-wrap: anywhere; }
+.project-principles { margin-top: 32px; padding-top: 26px; border-top: var(--comic-perforation); }
+.project-principles h2, .project-support > h2, .project-guides > h2 { margin-bottom: 16px; font-size: 1.35rem; line-height: 1.5; }
+.project-principles p { max-width: 980px; color: var(--muted); font-size: .9rem; line-height: 1.9; }
+.project-guides { margin-top: 44px; }
+.project-guides .help-card h3 { margin-bottom: 14px; font-size: 1.15rem; line-height: 1.5; }
+.project-feedback-note { margin-top: 32px; padding: 24px 28px; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background: var(--comic-warning-paper); color: var(--comic-warning-ink); }
+.project-feedback-note h2 { font-size: 1.15rem; margin-bottom: 10px; }
+.project-feedback-note p { max-width: 980px; color: var(--muted); font-size: .85rem; }
+html[lang=ko] .project-about, html[lang=ko] .project-help { word-break: keep-all; }
+@media (max-width: 1000px) {
+  .project-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .project-about, .project-help { padding-top: 28px; }
+  .project-support-grid { grid-template-columns: 1fr; }
+  .project-card { padding: 22px; }
+  .project-guides { margin-top: 32px; }
+}
+@media (max-width: 480px) {
+  .project-info-grid { grid-template-columns: 1fr; }
+  .project-feedback-note { padding: 20px; }
+}

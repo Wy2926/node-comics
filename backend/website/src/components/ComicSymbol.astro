@@ -1,0 +1,9 @@
+---
+interface Props { kind: 'spark' | 'shield' | 'play'; size?: number }
+const { kind, size = 24 } = Astro.props;
+---
+<svg width={size} height={size} viewBox="0 0 32 32" fill="none" stroke="var(--icon-comic-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  {kind === 'spark' && <><path fill="var(--icon-comic-yellow)" d="m16 2 3.5 8 8-4-3 9 6 4-9 2-1 9-6-7-8 5 2-9-7-4 9-3z"/><path d="m12 15 3 4 6-8"/></>}
+  {kind === 'shield' && <><path fill="var(--icon-comic-paper)" d="m16 3 11 5v7c0 8-11 14-11 14S5 23 5 15V8z"/><path fill="var(--icon-comic-blue)" stroke="none" d="M16 6v20s8-5 8-11v-5z"/><path d="m10 16 4 4 8-10"/></>}
+  {kind === 'play' && <path fill="var(--icon-comic-yellow)" d="m10 6 17 10-17 10z"/>}
+</svg>

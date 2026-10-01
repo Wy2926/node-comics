@@ -1,0 +1,44 @@
+---
+import { dictionaries, localPath, type Locale } from '../i18n';
+import { projectCopy } from '../i18n/project';
+import { site } from '../data/site';
+import '../styles/project.css';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const copy = projectCopy[locale];
+const { ui: t } = dictionaries[locale];
+---
+<section class="container content-section project-about">
+  <div class="project-identity">
+    <p class="eyebrow">NODELANE COMICS</p>
+    <h2>{copy.identityTitle}</h2>
+    <p>{copy.identityBody}</p>
+  </div>
+  <div class="project-info-grid">
+    <article class="project-card">
+      <h3>{copy.sourceTitle}</h3>
+      <p>{copy.sourceBody}</p>
+      <a class="text-link" href={site.github} target="_blank" rel="noopener noreferrer">{copy.sourceAction} <span aria-hidden="true">↗</span></a>
+    </article>
+    <article class="project-card">
+      <h3>{copy.updatesTitle}</h3>
+      <p>{copy.updatesBody}</p>
+      <a class="text-link" href={localPath('/changelog/', locale)}>{copy.updatesAction} <span aria-hidden="true">→</span></a>
+    </article>
+    <article class="project-card">
+      <h3>{t.videoTutorials}</h3>
+      <p>{t.youtubeDescription}</p>
+      <a class="text-link" href={site.youtube} target="_blank" rel="noopener noreferrer">{t.watchVideos} <span aria-hidden="true">↗</span></a>
+    </article>
+    <article class="project-card">
+      <h3>{copy.contactTitle}</h3>
+      <p>{copy.contactBody}</p>
+      <a class="text-link" href={`mailto:${site.email}`}>{site.email} <span aria-hidden="true">↗</span></a>
+    </article>
+  </div>
+  <div class="project-principles">
+    <h2>{copy.philosophyTitle}</h2>
+    <p>{t.aboutBody}</p>
+  </div>
+</section>

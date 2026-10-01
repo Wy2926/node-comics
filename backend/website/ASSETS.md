@@ -7,8 +7,21 @@
 | `journey-translated.webp` / `journey-en.webp` / `journey-ko.webp` | 用户提供并确认为常规翻译实测产物的中／英／韩对照图 |
 | `public/social-cover.webp` | 阅读角插画的 1200 × 630 分享图 |
 | Logo / favicon | 复用插件品牌资源，命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
+| [GitHubMark.astro](src/components/GitHubMark.astro) | GitHub 官方 [Octicons mark-github-16](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/mark-github-16.svg)，固定版本 `90af1f14984832de34e94b2d530043fbcf85eb7f`；保留原始轮廓，仅使用 `currentColor` 和 20px 显示尺寸。上游 SVG SHA-256：`7421820090b50ac79d7c2bf7c951a433d7098a8a9c474809207bdd45f62d9d46`；[MIT 许可](public/licenses/octicons.txt)随静态产物分发 |
 
 首页六张截图对应书架、发现、跨语言搜索、离线中心、阅读目录和翻译对照。预览保持完整画面，只加载当前选中图片；打开查看时再加载完整 PNG 原图，不重画 UI 或修改截图文字。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
+
+首屏书架预览和中英文教程封面同样使用上述真实产品截图，以 640 像素宽 WebP 输出。教程封面用于介绍相关产品操作，不冒充视频截帧；视频链接统一维护在 `src/data/site.ts`，点击后进入 NodeLane YouTube 频道的已发布视频。官网不嵌入播放器或加载远程视频缩略图。
+
+漫画星芒、隐私盾牌和播放标识由 [ComicSymbol.astro](src/components/ComicSymbol.astro) 绘制为静态 SVG，线条与颜色复用官网令牌中的漫画图标调色板；无外部素材、字体、运行脚本或网络请求。语言菜单的国旗由 [LanguageFlag.astro](src/components/LanguageFlag.astro) 复用插件已有的 [flag-icons 7.5.0](https://github.com/lipis/flag-icons/tree/v7.5.0/flags/4x3) 原始 SVG，复制至官网自身素材目录；保留原始轮廓，以内联 data URL 显示，不产生外部或额外图片请求。[MIT 许可](public/licenses/flag-icons.txt)随官网静态产物分发，图标只作装饰，语言名称保留为文本。
+
+| 国旗素材 | 对应语言 | 上游 SVG SHA-256 |
+| --- | --- | --- |
+| [src/assets/flags/cn.svg](src/assets/flags/cn.svg) | 简体中文 | `981da9bdf82d48e31691f20578cefcb26cf7d0bd95e4ebd5c0df00bdfe988c1a` |
+| [src/assets/flags/tw.svg](src/assets/flags/tw.svg) | 繁體中文 | `931757f06b9ee751fd1a0cc8dd7cf862e21fdcaf894d10ed7bcc68dabcca59ad` |
+| [src/assets/flags/us.svg](src/assets/flags/us.svg) | English | `e7be4240cf57987926673708f09233be1ab6bdf35acc7b86bd32a263f197a2a7` |
+| [src/assets/flags/jp.svg](src/assets/flags/jp.svg) | 日本語 | `bfea80baf9989383dc4bf7ca594ed95be0df0ff125bfc88d0bfa878eb0198022` |
+| [src/assets/flags/kr.svg](src/assets/flags/kr.svg) | 한국어 | `7a6cd5b51d0e2841ed8b79b1147ad8a66cf3c09f6344d4a63b5e4413ffa5d15b` |
 
 | 产物 | SHA-256 |
 | --- | --- |

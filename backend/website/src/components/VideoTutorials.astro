@@ -1,0 +1,34 @@
+---
+import { getImage } from 'astro:assets';
+import { site } from '../data/site';
+import { homeCopy } from '../i18n/home';
+import type { Locale } from '../i18n';
+import ComicSymbol from './ComicSymbol.astro';
+import chineseCover from '../../../../docs/images/library.png';
+import englishCover from '../../../../docs/images/en/translation-comparison.png';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = homeCopy[locale].quickStart;
+const covers = await Promise.all([chineseCover, englishCover].map(async image => ({
+  src: (await getImage({ src: image, width: 640, format: 'webp', quality: 85 })).src,
+  width: image.width, height: image.height,
+})));
+---
+<section class="container product-section video-tutorials" aria-labelledby="video-tutorials-title">
+  <div class="product-section-heading">
+    <div><p class="eyebrow">{t.eyebrow}</p><h2 id="video-tutorials-title">{t.title}</h2></div>
+    <p>{t.description}</p>
+  </div>
+  <div class="tutorial-grid">
+    {site.tutorialVideos.map((video, index) => <a class="tutorial-card" href={video.url} target="_blank" rel="noopener noreferrer">
+      <div class="tutorial-cover">
+        <img src={covers[index].src} alt={t.clips[index].title} width={covers[index].width} height={covers[index].height} loading="lazy" decoding="async" />
+        <span class="tutorial-play"><ComicSymbol kind="play" size={30}/></span>
+        <span class="tutorial-duration" aria-hidden="true">{video.duration}</span>
+      </div>
+      <div class="tutorial-copy"><span class="tutorial-language">{t.clips[index].language}</span><h3>{t.clips[index].title}</h3><p>{t.clips[index].description}</p><span class="text-link">{t.watch} <span aria-hidden="true">↗</span></span></div>
+    </a>)}
+  </div>
+  <a class="text-link tutorial-channel" href={site.youtube} target="_blank" rel="noopener noreferrer">{t.channel} <span aria-hidden="true">↗</span></a>
+</section>

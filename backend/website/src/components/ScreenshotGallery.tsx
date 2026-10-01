@@ -15,12 +15,12 @@ export default function ScreenshotGallery({ images, name, enlarge, close, note }
       {images.map((item, index) => <button key={item.src} type="button" aria-pressed={selected === index} aria-controls={`${id}-image`} onClick={() => setSelected(index)}><span className="gallery-switch-label">{item.label}</span></button>)}
     </div>
     <figure className="gallery-frame">
-      <figcaption className="gallery-caption"><div><strong>{current.label}</strong><p aria-live="polite">{current.description}</p></div><button ref={trigger} type="button" onClick={() => { setExpanded(true); dialog.current?.showModal(); }}>{enlarge}<span aria-hidden="true"> ↗</span></button></figcaption>
-      <div id={`${id}-image`} className="gallery-focus"><img key={current.src} src={current.src} width={current.width} height={current.height} alt={current.alt} loading="lazy" decoding="async" /></div>
+      <figcaption className="gallery-caption"><strong>{current.label}</strong><p aria-live="polite">{current.description}</p></figcaption>
+      <button ref={trigger} id={`${id}-image`} className="gallery-focus" type="button" aria-label={`${enlarge}: ${current.label}`} aria-haspopup="dialog" aria-expanded={expanded} onClick={() => { setExpanded(true); dialog.current?.showModal(); }}><img key={current.src} src={current.src} width={current.width} height={current.height} alt={current.alt} loading="lazy" decoding="async" /></button>
     </figure>
     <p className="gallery-note">{note}</p>
-    <dialog ref={dialog} className="screenshot-dialog" aria-label={current.label} onClose={() => { setExpanded(false); trigger.current?.focus(); }} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
-      <div className="screenshot-dialog-content"><div className="screenshot-dialog-heading"><strong>{current.label}</strong><button className="button compact secondary" type="button" autoFocus onClick={() => dialog.current?.close()}>{close}</button></div>{expanded && <img src={current.fullSrc} width={current.width} height={current.height} alt={current.alt} decoding="async" />}</div>
+    <dialog ref={dialog} className="screenshot-dialog" aria-label={current.label} onClose={() => { setExpanded(false); trigger.current?.focus({ preventScroll: true }); }} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+      <div className="screenshot-dialog-content"><div className="screenshot-dialog-heading"><strong>{current.label}</strong><button className="button compact secondary" type="button" autoFocus onClick={() => dialog.current?.close()}>{close}</button></div>{expanded && <button className="screenshot-dialog-image" type="button" aria-label={close} onClick={() => dialog.current?.close()}><img src={current.fullSrc} width={current.width} height={current.height} alt={current.alt} decoding="async" /></button>}</div>
     </dialog>
   </div>;
 }

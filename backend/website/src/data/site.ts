@@ -16,6 +16,11 @@ export const site = {
   url: 'https://comics.nodelane.net',
   email: 'comics@nodelane.net',
   github: 'https://github.com/Wy2926/node-comics',
+  youtube: 'https://www.youtube.com/@NodeLaneNet',
+  tutorialVideos: [
+    { url: 'https://www.youtube.com/watch?v=miDawIO4Xxw', duration: '3:09' },
+    { url: 'https://www.youtube.com/watch?v=pTQOBORnptY', duration: '3:12' },
+  ],
   language: 'zh-CN',
   updated: '2026-09-29',
   extensionPackages,

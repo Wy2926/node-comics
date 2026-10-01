@@ -1,9 +1,11 @@
 ---
 import UninstallForm from './UninstallForm';
+import LanguageFlag from './LanguageFlag.astro';
 import {uninstallCopy} from '../i18n/uninstall';
 import {dictionaries, localPath, locales, languageNames, type Locale} from '../i18n';
 import {absolute} from '../data/site';
 import '../styles/global.css';
+import '../styles/controls.css';
 import '../styles/header.css';
 interface Props {locale: Locale}
 const {locale} = Astro.props;
@@ -25,8 +27,8 @@ const t = uninstallCopy[locale];
     <main class="uninstall-shell">
       <div class="uninstall-language">
         <details class="language-menu">
-          <summary aria-label={dictionaries[locale].ui.language}>{languageNames[locale]} <span aria-hidden="true">⌄</span></summary>
-          <nav aria-label={dictionaries[locale].ui.language}>{locales.map(language => <a href={localPath('/uninstall/', language)} lang={language} aria-current={locale === language ? 'true' : undefined}>{languageNames[language]}</a>)}</nav>
+          <summary aria-label={`${dictionaries[locale].ui.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale}/><span>{languageNames[locale]}</span><span aria-hidden="true">⌄</span></summary>
+          <nav aria-label={dictionaries[locale].ui.language}>{locales.map(language => <a href={localPath('/uninstall/', language)} lang={language} aria-current={locale === language ? 'true' : undefined}><LanguageFlag locale={language}/><span>{languageNames[language]}</span></a>)}</nav>
         </details>
       </div>
       <p class="eyebrow">NODELANE COMICS</p>

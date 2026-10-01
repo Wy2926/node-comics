@@ -6,12 +6,20 @@
 .uninstall-card fieldset{border:0;padding:0;margin:0;min-width:0}
 .uninstall-card legend{font-size:1.15rem;font-weight:750;margin-bottom:16px}
 .uninstall-reasons{display:grid;gap:10px}
-.uninstall-reasons label{display:flex;align-items:start;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
-.uninstall-reasons label:has(:checked){border-color:var(--accent);background:var(--accent-soft)}
+.uninstall-reasons label{display:flex;align-items:start;gap:var(--comic-control-gap);padding:var(--comic-control-padding);border:var(--comic-border);border-radius:var(--comic-control-radius);background:var(--surface);box-shadow:var(--comic-shadow-small);cursor:pointer;transition:background var(--comic-control-duration),box-shadow var(--comic-control-duration),transform var(--comic-control-duration)}
+.uninstall-reasons label:has(input:not(:disabled)):hover{background:var(--accent-soft);box-shadow:var(--comic-shadow-hover);transform:translate(var(--comic-control-hover-translate))}
+.uninstall-reasons label:has(input:not(:disabled)):active{box-shadow:var(--comic-shadow-active);transform:translate(var(--comic-control-active-translate))}
+.uninstall-reasons label:has(:checked){background:var(--comic-control-selected-bg);color:var(--comic-control-selected-ink)}
+.uninstall-reasons label:has(input:focus-visible){outline:var(--comic-focus-ring);outline-offset:var(--comic-focus-offset)}
+.uninstall-reasons label:has(input:disabled){background:var(--comic-control-disabled-bg);color:var(--comic-control-disabled-ink);border-color:var(--comic-control-disabled-border);cursor:not-allowed;box-shadow:var(--comic-shadow-disabled)}
+.uninstall-reasons label:has(input:disabled:checked){background:var(--comic-control-selected-bg);color:var(--comic-control-selected-ink)}
 .uninstall-reasons input{margin-top:7px;accent-color:var(--accent);flex-shrink:0}
 .uninstall-comment{display:grid;gap:8px;margin-top:24px;font-weight:650}
-.uninstall-comment textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);font-weight:400}
+.uninstall-comment textarea{width:100%;resize:vertical;border:var(--comic-input-border);border-radius:var(--comic-control-radius);padding:var(--comic-control-padding);background:var(--surface);color:var(--ink);font-weight:400}
+.uninstall-comment textarea:focus-visible{outline:var(--comic-focus-ring);outline-offset:var(--comic-focus-offset)}
+.uninstall-comment textarea:disabled{background:var(--comic-control-disabled-bg);color:var(--comic-control-disabled-ink);border-color:var(--comic-control-disabled-border);cursor:not-allowed}
 .uninstall-note{font-size:.82rem;color:var(--muted);margin:18px 0}
 .uninstall-actions{display:flex;gap:16px;flex-wrap:wrap}
 .uninstall-card h2{font-size:1.6rem;margin-bottom:16px}
 @media(max-width:760px){.uninstall-card{padding:22px}.uninstall-shell{margin-bottom:48px}}
+@media(prefers-reduced-motion:reduce){.uninstall-reasons label{transition:none}.uninstall-reasons label:has(input:not(:disabled)):hover,.uninstall-reasons label:has(input:not(:disabled)):active{transform:none}}

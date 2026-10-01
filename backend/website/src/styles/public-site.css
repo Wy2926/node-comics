@@ -1,0 +1,27 @@
+/* Public page layouts use the shared comic tokens and control styles. */
+body[data-page='/download/'] .store-grid { gap: 24px; }
+body[data-page='/help/'] .help-card { display: flex; flex-direction: column; align-items: start; }
+body[data-page='/help/'] .help-card .text-link { margin-top: auto; }
+body[data-page='/about/'] .about-quote { margin-inline: 0; }
+
+/* Footer keeps all official channels aligned across desktop and mobile. */
+.site-footer .footer-top {
+  grid-template-columns: minmax(0, 1.7fr) repeat(3, minmax(0, 1fr));
+  gap: 36px;
+}
+.site-footer .footer-top > div { min-width: 0; }
+.site-footer .footer-top p { max-width: 320px; }
+.site-footer .footer-top > div:not(:first-child) > a { line-height: 1.6; margin-top: 12px; }
+.site-footer .email { display: inline-block; overflow-wrap: anywhere; }
+.site-footer .footer-bottom { align-items: baseline; }
+
+@media (max-width: 760px) {
+  .site-footer .footer-top { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 18px; }
+  .site-footer .footer-top > div:first-child { grid-column: 1 / -1; }
+  .site-footer .footer-bottom { align-items: start; }
+}
+
+@media (max-width: 380px) {
+  .site-footer .footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
+  .site-footer .footer-top > div:first-child { grid-column: 1 / -1; }
+}

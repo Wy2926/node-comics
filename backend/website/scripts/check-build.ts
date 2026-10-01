@@ -102,7 +102,11 @@ for (const file of htmlFiles) {
     if (comparison.find('.billing-availability button[disabled]').length !== 1 || $('.billing-availability[data-state="loading"]').length !== 1) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
     if ($('a[href*="price="]').length || $('[data-billing-catalog="live"]').length) errors.push(`${label}: static pricing must not fabricate a purchasable API offer`);
   }
-  $('img').each((_,node) => { if (!$(node).attr('alt') || !$(node).attr('width') || !$(node).attr('height')) errors.push(`${label}: image missing alt/dimensions`); });
+  $('img').each((_,node) => {
+    const image = $(node);
+    const decorative = image.attr('alt') === '' && image.attr('aria-hidden') === 'true';
+    if ((!image.attr('alt') && !decorative) || !image.attr('width') || !image.attr('height')) errors.push(`${label}: image missing alt/dimensions`);
+  });
   for (const node of $('a[href],img[src],script[src],link[rel=stylesheet]').toArray()) {
     const target = $(node).attr('href') ?? $(node).attr('src') ?? '';
     const resolved = new URL(target, canonical);

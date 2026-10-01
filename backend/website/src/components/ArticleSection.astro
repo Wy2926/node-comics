@@ -21,11 +21,11 @@ const headingId = `section-${index + 1}`;
 <style>
   section { margin-bottom: 2.5rem; min-width: 0; overflow-wrap: anywhere; }
   h2 { scroll-margin-top: 8rem; }
-  pre { padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); font-size: .875rem; line-height: 1.7; }
+  pre { padding: 1.25rem; overflow-x: auto; border: var(--comic-badge-border); border-radius: var(--comic-card-radius); background: var(--surface-soft); font-size: .875rem; line-height: 1.7; }
   code { font-family: Consolas, monospace; }
   table { min-width: 32rem; font-size: .9375rem; line-height: 1.7; }
   th, td { vertical-align: top; padding: 1rem; }
   th[scope="row"] { width: 25%; background: transparent; font-weight: 600; }
   .article-links { font-size: 1rem; }
-  :is(pre, .table-wrap):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  :is(pre, .table-wrap):focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
 </style>

@@ -5,12 +5,23 @@ export interface HomeCopy {
   description: string;
   install: string;
   seeReader: string;
+  readerPath: string;
+  readerAccess: string;
+  webAccess: string;
   desktop: string;
   platformHeading: string;
   guestEyebrow: string;
   popupAlt: string;
   popupCaption: string;
-  trust: string[];
+  trustLinks: [string, string][];
+  quickStart: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    watch: string;
+    channel: string;
+    clips: { title: string; description: string; language: string }[];
+  };
   stepsTitle: string;
   stepsIntro: string;
   steps: [string, string][];

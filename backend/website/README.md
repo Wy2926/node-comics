@@ -34,7 +34,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - 卸载反馈页 `/uninstall/` 提供五语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
 - [src/data/published-lite.ts](src/data/published-lite.ts)：官网静态公布的 Lite 价格与权益；购买状态和正式结账报价来自账单 API。更新规则见[支付规则](../../docs/STRIPE_BILLING.md#已确认的产品规则)。
-- [public/design-tokens.css](public/design-tokens.css)：官网与 Drive 连接页共用视觉令牌。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
+- [public/design-tokens.css](public/design-tokens.css) 是官网唯一的基础视觉令牌来源，也供 Drive 连接页复用；[src/styles/controls.css](src/styles/controls.css) 统一全站按钮、选择器及其交互状态，页面 CSS 只安排控件布局。[ComicSymbol.astro](src/components/ComicSymbol.astro) 提供原创静态 SVG。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
 - 每页维护标题、正文、canonical、hreflang 和结构化数据；页面关键词分工、五语用词与 FAQ 规则见 [SEO 规范](SEO.md)。账户、身份回调、支付返回与卸载反馈页不索引。构建检查站内链接、锚点、商店入口及 FAQ 正文与 SEO 数据一致性。
 - 账户使用同源 OIDC + PKCE，精确回调为 `/auth/callback/`；前端不存 client secret。会话限当前标签页，写请求不自动重放，支付返回页不发放权益。见[身份规范](../../docs/PRODUCTION_IDENTITY.md)和[支付规则](../../docs/STRIPE_BILLING.md)。
 

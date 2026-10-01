@@ -108,6 +108,10 @@ export interface UI {
   faqDescription: string;
   helpTitle: string;
   helpDescription: string;
+  videoTutorials: string;
+  githubSource: string;
+  youtubeDescription: string;
+  watchVideos: string;
   contactTitle: string;
   contactDescription: string;
   emailButton: string;

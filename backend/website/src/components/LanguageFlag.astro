@@ -1,0 +1,22 @@
+---
+import type {Locale} from '../i18n';
+import china from '../assets/flags/cn.svg?raw';
+import taiwan from '../assets/flags/tw.svg?raw';
+import unitedStates from '../assets/flags/us.svg?raw';
+import japan from '../assets/flags/jp.svg?raw';
+import southKorea from '../assets/flags/kr.svg?raw';
+
+interface Props { locale: Locale }
+const {locale} = Astro.props;
+const flags: Record<Locale, string> = {
+  'zh-CN': china, 'zh-TW': taiwan, en: unitedStates, ja: japan, ko: southKorea,
+};
+// Local flag-icons 7.5.0 artwork. MIT license: /licenses/flag-icons.txt.
+// Data URLs keep each flag's internal SVG references isolated without image requests.
+const source = `data:image/svg+xml,${encodeURIComponent(flags[locale])}`;
+---
+<img class="language-flag" src={source} width="20" height="15" alt="" aria-hidden="true" draggable="false" decoding="async" />
+<style>
+  .language-flag { display: block; width: 20px; height: 15px; flex: none; object-fit: contain; border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); background: var(--surface); }
+  :global(.language-menu nav) .language-flag { margin-inline-end: var(--comic-control-gap); }
+</style>

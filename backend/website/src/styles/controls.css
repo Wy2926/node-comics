@@ -1,0 +1,269 @@
+/* Website controls share one vocabulary; page styles only arrange them. */
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--comic-control-gap);
+}
+
+.button,
+.github-link,
+.hero-store,
+.language-menu summary,
+.mobile-nav summary,
+.account-link,
+.mobile-nav .mobile-download,
+.billing-cycle label:not(.price-card .billing-cycle-card),
+.billing-plan-card,
+.account-refresh,
+.account-signout, .account-upgrade > summary,
+.translation-records li > button,
+.translation-result-actions button.text-link,
+.translation-verification-close {
+  --control-bg: var(--surface);
+  --control-ink: var(--ink);
+  --control-hover-bg: var(--accent-soft);
+  --control-shadow: var(--comic-shadow-small);
+  --control-hover-shadow: var(--comic-shadow);
+  min-height: var(--comic-control-height);
+  padding: var(--comic-control-padding);
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  background: var(--control-bg);
+  color: var(--control-ink);
+  box-shadow: var(--control-shadow);
+  font: inherit;
+  font-size: var(--comic-control-font-size);
+  font-weight: var(--comic-control-font-weight);
+  line-height: var(--comic-control-line-height);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--comic-control-duration), box-shadow var(--comic-control-duration), background var(--comic-control-duration), color var(--comic-control-duration);
+}
+
+.button,
+.mobile-nav .mobile-download {
+  --control-bg: var(--accent);
+  --control-ink: var(--accent-on);
+  --control-hover-bg: var(--accent-hover);
+  --control-shadow: var(--comic-shadow);
+  --control-hover-shadow: var(--comic-shadow-hover);
+}
+
+.button:is(.secondary, .light) {
+  --control-bg: var(--surface);
+  --control-ink: var(--ink);
+  --control-hover-bg: var(--accent-soft);
+}
+
+.button.compact,
+.hero-store,
+.account-refresh,
+.account-signout, .account-upgrade > summary,
+.translation-records li > button,
+.translation-result-actions :is(.button, button.text-link),
+.translation-identity .button,
+.translation-alert .button,
+.image-dropzone[data-compact='true'] .button {
+  --comic-control-height: var(--comic-control-height-compact);
+  --comic-control-padding: var(--comic-control-padding-compact);
+  --comic-control-font-size: var(--comic-control-font-size-compact);
+  --control-shadow: var(--comic-shadow-small);
+  --control-hover-shadow: var(--comic-shadow);
+}
+
+.translation-result-actions button.text-link {
+  --control-ink: var(--danger);
+  --control-hover-bg: var(--danger-soft);
+}
+
+.translation-verification-close {
+  width: var(--comic-control-height-icon);
+  min-height: var(--comic-control-height-icon);
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+:where(.billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .translation-records li > button) {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.billing-cycle label:not(.price-card .billing-cycle-card),
+.billing-plan-card {
+  border-radius: var(--comic-card-radius);
+}
+
+.billing-plan-card[aria-pressed='true'],
+.translation-records li > button[aria-current='true'],
+.billing-cycle label:not(.price-card .billing-cycle-card)[data-selected='true'],
+.account-link[aria-current],
+.language-menu[open] summary,
+.mobile-nav[open] summary {
+  background: var(--comic-control-selected-bg);
+  color: var(--comic-control-selected-ink);
+  box-shadow: var(--comic-shadow-small);
+}
+
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+.billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
+  background: var(--control-hover-bg);
+  box-shadow: var(--control-hover-shadow);
+}
+
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+.billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
+  box-shadow: var(--comic-shadow-active);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+  .billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
+    transform: translate(var(--comic-control-hover-translate));
+  }
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+  .billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
+    transform: translate(var(--comic-control-active-translate));
+  }
+}
+
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):focus-visible,
+.billing-cycle label:not(.price-card .billing-cycle-card):has(input:focus-visible) {
+  outline: var(--comic-focus-ring);
+  outline-offset: var(--comic-focus-offset);
+}
+
+.billing-cycle input:focus-visible { outline: none; }
+
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):is(:disabled, [aria-disabled='true']),
+.billing-cycle label:not(.price-card .billing-cycle-card)[data-disabled='true'],
+.billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled),
+.billing-cycle:disabled label:not(.price-card .billing-cycle-card) {
+  background: var(--comic-control-disabled-bg);
+  color: var(--comic-control-disabled-ink);
+  border-color: var(--comic-control-disabled-border);
+  box-shadow: var(--comic-shadow-disabled);
+  transform: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled) :is(strong, small, .annual-badge),
+.billing-cycle:disabled label:not(.price-card .billing-cycle-card) :is(strong, small, .annual-badge) { color: var(--comic-control-disabled-ink); }
+
+.translation-settings select {
+  min-height: var(--comic-control-height);
+  padding: 10px 32px 10px 12px;
+  border: var(--comic-input-border);
+  border-radius: var(--comic-control-radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--comic-control-font-size);
+  transition: border-color var(--comic-control-duration), background var(--comic-control-duration);
+}
+.translation-settings select:focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
+.translation-settings select:disabled { background: var(--comic-control-disabled-bg); color: var(--comic-control-disabled-ink); border-color: var(--comic-control-disabled-border); cursor: not-allowed; }
+
+.button > svg,
+.account-link > svg,
+.language-menu summary > svg:not(.language-chevron) {
+  flex-shrink: 0;
+  width: var(--comic-control-icon-size);
+  height: var(--comic-control-icon-size);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close, .translation-settings select) { transition: none; }
+}
+
+/* Folder tabs select a view; they do not use action-button motion or shadows. */
+.segmented,
+.gallery-switches,
+.translation-tabs,
+.price-card .billing-cycle {
+  border: 0;
+  border-bottom: var(--comic-border);
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  gap: var(--comic-tab-gap);
+}
+
+:where(.segmented button, .gallery-switches button, .translation-tabs button, .price-card .billing-cycle-card) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.segmented button,
+.gallery-switches button,
+.translation-tabs button,
+.price-card .billing-cycle-card {
+  position: relative;
+  top: 2px;
+  min-height: var(--comic-tab-height);
+  padding: var(--comic-tab-padding);
+  border: var(--comic-border);
+  border-radius: var(--comic-tab-radius);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--comic-tab-font-size);
+  font-weight: var(--comic-control-font-weight);
+  line-height: var(--comic-control-line-height);
+  box-shadow: none;
+  transform: none;
+  cursor: pointer;
+  transition: background var(--comic-control-duration), color var(--comic-control-duration);
+}
+
+:is(.segmented button, .gallery-switches button, .translation-tabs button, .price-card .billing-cycle-card):is(:hover, :active):not(:disabled):not([aria-disabled='true']):not([data-disabled='true']):not([aria-pressed='true']):not([data-selected='true']):not(:has(input:disabled)) {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+:is(.segmented button, .gallery-switches button, .translation-tabs button)[aria-pressed='true'],
+.price-card .billing-cycle-card[data-selected='true'] {
+  z-index: 1;
+  background: var(--comic-tab-paper);
+  color: var(--ink);
+  border-color: var(--comic-stroke);
+  border-bottom-color: var(--comic-tab-selected-bottom);
+}
+
+:is(.segmented button, .gallery-switches button, .translation-tabs button):focus-visible,
+.price-card .billing-cycle-card:has(input:focus-visible) {
+  z-index: 2;
+  outline: var(--comic-focus-ring);
+  outline-offset: var(--comic-focus-offset);
+}
+
+:is(.segmented button, .gallery-switches button, .translation-tabs button):is(:disabled, [aria-disabled='true']),
+.price-card .billing-cycle-card[data-disabled='true'],
+.price-card .billing-cycle-card:has(input:disabled),
+.price-card .billing-cycle:disabled .billing-cycle-card {
+  background: var(--comic-control-disabled-bg);
+  color: var(--comic-control-disabled-ink);
+  border-color: var(--comic-control-disabled-border);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.price-card .billing-cycle-card:has(input:disabled) :is(strong, small, .annual-badge),
+.price-card .billing-cycle:disabled .billing-cycle-card :is(strong, small, .annual-badge) { color: var(--comic-control-disabled-ink); }
+
+@media (max-width: 760px) {
+  /* Wrapped gallery tabs keep complete boundaries in every row. */
+  .gallery-switches, .translation-tabs { --comic-tab-selected-bottom: var(--comic-stroke); }
+}
+
+@media (max-width: 480px) {
+  .segmented { --comic-tab-selected-bottom: var(--comic-stroke); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.segmented button, .gallery-switches button, .translation-tabs button, .price-card .billing-cycle-card) { transition: none; }
+}
