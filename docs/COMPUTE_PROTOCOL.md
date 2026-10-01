@@ -79,7 +79,7 @@ analysis 的 regions 保留分组几何和排版参数，并提供四点 lines�
 
 ## 覆盖结果与一次提交
 
-节点在原图 RGB 上完成抹字和嵌字，以最终 RGB 与原图逐像素差异计算变化范围，包含背景、字形、描边和抗锯齿，不能只使用 OCR mask。忽略原图 alpha 为 0 的隐藏 RGB，裁剪到最小整数 bbox；变化位置保存最终 RGB、alpha=255，其余为透明。alpha 表示像素替换，不再对字形抗锯齿做软混合。文件是单帧无损 RGBA WebP，不使用有损或 near-lossless 编码，去除无关元数据；格式依据见 [WebP 编码参数](https://developers.google.com/speed/webp/docs/cwebp)。
+节点在原图 RGB 上完成抹字和嵌字，以最终 RGB 与原图逐像素差异计算变化范围，包含背景、字形、描边和抗锯齿，不能只使用 OCR mask。忽略原图 alpha 为 0 的隐藏 RGB，裁剪到最小整数 bbox；变化位置保存最终 RGB、alpha=255，其余为透明。alpha 表示像素替换，不再对字形抗锯齿做软混合。文件是单帧无损 RGBA WebP，统一使用 Pillow `lossless=True, method=4, quality=10, exact=False`，不切换 PNG，不使用有损或 near-lossless 编码，去除无关元数据。无损模式的 quality 控制压缩投入，不降低可见像素质量；透明像素的隐藏 RGB 不作保真要求。格式依据见 [WebP 编码参数](https://developers.google.com/speed/webp/docs/cwebp)。
 
 无字通过 analysis 完成，公开结果为 `kind=no_text, representation=original`。有文字且嵌字校验成功但可见差分为空时，通过 result 提交 `representation=original` 元数据，不附 bbox 或文件，中心记录 `kind=translated`。检测或嵌字失败不能伪装成成功。
 

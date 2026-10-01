@@ -109,12 +109,18 @@ def font_runs(text, paths):
 def measure(text, paths, size):
     # Baseline alignment preserves accents and descenders across fallback fonts.
     x = 0.; left = top = right = bottom = 0
-    for path, value in font_runs(text, paths):
+    runs = font_runs(text, paths)
+    stroke_width = round(size*.045)
+    for index, (path, value) in enumerate(runs):
         font = font_at(path, size)
-        box = font.getbbox(value, anchor='ls', stroke_width=round(size*.045))
+        box = font.getbbox(value, anchor='ls', stroke_width=stroke_width)
         left, top = min(left, math.floor(x+box[0])), min(top, box[1])
         right, bottom = max(right, math.ceil(x+box[2])), max(bottom, box[3])
-        x += font.getlength(value)
+        # Pillow's horizontal bbox includes the rounded pen advance. A >=1px
+        # stroke also covers its ceil, so the final run needs no second shaping
+        # pass for getlength. Earlier runs still need exact fractional advances.
+        if index < len(runs)-1 or stroke_width == 0:
+            x += font.getlength(value)
     return left, top, max(right, math.ceil(x)), bottom
 
 
@@ -123,11 +129,13 @@ def glyph(text, paths, size, fill, stroke):
     box = measure(text, paths, size)
     tile = Image.new('RGBA', (max(1,box[2]-box[0]), max(1,box[3]-box[1])))
     draw = ImageDraw.Draw(tile); x = -box[0]
-    for path, value in font_runs(text, paths):
+    runs = font_runs(text, paths)
+    for index, (path, value) in enumerate(runs):
         font = font_at(path, size)
         draw.text((x,-box[1]), value, font=font, anchor='ls', fill=fill+(255,),
                   stroke_width=round(size*.045), stroke_fill=stroke+(255,))
-        x += font.getlength(value)
+        if index < len(runs)-1:
+            x += font.getlength(value)
     return tile
 
 
@@ -142,7 +150,7 @@ def hyphenator(language):
     return pyphen.Pyphen(lang=selected) if selected else None
 
 
-def horizontal_lines(text, paths, size, width, language):
+def horizontal_lines(text, paths, size, width, language, max_lines=None):
     def fits(value):
         box = measure(value.rstrip(' \t'), paths, size)
         return box[2]-box[0] <= width
@@ -155,6 +163,8 @@ def horizontal_lines(text, paths, size, width, language):
                 continue
             if current.strip(' \t'):
                 lines.append(current.rstrip(' \t')); current = ''
+                if max_lines is not None and len(lines) >= max_lines:
+                    return None
             unit = unit.lstrip(' \t')
             while unit and not fits(unit):
                 match = re.fullmatch(r'([^\w]*)([^\W\d_]+)([^\w]*)', unit, re.UNICODE)
@@ -165,8 +175,12 @@ def horizontal_lines(text, paths, size, width, language):
                             choice = (match[1]+head+'-',tail+match[3]); break
                 if choice is None: return None
                 lines.append(choice[0]); unit = choice[1]
+                if max_lines is not None and len(lines) >= max_lines:
+                    return None
             current = unit
         lines.append(current.rstrip(' \t'))
+        if max_lines is not None and len(lines) > max_lines:
+            return None
     return lines
 
 
@@ -189,7 +203,7 @@ def vertical_value(token, paths):
 
 def plan_layout(text, paths, size, width, height, vertical, language):
     if not vertical:
-        lines = horizontal_lines(text,paths,size,width,language)
+        lines = horizontal_lines(text,paths,size,width,language,math.floor(height/(size*1.2)))
         if lines is None: return None
         advance = max(size*1.20,max((measure(line,paths,size)[3]-measure(line,paths,size)[1] for line in lines),default=0))
         return (lines,advance) if len(lines)*advance <= height else None
@@ -232,36 +246,43 @@ def bubble_plan(text, paths, size, mask):
     units = break_units(text)
     if not units:
         return None
-    height, width = mask.shape
+    height = mask.shape[0]
     advance = math.ceil(max(size*1.2, max(measure(u,paths,size)[3]-measure(u,paths,size)[1] for u in units))/2)
     if advance > height:
         return None
     ys, xs = np.nonzero(mask)
     cx, cy = float(xs.mean()), float(ys.mean())
-    # Measure each possible line once per font probe, not once per slot/count.
-    segments = {}
-    for i in range(len(units)):
-        for j in range(i+1,len(units)+1):
-            value = ''.join(units[i:j]).strip(' \t')
-            box = measure(value,paths,size)
-            length = math.ceil((box[2]-box[0])/2)
-            if length > width:
-                break
-            segments[i,j] = (value,length)
+    # Shape only lines reached by the search, once per probe. Keep full-string
+    # metrics: adding individual glyph widths loses kerning and complex shaping.
+    @lru_cache(maxsize=8192)
+    def segment(start, end):
+        value = ''.join(units[start:end]).strip(' \t')
+        box = measure(value,paths,size)
+        return value, math.ceil((box[2]-box[0])/2)
+
+    @lru_cache(maxsize=1024)
+    def slot_at(y):
+        free = np.all(mask[y:y+advance] > 0, axis=0)
+        ends = np.flatnonzero(np.diff(np.r_[False,free,False]))
+        spans = list(zip(ends[::2],ends[1::2]))
+        if not spans:
+            return None
+        # Do not span across an artwork hole or a neighboring text region.
+        left,right = max(spans,key=lambda pair:(pair[1]-pair[0])-.25*abs((pair[0]+pair[1])/2-cx))
+        return int(left),y,int(right-left),advance
     best = None
     for count in range(1,min(len(units),height//advance)+1):
+        # Squared slack and the orphan penalty are nonnegative. Later counts
+        # cannot beat the current plan once their line-count penalty reaches it.
+        if best is not None and .015*count >= best[0]:
+            break
         top = max(0,min(height-count*advance,round(cy-count*advance/2)))
         slots = []
         for row in range(count):
-            y = top+row*advance
-            free = np.all(mask[y:y+advance] > 0, axis=0)
-            ends = np.flatnonzero(np.diff(np.r_[False,free,False]))
-            spans = list(zip(ends[::2],ends[1::2]))
-            if not spans:
+            slot = slot_at(top+row*advance)
+            if slot is None:
                 break
-            # Do not span across an artwork hole or a neighboring text region.
-            left,right = max(spans,key=lambda pair:(pair[1]-pair[0])-.25*abs((pair[0]+pair[1])/2-cx))
-            slots.append((int(left),y,int(right-left),advance))
+            slots.append(slot)
         if len(slots) != count:
             continue
         states = {0:(0.,[])}
@@ -269,18 +290,19 @@ def bubble_plan(text, paths, size, mask):
             next_states = {}
             for start,(cost,lines) in states.items():
                 for end in range(start+1,len(units)+1):
-                    segment = segments.get((start,end))
-                    if segment is None or segment[1] > slot[2]:
+                    if len(units)-end < count-row-1:
                         break
-                    remaining = len(units)-end
-                    if remaining < count-row-1:
+                    value,length = segment(start,end)
+                    if length > slot[2]:
                         break
-                    slack = (slot[2]-segment[1])/max(1,slot[2])
+                    if row == count-1 and end != len(units):
+                        continue
+                    slack = (slot[2]-length)/max(1,slot[2])
                     score = cost+slack**2
                     if row==count-1 and end-start==1 and count>1:
                         score += .15
                     if end not in next_states or score < next_states[end][0]:
-                        next_states[end] = (score,lines+[(segment[0],slot)])
+                        next_states[end] = (score,lines+[(value,slot)])
             states = next_states
         if len(units) in states:
             score,lines = states[len(units)]

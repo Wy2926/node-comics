@@ -60,7 +60,7 @@ def pack_result(image, original, alpha, version, analysis, translated):
     started = perf_counter()
     stream = BytesIO()
     try:
-        Image.fromarray(patch).save(stream, format='WEBP', lossless=True, method=4, exact=False)
+        Image.fromarray(patch).save(stream, format='WEBP', lossless=True, method=4, quality=10, exact=False)
     except (OSError, ValueError) as error:
         raise NodeFailure('CLASSIC_OUTPUT_ENCODE_FAILED') from error
     data = stream.getvalue()
