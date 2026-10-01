@@ -50,6 +50,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_image_transport.mjs` / `verify_source_image_cache.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与缓存重试 |
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
+| `verify_notifications.mjs` | Vite 5187 的隔离身份与提示夹具；全局登录过期／错误／成功提示的关闭、自动收起、交互暂停、亮暗主题，以及逐图提示收起、重试与原图位置恢复；不访问外网 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
 | `verify_analytics.mjs` | 隔离 Chromium MV3 检查默认关闭、书架卡片拒绝／关闭不重弹、搜索与导入入口可用、12 种主题组合及窄宽大字、主动同意、跨标签同步、白名单无凭据请求、失败留队列、撤回清理与重新同意；后台及页面 HTTP(S) 全部模拟，不向真实 API 或 GA4 发送；截图写入 `artifacts/analytics/` |
 | `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节归属与完整目录 |

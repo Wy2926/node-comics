@@ -38,7 +38,7 @@ describe('in-image retry status',()=>{
  });
  it.each(['outcome_unknown','unknown_released'] as const)('never presents regeneration for %s',status=>{
   const html=statusMarkup(fixture(status));
-  expect(html).toContain('核实');expect(html).not.toContain('<button');expect(html).not.toContain('点击重新生成');
+  expect(html).toContain('核实');expect(html).not.toContain('nc-image-translation-action');expect(html).not.toContain('点击重新生成');
  });
  it('offers reloading rather than regeneration when delivered bytes failed to download',()=>{
   const page=fixture('succeeded');page.jobs=page.jobs.slice(0,1);page.outputBlobs={};page.translationError='下载暂时失败';

@@ -137,7 +137,7 @@
 .nc-app :is(.nc-modal-footer, .nc-import-footer) { border-top: var(--comic-perforation); }
 .nc-app .nc-import-steps li>span { border: var(--comic-border); border-radius: var(--comic-control-radius); }
 .nc-app .nc-import-steps [aria-current=step]>span { color: var(--accent-on); box-shadow: var(--comic-shadow-small); }
-.nc-app :is(.nc-import-dock, .toast, .busy-pill) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
+.nc-app :is(.nc-import-dock, .busy-pill) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
 .nc-app .modal.nc-local-import-modal>.modal-spark { display: none; }
 .nc-app :is(.nc-export-copy, .nc-export-book, .nc-export-progress, .nc-export-result, .nc-publication-contents, .nc-publication-context, .nc-publication-relation) { border: var(--comic-border); border-radius: var(--comic-control-radius); }
 .nc-app :is(.nc-export-steps span, .nc-publication-icon) { border: var(--comic-border); border-radius: var(--comic-control-radius); }

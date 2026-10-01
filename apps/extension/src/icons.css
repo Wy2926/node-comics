@@ -3,7 +3,7 @@
 
 /* Failure and destructive actions retain the control's semantic color. */
 :where(
-  .button.danger, .nc-danger-text, .global-error, .nc-error,
+  .button.danger, .nc-danger-text, .nc-notification.error, .nc-error,
   .nc-action-feedback.error, .nc-image-translation.error
 ) .nc-icon {
   --icon-stroke: currentColor;

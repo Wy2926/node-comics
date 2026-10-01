@@ -1331,29 +1331,7 @@ a {
 .nc-app .shortcut-list b {
   color: var(--ink);
 }
-.nc-app .global-error {
-  font-size: .9375rem;
-  color: var(--danger);
-  background: var(--danger-soft);
-  border-bottom: 1px solid var(--danger);
-  padding: 14px 24px;
-  line-height: 1.7;
-  gap: 12px;
-  overflow-wrap: anywhere;
-  margin: 0;
-}
-.nc-app.is-reading .global-error {
-  position: fixed;
-  top: 68px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(700px,calc(100% - 24px));
-  z-index: 50;
-  border: 1px solid var(--danger);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-}
-.nc-app .toast,.nc-app .busy-pill {
+.nc-app .busy-pill {
   font-size: .9375rem;
   padding: 14px 22px;
   left: 50%;
@@ -1367,17 +1345,6 @@ a {
   z-index: 60;
   bottom: 100px;
   box-shadow: var(--shadow);
-}
-.nc-app .toast>span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.nc-app .toast>svg,.nc-app .toast>button {
-  flex-shrink: 0;
-}
-.nc-app .toast svg {
-  color: var(--success);
 }
 .nc-app .busy-pill {
   top: 92px;
@@ -1551,18 +1518,8 @@ a {
   .nc-drawer-scrim {
     background: #14223825;
   }
-  .nc-app .toast {
-    left: 16px;
-    width: calc(100vw - 32px);
-    transform: none;
-    padding: 12px 14px;
-    bottom: max(16px,env(safe-area-inset-bottom));
-  }
   .nc-app .busy-pill {
     top: 74px;
-  }
-  .nc-app.is-reading .global-error {
-    top: 64px;
   }
   .nc-app .modal {
     padding: 24px;
@@ -1757,11 +1714,6 @@ a {
 .nc-thumb-management .nc-page-order {
   flex-direction: row;
   gap: 6px;
-}
-@media(max-width:760px) {
-  .nc-app.is-reading .toast {
-    bottom: 62px;
-  }
 }
 
 .nc-page-versions {

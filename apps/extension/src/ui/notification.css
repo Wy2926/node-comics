@@ -1,0 +1,51 @@
+.nc-notifications {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: grid;
+  gap: 10px;
+  padding: 4px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 120px);
+  overflow: auto;
+  pointer-events: none;
+}
+.is-reading .nc-notifications { bottom: 88px; }
+.nc-notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: var(--comic-border);
+  border-radius: var(--comic-card-radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--comic-shadow);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  pointer-events: auto;
+}
+.nc-notification > .nc-icon { margin-top: 4px; }
+.nc-notification.info > .nc-icon { color: var(--accent); }
+.nc-notification.error { border-color: var(--danger); }
+.nc-notification.error > .nc-icon { color: var(--danger); }
+.nc-notification.success > .nc-icon { color: var(--success); }
+.nc-notification-content { flex: 1; min-width: 0; }
+.nc-notification-content p { margin: 0; max-height: 9em; overflow: auto; overflow-wrap: anywhere; line-height: inherit; }
+.nc-notification-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 5px;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+.nc-notification-action:hover { text-decoration: underline; text-underline-offset: 3px; }
+.nc-app .nc-notification .nc-notification-close { flex-shrink: 0; width: 32px; min-width: 32px; height: 32px; min-height: 32px; margin: -4px -4px 0 0; }
+@media (max-width: 760px) {
+  .nc-notifications { right: 16px; bottom: 16px; }
+  .is-reading .nc-notifications { bottom: 72px; }
+}

@@ -464,24 +464,6 @@ button {
   color: #cb8da2;
   margin-top: 8px;
 }
-.global-error {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 25px;
-  background: #fff2f5;
-  border-bottom: 1px solid #f6dce4;
-  color: #cb728e;
-  font-size: 11px;
-  line-height: 1.7;
-}
-.global-error>span {
-  flex: 1;
-}
-.global-error button {
-  display: flex;
-  color: inherit;
-}
 .modal {
   position: fixed;
   top: 50%;
@@ -600,7 +582,7 @@ button {
   text-align: center;
   margin-bottom: 15px;
 }
-.toast,.busy-pill {
+.busy-pill {
   position: fixed;
   bottom: 25px;
   left: calc(50% + 100px);
@@ -617,9 +599,6 @@ button {
   font-size: 12px;
   color: #7e8ba2;
   max-width: calc(100vw - 30px);
-}
-.toast>svg {
-  color: #87bca9;
 }
 .busy-pill {
   bottom: 85px;
@@ -755,7 +734,7 @@ kbd {
     padding: 7px 9px;
     font-size: 9px;
   }
-  .toast,.busy-pill {
+  .busy-pill {
     left: calc(50% + 90px);
   }
 }
@@ -766,7 +745,7 @@ kbd {
   .small-muted {
     display: none;
   }
-  .toast,.busy-pill {
+  .busy-pill {
     left: calc(50% + 38px);
   }
 }
@@ -869,7 +848,7 @@ kbd {
   .segmented button svg {
     width: 12px;
   }
-  .toast,.busy-pill {
+  .busy-pill {
     font-size: 10px;
     padding: 13px 17px;
     min-width: 260px;

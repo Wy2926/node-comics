@@ -1,0 +1,72 @@
+.nc-app .nc-image-translation.is-dismissible {
+  gap: 0;
+  padding: 0;
+}
+.nc-image-translation-action,
+.nc-image-translation-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+}
+.nc-image-translation-action,
+.nc-image-translation-dismiss {
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+.nc-image-translation-dismiss {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  min-width: 28px;
+  color: inherit;
+}
+.nc-image-translation-action:hover,
+.nc-image-translation-dismiss:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.nc-app .nc-image-translation.is-collapsed {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+}
+.nc-image-failure.over-image > .nc-image-failure-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--ink);
+}
+.nc-image-failure-retry {
+  position: absolute;
+  bottom: 24px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  box-shadow: var(--comic-shadow-small);
+  background: var(--surface);
+  color: var(--danger);
+}
+.nc-image-translation-action:focus-visible,
+.nc-image-translation-dismiss:focus-visible,
+.nc-image-failure-dismiss:focus-visible,
+.nc-image-failure-retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
