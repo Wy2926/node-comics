@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg">
   <!-- Shared comic artwork: fixed palette, contextual outlines, 24-unit grid. -->
+  <symbol id="release-notes" viewBox="0 0 24 24">
+    <path d="M5 4h11l4 4v13H5Z" fill="var(--icon-comic-ink)" stroke="none" opacity=".15" transform="translate(1 1)"/>
+    <path d="M4 3h11l4 4v14H4Z" fill="var(--icon-comic-paper)"/>
+    <path d="M15 3v5h4" fill="var(--icon-comic-blue)"/>
+    <path d="M7 14h8m-8 3h5" stroke="var(--icon-comic-mint)" stroke-width="2"/>
+    <path d="m8 6 .9 2.2 2.4.2-1.8 1.6.5 2.4-2-1.2-2 1.2.5-2.4L4.7 8.4l2.4-.2Z" fill="var(--icon-comic-yellow)" stroke-width="1.1"/>
+    <path d="M21 2v3m-1.5-1.5h3" stroke="var(--icon-comic-pink)" stroke-width="1.5"/>
+  </symbol>
   <symbol id="search" viewBox="0 0 24 24">
     <path d="m14.5 14.5 2.8-.1 5 5-2.9 2.9-5-5Z" fill="var(--icon-comic-pink)"/>
     <circle cx="10" cy="10" r="7.2" fill="var(--icon-comic-blue)"/>

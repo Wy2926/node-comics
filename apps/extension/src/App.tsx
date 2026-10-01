@@ -41,6 +41,7 @@ import type {ShelfView} from './ui/ShelfGrid';
 import { LocalImport } from './ui/LocalImport';
 import { Login } from './ui/Login';
 import { Notification } from './ui/Notification';
+import { ReleaseNotes } from './ui/release-notes/ReleaseNotes';
 import { Preferences } from './ui/Preferences';
 import {DocumentExport} from './ui/DocumentExport';
 import type {Entry} from './comics/domain';
@@ -243,6 +244,8 @@ export function App(){
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
  const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag
    &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
+ const releaseNotesActive=!current&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag
+   &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  function nav(value:View,tab:AccountTab='overview'){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
  const rights=usage??caps?.entitlements;
  const searchPanelProps={api,defaultLanguage:readSearchLanguage(settings.language),onLanguageChange:saveSearchLanguage,onLogin:()=>login.setOpen(true),existingSourceKeys:existingSearchKeys};
@@ -263,6 +266,7 @@ export function App(){
     <button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe" size={28}/>{msg('漫画网站')}</button>
    </nav>
    <div className="nc-header-actions">
+    <ReleaseNotes active={releaseNotesActive}/>
     <button className="icon-button nc-download-trigger" data-downloads-trigger aria-label={msg('离线缓存')} aria-current={view==='downloads'?'page':undefined} title={msg('离线缓存')} onClick={()=>downloads.open()}><Icon name="download" size={28}/>{activeDownloads>0&&<small>{activeDownloads}</small>}</button>
     <a className="icon-button" href="https://github.com/Wy2926/node-comics" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><Icon name="github" size={28}/></a>
     <button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message" size={28}/></button>
