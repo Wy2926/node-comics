@@ -6,6 +6,8 @@ export interface HomeCopy {
   install: string;
   seeReader: string;
   desktop: string;
+  platformHeading: string;
+  guestEyebrow: string;
   popupAlt: string;
   popupCaption: string;
   trust: string[];

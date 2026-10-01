@@ -1,5 +1,7 @@
 .env
 .env.*
+**/.env
+**/.env.*
 .git
 **/node_modules
 **/.venv
@@ -8,3 +10,7 @@
 artifacts
 data
 docs/evidence
+backend/app/admin_web/dist
+backend/app/website_dist
+backend/website/dist
+backend/website/.astro

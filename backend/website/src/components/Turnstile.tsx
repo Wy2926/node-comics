@@ -54,6 +54,7 @@ export default function Turnstile({
           sitekey: siteKey,
           action,
           theme: 'auto',
+          size: host.current.clientWidth < 300 ? 'compact' : 'normal',
           appearance: 'interaction-only',
           callback: (value: string) => token.current(value),
           'expired-callback': () => error.current(),
@@ -69,5 +70,5 @@ export default function Turnstile({
       if (id) window.turnstile?.remove(id);
     };
   }, [siteKey, action]);
-  return <div ref={host} />;
+  return <div ref={host} className="translation-turnstile" />;
 }

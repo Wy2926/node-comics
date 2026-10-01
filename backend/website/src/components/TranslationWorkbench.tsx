@@ -115,6 +115,8 @@ function Preview({
       }}
       className="translation-canvas"
       data-compare={view === 'compare'}
+      aria-label={record?.name}
+      role="region"
     >
       {urls && (
         <div className="translation-images" style={{ width: zoom + '%' }}>
@@ -627,18 +629,20 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
   return (
     <section className="translation-workbench container">
       <header className="translation-heading">
-        <div>
-          <p className="eyebrow">NODELANE / TRANSLATE</p>
+        <div className="translation-heading-copy">
+          <p className="translation-kicker"><span aria-hidden="true">✦</span> NODELANE / TRANSLATE</p>
           <h1>{t.title}</h1>
           <p>{t.intro}</p>
         </div>
         <div className="translation-identity">
-          <strong>{isGuestScope ? t.guest : account?.name}</strong>
-          <span>
-            {!isGuestScope
-              ? `${t.account} · ${entitlement?.unlimited ? t.unlimited : (entitlement?.quota?.available ?? '—')}`
-              : `${t.remaining} · ${guest?.remaining ?? '—'} / ${guest?.daily_limit ?? 5}`}
-          </span>
+          <div className="translation-identity-copy">
+            <strong>{isGuestScope ? t.guest : account?.name}</strong>
+            <span>{isGuestScope ? t.remaining : t.account}</span>
+          </div>
+          <div className="translation-quota" aria-live="polite">
+            <b>{isGuestScope ? (guest?.remaining ?? '—') : entitlement?.unlimited ? '∞' : (entitlement?.quota?.available ?? '—')}</b>
+            <span>{isGuestScope ? `/ ${guest?.daily_limit ?? 5}` : entitlement?.unlimited ? t.unlimited : t[mode]}</span>
+          </div>
           {!account && (
             <button
               className="button secondary"
@@ -652,14 +656,18 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
         </div>
       </header>
       {error && (
-        <p className="translation-error" role="alert">
-          {error}
-        </p>
+        <div className="translation-alert" role="alert">
+          <span className="translation-alert-mark" aria-hidden="true">!</span>
+          <div><strong>{t.errorTitle}</strong><p>{error}</p></div>
+          {!ready && <button className="button secondary" onClick={() => location.reload()}>{t.reload}</button>}
+        </div>
       )}
       {isGuestScope && guest && !guest.enabled && (
-        <p className="translation-note">{t.disabled}</p>
+        <p className="translation-availability">{t.disabled}</p>
       )}
       <div className="translation-toolbar">
+        <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">02</span>{t.settingsTitle}</h2>
+        <div className="translation-settings">
         <label>
           {t.language}
           <select
@@ -715,6 +723,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           }
         >
           {busy ? t.busy : t.start}
+          <span aria-hidden="true">→</span>
         </button>
         {busy && (
           <button
@@ -726,10 +735,11 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
             {t.cancel}
           </button>
         )}
+        </div>
       </div>
       {check && (
-        <div className="translation-verification">
-          <p>{t.verify}</p>
+        <div className="translation-verification" role="region" aria-label={t.verify}>
+          <div><strong>{t.verify}</strong><p>{t.verificationHint}</p></div>
           <Turnstile
             key={check.id}
             siteKey={guest!.site_key}
@@ -743,7 +753,14 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
       )}
       <div className="translation-layout">
         <aside className="translation-sidebar">
-          <h2>{t.history}</h2>
+          <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">01</span>{t.uploadTitle}</h2>
+          <ImageDropzone
+            locale={locale}
+            compact
+            disabled={busy || !ready}
+            onAdded={refresh}
+          />
+          <div className="translation-history-heading"><h3>{t.history}</h3><span>{displayed.length}</span></div>
           {account && hasGuestHistory && (
             <div className="translation-tabs">
               <button
@@ -762,11 +779,6 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
               </button>
             </div>
           )}
-          <ImageDropzone
-            locale={locale}
-            disabled={busy || !ready}
-            onAdded={refresh}
-          />
           <ol className="translation-records">
             {displayed.map((row, index) => (
               <li key={row.id}>
@@ -783,22 +795,28 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
                   <span className="record-number">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  <span>
+                  <span className="record-copy">
                     <strong>{row.name}</strong>
                     <small>
-                      {t[row.state as keyof typeof t] ?? t.paused} ·{' '}
-                      {new Date(row.created).toLocaleDateString(locale)}
+                      <span className="record-state" data-state={row.state}>{t[row.state as keyof typeof t] ?? t.paused}</span>
+                      <time dateTime={new Date(row.created).toISOString()}>{new Date(row.created).toLocaleDateString(locale)}</time>
                     </small>
                   </span>
                 </button>
               </li>
             ))}
           </ol>
-          <p className="translation-storage">
-            {t.storage}: {(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB
-          </p>
+          {!displayed.length && <p className="translation-history-empty">{t.historyEmpty}</p>}
+          <div className="translation-storage">
+            <p><span>{t.storage}</span><strong>{(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB</strong></p>
+            <meter min={0} max={256 * 1024 * 1024} value={usedBytes} aria-label={t.storage} />
+          </div>
         </aside>
         <div className="translation-viewer">
+          <div className="translation-view-heading">
+            <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">03</span>{t.previewTitle}</h2>
+            {current && <span className="translation-status" data-state={current.state} role="status"><i aria-hidden="true" />{t[current.state as keyof typeof t] ?? t.paused}</span>}
+          </div>
           <div className="translation-view-toolbar">
             <div className="translation-tabs">
               {(['original', 'translated', 'compare'] as const).map((value) => (
@@ -822,6 +840,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
                 value={zoom}
                 onChange={(event) => setZoom(Number(event.target.value))}
               />
+              <output>{zoom}%</output>
             </label>
           </div>
           {current ? (
@@ -834,13 +853,27 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
             />
           ) : (
             <div className="translation-empty">
-              <span aria-hidden="true">＋</span>
-              <p>{t.empty}</p>
+              <svg className="translation-empty-art" aria-hidden="true" viewBox="0 0 224 142" fill="none">
+                <path d="m33 25 72-9 12 100-72 9z" fill="var(--accent-soft)" stroke="currentColor" strokeWidth="2.5" />
+                <path d="m118 17 73 9-12 100-73-9z" fill="var(--surface)" stroke="currentColor" strokeWidth="2.5" />
+                <path d="m44 36 24-3 4 33-24 3zm34-4 19-2 4 33-19 2zm-28 46 53-7 4 33-53 7z" stroke="currentColor" strokeWidth="2" />
+                <path d="m132 39 42 5-2 21-14-2-8 5 1-6-22-2z" fill="var(--accent-soft)" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                <path d="m126 82 18 2-3 23-18-2zm28 3 18 2-3 23-18-2z" stroke="currentColor" strokeWidth="2" />
+                <path d="M5 56h17m-8-8v16m187 4h17m-8-8v16M99 7l6-6m89 132 6 6" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
+                <path d="m93 76 17-14 17 14h-11v16h-12V76z" fill="var(--comic-warning-paper)" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+              </svg>
+              <strong>{t.empty}</strong>
+              <ol className="translation-empty-steps">
+                <li><span>1</span>{t.select}</li>
+                <li><span>2</span>{t.language}</li>
+                <li><span>3</span>{t.start}</li>
+              </ol>
             </div>
           )}
           {current && (
             <footer className="translation-result-actions">
               <div>
+                <span className="translation-file-name" title={current.name}>{current.name}</span>
                 <strong>
                   {current.width && `${current.width} × ${current.height}`}
                 </strong>
@@ -897,8 +930,10 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-      <p className="translation-note">{t.local}</p>
-      <p className="translation-note">{t.retention}</p>
+      <div className="translation-notes">
+        <div><strong>{t.localTitle}</strong><p>{t.local}</p></div>
+        <div><strong>{t.serverTitle}</strong><p>{t.retention}</p></div>
+      </div>
     </section>
   );
 }

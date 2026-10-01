@@ -90,8 +90,8 @@ Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用�
 从仓库根目录分别构建；只改一个前端时只执行对应目标：
 
 ```sh
-docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/site-export backend
-docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/admin-export backend
+docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/site-export .
+docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/admin-export .
 python scripts/prepare_static_release.py website --source artifacts/site-export/site \
   --manifest artifacts/site-export/extension-release.json --destination /opt/1panel/www/node-comics \
   --release <官网版本> --oidc-origin https://auth.nodelane.net
@@ -120,8 +120,8 @@ python scripts/switch_release.py static --release <新官网版本> --previous-r
 ```powershell
 docker build --build-arg RELEASE_ID=rehearsal-blue -t node-comics-backend:deploy-blue backend
 docker build --build-arg RELEASE_ID=rehearsal-green -t node-comics-backend:deploy-green backend
-docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/deployment-build/website backend
-docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/deployment-build/admin backend
+docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/deployment-build/website .
+docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/deployment-build/admin .
 python scripts/tests/test_deployment.py
 python scripts/tests/rehearse_deployment.py
 ```

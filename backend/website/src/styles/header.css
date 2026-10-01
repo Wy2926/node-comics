@@ -1,0 +1,82 @@
+/* Navigation uses the same ink, paper and press states as the comic panels. */
+.site-header {
+  --nav-control-height: 44px;
+  --nav-tab-radius: 4px 12px 4px 4px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: var(--comic-border);
+}
+.header-inner { min-height: 88px; display: flex; align-items: center; gap: 24px; }
+.header-inner .brand { flex-shrink: 0; }
+.header-inner .brand img { width: 190px; height: auto; }
+.desktop-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: .83rem; font-weight: 750; }
+.desktop-nav a {
+  display: flex; align-items: center; justify-content: center;
+  min-height: var(--nav-control-height); padding: 8px 12px;
+  border: 2px solid transparent; border-radius: var(--nav-tab-radius); white-space: nowrap;
+}
+.desktop-nav a:hover { color: var(--accent); background: var(--accent-soft); }
+.desktop-nav a[aria-current] {
+  color: var(--accent); background: var(--accent-soft);
+  border: var(--comic-border); box-shadow: var(--comic-shadow-small); transform: rotate(-1deg);
+}
+.header-tools, .header-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header-tools { margin-left: auto; }
+.header-actions { font-size: .78rem; font-weight: 750; }
+.language-menu { position: relative; font-size: .75rem; }
+.language-menu summary, .mobile-nav summary, .account-link {
+  min-height: var(--nav-control-height); display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 8px 10px; border: var(--comic-border); border-radius: var(--comic-control-radius);
+  color: var(--ink); background: var(--surface); box-shadow: var(--comic-shadow-small);
+  font-weight: 750; white-space: nowrap; cursor: pointer; list-style: none;
+}
+.language-menu summary::-webkit-details-marker, .mobile-nav summary::-webkit-details-marker { display: none; }
+.language-menu summary:hover, .language-menu[open] summary, .account-link:hover, .account-link[aria-current], .mobile-nav[open] summary {
+  color: var(--accent); background: var(--accent-soft);
+}
+.language-menu summary > svg { display: block; flex-shrink: 0; }
+.language-chevron { width: 14px; height: 14px; transform-box: border-box; transform-origin: 50% 50%; }
+.language-menu[open] .language-chevron { transform: rotate(180deg); }
+.language-menu nav {
+  position: absolute; top: calc(100% + 12px); right: 0; min-width: 175px; padding: 7px;
+  display: grid; gap: 3px; background: var(--surface); border: var(--comic-border);
+  border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow);
+}
+.language-menu a, .mobile-nav nav a {
+  min-height: var(--nav-control-height); padding: 8px 12px; display: flex; align-items: center;
+  border-radius: var(--comic-control-radius); font-weight: 650;
+}
+.language-menu a:hover, .language-menu a[aria-current], .mobile-nav nav a:hover, .mobile-nav nav a[aria-current] {
+  background: var(--accent-soft); color: var(--accent);
+}
+.header-actions .button { min-height: var(--nav-control-height); padding: 8px 13px; font-size: .78rem; gap: 10px; box-shadow: var(--comic-shadow-small); }
+.header-actions .button:hover { box-shadow: var(--comic-shadow); }
+.header-actions .button:active { box-shadow: var(--comic-shadow-active); }
+.mobile-nav { display: none; }
+.mobile-nav summary { width: var(--nav-control-height); padding: 8px; }
+.mobile-nav nav {
+  position: absolute; top: calc(100% + 10px); left: 16px; right: 16px;
+  display: grid; gap: 4px; padding: 12px; background: var(--surface);
+  border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow);
+  font-size: .9rem;
+}
+.mobile-nav .mobile-download { color: var(--accent-on); background: var(--accent); border: var(--comic-border); }
+.mobile-nav .mobile-download:hover { background: var(--accent-hover); color: var(--accent-on); }
+@media (max-width: 1100px) {
+  .desktop-nav { display: none; }
+  .mobile-nav { display: block; }
+}
+@media (max-width: 760px) {
+  .header-inner { min-height: 76px; gap: 12px; }
+  .header-inner .brand img { width: 158px; }
+  .header-actions { display: none; }
+  .header-tools { gap: 10px; }
+}
+@media (max-width: 380px) {
+  .header-inner { gap: 8px; }
+  .header-inner .brand img { width: 112px; }
+  .header-tools { gap: 7px; }
+  .language-menu summary { padding-inline: 7px; gap: 5px; }
+}

@@ -551,6 +551,19 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.8.0",
+        "date": "2026-09-30",
+        "title": "0.8.0: Save complete translations for smoother reading",
+        "items": [
+          "Complete translated images are saved locally in your browser and reused when rereading, switching between originals and translations, or exporting, reducing repeated image composition.",
+          "Fixed reading position retention across chapter boundaries so you can continue from the correct position after switching chapters.",
+          "My Comics opens automatically after the first installation, taking you straight to your library.",
+          "Translation event connections are reused and client information is cached, reducing repeated connections and requests.",
+          "Added optional multilingual uninstall feedback for reporting problems and sharing suggestions.",
+          "Chrome and Edge 0.8.0 ZIP packages and the AMO-signed Firefox 0.8.0 XPI are available."
+        ]
+      },
+      {
         "id": "0.7.0",
         "date": "2026-09-29",
         "title": "0.7.0: Import Pixiv artists and series",

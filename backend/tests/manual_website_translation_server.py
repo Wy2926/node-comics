@@ -14,6 +14,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from PIL import Image, ImageDraw
 from manual_website_server import app, authorized, me, state, website
+from app.languages import LANGUAGES, REDRAW_LANGUAGES
 
 app.router.routes.pop()  # Replace this fixture's final static mount only.
 tasks = {}
@@ -42,8 +43,8 @@ async def start_session(request: Request):
 @app.get('/v1/capabilities')
 def capabilities(request: Request):
     return {'result_protocol': 'overlay-v1', 'limits': {'max_bytes': 134217728, 'max_pixels': 32000000, 'max_dimension': 16000},
-            'languages': [{'id':'zh-Hans','label':'简体中文'},{'id':'en','label':'English'}],
-            'modes': [{'id':'classic','enabled':True,'languages':['zh-Hans','en']}, {'id':'redraw','enabled':True,'languages':['zh-Hans','en']}],
+            'languages': [{'id':key,'label':label} for key,label in LANGUAGES.items()],
+            'modes': [{'id':'classic','enabled':True,'languages':list(LANGUAGES)}, {'id':'redraw','enabled':True,'languages':REDRAW_LANGUAGES}],
             'entitlements': me(request)['entitlements'] if authorized(request) else None}
 
 

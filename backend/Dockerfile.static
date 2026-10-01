@@ -1,23 +1,24 @@
-# Independent outputs: --target website|admin --output type=local,dest=...
+# Repository-root context; independent --target website|admin local outputs.
 FROM node:22-bookworm-slim AS admin-build
-WORKDIR /admin-ui
-COPY admin-ui/package*.json ./
+WORKDIR /workspace/backend/admin-ui
+COPY backend/admin-ui/package*.json ./
 RUN npm ci
-COPY admin-ui ./
+COPY backend/admin-ui ./
 RUN npm run build
 
 FROM node:22-bookworm-slim AS website-build
-WORKDIR /website
-COPY extension-release.json /extension-release.json
-COPY website/package*.json ./
+WORKDIR /workspace/backend/website
+COPY backend/extension-release.json /workspace/backend/extension-release.json
+COPY backend/website/package*.json ./
 RUN npm ci
-COPY website ./
-COPY shared /shared
+COPY backend/website ./
+COPY backend/shared /workspace/backend/shared
+COPY docs/images /workspace/docs/images
 RUN npm run build
 
 FROM scratch AS website
-COPY --from=website-build /website/dist /site
-COPY extension-release.json /extension-release.json
+COPY --from=website-build /workspace/backend/website/dist /site
+COPY backend/extension-release.json /extension-release.json
 
 FROM scratch AS admin
-COPY --from=admin-build /app/admin_web/dist /site
+COPY --from=admin-build /workspace/backend/app/admin_web/dist /site

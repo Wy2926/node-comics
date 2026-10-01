@@ -9,5 +9,5 @@ const t = translationCopy[locale];
 ---
 <Base title={t.title} description={t.intro} noindex>
   <TranslationWorkbench client:load locale={locale} />
-  <noscript><p class="container">{t.local}</p></noscript>
+  <noscript><p class="container translation-noscript">{t.local}</p></noscript>
 </Base>

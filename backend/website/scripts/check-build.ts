@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { load } from 'cheerio';
-import { site } from '../src/data/site';
+import { browserStores, site } from '../src/data/site';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
 async function files(dir: string): Promise<string[]> { return (await Promise.all((await readdir(dir, { withFileTypes: true })).map(entry => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir,entry.name)]))).flat(); }
@@ -9,6 +9,7 @@ const errors: string[] = [];
 const titles = new Set<string>();
 const descriptions = new Set<string>();
 const indexedRoutes = new Set<string>();
+const homePreviews = new Map<string, string>();
 const pages = new Map<string, ReturnType<typeof load>>();
 const htmlFiles = (await files(root)).filter(path => path.endsWith('.html'));
 for (const file of htmlFiles) pages.set(file, load(await readFile(file, 'utf8')));
@@ -68,6 +69,15 @@ for (const file of htmlFiles) {
     if ($('.translation-hero input[type=file]').length !== 1) errors.push(`${label}: missing homepage image entrance`);
     if (!$(`.translation-hero a[href="${localPath('/translate/',locale)}"]`).length) errors.push(`${label}: missing translator link`);
     if (!$(`.translation-hero a[href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: missing extension download`);
+    for (const store of browserStores) {
+      const entrance = $(`.hero-store[data-browser="${store.id}"]`);
+      const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
+      if (entrance.length !== 1 || entrance.attr('href') !== target) errors.push(`${label}: missing configured ${store.id} platform entrance`);
+    }
+    if ($('.gallery-switches button').length !== 6) errors.push(`${label}: expected the six README product screenshots`);
+    const preview = $('.gallery-focus img').attr('src');
+    if (!preview || $('.gallery-focus img').length !== 1 || $('.screenshot-dialog img').length) errors.push(`${label}: gallery must defer full screenshots until opened`);
+    else homePreviews.set(locale, preview);
   }
   if (basePath(route) === '/translate/') {
     if (!noindex || $('.translation-workbench').length !== 1 || $('.translation-sidebar input[type=file]').length !== 1) errors.push(`${label}: translator must be a private, usable work surface`);
@@ -107,6 +117,10 @@ for (const file of htmlFiles) {
   }
   if (/(sk-[a-zA-Z0-9]{20,}|sub2api\.nodelane\.net)/.test(html)) errors.push(`${label}: private generation config leaked`);
 }
+if (homePreviews.get('zh-CN') !== homePreviews.get('zh-TW')
+  || homePreviews.get('en') !== homePreviews.get('ja')
+  || homePreviews.get('en') !== homePreviews.get('ko')
+  || homePreviews.get('zh-CN') === homePreviews.get('en')) errors.push('Homepage screenshots must use Chinese for both Chinese locales and English for the other locales');
 const sitemap = await readFile(join(root,'sitemap.xml'),'utf8');
 const xml = load(sitemap, { xmlMode: true });
 const locations = xml('url > loc').toArray().map(node => xml(node).text());

@@ -2,13 +2,13 @@
 
 | 素材 | 来源与使用规范 |
 | --- | --- |
-| `src/assets/product/` | 用户授权用于官网和插件推广的六张实际截图。保留原图，构建转 WebP；界面内漫画归各自权利人，不能作为原创素材重新授权 |
+| [`../../docs/images/`](../../docs/images/) / [`../../docs/images/en/`](../../docs/images/en/) | 与中文、英文项目 README 共用的六张真实截图：首页直接引用原图，以构建生成的 WebP 预览；简中、繁中页面展示中文截图，其余页面展示英文截图。界面内漫画归各自权利人，不能作为原创素材重新授权 |
 | `journey-original.webp` / `reading-corner.webp` | 原创 AI 插画，gpt-image-2、high；提示词见 [hero.txt](assets/prompts/hero.txt)、[reading.txt](assets/prompts/reading.txt) |
 | `journey-translated.webp` / `journey-en.webp` / `journey-ko.webp` | 用户提供并确认为常规翻译实测产物的中／英／韩对照图 |
 | `public/social-cover.webp` | 阅读角插画的 1200 × 630 分享图 |
 | Logo / favicon | 复用插件品牌资源，命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
 
-截图可裁切展示，放大查看保持完整原图；不重画 UI 或修改截图文字。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
+首页六张截图对应书架、发现、跨语言搜索、离线中心、阅读目录和翻译对照。预览保持完整画面，只加载当前选中图片；打开查看时再加载完整 PNG 原图，不重画 UI 或修改截图文字。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
 
 | 产物 | SHA-256 |
 | --- | --- |
@@ -25,7 +25,7 @@
 
 ## 浏览器商店标识
 
-下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
+首页和下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
 
 | 文件 | 来源 | SHA-256 |
 | --- | --- | --- |

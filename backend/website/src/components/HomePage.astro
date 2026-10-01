@@ -2,6 +2,7 @@
 import { getImage } from 'astro:assets';
 import Compare from './Compare';
 import ScreenshotGallery from './ScreenshotGallery';
+import BrowserStores from './BrowserStores.astro';
 import ImageDropzone from './ImageDropzone';
 import {translationCopy} from '../i18n/translate';
 import FaqList from './FaqList.astro';
@@ -11,11 +12,18 @@ import original from '../assets/journey-original.webp';
 import chinese from '../assets/journey-translated.webp';
 import english from '../assets/journey-en.webp';
 import korean from '../assets/journey-ko.webp';
-import library from '../assets/product/01-your-comic-library.png';
-import reader from '../assets/product/02-reading-controls.png';
-import languages from '../assets/product/03-translation-languages.png';
-import websites from '../assets/product/04-supported-websites.png';
-import appearance from '../assets/product/05-personalize-your-reader.png';
+import libraryZh from '../../../../docs/images/library.png';
+import discoveryZh from '../../../../docs/images/discovery.png';
+import searchZh from '../../../../docs/images/cross-language-search.png';
+import offlineZh from '../../../../docs/images/offline-center.png';
+import directoryZh from '../../../../docs/images/reader-directory.png';
+import comparisonZh from '../../../../docs/images/translation-comparison.png';
+import libraryEn from '../../../../docs/images/en/library.png';
+import discoveryEn from '../../../../docs/images/en/discovery.png';
+import searchEn from '../../../../docs/images/en/cross-language-search.png';
+import offlineEn from '../../../../docs/images/en/offline-center.png';
+import directoryEn from '../../../../docs/images/en/reader-directory.png';
+import comparisonEn from '../../../../docs/images/en/translation-comparison.png';
 import '../styles/home.css';
 
 interface Props { locale: Locale }
@@ -30,25 +38,31 @@ const examples = await Promise.all([
   { id: 'en', image: english },
   { id: 'ko', image: korean },
 ].map(async ({ id, image }, i) => ({ id, label: h.comparison.labels[i], width: image.width, height: image.height, src: (await getImage({ src: image, width: 760, format: 'webp', quality: 88 })).src })));
-const crops = [
-  [{ x: 350, y: 104, width: 1328, height: 760 }],
-  [{ x: 768, y: 402, width: 506, height: 796 }, { x: 1580, y: 12, width: 374, height: 590 }],
-  [{ x: 768, y: 402, width: 506, height: 796 }, { x: 1645, y: 442, width: 310, height: 569 }],
-  [{ x: 350, y: 104, width: 1328, height: 825 }],
-  [{ x: 449, y: 315, width: 1134, height: 550 }],
-];
-const images = await Promise.all([library, reader, languages, websites, appearance].map(async (image, i) => ({
-  src: (await getImage({ src: image, format: 'webp', quality: 90 })).src,
-  width: image.width, height: image.height, label: h.galleryLabels[i], description: h.galleryBodies[i], alt: h.galleryAlt[i], crops: crops[i],
+const screenshots = locale === 'zh-CN' || locale === 'zh-TW'
+  ? [libraryZh, discoveryZh, searchZh, offlineZh, directoryZh, comparisonZh]
+  : [libraryEn, discoveryEn, searchEn, offlineEn, directoryEn, comparisonEn];
+const images = await Promise.all(screenshots.map(async (image, i) => ({
+  src: (await getImage({ src: image, width: 1280, format: 'webp', quality: 90 })).src,
+  fullSrc: image.src,
+  width: image.width, height: image.height, label: h.galleryLabels[i], description: h.galleryBodies[i], alt: h.galleryAlt[i],
 })));
 ---
 <div class="product-home">
-  <section class="translation-hero"><div class="container">
-    <p class="eyebrow">NODELANE COMICS / TRANSLATE</p>
-    <h1>{tr.title}</h1><p>{tr.intro}</p>
-    <ImageDropzone client:load locale={locale}/>
-    <p class="translation-note">{tr.guest} · JPG / PNG / WebP</p>
-    <div class="translation-hero-links"><a class="text-link" href={href('/translate/')}>{tr.open} →</a><a class="text-link" href={href('/download/')}>{h.install} →</a></div>
+  <section class="translation-hero home-hero"><div class="container home-hero-grid">
+    <div class="home-story-panel">
+      <p class="eyebrow">{h.eyebrow}</p>
+      <h1>{h.title[0]}<span>{h.title[1]}</span></h1>
+      <p class="home-story-description">{h.description}</p>
+      <div class="home-hero-actions"><a class="button" href={href('/download/')}>{h.install} <span aria-hidden="true">↗</span></a><a class="text-link" href="#see-it">{h.seeReader} <span aria-hidden="true">↓</span></a></div>
+      <div class="home-platforms"><div class="home-platform-heading-row"><p class="home-platform-heading">{h.platformHeading}</p><p class="home-desktop-note">{h.desktop}</p></div><BrowserStores locale={locale}/></div>
+    </div>
+    <div class="home-translate-panel">
+      <div class="home-translate-heading"><span class="home-panel-number" aria-hidden="true">01</span><p class="eyebrow">{h.guestEyebrow}</p></div>
+      <h2>{tr.title}</h2><p class="home-translate-intro">{tr.intro}</p>
+      <ImageDropzone client:load locale={locale}/>
+      <p class="translation-note">{tr.guest}</p>
+      <a class="text-link home-workspace-link" href={href('/translate/')}>{tr.open} <span aria-hidden="true">→</span></a>
+    </div>
   </div></section>
   <div class="product-trust"><div class="container">{h.trust.map(text => <p>{text}</p>)}</div></div>
   <section class="container product-section toolbar-story">
