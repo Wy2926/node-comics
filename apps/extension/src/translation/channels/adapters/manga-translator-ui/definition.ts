@@ -4,6 +4,7 @@ import {fallbackLanguages, type Capabilities} from '../../../../types';
 import type {ChannelDefinition, ChannelField} from '../../contracts';
 import {startImageTransfer} from '../../transport/client';
 import {DirectImageRuntime} from '../../transport/runtime';
+import {ImageTransferError} from '../../transport/types';
 import {languages, login, safeError, serviceBase, translationRequest} from './protocol';
 
 function capabilities(): Capabilities {
@@ -38,7 +39,10 @@ export const definition: ChannelDefinition = {
       unavailable: token ? undefined : {kind: 'error', message: msg('请在渠道设置中连接翻译服务。'), retryable: false},
       requiresInternet: false, allowsFeedback: false, analyticsCategory:'local', isCurrent: current,
       createRuntime: options => new DirectImageRuntime(scope, {...options, isCurrent: () => current() && options.isCurrent()}, {
-        start: (id, blob, mode, language) => startImageTransfer(id, scope.key, blob, translationRequest(base, token, mode, language)),
+        start: (id, blob, mode, language) => {
+          if(blob.size>capabilities().limits.max_bytes)throw new ImageTransferError('IMAGE_TOO_LARGE');
+          return startImageTransfer(id, scope.key, blob, translationRequest(base, token, mode, language));
+        },
         errorMessage: safeError,
       }),
       readResult: (job, signal) => {signal?.throwIfAborted(); return loadResultBlob({scope, job, isCurrent: current});},

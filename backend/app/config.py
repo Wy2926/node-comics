@@ -60,9 +60,9 @@ class Settings(BaseSettings):
     creem_webhook_secret: SecretStr = SecretStr('')
     creem_return_url: str = ''
     quota_timezone: str = "Asia/Shanghai"
-    max_upload_bytes: int = 20 * 1024 * 1024
-    max_pixels: int = 24_000_000
-    max_dimension: int = 8192
+    max_upload_bytes: int = 128 * 1024 * 1024
+    max_pixels: int = 32_000_000
+    max_dimension: int = 16000
     translation_requests_per_minute: int = Field(default=300, ge=1, le=10000)
     translation_request_burst: int = Field(default=30, ge=1, le=1000)
     translation_request_concurrency: int = Field(default=4, ge=1, le=32)

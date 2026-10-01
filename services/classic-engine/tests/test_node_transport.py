@@ -187,14 +187,28 @@ def test_result_rejects_corrupt_frozen_bytes_before_network(change):
         client.close()
 
 
-def test_result_transport_does_not_use_original_image_byte_limit(monkeypatch):
+def test_input_download_is_bounded_by_center_descriptor_not_a_node_byte_limit():
+    data = b'x' * (25 * 1024 * 1024)
+    client = Transport(config(), control_transport=httpx.MockTransport(lambda _: httpx.Response(200, content=data)))
+    try:
+        assert client.download('test', 'lease-secret', metadata(data)) == data
+        wrong = metadata(data)
+        wrong['byte_size'] -= 1
+        with pytest.raises(NodeFailure, match='INPUT_INVALID'):
+            client.download('test', 'lease-secret', wrong)
+    finally:
+        client.close()
+
+
+def test_result_transport_does_not_use_mask_byte_limit(monkeypatch):
     import classic_node.transport as transport
+    import classic_node.protocol as protocol
     data, body = upload_fixture()
-    monkeypatch.setattr(transport, 'MAX_IMAGE_BYTES', 1)
+    monkeypatch.setattr(protocol, 'MAX_MASK_BYTES', 1)
     client = Transport(config(), control_transport=httpx.MockTransport(
         lambda _: httpx.Response(200, json={'status': 'terminal'})))
     try:
-        assert len(data) > transport.MAX_IMAGE_BYTES
+        assert len(data) > protocol.MAX_MASK_BYTES
         assert client.deliver('test', body, data)['status'] == 'terminal'
         monkeypatch.setattr(transport, 'MAX_RESULT_BYTES', len(data) - 1)
         with pytest.raises(NodeFailure, match='INPUT_INVALID'):

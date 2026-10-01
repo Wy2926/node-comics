@@ -80,7 +80,7 @@ def node_for(v3, tmp_path, pages, runtime, lose_replies=False, lose_upload=False
     return Agent(config, runtime, transport, journal), transport, journal
 
 
-def drive(agent, jobs, timeout=15, *, schedule=False):
+def drive(agent, jobs, timeout=15, *, schedule=False, expected='succeeded'):
     start = time.monotonic()
     while time.monotonic() - start < timeout:
         if schedule:
@@ -95,10 +95,34 @@ def drive(agent, jobs, timeout=15, *, schedule=False):
         agent.reap()
         with session_factory()() as db:
             states = [db.get(Job, key).status for key in jobs]
-        if all(state == 'succeeded' for state in states) and not agent.pages:
+        if all(state == expected for state in states) and not agent.pages:
             return
         time.sleep(.03)
     pytest.fail('node/controller did not complete: ' + str(states))
+
+
+def test_definitive_output_rejection_reports_failure_once_and_drains_buffers(v3, tmp_path):
+    jobs = v3['create']()
+    runtime = FixtureRuntime()
+    agent, transport, journal = node_for(v3, tmp_path, 1, runtime)
+    rejected = []
+    def reject(*args):
+        rejected.append(True)
+        raise ControlFailure('INVALID_PROVIDER_OUTPUT', 422)
+    transport.deliver = reject
+    try:
+        agent.register()
+        agent.claim()
+        drive(agent, jobs, expected='failed')
+        assert len(rejected) == 1
+        assert runtime.analyzed == runtime.rendered == 1
+        assert not journal.leases() and agent.pipeline.used == 0
+        with session_factory()() as db:
+            assert db.get(Job, jobs[0]).error_code == 'RESULT_REJECTED'
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
 
 
 def test_text_wait_does_not_hold_compute_and_buffers_are_released(v3, tmp_path):
@@ -389,9 +413,7 @@ def test_resident_budget_applies_backpressure_and_all_pages_eventually_finish(v3
     try:
         agent.register()
         agent.claim()
-        first = next(iter(agent.pages.values())).lease['input']
-        from classic_node.protocol import MAX_IMAGE_BYTES, MAX_CHECKPOINT_BYTES
-        agent.pipeline.limit = first['width'] * first['height'] * 16 + MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+        agent.pipeline.limit = max(agent.pipeline.input_reservation(page) for page in agent.pages.values())
         deadline = time.monotonic() + 4
         while time.monotonic() < deadline:
             agent.reap()

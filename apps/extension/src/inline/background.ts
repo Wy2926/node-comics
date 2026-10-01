@@ -80,10 +80,8 @@ async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRe
   assertCurrent(ctx.channel.isCurrent);let blob:Blob;
   if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await(await fetch(source.data)).blob();}
   else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy);
-  assertCurrent(ctx.channel.isCurrent);if(blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
+  assertCurrent(ctx.channel.isCurrent);
   const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(ctx.channel.isCurrent);
-  if(prepared.blob.size>ctx.caps.limits.max_bytes)throw Error(msg("图片超过翻译服务的大小限制。"));
-  if(prepared.width*prepared.height>ctx.caps.limits.max_pixels||Math.max(prepared.width,prepared.height)>ctx.caps.limits.max_dimension)throw Error(msg("图片尺寸超过翻译服务限制。"));
   return prepared;
 }
 async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.MessageSender){

@@ -90,9 +90,9 @@ def test_result_encoding_uses_its_own_byte_limit(monkeypatch):
     rgb, alpha = runtime.decode(data, metadata)
     final = Image.fromarray(rgb)
     final.putpixel((1, 1), (10, 20, 30))
-    monkeypatch.setattr(protocol, 'MAX_IMAGE_BYTES', 1)
+    monkeypatch.setattr(protocol, 'MAX_MASK_BYTES', 1)
     packed = pack_result(final, rgb, alpha, runtime.version, analysis, translated)
-    assert len(packed['output_bytes']) > protocol.MAX_IMAGE_BYTES
+    assert len(packed['output_bytes']) > protocol.MAX_MASK_BYTES
     monkeypatch.setattr(protocol, 'MAX_RESULT_BYTES', len(packed['output_bytes']) - 1)
     with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
         pack_result(final, rgb, alpha, runtime.version, analysis, translated)
@@ -170,5 +170,19 @@ def test_decode_rejects_noncanonical_inputs(change):
         image.save(stream, 'PNG', **options)
         data = stream.getvalue()
         metadata.update(byte_size=len(data), sha256=hashlib.sha256(data).hexdigest())
+    with pytest.raises(NodeFailure, match='INPUT_INVALID'):
+        runtime.decode(data, metadata)
+
+
+@pytest.mark.parametrize('size', [(800, 12000), (5000, 5000)])
+def test_decode_uses_center_metadata_without_independent_pixel_or_edge_limit(size):
+    runtime, _, metadata, *_ = fixture()
+    stream = BytesIO()
+    Image.new('RGB', size, 'white').save(stream, 'PNG')
+    data = stream.getvalue()
+    metadata.update(width=size[0], height=size[1], byte_size=len(data), sha256=hashlib.sha256(data).hexdigest())
+    rgb, alpha = runtime.decode(data, metadata)
+    assert rgb.shape == (size[1], size[0], 3) and alpha is None
+    metadata['height'] += 1
     with pytest.raises(NodeFailure, match='INPUT_INVALID'):
         runtime.decode(data, metadata)

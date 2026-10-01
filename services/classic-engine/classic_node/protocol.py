@@ -8,10 +8,10 @@ from PIL import Image
 from time import perf_counter
 from manhua_engine.timing import record
 
-MAX_IMAGE_BYTES = 24 * 1024 * 1024
+# png64 utility budget only; input admission is owned by the center.
+MAX_MASK_BYTES = 24 * 1024 * 1024
 MAX_RESULT_BYTES = 88 * 1024 * 1024
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
-MAX_PIXELS = 24_000_000
 
 
 def digest(value):
@@ -26,7 +26,7 @@ def timestamp(value):
     return parsed.timestamp()
 
 
-def png64(image, limit=MAX_IMAGE_BYTES):
+def png64(image, limit=MAX_MASK_BYTES):
     out = BytesIO()
     image.save(out, format='PNG', compress_level=1)
     if out.tell() > limit:

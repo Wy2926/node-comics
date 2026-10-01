@@ -219,6 +219,30 @@ def test_analysis_text_revision_and_delivery_settle_once(v3, png):
         assert db.scalar(select(func.count()).select_from(TextCall)) == 1
 
 
+def test_admitted_long_strip_and_tall_overlay_deliver_without_a_second_8192_ceiling(v3):
+    source = BytesIO()
+    Image.new('RGB', (64, 12000), 'white').save(source, 'PNG')
+    user = login(v3['client'], 'long-strip-reader')
+    asset = upload(v3['client'], user, source.getvalue())
+    created = create_translation_job(v3['client'], user, asset, key=uuid4().hex, language='en', mode='classic')
+    assert created.status_code == 202
+    lease = claim(v3).json()['leases'][0]
+    analyze(v3, lease)
+    text(lease)
+    result, _ = result_for(v3, lease, source.getvalue())
+    overlay = BytesIO()
+    Image.new('RGBA', (1, 12000), (1, 2, 3, 255)).save(overlay, 'WEBP', lossless=True)
+    data = overlay.getvalue()
+    result.update(bbox={'x': 10, 'y': 0, 'width': 1, 'height': 12000},
+        output={'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data), 'width': 1, 'height': 12000, 'mime': 'image/webp'})
+    # Center still checks canvas identity and bounds before decoding/publishing.
+    assert deliver(v3, lease, {**result, 'height': 16001}, data).status_code == 422
+    response = deliver(v3, lease, result, data)
+    assert response.status_code == 200, response.text
+    assert response.json()['job_status'] == 'succeeded'
+    assert deliver(v3, lease, result, data).json() == response.json()
+
+
 def test_mixed_heartbeat_cancellation_and_stopped_ack(v3):
     jobs = v3['create'](2)
     leases = claim(v3, 2).json()['leases']

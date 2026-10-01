@@ -2,7 +2,7 @@ import type {PageReference} from '../../../../comics/pages/identity';
 import type {Job,TranslationInput,TranslationImage,TranslationSnapshot,Mode} from '../../../../types';
 import {openSourceDatabase} from '../../../../storage/database';
 
-export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;image:TranslationImage;blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;createdAt:number;}
+export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;image:TranslationImage;sourceSha256?:string;inputProfile?:'short-edge-1800-webp90-v1';inputSize?:{width:number;height:number};blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;createdAt:number;}
 export interface SyncState {id:string;jobs:Job[];imageRetryAt?:number;controlRetryAt?:number;}
 let opening:Promise<IDBDatabase>|undefined;
 function db(){return opening??=openSourceDatabase('translation-requests-overlay-v1',{operations:{keyPath:'id',indexes:[{name:'scope',keyPath:'scope'}]},sync:{keyPath:'id'}},()=>{opening=undefined;}).catch(error=>{opening=undefined;throw error;});}

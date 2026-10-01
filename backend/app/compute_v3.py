@@ -430,8 +430,8 @@ class NodeError(RequestBody):
 class OutputInfo(RequestBody):
     sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     byte_size: int = Field(ge=1, le=128 * 1024 * 1024, strict=True)
-    width: int = Field(ge=1, le=8192, strict=True)
-    height: int = Field(ge=1, le=8192, strict=True)
+    width: int = Field(ge=1, strict=True)
+    height: int = Field(ge=1, strict=True)
     mime: Literal['image/webp']
 
 
@@ -449,8 +449,10 @@ class PageResult(RequestBody):
     translations_revision: str = Field(pattern=r'^[a-f0-9]{64}$')
     representation: Literal['overlay-v1', 'original']
     normalization_version: Literal[1]
-    width: int = Field(ge=1, le=8192, strict=True)
-    height: int = Field(ge=1, le=8192, strict=True)
+    # validate_result binds these to the already admitted input dimensions;
+    # shape binds the output to this canvas. No second hard-coded ceiling.
+    width: int = Field(ge=1, strict=True)
+    height: int = Field(ge=1, strict=True)
     bbox: BBox | None
     output: OutputInfo | None
 

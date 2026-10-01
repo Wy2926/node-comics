@@ -16,7 +16,7 @@ from manhua_engine.engine import Engine, group
 from manhua_engine.quality import conservative_mask
 from manhua_engine.bubbles import lettering_areas
 from manhua_engine.layout import LayoutError, coverage, draw_region, font_paths, resolve_colors
-from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest, mask_image, png64, pack_result
+from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64, pack_result
 from manhua_engine.timing import record
 
 LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫畫', 'ja': '日本語あいうアイウ',
@@ -100,13 +100,13 @@ class Runtime:
 
     def decode(self, data, metadata):
         if (metadata.get('normalization_version') != 1
-                or len(data) > MAX_IMAGE_BYTES or len(data) != metadata['byte_size']):
+                or len(data) != metadata['byte_size']):
             raise NodeFailure('INPUT_INVALID')
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         with Image.open(BytesIO(data)) as image:
-            if (image.size != (metadata['width'], metadata['height']) or image.width * image.height > MAX_PIXELS
-                    or max(image.size) > 8192 or Image.MIME.get(image.format) != metadata['mime']
+            # Admission limits belong to the center; this checks descriptor integrity only.
+            if (image.size != (metadata['width'], metadata['height']) or Image.MIME.get(image.format) != metadata['mime']
                     or image.format not in {'PNG', 'JPEG', 'WEBP'} or getattr(image, 'n_frames', 1) != 1
                     or image.getexif().get(274, 1) != 1 or image.info.get('icc_profile')):
                 raise NodeFailure('INPUT_INVALID')

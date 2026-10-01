@@ -4,7 +4,7 @@ from threading import Lock
 import re
 import time
 
-from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest
+from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
 from .operations import report_page_failure
 from manhua_engine.timing import collect
 
@@ -26,8 +26,8 @@ class Pipeline:
     @staticmethod
     def input_reservation(page):
         metadata = page.lease.get('input') or {}
-        pixels = metadata.get('width', 0) * metadata.get('height', 0) or MAX_PIXELS
-        return pixels * 16 + MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+        pixels = metadata.get('width', 0) * metadata.get('height', 0)
+        return pixels * 16 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
 
     @staticmethod
     def delivery_reservation(body):
@@ -54,7 +54,7 @@ class Pipeline:
         with self.memory_lock:
             pending_bytes = sum(self.input_reservation(page) for page in downloading if not page.reserved)
             available = max(0, self.limit - self.used - pending_bytes)
-        minimum = MAX_IMAGE_BYTES * 3 + MAX_CHECKPOINT_BYTES * 6
+        minimum = MAX_CHECKPOINT_BYTES * 6
         return max(0, min(4, self.agent.local.get('download_workers', 4) - len(downloading), available // minimum))
 
     def close(self):
@@ -125,6 +125,16 @@ class Pipeline:
         }.get(page.step, 'CLASSIC_LOCAL_INTERRUPTED')
         report_page_failure(page.lease['lease_id'], page.step, code, error)
         saved = self.agent.journal.get('lease:' + page.lease['lease_id'], {})
+        # A definitive payload rejection cannot be repaired by uploading the
+        # same frozen bytes again. Preserve ambiguous/network failures, but
+        # replace rejected output atomically with a small terminal report.
+        if (page.step == 'deliver' and isinstance(error, ControlFailure)
+                and error.status in {400, 413, 415, 422}
+                and 'result' in (saved.get('completion') or {})):
+            page.completion = {'lease_token': page.lease['lease_token'], 'error': {'code': 'RESULT_REJECTED'}}
+            self.agent.journal.freeze('lease:' + page.lease['lease_id'], {**saved, 'completion': page.completion}, None)
+            self.resize_reservation(page, self.delivery_reservation(page.completion))
+            return
         page.completion = saved.get('completion') or {'lease_token': page.lease['lease_token'], 'error': {'code': code}}
         self.agent.journal.put('lease:' + page.lease['lease_id'], {**saved, 'completion': page.completion})
         page.step = 'deliver'

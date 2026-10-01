@@ -68,8 +68,7 @@ def canonical_source(path):
         if (getattr(image, 'is_animated', False) or image.getexif() or
                 any(image.info.get(k) for k in ('icc_profile', 'gamma', 'chromaticity'))):
             raise VerificationFailure('SOURCE_REQUIRES_CLIENT_NORMALIZATION')
-        if max(width, height) > 8192 or width * height > 24_000_000:
-            raise VerificationFailure('SOURCE_DIMENSIONS_UNSUPPORTED')
+        # Admission belongs to the isolated center, not a stale verifier ceiling.
     return source, {'sha256': hashlib.sha256(source).hexdigest(), 'byte_size': len(source),
                     'content_type': mime, 'normalization_version': 1}, width, height
 

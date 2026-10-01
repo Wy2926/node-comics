@@ -1417,13 +1417,11 @@
                               "type": "integer"
                             },
                             "width": {
-                              "maximum": 8192,
                               "minimum": 1,
                               "title": "Width",
                               "type": "integer"
                             },
                             "height": {
-                              "maximum": 8192,
                               "minimum": 1,
                               "title": "Height",
                               "type": "integer"
@@ -1485,13 +1483,11 @@
                                       "type": "integer"
                                     },
                                     "width": {
-                                      "maximum": 8192,
                                       "minimum": 1,
                                       "title": "Width",
                                       "type": "integer"
                                     },
                                     "height": {
-                                      "maximum": 8192,
                                       "minimum": 1,
                                       "title": "Height",
                                       "type": "integer"

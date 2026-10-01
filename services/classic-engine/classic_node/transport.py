@@ -4,7 +4,7 @@ import json
 import re
 import ssl
 import httpx
-from .protocol import ControlFailure, MAX_IMAGE_BYTES, MAX_RESULT_BYTES, NodeFailure
+from .protocol import ControlFailure, MAX_RESULT_BYTES, NodeFailure
 
 PREFIX = '/internal/compute/v3'
 
@@ -65,7 +65,7 @@ class Transport:
         if metadata.get('path') != path:
             raise NodeFailure('INPUT_INVALID')
         limit = metadata['byte_size']
-        if type(limit) is not int or not 0 < limit <= MAX_IMAGE_BYTES:
+        if type(limit) is not int or limit <= 0:
             raise NodeFailure('INPUT_INVALID')
         try:
             check()

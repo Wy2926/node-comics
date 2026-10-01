@@ -75,6 +75,34 @@ def test_page_failure_preserves_diagnostic_codes_and_identifies_stage(agent, err
     assert agent.journal.get('lease:0')['completion']['error'] == {'code': expected}
 
 
+@pytest.mark.parametrize('status', [400, 413, 415, 422])
+def test_rejected_frozen_output_is_not_enqueued_for_upload_forever(agent, status):
+    page = add_page(agent)
+    frozen = {'lease_token': page.lease['lease_token'], 'result': {'output': {'byte_size': 5}}}
+    agent.journal.freeze('lease:0', {'lease': page.lease, 'completion': frozen}, b'image')
+    page.step, page.completion = 'deliver', frozen
+    agent.pipeline.resize_reservation(page, agent.pipeline.delivery_reservation(frozen))
+    agent.pipeline.error(page, ControlFailure('INVALID_PROVIDER_OUTPUT', status))
+    assert page.completion == {'lease_token': page.lease['lease_token'], 'error': {'code': 'RESULT_REJECTED'}}
+    assert agent.journal.output('lease:0') is None
+    assert agent.journal.get('lease:0')['completion'] == page.completion
+    calls = []
+    agent.transport.post = lambda path, body: (calls.append((path, body)), {'status': 'terminal'})[1]
+    assert agent.deliver(page, page.completion) == {'status': 'terminal'}
+    assert calls[0][0].endswith('/complete')
+
+
+@pytest.mark.parametrize('status', [0, 429, 500, 503])
+def test_ambiguous_frozen_output_remains_recoverable(agent, status):
+    page = add_page(agent)
+    frozen = {'lease_token': page.lease['lease_token'], 'result': {'output': {'byte_size': 5}}}
+    agent.journal.freeze('lease:0', {'lease': page.lease, 'completion': frozen}, b'image')
+    page.step, page.completion = 'deliver', frozen
+    agent.pipeline.error(page, ControlFailure('CONTROL_UNAVAILABLE', status))
+    assert page.completion == frozen
+    assert agent.journal.output('lease:0') == b'image'
+
+
 def test_updates_apply_translation_without_renewal_and_never_revive_expiry(agent):
     page = add_page(agent)
     before = page.deadline, page.lease['expires_at'], page.renewed_at

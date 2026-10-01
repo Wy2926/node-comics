@@ -2,8 +2,8 @@ import type {Job,Page,ReadingEntry} from '../types';
 import {mergeJobs} from '../reader/jobs';
 import type {TranslationScope} from './channels/contracts';
 
-export function matchesPage(page:Page,job:Job){return page.jobs.some(j=>j.id===job.id)||!!job.image_sha256&&job.image_sha256===page.imageSha256;}
-function indexJobs(jobs:Job[]){const index=new Map<string,Job[]>();for(const job of jobs){for(const key of [`job:${job.id}`,...(job.image_sha256?[`sha:${job.image_sha256}`]:[])])index.set(key,[...(index.get(key)??[]),job]);}return index;}
+export function matchesPage(page:Page,job:Job){const sha=job.source_image_sha256??job.image_sha256;return page.jobs.some(j=>j.id===job.id)||!!sha&&sha===page.imageSha256;}
+function indexJobs(jobs:Job[]){const index=new Map<string,Job[]>();for(const job of jobs){const sha=job.source_image_sha256??job.image_sha256;for(const key of [`job:${job.id}`,...(sha?[`sha:${sha}`]:[])])index.set(key,[...(index.get(key)??[]),job]);}return index;}
 function pageJobs(page:Page,index:Map<string,Job[]>,includeLocal=true){const keys=[...(page.imageSha256?[`sha:${page.imageSha256}`]:[]),...(includeLocal?page.jobs.map(j=>`job:${j.id}`):[])];return [...new Map(keys.flatMap(key=>index.get(key)??[]).map(job=>[job.id,job])).values()];}
 /** Channel status never downloads images or changes the original's layout geometry. */
 export function applyChannelJobs(copy:ReadingEntry,jobs:Job[],scope:TranslationScope){

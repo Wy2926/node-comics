@@ -13,10 +13,13 @@
 | `channels/adapters/manga-translator-ui/` | MTU 登录、语言映射、表单与错误映射 |
 | `channels/transport/` | 与协议无关的直传执行、本地排程、执行回执和长请求宿主 |
 | `translation/automatic.ts`、`useAutomaticTranslation.ts` | 当前页与后三页窗口、渠道运行器调用及显示更新 |
+| `translation/input/` | 准备送译字节；上传与结果读取共用缓存读取、缺失重建和摘要校验，不管理任务状态或来源资源释放 |
 | `storage/translations/` | 按渠道作用域持久缓存完整译图，首次加载校验，后续直接读取并保留有限内存缓存 |
 | `translation/materialize.ts` | 官方结果验证及原生尺寸覆盖合成，供阅读器、原位、导出共用 |
 
 `ChannelDefinition` 声明配置字段并建立连接；`ChannelConnection` 提供能力、作用域、结果读取和运行器工厂；`ChannelRuntime` 提供 `init/submit/manual/wait/stateFor/refresh/dispose`。`submit` 更新阅读窗口并启动工作，不等待整张译图。官方查询与恢复留在官方运行器内，MTU 运行器只等待一次图片 HTTP 调用的结果。
+
+官方 `operations.ts` 只根据已准备好的图片信息同步构造请求记录，不读取图片或推断送译摘要。来源读取回调与资源释放由调用方提供，输入恢复函数不依赖官方请求记录或通用 `Job`。
 
 公共层不按协议 ID 分支执行。界面按适配器字段描述渲染配置；适配器不得互相依赖或引用界面实现；契约不得依赖装配/执行层；直传层不得依赖具体适配器或官方账号/API。旧的公共 `translation/coordinator.ts`、`store.ts`、`state.ts` 已移入官方目录，不保留转发文件。`check:modules` 检查这些边界、传递依赖、运行时循环及未被使用的模块。
 

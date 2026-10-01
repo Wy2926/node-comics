@@ -116,6 +116,12 @@ class VerificationTests(unittest.TestCase):
             (self.root / name).touch()
         self.assertEqual([p.name for p in live.source_files(self.root)], ['00002.webp', '00010.webp', 'page.webp'])
 
+    def test_strip_admission_belongs_to_center_not_old_8192_limit(self):
+        image = self.root / 'strip.png'
+        Image.new('RGB', (2, 12000), 'white').save(image)
+        _, _, width, height = live.canonical_source(image)
+        self.assertEqual((width, height), (2, 12000))
+
 
 if __name__ == '__main__':
     unittest.main()

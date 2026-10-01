@@ -7,6 +7,7 @@ import {catalog} from '../src/comics/repositories';
 import {acquirePage} from '../src/comics/pages/service';
 import {RENDER_PROFILE} from '../src/comics/pages/identity';
 import {materializeResult} from '../src/translation/materialize';
+import {loadDeliveredResult} from '../src/storage/translations/results';
 import {hashFile} from '../src/importers/hash';
 import type {Job,TranslationResult} from '../src/types';
 
@@ -26,15 +27,21 @@ export async function exportOverlayChapter(inputs:ChapterInput[],callbacks:Callb
     const pages=await catalog.listPages(entry.contentId,{limit:10000});
     if(pages.length!==inputs.length)throw Error('Imported chapter page count changed');
     const outputs:ChapterOutput[]=[],byJob=new Map<string,{input:ChapterInput;output:ChapterOutput}>();
+    let materializations=0;
     for(const [index,input] of inputs.entries()){
       const started=performance.now(),page=pages[index],lease=await acquirePage({entryId:entry.id,contentId:entry.contentId,pageId:page.pageId,renderProfileId:RENDER_PROFILE});
       try{
         const original=lease.blob,result=input.result,artifact=result?.artifact&&input.artifactUrl?await fetched(input.artifactUrl):undefined;
-        const rendered=result?await materializeResult(result,original,artifact):original,bitmap=await createImageBitmap(rendered);
+        const sha=lease.identity.imageSha256,job:Job|undefined=result?{id:crypto.randomUUID(),result:{key:result.artifact?.sha256??result.input_sha256,recoverable:true},delivery:result,image_sha256:sha,status:result.kind==='no_text'?'no_text':'succeeded',mode:'classic',target_language:'zh-Hans',phase:'succeeded',version:1,quota_pages:result.kind==='no_text'?0:1,cache_hit:false,created_at:new Date().toISOString()}:undefined;
+        let rendered=original;
+        if(job?.status==='succeeded'){
+          rendered=await loadDeliveredResult({scope,job,isCurrent:()=>true,original:async()=>original,
+            download:async()=>{materializations++;if(!artifact)throw Error('Missing fixture artifact');return artifact;}});
+        }else if(result)rendered=await materializeResult(result,original,artifact);
+        const bitmap=await createImageBitmap(rendered);
         const output:ChapterOutput={ordinal:input.ordinal,state:input.state,kind:result?.kind??'fallback',representation:result?.representation??'original',inputBytes:original.size,artifactBytes:artifact?.size??0,renderedBytes:rendered.size,sha256:await hashFile(rendered),mime:rendered.type,width:bitmap.width,height:bitmap.height,seconds:Math.round(performance.now()-started)/1000};bitmap.close();
         await callbacks.rendered(output,rendered);outputs.push(output);
-        if(result){
-          const sha=lease.identity.imageSha256,job:Job={id:crypto.randomUUID(),result:{key:result.artifact?.sha256??result.input_sha256,recoverable:true},delivery:result,image_sha256:sha,status:result.kind==='no_text'?'no_text':'succeeded',mode:'classic',target_language:'zh-Hans',phase:'succeeded',version:1,quota_pages:result.kind==='no_text'?0:1,cache_hit:false,created_at:new Date().toISOString()};
+        if(job){
           await catalog.put('translationBindings',{id:JSON.stringify([scope.key,sha]),scope:scope.key,imageSha256:sha,payload:{translationScope:scope.key,jobs:[job]},updatedAt:Date.now()});
           byJob.set(job.id,{input,output});
         }
@@ -43,12 +50,13 @@ export async function exportOverlayChapter(inputs:ChapterInput[],callbacks:Callb
     }
     let sourceReads=0;
     const exported=await exportDocument(entry.id,{format:'cbz',images:'translation',mode:'classic',language:'zh-Hans'},{scope,signal:new AbortController().signal,isCurrent:()=>true,destination:callbacks.destination,progress:value=>callbacks.progress?.({phase:'export',completed:value.completed,total:value.total}),readResult:async(job,_signal,readOriginal)=>{
-      const selected=byJob.get(job.id);if(!selected)throw Error('Unknown export binding');sourceReads++;
-      const result=job.delivery!,artifact=result.artifact&&selected.input.artifactUrl?await fetched(selected.input.artifactUrl):undefined;
-      const rendered=await materializeResult(result,await readOriginal?.(),artifact);
+      const selected=byJob.get(job.id);if(!selected)throw Error('Unknown export binding');
+      const rendered=await loadDeliveredResult({scope,job,isCurrent:()=>true,
+        original:async()=>{sourceReads++;return readOriginal?.();},download:async()=>{throw Error('Export unexpectedly downloaded or recomposed an already cached result');}});
       if(await hashFile(rendered)!==selected.output.sha256)throw Error('Export image differs from verified native composition');
       return rendered;
     }});
-    return {pages:outputs,sourceReads,archiveBytes:exported.bytes,archiveName:exported.name};
+    if(sourceReads)throw Error('Export reread originals instead of complete cached results');
+    return {pages:outputs,sourceReads,materializations,archiveBytes:exported.bytes,archiveName:exported.name};
   }finally{release();}
 }

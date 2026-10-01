@@ -11,13 +11,15 @@ import {operationId} from './operations';
 import {translationState} from './state';
 import {translationScope} from './store';
 import {loadDeliveredResult,registerResultReader,releaseResultReaders} from '../../../../storage/translations/results';
+import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from '../../../input/limits';
+import {loadTranslationInput} from '../../../input/load';
 
 // These baseline choices keep sign-in and cached views reachable without a network request.
 // New requests still require a successful policy refresh; the server enforces its actual limits.
 const baselineCapabilities=():Capabilities=>({modes:[
   {id:'classic',label:modeLabels.classic,enabled:true,languages:fallbackLanguages.map(language=>language.id)},
   {id:'redraw',label:modeLabels.redraw,enabled:true,languages:['zh-Hans','zh-Hant','en','ja','ko']},
-],languages:fallbackLanguages,limits:{max_bytes:20*1024*1024,max_pixels:24_000_000,max_dimension:8192,max_translation_ids:32},entitlements:null});
+],languages:fallbackLanguages,limits:{max_bytes:TRANSLATION_MAX_BYTES,max_pixels:TRANSLATION_MAX_PIXELS,max_dimension:TRANSLATION_MAX_DIMENSION,max_translation_ids:32},entitlements:null});
 
 export const definition:ChannelDefinition={
   id:'nodelane',label:'NodeLane',configurable:false,fields:[],
@@ -60,14 +62,19 @@ export const definition:ChannelDefinition={
         signal?.throwIfAborted();
         await authorization!.current();
         registerResultReader(scope,job,()=>connection.readResult(job,undefined,original));
-        const blob=await loadDeliveredResult({scope,job,original,download:()=>api.translationImage(job.id,signal),isCurrent:()=>live()&&!signal?.aborted});
+        const current=()=>live()&&!signal?.aborted;
+        const input=async()=>{
+          const result=job.delivery;if(!result)return undefined;
+          return loadTranslationInput(scope.key,{sha256:result.input_sha256,sourceSha256:job.source_image_sha256,profile:job.input_profile,size:result},async()=>original?.(),current);
+        };
+        const blob=await loadDeliveredResult({scope,job,original:input,download:()=>api.translationImage(job.id,signal),isCurrent:current});
         await authorization!.current();assertCurrent(live);return blob;
       },
       createRuntime(options:RuntimeOptions){
         let active=true;
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,limits:()=>caps.limits,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},

@@ -5,7 +5,7 @@ import {pageReference, RENDER_PROFILE, type PageReference} from '../src/comics/p
 import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {makeOperation, operationId} from '../src/translation/channels/adapters/nodelane/operations';
 import {readOperation, type LocalOperation} from '../src/translation/channels/adapters/nodelane/store';
-import {fixture, originalBytes, snapshot, target} from './translation-fixture';
+import {fixture, originalBytes, originalInput, snapshot, target} from './translation-fixture';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,7 +25,7 @@ async function seed(f: ReturnType<typeof fixture>, state: LocalOperation['state'
   const reference = {entryId: 'book', contentId: 'revision', pageId: 'page-0', renderProfileId: 'original-v1-gif-first-frame'};
   const oldTarget = {...target(0), mode, page: {...target(0).page, ...reference, blobKey: pageReference(reference)}};
   const scope = JSON.stringify([new URL(f.api.base).origin, f.userId]);
-  const record = await makeOperation(oldTarget, scope, 'zh-Hans', async () => originalBytes(0));
+  const record = makeOperation(oldTarget, scope, 'zh-Hans', originalInput(0));
   record.state = state;
   const database = await legacyDatabase();
   try {

@@ -1,9 +1,9 @@
 import type {TranslationResult} from '../types';
 import {hashFile} from '../importers/hash';
-import {RequestPool} from '../concurrency';
+import {imageWork} from './input/work';
+import {TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from './input/limits';
 import {msg} from '../i18n/runtime';
 
-const rendering = new RequestPool(1);
 const digest = /^[a-f0-9]{64}$/;
 const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
 
@@ -25,8 +25,8 @@ export class InvalidArtifactError extends Error {
 
 export function validateResult(result: TranslationResult) {
   if (result.normalization_version !== 1 || !digest.test(result.input_sha256) ||
-      !positive(result.width) || !positive(result.height) || Math.max(result.width, result.height) > 8192 ||
-      result.width * result.height > 24_000_000 || !['translated', 'partial', 'no_text'].includes(result.kind)) {
+      !positive(result.width) || !positive(result.height) || Math.max(result.width, result.height) > TRANSLATION_MAX_DIMENSION ||
+      result.width * result.height > TRANSLATION_MAX_PIXELS || !['translated', 'partial', 'no_text'].includes(result.kind)) {
     throw new InvalidArtifactError();
   }
   if (result.representation === 'original') {
@@ -68,7 +68,7 @@ export async function materializeResult(result: TranslationResult, original: Blo
   if (original && await hashFile(original) !== result.input_sha256) {
     throw Error(msg('原图内容已变化，请重新加载后翻译。'));
   }
-  return rendering.run(async () => {
+  return imageWork(async () => {
     let base: ImageBitmap | undefined;
     let patch: ImageBitmap | undefined;
     let canvas: OffscreenCanvas | undefined;

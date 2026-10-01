@@ -1,5 +1,4 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import background from '../entrypoints/background';
 
 // Keep every production message listener; isolate the wrapper and optional content registration.
 vi.mock('wxt/utils/define-background', () => ({defineBackground: (main: () => void) => ({main})}));
@@ -51,7 +50,10 @@ async function owned(message: Message, sender = extensionSender) {
   return result.response!;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Each case starts a new worker. Reusing one module graph would register
+  // permanent background/auth subscriptions repeatedly in the same process.
+  vi.resetModules();
   listeners.length = 0;
   local = {'nc-reader-settings': {uiLanguage: 'en', autoTranslateTabs: false}};
   session = {}; tabs = new Map();
@@ -92,6 +94,7 @@ beforeEach(() => {
       sendMessage: vi.fn(async () => undefined),
     },
   });
+  const {default:background}=await import('../entrypoints/background');
   background.main();
   expect(listeners).toHaveLength(7); // Locale, inline theme, inline reader, website sources, Drive, catalog sync, analytics.
 });

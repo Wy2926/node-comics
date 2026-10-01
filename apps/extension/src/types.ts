@@ -3,6 +3,8 @@ import type {UiLanguage} from './i18n/locales';
 export type Mode = 'redraw' | 'classic';
 export interface MembershipGift {starts_at:string|null;ends_at:string|null;days:number;state:'pending'|'scheduled'|'active'|'expired'}
 export type JobStatus = 'awaiting_upload' | 'validating_upload' | 'queued' | 'running' | 'succeeded' | 'no_text' | 'failed' | 'cancelled' | 'outcome_unknown' | 'unknown_released';
+/** Local source binding; never substitutes the server's actual input digest. */
+export interface Job {source_image_sha256?:string;input_profile?:'short-edge-1800-webp90-v1';}
 export interface Job { result?: {key:string;recoverable:boolean}; delivery?:TranslationResult; id: string; mode: Mode; target_language: string; status: JobStatus; phase: string; error?: { code: string; message: string }; quota_pages: number; quota_kind?:QuotaKind; quota_period_id?:string|null; created_at: string; completed_at?: string; version: number; cache_hit: boolean; reused?:boolean; quality_flags?: string[]; result_available?: boolean; result_expired?: boolean; settlement?: 'reserved'|'settled'|'released'|'free'|'included'; cancel_requested?:boolean; image_sha256?:string;  updated_at?:string; }
 export interface TranslationImage {sha256:string;byte_size:number;content_type:string;normalization_version?:1;}
 export type TranslationInput = ({image:TranslationImage;mode:Mode;target_language:string}|{retry_of:string}|{regenerate_of:string;acknowledge_unknown_cost?:boolean});

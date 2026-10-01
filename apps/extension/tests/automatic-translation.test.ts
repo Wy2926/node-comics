@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {describe,it,expect} from 'vitest';
 import {ReadingWindow,needsTranslation,targetKey} from '../src/translation/automatic';
 import {makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
-import {job,origin,target} from './translation-fixture';
+import {job,origin,target,originalInput} from './translation-fixture';
 describe('local reading timing',()=>{
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
@@ -29,9 +29,16 @@ describe('local reading timing',()=>{
  it.each(['queued','running','failed','cancelled','outcome_unknown','unknown_released','no_text','succeeded'] as const)('never automatically regenerates %s',status=>{
   const scope=JSON.stringify([origin,'alice']),page={...target(0).page,translationScope:scope,jobs:[job(0,{status})]};expect(needsTranslation(page,'classic','zh-Hans',scope)).toBe(false);
  });
- it('keeps account, page, mode and language operations separate and allows free reuse',async()=>{
-  const a=await makeOperation(target(0),'alice','zh-Hans',async()=>undefined),b=await makeOperation(target(0),'bob','en',async()=>undefined);
+ it('keeps account, page, mode and language operations separate and allows free reuse',()=>{
+  const a=makeOperation(target(0),'alice','zh-Hans',originalInput(0)),b=makeOperation(target(0),'bob','en',originalInput(0));
   expect(a.id).not.toBe(b.id);expect(a.requestId).not.toBe(b.requestId);expect(a.request).not.toHaveProperty("max_quota_pages");
   expect(targetKey(crypto.randomUUID(),{...target(0).page,contentId:crypto.randomUUID(),id:"a".repeat(640)},"classic")).toMatch(/^[a-f0-9]{64}$/);
+ });
+ it('constructs synchronously from prepared metadata without inferring input from the page',()=>{
+  const prepared={...originalInput(1),profile:'short-edge-1800-webp90-v1' as const,width:600,height:900,sourceSha256:target(0).page.imageSha256};
+  const record=makeOperation(target(0),'alice','en',prepared);
+  expect(record.image).toEqual(prepared.image);expect(record.sourceSha256).toBe(prepared.sourceSha256);
+  expect(record.inputProfile).toBe(prepared.profile);expect(record.inputSize).toEqual({width:600,height:900});
+  expect(record.request).toEqual({image:prepared.image,mode:'classic',target_language:'en'});
  });
 });

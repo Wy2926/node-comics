@@ -97,6 +97,8 @@ services/classic-engine/.venv-lama/Scripts/python.exe scripts/verify_overlay_liv
 
 私有配置仅读取 `TEXT_BASE_URL`、`TEXT_MODEL`、`TEXT_API_KEY`，协议由 `--protocol chat_completions|responses` 指定。脚本实际调用付费文本服务，限制每组一次尝试；先保存 UUID，再发送输入。按实际文件格式发送 MIME，仅接收不需要 EXIF／ICC／首帧转换的静态规范输入；目录按页名自然排序，忽略导出清单，原始文件不改动。
 
+真实图片先经过插件预处理：启动插件 Vite 5176，配置 `PLAYWRIGHT_MODULE`、`TEST_CHROMIUM`，执行 `node scripts/verify_translation_inputs.mjs <图片目录> <artifacts 下的输出目录>`。脚本限最多 16 张，通过实际规范化与高质量 WebP 代码生成 `inputs/`，另保留第一张的未压缩基线；`preparation.json` 记录大小、尺寸、预处理耗时和主线程定时器间隔，不把测试文件序列化计入 UI 耗时。将 `inputs/` 作为真实验证器的 `--source`；尺寸准入由中心统一判断，验证器不保留旧的 8192 上限。
+
 批次使用一个测试供应商和物理 GPU 节点。只停用同名旧测试供应商，检测到其他供应商则拒绝运行；复用同一测试 GPU 的节点身份，存在活动租约则拒绝旋转凭据。隔离中心每日额度调至至少页数加 100，并为批次创建新测试读者；供应商测试配置为 60 RPM、8192 输出 token、1800 字节分组和单次尝试。它不调整供应商实际账户配置。
 
 运行目录必须新建，每页保存 `intent.json`、原始字节、结果描述、覆盖文件、常规结果和统计，顶层 `report.json` 持续汇总。明确 429 根据 Retry-After 使用同一 UUID 重试；写入结果未知时只观察原 UUID。单页默认上限 900 秒，失败记录后继续下一页，终态原图结果不下载文件。失败或未知调用先核实已保存 UUID，不能反复新建任务盲试。控制台只输出状态／大小／耗时，不输出 OCR 或凭据。

@@ -21,7 +21,7 @@ try{
   await page.waitForFunction(()=>window.readerFixture.requests.includes('/v1/translations/events'));
   let state=await snapshot();assert.deepEqual(state.submitted,[0,1,2,3]);
   assert.equal(state.requests.filter(p=>p==='/v1/translations/events').length,1,'current and prefetch pages share their first SSE connection');
-  assert.deepEqual(state.translations.slice(0,4).map(item=>item.body.priority),['current','prefetch','prefetch','prefetch']);
+  assert(state.translations.slice(0,4).every(item=>!('priority' in item.body)),'reading order is local scheduling, not a server priority field');
   assert(state.translations.every(item=>/^[a-f0-9-]{36}$/.test(item.id)&&!('page_key' in item.body)&&!('session_id' in item.body)));
   check('current image is submitted first, followed by three independent prefetch images with short UUIDs');
   await page.evaluate(()=>{document.querySelector('.nc-reading-viewport').scrollTop+=4;});

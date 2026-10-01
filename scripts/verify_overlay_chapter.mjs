@@ -56,7 +56,7 @@ try{
   const translated=result.pages.filter(page=>page.representation!=='original');
   const sum=(pages,key)=>pages.reduce((value,page)=>value+page[key],0);
   const ratios=translated.map(page=>page.artifactBytes/page.renderedBytes).sort((a,b)=>a-b),percentile=p=>ratios.length?ratios[Math.max(0,Math.ceil(ratios.length*p)-1)]:null;
-  const summary={pages:result.pages.length,sourceReads:result.sourceReads,inputBytes:sum(result.pages,'inputBytes'),artifactBytes:sum(result.pages,'artifactBytes'),renderedBytes:sum(result.pages,'renderedBytes'),translatedRenderedBytes:sum(translated,'renderedBytes'),archiveBytes:result.archiveBytes,artifactToTranslatedRenderedRatio:sum(translated,'renderedBytes')?sum(translated,'artifactBytes')/sum(translated,'renderedBytes'):0,pageArtifactRatioP50:percentile(.5),pageArtifactRatioP95:percentile(.95)};
+  const summary={pages:result.pages.length,sourceReads:result.sourceReads,materializations:result.materializations,inputBytes:sum(result.pages,'inputBytes'),artifactBytes:sum(result.pages,'artifactBytes'),renderedBytes:sum(result.pages,'renderedBytes'),translatedRenderedBytes:sum(translated,'renderedBytes'),archiveBytes:result.archiveBytes,artifactToTranslatedRenderedRatio:sum(translated,'renderedBytes')?sum(translated,'artifactBytes')/sum(translated,'renderedBytes'):0,pageArtifactRatioP50:percentile(.5),pageArtifactRatioP95:percentile(.95)};
   await writeFile(path.join(out,'report.json'),JSON.stringify({...result,summary},null,2));
   // Verify the finished CBZ independently, including every fallback/no-text page.
   const verified=spawnSync(process.env.PYTHON||'python',['-c',[

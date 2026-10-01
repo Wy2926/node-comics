@@ -5,10 +5,12 @@ import {Api} from '../../../../api';
 import type {AuthState,Session} from '../../../../auth/model';
 import {API_ORIGIN} from '../../../../service';
 import type {Capabilities} from '../../../../types';
-import {entitlement,job,target} from '../../../../../tests/translation-fixture';
+import {entitlement,job,target,originalBytes} from '../../../../../tests/translation-fixture';
 import {definition} from './definition';
 import {translationCache} from '../../../../storage/translations';
 import {resultBlobKey} from '../../../../storage/translations/results';
+import {cacheInput,readInput} from '../../../input/cache';
+import {hashFile} from '../../../../importers/hash';
 
 const auth=vi.hoisted(()=>({value:{session:null} as AuthState,listeners:new Set<()=>void>()}));
 vi.mock('../../../../auth/storage',()=>({
@@ -56,6 +58,22 @@ describe('NodeLane channel boundary',()=>{
     expect(await(await connection.readResult(result)).text()).toBe('image');expect(download).not.toHaveBeenCalled();
     const controller=new AbortController();controller.abort();await expect(connection.readResult(result,controller.signal)).rejects.toThrow();
     auth.value={session:null};await expect(connection.readResult(result)).rejects.toThrow();expect(download).not.toHaveBeenCalled();connection.dispose();
+  });
+  it.each([false,true])('reads prepared input through the shared loader with cache hit=%s without submitting',async cached=>{
+    auth.value={session:session()};vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const download=vi.spyOn(Api.prototype,'translationImage'),translate=vi.spyOn(Api.prototype,'translate');
+    const connection=await definition.open(profile,{},()=>true),source=originalBytes(0);
+    const encoded=new Blob(['RIFF',new Uint8Array([14,0,0,0]),'WEBPVP8 ',new Uint8Array([2,0,0,0]),'ok'],{type:'image/webp'}),sha=await hashFile(encoded);
+    const encode=vi.fn(async()=>encoded),original=vi.fn(async()=>source);
+    vi.stubGlobal('Worker',undefined);vi.stubGlobal('createImageBitmap',async()=>({width:800,height:1200,close(){}}));
+    vi.stubGlobal('OffscreenCanvas',class {getContext(){return {drawImage(){}};}convertToBlob=encode;});
+    const result=job(0,{id:crypto.randomUUID(),status:'succeeded',source_image_sha256:await hashFile(source),input_profile:'short-edge-1800-webp90-v1',delivery:{kind:'translated',representation:'original',normalization_version:1,input_sha256:sha,width:800,height:1200}});
+    if(cached)await cacheInput(connection.scope.key,sha,encoded);
+    expect(await hashFile(await connection.readResult(result,undefined,original))).toBe(sha);
+    expect(await hashFile((await readInput(connection.scope.key,sha))!)).toBe(sha);
+    await connection.readResult(result,undefined,original);
+    expect(original).toHaveBeenCalledTimes(cached?0:1);expect(encode).toHaveBeenCalledTimes(cached?0:1);
+    expect(download).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();connection.dispose();
   });
   it('does not submit a manual retry when refreshing account policy fails',async()=>{
     auth.value={session:session()};vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);
