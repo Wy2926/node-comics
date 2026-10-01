@@ -199,9 +199,16 @@ func TestWatchdogUsesWorkerGenerationAndProgress(t *testing.T) {
 	if a.workerStalled(13, time.Now()) {
 		t.Fatal("previous process state used for new worker")
 	}
-	_ = writeJSON(filepath.Join(a.statePath(), "status.json"), map[string]any{"pid": 12, "updated_at": time.Now().Add(-30 * time.Second), "phase": "starting", "loop_age_seconds": 1})
+	_ = writeJSON(filepath.Join(a.statePath(), "status.json"), map[string]any{"pid": 12, "updated_at": time.Now().Add(-30 * time.Second), "phase": "running", "loop_age_seconds": 1})
 	if !a.workerStalled(12, time.Now()) {
 		t.Fatal("native stall not detected")
+	}
+	_ = writeJSON(filepath.Join(a.statePath(), "status.json"), map[string]any{"pid": 12, "updated_at": time.Now().Add(-30 * time.Second), "phase": "starting", "loop_age_seconds": 60})
+	if a.workerStalled(12, time.Now().Add(-60*time.Second)) {
+		t.Fatal("model initialization killed before startup budget")
+	}
+	if !a.workerStalled(12, time.Now().Add(-601*time.Second)) {
+		t.Fatal("startup deadline not enforced")
 	}
 }
 

@@ -365,12 +365,10 @@ func (a app) workerStalled(pid int, started time.Time) bool {
 	if err != nil || state.PID != pid {
 		return time.Since(started) > 60*time.Second
 	}
-	if time.Since(state.Updated) > 20*time.Second {
-		return true
-	}
-	limit := float64(120)
 	if state.Phase == "starting" {
-		limit = 600
+		// Model initialization can hold Python's GIL and pause status writes.
+		// Keep the existing startup budget bounded by the native launch time.
+		return time.Since(started) > 600*time.Second || state.LoopAge > 600
 	}
-	return state.LoopAge > limit
+	return time.Since(state.Updated) > 20*time.Second || state.LoopAge > 120
 }
