@@ -31,8 +31,8 @@
 | `backend/app/translation_routing.py` | 正文与漫画名共用的分流策略注册及稳定加权选择 |
 | `backend/app/translation_provider_limits.py` | 跨用途共享的供应商上游请求准入，与用户业务限流独立 |
 | `backend/app/translation_channels.py` | 渠道注册，绑定配置校验器和调用函数 |
-| `backend/app/adapters/llm.py` | 通用 `call_messages(messages, profile)`、`LLMConfig` 连接配置、统一响应和错误 |
-| `backend/app/adapters/text.py` | 正文 `TextPolicy`、分组、JSON 输入与提示词、译文完整性解析 |
+| `backend/app/adapters/llm.py` | 通用 `call_messages(messages, profile, json_schema=...)`、`LLMConfig` 连接配置、统一响应和错误 |
+| `backend/app/adapters/text.py` | 正文 `TextPolicy`、分组、JSON 输入与提示词、逐组输出 Schema、译文完整性解析 |
 | `backend/app/comic_titles.py` | 漫画名 JSON 输入与提示词、严格 JSON 解析、独立有界执行与缓存协调 |
 | `backend/app/comic_title_limits.py` | 每用户漫画名请求窗口、限速与诊断摘要 |
 | `backend/app/comic_title_cache.py` | 共享漫画名缓存、查询去重、执行续租及结果写入校验 |
@@ -40,7 +40,7 @@
 | `backend/app/classic.py` | 持久调用意图、重试、检查点及逐次成本计量 |
 | `backend/app/scheduler.py` | 结合供应商上游配额的文本执行池任务领取 |
 
-扩展来源时，继承 `adapters.llm.LLMConfig` 定义渠道连接配置，在注册表中加入 `TranslationChannel`。正文分组、重试与价格由 `adapters.text.TextPolicy` 单独校验；上游 RPM 属于供应商记录，不进入 `TextPolicy` 或新模型版本的配置。渠道调用函数接受消息列表（`role` / `content`）、供应商快照和后台解析的密钥，返回 `TextResponse(content, usage, request_id)` 或抛出 `TextError`。底层不构造业务提示词，不解析正文或漫画名 JSON，也不负责缓存、排队与重试。正文 worker 保留有界重试；漫画名只调用一次。供应商创建与编辑不自动请求模型，因此保存不代表已验证真实翻译效果。
+扩展来源时，继承 `adapters.llm.LLMConfig` 定义渠道连接配置，在注册表中加入 `TranslationChannel`。正文分组、重试与价格由 `adapters.text.TextPolicy` 单独校验；上游 RPM 属于供应商记录，不进入 `TextPolicy` 或新模型版本的配置。渠道调用函数接受消息列表（`role` / `content`）、供应商快照、后台解析的密钥和可选关键字参数 `json_schema`（`name`、`strict`、`schema`），转换为对应协议的结构化输出参数，返回 `TextResponse(content, usage, request_id)` 或抛出 `TextError`。底层不构造业务提示词，不解析正文或漫画名 JSON，也不负责缓存、排队与重试。正文 worker 保留有界重试；漫画名只调用一次。供应商创建与编辑不自动请求模型，因此保存不代表已验证真实翻译效果。
 
 分流算法与供应商配置、凭据及执行分离，通过 `translation_routing.py` 的 `STRATEGIES` 注册表扩展；当前策略为 `weighted`，两种用途共用入口，分别传入对应权重和业务键。
 
@@ -52,9 +52,11 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 
 ### 正文 LLM 文本格式
 
-发布切换时先停止接收新的常规翻译任务，并让旧文本任务完成，再协调更新 API 与文本 worker。当前运行代码不会根据旧任务的 `prompt_version` 选择历史提示词／解析器，不能让新旧 worker 混跑旧任务。已保存译文检查点仍是 ID 到译文的映射，插件、计算节点及数据库结构无须更换格式；独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
+发布时协调更新 API、文本 worker 与 maintenance，在全部进程升级后才保存超过旧版 8192 token 校验上限的供应商配置。新任务使用 `comic-json-v7` 缓存身份；旧 `comic-json-v6` JSON 任务保留供应商版本及输出上限，恢复时未完成分组使用当前代码的 Schema，已完成的 ID 到译文检查点可以直接复用。运行代码不会按旧 `prompt_version` 选择历史提示词／解析器；早于 JSON 的任务须先排空。回退到只支持 8192 token 的代码前，先将供应商指向原版本，并排空使用更大上限的新任务。插件、计算节点及数据库结构无须更换格式；独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
 
-Chat Completions 与 Responses 共用 `comic-json-v6` 提示词，源文本和译文只采用 JSON：顶层唯一字段为 `translations`，其值是段落 ID 到文本的对象映射。使用标准库编码和解析，没有新增第三方依赖；模型 HTTP 信封和内部检查点仍用各自原有的数据结构。此规则由业务提示词和本地校验执行，不向通用渠道强加供应商特有的结构化输出参数。
+Chat Completions 与 Responses 共用 `comic-json-v7` 输出契约，源文本和译文只采用 JSON：顶层唯一字段为 `translations`，其值是段落 ID 到文本的对象映射。正文逐组生成严格 JSON Schema，两层对象均禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验继续执行。使用标准库编码和解析，没有新增第三方依赖；模型 HTTP 信封和内部检查点仍用各自原有的数据结构。
+
+Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.strict=true`；Responses 发送 `text.format` 中的同等定义。OpenRouter 同时发送 `provider.require_parameters=true`，只向支持请求参数的端点路由。正文供应商必须支持严格结构化输出；不支持时按上游错误终止，不静默移除约束。漫画名及其他未传 Schema 的通用调用保持原请求参数。[OpenAI 结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)、[OpenRouter 结构化输出](https://openrouter.ai/docs/guides/features/structured-outputs)
 
 目标语言放在系统指令的 `Target: "zh-Hans"` 中，用户消息只包含 JSON 对象，避免模型在译文中复制目标语言字段。输入示例：
 
@@ -70,7 +72,9 @@ Chat Completions 与 Responses 共用 `comic-json-v6` 提示词，源文本和�
 
 系统指令要求自然、忠实，保留语气与名称，利用组内上下文；源文本只能作为数据。只发送 ID 和 OCR 原文，不发送坐标等图像字段。输入与输出使用同一结构，模型只替换文本值；ID 始终为字符串，不能把 `"01"` 改成 `"1"`。逗号、引号、反斜杠、换行和 Unicode 按 JSON 字符串规则处理，不作为表格分隔符。解析允许 JSON 空白及键顺序变化，但拒绝 Markdown 包裹、附加说明、额外字段、重复键（包括转义后相同的键）、缺失／未知 ID、非字符串或空白译文、超过 2000 字符的译文、NUL 和未配对代理字符。只接受这一种 JSON 结构，不保留旧表格解析或格式回退；失败进入已有有界重试并逐次计量。提示词版本进入任务快照及结果缓存身份。
 
-采用紧凑对象映射，避免为每段重复 `id`／`text` 字段；分组、并发、输出 token 上限保持不变，输入用量上界按实际 JSON 消息字节数重新计算。格式开销取决于段数和文本字符，真实 token 用量、模型延迟与格式错误率需用所选供应商验证，不能仅凭 JSON 改动推断改善幅度。
+采用紧凑对象映射，避免为每段重复 `id`／`text` 字段；分组和并发设置不变，Schema 大小随组内 ID 数量增长，输入成本预占包含消息及 Schema 的 UTF-8 字节上界。输出上限允许配置 128–32768 token，须符合所选模型能力；已有版本不自动加大。响应信封读取仍有 1 MiB 硬上限。较高输出上限增加未知成本预占，不要求模型生成同样多的 token；实际消耗仍按返回用量计量。格式开销、真实 token 用量、模型延迟与错误率需用所选供应商验证。
+
+达到 token 或其他生成限制的未完成响应仍进入有界重试。明确的 `refusal`／内容过滤响应记为 `TEXT_REFUSED`，保留用量与请求 ID 并终止，避免当作格式错误重复请求；拒绝内容不进入默认日志。严格 Schema 不替代业务校验，也不保证翻译质量。
 
 专项命令（在 `backend` 目录）：`.venv/Scripts/python.exe -m pytest -q tests/test_json_text.py tests/test_text_adapter.py tests/test_classic.py tests/test_classic_parallel.py tests/test_compute_v3.py tests/test_translation_providers.py`。隔离测试验证两种传输协议、特殊字符和标准 JSON 转义、ID 对应、重试计费及检查点恢复；不代表真实模型翻译质量或线上任务恢复已验证。
 

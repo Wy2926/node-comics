@@ -177,7 +177,7 @@ def test_json_prompt_version_changes_cache_identity_without_changing_node_protoc
         current = snapshot(db)
         monkeypatch.setattr(classic_config, 'PROMPT_VERSION', 'previous-prompt')
         previous = snapshot(db)
-    assert current['prompt_version'] == 'comic-json-v6'
+    assert current['prompt_version'] == 'comic-json-v7'
     assert current['engine'] == previous['engine'] == {'protocol_version': 3}
     assert current['text'] == previous['text']
     assert digest(current) != digest(previous)
@@ -321,7 +321,8 @@ def test_title_requests_use_selected_supplier_and_preserve_shared_cache(admin_ca
 def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_case, monkeypatch):
     from app.translation_channels import CHANNELS, TranslationChannel
     seen = []
-    def call(messages, profile, api_key):
+    def call(messages, profile, api_key, *, json_schema=None):
+        assert json_schema['strict'] is True
         seen.append((messages, profile['channel'], api_key))
         return TextResponse('{"translations":{}}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
     monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', LLMConfig, (), call))
@@ -331,6 +332,30 @@ def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_cas
         profile = snapshot(db, provider['id'])['text']
     assert call_text([], 'en', profile).request_id == 'synthetic'
     assert seen == [(messages([], 'en'), 'synthetic', 'isolated-new-key')]
+
+
+def test_output_limit_update_preserves_old_revision_and_wire_limit(admin_case, monkeypatch):
+    first = create(admin_case, body(max_output_tokens=8192))
+    with session_factory()() as db:
+        before = snapshot(db)
+    client, auth = admin_case
+    changed = client.put(PATH + '/' + first['id'], headers=auth, json=body(max_output_tokens=32768))
+    assert changed.status_code == 200
+    with session_factory()() as db:
+        after = snapshot(db)
+    assert before['text']['revision_id'] != after['text']['revision_id']
+    assert digest(before) != digest(after)
+    seen = []
+    def handler(request):
+        payload = json.loads(request.content)
+        assert payload['response_format']['json_schema']['strict'] is True
+        seen.append(payload['max_completion_tokens'])
+        return httpx.Response(200, json={'choices': [{'message': {'content': '{}'}, 'finish_reason': 'stop'}]})
+    monkeypatch.setattr(openai_text, 'CheckedTransport', lambda: httpx.MockTransport(handler))
+    for profile in [before, after, before]:
+        call_text([], 'en', profile['text'])
+    assert seen == [8192, 32768, 8192]
+    assert client.put(PATH + '/' + first['id'], headers=auth, json=body(max_output_tokens=32769)).status_code == 422
 
 
 def test_disabled_supplier_pauses_before_request_without_metering(text_case):

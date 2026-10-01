@@ -11,6 +11,8 @@ from .images import read_bounded
 from .transport import CheckedTransport
 from .llm import LLMConfig, Message, TextError, TextResponse
 
+MAX_RESPONSE_BYTES = 1024 * 1024
+
 
 class OpenAITextConfig(LLMConfig):
     base_url: str = Field(default='https://api.openai.com/v1', max_length=1000)
@@ -35,13 +37,21 @@ class OpenAITextConfig(LLMConfig):
         return value
 
 
-def call_messages(messages: list[Message], profile: dict, api_key: str) -> TextResponse:
+def call_messages(messages: list[Message], profile: dict, api_key: str, *,
+                  json_schema: dict | None = None) -> TextResponse:
     chat = profile["protocol"] == "chat_completions"
     payload = {"model": profile["model"], "stream": False, "store": False}
     if chat:
         payload.update(messages=messages, max_completion_tokens=profile["max_output_tokens"])
     else:
         payload.update(input=messages, max_output_tokens=profile["max_output_tokens"])
+    if json_schema is not None:
+        if chat:
+            payload['response_format'] = {'type': 'json_schema', 'json_schema': json_schema}
+        else:
+            payload['text'] = {'format': {'type': 'json_schema', **json_schema}}
+        if urlsplit(profile['base_url']).hostname == 'openrouter.ai':
+            payload['provider'] = {'require_parameters': True}
     # Previously saved revisions omit this setting; keep their original request
     # behavior until the administrator saves a new immutable revision.
     effort = profile.get('reasoning_effort', 'provider_default')
@@ -63,18 +73,23 @@ def call_messages(messages: list[Message], profile: dict, api_key: str) -> TextR
                             'TEXT_AUTH_FAILED' if response.status_code in (401, 403) else 'TEXT_PROVIDER_REJECTED')
                     raise TextError(code, "文本服务拒绝请求，请检查模型、接口协议、余额与密钥",
                                     retryable=retryable, retry_after=retry_delay(response.headers.get("retry-after")), request_id=request_id)
-                raw = read_bounded(response, 128 * 1024, time.monotonic() + profile["timeout_seconds"])
+                raw = read_bounded(response, MAX_RESPONSE_BYTES, time.monotonic() + profile["timeout_seconds"])
         data = json.loads(raw)
         usage = safe_usage(data.get("usage"))
         request_id = request_id or (data.get("id", "")[:200] if isinstance(data.get("id"), str) else None)
         try:
             if chat:
                 choice = data["choices"][0]
+                if choice['message'].get('refusal') or choice.get('finish_reason') == 'content_filter':
+                    raise TextError('TEXT_REFUSED', '文本服务拒绝生成内容', usage=usage, request_id=request_id)
                 content = choice["message"]["content"]
                 complete = choice.get("finish_reason") == "stop"
             else:
-                content = ''.join(part["text"] for item in data.get("output", []) if item.get("type") == "message"
-                                  for part in item.get("content", []) if part.get("type") == "output_text")
+                parts = [part for item in data.get('output', []) if item.get('type') == 'message'
+                         for part in item.get('content', [])]
+                if any(part.get('type') == 'refusal' for part in parts):
+                    raise TextError('TEXT_REFUSED', '文本服务拒绝生成内容', usage=usage, request_id=request_id)
+                content = ''.join(part['text'] for part in parts if part.get('type') == 'output_text')
                 complete = data.get("status") == "completed"
             if not complete or not isinstance(content, str):
                 raise ValueError()

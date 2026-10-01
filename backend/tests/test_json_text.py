@@ -3,7 +3,7 @@ import json
 
 import pytest
 from app.adapters.llm import TextError
-from app.adapters.text import input_bound, messages, parse_translations
+from app.adapters.text import input_bound, messages, parse_translations, response_schema
 
 
 @pytest.mark.parametrize('value', [
@@ -92,4 +92,20 @@ def test_source_payload_omits_image_geometry_and_bounds_actual_json():
     result = messages(segments, 'en')
     assert result[0]['content'].endswith('Target: "en"')
     assert json.loads(result[1]['content']) == {'translations': {'a': segments[0]['source']}}
-    assert input_bound(segments, 'en') == len(json.dumps(result, ensure_ascii=False).encode()) + 256
+    bound = input_bound(segments, 'en')
+    assert bound >= len(json.dumps({'messages': result, 'response_format': {
+        'type': 'json_schema', 'json_schema': response_schema(segments)}}, ensure_ascii=False).encode()) + 256
+
+
+def test_schema_requires_exact_string_ids_and_excludes_source_and_geometry():
+    segments = [{'id': key, 'source': 'private source', 'bbox': [1, 2, 3, 4]}
+                for key in ['0', '01', 'quoted"\\id']]
+    definition = response_schema(segments)
+    assert definition['strict'] is True
+    root = definition['schema']
+    assert root['required'] == ['translations'] and root['additionalProperties'] is False
+    values = root['properties']['translations']
+    assert values['required'] == ['0', '01', 'quoted"\\id']
+    assert values['additionalProperties'] is False
+    assert values['properties'] == {segment['id']: {'type': 'string'} for segment in segments}
+    assert 'private source' not in json.dumps(definition) and 'bbox' not in json.dumps(definition)

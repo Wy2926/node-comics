@@ -113,6 +113,44 @@ def test_text_stage_checkpoint_replay_never_repeats_paid_call(text_case):
         assert (call.accounted_micros, call.cost_state) == (1100, 'estimated')
 
 
+def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case):
+    import json
+    from app.adapters.text import messages, response_schema
+    from app.classic_config import snapshot
+    job_id, lease_id = text_case
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        provider = configure_text_provider(db, job.config['text']['provider_id'], max_output_tokens=32768)
+        job.config = {**job.config, 'text': snapshot(db, provider.id)['text']}
+        db.commit()
+    call_id, _, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
+    with session_factory()() as db:
+        call = db.get(TextCall, call_id)
+        sent_bytes = len(json.dumps({'messages': messages(SEGMENTS, 'zh-Hans'), 'response_format': {
+            'type': 'json_schema', 'json_schema': response_schema(SEGMENTS)}}, ensure_ascii=False).encode())
+        assert call.reserved_micros >= sent_bytes * 5 + 32768 * 30
+        assert call.accounted_micros == call.reserved_micros and call.cost_state == 'unknown'
+    classic.complete_call(call_id, lease_id, response=TextResponse(
+        '{}', {'input_tokens': 100, 'output_tokens': 20}, 'actual-usage'))
+    with session_factory()() as db:
+        call = db.get(TextCall, call_id)
+        assert call.accounted_micros == 1100 and call.cost_state == 'estimated'
+
+
+def test_refusal_stops_after_one_call_and_preserves_metering(text_case, monkeypatch):
+    def refuse(*args):
+        raise TextError('TEXT_REFUSED', '文本服务拒绝生成内容',
+                        usage={'input_tokens': 100, 'output_tokens': 5}, request_id='refused')
+    monkeypatch.setattr(classic, 'call_text', refuse)
+    with pytest.raises(TextError, match='TEXT_REFUSED'):
+        classic.run_text_stage(*text_case)
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall)).all()
+        assert len(calls) == 1
+        assert calls[0].accounted_micros == 650 and calls[0].request_id == 'refused'
+        assert db.get(ClassicState, text_case[0]).translations == {}
+
+
 def test_format_repair_records_cost_for_every_subcall(text_case, monkeypatch):
     original = classic.call_text
     replies = iter([TextResponse('invalid', {'input_tokens': 100, 'output_tokens': 5}, 'invalid'), original()])

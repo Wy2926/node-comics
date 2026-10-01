@@ -37,3 +37,14 @@ test('independent routing weights accept zero and reject invalid or fractional v
   assert.ok(validateProvider({...draft(), reasoning_effort: 'unknown'}, channels, true).reasoning_effort);
   for (const value of ['', '0', '-1', '0.5', '10001']) assert.ok(validateProvider({...draft(), requests_per_minute: value}, channels, true).requests_per_minute);
 });
+
+test('output limit accepts larger model responses and preserves existing values', () => {
+  for (const value of ['128', '8192', '32768']) {
+    const input = {...draft(), max_output_tokens: value};
+    assert.ok(!validateProvider(input, channels, true).max_output_tokens);
+    assert.equal(providerInput(input).config.max_output_tokens, Number(value));
+  }
+  for (const value of ['127', '32769', '8192.5', 'NaN']) {
+    assert.ok(validateProvider({...draft(), max_output_tokens: value}, channels, true).max_output_tokens);
+  }
+});
