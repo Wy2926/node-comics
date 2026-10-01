@@ -1,6 +1,6 @@
 # 系统设置与请求保护
 
-管理后台“系统设置”统一维护页数默认值、分钟准入、上传保护与反馈预算。只有管理员可以读取和修改；设置保存在数据库，API 与工作进程从同一份配置读取。
+管理后台“系统设置”统一维护页数默认值、匿名每日预算、分钟准入、上传保护与反馈预算。只有管理员可以读取和修改；设置保存在数据库，API 与工作进程从同一份配置读取。
 
 ## 参数及生效规则
 
@@ -8,6 +8,9 @@
 | --- | --- | --- | --- |
 | 页数权益 | 普通每日页数 `free_daily_pages` | 30 张 | 新建每日额度桶的授予页数，已有桶不回写 |
 | 页数权益 | 运营会员默认月重绘 `plus_monthly_redraw_pages` | 300 张 | 新开通运营会员未指定自定义额度时使用；续期保留原会员段快照 |
+| 匿名体验 | 每游客每日受理 `guest_daily_limit` | 5 张 | 同一游客身份的新受理常规翻译；整数范围 1–100 |
+| 匿名体验 | 每网络每日受理 `guest_network_daily_limit` | 100 张 | 同一 IPv4 地址或 IPv6 /64 前缀的共享预算；整数范围 1–1,000 |
+| 匿名体验 | 全站每日受理 `guest_global_daily_limit` | 10,000 张 | 全站匿名访客的新受理常规翻译合计；整数范围 1–100,000 |
 | 翻译速率 | 普通用户新翻译图片 | 10 张 / 60 秒 | 全账户跨模式、语言和设备的精确滚动窗口 |
 | 翻译速率 | PLUS 新翻译图片 | 100 张 / 60 秒 | 仅新受理翻译计数；重传、重放和结果复用不计数 |
 | 上传保护 | 单账户上传并发 | 10 | 一个账户跨 API 副本同时接收或写入存储的上传数量 |
@@ -21,17 +24,19 @@
 
 表中是代码默认初始值；空库首次配置可由环境变量覆盖。页数设置允许 0–1,000,000。每日额度修改不会重写已有桶的授予、已用或预占；运营会员已有段和续期保留原月额度，付费产品仍使用不可变权益版本。
 
+匿名预算按 `QUOTA_TIMEZONE` 的自然日统计，独立于注册账户页数。保存新限额后，后续匿名受理使用当前限额与当天已用次数判断；修改不清零计数、不返还失败或取消任务的次数，也不取消已受理任务。同一 UUID 重放、本人有效在途或完成任务复用不再次计次；失败、取消、无字和部分完成仍计次。更换游客 Cookie 不重置网络或全站预算。旧配置缺少这三个字段时，读取使用表中的默认值，不改配置版本或写回数据库；下次完整保存时持久化。
+
 单账户上传并发不能高于全局并发，接收空闲超时不能超过总超时。页面和服务端都校验范围。设置保存后供后续请求读取；已接纳的上传继续使用接纳时的超时和续租快照，不因修改设置而中断。降低并发上限不会主动取消已接纳上传，在占用低于新上限前停止接纳新上传。
 
 反馈设置变化不清零已使用的每日计数，也不重新填满令牌桶。相同幂等键与相同内容返回原回执，不重复创建、不消耗新反馈预算；相同键与不同内容仍为 409。不同键即使反馈内容相同，也必须消耗预算。超限返回 429，包含 `Retry-After` 和 JSON 的 `retry_after_seconds`。
 
-环境变量 `FREE_DAILY_PAGES`、`PLUS_MONTHLY_REDRAW_PAGES`、`FREE_IMAGES_PER_MINUTE`、`PLUS_IMAGES_PER_MINUTE`、`UPLOAD_USER_CONCURRENCY`、`UPLOAD_GLOBAL_CONCURRENCY`、`UPLOAD_IDLE_TIMEOUT_SECONDS`、`UPLOAD_BODY_TIMEOUT_SECONDS`、`UPLOAD_INGRESS_LEASE_SECONDS`、`FEEDBACK_REQUESTS_PER_MINUTE`、`FEEDBACK_REQUEST_BURST`、`FEEDBACK_RECEIPTS_PER_DAY` 仅用于首次初始化。系统配置创建后，以数据库为准；重启或不同副本的环境值不会覆盖管理员保存的设置。
+环境变量 `FREE_DAILY_PAGES`、`PLUS_MONTHLY_REDRAW_PAGES`、`GUEST_DAILY_LIMIT`、`GUEST_NETWORK_DAILY_LIMIT`、`GUEST_GLOBAL_DAILY_LIMIT`、`FREE_IMAGES_PER_MINUTE`、`PLUS_IMAGES_PER_MINUTE`、`UPLOAD_USER_CONCURRENCY`、`UPLOAD_GLOBAL_CONCURRENCY`、`UPLOAD_IDLE_TIMEOUT_SECONDS`、`UPLOAD_BODY_TIMEOUT_SECONDS`、`UPLOAD_INGRESS_LEASE_SECONDS`、`FEEDBACK_REQUESTS_PER_MINUTE`、`FEEDBACK_REQUEST_BURST`、`FEEDBACK_RECEIPTS_PER_DAY` 仅用于首次初始化。系统配置创建后，以数据库为准；重启或不同副本的环境值不会覆盖管理员保存的设置。
 
 ## 管理接口
 
 - `GET /v1/admin/system-settings` 返回版本、完整参数、最近更新时间及更新管理员。
 - `PUT /v1/admin/system-settings` 接受 `{ "expected_version": 1, "values": { ...完整参数... } }`。与读取版本不一致时返回 409 `SYSTEM_SETTINGS_CONFLICT`，避免两名管理员互相覆盖。页面保留草稿，要求重新读取最新版本再保存。
-- PUT 必须提交全部 12 个参数，包括上述两项运营规则；成功更新在同一事务中写入操作者和前后值审计，并通知客户端刷新策略。业务回滚时不留下成功审计。
+- PUT 必须提交全部 15 个参数，包括两项运营规则与三项匿名预算；成功更新在同一事务中写入操作者和前后值审计，并通知客户端刷新策略。业务回滚时不留下成功审计。
 - 普通用户和未登录请求不能读写系统设置；响应不包含任何供应商、数据库或存储凭据。
 
 ## 上传与领取的实现边界

@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     turnstile_secret_key: SecretStr = SecretStr("")
     guest_hash_secret: SecretStr = SecretStr("")
     guest_daily_limit: int = Field(default=5, ge=1, le=100)
-    guest_network_daily_limit: int = Field(default=5, ge=1, le=1000)
-    guest_global_daily_limit: int = Field(default=100, ge=1, le=100000)
+    guest_network_daily_limit: int = Field(default=100, ge=1, le=1000)
+    guest_global_daily_limit: int = Field(default=10000, ge=1, le=100000)
     guest_global_concurrency: int = Field(default=4, ge=1, le=100)
 
     @field_validator('guest_origin')

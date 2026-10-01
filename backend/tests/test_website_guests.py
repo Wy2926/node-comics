@@ -6,15 +6,15 @@ from uuid import uuid4
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import select, func
+from sqlalchemy import select, func, event
 from app import guests
 from app.config import settings
-from app.db import session_factory
+from app.db import engine, session_factory
 from app.guest_models import GuestSession, GuestDailyUsage, GuestDailyBudget
 from app.models import User, Job, Ledger, now
 from app.translation_requests import TranslationRequest
 from test_cluster_submissions import cluster, descriptor
-from conftest import login
+from conftest import login, configure_system_limits
 
 real_verify = guests.verify
 real_throttle = guests.throttle
@@ -104,9 +104,100 @@ def test_durable_five_attempts_replay_conflict_and_cancel(visitor):
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind=='guest_admit')) == 5
 
 
+@pytest.mark.parametrize(('field', 'code'), [
+    ('guest_daily_limit', 'GUEST_DAILY_LIMIT'),
+    ('guest_network_daily_limit', 'GUEST_NETWORK_LIMIT'),
+    ('guest_global_daily_limit', 'GUEST_GLOBAL_LIMIT'),
+])
+def test_admin_guest_limit_changes_apply_without_resetting_admission(visitor, field, code):
+    client, headers, owner, _ = visitor
+    auth = login(client, 'admin')
+    current = client.get('/v1/admin/system-settings', headers=auth).json()
+    def change(limit):
+        nonlocal current
+        response = client.put('/v1/admin/system-settings', headers=auth,
+            json={'expected_version': current['version'], 'values': {**current['values'], field: limit}})
+        assert response.status_code == 200, response.text
+        current = response.json()
+    change(1)
+    first_key = str(uuid4())
+    first = submit(visitor, b'first', first_key)
+    assert first.status_code == 202, first.text
+    cancel(visitor, first.json())
+    assert submit(visitor, b'blocked').json()['error']['code'] == code
+    status = client.get('/v1/guest/session', headers=headers).json()
+    assert status['daily_limit'] == current['values']['guest_daily_limit']
+    assert status['remaining'] == max(0, status['daily_limit'] - 1)
+    change(2)
+    second = submit(visitor, b'second')
+    assert second.status_code == 202, second.text
+    cancel(visitor, second.json())
+    change(1)
+    status = client.get('/v1/guest/session', headers=headers).json()
+    assert status['daily_limit'] == current['values']['guest_daily_limit']
+    assert status['remaining'] == max(0, status['daily_limit'] - 2)
+    assert submit(visitor, b'third').json()['error']['code'] == code
+    # Lowering the limit preserves replay access and never adds another admission.
+    replay = submit(visitor, b'first', first_key)
+    assert replay.status_code == 200 and replay.json()['error']['code'] == 'TRANSLATION_CANCELLED'
+    with session_factory()() as db:
+        assert db.scalar(select(func.sum(GuestDailyUsage.accepted_count))) == 2
+        assert sorted(db.scalars(select(GuestDailyBudget.accepted_count))) == [2, 2]
+        assert db.scalar(select(func.count()).select_from(Job).where(Job.owner_id == owner)) == 2
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'guest_admit')) == 2
+
+
+def test_legacy_saved_settings_enforce_new_guest_defaults(visitor):
+    from app.system_settings import SystemSettings
+    client, headers, *_ = visitor
+    configure_system_limits()
+    with session_factory()() as db:
+        row = db.get(SystemSettings, 1)
+        row.values = {name: value for name, value in row.values.items() if not name.startswith('guest_')}
+        legacy_version = row.version
+        db.commit()
+    settings().guest_daily_limit = 1
+    settings().guest_network_daily_limit = 1
+    settings().guest_global_daily_limit = 1
+    status = client.get('/v1/guest/session', headers=headers).json()
+    assert status['daily_limit'] == status['remaining'] == 5
+    for index in range(5):
+        response = submit(visitor, f'legacy-{index}'.encode())
+        assert response.status_code == 202, response.text
+        cancel(visitor, response.json())
+    assert submit(visitor, b'legacy-sixth').json()['error']['code'] == 'GUEST_DAILY_LIMIT'
+    with session_factory()() as db:
+        row = db.get(SystemSettings, 1)
+        assert row.version == legacy_version
+        assert not any(name.startswith('guest_') for name in row.values)
+
+
+def test_guest_operations_read_one_settings_snapshot(visitor):
+    client, headers, *_ = visitor
+    configure_system_limits()
+    queries = []
+    def record(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith('SELECT') and 'FROM system_settings' in statement:
+            queries.append(statement)
+    event.listen(engine(), 'before_cursor_execute', record)
+    try:
+        assert client.get('/v1/guest/session', headers=headers).status_code == 200
+        assert len(queries) == 1
+        queries.clear()
+        key = str(uuid4())
+        accepted = submit(visitor, key=key)
+        assert accepted.status_code == 202, accepted.text
+        assert len(queries) == 1  # Image rate admission and daily limits share this snapshot.
+        queries.clear()
+        assert submit(visitor, key=key).status_code == 202
+        assert not queries  # Durable replay does not need another limit read.
+    finally:
+        event.remove(engine(), 'before_cursor_execute', record)
+
+
 def test_network_budget_survives_cookie_reset_and_ip_header_spoof(visitor):
     client, headers, _, _ = visitor
-    settings().guest_network_daily_limit = 1
+    configure_system_limits(guest_network_daily_limit=1)
     first = submit(visitor)
     assert first.status_code == 202, first.text
     cancel(visitor, first.json())
@@ -135,7 +226,7 @@ def test_same_content_reuses_job_and_concurrent_new_content_has_one_slot(visitor
 
 
 def test_global_budget_rollback_does_not_consume_guest_or_network(visitor):
-    settings().guest_global_daily_limit = 1
+    configure_system_limits(guest_global_daily_limit=1)
     first = submit(visitor)
     assert first.status_code == 202
     cancel(visitor, first.json())
@@ -160,7 +251,10 @@ def test_independent_guests_cannot_race_past_shared_limits(visitor,setting,code)
     assert second.status_code==200 and second.json()['user_id']!=first_owner
     second_cookie=client.cookies.get('nc-guest')
     client.cookies.clear()
-    setattr(settings(),setting,1)
+    if setting == 'guest_global_concurrency':
+        setattr(settings(), setting, 1)
+    else:
+        configure_system_limits(**{setting: 1})
     barrier=Barrier(2)
     def create(cookie):
         barrier.wait(timeout=10)

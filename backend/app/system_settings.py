@@ -34,6 +34,9 @@ class RequestLimits(RequestBody):
     feedback_requests_per_minute: int = Field(ge=1, le=1000)
     feedback_request_burst: int = Field(ge=1, le=100)
     feedback_receipts_per_day: int = Field(ge=1, le=10000)
+    guest_daily_limit: int = Field(ge=1, le=100)
+    guest_network_daily_limit: int = Field(ge=1, le=1000)
+    guest_global_daily_limit: int = Field(ge=1, le=100000)
 
     @model_validator(mode="after")
     def consistent_limits(self):
@@ -78,13 +81,20 @@ def initialize_system_settings(db):
                      .execution_options(populate_existing=True))
 
 
+def stored_limits(values):
+    # Existing versioned rows predate guest controls. Do not overwrite their
+    # settings or versions during reads; a complete PUT persists the new fields.
+    return RequestLimits.model_validate({'guest_daily_limit': 5,
+        'guest_network_daily_limit': 100, 'guest_global_daily_limit': 10000, **values})
+
+
 def get_request_limits(db):
     """Use the supplied transaction/connection; never cache across requests."""
-    return RequestLimits.model_validate(initialize_system_settings(db).values)
+    return stored_limits(initialize_system_settings(db).values)
 
 
 def settings_json(row):
-    return {"version": row.version, "values": RequestLimits.model_validate(row.values).model_dump(),
+    return {"version": row.version, "values": stored_limits(row.values).model_dump(),
             "updated_at": row.updated_at.isoformat() + "Z", "updated_by": row.updated_by}
 
 

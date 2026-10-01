@@ -14,7 +14,7 @@ from conftest import login
 from app.auth import token_for
 from app.config import settings
 from app.db import engine, session_factory
-from app.models import User, uid
+from app.models import User, now, uid
 from app.system_settings import (RequestLimits, SystemSettings, SystemSettingsUpdate, get_request_limits,
     initialize_system_settings, put_system_settings, router, settings_json)
 from test_classic import text_database
@@ -26,6 +26,7 @@ DEFAULTS = {
     "upload_idle_timeout_seconds": 15, "upload_body_timeout_seconds": 120,
     "upload_ingress_lease_seconds": 45, "feedback_requests_per_minute": 30,
     "feedback_request_burst": 10, "feedback_receipts_per_day": 100,
+    "guest_daily_limit": 5, "guest_network_daily_limit": 100, "guest_global_daily_limit": 10000,
 }
 PATH = "/v1/admin/system-settings"
 
@@ -90,6 +91,10 @@ def test_only_administrators_can_read_and_change_settings(system_case):
     {"upload_body_timeout_seconds": 901}, {"upload_ingress_lease_seconds": 14},
     {"upload_ingress_lease_seconds": 301}, {"feedback_requests_per_minute": 1001},
     {"feedback_request_burst": 101}, {"feedback_receipts_per_day": 10001},
+    {"guest_daily_limit": 0}, {"guest_daily_limit": 101}, {"guest_daily_limit": True},
+    {"guest_network_daily_limit": 0}, {"guest_network_daily_limit": 1001},
+    {"guest_global_daily_limit": 0}, {"guest_global_daily_limit": 100001},
+    {"guest_global_daily_limit": "10000"},
     {"unrecognized_field": 1},
 ])
 def test_invalid_values_do_not_change_settings(system_case, change):
@@ -103,9 +108,10 @@ def test_invalid_values_do_not_change_settings(system_case, change):
 
 def test_complete_values_and_consistent_limits_are_required(system_case):
     case = system_case
-    missing = {name: value for name, value in DEFAULTS.items() if name != "upload_user_concurrency"}
-    assert case.client.put(PATH, headers=case.auth,
-        json={"expected_version": 1, "values": missing}).status_code == 422
+    for field in ("upload_user_concurrency", "guest_daily_limit", "guest_network_daily_limit", "guest_global_daily_limit"):
+        missing = {name: value for name, value in DEFAULTS.items() if name != field}
+        assert case.client.put(PATH, headers=case.auth,
+            json={"expected_version": 1, "values": missing}).status_code == 422
     for changes, message in (({"upload_user_concurrency": 17}, "每用户上传"),
                              ({"upload_body_timeout_seconds": 10}, "上传空闲超时")):
         response = case.client.put(PATH, headers=case.auth,
@@ -130,6 +136,30 @@ def test_environment_only_seeds_once_and_initializer_leaves_commit_to_caller(sys
     with session_factory()() as db:
         assert settings_json(initialize_system_settings(db)) == initial
         assert get_request_limits(db).model_dump() == DEFAULTS
+
+
+def test_legacy_row_exposes_guest_defaults_without_mutating_saved_settings(system_case):
+    case = system_case
+    legacy = {name: value for name, value in DEFAULTS.items() if not name.startswith("guest_")}
+    with session_factory()() as db:
+        db.add(SystemSettings(id=1, version=7, values=legacy, updated_at=now(),
+                              updated_by=case.owner_id))
+        db.commit()
+    settings().guest_daily_limit = 9
+    settings().guest_network_daily_limit = 3
+    settings().guest_global_daily_limit = 4
+    original = case.client.get(PATH, headers=case.auth)
+    assert original.status_code == 200, original.text
+    assert original.json()["version"] == 7 and original.json()["values"] == DEFAULTS
+    with session_factory()() as db:
+        assert get_request_limits(db).model_dump() == DEFAULTS
+        row = db.get(SystemSettings, 1)
+        assert row.values == legacy and row.version == 7 and row.updated_by == case.owner_id
+    values = {**DEFAULTS, "guest_daily_limit": 8}
+    changed = case.client.put(PATH, headers=case.auth, json={"expected_version": 7, "values": values})
+    assert changed.status_code == 200 and changed.json()["version"] == 8
+    with session_factory()() as db:
+        assert db.get(SystemSettings, 1).values == values
 
 
 def test_request_snapshots_refresh_without_extra_connections_or_implicit_commit(system_case):

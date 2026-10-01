@@ -15,7 +15,12 @@ def server_now(db):
 def image_limit(db, user):
     from .entitlements import is_plus
     from .system_settings import get_request_limits
-    cfg = get_request_limits(db)
+    guest_operation = user.kind == 'guest' and bool(db.info.get('guest_network'))
+    cfg = db.info.get('guest_limits') if guest_operation else None
+    if cfg is None:
+        cfg = get_request_limits(db)
+        if guest_operation:
+            db.info['guest_limits'] = cfg  # Shared only until this guest operation exits.
     return cfg.plus_images_per_minute if is_plus(db, user) else cfg.free_images_per_minute
 
 

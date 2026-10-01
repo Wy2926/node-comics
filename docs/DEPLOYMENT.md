@@ -79,7 +79,7 @@ maintenance 保持单活：先退休旧实例（含计费维护线程结束）�
 
 此功能需先升级 API／控制进程和数据库，再发布官网，不能只替换静态页。`website_guests_0010` 保留原用户 ID、OIDC subject、任务和账本，新增 guest 身份与三张会话／预算表；先在备份库演练、停旧进程、显式迁移，再启动支持新结构的全部进程。旧版不支持游客，禁止混跑或仅回退镜像。
 
-在 `.env.server` 配置 `GUEST_ORIGIN`（精确官网 HTTPS origin，无尾斜线）、真实 `TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY`、至少 32 字符的独立随机 `GUEST_HASH_SECRET`，最后设置 `GUEST_ENABLED=true`。全部 API 槽位共享稳定 HMAC 密钥；更换会重置网络身份，不应随发布轮换。密钥缺失或生产使用测试密钥拒绝启动。默认预算见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)，可通过模板中的四项 GUEST 限额调整；关闭开关拒绝新任务但保留已有任务读取。
+在 `.env.server` 配置 `GUEST_ORIGIN`（精确官网 HTTPS origin，无尾斜线）、真实 `TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY`、至少 32 字符的独立随机 `GUEST_HASH_SECRET`，最后设置 `GUEST_ENABLED=true`。全部 API 槽位共享稳定 HMAC 密钥；更换会重置网络身份，不应随发布轮换。密钥缺失或生产使用测试密钥拒绝启动。三项每日预算的环境变量仅用于首次初始化，日常通过[后台系统设置](SYSTEM_SETTINGS.md)调整并即时生效，默认值为每位访客 5、同网 100、全站 10000；`GUEST_GLOBAL_CONCURRENCY` 仍由环境变量配置，默认 4。关闭开关拒绝新任务但保留已有任务读取。
 
 Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为五语翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
 

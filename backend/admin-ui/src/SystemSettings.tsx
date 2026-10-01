@@ -7,6 +7,12 @@ const fields = [
     help: '仅新建的每日额度周期采用新值，已生效周期的已用、预占和总额保持不变。'},
   {key: 'plus_monthly_redraw_pages', group: 'entitlements', title: '运营会员默认月重绘页数', unit: '页 / 会员月', min: 0, max: 1000000, integer: true,
     help: '仅新开通的运营会员段采用此默认值；已有会员续期和付费产品权益版本保持原规则。'},
+  {key: 'guest_daily_limit', group: 'guest', title: '每位匿名访客每日受理上限', unit: '张 / 天', min: 1, max: 100, integer: true,
+    help: '同一游客身份的新受理常规翻译张数；已受理任务失败、取消、无字或部分完成仍计次。'},
+  {key: 'guest_network_daily_limit', group: 'guest', title: '同一网络每日匿名受理上限', unit: '张 / 天', min: 1, max: 1000, integer: true,
+    help: '同一 IPv4 地址或 IPv6 /64 前缀共享预算；更换游客 Cookie 不重置网络已用次数。'},
+  {key: 'guest_global_daily_limit', group: 'guest', title: '全站每日匿名受理上限', unit: '张 / 天', min: 1, max: 100000, integer: true,
+    help: '全站匿名访客合计的新受理张数；修改限额不清零已用次数，也不取消已受理任务。'},
   {key: 'free_images_per_minute', group: 'translation', title: '普通用户新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
     help: '同一账户在任意滚动 60 秒内受理的新翻译图片数。重复请求、重传和完成结果复用不计数。'},
   {key: 'plus_images_per_minute', group: 'translation', title: 'PLUS 新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
@@ -135,7 +141,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
 
   return <main id="main" tabIndex={-1} className="system-settings">
     <div className="page-heading"><div><p className="eyebrow">SYSTEM SETTINGS</p><h1>系统设置</h1>
-      <p className="muted">管理默认额度、调度权重及翻译、上传和反馈保护规则。</p></div>
+      <p className="muted">管理默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
       <button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</button>
     </div>
     <div className="sync-line"><span role="status">{operation === 'saving' ? '正在保存设置…' : operation === 'loading' ? '正在读取系统设置…' :
@@ -150,10 +156,10 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
       <p role="status">{busy ? '正在读取系统设置…' : '暂时无法读取设置，请点击“读取最新设置”重试。'}</p>
     </section> : <form className="settings-form" noValidate onSubmit={event => {event.preventDefault(); void save();}}>
       <fieldset disabled={busy} className="config-body">
-        {(['entitlements', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
+        {(['entitlements', 'guest', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
           <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">{group === 'upload' ? '↥' : '≡'}</span>
-            <div><h2 id={`settings-${group}`}>{group === 'entitlements' ? '额度与调度规则' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
-              <p className="muted">{group === 'entitlements' ? '设置新额度周期与运营会员的默认页数，以及同优先级下的调度份额。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
+            <div><h2 id={`settings-${group}`}>{group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
+              <p className="muted">{group === 'entitlements' ? '设置新额度周期与新开通运营会员段的默认页数。' : group === 'guest' ? '按服务配置的额度时区自然日计次，游客、网络和全站预算分别控制。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
           <div className="settings-fields">{fields.filter(field => field.group === group).map(field => {
             const fieldError = validation?.errors[field.key];
             const isChanged = changed(draft, snapshot.values, field.key);
@@ -169,7 +175,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
               {isChanged && <p className="settings-current-value">当前已保存：{snapshot.values[field.key]} {field.unit}</p>}
             </div>;
           })}</div>
-          <p className="settings-section-note">{group === 'entitlements' ? '额度按新周期或新会员段生效；付费订阅使用产品绑定的权益版本。修改记录可在操作审计中查询。' : group === 'translation' ? '保存后即时用于新翻译准入，已消耗的分钟名额不会清零；每日与会员月页数权益独立计算。' : group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
+          <p className="settings-section-note">{group === 'entitlements' ? '额度按新周期或新会员段生效；付费订阅使用产品绑定的权益版本。修改记录可在操作审计中查询。' : group === 'guest' ? '保存后按新限额与当天已用次数判断新受理；同一 UUID 重放或本人有效任务复用不再次计次。修改记录可在操作审计中查询。' : group === 'translation' ? '保存后即时用于新翻译准入，已消耗的分钟名额不会清零；每日与会员月页数权益独立计算。' : group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
             '修改设置不会清零已经使用的反馈预算，也不会改变用户的翻译页数额度。'}</p>
         </section>)}
       </fieldset>

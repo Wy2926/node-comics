@@ -23,6 +23,7 @@ from .guest_models import GuestSession, GuestDailyUsage, GuestDailyBudget
 from .models import User, Job, Ledger, Asset, now, uid
 from .request_models import RequestBody
 from .scheduler import ACTIVE
+from .system_settings import get_request_limits
 from .translation_requests import TranslationRequest
 
 router = APIRouter(prefix='/v1/guest', tags=['Anonymous image translation'])
@@ -114,10 +115,11 @@ def day_window(at):
 
 def session_json(db, session):
     day, end = day_window(now())
+    limits = get_request_limits(db)
     used = db.get(GuestDailyUsage, (session.user_id, day)) if session else None
     return {'enabled': enabled(), 'site_key': settings().turnstile_site_key if enabled() else '',
-        'user_id': session.user_id if session else None, 'daily_limit': settings().guest_daily_limit,
-        'remaining': max(0, settings().guest_daily_limit - (used.accepted_count if used else 0)),
+        'user_id': session.user_id if session else None, 'daily_limit': limits.guest_daily_limit,
+        'remaining': max(0, limits.guest_daily_limit - (used.accepted_count if used else 0)),
         'resets_at': end.isoformat(), 'result_retention_hours': 24}
 
 
@@ -162,6 +164,7 @@ def reserve_guest(db, user, job, at):
     if not network or job.mode != 'classic':
         problem('GUEST_FORBIDDEN', '匿名任务缺少有效准入', 403)
     cfg = settings()
+    limits = db.info.get('guest_limits') or get_request_limits(db)
     active = select(Job.id).where(Job.status.in_(ACTIVE), Job.id != job.id)
     if db.scalar(active.where(Job.owner_id == user.id).limit(1)):
         raise HTTPException(429, detail={'code': 'GUEST_BUSY', 'message': '请等待当前图片完成'}, headers={'Retry-After': '5'})
@@ -169,9 +172,9 @@ def reserve_guest(db, user, job, at):
             User.kind == 'guest', Job.status.in_(ACTIVE), Job.id != job.id)) >= cfg.guest_global_concurrency:
         raise HTTPException(429, detail={'code': 'GUEST_BUSY', 'message': '匿名体验繁忙，请稍后再试'}, headers={'Retry-After': '10'})
     day, end = day_window(at)
-    specs = [(GuestDailyUsage, (user.id, day), {'user_id': user.id, 'day': day}, cfg.guest_daily_limit, 'GUEST_DAILY_LIMIT'),
-             (GuestDailyBudget, (network, day), {'key': network, 'day': day}, cfg.guest_network_daily_limit, 'GUEST_NETWORK_LIMIT'),
-             (GuestDailyBudget, ('global', day), {'key': 'global', 'day': day}, cfg.guest_global_daily_limit, 'GUEST_GLOBAL_LIMIT')]
+    specs = [(GuestDailyUsage, (user.id, day), {'user_id': user.id, 'day': day}, limits.guest_daily_limit, 'GUEST_DAILY_LIMIT'),
+             (GuestDailyBudget, (network, day), {'key': network, 'day': day}, limits.guest_network_daily_limit, 'GUEST_NETWORK_LIMIT'),
+             (GuestDailyBudget, ('global', day), {'key': 'global', 'day': day}, limits.guest_global_daily_limit, 'GUEST_GLOBAL_LIMIT')]
     for model, key, values, limit, code in specs:
         row = db.get(model, key)
         if not row:
@@ -200,6 +203,7 @@ def translate(translation_id: UUID, body: translations.TranslationInput, request
         return translations.translate(translation_id, body, request, user, db)
     finally:
         db.info.pop('guest_network', None)
+        db.info.pop('guest_limits', None)
 
 
 @router.get('/translations/events')
