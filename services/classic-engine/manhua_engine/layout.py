@@ -264,11 +264,12 @@ def bubble_plan(text, paths, size, mask):
     def slot_at(y):
         free = np.all(mask[y:y+advance] > 0, axis=0)
         ends = np.flatnonzero(np.diff(np.r_[False,free,False]))
-        spans = list(zip(ends[::2],ends[1::2]))
+        # A centered line cannot move into a detached wing beside another region.
+        spans = [pair for pair in zip(ends[::2],ends[1::2]) if pair[0] <= cx < pair[1]]
         if not spans:
             return None
         # Do not span across an artwork hole or a neighboring text region.
-        left,right = max(spans,key=lambda pair:(pair[1]-pair[0])-.25*abs((pair[0]+pair[1])/2-cx))
+        left,right = spans[0]
         return int(left),y,int(right-left),advance
     best = None
     for count in range(1,min(len(units),height//advance)+1):

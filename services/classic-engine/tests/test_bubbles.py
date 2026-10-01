@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from PIL import Image, ImageDraw
 from manhua_engine.bubbles import lettering_areas
-from manhua_engine.layout import draw_region
+from manhua_engine.layout import bubble_plan, draw_region, font_paths
 
 
 def balloon():
@@ -43,6 +43,40 @@ def test_shared_balloon_assignments_and_fallback_boxes_do_not_overlap():
         a,b,c,d = other['bbox']
         assert not local[b:d,a:c].any()
     assert occupied.max()==1
+
+
+def test_shared_horizontal_balloon_does_not_move_a_short_tail_into_a_side_wing():
+    image = Image.new('RGB',(768,512),'#cedeea')
+    ImageDraw.Draw(image).ellipse((86,51,684,259),fill='white',outline='black',width=3)
+    regions = [{'bbox':[232,100,533,134],'dir':'h'}, {'bbox':[252,164,514,192],'dir':'h'}]
+    areas = lettering_areas(np.array(image),regions)
+    first = draw_region(image,'你好，朋友！',regions[0],target='zh-Hans',area=areas[0])
+    assert first['area_source']=='bubble' and first['lines']==['你好，朋友！']
+    plan = bubble_plan('你好，朋友！',font_paths((), 'zh'),round(first['font_px']*2),areas[0]['mask'])
+    center = np.nonzero(areas[0]['mask'])[1].mean()
+    assert all(x <= center < x+w for _,(x,y,w,h) in plan)
+    second = draw_region(image,'我们来读书吧！',regions[1],target='zh-Hans',area=areas[1])
+    assert second['area_source']=='bubble' and second['lines']==['我们来读书吧！']
+    # Slot selection cannot enlarge a region's blank area into its neighbor.
+    first_area = np.zeros((512,768),bool)
+    x0,y0,x1,y1 = areas[0]['bbox']
+    first_area[y0:y1,x0:x1] = areas[0]['mask']>0
+    a,b,c,d = regions[1]['bbox']
+    assert not first_area[b:d,a:c].any()
+
+
+def test_rectangular_blank_area_keeps_wrapped_lines_on_the_same_center():
+    image = Image.new('RGB',(420,300),'#777777')
+    ImageDraw.Draw(image).rectangle((40,35,380,265),fill='white',outline='black',width=4)
+    region = {'bbox':[185,75,235,225],'dir':'v'}
+    area = lettering_areas(np.array(image),[region])[0]
+    text = 'Tomorrow will surely be wonderful.'
+    result = draw_region(image,text,region,target='en',area=area)
+    assert result['area_source']=='bubble' and len(result['lines'])>1
+    assert ' '.join(result['lines'])==text
+    plan = bubble_plan(text,font_paths((), 'en'),round(result['font_px']*2),area['mask'])
+    centers = [x+w/2 for _,(x,y,w,h) in plan]
+    assert max(centers)==min(centers)
 
 
 def test_blank_page_and_unbounded_artwork_do_not_become_a_balloon():
