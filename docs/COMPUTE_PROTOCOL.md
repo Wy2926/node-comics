@@ -110,6 +110,8 @@ metadata 是 JSON 文本：
 
 result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bbox 不得越界。original 的 bbox/output 均为 null，并省略 output 文件。metadata 最多 64 KiB，output 受中心 `cluster_max_result_bytes` 约束，与原图 `max_upload_bytes` 分开；节点编码和传输上限为 88 MiB，与中心默认值一致。这是单文件协议限制，不作为磁盘容量准入。未知字段、多余文件或重复字段均被拒绝。timings 不参与 result 摘要。
 
+`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（WebP 编码）。`detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；OCR 值是并行文本块锁等待的累计时间，不是页墙钟时间。细分计时仅用于诊断，不改变结果身份、租约与结算；先升级中心以接受这些字段，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
+
 中心先冻结提交摘要和交付意图，在调度锁外检查文件长度、SHA-256、解码尺寸和二值 alpha。校验完成后再次检查租约及最早截止，在短事务中持久化受理时间与截止快照，然后耐久发布文件。最终事务与崩溃恢复共用同一规则：必须有及时受理记录、当前执行代次、对应分析/译文版本且未取消，才能提交 Job 结果描述、产物关联、任务成功、一次结算和稳定回执。无文件 original 也必须完成请求校验后才能受理。恢复与清理规则以[文件存储](OBJECT_STORAGE.md#文件发布与恢复)为准。
 
 节点在发请求前，以同一 SQLite 事务将 completion JSON 和覆盖字节 BLOB 写入本地恢复数据库；不存结果 base64，也不另建文件确认流程。响应丢失时重交相同描述与二进制，中心返回原回执。只保留未完成领取和未确认租约，终态后同事务清除记录与字节，SQLite 自动回收空闲页；不为恢复数据库设置容量领取门槛，也不按时间清除未确认交付。同租约不同摘要冲突，旧代次不能覆盖新结果。中心文件已耐久发布而最终事务未提交时，maintenance 可复核当前代次恢复交付，不重新调用文本模型。

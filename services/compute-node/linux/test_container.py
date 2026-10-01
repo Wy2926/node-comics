@@ -104,6 +104,28 @@ class ContainerTests(unittest.TestCase):
         self.assertIn('stop_grace_period: 90s', compose)
         self.assertNotIn('ports:', compose)
 
+    def test_runtime_builds_and_checks_the_pinned_gil_releasing_ncnn(self):
+        dockerfile = (ROOT / 'Dockerfile').read_text()
+        self.assertIn('AS ncnn-wheel', dockerfile)
+        self.assertIn('282f0f4a1beec1f5212aa0d22c00737418645055f33c2d2082922931cdbdc537', dockerfile)
+        self.assertIn('patch --batch --fuzz=0', dockerfile)
+        self.assertIn('COPY --from=ncnn-wheel /wheels/', dockerfile)
+        self.assertIn('/opt/node/venv/bin/python /tmp/test_ncnn_gil.py', dockerfile)
+        self.assertIn('/opt/node/source/ncnn/', dockerfile)
+        self.assertIn('1.0.20260526+nodegil1', (ROOT / 'verify_assets.py').read_text())
+
+    def test_runtime_does_not_copy_tests_or_local_experiments(self):
+        dockerfile = (ROOT / 'Dockerfile').read_text()
+        runtime = dockerfile.split('FROM base AS runtime', 1)[1]
+        self.assertIn('--mount=type=bind,source=.,target=/src,ro', runtime)
+        self.assertNotIn('COPY services/compute-node/linux/ /', runtime)
+        self.assertNotIn('COPY services/classic-engine/tools/ /', runtime)
+        self.assertNotIn('COPY services/compute-node/linux/ncnn/ /', dockerfile)
+        for line in runtime.splitlines():
+            if line.startswith('COPY '):
+                for forbidden in ('test_', 'benchmark', '/wsl/', '/artifacts/'):
+                    self.assertNotIn(forbidden, line)
+
     def test_environment_bootstrap_is_private_and_preserves_identity(self):
         environ = {'NODE_CONTROL_URL': 'https://example.com', 'NODE_ID': 'node-test',
                    'NODE_TOKEN': 'test-credential', 'NODE_RESOURCE_ID': 'test:gpu:0'}
@@ -113,6 +135,7 @@ class ContainerTests(unittest.TestCase):
             config = json.loads(path.read_text())
             self.assertEqual([config[key] for key in ('local_pages', 'max_leases',
                 'download_workers', 'delivery_workers')], [2, 8, 6, 6])
+            self.assertEqual(config['render_workers'], 1)
             self.assertEqual(config['state_dir'], str(root / 'state'))
             if sys.platform != 'win32':
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)

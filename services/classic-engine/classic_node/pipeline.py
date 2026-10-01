@@ -6,6 +6,7 @@ import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest
 from .operations import report_page_failure
+from manhua_engine.timing import collect
 
 
 class Pipeline:
@@ -13,13 +14,14 @@ class Pipeline:
         self.agent = agent
         cfg = agent.local
         self.compute = ThreadPoolExecutor(cfg['local_pages'], thread_name_prefix='compute')
+        self.render_workers = cfg.get('render_workers', 1)
+        self.render = ThreadPoolExecutor(self.render_workers, thread_name_prefix='render')
         self.download = ThreadPoolExecutor(cfg.get('download_workers', 4), thread_name_prefix='download')
         self.control = ThreadPoolExecutor(cfg.get('download_workers', 4), thread_name_prefix='analysis')
         self.delivery = ThreadPoolExecutor(cfg.get('delivery_workers', 4), thread_name_prefix='delivery')
         self.limit = cfg.get('resident_bytes', 1024 * 1024 * 1024)
         self.used = 0
         self.memory_lock = Lock()
-        self.turn = False
 
     @staticmethod
     def input_reservation(page):
@@ -56,7 +58,7 @@ class Pipeline:
         return max(0, min(4, self.agent.local.get('download_workers', 4) - len(downloading), available // minimum))
 
     def close(self):
-        for pool in (self.download, self.compute, self.control, self.delivery):
+        for pool in (self.download, self.compute, self.render, self.control, self.delivery):
             pool.shutdown(wait=True)
 
     def submit(self, page, pool, name, operation):
@@ -66,10 +68,12 @@ class Pipeline:
             page.check()
             start = time.monotonic()
             page.timings[name + '_queue'] = start - page.ready_at
-            try:
-                return operation()
-            finally:
-                page.timings[name] = time.monotonic() - start
+            with collect() as details:
+                try:
+                    return operation()
+                finally:
+                    page.timings.update(details)
+                    page.timings[name] = time.monotonic() - start
 
         page.future = pool.submit(run)
         page.future.add_done_callback(lambda _: self.agent.wake.set())
@@ -185,20 +189,22 @@ class Pipeline:
                 self.submit(page, self.download, 'download', lambda p=page: self.agent.input_bytes(p))
             elif page.step == 'deliver':
                 self.submit(page, self.delivery, 'deliver', lambda p=page: self.agent.deliver(p, p.completion))
-        running = sum(bool(p.future and p.step in {'analyze', 'inpaint', 'render'}) for p in pages)
-        ready = [p for p in pages if not p.future and not p.pending_error and not p.stopped and not p.terminal
-                 and p.step in {'analyze', 'inpaint', 'render'}]
-        # Alternate completion and preparation, preserving FIFO within each class.
-        while ready and running < self.agent.local['local_pages']:
-            prefer_render = not self.turn
-            page = next((p for p in ready if (p.step == 'render') == prefer_render), ready[0])
-            ready.remove(page)
-            self.turn = not self.turn
-            if page.step == 'analyze':
-                operation = lambda p=page: self.prepare(p)
-            elif page.step == 'inpaint':
-                operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
-            else:
-                operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
-            self.submit(page, self.compute, page.step, operation)
-            running += 1
+        # Submit only available slots, not an unbounded executor backlog. A page
+        # owns its buffers until its future drains; waits retain the same lease
+        # and resident-byte reservation. No lock spans either execution pool.
+        # Advance prepared pages before admitting more analysis work, so a batch
+        # of downloads cannot postpone the first result until all are analyzed.
+        for stages, pool, capacity in (({'analyze', 'inpaint'}, self.compute, self.agent.local['local_pages']),
+                                       ({'render'}, self.render, self.render_workers)):
+            running = sum(bool(p.future and p.step in stages) for p in pages)
+            ready = sorted((p for p in pages if not p.future and not p.pending_error
+                            and not p.stopped and not p.terminal and p.step in stages),
+                           key=lambda p: (p.step == 'analyze', p.ready_at))
+            for page in ready[:max(0, capacity - running)]:
+                if page.step == 'analyze':
+                    operation = lambda p=page: self.prepare(p)
+                elif page.step == 'inpaint':
+                    operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
+                else:
+                    operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
+                self.submit(page, pool, page.step, operation)

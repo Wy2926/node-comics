@@ -6,6 +6,7 @@
   "resource_id": "machine:vulkan:0",
   "state_dir": "state",
   "local_pages": 2,
+  "render_workers": 1,
   "max_leases": 8,
   "download_workers": 4,
   "delivery_workers": 4,

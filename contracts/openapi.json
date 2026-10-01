@@ -1552,7 +1552,14 @@
                               "analysis_submit",
                               "text_wait",
                               "local_total",
-                              "output_put"
+                              "output_put",
+                              "render_areas",
+                              "render_layout",
+                              "render_diff",
+                              "render_encode",
+                              "detect_lock_wait",
+                              "ocr_lock_wait",
+                              "inpaint_lock_wait"
                             ]
                           },
                           "title": "Timings",
@@ -7662,7 +7669,14 @@
                 "analysis_submit",
                 "text_wait",
                 "local_total",
-                "output_put"
+                "output_put",
+                "render_areas",
+                "render_layout",
+                "render_diff",
+                "render_encode",
+                "detect_lock_wait",
+                "ocr_lock_wait",
+                "inpaint_lock_wait"
               ]
             },
             "type": "object",

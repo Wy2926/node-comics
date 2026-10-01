@@ -27,6 +27,18 @@ from test_node_management import provision
 PREFIX = '/internal/compute/v3'
 
 
+def test_node_detailed_timings_are_bounded_and_whitelisted():
+    from pydantic import TypeAdapter, ValidationError
+    from app.compute_v3 import Timings
+    adapter = TypeAdapter(Timings)
+    values = {key: .25 for key in ('render_areas', 'render_layout', 'render_diff', 'render_encode',
+                                  'detect_lock_wait', 'ocr_lock_wait', 'inpaint_lock_wait')}
+    assert adapter.validate_python(values) == values
+    for invalid in ({'render_encode': -1}, {'render_layout': float('nan')}, {'not_a_timing': 1}):
+        with pytest.raises(ValidationError):
+            adapter.validate_python(invalid)
+
+
 @pytest.fixture
 def v3(client, monkeypatch, png):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')

@@ -6,10 +6,13 @@ from pathlib import Path
 
 def verify(root):
     import importlib.util
+    from importlib.metadata import version
     import onnxruntime as ort
     from PIL import features
     from classic_node.runtime import LANGUAGE_PROBES, model_identity
     from manhua_engine.layout import coverage
+    if version('ncnn') != '1.0.20260526+nodegil1':
+        raise ValueError('Linux runtime requires the GIL-releasing NCNN build')
     if 'CUDAExecutionProvider' not in ort.get_available_providers() or not features.check('webp'):
         raise ValueError('Runtime requires the CUDA provider and WebP support')
     if any(importlib.util.find_spec(name) is not None for name in ('torch', 'pnnx')):

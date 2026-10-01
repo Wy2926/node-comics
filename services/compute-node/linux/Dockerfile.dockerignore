@@ -11,7 +11,9 @@
 !services/classic-engine/manhua_engine/
 !services/classic-engine/manhua_engine/**
 !services/classic-engine/tools/
-!services/classic-engine/tools/**
+!services/classic-engine/tools/build_ocr.py
+!services/classic-engine/tools/build_lama.py
+!services/classic-engine/tools/lama_model.py
 !services/compute-node/
 !services/compute-node/build_support.py
 !services/compute-node/toolchain.lock.json
@@ -20,6 +22,9 @@
 !services/compute-node/build-deps/**
 !services/compute-node/linux/
 !services/compute-node/linux/*.py
+!services/compute-node/linux/ncnn/
+!services/compute-node/linux/ncnn/gil-release.patch
+!services/compute-node/linux/ncnn/test_gil.py
 !services/compute-node/linux/Dockerfile
 !services/compute-node/linux/Dockerfile.dockerignore
 !services/compute-node/linux/compose.yaml

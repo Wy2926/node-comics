@@ -1,5 +1,7 @@
 """Recoverable analysis and sparse replacement pixels, without encoding a full page."""
 from concurrent.futures import wait
+from contextvars import copy_context
+from time import perf_counter
 import hashlib
 from importlib.metadata import version as package_version
 from io import BytesIO
@@ -15,6 +17,7 @@ from manhua_engine.quality import conservative_mask
 from manhua_engine.bubbles import lettering_areas
 from manhua_engine.layout import LayoutError, coverage, draw_region, font_paths, resolve_colors
 from .protocol import MAX_CHECKPOINT_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, NodeFailure, digest, mask_image, png64, pack_result
+from manhua_engine.timing import record
 
 LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫畫', 'ja': '日本語あいうアイウ',
                    'ko': '한국어가나다', 'en': 'English', 'fr': 'Françaiséèç', 'es': 'Españolñ',
@@ -112,7 +115,7 @@ class Runtime:
 
     def analyze(self, rgb, input_hash):
         quads, segmentation = self.engine.detect(rgb)
-        futures = [self.engine.ocr_pool.submit(self.engine.read_line, rgb, quad) for quad in quads]
+        futures = [self.engine.ocr_pool.submit(copy_context().run, self.engine.read_line, rgb, quad) for quad in quads]
         try:
             lines = [value for future in futures if (value := future.result()) is not None]
         finally:
@@ -142,7 +145,10 @@ class Runtime:
         if len(analysis['segments']) != len(analysis['regions']):
             raise NodeFailure('CLASSIC_RENDER_MISMATCH')
         image = Image.fromarray(cleaned)
+        started = perf_counter()
         areas = lettering_areas(cleaned, analysis['regions'])
+        record('render_areas', perf_counter() - started)
+        started = perf_counter()
         rendered = False
         for segment, region, area in zip(analysis['segments'], analysis['regions'], areas):
             text = translated['translations'][segment['id']]
@@ -163,4 +169,5 @@ class Runtime:
             rendered = True
         if rendered and not np.any(np.array(image) != cleaned):
             raise NodeFailure('CLASSIC_RENDER_EMPTY')
+        record('render_layout', perf_counter() - started)
         return pack_result(image, original, alpha, self.version, analysis, translated)

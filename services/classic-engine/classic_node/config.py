@@ -36,6 +36,7 @@ def load(path):
     if value['engine']['ocr_language'] not in ('auto', 'ja', 'zh', 'en', 'ko', 'latin'):
         raise ValueError('Unsupported ocr_language')
     value.setdefault('local_pages', 2)
+    value.setdefault('render_workers', 1)
     value.setdefault('max_leases', 8)
     value.setdefault('download_workers', 4)
     value.setdefault('delivery_workers', 4)
@@ -45,6 +46,8 @@ def load(path):
     value['engine']['font'] = [str((path.parent / font).resolve()) for font in value['engine']['font']]
     if not 1 <= value['local_pages'] <= value['max_leases'] <= 32:
         raise ValueError('Require 1 <= local_pages <= max_leases <= 32')
+    if type(value['render_workers']) is not int or not 1 <= value['render_workers'] <= min(16, value['max_leases']):
+        raise ValueError('render_workers must be between 1 and min(16, max_leases)')
     if not all(type(value[k]) is int and 1 <= value[k] <= 16 for k in ('download_workers', 'delivery_workers')):
         raise ValueError('Network worker counts must be between 1 and 16')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:

@@ -203,6 +203,30 @@ def test_newlines_and_parallel_render_are_deterministic():
     assert all(result==results[0] for result in results)
 
 
+def test_parallel_render_uses_thread_local_font_faces():
+    from threading import Barrier
+    from manhua_engine.layout import font_at
+    try:
+        paths = font_paths((), 'zh')
+    except FileNotFoundError:
+        pytest.skip('Install a CJK font for concurrent raster checks')
+    barrier = Barrier(4)
+    texts = ['并行嵌字测试', '这是一段译文', '不同页面同时绘字', 'Hello world']
+    def raster(index, parallel=False):
+        face = font_at(paths[0], 24)
+        if parallel:
+            barrier.wait(timeout=5)
+        canvas = Image.new('RGB', (240, 160), 'white')
+        draw_region(canvas, texts[index], {'bbox': [5, 5, 230, 155], 'dir': 'h'},
+                    font_path=paths, target='zh')
+        return face, canvas.tobytes()
+    expected = [raster(i)[1] for i in range(4)]
+    with ThreadPoolExecutor(4) as pool:
+        actual = list(pool.map(lambda i: raster(i, True), range(4)))
+    assert len({id(face) for face, _ in actual}) == 4
+    assert [pixels for _, pixels in actual] == expected
+
+
 def test_webtoon_windows_cover_page_and_deduplicate_seams():
     for h,w in [(900,626),(4000,600),(600,4000)]:
         seen=np.zeros((h,w),np.uint8)

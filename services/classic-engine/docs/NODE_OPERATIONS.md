@@ -6,7 +6,7 @@
 
 - `gpu` 选择 NCNN Vulkan 设备，`inpaint_gpu` 选择 DirectML 设备；两者枚举不保证一致。GPU 模式禁用 CPU 回退，`gpu=-1` 为显式 CPU 诊断模式。
 - `check` / `doctor` 只做本地校验；注册和心跳才能证明连接中心。模型、源码、依赖、字体与排版参数参与引擎版本，中心必须匹配实际版本。
-- `max_leases` 限制本地整页租约，中心仍以 `execution_slots` 限额；`local_pages` 限制同时进行的图像计算。等待文本和交付回执仍占租约，不占计算线程。
+- `max_leases` 限制本地整页租约，中心仍以 `execution_slots` 限额；`local_pages` 限制检测／OCR 和抹字，`render_workers` 限制独立嵌字编码池（默认 1）。嵌字不占图像计算位置；等待文本和交付回执仍占租约，不占计算线程。两池共用在途与内存预算，详见[节点配置](../../../docs/NODE_CONFIGURATION.md)。
 - 本地线程、NCNN 线程与 OCR 池由节点配置；目标语言声明字体覆盖，与 OCR 来源语言独立。
 - `control_ca` 可指定中心 PEM 信任文件，保留证书与主机名校验。注册、输入 GET、结果 PUT 都使用同一中心 HTTPS；输入再带当前租约令牌。节点只持有中心分配的独立凭据，不持有数据库或文本供应商密钥，也不配置对象存储。
 

@@ -109,4 +109,13 @@ def execute(args):
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        exit_code = main()
+    finally:
+        # Release NCNN networks before Vulkan/Python DLL teardown on Windows.
+        # Lightweight commands must not import or initialize the GPU runtime.
+        import gc
+        gc.collect()
+        if 'ncnn' in sys.modules:
+            sys.modules['ncnn'].destroy_gpu_instance()
+    sys.exit(exit_code)

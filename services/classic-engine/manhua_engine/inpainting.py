@@ -8,6 +8,7 @@ from threading import Lock
 import cv2
 import numpy as np
 import onnxruntime as ort
+from .timing import waiting_for
 
 CHECKPOINT = 'lama_large_512px.ckpt'
 CHECKSUM = '11d30fbb3000fb2eceae318b75d9ced9229d99ae990a7f8b3ac35c8d31f2c935'
@@ -75,7 +76,7 @@ class Lama:
         image = np.ascontiguousarray(rgb.transpose(2, 0, 1)[None], dtype=np.float32) / 255
         binary = np.ascontiguousarray((mask > 0)[None, None], dtype=np.float32)
         # DirectML does not permit concurrent Run calls on a single session.
-        with self.lock:
+        with waiting_for(self.lock, 'inpaint_lock_wait'):
             output = self.session.run(['output'], {'image': image, 'mask': binary})[0]
         if output.shape != image.shape or not np.isfinite(output).all():
             raise ValueError('Invalid LaMa model output')

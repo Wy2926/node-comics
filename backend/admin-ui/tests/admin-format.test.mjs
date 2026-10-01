@@ -24,6 +24,16 @@ function load(relative, parent = import.meta.url) {
 const {columnText} = load('../src/AdminResource.tsx');
 const {billingStatus} = load('../src/billing.ts');
 const {auditChanges, flat} = load('../src/AuditLog.tsx');
+const {taskTimingRows} = load('../src/timings.ts');
+
+test('node substage timings are displayed but protocol version is not a duration', () => {
+  assert.deepEqual(taskTimingRows({node: {render: 1.9, render_encode: .7, ocr_lock_wait: .2}, delivery: {protocol: 3}}), [
+    {key: 'render', seconds: 1.9, source: '节点'},
+    {key: 'render_encode', seconds: .7, source: '节点'},
+    {key: 'ocr_lock_wait', seconds: .2, source: '节点'},
+  ]);
+  assert.deepEqual(taskTimingRows(undefined), []);
+});
 
 test('column formatter distinguishes payment pending from event pending and preserves unknown states', () => {
   const event = {key: 'status', title: '事件状态'};

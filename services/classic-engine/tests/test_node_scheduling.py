@@ -312,3 +312,115 @@ def test_late_configuration_response_never_rolls_back_newer_version(agent):
     agent.apply_config({**original, 'version': 2, 'execution_slots': 4})
     agent.apply_config(original)
     assert agent.config['version'] == 2 and agent.config['execution_slots'] == 4
+
+
+def isolate_pipeline_pools(agent):
+    for name in ('compute', 'render', 'delivery'):
+        getattr(agent.pipeline, name).shutdown(wait=True)
+        setattr(agent.pipeline, name, PendingPool())
+
+
+@pytest.mark.parametrize('workers', [1, 2])
+def test_render_has_independent_bounded_slots_and_keeps_memory(agent, workers):
+    isolate_pipeline_pools(agent)
+    agent.pipeline.render_workers = workers
+    pages = [add_page(agent, i) for i in range(6)]
+    for page in pages:
+        page.step = 'render' if int(page.lease['lease_id']) < 3 else 'inpaint'
+        page.rgb = page.cleaned = object()
+        agent.pipeline.resize_reservation(page, 1024)
+    agent.pipeline.tick()
+    assert len(agent.pipeline.render.calls) == workers
+    assert len(agent.pipeline.compute.calls) == 2
+    assert sum(p.future is not None for p in pages) == workers + 2
+    for _ in range(10):
+        agent.pipeline.tick()
+    assert len(agent.pipeline.render.calls) == workers  # No executor backlog.
+    assert len(agent.pipeline.compute.calls) == 2
+    assert agent.pipeline.used == 6 * 1024
+    # Finish computation while the first render remains blocked.
+    agent.pipeline.compute.finish(0, response=object())
+    agent.pipeline.tick()
+    assert len(agent.pipeline.compute.calls) == 3
+    assert not agent.pipeline.render.calls[0][0].done()
+
+
+def test_real_render_thread_does_not_hold_compute_slot(agent):
+    from threading import Event
+    began, release, computed = Event(), Event(), Event()
+    agent.local['local_pages'] = 1
+    rendering, waiting = add_page(agent, 0), add_page(agent, 1)
+    rendering.step, waiting.step = 'render', 'text'
+    def render(*_):
+        began.set()
+        assert release.wait(5)
+        return {'result': {'output': None}, 'output_bytes': None}
+    agent.runtime.render = render
+    agent.runtime.inpaint = lambda *_: (computed.set(), object())[1]
+    try:
+        agent.pipeline.tick()
+        assert began.wait(3)
+        waiting.step = 'inpaint'
+        agent.pipeline.tick()
+        assert computed.wait(3)
+        assert not rendering.future.done()
+    finally:
+        release.set()
+        if rendering.future:
+            rendering.future.result(timeout=5)
+
+
+def test_inpaint_progress_is_not_queued_behind_older_unanalyzed_pages(agent):
+    isolate_pipeline_pools(agent)
+    agent.local['local_pages'] = 1
+    queued, prepared = add_page(agent, 0), add_page(agent, 1)
+    queued.step, prepared.step = 'analyze', 'inpaint'
+    queued.ready_at, prepared.ready_at = 1, 2
+    agent.pipeline.tick()
+    assert queued.future is None and prepared.future is not None
+
+
+@pytest.mark.parametrize('terminal', [False, True])
+def test_cancelled_render_drains_before_releasing_buffers(agent, terminal):
+    isolate_pipeline_pools(agent)
+    page = add_page(agent)
+    page.step = 'render'
+    page.rgb = page.cleaned = sentinel = object()
+    agent.pipeline.resize_reservation(page, 1024)
+    agent.pipeline.tick()
+    page.update({'status': 'terminal' if terminal else 'stop'})
+    agent.reap()
+    assert page.rgb is sentinel and agent.pipeline.used == 1024
+    agent.pipeline.render.calls[0][0].set_exception(NodeFailure('LEASE_STOPPED'))
+    agent.reap()
+    if not terminal:
+        assert agent.pipeline.used == 1024
+        agent.pipeline.delivery.finish(response={'status': 'terminal'})
+        agent.reap()
+    assert not agent.pages and agent.pipeline.used == 0 and page.rgb is None
+
+
+def test_failed_render_does_not_block_other_pages(agent):
+    isolate_pipeline_pools(agent)
+    first, second = add_page(agent, 0), add_page(agent, 1)
+    first.step = second.step = 'render'
+    agent.pipeline.tick()
+    agent.pipeline.render.calls[0][0].set_exception(NodeFailure('CLASSIC_LAYOUT_OVERFLOW'))
+    agent.pipeline.tick()
+    assert first.step == 'deliver' and first.completion['error']['code'] == 'CLASSIC_LAYOUT_OVERFLOW'
+    assert second.future is not None and len(agent.pipeline.render.calls) == 2
+
+
+def test_render_timings_survive_freeze_without_changing_result(agent):
+    from manhua_engine.timing import record
+    page = add_page(agent)
+    page.step = 'render'
+    def operation():
+        record('render_layout', .125)
+        return {'result': {'output': None}, 'output_bytes': None}
+    agent.pipeline.submit(page, agent.pipeline.render, 'render', operation)
+    page.future.result(timeout=5)
+    agent.pipeline.advance(page)
+    saved = agent.journal.get('lease:0')['completion']
+    assert saved['timings']['render_layout'] == .125
+    assert saved['result'] == {'output': None}

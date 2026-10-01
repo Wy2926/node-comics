@@ -1,5 +1,6 @@
 """Unicode line breaking, offline hyphenation and measured multilingual rendering."""
 from functools import lru_cache
+from threading import local
 from pathlib import Path
 import math
 import re
@@ -75,9 +76,14 @@ def font_paths(custom=(), language='zh'):
     return paths
 
 
-@lru_cache(maxsize=256)
+_thread_fonts = local()
+
+
 def font_at(path, size):
-    return ImageFont.truetype(path, size)
+    # FreeType face state must not be shared by concurrent render workers.
+    if not hasattr(_thread_fonts, 'load'):
+        _thread_fonts.load = lru_cache(maxsize=256)(ImageFont.truetype)
+    return _thread_fonts.load(path, size)
 
 
 @lru_cache(maxsize=8192)

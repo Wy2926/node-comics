@@ -22,6 +22,7 @@ class Recognizer:
             path=Path(models)/'ocr-fp32/backbone.ncnn.param'
             if not path.is_file(): raise FileNotFoundError('Build FP32 OCR with tools/build_ocr.py first (see README)')
             self.net=Network(path,gpu,threads)
+            self.net.lock_metric = 'ocr_lock_wait'
             self.session=ort.InferenceSession(str(path.parent/'decoder.onnx'),opts,providers=['CPUExecutionProvider'])
             self.provider=('NCNN-Vulkan' if gpu>=0 else 'NCNN-CPU')+'-FP32-backbone+ORT-CPU-FP32-decoder'
         else:

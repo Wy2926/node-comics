@@ -6,6 +6,7 @@
   "resource_id": "REPLACE_WITH_UNIQUE_MACHINE_GPU_RESOURCE_ID",
   "state_dir": "/data/state",
   "local_pages": 2,
+  "render_workers": 1,
   "max_leases": 8,
   "download_workers": 6,
   "delivery_workers": 6,

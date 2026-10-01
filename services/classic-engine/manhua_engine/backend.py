@@ -3,6 +3,7 @@ import threading
 import cv2
 import ncnn
 import numpy as np
+from .timing import waiting_for
 
 
 def devices():
@@ -16,6 +17,7 @@ class Network:
     def __init__(self, path, gpu=0, threads=2):
         self.net = ncnn.Net()
         self.lock = threading.Lock()
+        self.lock_metric = 'detect_lock_wait'
         self.net.opt.num_threads = threads
         self.net.opt.use_vulkan_compute = gpu >= 0
         self.net.opt.use_fp16_packed = False
@@ -31,7 +33,9 @@ class Network:
 
     def run(self, inputs, outputs):
         buffers = {k: np.ascontiguousarray(v, dtype=np.float32) for k, v in inputs.items()}
-        with self.lock, self.net.create_extractor() as ex:
+        # The Linux NCNN binding releases the GIL in extract(). Keep this model
+        # lock and the input owners alive until extraction and output copies end.
+        with waiting_for(self.lock, self.lock_metric), self.net.create_extractor() as ex:
             for name, array in buffers.items():
                 if ex.input(name, ncnn.Mat(array)):
                     raise RuntimeError(f"NCNN input failed: {name}")

@@ -80,6 +80,9 @@ class SimulatedTransport:
         now = datetime.now(timezone.utc)
         return now.isoformat(), (now + timedelta(seconds=300)).isoformat()
 
+    def input_for(self, key):
+        return self.data[int(key) % len(self.data)] if isinstance(self.data, list) else self.data
+
     def gate(self, stage, key):
         held = (self.scenario == 'upload' and stage == 'upload' or
                 self.scenario == 'mixed' and (stage, key) in {
@@ -137,13 +140,15 @@ class SimulatedTransport:
                 for _ in range(min(body['count'], self.total - self.claimed)):
                     key = str(self.claimed)
                     self.claimed += 1
-                    with Image.open(BytesIO(self.data)) as image:
+                    data = self.input_for(key)
+                    with Image.open(BytesIO(data)) as image:
                         width, height = image.size
+                        mime = Image.MIME[image.format]
                     lease = {'lease_id': key, 'lease_token': 'fixture-token-' + key,
                         'status': 'active', 'expires_at': expires, 'language': 'en',
-                        'config': {'engine': {'version': self.runtime.version}},
-                        'input': {'sha256': hashlib.sha256(self.data).hexdigest(), 'byte_size': len(self.data),
-                                  'width': width, 'height': height, 'mime': 'image/png',
+                        'config': {'engine': {'protocol_version': 3}},
+                        'input': {'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data),
+                                  'width': width, 'height': height, 'mime': mime,
                                   'path': '/internal/compute/v3/leases/' + key + '/input',
                                   'normalization_version': 1}}
                     self.leases[key] = lease
@@ -170,7 +175,7 @@ class SimulatedTransport:
     def download(self, key, token, metadata, check):
         self.gate('download', key)
         check()
-        return self.data
+        return self.input_for(key)
 
     def deliver(self, key, body, data, check):
         self.gate('upload', key)

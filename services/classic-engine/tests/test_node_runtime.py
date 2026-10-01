@@ -42,7 +42,11 @@ def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alp
         canvas.putpixel((10, 10), (100, 101, 102))  # Includes already antialiased RGB.
         return {'rendered': True}
     monkeypatch.setattr(module, 'draw_region', draw)
-    packed = runtime.render(rgb, cleaned, analysis, translated, 'en', opacity)
+    from manhua_engine.timing import collect
+    with collect() as timings:
+        packed = runtime.render(rgb, cleaned, analysis, translated, 'en', opacity)
+    assert {'render_areas', 'render_layout', 'render_diff'} <= timings.keys()
+    assert all(value >= 0 for value in timings.values())
     result, output = packed['result'], packed['output_bytes']
     assert 'image' not in packed and result['normalization_version'] == 1
     assert (result['width'], result['height']) == (80, 64)
@@ -51,6 +55,7 @@ def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alp
         assert output is None and result['output'] is None
         return
     assert result['representation'] == 'overlay-v1'
+    assert 'render_encode' in timings and 'timings' not in result
     assert result['bbox'] == {'x': 7, 'y': 6, 'width': 4, 'height': 5}
     assert result['output']['sha256'] == hashlib.sha256(output).hexdigest()
     assert result['output']['byte_size'] == len(output) and 'md5' not in result['output']
