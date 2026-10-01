@@ -2,7 +2,6 @@
 deploy/engine.json
 .env.*
 !.env.example
-!deploy/.env.production.example
 !deploy/.env.server.example
 node_modules/
 .venv/
@@ -32,3 +31,5 @@ private-test-data/
 # Generated store delivery bundles; keep artwork and review copy locally.
 /output/chrome-web-store-*/
 /output/chrome-web-store-*.zip
+/output/imagegen/blue-manga-store/
+/output/imagegen/blue-manga-store-kit.zip

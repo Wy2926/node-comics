@@ -15,7 +15,8 @@ from .adapters.images import redraw
 from .assets import available, asset_storage_key, create_asset, inspect_image, read_asset
 from .classic import run_text_stage
 from .config import settings
-from .db import initialize, session_factory
+from .db import session_factory
+from .runtime import check_runtime
 from .errors import ProcessingError, problem
 from .health import log_failure, report_failure, report_progress
 from .jobs import settle
@@ -348,13 +349,11 @@ def main():
         wake.set()
     for name in (signal.SIGTERM, signal.SIGINT):
         signal.signal(name, stop)
-    initialize()
+    check_runtime()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    from .control_pools import POOL_LIMITS, initialize_pools, report_pools
+    from .control_pools import POOL_LIMITS, report_pools
     from .notifications import close_hub, hub
     executor_id = f"{socket.gethostname()}:{os.getpid()}"[:160]
-    with session_factory()() as db:
-        initialize_pools(db)
     notices = hub()
     notices.start()
     next_heartbeat = 0

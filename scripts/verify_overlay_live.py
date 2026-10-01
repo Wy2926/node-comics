@@ -332,7 +332,7 @@ def main():
             journal = Journal(run / 'node-journal')
             agent = Agent(config, runtime, transport, journal)
             agent.register()
-            if checked(client.get('/health/ready'))['status'] != 'ready':
+            if checked(client.get('/health/cluster'))['status'] != 'ready':
                 raise VerificationFailure('CENTER_NOT_READY')
             for ordinal, source_path in enumerate(files, 1):
                 item = run_page(client, auth, other, agent, source_path, run / f'{ordinal:05}', ordinal, args.timeout)

@@ -69,6 +69,8 @@ def client(tmp_path, monkeypatch):
     from app.main import app
     from app.db import session_factory
     from translation_fixtures import configure_text_provider
+    from app.migrate import migrate
+    migrate()
     with TestClient(app, headers={'X-Translation-Protocol': 'overlay-v1'}) as test_client:
         with session_factory()() as db:
             configure_text_provider(db)

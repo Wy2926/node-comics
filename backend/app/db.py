@@ -35,6 +35,7 @@ def get_db():
 
 
 def initialize():
+    """Explicit migration helper; never called by serving processes."""
     from . import translation_models  # noqa: F401
     from . import models  # noqa: F401
     from . import health_models  # noqa: F401
@@ -56,19 +57,25 @@ def initialize():
     config.set_main_option("script_location", str(root / "migrations"))
     with _migration_lock, engine().begin() as connection:
         if connection.dialect.name == "postgresql":
+            connection.execute(text("SET LOCAL lock_timeout = '5s'"))
             connection.execute(text("SELECT pg_advisory_xact_lock(761349210)"))
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
-        from .billing_providers import provider_enabled, provider_environment
-        for provider in ('stripe', 'creem'):
-            if provider_enabled(provider):
-                for model in (billing_models.BillingCustomer, billing_models.BillingCheckout):
-                    if connection.scalar(select(model.id).where(model.provider == provider,
-                            model.environment != provider_environment(provider)).limit(1)):
-                        raise RuntimeError('Payment environment does not match this database; use an isolated database')
-                if connection.scalar(select(billing_models.BillingPrice.id).where(
-                        billing_models.BillingPrice.environment != provider_environment(provider)).limit(1)):
-                    raise RuntimeError('Payment catalog environment does not match this database; use an isolated database')
+        check_payment_environment(connection)
     settings().storage_path.mkdir(parents=True, exist_ok=True)
     for directory in ("inputs", "results", "staging"):
         (settings().storage_path / directory).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+
+def check_payment_environment(connection):
+    from . import billing_models
+    from .billing_providers import provider_enabled, provider_environment
+    for provider in ('stripe', 'creem'):
+        if provider_enabled(provider):
+            for model in (billing_models.BillingCustomer, billing_models.BillingCheckout):
+                if connection.scalar(select(model.id).where(model.provider == provider,
+                        model.environment != provider_environment(provider)).limit(1)):
+                    raise RuntimeError('Payment environment does not match this database; use an isolated database')
+            if connection.scalar(select(billing_models.BillingPrice.id).where(
+                    billing_models.BillingPrice.environment != provider_environment(provider)).limit(1)):
+                raise RuntimeError('Payment catalog environment does not match this database; use an isolated database')

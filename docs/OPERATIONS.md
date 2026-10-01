@@ -7,17 +7,18 @@
 | 入口 | 含义与失败表现 |
 | --- | --- |
 | `GET /health`、`GET /health/live` | API 进程能响应；不查询数据库或远端服务 |
-| `GET /health/ready` | 检查数据库、Redis、控制进程、维护进程、控制资源池；OIDC 模式另要求近期成功的公共 JWKS 探测，常规翻译启用时另要求在线计算节点；依赖不可用返回 503 |
+| `GET /health/ready` | 当前 API 的结构兼容、支付环境、共享目录权限和 Redis 连通性；返回镜像 release，不依赖后台心跳，不扫描队列，失败 503 |
+| `GET /health/cluster` | 检查数据库、Redis、控制进程、维护进程、控制资源池；OIDC 模式另要求近期成功的公共 JWKS 探测，常规翻译启用时另要求在线计算节点；依赖不可用返回 503 |
 | `python -m app.health control-worker` | 检查当前容器 PID 1 的控制进程已完成循环，退出码 0/1 |
 | `python -m app.health maintenance` | 检查当前容器 PID 1 的维护进程已完成循环，退出码 0/1 |
 
-Compose 已为三个控制服务配置健康检查，每 15 秒一次，启动宽限 60 秒，连续失败 3 次标为 unhealthy。Docker 的 `restart: unless-stopped` 处理进程退出；**unhealthy 本身不会让 Docker 自动重启**，需由部署环境的监控处理。故障恢复循环保留数据库租约和调用意图，不因重新启动而自动重发结果未知的图片调用。
+服务器 Compose 的 API 每 10 秒检查一次，启动宽限 20 秒，连续失败 6 次标为 unhealthy；后台每 15 秒一次、宽限 60 秒、连续失败 3 次。Docker 的 `restart: unless-stopped` 处理进程退出；**unhealthy 本身不会让 Docker 自动重启**，需由部署环境的监控处理。故障恢复循环保留数据库租约和调用意图，不因重新启动而自动重发结果未知的图片调用。
 
 `service_heartbeats` 按角色、主机、PID 保存进展、最近成功时间、连续失败数、累计失败数和脱敏错误码。控制进程在领取循环完成后最多每 5 秒记录一次；维护进程完成租约恢复和文件清理后记录一次，循环卡死不会继续报告成功。失联窗口使用 `CLUSTER_NODE_TIMEOUT_SECONDS`（默认 120 秒）。同角色其他健康副本能维持集群就绪，单容器检查始终检查自己的实例。超过 7 天的历史心跳可删除，不涉及对象或业务记录。
 
 维护进程每 `min(60, CLUSTER_NODE_TIMEOUT_SECONDS / 3)` 秒强制刷新公共 JWKS 并记录 `oidc` 心跳；请求超时使用 `OIDC_JWKS_TIMEOUT_SECONDS`。开发免密码模式跳过探测。健康 HTTP 请求只读数据库并 PING Redis，不调用 OIDC 或模型。该探测验证公钥端点及签名键可读，不能替代浏览器登录、授权端点或令牌换取端到端验收。
 
-`/health/ready` 的 `alerts` 是不含用户、任务 ID 或图片内容的全局数量，每项最多计到 1000：
+`/health/cluster` 的 `alerts` 是不含用户、任务 ID 或图片内容的全局数量，每项最多计到 1000：
 
 | 信号 | 报警条件与处理 |
 | --- | --- |

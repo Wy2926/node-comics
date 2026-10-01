@@ -16,14 +16,15 @@ def mark_ready():
 
 def test_live_is_independent_of_dependencies_and_ready_requires_all_services(client):
     assert client.get("/health/live").status_code == 200
-    response = client.get("/health/ready")
+    assert client.get('/health/ready').status_code == 200
+    response = client.get("/health/cluster")
     assert response.status_code == 503
     assert response.json()["checks"]["maintenance"] == "unavailable"
     mark_ready()
     assert client.get("/health/ready").status_code == 200
     with patch("app.health.session_factory", side_effect=RuntimeError("secret database URL")):
         assert client.get("/health/live").status_code == 200
-        response = client.get("/health/ready")
+        response = client.get("/health/cluster")
         assert response.status_code == 503
         assert "secret" not in response.text
 

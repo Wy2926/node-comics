@@ -34,6 +34,8 @@ def client(pg_scope):
     from app.main import app
     from app.db import session_factory
     from translation_fixtures import configure_text_provider
+    from app.migrate import migrate
+    migrate()
     with TestClient(app) as value:
         with session_factory()() as db:
             configure_text_provider(db)

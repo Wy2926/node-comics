@@ -203,9 +203,9 @@ def test_proxy_ip_limit_cannot_be_bypassed_by_rotating_forwarded_headers_and_cli
     monkeypatch.setattr(analytics.time, 'time', lambda: now)
     monkeypatch.setattr(redis_state, '_clock_ms', lambda: int(now * 1000))
     template = (Path(__file__).resolve().parents[2] / 'deploy/openresty.comics.conf').read_text(encoding='utf-8')
-    api_location = re.search(r'location\s+/\s*\{([^{}]*)\}', template)
-    assert api_location, 'API proxy location changed; update the forwarding test'
-    directive = re.search(r'^\s*proxy_set_header\s+X-Forwarded-For\s+(\S+)\s*;', api_location.group(1), re.M)
+    assert 'include /www/node-comics/openresty.api.inc;' in template
+    proxy_config = (Path(__file__).resolve().parents[2] / 'deploy/openresty.api.inc').read_text(encoding='utf-8')
+    directive = re.search(r'^\s*proxy_set_header\s+X-Forwarded-For\s+(\S+)\s*;', proxy_config, re.M)
     assert directive, 'API proxy must explicitly set X-Forwarded-For'
 
     # Resolve the template's Nginx variable, then exercise the actual Uvicorn

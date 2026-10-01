@@ -29,6 +29,11 @@ x-backend: &backend
   logging: *logging
 
 services:
+  migrate:
+    <<: *backend
+    command: [python, -m, app.migrate]
+    restart: "no"
+    profiles: [migration]
   redis:
     logging: *logging
     image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
@@ -57,8 +62,18 @@ services:
     restart: unless-stopped
   api:
     <<: *backend
+    environment:
+      <<: *backend-env
+      SERVE_STATIC: "true"
+    # Local convenience only: independently built pages, never baked into backend images.
+    volumes:
+      - translation_files:/data/translation
+      - ./backend/website/dist:/app/app/website_dist:ro
+      - ./backend/app/admin_web/dist:/app/app/admin_web/dist:ro
+      - ./backend/extension-release.json:/app/extension-release.json:ro
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
     ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
+    stop_grace_period: 31m
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
       interval: 15s
@@ -68,6 +83,7 @@ services:
   maintenance:
     <<: *backend
     command: [python, -m, app.dispatcher]
+    stop_grace_period: 31m
     healthcheck:
       test: [CMD, python, -m, app.health, maintenance]
       interval: 15s

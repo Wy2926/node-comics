@@ -45,14 +45,13 @@ def test_control_worker_sigterm_drains_an_active_stage(tmp_path):
             assert release.wait(3)
             finished.set()
 
-        workers.initialize = lambda: None
+        workers.check_runtime = lambda: None
         workers.session_factory = lambda: Session
         workers.claim_batch = claim
         workers.run_control_stage = run
         workers.report_progress = lambda *args: None
         workers.report_failure = lambda *args: None
         control_pools.POOL_LIMITS = {"text": 1, "redraw": 1}
-        control_pools.initialize_pools = lambda db: None
         control_pools.report_pools = lambda db: None
         notifications.hub = lambda: notices
         notifications.close_hub = notices.close

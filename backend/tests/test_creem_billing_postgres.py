@@ -12,6 +12,8 @@ from test_billing_admin import administrator, test_early_subscription_notificati
 @pytest.fixture
 def client(pg_scope):
     from app.main import app
+    from app.migrate import migrate
+    migrate()
     with TestClient(app) as value:
         yield value
 

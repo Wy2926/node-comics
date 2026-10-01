@@ -33,7 +33,8 @@ from app import creem_client, stripe_client, billing_checkout
 from app.billing_models import BillingPrice, BillingPriceBinding, BillingCheckout, BillingSubscription, BillingOrder, BillingOrderTransition, BillingEvent
 from app.billing_catalog import initialize_catalog
 from app.billing_providers import BillingError
-from app.db import initialize, session_factory
+from app.db import session_factory
+from app.migrate import migrate
 from app.models import User, now
 from app.main import app
 
@@ -93,7 +94,7 @@ async def fixture_faults(request, call_next):
     return await call_next(request)
 
 
-initialize()
+migrate()
 with session_factory()() as db:
     initialize_catalog(db)
     db.add(User(id='billing-demo-user', subject='fixture:billing-reader', name='测试读者小岚'))

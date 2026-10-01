@@ -36,6 +36,10 @@ x-center: &center
   logging: *logging
 
 services:
+  migrate:
+    <<: *center
+    command: [python, -m, app.migrate]
+    profiles: [migration]
   postgres:
     logging: *logging
     image: postgres:17.6-alpine

@@ -6153,6 +6153,22 @@
         }
       }
     },
+    "/health/cluster": {
+      "get": {
+        "summary": "Health Cluster",
+        "operationId": "health_cluster_health_cluster_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/config": {
       "get": {
         "summary": "Auth Config",

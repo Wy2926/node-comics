@@ -15,6 +15,8 @@ def test_postgres_monitor_queries_and_schema(pg_scope):
     from alembic.migration import MigrationContext
     from admin_fixture import seed, DONE_ID
     from conftest import login
+    from app.migrate import migrate
+    migrate()
     with TestClient(app) as client:
         auth = login(client, settings().dev_admin_username)
         with session_factory()() as db:

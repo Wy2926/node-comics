@@ -6,20 +6,18 @@ x-logging: &logging
     max-size: "10m"
     max-file: "3"
 
-# Only the control plane. PostgreSQL is an existing external service;
-# image engines and compute agents run on the operator's own machines.
+# Application lifecycle only. PostgreSQL, Redis, network and storage are external.
+# Select a service explicitly. Never use project-wide down during releases.
 x-server: &server
-  image: ${SERVER_IMAGE:?Set SERVER_IMAGE to a versioned backend image}
   env_file: [.env.server]
   environment:
     APP_ENV: production
     DEV_AUTH: "false"
     DEV_AUTH_SECRET: ""
+    SERVE_STATIC: "false"
     STORAGE_PATH: /data/translation
     TMPDIR: /data/translation/staging
-  networks: [infrastructure, admission]
-  depends_on:
-    redis: {condition: service_healthy}
+  networks: [infrastructure]
   read_only: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
@@ -30,33 +28,38 @@ x-server: &server
   restart: unless-stopped
   logging: *logging
 
+x-api: &api
+  <<: *server
+  command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
+  stop_grace_period: 31m
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+    interval: 10s
+    timeout: 6s
+    retries: 6
+    start_period: 20s
+
 services:
-  redis:
-    logging: *logging
-    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
-    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAX_MEMORY:-256mb}", --maxmemory-policy, noeviction]
-    networks: [admission]
-    volumes: [admission_redis:/data]
-    healthcheck:
-      test: [CMD, redis-cli, ping]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-  api:
+  api-blue:
+    <<: *api
+    profiles: [blue]
+    image: ${BLUE_IMAGE:?Set immutable blue image}
+    ports: ["127.0.0.1:${BLUE_PORT:-18088}:8000"]
+  api-green:
+    <<: *api
+    profiles: [green]
+    image: ${GREEN_IMAGE:?Set immutable green image}
+    ports: ["127.0.0.1:${GREEN_PORT:-18089}:8000"]
+  migrate:
     <<: *server
-    # Proxy headers are trusted only within this private control-plane boundary.
-    # Keep the host port loopback-only; OpenResty must overwrite incoming XFF.
-    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
-    ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
-    healthcheck:
-      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
-      interval: 15s
-      timeout: 6s
-      retries: 3
-      start_period: 120s
+    profiles: [migration]
+    image: ${MIGRATION_IMAGE:?Set reviewed migration image}
+    command: [python, -m, app.migrate]
+    restart: "no"
   control-worker:
     <<: *server
+    profiles: [background]
+    image: ${WORKER_IMAGE:?Set worker image}
     command: [python, -m, app.workers]
     stop_grace_period: 31m
     healthcheck:
@@ -67,7 +70,10 @@ services:
       start_period: 60s
   maintenance:
     <<: *server
+    profiles: [background]
+    image: ${MAINTENANCE_IMAGE:?Set maintenance image}
     command: [python, -m, app.dispatcher]
+    stop_grace_period: 31m
     healthcheck:
       test: [CMD, python, -m, app.health, maintenance]
       interval: 15s
@@ -76,12 +82,11 @@ services:
       start_period: 60s
 
 networks:
-  admission:
-    internal: true
   infrastructure:
     external: true
     name: ${INFRA_NETWORK:-1panel-network}
 
 volumes:
-  admission_redis:
   translation_files:
+    external: true
+    name: ${TRANSLATION_VOLUME:?Set EXISTING shared translation volume}

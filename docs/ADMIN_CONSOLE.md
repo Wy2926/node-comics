@@ -80,7 +80,7 @@ npm run build
 python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(16) + '/')"
 ```
 
-本地 Compose 使用 `deploy/.env.local`，生产 Compose 使用 `deploy/.env.production`，服务器 Compose 使用 `deploy/.env.server`。开发引导脚本只在本地配置缺少该项时生成，重启不轮换；生产入口需显式配置。无尾斜线的新入口会补齐尾斜线并保留回调查询参数。
+本地 Compose 使用 `deploy/.env.local`；生产只使用服务器 Compose，应用配置位于部署目录 `.env.server`。开发引导脚本只在本地配置缺少该项时生成，重启不轮换；生产静态后台通过 OpenResty 独立发布，并沿用同一入口与 OIDC 回调，见[部署规范](DEPLOYMENT.md)。无尾斜线的新入口会补齐尾斜线并保留回调查询参数。
 
 页面路由不进入 OpenAPI，`/v1/auth/config` 不返回入口。知道路径仍能加载登录页，管理员权限始终由服务端校验。更换入口后，旧入口不保留别名；已开始的后台登录需要重新发起。
 

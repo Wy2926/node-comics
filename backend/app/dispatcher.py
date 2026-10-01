@@ -7,7 +7,8 @@ import time
 from sqlalchemy import and_, or_, select
 from .assets import available, asset_storage_key, create_asset, inspect_image
 from .config import settings
-from .db import initialize, session_factory
+from .db import session_factory
+from .runtime import check_runtime
 from .errors import ProcessingError
 from .health import log_failure, probe_oidc, report_failure, report_progress
 from .jobs import settle
@@ -260,11 +261,12 @@ def main():
     stopping = Event()
     for name in (signal.SIGTERM, signal.SIGINT):
         signal.signal(name, lambda *_: stopping.set())
-    initialize()
+    check_runtime()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     from threading import Thread
     from .billing_sync import run as billing_maintenance
-    Thread(target=billing_maintenance, args=(stopping,), daemon=True).start()
+    billing_thread = Thread(target=billing_maintenance, args=(stopping,))
+    billing_thread.start()
     next_oidc_probe = 0
     next_campaign_scan = 0
     while not stopping.is_set():
@@ -283,6 +285,7 @@ def main():
         except Exception as error:
             report_failure("maintenance", error)
         stopping.wait(settings().dispatch_interval_seconds)
+    billing_thread.join()
 
 
 if __name__ == "__main__":

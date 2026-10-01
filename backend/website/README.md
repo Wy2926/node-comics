@@ -20,7 +20,7 @@ npm run preview
 uv run --with-requirements backend/requirements.txt python backend/tests/manual_website_server.py
 ```
 
-打开 `http://127.0.0.1:4322/`；身份、订阅与支付均为模拟。正式构建由后端 Docker 集成，发布步骤见[部署规范](../../docs/DEPLOYMENT.md)。
+打开 `http://127.0.0.1:4322/`；身份、订阅与支付均为模拟。正式构建使用 `backend/Dockerfile.static` 的 `website` 目标，OpenResty 独立提供静态产物；发布不重建或重启 API，步骤见[部署规范](../../docs/DEPLOYMENT.md)。
 
 ## 内容与规范
 

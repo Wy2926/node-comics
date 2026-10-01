@@ -2,16 +2,15 @@
 
 后端默认 `APP_ENV=production`。生产启动校验要求 `DEV_AUTH=false`、PostgreSQL、完整 OIDC 配置、可写的私有文件目录，以及明确的网页来源或固定扩展 ID。任何一项缺失会在连接数据库、迁移和启动服务之前失败。免密码开发管理员登录仅在显式 `APP_ENV=development` / `test` 且配置至少 32 字符签名密钥时可用。
 
-生产配置使用 [deploy/.env.production.example](../deploy/.env.production.example)；复制为被忽略的 `deploy/.env.production` 后填写真实值。`scripts/bootstrap.ps1 -Production -Start` 选择这份文件，先构建后端并执行无外部访问的配置预检，再启动服务。未传 `-Production` 的引导命令为本地开发入口，会显式标记 `APP_ENV=development`。直接调用 Compose 时需设置 `COMICS_ENV_FILE=deploy/.env.production` 并传入相同的 `--env-file`；否则容器仍默认读取本地环境文件。
+生产部署使用 [服务器 Compose](../deploy/compose.server.yaml)，应用配置从 [deploy/.env.server.example](../deploy/.env.server.example) 复制到部署目录 `.env.server`，版本／端口等从 [server.env.example](../deploy/server.env.example) 复制到 `.env`。服务器复用统一 PostgreSQL 和 Redis，不由应用创建基础设施。`scripts/bootstrap.ps1 -Start` 与根 Compose 仅供本地开发，不再承担生产部署。
 
 ```powershell
-$env:COMICS_ENV_FILE = 'deploy/.env.production'
-docker compose --env-file .env --env-file deploy/.env.production --project-name node-comics-production run --rm --no-deps api python -m app.config --production
+docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate python -m app.config --production
 ```
 
 此预检只验证配置格式，不代表数据库、文件卷、身份服务可用，也不代表身份服务已经登记正确的资源授权与回调。Compose 的 `config --quiet` 同样不能替代身份校验。
 
-生产引导固定选择独立 Compose 项目，并要求最终生效的 `APP_ENV` 为 production；shell 中残留的开发模式覆盖值会让预检失败，不能通过环境文件表面配置绕过。
+服务器 Compose 固定 `APP_ENV=production`、`DEV_AUTH=false`；预检仍核对最终生效配置，不能用环境文件表面值绕过。先预检，迁移和切流分别显式执行，见[部署规范](DEPLOYMENT.md)。
 
 ## OIDC 必需项
 

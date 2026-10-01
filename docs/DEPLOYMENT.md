@@ -2,49 +2,119 @@
 
 部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `simple_scheduler_0009`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
-## 控制服务与官网
+## 发布边界
 
-`local_overlay_0007` 增加覆盖层描述，`job_results_0008` 将结果统一到 Job、TranslationRequest 和 Asset，删除旧结果副本、共享授权、文件页关联和存储后端选择字段。中心、v3 节点和 overlay-v1 插件必须配套升级，全部 translation 路由对缺少或不匹配的协议头返回 409。切换前用旧系统排空或核实旧远端任务；活动任务、结果未知或已释放用户预占但仍未核实供应商成本的 `unknown_released` 任务都会阻止迁移。迁移撤销旧共享授权和远端结果对应的 UUID，保留撤销墓碑、用户、权益、调用记录与资金账本，不访问、搬运或删除 R2 历史图片。新代码不读取旧远端结果，也不滚动混跑两种协议。切换不可通过数据库降级自动恢复旧授权；回退使用切换前配套备份。
+| 部分 | 生命周期 |
+| --- | --- |
+| PostgreSQL、统一 Redis、图片卷、基础设施网络 | 外部常驻资源，应用发布不创建、不重启、不清空 |
+| API blue / green | 两个回环端口，独立镜像，OpenResty 只向活动槽位发送新流量 |
+| control-worker、maintenance | 独立镜像配置和更新；maintenance 单活交接 |
+| 数据库迁移 | 显式 `python -m app.migrate`，不随服务启动执行 |
+| 官网、管理后台 | 独立静态构建，由 OpenResty 直接读取，不进入 Python 镜像 |
 
-此次 overlay-v1 协议从插件 0.8.0 提供。先准备并发布兼容的新客户端，填写、验证对应永久下载 URL 和商店入口，再切换中心与节点；发布清单中的旧版本不能作为升级到新协议的入口。Firefox 须等兼容版本的签名包或商店版本就绪；未就绪时延后该浏览器的官方翻译切换，或明确显示暂不可用，不能继续引导用户安装旧包并反复提示更新。清单版本只在真实安装包就绪后更新。
+使用 [服务器 Compose](../deploy/compose.server.yaml)；从 [server.env.example](../deploy/server.env.example) 准备 `.env`，从 [应用配置模板](../deploy/.env.server.example) 准备 `.env.server`。配置限运行账号读取。每个角色使用不可变镜像标签或摘要；构建时 `--build-arg RELEASE_ID=<版本>` 写入镜像身份，不能在运行环境伪装成另一个版本。
 
-API、control-worker、maintenance 必须挂载同一个 `translation_files` 卷，UID 10001 可写。输入和结果都位于 `/data/translation`，临时接收目录同卷，不能沿用每容器独立图片 tmpfs。部署环境保证文件卷空间；应用不配置磁盘低水位或容量预留。备份必须覆盖数据库与结果目录，详见[存储规范](OBJECT_STORAGE.md)。
+服务器 Compose **没有 Redis 服务、Redis 卷或 Redis 管理命令**。`REDIS_URL` 指向服务器已有实例；所有槽位和后台进程必须使用同一数据库编号与 `REDIS_NAMESPACE`。通过私网、ACL 或 TLS 限制访问；运行时只执行业务命令和 PING，不修改统一实例的 AOF、内存等配置，也不执行 FLUSH。准入要求 `noeviction`，上线前由实例管理员核实；命名空间不能代替容量隔离。恢复 Redis 丢失的短期状态前须排空仍存活的请求，不能清空令牌后让新旧请求同时重入。用户额度与结算仍以 PostgreSQL 为准。
 
-1. 核对目标服务、数据库、镜像和代理配置，按[运维规范](OPERATIONS.md)备份。首次部署准备专用空库；数据库不兼容时先确定数据处置，不能以镜像回退代替数据库恢复。
-2. 以 `backend/Dockerfile` 构建新的版本标签；镜像同时包含 API、官网和管理后台。保留原标签以便回退。
-3. 使用 [compose.server.yaml](../deploy/compose.server.yaml)：`.env` 提供 `SERVER_IMAGE`、端口和网络；`.env.server` 提供应用配置，模板见 [环境示例](../deploy/.env.server.example)。配置文件限运行账号读取。
-4. 在部署目录执行：
+根 Compose 仅用于本地开发，测试／演练使用独立临时 Redis，不连接生产实例。测试镜像摘要、redis-py 和 fakeredis 来源许可见配置及依赖文件；Redis 来源为 [官方仓库](https://github.com/redis/redis)，许可见[官方说明](https://redis.io/legal/licenses/)。
+
+所有控制进程挂载同一外部图片卷，`TRANSLATION_VOLUME` 必须填写实际在用的 Docker 卷名；不要将升级变成新建空卷。UID 10001 可写，输入、结果和接收暂存均在 `/data/translation`。部署负责磁盘容量，备份同时覆盖数据库和结果目录，见[存储规范](OBJECT_STORAGE.md)。首次安装才由运维预建网络、专用空库和文件卷。
+
+## 迁移与兼容性
+
+运行进程只检查结构、支付环境、文件目录权限和 Redis 连通性，不改表、不写默认配置。显式迁移命令同时初始化缺失的供应商、控制池、系统设置和计费目录；不重置已配置值。PostgreSQL 迁移保留 advisory lock，锁等待超过 5 秒失败，禁止无限阻塞线上请求。
+
+当前运行代码仅接受 `simple_scheduler_0009`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。
+
+从早于当前基线的系统升级时，先备份并在隔离库演练，使用旧服务排空／核实活动、结果未知与 `unknown_released` 任务，再停止所有旧控制进程并显式迁移。调度、Job 结果、会员顺延、活动额度及 Redis 准入的旧代码不能混跑，也不能仅回退镜像；回退依赖配套数据库和文件备份。旧远端结果授权不恢复，历史 R2 图片不搬运、不删除；当前 UUID、检查点与账本由迁移规则保留。
+
+迁移只在首次安装或已审核的结构升级时执行，不放入普通切流脚本：
 
 ```sh
-docker compose --env-file .env -f compose.server.yaml config --quiet
-docker compose --env-file .env -f compose.server.yaml run --rm --no-deps api python -m app.config --production
-docker compose --env-file .env -f compose.server.yaml run --rm --no-deps api python -c 'from app.db import initialize; initialize()'
-docker compose --env-file .env -f compose.server.yaml up -d
-docker compose --env-file .env -f compose.server.yaml ps
-curl --fail https://comics.nodelane.net/health/ready
+docker compose --env-file .env -f compose.server.yaml --profile migration config --quiet
+docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate python -m app.config --production
+docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 ```
 
-反向代理使用 [OpenResty 模板](../deploy/openresty.comics.conf)，保留 API／私有后台路由优先级、缓存和 CSP；关闭图片磁盘缓冲与包含授权参数的访问日志。API 端口仅绑定宿主机回环地址，基础设施局域网只允许可信控制服务，API 信任该边界内的代理头。OpenResty 仅信任 Cloudflare 官方公布的 IPv4／IPv6 网段，通过 `real_ip_header CF-Connecting-IP` 恢复客户端地址，再用 `$remote_addr` 覆盖外部传入的 `X-Forwarded-For` 和 `X-Real-IP`；来自其他地址的请求不能借这些头伪造来源。Cloudflare 网段变更时复核信任清单，更新后检查代理配置并重载。OIDC 回调配置见[身份规范](PRODUCTION_IDENTITY.md)。GA4 中继与隐私政策先于插件上线，依赖与顺序见[分析规范](ANALYTICS.md#中继与发布)。
+当前翻译协议为 overlay-v1，插件从 0.8.0 提供，节点使用 v3。协议切换必须先发布兼容客户端及真实下载入口；Firefox 兼容签名包未就绪时不得继续把旧包当作升级入口。规则见[翻译契约](READING_TRANSLATION_CONTRACT.md)。
 
-官网与后台静态资源分别由 API 镜像中的 `app/website_dist`、`app/admin_web/dist` 提供。单独更新其一时，以实际运行 API 镜像为基础，仅替换对应目录，保留后端和其他资源；核对目标 Compose 后只重建 API。失败时恢复原镜像配置。公开 HTML 可能被 CDN 注入，验收使用内容、资源与交互，不只比较 HTML 哈希。
+## API 切流与回退
 
-赠送顺延的 `gift_renewal_0005` 只新增用户与订阅所需字段，不转换旧交易数据。既有运营会员保留 `plus_timezone`、原额度 ID 与日历月周期；新会员段使用 30 天周期。升级前停止旧 API、worker 和 maintenance，完成结构升级后统一启动同版本服务，避免旧进程忽略已安排的延期。账户、漫画、任务与历史额度保留。仍有续费延期操作或未结束的 30 天赠送时禁止回退到旧会员代码。
+在仓库构建 `docker build --build-arg RELEASE_ID=<版本> -t <镜像:版本> backend`，提前传输镜像并准备配置。只修改非活动槽位对应的镜像配置，再按服务名启动，不能执行项目级 `down` 或无差别 `up`：
 
-额度活动的 `quota_campaigns_0006` 新增配置与用户领取回执，并允许赠送桶没有到期时间；原有额度、已用／预占和账本保持不变。备份后停止全部旧控制进程，迁移并统一启动兼容代码，再通过管理员活动接口配置、启用和核对已发人数。迁移不自动发放。已有活动配置或无到期赠送时禁止降级；应暂停活动处理问题，不能删除回执重跑或启动旧额度代码。账户接口的 `expires_at`、`next_expiry_at` 允许 `null`，客户端不可将空值格式化为日期。
+```sh
+docker compose --env-file .env -f compose.server.yaml up -d --no-deps --wait api-green
+curl --fail http://127.0.0.1:18089/health/ready
+```
 
-`simple_scheduler_0009` 删除阅读优先级、公平状态表和精确权重，增加就绪顺序与节点活动租约索引，自动去掉人工语言白名单并归一化 v3 任务缓存身份；不修改 UUID、检查点、调用和结算。首次切换须停止旧中心进程，运行迁移并配套更新中心和节点，不能混跑旧调度代码。已有 overlay-v1 插件无需同步更新，旧请求字段的兼容规则见[翻译契约](READING_TRANSLATION_CONTRACT.md#3-创建与上传)。已有 v3 任务无需手工改表；旧程序停机后的租约由新中心恢复。之后更换兼容节点只需创建身份、启动新节点并停用旧节点的新领取，不再复制构建指纹。回退使用升级前的完整数据库备份。
+`/health/ready` 检查当前 API 实例可接流量且返回镜像 `release`；`/health/cluster` 单独检查后台、OIDC、计算节点和积压。两者均须验收；API 候选不能用旧 worker 心跳冒充新版后台健康。后台容器的健康命令检查自己的实例，发布还需检查其实际镜像摘要。
 
-## Redis 与准入迁移
+首次接入时保留现有 TLS、Cloudflare 信任清单和 Picker 文件。安装 [OpenResty 模板](../deploy/openresty.comics.conf) 与 [API 转发片段](../deploy/openresty.api.inc)，后者在容器内为 `/www/node-comics/openresty.api.inc`。当前服务器已将 `/opt/1panel/www` 挂载到 `/www`，静态根使用 `/opt/1panel/www/node-comics`，无需重建代理容器。其他环境也应挂载整个目录，不逐个绑定 `.inc` 文件，否则原子替换后容器可能仍看到旧 inode。准备 `active/api.inc`（[示例](../deploy/api-active.inc.example)）、`active/website.inc`、`active/admin.inc` 后校验并 reload；禁用后台时 `admin.inc` 为空。首次拆分代理也须先在隔离环境验证全部路由，不能直接覆盖生产配置。
 
-根 Compose 和服务器 Compose 均提供 Redis 8.2 服务，不发布公网端口。服务器部署使用专用内部网络，只允许本项目控制服务访问。Redis 开启 AOF、每秒刷盘、默认 256 MiB 内存上限和 `noeviction`；可通过 Compose 的 `REDIS_MAX_MEMORY` 调整容量。数据卷必须保留，不能使用淘汰策略随意删除仍有效的并发令牌。AOF 每秒刷盘仍可能在异常断电时丢失最近一秒短期状态，用户页数与结算始终以 PostgreSQL 为准。
+以后只替换活动 include。下列路径是宿主机挂载目录，容器名必须用实际值；脚本在代理宿主机运行：
 
-Compose 固定 Docker 官方 `redis:8.2-alpine` 镜像摘要，包含 Redis 8.2.10；摘要保留在三个 Compose 文件中。来源为 [Redis](https://github.com/redis/redis)，Redis 8 提供 AGPLv3／RSALv2／SSPLv1 三种许可选择，参见[官方许可](https://redis.io/legal/licenses/)。Python 客户端 redis-py 8.1.0 使用 MIT，fakeredis 2.38.0 仅用于测试并使用 BSD-3-Clause；版本、来源和发行摘要保留在依赖文件中。
+```sh
+python scripts/switch_release.py api --port 18089 --release <新版本> --previous-release <旧版本> \
+  --active-file /opt/1panel/www/node-comics/active/api.inc \
+  --probe-url https://comics.nodelane.net/health/ready --openresty-container <实际容器名>
+```
 
-`REDIS_URL` 为 redis-py 直接连接的 `redis://` 或 `rediss://` 地址，服务器模板默认 `redis://redis:6379/0`。API、control-worker、maintenance 必须连接同一实例、数据库编号和 `REDIS_NAMESPACE`；生产、测试及沙箱使用不同实例或命名空间。外部 Redis 需通过私网、凭据或 TLS 限制访问，地址和密钥仅保留在后端环境配置。
+脚本检查候选就绪和旧版本、取得发布互斥锁、原子替换 include、执行配置检查与 reload，再核验经过代理的版本。失败自动恢复原 include 并再次 reload／核验；恢复失败明确报错，不宣称回退成功。上一个配置保留在 `.previous`，它不是数据库备份。原生安装可改用 `--nginx-bin <绝对路径>`。健康 URL 禁止 CDN 缓存；若 CDN 绕过规则不确定，应通过受信任的直连域名验收。
 
-从数据库准入切换时，先停止新流量，等待在途上传完成，再停止全部旧 API、worker 和 maintenance。准备 Redis 及持久卷，使用新镜像执行数据库迁移后统一启动全部控制服务；不能新旧版本混跑。`redis_admission_0004` 删除分钟计数、反馈／公开申请限流及上传门禁表；持久任务、上传回执、漫画名缓存、审计、额度和调用成本不变。首次切换的短期窗口和当日反馈／公开申请计数从空 Redis 开始；正常服务重启保留 Redis 卷，不能反复清空以绕过限制。
+切回旧版使用相同命令，将 `--port / --release / --previous-release` 对调；先检查旧 API 仍然就绪且结构兼容。脚本不停止任何 API，不重试写请求，不执行迁移。
 
-数据库备份不包含 Redis。恢复或回退时先停止流量并排空正在执行的短期请求，再处理对应版本的数据库与 Redis；旧二进制不能直接运行在已删除准入表的新结构上。通过 `/health/ready` 的 `redis` 项核实连接，然后验收不同 API 副本之间的限流、上传续租和故障恢复。算法及异常语义见[请求保护](SUBMISSION_SCHEDULING.md)。
+reload 后旧代理 worker 仍可能持有上传、下载和 SSE。SSE 已有 295 秒上限；必须等相关旧代理 worker 退出，才可退休旧 API。保留旧镜像与静态资源至少覆盖发布回退窗口。不要按“reload 后等两秒”删除旧容器。后台模型请求还可能在 HTTP 取消后继续运行，API 退出会等待其执行器完成。
+
+安全退休使用 [retire_release.py](../scripts/retire_release.py)：确认活动槽位、代理已排空、目标镜像身份后禁用旧容器自动重启并发 SIGTERM，等待正常退出；超时保留进程并报错，不发 SIGKILL。API 和 worker 最多会同时占用两份进程内存／连接池；发布前检查余量。新旧 worker 的供应商并发仍受共享池约束，不能提高配置来掩盖发布积压。
+
+## 后台进程独立更新
+
+API-only 发布不更新后台。兼容 worker 更新时，先对旧 worker 发送排空信号，保留其续租线程，再用新镜像启动新的领取实例，完成后核对任务与结算且旧容器正常退出。`retire_release.py worker` 不等待整个集群空闲，只等待该实例已接受的阶段。替代实例可用 `docker compose run -d --name <新实例名> --no-deps control-worker`，角色与镜像身份必须匹配；后续运维须将该显式名称纳入监控。
+
+maintenance 保持单活：先退休旧实例（含计费维护线程结束），再修改 `MAINTENANCE_IMAGE` 并 `up -d --no-deps --wait maintenance`。短暂停止维护不停止 API；禁止未验证的多副本清理。若阶段语义不兼容，全部旧任务先排空再升级，不能借蓝绿切流绕过业务兼容限制。
+
+## 官网与后台独立发布
+
+从仓库根目录分别构建；只改一个前端时只执行对应目标：
+
+```sh
+docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/site-export backend
+docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/admin-export backend
+python scripts/prepare_static_release.py website --source artifacts/site-export/site \
+  --manifest artifacts/site-export/extension-release.json --destination /opt/1panel/www/node-comics \
+  --release <官网版本> --oidc-origin https://auth.nodelane.net
+python scripts/prepare_static_release.py admin --source artifacts/admin-export/site \
+  --destination /opt/1panel/www/node-comics --release <后台版本> --admin-path <当前私有入口> \
+  --oidc-origin https://auth.nodelane.net
+```
+
+产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、五语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 继续复用既有独立位置。
+
+将候选 `release.inc` 通过同一事务式脚本激活：
+
+```sh
+python scripts/switch_release.py static --release <新官网版本> --previous-release <旧官网版本> \
+  --candidate-file /opt/1panel/www/node-comics/releases/website/<新官网版本>/release.inc \
+  --active-file /opt/1panel/www/node-comics/active/website.inc \
+  --probe-url https://comics.nodelane.net/ --openresty-container <实际容器名>
+```
+
+后台独立替换 `active/admin.inc`，探测 URL 使用私有入口，不能写入默认访问日志。回退同样激活旧版本的 include。所有带哈希资源合并到只追加的 `assets` 池，重名而内容不同立即拒绝，已打开旧页面与回退仍可取旧 chunk。不自动清理：维护时仅删除已不被保留版本引用且超出回退／客户端缓存窗口的资源。公开 HTML 可能被 CDN 注入，验收内容、资源与交互，不只比较 HTML 哈希。
+
+## 本地演练
+
+演练用随机项目名创建隔离 PostgreSQL、模拟统一 Redis、真实 OpenResty 与两个 API；仅图片供应商是合成实现，不调用付费模型。不会读取服务器配置或操作现有 Docker 项目。
+
+```powershell
+docker build --build-arg RELEASE_ID=rehearsal-blue -t node-comics-backend:deploy-blue backend
+docker build --build-arg RELEASE_ID=rehearsal-green -t node-comics-backend:deploy-green backend
+docker build -f backend/Dockerfile.static --target website --output type=local,dest=artifacts/deployment-build/website backend
+docker build -f backend/Dockerfile.static --target admin --output type=local,dest=artifacts/deployment-build/admin backend
+python scripts/tests/test_deployment.py
+python scripts/tests/rehearse_deployment.py
+```
+
+需要后端 Python 依赖。报告写入忽略的 `artifacts/deployment-rehearsal/`；默认清理本轮容器／卷／网络，`--keep` 仅供手动检查。演练包含持续请求、切换／回退、错误配置与版本不符恢复、慢上传、SSE、worker 排空、UUID 重放、独立静态发布及基础设施不变检查。测试代理采用官方 [OpenResty Docker](https://github.com/openresty/docker-openresty) `1.29.2.4-1-alpine`，摘要固定在演练脚本，组件许可随官方镜像保留。Docker Desktop 内部代理使用 IPv4 宿主地址；生产模板仍为回环端口。单机演练不证明真实 OIDC、支付、远端 GPU 或生产延迟，也不证明未来任意版本可兼容混跑。
 
 ## 插件安装包
 
@@ -57,13 +127,13 @@ Compose 固定 Docker 官方 `redis:8.2-alpine` 镜像摘要，包含 Redis 8.2.
 python scripts/verify_extension_release.py --browser <chrome|edge|firefox> --zip <安装包路径> --manifest backend/extension-release.json
 ```
 
-脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。重新部署后端与官网以更新发行清单，商店提交包不作为手动安装包交付。
+脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。独立重建并发布官网以更新发行清单和下载重定向，无需重启后端；商店提交包不作为手动安装包交付。
 
 官网按钮直接链接各包的 `download_url`，旧 `/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，五语官网显示暂不可下载，旧路径返回 503；填写并验真后再提供下载，不使用占位地址。
 
 ## 上线检查
 
-- 核对镜像、数据库、控制进程、节点版本与心跳，确认 `/health/ready`。
+- 核对镜像、数据库、控制进程、节点版本与心跳，分别确认 `/health/ready` 与 `/health/cluster`。
 - 实际完成 OIDC 登录、临时原图上传、v3 节点直读/交付、原图终态删除与中心鉴权下载；支付按配置渠道独立验证。
 - 检查五语页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
 - 运行记录保存在部署环境或忽略的产物目录；仓库文档只维护流程。

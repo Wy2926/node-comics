@@ -14,6 +14,8 @@ from test_billing_default_provider import (enable_stripe,
 @pytest.fixture
 def client(pg_scope):
     from app.main import app
+    from app.migrate import migrate
+    migrate()
     with TestClient(app) as value:
         yield value
 

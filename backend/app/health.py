@@ -108,6 +108,22 @@ def queue_alerts(db):
             "overdue_after_seconds": threshold, "count_limit": 1000}
 
 
+def api_readiness():
+    """Cheap per-instance routing gate; no queue scans or background-role coupling."""
+    from .runtime import check_database, check_storage, check_redis
+    checks = {}
+    for name, check in (('database', check_database), ('storage', check_storage), ('redis', check_redis)):
+        try:
+            check()
+            checks[name] = 'ready'
+        except Exception as error:
+            checks[name] = 'unavailable'
+            log_failure('api-readiness-' + name, error)
+    ready = all(value == 'ready' for value in checks.values())
+    return {'status': 'ready' if ready else 'unavailable', 'release': settings().release_id,
+            'checks': checks}, ready
+
+
 def readiness(*, role=None, instance=None):
     """Return bounded, non-sensitive dependency state and an HTTP-ready flag."""
     checks = {"database": "unavailable"}

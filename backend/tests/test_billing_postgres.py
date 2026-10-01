@@ -8,5 +8,7 @@ from test_billing_catalog import test_annual_concurrent_reconciliation_grants_on
 @pytest.fixture
 def client(pg_scope):
     from app.main import app
+    from app.migrate import migrate
+    migrate()
     with TestClient(app) as value:
         yield value

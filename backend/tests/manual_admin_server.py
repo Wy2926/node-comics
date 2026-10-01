@@ -18,7 +18,8 @@ os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app
-from app.db import initialize, session_factory
+from app.db import session_factory
+from app.migrate import migrate
 from translation_fixtures import configure_text_provider
 from admin_fixture import seed
 from fastapi.responses import JSONResponse
@@ -37,7 +38,7 @@ async def fixture_faults(request, call_next):
             return JSONResponse({"error": {"code": "FIXTURE_UNAVAILABLE", "message": "隔离测试：监控接口暂时不可用"}}, status_code=503)
     return await call_next(request)
 
-initialize()
+migrate()
 with session_factory()() as db:
     configure_text_provider(db)
     seed(db)

@@ -22,7 +22,7 @@ class BodyLimitMiddleware:
             if headers.get(b'x-translation-protocol') != b'overlay-v1':
                 response = JSONResponse(status_code=409, content={'error': {
                     'code': 'CLIENT_UPGRADE_REQUIRED',
-                    'message': '请更新 NodeLane 漫译插件后重试：https://comics.nodelane.net/download/',
+                    'message': '请安装 0.8.0 或更新版本：https://comics.nodelane.net/download/。',
                     'update_url': 'https://comics.nodelane.net/download/'}})
                 return await response(scope, receive, send)
         consumed = 0

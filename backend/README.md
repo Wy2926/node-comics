@@ -24,7 +24,7 @@ python -m app.workers
 python -m app.dispatcher
 ```
 
-Docker 自动构建官网与管理后台；本机运行页面前，分别在 `website`、`admin-ui` 执行 `npm ci` 和 `npm run build`。正式环境配置与发布见[部署规范](../docs/DEPLOYMENT.md)。
+首次运行及结构升级前单独执行 `python -m app.migrate`；上述进程只检查数据库兼容性，不自动迁移。后端 Docker 镜像不再包含页面；生产官网、管理后台通过 `Dockerfile.static` 独立构建并由 OpenResty 提供。本地 `bootstrap.ps1 -Start` 单独运行两个前端的 npm 构建，并由根 Compose 只读挂载到 API，需安装 Node.js；直接运行 Python 时将官网产物放到 `app/website_dist`，后台产物由现有构建脚本生成。服务器直接复用统一 Redis，不启动新 Redis 容器。双槽位切换、后台排空和本地演练见[部署规范](../docs/DEPLOYMENT.md)。
 
 ## 开发入口
 

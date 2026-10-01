@@ -11,6 +11,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore", hide_input_in_errors=True)
     app_env: Literal["production", "development", "test"] = "production"
+    release_id: str = Field(default='development', pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$')
+    serve_static: bool = True  # Local fixtures only; production Compose disables it.
     database_url: str = "sqlite:///./node-comics.db"
     redis_url: SecretStr = SecretStr('redis://127.0.0.1:6379/0')
     redis_namespace: str = Field(default='node-comics', pattern=r'^[A-Za-z0-9_-]{1,80}$')

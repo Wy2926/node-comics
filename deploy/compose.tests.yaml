@@ -38,6 +38,7 @@ services:
       - ../services/classic-engine:/workspace/services/classic-engine:ro
       - ../contracts:/workspace/contracts:ro
       - ./openresty.comics.conf:/workspace/deploy/openresty.comics.conf:ro
+      - ./openresty.api.inc:/workspace/deploy/openresty.api.inc:ro
       - ../apps/extension/src/analytics/schema.ts:/workspace/apps/extension/src/analytics/schema.ts:ro
       - ../apps/extension/package.json:/workspace/apps/extension/package.json:ro
     depends_on:

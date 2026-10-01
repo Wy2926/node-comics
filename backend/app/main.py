@@ -17,11 +17,12 @@ from .analytics import router as analytics_router
 from .compute_v3 import router as compute_v3_router
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
-from .db import get_db, initialize, session_factory
+from .db import get_db, session_factory
+from .runtime import check_runtime
 from .errors import problem
 from .entitlements import entitlements_json
 from .models import Ledger, Provider, User
-from .providers import LANGUAGES, credential, initialize_providers
+from .providers import LANGUAGES, credential
 from .languages import REDRAW_LANGUAGES
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
@@ -32,8 +33,8 @@ from .admin_operations import router as admin_operations_router
 from .user_admin import router as user_admin_router
 from .admin_web import create_router as create_admin_web_router
 from .request_models import RequestBody
-from .health import readiness
-from .system_settings import initialize_system_settings, router as system_settings_router
+from .health import readiness, api_readiness
+from .system_settings import router as system_settings_router
 from .translation_providers import router as translation_providers_router
 from .reader_api import router as reader_router
 from .support_requests import router as support_requests_router
@@ -41,20 +42,13 @@ from .quota_grants import router as grants_router
 from .quota_campaigns import router as campaigns_router
 from .billing_api import router as billing_router
 from .billing_admin import router as billing_admin_router
-from .billing_catalog import router as billing_catalog_router, initialize_catalog
+from .billing_catalog import router as billing_catalog_router
 from .schemas import CapabilitiesResponse, EntitlementsResponse, LoginResponse, UsageResponse
 
 
 @asynccontextmanager
 async def lifespan(app):
-    initialize()
-    with session_factory()() as db:
-        initialize_providers(db)
-        from .control_pools import initialize_pools
-        initialize_pools(db)
-        initialize_system_settings(db)
-        initialize_catalog(db)
-        db.commit()
+    check_runtime()
     from .notifications import hub, close_hub
     hub().start()
     app.state.comic_title_executor = TitleExecutor()
@@ -81,7 +75,8 @@ app.include_router(admin_monitor_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_operations_router)
 app.include_router(user_admin_router)
-app.include_router(create_admin_web_router(settings().admin_web_path))
+if settings().serve_static:
+    app.include_router(create_admin_web_router(settings().admin_web_path))
 app.include_router(system_settings_router)
 app.include_router(translation_providers_router)
 cfg = settings()
@@ -149,11 +144,17 @@ def optional_identity(credentials=Depends(bearer), db: Session = Depends(get_db)
 @app.get("/health")
 @app.get("/health/live")
 def health():
-    return {"status": "ok", "service": "node-comics", "version": "0.3.0"}
+    return {"status": "ok", "service": "node-comics", "version": "0.3.0", "release": settings().release_id}
 
 
 @app.get("/health/ready")
 def health_ready():
+    payload, ready = api_readiness()
+    return JSONResponse(status_code=200 if ready else 503, content=payload, headers={'Cache-Control': 'no-store'})
+
+
+@app.get("/health/cluster")
+def health_cluster():
     payload, ready = readiness()
     return JSONResponse(status_code=200 if ready else 503, content=payload)
 
@@ -257,5 +258,6 @@ app.openapi = translation_openapi
 
 
 # Keep this mount last: /v1, /internal, billing and the private admin entry win.
-from .website import WebsiteFiles
-app.mount('/', WebsiteFiles(), name='website')
+if settings().serve_static:
+    from .website import WebsiteFiles
+    app.mount('/', WebsiteFiles(), name='website')

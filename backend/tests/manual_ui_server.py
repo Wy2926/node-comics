@@ -31,7 +31,8 @@ os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app
-from app.db import initialize, session_factory
+from app.db import session_factory
+from app.migrate import migrate
 from translation_fixtures import configure_text_provider
 from app.models import Job
 from app.adapters.images import TranslationOutput
@@ -57,7 +58,7 @@ workers.redraw=lambda data,*args:output(data)
 # The fixture embeds the control loop in a background thread; uvicorn owns the
 # process signals. Production workers still install their normal drain handlers.
 workers.signal = SimpleNamespace(SIGTERM=workers.signal.SIGTERM, SIGINT=workers.signal.SIGINT, signal=lambda *_: None)
-initialize()
+migrate()
 with session_factory()() as db:
     configure_text_provider(db)
 threading.Thread(target=workers.main,daemon=True).start()
