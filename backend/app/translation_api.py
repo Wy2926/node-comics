@@ -71,6 +71,8 @@ def iso(value):
 
 
 def unavailable(db, row, entry, assets=None):
+    if entry and (entry.entitlement or {}).get('plan') == 'guest' and entry.completed_at and entry.completed_at <= now() - timedelta(hours=24):
+        return True
     if row.revoked_at or entry is None:
         return True
     lookup = (lambda key: assets.get(key)) if assets is not None else (lambda key: db.get(Asset, key))
@@ -154,7 +156,7 @@ def translation_json(db, row, *, context=None):
             'artifact': None, 'quality_flags': entry.quality_flags or []}
         if output:
             result['artifact'] = {'sha256': output.sha256, 'byte_size': output.byte_size, 'mime': output.mime,
-                'path': f'/v1/translations/{row.id}/result'}
+                'path': f"/v1/{'guest/' if (entry.entitlement or {}).get('plan') == 'guest' else ''}translations/{row.id}/result"}
             if representation == 'overlay-v1':
                 result.update(bbox=output.bbox, composite='source-atop')
             if not available(output):

@@ -125,7 +125,7 @@ export default {
     "changelogDescription": "Follow manga translator updates, new site support, browser compatibility and reading fixes. Chrome, Edge and Firefox store approvals may differ; check your installed version.",
     "rss": "Follow updates via RSS",
     "accountTitle": "My account",
-    "accountDescription": "Manage your account and membership. Read and translate in the browser extension.",
+    "accountDescription": "Manage your account and membership. Website image translation and the extension share your account allowance.",
     "callbackTitle": "Opening your reader pass.",
     "callbackDescription": "You will return to your account when sign-in is complete.",
     "noscript": "JavaScript is required for account sign-in. Product pages, pricing and guides work without it.",
@@ -342,6 +342,14 @@ export default {
         "description": "How NodeLane Comics handles accounts, images, permissions, translation, subscriptions and deletion.",
         "sections": [
           {
+            "title": "Website image translation and guest trials",
+            "paragraphs": [
+              "The website accepts JPG, PNG and WebP images. Original files, translation inputs, complete results and history are stored in this browser’s IndexedDB, not synced across devices. Clearing site data removes them. “Delete local record” removes only the local copy, not server tasks or audit records.",
+              "Guest trials use Cloudflare Turnstile. Cloudflare processes browser and network signals needed for verification under its privacy policy; our verification requests do not include comic images. We use a secure HttpOnly session cookie lasting up to 30 days, HMAC network identifiers and daily counters retained for seven days to prevent abuse. These identifiers are pseudonymous, not a guarantee of complete anonymity.",
+              "Guest server results can be retrieved for 24 hours after a task ends, then access is revoked and files are reclaimed. Saved local results remain available. Inputs are removed at task completion; necessary task, cost and security records follow their respective retention rules. Long-term result retention below applies to registered accounts. Guests do not create an identity-provider account; signing in does not merge history. The default trial accepts up to five new images daily, with shared-network limits; failures also count."
+            ]
+          },
+          {
             "title": "Scope and contact",
             "paragraphs": [
               "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated September 28, 2026. Material changes will be explained on this page and communicated appropriately."
@@ -465,7 +473,7 @@ export default {
       {
         "id": "overview",
         "question": "What is NodeLane Comics?",
-        "answer": "A browser extension with a comic reader, web-image discovery and local import. Translation has classic and AI redraw modes, with originals always available. Reading happens in the extension; this website provides downloads, guides and account management.",
+        "answer": "NodeLane Comics offers a manga reader extension and website image translation. Read web or local comics in the extension, or upload JPG, PNG and WebP images on the website. Try guest translation or sign in with your existing allowance, download complete results and keep local history. We do not provide a comic catalog.",
         "relatedPath": "/guides/manga-translation/"
       },
       {

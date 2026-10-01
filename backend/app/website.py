@@ -92,7 +92,7 @@ class WebsiteFiles(StaticFiles):
         if normalized == '404.html' or '404' in segments:
             response.status_code = 404
         scope.setdefault('state', {})['public_website'] = True
-        private_page = any(segment in {'account', 'auth', 'payment', 'uninstall'} for segment in segments)
+        private_page = any(segment in {'account', 'auth', 'payment', 'uninstall', 'translate'} for segment in segments)
         response.headers['Cache-Control'] = ('private, no-store' if private_page or response.status_code >= 400 else
             'public, max-age=31536000, immutable' if normalized.startswith('_astro/') else 'public, max-age=0, must-revalidate')
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -104,8 +104,11 @@ class WebsiteFiles(StaticFiles):
             hashes = script_hashes(str(file), file.stat().st_mtime_ns)
             identity = urlsplit(settings().oidc_token_endpoint)
             identity_origin = f'{identity.scheme}://{identity.netloc}' if identity.scheme in {'https', 'http'} and identity.netloc else ''
+            challenge = ' https://challenges.cloudflare.com' if 'translate' in segments else ''
+            blobs = ' blob:' if 'translate' in segments else ''
+            frames = challenge.strip() or "'none'"
             response.headers['Content-Security-Policy'] = (
-                f"default-src 'self'; script-src 'self' {hashes}; style-src 'self' 'unsafe-inline'; "
-                f"img-src 'self' data:; font-src 'self'; connect-src 'self' {identity_origin}; "
-                "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src 'none'")
+                f"default-src 'self'; script-src 'self'{challenge} {hashes}; style-src 'self' 'unsafe-inline'; "
+                f"img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; connect-src 'self' {identity_origin}{challenge}; "
+                f"object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
         return response

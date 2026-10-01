@@ -71,6 +71,8 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
             user = db.scalar(select(User).where(User.subject == subject))
             if user is None:
                 raise
+    if user.kind != 'registered':
+        problem('AUTH_REQUIRED', '请使用注册账号登录', 401)
     if not cfg.dev_auth:
         roles = claims.get("roles", [])
         role = "admin" if isinstance(roles, list) and cfg.oidc_admin_role in roles else "user"

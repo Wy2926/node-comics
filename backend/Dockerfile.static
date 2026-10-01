@@ -12,6 +12,7 @@ COPY extension-release.json /extension-release.json
 COPY website/package*.json ./
 RUN npm ci
 COPY website ./
+COPY shared /shared
 RUN npm run build
 
 FROM scratch AS website

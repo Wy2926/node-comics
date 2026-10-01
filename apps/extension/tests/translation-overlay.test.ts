@@ -7,6 +7,7 @@ import {loadDeliveredResult,resultBlobKey} from '../src/storage/translations/res
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 import {invalidateResultMemory,resultInMemory} from '../src/storage/translations/memory';
 import type {Job,TranslationResult} from '../src/types';
+import {englishDictionary,installDictionary} from '../src/i18n/runtime';
 
 const original=new Blob(['original'],{type:'image/png'}),patch=new Blob(['overlay'],{type:'image/webp'});
 let result:TranslationResult;
@@ -34,6 +35,15 @@ describe('official translation overlays',()=>{
   });
   it('reports unavailable original instead of treating a patch as a complete image',async()=>{
     await expect(materializeResult(result,undefined,patch)).rejects.toMatchObject({code:'ORIGINAL_UNAVAILABLE'});expect(draw).not.toHaveBeenCalled();
+  });
+  it('localizes missing-source failures from both composition and cache recovery',async()=>{
+    installDictionary('en',englishDictionary);
+    try{
+      const expected={code:'ORIGINAL_UNAVAILABLE',message:englishDictionary['原图不可用，请恢复所属来源或本地原图缓存。']};
+      await expect(materializeResult(result,undefined,patch)).rejects.toMatchObject(expected);
+      const read=deliveredRead();read.original.mockResolvedValue(undefined);
+      await expect(loadDeliveredResult(read)).rejects.toMatchObject(expected);
+    }finally{installDictionary('zh-CN',{});}
   });
   it.each([{bbox:{x:7,y:3,width:4,height:5}},{bbox:{x:1.5,y:3,width:4,height:5}},{normalization_version:2},{composite:'source-over'}])('rejects invalid frozen descriptors %j',async change=>{
     await expect(materializeResult({...result,...change} as TranslationResult,original,patch)).rejects.toThrow();expect(draw).not.toHaveBeenCalled();

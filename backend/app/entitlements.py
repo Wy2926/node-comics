@@ -243,6 +243,10 @@ def entitlements_json(db, user, at=None):
 
 
 def require_entitlement(user, mode, at=None, db=None):
+    if user.kind == 'guest':
+        if mode != 'classic' or db is None or not db.info.get('guest_network'):
+            problem('GUEST_FORBIDDEN', '匿名体验仅支持已验证的常规图片翻译', 403)
+        return 'guest_trial'
     kind = quota_kind(user, mode, at, db)
     if kind == "unavailable":
         problem("PLUS_REQUIRED", "AI 重绘需要有效 PLUS 会员或限时重绘赠送额度；已有译图仍可查看", 403)
@@ -252,6 +256,10 @@ def require_entitlement(user, mode, at=None, db=None):
 def reserve(db, user, job, at=None):
     """The caller holds the user lock and has resolved cache/in-flight reuse."""
     at = at or now()
+    if user.kind == 'guest':
+        from .guests import reserve_guest
+        reserve_guest(db, user, job, at)
+        return
     kind = require_entitlement(user, job.mode, at, db=db)
     job.quota_kind = kind
     job.entitlement = {"plan": "plus" if is_plus(db, user, at) else "free", "accepted_at": iso(at),
@@ -316,6 +324,8 @@ def change_membership(db, owner_id, operator_id, key, *, action, months=None, da
     transaction_key = f"membership:{operator_id}:{key}"
     lock_operation(db, transaction_key)
     user = locked_user(db, owner_id)
+    if user and user.kind != 'registered':
+        problem('GUEST_FORBIDDEN', '游客不能获得会员权益', 403)
     if user is None:
         problem("NOT_FOUND", "用户不存在", 404)
     request_hash = digest([owner_id, action, months, monthly_pages, note] + ([days] if days is not None else []))
@@ -390,6 +400,8 @@ def compensate(db, owner_id, operator_id, key, *, kind, pages, note):
     transaction_key = f"compensate:{operator_id}:{key}"
     lock_operation(db, transaction_key)
     user = locked_user(db, owner_id)
+    if user and user.kind != 'registered':
+        problem('GUEST_FORBIDDEN', '游客不能获得账户额度', 403)
     if user is None:
         problem("NOT_FOUND", "用户不存在", 404)
     request_hash = digest([owner_id, kind, pages, note])

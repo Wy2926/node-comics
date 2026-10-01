@@ -41,6 +41,8 @@ def grant_pages(db, owner_id, operator_id, key, request):
     transaction_key = f"grant:{operator_id}:{key}"
     lock_operation(db, transaction_key)
     user = locked_user(db, owner_id)
+    if user and user.kind != 'registered':
+        problem('GUEST_FORBIDDEN', '游客不能获得账户赠送', 403)
     if user is None:
         problem("NOT_FOUND", "用户不存在", 404)
     parameters = {"owner_id": owner_id, **request.model_dump(mode="json")}

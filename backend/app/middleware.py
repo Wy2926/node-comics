@@ -18,7 +18,8 @@ class BodyLimitMiddleware:
             return await self.app(scope, receive, send)
         path = scope.get('path', '')
         headers = dict(scope.get('headers', []))
-        if scope.get('method') != 'OPTIONS' and (path == '/v1/translations' or path.startswith('/v1/translations/')):
+        translation_path = path == '/v1/translations' or path.startswith('/v1/translations/') or path.startswith('/v1/guest/translations')
+        if scope.get('method') != 'OPTIONS' and translation_path:
             if headers.get(b'x-translation-protocol') != b'overlay-v1':
                 response = JSONResponse(status_code=409, content={'error': {
                     'code': 'CLIENT_UPGRADE_REQUIRED',
@@ -28,7 +29,7 @@ class BodyLimitMiddleware:
         consumed = 0
         started = False
         limit = settings().cluster_max_result_bytes if scope.get("path", "").startswith("/internal/") else settings().max_upload_bytes + 1024 * 1024
-        if scope.get("path", "").startswith("/v1/translations/") and not scope["path"].endswith("/input"):
+        if (translation_path or path.startswith('/v1/guest/')) and not path.endswith('/input'):
             limit = settings().translation_max_body_bytes
         if scope.get('path') == '/v1/support-requests':
             limit = 16384

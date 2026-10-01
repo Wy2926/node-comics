@@ -170,12 +170,12 @@ def overview(db: Session = Depends(get_db)):
     lease_status = case((ExecutionLease.expires_at > at, "running"), else_="expired")
     lease_counts = db.execute(select(lease_status, func.count()).where(
         ExecutionLease.completed_at.is_(None)).group_by(lease_status)).all()
-    user_count = db.scalar(select(func.count()).select_from(User))
+    user_count = db.scalar(select(func.count()).select_from(User).where(User.kind == 'registered'))
     plus_count = db.scalar(select(func.count()).select_from(User).where(or_(
         and_(User.plus_pending.is_(False), User.plus_started_at <= at, User.plus_expires_at > at),
         access_exists(at))))
     return {"generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
-        "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).where(Job.created_at >= since))},
+        "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).join(User, User.id == Job.owner_id).where(Job.created_at >= since, User.kind == 'registered'))},
         "nodes": {"total": len(nodes), "online_enabled": online}, "leases": dict(lease_counts),
         "queues": queues, "stages": [{"name": name, "status": status, "count": count} for name, status, count in stages],
         "completed_24h": [{"mode": mode, "status": status, "count": count, "avg_elapsed_seconds": round(max(0, avg), 3)}
@@ -217,7 +217,7 @@ def nodes(db: Session = Depends(get_db)):
 @router.get("/users")
 def users(q: str = Query("", max_length=120), plan: Literal["free", "plus"] | None = None,
           offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    at, query = now(), select(User)
+    at, query = now(), select(User).where(User.kind == 'registered')
     if q.strip():
         query = query.where(or_(User.name.contains(q.strip(), autoescape=True), User.id.contains(q.strip(), autoescape=True)))
     if plan:

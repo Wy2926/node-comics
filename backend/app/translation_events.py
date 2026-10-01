@@ -40,13 +40,15 @@ class SnapshotStream(StreamingResponse):
                 await self.cleanup()
 
 
-async def translation_events(owner_id, ids, request):
+async def translation_events(owner_id, ids, request, *, expires_at=None):
     from .translation_api import read_snapshot
 
     # identity has already verified the signature, issuer and audience. Bound the
     # stream to that same credential's expiry; reconnect uses normal auth again.
-    claims = jwt.decode(request.headers['authorization'].split()[1], options={'verify_signature': False})
-    lifetime = min(STREAM_SECONDS, claims['exp'] - time.time())
+    if expires_at is None:
+        claims = jwt.decode(request.headers['authorization'].split()[1], options={'verify_signature': False})
+        expires_at = claims['exp']
+    lifetime = min(STREAM_SECONDS, expires_at - time.time())
     if lifetime <= 0:
         problem('TOKEN_INVALID', '登录已过期，请重新登录', 401)
     end = time.monotonic() + lifetime

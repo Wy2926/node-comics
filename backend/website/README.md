@@ -1,6 +1,6 @@
 # NodeLane 官网
 
-Astro + React + TypeScript。公开页面输出静态 HTML，账户与图片对照使用 React 岛，与后端共用域名和 API。
+Astro + React + TypeScript。公开页面输出静态 HTML，首页选图、图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页选图后进入 `/translate/`，支持原图／译图／对照、下载完整译图和浏览器本地历史。
 
 ## 运行
 
@@ -23,6 +23,11 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 打开 `http://127.0.0.1:4322/`；身份、订阅与支付均为模拟。正式构建使用 `backend/Dockerfile.static` 的 `website` 目标，OpenResty 独立提供静态产物；发布不重建或重启 API，步骤见[部署规范](../../docs/DEPLOYMENT.md)。
 
 ## 内容与规范
+
+图片翻译浏览器验收：构建后在仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_website_translation_server.py`，打开 `http://127.0.0.1:4322/`，不要同时运行上述账户夹具。服务生成 `artifacts/website-translation/sample.png`，提供模拟身份、人机验证和覆盖层；`POST /test/reset` 可控制丢失受理回执和结果下载失败。不会访问真实 Cloudflare、数据库或模型。正式匿名体验配置见[部署规范](../../docs/DEPLOYMENT.md#官网匿名图片体验)。
+
+- 图片工作台只接收 JPG、PNG、WebP，不导入漫画容器、远程网址或书架。送译缩放、单次 WebP 压缩、摘要和完整图合成复用 [shared/translation-images](../shared/translation-images)。像素处理按需启动单 Worker，跨标签页使用 Web Locks 串行；首页不加载像素处理模块或验证脚本。规则见[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md#官网图片工作台)。
+- 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。
 
 - [src/i18n](src/i18n)：简中、繁中、英文、日文、韩文独立字典；新增页面或文案同步五语。语言由 URL 决定，切换保留当前页面；[语言偏好方案](../../docs/WEBSITE_LANGUAGE_DESIGN.md)尚待实现。
 - [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；由指南列表、帮助、FAQ 和相关文章进入。正文支持步骤、命令、对照表及来源链接。

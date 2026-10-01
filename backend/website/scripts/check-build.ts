@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { load } from 'cheerio';
-import { site, browserStores } from '../src/data/site';
+import { site } from '../src/data/site';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
 async function files(dir: string): Promise<string[]> { return (await Promise.all((await readdir(dir, { withFileTypes: true })).map(entry => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir,entry.name)]))).flat(); }
@@ -65,13 +65,12 @@ for (const file of htmlFiles) {
     } catch { errors.push(`${label}: invalid JSON-LD graph`); }
   });
   if (basePath(route) === '/') {
-    if ($('.hero-stores a').length !== 3) errors.push(`${label}: expected three homepage browser entrances`);
-    for (const store of browserStores) {
-      const link = $(`.hero-stores [data-browser="${store.id}"]`);
-      const expected = store.url || `${localPath('/download/', locale)}#${store.id}`;
-      if (link.attr('href') !== expected || link.find('img').attr('src') !== store.icon) errors.push(`${label}: wrong browser entrance ${store.id}`);
-      if (!store.url && !$('.hero-store-status').text().includes(dictionaries[locale].ui.storeUnavailable)) errors.push(`${label}: missing pending store status`);
-    }
+    if ($('.translation-hero input[type=file]').length !== 1) errors.push(`${label}: missing homepage image entrance`);
+    if (!$(`.translation-hero a[href="${localPath('/translate/',locale)}"]`).length) errors.push(`${label}: missing translator link`);
+    if (!$(`.translation-hero a[href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: missing extension download`);
+  }
+  if (basePath(route) === '/translate/') {
+    if (!noindex || $('.translation-workbench').length !== 1 || $('.translation-sidebar input[type=file]').length !== 1) errors.push(`${label}: translator must be a private, usable work surface`);
   }
   if (basePath(route) === '/pricing/') {
     const published = $('.published-plus-pricing');

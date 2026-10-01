@@ -65,9 +65,29 @@ class ReleaseTests(unittest.TestCase):
         (source / 'index.html').write_text('console', encoding='utf-8')
         config = prepare('admin', source, self.root / 'static', 'v1', '/www/node-comics', admin_path='/existing-panel/')
         self.assertIn('location = /existing-panel/', config.read_text())
-        for path in ('/admin/', '/v1/', '/billing/', '/webhooks/'):
+        for path in ('/admin/', '/v1/', '/billing/', '/webhooks/', '/translate/'):
             with self.assertRaises(ValueError):
                 prepare('admin', source, self.root / 'static', 'v2', '/www/node-comics', admin_path=path)
+
+    def test_translation_pages_keep_private_headers_and_scoped_challenge_csp(self):
+        source = self.root / 'build'
+        source.mkdir()
+        (source / 'index.html').write_text('<h1>Public home</h1>', encoding='utf-8')
+        for locale in ('', 'en', 'ja', 'ko', 'zh-tw'):
+            page = source / locale / 'translate' / 'index.html'
+            page.parent.mkdir(parents=True)
+            page.write_text('<h1>Translation</h1>', encoding='utf-8')
+        config = prepare('website', source, self.root / 'static', 'v1', '/www/node-comics').read_text()
+        home = config.split('location = / {', 1)[1].split('\n}', 1)[0]
+        self.assertNotIn('challenges.cloudflare.com', home)
+        self.assertNotIn('blob:', home)
+        for locale in ('', 'en/', 'ja/', 'ko/', 'zh-tw/'):
+            page = config.split(f'location = /{locale}translate/ {{', 1)[1].split('\n}', 1)[0]
+            self.assertIn('no-store', page)
+            self.assertIn('noindex', page)
+            self.assertIn('https://challenges.cloudflare.com', page)
+            self.assertIn("img-src 'self' data: blob:", page)
+            self.assertIn("worker-src 'self'", page)
 
     def test_static_release_is_immutable_and_old_chunks_remain(self):
         source = self.root / 'build'

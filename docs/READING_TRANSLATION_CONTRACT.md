@@ -8,6 +8,14 @@
 
 ## 1. 翻译流程
 
+### 官网图片工作台
+
+官网与插件复用 `backend/shared/translation-images` 的缩放、压缩、摘要和合成实现：保留高分辨率原文件，生成短边不超过 1800 的送译副本；需缩小或大于 1 MiB 时单次 WebP 0.9 编码，同尺寸且输入无需额外规范化时，无体积收益则保留输入。仍检查源图、像素、长边和 API capabilities 限制，不反复试质量、不自动切长图。选图与 Worker 均在像素解码前读取有界图片头检查源图尺寸；按需 Worker 串行处理，不在首页解码全批图片。
+
+注册用户调用现有 Bearer `/v1/translations`；游客调用同结构 Cookie `/v1/guest/translations`，均要求 `X-Translation-Protocol: overlay-v1`。游客额外使用 `X-Guest-Request: 1`，新 UUID 携带 `X-Turnstile-Token`（action=`guest_translate`）；`POST /v1/guest/session` 的 token 对应 `guest_session`。服务端校验 Turnstile hostname/action，不把前端成功当作准入。身份与限额见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。
+
+受理／上传前冻结本地 UUID 与实际输入。刷新和失联后先 GET 原 UUID，仅确认 404 才以同 UUID 提交原描述；`needs_input` 重传原字节，SSE 退避核实，未知结果不自动重调。覆盖层合成后保存完整译图，再次查看直接读本地；写盘失败仍可立即下载。明确重试／重译创建新 UUID 并保留 `retry_of`／`regenerate_of`，不把传输失败当作重译。
+
 ```mermaid
 sequenceDiagram
   participant C as 客户端
@@ -68,9 +76,9 @@ X-Translation-Protocol: overlay-v1
 
 能力响应必须声明 `result_protocol=overlay-v1`。全部 `/v1/translations` 业务路由都要求 `X-Translation-Protocol: overlay-v1`，包括创建、上传、单项／批量／历史查询、SSE、下载、取消、删除、反馈和详情；CORS OPTIONS 预检除外。缺少或不匹配时在读取请求体前返回 409 `CLIENT_UPGRADE_REQUIRED`，包含 `update_url=https://comics.nodelane.net/download/`；不能只保护创建而让旧客户端读取覆盖文件。
 
-来源页先统一静态首帧、EXIF 方向与 sRGB 色彩语义；普通静态图片保留原字节，带 EXIF/ICC/动画等语义的输入转换为静态 PNG。阅读原图不因翻译而缩小。
+送译前统一静态首帧、EXIF 方向与 sRGB 色彩语义。插件来源页的普通静态图片保留原字节，带 EXIF/ICC/动画等语义的输入转换为静态 PNG。官网需 WebP 编码时，由该画布步骤同时完成规范化，跳过中间的全尺寸 PNG；无需 WebP 编码时，带元数据的输入仍转换为静态 PNG。阅读原图不因翻译而缩小。
 
-官方渠道在创建请求前按 `min(1, 1800 / 短边)` 等比例缩小送译副本，尺寸四舍五入，不放大小图。需要缩小，或原文件超过 1 MiB 时，仅执行一次高质量 WebP 编码（`quality=0.90`）；不追求硬性 5 MB 目标，不循环降质量。无需缩小且不超过 1 MiB 时直接复用原字节；同尺寸重编码没有节省字节时也保留原文件，避免无收益的有损压缩。原图始终不改写。摘要、大小和尺寸绑定实际送译字节；本地另外保存来源摘要用于页面匹配，不能把送译摘要覆盖到原图身份上。编码策略固定为 `short-edge-1800-webp90-v1`，重试复用冻结字节。缩放与编码在 Worker 内执行；扩展 service worker 直接使用自身后台线程，像素处理跨上下文串行，并复用同一锁限制结果合成。上传不占用像素处理锁。
+官方渠道在创建请求前按 `min(1, 1800 / 短边)` 等比例缩小送译副本，尺寸四舍五入，不放大小图。需要缩小，或原文件超过 1 MiB 时，仅执行一次高质量 WebP 编码（`quality=0.90`）；不追求硬性 5 MB 目标，不循环降质量。无需缩小且不超过 1 MiB 的已规范化输入直接复用原字节；同尺寸重编码没有节省字节且输入无需额外规范化时，也保留原文件，避免无收益的有损压缩。原图始终不改写。摘要、大小和尺寸绑定实际送译字节；本地另外保存来源摘要用于页面匹配，不能把送译摘要覆盖到原图身份上。编码策略固定为 `short-edge-1800-webp90-v1`，重试复用冻结字节。缩放与编码在 Worker 内执行；扩展 service worker 直接使用自身后台线程，像素处理跨上下文串行，并复用同一锁限制结果合成。上传不占用像素处理锁。
 
 中心统一校验实际输入字节与尺寸，默认最多 128 MiB、3200 万像素、单边 16000；字节上限是传输安全边界，不是压缩目标。插件按能力响应提前检查缩小后的图片，过长条漫明确失败，不自动切片或继续缩小短边。节点不另设图片字节、像素或单边准入上限，仅核对中心元数据、摘要、格式和规范化；资源并发与工作内存预算仍有效。
 

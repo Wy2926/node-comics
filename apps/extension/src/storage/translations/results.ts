@@ -91,8 +91,8 @@ export async function loadDeliveredResult(request:ResultRequest&{download:()=>Pr
     validateResult(result);
     let original:Blob|undefined;
     if(result.representation!=='full-image-v1'){
-      try{original=await request.original?.();}catch(error){if(error instanceof SourceDatabaseSchemaError)throw error;throw new OriginalUnavailableError();}
-      if(!original)throw new OriginalUnavailableError();
+      try{original=await request.original?.();}catch(error){if(error instanceof SourceDatabaseSchemaError)throw error;throw new OriginalUnavailableError(msg('原图不可用，请恢复所属来源或本地原图缓存。'));}
+      if(!original)throw new OriginalUnavailableError(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
     }
     const artifact=result.representation==='original'?undefined:await request.download();
     assertCurrent(request.isCurrent);

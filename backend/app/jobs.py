@@ -88,6 +88,10 @@ def find_reusable(db, user, asset, mode, language, config):
         Job.status.in_(ACTIVE | {'succeeded', 'no_text'}), Job.cancel_requested.is_(False),
         Job.discard_output.is_(False)).order_by(Job.created_at.desc(), Job.id))
     for candidate in candidates:
+        if user.kind == 'guest' and candidate.completed_at:
+            from datetime import timedelta
+            if candidate.completed_at <= now() - timedelta(hours=24):
+                continue
         if candidate.input_asset_id and not descriptor_available(db.get(Asset, candidate.input_asset_id)):
             continue
         if candidate.status == 'succeeded' and candidate.output_asset_id:

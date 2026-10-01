@@ -44,6 +44,39 @@ class Settings(BaseSettings):
     oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
+    guest_enabled: bool = False
+    guest_origin: str = "https://comics.nodelane.net"
+    turnstile_site_key: str = ""
+    turnstile_secret_key: SecretStr = SecretStr("")
+    guest_hash_secret: SecretStr = SecretStr("")
+    guest_daily_limit: int = Field(default=5, ge=1, le=100)
+    guest_network_daily_limit: int = Field(default=5, ge=1, le=1000)
+    guest_global_daily_limit: int = Field(default=100, ge=1, le=100000)
+    guest_global_concurrency: int = Field(default=4, ge=1, le=100)
+
+    @field_validator('guest_origin')
+    @classmethod
+    def valid_guest_origin(cls, value):
+        parsed = urlsplit(value)
+        if (parsed.scheme not in ('https', 'http') or not parsed.hostname or parsed.username or parsed.password
+                or parsed.path or parsed.query or parsed.fragment or '*' in value
+                or (parsed.scheme == 'http' and parsed.hostname not in ('127.0.0.1', 'localhost', 'testserver'))):
+            raise ValueError('GUEST_ORIGIN must be an exact HTTPS origin (HTTP loopback only for tests)')
+        return value
+    @model_validator(mode='after')
+    def validate_guest_configuration(self):
+        if self.guest_enabled:
+            if not self.turnstile_site_key or not self.turnstile_secret_key.get_secret_value() or len(self.guest_hash_secret.get_secret_value()) < 32:
+                raise ValueError('Guest trials require Turnstile site/secret keys and a GUEST_HASH_SECRET of at least 32 characters')
+            if self.app_env == 'production':
+                if not self.guest_origin.startswith('https://'):
+                    raise ValueError('Production guest trials require an HTTPS origin')
+                # Cloudflare publishes these prefixes for its always-pass/fail test keys.
+                test_prefixes = ('1x00000000000000000000','2x00000000000000000000','3x00000000000000000000')
+                if self.turnstile_site_key.startswith(test_prefixes) or self.turnstile_secret_key.get_secret_value().startswith(test_prefixes):
+                    raise ValueError('Turnstile test keys are forbidden in production')
+        return self
+
     ga4_enabled: bool = False
     ga4_debug_mode: bool = False
     ga4_extension_measurement_id: str = Field(default="", pattern=r"^(G-[A-Z0-9]{4,20})?$")
@@ -141,7 +174,7 @@ class Settings(BaseSettings):
         if self.admin_web_path and (not re.fullmatch(r"/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/", self.admin_web_path)
                 or self.admin_web_path.strip("/").lower() in {
                     "admin", "v1", "internal", "health", "docs", "redoc", "api", "openapi",
-                    "account", "auth", "features", "pricing", "download", "guides", "faq", "help",
+                    "account", "auth", "features", "pricing", "download", "guides", "faq", "help", "translate",
                     "about", "changelog", "privacy", "terms", "refund", "zh-tw", "en", "ja", "ko"}):
             raise ValueError("ADMIN_WEB_PATH must be empty (disabled) or a non-reserved /name/ path using letters, digits, hyphens or underscores")
         return self

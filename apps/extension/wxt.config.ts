@@ -1,4 +1,5 @@
 import { defineConfig } from 'wxt';
+import { fileURLToPath } from 'node:url';
 import { importAssets } from './import-assets';
 import { writeStoreLocales } from './store-locales';
 import { unrarCsp } from './unrar-csp';
@@ -6,6 +7,11 @@ import { extensionIdentity } from './extension-identity';
 writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  zip: {
+    // Preserve relative imports to the image code shared with the website in review sources.
+    sourcesRoot: fileURLToPath(new URL('../../', import.meta.url)),
+    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'LICENSE'],
+  },
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
   manifest: ({browser}) => ({
     ...(browser === 'firefox' ? {browser_specific_settings: {

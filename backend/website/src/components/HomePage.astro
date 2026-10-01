@@ -1,8 +1,9 @@
 ---
-import { Image, getImage } from 'astro:assets';
+import { getImage } from 'astro:assets';
 import Compare from './Compare';
 import ScreenshotGallery from './ScreenshotGallery';
-import BrowserStores from './BrowserStores.astro';
+import ImageDropzone from './ImageDropzone';
+import {translationCopy} from '../i18n/translate';
 import FaqList from './FaqList.astro';
 import { dictionaries, localPath, type Locale } from '../i18n';
 import { homeCopy } from '../i18n/home';
@@ -15,12 +16,12 @@ import reader from '../assets/product/02-reading-controls.png';
 import languages from '../assets/product/03-translation-languages.png';
 import websites from '../assets/product/04-supported-websites.png';
 import appearance from '../assets/product/05-personalize-your-reader.png';
-import popup from '../assets/product/06-browser-popup.png';
 import '../styles/home.css';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const h = homeCopy[locale];
+const tr = translationCopy[locale];
 const { ui: t, documents } = dictionaries[locale];
 const href = (path: string) => localPath(path, locale);
 const examples = await Promise.all([
@@ -42,20 +43,13 @@ const images = await Promise.all([library, reader, languages, websites, appearan
 })));
 ---
 <div class="product-home">
-  <section class="container product-hero">
-    <div class="product-hero-copy">
-      <p class="eyebrow">{h.eyebrow}</p>
-      <h1>{h.title[0]}<br/><span>{h.title[1]}</span></h1>
-      <p class="product-lead">{h.description}</p>
-      <BrowserStores locale={locale}/>
-      <div class="hero-actions"><a class="text-link" href="#see-it">{h.seeReader} <span aria-hidden="true">↓</span></a><a class="text-link" href={href('/download/')}>{t.installTitle} <span aria-hidden="true">→</span></a></div>
-      <p class="product-platform">{h.desktop}<span>Chrome / Edge / Firefox</span></p>
-    </div>
-    <figure class="popup-showcase">
-      <div class="popup-image"><Image src={popup} alt={h.popupAlt} width={420} format="webp" quality={95} loading="eager" fetchpriority="high" /></div>
-      <figcaption>{h.popupCaption}</figcaption>
-    </figure>
-  </section>
+  <section class="translation-hero"><div class="container">
+    <p class="eyebrow">NODELANE COMICS / TRANSLATE</p>
+    <h1>{tr.title}</h1><p>{tr.intro}</p>
+    <ImageDropzone client:load locale={locale}/>
+    <p class="translation-note">{tr.guest} · JPG / PNG / WebP</p>
+    <div class="translation-hero-links"><a class="text-link" href={href('/translate/')}>{tr.open} →</a><a class="text-link" href={href('/download/')}>{h.install} →</a></div>
+  </div></section>
   <div class="product-trust"><div class="container">{h.trust.map(text => <p>{text}</p>)}</div></div>
   <section class="container product-section toolbar-story">
     <div class="product-section-heading"><div><p class="eyebrow">01 / NODELANE COMICS</p><h2>{h.stepsTitle}</h2></div><p>{h.stepsIntro}</p></div>

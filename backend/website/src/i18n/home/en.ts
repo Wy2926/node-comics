@@ -8,7 +8,7 @@ const copy: HomeCopy = {
   install: 'Get the extension', seeReader: 'Explore the reader',
   desktop: 'Made for desktop reading', popupAlt: 'NodeLane Comics toolbar popup with English selected and the Translate current tab button.',
   popupCaption: 'A new chapter starts in your toolbar.',
-  trust: ["Read local originals for free, without an account.","Use official translation allowances or connect a local service."],
+  trust: ["Try image translation as a guest, or sign in to use your account allowance.","Read local originals free in the extension, or connect a local translation service."],
   stepsTitle: 'Start from your toolbar.', stepsIntro: 'One place to choose your language and get back to the story.',
   steps: [
     ['Choose your language', 'Set the language you want to read in from the extension popup.'],

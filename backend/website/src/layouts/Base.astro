@@ -5,6 +5,7 @@ import logoEn from '../assets/logo-en.webp';
 import { site, absolute } from '../data/site';
 import { dictionaries, localeFromPath, basePath, localPath, locales, languageNames } from '../i18n';
 import '../styles/global.css';
+import {translationCopy} from '../i18n/translate';
 interface Props {
   title: string;
   description: string;
@@ -18,7 +19,7 @@ const locale=localeFromPath(path);
 const route=basePath(path);
 const t=dictionaries[locale].ui;
 const href=(target:string)=>localPath(target,locale);
-const navigation=[{href:href('/features/'),label:t.features},{href:href('/pricing/'),label:t.pricing},{href:href('/guides/'),label:t.guides},{href:href('/help/'),label:t.help}];
+const navigation=[{href:href('/translate/'),label:translationCopy[locale].open},{href:href('/features/'),label:t.features},{href:href('/pricing/'),label:t.pricing},{href:href('/help/'),label:t.help}];
 const canonical = absolute(path);
 const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
 const pageSchema = schema.find(item => item['@id'] === canonical);

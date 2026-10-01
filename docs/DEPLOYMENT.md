@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `simple_scheduler_0009`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `website_guests_0010`。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 发布边界
 
@@ -24,7 +24,7 @@
 
 运行进程只检查结构、支付环境、文件目录权限和 Redis 连通性，不改表、不写默认配置。显式迁移命令同时初始化缺失的供应商、控制池、系统设置和计费目录；不重置已配置值。PostgreSQL 迁移保留 advisory lock，锁等待超过 5 秒失败，禁止无限阻塞线上请求。
 
-当前运行代码仅接受 `simple_scheduler_0009`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。
+当前运行代码仅接受 `website_guests_0010`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。
 
 从早于当前基线的系统升级时，先备份并在隔离库演练，使用旧服务排空／核实活动、结果未知与 `unknown_released` 任务，再停止所有旧控制进程并显式迁移。调度、Job 结果、会员顺延、活动额度及 Redis 准入的旧代码不能混跑，也不能仅回退镜像；回退依赖配套数据库和文件备份。旧远端结果授权不恢复，历史 R2 图片不搬运、不删除；当前 UUID、检查点与账本由迁移规则保留。
 
@@ -74,6 +74,18 @@ API-only 发布不更新后台。兼容 worker 更新时，先对旧 worker 发�
 maintenance 保持单活：先退休旧实例（含计费维护线程结束），再修改 `MAINTENANCE_IMAGE` 并 `up -d --no-deps --wait maintenance`。短暂停止维护不停止 API；禁止未验证的多副本清理。若阶段语义不兼容，全部旧任务先排空再升级，不能借蓝绿切流绕过业务兼容限制。
 
 ## 官网与后台独立发布
+
+### 官网匿名图片体验
+
+此功能需先升级 API／控制进程和数据库，再发布官网，不能只替换静态页。`website_guests_0010` 保留原用户 ID、OIDC subject、任务和账本，新增 guest 身份与三张会话／预算表；先在备份库演练、停旧进程、显式迁移，再启动支持新结构的全部进程。旧版不支持游客，禁止混跑或仅回退镜像。
+
+在 `.env.server` 配置 `GUEST_ORIGIN`（精确官网 HTTPS origin，无尾斜线）、真实 `TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY`、至少 32 字符的独立随机 `GUEST_HASH_SECRET`，最后设置 `GUEST_ENABLED=true`。全部 API 槽位共享稳定 HMAC 密钥；更换会重置网络身份，不应随发布轮换。密钥缺失或生产使用测试密钥拒绝启动。默认预算见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)，可通过模板中的四项 GUEST 限额调整；关闭开关拒绝新任务但保留已有任务读取。
+
+Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为五语翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
+
+上线前必须核实真实 IP 信任链：公网请求只进入 OpenResty／受信 Cloudflare，API 槽位不开放公网；代理覆盖 `X-Forwarded-For`，仅受信 Cloudflare 网段可提供 CF-Connecting-IP。应用只读取处理后的 `request.client.host`，不自行信任用户头。当前容器内 Uvicorn 信任代理头的前提是回环端口和私网访问隔离；若改变拓扑，改为精确可信代理地址。不可用 Cookie 或 Turnstile 替代该检查。
+
+在真实域名独立验收 Turnstile、Cookie、5 次／同网限制、登录账户复用、Redis 故障拒绝、24 小时过期、任务恢复，再开放。代理池／真人打码无法彻底识别为同一个人，全站硬预算为成本底线，边缘 WAF／速率规则作为额外保护。生产不能挂载或暴露 `tests/manual_website_translation_server.py`。
 
 从仓库根目录分别构建；只改一个前端时只执行对应目标：
 

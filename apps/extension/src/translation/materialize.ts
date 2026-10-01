@@ -1,102 +1,22 @@
-import type {TranslationResult} from '../types';
-import {hashFile} from '../importers/hash';
-import {imageWork} from './input/work';
-import {TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from './input/limits';
 import {msg} from '../i18n/runtime';
+import {InvalidArtifactError, OriginalUnavailableError, materializeResult as materialize, validateResult as validate} from '../../../../backend/shared/translation-images/materialize';
+export {OriginalUnavailableError, InvalidArtifactError};
 
-const digest = /^[a-f0-9]{64}$/;
-const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
-
-export class OriginalUnavailableError extends Error {
-  readonly code = 'ORIGINAL_UNAVAILABLE';
-  constructor() {
-    super(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
-    this.name = 'OriginalUnavailableError';
+function localized(error: unknown) {
+  if (error instanceof InvalidArtifactError) {
+    error.message = msg('翻译文件校验失败，请重新加载。');
+  } else if (error instanceof OriginalUnavailableError) {
+    error.message = msg('原图不可用，请恢复所属来源或本地原图缓存。');
+  } else if (error instanceof Error && error.message === '原图内容已变化，请重新加载后翻译。') {
+    error.message = msg('原图内容已变化，请重新加载后翻译。');
   }
+  return error;
 }
-
-export class InvalidArtifactError extends Error {
-  readonly code = 'RESULT_ARTIFACT_INVALID';
-  constructor() {
-    super(msg('翻译文件校验失败，请重新加载。'));
-    this.name = 'InvalidArtifactError';
-  }
+export function validateResult(...args: Parameters<typeof validate>) {
+  try { return validate(...args); }
+  catch (error) { throw localized(error); }
 }
-
-export function validateResult(result: TranslationResult) {
-  if (result.normalization_version !== 1 || !digest.test(result.input_sha256) ||
-      !positive(result.width) || !positive(result.height) || Math.max(result.width, result.height) > TRANSLATION_MAX_DIMENSION ||
-      result.width * result.height > TRANSLATION_MAX_PIXELS || !['translated', 'partial', 'no_text'].includes(result.kind)) {
-    throw new InvalidArtifactError();
-  }
-  if (result.representation === 'original') {
-    if (result.artifact || result.bbox || result.composite) throw new InvalidArtifactError();
-    return;
-  }
-  const artifact = result.artifact;
-  if (!artifact || !digest.test(artifact.sha256) || !positive(artifact.byte_size) ||
-      artifact.byte_size > 128 * 1024 * 1024 || result.kind === 'no_text') {
-    throw new InvalidArtifactError();
-  }
-  if (result.representation === 'overlay-v1') {
-    const box = result.bbox;
-    if (result.composite !== 'source-atop' || artifact.mime !== 'image/webp' || !box ||
-        !Number.isSafeInteger(box.x) || !Number.isSafeInteger(box.y) || box.x < 0 || box.y < 0 ||
-        !positive(box.width) || !positive(box.height) ||
-        box.x + box.width > result.width || box.y + box.height > result.height) {
-      throw new InvalidArtifactError();
-    }
-  } else if (result.representation !== 'full-image-v1' || result.bbox || result.composite) {
-    throw new InvalidArtifactError();
-  }
-}
-
-async function validateArtifact(result: TranslationResult, blob: Blob) {
-  const artifact = result.artifact;
-  if (!artifact || blob.size !== artifact.byte_size || blob.type !== artifact.mime ||
-      await hashFile(blob) !== artifact.sha256) {
-    throw new InvalidArtifactError();
-  }
-}
-
-/** Reader, inline display and export verify delivered bytes once, before caching or composing. */
-export async function materializeResult(result: TranslationResult, original: Blob | undefined, artifact?: Blob): Promise<Blob> {
-  validateResult(result);
-  if (artifact) await validateArtifact(result, artifact);
-  if (result.representation !== 'original' && !artifact) throw new InvalidArtifactError();
-  if (result.representation !== 'full-image-v1' && !original) throw new OriginalUnavailableError();
-  if (original && await hashFile(original) !== result.input_sha256) {
-    throw Error(msg('原图内容已变化，请重新加载后翻译。'));
-  }
-  return imageWork(async () => {
-    let base: ImageBitmap | undefined;
-    let patch: ImageBitmap | undefined;
-    let canvas: OffscreenCanvas | undefined;
-    try {
-      if (original) {
-        base = await createImageBitmap(original, {imageOrientation: 'from-image', colorSpaceConversion: 'default'});
-        if (result.representation !== 'full-image-v1' && (base.width !== result.width || base.height !== result.height)) {
-          throw Error(msg('原图内容已变化，请重新加载后翻译。'));
-        }
-      }
-      if (result.representation === 'original') return original!;
-      try { patch = await createImageBitmap(artifact!); }
-      catch { throw new InvalidArtifactError(); }
-      const expected = result.representation === 'overlay-v1' ? result.bbox! : result;
-      if (patch.width !== expected.width || patch.height !== expected.height) throw new InvalidArtifactError();
-      if (result.representation === 'full-image-v1') return artifact!;
-      canvas = new OffscreenCanvas(result.width, result.height);
-      const context = canvas.getContext('2d', {colorSpace: 'srgb'});
-      if (!context) throw new InvalidArtifactError();
-      context.imageSmoothingEnabled = false;
-      context.drawImage(base!, 0, 0);
-      context.globalCompositeOperation = 'source-atop';
-      context.drawImage(patch, result.bbox!.x, result.bbox!.y);
-      return await canvas.convertToBlob({type: 'image/png'});
-    } finally {
-      base?.close();
-      patch?.close();
-      if (canvas) canvas.width = canvas.height = 1;
-    }
-  });
+export async function materializeResult(...args: Parameters<typeof materialize>) {
+  try { return await materialize(...args); }
+  catch (error) { throw localized(error); }
 }

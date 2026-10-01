@@ -6,8 +6,8 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "simple_scheduler_0009"
-NEW_TABLES = {"quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
+HEAD = "website_guests_0010"
+NEW_TABLES = {"guest_sessions", "guest_daily_usage", "guest_daily_budgets", "quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
 
@@ -300,7 +300,10 @@ def test_overlay_upgrade_cannot_roll_back_after_local_protocol_data(isolated_mig
         config.attributes['connection'] = connection
         command.upgrade(config, 'local_overlay_0007')
     with isolated_migration_database.begin() as connection:
-        connection.execute(User.__table__.insert().values(id='overlay-owner', subject='overlay-owner', name='Reader'))
+        from sqlalchemy import Table, MetaData
+        from app.models import now
+        legacy_users = Table('users', MetaData(), autoload_with=connection)
+        connection.execute(legacy_users.insert().values(id='overlay-owner', subject='overlay-owner', name='Reader', role='user', plus_pending=False, created_at=now()))
         connection.execute(Asset.__table__.insert().values(id='overlay-asset', owner_id='overlay-owner',
             sha256='a'*64, storage_key=key, mime='image/png', width=1, height=1,
             byte_size=10, representation=representation))

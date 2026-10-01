@@ -195,6 +195,8 @@ def cleanup(db):
     global _lease_cleanup_cursor, _upload_cleanup_cursor
     lock_scheduler(db)
     orphan_cutoff = now() - timedelta(seconds=max(3600, settings().upload_body_timeout_seconds * 2))
+    from .guests import expire_guests
+    expire_guests(db)
     orphan_results = list(db.scalars(select(Asset).outerjoin(Job, Job.output_asset_id == Asset.id).where(
         Asset.kind != "original", Asset.deleted_at.is_(None), Asset.created_at <= orphan_cutoff,
         Job.id.is_(None), or_(Asset.parent_id.is_(None), Asset.parent_id.not_in(

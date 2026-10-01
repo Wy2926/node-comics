@@ -10,6 +10,7 @@ import BillingOffers from './BillingOffers';
 import reading from '../assets/reading-corner.webp';
 import {dictionaries,localPath,type Locale} from '../i18n';
 import {homeCopy} from '../i18n/home';
+import {translationCopy} from '../i18n/translate';
 import {site,absolute,browserStores} from '../data/site';
 interface Props {locale:Locale;path:string}
 const {locale,path}=Astro.props;
@@ -23,8 +24,8 @@ const updated=guide?.updated??site.updated;
 const relatedGuides=guide?.related ? guide.related.map(slug=>d.guides.find(item=>item.slug===slug)).filter((item):item is NonNullable<typeof item>=>!!item) : d.guides.filter(item=>item.slug!==guide?.slug).slice(0,3);
 const titles:Record<string,string>={features:t.seoFeaturesTitle,pricing:t.seoPricingTitle,download:t.seoDownloadTitle,guides:t.seoGuidesTitle,faq:t.seoFaqTitle,help:t.seoHelpTitle,about:t.seoAboutTitle,changelog:t.seoChangelogTitle,account:t.account,auth:t.callbackTitle};
 const intros:Record<string,[string,string]>={features:[t.featureHeading,t.featureDescription],pricing:[t.pricingTitle,t.pricingDescription],download:[t.downloadTitle,t.downloadDescription],guides:[t.guidesTitle,t.guidesDescription],faq:[t.faqTitle,t.faqDescription],help:[t.helpTitle,t.helpDescription],about:[t.aboutTitle,t.aboutDescription],changelog:[t.changelogTitle,t.changelogDescription],account:[t.accountTitle,t.accountDescription],auth:[t.callbackTitle,t.callbackDescription]};
-const title=article?.title??titles[key]??t.seoHomeTitle;
-const description=article?.description??intros[key]?.[1]??homeCopy[locale].description;
+const title=path==='/'?translationCopy[locale].title:article?.title??titles[key]??t.seoHomeTitle;
+const description=path==='/'?translationCopy[locale].intro:article?.description??intros[key]?.[1]??homeCopy[locale].description;
 const schema:Record<string,unknown>[]=[];
 if(path==='/')schema.push({'@type':'SoftwareApplication','@id':absolute(`${href('/')}#software`),name:t.brandName,applicationCategory:'BrowserApplication',operatingSystem:'Windows, macOS, Linux',browserRequirements:'Desktop Chrome, Microsoft Edge or Mozilla Firefox',description,url:absolute(href('/')),installUrl:absolute(href('/download/')),sameAs:browserStores.filter(store=>store.url).map(store=>store.url),publisher:{'@id':absolute('/#organization')},inLanguage:locale,offers:{'@type':'Offer',price:'0',priceCurrency:'USD',description:t.freeBenefits[0],url:absolute(href('/pricing/'))}});
 if(key==='faq')schema.push({'@type':'FAQPage','@id':absolute(href(path)),mainEntity:d.faqs.map(item=>({'@type':'Question','@id':absolute(`${href(path)}#${item.id}`),name:item.question,acceptedAnswer:{'@type':'Answer',text:item.answer}}))});

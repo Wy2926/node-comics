@@ -90,7 +90,7 @@
 | --- | --- |
 | [浏览器插件](apps/extension/README.md) | 阅读器、书架、网站适配与翻译交互 |
 | [后端](backend/README.md) | API、持久任务、账户、会员与管理后台 |
-| [官网](backend/website/README.md) | 五语介绍、下载与账户页面 |
+| [官网](backend/website/README.md) | 五语介绍、图片翻译、匿名体验、本地历史、下载与账户页面 |
 | [Drive 连接页](apps/drive-connect/README.md) | Google 授权与文件选择 |
 | [计算节点](services/compute-node/README.md) | Windows 独立包与 Linux NVIDIA 镜像的安装、运行与构建 |
 | [图像引擎](services/classic-engine/README.md) | 检测、OCR、LaMa 抹字与嵌字开发 |

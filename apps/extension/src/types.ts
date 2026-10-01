@@ -1,5 +1,7 @@
 import {msg} from './i18n/runtime';
 import type {UiLanguage} from './i18n/locales';
+import type {TranslationResult} from '../../../backend/shared/translation-images/types';
+export type {TranslationArtifact,TranslationResult} from '../../../backend/shared/translation-images/types';
 export type Mode = 'redraw' | 'classic';
 export interface MembershipGift {starts_at:string|null;ends_at:string|null;days:number;state:'pending'|'scheduled'|'active'|'expired'}
 export type JobStatus = 'awaiting_upload' | 'validating_upload' | 'queued' | 'running' | 'succeeded' | 'no_text' | 'failed' | 'cancelled' | 'outcome_unknown' | 'unknown_released';
@@ -8,8 +10,6 @@ export interface Job {source_image_sha256?:string;input_profile?:'short-edge-180
 export interface Job { result?: {key:string;recoverable:boolean}; delivery?:TranslationResult; id: string; mode: Mode; target_language: string; status: JobStatus; phase: string; error?: { code: string; message: string }; quota_pages: number; quota_kind?:QuotaKind; quota_period_id?:string|null; created_at: string; completed_at?: string; version: number; cache_hit: boolean; reused?:boolean; quality_flags?: string[]; result_available?: boolean; result_expired?: boolean; settlement?: 'reserved'|'settled'|'released'|'free'|'included'; cancel_requested?:boolean; image_sha256?:string;  updated_at?:string; }
 export interface TranslationImage {sha256:string;byte_size:number;content_type:string;normalization_version?:1;}
 export type TranslationInput = ({image:TranslationImage;mode:Mode;target_language:string}|{retry_of:string}|{regenerate_of:string;acknowledge_unknown_cost?:boolean});
-export interface TranslationArtifact {sha256:string;byte_size:number;mime:string;path:string;}
-export interface TranslationResult {kind:'translated'|'no_text'|'partial';representation:'overlay-v1'|'full-image-v1'|'original';input_sha256:string;normalization_version:1;width:number;height:number;bbox?:{x:number;y:number;width:number;height:number};composite?:'source-atop';artifact?:TranslationArtifact|null;quality_flags?:string[];}
 export interface TranslationSnapshot {id:string;state:'needs_input'|'queued'|'running'|'succeeded'|'failed'|'needs_attention';mode:Mode;target_language:string;execution_resolved?:boolean;image_sha256?:string;created_at?:string;updated_at?:string;result?:TranslationResult|null;error?:{code:string;message:string}|null;}
 export interface TranslationBatch {items:TranslationSnapshot[];missing_ids:string[];}
 export interface ImageRateLimit {window_seconds:number;limit:number;remaining?:number;retry_after_seconds?:number;}

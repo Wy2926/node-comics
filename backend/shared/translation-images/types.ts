@@ -1,0 +1,2 @@
+export interface TranslationArtifact {sha256:string;byte_size:number;mime:string;path:string;}
+export interface TranslationResult {kind:'translated'|'no_text'|'partial';representation:'overlay-v1'|'full-image-v1'|'original';input_sha256:string;normalization_version:1;width:number;height:number;bbox?:{x:number;y:number;width:number;height:number};composite?:'source-atop';artifact?:TranslationArtifact|null;quality_flags?:string[];}

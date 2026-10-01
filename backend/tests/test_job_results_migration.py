@@ -34,7 +34,7 @@ def verify_legacy_cutover(engine, *, status='succeeded', cost_state='reported'):
     metadata.reflect(engine)
     with engine.begin() as connection:
         for owner in ('generator', 'recipient'):
-            connection.execute(User.__table__.insert().values(id=owner, subject=owner, name=owner))
+            connection.execute(metadata.tables['users'].insert().values(id=owner, subject=owner, name=owner, role='user', plus_pending=False, created_at=stamp))
             for kind in ('original', 'classic'):
                 asset_id = owner + '-' + kind
                 connection.execute(Asset.__table__.insert().values(id=asset_id, owner_id=owner,
@@ -121,7 +121,7 @@ def test_unresolved_remote_job_blocks_cutover_before_any_legacy_data_changes(iso
     metadata.reflect(engine)
     stamp = datetime(2026, 1, 1)
     with engine.begin() as connection:
-        connection.execute(User.__table__.insert().values(id='waiting-user', subject='waiting', name='Waiting'))
+        connection.execute(metadata.tables['users'].insert().values(id='waiting-user', subject='waiting', name='Waiting', role='user', plus_pending=False, created_at=stamp))
         connection.execute(legacy_jobs().insert().values(id='waiting-job', owner_id='waiting-user',
             source_sha256='a'*64, mode='classic', target_language='en', status=status,
             phase='awaiting_upload', idempotency_key='waiting', operation='translation', request_hash='b'*64,

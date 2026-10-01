@@ -187,6 +187,8 @@ def award_campaigns(db, user, at=None):
     Shared campaign locks serialize pause against delivery. The account lock then
     serializes registration/backfill retries and quota admission for that owner.
     """
+    if user.kind != 'registered':
+        return 0
     at = at or now()
     campaigns = list(db.scalars(select(QuotaCampaign).join(User, User.id == user.id)
         .where(*active_campaigns(at), audience_filter(), missing_award())
@@ -223,7 +225,7 @@ def backfill_campaigns(limit=100):
     """
     with session_factory()() as db:
         owners = list(db.scalars(select(User.id).join(QuotaCampaign, audience_filter())
-            .where(*active_campaigns(now()), missing_award()).distinct().order_by(User.id).limit(limit)))
+            .where(User.kind == 'registered', *active_campaigns(now()), missing_award()).distinct().order_by(User.id).limit(limit)))
     awarded = 0
     for owner_id in owners:
         with session_factory()() as db:

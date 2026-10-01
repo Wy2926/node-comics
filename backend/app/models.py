@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -16,7 +16,8 @@ def uid():
 class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    subject: Mapped[str] = mapped_column(String(255), unique=True)
+    subject: Mapped[str | None] = mapped_column(String(255), unique=True)
+    kind: Mapped[str] = mapped_column(String(16), default="registered", server_default="registered", index=True)
     name: Mapped[str] = mapped_column(String(80))
     role: Mapped[str] = mapped_column(String(20), default="user")
     membership_id: Mapped[str | None] = mapped_column(String(36))
@@ -26,7 +27,11 @@ class User(Base):
     plus_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     plus_monthly_pages: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
-    __table_args__ = (CheckConstraint("plus_monthly_pages >= 0"),)
+    __table_args__ = (CheckConstraint("plus_monthly_pages >= 0"),
+        CheckConstraint("(kind = 'registered' AND subject IS NOT NULL) OR "
+            "(kind = 'guest' AND subject IS NULL AND role = 'user' AND membership_id IS NULL "
+            "AND plus_started_at IS NULL AND plus_expires_at IS NULL AND plus_timezone IS NULL "
+            "AND plus_monthly_pages IS NULL AND NOT plus_pending)", name="ck_user_identity"))
 
 
 class Asset(Base):
@@ -90,7 +95,10 @@ class Job(Base):
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
-                     Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"))
+                     Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"),
+                     Index("ix_jobs_guest_expiry", "completed_at",
+                         sqlite_where=text("quota_kind = 'guest_trial' AND discard_output IS 0"),
+                         postgresql_where=text("quota_kind = 'guest_trial' AND discard_output IS FALSE")))
 
 
 class Attempt(Base):

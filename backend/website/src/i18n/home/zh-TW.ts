@@ -6,7 +6,7 @@ const copy: HomeCopy = {
     description: "使用 NodeLane 漫譯，在 Chrome、Edge、Firefox 中邊看漫畫邊翻譯。支援適配網站及 CBZ、CBR、PDF、無 DRM MOBI 檔案，隨時對照原圖。",
     install: '取得擴充功能', seeReader: '看看閱讀器', desktop: '為桌面閱讀設計',
     popupAlt: 'NodeLane Comics 擴充功能彈窗，已選擇英語，顯示翻譯目前分頁按鈕。', popupCaption: '下一章，從瀏覽器工具列開始。',
-    trust: ["本機原圖閱讀免費，無需帳號。","官方翻譯使用帳號額度，也可連接本機服務。"],
+    trust: ["官網可匿名體驗圖片翻譯，登入後使用帳戶額度。","擴充功能免費閱讀本機原圖，也可連接本機翻譯服務。"],
     stepsTitle: '從工具列開始閱讀。', stepsIntro: '選擇語言，然後回到故事裡。',
     steps: [['選擇閱讀語言', '在擴充功能彈窗中設定你希望使用的翻譯語言。'], ['翻譯目前頁面', '在支援的漫畫頁面上，需要時開啟頁面翻譯。'], ['收藏你的下一本', '開啟「我的漫畫」，匯入檔案或繼續上次的閱讀。']],
     compareEyebrow: '看清每一頁', compareTitle: '看懂譯文，也保留原圖。',

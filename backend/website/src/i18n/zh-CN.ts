@@ -125,7 +125,7 @@ export default {
     "changelogDescription": "查看漫画翻译插件的新功能、网站适配、浏览器兼容与阅读修复。Chrome、Edge、Firefox 商店审核进度可能不同，以已安装版本为准。",
     "rss": "通过 RSS 订阅更新",
     "accountTitle": "我的账户",
-    "accountDescription": "管理账户与会员订阅。阅读与翻译，请使用浏览器插件。",
+    "accountDescription": "管理账户与会员订阅。官网图片翻译与浏览器插件共用账户额度。",
     "callbackTitle": "正在打开你的读者通行证。",
     "callbackDescription": "登录完成后自动返回账户页面。",
     "noscript": "账户登录需要启用 JavaScript。产品介绍、定价和阅读指南无需 JavaScript 即可阅读。",
@@ -147,6 +147,14 @@ export default {
         "title": "隐私政策",
         "description": "了解 NodeLane 漫译 如何处理账户信息、漫画图片、翻译任务、浏览器权限、反馈和订阅信息，以及数据保留与删除方式。",
         "sections": [
+          {
+            "title": "官网图片翻译与匿名体验",
+            "paragraphs": [
+              "官网允许直接上传 JPG、PNG、WebP 翻译。原始文件、送译副本、完整译图和历史保存在当前浏览器 IndexedDB，不跨设备同步；清理网站数据会丢失。工作台“删除本地记录”只删除本地副本，不取消服务器任务或删除服务器审计记录。",
+              "匿名体验使用 Cloudflare Turnstile 防止滥用；Cloudflare 会处理验证所需的浏览器和网络信号，适用其隐私政策。验证请求不包含漫画图片。我们使用最长 30 天的安全 HttpOnly 会话 Cookie，以及服务密钥 HMAC 后的网络标识和日计数（保留七天）实施限额；这些是假名标识，不保证完全匿名。",
+              "匿名服务器译图在任务结束后可取回 24 小时，之后撤销访问并回收文件；本地已保存的完整译图不受影响。原图仍在终态清理，必要任务、成本和安全记录按相应规则保留。下文长期结果保留指注册账户；游客不进入身份服务，登录不会自动合并历史。匿名默认每天最多受理 5 张，同网共享限制，失败也计次。"
+            ]
+          },
           {
             "title": "适用范围与联系",
             "paragraphs": [
@@ -558,7 +566,7 @@ export default {
       {
         "id": "overview",
         "question": "NodeLane 漫译 是什么？",
-        "answer": "NodeLane 漫译 是带有漫画阅读器的浏览器插件。你可以从网页发现图片，或导入本地漫画，在阅读时使用常规翻译或 AI 重绘，随时切换回原图。官网用于下载、查看指南和管理账户，阅读与翻译在插件中进行。",
+        "answer": "NodeLane 漫译提供漫画阅读插件和官网图片翻译。插件支持网页图片与本地漫画阅读；官网可直接上传 JPG、PNG、WebP，匿名体验或登录使用账户额度，提供完整译图下载与本地历史，不提供漫画内容库。",
         "relatedPath": "/guides/manga-translation/"
       },
       {

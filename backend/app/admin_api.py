@@ -213,8 +213,8 @@ def admin_job_attempts(job_id: str, offset: int = Query(0, ge=0), limit: int = Q
 
 @router.get("/v1/admin/users")
 def admin_users(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(admin), db: Session = Depends(get_db)):
-    rows = db.scalars(select(User).order_by(User.created_at.desc()).offset(offset).limit(limit))
-    return {"items": [{**user_json(row), "entitlements": entitlements_json(db, row)} for row in rows], "total": db.scalar(select(func.count()).select_from(User))}
+    rows = db.scalars(select(User).where(User.kind == 'registered').order_by(User.created_at.desc()).offset(offset).limit(limit))
+    return {"items": [{**user_json(row), "entitlements": entitlements_json(db, row)} for row in rows], "total": db.scalar(select(func.count()).select_from(User).where(User.kind == 'registered'))}
 
 
 @router.post("/v1/admin/users/{user_id}/membership")

@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import TranslationWorkbench from './TranslationWorkbench';
+import { translationCopy } from '../i18n/translate';
+import type { Locale } from '../i18n';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = translationCopy[locale];
+---
+<Base title={t.title} description={t.intro} noindex>
+  <TranslationWorkbench client:load locale={locale} />
+  <noscript><p class="container">{t.local}</p></noscript>
+</Base>

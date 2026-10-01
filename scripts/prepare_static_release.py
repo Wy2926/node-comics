@@ -65,7 +65,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
     reserved = {'admin', 'v1', 'internal', 'health', 'docs', 'redoc', 'api', 'openapi', 'account', 'auth',
                 'features', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
                 'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'webhooks', 'billing', 'payment',
-                'uninstall', 'drive-connect'}
+                'uninstall', 'drive-connect', 'translate'}
     if kind == 'admin' and (not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/', admin_path)
                             or admin_path.strip('/').lower() in reserved):
         raise ValueError('Explicit non-reserved private /name/ entry required')
@@ -130,12 +130,15 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
                     configs.append(block(uri, f'    alias {public}/{relative};\n' + common))
                     continue
                 segments = relative.split('/')
-                private = any(item in {'account', 'auth', 'payment', 'uninstall', '404'} for item in segments) or relative == '404.html'
+                private = any(item in {'account', 'auth', 'payment', 'uninstall', 'translate', '404'} for item in segments) or relative == '404.html'
                 parser = Scripts()
                 parser.feed(path.read_text(encoding='utf-8'))
-                csp = ("default-src 'self'; script-src 'self' " + ' '.join(parser.hashes) +
-                       "; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " +
-                       f"connect-src 'self' {oidc_origin}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src 'none'")
+                challenge = ' https://challenges.cloudflare.com' if 'translate' in segments else ''
+                blobs = ' blob:' if 'translate' in segments else ''
+                frames = challenge.strip() or "'none'"
+                csp = (f"default-src 'self'; script-src 'self'{challenge} " + ' '.join(parser.hashes) +
+                       f"; style-src 'self' 'unsafe-inline'; img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; " +
+                       f"connect-src 'self' {oidc_origin}{challenge}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
                 response_headers = headers(release, private=private, csp=csp)
                 canonical = uri[:-10] if relative.endswith('index.html') else uri
                 if relative == '404.html' or '404' in segments:

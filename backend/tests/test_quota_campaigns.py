@@ -232,7 +232,11 @@ def verify_quota_upgrade(database):
         config.attributes['connection'] = connection
         command.upgrade(config, 'gift_renewal_0005')
     with Session(database) as db:
-        db.add(User(id='preserve', subject='preserve', name='Preserved'))
+        # Seed the historical schema through reflection, not the current User mapper.
+        from sqlalchemy import Table, MetaData
+        legacy_users = Table('users', MetaData(), autoload_with=db.connection())
+        db.execute(legacy_users.insert().values(id='preserve', subject='preserve', name='Preserved',
+            role='user', plus_pending=False, created_at=now()))
         db.flush()
         db.add(QuotaPeriod(id='preserved-quota', owner_id='preserve', kind='classic_grant',
             mode='classic', source='grant', source_key='original', starts_at=now(),
