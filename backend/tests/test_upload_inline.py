@@ -23,12 +23,20 @@ def test_input_uses_one_object_put_and_reupload_is_idempotent(cluster, png):
             JobStage.job_id == request_record(client, auth, item['id']).job_id)).all()
 
 
-def test_written_original_recovers_without_browser_confirmation(cluster, png, monkeypatch):
+@pytest.mark.parametrize('padded_jpeg', [False, True])
+def test_written_original_recovers_without_browser_confirmation(cluster, png, monkeypatch, padded_jpeg):
+    from hashlib import sha256
+    from app.models import Asset, Ledger
+    from sqlalchemy import func
     from app import upload_ingress
     from app.dispatcher import recover_once
+    if padded_jpeg:
+        from test_image_metadata import encoded
+        png = encoded('JPEG') + b'\0' * 3
     client, sdk = cluster
     auth = login(client)
-    item = submit(client, auth, descriptor(png)).json()
+    image = descriptor(png, content_type='image/jpeg' if padded_jpeg else 'image/png')
+    item = submit(client, auth, image).json()
     record = request_record(client, auth, item['id'])
     receipt_id = upload_id(client, auth, item)
     with session_factory()() as db:
@@ -52,4 +60,9 @@ def test_written_original_recovers_without_browser_confirmation(cluster, png, mo
     validate_next()
     current = client.get('/v1/translations/' + item['id'], headers=auth)
     assert current.json()['state'] == 'queued', current.text
+    assert upload_and_enqueue(client, auth, item, png)['state'] == 'queued'
     assert [method for method, _ in sdk.calls] == ['PUT']
+    with session_factory()() as db:
+        source = db.get(Asset, db.get(Job, record.job_id).input_asset_id)
+        assert source.sha256 == sha256(png).hexdigest() and source.byte_size == len(png)
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'reserve')) == 1

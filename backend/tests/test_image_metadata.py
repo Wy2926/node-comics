@@ -81,6 +81,37 @@ def test_truncated_containers_are_rejected_without_pixels(format):
     assert error.value.detail['code'] == 'UNSUPPORTED_IMAGE'
 
 
+@pytest.mark.parametrize('progressive', [False, True])
+@pytest.mark.parametrize('padding_size', [1, 2, 3, 64 * 1024 + 3])
+def test_jpeg_record_padding_preserves_uploaded_size_and_hash(monkeypatch, progressive, padding_size):
+    raw = encoded('JPEG', progressive=progressive) + b'\0' * padding_size
+    with Image.open(BytesIO(raw)) as image:
+        image.load()
+    monkeypatch.setattr(Image, 'open', lambda *args, **kwargs: pytest.fail('Center must not decode pixels'))
+
+    class BoundedFile(BytesIO):
+        def read(self, size=-1):
+            assert 0 <= size <= 64 * 1024
+            return super().read(size)
+
+    info = inspect_image_file(BoundedFile(raw))
+    assert (info['width'], info['height'], info['mime']) == (37, 61, 'image/jpeg')
+    assert info['byte_size'] == len(raw) and info['sha256'] == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize('tail', [b'\0x', b'\0\xff\xd8', b'\0\xff\xd9'])
+def test_jpeg_nonzero_trailing_data_is_still_rejected(tail):
+    with pytest.raises(HTTPException) as error:
+        inspect_image(encoded('JPEG') + tail)
+    assert error.value.detail['code'] == 'UNSUPPORTED_IMAGE'
+
+
+def test_jpeg_zero_padding_does_not_replace_missing_end_marker():
+    with pytest.raises(HTTPException) as error:
+        inspect_image(encoded('JPEG')[:-2] + b'\0' * 3)
+    assert error.value.detail['code'] == 'UNSUPPORTED_IMAGE'
+
+
 def test_png_crc_and_webp_riff_lengths_are_verified():
     png = bytearray(encoded('PNG'))
     png[-1] ^= 1

@@ -152,8 +152,12 @@ def _jpeg(handle, length):
         marker = _jpeg_marker(handle, scan)
         scan = False
         if marker == 0xd9:
-            if width is None or not saw_scan or handle.tell() != length:
+            if width is None or not saw_scan:
                 raise ValueError('Invalid JPEG image length')
+            # MOBI image records may retain zero padding after the JPEG end marker.
+            while padding := handle.read(64 * 1024):
+                if padding.strip(b'\0'):
+                    raise ValueError('Invalid JPEG trailing data')
             return width, height, icc, orientation
         if marker == 0xd8 or 0xd0 <= marker <= 0xd7:
             raise ValueError('Invalid JPEG marker ordering')
