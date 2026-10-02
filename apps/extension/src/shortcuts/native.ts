@@ -1,5 +1,5 @@
 /** Browser commands provide the activeTab gesture required by captureVisibleTab. */
-export const regionCommandName='nc-translate-region';
+const regionCommandName='nc-translate-region';
 export const canManageBrowserShortcuts=()=>typeof chrome!=='undefined'&&!!chrome.commands?.getAll&&!!chrome.tabs?.create;
 
 export async function readRegionShortcut():Promise<string|undefined> {

@@ -2,15 +2,14 @@ import {requireHostAccess} from '../host-permissions';
 import {msg} from '../i18n/runtime';
 import {activateInline} from '../inline/background';
 import {activateRegion} from '../region/background';
-import {normalizeOverrides} from './model';
-import {loadShortcutOverrides,shortcutStorageKey} from './store';
+import {decodeShortcutOverrides,loadShortcutOverrides,shortcutStorageKey} from './store';
 import type {ShortcutOverrides} from './catalog';
 
 const isWebsite=(url:unknown):url is string=>typeof url==='string'&&/^https?:\/\//.test(url);
 const fromWebsite=(sender:chrome.runtime.MessageSender)=>sender.id===chrome.runtime.id
   && sender.frameId===0&&sender.tab?.id!=null&&isWebsite(sender.url);
 const actions=new Set(['web.translate','web.shortcuts']);
-const publicOverrides=(value:unknown):ShortcutOverrides=>Object.fromEntries(Object.entries(normalizeOverrides(value)).filter(([id])=>id.startsWith('web.')));
+const publicOverrides=(value:ShortcutOverrides):ShortcutOverrides=>Object.fromEntries(Object.entries(value).filter(([id])=>id.startsWith('web.')));
 
 /** Own protocol: no relaxation of the existing extension-only translation messages. */
 export function registerWebShortcutsBackground() {
@@ -57,7 +56,7 @@ export function registerWebShortcutsBackground() {
   chrome.storage.onChanged.addListener((changes,area)=>{
     if(area!=='local'||!changes[shortcutStorageKey])return;
     const saved:unknown=changes[shortcutStorageKey].newValue;
-    const overrides=publicOverrides(saved&&typeof saved==='object'&&'version' in saved&&saved.version===1&&'overrides' in saved?saved.overrides:undefined),stamp=++revision;
+    const overrides=publicOverrides(decodeShortcutOverrides(saved)),stamp=++revision;
     void chrome.tabs.query({url:['http://*/*','https://*/*']}).then(tabs=>{
       if(stamp!==revision)return;
       return Promise.all(tabs.map(tab=>tab.id==null?undefined:chrome.tabs.sendMessage(tab.id,{type:'NC_SHORTCUTS_CHANGED',overrides},{frameId:0}).catch(()=>{})));

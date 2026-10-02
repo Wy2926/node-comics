@@ -1,7 +1,7 @@
 import {useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent} from 'react';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
-import {shortcutCommands, type ShortcutId, type ShortcutOverrides} from '../../shortcuts/catalog';
+import {shortcutCommands, type ShortcutId, type ShortcutOverrides, type ShortcutScope as Scope} from '../../shortcuts/catalog';
 import {bindingFromEvent, validateBinding} from '../../shortcuts/keys';
 import {findConflict, resolveBindings} from '../../shortcuts/model';
 import {browserShortcutBinding, canManageBrowserShortcuts, openBrowserShortcutSettings, readRegionShortcut} from '../../shortcuts/native';
@@ -9,7 +9,6 @@ import {useShortcutPreferences} from '../../shortcuts/react';
 import {ShortcutBindingControl} from './ShortcutBindingControl';
 import './shortcut-panel.css';
 
-type Scope = 'global' | 'app' | 'reader' | 'web';
 type Recording = {id: ShortcutId; index: number};
 const scopes = ['global', 'app', 'reader', 'web'] as const;
 const scopeIcons = {global: 'keyboard', app: 'home', reader: 'book', web: 'translate'};

@@ -8,7 +8,7 @@ import {loadShortcutOverrides} from '../src/shortcuts/store';
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(async()=>{})}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(async()=>{})}));
 vi.mock('../src/host-permissions',()=>({requireHostAccess:vi.fn(async()=>{})}));
-vi.mock('../src/shortcuts/store',()=>({shortcutStorageKey:'nc-shortcuts',loadShortcutOverrides:vi.fn(async()=>({'web.translate':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB']}))}));
+vi.mock('../src/shortcuts/store',async original=>({...await original<typeof import('../src/shortcuts/store')>(),loadShortcutOverrides:vi.fn(async()=>({'web.translate':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB']}))}));
 vi.mock('../src/i18n/runtime',()=>({msg:(value:string)=>value}));
 
 type Listener=(message:any,sender:chrome.runtime.MessageSender,respond:(value:any)=>void)=>unknown;

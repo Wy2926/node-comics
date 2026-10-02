@@ -14,7 +14,7 @@
 }
 .nc-app dialog.nc-shortcut-panel[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .nc-shortcut-panel::backdrop { background: var(--dialog-backdrop); backdrop-filter: blur(3px); }
-.nc-shortcut-panel :is(button, kbd) { font-family: inherit; }
+.nc-shortcut-panel button { font-family: inherit; }
 .nc-shortcut-panel button { cursor: pointer; }
 .nc-shortcut-panel button:disabled { cursor: not-allowed; opacity: 1; }
 .nc-shortcut-panel button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
@@ -42,7 +42,6 @@
 .nc-shortcut-action:not(:disabled):hover { transform: translate(-1px, -1px); box-shadow: var(--comic-shadow-hover); }
 .nc-shortcut-close:not(:disabled):active,
 .nc-shortcut-action:not(:disabled):active { transform: translate(2px, 2px); box-shadow: var(--comic-shadow-active); }
-.nc-shortcut-close:disabled,
 .nc-shortcut-action:disabled,
 .nc-shortcut-binding.is-disabled { border-color: var(--line); color: var(--muted); background: var(--surface-soft); box-shadow: var(--comic-shadow-disabled); }
 

@@ -8,14 +8,14 @@ let initialization:Promise<void>|undefined;
 let revision=0,connected=false;
 const listeners=new Set<()=>void>();
 const storage=()=>typeof chrome!=='undefined'&&chrome.storage?.local;
-const unpack=(value:unknown):ShortcutOverrides=>value&&typeof value==='object'&&'version' in value&&value.version===1&&'overrides' in value?normalizeOverrides(value.overrides):{};
+export const decodeShortcutOverrides=(value:unknown):ShortcutOverrides=>value&&typeof value==='object'&&'version' in value&&value.version===1&&'overrides' in value?normalizeOverrides(value.overrides):{};
 function publish(value:Snapshot){snapshot=value;for(const listener of listeners)listener();}
 
 export async function loadShortcutOverrides():Promise<ShortcutOverrides> {
   const extension=storage();
-  if(extension)return unpack((await extension.get(shortcutStorageKey))[shortcutStorageKey]);
+  if(extension)return decodeShortcutOverrides((await extension.get(shortcutStorageKey))[shortcutStorageKey]);
   const raw=localStorage.getItem(shortcutStorageKey);
-  try{return raw?unpack(JSON.parse(raw)):{};}catch{return {};}
+  try{return raw?decodeShortcutOverrides(JSON.parse(raw)):{};}catch{return {};}
 }
 export const getShortcutSnapshot=()=>snapshot;
 export function subscribeShortcutPreferences(listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};}
@@ -26,12 +26,12 @@ export function initializeShortcuts():Promise<void> {
     connected=true;
     if(storage())chrome.storage.onChanged.addListener((changes,area)=>{
       if(area!=='local'||!changes[shortcutStorageKey])return;
-      revision++;publish({overrides:unpack(changes[shortcutStorageKey].newValue),ready:true,error:false});
+      revision++;publish({overrides:decodeShortcutOverrides(changes[shortcutStorageKey].newValue),ready:true,error:false});
     });
     else if(typeof window!=='undefined')window.addEventListener('storage',event=>{
       if(event.key!==shortcutStorageKey&&event.key!==null)return;
       revision++;let overrides:ShortcutOverrides={};
-      try{overrides=event.newValue?unpack(JSON.parse(event.newValue)):{};}catch{/* Corrupt local preference resets to defaults. */}
+      try{overrides=event.newValue?decodeShortcutOverrides(JSON.parse(event.newValue)):{};}catch{/* Corrupt local preference resets to defaults. */}
       publish({overrides,ready:true,error:false});
     });
   }

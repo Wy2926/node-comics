@@ -68,6 +68,8 @@ describe('always-on shortcut entry',()=>{
   it('sends its own document identity and suppresses overlapping activations',async()=>{
     const cleanup=installWebShortcuts();initial.resolve({ok:true,overrides:{}});await flush();
     const handlers:ShortcutHandlers=binding()[1];
+    handlers['web.translate']!(key(false));handlers['web.shortcuts']!(key(false));
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledExactlyOnceWith({type:'NC_SHORTCUTS_GET'});
     handlers['web.translate']!(key());expect(handlers['web.translate']!(key())).toBe(false);
     expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({type:'NC_SHORTCUTS_EXECUTE',action:'web.translate',url:'https://source.test/chapter',instanceId:expect.any(String)});
     await flush();handlers['web.shortcuts']!(key());

@@ -483,11 +483,6 @@ button {
   background: #515a7255;
   backdrop-filter: blur(4px);
 }
-.modal-close {
-  position: absolute;
-  right: 13px;
-  top: 13px;
-}
 .modal-spark {
   color: #e89bb6;
   font-size: 24px;
@@ -685,29 +680,6 @@ button {
 }
 .switch.on i {
   transform: translateX(14px);
-}
-kbd {
-  font-family: inherit;
-  font-size: 8px;
-  background: #f6f8fb;
-  border: 1px solid #eaeef5;
-  border-radius: 3px;
-  padding: 2px 4px;
-  color: #abb6c9;
-}
-.shortcut-list p {
-  padding: 15px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-  color: #a6b0c2;
-}
-.shortcut-list b {
-  font-weight: 400;
-  font-size: 10px;
-  color: #939cb0;
 }
 .error-message {
   font-size: 10px;

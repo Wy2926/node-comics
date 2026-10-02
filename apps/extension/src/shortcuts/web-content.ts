@@ -17,6 +17,7 @@ export function bindWebShortcuts(handlers:ShortcutHandlers, enabled:()=>boolean)
   void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_GET'}).then(response=>{
     if(!disposed&&revision===initialRevision&&response?.ok){overrides=normalizeOverrides(response.overrides);ready=true;}
   }).catch(()=>{});
+  // The page must not invoke extension actions through synthetic keyboard events.
   const guarded=Object.fromEntries(Object.entries(handlers).map(([id,handler])=>[id,(event:KeyboardEvent)=>
     event.isTrusted?handler!(event):false])) as ShortcutHandlers;
   const unbind=bindShortcuts(window,guarded,{getOverrides:()=>overrides,enabled:()=>ready&&!disposed&&!document.hidden&&enabled()});
@@ -44,17 +45,16 @@ export function installWebShortcuts() {
     shadow.append(notice);document.documentElement.append(host);errorHost=host;
     errorTimer=setTimeout(()=>{host.remove();if(errorHost===host)errorHost=undefined;},7000);
   }
-  function execute(action:'web.translate'|'web.shortcuts',event:KeyboardEvent){
-    // The page must not start an upload by dispatching synthetic keyboard events.
-    if(!event.isTrusted||busy)return false;
+  function execute(action:'web.translate'|'web.shortcuts'){
+    if(busy)return false;
     busy=true;
     void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_EXECUTE',action,url:location.href,instanceId})
       .then(response=>{if(!response?.ok&&response?.error)showError(response.error);})
       .catch(()=>{}).finally(()=>{busy=false;});
   }
   const unbind=bindWebShortcuts({
-    'web.translate':event=>execute('web.translate',event),
-    'web.shortcuts':event=>execute('web.shortcuts',event),
+    'web.translate':()=>execute('web.translate'),
+    'web.shortcuts':()=>execute('web.shortcuts'),
   },()=>!disposed);
   return ()=>{
     disposed=true;unbind();chrome.runtime.onMessage.removeListener(identity);

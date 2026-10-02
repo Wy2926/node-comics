@@ -1294,20 +1294,6 @@ a {
   margin: 18px 0;
   line-height: 1.7;
 }
-.nc-app .modal-close {
-  top: 14px;
-  right: 14px;
-}
-.nc-app .shortcut-list p {
-  font-size: .9375rem;
-  padding: 14px 0;
-  border-color: var(--line);
-  gap: 20px;
-  color: var(--muted);
-}
-.nc-app .shortcut-list b {
-  color: var(--ink);
-}
 .nc-app .busy-pill {
   font-size: .9375rem;
   padding: 14px 22px;

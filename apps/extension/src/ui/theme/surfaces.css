@@ -131,9 +131,9 @@
 
 /* All dialogs share the login shell. Its two-page cover keeps its own layout. */
 .nc-app .modal { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-dialog-shadow); }
-.nc-app .modal:not(.nc-login)>.modal-spark, .nc-app .nc-modal-controls>.modal-spark { display: inline-grid; place-items: center; width: 36px; height: 36px; border: var(--comic-border); background: var(--accent-soft); border-radius: var(--comic-control-radius); transform: rotate(-6deg); font-size: 23px; }
+.nc-app .nc-modal-controls>.modal-spark { display: inline-grid; place-items: center; width: 36px; height: 36px; border: var(--comic-border); background: var(--accent-soft); border-radius: var(--comic-control-radius); transform: rotate(-6deg); font-size: 23px; }
 .nc-app .modal h2 { font-weight: 850; letter-spacing: -.03em; }
-.nc-app .modal:not(.nc-login)>.modal-subtitle, .nc-app .nc-modal-body>.modal-subtitle { padding-bottom: 18px; border-bottom: var(--comic-perforation); }
+.nc-app .nc-modal-body>.modal-subtitle { padding-bottom: 18px; border-bottom: var(--comic-perforation); }
 .nc-app :is(.nc-modal-footer, .nc-import-footer) { border-top: var(--comic-perforation); }
 .nc-app .nc-import-steps li>span { border: var(--comic-border); border-radius: var(--comic-control-radius); }
 .nc-app .nc-import-steps [aria-current=step]>span { color: var(--accent-on); box-shadow: var(--comic-shadow-small); }

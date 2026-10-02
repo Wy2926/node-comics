@@ -292,15 +292,15 @@ test('record, clear and icon-only alternative controls remain named and operable
   assert.equal(await row.locator('.nc-shortcut-binding.is-empty.is-compact').count(), 1);
 
   await original().focus(); await page.keyboard.press('Enter');
-  assert.equal(await row.locator('.nc-shortcut-key.is-recording').count(), 1, 'Enter starts the focused recorder');
+  assert.equal(await row.locator('.nc-shortcut-binding.is-recording').count(), 1, 'Enter starts the focused recorder');
   await page.keyboard.press('Tab');
-  assert.equal(await row.locator('.nc-shortcut-key.is-recording').count(), 0);
+  assert.equal(await row.locator('.nc-shortcut-binding.is-recording').count(), 0);
   const removeOriginal = row.getByRole('button', {name: '移除“查看原图 · O”的快捷键', exact: true});
   assert(await removeOriginal.evaluate(element => element === document.activeElement), 'Tab exits recording and reaches its separate clear control');
   await page.keyboard.press('Tab');
   assert(await alternative().evaluate(element => element === document.activeElement), 'The icon-only alternative stays in the native tab order');
   await page.keyboard.press('Enter');
-  assert.equal(await row.locator('.nc-shortcut-key.is-recording').count(), 1);
+  assert.equal(await row.locator('.nc-shortcut-binding.is-recording').count(), 1);
   await page.keyboard.press('Control+Alt+u'); await saved();
   assert.deepEqual(await row.locator('.nc-shortcut-key[aria-description]').evaluateAll(elements => elements.map(element => element.getAttribute('aria-description'))), ['O', 'Ctrl + Alt + U']);
   const focusAfterRecord = await row.evaluate(element => ({withinRow: element.contains(document.activeElement), tag: document.activeElement?.tagName, label: document.activeElement?.getAttribute('aria-label')}));
@@ -315,9 +315,9 @@ test('record, clear and icon-only alternative controls remain named and operable
   await page.keyboard.press('Tab');
   assert(await panel().evaluate(element => element.contains(document.activeElement)), 'Tab remains usable after clearing a binding');
   await alternative().focus(); await page.keyboard.press('Enter');
-  assert.equal(await row.locator('.nc-shortcut-key.is-recording').count(), 1, 'The cleared alternative can immediately be recorded again');
+  assert.equal(await row.locator('.nc-shortcut-binding.is-recording').count(), 1, 'The cleared alternative can immediately be recorded again');
   await page.keyboard.press('Escape');
-  assert.equal(await row.locator('.nc-shortcut-key.is-recording').count(), 0);
+  assert.equal(await row.locator('.nc-shortcut-binding.is-recording').count(), 0);
   assert(await panel().isVisible());
 });
 
