@@ -394,13 +394,18 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
           meta.mode = useAccount ? mode : 'classic';
           meta.language = language;
         }
+        const allowTiles = meta.requestId
+          ? meta.resultFormat === 'overlay-tiles-v1'
+          : meta.mode === 'classic' && !!caps.representations?.includes('overlay-tiles-v1');
+        // Existing UUIDs must keep their durable input, including after encoder/capability changes.
+        if (meta.requestId && !data.input) throw new TranslationError('LOCAL_INPUT_MISSING');
         if (!data.input) {
           meta.state = 'preparing';
           meta.error = undefined;
           await commit(meta);
           let prepared;
           try {
-            prepared = await pixels(data.source, caps.limits);
+            prepared = await pixels(data.source, caps.limits, undefined, undefined, allowTiles);
           } catch (error) {
             abort.signal.throwIfAborted();
             meta.state = 'failed';
@@ -423,6 +428,17 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
             state: 'draft',
           });
           await commit(meta, data);
+        }
+        if (!meta.requestId && !meta.intent) {
+          if (Math.max(meta.width!, meta.height!) > 16383) {
+            if (!allowTiles) {
+              meta.state = 'failed';
+              meta.error = 'RESULT_FORMAT_UNAVAILABLE';
+              await commit(meta);
+              continue;
+            }
+            meta.resultFormat = 'overlay-tiles-v1';
+          } else delete meta.resultFormat;
         }
         if (!useAccount) {
           if (!guestRef.current?.user_id) {
@@ -487,6 +503,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
                   },
                   mode: meta.mode,
                   target_language: meta.language,
+                  ...(meta.resultFormat ? { result_format: meta.resultFormat } : {}),
                 },
               ),
               signal: abort.signal,

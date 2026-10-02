@@ -1,13 +1,18 @@
 """Lossless sparse RGB replacement pixels and canonical input validation."""
 import hashlib
 from io import BytesIO
+import json
+import struct
+import zlib
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 from PIL import Image
+from PIL import ImageDraw
 
-from classic_node.protocol import NodeFailure, digest, pack_result
+from classic_node.protocol import NodeFailure, digest, pack_result, png64
+from classic_node.pipeline import Pipeline
 from classic_node.runtime import Runtime
 
 
@@ -186,3 +191,116 @@ def test_decode_uses_center_metadata_without_independent_pixel_or_edge_limit(siz
     metadata['height'] += 1
     with pytest.raises(NodeFailure, match='INPUT_INVALID'):
         runtime.decode(data, metadata)
+
+
+def test_tiles_partition_final_glyph_pixels_across_boundaries_without_relayout():
+    rgb = np.full((20000, 64, 3), 240, dtype=np.uint8)
+    final = Image.fromarray(rgb)
+    drawing = ImageDraw.Draw(final)
+    drawing.point((0, 0), fill=(10, 20, 30))
+    drawing.text((4, 4092), 'Boundary', fill=(0, 0, 0))
+    drawing.point((63, 19999), fill=(40, 50, 60))
+    analysis = {'input_hash': 'a' * 64}
+    translated = {'analysis_hash': 'b' * 64, 'revision': 'c' * 64}
+    with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
+        pack_result(final, rgb, None, 'test', analysis, translated)
+    packed = pack_result(final, rgb, None, 'test', analysis, translated, allow_tiles=True)
+    data = packed['output_bytes']
+    assert packed['result']['representation'] == 'overlay-tiles-v1' and data[:8] == b'NCOT0001'
+    length = struct.unpack('<I', data[8:12])[0]
+    manifest = json.loads(data[12:12 + length])
+    restored, offset = rgb.copy(), 12 + length
+    for tile in manifest['tiles']:
+        body = data[offset:offset + tile['byte_size']]
+        offset += tile['byte_size']
+        assert hashlib.sha256(body).hexdigest() == tile['sha256']
+        assert tile['width'] <= 2048 and tile['height'] <= 4096
+        patch = np.asarray(Image.open(BytesIO(body)).convert('RGBA'))
+        x, y, w, h = (tile[key] for key in ('x', 'y', 'width', 'height'))
+        mask = patch[..., 3] == 255
+        restored[y:y + h, x:x + w][mask] = patch[..., :3][mask]
+    assert offset == len(data) and np.array_equal(restored, np.asarray(final))
+    assert any(tile['y'] < 4096 for tile in manifest['tiles']) and any(4096 <= tile['y'] < 4200 for tile in manifest['tiles'])
+
+
+def test_tile_capability_preserves_existing_single_webp_bytes():
+    runtime, data, _, analysis, translated = fixture()
+    rgb = np.array(Image.open(BytesIO(data)))
+    final = Image.fromarray(rgb)
+    final.putpixel((10, 10), (0, 0, 0))
+    ordinary = pack_result(final, rgb, None, runtime.version, analysis, translated)
+    assert pack_result(final, rgb, None, runtime.version, analysis, translated, allow_tiles=True) == ordinary
+
+
+def corrupt_png_pixels(data):
+    """Keep a valid PNG container/header/CRC, with invalid compressed pixel data."""
+    result = data[:8]
+    at = 8
+    while at < len(data):
+        length = struct.unpack('>I', data[at:at + 4])[0]
+        kind, payload = data[at + 4:at + 8], data[at + 8:at + 8 + length]
+        if kind == b'IDAT':
+            payload = b'not-a-deflate-stream'
+        result += struct.pack('>I', len(payload)) + kind + payload + struct.pack('>I', zlib.crc32(kind + payload))
+        at += length + 12
+    return result
+
+
+def test_corrupt_input_pixels_fail_before_analysis_or_text_submission():
+    runtime, data, metadata, *_ = fixture()
+    data = corrupt_png_pixels(data)
+    metadata.update(byte_size=len(data), sha256=hashlib.sha256(data).hexdigest())
+    runtime.analyze = lambda *_: pytest.fail('corrupt input reached OCR')
+    pipeline = Pipeline.__new__(Pipeline)
+    pipeline.agent = SimpleNamespace(runtime=runtime)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=None)
+    with pytest.raises(NodeFailure, match='^INPUT_INVALID$'):
+        pipeline.prepare(page)
+
+
+def test_input_decode_memory_failure_has_a_terminal_resource_code(monkeypatch):
+    runtime, data, metadata, *_ = fixture()
+    def exhaust(*_args, **_kwargs):
+        raise MemoryError()
+    monkeypatch.setattr(Image, 'open', exhaust)
+    with pytest.raises(NodeFailure, match='^INPUT_MEMORY_EXCEEDED$'):
+        runtime.decode(data, metadata)
+
+
+@pytest.mark.parametrize('failure', ['corrupt', 'empty', 'wrong-size'])
+def test_restored_checkpoint_pixels_are_checked_before_text_can_resume(failure):
+    runtime, data, metadata, analysis, *_ = fixture()
+    mask = Image.new('L', (1, 1) if failure == 'wrong-size' else (80, 64), 0 if failure == 'empty' else 255)
+    encoded = png64(mask)
+    if failure == 'corrupt':
+        import base64
+        encoded = base64.b64encode(corrupt_png_pixels(base64.b64decode(encoded))).decode()
+    analysis['mask'] = encoded
+    runtime.analyze = lambda *_: pytest.fail('restored analysis must not be regenerated')
+    pipeline = Pipeline.__new__(Pipeline)
+    pipeline.agent = SimpleNamespace(runtime=runtime)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    with pytest.raises(NodeFailure, match='^CLASSIC_OCR_INVALID$'):
+        pipeline.prepare(page)
+
+
+@pytest.mark.parametrize('failure', ['corrupt', 'transparent', 'soft-alpha', 'wrong-size'])
+@pytest.mark.parametrize('tiles', [False, True])
+def test_encoded_overlay_pixels_are_verified_on_node_before_freezing(monkeypatch, failure, tiles):
+    original = np.zeros((17000 if tiles else 16, 2, 3), dtype=np.uint8)
+    final = Image.fromarray(original)
+    final.putpixel((0, 0), (10, 20, 30))
+    final.putpixel((1, original.shape[0] - 1), (40, 50, 60))
+    real_save = Image.Image.save
+    def broken_encoder(image, stream, *args, **kwargs):
+        if failure == 'corrupt':
+            stream.write(b'not-webp')
+            return
+        size = (image.width + 1, image.height) if failure == 'wrong-size' else image.size
+        alpha = 0 if failure == 'transparent' else 64 if failure == 'soft-alpha' else 255
+        with Image.new('RGBA', size, (10, 20, 30, alpha)) as broken:
+            real_save(broken, stream, *args, **kwargs)
+    monkeypatch.setattr(Image.Image, 'save', broken_encoder)
+    with pytest.raises(NodeFailure, match='^CLASSIC_OUTPUT_ENCODE_FAILED$'):
+        pack_result(final, original, None, 'test', {'input_hash': 'a' * 64},
+                    {'analysis_hash': 'b' * 64, 'revision': 'c' * 64}, allow_tiles=tiles)

@@ -6,7 +6,7 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "hourly_image_limit_0011"
+HEAD = "asset_mime_0012"
 NEW_TABLES = {"guest_sessions", "guest_daily_usage", "guest_daily_budgets", "quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}

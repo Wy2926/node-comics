@@ -43,7 +43,7 @@ describe('source database baseline isolation', () => {
       expect(await (await cache.get('new'))?.text()).toBe('new bytes');
     }
     const { saveSync, readSync } = await import('../src/translation/channels/adapters/nodelane/store');
-    await saveSync({ id: 'new-account-scope', jobs: [] }); expect(await readSync('new-account-scope')).toEqual({ id: 'new-account-scope', jobs: [] });
+    await saveSync({ id: 'new-account-scope', imageRetryAt: 123 }); expect(await readSync('new-account-scope')).toEqual({ id: 'new-account-scope', imageRetryAt: 123 });
     for (const name of names) {
       const old = await rawDatabase('node-comics-' + name);
       expect(old.version).toBe(1); expect([...old.objectStoreNames]).toEqual(['sentinel']);
@@ -90,6 +90,50 @@ describe('same-version structure validation', () => {
     const get = vi.spyOn(IDBObjectStore.prototype, 'get'), all = vi.spyOn(IDBObjectStore.prototype, 'getAll'), keys = vi.spyOn(IDBObjectStore.prototype, 'getAllKeys'), cursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
     track(await openSourceDatabase(name, sampleSchema, () => {}));
     for (const spy of [get, all, keys, cursor]) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('explicit store-owned upgrades', () => {
+  const nextSchema: DatabaseSchema = {...sampleSchema, receipts: {keyPath: 'id'}};
+  it('keeps optional record fields readable without a version upgrade', async () => {
+    const name = 'optional-fields', initial = track(await openSourceDatabase(name, sampleSchema, () => {}));
+    const tx = initial.transaction('records', 'readwrite'), done = completed(tx);
+    tx.objectStore('records').put({id: 'keep', scope: 'owner', representation: 'overlay-tiles-v1'}); await done; initial.close();
+    const reopened = track(await openSourceDatabase(name, sampleSchema, () => {}));
+    expect(reopened.version).toBe(1);
+    expect(await request(reopened.transaction('records').objectStore('records').get('keep'))).toMatchObject({representation: 'overlay-tiles-v1'});
+  });
+  it('closes another current connection on versionchange before upgrading', async () => {
+    const name = 'versionchange', closed = vi.fn();
+    track(await openSourceDatabase(name, sampleSchema, closed));
+    const upgrade = vi.fn((tx: IDBTransaction, oldVersion: number) => {expect(oldVersion).toBe(1);tx.db.createObjectStore('receipts', {keyPath: 'id'});});
+    const upgraded = track(await openSourceDatabase(name, nextSchema, () => {}, undefined, undefined, {version: 2, upgrade}));
+    expect(closed).toHaveBeenCalledOnce(); expect(upgrade).toHaveBeenCalledOnce(); expect(upgraded.version).toBe(2);
+  });
+  it('rolls back store and record changes together after an aborted upgrade, then retries safely', async () => {
+    const name = 'upgrade-rollback', initial = track(await openSourceDatabase(name, sampleSchema, () => {}));
+    const tx = initial.transaction('objects', 'readwrite'), done = completed(tx);tx.objectStore('objects').put('original', 'keep');await done;initial.close();
+    await expect(openSourceDatabase(name, nextSchema, () => {}, undefined, undefined, {version: 2, upgrade(transaction) {
+      transaction.db.createObjectStore('receipts', {keyPath: 'id'});
+      transaction.objectStore('objects').put('uncommitted', 'keep');transaction.abort();
+    }})).rejects.toBeDefined();
+    const original = await rawDatabase(sourceDatabaseName(name));
+    expect(original.version).toBe(1);expect(original.objectStoreNames.contains('receipts')).toBe(false);
+    expect(await request(original.transaction('objects').objectStore('objects').get('keep'))).toBe('original');original.close();
+    const upgraded = track(await openSourceDatabase(name, nextSchema, () => {}, undefined, undefined, {version: 2, upgrade(transaction) {
+      transaction.db.createObjectStore('receipts', {keyPath: 'id'});
+    }}));
+    expect(upgraded.version).toBe(2);expect(await request(upgraded.transaction('objects').objectStore('objects').get('keep'))).toBe('original');
+  });
+  it('reports a blocking old tab and does not upgrade later after that open attempt was rejected', async () => {
+    const name = 'upgrade-blocked', initial = await rawDatabase(sourceDatabaseName(name), db => {
+      const records = db.createObjectStore('records', {keyPath: 'id'});records.createIndex('scope', 'scope', {unique: true});db.createObjectStore('objects');
+    });
+    const upgrade = vi.fn((tx: IDBTransaction) => {tx.db.createObjectStore('receipts', {keyPath: 'id'});});
+    await expect(openSourceDatabase(name, nextSchema, () => {}, undefined, undefined, {version: 2, upgrade})).rejects.toMatchObject({name: 'SourceDatabaseSchemaError', message: expect.stringContaining('阻塞')});
+    initial.close();
+    const unchanged = await rawDatabase(sourceDatabaseName(name));
+    expect(unchanged.version).toBe(1);expect(upgrade).not.toHaveBeenCalled();expect(unchanged.objectStoreNames.contains('receipts')).toBe(false);
   });
 });
 

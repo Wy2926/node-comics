@@ -101,13 +101,13 @@ class Transport:
         if result.get('representation') == 'original':
             if data is not None or info is not None or result.get('bbox') is not None:
                 raise NodeFailure('INPUT_INVALID')
-        elif (result.get('representation') != 'overlay-v1' or not isinstance(data, bytes) or not info
+        elif (result.get('representation') not in {'overlay-v1', 'overlay-tiles-v1'} or not isinstance(data, bytes) or not info
                 or not 0 < len(data) <= MAX_RESULT_BYTES or len(data) != info['byte_size']
-                or hashlib.sha256(data).hexdigest() != info['sha256'] or info['mime'] != 'image/webp'):
+                or hashlib.sha256(data).hexdigest() != info['sha256'] or info['mime'] not in {'image/webp', 'application/vnd.nodelane.overlay-tiles'}):
             raise NodeFailure('INPUT_INVALID')
         files = {'metadata': (None, json.dumps(body, allow_nan=False), 'application/json')}
         if data is not None:
-            files['output'] = ('overlay.webp', data, 'image/webp')
+            files['output'] = ('overlay.webp' if info['mime'] == 'image/webp' else 'overlay.tiles', data, info['mime'])
         try:
             check()
             response = self.control.put(path, files=files)

@@ -36,9 +36,15 @@ describe('materialized image normalization',()=>{
     const prepared=await prepareComicPage({name:'page',blob:new Blob([bytes],{type:'application/octet-stream'})});
     expect(prepared.blob.type).toBe('image/png');expect(prepared.imageSha256).toBe(createHash('sha256').update(bytes).digest('hex'));expect(close).toHaveBeenCalledOnce();
   });
-  it('rejects oversized decoded dimensions and always releases the bitmap',async()=>{
-    const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width:40000,height:200,close}));
-    await expect(prepareComicPage({name:'huge',blob:new Blob([new Uint8Array([255,216,255])],{type:'image/jpeg'})})).rejects.toThrow('尺寸');expect(close).toHaveBeenCalledOnce();
+  it.each([[40000,200],[8000,6000]])('keeps readable %i x %i source bytes beyond the former reader limits',async(width,height)=>{
+    const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width,height,close}));
+    const blob=new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'});
+    const result=await prepareComicPage({name:'huge',blob,width,height});
+    expect(result).toMatchObject({blob,width,height});expect(result.blob).toBe(blob);expect(close).toHaveBeenCalledOnce();
+  });
+  it.each([[0,200],[100,Infinity],[1.5,200]])('rejects invalid decoded dimensions %s x %s and releases the bitmap',async(width,height)=>{
+    const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width,height,close}));
+    await expect(prepareComicPage({name:'invalid',blob:new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'})})).rejects.toThrow('无法解码');expect(close).toHaveBeenCalledOnce();
   });
   it('refuses an unsupported payload before handing it to an image decoder',async()=>{
     const decode=vi.fn();vi.stubGlobal('createImageBitmap',decode);

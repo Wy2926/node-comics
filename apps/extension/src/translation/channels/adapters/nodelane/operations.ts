@@ -15,6 +15,6 @@ export function makeOperation(target:ReadingTarget,scope:string,language:string,
   const {page,entryId,mode}=target;
   const {image,sourceSha256,profile,width,height}=prepared;
   if(!sourceSha256||!image.byte_size)throw Error(msg('原图尚未就绪，请完成采集或重新导入。'));
-  const request:TranslationInput=action??{image,mode,target_language:language};
+  const request:TranslationInput=action??{image,mode,target_language:language,...(prepared.resultFormat?{result_format:prepared.resultFormat}:{})};
   return {id:operationId(scope,language,target),requestId:crypto.randomUUID(),scope,entryId,pageId:page.id,mode,language,image,sourceSha256,inputProfile:profile,inputSize:profile?{width,height}:undefined,blobKey:page.entryId?undefined:page.blobKey,pageRef:page.blobKey?parsePageReference(page.blobKey):undefined,request,state:'local',createdAt:Date.now()};
 }

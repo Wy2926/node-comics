@@ -162,7 +162,7 @@ def redraw(image: bytes, mime: str, language: str, config: dict):
     except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError) as exc:
         raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "请求连接中断，供应商可能已受理，结果待核实", unknown=True, request_id=request_id) from exc
     except (ValueError, KeyError, IndexError, TypeError, binascii.Error) as exc:
-        raise ProcessingError("INVALID_PROVIDER_OUTPUT", "供应商响应不含可解码图片", request_id=request_id, usage=usage) from exc
+        raise ProcessingError("INVALID_PROVIDER_OUTPUT", "供应商响应不含有效图片容器或元数据", request_id=request_id, usage=usage) from exc
 
 
 def numeric_usage(value, depth=0):

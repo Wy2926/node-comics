@@ -6,6 +6,11 @@ export interface StoreSchema {
   indexes?: readonly { name: string; keyPath: string | string[]; unique?: boolean }[];
 }
 export type DatabaseSchema = Record<string, StoreSchema>;
+export interface DatabaseEvolution {
+  version: number;
+  /** Schedule explicit changes in this versionchange transaction; throwing or aborting rolls them back. */
+  upgrade: (transaction: IDBTransaction, oldVersion: number) => void;
+}
 export class SourceDatabaseSchemaError extends Error {
   constructor(database: string, detail: string) {
     super(`本机资料库结构与当前扩展不一致（${database}：${detail}）。请关闭漫画页面并重新加载最新扩展；已有资料未被清除。`);
@@ -13,10 +18,10 @@ export class SourceDatabaseSchemaError extends Error {
   }
 }
 const sameKey = (actual: string | string[] | null, expected: string | string[] | null) => JSON.stringify(actual) === JSON.stringify(expected);
-function validate(database: IDBDatabase, schema: DatabaseSchema) {
+function validate(database: IDBDatabase, schema: DatabaseSchema, transaction?: IDBTransaction) {
   const names = Object.keys(schema);
   for (const name of names) if (!database.objectStoreNames.contains(name)) throw new SourceDatabaseSchemaError(database.name, `缺少 ${name}`);
-  const tx = database.transaction(names);
+  const tx = transaction ?? database.transaction(names);
   for (const [name, definition] of Object.entries(schema)) {
     const store = tx.objectStore(name);
     if (!sameKey(store.keyPath, definition.keyPath) || store.autoIncrement) throw new SourceDatabaseSchemaError(database.name, `${name} 主键不匹配`);
@@ -27,20 +32,33 @@ function validate(database: IDBDatabase, schema: DatabaseSchema) {
     }
   }
 }
-/** No migration, destructive reset, or fallback to a database with a different schema. */
-export function openSourceDatabase(name: string, schema: DatabaseSchema, closed: () => void, initialize?: (tx: IDBTransaction) => void, verify?: (database: IDBDatabase) => Promise<void>): Promise<IDBDatabase> {
+/** Existing callers stay on version 1. Only the owning store can opt into an explicit upgrade. */
+export function openSourceDatabase(name: string, schema: DatabaseSchema, closed: () => void, initialize?: (tx: IDBTransaction) => void, verify?: (database: IDBDatabase) => Promise<void>, evolution?: DatabaseEvolution): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(sourceDatabaseName(name), 1);
-    request.onupgradeneeded = () => {
-      for (const [table, definition] of Object.entries(schema)) {
-        const store = request.result.createObjectStore(table, definition.keyPath === null ? undefined : { keyPath: definition.keyPath });
-        for (const index of definition.indexes ?? []) store.createIndex(index.name, index.keyPath, { unique: !!index.unique });
-      }
-      initialize?.(request.transaction!);
+    const request = indexedDB.open(sourceDatabaseName(name), evolution?.version ?? 1);
+    let abandoned = false, upgradeError: unknown;
+    request.onblocked = () => { abandoned = true; reject(new SourceDatabaseSchemaError(sourceDatabaseName(name), '升级被其他页面阻塞，请关闭漫画页面后重试')); };
+    request.onupgradeneeded = event => {
+      const tx = request.transaction!;
+      if (abandoned) { tx.abort(); return; }
+      try {
+        if (event.oldVersion === 0) {
+          for (const [table, definition] of Object.entries(schema)) {
+            const store = request.result.createObjectStore(table, definition.keyPath === null ? undefined : { keyPath: definition.keyPath });
+            for (const index of definition.indexes ?? []) store.createIndex(index.name, index.keyPath, { unique: !!index.unique });
+          }
+          initialize?.(tx);
+        } else {
+          if (!evolution) throw new SourceDatabaseSchemaError(request.result.name, '缺少明确的升级步骤');
+          evolution.upgrade(tx, event.oldVersion);
+        }
+        validate(request.result, schema, tx);
+      } catch (error) { upgradeError = error; try { tx.abort(); } catch { /* The owner may already have aborted. */ } }
     };
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(upgradeError ?? request.error);
     request.onsuccess = async () => {
       const database = request.result;
+      if (abandoned) { database.close(); return; }
       database.onversionchange = () => { database.close(); closed(); };
       database.onclose = closed;
       try { validate(database, schema); await verify?.(database); }

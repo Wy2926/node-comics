@@ -80,6 +80,9 @@ def _eligible_stages(node, stages, at, *, stage_ids=None, blocked_providers=()):
                 Asset.purged_at.is_(None), or_(Asset.expires_at.is_(None), Asset.expires_at > at, Asset.active_references > 0))),
             or_(~image_stage, and_(Job.target_language.in_(node.supported_languages),
                 Job.config["engine"]["protocol_version"].as_integer() == 3))))
+    if not (node.runtime_report or {}).get('overlay_tiles'):
+        result_format = Job.config['result_format'].as_string()
+        eligible = eligible.where(or_(JobStage.name != 'page', result_format.is_(None), result_format != 'overlay-tiles-v1'))
     if stage_ids is not None:
         eligible = eligible.where(JobStage.id.in_(stage_ids))
     if "text" in stages:

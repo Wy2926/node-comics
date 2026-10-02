@@ -4,6 +4,7 @@ import {MAX_PAGE} from '../formats/limits';
 import {imageMimeFromBytes} from '../formats/identify';
 import HashWorker from './hash.worker?worker';
 import {needsNormalization} from './image-metadata';
+import {bitmapPng} from '../../../../../backend/shared/translation-images/png';
 export interface PageInput {name: string; blob: Blob; width?: number; height?: number}
 
 async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {
@@ -33,7 +34,7 @@ async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {
 export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (item.blob.size > MAX_PAGE) throw Error(msg('{0} 超过单页 32 MB 限制。', {'0': item.name}));
-  if (item.width && item.height) checkDimensions(item.width, item.height);
+  if (item.width !== undefined && item.height !== undefined) checkDimensions(item.width, item.height, item.name);
   const mime=imageMimeFromBytes(new Uint8Array(await item.blob.slice(0,12).arrayBuffer()));
   if(!mime)throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': item.name}));
   const input=item.blob.type===mime?item.blob:item.blob.slice(0,item.blob.size,mime);
@@ -42,19 +43,22 @@ export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
   catch { throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': item.name})); }
   try {
     signal?.throwIfAborted();
-    const {width, height} = bitmap; checkDimensions(width, height);
+    const {width, height} = bitmap; checkDimensions(width, height, item.name);
     let blob = input;
     if (await needsNormalization(blob)) {
-      const canvas = new OffscreenCanvas(width, height);
-      try { canvas.getContext('2d',{colorSpace:'srgb'})!.drawImage(bitmap, 0, 0); blob = await canvas.convertToBlob({type: 'image/png'}); }
-      finally { canvas.width = canvas.height = 1; }
+      if(Math.max(width,height)>16383)blob=await bitmapPng(bitmap,[],MAX_PAGE);
+      else{
+        const canvas = new OffscreenCanvas(width, height);
+        try { canvas.getContext('2d',{colorSpace:'srgb'})!.drawImage(bitmap, 0, 0); blob = await canvas.convertToBlob({type: 'image/png'}); }
+        finally { canvas.width = canvas.height = 1; }
+      }
     }
     if (blob.size > MAX_PAGE) throw Error(msg('{0} 转换后超过单页 32 MB 限制。', {'0': item.name}));
     const imageSha256 = await digestPage(blob, signal);
     signal?.throwIfAborted(); return {blob, width, height, imageSha256};
   } finally { bitmap.close(); }
 }
-function checkDimensions(width: number, height: number) {
-  if (!Number.isFinite(width * height) || width < 1 || height < 1 || width * height > 40_000_000 || Math.max(width, height) > 30000)
-    throw Error(msg('漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。'));
+function checkDimensions(width: number, height: number, name: string) {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || !Number.isSafeInteger(width * height))
+    throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': name}));
 }

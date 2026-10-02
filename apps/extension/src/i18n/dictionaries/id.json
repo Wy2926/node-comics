@@ -88,7 +88,6 @@
   "{0} 超过单页 32 MB 限制。": "{0} melebihi batas 32 MB untuk satu halaman.",
   "{0} 无法解码，请检查图片是否损坏。": "{0} tidak dapat didekodekan, harap periksa apakah gambarnya rusak.",
   "{0} 转换后超过单页 32 MB 限制。": "{0} melebihi batas satu halaman 32 MB setelah konversi.",
-  "漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。": "Ukuran halaman komik melebihi batas pembaca (40 juta piksel, 30.000 per sisi).",
   "SHA-256 已结束。": "SHA-256 berakhir.",
   "MOBI 文件头不完整。": "Header file MOBI tidak lengkap.",
   "MOBI 记录越界或已损坏。": "Catatan MOBI di luar batas atau rusak.",

@@ -155,7 +155,6 @@ export function openMobiDocument(source: RandomAccessSource): DocumentSession {
       const bytes = await source.readAt(offset as number, length as number, signal);
       const info = imageInfo(bytes.subarray(0, 65536));
       if (!info) fail(`第 ${page.ordinal + 1} 页不是支持的漫画图片。`);
-      if (info.width && info.height && (info.width * info.height > 40_000_000 || Math.max(info.width, info.height) > 30000)) fail('MOBI 页面尺寸超出阅读器安全限制。');
       throwIfAborted(signal);
       return new Blob([new Uint8Array(bytes)], {type: info.mime});
     },

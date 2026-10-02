@@ -45,10 +45,34 @@ it('keeps source identity separate and encodes only once',async()=>{
   expect(matchesPage(t.page,translationJob(record.result!,record))).toBe(true);
   await f.core.submit([t]);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/webp',quality:.9});expect(close).toHaveBeenCalledOnce();
 });
+it('negotiates long delivery explicitly and retains the same frozen UUID on window updates',async()=>{
+  const f=fixture(),t=target(1);t.page.width=64;t.page.height=100000;
+  const core=new TranslationCoordinator({...f.core.options,tiles:()=>true});
+  await core.submit([t]);await core.submit([t]);
+  expect(f.submit).toHaveBeenCalledOnce();expect(f.submit.mock.calls[0][1]).toMatchObject({result_format:'overlay-tiles-v1'});
+  expect(createImageBitmap).not.toHaveBeenCalled();
+});
+it('refuses an unsupported long result format before acquiring source pixels or creating a paid request',async()=>{
+  const f=fixture(),t=target(1);t.page.width=64;t.page.height=100000;t.page.imageByteSize=2*1024*1024;
+  await f.core.submit([t]);
+  expect(t.page.translationError).toBe('翻译服务暂不可用');expect(f.core.records).toHaveLength(0);
+  expect(f.submit).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
 it('rejects excessive strips before acquiring source pixels',async()=>{
   const read=vi.fn(),page={...target(1).page,width:800,height:20000};
-  await expect(prepareTranslationInput(page,read,()=>true)).rejects.toThrow('尺寸');
+  await expect(prepareTranslationInput(page,read,()=>true,{max_bytes:128*1024*1024,max_pixels:32_000_000,max_dimension:16000,max_translation_ids:32})).rejects.toThrow('尺寸');
   expect(read).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
+it('uses the current center dimension ceiling without an independent source-pixel limit',async()=>{
+  const read=vi.fn();
+  const strip={...target(1).page,width:1000,height:100000};
+  const prepared=await prepareTranslationInput(strip,read,()=>true);
+  expect(prepared).toMatchObject({width:1000,height:100000,image:{sha256:strip.imageSha256}});
+  const largePage={...target(1).page,width:8000,height:6000};
+  await prepareTranslationInput(largePage,async()=>originalBytes(1),()=>true);
+  expect(encode).toHaveBeenCalledOnce();
+  await expect(prepareTranslationInput({...strip,height:100001},read,()=>true)).rejects.toThrow('尺寸');
+  expect(read).not.toHaveBeenCalled();
 });
 it('compresses a large narrow strip without changing its dimensions',async()=>{
   const source=new Blob([new Uint8Array(1024*1024+1)],{type:'image/png'}),sha=await hashFile(source);

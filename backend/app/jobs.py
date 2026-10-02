@@ -107,7 +107,7 @@ def find_reusable(db, user, asset, mode, language, config):
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
-               source_sha256=None, request_hash_override=None):
+               source_sha256=None, request_hash_override=None, result_format='overlay-v1'):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
@@ -119,6 +119,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     if existing:
         return existing
     config = config or configuration(db, mode, language, source_sha256=sha)
+    if result_format == 'overlay-tiles-v1':
+        config = {**config, 'result_format': result_format, 'version': digest([config['version'], result_format])}
     if asset:
         validate_input(asset, config)
     cached = None if force else find_reusable(db, user, sha, mode, language, config)

@@ -1,5 +1,7 @@
 import {hashFile} from './hash';
 import {TRANSLATION_WEBP_QUALITY} from './limits';
+import {bitmapPng} from './png';
+export {ImageOutputTooLargeError} from './png';
 
 /** Only for our sRGB canvas output: remove redundant profiles without re-encoding pixels. */
 export async function canvasWebp(blob:Blob):Promise<Blob>{
@@ -31,6 +33,10 @@ export async function resizeInput(blob:Blob,width:number,height:number) {
   const bitmap=await createImageBitmap(blob,{imageOrientation:'from-image',colorSpaceConversion:'default',resizeWidth:width,resizeHeight:height,resizeQuality:'high'});
   let canvas:OffscreenCanvas|undefined;
   try {
+    if(Math.max(width,height)>16383){
+      const output=await bitmapPng(bitmap);
+      return {blob:output,sha256:await hashFile(output)};
+    }
     canvas=new OffscreenCanvas(width,height);
     const context=canvas.getContext('2d',{colorSpace:'srgb'});
     if(!context)throw Error('Image canvas unavailable');

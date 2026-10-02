@@ -296,7 +296,7 @@ def test_deadline_cannot_be_extended_by_heartbeats(v3):
     assert reply.json()['job_status'] == 'failed'
 
 
-@pytest.mark.parametrize('code', ['CLASSIC_LAYOUT_OVERFLOW', 'FUTURE_NODE_ERROR_123'])
+@pytest.mark.parametrize('code', ['INPUT_INVALID', 'INPUT_MEMORY_EXCEEDED', 'CLASSIC_LAYOUT_OVERFLOW', 'FUTURE_NODE_ERROR_123'])
 def test_node_diagnostic_codes_fail_once_and_remain_visible(v3, code):
     from app.models import Ledger
     v3['create']()
@@ -390,7 +390,7 @@ def test_result_written_before_lost_commit_is_recovered(v3, png, monkeypatch):
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.job_id == job.id, Ledger.kind == 'settle')) <= 1
 
 
-def test_upload_is_scoped_frozen_and_validates_pixels(v3, png):
+def test_upload_is_scoped_frozen_and_validates_container_metadata(v3, png):
     v3['create']()
     lease = claim(v3).json()['leases'][0]
     analyze(v3, lease)

@@ -88,7 +88,6 @@
   "登录授权码交换失败（HTTP {0}），请重新登录；若仍失败，请联系管理员检查身份服务配置。": "Login authorization code exchange failed (HTTP {0}), please log in again; if it still fails, please contact the administrator to check the identity service configuration.",
   "{0} 无法解码，请检查图片是否损坏。": "{0} cannot be decoded, please check whether the image is damaged.",
   "{0} 转换后超过单页 32 MB 限制。": "{0} exceeds the 32 MB single page limit after conversion.",
-  "漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。": "The comic page size exceeds the reader limit (40 million pixels, 30000 per side).",
   "SHA-256 已结束。": "SHA-256 ended.",
   "MOBI 文件头不完整。": "MOBI file header is incomplete.",
   "MOBI 记录越界或已损坏。": "The MOBI record is out of bounds or corrupted.",

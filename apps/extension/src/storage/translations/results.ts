@@ -30,7 +30,7 @@ async function validate(blob:Blob){
   if(!blob.size||blob.size>128*1024*1024)throw Error(msg('图片尺寸超过翻译服务限制。'));
   let bitmap:ImageBitmap;
   try{bitmap=await createImageBitmap(blob);}catch{throw Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('译图')}));}
-  try{if(!bitmap.width||!bitmap.height||Math.max(bitmap.width,bitmap.height)>32768||bitmap.width*bitmap.height>100_000_000)throw Error(msg('图片尺寸超过翻译服务限制。'));}
+  try{if(!Number.isSafeInteger(bitmap.width)||!Number.isSafeInteger(bitmap.height)||bitmap.width<1||bitmap.height<1||!Number.isSafeInteger(bitmap.width*bitmap.height))throw Error(msg('图片尺寸超过翻译服务限制。'));}
   finally{bitmap.close();}
 }
 async function publish(request:ResultRequest,blob:Blob,token:CacheToken|undefined){

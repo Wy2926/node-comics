@@ -15,6 +15,7 @@ export interface Account {
 }
 export interface Capabilities {
   result_protocol: string;
+  representations?: string[];
   limits: { max_bytes: number; max_pixels: number; max_dimension: number };
   languages: { id: string; label: string }[];
   modes: { id: string; enabled: boolean; languages: string[] }[];

@@ -60,6 +60,13 @@ describe('official translation overlays',()=>{
     }
     expect(convert).not.toHaveBeenCalled();
   });
+  it('reads a frozen long result beyond the former pixel ceiling and still verifies its native dimensions',async()=>{
+    const descriptor={...result,kind:'no_text' as const,representation:'original' as const,width:1000,height:100000,bbox:undefined,composite:undefined,artifact:null};
+    vi.mocked(createImageBitmap).mockResolvedValue({width:1000,height:100000,close} as ImageBitmap);
+    expect(await materializeResult(descriptor,original)).toBe(original);
+    await expect(materializeResult({...descriptor,height:100001},original)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
+    expect(createImageBitmap).toHaveBeenCalledOnce();expect(convert).not.toHaveBeenCalled();
+  });
   it('accepts a full-image result whose output dimensions differ from the hashed source',async()=>{
     const descriptor={...result,representation:'full-image-v1' as const,width:4,height:5,bbox:undefined,composite:undefined};
     expect(await materializeResult(descriptor,original,patch)).toBe(patch);

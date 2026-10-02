@@ -11,7 +11,7 @@ const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],c
 page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
 await page.addInitScript(()=>{
- const live=new Map(),reads=[],decodes=[],keys=new WeakMap();let created=0,peakUrls=0,activeDecodes=0,peakDecodes=0;
+ const live=new Map(),reads=[],decodes=[],decodeFailures=[],keys=new WeakMap();let created=0,peakUrls=0,activeDecodes=0,peakDecodes=0;
  const get=IDBObjectStore.prototype.get;
  IDBObjectStore.prototype.get=function(key){
   const request=get.call(this,key);
@@ -24,9 +24,11 @@ await page.addInitScript(()=>{
  const decode=HTMLImageElement.prototype.decode;
  HTMLImageElement.prototype.decode=async function(){
   const start=performance.now(),key=live.get(this.src)?.key;activeDecodes++;peakDecodes=Math.max(peakDecodes,activeDecodes);
-  try{await decode.call(this);decodes.push({key,milliseconds:performance.now()-start,width:this.naturalWidth,height:this.naturalHeight});}finally{activeDecodes--;}
+  try{await decode.call(this);decodes.push({key,milliseconds:performance.now()-start,width:this.naturalWidth,height:this.naturalHeight,cancelled:!live.has(this.src)});}
+  catch(error){decodeFailures.push({key,name:error.name,width:this.naturalWidth,height:this.naturalHeight,cancelled:!live.has(this.src)});throw error;}
+  finally{activeDecodes--;}
  };
- window.readerPreloadMetrics=()=>({liveUrls:live.size,peakUrls,created,liveKeys:[...live.values()].map(value=>value.key),reads,decodes,activeDecodes,peakDecodes});
+ window.readerPreloadMetrics=()=>({liveUrls:live.size,peakUrls,created,liveKeys:[...live.values()].map(value=>value.key),reads,decodes,decodeFailures,activeDecodes,peakDecodes});
 });
 const viewport=page.locator('.nc-reading-viewport');
 const input=page.getByLabel('跳转页码',{exact:true});
@@ -113,10 +115,14 @@ try{
  checks.push('Repeated far jumps release old images while keeping the DOM and held URLs bounded');
  await page.screenshot({path:path.join(out,'reopened.png')});
  const metrics=await page.evaluate(()=>window.readerPreloadMetrics());
- assert(metrics.decodes.every(item=>item.width===4000&&item.height===6000));
+ // Cancelled preloads clear their src immediately; a late native decode resolution can then have zero dimensions.
+ const completedDecodes=metrics.decodes.filter(item=>!item.cancelled);
+ assert(completedDecodes.every(item=>item.width===4000&&item.height===6000));
  assert(metrics.peakUrls<=12,`Transient Blob URL peak grew beyond two comparison windows: ${metrics.peakUrls}`);
  assert.deepEqual(errors,[]);
- const timings=metrics.decodes.map(item=>item.milliseconds).sort((a,b)=>a-b),percentile=q=>timings[Math.min(timings.length-1,Math.floor((timings.length-1)*q))];
- const report={checks,errors,synthetic:true,livePixiv:false,liveTranslation:false,resolution:{width:4000,height:6000},firstReadyMilliseconds,samples,metrics:{createdUrls:metrics.created,peakUrls:metrics.peakUrls,peakConcurrentDecodes:metrics.peakDecodes,decodeCount:timings.length,decodeMilliseconds:{median:percentile(.5),p95:percentile(.95),max:timings.at(-1)},cacheReadsByKey:Object.fromEntries([...new Set(metrics.reads.map(item=>item.key))].map(key=>[key,metrics.reads.filter(item=>item.key===key).length]))},memoryEstimate:'Displayed original and result PNG dimensions times 4 bytes per pixel; browser process memory is not measured by this script.'};
+ const timings=completedDecodes.map(item=>item.milliseconds).sort((a,b)=>a-b),percentile=q=>timings[Math.min(timings.length-1,Math.floor((timings.length-1)*q))];
+ const decodeFallbacks=metrics.decodeFailures.filter(item=>!item.cancelled&&item.name==='EncodingError');
+ if(decodeFallbacks.length)checks.push('Valid originals and translations remain readable after native predecode EncodingError');
+ const report={checks,errors,synthetic:true,livePixiv:false,liveTranslation:false,resolution:{width:4000,height:6000},firstReadyMilliseconds,samples,metrics:{createdUrls:metrics.created,peakUrls:metrics.peakUrls,peakConcurrentDecodes:metrics.peakDecodes,decodeCount:timings.length,decodeFallbackCount:decodeFallbacks.length,cancelledDecodes:metrics.decodes.length-completedDecodes.length+metrics.decodeFailures.filter(item=>item.cancelled).length,decodeMilliseconds:{median:percentile(.5),p95:percentile(.95),max:timings.at(-1)},cacheReadsByKey:Object.fromEntries([...new Set(metrics.reads.map(item=>item.key))].map(key=>[key,metrics.reads.filter(item=>item.key===key).length]))},memoryEstimate:'Displayed original and result PNG dimensions times 4 bytes per pixel; browser process memory is not measured by this script.'};
  await writeFile(path.join(out,'results.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({out,checks,errors,firstReadyMilliseconds,metrics:report.metrics}));
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});throw error;}finally{await browser.close();}

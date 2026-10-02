@@ -44,6 +44,7 @@ class TranslationInput(RequestBody):
     retry_of: UUID | None = None
     regenerate_of: UUID | None = None
     acknowledge_unknown_cost: bool = False
+    result_format: Literal['overlay-v1', 'overlay-tiles-v1'] = Field(default='overlay-v1', exclude=True)
     priority: Literal['current', 'prefetch'] = Field(default='current', exclude=True, deprecated=True,
         description='仅兼容旧插件；接收后忽略，不参与调度、持久化或请求身份。')
 
@@ -159,6 +160,8 @@ def translation_json(db, row, *, context=None):
                 'path': f"/v1/{'guest/' if (entry.entitlement or {}).get('plan') == 'guest' else ''}translations/{row.id}/result"}
             if representation == 'overlay-v1':
                 result.update(bbox=output.bbox, composite='source-atop')
+            elif representation == 'overlay-tiles-v1':
+                result['composite'] = 'source-atop'
             if not available(output):
                 error = {'code': 'RESULT_UNAVAILABLE', 'message': '结果文件暂不可用，请稍后重试'}
     return {'id': row.id, 'state': state,
@@ -173,7 +176,10 @@ def translation_json(db, row, *, context=None):
 
 
 def accept_translation(db, user, request_id, body):
-    signature = digest(body.model_dump(mode='json'))
+    content = body.model_dump(mode='json')
+    if body.result_format != 'overlay-v1':
+        content['result_format'] = body.result_format
+    signature = digest(content)
     old = db.get(TranslationRequest, (user.id, request_id))
     if old:
         if old.request_hash != signature:
@@ -183,6 +189,7 @@ def accept_translation(db, user, request_id, body):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
         return old
     image, mode, language = body.image, body.mode, body.target_language
+    result_format = body.result_format
     previous_id = body.retry_of or body.regenerate_of
     if previous_id:
         previous = owned_translation(db, user.id, previous_id)
@@ -198,16 +205,23 @@ def accept_translation(db, user, request_id, body):
             problem('REGENERATE_NOT_ALLOWED', '只有完成的请求可以重新翻译', 409)
         image = ImageDescriptor.model_validate(previous.descriptor['image'])
         mode, language = entry.mode, entry.target_language
+        result_format = (previous.descriptor or {}).get('result_format', 'overlay-v1')
+        if body.result_format != 'overlay-v1' and body.result_format != result_format:
+            problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原结果格式', 409)
+    if mode != 'classic' and result_format != 'overlay-v1':
+        problem('MODE_UNSUPPORTED', '分块覆盖仅用于常规翻译', 422)
     if image.byte_size > settings().max_upload_bytes:
         problem('IMAGE_TOO_LARGE', '图片大小超过限制', 413)
     asset = None  # Inputs are private to each actual job, never claimed by hash.
     entry = create_job(db, user, asset, mode, language, request_id, operation='translation',
-        force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature)
+        force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature, result_format=result_format)
     row = db.get(TranslationRequest, (user.id, request_id))
     row.descriptor = {'image': image.model_dump(), 'mode': mode, 'target_language': language,
         'retry_of': str(body.retry_of) if body.retry_of else None,
         'regenerate_of': str(body.regenerate_of) if body.regenerate_of else None,
         'acknowledge_unknown_cost': body.acknowledge_unknown_cost}
+    if result_format != 'overlay-v1':
+        row.descriptor = {**row.descriptor, 'result_format': result_format}
     if entry.status == 'awaiting_upload':
         create_upload(db, entry, {'sha256': image.sha256, 'byte_size': image.byte_size, 'mime': image.content_type})
     db.flush()
@@ -391,7 +405,8 @@ def classic_details(translation_id: UUID, user: User = Depends(identity), db: Se
 
 @router.get('/v1/translations/{translation_id}/result', response_class=Response, responses={
     200: {'description': 'Authenticated immutable result bytes; original representation has no file.',
-        'content': {mime: {'schema': {'type': 'string', 'format': 'binary'}} for mime in ('image/webp', 'image/png', 'image/jpeg')}},
+        'content': {mime: {'schema': {'type': 'string', 'format': 'binary'}} for mime in (
+            'image/webp', 'image/png', 'image/jpeg', 'application/vnd.nodelane.overlay-tiles')}},
     304: {'description': 'Authorized If-None-Match matches the result SHA-256 ETag.'},
     409: {'description': 'Result is not ready or uses original representation.'},
     410: {'description': 'This translation authorization has been revoked.'},

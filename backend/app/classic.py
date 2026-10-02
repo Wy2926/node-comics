@@ -4,13 +4,13 @@ from io import BytesIO
 import json
 import math
 import time
-from PIL import Image
 from sqlalchemy import func, or_, select
 from .adapters.llm import TextError
 from .adapters.text import call_text, groups, input_bound, parse_translations
 from .assets import available
 from .db import session_factory
 from .errors import ProcessingError
+from .image_metadata import image_metadata
 from .models import Asset, ClassicState, Job, TextCall, now, uid
 from .translation_provider_limits import reserve_request, release_unstarted_request
 
@@ -63,9 +63,9 @@ def validate_analysis(result, width, height):
             seen.add(segment['id'])
         if segments:
             mask_bytes = decode_bounded(result['mask'], MAX_CHECKPOINT_BYTES)
-            with Image.open(BytesIO(mask_bytes)) as mask:
-                if mask.format != 'PNG' or mask.size != (width, height) or not mask.convert('L').getbbox():
-                    raise ValueError()
+            mask = image_metadata(BytesIO(mask_bytes))
+            if mask['mime'] != 'image/png' or (mask['width'], mask['height']) != (width, height):
+                raise ValueError()
             for region in result['regions']:
                 lines = region['lines']
                 if not isinstance(lines, list) or not 1 <= len(lines) <= 500:
@@ -80,7 +80,7 @@ def validate_analysis(result, width, height):
                             raise ValueError()
         elif result.get('mask') is not None:
             raise ValueError()
-    except (KeyError, ValueError, TypeError, OSError, Image.DecompressionBombError):
+    except (KeyError, ValueError, TypeError, OSError):
         raise ProcessingError('CLASSIC_OCR_INVALID', 'OCR 区域或掩膜无效，未调用文本服务') from None
 
 

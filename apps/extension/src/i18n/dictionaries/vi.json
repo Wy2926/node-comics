@@ -88,7 +88,6 @@
   "{0} 超过单页 32 MB 限制。": "{0} vượt quá giới hạn 32 MB cho một trang.",
   "{0} 无法解码，请检查图片是否损坏。": "{0} không thể giải mã được, vui lòng kiểm tra xem hình ảnh có bị hỏng không.",
   "{0} 转换后超过单页 32 MB 限制。": "{0} vượt quá giới hạn trang đơn 32 MB sau khi chuyển đổi.",
-  "漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。": "Kích thước trang truyện tranh vượt quá giới hạn người đọc (40 triệu pixel, 30000 mỗi mặt).",
   "SHA-256 已结束。": "SHA-256 đã kết thúc.",
   "MOBI 文件头不完整。": "Tiêu đề tệp MOBI không đầy đủ.",
   "MOBI 记录越界或已损坏。": "Bản ghi MOBI nằm ngoài giới hạn hoặc bị hỏng.",

@@ -11,7 +11,7 @@ import {sourceRangeCache} from '../src/storage/source-ranges';
 import type {SourceSelection} from '../src/comics/sources/contracts';
 import type {IndexedPage} from '../src/comics/formats/contracts';
 
-function fixture(textRecords = 1) {
+function fixture(textRecords = 1, width = 200, height = 100) {
   const header = new Uint8Array(78 + (textRecords + 3) * 8), table = new DataView(header.buffer);
   header.set(new TextEncoder().encode('BOOKMOBI'), 60); table.setUint16(76, textRecords + 3);
   const first = new Uint8Array(248), fields = new DataView(first.buffer);
@@ -19,7 +19,7 @@ function fixture(textRecords = 1) {
   first.set(new TextEncoder().encode('MOBI'), 16);
   fields.setUint32(20, 232); fields.setUint32(36, 6); fields.setUint32(108, textRecords + 1);
   const png = new Uint8Array(1024 * 1024); png.set([137, 80, 78, 71, 13, 10, 26, 10]);
-  new DataView(png.buffer).setUint32(16, 200); new DataView(png.buffer).setUint32(20, 100);
+  new DataView(png.buffer).setUint32(16, width); new DataView(png.buffer).setUint32(20, height);
   const text = new TextEncoder().encode('<img recindex="2"><img recindex="1"><img recindex="2">');
   const records = [first, ...Array.from({length: textRecords}, () => text), png, png];
   let end = header.length;
@@ -51,6 +51,11 @@ function fixture(textRecords = 1) {
 }
 
 describe('MOBI over the Drive byte-source contract', () => {
+  it.each([[64,100000],[8000,6000]])('reads a bounded image record at %i x %i without an independent pixel ceiling',async(width,height)=>{
+    const {source}=fixture(1,width,height),session=await openDocument('mobi',source);
+    try{const pages=await session.index();expect(await session.materialize(pages[0])).toMatchObject({type:'image/png',size:1024*1024});}
+    finally{await session.close();await source.close();}
+  });
   it('reuses imported index ranges when opening the cover and releases them with the comic', async () => {
     const {createSource, reads, request, binding} = fixture(32);
     const dispose = registerSourceDriver({id: 'mobi-test', label: 'Test', cachePages: true, cacheRanges: true, open: async () => createSource()});

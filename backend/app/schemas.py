@@ -160,7 +160,7 @@ class TranslationArtifactResponse(BaseModel):
 
 class TranslationResultResponse(BaseModel):
     kind: Literal['translated', 'no_text', 'partial']
-    representation: Literal['overlay-v1', 'full-image-v1', 'original']
+    representation: Literal['overlay-v1', 'overlay-tiles-v1', 'full-image-v1', 'original']
     input_sha256: str
     normalization_version: Literal[1]
     width: int

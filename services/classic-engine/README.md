@@ -1,6 +1,6 @@
 # Classic Engine
 
-常规漫画翻译的图像引擎和整页计算节点：NCNN Vulkan 检测／OCR、ONNX FP32 LaMa 抹字、字体嵌字。Windows 使用 DirectML，Linux NVIDIA 使用 CUDA；文本翻译由中心执行。
+常规漫画翻译的图像引擎和整页计算节点：输入解码与像素校验、NCNN Vulkan 检测／OCR、ONNX FP32 LaMa 抹字、字体嵌字及编码产物校验。Windows 使用 DirectML，Linux NVIDIA 使用 CUDA；中心只检查文件结构和摘要并执行文本翻译。
 
 直接部署使用 [Windows 独立节点包](../compute-node/README.md)或 [Linux NVIDIA 镜像](../compute-node/linux/README.md)；本目录用于引擎与节点协议开发。
 
@@ -30,7 +30,7 @@ Linux NVIDIA 需要 Vulkan 驱动、CUDA 12.8、cuDNN 9 和 Noto 字体。执行
 
 `check` 校验本地模型并输出引擎版本；配置文本供应商并启用常规翻译。`run` 才注册和领取任务，以中心心跳确认在线。
 
-节点使用 v3：凭当前租约从中心读取规范化临时原图，提交裁剪后的无损 WebP 覆盖层。覆盖 alpha 仅为 0/255，客户端用 `source-atop` 保留原图透明度；无可见变化返回原图表示而不上传文件。冻结结果以 SQLite 二进制 BLOB 与完成记录一起耐久保存，丢回执可复交，终态后清除；不编码或上传整页 PNG，不配置对象存储。
+节点使用 v3：凭当前租约从中心读取规范化临时原图，提交裁剪后的无损 WebP 覆盖层；已协商的超长结果在整页渲染完成后切为 WebP 块，单包交付。格式及升级顺序见[计算协议](../../docs/COMPUTE_PROTOCOL.md#webp-分块包)。覆盖 alpha 仅为 0/255，客户端用 `source-atop` 保留原图透明度；无可见变化返回原图表示而不上传文件。冻结结果以 SQLite 二进制 BLOB 与完成记录一起耐久保存，丢回执可复交，终态后清除；不编码或上传整页 PNG，不配置对象存储。
 
 节点身份与语言见[节点配置](../../docs/NODE_CONFIGURATION.md)，执行、日志与恢复见[节点运维](docs/NODE_OPERATIONS.md)，消息与交付见[计算协议](../../docs/COMPUTE_PROTOCOL.md)。
 

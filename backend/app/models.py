@@ -42,7 +42,7 @@ class Asset(Base):
     kind: Mapped[str] = mapped_column(String(20), default="original")
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
     storage_key: Mapped[str] = mapped_column(String(200))
-    mime: Mapped[str] = mapped_column(String(30))
+    mime: Mapped[str] = mapped_column(String(128))
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
     byte_size: Mapped[int] = mapped_column(Integer)

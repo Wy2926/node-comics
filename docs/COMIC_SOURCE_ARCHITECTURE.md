@@ -18,9 +18,11 @@ PageDescriptor 保存当前内容身份、稳定页键、ordinal、尺寸和格�
 
 ## 新库基线
 
-[storage/database.ts](../apps/extension/src/storage/database.ts)统一使用 `node-comics-reading-v2-*`，初始版本 1。目录库包括 comics、entries、connections、pageDescriptors、materializations、positions、catalogs、tasks、translationBindings、metadata、tombstones。
+[storage/database.ts](../apps/extension/src/storage/database.ts)统一使用 `node-comics-reading-v2-*`，默认版本 1。目录库包括 comics、entries、connections、pageDescriptors、materializations、positions、catalogs、tasks、metadata、tombstones；渠道绑定单独保存于 `channel-bindings` 库。
 
-不扫描、升级或读取旧库，也没有双写、别名、迁移链。当前基线缺表会明确报告结构不一致，不能静默重建用户数据。删除使用 tombstone 和内容代次保护迟到写入；catalog 是来源资源快照，重新导入时允许在新的漫画身份下重新创建。
+不扫描或读取更早的开发基线。当前基线的结构变更由所属存储模块显式声明版本和升级回调，在 IndexedDB 升级事务内完成；公共打开层只管理版本、结构检查与连接关闭，不推断迁移、不删除重建用户数据。未声明升级的缺表仍明确报告结构不一致。
+
+官方请求库使用版本 2：操作日志保留幂等 UUID，任务快照按 scope／UUID 分条保存并按来源图片索引查询，sync 只保存退避控制字段；版本 1 的任务数组在同一升级事务内搬入任务表，失败自动回滚。阅读器和翻译调度器不承担迁移。旧回执按原 UUID 归入历史，操作状态只在 UUID 仍匹配时以同一事务更新。删除使用 tombstone 和内容代次保护迟到写入；catalog 是来源资源快照，重新导入时允许在新的漫画身份下重新创建。
 
 ## 文件来源驱动
 

@@ -19,6 +19,9 @@ from manhua_engine.layout import LayoutError, coverage, draw_region, font_paths,
 from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64, pack_result
 from manhua_engine.timing import record
 
+# Dimension and byte admission belong to the center; Pillow must not add an area ceiling.
+Image.MAX_IMAGE_PIXELS = None
+
 LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫畫', 'ja': '日本語あいうアイウ',
                    'ko': '한국어가나다', 'en': 'English', 'fr': 'Françaiséèç', 'es': 'Españolñ',
                    'pt-BR': 'Portuguêsã', 'de': 'Deutschäöüß', 'it': 'Italianoà', 'ru': 'Русский',
@@ -104,14 +107,27 @@ class Runtime:
             raise NodeFailure('INPUT_INVALID')
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
-        with Image.open(BytesIO(data)) as image:
-            # Admission limits belong to the center; this checks descriptor integrity only.
-            if (image.size != (metadata['width'], metadata['height']) or Image.MIME.get(image.format) != metadata['mime']
-                    or image.format not in {'PNG', 'JPEG', 'WEBP'} or getattr(image, 'n_frames', 1) != 1
-                    or image.getexif().get(274, 1) != 1 or image.info.get('icc_profile')):
-                raise NodeFailure('INPUT_INVALID')
-            alpha = image.convert('RGBA').getchannel('A') if 'A' in image.getbands() or 'transparency' in image.info else None
-            return np.array(image.convert('RGB')), alpha
+        alpha = None
+        try:
+            with Image.open(BytesIO(data)) as image:
+                # The center checks the container; pixel validity belongs to this first decode.
+                if (image.size != (metadata['width'], metadata['height']) or Image.MIME.get(image.format) != metadata['mime']
+                        or image.format not in {'PNG', 'JPEG', 'WEBP'} or getattr(image, 'n_frames', 1) != 1
+                        or image.getexif().get(274, 1) != 1 or image.info.get('icc_profile')):
+                    raise NodeFailure('INPUT_INVALID')
+                if 'A' in image.getbands() or 'transparency' in image.info:
+                    with image.convert('RGBA') as rgba:
+                        alpha = rgba.getchannel('A')
+                with image.convert('RGB') as rgb:
+                    return np.array(rgb), alpha
+        except MemoryError as error:
+            if alpha is not None:
+                alpha.close()
+            raise NodeFailure('INPUT_MEMORY_EXCEEDED') from error
+        except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
+            if alpha is not None:
+                alpha.close()
+            raise NodeFailure('INPUT_INVALID') from error
 
     def analyze(self, rgb, input_hash):
         quads, segmentation = self.engine.detect(rgb)
@@ -135,10 +151,11 @@ class Runtime:
         return analysis
 
     def inpaint(self, rgb, analysis):
-        mask = np.array(mask_image(analysis['mask'], (rgb.shape[1], rgb.shape[0])))
+        with mask_image(analysis['mask'], (rgb.shape[1], rgb.shape[0])) as decoded:
+            mask = np.array(decoded)
         return self.engine.remove(rgb, mask)[0]
 
-    def render(self, original, cleaned, analysis, translated, language, alpha):
+    def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False):
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}):
             raise NodeFailure('CLASSIC_RENDER_MISMATCH')
@@ -170,4 +187,4 @@ class Runtime:
         if rendered and not np.any(np.array(image) != cleaned):
             raise NodeFailure('CLASSIC_RENDER_EMPTY')
         record('render_layout', perf_counter() - started)
-        return pack_result(image, original, alpha, self.version, analysis, translated)
+        return pack_result(image, original, alpha, self.version, analysis, translated, allow_tiles=allow_tiles)

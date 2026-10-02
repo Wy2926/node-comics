@@ -20,6 +20,12 @@ const request = () => ({ scope:{key:crypto.randomUUID()},
   job: job(1, {status: 'succeeded'}),
   download: vi.fn(async () => new Blob(['translated'])), isCurrent: () => true });
 
+it('retains decoded long results without a separate pixel or dimension admission ceiling',async()=>{
+  const close=vi.fn();vi.mocked(createImageBitmap).mockResolvedValueOnce({width:64,height:100000,close} as unknown as ImageBitmap);
+  const input=request(),blob=await loadResultBlob(input);
+  expect(blob.size).toBeGreaterThan(0);expect(close).toHaveBeenCalledOnce();
+});
+
 it('coalesces concurrent readers and retains bytes after the display is released', async () => {
   const input = request();
   const blobs = await Promise.all(Array.from({length: 4}, () => loadResultBlob(input)));
@@ -141,11 +147,11 @@ it('keeps local results readable with disk cache disabled, then honors an explic
   expect(input.download).not.toHaveBeenCalled();
 });
 
-it('rejects undecodable and oversized results before publishing bytes',async()=>{
+it('rejects undecodable images and invalid dimensions before publishing bytes',async()=>{
   const input=request(),blob=new Blob(['bad image']);
   vi.mocked(createImageBitmap).mockRejectedValueOnce(Error('decode failed'));
   await expect(saveResultBlob({...input,blob})).rejects.toThrow('无法解码');
-  const close=vi.fn();vi.mocked(createImageBitmap).mockResolvedValueOnce({width:40000,height:1200,close} as unknown as ImageBitmap);
+  const close=vi.fn();vi.mocked(createImageBitmap).mockResolvedValueOnce({width:0,height:1200,close} as unknown as ImageBitmap);
   await expect(saveResultBlob({...input,blob})).rejects.toThrow('尺寸');
   expect(close).toHaveBeenCalledOnce();
   const key=resultBlobKey(input.scope,input.job);expect(await translationCache.has(key)).toBe(false);expect(resultInMemory(key)).toBeUndefined();

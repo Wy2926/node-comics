@@ -5,7 +5,7 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'hourly_image_limit_0011'})
+SUPPORTED_SCHEMAS = frozenset({'asset_mime_0012'})
 
 
 def check_schema(connection):

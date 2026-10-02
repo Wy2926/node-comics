@@ -3,11 +3,11 @@ import {
   needsNormalization,
   probeImageMetadata,
 } from '../../../shared/translation-images/image-metadata';
-import { SOURCE_MAX_PIXELS, SOURCE_MAX_DIMENSION } from './translation-store';
-import { resizeInput } from '../../../shared/translation-images/resize';
+import { ImageOutputTooLargeError, resizeInput } from '../../../shared/translation-images/resize';
 import {
   translationSize,
   TRANSLATION_REENCODE_BYTES,
+  TRANSLATION_MAX_BYTES,
   TRANSLATION_MAX_PIXELS,
   TRANSLATION_MAX_DIMENSION,
 } from '../../../shared/translation-images/limits';
@@ -21,10 +21,11 @@ self.onmessage = async (
     limits: Limits;
     result?: TranslationResult;
     artifact?: Blob;
+    allowTiles?: boolean;
   }>,
 ) => {
   try {
-    const { source, limits, result, artifact } = event.data;
+    const { source, limits, result, artifact, allowTiles = false } = event.data;
     if (result) {
       self.postMessage({
         result: await materializeResult(
@@ -39,16 +40,20 @@ self.onmessage = async (
       if (source.size > 32 * 1024 * 1024) throw Error('IMAGE_FORMAT_LIMIT');
       const metadata = await probeImageMetadata(source);
       if (!metadata) throw Error('IMAGE_FORMAT_LIMIT');
-      const planned = translationSize(metadata.width, metadata.height);
-      if (
-        metadata.width * metadata.height > SOURCE_MAX_PIXELS ||
-        Math.max(metadata.width, metadata.height) > SOURCE_MAX_DIMENSION ||
-        planned.width * planned.height >
-          Math.min(TRANSLATION_MAX_PIXELS, limits.max_pixels) ||
-        Math.max(planned.width, planned.height) >
-          Math.min(TRANSLATION_MAX_DIMENSION, limits.max_dimension)
-      )
-        throw Error('IMAGE_DIMENSIONS_LIMIT');
+      const checkedSize = (width: number, height: number) => {
+        if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
+          width < 1 || height < 1 || Math.max(width, height) > TRANSLATION_MAX_DIMENSION)
+          throw Error('IMAGE_DIMENSIONS_LIMIT');
+        const size = translationSize(width, height);
+        if (Math.max(size.width, size.height) > 16383 && !allowTiles)
+          throw Error('RESULT_FORMAT_UNAVAILABLE');
+        if (size.width * size.height > Math.min(TRANSLATION_MAX_PIXELS, limits.max_pixels) ||
+          Math.max(size.width, size.height) > Math.min(TRANSLATION_MAX_DIMENSION, limits.max_dimension))
+          throw Error('IMAGE_DIMENSIONS_LIMIT');
+        return size;
+      };
+      checkedSize(metadata.width, metadata.height);
+      const maxBytes = Math.min(TRANSLATION_MAX_BYTES, limits.max_bytes);
       const mime = metadata.mime;
       let input = source.slice(0, source.size, mime),
         sha256: string | undefined;
@@ -58,21 +63,15 @@ self.onmessage = async (
       });
       const width = bitmap.width,
         height = bitmap.height;
-      const size = translationSize(width, height);
-      const changed = size.width !== width || size.height !== height;
-      const reencode = changed || input.size > TRANSLATION_REENCODE_BYTES;
+      let size: { width: number; height: number }, changed: boolean, reencode: boolean, normalize: boolean;
       try {
-        if (
-          width * height > SOURCE_MAX_PIXELS ||
-          Math.max(width, height) > SOURCE_MAX_DIMENSION ||
-          size.width * size.height >
-            Math.min(TRANSLATION_MAX_PIXELS, limits.max_pixels) ||
-          Math.max(size.width, size.height) >
-            Math.min(TRANSLATION_MAX_DIMENSION, limits.max_dimension)
-        )
-          throw Error('IMAGE_DIMENSIONS_LIMIT');
+        size = checkedSize(width, height);
+        changed = size.width !== width || size.height !== height;
+        normalize = await needsNormalization(input);
+        reencode = changed || input.size > TRANSLATION_REENCODE_BYTES ||
+          normalize && Math.max(size.width, size.height) > 16383;
         // resizeInput already applies orientation and draws into an sRGB canvas.
-        if (!reencode && (await needsNormalization(input))) {
+        if (!reencode && normalize) {
           const canvas = new OffscreenCanvas(width, height);
           try {
             canvas
@@ -86,18 +85,20 @@ self.onmessage = async (
       } finally {
         bitmap.close();
       }
-      if (changed || input.size > TRANSLATION_REENCODE_BYTES) {
-        const resized = await resizeInput(input, size.width, size.height);
-        if (
-          changed ||
-          resized.blob.size < input.size ||
-          (reencode && (await needsNormalization(input)))
-        ) {
-          input = resized.blob;
-          sha256 = resized.sha256;
+      if (reencode || input.size > TRANSLATION_REENCODE_BYTES) {
+        try {
+          const resized = await resizeInput(input, size.width, size.height);
+          if (changed || resized.blob.size < input.size || reencode && normalize) {
+            input = resized.blob;
+            sha256 = resized.sha256;
+          }
+        } catch (error) {
+          // Only optional compression may retain already normalized, admissible bytes.
+          if (changed || reencode && normalize || input.size > maxBytes || !(error instanceof ImageOutputTooLargeError))
+            throw error;
         }
       }
-      if (input.size > limits.max_bytes) throw Error('IMAGE_FORMAT_LIMIT');
+      if (input.size > maxBytes) throw Error('IMAGE_FORMAT_LIMIT');
       self.postMessage({
         input,
         ...size,

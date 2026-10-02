@@ -15,6 +15,7 @@ async function jump(n){const input=page.getByLabel('跳转页码',{exact:true});
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline');
+  await page.locator('.nc-release-notes[open] .nc-release-close').click();
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'常规翻译',exact:true}).click();
   await page.waitForFunction(()=>window.readerFixture.submitted.length===4);
@@ -78,6 +79,28 @@ try{
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   check('single-page reader downloads the next completed translation while still showing page 1');
   await page.screenshot({path:path.join(out,'reading.png')});
+  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await page.getByRole('button',{name:'连续阅读',exact:true}).click();
+  await page.getByRole('button',{name:'铺满宽度',exact:true}).click();
+  await page.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.locator('.nc-reading-viewport').evaluate(node=>{node.scrollTop=200;});
+  await page.waitForTimeout(200);
+  const top=await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop);
+  const resultId=await page.locator('.nc-page-image').first().getAttribute('data-result-job');
+  const submittedBeforeSwitch=(await snapshot()).translations.length;
+  assert(top>100);assert(resultId&&resultId!=='original');
+  await page.getByRole('button',{name:'原图',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')==='original');
+  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
+  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.waitForFunction(id=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')===id,resultId);
+  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
+  state=await snapshot();assert.equal(state.translations.length,submittedBeforeSwitch);
+  assert.deepEqual(errors,[]);
+  check('original and translated views preserve a nonzero in-page reading position without resubmission');
+  await page.screenshot({path:path.join(out,'switched-position.png')});
   assert(!state.requests.some(p=>p.startsWith('/v1/images/')&&p.endsWith('/access')));
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,translationRequests:state.translations.length,idleRequests,liveProvider:false},null,2));
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,state:await snapshot().catch(()=>null)},null,2));throw error;}

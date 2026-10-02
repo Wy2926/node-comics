@@ -161,7 +161,7 @@ class Agent:
         response = self.transport.post('/nodes/register', {'protocol_version': 3,
             'engine_version': self.runtime.version, 'resource_id': self.local['resource_id'],
             'device': 'cpu' if self.local['engine']['gpu'] < 0 else 'vulkan:' + str(self.local['engine']['gpu']),
-            'supported_languages': self.runtime.languages, 'ready': True})
+            'supported_languages': self.runtime.languages, 'ready': True, 'result_formats': ['overlay-v1', 'overlay-tiles-v1']})
         if response['protocol_version'] != 3:
             raise NodeFailure('PROTOCOL_MISMATCH')
         self.apply_config(response['config'])

@@ -1,7 +1,7 @@
 import type { TranslationResult } from '../../../shared/translation-images/types';
 import { probeImageMetadata } from '../../../shared/translation-images/image-metadata';
-export const SOURCE_MAX_PIXELS = 40_000_000;
-export const SOURCE_MAX_DIMENSION = 30000;
+import { TRANSLATION_MAX_DIMENSION } from '../../../shared/translation-images/limits';
+export const SOURCE_MAX_DIMENSION = TRANSLATION_MAX_DIMENSION;
 export type Mode = 'classic' | 'redraw';
 export interface Snapshot {
   id: string;
@@ -31,6 +31,8 @@ export interface RecordMeta {
   mode: Mode;
   language: string;
   requestId?: string;
+  /** Frozen with requestId; absence preserves the ordinary format of existing requests. */
+  resultFormat?: 'overlay-tiles-v1';
   intent?: { retry_of: string } | { regenerate_of: string };
   width?: number;
   height?: number;
@@ -166,10 +168,7 @@ export async function importImages(files: File[], scope = draftScope()) {
       throw Error('IMAGE_FORMAT_LIMIT');
     const metadata = await probeImageMetadata(file);
     if (!metadata) throw Error('IMAGE_FORMAT_LIMIT');
-    if (
-      metadata.width * metadata.height > SOURCE_MAX_PIXELS ||
-      Math.max(metadata.width, metadata.height) > SOURCE_MAX_DIMENSION
-    )
+    if (Math.max(metadata.width, metadata.height) > SOURCE_MAX_DIMENSION)
       throw Error('IMAGE_DIMENSIONS_LIMIT');
   }
   const records = files.map((file) => {

@@ -150,9 +150,12 @@ def multipart(request):
             for part in message.iter_parts()}
 
 
-@pytest.mark.parametrize('representation', ['overlay-v1', 'original'])
+@pytest.mark.parametrize('representation', ['overlay-v1', 'overlay-tiles-v1', 'original'])
 def test_one_multipart_result_uses_node_auth_and_binary_not_base64(representation):
     data, body = upload_fixture()
+    if representation == 'overlay-tiles-v1':
+        body['result']['representation'] = representation
+        body['result']['output']['mime'] = 'application/vnd.nodelane.overlay-tiles'
     if representation == 'original':
         data = None
         body['result'] = {'representation': 'original', 'output': None, 'bbox': None}

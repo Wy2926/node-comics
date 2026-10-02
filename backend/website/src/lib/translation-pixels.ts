@@ -14,6 +14,7 @@ export function pixels(
   limits: { max_bytes: number; max_pixels: number; max_dimension: number },
   result?: TranslationResult,
   artifact?: Blob,
+  allowTiles = false,
 ): Promise<PixelResult> {
   const work = () =>
     new Promise<PixelResult>((resolve, reject) => {
@@ -35,7 +36,7 @@ export function pixels(
         if (event.data.error) reject(Error(event.data.error));
         else resolve(event.data);
       };
-      worker.postMessage({ source, limits, result, artifact });
+      worker.postMessage({ source, limits, result, artifact, allowTiles });
     });
   const next = tail.then(work);
   tail = next.catch(() => undefined);

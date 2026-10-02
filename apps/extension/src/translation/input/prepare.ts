@@ -4,10 +4,10 @@ import type {Capabilities,Page,TranslationImage} from '../../types';
 import {hashFile} from '../../importers/hash';
 import {INPUT_PROFILE,TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS,TRANSLATION_REENCODE_BYTES,translationSize} from './limits';
 import {imageWork} from './work';
-import {resizeInput} from './resize';
+import {ImageOutputTooLargeError,resizeInput} from './resize';
 import ResizeWorker from './resize.worker?worker';
 
-export interface PreparedInput {image:TranslationImage;sourceSha256:string;width:number;height:number;profile?:typeof INPUT_PROFILE;blob?:Blob;}
+export interface PreparedInput {image:TranslationImage;sourceSha256:string;width:number;height:number;profile?:typeof INPUT_PROFILE;blob?:Blob;resultFormat?:'overlay-tiles-v1';}
 export class InputChangedError extends Error {
   readonly code='SOURCE_CHANGED';
   constructor(){super(msg('原图内容已变化，请重新加载后翻译。'));}
@@ -17,12 +17,14 @@ function resized(blob:Blob,width:number,height:number):Promise<{blob:Blob;sha256
   if(typeof Worker==='undefined')return resizeInput(blob,width,height);
   return new Promise((resolve,reject)=>{
     const worker=new ResizeWorker();
-    const fail=()=>{clearTimeout(timer);worker.terminate();reject(Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('原图')})));};
+    const finish=()=>{clearTimeout(timer);worker.terminate();};
+    const fail=()=>{finish();reject(Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('原图')})));};
     const timer=setTimeout(fail,120000);
     worker.onerror=fail;
-    worker.onmessage=(event:MessageEvent<{blob?:Blob;sha256?:string}>)=>{
+    worker.onmessage=(event:MessageEvent<{blob?:Blob;sha256?:string;error?:string}>)=>{
+      if(event.data.error==='IMAGE_OUTPUT_TOO_LARGE'){finish();reject(new ImageOutputTooLargeError());return;}
       if(!event.data.blob||!event.data.sha256){fail();return;}
-      clearTimeout(timer);worker.terminate();resolve({blob:event.data.blob,sha256:event.data.sha256});
+      finish();resolve({blob:event.data.blob,sha256:event.data.sha256});
     };
     worker.postMessage({blob,width,height});
   });
@@ -40,7 +42,7 @@ export async function restoreTranslationInput(source:Blob,width:number,height:nu
 }
 export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits']):Promise<PreparedInput> {
   const size=translationSize(page.width,page.height);
-  if(!Number.isFinite(page.width*page.height)||page.width<1||page.height<1||page.width*page.height>40_000_000||Math.max(page.width,page.height)>30000
+  if(!Number.isSafeInteger(page.width)||!Number.isSafeInteger(page.height)||page.width<1||page.height<1||!Number.isSafeInteger(page.width*page.height)
     ||size.width*size.height>Math.min(TRANSLATION_MAX_PIXELS,limits?.max_pixels??Infinity)
     ||Math.max(size.width,size.height)>Math.min(TRANSLATION_MAX_DIMENSION,limits?.max_dimension??Infinity))throw Error(msg('图片尺寸超过翻译服务限制。'));
   const changed=size.width!==page.width||size.height!==page.height;
@@ -56,7 +58,14 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     const sourceSha256=await hashFile(source);
     assertCurrent(current);
     if(page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
-    const encoded=changed||source.size>TRANSLATION_REENCODE_BYTES?await resized(source,size.width,size.height):undefined;
+    let encoded:Awaited<ReturnType<typeof resized>>|undefined;
+    if(changed||source.size>TRANSLATION_REENCODE_BYTES){
+      try{encoded=await resized(source,size.width,size.height);}
+      catch(error){
+        // Only optional same-size compression may keep the already normalized source.
+        if(changed||source.size>maxBytes||!(error instanceof ImageOutputTooLargeError))throw error;
+      }
+    }
     // Keep original bytes if re-encoding an unchanged-sized image saves no space.
     const result=encoded&&(changed||encoded.blob.size<source.size)?encoded:{blob:source,sha256:sourceSha256};
     const prepared=result.blob!==source;

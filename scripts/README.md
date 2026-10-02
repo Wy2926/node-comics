@@ -63,11 +63,13 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
 | `verify_reader_scroll.mjs` | Vite 5181 的阅读窗口夹具；模拟翻译状态与译图更新，检查章节交界、双向滚动、窗口淘汰、失败与位置恢复 |
 | `verify_reader_preload.mjs` | 同一 Vite 5181 夹具的 `?highres=1` 样本；真实 4000×6000 原图的邻页加载、非当前可见页、并排／单页、失败隔离、位置恢复与图片 URL 释放，不访问源站或翻译服务 |
+| `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_membership_renewal.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5192 --strictPort`；模拟赠送顺延、续费取消与回执丢失后刷新、无订阅赠送期间禁止即时购买及窄屏布局 |
 | `verify_translation_overlay.mjs` | 真实 Chromium 像素、透明度、EXIF/ICC/首帧规范化、摘要与 bbox 校验；可使用实际 LLM 产物验证合成和导出 |
+| `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素合成样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
 | `verify_overlay_live.py` | 隔离 Docker 中心 + 本机 GPU + 真实文本 LLM；支持静态规范图片或整章目录，逐页保存 UUID、结果与统计，检查结果鉴权和 UUID 重放 |
 | `verify_overlay_chapter.mjs <运行目录>` | Vite 5176 + 真实 Chromium 逐页合成真实批次产物，走产品导入与流式 CBZ 导出，独立解包校验全部页面 SHA；不调用 API/LLM |
 | `smoke_api.py` / `verify_image_provider_live.py` | API／真实图片供应商；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
@@ -84,9 +86,12 @@ Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；
 | `verify_website_pricing.mjs` | 五语无 JavaScript 公示月年价格与开放日期、双卡及六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 四种图片、切换、加载失败与恢复 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |
+| `verify_website_translation_tiles.mjs` | 先构建官网并启动上述夹具 `--port 4323`；验证单边 100000 的长／宽图、分块跨边界文字像素、完整下载、本地历史恢复、同 UUID 重放、能力缺失及普通翻译；仅允许本机回环地址 |
 | `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、结账与退出，覆盖五语及窄屏 |
 
 完整同源账户流程见[官网 README](../backend/website/README.md)。模拟响应验证交互，真实身份、付款和模型效果分别验证。
+
+分块脚本默认读取 `http://127.0.0.1:4323`，可通过 `WEBSITE_TRANSLATION_URL` 指向其他回环端口；可设置 `TEST_CHROMIUM` 与 `PLAYWRIGHT_MODULE` 指定本机浏览器和依赖。
 
 ## 辅助工具
 

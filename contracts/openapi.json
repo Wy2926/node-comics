@@ -603,6 +603,12 @@
                   "type": "string",
                   "format": "binary"
                 }
+              },
+              "application/vnd.nodelane.overlay-tiles": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
@@ -1697,7 +1703,7 @@
             }
           },
           "422": {
-            "description": "Invalid metadata, file hash/size/dimensions/alpha, or processing deadline exceeded.",
+            "description": "Invalid metadata, container structure, file hash/size/dimensions, or processing deadline exceeded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1766,6 +1772,7 @@
                             "representation": {
                               "enum": [
                                 "overlay-v1",
+                                "overlay-tiles-v1",
                                 "original"
                               ],
                               "title": "Representation",
@@ -1853,7 +1860,10 @@
                                       "type": "integer"
                                     },
                                     "mime": {
-                                      "const": "image/webp",
+                                      "enum": [
+                                        "image/webp",
+                                        "application/vnd.nodelane.overlay-tiles"
+                                      ],
                                       "title": "Mime",
                                       "type": "string"
                                     }
@@ -1934,7 +1944,7 @@
                   "output": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Lossless WebP overlay; required for overlay-v1 and forbidden for original."
+                    "description": "Lossless WebP overlay or negotiated WebP tile bundle; required for overlay-v1/overlay-tiles-v1 and forbidden for original."
                   }
                 }
               },
@@ -1943,7 +1953,7 @@
                   "contentType": "application/json"
                 },
                 "output": {
-                  "contentType": "image/webp"
+                  "contentType": "image/webp, application/vnd.nodelane.overlay-tiles"
                 }
               }
             }
@@ -9634,6 +9644,18 @@
           "ready": {
             "type": "boolean",
             "title": "Ready"
+          },
+          "result_formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "overlay-v1",
+                "overlay-tiles-v1"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Result Formats"
           }
         },
         "additionalProperties": false,
@@ -10158,6 +10180,15 @@
             "title": "Acknowledge Unknown Cost",
             "default": false
           },
+          "result_format": {
+            "type": "string",
+            "enum": [
+              "overlay-v1",
+              "overlay-tiles-v1"
+            ],
+            "title": "Result Format",
+            "default": "overlay-v1"
+          },
           "priority": {
             "type": "string",
             "enum": [
@@ -10283,6 +10314,7 @@
             "type": "string",
             "enum": [
               "overlay-v1",
+              "overlay-tiles-v1",
               "full-image-v1",
               "original"
             ],

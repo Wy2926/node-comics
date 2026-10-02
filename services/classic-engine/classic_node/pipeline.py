@@ -4,7 +4,7 @@ from threading import Lock
 import re
 import time
 
-from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
+from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest, mask_image
 from .operations import report_page_failure
 from manhua_engine.timing import collect
 
@@ -84,6 +84,10 @@ class Pipeline:
         analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'])
         if analysis['input_hash'] != page.metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
+        if page.analysis and analysis.get('segments'):
+            # A restored checkpoint must pass pixel checks before text work can resume.
+            with mask_image(analysis['mask'], (page.metadata['width'], page.metadata['height'])):
+                pass
         return rgb, alpha, analysis
 
     def accepted(self, page):
@@ -192,7 +196,7 @@ class Pipeline:
                 # Working RGB/masks plus encoded result copies; model workspace is separate.
                 reserve = self.input_reservation(page)
                 if reserve > self.limit:
-                    self.error(page, NodeFailure('INPUT_INVALID'))
+                    self.error(page, NodeFailure('INPUT_MEMORY_EXCEEDED'))
                     continue
                 if not self.resize_reservation(page, reserve, bounded=True):
                     continue
@@ -216,5 +220,6 @@ class Pipeline:
                 elif page.step == 'inpaint':
                     operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
                 else:
-                    operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha)
+                    operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
+                        **({'allow_tiles': True} if p.lease['config'].get('result_format') == 'overlay-tiles-v1' else {}))
                 self.submit(page, pool, page.step, operation)

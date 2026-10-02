@@ -29,7 +29,7 @@ export async function openPdfDocument(source: RandomAccessSource, signal?: Abort
   const range = new SourceRange(source.snapshot.size, initial, true);
   const assets = new URL('import-assets/pdf/', location.origin + '/').href;
   const task = getDocument({range, disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
-    useSystemFonts: false, stopAtErrors: true, maxImageSize: 40_000_000,
+    useSystemFonts: false, stopAtErrors: true, maxImageSize: -1,
     cMapUrl: assets + 'cmaps/', cMapPacked: true, standardFontDataUrl: assets + 'standard_fonts/', wasmUrl: assets + 'wasm/'});
   const timer = setTimeout(() => { failure = new Error('PDF 打开超时。'); void task.destroy(); }, 60_000);
   const cancelOpening=()=>{failure=signal?.reason??new DOMException('PDF 打开已取消。','AbortError');lifetime.abort();void task.destroy();};

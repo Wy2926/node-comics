@@ -88,7 +88,6 @@
   "登录授权码交换失败（HTTP {0}），请重新登录；若仍失败，请联系管理员检查身份服务配置。": "Error en el intercambio del código de autorización de inicio de sesión (HTTP {0}), inicie sesión nuevamente; Si aún falla, comuníquese con el administrador para verificar la configuración del servicio de identidad.",
   "{0} 无法解码，请检查图片是否损坏。": "{0} no se puede decodificar; verifique si la imagen está dañada.",
   "{0} 转换后超过单页 32 MB 限制。": "{0} excede el límite de página única de 32 MB después de la conversión.",
-  "漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。": "El tamaño de la página del cómic excede el límite de lectores (40 millones de píxeles, 30000 por lado).",
   "SHA-256 已结束。": "SHA-256 finalizó.",
   "MOBI 文件头不完整。": "El encabezado del archivo MOBI está incompleto.",
   "MOBI 记录越界或已损坏。": "El registro MOBI está fuera de los límites o dañado.",

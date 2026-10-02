@@ -209,10 +209,18 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
     cfg = settings()
     redraw_enabled = any(credential(provider.config) for provider in db.scalars(select(Provider).where(Provider.enabled.is_(True))))
     from .classic_config import enabled as classic_enabled
+    from datetime import timedelta
+    from .models import now
+    from .queue_models import ComputeNode
+    tiled = db.scalar(select(ComputeNode.id).where(ComputeNode.enabled.is_(True),
+        ComputeNode.heartbeat_at > now() - timedelta(seconds=cfg.cluster_node_timeout_seconds),
+        ComputeNode.runtime_report['overlay_tiles'].as_boolean().is_(True)).limit(1))
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db), "languages": list(LANGUAGES)},
                       {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
-            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_pixels, "max_dimension": cfg.max_dimension, "max_translation_ids": 32},
+            "representations": ['overlay-v1', 'full-image-v1', 'original'] + (['overlay-tiles-v1'] if tiled else []),
+            # Retain the numeric field for existing clients; area is derived from the sole dimension ceiling.
+            "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_dimension ** 2, "max_dimension": cfg.max_dimension, "max_translation_ids": 32},
             "entitlements": entitlements_json(db, user) if user else None,
             "unknown_release_seconds": cfg.unknown_release_seconds}
 

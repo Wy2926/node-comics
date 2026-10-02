@@ -1,87 +1,42 @@
-from contextlib import contextmanager
 import hashlib
 from io import BytesIO
-import warnings
-from PIL import Image, UnidentifiedImageError
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 from .config import settings
 from .errors import problem, ProcessingError
+from .image_metadata import image_metadata
 from .models import Asset, now, uid
 from .storage import get_store, LocalStore
 
-MIMES = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
-
-
-@contextmanager
-def decoded_image(data: bytes, *, output=False):
-    """Validate once and keep decoded pixels available to the caller."""
-    cfg = settings()
-    image = None
-    try:
-        if not data or len(data) > cfg.max_upload_bytes:
-            raise ValueError("size")
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(BytesIO(data)) as image:
-                if image.format not in MIMES or getattr(image, "n_frames", 1) != 1:
-                    raise ValueError("format")
-                width, height = image.size
-                mime = MIMES[image.format]
-                if width < 1 or height < 1 or width * height > cfg.max_pixels or max(width, height) > cfg.max_dimension:
-                    raise ValueError("dimensions")
-                image.verify()
-            image = Image.open(BytesIO(data))
-            image.load()
-    except (ValueError, OSError, UnidentifiedImageError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
-        if image is not None:
-            image.close()
-        if output:
-            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "供应商未返回符合限制的有效图片") from exc
-        if str(exc) in ("size", "dimensions"):
-            problem("IMAGE_TOO_LARGE", f"图片超过限制：{cfg.max_upload_bytes // 1024 // 1024} MB、{cfg.max_pixels // 1_000_000} 百万像素、单边 {cfg.max_dimension} 像素", 413)
-        problem("UNSUPPORTED_IMAGE", "请选择可正常解码的静态 PNG、JPEG 或 WebP 图片", 422)
-    try:
-        yield image, {"width": width, "height": height, "mime": mime,
-                      "byte_size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-    finally:
-        image.close()
-
-
 def inspect_image(data: bytes, *, output=False):
-    with decoded_image(data, output=output) as (_, info):
-        return info
+    return inspect_image_file(BytesIO(data), output=output)
 
 
 def inspect_image_file(handle, *, output=False):
-    """Inspect bounded file bytes without materializing a second image buffer."""
+    """Validate bounded bytes and metadata; pixel validity belongs to the node."""
     cfg = settings()
     handle.seek(0, 2)
     length = handle.tell()
     handle.seek(0)
     maximum = cfg.cluster_max_result_bytes if output else cfg.max_upload_bytes
-    if not 0 < length <= maximum:
-        problem('IMAGE_TOO_LARGE', '图片字节数超过限制', 413)
-    sha = hashlib.file_digest(handle, 'sha256').hexdigest()
-    handle.seek(0)
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(handle) as image:
-                width, height = image.size
-                mime = MIMES.get(image.format)
-                if not mime or getattr(image, 'n_frames', 1) != 1:
-                    raise ValueError('format')
-                if width * height > cfg.max_pixels or max(width, height) > cfg.max_dimension:
-                    problem('IMAGE_TOO_LARGE', '图片尺寸超过限制', 413)
-                if not output and (image.info.get('icc_profile') or image.getexif().get(274, 1) != 1):
-                    problem('INPUT_NOT_NORMALIZED', '请先规范化原图方向和色彩', 422)
-                image.load()
-    except (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
-        problem('UNSUPPORTED_IMAGE', '图片无法正常解码', 422)
+        if not 0 < length <= maximum:
+            raise ValueError('size')
+        metadata = image_metadata(handle)
+        if max(metadata['width'], metadata['height']) > cfg.max_dimension:
+            raise ValueError('dimensions')
+        if not output and (metadata['icc_profile'] or metadata['orientation'] != 1):
+            problem('INPUT_NOT_NORMALIZED', '请先规范化原图方向和色彩', 422)
+        sha = hashlib.file_digest(handle, 'sha256').hexdigest()
+    except (ValueError, OSError) as error:
+        if output:
+            raise ProcessingError('INVALID_PROVIDER_OUTPUT', '供应商图片容器或元数据无效') from error
+        if str(error) in ('size', 'dimensions'):
+            problem('IMAGE_TOO_LARGE', f'图片超过限制：{maximum // 1024 // 1024} MB、单边 {cfg.max_dimension} 像素', 413)
+        problem('UNSUPPORTED_IMAGE', '请选择静态 PNG、JPEG 或 WebP 图片', 422)
     finally:
         handle.seek(0)
-    return {'width': width, 'height': height, 'mime': mime, 'byte_size': length, 'sha256': sha}
+    return {key: metadata[key] for key in ('width', 'height', 'mime')} | {'byte_size': length, 'sha256': sha}
 
 
 def object_path(key: str):

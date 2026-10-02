@@ -12,10 +12,12 @@ from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import Path
+import struct
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from PIL import Image, ImageDraw
+import manual_website_server as base_fixture
 from manual_website_server import app, authorized, me, state, website
 from app.languages import LANGUAGES, REDRAW_LANGUAGES
 
@@ -25,8 +27,9 @@ DEFAULTS = dict(guest=False, accepted=0, create_calls=0, input_calls=0, get_call
                result_calls=0, events_calls=0, fail_create_response_once=False,
                events_truncate_once=False, events_reconnect_once=False,
                events_delay_ms=250, result_delay_ms=0, widget_delay_ms=25,
-               result_failure=False, result_failure_once=False, last_input=None)
-state.update(DEFAULTS, requests={})
+               result_failure=False, result_failure_once=False, last_input=None,
+               tiles_enabled=True, max_dimension=100000, fail_before_accept_once=False)
+state.update(DEFAULTS, requests={}, request_log=[], admitted_requests={})
 
 
 @app.post('/__state')
@@ -41,7 +44,7 @@ async def configure_fixture(request: Request):
             return error('INVALID_FIXTURE_CONTROL', 400)
     if controls.pop('reset', False):
         tasks.clear()
-        state.update(DEFAULTS, requests={})
+        state.update(DEFAULTS, requests={}, request_log=[], admitted_requests={})
     state.update(controls)
     return state
 
@@ -55,6 +58,7 @@ def count_request(key, operation):
     state[operation + '_calls'] += 1
     counts = state['requests'].setdefault(key, dict(create=0, input=0, get=0, result=0, events=0))
     counts[operation] += 1
+    state['request_log'].append({'id': key, 'operation': operation})
 
 
 def error(code, status=403):
@@ -77,7 +81,9 @@ async def start_session(request: Request):
 
 @app.get('/v1/capabilities')
 def capabilities(request: Request):
-    return {'result_protocol': 'overlay-v1', 'limits': {'max_bytes': 134217728, 'max_pixels': 32000000, 'max_dimension': 16000},
+    return {'result_protocol': 'overlay-v1',
+            **({'representations': ['overlay-v1', 'overlay-tiles-v1', 'full-image-v1', 'original']} if state['tiles_enabled'] else {}),
+            'limits': {'max_bytes': 134217728, 'max_pixels': state['max_dimension']**2, 'max_dimension': state['max_dimension']},
             'languages': [{'id':key,'label':label} for key,label in LANGUAGES.items()],
             'modes': [{'id':'classic','enabled':True,'languages':list(LANGUAGES)}, {'id':'redraw','enabled':True,'languages':REDRAW_LANGUAGES}],
             'entitlements': me(request)['entitlements'] if authorized(request) else None}
@@ -150,16 +156,96 @@ async def create_task(key: str, request: Request):
     if not guest and not authorized(request):
         return error('AUTH_REQUIRED',401)
     count_request(key, 'create')
+    if state['fail_before_accept_once']:
+        state['fail_before_accept_once'] = False
+        return error('NETWORK_ERROR',503)
     if key not in tasks:
         if guest and state['accepted'] >= 5:
             return error('GUEST_DAILY_LIMIT',429)
         if guest:
             state['accepted'] += 1
-        tasks[key] = {'id':key,'state':'needs_input','owner':'guest' if guest else 'account','body':body}
+        parent = body.get('retry_of') or body.get('regenerate_of')
+        if parent and not can_read(request, parent):
+            return error('TRANSLATION_NOT_FOUND',404)
+        prepared_body = tasks[parent]['prepared_body'] if parent else body
+        tasks[key] = {'id':key,'state':'needs_input','owner':'guest' if guest else 'account',
+                      'body':body, 'prepared_body':prepared_body}
+        state['admitted_requests'][key] = body
+    elif tasks[key]['body'] != body:
+        return error('IDEMPOTENCY_CONFLICT',409)
     if state['fail_create_response_once']:
         state['fail_create_response_once'] = False
         return error('NETWORK_ERROR',503)  # Admission happened; response was lost.
     return JSONResponse(snapshot(key),status_code=202)
+
+
+def encoded(image, format):
+    output = BytesIO()
+    image.save(output, format=format, **({'lossless': True, 'method': 4, 'quality': 10} if format == 'WEBP' else {}))
+    return output.getvalue()
+
+
+def synthetic_result(source, body, input_sha, path):
+    """Full-page rendered pixels are split only after lettering, like the node contract."""
+    width, height = source.size
+    overlay = Image.new('RGBA', source.size)
+    try:
+        draw = ImageDraw.Draw(overlay)
+        long = max(width, height) > 16383
+        if long:
+            # Opaque white behind the text keeps replacement alpha binary.
+            if width > height:
+                draw.rectangle((2020, 8, 2175, 50), fill='white')
+                draw.text((2035, 17), 'CROSS TILE', fill='black', font_size=16)
+            else:
+                draw.rectangle((4, 4078, 59, 4124), fill='white')
+                draw.text((5, 4086), 'TILE', fill='black', font_size=18)
+            draw.point((0, 0), fill=(10, 20, 30, 255))
+            draw.point((width-1, height-1), fill=(70, 80, 90, 255))
+        else:
+            draw.rectangle((50, 50, 549, 199), fill='white')
+            draw.text((80, 110), 'TRANSLATED TEST IMAGE', fill='black', font_size=30)
+        with source.copy() as complete:
+            complete.paste(overlay, (0, 0), overlay)
+            expected = encoded(complete, 'PNG')
+            if body.get('mode') == 'redraw':
+                artifact = encoded(complete, 'WEBP')
+                representation, mime, bbox = 'full-image-v1', 'image/webp', None
+            elif long and body.get('result_format') == 'overlay-tiles-v1':
+                tiles, bodies = [], []
+                for y in range(0, height, 4096):
+                    for x in range(0, width, 2048):
+                        with overlay.crop((x, y, min(width, x+2048), min(height, y+4096))) as cell:
+                            with cell.getchannel('A') as alpha:
+                                bounds = alpha.getbbox()
+                            if bounds is None:
+                                continue
+                            with cell.crop(bounds) as patch:
+                                data = encoded(patch, 'WEBP')
+                                tiles.append({'x': x+bounds[0], 'y': y+bounds[1], 'width': patch.width,
+                                              'height': patch.height, 'sha256': sha256(data).hexdigest(), 'byte_size': len(data)})
+                                bodies.append(data)
+                manifest = json.dumps({'format': 'overlay-tiles-v1', 'input_sha256': input_sha,
+                                       'width': width, 'height': height, 'tiles': tiles}, separators=(',', ':')).encode()
+                artifact = b'NCOT0001' + struct.pack('<I', len(manifest)) + manifest + b''.join(bodies)
+                representation, mime, bbox = 'overlay-tiles-v1', 'application/vnd.nodelane.overlay-tiles', None
+            else:
+                with overlay.getchannel('A') as alpha:
+                    bounds = alpha.getbbox()
+                with overlay.crop(bounds) as patch:
+                    artifact = encoded(patch, 'WEBP')
+                    bbox = {'x': bounds[0], 'y': bounds[1], 'width': patch.width, 'height': patch.height}
+                representation, mime = 'overlay-v1', 'image/webp'
+        result = {'kind': 'translated', 'representation': representation, 'input_sha256': input_sha,
+                  'normalization_version': 1, 'width': width, 'height': height,
+                  'artifact': {'sha256': sha256(artifact).hexdigest(), 'byte_size': len(artifact), 'mime': mime, 'path': path}}
+        if representation != 'full-image-v1':
+            result['composite'] = 'source-atop'
+        if bbox:
+            result['bbox'] = bbox
+        return artifact, result, expected
+    finally:
+        overlay.close()
 
 
 @app.put('/v1/guest/translations/{key}/input')
@@ -169,19 +255,14 @@ async def upload(key: str, request: Request):
         return error('TRANSLATION_NOT_FOUND',404)
     data = await request.body()
     entry = tasks[key]
-    descriptor = entry['body']['image']
+    descriptor = entry['prepared_body']['image']
     assert descriptor['sha256'] == sha256(data).hexdigest()
     assert descriptor['byte_size'] == len(data)
     with Image.open(BytesIO(data)) as image:
         width,height = image.size
-    patch = Image.new('RGBA',(500,150),'white')
-    ImageDraw.Draw(patch).text((30,60),'TRANSLATED TEST IMAGE',fill='black',font_size=30)
-    buffer=BytesIO();patch.save(buffer,format='WEBP',lossless=True);artifact=buffer.getvalue()
-    entry['artifact']=artifact
-    entry['result']={'kind':'translated','representation':'overlay-v1','input_sha256':descriptor['sha256'],
-                     'normalization_version':1,'width':width,'height':height,'bbox':{'x':50,'y':50,'width':500,'height':150},
-                     'composite':'source-atop','artifact':{'sha256':sha256(artifact).hexdigest(),'byte_size':len(artifact),
-                                                        'mime':'image/webp','path':str(request.url.path).removesuffix('/input')+'/result'}}
+        with image.convert('RGB') as source:
+            entry['artifact'], entry['result'], entry['expected'] = synthetic_result(
+                source, entry['prepared_body'], descriptor['sha256'], str(request.url.path).removesuffix('/input')+'/result')
     entry['state']='queued'
     count_request(key, 'input')
     state['last_input']={'width':width,'height':height,'bytes':len(data),'mime':request.headers.get('Content-Type')}
@@ -198,7 +279,12 @@ async def result(key: str, request: Request):
     if state['result_failure'] or state['result_failure_once']:
         state['result_failure_once'] = False
         return error('NETWORK_ERROR',503)
-    return Response(tasks[key]['artifact'],media_type='image/webp')
+    return Response(tasks[key]['artifact'],media_type=tasks[key]['result']['artifact']['mime'])
+
+
+@app.get('/__expected/{key}')
+def expected_result(key: str):
+    return Response(tasks[key]['expected'], media_type='image/png') if key in tasks and 'expected' in tasks[key] else error('NOT_FOUND',404)
 
 
 WIDGET = """window.turnstile=(()=>{
@@ -239,7 +325,12 @@ class FixtureWebsite(website.WebsiteFiles):
 app.mount('/',FixtureWebsite(Path(__file__).resolve().parents[1]/'website'/'dist'))
 
 if __name__ == '__main__':
+    import argparse
     import uvicorn
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=4322)
+    args = parser.parse_args()
+    base_fixture.ORIGIN = f'http://127.0.0.1:{args.port}'
     output=Path(__file__).resolve().parents[2]/'artifacts'/'website-translation'
     output.mkdir(parents=True,exist_ok=True)
     image=Image.new('RGB',(2400,3600),'#edf3fa')
@@ -249,4 +340,8 @@ if __name__ == '__main__':
         draw.rounded_rectangle((80,y,2320,y+360),radius=30,fill='#b8cfe8' if index%2 else '#ffffff',outline='#245788',width=10)
         draw.text((180,y+140),'Synthetic comic panel '+str(index+1),fill='#12283f',font_size=60)
     image.save(output/'sample.png')
-    uvicorn.run(app,host='127.0.0.1',port=4322,access_log=False)
+    image.close()
+    for name, size in [('wide', (100000, 64)), ('long', (64, 100000)), ('ordinary', (640, 900))]:
+        with Image.new('RGB', size, (240, 230, 220)) as image:
+            image.save(output/(name+'-source.png'))
+    uvicorn.run(app,host='127.0.0.1',port=args.port,access_log=False)

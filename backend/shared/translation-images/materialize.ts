@@ -1,7 +1,9 @@
 import type {TranslationResult} from './types';
 import {hashFile} from './hash';
 import {imageWork} from './work';
-import {TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from './limits';
+import {TRANSLATION_MAX_DIMENSION} from './limits';
+import {TILES_MIME,readTiles} from './tiles';
+import {bitmapPng} from './png';
 
 const digest = /^[a-f0-9]{64}$/;
 const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
@@ -25,7 +27,7 @@ export class InvalidArtifactError extends Error {
 export function validateResult(result: TranslationResult) {
   if (result.normalization_version !== 1 || !digest.test(result.input_sha256) ||
       !positive(result.width) || !positive(result.height) || Math.max(result.width, result.height) > TRANSLATION_MAX_DIMENSION ||
-      result.width * result.height > TRANSLATION_MAX_PIXELS || !['translated', 'partial', 'no_text'].includes(result.kind)) {
+      !['translated', 'partial', 'no_text'].includes(result.kind)) {
     throw new InvalidArtifactError();
   }
   if (result.representation === 'original') {
@@ -45,6 +47,8 @@ export function validateResult(result: TranslationResult) {
         box.x + box.width > result.width || box.y + box.height > result.height) {
       throw new InvalidArtifactError();
     }
+  } else if(result.representation==='overlay-tiles-v1'){
+    if(result.bbox||result.composite!=='source-atop'||artifact.mime!==TILES_MIME)throw new InvalidArtifactError();
   } else if (result.representation !== 'full-image-v1' || result.bbox || result.composite) {
     throw new InvalidArtifactError();
   }
@@ -79,11 +83,17 @@ export async function materializeResult(result: TranslationResult, original: Blo
         }
       }
       if (result.representation === 'original') return original!;
+      if(result.representation==='overlay-tiles-v1'){
+        try{return await bitmapPng(base!,await readTiles(artifact!,result.input_sha256,result.width,result.height));}
+        catch{throw new InvalidArtifactError();}
+      }
       try { patch = await createImageBitmap(artifact!); }
       catch { throw new InvalidArtifactError(); }
       const expected = result.representation === 'overlay-v1' ? result.bbox! : result;
       if (patch.width !== expected.width || patch.height !== expected.height) throw new InvalidArtifactError();
       if (result.representation === 'full-image-v1') return artifact!;
+      if(Math.max(result.width,result.height)>16383)
+        return await bitmapPng(base!,[{...result.bbox!,bitmap:patch}]);
       canvas = new OffscreenCanvas(result.width, result.height);
       const context = canvas.getContext('2d', {colorSpace: 'srgb'});
       if (!context) throw new InvalidArtifactError();

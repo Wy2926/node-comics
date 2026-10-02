@@ -88,7 +88,6 @@
   "{0} 超过单页 32 MB 限制。": "{0} przekracza limit 32 MB dla pojedynczej strony.",
   "{0} 无法解码，请检查图片是否损坏。": "Nie można zdekodować pliku {0}. Sprawdź, czy obraz nie jest uszkodzony.",
   "{0} 转换后超过单页 32 MB 限制。": "{0} przekracza limit pojedynczej strony wynoszący 32 MB po konwersji.",
-  "漫画页尺寸超过阅读器限制（4000 万像素、单边 30000）。": "Rozmiar strony komiksu przekracza limit czytnika (40 milionów pikseli, 30000 na stronę).",
   "SHA-256 已结束。": "SHA-256 zakończyło się.",
   "MOBI 文件头不完整。": "Nagłówek pliku MOBI jest niekompletny.",
   "MOBI 记录越界或已损坏。": "Rekord MOBI jest poza zakresem lub jest uszkodzony.",

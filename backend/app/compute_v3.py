@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, Response, Request, Header, HTTPException
 from starlette.responses import StreamingResponse
 from starlette.datastructures import UploadFile
 from pydantic import ValidationError, model_validator
-from PIL import Image
 import hashlib
 from starlette.concurrency import run_in_threadpool
 from pydantic import Field
@@ -133,7 +132,8 @@ def lease_payload(db, lease):
     analysis = state.analysis if state else None
     return {'lease_id': lease.id, 'lease_token': lease.token, 'job_id': job.id, 'generation': lease.generation,
             'status': 'active', 'expires_at': stamp(lease.expires_at), 'limits': lease.limits,
-            'input': input_descriptor(db, lease, source), 'config': {'engine': {'protocol_version': 3}},
+            'input': input_descriptor(db, lease, source), 'config': {'engine': {'protocol_version': 3},
+                **({'result_format': 'overlay-tiles-v1'} if job.config.get('result_format') == 'overlay-tiles-v1' else {})},
             'language': job.target_language, 'analysis': analysis,
             'analysis_hash': digest(analysis) if analysis else None,
             'translations': translations_payload(db, job.id)}
@@ -146,6 +146,7 @@ class Registration(RequestBody):
     device: str = Field(min_length=1, max_length=80)
     supported_languages: list[Language] = Field(min_length=1, max_length=16)
     ready: bool
+    result_formats: list[Literal['overlay-v1', 'overlay-tiles-v1']] = Field(default_factory=lambda: ['overlay-v1'], max_length=2)
 
 
 @router.post('/nodes/register')
@@ -159,7 +160,8 @@ def register(body: Registration, identity=Depends(node_auth), db: Session = Depe
     node.engine_version, node.device = body.engine_version, body.device
     node.capabilities = ['page'] if body.ready else []
     node.supported_languages = list(dict.fromkeys(body.supported_languages))
-    node.runtime_report = {'protocol_version': 3, 'ready': body.ready, 'languages': body.supported_languages}
+    node.runtime_report = {'protocol_version': 3, 'ready': body.ready, 'languages': body.supported_languages,
+        'overlay_tiles': body.ready and 'overlay-tiles-v1' in body.result_formats}
     node.applied_config_version, node.config_error, node.heartbeat_at = node.config_version, None, now()
     result = {'protocol_version': 3, 'config': config_payload(node), 'server_time': stamp(now()),
               'leases': [lease_payload(db, lease) for lease in leases]}
@@ -432,7 +434,7 @@ class OutputInfo(RequestBody):
     byte_size: int = Field(ge=1, le=128 * 1024 * 1024, strict=True)
     width: int = Field(ge=1, strict=True)
     height: int = Field(ge=1, strict=True)
-    mime: Literal['image/webp']
+    mime: Literal['image/webp', 'application/vnd.nodelane.overlay-tiles']
 
 
 class BBox(RequestBody):
@@ -447,7 +449,7 @@ class PageResult(RequestBody):
     input_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
     analysis_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
     translations_revision: str = Field(pattern=r'^[a-f0-9]{64}$')
-    representation: Literal['overlay-v1', 'original']
+    representation: Literal['overlay-v1', 'overlay-tiles-v1', 'original']
     normalization_version: Literal[1]
     # validate_result binds these to the already admitted input dimensions;
     # shape binds the output to this canvas. No second hard-coded ceiling.
@@ -461,7 +463,11 @@ class PageResult(RequestBody):
         if self.representation == 'original':
             if self.bbox is not None or self.output is not None:
                 raise ValueError('Original representation must not have an artifact')
-        elif (self.bbox is None or self.output is None
+        elif self.representation == 'overlay-tiles-v1':
+            if (self.bbox is not None or self.output is None or self.output.mime != 'application/vnd.nodelane.overlay-tiles'
+                    or (self.output.width, self.output.height) != (self.width, self.height)):
+                raise ValueError('Invalid tile representation')
+        elif (self.bbox is None or self.output is None or self.output.mime != 'image/webp'
               or self.bbox.x + self.bbox.width > self.width
               or self.bbox.y + self.bbox.height > self.height
               or (self.bbox.width, self.bbox.height) != (self.output.width, self.output.height)):
@@ -499,15 +505,16 @@ def result_multipart_schema():
         'metadata': {'type': 'string', 'contentMediaType': 'application/json', 'contentSchema': inline(schema),
             'description': 'JSON-encoded OutputRequest: lease_token, result and optional timings; at most 64 KiB.'},
         'output': {'type': 'string', 'format': 'binary',
-            'description': 'Lossless WebP overlay; required for overlay-v1 and forbidden for original.'}}}
+            'description': 'Lossless WebP overlay or negotiated WebP tile bundle; required for overlay-v1/overlay-tiles-v1 and forbidden for original.'}}}
 
 
 def validate_result(db, job, result):
     source = db.get(Asset, job.input_asset_id)
+    if result['representation'] == 'overlay-tiles-v1' and job.config.get('result_format') != 'overlay-tiles-v1':
+        problem('INVALID_PROVIDER_OUTPUT', '任务未协商分块覆盖格式', 422)
     if (result['input_hash'] != source.sha256 or result['normalization_version'] != source.normalization_version):
         problem('ENGINE_RESULT_MISMATCH', '结果与输入不一致', 409)
     if ((result['width'], result['height']) != (source.width, source.height)
-            or result['width'] * result['height'] > settings().max_pixels
             or max(result['width'], result['height']) > settings().max_dimension
             or result['output'] and result['output']['byte_size'] > settings().cluster_max_result_bytes):
         problem('INVALID_PROVIDER_OUTPUT', '结果元数据超出图片限制', 422)
@@ -536,19 +543,17 @@ def verify_output(handle, result):
         problem('RESULT_HASH_MISMATCH', '结果字节与冻结摘要不符', 422)
     handle.seek(0)
     try:
-        with Image.open(handle) as decoded:
-            if (decoded.format != 'WEBP' or decoded.size != (info['width'], info['height'])
-                    or getattr(decoded, 'n_frames', 1) != 1 or decoded.width * decoded.height > settings().max_pixels):
-                raise ValueError('Invalid overlay image')
-            decoded.load()
-            if decoded.mode != 'RGBA':
-                # Fully covered rectangular patches can be encoded as RGB.
-                decoded = decoded.convert('RGBA')
-            histogram = decoded.getchannel('A').histogram()
-            if any(histogram[1:255]) or not histogram[255]:
-                raise ValueError('Overlay alpha must be a nonempty binary replacement mask')
-    except (OSError, ValueError, Image.DecompressionBombError):
-        problem('INVALID_PROVIDER_OUTPUT', '覆盖文件格式或透明度无效', 422)
+        if result['representation'] == 'overlay-tiles-v1':
+            from .overlay_tiles import verify_tiles
+            verify_tiles(handle, result)
+            handle.seek(0)
+            return
+        from .image_metadata import image_metadata
+        metadata = image_metadata(handle)
+        if metadata['mime'] != 'image/webp' or (metadata['width'], metadata['height']) != (info['width'], info['height']):
+            raise ValueError('Invalid overlay container')
+    except (OSError, ValueError, TypeError, KeyError):
+        problem('INVALID_PROVIDER_OUTPUT', '覆盖文件容器或元数据无效', 422)
     handle.seek(0)
 
 
@@ -644,7 +649,7 @@ def receive_result(lease_id, body, handle, identity):
             lease.expires_at = persist_deadline
         db.commit()
     if key is not None:
-        get_store().put_file(key, handle, 'image/webp', kind='classic')
+        get_store().put_file(key, handle, result['output']['mime'], kind='classic')
     with session_factory()() as db:
         lock_scheduler(db)
         lease = scoped_lease(db, lease_id, body.lease_token, identity)
@@ -661,12 +666,13 @@ def receive_result(lease_id, body, handle, identity):
 @router.put('/leases/{lease_id}/result', openapi_extra={
     'requestBody': {'required': True, 'content': {'multipart/form-data': {
         'schema': result_multipart_schema(), 'encoding': {
-            'metadata': {'contentType': 'application/json'}, 'output': {'contentType': 'image/webp'}}}}},
+            'metadata': {'contentType': 'application/json'},
+            'output': {'contentType': 'image/webp, application/vnd.nodelane.overlay-tiles'}}}}},
     'responses': {
         '200': {'description': 'Stable terminal receipt; replaying the same result never settles twice.'},
         '408': {'description': 'Multipart total body timeout; retry the same frozen result.'},
         '409': {'description': 'Lease or generation is no longer active, or the frozen result conflicts.'},
-        '422': {'description': 'Invalid metadata, file hash/size/dimensions/alpha, or processing deadline exceeded.'},
+        '422': {'description': 'Invalid metadata, container structure, file hash/size/dimensions, or processing deadline exceeded.'},
         '503': {'description': 'Result ingress capacity or storage is unavailable; retry the same frozen result.'}}})
 async def deliver_result(lease_id: str, request: Request, identity=Depends(node_auth)):
     from .result_ingress import begin_result_ingress, release_result_ingress
