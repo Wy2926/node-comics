@@ -10,6 +10,7 @@ import {
   TRANSLATION_MAX_BYTES,
   TRANSLATION_MAX_PIXELS,
   TRANSLATION_MAX_DIMENSION,
+  TRANSLATION_JPEG_MAX_DIMENSION,
 } from '../../../shared/translation-images/limits';
 import { materializeResult } from '../../../shared/translation-images/materialize';
 import { imageWork } from '../../../shared/translation-images/work';
@@ -63,13 +64,15 @@ self.onmessage = async (
       });
       const width = bitmap.width,
         height = bitmap.height;
-      let size: { width: number; height: number }, changed: boolean, reencode: boolean, normalize: boolean;
+      let size: { width: number; height: number }, changed: boolean, reencode: boolean, normalize: boolean, canReencode: boolean;
       try {
         size = checkedSize(width, height);
         changed = size.width !== width || size.height !== height;
         normalize = await needsNormalization(input);
-        reencode = changed || input.size > TRANSLATION_REENCODE_BYTES ||
-          normalize && Math.max(size.width, size.height) > 16383;
+        canReencode = Math.max(size.width, size.height) <= TRANSLATION_JPEG_MAX_DIMENSION;
+        if (!canReencode && (changed || normalize)) throw Error('IMAGE_DIMENSIONS_LIMIT');
+        reencode = canReencode && (changed || input.size > TRANSLATION_REENCODE_BYTES ||
+          normalize && Math.max(size.width, size.height) > 16383);
         // resizeInput already applies orientation and draws into an sRGB canvas.
         if (!reencode && normalize) {
           const canvas = new OffscreenCanvas(width, height);
@@ -85,7 +88,7 @@ self.onmessage = async (
       } finally {
         bitmap.close();
       }
-      if (reencode || input.size > TRANSLATION_REENCODE_BYTES) {
+      if (reencode || canReencode && input.size > TRANSLATION_REENCODE_BYTES) {
         try {
           const resized = await resizeInput(input, size.width, size.height);
           if (changed || resized.blob.size < input.size || reencode && normalize) {

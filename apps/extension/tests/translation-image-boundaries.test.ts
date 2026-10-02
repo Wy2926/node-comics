@@ -1,5 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {prepareTranslationInput,restoreTranslationInput} from '../src/translation/input/prepare';
+import {INPUT_PROFILE,LEGACY_INPUT_PROFILE} from '../src/translation/input/limits';
 import {prepareComicPage} from '../src/comics/pages/normalize';
 import * as metadata from '../src/comics/pages/image-metadata';
 import {hashFile} from '../src/importers/hash';
@@ -11,15 +12,18 @@ const workerFactory=vi.hoisted(()=>vi.fn());
 vi.mock('../src/translation/input/resize.worker?worker',()=>({default:class {constructor(){return workerFactory();}}}));
 const source=new Blob([new Uint8Array([255,216,255,224]),new Uint8Array(1024*1024)],{type:'image/jpeg'});
 const page=(width=1800,height=26000):Page=>({id:'boundary',name:'Synthetic long source',width,height,imageByteSize:source.size,imageMime:source.type,jobs:[],outputBlobs:{}});
-const close=vi.fn(),draw=vi.fn();
+const close=vi.fn(),draw=vi.fn(),fill=vi.fn();
+const jpeg=new Blob([new Uint8Array([255,216,255,218]),'encoded JPEG'],{type:'image/jpeg'}),encode=vi.fn(async()=>jpeg);
 const canvases:{width:number;height:number}[]=[];
 beforeEach(()=>{
-  close.mockReset();draw.mockReset();
+  close.mockReset();draw.mockReset();fill.mockReset();
+  encode.mockReset();encode.mockResolvedValue(jpeg);
   vi.stubGlobal('Worker',undefined);
   vi.stubGlobal('createImageBitmap',vi.fn(async(_blob:Blob,options?:ImageBitmapOptions)=>({width:options?.resizeWidth??1800,height:options?.resizeHeight??26000,close})));
   vi.stubGlobal('OffscreenCanvas',class {
     constructor(public width:number,public height:number){canvases.push(this);}
-    getContext(){return {drawImage:draw,getImageData:(_x:number,_y:number,width:number,height:number)=>({data:new Uint8ClampedArray(width*height*4)})};}
+    getContext(){return {drawImage:draw,fillRect:fill,getImageData:(_x:number,_y:number,width:number,height:number)=>({data:new Uint8ClampedArray(width*height*4)})};}
+    convertToBlob=encode;
   });
 });
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();canvases.length=0;});
@@ -32,15 +36,25 @@ function replyingWorker(error:string,beforeReply=()=>{}){
 }
 
 describe('optional input encoding boundaries',()=>{
-  it('reuses exact source bytes only when optional same-size PNG encoding exceeds its output budget',async()=>{
-    outputLimit();const prepared=await prepareTranslationInput(page(),async()=>source,()=>true);
-    expect(prepared.image).toMatchObject({sha256:await hashFile(source),byte_size:source.size,content_type:'image/jpeg'});
-    expect(prepared.blob).toBeUndefined();expect(prepared.profile).toBeUndefined();expect(close).toHaveBeenCalledOnce();
+  it('encodes a long new input as JPEG without a PNG attempt and releases the full canvas',async()=>{
+    const pngEncode=vi.spyOn(png,'bitmapPng');
+    const prepared=await prepareTranslationInput(page(),async()=>source,()=>true);
+    expect(prepared).toMatchObject({width:1800,height:26000,profile:INPUT_PROFILE,image:{sha256:await hashFile(jpeg),byte_size:jpeg.size,content_type:'image/jpeg'}});
+    expect(prepared.blob).toBe(jpeg);expect(pngEncode).not.toHaveBeenCalled();expect(close).toHaveBeenCalledOnce();
+    expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/jpeg',quality:expect.any(Number)});
+    expect(fill).toHaveBeenCalledExactlyOnceWith(0,0,1800,26000);
+    expect(canvases).toHaveLength(1);expect(canvases[0]).toMatchObject({width:1,height:1});
   });
-  it('does not reuse an oversized source or skip required resizing',async()=>{
-    outputLimit();
-    await expect(prepareTranslationInput(page(2400,26000),async()=>source,()=>true)).rejects.toBeInstanceOf(png.ImageOutputTooLargeError);
-    await expect(prepareTranslationInput(page(),async()=>source,()=>true,{max_bytes:source.size-1,max_dimension:100000,max_pixels:100000**2,max_translation_ids:100})).rejects.toBeInstanceOf(png.ImageOutputTooLargeError);
+  it('does not reuse source bytes when JPEG encoding fails during required resizing',async()=>{
+    const error=Error('JPEG encoding failed');encode.mockRejectedValueOnce(error);
+    await expect(prepareTranslationInput(page(2400,26000),async()=>source,()=>true)).rejects.toBe(error);
+    expect(close).toHaveBeenCalledOnce();expect(canvases.every(canvas=>canvas.width===1&&canvas.height===1)).toBe(true);
+  });
+  it('checks the service byte budget for both resized JPEG and unchanged source fallback',async()=>{
+    encode.mockResolvedValue(new Blob([new Uint8Array([255,216,255,218]),new Uint8Array(source.size)],{type:'image/jpeg'}));
+    const limits={max_bytes:source.size-1,max_dimension:100000,max_pixels:100000**2,max_translation_ids:100};
+    await expect(prepareTranslationInput(page(2400,26000),async()=>source,()=>true,limits)).rejects.toThrow('大小限制');
+    await expect(prepareTranslationInput(page(),async()=>source,()=>true,limits)).rejects.toThrow('大小限制');
     expect(close).toHaveBeenCalledTimes(2);
   });
   it('does not hide actual image decode failures',async()=>{
@@ -53,10 +67,18 @@ describe('optional input encoding boundaries',()=>{
     await expect(prepareComicPage({name:'tagged long image',blob:source})).rejects.toBeInstanceOf(png.ImageOutputTooLargeError);
     expect(close).toHaveBeenCalledOnce();
   });
-  it('never substitutes source bytes when rebuilding frozen encoded input',async()=>{
+  it('never substitutes source bytes when rebuilding legacy frozen PNG input',async()=>{
     outputLimit();const sha=await hashFile(source);
-    await expect(restoreTranslationInput(source,1800,26000,sha,sha,()=>true)).rejects.toBeInstanceOf(png.ImageOutputTooLargeError);
+    await expect(restoreTranslationInput(source,1800,26000,sha,sha,()=>true,LEGACY_INPUT_PROFILE)).rejects.toBeInstanceOf(png.ImageOutputTooLargeError);
     expect(close).toHaveBeenCalledOnce();
+  });
+  it.each([LEGACY_INPUT_PROFILE,INPUT_PROFILE])('passes frozen profile %s to a recovery Worker',async profile=>{
+    vi.stubGlobal('Worker',class {});
+    const sha256=await hashFile(jpeg),worker={onmessage:null as null|((event:{data:{blob:Blob;sha256:string}})=>void),onerror:null as null|(()=>void),
+      postMessage:vi.fn(()=>queueMicrotask(()=>worker.onmessage!({data:{blob:jpeg,sha256}}))),terminate:vi.fn()};
+    workerFactory.mockReturnValue(worker);
+    expect(await restoreTranslationInput(source,1800,26000,await hashFile(source),sha256,()=>true,profile)).toBe(jpeg);
+    expect(worker.postMessage).toHaveBeenCalledWith({blob:source,width:1800,height:26000,profile});expect(worker.terminate).toHaveBeenCalledOnce();
   });
   it('preserves the typed worker output-limit failure and terminates the worker before fallback',async()=>{
     const worker=replyingWorker('IMAGE_OUTPUT_TOO_LARGE'),prepared=await prepareTranslationInput(page(),async()=>source,()=>true);

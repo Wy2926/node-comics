@@ -5,23 +5,25 @@ import {readInput,cacheInput,INPUT_BUDGET_BYTES} from '../src/translation/input/
 import {loadTranslationInput} from '../src/translation/input/load';
 import {ByteCache} from '../src/storage/cache';
 import {setTranslationCacheLimitMb} from '../src/storage/translations';
-import {translationSize} from '../src/translation/input/limits';
+import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,translationSize} from '../src/translation/input/limits';
 import {hashFile} from '../src/importers/hash';
 import {matchesPage} from '../src/translation/sync';
 import {TranslationCoordinator,translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
 import {operationId,makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {ApiError} from '../src/api';
-import {canvasWebp} from '../src/translation/input/resize';
+import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
+import * as png from '../../../backend/shared/translation-images/png';
 import {fixture,target,snapshot,originalInput,originalBytes} from './translation-fixture';
 
 const encoded=new Blob(['RIFF',new Uint8Array([14,0,0,0]),'WEBPVP8 ',new Uint8Array([2,0,0,0]),'ok'],{type:'image/webp'}),close=vi.fn(),draw=vi.fn(),encode=vi.fn(async()=>encoded);
 const inputs=new ByteCache({name:'translation-inputs-v1',budgetBytes:INPUT_BUDGET_BYTES});
 beforeEach(async()=>{
   await inputs.clear();
+  encode.mockReset();encode.mockResolvedValue(encoded);
   vi.stubGlobal('Worker',undefined);
   vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:1800,height:3600,close})));
-  vi.stubGlobal('OffscreenCanvas',class {constructor(public width:number,public height:number){} getContext(){return {drawImage:draw};}convertToBlob=encode;});
+  vi.stubGlobal('OffscreenCanvas',class {constructor(public width:number,public height:number){} getContext(){return {drawImage:draw,fillRect:vi.fn()};}convertToBlob=encode;});
 });
 afterEach(async()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();await setTranslationCacheLimitMb(1024);});
 const large=()=>{const t=target(1);t.page.width=2400;t.page.height=4800;return t;};
@@ -40,6 +42,7 @@ it('keeps source identity separate and encodes only once',async()=>{
   const f=fixture(),t=large(),before={...t.page};await f.core.submit([t]);
   const record=(await readOperation(operationId(f.core.scope,'zh-Hans',t)))!;
   expect(t.page).toEqual(before);expect(record.sourceSha256).toBe(t.page.imageSha256);
+  expect(record.inputProfile).toBe(INPUT_PROFILE);
   expect(record.image.sha256).toBe(await hashFile(encoded));expect(record.inputSize).toEqual({width:1800,height:3600});
   expect(await hashFile((await readInput(f.core.scope,record.image.sha256))!)).toBe(await hashFile(encoded));
   expect(matchesPage(t.page,translationJob(record.result!,record))).toBe(true);
@@ -74,6 +77,18 @@ it('uses the current center dimension ceiling without an independent source-pixe
   await expect(prepareTranslationInput({...strip,height:100001},read,()=>true)).rejects.toThrow('尺寸');
   expect(read).not.toHaveBeenCalled();
 });
+it('reuses admissible same-size input beyond the JPEG limit without decoding or encoding it',async()=>{
+  const source=new Blob([new Uint8Array(1024*1024+1)],{type:'image/png'}),sha=await hashFile(source);
+  const page={...target(1).page,width:800,height:100000,imageByteSize:source.size,imageSha256:sha,imageMime:source.type};
+  const result=await prepareTranslationInput(page,async()=>source,()=>true);
+  expect(result).toMatchObject({width:800,height:100000,image:{sha256:sha,byte_size:source.size,content_type:'image/png'}});
+  expect(result.blob).toBeUndefined();expect(result.profile).toBeUndefined();expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+});
+it('rejects required resized input beyond the JPEG limit before reading or decoding its source',async()=>{
+  const read=vi.fn(),page={...target(1).page,width:2400,height:100000};
+  await expect(prepareTranslationInput(page,read,()=>true)).rejects.toThrow('尺寸');
+  expect(read).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
 it('compresses a large narrow strip without changing its dimensions',async()=>{
   const source=new Blob([new Uint8Array(1024*1024+1)],{type:'image/png'}),sha=await hashFile(source);
   const page={...target(1).page,width:800,height:12000,imageByteSize:source.size,imageSha256:sha};
@@ -97,6 +112,22 @@ it('removes only canvas metadata and preserves alpha flags and compressed pixel 
   const clean=await canvasWebp(new Blob([header,...chunks],{type:'image/webp'})),bytes=new Uint8Array(await clean.arrayBuffer());
   expect(new DataView(bytes.buffer).getUint32(4,true)).toBe(clean.size-8);expect(bytes[20]).toBe(0x10);expect([...bytes.slice(-2)]).toEqual([77,88]);expect(await clean.text()).not.toContain('ICCP');
 });
+it('strips canvas JPEG EXIF and ICC without changing quantization or scan bytes',async()=>{
+  const segment=(marker:number,data:number[])=>new Uint8Array([255,marker,0,data.length+2,...data]);
+  const header=new Uint8Array([255,216]),jfif=segment(0xe0,[74,70]),quant=segment(0xdb,[42,43]),scan=new Uint8Array([255,218,0,2,70,255,0,80,255,217]);
+  const plain=new Blob([header,jfif,quant,scan],{type:'image/jpeg'});
+  const tagged=new Blob([header,jfif,segment(0xe1,[69,88]),segment(0xe2,[73,67]),quant,scan],{type:'image/jpeg'});
+  expect(await canvasJpeg(plain)).toBe(plain);
+  expect(await (await canvasJpeg(tagged)).arrayBuffer()).toEqual(await plain.arrayBuffer());
+});
+it.each([
+  new Blob(['not JPEG'],{type:'image/jpeg'}),
+  new Blob([new Uint8Array([255,216,255,225,0,1])],{type:'image/jpeg'}),
+  new Blob([new Uint8Array([255,216,255,225,0,8,1])],{type:'image/jpeg'}),
+  new Blob([new Uint8Array([255,216])],{type:'image/png'}),
+])('rejects malformed or unavailable canvas JPEG output',async blob=>{
+  await expect(canvasJpeg(blob)).rejects.toThrow();
+});
 it('recovery verifies the frozen output hash instead of assuming deterministic encoders',async()=>{
   const source=new Blob(['source']),sha=await hashFile(source);
   expect(await restoreTranslationInput(source,1800,3600,sha,await hashFile(encoded),()=>true)).toBe(encoded);
@@ -113,6 +144,19 @@ it('shared input loading rebuilds once and then skips the source on a cache hit'
   expect(await loadTranslationInput(scope,input,read,()=>true)).toBe(encoded);
   expect(await hashFile((await loadTranslationInput(scope,input,read,()=>true))!)).toBe(input.sha256);
   expect(read).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledOnce();
+});
+it.each([LEGACY_INPUT_PROFILE,INPUT_PROFILE])('restores evicted long input with its frozen encoder profile %s',async profile=>{
+  const scope=crypto.randomUUID(),source=originalBytes(0),read=vi.fn(async()=>source);
+  const legacy=new Blob(['frozen legacy PNG'],{type:'image/png'}),current=new Blob([new Uint8Array([255,216,255,218]),'frozen current JPEG'],{type:'image/jpeg'});
+  const pngEncode=vi.spyOn(png,'bitmapPng').mockResolvedValue(legacy);encode.mockResolvedValueOnce(current);
+  vi.mocked(createImageBitmap).mockResolvedValue({width:800,height:20000,close} as unknown as ImageBitmap);
+  const output=profile===LEGACY_INPUT_PROFILE?legacy:current;
+  const input={sha256:await hashFile(output),sourceSha256:await hashFile(source),profile,size:{width:800,height:20000}};
+  expect(await loadTranslationInput(scope,input,read,()=>true)).toBe(output);
+  expect(await hashFile((await loadTranslationInput(scope,input,read,()=>true))!)).toBe(input.sha256);
+  expect(read).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
+  if(profile===LEGACY_INPUT_PROFILE){expect(pngEncode).toHaveBeenCalledOnce();expect(encode).not.toHaveBeenCalled();}
+  else {expect(pngEncode).not.toHaveBeenCalled();expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/jpeg',quality:expect.any(Number)});}
 });
 it('shared input loading stops on cancellation, missing source or mismatched bytes without caching them',async()=>{
   const scope=crypto.randomUUID(),source=originalBytes(0),read=vi.fn(async()=>source),put=vi.spyOn(ByteCache.prototype,'put');

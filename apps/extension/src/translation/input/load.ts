@@ -12,7 +12,7 @@ export async function loadTranslationInput(scope:string,input:FrozenInput,readSo
   const source=await readSource();assertCurrent(current);
   if(!source||!input.profile)return source;
   if(!input.size)throw new InputChangedError();
-  const blob=await restoreTranslationInput(source,input.size.width,input.size.height,input.sourceSha256,input.sha256,current);
+  const blob=await restoreTranslationInput(source,input.size.width,input.size.height,input.sourceSha256,input.sha256,current,input.profile);
   await cacheInput(scope,input.sha256,blob);assertCurrent(current);
   return blob;
 }
