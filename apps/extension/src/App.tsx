@@ -62,7 +62,6 @@ import {ShortcutPanel} from './ui/shortcuts/ShortcutPanel';
 import {RemoteLibrary} from './ui/remote-library/RemoteLibrary';
 import {openRegisteredRemoteComic} from './comics/application/remote-library-service';
 import {FileDownloadPrompt} from './ui/downloads/FileDownloads';
-import {queueRemoteFileDownload} from './comics/acquisition/files';
 
 type View='downloads'|'library'|'remote-library'|'sites'|'search'|'discover'|'settings'|'account';
 const directSearchSeed:SearchSeed={title:''};
@@ -367,7 +366,7 @@ export function App(){
   <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
   <main className="nc-main nc-search-main" hidden={!!current||view!=='search'}>{(searchPageVisited||view==='search')&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:page`} presentation="page" open={!current&&view==='search'} seed={directSearchSeed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='search')}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
-  <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={async(connectionId,plan)=>{await queueRemoteFileDownload(connectionId,plan,{confirmed:true});downloads.refresh();notify(msg('已加入下载，可在离线中心查看进度。'));}}/>}</main>
+  <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={downloads.promptFileDownload}/>}</main>
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}

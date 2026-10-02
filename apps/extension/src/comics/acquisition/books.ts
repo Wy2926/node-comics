@@ -201,7 +201,12 @@ async function settleBooks(){
       if(plan?.generation!==view.plan.generation||plan.status!=='running')return false;
       await tx.put('metadata',{...plan,status,owner:undefined,updatedAt:Date.now()});return true;
     });
-    if(settled)track('offline_download_result',{surface:'reader',source_type:'website',outcome:status==='complete'?'success':'partial',count:Math.min(10000,view.completed),duration_ms:Math.min(86400000,Math.max(0,Date.now()-view.plan.createdAt))},view.plan.createdAt);
+    if (settled) {
+      const connection = await catalog.get('connections', view.comic.source.connectionId).catch(() => undefined);
+      const sourceType = connection?.provider === 'opds' || connection?.provider === 'website' ? connection.provider : 'unknown';
+      track('offline_download_result', {surface: 'reader', source_type: sourceType, outcome: status === 'complete' ? 'success' : 'partial',
+        count: Math.min(10000, view.completed), duration_ms: Math.min(86400000, Math.max(0, Date.now() - view.plan.createdAt))}, view.plan.createdAt);
+    }
   }
 }
 /** A host iteration; production callers hold the book host lock for their full lifetime. */

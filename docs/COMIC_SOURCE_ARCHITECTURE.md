@@ -48,11 +48,15 @@ Google Drive 支持 CBZ/ZIP、未加密 MOBI 的 Range 读取。MOBI 复用通�
 
 [OPDS provider](../apps/extension/src/comics/sources/opds/provider.ts) 支持 OPDS 1.2 Atom、OPDS 2 JSON、部分出版物详情、OpenSearch 和常见查询模板。XML 使用浏览器原生 `DOMParser`，拒绝 DTD／实体声明并限制文档大小和树深；`@xmldom/xmldom` 仅作为 Node 测试的开发依赖，不随插件引入另一套 XML 解析器。[r2-opds-js 官方](https://github.com/edrlab/r2-opds-js#npm-package)声明只支持 Node.js，未引入其文件系统／归档／DRM 依赖；协议模型规范化留在 provider 内。
 
+目录展示与实际打开共用链接分类：已确认可读、需按需展开详情／图片清单、明确不支持三种情况分开处理。不能仅因同时存在 EPUB 下载链接就禁用可能的图片清单；展开后仅含 XHTML 的 EPUB 正文仍不支持，不读取正文或写服务端进度。不可读原因区分 EPUB、DRM／借阅／购买、非只读页流及未知表示，不向用户暴露私有资源地址。标准 RAR MIME `application/vnd.rar` 与既有漫画归档别名使用同一格式映射，不按服务品牌分支。
+
 解析器不决定如何阅读。`catalog.resolve` 返回当前资源的 `pages`、`range-file` 或 `download-file` 计划：
 
 - 图片型 Divina/Web Publication 或可安全只读的 OPDS-PSE 生成 `image-sequence` Entry。封面不是正文，HTML／音频 Web Publication 不作为漫画页序列。
 - CBZ／ZIP、未加密 MOBI 仅在服务器提供可核验的 206 Range、大小与强 ETag 时按需读取；忽略 Range、内容变化或无法证明快照一致性时不能静默整包读取。
 - 需要完整文件的资源由用户确认后流式保存，包括 PDF／CBR 和不满足 Range 条件的支持格式。完成格式校验与索引后才发布漫画；中断不发布空漫画。下载复用完整容器存储，不引入第三套图片仓库。
+
+远程书库与书架共用下载确认和任务入口。完整文件的归属引用先建立，再将漫画索引与任务完成态原子发布；发布成功后的临时引用清理失败不得回滚已发布文件。未完成的清理保留容器定位，交给恢复流程重试。没有独立封面时，漫画保存封面页的实际格式，用当前渲染配置生成缩略图，不从 provider 私有定位或下载地址猜格式。
 
 显式重新载入先重新解析当前计划与准备完整索引，再原子替换定位、快照和页面身份。图片流重新载入建立新内容身份并回到第一页，避免服务器静默改图后旧物化信息阻塞恢复；普通打开和重连不重置位置。可靠 Range 文件快照未变则保留位置，变化后回到第一页。独立封面按来源代次失效，即使封面地址或引用 ID 未变也重新读取。不保留历史版本，不在不同表示之间自动切换；完整文件变化需明确重新保存。
 
@@ -81,6 +85,8 @@ Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮�
 网站原图的网络读取使用 `cache: 'no-store'`，跳过浏览器 HTTP 缓存，避免源站带缓存头的 503 等失败响应阻塞重试。已校验的图片仍复用原图页缓存或显式下载资料；此策略不改变这些应用缓存的保留规则。
 
 [PageService](../apps/extension/src/comics/pages/service.ts)通过 Entry 的唯一 Comic.source 获取字节。读取前后核验当前 contentId、generation、连接和来源状态；页面物化和翻译恢复使用实际字节摘要。内容改变时新索引原子替换旧索引，位置回当前条目第一页；不会把旧页码映射到新内容。
+
+阅读和下载统一经 `prepareEntryContent` 判断是否需要发现、重载或刷新临时地址。下载调用可复用刚核实的同 contentId 保存页数，避免重复读取离线清单；不同内容身份不能复用该结果。
 
 ## 独立存储职责
 

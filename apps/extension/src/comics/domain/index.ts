@@ -13,7 +13,7 @@ export interface Comic {
   createdAt: number; updatedAt: number; lastReadAt?: number; lastEntryId?: string;
   startEntryId?: string; sourceName: string; sourceUrl?: string;
   lastPage?: number; lastPageCount?: number;
-  cover?: { entryId: string; contentId: string; pageId: string };
+  cover?: { entryId: string; contentId: string; pageId: string; format?: EntryFormat };
   /** Dedicated website artwork; independent of the file/first-page cover. */
   sourceCover?: {url: string};
   /** Remote library artwork is separate from the legacy website cover reference. */

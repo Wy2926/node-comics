@@ -17,32 +17,10 @@ let runController: AbortController | undefined;
 export const downloadErrorMessage = websiteContentError;
 const message=downloadErrorMessage;
 const aborted = () => new DOMException('下载已暂停或文档已移除。', 'AbortError');
-type DiscoveryOptions={reload?:boolean;refreshResources?:boolean};
 const retainedPages=async(document:Entry)=>(await downloadStore.inventory([document.id],true)).filter(item=>item.contentId===document.contentId);
 
 /** Metadata discovery only. Opening a document never creates an explicit download task. */
-export async function discoverEntryContent(id: string, signal?: AbortSignal, options:DiscoveryOptions={}): Promise<void> {
-  signal?.throwIfAborted();
-  const document = await catalog.get('entries', id);
-  if (!document) throw Error('文档已移除。');
-  if (entryContentKind(document) !== 'pages') return;
-  await discoverContent(document,signal,options);
-}
-async function discoverContent(document:Entry,signal:AbortSignal|undefined,{reload=false,refreshResources=false}:DiscoveryOptions,saved?:Awaited<ReturnType<typeof retainedPages>>):Promise<void>{
-  if(!reload&&!refreshResources&&document.discoveryComplete)return;
-  if(!reload&&document.discoveryComplete&&document.pageCount){
-    if(isEntryFullyCached(document,(saved??await retainedPages(document)).length))return;
-  }
-  if (document.sourceRemoved || document.readable === false) throw Error('源站此章节暂不可读，已保存的页面仍可阅读。');
-  if (document.discoveryComplete&&!reload) {
-    if(!refreshResources)return;
-    if(document.format==='website'){
-      const pages=await catalog.listPages(document.contentId,{limit:1500});
-      if(!pages.some(page=>typeof page.locator.contentKey==='string'))return;
-    }
-  }
-  await prepareEntryContent(document.id,signal,{reload,refreshResources});
-}
+export {prepareEntryContent as discoverEntryContent} from '../application/entry-content';
 
 /** Idempotent intent registration. It does not start network work or grant permissions. */
 export async function queueDownloads(ids: string[], book?:{comicId:string;generation:number}, signal?:AbortSignal): Promise<void> {
@@ -116,7 +94,7 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
   try {
     let document=await active();
     const retained=await retainedPages(document);
-    await discoverContent(document,signal,{refreshResources:true},retained);
+    await prepareEntryContent(document.id,signal,{refreshResources:true,retainedPages:{contentId:document.contentId,count:retained.length}});
     document=await active();
     // Resuming checks retained object keys once, without loading saved image Blobs again.
     const saved=new Map(retained.map(item=>[item.key,item.size]));

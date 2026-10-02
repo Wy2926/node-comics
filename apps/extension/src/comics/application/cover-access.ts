@@ -12,7 +12,10 @@ export function coverReference(comic: Comic): string | undefined {
   if(comic.sourceArtwork)return prefix+JSON.stringify([comic.id,'provider',comic.sourceArtwork.id,String(comic.source.generation)]);
   if (comic.sourceCover) return prefix + JSON.stringify([comic.id, comic.sourceCover.url]);
   const name=typeof comic.source.locator.name==='string' ? comic.source.locator.name : '';
-  return comic.cover ? pageReference({...comic.cover, renderProfileId: pageRenderProfile(detectFormat(name)??'website')}) : undefined;
+  return comic.cover ? pageReference({
+    ...comic.cover,
+    renderProfileId: pageRenderProfile(comic.cover.format ?? detectFormat(name) ?? 'website'),
+  }) : undefined;
 }
 export async function openSourceCover(key: string) {
   if (!key.startsWith(prefix)) return;

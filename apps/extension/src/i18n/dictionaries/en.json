@@ -1,4 +1,9 @@
 {
+  "此条目仅提供 EPUB，暂不支持阅读。": "This entry only offers EPUB, which is not currently supported.",
+  "此条目需要 DRM 解锁、借阅、购买或其他获取流程，暂不支持阅读。": "This entry requires DRM authorization, borrowing, purchase, or another acquisition flow that is not currently supported.",
+  "此条目的页流可能修改服务端进度，暂不支持直接阅读。": "This page stream may change server-side reading progress, so direct reading is not currently supported.",
+  "此条目的图片清单或页流格式暂不支持。": "This image manifest or page-stream format is not currently supported.",
+  "此条目未提供可识别的漫画文件、图片清单或完整条目链接。": "This entry provides no recognized comic file, image manifest, or full-entry link.",
   "OPDS 目录地址": "OPDS catalog URL",
   "授权方式": "Authentication",
   "无需授权": "No authentication",
