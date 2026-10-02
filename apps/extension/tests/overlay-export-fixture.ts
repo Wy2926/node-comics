@@ -26,10 +26,10 @@ export async function exportOverlay(original:Blob,artifact:Blob,result:Translati
     const exported=await exportDocument(entry.id,{format:'cbz',images:'translation',mode:'classic',language:'zh-Hans'},{scope,signal:new AbortController().signal,isCurrent:()=>true,readResult:async(job,_signal,readOriginal)=>{sourceReads++;return materializeResult(job.delivery!,await readOriginal?.(),artifact);}});
     const reader=new ZipReader(new BlobReader(exported.blob!));
     try{
-      const files=await reader.getEntries(),image=files.find(file=>file.filename==='00001.png');
-      if(!image||image.directory)throw Error('Export did not contain a complete PNG');
+      const files=await reader.getEntries(),image=files.find(file=>/^00001\.(png|webp|jpg)$/.test(file.filename));
+      if(!image||image.directory)throw Error('Export did not contain a complete image');
       const blob=await image.getData(new BlobWriter());
-      return {sourceReads,imageSha256:await hashFile(blob),imageBytes:blob.size,archive:[...new Uint8Array(await exported.blob!.arrayBuffer())]};
+      return {sourceReads,imageName:image.filename,imageSha256:await hashFile(blob),imageBytes:blob.size,archive:[...new Uint8Array(await exported.blob!.arrayBuffer())]};
     }finally{await reader.close();}
   }finally{release();}
 }

@@ -9,8 +9,8 @@ export class CanvasDisplay {
  private oldPosition?:{value:string;priority:string;hadStyle:boolean};
  key?:string;
  constructor(readonly canvas:HTMLCanvasElement){}
- async show(data:string,key:string,current:()=>boolean){
-  const blob=await(await fetch(data)).blob(),url=URL.createObjectURL(blob),preview=new Image();
+ async show(blob:Blob,key:string,current:()=>boolean){
+  const url=URL.createObjectURL(blob),preview=new Image();
   preview.src=url;
   try{await preview.decode();}catch{URL.revokeObjectURL(url);throw Error(msg('当前网站阻止显示译图，原图已保留。'));}
   if(!current()||!this.canvas.parentElement){URL.revokeObjectURL(url);return;}

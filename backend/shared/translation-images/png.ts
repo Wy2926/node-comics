@@ -5,7 +5,7 @@ export class ImageOutputTooLargeError extends Error {
   constructor(){super('Composed image exceeds byte limit');this.name='ImageOutputTooLargeError';}
 }
 // Borrowed bitmaps remain owned by the caller; encoded tiles are decoded and closed here.
-type PngPatch=OverlayTile|(Omit<OverlayTile,'blob'>&{bitmap:ImageBitmap});
+export type PngPatch=OverlayTile|(Omit<OverlayTile,'blob'>&{bitmap:ImageBitmap});
 
 const crcTable=Uint32Array.from({length:256},(_,value)=>{
   for(let i=0;i<8;i++)value=value&1?0xedb88320^(value>>>1):value>>>1;

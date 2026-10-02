@@ -1,13 +1,14 @@
 import { msg, subscribeLocale } from '../i18n/runtime';
 import { RequestPool } from '../concurrency';
-import { imageDataUrl, sourceImage } from '../sources';
+import { sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
 import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
 import { advancesReadingWindow } from '../translation/automatic';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
 import { imageDisplay, inlineStyles } from './display';
-import { readingImages, type InlineResponse, type InlineResult, type InlineImageResponse } from './protocol';
+import { readingImages, type InlineResponse, type InlineResult } from './protocol';
+import {INLINE_RESULT_PORT, INLINE_SOURCE_PORT, receiveImage, serveImage} from './blob-transfer';
 import { connectInlineTheme } from './theme';
 import {track} from '../analytics';
 import {readAnalyticsPreferences} from '../analytics/client';
@@ -61,6 +62,8 @@ export function installInline() {
     raf = 0;
   const tracked = new Map<ComicElement, Candidate>();
   const imageLoads = new RequestPool(2);
+  const transfers = new Set<AbortController>();
+  const sourceTransfers = new Set<() => void>();
   const host = document.createElement('div');
   host.style.cssText =
     'all:initial!important;position:fixed!important;inset:0!important;z-index:2147483646!important;pointer-events:none!important';
@@ -91,6 +94,7 @@ export function installInline() {
     chrome.runtime.sendMessage({ type, navigationId, generation, ...extra });
   const invalidate = () => {
     generation++;
+    for (const transfer of transfers) transfer.abort();
     void send('NC_INLINE_INVALIDATE').catch(() => {});
   };
   const pause = button(msg('暂停'), () => {
@@ -336,20 +340,19 @@ export function installInline() {
   });
   async function loadResult(item: Candidate, key: string, stamp: number) {
     if (item.loading?.key === key && item.loading.stamp === stamp) return;
-    const loading = { key, stamp };
+    const loading = { key, stamp }, controller = new AbortController();
     const live = () => enabled && !paused && !original && !document.hidden && stamp === generation
       && item.resultKey === key && item.image.isConnected && current(item);
     item.loading = loading;
+    transfers.add(controller);
     paint();
     try {
       await imageLoads.run(async () => {
         if (!live()) return;
-        const value = await send('NC_INLINE_IMAGE', { ...payload([item]), resultKey: key });
+        const blob = await receiveImage(chrome.runtime.connect({name: INLINE_RESULT_PORT}),
+          {type:'NC_INLINE_IMAGE', navigationId, generation:stamp, ...payload([item]), resultKey:key}, controller.signal, live);
         if (!live()) return;
-        if (!value?.ok) throw Object.assign(Error(value?.error ?? msg('翻译服务暂不可用')), {code:value?.errorCode});
-        const result = value.data as InlineImageResponse;
-        if (result.resultKey !== key) return;
-        await item.display.show(result.data, key, live);
+        await item.display.show(blob, key, live);
         if (live()) item.loadError = undefined;
       });
     } catch (error) {
@@ -358,6 +361,7 @@ export function installInline() {
         item.loadError = { kind: 'error', message: (error as Error).message, retranslate, retryAction:retranslate?'translate':undefined, retryLabel: msg('点击重新加载') };
       }
     } finally {
+      transfers.delete(controller);
       if (item.loading === loading) item.loading = undefined;
       paint();
     }
@@ -506,6 +510,7 @@ export function installInline() {
   function stop() {
     if (!enabled) return;
     enabled = false;
+    for (const close of sourceTransfers) close();
     analyticsObservation++;
     analytics.stop();
     invalidate();
@@ -582,20 +587,20 @@ export function installInline() {
       }
       schedule();
     }
-    if (message?.type === 'NC_INLINE_SOURCE' && message.navigationId === navigationId && enabled) {
+  });
+  chrome.runtime.onConnect.addListener(port => {
+    if (port.name !== INLINE_SOURCE_PORT) return;
+    if (port.sender?.id !== chrome.runtime.id || !port.sender.url?.startsWith(chrome.runtime.getURL('')) || sourceTransfers.size >= 2) {port.disconnect();return;}
+    const close = serveImage(port, async (value, signal) => {
+      const message = value as {navigationId?: string; id?: string};
+      if (message?.navigationId !== navigationId || !enabled) throw Error(msg('图片已离开当前阅读范围。'));
       const item = windowImages.find((i) => i.id === message.id);
       if (!item || !current(item) || !/^(blob:|data:|page-image:)/.test(item.url)) {
-        respond({ error: msg('图片已离开当前阅读范围。') });
-        return;
+        throw Error(msg('图片已离开当前阅读范围。'));
       }
-      void (item.read ? item.read() : sourceImage(item.url))
-        .then((blob) => {
-          if (!current(item)) throw Error(msg('图片已离开当前阅读范围。'));
-          return imageDataUrl(blob);
-        })
-        .then((data) => respond({ data }))
-        .catch((error) => respond({ error: error.message }));
-      return true;
-    }
+      const blob = await (item.read ? item.read() : sourceImage(item.url));
+      return {blob, current: () => !signal.aborted && message.navigationId === navigationId && current(item) && windowImages.includes(item)};
+    }, () => sourceTransfers.delete(close));
+    sourceTransfers.add(close);
   });
 }

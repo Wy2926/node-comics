@@ -1,4 +1,4 @@
-// Actual Chromium decoders, lossless tile pixels and bounded PNG composition; no provider calls.
+// Actual Chromium codecs, result encoding, bounded fallback and frozen inputs; no provider calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -46,6 +46,11 @@ for name, size in [('long', (64, 100000)), ('wide', (100000, 64)), ('alpha', (64
     if result.get('bbox'): public['bbox'] = result['bbox']
     (root / (name+'.json')).write_text(json.dumps(public), encoding='utf-8')
 Image.new('RGB', (8000, 6000), (240, 230, 220)).save(root / 'high-pixels.png')
+panel = Image.open('apps/extension/public/samples/starlight-bookshop.png').convert('RGB')
+panel = panel.resize((800, round(panel.height * 800 / panel.width)), Image.Resampling.LANCZOS)
+strip = Image.new('RGB', (800, 30000))
+for y in range(0, strip.height, panel.height): strip.paste(panel, (0, y))
+strip.save(root / 'representative-long.jpg', quality=90)
 Image.open(root / 'long-original.png').save(root / 'icc-long.png', icc_profile=ImageCmsProfile(createProfile('sRGB')).tobytes())
 Image.new('RGB', (128, 20000), (240, 230, 220)).save(root / 'optional-long.jpg', quality=90)
 with (root / 'optional-long.jpg').open('ab') as handle:
@@ -60,12 +65,12 @@ try{
   await page.route(web+'/tiles-validation',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><title>WebP tile verification</title><body style="font:16px sans-serif;padding:24px;background:#eee"><h1>WebP tiles · native pixels</h1></body>'}));
   const serveFixture=async route=>{
     const name=new URL(route.request().url()).pathname.split('/').pop();
-    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long)\.png$|^(optional-long|large-bytes)\.jpg$/.test(name));
+    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long)\.png$|^(optional-long|large-bytes|representative-long)\.jpg$/.test(name));
     await route.fulfill({body:await readFile(path.join(root,name)),contentType:name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':name.endsWith('.json')?'application/json':name.startsWith('single')?'image/webp':'application/vnd.nodelane.overlay-tiles'});
   };
   await page.route(web+'/tile-fixture/*',serveFixture);
   await page.goto(web+'/tiles-validation');
-  const report=await page.evaluate(async()=>{
+  const report=await page.evaluate(async shared=>{
     const {materializeResult}=await import('/src/translation/materialize.ts');
     const {prepareComicPage}=await import('/src/comics/pages/normalize.ts');
     const {prepareTranslationInput}=await import('/src/translation/input/prepare.ts');
@@ -75,6 +80,8 @@ try{
     const {loadDeliveredResult,resultBlobKey}=await import('/src/storage/translations/results.ts');
     const {translationCache}=await import('/src/storage/translations/index.ts');
     const {needsNormalization}=await import('/src/comics/pages/image-metadata.ts');
+    const {compositeImage}=await import(shared+'/composite.ts');
+    const {bitmapPng}=await import(shared+'/png.ts');
     const checks=[],cases=[];
     for(const name of ['long','wide','alpha','single','single-wide']){
       const original=await(await fetch('/tile-fixture/'+name+'-original.png')).blob();
@@ -149,8 +156,36 @@ try{
       {max_bytes:32*1024*1024,max_dimension:100000,max_pixels:100000**2,max_translation_ids:32});
     if(translated.image.byte_size>32*1024*1024||translated.sourceSha256!==readable.imageSha256||readable.blob!==large)throw Error('Upload preflight changed or blocked the original');
     checks.push('An actual JPEG above 40 MiB reads and crosses page transport unchanged; its translation copy respects a separate 32 MiB upload budget');
-    return {checks,cases,largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
-  });
+    const representative=await(await fetch('/tile-fixture/representative-long.jpg')).blob(),base=await createImageBitmap(representative);
+    const lettering=new OffscreenCanvas(700,220),letter=lettering.getContext('2d');
+    letter.fillStyle='white';letter.fillRect(0,0,700,220);letter.fillStyle='#172943';letter.font='32px sans-serif';
+    letter.fillText('清晰的中文译文 / READ EVERY LINE',16,70);letter.font='16px sans-serif';letter.fillText('Small text, thin strokes: 0123456789 ABC xyz',16,120);
+    for(let y=145;y<190;y+=5)letter.fillRect(16,y,640,1);
+    const patch=await createImageBitmap(lettering),patches=[{x:50,y:1000,width:700,height:220,bitmap:patch}];
+    const baselineStart=performance.now(),baseline=await bitmapPng(base,patches),baselineMs=performance.now()-baselineStart;
+    const optimizedStart=performance.now(),optimized=await compositeImage(base,patches,'image/jpeg'),optimizedMs=performance.now()-optimizedStart;
+    if(optimized.type!=='image/jpeg'||optimized.size>=baseline.size*.5)throw Error('Representative long-page encoding did not reduce PNG size by at least half');
+    const reference=await createImageBitmap(baseline),actual=await createImageBitmap(optimized);
+    if(actual.width!==800||actual.height!==30000)throw Error('Result encoding resized the long page');
+    const compare=new OffscreenCanvas(800,512),paint=compare.getContext('2d',{willReadFrequently:true});let squared=0,count=0,textSquared=0,textCount=0;
+    for(let y=0;y<30000;y+=512){
+      const h=Math.min(512,30000-y);compare.height=h;paint.drawImage(reference,0,y,800,h,0,0,800,h);const a=paint.getImageData(0,0,800,h).data;
+      paint.drawImage(actual,0,y,800,h,0,0,800,h);const b=paint.getImageData(0,0,800,h).data;
+      for(let i=0;i<a.length;i+=4){if(a[i+3]!==b[i+3])throw Error('Opaque alpha changed');const x=(i/4)%800,py=y+Math.floor(i/4/800),text=x>=50&&x<750&&py>=1000&&py<1220;
+        for(let c=0;c<3;c++){const error=(a[i+c]-b[i+c])**2;squared+=error;count++;if(text){textSquared+=error;textCount++;}}
+      }
+    }
+    const rmse=Math.sqrt(squared/count),textRmse=Math.sqrt(textSquared/textCount);
+    if(rmse>6||textRmse>6)throw Error('High-quality result exceeded the measured pixel error budget: '+JSON.stringify({rmse,textRmse}));
+    for(const [name,image] of [['PNG baseline',reference],['JPEG result',actual]]){
+      compare.width=700;compare.height=220;paint.drawImage(image,50,1000,700,220,0,0,700,220);
+      const title=document.createElement('p');title.textContent=name+' · Chinese, small text and single-pixel lines';
+      const preview=document.createElement('img');preview.src=URL.createObjectURL(await compare.convertToBlob());document.body.append(title,preview);
+    }
+    base.close();patch.close();reference.close();actual.close();lettering.width=lettering.height=compare.width=compare.height=1;
+    checks.push('800 × 30000 illustrated long JPEG keeps native dimensions, Chinese/small text and alpha; actual encoded size and error measured against the old PNG path');
+    return {checks,cases,encoding:{width:800,height:30000,inputBytes:representative.size,baselineBytes:baseline.size,optimizedBytes:optimized.size,mime:optimized.type,baselineMs,optimizedMs,rmse,textRmse},largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
+  },'/@fs/'+path.resolve('backend/shared/translation-images').replaceAll('\\','/'));
   // Lower only translation-input encoding's budget; original normalization and result composition stay unrestricted.
   const limited=await browser.newContext();
   try{
@@ -189,7 +224,7 @@ try{
     assert(injected>=1);assert.deepEqual(errors,[]);
     report.checks.push('A real JPEG retains its original bytes independently of upload encoding; a 1 KiB legacy upload PNG budget still rejects frozen restoration and required encoding, and workers terminate');
   }finally{await limited.close();}
-  await page.screenshot({path:path.join(root,'browser.png')});
+  await page.screenshot({path:path.join(root,'browser.png'),fullPage:true});
   await writeFile(path.join(root,'browser.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify(report));
 }finally{await browser.close();}

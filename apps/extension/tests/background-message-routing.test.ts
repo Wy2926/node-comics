@@ -72,7 +72,7 @@ beforeEach(async () => {
   vi.stubGlobal('chrome', {
     runtime: {
       id: extensionId, getURL: (path: string) => `chrome-extension://${extensionId}/${path.replace(/^\//, '')}`,getManifest:()=>({version:'0.6.0'}),
-      onInstalled: event(), onStartup: event(),
+      onInstalled: event(), onStartup: event(), onConnect: event(),
       onMessage: {addListener: (listener: Listener) => listeners.push(listener)},
       sendMessage: async (message: unknown) => (await dispatch(message)).response,
     },
@@ -100,6 +100,37 @@ beforeEach(async () => {
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
+
+function inlinePort(sender: chrome.runtime.MessageSender) {
+  const port = {name:'NC_INLINE_RESULT',sender,onMessage:event(),onDisconnect:event(),postMessage:vi.fn(),disconnect:vi.fn()};
+  port.disconnect.mockImplementation(() => {for(const [listener] of port.onDisconnect.addListener.mock.calls)listener();});
+  for(const [listener] of vi.mocked(chrome.runtime.onConnect.addListener).mock.calls)listener(port as unknown as chrome.runtime.Port);
+  return port;
+}
+
+describe('inline image port authorization', () => {
+  const sender: chrome.runtime.MessageSender = {id:extensionId,url:'https://source.test/book',tab:{id:42} as chrome.tabs.Tab,frameId:0,documentId:'document'};
+  it.each([{id:'another-extension'},{frameId:1},{tab:undefined}])('rejects an untrusted port sender: %j', async change => {
+    const port=inlinePort({...sender,...change});
+    expect(port.disconnect).toHaveBeenCalledOnce();expect(port.onMessage.addListener).not.toHaveBeenCalled();expect(request).not.toHaveBeenCalled();
+  });
+  it.each(['document','navigation','origin','generation','window','result'])('rejects a stale or invalid %s before reading any image', async kind => {
+    tabs.set(42,{id:42,url:sender.url!});session['nc-inline:42']={url:sender.url,navigationId:'navigation',documentId:'document'};
+    const port=inlinePort({...sender,...(kind==='document'?{documentId:'old'}:kind==='origin'?{url:'https://other.test/book'}:{})});
+    const image={id:'page-1',url:'https://source.test/page.jpg',width:800,height:1200};
+    const message={type:'NC_INLINE_IMAGE',navigationId:kind==='navigation'?'old':'navigation',generation:kind==='generation'?-1:1,
+      images:kind==='window'?[image,image]:[image],resultKey:kind==='result'?undefined:'current-result'};
+    for(const [listener] of port.onMessage.addListener.mock.calls)listener({type:'open',request:message});
+    await vi.waitFor(()=>expect(port.disconnect).toHaveBeenCalledOnce());
+    expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'error'}));expect(request).not.toHaveBeenCalled();
+  });
+  it('bounds per-tab transfers and releases the slot after disconnect', () => {
+    const first=inlinePort(sender),second=inlinePort(sender),third=inlinePort(sender);
+    expect(first.disconnect).not.toHaveBeenCalled();expect(second.disconnect).not.toHaveBeenCalled();expect(third.disconnect).toHaveBeenCalledOnce();
+    first.disconnect();const replacement=inlinePort(sender);expect(replacement.disconnect).not.toHaveBeenCalled();
+    second.disconnect();replacement.disconnect();
+  });
+});
 
 describe('production background listeners share the runtime message channel', () => {
   it('uses installed host access without a prompt and starts a manual session with automatic tabs disabled', async () => {

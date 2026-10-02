@@ -7,6 +7,7 @@ import {createServer} from 'node:http';
 import {createHash, randomUUID} from 'node:crypto';
 import {cp, mkdir, readFile, writeFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
+import {probeImageMetadata} from '../backend/shared/translation-images/image-metadata.ts';
 const sitesDirectory=path.resolve('apps/extension/src/sources/sites');
 const siteChecks=[];
 for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
@@ -28,6 +29,7 @@ assert(!manifest.content_scripts.some(s=>s.js.includes('content-scripts/inline.j
 // and installed menu titles; required host access must never cause a runtime permission request.
 const background=path.join(extension,'background.js');
 await writeFile(background,`globalThis.fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.fixturePermissionRequests++;throw Error('Unexpected host permission request')};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
+await writeFile(background,`globalThis.fixtureTransfers={maxMessageBytes:0,resultChunks:0,sourceChunks:0};const observeChunk=(v,kind)=>{if(v?.type==='chunk'){fixtureTransfers.maxMessageBytes=Math.max(fixtureTransfers.maxMessageBytes,JSON.stringify(v).length);fixtureTransfers[kind]++;}};const connectListener=chrome.runtime.onConnect.addListener.bind(chrome.runtime.onConnect);chrome.runtime.onConnect.addListener=fn=>connectListener(port=>{const post=port.postMessage.bind(port);port.postMessage=v=>{observeChunk(v,'resultChunks');post(v)};fn(port)});const connectTab=chrome.tabs.connect.bind(chrome.tabs);chrome.tabs.connect=(...args)=>{const port=connectTab(...args);port.onMessage.addListener(v=>observeChunk(v,'sourceChunks'));return port};\n`+await readFile(background,'utf8'));
 const requests=[],sourceRequests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
 const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:'classic_unlimited',consent_version:'fixture',quota:null}]))};
@@ -90,7 +92,7 @@ const server=createServer(async(req,res)=>{
       const [,id,input]=route;
       if(input&&req.method==='PUT'){
         const entry=translations.get(id);assert(entry,'input requires an accepted request');const job=jobs.get(entry.jobId);
-        assert.equal(sha(body),job.image_sha256);uploads.set(id,body);job.width=body.readUInt32BE(16);job.height=body.readUInt32BE(20);
+        assert.equal(sha(body),job.image_sha256);uploads.set(id,body);const size=await probeImageMetadata(new Blob([body]));assert(size,'input has valid image dimensions');job.width=size.width;job.height=size.height;
         if(job.status==='awaiting_upload')Object.assign(job,{status:'queued',updated_at:new Date().toISOString()});
         return json(translationResult(id),202);
       }
@@ -206,6 +208,32 @@ try{
   await button('显示译图');await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
   assert.equal(accessCount(),accessesBeforeRestore);assert.equal(resultRequests.length,downloadsBeforeRestore);
   check('original/translation toggle uses persistent bytes with zero image access or download requests');
+  // Seed a legacy large PNG cache entry. Padding isolates the transport boundary
+  // from pixel dimensions; representative long-image encoding is tested separately.
+  const firstId=[...translations].find(([,entry])=>entry.jobId==='seed-1')[0];
+  const largeCache=await worker.evaluate(async requestId=>{
+    const get=request=>new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    const name=(await indexedDB.databases()).find(db=>db.name.endsWith('-translations')).name;
+    const db=await get(indexedDB.open(name)),keys=await get(db.transaction('objects').objectStore('objects').getAllKeys());
+    const key=keys.find(key=>key.includes(requestId));if(!key)throw Error('Missing selected result cache');
+    const previous=await get(db.transaction('objects').objectStore('objects').get(key));
+    const bitmap=await createImageBitmap(previous),canvas=new OffscreenCanvas(bitmap.width,bitmap.height);canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();
+    const blob=new Blob([await canvas.convertToBlob({type:'image/png'}),new Uint8Array(65*1024*1024)],{type:'image/png'});canvas.width=canvas.height=1;
+    const tx=db.transaction(['objects','metadata','state'],'readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
+    const metadata=await get(tx.objectStore('metadata').get(key)),usage=await get(tx.objectStore('state').get('usage'));
+    usage.bytes+=blob.size-metadata.size;metadata.size=blob.size;tx.objectStore('objects').put(blob,key);tx.objectStore('metadata').put(metadata);tx.objectStore('state').put(usage);await done;db.close();
+    const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');
+    return {size:blob.size,digest};
+  },firstId);
+  await button('恢复原图');await button('显示译图');
+  await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),null,{timeout:30000});
+  const delivered=await page.locator('#first').evaluate(async image=>{
+    const url=image.style.content.match(/url\(["']?(.*?)["']?\)/)[1],blob=await(await fetch(url)).blob();
+    const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');
+    return {size:blob.size,digest};
+  });
+  assert.deepEqual(delivered,largeCache);assert.equal(resultRequests.length,downloadsBeforeRestore);assert.equal(createdJobs,1);
+  check('a legacy PNG cache over 65 MiB crosses real extension ports with identical bytes, zero downloads and no new translation');
   await button('恢复原图');await page.waitForFunction(()=>document.querySelector('#first').style.content==='');assert.equal(await page.locator('#first').getAttribute('width'),null);assert.equal(await page.locator('#first').getAttribute('height'),null);check('restore originals removes only extension-owned changes');
   await button('显示译图');await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'));
   await page.setViewportSize({width:1280,height:900});await page.locator('#third').scrollIntoViewIfNeeded();await page.waitForTimeout(700);await page.screenshot({path:path.join(out,'failed-page.png')});const thirdBefore=await page.locator('#third').evaluate(i=>({width:i.clientWidth,height:i.clientHeight}));await button('翻译失败 · 重试');await page.waitForFunction(()=>document.querySelector('#third').style.content.includes('blob:'),{},{timeout:18000});assert.equal(createdJobs,2);assert.deepEqual(await page.locator('#third').evaluate(i=>({width:i.clientWidth,height:i.clientHeight})),thirdBefore);check('individual failed image retries explicitly without blocking neighbours');
@@ -213,7 +241,7 @@ try{
   // Hold the synthetic result until restoration is observed; a fast cached
   // decode must not let the polling assertion miss the intermediate state.
   complete=false;await page.locator('#lazy').evaluate((i,url)=>i.src=url,api+'/source/5.png');await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');complete=true;await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('site-owned source change removes stale translation and translates the new image');
-  complete=false;await page.locator('#lazy').evaluate((i,bytes)=>i.src=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'image/png'})),[...images.get(6)]);await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');complete=true;await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:18000});check('page-owned blob images are read in the content script without exposing credentials');
+  complete=false;await page.locator('#lazy').evaluate((i,bytes)=>i.src=URL.createObjectURL(new Blob([new Uint8Array(bytes),new Uint8Array(65*1024*1024)],{type:'image/png'})),[...images.get(6)]);await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');complete=true;await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:45000});check('page-owned Blob input over 65 MiB crosses bounded source ports, prepares a separate upload and displays without exposing credentials');
   const jobsBeforeReturn=createdJobs;
   const firstDownloadsBeforeReturn=resultRequests.filter(id=>id==='output-seed-1').length;
   await page.waitForFunction(()=>document.querySelector('#first').style.content==='');
@@ -372,8 +400,10 @@ try{
   }
   assert.equal(permissionRequests,0);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);
   check('inline activation and image reads never request host access at runtime');
+  const transfers=await worker.evaluate(()=>fixtureTransfers);
+  assert(transfers.maxMessageBytes<710000);if(!selectedSite){assert(transfers.resultChunks>130);assert(transfers.sourceChunks>130);}
   assert.equal(errors.length,0,errors.join('\n'));
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,transfers,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests,resultRequests,accessibility:await cdp.send('Accessibility.getFullAXTree').then(v=>v.nodes.filter(n=>n.role?.value==='button').map(n=>({name:n.name?.value,description:n.description?.value}))).catch(()=>[])},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
 finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

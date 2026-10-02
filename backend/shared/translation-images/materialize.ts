@@ -2,7 +2,7 @@ import type {TranslationResult} from './types';
 import {hashFile} from './hash';
 import {imageWork} from './work';
 import {TILES_MIME,readTiles} from './tiles';
-import {bitmapPng} from './png';
+import {compositeImage} from './composite';
 
 const digest = /^[a-f0-9]{64}$/;
 const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
@@ -72,7 +72,6 @@ export async function materializeResult(result: TranslationResult, original: Blo
   return imageWork(async () => {
     let base: ImageBitmap | undefined;
     let patch: ImageBitmap | undefined;
-    let canvas: OffscreenCanvas | undefined;
     try {
       if (original) {
         base = await createImageBitmap(original, {imageOrientation: 'from-image', colorSpaceConversion: 'default'});
@@ -82,7 +81,7 @@ export async function materializeResult(result: TranslationResult, original: Blo
       }
       if (result.representation === 'original') return original!;
       if(result.representation==='overlay-tiles-v1'){
-        try{return await bitmapPng(base!,await readTiles(artifact!,result.input_sha256,result.width,result.height));}
+        try{return await compositeImage(base!,await readTiles(artifact!,result.input_sha256,result.width,result.height),original!.type);}
         catch{throw new InvalidArtifactError();}
       }
       try { patch = await createImageBitmap(artifact!); }
@@ -90,20 +89,10 @@ export async function materializeResult(result: TranslationResult, original: Blo
       const expected = result.representation === 'overlay-v1' ? result.bbox! : result;
       if (patch.width !== expected.width || patch.height !== expected.height) throw new InvalidArtifactError();
       if (result.representation === 'full-image-v1') return artifact!;
-      if(Math.max(result.width,result.height)>16383)
-        return await bitmapPng(base!,[{...result.bbox!,bitmap:patch}]);
-      canvas = new OffscreenCanvas(result.width, result.height);
-      const context = canvas.getContext('2d', {colorSpace: 'srgb'});
-      if (!context) throw new InvalidArtifactError();
-      context.imageSmoothingEnabled = false;
-      context.drawImage(base!, 0, 0);
-      context.globalCompositeOperation = 'source-atop';
-      context.drawImage(patch, result.bbox!.x, result.bbox!.y);
-      return await canvas.convertToBlob({type: 'image/png'});
+      return await compositeImage(base!,[{...result.bbox!,bitmap:patch}],original!.type);
     } finally {
       base?.close();
       patch?.close();
-      if (canvas) canvas.width = canvas.height = 1;
     }
   });
 }

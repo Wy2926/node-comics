@@ -38,9 +38,12 @@ try{
     const scope={key:'overlay-browser-cache-'+crypto.randomUUID()},job={id:crypto.randomUUID(),result:{key:result.artifact.sha256,recoverable:true},delivery:result,mode:'classic',target_language:'en',status:'succeeded',phase:'succeeded',quota_pages:1,created_at:new Date().toISOString(),version:1,cache_hit:false};
     const complete=await loadDeliveredResult({scope,job,original:async()=>original,download:async()=>patch,isCurrent:()=>true});
     const stored=await translationCache.get(resultBlobKey(scope,job));
-    assert(stored?.type==='image/png'&&await hashFile(stored)===await hashFile(rendered),'IndexedDB stores the complete composed PNG');
+    assert(stored?.type==='image/webp'&&await hashFile(stored)===await hashFile(rendered),'IndexedDB stores the complete composed WebP');
     assert((await translationCache.inventory([scope.key])).length===1,'only one complete image is persisted per result');
     window.cachedOverlay={scope,job,sha256:await hashFile(complete)};
+    const {exportOverlay}=await import('/tests/overlay-export-fixture.ts');
+    const exported=await exportOverlay(original,patch,result);
+    assert(exported.imageName==='00001.webp'&&exported.imageSha256===await hashFile(rendered),'CBZ exports the identical complete WebP with its actual extension');
     const {prepareComicPage}=await import('/src/comics/pages/normalize.ts');
     const normalized=await prepareComicPage({name:'static',blob:original});assert(normalized.blob===original&&normalized.imageSha256===result.input_sha256,'static sRGB PNG preserves exact upload bytes');
     const {needsNormalization}=await import('/src/comics/pages/image-metadata.ts');
@@ -118,9 +121,9 @@ try{
       const {exportOverlay}=await import('/tests/overlay-export-fixture.ts'),{hashFile}=await import('/src/importers/hash.ts');
       const exported=await exportOverlay(original,artifact,result);
       if(exported.sourceReads!==1||exported.imageSha256!==await hashFile(rendered))throw Error('Export did not materialize the exact full translated image');
-      return {width:image.naturalWidth,height:image.naturalHeight,bytes:rendered.size,artifactBytes:artifact.size,exportImageBytes:exported.imageBytes,archive:exported.archive,rendered:[...new Uint8Array(await rendered.arrayBuffer())]};
+      return {width:image.naturalWidth,height:image.naturalHeight,mime:rendered.type,bytes:rendered.size,artifactBytes:artifact.size,exportImageBytes:exported.imageBytes,archive:exported.archive,rendered:[...new Uint8Array(await rendered.arrayBuffer())]};
     },payload);
-    assert(real.width>0&&real.height>0);await writeFile(path.join(out,'real-rendered.png'),new Uint8Array(real.rendered));delete real.rendered;
+    assert(real.width>0&&real.height>0);await writeFile(path.join(out,'real-rendered.'+({'image/png':'png','image/webp':'webp','image/jpeg':'jpg'}[real.mime])),new Uint8Array(real.rendered));delete real.rendered;
     await writeFile(path.join(out,'real-translated.cbz'),new Uint8Array(real.archive));delete real.archive;
     checks.push('real provider artifact decoded and materialized: '+JSON.stringify(real));
   }
@@ -130,11 +133,11 @@ try{
   await page.evaluate(async saved=>{
     const {loadDeliveredResult}=await import('/src/storage/translations/results.ts'),{hashFile}=await import('/src/importers/hash.ts');
     const blob=await loadDeliveredResult({...saved,isCurrent:()=>true,original:async()=>{throw Error('Original source unavailable');},download:async()=>{throw Error('Result server unavailable');}});
-    if(blob.type!=='image/png'||await hashFile(blob)!==saved.sha256)throw Error('Complete cached image changed after reload');
+    if(blob.type!=='image/webp'||await hashFile(blob)!==saved.sha256)throw Error('Complete cached image changed after reload');
     const image=document.createElement('img');image.src=URL.createObjectURL(blob);image.style='width:320px;image-rendering:pixelated';document.body.append(image);await image.decode();
     if(image.naturalWidth!==4||image.naturalHeight!==4)throw Error('Cached image does not display at the original page dimensions');
   },cachedOverlay);
-  checks.push('page reload displays the identical complete PNG without original source or result server');
+  checks.push('page reload displays the identical complete WebP without original source or result server');
   await page.screenshot({path:path.join(out,'cached-reload.png'),fullPage:true});
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,realProviderArtifacts:!!process.env.REAL_TRANSLATION_INPUT},null,2));
   for(const check of checks)console.log('PASS '+check);

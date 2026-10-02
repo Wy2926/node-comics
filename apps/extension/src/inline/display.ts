@@ -14,8 +14,8 @@ export class ImageDisplay {
   private objectUrl?:string;
   key?:string;
   constructor(readonly image:HTMLImageElement){}
-  async show(data:string,key:string,current:()=>boolean){
-    const response=await fetch(data),blob=await response.blob(),url=URL.createObjectURL(blob);
+  async show(blob:Blob,key:string,current:()=>boolean){
+    const url=URL.createObjectURL(blob);
     const preview=new Image();preview.src=url;
     try{await preview.decode();}catch{URL.revokeObjectURL(url);throw Error(msg("当前网站阻止显示译图，原图已保留。"));}
     if(!current()){URL.revokeObjectURL(url);return;}
