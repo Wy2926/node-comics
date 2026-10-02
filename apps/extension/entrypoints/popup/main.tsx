@@ -20,10 +20,10 @@ type Discovery={kind:'catalog'|'pages';id:string};
 function Popup({initialError=''}:{initialError?:string}){
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
  const [error,setError]=useState(initialError),[discoveryError,setDiscoveryError]=useState('');
- const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState(false),[saving,setSaving]=useState(false);
+ const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState<'tab'|'region'>(),[saving,setSaving]=useState(false);
  const lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
  const [preferences,setPreferences]=useState(settings);useAppearance(preferences);
- const disabled=busy||opening||translating||saving;
+ const disabled=busy||opening||!!translating||saving;
  const resolved=source?.url?sourceFor(source.url):undefined;
  const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
  async function readSource(){
@@ -56,15 +56,15 @@ function Popup({initialError=''}:{initialError?:string}){
   try{await saveSettings(next);}catch{setError(msg("语言未能同步，请重新选择后再翻译。"));}
   finally{saveLock.current=false;setSaving(false);}
  }
- async function translate(){
+ async function translate(kind:'tab'|'region'='tab'){
   if(source?.id==null||lock.current||openLock.current||saveLock.current)return;
-  openLock.current=true;setTranslating(true);setError('');
+  openLock.current=true;setTranslating(kind);setError('');
   try{
    await requireHostAccess();
    await saveSettings(settings());
-   await sourceMessage({type:'NC_TRANSLATE_TAB',tabId:source.id,url:source.url});window.close();
+   await sourceMessage({type:kind==='region'?'NC_TRANSLATE_REGION':'NC_TRANSLATE_TAB',tabId:source.id,url:source.url});window.close();
   }catch(e){setError((e as Error).message);}
-  finally{openLock.current=false;setTranslating(false);}
+  finally{openLock.current=false;setTranslating(undefined);}
  }
  async function open(){if(disabled)return;setOpening(true);try{await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html')});window.close();}catch(e){setError((e as Error).message);}finally{setOpening(false);}}
  async function openSettings(){try{await chrome.runtime.openOptionsPage();window.close();}catch{setError(msg("设置未能打开，请重试。"));}}
@@ -80,8 +80,9 @@ function Popup({initialError=''}:{initialError?:string}){
    <section className="nc-popup-translation" aria-label={msg("网页翻译")}>
     <div className="nc-popup-language"><div><b>{msg("翻译成")}</b><p id="popup-language-hint">{msg("与设置中的默认目标语言同步")}</p></div><TargetLanguage value={preferences.language} onChange={language=>void changeLanguage(language)} disabled={disabled} describedBy="popup-language-hint"/></div>
     <AutoTranslateTabs enabled={preferences.autoTranslateTabs} onSaved={setPreferences} disabled={disabled}/>
-    <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}>{translating?<><span className="spinner"/>{msg("正在启动翻译…")}</>:<><Icon name="spark" size={18}/>{msg("翻译当前标签页")}<Icon name="arrow" size={18}/></>}</button>
+    <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}>{translating==='tab'?<><span className="spinner"/>{msg("正在启动翻译…")}</>:<><Icon name="spark" size={18}/>{msg("翻译当前标签页")}<Icon name="arrow" size={18}/></>}</button>
     <p className="nc-popup-hint">{msg("留在原网页，当前图片与后三张随读随译。")}</p>
+    <button className="button secondary full nc-popup-region" disabled={!source||disabled} onClick={()=>void translate('region')}>{translating==='region'?<><span className="spinner"/>{msg('正在启动翻译…')}</>:<><Icon name="expand" size={18}/>{msg('划图翻译')}</>}</button>
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
    <section className="nc-popup-import" aria-label={msg('漫画阅读')}>

@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Dont {0} pages livrées avec les droits d’abonnement",
   "成功交付后扣减有限额度。": "Les quotas limités sont déduits après livraison réussie.",
   "{0}：交付 {1} 页": "{0} : {1} pages livrées",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Sélectionnez les images traduites pour traduire la page actuelle et les trois suivantes pendant la lecture. Cet affichage s’applique uniquement à ce manga."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Sélectionnez les images traduites pour traduire la page actuelle et les trois suivantes pendant la lecture. Cet affichage s’applique uniquement à ce manga.",
+  "划图翻译": "Traduire la zone sélectionnée",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Faites glisser pour sélectionner, relâchez pour traduire. Clic droit ou Échap pour annuler.",
+  "重新框选": "Sélectionner à nouveau",
+  "截图预览": "Aperçu de la capture",
+  "译图预览": "Aperçu de la traduction",
+  "正在截取选区…": "Capture de la sélection en cours…",
+  "页面已变化，译图仅在预览中显示。": "La page a changé. La traduction s’affiche uniquement dans l’aperçu.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Cette zone ne peut pas être positionnée de manière fiable. Sa traduction s’affichera dans l’aperçu.",
+  "选区过小，请重新框选。": "La sélection est trop petite. Sélectionnez une zone plus grande.",
+  "截图未能读取，请重新框选。": "Impossible de lire la capture. Sélectionnez à nouveau la zone.",
+  "当前页面已变化，请重新框选。": "Cette page a changé. Sélectionnez à nouveau la zone.",
+  "关闭预览": "Fermer l’aperçu",
+  "显示预览": "Afficher l’aperçu",
+  "截图失败，请保持当前标签页可见后重试。": "La capture a échoué. Gardez cet onglet visible et réessayez.",
+  "无法保存截图，请释放本地存储空间后重试。": "Impossible d’enregistrer la capture. Libérez de l’espace de stockage local et réessayez.",
+  "选区已失效，请重新框选。": "Cette sélection n’est plus disponible. Sélectionnez à nouveau la zone.",
+  "翻译设置已变化，请重新框选。": "Les paramètres de traduction ont changé. Sélectionnez à nouveau la zone."
 }

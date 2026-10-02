@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "W tym {0} stron dostarczonych w ramach członkostwa",
   "成功交付后扣减有限额度。": "Ograniczone limity są pobierane po pomyślnym dostarczeniu.",
   "{0}：交付 {1} 页": "{0}: dostarczono {1} stron",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Wybierz przetłumaczone obrazy, aby podczas czytania tłumaczyć bieżącą stronę i następne trzy. Ten widok dotyczy tylko tego komiksu."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Wybierz przetłumaczone obrazy, aby podczas czytania tłumaczyć bieżącą stronę i następne trzy. Ten widok dotyczy tylko tego komiksu.",
+  "划图翻译": "Przetłumacz zaznaczony obszar",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Przeciągnij, aby zaznaczyć; puść, aby przetłumaczyć. Prawy przycisk myszy lub Esc anuluje.",
+  "重新框选": "Zaznacz ponownie",
+  "截图预览": "Podgląd zrzutu",
+  "译图预览": "Podgląd tłumaczenia",
+  "正在截取选区…": "Przechwytywanie zaznaczenia…",
+  "页面已变化，译图仅在预览中显示。": "Strona się zmieniła. Tłumaczenie jest wyświetlane tylko w podglądzie.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Nie można wiarygodnie ustalić położenia tego obszaru. Jego tłumaczenie pojawi się w podglądzie.",
+  "选区过小，请重新框选。": "Zaznaczenie jest za małe. Zaznacz większy obszar.",
+  "截图未能读取，请重新框选。": "Nie udało się odczytać zrzutu. Zaznacz obszar ponownie.",
+  "当前页面已变化，请重新框选。": "Ta strona się zmieniła. Zaznacz obszar ponownie.",
+  "关闭预览": "Zamknij podgląd",
+  "显示预览": "Pokaż podgląd",
+  "截图失败，请保持当前标签页可见后重试。": "Nie udało się wykonać zrzutu. Pozostaw tę kartę widoczną i spróbuj ponownie.",
+  "无法保存截图，请释放本地存储空间后重试。": "Nie udało się zapisać zrzutu. Zwolnij miejsce w pamięci lokalnej i spróbuj ponownie.",
+  "选区已失效，请重新框选。": "To zaznaczenie nie jest już dostępne. Zaznacz obszar ponownie.",
+  "翻译设置已变化，请重新框选。": "Ustawienia tłumaczenia się zmieniły. Zaznacz obszar ponownie."
 }

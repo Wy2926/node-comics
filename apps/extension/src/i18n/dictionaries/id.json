@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Termasuk {0} halaman yang dikirim dengan manfaat keanggotaan",
   "成功交付后扣减有限额度。": "Kuota terbatas dipotong setelah pengiriman berhasil.",
   "{0}：交付 {1} 页": "{0}: {1} halaman dikirim",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Pilih gambar terjemahan untuk menerjemahkan halaman saat ini dan tiga halaman berikutnya saat membaca. Tampilan ini hanya berlaku untuk komik ini."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Pilih gambar terjemahan untuk menerjemahkan halaman saat ini dan tiga halaman berikutnya saat membaca. Tampilan ini hanya berlaku untuk komik ini.",
+  "划图翻译": "Terjemahkan area terpilih",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Seret untuk memilih, lepaskan untuk menerjemahkan. Klik kanan atau tekan Esc untuk membatalkan.",
+  "重新框选": "Pilih lagi",
+  "截图预览": "Pratinjau tangkapan layar",
+  "译图预览": "Pratinjau terjemahan",
+  "正在截取选区…": "Mengambil tangkapan area terpilih…",
+  "页面已变化，译图仅在预览中显示。": "Halaman telah berubah. Terjemahan hanya ditampilkan dalam pratinjau.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Posisi area ini tidak dapat ditentukan secara andal. Terjemahannya akan muncul dalam pratinjau.",
+  "选区过小，请重新框选。": "Area terpilih terlalu kecil. Pilih area yang lebih besar.",
+  "截图未能读取，请重新框选。": "Tidak dapat membaca tangkapan layar. Pilih area lagi.",
+  "当前页面已变化，请重新框选。": "Halaman ini telah berubah. Pilih area lagi.",
+  "关闭预览": "Tutup pratinjau",
+  "显示预览": "Tampilkan pratinjau",
+  "截图失败，请保持当前标签页可见后重试。": "Gagal mengambil tangkapan layar. Pastikan tab ini tetap terlihat, lalu coba lagi.",
+  "无法保存截图，请释放本地存储空间后重试。": "Tidak dapat menyimpan tangkapan layar. Kosongkan ruang penyimpanan lokal, lalu coba lagi.",
+  "选区已失效，请重新框选。": "Pilihan area ini tidak lagi tersedia. Pilih area lagi.",
+  "翻译设置已变化，请重新框选。": "Pengaturan terjemahan telah berubah. Pilih area lagi."
 }

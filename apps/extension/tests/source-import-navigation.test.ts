@@ -4,6 +4,7 @@ import {registerSourceBackground} from '../src/sources/runtime/background';
 
 vi.mock('../src/i18n/background', () => ({registerLocaleBackground: () => async () => {}}));
 vi.mock('../src/inline/background', () => ({activateInline: vi.fn(), registerInlineBackground: vi.fn()}));
+vi.mock('../src/region/background', () => ({activateRegion: vi.fn(), registerRegionBackground: vi.fn()}));
 
 type Listener = (message: unknown, sender: chrome.runtime.MessageSender, respond: (value: unknown) => void) => unknown;
 let listener: Listener;

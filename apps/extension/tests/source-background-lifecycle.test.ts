@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PageManifest,DocumentSnapshot } from '../src/sources/contracts/source';
 vi.mock('../src/i18n/background', () => ({ registerLocaleBackground: () => async () => {} }));
 vi.mock('../src/inline/background', () => ({ activateInline: vi.fn(), registerInlineBackground: vi.fn() }));
+vi.mock('../src/region/background', () => ({ activateRegion: vi.fn(), registerRegionBackground: vi.fn() }));
 
 import { registerSourceBackground } from '../src/sources/runtime/background';
 

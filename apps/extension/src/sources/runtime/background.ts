@@ -4,6 +4,7 @@ import { requireHostAccess } from '../../host-permissions';
 import { sourceFailure } from './diagnostics';
 
 import { activateInline, registerInlineBackground } from '../../inline/background';
+import { activateRegion, registerRegionBackground } from '../../region/background';
 import type { SourceCatalog } from '../../comics/application/types';
 import { pollSourceDiscovery } from '../core/discovery';
 import {
@@ -29,6 +30,7 @@ const sourceMessageTypes = new Set([
   'NC_SEARCH_CURRENT',
   'NC_SEARCH_TAB',
   'NC_TRANSLATE_TAB',
+  'NC_TRANSLATE_REGION',
   'NC_DISCOVER_TAB',
   'NC_OPEN_PAGE',
   'NC_REGISTER_CATALOG',
@@ -95,6 +97,7 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
 export function registerSourceBackground(readCatalog:(url:string)=>Promise<SourceCatalogSnapshot> = readSourceCatalog) {
   const localeReady = registerLocaleBackground();
   registerInlineBackground();
+  registerRegionBackground();
   void recoverImageHeaders().catch(()=>{});
   void chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   chrome.runtime.onInstalled.addListener(() => {
@@ -106,15 +109,26 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
           contexts: ['page', 'image', 'link', 'selection'],
           documentUrlPatterns: ['http://*/*', 'https://*/*'],
         });
+        chrome.contextMenus.create({
+          id: 'nc-translate-region',
+          title: msg('划图翻译'),
+          contexts: ['page', 'image', 'link', 'selection'],
+          documentUrlPatterns: ['http://*/*', 'https://*/*'],
+        });
       }),
     );
   });
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (info.menuItemId === 'nc-translate-page' && tab?.id != null) {
+    if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-region') && tab?.id != null) {
       try {
         await requireHostAccess();
         await localeReady();
-        await activateInline(tab.id);
+        if (info.menuItemId === 'nc-translate-region') {
+          const current = await chrome.tabs.get(tab.id);
+          if (!current.url || !safeImageUrl(current.url, current.url)) throw Error(msg('请在普通网页中使用翻译。'));
+          if (current.url !== tab.url) throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
+          await activateRegion(tab.id);
+        } else await activateInline(tab.id);
       } catch {
         await chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html#settings') });
       }
@@ -153,13 +167,14 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     (async () => {
       await localeReady();
       if(message.type==='NC_SEARCH_TAB'){await openSearchFromTab(message.tabId,message.url);return true;}
-      if (message?.type === 'NC_TRANSLATE_TAB') {
+      if (message?.type === 'NC_TRANSLATE_TAB' || message?.type === 'NC_TRANSLATE_REGION') {
         if (!Number.isInteger(message.tabId) || message.tabId < 0)
           throw Error(msg('当前标签页不可用，请重新打开插件。'));
         const tab = await chrome.tabs.get(message.tabId);
         if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请在普通网页中使用翻译。'));
         if (tab.url !== message.url) throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-        await activateInline(message.tabId);
+        if (message.type === 'NC_TRANSLATE_REGION') await activateRegion(message.tabId);
+        else await activateInline(message.tabId);
         return true;
       }
       if (message?.type === 'NC_DISCOVER_TAB') return discover(Number(message.tabId),readCatalog);

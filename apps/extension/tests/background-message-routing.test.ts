@@ -96,7 +96,7 @@ beforeEach(async () => {
   });
   const {default:background}=await import('../entrypoints/background');
   background.main();
-  expect(listeners).toHaveLength(7); // Locale, inline theme, inline reader, website sources, Drive, catalog sync, analytics.
+  expect(listeners).toHaveLength(8); // Locale, inline theme, inline reader, region, website sources, Drive, catalog sync, analytics.
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
@@ -202,7 +202,7 @@ describe('production background listeners share the runtime message channel', ()
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]); expect(result.response).toBeUndefined();
   });
 
-  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
+  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS','NC_TRANSLATE_REGION'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
     const result = await dispatch({type, manifestId: 'book', pageId: 'page-1'}, {id: extensionId, url: 'https://example.test/book', frameId: 0, tab: {id: 1} as chrome.tabs.Tab});
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]);
   });

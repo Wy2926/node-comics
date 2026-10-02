@@ -27,6 +27,7 @@ html,body,#root{margin:0;width:420px;min-width:0;min-height:0}
 .nc-popup .nc-comic-action{min-height:46px;justify-content:center;font-size:.875rem;gap:10px}
 .nc-popup .nc-comic-action>svg:last-child{margin-left:auto}
 .nc-popup-hint{font-size:.625rem;color:var(--muted);text-align:center;margin:13px 0 0}
+.nc-popup-region{margin-top:12px;min-height:44px}
 .nc-popup-import{margin:0 22px;padding:12px 0 16px;border-top:1px solid var(--line)}
 .nc-popup-discover{display:flex;align-items:center;gap:10px;width:100%;padding:8px 0;text-align:left}
 .nc-popup-discover>svg:first-child{color:var(--accent)}

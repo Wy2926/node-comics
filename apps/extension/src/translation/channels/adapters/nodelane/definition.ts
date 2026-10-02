@@ -73,7 +73,7 @@ export const definition:ChannelDefinition={
         let active=true;
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},

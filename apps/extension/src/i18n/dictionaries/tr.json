@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Üyelik kapsamında teslim edilen {0} sayfa dahil",
   "成功交付后扣减有限额度。": "Sınırlı kotalar başarılı teslimden sonra düşülür.",
   "{0}：交付 {1} 页": "{0}: {1} sayfa teslim edildi",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Okurken mevcut sayfayı ve sonraki üç sayfayı çevirmek için çevrilmiş görselleri seçin. Bu görünüm yalnızca bu çizgi roman için geçerlidir."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Okurken mevcut sayfayı ve sonraki üç sayfayı çevirmek için çevrilmiş görselleri seçin. Bu görünüm yalnızca bu çizgi roman için geçerlidir.",
+  "划图翻译": "Seçili alanı çevir",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Seçmek için sürükleyin, çevirmek için bırakın. İptal etmek için sağ tıklayın veya Esc tuşuna basın.",
+  "重新框选": "Yeniden seç",
+  "截图预览": "Ekran görüntüsü önizlemesi",
+  "译图预览": "Çeviri önizlemesi",
+  "正在截取选区…": "Seçili alanın görüntüsü alınıyor…",
+  "页面已变化，译图仅在预览中显示。": "Sayfa değişti. Çeviri yalnızca önizlemede gösteriliyor.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Bu alanın konumu güvenilir biçimde belirlenemiyor. Çevirisi önizlemede görünecek.",
+  "选区过小，请重新框选。": "Seçili alan çok küçük. Daha büyük bir alan seçin.",
+  "截图未能读取，请重新框选。": "Ekran görüntüsü okunamadı. Alanı yeniden seçin.",
+  "当前页面已变化，请重新框选。": "Bu sayfa değişti. Alanı yeniden seçin.",
+  "关闭预览": "Önizlemeyi kapat",
+  "显示预览": "Önizlemeyi göster",
+  "截图失败，请保持当前标签页可见后重试。": "Ekran görüntüsü alınamadı. Bu sekmeyi görünür tutup yeniden deneyin.",
+  "无法保存截图，请释放本地存储空间后重试。": "Ekran görüntüsü kaydedilemedi. Yerel depolamada yer açıp yeniden deneyin.",
+  "选区已失效，请重新框选。": "Bu seçim artık kullanılamıyor. Alanı yeniden seçin.",
+  "翻译设置已变化，请重新框选。": "Çeviri ayarları değişti. Alanı yeniden seçin."
 }

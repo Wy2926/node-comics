@@ -9,6 +9,7 @@ import {readImportCatalog} from '../../../runtime/import';
 import {catalogHtml, reader, readerHtml, url} from './fixtures';
 vi.mock('../../../../i18n/background', () => ({registerLocaleBackground: () => async () => {}}));
 vi.mock('../../../../inline/background', () => ({activateInline: vi.fn(), registerInlineBackground: vi.fn()}));
+vi.mock('../../../../region/background', () => ({activateRegion: vi.fn(), registerRegionBackground: vi.fn()}));
 afterEach(async () => {vi.unstubAllGlobals();for(const comic of await catalog.list('comics'))await catalog.deleteComic(comic.id);});
 
 describe.each(['embedded','popup'])('%s reader imports',entry=>{

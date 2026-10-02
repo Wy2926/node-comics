@@ -39,6 +39,21 @@ it('reuses unchanged bytes without reading, decoding or saving another input',as
   expect(prepared.image.sha256).toBe(target(1).page.imageSha256);expect(prepared.blob).toBeUndefined();
   expect(read).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
 });
+it('uses durably prepared screenshot bytes without re-encoding on submit or recovery',async()=>{
+  const f=fixture(),wanted=target(1),prepareInput=vi.fn(async()=>originalInput(1));
+  // Its byte size would normally trigger another optional lossy encode.
+  wanted.page.imageByteSize=2*1024*1024;
+  const core=new TranslationCoordinator({...f.core.options,prepareInput});
+  await core.submit([wanted]);await core.submit([wanted]);
+  expect(prepareInput).toHaveBeenCalledOnce();expect(encode).not.toHaveBeenCalled();expect(f.submit).toHaveBeenCalledOnce();
+  const restored=new TranslationCoordinator({...f.core.options,prepareInput});await restored.submit([wanted]);
+  expect(prepareInput).toHaveBeenCalledOnce();expect(encode).not.toHaveBeenCalled();expect(f.submit).toHaveBeenCalledOnce();
+});
+it('does not admit a screenshot when its mandatory frozen-input preparation fails',async()=>{
+  const f=fixture(),wanted=target(1),prepareInput=vi.fn(async()=>{throw Error('snapshot storage unavailable');});
+  const core=new TranslationCoordinator({...f.core.options,prepareInput});await core.submit([wanted]);
+  expect(f.submit).not.toHaveBeenCalled();expect(await readOperation(operationId(core.scope,'zh-Hans',wanted))).toBeUndefined();
+});
 it('keeps source identity separate and encodes only once',async()=>{
   const f=fixture(),t=large(),before={...t.page};await f.core.submit([t]);
   const record=(await readOperation(operationId(f.core.scope,'zh-Hans',t)))!;

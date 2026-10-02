@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Incluye {0} páginas entregadas con beneficios de membresía",
   "成功交付后扣减有限额度。": "Las cuotas limitadas se descuentan después de una entrega correcta.",
   "{0}：交付 {1} 页": "{0}: {1} páginas entregadas",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Selecciona imágenes traducidas para traducir la página actual y las tres siguientes mientras lees. Esta vista solo se aplica a este cómic."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Selecciona imágenes traducidas para traducir la página actual y las tres siguientes mientras lees. Esta vista solo se aplica a este cómic.",
+  "划图翻译": "Traducir área seleccionada",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Arrastra para seleccionar y suelta para traducir. Clic derecho o Esc para cancelar.",
+  "重新框选": "Volver a seleccionar",
+  "截图预览": "Vista previa de la captura",
+  "译图预览": "Vista previa de la traducción",
+  "正在截取选区…": "Capturando selección…",
+  "页面已变化，译图仅在预览中显示。": "La página ha cambiado. La traducción solo se muestra en la vista previa.",
+  "此区域无法可靠定位，译图将在预览中显示。": "No se puede ubicar esta área de forma fiable. Su traducción aparecerá en la vista previa.",
+  "选区过小，请重新框选。": "La selección es demasiado pequeña. Selecciona un área más grande.",
+  "截图未能读取，请重新框选。": "No se pudo leer la captura. Vuelve a seleccionar el área.",
+  "当前页面已变化，请重新框选。": "Esta página ha cambiado. Vuelve a seleccionar el área.",
+  "关闭预览": "Cerrar vista previa",
+  "显示预览": "Mostrar vista previa",
+  "截图失败，请保持当前标签页可见后重试。": "La captura falló. Mantén esta pestaña visible e inténtalo de nuevo.",
+  "无法保存截图，请释放本地存储空间后重试。": "No se pudo guardar la captura. Libera espacio de almacenamiento local e inténtalo de nuevo.",
+  "选区已失效，请重新框选。": "Esta selección ya no está disponible. Vuelve a seleccionar el área.",
+  "翻译设置已变化，请重新框选。": "La configuración de traducción ha cambiado. Vuelve a seleccionar el área."
 }

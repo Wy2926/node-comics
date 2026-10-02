@@ -565,6 +565,12 @@ export function installInline() {
       respond({ ok: true });
       return;
     }
+    if (message?.type === 'NC_INLINE_STOP') {
+      dismissedUrl = location.href;
+      stop();
+      respond({ ok: true });
+      return;
+    }
     if (message?.type === 'NC_INLINE_STOP_AUTO') {
       if (automatic) {
         stop();

@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Gồm {0} trang được giao theo quyền lợi thành viên",
   "成功交付后扣减有限额度。": "Hạn mức hữu hạn được trừ sau khi giao thành công.",
   "{0}：交付 {1} 页": "{0}: đã giao {1} trang",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Chọn ảnh đã dịch để dịch trang hiện tại và ba trang tiếp theo khi đọc. Cách xem này chỉ áp dụng cho truyện này."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Chọn ảnh đã dịch để dịch trang hiện tại và ba trang tiếp theo khi đọc. Cách xem này chỉ áp dụng cho truyện này.",
+  "划图翻译": "Dịch vùng đã chọn",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Kéo để chọn, thả để dịch. Nhấp chuột phải hoặc nhấn Esc để hủy.",
+  "重新框选": "Chọn lại",
+  "截图预览": "Xem trước ảnh chụp",
+  "译图预览": "Xem trước ảnh dịch",
+  "正在截取选区…": "Đang chụp vùng đã chọn…",
+  "页面已变化，译图仅在预览中显示。": "Trang đã thay đổi. Ảnh dịch chỉ được hiển thị trong phần xem trước.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Không thể xác định chính xác vị trí của vùng này. Ảnh dịch sẽ hiển thị trong phần xem trước.",
+  "选区过小，请重新框选。": "Vùng chọn quá nhỏ. Hãy chọn vùng lớn hơn.",
+  "截图未能读取，请重新框选。": "Không thể đọc ảnh chụp. Hãy chọn lại vùng.",
+  "当前页面已变化，请重新框选。": "Trang hiện tại đã thay đổi. Hãy chọn lại vùng.",
+  "关闭预览": "Đóng phần xem trước",
+  "显示预览": "Hiện phần xem trước",
+  "截图失败，请保持当前标签页可见后重试。": "Chụp ảnh thất bại. Hãy giữ thẻ này hiển thị rồi thử lại.",
+  "无法保存截图，请释放本地存储空间后重试。": "Không thể lưu ảnh chụp. Hãy giải phóng dung lượng lưu trữ cục bộ rồi thử lại.",
+  "选区已失效，请重新框选。": "Vùng chọn này không còn khả dụng. Hãy chọn lại vùng.",
+  "翻译设置已变化，请重新框选。": "Cài đặt dịch đã thay đổi. Hãy chọn lại vùng."
 }

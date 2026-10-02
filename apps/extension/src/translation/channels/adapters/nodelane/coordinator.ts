@@ -14,7 +14,7 @@ import {cacheInput} from '../../../input/cache';
 import {loadTranslationInput} from '../../../input/load';
 import {translationSize} from '../../../input/limits';
 
-interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
+interface Options {api:Api;userId:string;language:string;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;prepareInput?:(target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
 const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!r.result&&['needs_input','queued','running','needs_attention'].includes(r.result.state);
 const policyKey=(rights:Entitlements|undefined)=>rights?new Sha256().update(new TextEncoder().encode(JSON.stringify(rights))).digest():undefined;
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
@@ -39,7 +39,7 @@ export class TranslationCoordinator {
     if(!action&&Math.max(planned.width,planned.height)>16383&&!this.options.tiles?.())
       throw new ApiError(msg('翻译服务暂不可用'),'RESULT_FORMAT_UNAVAILABLE',503);
     // retry_of/regenerate_of inherit the server's frozen image, including requests made before resizing.
-    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previous.inputSize?.width??target.page.width,height:previous.inputSize?.height??target.page.height,profile:previous.inputProfile}:await prepareTranslationInput(target.page,async()=>{
+    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previous.inputSize?.width??target.page.width,height:previous.inputSize?.height??target.page.height,profile:previous.inputProfile}:this.options.prepareInput?await this.options.prepareInput(target,current,this.options.limits?.()):await prepareTranslationInput(target.page,async()=>{
       const ref=target.page.blobKey;
       return ref?this.options.getBlob(ref):undefined;
     },current,this.options.limits?.());

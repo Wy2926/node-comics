@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Davon {0} Seiten im Rahmen der Mitgliedschaft geliefert",
   "成功交付后扣减有限额度。": "Begrenzte Kontingente werden nach erfolgreicher Lieferung belastet.",
   "{0}：交付 {1} 页": "{0}: {1} Seiten geliefert",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Übersetzte Bilder wählen, um beim Lesen die aktuelle Seite und die nächsten drei zu übersetzen. Diese Ansicht gilt nur für diesen Comic."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Übersetzte Bilder wählen, um beim Lesen die aktuelle Seite und die nächsten drei zu übersetzen. Diese Ansicht gilt nur für diesen Comic.",
+  "划图翻译": "Ausgewählten Bereich übersetzen",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Zum Auswählen ziehen, zum Übersetzen loslassen. Rechtsklick oder Esc zum Abbrechen.",
+  "重新框选": "Erneut auswählen",
+  "截图预览": "Aufnahmevorschau",
+  "译图预览": "Übersetzungsvorschau",
+  "正在截取选区…": "Ausgewählter Bereich wird aufgenommen…",
+  "页面已变化，译图仅在预览中显示。": "Die Seite hat sich geändert. Die Übersetzung wird nur in der Vorschau angezeigt.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Dieser Bereich kann nicht zuverlässig positioniert werden. Seine Übersetzung wird in der Vorschau angezeigt.",
+  "选区过小，请重新框选。": "Die Auswahl ist zu klein. Wähle einen größeren Bereich aus.",
+  "截图未能读取，请重新框选。": "Die Aufnahme konnte nicht gelesen werden. Wähle den Bereich erneut aus.",
+  "当前页面已变化，请重新框选。": "Diese Seite hat sich geändert. Wähle den Bereich erneut aus.",
+  "关闭预览": "Vorschau schließen",
+  "显示预览": "Vorschau anzeigen",
+  "截图失败，请保持当前标签页可见后重试。": "Die Aufnahme ist fehlgeschlagen. Lass diesen Tab sichtbar und versuche es erneut.",
+  "无法保存截图，请释放本地存储空间后重试。": "Die Aufnahme konnte nicht gespeichert werden. Gib lokalen Speicherplatz frei und versuche es erneut.",
+  "选区已失效，请重新框选。": "Diese Auswahl ist nicht mehr verfügbar. Wähle den Bereich erneut aus.",
+  "翻译设置已变化，请重新框选。": "Die Übersetzungseinstellungen haben sich geändert. Wähle den Bereich erneut aus."
 }

@@ -1,6 +1,7 @@
 import type {PageReference} from '../../comics/pages/identity';
 import type {Capabilities, Job} from '../../types';
 import type {ReadingTarget, TranslationState} from '../automatic';
+import type {PreparedInput} from '../input/prepare';
 
 /** Stable namespace for requests, results and page bindings. Never a credential. */
 export interface TranslationScope { key: string }
@@ -22,6 +23,8 @@ export interface RuntimeOptions {
   onChange: ()=>void;
   onInputConsumed?: (blobKey:string)=>Promise<void>;
   isCurrent: ()=>boolean;
+  /** Screenshot callers durably prepare bytes before admission; never encode those bytes twice. */
+  prepareInput?: (target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;
 }
 /** submit updates a reading window; it must not await an entire image translation. */
 export interface ChannelRuntime {

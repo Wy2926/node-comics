@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Including {0} pages delivered under membership benefits",
   "成功交付后扣减有限额度。": "Finite quotas are charged after successful delivery.",
   "{0}：交付 {1} 页": "{0}: {1} pages delivered",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Select translated images to translate the current page and the next three as you read. This view applies only to this comic."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Select translated images to translate the current page and the next three as you read. This view applies only to this comic.",
+  "划图翻译": "Translate selected area",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Drag to select, release to translate. Right-click or press Esc to cancel.",
+  "重新框选": "Select again",
+  "截图预览": "Capture preview",
+  "译图预览": "Translation preview",
+  "正在截取选区…": "Capturing selection…",
+  "页面已变化，译图仅在预览中显示。": "The page has changed. The translation is shown in the preview only.",
+  "此区域无法可靠定位，译图将在预览中显示。": "This area cannot be positioned reliably. Its translation will appear in the preview.",
+  "选区过小，请重新框选。": "The selection is too small. Select a larger area.",
+  "截图未能读取，请重新框选。": "Could not read the capture. Select the area again.",
+  "当前页面已变化，请重新框选。": "This page has changed. Select the area again.",
+  "关闭预览": "Close preview",
+  "显示预览": "Show preview",
+  "截图失败，请保持当前标签页可见后重试。": "Capture failed. Keep this tab visible and try again.",
+  "无法保存截图，请释放本地存储空间后重试。": "Could not save the capture. Free up local storage and try again.",
+  "选区已失效，请重新框选。": "This selection is no longer available. Select the area again.",
+  "翻译设置已变化，请重新框选。": "Translation settings have changed. Select the area again."
 }

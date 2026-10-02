@@ -955,5 +955,22 @@
   "其中会员权益内交付 {0} 页": "Inclui {0} páginas entregues com benefícios da assinatura",
   "成功交付后扣减有限额度。": "As cotas limitadas são descontadas após a entrega bem-sucedida.",
   "{0}：交付 {1} 页": "{0}: {1} páginas entregues",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Selecione imagens traduzidas para traduzir a página atual e as próximas três durante a leitura. Esta visualização vale apenas para este quadrinho."
+  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Selecione imagens traduzidas para traduzir a página atual e as próximas três durante a leitura. Esta visualização vale apenas para este quadrinho.",
+  "划图翻译": "Traduzir área selecionada",
+  "拖动框选，松手翻译；右键或 Esc 取消。": "Arraste para selecionar e solte para traduzir. Clique com o botão direito ou pressione Esc para cancelar.",
+  "重新框选": "Selecionar novamente",
+  "截图预览": "Prévia da captura",
+  "译图预览": "Prévia da tradução",
+  "正在截取选区…": "Capturando seleção…",
+  "页面已变化，译图仅在预览中显示。": "A página mudou. A tradução é exibida apenas na prévia.",
+  "此区域无法可靠定位，译图将在预览中显示。": "Não é possível posicionar esta área de forma confiável. A tradução aparecerá na prévia.",
+  "选区过小，请重新框选。": "A seleção é pequena demais. Selecione uma área maior.",
+  "截图未能读取，请重新框选。": "Não foi possível ler a captura. Selecione a área novamente.",
+  "当前页面已变化，请重新框选。": "Esta página mudou. Selecione a área novamente.",
+  "关闭预览": "Fechar prévia",
+  "显示预览": "Mostrar prévia",
+  "截图失败，请保持当前标签页可见后重试。": "A captura falhou. Mantenha esta aba visível e tente novamente.",
+  "无法保存截图，请释放本地存储空间后重试。": "Não foi possível salvar a captura. Libere espaço no armazenamento local e tente novamente.",
+  "选区已失效，请重新框选。": "Esta seleção não está mais disponível. Selecione a área novamente.",
+  "翻译设置已变化，请重新框选。": "As configurações de tradução mudaram. Selecione a área novamente."
 }

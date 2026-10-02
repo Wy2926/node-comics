@@ -8,6 +8,7 @@ vi.mock('wxt/utils/define-background',()=>({defineBackground:(main:()=>void)=>({
 vi.mock('../src/sources/runtime/optional-content',()=>({registerOptionalSourceContent:vi.fn()}));
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({registerInlineBackground:()=>{},activateInline:vi.fn()}));
+vi.mock('../src/region/background',()=>({registerRegionBackground:()=>{},activateRegion:vi.fn()}));
 vi.mock('../src/comics/application/website-catalog',()=>({readWebsiteCatalog:vi.fn()}));
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 

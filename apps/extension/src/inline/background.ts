@@ -16,29 +16,55 @@ import { settingsKey } from './settings';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
 import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
+import {regionActivationKey} from '../region/protocol';
 
 interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;currentKey?:string;waiting?:AbortController;active:boolean;abort:AbortController;}
+interface RequestActivity {active:()=>boolean;current:()=>boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
+const activationEpochs=new Map<number,{active:boolean}>();
+function activationEpoch(tabId:number){
+  let epoch=activationEpochs.get(tabId);
+  if(!epoch){epoch={active:true};activationEpochs.set(tabId,epoch);} // A restarted worker may restore an authorized document.
+  return epoch;
+}
+function invalidateTab(tabId:number){
+  const epoch={active:false};activationEpochs.set(tabId,epoch);
+  const old=contexts.get(tabId);if(old){disposeContext(old);contexts.delete(tabId);}
+  windowGenerations.delete(tabId);return epoch;
+}
 export async function activateInline(tabId:number,automatic=false){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
     const tab=await chrome.tabs.get(tabId);
     if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
     if(automatic){
       if(!tab.active||!await automaticTabsAllowed())return;
+      const region=await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_IDENTITY'},{frameId:0}).catch(()=>null);
+      if(region?.url===tab.url&&(region.enabled||region.dismissedUrl===tab.url))return;
       const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},{frameId:0}).catch(()=>null);
       // Do not reset a manual pause, original-view choice, or dismissal on tab activation.
       if(existing?.url===tab.url&&(existing.dismissedUrl===tab.url||existing.enabled&&existing.activeUrl===tab.url))return;
     }
+    const epoch=invalidateTab(tabId),current=()=>activationEpochs.get(tabId)===epoch;
+    await chrome.storage.session.remove(activationKey(tabId));
+    await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_STOP'},{frameId:0}).catch(()=>{});
+    await chrome.storage.session.remove(regionActivationKey(tabId));
     const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
     const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
     const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target);
+    assertCurrent(current);
     if(!identity||identity.url!==tab.url)throw Error(msg("网页已变化，请重新启动翻译。"));
     if(automatic&&!await automaticTabsAllowed())return;
-    windowGenerations.delete(tabId);
-    const old=contexts.get(tabId);if(old){disposeContext(old);contexts.delete(tabId);}
+    assertCurrent(current);
     await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic} satisfies Activation});
+    assertCurrent(current);epoch.active=true;
     await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic},target);
   });
+}
+/** A hand-selected crop owns this document until explicitly leaving region mode. */
+export async function suspendInline(tabId:number){
+  invalidateTab(tabId);
+  await chrome.storage.session.remove(activationKey(tabId));
+  await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},{frameId:0}).catch(()=>{});
 }
 async function stopAutomaticInline(tabId:number){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
@@ -46,23 +72,27 @@ async function stopAutomaticInline(tabId:number){
     if(await automaticTabsAllowed())return;
     const key=activationKey(tabId),saved=await chrome.storage.session.get(key),activation=saved[key] as Activation|undefined;
     if(!activation?.automatic)return;
-    const old=contexts.get(tabId);if(old){disposeContext(old);contexts.delete(tabId);}
+    invalidateTab(tabId);
     await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP_AUTO'},{frameId:0,...(activation.documentId?{documentId:activation.documentId}:{})}).catch(()=>{});
-    await chrome.storage.session.remove(key);windowGenerations.delete(tabId);
+    await chrome.storage.session.remove(key);
   });
 }
-async function context(tabId:number,navigationId:string):Promise<Context|undefined>{
-  return navigator.locks.request('nc-inline-context:'+tabId,()=>createContext(tabId,navigationId));
+async function context(tabId:number,navigationId:string,activity:RequestActivity):Promise<Context>{
+  return navigator.locks.request('nc-inline-context:'+tabId,()=>createContext(tabId,navigationId,activity));
 }
-async function createContext(tabId:number,navigationId:string):Promise<Context>{
+async function createContext(tabId:number,navigationId:string,activity:RequestActivity):Promise<Context>{
+  assertCurrent(activity.current);
   const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>};
+  assertCurrent(activity.current);
   const key=JSON.stringify([settings.language,navigationId,configGeneration]);
   const previous=contexts.get(tabId);if(previous?.key===key){previous.settings=settings;return previous;}
-  if(previous)disposeContext(previous);
-  const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
-  const current=()=>generation===configGeneration&&(!ctx||ctx.active);
+  if(previous){disposeContext(previous);contexts.delete(tabId);}
+  const pages=new Map<string,Page>();let ctx:Context|undefined;
+  // The channel survives reading-window changes, but never a new activation.
+  const current=()=>activity.active()&&(!ctx||ctx.active);
   const channel=await openActiveChannel(current),caps=channel.capabilities;
-  assertCurrent(current);
+  try{
+  assertCurrent(activity.current);assertCurrent(current);
   const originals=new InlineOriginals('inline:'+key);
   const attach=async(jobs:Job[])=>{
     assertCurrent(current);if(!ctx)return;ctx.jobs=mergeJobs(ctx.jobs,jobs);
@@ -70,9 +100,13 @@ async function createContext(tabId:number,navigationId:string):Promise<Context>{
   };
   ctx={key,channel,settings,caps,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController()};
   if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:key=>originals.read(key),isCurrent:current,onJobs:attach,onChange:()=>{},onInputConsumed:key=>originals.uploaded(key)});
-  contexts.set(tabId,ctx);await ctx.core?.init();return ctx;
+  contexts.set(tabId,ctx);await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
+  }catch(error){
+    if(ctx){if(contexts.get(tabId)===ctx)contexts.delete(tabId);disposeContext(ctx);}else channel.dispose();
+    throw error;
+  }
 }
-function disposeContext(ctx:Context){ctx.active=false;ctx.abort.abort();ctx.waiting?.abort();ctx.core?.dispose();ctx.channel.dispose();ctx.originals.clear();}
+function disposeContext(ctx:Context){if(!ctx.active)return;ctx.active=false;ctx.abort.abort();ctx.waiting?.abort();ctx.core?.dispose();ctx.channel.dispose();ctx.originals.clear();}
 
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
 async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
@@ -125,10 +159,10 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     needsSubmit:ctx.channel.available&&request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
 }
 /** A display reload can only read this page's selected result; it never enters the plan/retry path. */
-async function imageResponse(request:InlineRequest,sender:chrome.runtime.MessageSender,signal:AbortSignal){
-  const ctx=await context(sender.tab!.id!,request.navigationId);
-  if(!ctx||!ctx.channel.available)throw Error(ctx?.channel.unavailable?.message??msg('正在连接翻译服务'));
-  const current=()=>!signal.aborted&&ctx.active&&ctx.channel.isCurrent()&&request.generation===(windowGenerations.get(sender.tab!.id!)??0);
+async function imageResponse(request:InlineRequest,sender:chrome.runtime.MessageSender,signal:AbortSignal,activity:RequestActivity){
+  const ctx=await context(sender.tab!.id!,request.navigationId,activity);
+  if(!ctx.channel.available)throw Error(ctx.channel.unavailable?.message??msg('正在连接翻译服务'));
+  const current=()=>!signal.aborted&&activity.current()&&ctx.active&&ctx.channel.isCurrent();
   assertCurrent(current);
   const page=ctx.pages.get(pageKey(request,request.images[0])),job=page&&pageResult(ctx,page);
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.result?.key]);
@@ -149,23 +183,31 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
 }
 
 async function checkedRequest(message:InlineRequest,sender:chrome.runtime.MessageSender){
+  const tabId=sender.tab!.id!,epoch=activationEpoch(tabId),configuration=configGeneration;
+  const active=()=>epoch.active&&activationEpochs.get(tabId)===epoch&&configuration===configGeneration;
+  assertCurrent(active);
   const current=await currentInlineActivation(sender,message.navigationId);
+  assertCurrent(active);
   if(!current)throw Error(msg('网页已变化，请重新右键翻译当前页面。'));
-  const {activation,tab}=current,tabId=sender.tab!.id!;
+  const {activation,tab}=current;
   if(activation.automatic&&!await automaticTabsAllowed())throw Error(msg('标签页自动翻译已关闭。'));
+  assertCurrent(active);
   if(!Number.isSafeInteger(message.generation)||message.generation<0)throw Error(msg('阅读窗口无效。'));
   windowGenerations.set(tabId,Math.max(windowGenerations.get(tabId)??0,message.generation));
-  if(!activation.documentId&&sender.documentId){activation.documentId=sender.documentId;await chrome.storage.session.set({[activationKey(tabId)]:activation});}
-  if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab};
+  if(!activation.documentId&&sender.documentId)await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
+    assertCurrent(active);activation.documentId=sender.documentId;
+    await chrome.storage.session.set({[activationKey(tabId)]:activation});assertCurrent(active);
+  });
+  const activity={active,current:()=>active()&&message.generation===(windowGenerations.get(tabId)??0)};
+  if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity};
   if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg('图片范围无效。'));
   if(message.type==='NC_INLINE_IMAGE'&&(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048))throw Error(msg('图片范围无效。'));
-  return {tabId,tab};
+  return {tabId,tab,...activity};
 }
-async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):Promise<InlineResponse>{
-  const ctx=await context(sender.tab!.id!,request.navigationId);
-  if(!ctx)throw Error(msg('正在连接翻译服务'));
+async function step(request:InlineRequest,sender:chrome.runtime.MessageSender,activity:RequestActivity):Promise<InlineResponse>{
+  const ctx=await context(sender.tab!.id!,request.navigationId,activity);
   if(!ctx.channel.available||!ctx.core)return response(ctx,request);
-  const current=()=>ctx.active&&request.generation===(windowGenerations.get(sender.tab!.id!)??0);
+  const current=()=>activity.current()&&ctx.active&&ctx.channel.isCurrent();
   if(!current())return response(ctx,request);
   if(request.type==='NC_INLINE_WAIT'){
     if(!ctx.waiting||ctx.waiting.signal.aborted)ctx.waiting=new AbortController();const waiting=ctx.waiting;
@@ -175,8 +217,9 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
     const mode='classic',language=ctx.settings.language;
     if(!ctx.caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(ctx.caps,mode,language))return {mode,language,scope:ctx.key,items:request.images.map(i=>({id:i.id,state:{kind:'error',message:msg("此翻译方式暂不可用"),retryable:false}}))};
     if(request.refreshRights&&!request.retryId)await ctx.core.refresh();
+    if(!current())return response(ctx,request);
     const currentKey=request.images[0]&&pageKey(request,request.images[0]);
-    if(!request.retryId&&currentKey!==ctx.currentKey&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);await ctx.core.submit(targets,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
+    if(!request.retryId&&currentKey!==ctx.currentKey&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);if(!current())return response(ctx,request);await ctx.core.submit(targets,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
     const targets=await prepare(ctx,request,sender);
     if(!current())return response(ctx,request);
     if(request.retryId){const image=request.images.find(i=>i.id===request.retryId),page=image&&ctx.pages.get(pageKey(request,image));const target=targets.find(t=>t.page.id===page?.id);if(target)await ctx.core.manual(target);}
@@ -198,8 +241,8 @@ export function registerInlineBackground(){
     const close=serveImage(port,async(value,signal)=>{
       const request=value as InlineRequest;
       if(request?.type!=='NC_INLINE_IMAGE')throw Error(msg('图片范围无效。'));
-      await checkedRequest(request,sender);
-      signal.throwIfAborted();return imageResponse(request,sender,signal);
+      const activity=await checkedRequest(request,sender);
+      signal.throwIfAborted();return imageResponse(request,sender,signal,activity);
     },()=>{active.delete(close);if(!active.size)transfers.delete(tabId);});
     active.add(close);
   });
@@ -208,17 +251,18 @@ export function registerInlineBackground(){
   const invalidate=()=>{configGeneration++;for(const id of transfers.keys())closeTransfers(id);for(const ctx of contexts.values())disposeContext(ctx);contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));};
   subscribeChannels(invalidate);
   chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&before?.language!==after?.language)invalidate();});
-  chrome.tabs.onRemoved.addListener(tabId=>{closeTransfers(tabId);const ctx=contexts.get(tabId);if(ctx){disposeContext(ctx);}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
+  chrome.tabs.onRemoved.addListener(tabId=>{closeTransfers(tabId);invalidateTab(tabId);activationEpochs.delete(tabId);void navigator.locks.request('nc-inline-activation:'+tabId,()=>chrome.storage.session.remove(activationKey(tabId)));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{
-      const {tabId,tab}=await checkedRequest(message,sender);
+      const activity=await checkedRequest(message,sender),{tabId,tab}=activity;
+      assertCurrent(activity.current);
       if(message.type==='NC_INLINE_INVALIDATE'){contexts.get(tabId)?.waiting?.abort();return;}
       if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
       // Use the current, activation-checked tab URL; sender.url can lag behind SPA navigation.
       const currentSender={...sender,tab};
-      if(message.type==='NC_INLINE_WAIT')return step(message,currentSender);
-      return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,currentSender));
+      if(message.type==='NC_INLINE_WAIT')return step(message,currentSender,activity);
+      return navigator.locks.request('nc-inline-step:'+tabId,()=>step(message,currentSender,activity));
     })().then(data=>respond({ok:true,data})).catch(error=>respond({ok:false,error:error.message,errorCode:typeof error.code==='string'?error.code:undefined,retryAfterMs:error.retryAfterSeconds?error.retryAfterSeconds*1000:undefined}));return true;
   });
 }
