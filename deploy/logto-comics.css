@@ -1,0 +1,287 @@
+/*
+ * NodeLane Comics — Logto 1.43.0 application-level CSS overrides.
+ * Paste this entire file into NodeLane-Comics > Branding > CSS overrides.
+ * Brand color: #1769b3. Brand color (dark): #8dc7ff.
+ * Do not replace the tenant-wide NodeLane stylesheet with this file.
+ * Palette and comic tokens: apps/extension/src/ui/theme/tokens.css.
+ * Dark mode follows Logto's html[data-theme], not a separate media query.
+ * CSS alone cannot read the extension's locally selected accent or appearance.
+ * Native layout hooks are stable; component suffixes below target Logto 1.43.0.
+ * No remote fonts, images, scripts, or changes to authentication behavior.
+ */
+
+html body {
+  --canvas: #f6f8fc;
+  --surface: #fff;
+  --surface-soft: #f0f3f8;
+  --ink: #202d43;
+  --muted: #5e6d82;
+  --line: #dce3ed;
+  --accent: #1769b3;
+  --accent-hover: #125591;
+  --accent-soft: #eaf3ff;
+  --accent-on: #fff;
+  --success: #267352;
+  --warning: #955514;
+  --danger: #af3845;
+  --danger-soft: #fff0f1;
+  --dialog-backdrop: #101c32a0;
+  --comic-stroke: var(--ink);
+  --comic-shadow-color: var(--ink);
+  --comic-shadow-disabled-color: var(--line);
+  --comic-border: 2px solid var(--comic-stroke);
+  --comic-input-border: 2px solid color-mix(in srgb, var(--ink) 38%, var(--line));
+  --comic-control-radius: 5px;
+  --comic-panel-radius: 8px 24px 24px 24px;
+  --comic-shadow-small: 2px 2px 0 var(--comic-shadow-color);
+  --comic-shadow: 4px 4px 0 var(--comic-shadow-color);
+  --comic-shadow-hover: 5px 5px 0 var(--comic-shadow-color);
+  --comic-shadow-active: 1px 1px 0 var(--comic-shadow-color);
+  --comic-shadow-disabled: 2px 2px 0 var(--comic-shadow-disabled-color);
+  --comic-perforation: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  --comic-dot-pattern: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) .7px, transparent .7px);
+  --comic-dot-size: 7px 7px;
+  --nc-font: "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+html[data-theme="dark"] body {
+  --canvas: #151b27;
+  --surface: #1d2737;
+  --surface-soft: #263246;
+  --ink: #edf2fc;
+  --muted: #b0bdd1;
+  --line: #3b485d;
+  --accent: #8dc7ff;
+  --accent-hover: #b8deff;
+  --accent-soft: #253e58;
+  --accent-on: #132b43;
+  --success: #9cdbb9;
+  --warning: #efc28b;
+  --danger: #ffacb5;
+  --danger-soft: #452b35;
+  --comic-stroke: #53627a;
+  --comic-shadow-color: #080f1a;
+  --comic-shadow-disabled-color: #101722;
+  color-scheme: dark;
+}
+
+/* Outrank Logto's theme selectors even if its bundle loads after this CSS.
+ * Brand variables are set inline
+ * by Logto, so only those mappings need !important. */
+html:root[data-theme] body[class] {
+  --radius: var(--comic-control-radius);
+  --font-headline-1: 850 28px/1.3 var(--nc-font);
+  --font-headline-2: 800 24px/1.4 var(--nc-font);
+  --font-title-1: 800 20px/1.4 var(--nc-font);
+  --font-title-2: 750 20px/1.4 var(--nc-font);
+  --font-title-3: 700 16px/1.5 var(--nc-font);
+  --font-label-1: 700 16px/1.5 var(--nc-font);
+  --font-label-2: 700 14px/1.5 var(--nc-font);
+  --font-label-3: 650 12px/1.5 var(--nc-font);
+  --font-body-1: 400 16px/1.6 var(--nc-font);
+  --font-body-2: 400 14px/1.6 var(--nc-font);
+  --font-body-3: 400 12px/1.6 var(--nc-font);
+  --font-subhead-cap: 750 12px/1.5 var(--nc-font);
+  --color-type-primary: var(--ink);
+  --color-type-secondary: var(--muted);
+  --color-type-disable: var(--muted);
+  --color-type-link: var(--accent);
+  --color-line-divider: var(--line);
+  --color-line-border: color-mix(in srgb, var(--ink) 38%, var(--line));
+  --color-line-border-transparent: var(--line);
+  --color-bg-body-base: var(--canvas);
+  --color-bg-body: var(--surface);
+  --color-bg-body-overlay: var(--surface);
+  --color-bg-layer-1: var(--surface);
+  --color-bg-layer-2: var(--surface-soft);
+  --color-bg-float-base: var(--canvas);
+  --color-bg-float: var(--surface);
+  --color-bg-float-overlay: var(--surface-soft);
+  --color-bg-mask: var(--dialog-backdrop);
+  --color-bg-toast: var(--comic-shadow-color);
+  --color-bg-state-unselected: var(--line);
+  --color-bg-state-disabled: var(--surface-soft);
+  --color-bg-light: var(--surface-soft);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-soft);
+  --color-surface-3: var(--surface-soft);
+  --color-surface-4: var(--surface-soft);
+  --color-brand-default: var(--accent) !important;
+  --color-brand-hover: var(--accent-hover) !important;
+  --color-brand-pressed: var(--accent-hover) !important;
+  --color-brand-loading: var(--accent) !important;
+  --color-danger-default: var(--danger);
+  --color-danger-hover: var(--danger);
+  --color-danger-pressed: var(--danger);
+  --color-success-default: var(--success);
+  --color-success-hover: var(--success);
+  --color-success-pressed: var(--success);
+  --color-success-disable: var(--surface-soft);
+  --color-container-alert: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  --color-container-on-alert: var(--warning);
+  --color-overlay-neutral-hover: var(--surface-soft);
+  --color-overlay-neutral-pressed: var(--accent-soft);
+  --color-overlay-neutral-focused: color-mix(in srgb, var(--accent) 25%, transparent);
+  --color-overlay-brand-hover: color-mix(in srgb, var(--accent) 8%, transparent) !important;
+  --color-overlay-brand-pressed: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+  --color-overlay-brand-focused: color-mix(in srgb, var(--accent) 25%, transparent) !important;
+  --color-overlay-danger-hover: var(--danger-soft);
+  --color-overlay-danger-pressed: var(--danger-soft);
+  --color-overlay-danger-focused: color-mix(in srgb, var(--danger) 25%, transparent);
+  --color-shadow-1: var(--comic-shadow-small);
+  --color-shadow-2: var(--comic-shadow);
+  color: var(--ink);
+  background: var(--canvas);
+  font: var(--font-body-2);
+}
+
+html[data-theme="light"] body { color-scheme: light; }
+
+html body[class] .logto_page-container {
+  padding: 32px 20px;
+  background: var(--canvas);
+}
+
+html body[class] .logto_main-content {
+  flex: 0 1 auto;
+  align-self: center;
+  width: min(100%, 480px);
+  min-height: 0;
+  padding: 28px;
+  border: var(--comic-border);
+  border-radius: var(--comic-panel-radius);
+  background: var(--surface);
+  box-shadow: var(--comic-shadow);
+}
+
+html body[class] .logto_branding-header {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  padding: 20px 16px;
+  margin-bottom: 24px;
+  border-bottom: var(--comic-perforation);
+  border-radius: var(--comic-control-radius);
+  background: var(--accent-soft) var(--comic-dot-pattern);
+  background-size: var(--comic-dot-size);
+}
+
+html body[class] .logto_branding-header [class*="_headline"] {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  font: var(--font-headline-2);
+}
+
+/* Keep logos, provider icons, translated text, and legal links unchanged. */
+html body[class] .logto_signature {
+  position: static;
+  align-self: center;
+  transform: none;
+  margin: 28px 0 0;
+  padding: 0;
+}
+
+html body[class] .logto_main-content button[class*="_button"] {
+  height: auto;
+  min-height: 48px;
+  padding-block: 10px;
+  border: var(--comic-border);
+  border-radius: var(--comic-control-radius);
+  box-shadow: var(--comic-shadow-small);
+  font: var(--font-label-1);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+
+html body[class] .logto_main-content button[class*="_button"][class*="_primary"] {
+  color: var(--accent-on);
+  box-shadow: var(--comic-shadow);
+}
+
+html body[class] .logto_main-content button[class*="_button"][class*="_danger"] {
+  --color-danger-hover: var(--danger-soft);
+  --color-danger-pressed: var(--danger-soft);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+@media (hover: hover) {
+  html body[class] .logto_main-content button[class*="_button"]:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--comic-shadow-hover);
+  }
+}
+
+html body[class] .logto_main-content button[class*="_button"]:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: var(--comic-shadow-active);
+}
+
+html body[class] .logto_main-content button[class*="_button"]:disabled:not([class*="_loading"]) {
+  opacity: 1;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-color: var(--line);
+  box-shadow: var(--comic-shadow-disabled);
+}
+
+html body[class] .logto_main-content :is(button, a):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* Logto inputs use a notched fieldset. Style that one border, not the input
+ * plus its wrapper. Preserve native floating labels, focus, and error colors. */
+html body[class] .logto_main-content [class*="_inputField"]:has(> input) {
+  height: 48px;
+}
+
+html body[class] .logto_main-content [class*="_inputField"] > input {
+  min-width: 0;
+  font: var(--font-body-1);
+}
+
+html body[class] .logto_main-content fieldset[class*="_border"] {
+  border-width: 2px;
+  border-radius: var(--comic-control-radius);
+}
+
+html body[class] .logto_main-content fieldset[class*="_outline"] {
+  display: none;
+}
+
+html body[class] .logto_main-content [class*="_passcode"] {
+  gap: 8px;
+}
+
+html body[class] .logto_main-content [class*="_passcode"] > input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  border: var(--comic-input-border);
+  border-radius: var(--comic-control-radius);
+  font: var(--font-label-1);
+}
+
+html body[class] .logto_main-content [class*="_passcode"] > input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+@media (max-width: 520px) {
+  html body[class] .logto_page-container { padding: 20px 16px; }
+  html body[class] .logto_main-content { padding: 22px 18px; }
+}
+
+/* Only reduce motion introduced here; preserve Logto's loading spinner and
+ * autofill-detection animations. */
+@media (prefers-reduced-motion: reduce) {
+  html body[class] .logto_main-content button[class*="_button"],
+  html body[class] .logto_main-content button[class*="_button"]:is(:hover, :active):not(:disabled) {
+    transition: none;
+    transform: none;
+  }
+}

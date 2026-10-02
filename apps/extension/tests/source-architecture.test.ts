@@ -104,8 +104,9 @@ describe('source composition and identity', () => {
     ).toThrow('CONFLICT');
     expect(() => sourceFor('https://user:secret@example.test')).toThrow('INVALID_SOURCE_URL');
   });
-  it('keeps automatic script matches distinct from global host access', () => {
-    expect(sourceInstallation.autoContentMatches).toEqual([
+  it('keeps embedded script matches out of installation permissions', () => {
+    expect(sourceInstallation.autoContentMatches).toEqual([]);
+    expect(sourceFor(sourceUrl).definition.installation.optionalContentMatches).toEqual([
       'https://*.mangacopy.com/comic/*',
       'https://*.copy4000.com/comic/*',
     ]);

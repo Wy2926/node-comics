@@ -24,7 +24,7 @@ const extension=path.join(out,'extension');await cp('apps/extension/.output/chro
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 assert(manifest.host_permissions.includes('http://*/*')&&manifest.host_permissions.includes('https://*/*'));
 assert(!Object.hasOwn(manifest,'optional_host_permissions'));
-assert(!manifest.content_scripts.some(s=>s.js.includes('content-scripts/inline.js')),'No automatic page injection');
+assert(!(manifest.content_scripts??[]).some(s=>s.js.includes('content-scripts/inline.js')),'No automatic page injection');
 // Dispatch the actual registered menu callback. Only this temporary copy exposes its listener
 // and installed menu titles; required host access must never cause a runtime permission request.
 const background=path.join(extension,'background.js');
