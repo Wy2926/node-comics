@@ -19,6 +19,10 @@ afterEach(async () => {
   await done;
 });
 describe('Pixiv author and tag catalogs', () => {
+  it('preserves valid original dimensions above the former source edge ceiling', () => {
+    const data = pages(); Object.assign(data[0], {width: 100001, height: 100001});
+    expect(parsePages(detail(), data, reader).items[0]).toMatchObject({width: 100001, height: 100001});
+  });
   it('normalizes author links and keeps author/tag identities separate', () => {
     for (const target of [url, url + '/?p=3', url.replace('/users/', '/en/users/'), 'https://www.pixiv.net/users/7', 'https://www.pixiv.net/en/users/7/'])
       expect(sourceFor(target).location.catalog?.key).toBe('pixiv:user:7:all');

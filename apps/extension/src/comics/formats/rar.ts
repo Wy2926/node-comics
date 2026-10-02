@@ -1,6 +1,6 @@
 import {createExtractorFromData} from 'node-unrar-js/esm/index.esm';
 import wasmUrl from 'node-unrar-js/esm/js/unrar.wasm?url';
-import {MAX_ENTRIES, MAX_PAGE, MiB, imageMime, validateEntries} from './limits';
+import {MAX_ENTRIES, MiB, imageMime, validateEntries} from './limits';
 import {throwIfAborted, type DocumentSession, type IndexedPage, type RandomAccessSource} from './contracts';
 
 /** This driver runs in a terminable Worker and is deliberately local-only. */
@@ -23,10 +23,10 @@ export async function openRarDocument(source: RandomAccessSource): Promise<Docum
   const images = validateEntries(entries.filter(entry => !entry.directory), 256 * MiB);
   const pages: IndexedPage[] = images.map((entry, ordinal) => ({ordinal, name: entry.name, locator: {entry: entry.name}}));
   const io = extractor as unknown as {write(fd: number, buf: number, size: number): boolean};
-  const write = io.write.bind(extractor); let written = 0;
+  const write = io.write.bind(extractor); let written = 0, expected = 0;
   io.write = (fd, buf, size) => {
     written += size;
-    if (size < 0 || written > MAX_PAGE) throw new Error('RAR 实际输出超过 32 MB 安全限制。');
+    if (size < 0 || written > expected) throw new Error('RAR 实际输出超过声明。');
     return write(fd, buf, size);
   };
   return {
@@ -36,7 +36,7 @@ export async function openRarDocument(source: RandomAccessSource): Promise<Docum
       throwIfAborted(signal);
       const image = images.find(entry => entry.name === page.locator.entry);
       if (!image) throw new Error('RAR 页面索引不属于当前文件。');
-      written = 0;
+      written = 0; expected = image.size;
       // UnRAR skips preceding output; the extraction iterator must be exhausted to release its handle.
       let result: Blob | undefined;
       try {

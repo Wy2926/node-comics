@@ -98,7 +98,7 @@ export function parsePages(detailValue: unknown, pagesValue: unknown, url: strin
     if (image.origin !== 'https://i.pximg.net' || image.username || image.password || image.search || image.hash ||
       !new RegExp(`^/img-original/img/\\d{4}(?:/\\d{2}){5}/${loc.artworkId}_p${order}\\.(?:png|jpe?g|gif|webp|avif)$`, 'i').test(image.pathname))
       throw Error('Pixiv 原图地址与作品页序不一致。');
-    const width = count(page.width, 100000), height = count(page.height, 100000);
+    const width = count(page.width, Number.MAX_SAFE_INTEGER), height = count(page.height, Number.MAX_SAFE_INTEGER);
     if (!width || !height) throw invalid();
     return {id: `page-${order}`, order, width, height, resource: {kind: 'http' as const, url: image.href}};
   });

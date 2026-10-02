@@ -1,13 +1,13 @@
 import 'fake-indexeddb/auto';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {startImageTransfer, interruptAbandonedTransfer, HOST_MESSAGE} from '../src/translation/channels/transport/client';
-import {executeImageTransfer} from '../src/translation/channels/transport/execute';
+import {executeImageTransfer, validateTransferRequest} from '../src/translation/channels/transport/execute';
 import {readTransferReceipt, saveTransferReceipt} from '../src/translation/channels/transport/receipts';
 import {registerImageTransferHost, trustedHostSender} from '../src/translation/channels/transport/host';
 import {transferLock, type ImageTransferRequest} from '../src/translation/channels/transport/types';
 import {decodedImage, transferLocks} from './channel-transfer-fixture';
 
-const recipe = (): ImageTransferRequest => ({url: 'http://localhost:8000/translate/image', headers: {'X-Test-Token': 'fixture-secret'}, imageField: 'image', fields: {config: '{}'}, maxBytes: 1024, maxPixels: 40_000_000, maxDimension: 30000});
+const recipe = (): ImageTransferRequest => ({url: 'http://localhost:8000/translate/image', headers: {'X-Test-Token': 'fixture-secret'}, imageField: 'image', fields: {config: '{}'}});
 beforeEach(() => {transferLocks(); decodedImage();});
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
 
@@ -49,8 +49,8 @@ it('marks an abandoned request interrupted and does not automatically resend it'
   await startImageTransfer(id, 'closed-page', new Blob(['original']), recipe());
   expect(fetcher).not.toHaveBeenCalled();
 });
-it('does not accept HTTP success with invalid/oversized images and retains no remote error text', async () => {
-  for (const response of [new Response('OCR and credentials', {headers: {'Content-Type': 'text/plain'}}), new Response('private', {status: 401}), new Response(new Blob(['x'.repeat(1025)], {type: 'image/png'}))]) {
+it('does not accept HTTP success with invalid images and retains no remote error text', async () => {
+  for (const response of [new Response('OCR and credentials', {headers: {'Content-Type': 'text/plain'}}), new Response('private', {status: 401}), new Response(new Blob([], {type: 'image/png'}))]) {
     vi.stubGlobal('fetch', vi.fn(async () => response));
     const id = crypto.randomUUID(); await startImageTransfer(id, id, new Blob(['original']), recipe());
     await vi.waitFor(async () => expect((await readTransferReceipt(id))?.state).toBe('failed'));
@@ -60,6 +60,26 @@ it('does not accept HTTP success with invalid/oversized images and retains no re
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Blob(['undecodable'], {type: 'image/png'}))));
   const id = crypto.randomUUID(); await startImageTransfer(id, id, new Blob(['original']), recipe());
   await vi.waitFor(async () => expect((await readTransferReceipt(id))?.errorCode).toBe('INVALID_IMAGE'));
+});
+it('accepts returned images above the old byte, pixel and dimension limits', async () => {
+  const output = new Blob([new Uint8Array(32 * 1024 * 1024 + 1)], {type: 'image/png'});
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({width: 800, height: 60000, close: vi.fn()})));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(output, {headers: {'Content-Length': String(output.size)}})));
+  const id = crypto.randomUUID(); await startImageTransfer(id, id, new Blob(['original']), recipe());
+  await vi.waitFor(async () => expect((await readTransferReceipt(id))?.state).toBe('succeeded'));
+  expect((await readTransferReceipt(id))?.output?.size).toBe(output.size);
+});
+it.each([{width: 0, height: 1200}, {width: 800, height: Infinity}, {width: 100_000_000, height: 100_000_000}])('rejects invalid decoded dimensions $width × $height', async size => {
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({...size, close: vi.fn()})));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Blob(['image'], {type: 'image/png'}))));
+  const id = crypto.randomUUID(); await startImageTransfer(id, id, new Blob(['original']), recipe());
+  await vi.waitFor(async () => expect((await readTransferReceipt(id))?.errorCode).toBe('INVALID_IMAGE'));
+});
+it('validates transfer protocol fields without output size settings', () => {
+  expect(validateTransferRequest(recipe())).toBe(true);
+  expect(validateTransferRequest({...recipe(), url: 'file:///image'})).toBe(false);
+  expect(validateTransferRequest({...recipe(), headers: {'X-Test': 'x'.repeat(8193)}})).toBe(false);
+  expect(validateTransferRequest({...recipe(), imageField: 'image\r\nother'})).toBe(false);
 });
 it('runs a worker request in an inactive host and survives a lost message acknowledgement without a resend', async () => {
   let ready = false;

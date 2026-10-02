@@ -139,7 +139,6 @@ export function openMobiDocument(source: RandomAccessSource): DocumentSession {
       pages = refs.map((reference, ordinal) => {
         const record = firstImage + reference - 1;
         if (record < firstImage || record >= count) fail(`第 ${ordinal + 1} 页的图片记录不存在。`);
-        if (offsets[record + 1] - offsets[record] > 32 * 1024 * 1024) fail(`第 ${ordinal + 1} 页超过 32 MB。`);
         return {ordinal, name: `第 ${ordinal + 1} 页`, locator: {record, offset: offsets[record], length: offsets[record + 1] - offsets[record], occurrence: ordinal}};
       });
       capabilities.indexComplete = true;

@@ -5,8 +5,8 @@ const workerFactory=vi.hoisted(()=>vi.fn());
 vi.mock('./hash.worker?worker',()=>({default:class {constructor(){return workerFactory();}}}));
 afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
 
-function workerPage(){
-  const bytes=new Uint8Array(1024*1024);bytes.set([137,80,78,71,13,10,26,10]);
+function workerPage(size=1024*1024){
+  const bytes=new Uint8Array(size);bytes.set([137,80,78,71,13,10,26,10]);
   const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width:1024,height:1024,close}));
   vi.stubGlobal('Worker',class {});
   let sent!:()=>void;const started=new Promise<void>(resolve=>{sent=resolve;});
@@ -15,6 +15,18 @@ function workerPage(){
   return {bytes,blob:new Blob([bytes],{type:'image/png'}),close,worker,started};
 }
 describe('materialized image normalization',()=>{
+  it('keeps source bytes above the former 32 MiB page ceiling',async()=>{
+    const {blob,close,worker,started}=workerPage(41*1024*1024),pending=prepareComicPage({name:'large',blob});await started;
+    worker.onmessage!({data:{sha256:'large-page-digest'}});
+    expect((await pending).blob).toBe(blob);expect(close).toHaveBeenCalledOnce();
+  });
+  it('keeps a normalized PNG above the former 32 MiB page ceiling',async()=>{
+    const {blob,close,worker,started}=workerPage(41*1024*1024);
+    vi.stubGlobal('OffscreenCanvas',class {width=100;height=200;getContext(){return {drawImage(){}};}async convertToBlob(){return blob;}});
+    const pending=prepareComicPage({name:'animated',blob:new Blob(['GIF89a'],{type:'image/gif'})});await started;
+    worker.onmessage!({data:{sha256:'normalized-page-digest'}});
+    expect((await pending).blob).toBe(blob);expect(close).toHaveBeenCalledOnce();
+  });
   it('uses the bundled worker for large page digests and releases both resources',async()=>{
     const {bytes,blob,close,worker,started}=workerPage(),digest=createHash('sha256').update(bytes).digest('hex');
     const pending=prepareComicPage({name:'large',blob});await started;

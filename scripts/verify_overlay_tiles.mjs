@@ -50,6 +50,9 @@ Image.open(root / 'long-original.png').save(root / 'icc-long.png', icc_profile=I
 Image.new('RGB', (128, 20000), (240, 230, 220)).save(root / 'optional-long.jpg', quality=90)
 with (root / 'optional-long.jpg').open('ab') as handle:
     handle.write(bytes(1024 * 1024))  # Valid JPEG padding triggers optional recompression with a small decoded image.
+Image.new('RGB', (800, 1200), (240, 230, 220)).save(root / 'large-bytes.jpg', quality=90)
+with (root / 'large-bytes.jpg').open('ab') as handle:
+    for _ in range(41): handle.write(bytes(1024 * 1024))
 `,root],{stdio:'pipe'});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 try{
@@ -57,7 +60,7 @@ try{
   await page.route(web+'/tiles-validation',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><title>WebP tile verification</title><body style="font:16px sans-serif;padding:24px;background:#eee"><h1>WebP tiles · native pixels</h1></body>'}));
   const serveFixture=async route=>{
     const name=new URL(route.request().url()).pathname.split('/').pop();
-    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long)\.png$|^optional-long\.jpg$/.test(name));
+    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long)\.png$|^(optional-long|large-bytes)\.jpg$/.test(name));
     await route.fulfill({body:await readFile(path.join(root,name)),contentType:name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':name.endsWith('.json')?'application/json':name.startsWith('single')?'image/webp':'application/vnd.nodelane.overlay-tiles'});
   };
   await page.route(web+'/tile-fixture/*',serveFixture);
@@ -68,6 +71,7 @@ try{
     const {prepareTranslationInput}=await import('/src/translation/input/prepare.ts');
     const {hashFile}=await import('/src/importers/hash.ts');
     const {resizeInput}=await import('/src/translation/input/resize.ts');
+    const {LEGACY_INPUT_PROFILE}=await import('/src/translation/input/limits.ts');
     const {loadDeliveredResult,resultBlobKey}=await import('/src/storage/translations/results.ts');
     const {translationCache}=await import('/src/storage/translations/index.ts');
     const {needsNormalization}=await import('/src/comics/pages/image-metadata.ts');
@@ -128,24 +132,35 @@ try{
     if(normalized.width!==8000||normalized.height!==6000||normalized.blob!==source)throw Error('Former reader pixel limit remains');
     checks.push('An actual 8000 × 6000 source is readable without changing its bytes');
     const longSource=await(await fetch('/tile-fixture/long-original.png')).blob();
-    const first=await resizeInput(longSource,64,100000),second=await resizeInput(longSource,64,100000);
+    const first=await resizeInput(longSource,64,100000,LEGACY_INPUT_PROFILE),second=await resizeInput(longSource,64,100000,LEGACY_INPUT_PROFILE);
     if(first.blob.type!=='image/png'||first.sha256!==second.sha256)throw Error('Frozen long input could not be regenerated exactly');
     checks.push('Long input encoding preserves 100000 pixels and reproduces identical frozen PNG bytes');
     const tagged=await(await fetch('/tile-fixture/icc-long.png')).blob(),staticPage=await prepareComicPage({name:'Tagged long source',blob:tagged});
     if(staticPage.width!==64||staticPage.height!==100000||await needsNormalization(staticPage.blob))throw Error('Long source normalization failed');
     checks.push('An actual ICC-tagged 100000-pixel source normalizes at its original resolution');
-    return {checks,cases,synthetic:true,realProvider:false};
+    const {sourceImage,imageDataUrl}=await import('/src/sources/index.ts');
+    const start=performance.now(),large=await sourceImage('/tile-fixture/large-bytes.jpg');
+    if(large.size<=40*1024*1024)throw Error('Large-image fixture did not cross the former byte limits');
+    const readable=await prepareComicPage({name:'Large original',blob:large});
+    if(readable.blob!==large||readable.width!==800||readable.height!==1200)throw Error('Large original was rejected or changed');
+    const sourceMs=performance.now()-start,dataUrl=await imageDataUrl(large);
+    if(dataUrl.length<large.size*4/3)throw Error('Large original could not cross the page transport');
+    const translated=await prepareTranslationInput({...readable,id:'large-original',name:'Large original',jobs:[],outputBlobs:{},imageByteSize:large.size,imageMime:large.type},async()=>large,()=>true,
+      {max_bytes:32*1024*1024,max_dimension:100000,max_pixels:100000**2,max_translation_ids:32});
+    if(translated.image.byte_size>32*1024*1024||translated.sourceSha256!==readable.imageSha256||readable.blob!==large)throw Error('Upload preflight changed or blocked the original');
+    checks.push('An actual JPEG above 40 MiB reads and crosses page transport unchanged; its translation copy respects a separate 32 MiB upload budget');
+    return {checks,cases,largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
   });
-  // Lower only the test context's PNG byte budget to exercise real worker failure delivery without a huge allocation.
+  // Lower only translation-input encoding's budget; original normalization and result composition stay unrestricted.
   const limited=await browser.newContext();
   try{
     await limited.route(web+'/tiles-validation',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Bounded PNG input errors</title>'}));
     await limited.route(web+'/tile-fixture/*',serveFixture);
     let injected=0;
-    await limited.route(/\/backend\/shared\/translation-images\/png\.ts(?:\?|$)/,async route=>{
+    await limited.route(/\/backend\/shared\/translation-images\/resize\.ts(?:\?|$)/,async route=>{
       const response=await route.fetch(),source=await response.text();
-      const replacement=source.replace(/maxBytes\s*=\s*128\s*\*\s*1024\s*\*\s*1024/,'maxBytes = 1024');
-      assert.notEqual(replacement,source,'PNG test budget injection did not match');injected++;
+      const replacement=source.replace(/bitmapPng\(\s*bitmap\s*,\s*\[\s*\]\s*,\s*TRANSLATION_MAX_BYTES\s*\)/,'bitmapPng(bitmap, [], 1024)');
+      assert.notEqual(replacement,source,'Upload PNG test budget injection did not match');injected++;
       await route.fulfill({response,body:replacement});
     });
     const inputPage=await limited.newPage(),errors=[];inputPage.on('pageerror',error=>errors.push(error.message));
@@ -154,6 +169,7 @@ try{
       const {prepareComicPage}=await import('/src/comics/pages/normalize.ts');
       const {prepareTranslationInput,restoreTranslationInput}=await import('/src/translation/input/prepare.ts');
       const {resizeInput}=await import('/src/translation/input/resize.ts');
+      const {LEGACY_INPUT_PROFILE}=await import('/src/translation/input/limits.ts');
       const source=await(await fetch('/tile-fixture/optional-long.jpg')).blob();
       const normalized=await prepareComicPage({name:'Optional long JPEG',blob:source});
       if(normalized.blob!==source)throw Error('Ordinary JPEG source changed during normalization');
@@ -161,17 +177,17 @@ try{
       Worker.prototype.terminate=function(){terminated++;return terminate.call(this);};
       try{
         const prepared=await prepareTranslationInput({...normalized,imageByteSize:source.size,imageMime:source.type},async()=>source,()=>true);
-        if(prepared.image.sha256!==normalized.imageSha256||prepared.image.content_type!=='image/jpeg'||prepared.blob||prepared.profile)throw Error('Optional encoding did not preserve the original JPEG bytes');
+        if(prepared.sourceSha256!==normalized.imageSha256||normalized.blob!==source)throw Error('Upload encoding changed the original JPEG bytes');
         if(terminated!==1)throw Error('Optional encoding did not terminate its worker');
         let restoreRejected=false,resizeRejected=false;
-        try{await restoreTranslationInput(source,128,20000,normalized.imageSha256,normalized.imageSha256,()=>true);}catch(error){restoreRejected=error.code==='IMAGE_OUTPUT_TOO_LARGE';}
-        try{await resizeInput(source,128,18000);}catch(error){resizeRejected=error.code==='IMAGE_OUTPUT_TOO_LARGE';}
+        try{await restoreTranslationInput(source,128,20000,normalized.imageSha256,normalized.imageSha256,()=>true,LEGACY_INPUT_PROFILE);}catch(error){restoreRejected=error.code==='IMAGE_OUTPUT_TOO_LARGE';}
+        try{await resizeInput(source,128,18000,LEGACY_INPUT_PROFILE);}catch(error){resizeRejected=error.code==='IMAGE_OUTPUT_TOO_LARGE';}
         if(!restoreRejected||!resizeRejected||terminated!==2)throw Error('Required encoding silently reused source bytes or retained a worker');
-        return {width:128,height:20000,inputBytes:source.size,simulatedOutputBudget:1024,originalReused:true,frozenRestoreRejected:restoreRejected,requiredResizeRejected:resizeRejected,terminatedWorkers:terminated};
+        return {width:128,height:20000,inputBytes:source.size,simulatedOutputBudget:1024,originalRetained:true,frozenRestoreRejected:restoreRejected,requiredResizeRejected:resizeRejected,terminatedWorkers:terminated};
       }finally{Worker.prototype.terminate=terminate;}
     });
     assert(injected>=1);assert.deepEqual(errors,[]);
-    report.checks.push('With a 1 KiB injected PNG budget, a real JPEG keeps its original bytes after optional worker encoding fails; required resizing and frozen restoration still fail, and workers terminate');
+    report.checks.push('A real JPEG retains its original bytes independently of upload encoding; a 1 KiB legacy upload PNG budget still rejects frozen restoration and required encoding, and workers terminate');
   }finally{await limited.close();}
   await page.screenshot({path:path.join(root,'browser.png')});
   await writeFile(path.join(root,'browser.json'),JSON.stringify(report,null,2));

@@ -16,10 +16,17 @@ it('preserves remainder pixels, transposes whole 8-aligned tiles and releases bi
 it('rejects malformed recipes, wrong dimensions and invalid inline hosts; cancellation never leaks bitmaps', async () => {
   const bitmap = {width: 67, height: 99, close: vi.fn()};
   vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
-  for (const value of ['unknown', 'webry-baku:0:10', 'webry-baku:20000:20000']) expect(() => parseProcessing(value)).toThrow();
+  for (const value of ['unknown', 'webry-baku:0:10', 'webry-baku:9007199254740992:10']) expect(() => parseProcessing(value)).toThrow();
   await expect(decodeBaku(new Blob(), {width: 68, height: 99})).rejects.toThrow(); expect(bitmap.close).toHaveBeenCalledOnce();
   await expect(image.decodeInline!(new Blob(), new Headers(), 'https://evil.test/image')).rejects.toThrow();
   const controller = new AbortController(); controller.abort();
   await expect(decodeBaku(new Blob(), undefined, controller.signal)).rejects.toThrow();
   expect(createImageBitmap).toHaveBeenCalledTimes(1);
+});
+it('restores valid large originals without a source pixel or edge ceiling', async () => {
+  const bitmap = {width: 20001, height: 20001, close: vi.fn()}, drawImage = vi.fn(), output = new Blob(['png']);
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+  vi.stubGlobal('OffscreenCanvas', class {getContext() {return {drawImage};} async convertToBlob() {return output;}});
+  expect(await decodeBaku(new Blob(), {width: bitmap.width, height: bitmap.height})).toBe(output);
+  expect(drawImage).toHaveBeenCalledTimes(17); expect(bitmap.close).toHaveBeenCalledOnce();
 });

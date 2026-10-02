@@ -6,7 +6,15 @@ it('rejects malformed permutations before decoding', async () => {
   const decode = vi.fn(); vi.stubGlobal('createImageBitmap', decode);
   await expect(decodeImage(new Blob(), new Headers(), 'comici-v1:720:1024:0,0')).rejects.toThrow();
   expect(decode).not.toHaveBeenCalled();
-  expect(() => parseProcessing(processing.replace('720', '20001'))).toThrow();
+  expect(() => parseProcessing(processing.replace('720', '9007199254740992'))).toThrow();
+});
+it('restores valid large originals without a source pixel or edge ceiling', async () => {
+  const bitmap = {width: 20001, height: 20001, close: vi.fn()}, drawImage = vi.fn(), output = new Blob(['png']);
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+  vi.stubGlobal('OffscreenCanvas', class {getContext() {return {drawImage};} async convertToBlob() {return output;}});
+  const large = processing.replace('720:1024', '20001:20001');
+  expect(await decodeImage(new Blob(), new Headers(), large)).toBe(output);
+  expect(drawImage).toHaveBeenCalledTimes(16); expect(bitmap.close).toHaveBeenCalledOnce();
 });
 it('restores column-major tiles at original dimensions and closes decoded resources', async () => {
   const bitmap = {width: 720, height: 1024, close: vi.fn()}, drawImage = vi.fn(), output = new Blob(['png']);

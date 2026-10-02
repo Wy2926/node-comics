@@ -4,7 +4,7 @@ export function parseProcessing(value: string) {
   const match = /^webry-baku:(\d+):(\d+)$/.exec(value);
   if (!match) throw changed();
   const width = Number(match[1]), height = Number(match[2]);
-  if (width < 1 || height < 1 || width > 20000 || height > 20000 || width * height > 60_000_000) throw changed();
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) throw changed();
   return {width, height};
 }
 /** GigaViewer baku transposes a 4x4 grid of tiles rounded down to multiples of 8. */

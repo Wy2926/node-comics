@@ -65,7 +65,7 @@ export const network={
     const items=pages.items.map((value,order)=>{
       const item=object(value),imageUrl=safeImageUrl(base+text(item.url),url);
       if(!imageUrl||!imageUrl.startsWith('https://')||item.s!==undefined&&item.s!==0&&item.s!==1)throw Error('Comix 图片地址或格式无效。');
-      const width=integer(item.width),height=integer(item.height);if(!width||!height||width*height>60_000_000)throw Error('Comix 图片尺寸无效。');
+      const width=integer(item.width),height=integer(item.height);if(!width||!height)throw Error('Comix 图片尺寸无效。');
        return {id:'page-'+order,order,width,height,resource:{kind:'http' as const,url:imageUrl,...(item.s===1?{processing:'tiles-v1'}:{})}};
     });
     return {url,adapter:'comix',title:'Chapter '+loc.number,direction:'ltr',note:'',discoveryComplete:true,knownTotal:items.length,items} satisfies SourceSnapshot;

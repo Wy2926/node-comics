@@ -7,9 +7,9 @@ import { prepareComicPage } from './normalize';
 import { ImagePermissionsRequired, readSourceImage } from '../../sources';
 import {refreshWebsitePage} from '../application/website-content';
 import { sourcePageCache } from '../../storage/source-pages';
-import { downloadStore } from '../../storage/downloads';
+import { downloadKey, downloadStore } from '../../storage/downloads';
 import { SourceDatabaseSchemaError } from '../../storage/database';
-import { RENDER_PROFILE, pageReference, type PageReference } from './identity';
+import { pageRenderProfile, pageReference, type PageReference } from './identity';
 import type { PageDescriptor, PageMaterialization } from '../domain';
 
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; }
@@ -23,15 +23,15 @@ const queue:{priority:number;run:()=>void}[]=[];
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 function schedule<T>(priority:number,action:()=>Promise<T>):Promise<T>{return new Promise((resolve,reject)=>{queue.push({priority,run:()=>{active++;action().then(resolve,reject).finally(()=>{active--;drain();});}});queue.sort((a,b)=>a.priority-b.priority);drain();});}
 function drain(){while(active<2&&queue.length)queue.shift()!.run();}
-export const downloadKey=(contentId:string,pageId:string)=>JSON.stringify([contentId,pageId]);
+export {downloadKey} from '../../storage/downloads';
 export const materializationId=(ref:PageReference)=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId]);
 export const onMaterialized=(listener:(identity:PageMaterialization)=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
 
 async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   signal.throwIfAborted();
-  if(request.renderProfileId!==RENDER_PROFILE)throw Error('不支持的页面渲染版本，请重新打开漫画。');
   const [descriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
   if(!descriptor||!doc||doc.contentId!==request.contentId)throw Error('页面已移除或来源内容已变化。');
+  if(request.renderProfileId!==pageRenderProfile(doc.format))throw Error('不支持的页面渲染版本，请重新打开漫画。');
   const comic=await catalog.get('comics',doc.comicId),binding=comic?.source;
   const connection=binding&&await catalog.get('connections',binding.connectionId);
   if(!comic||!binding||!connection)throw Error('漫画来源已移除。');
@@ -43,7 +43,7 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   const cachePages=getSourceDriver(connection.provider)?.cachePages!==false;
   const cacheToken=cachePages&&request.purpose!=='download'?await sourcePageCache.token(doc.id).catch(cacheUnavailable):undefined;
   const id=materializationId(request),known=await catalog.get('materializations',id);
-  let blob=await downloadStore.get(downloadKey(request.contentId,request.pageId)).catch(cacheUnavailable);
+  let blob=await downloadStore.get(downloadKey(request.contentId,request.pageId,request.renderProfileId)).catch(cacheUnavailable);
   if(!blob&&cachePages)blob=await sourcePageCache.get(pageReference(request)).catch(cacheUnavailable);
   // These repositories contain already-normalized output from this service, keyed by current content identity/profile.
   const trustedCache=!!blob;

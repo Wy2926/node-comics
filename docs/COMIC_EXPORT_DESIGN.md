@@ -20,7 +20,7 @@
 
 CBZ／ZIP 依页序保存可用原始图片字节并包含 `export-manifest.json`。PDF 按页绘制且可能重编码，需要原始字节时使用 CBZ 或完整源文件导出。
 
-支持文件选择器的浏览器可将 CBZ／ZIP 逐页写入文件。其他浏览器及 PDF 使用有界缓冲，当前上限 128 MiB。关闭面板会取消当前操作并释放资源，不保存临时漫画副本，也不修改阅读位置。
+支持文件选择器的浏览器可将 CBZ／ZIP 逐页写入文件。其他浏览器及 PDF 使用有界缓冲，当前整份导出上限 128 MiB；单页图片不另设字节、像素或边长上限。关闭面板会取消当前操作并释放资源，不保存临时漫画副本，也不修改阅读位置。
 
 实现：[导出服务](../apps/extension/src/comics/application/export-service.ts)、[页面计划](../apps/extension/src/export/plan.ts)、[导出面板](../apps/extension/src/ui/DocumentExport.tsx)。依赖版本与许可证见[格式说明](IMPORT_FORMATS_AND_CACHE.md)。
 

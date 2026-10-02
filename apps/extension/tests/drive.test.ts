@@ -61,12 +61,26 @@ describe('Drive range safety', () => {
     await expect(drive.readAt(20,4)).rejects.toMatchObject({code:'source-changed'});
     expect(request).toHaveBeenCalledTimes(3);
   });
-  it('rejects invalid boundaries and budget before network I/O', async () => {
-    const {source: drive, request} = source([], {maxNetworkBytes:3});
+  it('rejects invalid boundaries before network I/O', async () => {
+    const {source: drive, request} = source([]);
     await expect(drive.readAt(-1,1)).rejects.toBeInstanceOf(RangeError);
     await expect(drive.readAt(999,2)).rejects.toBeInstanceOf(RangeError);
-    await expect(drive.readAt(0,4)).rejects.toMatchObject({code:'budget-exceeded'});
     expect(request).not.toHaveBeenCalled();
+  });
+  it('reads large declared ranges above the former single-request and total budgets while bounding repeat reads', async () => {
+    const MiB=1024*1024,size=80*MiB,length=33*MiB,largeBinding={...binding,size};
+    const request=vi.fn<typeof fetch>(async(input,init)=>{
+      if(!new URL(String(input)).searchParams.has('alt'))return metadata('17',{size:String(size)});
+      const match=/^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get('Range')!)!,offset=Number(match[1]);
+      let remaining=length;const chunk=new Uint8Array(65536).fill(7);
+      return new Response(new ReadableStream<Uint8Array>({pull(controller){if(!remaining){controller.close();return;}const take=Math.min(remaining,chunk.length);controller.enqueue(chunk.subarray(0,take));remaining-=take;}}),
+        {status:206,headers:{'Content-Range':`bytes ${offset}-${offset+length-1}/${size}`,'Content-Length':String(length)}});
+    });
+    const drive=new DriveRangeSource(largeBinding,{token:async()=>'token',fetch:request});
+    for(const offset of [0,length]){const bytes=await drive.readAt(offset,length);expect(bytes.length).toBe(length);expect(bytes[0]).toBe(7);expect(bytes.at(-1)).toBe(7);}
+    expect(drive.networkBytes).toBe(66*MiB);expect(request).toHaveBeenCalledTimes(6);
+    await expect(drive.readAt(0,length)).rejects.toMatchObject({code:'budget-exceeded'});expect(request).toHaveBeenCalledTimes(6);
+    await drive.close();
   });
   it('distinguishes expired credentials from explicit lost access and only purges the latter', async () => {
     const onAccessLost = vi.fn();

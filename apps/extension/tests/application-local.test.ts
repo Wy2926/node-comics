@@ -6,10 +6,14 @@ import {importLocalFile,reindexEntry} from '../src/comics/application/import-ser
 import {beginImportJournal,recordCopiedFile} from '../src/comics/application/import-journal';
 import {initializeSources} from '../src/comics/application/source-lifecycle';
 import {registerSourceDriver} from '../src/comics/sources/registry';
-import {loadEntry,removeComic,saveReaderState} from '../src/comics/application/library-service';
+import {coverReference,loadEntry,removeComic,saveReaderState} from '../src/comics/application/library-service';
 import {LocalImportQueue} from '../src/comics/application/import-queue';
 import type {Job} from '../src/types';
-import {RENDER_PROFILE} from '../src/comics/pages/identity';
+import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
+import {acquirePage,materializationId} from '../src/comics/pages/service';
+import {sourcePageCache} from '../src/storage/source-pages';
+import {downloadKey,downloadStore} from '../src/storage/downloads';
+import {planExport} from '../src/export/plan';
 const mocks=vi.hoisted(()=>({index:vi.fn(),materialize:vi.fn()}));
 vi.mock('../src/comics/formats',()=>({openDocument:async()=>({index:mocks.index,materialize:mocks.materialize,close:async()=>{}})}));
 let dispose:()=>void;
@@ -17,6 +21,32 @@ beforeEach(()=>{mocks.index.mockReset().mockResolvedValue([{ordinal:0,name:'page
 afterEach(()=>dispose());
 const file=(name=crypto.randomUUID()+'.cbz',content=crypto.randomUUID())=>new File(['PK',content],name,{type:'application/zip'});
 describe('single-file comic imports',()=>{
+ it('isolates the new PDF render profile while retaining old cached pages, translations and reading position',async()=>{
+  const input=new File(['%PDF-',crypto.randomUUID()],crypto.randomUUID()+'.pdf'),created=await importLocalFile(input),copy=await loadEntry(created.id),page=copy.pages[0];
+  const oldRef={entryId:copy.id,contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE},newRef={...oldRef,renderProfileId:PDF_RENDER_PROFILE};
+  const oldBlob=new Blob(['old-pdf'],{type:'image/png'}),oldSha='e'.repeat(64),oldIdentity={id:materializationId(oldRef),contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE,imageSha256:oldSha,width:8192,height:1953,byteSize:oldBlob.size,mime:'image/png',updatedAt:1};
+  await catalog.putMaterialization(oldIdentity,copy.generation);
+  await sourcePageCache.put(pageReference(oldRef),oldBlob,{owner:copy.id,contentId:copy.contentId});
+  await downloadStore.put(downloadKey(copy.contentId!,page.id),oldBlob,{owner:copy.id,contentId:copy.contentId});
+  const oldJob:Job={id:'old-pdf-result',status:'succeeded',result:{key:'old-pdf-result',recoverable:false},mode:'classic',target_language:'en',phase:'done',created_at:'2026-09-22',version:1,cache_hit:false,quota_pages:0};
+  await saveReaderState({...copy,pageId:page.id,lastReadAt:100,relativeOffset:.3,pages:[{...page,imageSha256:oldSha,translationScope:'pdf-channel',jobs:[oldJob]}]});
+  const position=await catalog.get('positions',copy.id);
+  vi.stubGlobal('createImageBitmap',async()=>({width:10000,height:12000,close(){}}));
+  const newBlob=new Blob([new Uint8Array([137,80,78,71,13,10,26,10,1,2,3,4])],{type:'image/png'});mocks.materialize.mockResolvedValue(newBlob);
+  try{
+   const before=await loadEntry(copy.id,{key:'pdf-channel'});expect(before.pages[0]).toMatchObject({renderProfileId:PDF_RENDER_PROFILE,blobKey:pageReference(newRef),jobs:[]});expect(before.pages[0].imageSha256).toBeUndefined();
+   const comic=(await catalog.get('comics',created.comicId))!;expect(coverReference(comic)).toBe(pageReference(newRef));
+   expect((await planExport(copy.id,{format:'cbz',images:'original',mode:'classic',language:'en'})).pages[0].reference).toEqual(newRef);
+   const lease=await acquirePage(newRef);try{expect(lease.blob).toBe(newBlob);expect(lease.identity).toMatchObject({renderProfileId:PDF_RENDER_PROFILE,width:10000,height:12000});expect(lease.identity.imageSha256).not.toBe(oldSha);}finally{lease.release();}
+   const after=await loadEntry(copy.id,{key:'pdf-channel'});expect(after.pages[0]).toMatchObject({renderProfileId:PDF_RENDER_PROFILE,width:10000,height:12000,jobs:[]});expect(after.relativeOffset).toBe(.3);
+   expect(await catalog.get('positions',copy.id)).toEqual(position);expect(await catalog.get('entries',copy.id)).toMatchObject({contentId:copy.contentId,generation:copy.generation});
+   expect(await catalog.get('materializations',materializationId(oldRef))).toEqual(oldIdentity);
+   expect(await (await sourcePageCache.get(pageReference(oldRef)))!.text()).toBe('old-pdf');expect(await (await downloadStore.get(downloadKey(copy.contentId!,page.id)))!.text()).toBe('old-pdf');
+   expect((await catalog.get('translationBindings',JSON.stringify(['pdf-channel',oldSha])))!.payload).toMatchObject({jobs:[oldJob]});
+   expect(downloadKey(copy.contentId!,page.id,PDF_RENDER_PROFILE)).toBe(JSON.stringify([copy.contentId,page.id,PDF_RENDER_PROFILE]));
+   expect(downloadKey(copy.contentId!,page.id)).toBe(JSON.stringify([copy.contentId,page.id]));
+  }finally{vi.unstubAllGlobals();await removeComic(created.comicId);}
+ });
  it('restores channel bindings independently while preserving source bytes and reading position',async()=>{
   const input=file(),created=await importLocalFile(input),copy=await loadEntry(created.id),page=copy.pages[0],sha='c'.repeat(64);
   await catalog.putMaterialization({id:JSON.stringify([copy.contentId,page.id,RENDER_PROFILE]),contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE,imageSha256:sha,width:800,height:1200,byteSize:10,mime:'image/png',updatedAt:Date.now()},copy.generation);

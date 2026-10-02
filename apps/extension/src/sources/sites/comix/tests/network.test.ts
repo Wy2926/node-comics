@@ -27,6 +27,10 @@ function fixture(rows=[row(20,0),row(30,1),row(10,1,true),row(40,1.5)],mutate?:(
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('Comix network adapter',()=>{
+ it('preserves large valid page dimensions without a source pixel ceiling',async()=>{
+   const context=fixture(),request=async(target:string)=>(await context.request(target)).replace('"width":800,"height":1200','"width":20001,"height":20001');
+   expect((await network.pages(url+'/20-chapter-0',{request})).items[0]).toMatchObject({width:20001,height:20001});
+ });
  it('reads the dedicated poster without treating it as a chapter image',async()=>{
    const context=fixture(),request=async(target:string)=>(await context.request(target)).replace('"title":"Fixture"','"title":"Fixture","poster":{"large":"https://static.comix.to/cover.jpg","medium":"https://static.comix.to/small.jpg"}');
    const source=validateSourceCatalog(await network.catalog(url,{request}));

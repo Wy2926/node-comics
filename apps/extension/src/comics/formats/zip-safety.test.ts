@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {ZipWriter, BlobWriter, TextReader} from '@zip.js/zip.js/index-native.js';
-import {validateEntries, comparePaths, MAX_PAGE, MiB} from './limits';
+import {ZipWriter, BlobReader, BlobWriter, TextReader} from '@zip.js/zip.js/index-native.js';
+import {validateEntries, comparePaths, MiB} from './limits';
 import {openZipDocument} from './zip';
 import {decompressPalmDoc} from './mobi';
 import type {RandomAccessSource} from './contracts';
@@ -35,11 +35,20 @@ describe('archive resource limits and integrity', () => {
     finally { await session.close(); }
   });
   it('bounds declared expansion, page count and ambiguous paths', () => {
-    expect(() => validateEntries([{name:'1.png',size:MAX_PAGE+1}])).toThrow('32 MB');
+    expect(validateEntries([{name:'1.png',size:41*MiB}])).toHaveLength(1);
+    for (const size of [-1, Infinity, 1.5]) expect(() => validateEntries([{name:'1.png',size}])).toThrow('大小无效');
     expect(() => validateEntries(Array.from({length:1501},(_,i)=>({name:`${i}.png`,size:1})))).toThrow('1500');
     expect(() => validateEntries([{name:'a.png',size:20*MiB},{name:'b.png',size:20*MiB}],32*MiB)).toThrow('展开');
     expect(() => validateEntries([{name:'a.png',size:1},{name:'a.png',size:1}])).toThrow('重名');
     expect([{name:'2.png'},{name:'02.png'},{name:'A/1.png'},{name:'a/1.png'}].sort(comparePaths).map(e=>e.name)).toEqual(['02.png','2.png','A/1.png','a/1.png']);
+  });
+  it('materializes a page above the former 32 MiB output and 40 MiB read ceilings', async () => {
+    const page = new Blob([new Uint8Array(41 * MiB)], {type:'image/png'});
+    const writer = new ZipWriter(new BlobWriter(), {useWebWorkers:false, level:0});
+    await writer.add('large.png',new BlobReader(page));
+    const session = openZipDocument(source(await writer.close()));
+    try { const [descriptor] = await session.index(); expect((await session.materialize(descriptor)).size).toBe(page.size); }
+    finally { await session.close(); }
   });
   it('bounds PalmDOC expansion and rejects invalid backward references', () => {
     expect(() => decompressPalmDoc(Uint8Array.from([128,24]))).toThrow('回溯');

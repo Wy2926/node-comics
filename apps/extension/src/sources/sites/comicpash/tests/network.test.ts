@@ -79,7 +79,7 @@ describe('Comic PASH public network source', () => {
     if (mode === 'host') body.result[0].imageUrl = body.result[0].imageUrl.replace('viewer.comicpash.jp', 'viewer.comicpash.jp.evil.test');
     if (mode === 'owner') body.result[0].imageUrl = body.result[0].imageUrl.replace(viewer, 'foreign');
     if (mode === 'scramble') body.result[0].scramble = '[0,0]';
-    if (mode === 'dimensions') body.result[0].width = 20001;
+    if (mode === 'dimensions') body.result[0].width = Number.MAX_SAFE_INTEGER + 1;
     expect(() => parseContents(JSON.stringify(body), viewer)).toThrow();
   });
   it('rejects restricted readers, cross-series bindings and changing/incomplete page counts', async () => {

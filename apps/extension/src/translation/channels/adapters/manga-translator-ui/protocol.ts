@@ -24,7 +24,7 @@ export function safeError(code: string): string {
   if (code === 'SOURCE_MISSING') return msg('本地原图尚未就绪，请重新采集。');
   if (code === 'SOURCE_CHANGED') return msg('原图内容已变化，请重新加载后翻译。');
   if (code === 'INVALID_IMAGE') return msg('翻译服务未返回可解码的图片。');
-  if (code === 'IMAGE_TOO_LARGE') return msg('图片尺寸超过翻译服务限制。');
+  if (code === 'IMAGE_TOO_LARGE') return msg('图片超过翻译服务的大小限制。');
   if (code === 'RESULT_MISSING' || code === 'RESULT_NOT_CACHED') return msg('本地译图缓存已清理，请手动重新翻译。');
   if (code === 'HOST_UNAVAILABLE') return msg('翻译执行页面无法打开，请重新尝试。');
   if (code === 'INTERRUPTED') return msg('翻译连接已中断，服务可能仍在处理。确认后可手动重试。');
@@ -38,7 +38,6 @@ export function translationRequest(base: string, token: string, mode: Mode, lang
   return {
     url: base + 'translate/with-form/image', headers: {'X-Session-Token': token}, imageField: 'image',
     fields: {config: JSON.stringify({translator: {target_lang: target}})},
-    maxBytes: 32 * 1024 * 1024, maxPixels: 40_000_000, maxDimension: 30000,
   };
 }
 

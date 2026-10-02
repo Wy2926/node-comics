@@ -1,6 +1,5 @@
 import {msg} from '../../i18n/runtime';
 import {Sha256} from '../../importers/hash';
-import {MAX_PAGE} from '../formats/limits';
 import {imageMimeFromBytes} from '../formats/identify';
 import HashWorker from './hash.worker?worker';
 import {needsNormalization} from './image-metadata';
@@ -33,7 +32,6 @@ async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {
 /** Only materialized pages are normalized; indexing never calls a bitmap decoder. */
 export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
   signal?.throwIfAborted();
-  if (item.blob.size > MAX_PAGE) throw Error(msg('{0} 超过单页 32 MB 限制。', {'0': item.name}));
   if (item.width !== undefined && item.height !== undefined) checkDimensions(item.width, item.height, item.name);
   const mime=imageMimeFromBytes(new Uint8Array(await item.blob.slice(0,12).arrayBuffer()));
   if(!mime)throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': item.name}));
@@ -46,14 +44,13 @@ export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
     const {width, height} = bitmap; checkDimensions(width, height, item.name);
     let blob = input;
     if (await needsNormalization(blob)) {
-      if(Math.max(width,height)>16383)blob=await bitmapPng(bitmap,[],MAX_PAGE);
+      if(Math.max(width,height)>16383)blob=await bitmapPng(bitmap);
       else{
         const canvas = new OffscreenCanvas(width, height);
         try { canvas.getContext('2d',{colorSpace:'srgb'})!.drawImage(bitmap, 0, 0); blob = await canvas.convertToBlob({type: 'image/png'}); }
         finally { canvas.width = canvas.height = 1; }
       }
     }
-    if (blob.size > MAX_PAGE) throw Error(msg('{0} 转换后超过单页 32 MB 限制。', {'0': item.name}));
     const imageSha256 = await digestPage(blob, signal);
     signal?.throwIfAborted(); return {blob, width, height, imageSha256};
   } finally { bitmap.close(); }

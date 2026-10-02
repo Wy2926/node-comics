@@ -1,7 +1,6 @@
 import {msg} from '../../i18n/runtime';
 export const MiB = 1024 * 1024;
 export const MAX_FILE = 512 * MiB;
-export const MAX_PAGE = 32 * MiB;
 export const MAX_EXPANDED = 1024 * MiB;
 export const MAX_PAGES = 1500;
 export const MAX_ENTRIES = 10000;
@@ -21,7 +20,7 @@ export function validateEntries<T extends {name:string; size:number; encrypted?:
   let expanded=0;
   for(const entry of entries) {
     if(entry.encrypted)throw Error(msg("暂不支持加密压缩包，请先在本机解密后导入。"));
-    if(!Number.isSafeInteger(entry.size)||entry.size<0||entry.size>MAX_PAGE)throw Error(msg("压缩包单个文件不能超过 32 MB。"));
+    if(!Number.isSafeInteger(entry.size)||entry.size<0)throw Error('压缩包文件大小无效。');
     expanded+=entry.size;
     if(expanded>limit)throw Error(msg("压缩包展开大小超过 {0} MB，请拆分为较小章节。", {"0": limit/MiB}));
   }

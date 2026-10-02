@@ -2,6 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {fetchSourceImage} from '../src/sources/runtime/image-fetch';
 import {ImagePermissionsRequired} from '../src/sources/runtime/permissions';
 import {imageReferer} from '../src/sources/shared/referrer';
+import {imageDataUrl} from '../src/sources/shared/bytes';
 const fixture=vi.hoisted(()=>({headers:[] as Record<string,string>[]}));
 vi.mock('../src/sources/runtime/image-headers',()=>({withImageHeaders:async(_url:string,headers:Record<string,string>,_signal:AbortSignal,read:()=>Promise<unknown>)=>{fixture.headers.push(headers);return read();}}));
 beforeEach(()=>{
@@ -43,9 +44,20 @@ describe('common image request context',()=>{
     const fetch=vi.fn();vi.stubGlobal('fetch',fetch);vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
     await expect(fetchSourceImage(image)).rejects.toBeInstanceOf(ImagePermissionsRequired);expect(fetch).not.toHaveBeenCalled();
   });
-  it('preserves actionable HTTP failures and bounds response bytes',async()=>{
-    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response('denied',{status:403})).mockResolvedValueOnce(new Response('too large',{headers:{'content-length':String(41*1024*1024)}})));
-    await expect(fetchSourceImage(image)).rejects.toThrow('403');await expect(fetchSourceImage(image)).rejects.toThrow('40 MB');
+  it('preserves actionable HTTP failures without imposing a source byte ceiling',async()=>{
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response('denied',{status:403})).mockResolvedValueOnce(new Response('image',{headers:{'content-length':String(41*1024*1024)}})));
+    await expect(fetchSourceImage(image)).rejects.toThrow('403');
+    expect(await(await fetchSourceImage(image)).blob.text()).toBe('image');
+  });
+  it('reads a source stream above the former 40 MiB ceiling without Content-Length',async()=>{
+    const size=40*1024*1024+1;
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(new Uint8Array(size))));
+    expect((await fetchSourceImage(image)).blob.size).toBe(size);
+  });
+  it('serializes page image bytes independently of a declared original size',async()=>{
+    // Keep the encoded fixture small while exercising the former Blob.size rejection.
+    const original={size:41*1024*1024,type:'image/png',arrayBuffer:async()=>new Uint8Array([97]).buffer} as Blob;
+    expect(await imageDataUrl(original)).toBe('data:image/png;base64,YQ==');
   });
   it('aborts before requesting and keeps page data outside host permissions',async()=>{
     const fetch=vi.fn(async()=>new Response('pixels'));vi.stubGlobal('fetch',fetch);

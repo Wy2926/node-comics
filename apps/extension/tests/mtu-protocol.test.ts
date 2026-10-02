@@ -68,5 +68,6 @@ it('opens an independent channel without any NodeLane login or rights', async ()
   expect(connection.available).toBe(true); expect(connection.requiresInternet).toBe(false);
   expect(connection.capabilities.entitlements).toBeNull();
   expect(connection.capabilities.modes.map(mode => mode.id)).toEqual(['classic']);
+  expect(connection.capabilities.limits).toEqual({max_bytes: 32 * 1024 * 1024, max_pixels: Number.MAX_SAFE_INTEGER, max_dimension: Number.MAX_SAFE_INTEGER, max_translation_ids: 4});
   connection.dispose(); expect(connection.isCurrent()).toBe(false);
 });

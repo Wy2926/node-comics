@@ -1,7 +1,7 @@
 import {catalog} from '../repositories';
 import type {Comic,Entry,PageDescriptor,PageMaterialization} from '../domain';
 import type {Page,ReadingEntry} from '../../types';
-import {RENDER_PROFILE,pageReference} from '../pages/identity';
+import {pageRenderProfile,pageReference} from '../pages/identity';
 import {materializationId} from '../pages/service';
 import {releaseContainer} from '../../storage/containers';
 import {sourcePageCache} from '../../storage/source-pages';
@@ -48,9 +48,10 @@ export async function continueEntry(comicId:string,targetLanguage?:string):Promi
   return start?chooseReadingEntry(start,preferences,targetLanguage):undefined;
 }
 export function descriptorView(entry:Entry,page:PageDescriptor,identity?:PageMaterialization):Page {
+  const renderProfileId=pageRenderProfile(entry.format);
   return {id:page.pageId,name:page.name,width:identity?.width??page.width??900,height:identity?.height??page.height??1300,
-    entryId:entry.id,contentId:page.contentId,renderProfileId:RENDER_PROFILE,
-    blobKey:pageReference({entryId:entry.id,contentId:page.contentId,pageId:page.pageId,renderProfileId:RENDER_PROFILE}),
+    entryId:entry.id,contentId:page.contentId,renderProfileId,
+    blobKey:pageReference({entryId:entry.id,contentId:page.contentId,pageId:page.pageId,renderProfileId}),
     ...(identity?{imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime}:{}),
     sourceUrl:typeof page.locator.url==='string'?page.locator.url:undefined,jobs:[],outputBlobs:{}};
 }
@@ -64,7 +65,7 @@ export async function loadEntry(id:string,scope?:TranslationScope):Promise<Readi
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
   const [descriptors,position,comic]=await Promise.all([catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
   const pages=await Promise.all(descriptors.map(async descriptor=>{
-    const identity=await catalog.get('materializations',materializationId({entryId:id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:RENDER_PROFILE}));
+    const identity=await catalog.get('materializations',materializationId({entryId:id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(entry.format)}));
     const page=descriptorView(entry,descriptor,identity);
     if(scope&&identity){
       const saved=await catalog.get('translationBindings',JSON.stringify([scope.key,identity.imageSha256]));

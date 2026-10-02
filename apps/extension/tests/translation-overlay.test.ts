@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {hashFile} from '../src/importers/hash';
 import * as hashing from '../src/importers/hash';
-import {materializeResult} from '../src/translation/materialize';
+import {materializeResult,validateResult} from '../src/translation/materialize';
 import {loadDeliveredResult,resultBlobKey} from '../src/storage/translations/results';
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 import {invalidateResultMemory,resultInMemory} from '../src/storage/translations/memory';
@@ -64,8 +64,18 @@ describe('official translation overlays',()=>{
     const descriptor={...result,kind:'no_text' as const,representation:'original' as const,width:1000,height:100000,bbox:undefined,composite:undefined,artifact:null};
     vi.mocked(createImageBitmap).mockResolvedValue({width:1000,height:100000,close} as ImageBitmap);
     expect(await materializeResult(descriptor,original)).toBe(original);
-    await expect(materializeResult({...descriptor,height:100001},original)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
-    expect(createImageBitmap).toHaveBeenCalledOnce();expect(convert).not.toHaveBeenCalled();
+    vi.mocked(createImageBitmap).mockResolvedValue({width:1000,height:100001,close} as ImageBitmap);
+    expect(await materializeResult({...descriptor,height:100001},original)).toBe(original);
+    vi.mocked(createImageBitmap).mockResolvedValue({width:1000,height:100000,close} as ImageBitmap);
+    await expect(materializeResult({...descriptor,height:100001},original)).rejects.toThrow('原图内容');
+    expect(createImageBitmap).toHaveBeenCalledTimes(3);expect(convert).not.toHaveBeenCalled();
+  });
+  it('accepts large delivered file descriptors and still checks exact artifact bytes',async()=>{
+    const descriptor={...result,representation:'full-image-v1' as const,width:100001,height:5,bbox:undefined,composite:undefined,
+      artifact:{...result.artifact!,byte_size:129*1024*1024}};
+    expect(()=>validateResult(descriptor)).not.toThrow();
+    await expect(materializeResult(descriptor,undefined,patch)).rejects.toMatchObject({code:'RESULT_ARTIFACT_INVALID'});
+    expect(createImageBitmap).not.toHaveBeenCalled();
   });
   it('accepts a full-image result whose output dimensions differ from the hashed source',async()=>{
     const descriptor={...result,representation:'full-image-v1' as const,width:4,height:5,bbox:undefined,composite:undefined};

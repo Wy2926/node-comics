@@ -27,10 +27,11 @@ function assertResult({job,isCurrent}:ResultRequest){
     throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
 }
 async function validate(blob:Blob){
-  if(!blob.size||blob.size>128*1024*1024)throw Error(msg('图片尺寸超过翻译服务限制。'));
+  const invalid=()=>Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('译图')}));
+  if(!blob.size)throw invalid();
   let bitmap:ImageBitmap;
-  try{bitmap=await createImageBitmap(blob);}catch{throw Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('译图')}));}
-  try{if(!Number.isSafeInteger(bitmap.width)||!Number.isSafeInteger(bitmap.height)||bitmap.width<1||bitmap.height<1||!Number.isSafeInteger(bitmap.width*bitmap.height))throw Error(msg('图片尺寸超过翻译服务限制。'));}
+  try{bitmap=await createImageBitmap(blob);}catch{throw invalid();}
+  try{if(!Number.isSafeInteger(bitmap.width)||!Number.isSafeInteger(bitmap.height)||bitmap.width<1||bitmap.height<1||!Number.isSafeInteger(bitmap.width*bitmap.height))throw invalid();}
   finally{bitmap.close();}
 }
 async function publish(request:ResultRequest,blob:Blob,token:CacheToken|undefined){

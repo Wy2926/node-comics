@@ -5,7 +5,7 @@ import {InlineOriginals} from './originals';
 import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
-import { imageDataUrl, maxInlineBytes, safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
+import { imageDataUrl, safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
 import { type ReadingTarget } from '../translation/automatic';
 import { matchesPage } from '../translation/sync';
 import { defaults, supportsLanguage, type Capabilities, type Job, type Page, type Settings } from '../types';
@@ -62,7 +62,7 @@ async function createContext(tabId:number,navigationId:string):Promise<Context>{
   const current=()=>generation===configGeneration&&(!ctx||ctx.active);
   const channel=await openActiveChannel(current),caps=channel.capabilities;
   assertCurrent(current);
-  const originals=new InlineOriginals('inline:'+key,Math.min(128*1024*1024,caps.limits.max_bytes*4));
+  const originals=new InlineOriginals('inline:'+key);
   const attach=async(jobs:Job[])=>{
     assertCurrent(current);if(!ctx)return;ctx.jobs=mergeJobs(ctx.jobs,jobs);
     for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,translationScope:channel.scope.key,jobs:mergeJobs(page.jobs,incoming)});}
@@ -76,7 +76,7 @@ function disposeContext(ctx:Context){ctx.active=false;ctx.waiting?.abort();ctx.c
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
 async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
   assertCurrent(ctx.channel.isCurrent);let blob:Blob;
-  if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||source.data.length>maxInlineBytes*4/3+200||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await(await fetch(source.data)).blob();}
+  if(image.url==='page-image:'+image.id){const source=await chrome.tabs.sendMessage(sender.tab!.id!,{type:'NC_INLINE_SOURCE',navigationId:request.navigationId,id:image.id},{documentId:sender.documentId,frameId:0});if(typeof source?.data!=='string'||!/^data:[\w.+/-]+;base64,/.test(source.data))throw Error(source?.error??msg("网页原图读取失败。"));blob=await(await fetch(source.data)).blob();}
   else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy);
   assertCurrent(ctx.channel.isCurrent);
   const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(ctx.channel.isCurrent);

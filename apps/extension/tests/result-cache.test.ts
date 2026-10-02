@@ -26,6 +26,17 @@ it('retains decoded long results without a separate pixel or dimension admission
   expect(blob.size).toBeGreaterThan(0);expect(close).toHaveBeenCalledOnce();
 });
 
+it('keeps a large valid result readable when it exceeds the persistent cache budget',async()=>{
+  await setTranslationCacheLimitMb(0);
+  const input=request(),blob=new Blob(['large translated image'],{type:'image/png'});
+  // Model a large delivered file without allocating its pixels in the storage unit test.
+  vi.spyOn(blob,'size','get').mockReturnValue(129*1024*1024);
+  expect(await saveResultBlob({...input,blob})).toBe(blob);
+  expect(createImageBitmap).toHaveBeenCalledWith(blob);
+  expect(await translationCache.has(resultBlobKey(input.scope,input.job))).toBe(false);
+  expect(await loadResultBlob(input)).toBe(blob);expect(input.download).not.toHaveBeenCalled();
+});
+
 it('coalesces concurrent readers and retains bytes after the display is released', async () => {
   const input = request();
   const blobs = await Promise.all(Array.from({length: 4}, () => loadResultBlob(input)));
@@ -152,7 +163,7 @@ it('rejects undecodable images and invalid dimensions before publishing bytes',a
   vi.mocked(createImageBitmap).mockRejectedValueOnce(Error('decode failed'));
   await expect(saveResultBlob({...input,blob})).rejects.toThrow('无法解码');
   const close=vi.fn();vi.mocked(createImageBitmap).mockResolvedValueOnce({width:0,height:1200,close} as unknown as ImageBitmap);
-  await expect(saveResultBlob({...input,blob})).rejects.toThrow('尺寸');
+  await expect(saveResultBlob({...input,blob})).rejects.toThrow('无法解码');
   expect(close).toHaveBeenCalledOnce();
   const key=resultBlobKey(input.scope,input.job);expect(await translationCache.has(key)).toBe(false);expect(resultInMemory(key)).toBeUndefined();
 });

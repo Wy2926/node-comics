@@ -4,9 +4,6 @@ export interface ImageTransferRequest {
   headers: Record<string, string>;
   imageField: string;
   fields: Record<string, string>;
-  maxBytes: number;
-  maxPixels: number;
-  maxDimension: number;
 }
 
 export interface ImageTransferReceipt {

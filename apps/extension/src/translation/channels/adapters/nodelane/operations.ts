@@ -1,6 +1,6 @@
 import {msg} from '../../../../i18n/runtime';
 import {Sha256} from '../../../../importers/hash';
-import {parsePageReference} from '../../../../comics/pages/identity';
+import {RENDER_PROFILE,parsePageReference} from '../../../../comics/pages/identity';
 import type {ModeEntitlement,TranslationInput} from '../../../../types';
 import {targetKey,type ReadingTarget} from '../../../automatic';
 import type {LocalOperation} from './store';
@@ -9,7 +9,9 @@ import type {PreparedInput} from '../../../input/prepare';
 const digest=(value:unknown)=>new Sha256().update(new TextEncoder().encode(JSON.stringify(value))).digest();
 export const exhausted=(rights:ModeEntitlement)=>!rights.allowed||!rights.unlimited&&(rights.quota?.available??0)<=0;
 export const quotaErrors=new Set(['DAILY_QUOTA_EXHAUSTED']);
-export const operationId=(scope:string,language:string,target:ReadingTarget)=>digest([scope,language,targetKey(target.entryId,target.page,target.mode)]);
+const operationIdentity=(scope:string,language:string,target:ReadingTarget)=>[scope,language,targetKey(target.entryId,target.page,target.mode)];
+export const operationId=(scope:string,language:string,target:ReadingTarget)=>digest(target.page.renderProfileId&&target.page.renderProfileId!==RENDER_PROFILE
+  ?[...operationIdentity(scope,language,target),target.page.renderProfileId]:operationIdentity(scope,language,target));
 
 export function makeOperation(target:ReadingTarget,scope:string,language:string,prepared:PreparedInput,action?:{retry_of:string}|{regenerate_of:string}):LocalOperation{
   const {page,entryId,mode}=target;

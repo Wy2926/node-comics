@@ -1,7 +1,6 @@
 import { msg } from '../../i18n/runtime';
-import { maxInlineBytes } from './bytes';
 export async function canvasImage(canvas: HTMLCanvasElement, signal?: AbortSignal): Promise<Blob> {
-  if (!canvas.width || !canvas.height || canvas.width * canvas.height > 60_000_000)
+  if (!Number.isSafeInteger(canvas.width) || !Number.isSafeInteger(canvas.height) || canvas.width < 1 || canvas.height < 1)
     throw Error(msg('原图尺寸不可用。'));
   signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(30000),
@@ -14,7 +13,7 @@ export async function canvasImage(canvas: HTMLCanvasElement, signal?: AbortSigna
       canvas.toBlob(resolve, 'image/png');
     });
     combined.throwIfAborted();
-    if (!blob || blob.size > maxInlineBytes) throw Error();
+    if (!blob) throw Error();
     return blob;
   } catch {
     throw Error(msg('网页原图读取失败。'));

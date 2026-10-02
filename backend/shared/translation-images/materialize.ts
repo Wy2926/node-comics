@@ -1,7 +1,6 @@
 import type {TranslationResult} from './types';
 import {hashFile} from './hash';
 import {imageWork} from './work';
-import {TRANSLATION_MAX_DIMENSION} from './limits';
 import {TILES_MIME,readTiles} from './tiles';
 import {bitmapPng} from './png';
 
@@ -26,7 +25,7 @@ export class InvalidArtifactError extends Error {
 
 export function validateResult(result: TranslationResult) {
   if (result.normalization_version !== 1 || !digest.test(result.input_sha256) ||
-      !positive(result.width) || !positive(result.height) || Math.max(result.width, result.height) > TRANSLATION_MAX_DIMENSION ||
+      !positive(result.width) || !positive(result.height) || !Number.isSafeInteger(result.width * result.height) ||
       !['translated', 'partial', 'no_text'].includes(result.kind)) {
     throw new InvalidArtifactError();
   }
@@ -35,8 +34,7 @@ export function validateResult(result: TranslationResult) {
     return;
   }
   const artifact = result.artifact;
-  if (!artifact || !digest.test(artifact.sha256) || !positive(artifact.byte_size) ||
-      artifact.byte_size > 128 * 1024 * 1024 || result.kind === 'no_text') {
+  if (!artifact || !digest.test(artifact.sha256) || !positive(artifact.byte_size) || result.kind === 'no_text') {
     throw new InvalidArtifactError();
   }
   if (result.representation === 'overlay-v1') {

@@ -1,6 +1,7 @@
 import type {Comic} from '../domain';
 import {catalog} from '../repositories';
-import {pageReference, RENDER_PROFILE} from '../pages/identity';
+import {pageReference, pageRenderProfile} from '../pages/identity';
+import {detectFormat} from '../formats/identify';
 import {readSourceCover} from '../../sources';
 import type {SourceCatalog} from './types';
 
@@ -8,7 +9,8 @@ const prefix = 'source-cover:';
 export const sourceCoverOwner = (comicId: string) => prefix + comicId;
 export function coverReference(comic: Comic): string | undefined {
   if (comic.sourceCover) return prefix + JSON.stringify([comic.id, comic.sourceCover.url]);
-  return comic.cover ? pageReference({...comic.cover, renderProfileId: RENDER_PROFILE}) : undefined;
+  const name=typeof comic.source.locator.name==='string' ? comic.source.locator.name : '';
+  return comic.cover ? pageReference({...comic.cover, renderProfileId: pageRenderProfile(detectFormat(name)??'website')}) : undefined;
 }
 export async function openSourceCover(key: string) {
   if (!key.startsWith(prefix)) return;

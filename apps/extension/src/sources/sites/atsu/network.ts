@@ -61,7 +61,7 @@ function preparePages(value: unknown, url: string) {
     seen.add(pageId);
     const image = assetUrl(row.image, 'page', loc.mangaId, loc.chapterId, scanlator);
     if (!image.startsWith(`${cdnOrigin}/static/pages/${loc.mangaId}/`)) scanlationOwned = true;
-    return {id: pageId, order, width: count(row.width, 100000), height: count(row.height, 100000),
+    return {id: pageId, order, width: count(row.width, Number.MAX_SAFE_INTEGER), height: count(row.height, Number.MAX_SAFE_INTEGER),
       resource: {kind: 'http' as const, url: image}};
   });
   const snapshot: SourceSnapshot = {url, adapter: 'atsu', title: text(chapter.title), direction: 'rtl', note: '',

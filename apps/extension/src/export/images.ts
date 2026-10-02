@@ -11,7 +11,7 @@ export async function exportImage(blob: Blob, pdf = false, known?: {width: numbe
   try {
     signal?.throwIfAborted();
     const {width, height} = bitmap;
-    if (!width || !height || width * height > 32_000_000) throw Error(msg("单页超过 3200 万像素，请缩小该图片后重试。"));
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || !Number.isSafeInteger(width * height)) throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': msg('页面')}));
     if (!pdf && extension) return {blob, extension, width, height};
     const canvas = new OffscreenCanvas(width, height), ctx = canvas.getContext('2d');
     if (!ctx) throw Error(msg("浏览器无法创建图片画布。"));

@@ -21,7 +21,7 @@ function chunk(name:string,data:Uint8Array):Blob {
 }
 
 /** Stream RGBA rows through small canvases; neither axis requires a full-page canvas. */
-export async function bitmapPng(base:ImageBitmap,tiles:PngPatch[]=[],maxBytes=128*1024*1024):Promise<Blob> {
+export async function bitmapPng(base:ImageBitmap,tiles:PngPatch[]=[],maxBytes=Infinity):Promise<Blob> {
   const {width,height}=base,stride=width*4,band=Math.max(1,Math.min(4096,Math.floor(4_194_304/width)));
   const ihdr=new Uint8Array(13),view=new DataView(ihdr.buffer);
   view.setUint32(0,width);view.setUint32(4,height);ihdr[8]=8;ihdr[9]=6;

@@ -18,12 +18,12 @@ async function zip() {
   await writer.add('10.png', new BlobReader(new Blob([png()]))); await writer.add('2.png', new BlobReader(new Blob([png()])));
   return writer.close();
 }
-function mobi(refs = [2,1,2], encrypted = false) {
+function mobi(refs = [2,1,2], encrypted = false, imageBytes = 1024 * 1024) {
   const header = new Uint8Array(110); header.set(new TextEncoder().encode('BOOKMOBI'), 60);
   const h = new DataView(header.buffer); h.setUint16(76,4);
   const first = new Uint8Array(248), view = new DataView(first.buffer); view.setUint16(0,1); view.setUint16(8,1); view.setUint16(12,encrypted ? 1 : 0);
   first.set(new TextEncoder().encode('MOBI'),16); view.setUint32(20,232); view.setUint32(36,6); view.setUint32(108,2);
-  const records = [first, new TextEncoder().encode(refs.map(value => `<img recindex="${value}">`).join('')), png(), png()];
+  const records = [first, new TextEncoder().encode(refs.map(value => `<img recindex="${value}">`).join('')), png(imageBytes), png()];
   let offset = header.length; records.forEach((record,index) => { h.setUint32(78 + index * 8, offset); offset += record.length; });
   const bytes = new Uint8Array(offset); bytes.set(header); offset = header.length;
   for (const record of records) { bytes.set(record,offset); offset += record.length; }
@@ -31,6 +31,11 @@ function mobi(refs = [2,1,2], encrypted = false) {
 }
 
 describe('page indexes separate from materialization', () => {
+  it('indexes and reads a MOBI image record above the former 32 MiB ceiling', async () => {
+    const fixture=mobi([1],false,41*1024*1024),{source,reads}=sourceFor(fixture.bytes,false),session=await openDocument('mobi',source);
+    try { const [page]=await session.index();expect(reads.every(read=>read.offset+read.length<=fixture.imageStart)).toBe(true);expect((await session.materialize(page)).size).toBe(41*1024*1024); }
+    finally { await session.close(); }
+  });
   it('indexes ZIP using small metadata ranges, sorts numeric paths, and extracts only the requested page', async () => {
     const {source, reads} = sourceFor(await zip()), session = openZipDocument(source);
     try {

@@ -61,7 +61,7 @@ export function parsePages(value: unknown, url: string): SourceSnapshot {
   if (!pages) throw Error('MangaDot 此发布条目没有正文图片，请在源站确认状态。');
   const items = images.map((value, order) => {
     const image = object(value);
-    return {id: 'page-' + order, order, width: count(image.w, 100000), height: count(image.h, 100000),
+    return {id: 'page-' + order, order, width: count(image.w, Number.MAX_SAFE_INTEGER), height: count(image.h, Number.MAX_SAFE_INTEGER),
       resource: {kind: 'http' as const, url: assetUrl(image.url, 'page', mangaId)}};
   });
   return {url, adapter: 'mangadot', title: title({kind: requested.kind,

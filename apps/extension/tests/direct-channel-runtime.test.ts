@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {DirectImageRuntime} from '../src/translation/channels/transport/runtime';
+import {definition as mtu} from '../src/translation/channels/adapters/manga-translator-ui/definition';
 import {startImageTransfer} from '../src/translation/channels/transport/client';
 import {readTransferReceipt, saveTransferReceipt} from '../src/translation/channels/transport/receipts';
 import {readDirectOperations, saveDirectOperation, updateDirectOperation} from '../src/translation/channels/transport/operations';
@@ -17,11 +18,21 @@ afterEach(() => {for (const runtime of runtimes.splice(0)) runtime.dispose(); vi
 function target(id: string): ReadingTarget {
   return {entryId: 'book', mode: 'classic', page: {id, name: id, width: 800, height: 1200, blobKey: 'original-' + id, jobs: [], outputBlobs: {}}};
 }
+it('keeps the MTU upload byte limit at the channel submission entry', async () => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  const blob = new Blob([new Uint8Array(32 * 1024 * 1024 + 1)], {type: 'image/png'}), jobs: Job[] = [];
+  const connection = await mtu.open({id: crypto.randomUUID(), adapterId: mtu.id, name: 'Local GPU', revision: 1, settings: {baseUrl: 'http://localhost:8000'}}, {token: 'fixture-token'}, () => true);
+  const runtime = connection.createRuntime({language: 'zh-Hans', getBlob: async () => blob, onJobs: async incoming => {jobs.push(...incoming);}, onChange: () => {}, isCurrent: () => true});
+  try {
+    await runtime.manual(target('oversized-upload'));
+    expect(jobs.at(-1)).toMatchObject({status: 'failed', error: {code: 'IMAGE_TOO_LARGE'}});
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally {runtime.dispose(); connection.dispose();}
+});
 function setup(scope = {key: crypto.randomUUID()}) {
   const jobs = new Map<string, Job>(), consumed = vi.fn(async () => {});
   const driver = {errorMessage: (code: string) => code, start: vi.fn(async (id: string, blob: Blob) => {
-    await startImageTransfer(id, scope.key, blob, {url: 'http://localhost/fixture', headers: {}, imageField: 'image', fields: {},
-      maxBytes: 1024, maxPixels: 40_000_000, maxDimension: 30000});
+    await startImageTransfer(id, scope.key, blob, {url: 'http://localhost/fixture', headers: {}, imageField: 'image', fields: {}});
   })};
   const runtime = new DirectImageRuntime(scope, {language: 'zh-Hans', getBlob: async key => new Blob([key]),
     onJobs: async incoming => {for (const job of incoming) jobs.set(job.id, job);}, onChange: () => {}, isCurrent: () => true,

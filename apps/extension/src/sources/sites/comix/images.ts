@@ -25,7 +25,7 @@ export async function decodeImage(blob:Blob,headers:Headers,processing?:string,s
   try{
     signal?.throwIfAborted();
     const {width,height}=bitmap;
-    if(width*height>60_000_000||width<cols||height<rows)throw Error('Comix 图片尺寸无效。');
+    if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<cols||height<rows)throw Error('Comix 图片尺寸无效。');
     const canvas=new OffscreenCanvas(width,height),ctx=canvas.getContext('2d',{colorSpace:'srgb'});
     if(!ctx)throw Error('图片还原不可用。');
     ctx.drawImage(bitmap,0,0); // Preserve the remainder pixels outside the equal-sized grid.

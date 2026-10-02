@@ -5,8 +5,6 @@ import {DRIVE_API, driveHeaders, fetchDriveMetadata, type DriveBinding, type Dri
 export interface DriveRangeOptions {
   token: () => Promise<string>;
   fetch?: DriveFetch;
-  maxRequestBytes?: number;
-  maxNetworkBytes?: number;
   timeoutMs?: number;
   onAccessLost?: (binding: DriveBinding) => Promise<void>;
 }
@@ -79,9 +77,10 @@ export class DriveRangeSource implements RandomAccessSource {
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset > this.snapshot.size - length)
       throw new RangeError('读取范围超出文件边界。');
     if (length === 0) return new Uint8Array();
-    if (length > (this.options.maxRequestBytes ?? 32 * 1024 * 1024) || this.used + length > (this.options.maxNetworkBytes ?? 64 * 1024 * 1024))
+    if (this.used + length > this.snapshot.size + 16 * 1024 * 1024)
       throw new DriveError('budget-exceeded', '本次云端读取超出字节预算，请重试当前页或从本地导入。');
-    // Reserve before awaiting; parallel requests cannot both spend the same remaining budget.
+    // A session may read the declared source plus bounded index/header overhead.
+    // Reserve before awaiting so parallel requests share the same total budget.
     this.used += length;
     try {
       await this.metadata(combined);

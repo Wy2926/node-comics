@@ -10,7 +10,8 @@ import {languages, login, safeError, serviceBase, translationRequest} from './pr
 function capabilities(): Capabilities {
   return {modes: [{id: 'classic', label: msg('常规翻译'), enabled: true, languages: Object.keys(languages)}],
     languages: fallbackLanguages.filter(language => language.id in languages),
-    limits: {max_bytes: 32 * 1024 * 1024, max_pixels: 40_000_000, max_dimension: 30000, max_translation_ids: 4},
+    // The adapter only preflights upload bytes; decoded dimensions have no fixed client ceiling.
+    limits: {max_bytes: 32 * 1024 * 1024, max_pixels: Number.MAX_SAFE_INTEGER, max_dimension: Number.MAX_SAFE_INTEGER, max_translation_ids: 4},
     entitlements: null};
 }
 

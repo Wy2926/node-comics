@@ -11,38 +11,23 @@ export function validateTransferRequest(value: unknown): value is ImageTransferR
   const strings = (items: unknown, limit: number) => !!items && typeof items === 'object' && !Array.isArray(items)
     && Object.entries(items).length <= 20 && Object.entries(items).every(([k, v]) => k.length <= 100 && typeof v === 'string' && v.length <= limit);
   return typeof request.imageField === 'string' && /^[a-zA-Z_][a-zA-Z_0-9]{0,60}$/.test(request.imageField)
-    && strings(request.headers, 8192) && strings(request.fields, 65536)
-    && [request.maxBytes, request.maxPixels, request.maxDimension].every(value => Number.isSafeInteger(value) && value > 0)
-    && request.maxBytes <= 64 * 1024 * 1024 && request.maxPixels <= 40_000_000 && request.maxDimension <= 30000;
+    && strings(request.headers, 8192) && strings(request.fields, 65536);
 }
 
-async function imageBody(response: Response, request: ImageTransferRequest): Promise<Blob> {
+async function imageBody(response: Response): Promise<Blob> {
   if (!response.ok) throw new ImageTransferError('HTTP_' + response.status);
   if (response.redirected || response.type === 'opaqueredirect') throw new ImageTransferError('REDIRECT');
   const type = response.headers.get('content-type')?.split(';')[0].toLowerCase();
   if (!type || !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(type))
     throw new ImageTransferError('INVALID_IMAGE');
-  if (Number(response.headers.get('content-length')) > request.maxBytes) throw new ImageTransferError('IMAGE_TOO_LARGE');
-  const reader = response.body?.getReader();
-  if (!reader) throw new ImageTransferError('INVALID_IMAGE');
-  const chunks: ArrayBuffer[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      total += value.length;
-      if (total > request.maxBytes) throw new ImageTransferError('IMAGE_TOO_LARGE');
-      chunks.push(value.slice().buffer);
-    }
-  } catch (error) { await reader.cancel().catch(() => {}); throw error; }
-  finally {reader.releaseLock();}
-  const blob = new Blob(chunks, {type});
+  const body = await response.blob();
+  if (!body.size) throw new ImageTransferError('INVALID_IMAGE');
+  const blob = body.type === type ? body : body.slice(0, body.size, type);
   let image: ImageBitmap;
   try {image = await createImageBitmap(blob);} catch {throw new ImageTransferError('INVALID_IMAGE');}
   try {
-    if (image.width < 1 || image.height < 1 || image.width * image.height > request.maxPixels
-      || Math.max(image.width, image.height) > request.maxDimension) throw new ImageTransferError('IMAGE_TOO_LARGE');
+    if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height) || image.width < 1 || image.height < 1
+      || !Number.isSafeInteger(image.width * image.height)) throw new ImageTransferError('INVALID_IMAGE');
   } finally {image.close();}
   return blob;
 }
@@ -71,7 +56,7 @@ export async function executeImageTransfer(id: string, request: ImageTransferReq
           method: 'POST', headers: request.headers, body: form, credentials: 'omit', redirect: 'error', cache: 'no-store',
           referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(30 * 60 * 1000),
         });
-        const output = await imageBody(response, request);
+        const output = await imageBody(response);
         await saveTransferReceipt({...current, input: undefined, output, state: 'succeeded', updatedAt: Date.now()});
       } catch (error) {
         // Never retain remote response text, a URL, or fetch's potentially sensitive message.

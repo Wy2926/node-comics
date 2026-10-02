@@ -1,7 +1,7 @@
 import type {Job, Mode, Page} from '../types';
 import {msg} from '../i18n/runtime';
 import {catalog} from '../comics/repositories';
-import {RENDER_PROFILE, type PageReference} from '../comics/pages/identity';
+import {pageRenderProfile, type PageReference} from '../comics/pages/identity';
 import {materializationId} from '../comics/pages/service';
 import {pageTranslation} from '../reader/presentation';
 import type {TranslationScope} from '../translation/channels/contracts';
@@ -47,7 +47,7 @@ export async function planExport(entryId: string, options: ExportOptions, scope?
   const pages: ExportPage[] = [];
   for (const descriptor of descriptors) {
     signal?.throwIfAborted();
-    const reference = {entryId,contentId:document.contentId,pageId:descriptor.pageId,renderProfileId:RENDER_PROFILE};
+    const reference = {entryId,contentId:document.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(document.format)};
     const page: ExportPage = {pageId:descriptor.pageId,ordinal:descriptor.ordinal,name:descriptor.name,reference,kind:'original'};
     if (options.images === 'translation') {
       const identity = await catalog.get('materializations',materializationId(reference));

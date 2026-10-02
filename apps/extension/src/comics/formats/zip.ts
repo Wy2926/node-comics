@@ -1,5 +1,5 @@
 import {Reader, ZipReader, type Entry} from '@zip.js/zip.js/index-native.js';
-import {MAX_ENTRIES, MAX_PAGE, MiB, imageMime, validateEntries} from './limits';
+import {MAX_ENTRIES, MiB, imageMime, validateEntries} from './limits';
 import {throwIfAborted, type DocumentSession, type IndexedPage, type RandomAccessSource} from './contracts';
 
 export function openZipDocument(source: RandomAccessSource): DocumentSession {
@@ -46,12 +46,12 @@ export function openZipDocument(source: RandomAccessSource): DocumentSession {
       if (!images) await this.index(signal);
       const item = images!.find(value => value.name === page.locator.entry);
       if (!item || item.entry.directory) throw new Error('ZIP 页面索引不属于当前文件。');
-      activeSignal = signal; read = 0; budget = 40 * MiB;
+      activeSignal = signal; read = 0; budget = item.entry.compressedSize + 16 * MiB;
       let written = 0;
       const chunks: Uint8Array<ArrayBuffer>[] = [];
       const stream = new WritableStream<Uint8Array>({write(chunk) {
         written += chunk.byteLength;
-        if (written > MAX_PAGE || written > item.size) throw new Error('ZIP 实际展开大小超过声明或安全限制。');
+        if (written > item.size) throw new Error('ZIP 实际展开大小超过声明。');
         chunks.push(new Uint8Array(chunk));
       }});
       await item.entry.getData(stream, {signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000)});

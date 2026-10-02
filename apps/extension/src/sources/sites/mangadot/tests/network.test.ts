@@ -8,6 +8,10 @@ import {chapter, chapters, images, metadata, volumes} from './fixtures';
 
 const url = catalogUrl('7'), reader = releaseUrl('1', 'user', 'chapter', '7');
 describe('MangaDot full HTTP source', () => {
+  it('preserves valid page dimensions above the former source edge ceiling', () => {
+    const data = images(); Object.assign(data.images[0], {w: 100001, h: 100001});
+    expect(parsePages(data, reader).items[0]).toMatchObject({width: 100001, height: 100001});
+  });
   it('claims only its HTTPS host and keeps scraper, upload, and volume identities distinct', () => {
     expect(definition.identify(new URL(url))?.catalog?.key).toBe('mangadot:7');
     const urls = [releaseUrl('1', 'scraper', 'chapter'), reader, releaseUrl('1', 'user', 'volume')];

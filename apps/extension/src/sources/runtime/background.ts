@@ -14,7 +14,6 @@ import {
   validateSourceCatalog,
   type PageManifest,
 } from '../index';
-import { maxInlineBytes } from '../shared/bytes';
 import { isPageImageUrl } from '../shared/urls';
 import {networkOperation,readNetworkPages} from './network';
 import {readImportCatalog} from './import';
@@ -263,7 +262,6 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
           );
           if (
             typeof source?.data !== 'string' ||
-            source.data.length > (maxInlineBytes * 4) / 3 + 200 ||
             !/^data:image\/png;base64,/.test(source.data)
           )
             throw Error(source?.error ?? msg('网页原图读取失败。'));

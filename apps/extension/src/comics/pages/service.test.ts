@@ -12,15 +12,16 @@ vi.mock('../application/website-content',()=>({refreshWebsitePage:mocks.refresh}
 vi.mock('./normalize', () => ({prepareComicPage: mocks.prepare}));
 vi.mock('../sources/local', () => ({openContainer: mocks.openContainer}));
 vi.mock('../formats', () => ({openDocument: vi.fn()}));
-vi.mock('../../storage/downloads', () => ({downloadStore: {get: mocks.downloadGet}}));
+vi.mock('../../storage/downloads', async original => ({...await original<typeof import('../../storage/downloads')>(),downloadStore: {get: mocks.downloadGet}}));
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
-import {acquirePage} from './service';
-import {RENDER_PROFILE} from './identity';
+import {acquirePage,downloadKey,materializationId} from './service';
+import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from './identity';
 import {SourceDatabaseSchemaError} from '../../storage/database';
 import {registerSourceDriver} from '../sources/registry';
 import {ImagePermissionsRequired} from '../../sources';
+import {openDocument} from '../formats';
 let unregisterLocal: (()=>void)|undefined;
 const request = {entryId: 'document', contentId: 'revision', pageId: 'page', renderProfileId: RENDER_PROFILE};
 const put = (table: string, id: unknown, value: unknown) => mocks.records.set(JSON.stringify([table,id]), value);
@@ -45,6 +46,23 @@ beforeEach(() => {
 });
 afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
+  it('materializes the current PDF profile without reusing retained bytes or metadata from the old profile',async()=>{
+    put('entries','document',{id:'document',comicId:'comic',contentId:'revision',containerId:'container',generation:1,format:'pdf'});
+    put('connections','connection',{id:'connection',generation:1,provider:'local',status:'connected'});
+    const current={...request,renderProfileId:PDF_RENDER_PROFILE},oldBlob=new Blob(['old'],{type:'image/png'}),newBlob=new Blob(['new'],{type:'image/png'});
+    const oldId=materializationId(request),oldIdentity={id:oldId,imageSha256:'b'.repeat(64),width:100,height:200,byteSize:oldBlob.size,mime:oldBlob.type};
+    put('materializations',oldId,oldIdentity);mocks.cache.set(pageReference(request),oldBlob);
+    mocks.downloadGet.mockImplementation(async key=>key===downloadKey(request.contentId,request.pageId)?oldBlob:undefined);
+    const close=vi.fn().mockResolvedValue(undefined),materialize=vi.fn().mockResolvedValue(newBlob);
+    mocks.openContainer.mockResolvedValue({snapshot:{identity:'source',version:'1',size:100,local:true},close});
+    vi.mocked(openDocument).mockResolvedValue({capabilities:{access:'random',remote:false,encrypted:false,multiVolume:false,indexComplete:true},index:vi.fn(),materialize,close:vi.fn().mockResolvedValue(undefined)});
+    const lease=await acquirePage(current);try{expect(lease.blob).toBe(newBlob);expect(lease.identity.renderProfileId).toBe(PDF_RENDER_PROFILE);expect(materialize).toHaveBeenCalledOnce();}
+    finally{lease.release();}
+    expect(mocks.downloadGet).toHaveBeenCalledWith(downloadKey(request.contentId,request.pageId,PDF_RENDER_PROFILE));
+    expect(mocks.records.get(JSON.stringify(['materializations',oldId]))).toBe(oldIdentity);expect(mocks.cache.get(pageReference(request))).toBe(oldBlob);
+    expect(mocks.records.get(JSON.stringify(['materializations',materializationId(current)]))).toMatchObject({imageSha256:'a'.repeat(64)});
+    await expect(acquirePage(request)).rejects.toThrow('渲染版本');
+  });
   it('validates manifest membership and reuses normalized cached pixels without decoding or hashing again', async () => {
     renewable();
     const first = await acquirePage(request); first.release();

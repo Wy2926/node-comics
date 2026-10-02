@@ -92,7 +92,7 @@ describe('site adapter registry and Comic PASH canvases', () => {
       '来源已变化',
     );
   });
-  it('reports tainted and oversized canvases without reading their pixels', async () => {
+  it('reports tainted canvases and rejects invalid dimensions before reading their pixels', async () => {
     const canvas = {
       width: 800,
       height: 1200,
@@ -102,7 +102,13 @@ describe('site adapter registry and Comic PASH canvases', () => {
     } as unknown as HTMLCanvasElement;
     await expect(canvasImage(canvas)).rejects.toThrow('网页原图读取失败');
     await expect(
-      canvasImage({ ...canvas, width: 20000, height: 20000 } as HTMLCanvasElement),
+      canvasImage({ ...canvas, width: 0 } as HTMLCanvasElement),
     ).rejects.toThrow('尺寸');
+  });
+  it('captures large valid canvases without a pixel or output byte ceiling', async () => {
+    // The canvas and declared size are mocked; no large bitmap or PNG is allocated.
+    const blob = new Blob(['png']); Object.defineProperty(blob, 'size', {value: 41 * 1024 * 1024});
+    const canvas = {width: 20001, height: 20001, toBlob: (callback: BlobCallback) => callback(blob)} as HTMLCanvasElement;
+    expect(await canvasImage(canvas)).toBe(blob);
   });
 });

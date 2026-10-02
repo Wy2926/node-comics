@@ -3,7 +3,7 @@ import type {Entry} from '../domain';
 import type { DownloadTask } from '../application/types';
 import {discoverWebsiteContent,websiteContentError} from '../application/website-content';
 import { acquirePage } from '../pages/service';
-import { RENDER_PROFILE } from '../pages/identity';
+import { pageRenderProfile } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
 import { ImagePermissionsRequired } from '../../sources';
 import {bookDownloadId,downloadTaskId as taskId,bookTaskActive,suspendBook,listBookPlans,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan} from './book-model';
@@ -131,12 +131,12 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
       if (!pages.length) break;
       for (const page of pages) {
         await active();
-        const key = downloadKey(document.contentId, page.pageId);
+        const renderProfileId=pageRenderProfile(document.format),key = downloadKey(document.contentId, page.pageId,renderProfileId);
         const size=saved.get(key);
         if (size!==undefined) { completed++; bytes+=size; continue; }
         try {
           let attempt=0;
-          const read=()=>acquirePage({ entryId: document.id, contentId: document.contentId, pageId: page.pageId, renderProfileId: RENDER_PROFILE, signal, priority: 'background', purpose: 'download' });
+          const read=()=>acquirePage({ entryId: document.id, contentId: document.contentId, pageId: page.pageId, renderProfileId, signal, priority: 'background', purpose: 'download' });
           const lease = await (async()=>{
             for(;;){try{return await read();}catch(error){
               await active();

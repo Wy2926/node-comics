@@ -15,8 +15,8 @@ export function parsePages(value: unknown, url: string) {
       if (!['link', 'other', 'backMatter'].includes(String(row.type))) throw changed();
       continue;
     }
-    const width = count(row.width, 20000), height = count(row.height, 20000), src = pageUrl(row.src);
-    if (!width || !height || width * height > 60_000_000 || items.length >= 1500) throw changed();
+    const width = count(row.width, Number.MAX_SAFE_INTEGER), height = count(row.height, Number.MAX_SAFE_INTEGER), src = pageUrl(row.src);
+    if (!width || !height || items.length >= 1500) throw changed();
     items.push({id: 'page-' + index, order: items.length, width, height,
       resource: {kind: 'http', url: src, ...(structure.choJuGiga === 'baku' ? {processing: `webry-baku:${width}:${height}`} : {})}});
   }

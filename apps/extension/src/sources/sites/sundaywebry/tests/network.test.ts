@@ -75,10 +75,15 @@ describe('Sunday Webry pages and search', () => {
     if (mode === 'host') data.readableProduct.pageStructure.pages[0].src = 'https://evil.test/a';
     if (mode === 'missing') delete data.readableProduct.pageStructure.pages[0].src;
     if (mode === 'protocol') data.readableProduct.pageStructure.choJuGiga = 'unknown';
-    if (mode === 'dimensions') data.readableProduct.pageStructure.pages[0].width = 20001;
+    if (mode === 'dimensions') data.readableProduct.pageStructure.pages[0].width = Number.MAX_SAFE_INTEGER + 1;
     if (mode === 'type') data.readableProduct.pageStructure.pages[0].type = 'unknown';
     if (mode === 'locked') Object.assign(data.readableProduct, {pageStructure: null});
     expect(() => parsePages(data, episodeUrl('11'))).toThrow();
+  });
+  it('preserves large source dimensions while validating page identity and order', () => {
+    const data = readerData();
+    Object.assign(data.readableProduct.pageStructure.pages[0], {width: 20001, height: 20001});
+    expect(parsePages(data, episodeUrl('11')).items[0]).toMatchObject({width: 20001, height: 20001});
   });
   it('returns source work metadata, bounded search pages and a query-bound cursor', async () => {
     const html = searchHtml(query.query, Array.from({length: 51}, (_, i) => String(i + 1)));

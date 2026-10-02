@@ -1,5 +1,4 @@
 import { msg } from '../../i18n/runtime';
-import { maxInlineBytes } from '../shared/bytes';
 import {withImageHeaders} from './image-headers';
 import {requireImagePermissions} from './permissions';
 import {safeImageUrl} from '../shared/urls';
@@ -7,7 +6,7 @@ import {imageReferer} from '../shared/referrer';
 import {observeImageRedirect} from './image-redirect';
 import {SourceHttpError,sourceRetryAfter} from './http';
 export interface ImageRequestContext {pageUrl:string;referrerPolicy?:ReferrerPolicy;}
-/** A source response must stay bounded even when Content-Length is missing. */
+/** Source reads are cancellable; translation input limits belong to the translation entry point. */
 export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:Readonly<Record<string,string>>,context?:ImageRequestContext) {
   const lifetime=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(30000)]);
   if(!/^https?:/.test(url))return readResponse(await fetch(url,{signal:lifetime}),lifetime);
@@ -45,24 +44,19 @@ export async function sourceImage(url:string,signal?:AbortSignal):Promise<Blob> 
   return (await fetchSourceImage(url,signal)).blob;
 }
 async function readResponse(response:Response,signal:AbortSignal) {
-  const max = maxInlineBytes;
   if (!response.ok){
     await response.body?.cancel();
     throw new SourceHttpError('http',msg('来源图片获取失败（HTTP {0}），可重新解析后补齐。', { '0': response.status }),
       {status:response.status,retryAfter:sourceRetryAfter(response.headers.get('retry-after'))});
   }
-  if (Number(response.headers.get('content-length')) > max){await response.body?.cancel();throw Error(msg('单图超过 40 MB 限制。'));}
   if (!response.body) throw Error(msg('图片响应为空。'));
   const reader = response.body.getReader();
   const chunks: Uint8Array<ArrayBuffer>[] = [];
-  let size = 0;
   try {
     while (true) {
       signal.throwIfAborted();
       const { value, done } = await reader.read();
       if (done) break;
-      size += value.byteLength;
-      if (size > max) throw Error(msg('单图超过 40 MB 限制。'));
       chunks.push(value as Uint8Array<ArrayBuffer>);
     }
   } catch (e) {

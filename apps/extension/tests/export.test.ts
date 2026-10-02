@@ -6,6 +6,7 @@ import {catalog} from '../src/comics/repositories';
 import {RENDER_PROFILE} from '../src/comics/pages/identity';
 import {exportManifest,MAX_EXPORT_BYTES,planExport,safeName,type ExportOptions} from '../src/export/plan';
 import {writeExport} from '../src/export/files';
+import {exportImage} from '../src/export/images';
 import {importContainer,releaseContainer} from '../src/storage/containers';
 import {exportDocument,exportOriginalFile} from '../src/comics/application/export-service';
 import type {Job} from '../src/types';
@@ -27,6 +28,11 @@ async function bind(s:Awaited<ReturnType<typeof sample>>,jobs:Job[],outputBlobs:
   await catalog.put('translationBindings',{id:JSON.stringify([scope.key,identity.imageSha256]),scope:scope.key,imageSha256:identity.imageSha256,payload:{translationScope:scope.key,jobs,outputBlobs},updatedAt:Date.now()});
 }
 describe('document export through page leases',()=>{
+  it('exports a decoded page beyond the former 32 million pixel ceiling',async()=>{
+    const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width:8000,height:6000,close}));
+    try { const blob=image();expect(await exportImage(blob)).toMatchObject({blob,width:8000,height:6000});expect(close).toHaveBeenCalledOnce(); }
+    finally { vi.unstubAllGlobals(); }
+  });
   it('exports through the injected channel reader and reuses existing result bytes without network access',async()=>{
     const s=await sample(1),result=job('export-cached');await bind(s,[result]);
     await translationCache.put(resultBlobKey(scope,result),image(),{owner:scope.key});

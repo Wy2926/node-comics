@@ -2,7 +2,7 @@ export function parseProcessing(value: string) {
   const match = /^comici-v1:(\d+):(\d+):([\d,]+)$/.exec(value);
   if (!match) throw Error('Comic PASH 图片还原协议无效。');
   const width = Number(match[1]), height = Number(match[2]), order = match[3].split(',').map(Number);
-  if (width < 4 || height < 4 || width > 20000 || height > 20000 || width * height > 60_000_000 ||
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 4 || height < 4 ||
     order.length !== 16 || new Set(order).size !== 16 || order.some(n => !Number.isInteger(n) || n < 0 || n > 15))
     throw Error('Comic PASH 图片还原参数无效。');
   return {width, height, order};

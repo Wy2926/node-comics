@@ -3,12 +3,28 @@ import {describe,it,expect,vi} from 'vitest';
 import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {makeOperation,operationId} from '../src/translation/channels/adapters/nodelane/operations';
 import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
-import {pageReference} from '../src/comics/pages/identity';
+import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
 import {fixture,target,originalBytes,originalInput,job,origin,snapshot} from './translation-fixture';
 import {loadResultBlob,resultInMemory,resultBlobKey} from '../src/storage/translations/results';
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 
 describe('content identity and recoverable source references',()=>{
+ it('uses a separate render identity without recovering the old PDF operation',async()=>{
+  const f=fixture(),ref={entryId:'book',contentId:'pdf-revision',pageId:'page-0',renderProfileId:RENDER_PROFILE};
+  const oldTarget={...target(0),page:{...target(0).page,...ref,blobKey:pageReference(ref)}};
+  const currentRef={...ref,renderProfileId:PDF_RENDER_PROFILE};
+  const current={...target(1),page:{...target(1).page,...currentRef,blobKey:pageReference(currentRef)}};
+  const previous=makeOperation(oldTarget,f.core.scope,'zh-Hans',originalInput(0));
+  previous.state='accepted';previous.result=snapshot(previous.requestId,previous.request);await saveOperation(previous);
+  expect(operationId(f.core.scope,'zh-Hans',{...oldTarget,page:{...oldTarget.page,renderProfileId:undefined}})).toBe(previous.id);
+  const core=new TranslationCoordinator({...f.core.options,getBlob:async()=>originalBytes(1)});
+  await core.submit([current]);await core.submit([current]);
+  expect(f.api.translations).not.toHaveBeenCalled();expect(f.submit).toHaveBeenCalledOnce();
+  expect(f.submit.mock.calls[0][0]).not.toBe(previous.requestId);
+  expect(f.submit.mock.calls[0][1]).toMatchObject({image:{sha256:current.page.imageSha256}});
+  expect(await readOperation(operationId(core.scope,'zh-Hans',current))).toMatchObject({pageRef:currentRef});
+  expect(await readOperation(previous.id)).toEqual(previous);
+ });
  it('freezes document revision/page/profile without file hash or durable blob key',async()=>{
   const ref={entryId:'document',contentId:'revision',pageId:'page-0',renderProfileId:'original-v1-gif-first-frame'};
   const page={...target(0).page,...ref,blobKey:pageReference(ref)};

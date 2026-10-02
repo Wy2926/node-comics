@@ -25,7 +25,7 @@ export {
   ImagePermissionsRequired,
   requireImagePermissions,
 } from './runtime/permissions';
-export { imageDataUrl, maxInlineBytes } from './shared/bytes';
+export { imageDataUrl } from './shared/bytes';
 export { comicSize } from './shared/dimensions';
 export { isPageImageUrl, safeImageUrl } from './shared/urls';
 export {isImageReferrerPolicy} from './shared/referrer';

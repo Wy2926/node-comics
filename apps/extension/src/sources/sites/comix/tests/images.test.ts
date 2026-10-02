@@ -25,6 +25,14 @@ describe('Comix image response variants',()=>{
   it('keeps ordinary images unchanged',async()=>{
     const blob=new Blob(['original']);expect(await decodeImage(blob,new Headers())).toBe(blob);
   });
+ it('restores valid large originals without a source pixel ceiling',async()=>{
+   const bitmap={width:20001,height:20001,close:vi.fn()},drawImage=vi.fn(),output=new Blob(['decoded']);
+   vi.stubGlobal('createImageBitmap',vi.fn(async()=>bitmap));
+   vi.stubGlobal('OffscreenCanvas',class {getContext(){return {drawImage};} async convertToBlob(){return output;}});
+   const headers=new Headers({'X-Scramble-Seed':'1','X-Scramble-Grid':'5x5','X-Scramble-Algo':'3'});
+   expect(await decodeImage(new Blob(),headers,'tiles-v1')).toBe(output);
+   expect(drawImage).toHaveBeenCalledTimes(26);expect(bitmap.close).toHaveBeenCalledOnce();
+ });
   it.each([{seed:'1',grid:'5x5',algo:'4'},{seed:'4294967296',grid:'5x5',algo:'3'},{seed:'1',grid:'',algo:'3'}])('still rejects invalid protocol headers: %j',async({seed,grid,algo})=>{
     await expect(decodeImage(new Blob(),new Headers({'X-Scramble-Seed':seed,'X-Scramble-Grid':grid,'X-Scramble-Algo':algo}),'tiles-v1')).rejects.toThrow('协议已变化');
   });
