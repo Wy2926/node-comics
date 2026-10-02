@@ -1,5 +1,5 @@
 import {catalog} from '../repositories';
-import type {CatalogRecord, Entry} from '../domain';
+import {entryContentKind, type CatalogRecord, type Entry} from '../domain';
 import type {DownloadTask, SourceCatalog} from '../application/types';
 import {downloadStore} from '../../storage/downloads';
 
@@ -33,7 +33,7 @@ export function downloadLanguage(value?:string):string {
 }
 export function selectDownloadScope(entries:Entry[], source:SourceCatalog|undefined, languages:DownloadLanguages):DownloadScope {
   const related=new Set(source?.entries.filter(entry=>entry.related).map(entry=>entry.id));
-  const unique=[...new Map(entries.filter(entry=>entry.format==='website'&&!related.has(entry.sourceEntryId??'')).map(entry=>[entry.id,entry])).values()];
+  const unique=[...new Map(entries.filter(entry=>entryContentKind(entry)==='pages'&&!related.has(entry.sourceEntryId??'')).map(entry=>[entry.id,entry])).values()];
   const counts=new Map<string,number>();
   for(const entry of unique){const key=downloadLanguage(entry.contentLanguage);counts.set(key,(counts.get(key)??0)+1);}
   const selected=unique.filter(entry=>!languages||languages.includes(downloadLanguage(entry.contentLanguage)));

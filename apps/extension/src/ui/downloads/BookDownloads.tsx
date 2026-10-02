@@ -13,6 +13,7 @@ import {openHostAccessSettings} from '../../host-permissions';
 import {clearBookDownloads,downloadLanguages,readDownloadScope,saveDownloadLanguages,startBookDownload,pauseBookDownload,cancelBookDownload,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,type BookDownloadView,type DownloadLanguages,type DownloadScope} from '../../comics/acquisition/books';
 import type {BookDownloadsController} from './useBookDownloads';
 import './downloads.css';
+import {FileDownloadRows} from './FileDownloads';
 
 const cacheSize=(bytes:number)=>bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GB`:`${(bytes/1024**2).toFixed(1)} MB`;
 const languageName=(id:string)=>id===unknownDownloadLanguage?msg('语言未标注'):contentLanguageLabel(id);
@@ -35,12 +36,14 @@ function useDownloadAction(controller:BookDownloadsController){
   return {busy,error,act};
 }
 export function BookDownloads({controller,onRead,onManageStorage}:{controller:BookDownloadsController;onRead:(comicId:string)=>void;onManageStorage:()=>void}){
+  const totalBooks=controller.books.length+controller.files.length,totalBytes=controller.books.reduce((sum,book)=>sum+book.bytes,0)+controller.files.reduce((sum,file)=>sum+file.intent.bytes,0);
   return <section className="nc-download-center" aria-label={msg('离线中心')}>
-    <div className="nc-page-heading"><div><h1>{msg('离线中心')}</h1><p>{msg('共 {0} 部漫画 · {1} 部缓存中 · 已保留 {2}',{'0':controller.books.length,'1':controller.activeCount,'2':cacheSize(controller.books.reduce((sum,book)=>sum+book.bytes,0))})}</p></div></div>
+    <div className="nc-page-heading"><div><h1>{msg('离线中心')}</h1><p>{msg('共 {0} 部漫画 · {1} 部缓存中 · 已保留 {2}',{'0':totalBooks,'1':controller.activeCount,'2':cacheSize(totalBytes)})}</p></div></div>
     <p className="nc-download-lifetime"><Icon name="info" size={16}/>{msg('请保持此插件页打开，可切换到其他标签页。')}</p>
-    {!controller.books.length?<div className="nc-empty"><Icon name="download" size={40}/><h2>{msg('暂无离线缓存')}</h2><p>{msg('从漫画的更多菜单选择“缓存整本”。')}</p></div>:<div className="nc-download-books">
+    {!totalBooks?<div className="nc-empty"><Icon name="download" size={40}/><h2>{msg('暂无离线缓存')}</h2><p>{msg('从漫画的更多菜单选择“缓存整本”。')}</p></div>:<div className="nc-download-books">
       {controller.books.map(book=><BookRow key={book.comic.id} book={book} controller={controller} focused={controller.focusedComicId===book.comic.id} onRead={()=>onRead(book.comic.id)} onManageStorage={onManageStorage}/>)}
     </div>}
+    <FileDownloadRows controller={controller} onRead={onRead}/>
   </section>;
 }
 function BookRow({book,controller,focused,onRead,onManageStorage}:{book:BookDownloadView;controller:BookDownloadsController;focused:boolean;onRead:()=>void;onManageStorage:()=>void}){

@@ -87,6 +87,19 @@ def test_forward_only_allowlisted_categories_and_synthetic_page(relay):
     assert 'private' not in request.content.decode().lower()
 
 
+def test_opds_categories_never_include_catalog_or_account_details(relay):
+    client, requests, _ = relay
+    body = batch(event(screen='remote-library', catalog_url='https://private.example/opds?token=private'),
+        event('reader_open', source_type='opds', format='image-sequence',
+              connection_id='private-connection', publication_title='Private book', password='private-password'))
+    assert client.post(URL, json=body).status_code == 204
+    payload = json.loads(requests[0].content)
+    assert payload['events'][0]['params']['screen'] == 'remote-library'
+    assert payload['events'][1]['params']['source_type'] == 'opds'
+    assert payload['events'][1]['params']['format'] == 'image-sequence'
+    assert 'private' not in requests[0].content.decode().lower()
+
+
 def test_purchase_refund_and_unused_or_unknown_events_are_never_relayed(relay):
     client, requests, _ = relay
     unsupported = ('purchase', 'refund', 'translation_result', 'feature_error', 'login', 'arbitrary')

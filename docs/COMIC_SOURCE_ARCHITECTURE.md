@@ -4,7 +4,7 @@
 
 ## 元数据与身份
 
-`Comic → Entry → PageDescriptor` 是可重建的读取索引。Comic 直接绑定一个 `ComicSource`；本地文件以完整容器摘要和大小去重，云盘以连接与 file ID 定位，网站以适配器与其稳定资源键定位。不同来源不合并。
+`Comic → Entry → PageDescriptor` 是可重建的读取索引。Comic 直接绑定一个 `ComicSource`；本地文件以完整容器摘要和大小去重，云盘以连接与 file ID 定位，网站以适配器与其稳定资源键定位，远程书库以连接与出版物 ID 定位。不同来源不合并。
 
 Entry 保存来源条目标题、顺序、可选阅读序列、当前 contentId、索引状态与取页定位。文件只有一个隐式 Entry；网站分组保存在只读 catalog 快照中，同一条目可以多组引用。
 
@@ -24,9 +24,11 @@ PageDescriptor 保存当前内容身份、稳定页键、ordinal、尺寸和格�
 
 官方请求库使用版本 2：操作日志保留幂等 UUID，任务快照按 scope／UUID 分条保存并按来源图片索引查询，sync 只保存退避控制字段；版本 1 的任务数组在同一升级事务内搬入任务表，失败自动回滚。阅读器和翻译调度器不承担迁移。旧回执按原 UUID 归入历史，操作状态只在 UUID 仍匹配时以同一事务更新。删除使用 tombstone 和内容代次保护迟到写入；catalog 是来源资源快照，重新导入时允许在新的漫画身份下重新创建。
 
-## 文件来源驱动
+## 来源能力与装配
 
-[contracts.ts](../apps/extension/src/comics/sources/contracts.ts) 定义选择、打开和访问变化契约，[registry.ts](../apps/extension/src/comics/sources/registry.ts) 注册能力，[runtime.ts](../apps/extension/src/comics/sources/runtime.ts) 负责范围缓存与关闭失效读取，[install.ts](../apps/extension/src/comics/sources/install.ts) 显式装配来源。新增同格式文件来源实现驱动并注册，不修改阅读器、页面服务或翻译。
+[contracts.ts](../apps/extension/src/comics/sources/contracts.ts) 的 `SourceProvider` 按能力组合连接、远程目录、文件、页面与封面；[registry.ts](../apps/extension/src/comics/sources/registry.ts) 统一注册，[runtime.ts](../apps/extension/src/comics/sources/runtime.ts) 负责范围缓存与关闭失效读取，[install.ts](../apps/extension/src/comics/sources/install.ts) 显式装配来源。本地和 Drive 的文件驱动注册输入转换到同一能力记录，不维护第二套注册中心。新增来源只实现其实际能力，不修改阅读器、页面服务或翻译。
+
+一个 provider 可有多个独立连接，一个连接可浏览多个目录与出版物。远程书库 UI 只枚举具备目录能力的 provider；连接表单字段由 provider 提供，UI 不读取私有账户结构。Komga、Kavita 等支持 OPDS 的服务是同一协议的不同连接，不按服务器品牌复制公共分支。其他协议须有实际需求才实现，不因预留接入点而增加空驱动。
 
 驱动核验自己的账户、资源与冻结快照，只获取字节和通知访问变化；不导入仓储、应用、其他驱动或缓存策略。公共核心不解析供应商私有字段，也不把未知来源猜成 Google Drive。来源打开或读取期间撤权，迟到实例关闭、结果拒绝；重新选择只恢复明确核实的文件范围。
 
@@ -40,9 +42,31 @@ Google Drive 支持 CBZ/ZIP、未加密 MOBI 的 Range 读取。MOBI 复用通�
 
 云盘导入完成后，已校验的索引分段缓存从临时导入归属转交给漫画条目，封面和阅读器复用这些区间；失败导入仍清理临时缓存，移除漫画仍清理其缓存。MOBI 的连续正文记录合并为一次有界读取，再按记录边界解析；索引阶段不读图片，也不逐条记录触发云端往返。Drive 的每次实际 Range 读取仍保留前后版本核验。
 
+## 远程书库与 OPDS
+
+远程书库是浏览入口，不是批量导入器。连接并授权后按页读取目录、分组、筛选、下一页和搜索；目录只读，不扫描完整服务器，不把浏览结果写成 Comic。第一次打开出版物才登记唯一来源和可读索引，后续打开复用漫画与阅读位置；服务器重名、相同出版物 ID 或不同账户之间不会串书。
+
+[OPDS provider](../apps/extension/src/comics/sources/opds/provider.ts) 支持 OPDS 1.2 Atom、OPDS 2 JSON、部分出版物详情、OpenSearch 和常见查询模板。XML 使用浏览器原生 `DOMParser`，拒绝 DTD／实体声明并限制文档大小和树深；`@xmldom/xmldom` 仅作为 Node 测试的开发依赖，不随插件引入另一套 XML 解析器。[r2-opds-js 官方](https://github.com/edrlab/r2-opds-js#npm-package)声明只支持 Node.js，未引入其文件系统／归档／DRM 依赖；协议模型规范化留在 provider 内。
+
+解析器不决定如何阅读。`catalog.resolve` 返回当前资源的 `pages`、`range-file` 或 `download-file` 计划：
+
+- 图片型 Divina/Web Publication 或可安全只读的 OPDS-PSE 生成 `image-sequence` Entry。封面不是正文，HTML／音频 Web Publication 不作为漫画页序列。
+- CBZ／ZIP、未加密 MOBI 仅在服务器提供可核验的 206 Range、大小与强 ETag 时按需读取；忽略 Range、内容变化或无法证明快照一致性时不能静默整包读取。
+- 需要完整文件的资源由用户确认后流式保存，包括 PDF／CBR 和不满足 Range 条件的支持格式。完成格式校验与索引后才发布漫画；中断不发布空漫画。下载复用完整容器存储，不引入第三套图片仓库。
+
+显式重新载入先重新解析当前计划与准备完整索引，再原子替换定位、快照和页面身份。图片流重新载入建立新内容身份并回到第一页，避免服务器静默改图后旧物化信息阻塞恢复；普通打开和重连不重置位置。可靠 Range 文件快照未变则保留位置，变化后回到第一页。独立封面按来源代次失效，即使封面地址或引用 ID 未变也重新读取。不保留历史版本，不在不同表示之间自动切换；完整文件变化需明确重新保存。
+
+凭据和实际取图／下载地址保存在 provider 私有库；公共目录、任务及封面只保存不透明引用。支持匿名、HTTPS Basic 和令牌地址；凭据不上传后端，不进入默认日志。请求仅 GET／HEAD、同源、无 Cookie／Referer，拒绝重定向与跨源取图。不同域名的 CDN、OAuth／交互认证、借阅／购买、DRM、完整 RFC6570 模板和服务端进度同步不在当前支持范围；遇到它们明确报错，不承诺兼容全部 OPDS 服务。已知会写阅读进度的 Kavita PSE 图片路由不调用。
+
+每次目录响应上限 4 MiB，单页最多 2000 个不透明引用，超出时提示缩小服务端分页；传输并发最多 4。封面仅在邻近视口时加载，并发最多 2，离开时释放 URL。浏览引用仅在有界内存中保存；选中阅读的必要引用才持久化。历史只保留最多 32 个位置，不缓存整库。下载上限沿用完整容器限制 512 MiB；普通阅读原图不为节省流量降采样。
+
+断开清除授权并中止在途请求，保留漫画与阅读记录；显式断开后不能继续通过普通缓存或离线资料绕过来源状态。重连恢复同一目录与账户的访问，不替换为另一服务器，不自动恢复暂停的下载。来源读取和翻译仍是独立授权流程。
+
+真实联调入口为 [verify_opds_live.mjs](../scripts/verify_opds_live.mjs)，使用公开 Komga 服务器的真实目录、封面、原图及 CBZ；隔离扩展 profile，不伪造 OPDS 响应，不写远端进度，不调用翻译。
+
 ## 账户展示注册
 
-设置中的账户通过文件来源注册契约 `FileSourceDriver.listAccounts()` 读取，`subscribeAccounts()` 通知授权状态变化，`describeAccount(account)` 返回纯文本的 `{id,label,value}` 字段列表。应用层按来源和账户身份合并授权后台与漫画目录已有的记录，UI 不读取供应商私有字段或判断供应商 ID。账户列表独立于缓存统计加载；某个来源失败时显示原因和重试入口，不把读取失败显示为“暂无云盘账户”，也不影响其他来源。
+设置中的来源连接通过 `SourceProvider.connection.list/subscribe/describe` 读取和订阅，描述字段为纯文本的 `{id,label,value}` 列表；既有文件驱动的账户方法由 registry 转换。应用层按来源和账户身份合并授权后台与漫画目录已有的记录，UI 不读取供应商私有字段或判断供应商 ID。账户列表独立于缓存统计加载；某个来源失败时显示原因和重试入口，不把读取失败显示为空列表，也不影响其他来源。远程书库只读取具备目录能力的连接，不初始化文件专用账户。
 
 `SourceAccount` 是展示快照，不携带漫画访问代次；读取账户不创建目录记录或恢复文件访问。来源选择成功时，即使没有选择文件也保存 `SourceConnection`。选择返回的 `accountMetadata` 只允许非敏感展示资料，保存在本机；重新选择或连接时刷新，资料变化不增加访问代次。Google Drive 的列表仅投影插件已核验的本地连接与会话账户，不返回令牌、不调用 OAuth、不探测浏览器登录账户；仅连接账户、尚未导入漫画时也可显示。账户记录跨浏览器重启保留，用于再次进入云盘时自动跳转 Google；令牌只在可信会话中保存，断开会删除自动跳转记录。
 
@@ -67,7 +91,7 @@ Google Drive 驱动从已验证的 `about.user` 响应读取名称和可选邮�
 | 来源分段缓存 | 云盘已取得的字节区间 |
 | 缩略图缓存 | 有界书架／页面缩略图 |
 | 译图缓存 | 按渠道作用域隔离的完整译图；官方覆盖首次合成后保存整页，重绘与 MTU 保存完整结果 |
-| 显式下载资料 | 用户主动保留的网站原图，不受普通缓存清理影响 |
+| 显式下载资料 | 用户主动保留的网站／远程页序列原图，不受普通缓存清理影响；完整文件下载使用完整容器 |
 
 页面服务按 `original-v2-static-srgb` 处理静态首帧、EXIF 方向和 sRGB 语义，只有需要的输入重编码；送译摘要对应实际缓存字节。中心不提供原图恢复，常规覆盖合成必须配合同摘要原图，完整译图缓存命中后可独立读取；完整译图缺失且原图来源和缓存均不可用时明确报错。
 

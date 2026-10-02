@@ -3,7 +3,7 @@ import {msg} from '../i18n/runtime';
 import {canFindAlternatives} from '../sources';
 import {Icon} from '../icons';
 import {continueEntry,hasCatalogUpdates,removeComics,type Comic,type Entry} from '../comics/application/library-service';
-import {readDownloadScope} from '../comics/acquisition/books';
+import {readDownloadScope,readComicOfflineCapability} from '../comics/acquisition/books';
 import type {LibraryViewModel} from '../comics/application/types';
 import {useContextMenu} from './ContextMenu';
 import {Select} from './Select';
@@ -32,14 +32,23 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
  const changeUpdatesOnly=()=>{shelfView.current.updatesOnly=!filterUpdates;shelfView.current.scrollTop=0;setUpdatesOnly(!filterUpdates);window.scrollTo({top:0,behavior:'instant'});};
  const open=(id:string)=>{shelfView.current.scrollTop=window.scrollY;onOpen(id);};
  const toggle=(id:string)=>setSelected(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;});
- const actions=(comic:Comic)=>[
+ const actions=(comic:Comic)=>{
+  let capability:ReturnType<typeof readComicOfflineCapability>|undefined;
+  const offline=()=>capability??=readComicOfflineCapability(comic.id);
+  const retained=downloads?.books.some(book=>book.comic.id===comic.id)||downloads?.files.some(file=>file.intent.comicId===comic.id);
+  return [
   {icon:'book',label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
   ...(comic.sourceUrl?[{icon:'external',label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
-  ...(downloads?[{icon:'download',label:comic.source.connectionId==='local'?msg('已保存在本机'):!comic.source.connectionId.startsWith('website:')?msg('此来源暂不支持整本缓存'):downloads.books.some(book=>book.comic.id===comic.id)?msg('查看缓存进度'):msg('缓存整本'),disabled:!comic.source.connectionId.startsWith('website:'),onSelect:()=>downloads.books.some(book=>book.comic.id===comic.id)?downloads.open(comic.id):void downloads.start(comic.id)},...(comic.source.connectionId.startsWith('website:')?[{icon:'globe',label:msg('缓存语言'),visible:async()=>(await readDownloadScope(comic.id)).languages.length>1,onSelect:()=>downloads.open(comic.id,true)}]:[])]:[]),
+  ...(downloads?[
+   {icon:'download',label:msg('已保存在本机'),disabled:true,visible:async()=>await offline()==='local',onSelect:()=>{}},
+   {icon:'download',label:msg('此来源暂不支持整本缓存'),disabled:true,visible:async()=>await offline()==='none',onSelect:()=>{}},
+   {icon:'download',label:retained?msg('查看缓存进度'):msg('缓存整本'),visible:async()=>['pages','file'].includes(await offline()),onSelect:()=>retained?downloads.open(comic.id):void downloads.start(comic.id)},
+   {icon:'globe',label:msg('缓存语言'),visible:async()=>await offline()==='pages'&&(await readDownloadScope(comic.id)).languages.length>1,onSelect:()=>downloads.open(comic.id,true)}
+  ]:[]),
   ...(onFind&&canFindAlternatives(comic.sourceUrl)?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {icon:'download',label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
   {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
- ];
+ ];};
  async function confirmRemoval(){
   if(!removing?.length||removalRunning.current)return;
   removalRunning.current=true;setBusy(true);

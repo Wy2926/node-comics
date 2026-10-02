@@ -1,0 +1,141 @@
+import type {SourceConnection} from '../../domain';
+import {msg} from '../../../i18n/runtime';
+import type {ComicFormat} from '../../formats/contracts';
+import type {OpenFileSourceContext,RemoteCatalogPage,RemotePublication,RemoteReadingPlan,SourceAccount,SourceAccessChange,SourceProvider} from '../contracts';
+import {OpdsError} from './errors';
+import {expandSearch,hasRel,isAcquisition,isBitmap,isManifest,mediaType,parseCatalog,parsePublication,parseSearchDescription,PSE_REL,safePse,type OpdsCatalog,type OpdsLink,type OpdsPublication} from './protocol';
+import {identityUrl,opaqueId,PrivateOpdsStore,type OpdsStore,type PrivateConnection,type PrivateResource,type OpdsAuth} from './private-store';
+import {OpdsRangeSource,probeRange} from './range-source';
+import {allowedUrl,IMAGE_LIMIT,OpdsTransport,validateRoot} from './transport';
+
+const PROVIDER='opds';
+type Opening={publicationId:string;kind:RemoteReadingPlan['kind'];format:RemoteReadingPlan['format'];version:string;pages?:OpdsLink[];template?:OpdsLink;url?:string;etag?:string;size?:number;title:string;};
+const cleanText=(v:string,max=4000)=>v.replace(/<[^>]*>/g,'').slice(0,max);
+function formatOf(link:OpdsLink):ComicFormat|undefined {
+  if(link.indirect||!isAcquisition(link))return;
+  switch(mediaType(link.type)){
+    case 'application/zip':case 'application/x-cbz':case 'application/vnd.comicbook+zip':return 'cbz';
+    case 'application/x-cbr':case 'application/vnd.comicbook-rar':case 'application/x-rar-compressed':return 'cbr';
+    case 'application/pdf':return 'pdf';case 'application/x-mobipocket-ebook':return 'mobi';
+  }
+}
+function account(connection:PrivateConnection):SourceAccount{return {id:connection.id,provider:PROVIDER,accountId:connection.id,displayName:connection.name,status:connection.disconnected?'disconnected':'connected',accountMetadata:{origin:connection.origin??new URL(connection.root).origin,protocol:connection.namespace.split(':')[0],authentication:connection.auth.kind}};}
+
+export function createOpdsProvider(options:{store?:OpdsStore;fetch?:typeof fetch}={}):SourceProvider {
+  const store=options.store??new PrivateOpdsStore(),listeners=new Set<()=>void>(),accessListeners=new Set<(change:SourceAccessChange)=>Promise<void>>();
+  const transport=new OpdsTransport(options.fetch,async connection=>{const current=await store.connection(connection.id);if(!current||current.disconnected||current.revision!==connection.revision)throw new OpdsError('disconnected','OPDS 连接授权已变更，请重新打开。');});
+  let broadcast:BroadcastChannel|undefined;
+  function listen(){if(!broadcast&&typeof window!=='undefined'&&typeof BroadcastChannel!=='undefined'){broadcast=new BroadcastChannel('node-comics-opds-connections');broadcast.onmessage=event=>{if(['disconnected','credentials'].includes(event.data?.type)&&typeof event.data.id==='string')void changed(event.data.id,false,event.data.type==='disconnected');};}}
+  async function changed(id:string,notify=true,accessLost=true){transport.abortConnection(id);if(!notify||accessLost)store.clearTransient?.(id);for(const listener of listeners)listener();if(accessLost)await Promise.allSettled([...accessListeners].map(listener=>listener({connectionId:id})));if(notify)broadcast?.postMessage({type:accessLost?'disconnected':'credentials',id});}
+  async function connectionFor(value:Pick<SourceConnection,'id'|'provider'>,allowDisconnected=false){listen();const connection=value.provider===PROVIDER?await store.connection(value.id):undefined;if(!connection||connection.disconnected&&!allowDisconnected)throw new OpdsError('disconnected','OPDS 连接已断开，请重新添加。');return connection;}
+  async function resourceFor(connection:PrivateConnection,id:string,kind:PrivateResource['kind']){const resource=await store.resource(id);if(!resource||resource.connectionId!==connection.id||resource.kind!==kind||resource.revision!==connection.revision)throw new OpdsError('source-changed','OPDS 目录引用已过期，请返回目录重新打开。');return resource;}
+  const record=(connection:PrivateConnection,id:string,kind:PrivateResource['kind'],value:Record<string,unknown>,pinned=false):PrivateResource=>({id,kind,value,connectionId:connection.id,revision:connection.revision,pinned,updatedAt:Date.now()});
+  async function catalogReference(connection:PrivateConnection,url:string,records:PrivateResource[]){const id=await opaqueId(connection.id,'catalog',`${connection.namespace}:${identityUrl(url,connection)}`);records.push(record(connection,id,'catalog',{url}));return id;}
+  async function publicationReference(connection:PrivateConnection,pub:OpdsPublication,protocol:string,records:PrivateResource[],catalogUrl?:string):Promise<RemotePublication>{
+    const fallback=pub.links.find(l=>isAcquisition(l)||hasRel(l,PSE_REL)||isManifest(l));
+    if(!pub.identity&&!fallback)throw new OpdsError('unsupported','出版物缺少可识别的目录记录或读取地址。');
+    const identity=identityUrl(pub.identity??fallback!.href,connection),id=await opaqueId(connection.id,'publication',`${connection.namespace}:${protocol}:${identity}`);
+    records.push(record(connection,id,'publication',{publication:pub,protocol,...(catalogUrl?{catalogUrl}:{})}));
+    const art=pub.images.find(l=>hasRel(l,'http://opds-spec.org/image/thumbnail'))??pub.images[0];let artwork:RemotePublication['artwork'];
+    if(art){const imageId=await opaqueId(connection.id,'artwork',`${id}:${identityUrl(art.href,connection)}`);records.push(record(connection,imageId,'artwork',{link:art}));artwork={id:imageId,locator:{resourceId:imageId}};}
+    const epubOnly=pub.links.some(l=>isAcquisition(l)&&mediaType(l.type)==='application/epub+zip')&&!pub.links.some(l=>formatOf(l)||safePse(l)||mediaType(l.type)==='application/divina+json');
+    const supported=!epubOnly&&pub.links.some(l=>formatOf(l)||safePse(l)||isManifest(l)||mediaType(l.type)==='application/opds-publication+json'||mediaType(l.type)==='application/atom+xml'&&l.type?.includes('type=entry'));
+    return {id,title:cleanText(pub.title,300),authors:pub.authors.map(v=>cleanText(v,300)),summary:pub.summary?cleanText(pub.summary):undefined,artwork,formats:[...new Set(pub.links.map(l=>formatOf(l)).filter((v):v is ComicFormat=>!!v))],readable:supported,reason:supported?undefined:'此条目没有可读取的漫画图片或支持的文件格式。'};
+  }
+  async function normalized(connection:PrivateConnection,catalog:OpdsCatalog,url:string):Promise<RemoteCatalogPage>{
+    const records:PrivateResource[]=[],location=await catalogReference(connection,url,records);
+    const navigation=async(links:OpdsLink[])=>Promise.all(links.map(async link=>{const location=await catalogReference(connection,link.href,records);return {id:location,location,title:cleanText(link.title??msg('书库目录'),300)};}));
+    const pubs=(values:OpdsPublication[])=>Promise.all(values.map(pub=>publicationReference(connection,pub,catalog.protocol,records,url)));
+    const result:RemoteCatalogPage={title:cleanText(catalog.title,300),location,navigation:await navigation(catalog.navigation),publications:await pubs(catalog.publications),groups:[],facets:[],searchable:catalog.links.some(l=>hasRel(l,'search'))};
+    for(const group of catalog.groups){const self=group.links.find(l=>hasRel(l,'self'));result.groups!.push({title:cleanText(group.title,300),navigation:await navigation([...group.navigation,...(self?[{...self,title:msg('查看全部')}]:[])]),publications:await pubs(group.publications)});}
+    for(const facet of catalog.facets){const links=await navigation(facet.links);result.facets!.push({title:cleanText(facet.title,300),links:links.map((link,i)=>({...link,active:facet.links[i].active||hasRel(facet.links[i],'self')}))});}
+    for(const [field,rels] of [['next',['next']],['previous',['previous','prev']]] as const){const link=catalog.links.find(l=>rels.some(r=>hasRel(l,r)));if(link)result[field]=await catalogReference(connection,link.href,records);}
+    const search=catalog.links.find(l=>hasRel(l,'search'));if(search)records.find(r=>r.id===location)!.value.search=search;
+    const rootLocation=await catalogReference(connection,connection.root,records);result.breadcrumbs=[{title:connection.name,location:rootLocation}];
+    // Duplicate self/root records must not overwrite the search discovery above.
+    const unique=new Map<string,PrivateResource>();for(const item of records)if(!unique.has(item.id))unique.set(item.id,item);
+    if(unique.size>2000)throw new OpdsError('too-large','OPDS 单页目录过大，请在服务端缩小目录分页。');
+    await store.saveResources([...unique.values()]);return result;
+  }
+  async function openingFor(context:OpenFileSourceContext){const connection=await connectionFor(context.connection),id=context.source.locator.representationId;
+    if(typeof id!=='string'||context.source.locator.publicationId!==context.source.providerItemId)throw new OpdsError('source-changed','OPDS 读取绑定无效，请重新打开。');
+    const resource=await resourceFor(connection,id,'opening'),opening=resource.value as unknown as Opening;
+    if(opening.publicationId!==context.source.providerItemId||context.sourceSnapshot?.version!==opening.version)throw new OpdsError('source-changed','OPDS 读取版本已变更，请重新打开。');return {connection,opening,id};
+  }
+  return {
+    id:PROVIDER,label:'OPDS',cachePages:true,cacheRanges:true,
+    connection:{
+      get fields(){return [{id:'name',label:msg('名称'),type:'text' as const,required:true},{id:'url',label:msg('OPDS 目录地址'),type:'url' as const,required:true,placeholder:'https://server.example/opds'},{id:'auth',label:msg('授权方式'),type:'select' as const,options:[{value:'anonymous',label:msg('无需授权')},{value:'basic',label:msg('Basic 用户名和密码')},{value:'url-token',label:msg('地址已包含访问令牌')}]},{id:'username',label:msg('用户名'),type:'text' as const},{id:'password',label:msg('密码'),type:'password' as const}];},
+      async connect(values,existing,signal){
+        const auth:OpdsAuth=values.auth==='basic'?{kind:'basic',username:values.username??'',password:values.password??''}:values.auth==='url-token'?{kind:'url-token'}:{kind:'anonymous'};
+        if(auth.kind==='basic'&&(!auth.username||!auth.password||auth.username.includes(':')))throw new OpdsError('authentication-required','请填写有效的 Basic 用户名和密码。');
+        const root=validateRoot(values.url?.trim()??'',auth.kind!=='anonymous'),previous=existing?await connectionFor(existing,true):undefined;
+        const connection:PrivateConnection={id:previous?.id??`opds:${crypto.randomUUID()}`,name:cleanText(values.name?.trim()||new URL(root).hostname,100),root,auth,revision:(previous?.revision??0)+1,namespace:'',createdAt:previous?.createdAt??Date.now()};
+        connection.origin=new URL(root).origin;connection.endpointKey=await opaqueId(connection.id,'endpoint',identityUrl(root,connection));connection.accountKey=await opaqueId(connection.id,'account',auth.kind==='basic'?auth.username:auth.kind);
+        if(previous&&(connection.endpointKey!==previous.endpointKey||connection.accountKey!==previous.accountKey||auth.kind!==previous.auth.kind))throw new OpdsError('scope-blocked','不能将已有连接改为另一目录或账户，请添加新连接。');
+        const document=await new OpdsTransport(options.fetch).document(connection,root,signal),catalog=parseCatalog(document.text,root,document.contentType);connection.namespace=`${catalog.protocol}:${connection.endpointKey}`;
+        if(previous&&connection.namespace!==previous.namespace)throw new OpdsError('scope-blocked','不同 OPDS 版本或目录需要单独连接。');
+        signal?.throwIfAborted();await store.saveConnection(connection,previous,signal);await normalized(connection,catalog,root);listen();await changed(connection.id,true,false);return account(connection);
+      },
+      list:async()=>{listen();return (await store.connections()).map(account);},subscribe(listener){listen();listeners.add(listener);return ()=>{listeners.delete(listener);};},
+      describe(value){return [{id:'origin',label:msg('服务地址'),value:value.accountMetadata?.origin??''},{id:'protocol',label:msg('协议'),value:value.accountMetadata?.protocol??''}];},
+      async disconnect(value){const connection=await connectionFor(value,true);await store.disconnect(connection.id);await changed(connection.id);},
+    },
+    catalog:{
+      async browse(request){
+        const connection=await connectionFor(request.connection),ref=request.cursor??request.location;let url=connection.root;
+        if(ref)url=String((await resourceFor(connection,ref,'catalog')).value.url);
+        let document=await transport.document(connection,url,request.signal),catalog=parseCatalog(document.text,url,document.contentType);
+        if(!request.cursor&&request.search?.trim()){
+          const search=catalog.links.find(l=>hasRel(l,'search'));if(!search)throw new OpdsError('unsupported','此目录没有提供搜索。');
+          let template=search.href;
+          if(mediaType(search.type)==='application/opensearchdescription+xml'){const description=await transport.document(connection,search.href,request.signal);template=parseSearchDescription(description.text,search.href);}
+          url=expandSearch(template,request.search.trim());document=await transport.document(connection,url,request.signal);catalog=parseCatalog(document.text,url,document.contentType);
+        }
+        return normalized(connection,catalog,url);
+      },
+      async resolve(publicConnection,publicationId,options={}){
+        const connection=await connectionFor(publicConnection),resource=await resourceFor(connection,publicationId,'publication');let publication=resource.value.publication as unknown as OpdsPublication;
+        const detail=publication.links.find(l=>mediaType(l.type)==='application/opds-publication+json'&&(hasRel(l,'self')||hasRel(l,'alternate'))||mediaType(l.type)==='application/atom+xml'&&l.type?.includes('type=entry')&&hasRel(l,'alternate'));
+        if(detail){const doc=await transport.document(connection,detail.href,options.signal);publication=parsePublication(doc.text,detail.href);}
+        else if(resource.value.protocol==='opds1'&&typeof resource.value.catalogUrl==='string'){
+          const catalogUrl=resource.value.catalogUrl,doc=await transport.document(connection,catalogUrl,options.signal),current=parseCatalog(doc.text,catalogUrl,doc.contentType);
+          const fresh=[...current.publications,...current.groups.flatMap(group=>group.publications)].find(pub=>pub.identity===publication.identity);
+          if(!fresh)throw new OpdsError('source-changed','出版物已不在原目录页，请重新浏览目录定位。');publication=fresh;
+        }
+        let opening:Opening|undefined;
+        if(options.purpose!=='download'){
+          const manifest=publication.links.find(l=>isManifest(l)&&!l.indirect&&(hasRel(l,'self')||isAcquisition(l)));
+          if(manifest){const doc=await transport.document(connection,manifest.href,options.signal),full=parsePublication(doc.text,manifest.href);if(full.readingOrder?.length&&full.readingOrder.length<=20000&&full.readingOrder.every(isBitmap))opening={publicationId,kind:'pages',format:'image-sequence',version:await opaqueId(connection.id,'version',JSON.stringify([full.modified,full.readingOrder.map(l=>identityUrl(l.href,connection))])),pages:full.readingOrder,title:publication.title};}
+          if(!opening){const template=publication.links.find(safePse);if(template)opening={publicationId,kind:'pages',format:'image-sequence',version:await opaqueId(connection.id,'version',JSON.stringify([publication.modified,identityUrl(template.href,connection),template.count])),template,title:publication.title};}
+        }
+        if(!opening){
+          const file=publication.links.find(l=>!!formatOf(l));
+          if(!file){if(publication.links.some(l=>hasRel(l,PSE_REL)&&!safePse(l)))throw new OpdsError('unsupported','此页流可能修改服务端进度或模板不受支持；请使用安全的图片清单或下载文件。');throw new OpdsError('unsupported','此条目不是可读取的图片清单/漫画文件，或需要 DRM、借阅、购买等额外流程。');}
+          const format=formatOf(file)!,range=!['cbz','mobi'].includes(format)?undefined:await probeRange(transport,connection,file.href,options.signal);
+          opening={publicationId,kind:range?'range-file':'download-file',format,version:range?.etag??await opaqueId(connection.id,'version',`${publication.modified??''}:${identityUrl(file.href,connection)}`),url:file.href,etag:range?.etag,size:range?.size,title:publication.title};
+        }
+        const representationId=await opaqueId(connection.id,'opening',`${publicationId}:${opening.format}:${opening.url?identityUrl(opening.url,connection):'pages'}:${opening.version}`),records:PrivateResource[]=[],visible=await publicationReference(connection,publication,String(resource.value.protocol),records);
+        // Partial-entry details can have a different self link; retain the selected catalog identity.
+        visible.id=publicationId;records.push({...resource,value:{...resource.value,publication},pinned:true,updatedAt:Date.now()},record(connection,representationId,'opening',opening as unknown as Record<string,unknown>,true));
+        if(visible.artwork){const art=records.find(r=>r.id===visible.artwork!.id);if(art)art.pinned=true;}
+        await store.saveResources(records);
+        return {publication:visible,kind:options.purpose==='download'&&opening.kind==='range-file'?'download-file':opening.kind,format:opening.format,representationId,locator:{publicationId,representationId},snapshot:{version:opening.version,representationId,...(opening.size?{size:opening.size}:{})},size:opening.size};
+      },
+    },
+    pages:{
+      async index(context){const {opening,id}=await openingFor(context);if(opening.kind!=='pages')throw new OpdsError('unsupported','此出版物不是图片序列。');const total=opening.pages?.length??opening.template?.count??0;
+        return {complete:true,total,pages:Array.from({length:total},(_,ordinal)=>({ordinal,name:`${ordinal+1}`,locator:{sourceId:`${opening.publicationId}:${ordinal}`,contentKey:`${opening.version}:${ordinal}`,representationId:id,ordinal},width:opening.pages?.[ordinal].width,height:opening.pages?.[ordinal].height}))};},
+      async read(context,page){const {connection,opening,id}=await openingFor(context),ordinal=page.ordinal;if(page.locator.representationId!==id||page.locator.ordinal!==ordinal||!Number.isSafeInteger(ordinal)||ordinal<0)throw new OpdsError('source-changed','OPDS 页定位无效。');
+        const link=opening.pages?.[ordinal]??(opening.template&&ordinal<(opening.template.count??0)?{...opening.template,href:opening.template.href.replaceAll('{pageNumber}',String(ordinal)).replaceAll('{maxWidth}','').replaceAll('{maxHeight}','')}:undefined);
+        if(!link)throw new OpdsError('source-changed','OPDS 页已不存在。');const result=await transport.bytes(connection,link.href,{signal:context.signal,maxBytes:IMAGE_LIMIT});const type=mediaType(result.headers.get('Content-Type')??link.type);if(!isBitmap({...link,type}))throw new OpdsError('unsupported','源站没有返回支持的原图。');return new Blob([result.bytes],{type});},
+    },
+    artwork:{async read(publicConnection,artwork,signal){const connection=await connectionFor(publicConnection),resource=await resourceFor(connection,artwork.id,'artwork'),link=resource.value.link as unknown as OpdsLink;const result=await transport.bytes(connection,link.href,{signal,maxBytes:IMAGE_LIMIT});const type=mediaType(result.headers.get('Content-Type')??link.type);if(!isBitmap({...link,type}))throw new OpdsError('unsupported','封面不是支持的图片。');return new Blob([result.bytes],{type});}},
+    files:{
+      async open(context){const {connection,opening}=await openingFor(context);if(opening.kind!=='range-file'||!opening.url||!opening.etag||!opening.size)throw new OpdsError('range-unsupported','此文件需要先下载再阅读。');return new OpdsRangeSource(transport,connection,{url:opening.url,etag:opening.etag,size:opening.size,identity:`${connection.id}:${opening.publicationId}`},async()=>{const current=await store.connection(connection.id);return current?.revision===connection.revision;});},
+      async download(context){const {connection,opening}=await openingFor(context);if(!opening.url||opening.format==='image-sequence')throw new OpdsError('unsupported','此出版物未提供可下载文件。');allowedUrl(connection,opening.url);const result=await transport.download(connection,opening.url,context.signal,{etag:opening.etag,size:opening.size});return {...result,name:`${cleanText(opening.title,180).replace(/[<>:"/\\|?*\u0000-\u001f]/g,'_')}.${opening.format}`};},
+    },
+    subscribe(listener){accessListeners.add(listener);return ()=>{accessListeners.delete(listener);};},
+  };
+}
+export const opdsProvider=createOpdsProvider();

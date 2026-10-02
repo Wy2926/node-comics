@@ -1,5 +1,8 @@
 /** Persistent metadata. Bytes, credentials and live browser handles have separate owners. */
-export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'website';
+export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'website' | 'image-sequence';
+/** Opaque provider-owned artwork reference, never a credential-bearing URL. */
+export interface SourceArtwork {id:string;locator:Record<string,unknown>}
+export const entryContentKind=(entry:Pick<Entry,'format'>):'file'|'pages'=>entry.format==='website'||entry.format==='image-sequence'?'pages':'file';
 export interface ComicSource {
   connectionId: string; providerItemId: string; locator: Record<string, unknown>;
   generation: number; status: 'active' | 'revoked' | 'disconnected';
@@ -13,6 +16,8 @@ export interface Comic {
   cover?: { entryId: string; contentId: string; pageId: string };
   /** Dedicated website artwork; independent of the file/first-page cover. */
   sourceCover?: {url: string};
+  /** Remote library artwork is separate from the legacy website cover reference. */
+  sourceArtwork?:SourceArtwork;
   catalogSync?: { nextCheckAt: number; lastAttemptAt?: number; lastSuccessAt?: number; lease?: string };
   catalogUpdates?: { revision: number; seenRevision: number; count: number };
 }
@@ -29,6 +34,8 @@ export interface Entry {
   knownTotal?: number; pageCount?: number; error?: string; coverPageId?: string;
   /** Current content only. There is no revision history or alternative document relation. */
   containerId?: string; sourceSnapshot?: Record<string, unknown>;
+  /** Chosen remote representation; availability of a local replica does not change its source. */
+  acquisition?:{kind:'pages'|'range-file'|'download-file';representationId:string};
   /** Retain reading data and its slot when the source removes this release. */
   sourceRemoved?: boolean;
 }

@@ -1,6 +1,7 @@
 import {sourceLock} from './locks';
 import {catalog, type CatalogWrite} from '../repositories';
 import type {Comic, Entry, PageDescriptor, SourceConnection} from '../domain';
+import {entryContentKind} from '../domain';
 import {importContainer, openContainer, releaseContainer, type ManagedContainer} from '../../storage/containers';
 import {openDocument} from '../formats';
 import type {ComicFormat, IndexedPage} from '../formats/contracts';
@@ -33,7 +34,7 @@ async function connection(input:ConnectionInput) {
   const value:SourceConnection={...input,status:'connected',generation:1,createdAt:now,updatedAt:now};
   await catalog.put('connections',value);return value;
 }
-function descriptors(contentId:string,pages:IndexedPage[]):PageDescriptor[] {
+export function descriptors(contentId:string,pages:IndexedPage[]):PageDescriptor[] {
   return pages.map(page=>{
     const locator='sourceId' in page.locator
       ? (typeof page.locator.contentKey==='string' ? {contentKey:page.locator.contentKey,sourceId:page.locator.sourceId} : {url:page.locator.url,sourceId:page.locator.sourceId})
@@ -127,7 +128,7 @@ export async function importSourceFiles(selection:SourceSelection,signal?:AbortS
 }
 export async function reindexEntry(id:string,signal?:AbortSignal) {
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
-  if(entry.format==='website')throw Error('请通过已适配的网站重新载入内容。');
+  if(entryContentKind(entry)==='pages')throw Error('请通过来源页面索引重新载入内容。');
   const comic=await catalog.get('comics',entry.comicId),connected=comic&&await catalog.get('connections',comic.source.connectionId);
   if(!comic||!connected)throw Error('漫画来源已移除。');
   const pages=await filePages({connection:connected,source:comic.source,entryId:id,contentId:entry.contentId,sourceSnapshot:entry.sourceSnapshot,format:entry.format,containerId:entry.containerId,signal});

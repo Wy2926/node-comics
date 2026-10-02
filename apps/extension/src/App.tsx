@@ -12,7 +12,8 @@ import { COMIC_ACCEPT } from './comics/formats/limits';
 import { LocalImportQueue } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
 import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, getComic, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, coverReference, setSourceLanguagePreference, type Comic, type ReadingDirectory } from './comics/application/library-service';
-import { importSourceFiles, importManifest, reindexEntry } from './comics/application/import-service';
+import { importSourceFiles, importManifest } from './comics/application/import-service';
+import {prepareEntryContent} from './comics/application/entry-content';
 import { settings as readSettings, saveSettings } from './comics/application/preferences';
 import { discoverEntryContent } from './comics/acquisition';
 import { chooseSourceFiles, sourceImportOptions } from './comics/application/source-service';
@@ -58,10 +59,14 @@ import {observeImport} from './comics/application/import-analytics';
 import {useShortcuts} from './shortcuts/react';
 import type {ShortcutScope} from './shortcuts/catalog';
 import {ShortcutPanel} from './ui/shortcuts/ShortcutPanel';
+import {RemoteLibrary} from './ui/remote-library/RemoteLibrary';
+import {openRegisteredRemoteComic} from './comics/application/remote-library-service';
+import {FileDownloadPrompt} from './ui/downloads/FileDownloads';
+import {queueRemoteFileDownload} from './comics/acquisition/files';
 
-type View='downloads'|'library'|'sites'|'search'|'discover'|'settings'|'account';
+type View='downloads'|'library'|'remote-library'|'sites'|'search'|'discover'|'settings'|'account';
 const directSearchSeed:SearchSeed={title:''};
-function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='downloads'||value==='sites'||value==='search'||value==='discover'||value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
+function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];if(value==='downloads'||value==='remote-library'||value==='sites'||value==='search'||value==='discover'||value==='settings'||value==='account')return value;if(value&&value!=='library')history.replaceState(null,'',location.pathname+location.search+'#library');return 'library';}
 export function App(){
  const [library,setLibrary]=useState(emptyLibrary),[copies,setCopies]=useState<ReadingEntry[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
  const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent',updatesOnly:false});
@@ -87,12 +92,14 @@ export function App(){
  useEffect(()=>{if(!analyticsEnabled){previousAnalyticsScreen.current=undefined;return;}const observation=consentedAt+':'+analyticsScreen;if(previousAnalyticsScreen.current!==observation){previousAnalyticsScreen.current=observation;track('page_view',{surface:'reader',screen:analyticsScreen});}},[analyticsScreen,analyticsEnabled,consentedAt]);
  const readerAnalytics=useMemo(()=>new ReaderAnalytics(track),[current?.comicId??current?.id]);
  const readingConnection=library.comics.find(comic=>comic.id===current?.comicId)?.source.connectionId;
- const readingSource=readingConnection==='local'?'local':readingConnection?.startsWith('website:')?'website':readingConnection?.startsWith('drive:')?'google_drive':'unknown';
+ const readingSource=readingConnection==='local'?'local':readingConnection?.startsWith('website:')?'website':readingConnection?.startsWith('drive:')?'google_drive':readingConnection?.startsWith('opds:')?'opds':'unknown';
  const viewRef=useRef(view);viewRef.current=view;
  const libraryActive=!current&&view==='library';
  const [libraryVisited,setLibraryVisited]=useState(view==='library');
  const [searchPageVisited,setSearchPageVisited]=useState(view==='search');
  const [discoveryVisited,setDiscoveryVisited]=useState(view==='discover');
+ const [remoteVisited,setRemoteVisited]=useState(view==='remote-library');
+ useEffect(()=>{if(view==='remote-library')setRemoteVisited(true);},[view]);
  useEffect(()=>{if(view==='search')setSearchPageVisited(true);},[view]);
  useEffect(()=>{if(view==='discover')setDiscoveryVisited(true);},[view]);
  useEffect(()=>{if(libraryActive)setLibraryVisited(true);},[libraryActive]);
@@ -125,8 +132,8 @@ export function App(){
  },[]);
  const leaveReader=useCallback(()=>{readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[]);
  const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));},[]);
- const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false)=>{
-   const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>request===readingEpoch.current&&api.isCurrent();setReadingBusy(true);setError('');
+ const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false,requestIsCurrent?:()=>boolean)=>{
+   const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>request===readingEpoch.current&&api.isCurrent()&&(requestIsCurrent?.()??true);setReadingBusy(true);setError('');
    try{await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readSequence(id);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
  },[api]);
  function activateEntry(id:string){
@@ -181,7 +188,13 @@ export function App(){
    try{await trackWebsiteImport(options=>resumeWebsiteCatalog(comicId,options),()=>{},comicId);}
    catch(error){if(copiesRef.current.some(copy=>copy.id===currentRef.current&&copy.comicId===comicId))setError((error as Error).message);}
  }
- async function openComic(comicId:string){const entry=await continueEntry(comicId,settingsRef.current.language);if(!entry)throw Error(msg('无法打开来源。'));await openEntry(entry.id);}
+ async function openComic(comicId:string){
+   const epoch=readingEpoch.current,remote=await openRegisteredRemoteComic(comicId);
+   if(epoch!==readingEpoch.current||!api.isCurrent())return;
+   if(remote?.kind==='download-required'){const comic=await getComic(comicId);if(comic&&epoch===readingEpoch.current)downloads.promptFileDownload(comic.source.connectionId,remote.plan);return;}
+   if(remote?.kind==='opened'){await openEntry(remote.entryId);return;}
+   const entry=await continueEntry(comicId,settingsRef.current.language);if(epoch!==readingEpoch.current)return;if(!entry)throw Error(msg('无法打开来源。'));await openEntry(entry.id);
+ }
  function beginImport(){const state=localImport.getSnapshot();if(state.running||state.phase==='paused'){setImportExpanded(true);return;}input.current?.click();}
  function chooseFiles(files:File[]){
   if(input.current)input.current.value='';if(!files.length)return;
@@ -200,7 +213,7 @@ export function App(){
    if(result.results.length===1&&selected.files.length===1&&request===readingEpoch.current)await openEntry(result.results[0].id);else notify(msg('{0} 份已导入 · {1} 份需要处理',{'0':result.results.length,'1':result.failures.length}));
   }catch(e){setError((e as Error).message);}finally{sourceInProgress.current=false;setBusy('');}
  }
- async function reloadCurrent(){if(!currentId)return;const id=currentId;setBusy(msg('正在重新载入'));try{const entry=await getEntry(id);if(!entry)return;if(entry.format==='website')await discoverEntryContent(id,undefined,{reload:true});else await reindexEntry(id);await openEntry(id);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
+ async function reloadCurrent(){if(!currentId)return;const id=currentId;setBusy(msg('正在重新载入'));try{await prepareEntryContent(id,undefined,{reload:true});await openEntry(id);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
  useEffect(()=>{localImport.activate();void initializeSources().then(reloadLibrary).catch(e=>setError(e.message));return()=>localImport.dispose();},[localImport]);
  useEffect(()=>{void reloadLibrary().catch(e=>setError(e.message));},[reloadLibrary]);
  useEffect(()=>{if(inExtension())void chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}).catch(()=>{});},[]);
@@ -323,11 +336,13 @@ export function App(){
  return <div className={`nc-app ${current?'is-reading':''}`} onDragOver={e=>{if(!searchOpen&&e.dataTransfer.types.includes('Files')){e.preventDefault();setDrag(!current);}}} onDrop={e=>{e.preventDefault();setDrag(false);if(!current&&!searchOpen)chooseFiles(Array.from(e.dataTransfer.files));}}>
   <div style={{display:'contents'}} inert={searchOpen||undefined}>
   <DownloadLanguagesPopover controller={downloads}/>
+  <FileDownloadPrompt controller={downloads}/>
   <input aria-label={msg('选择漫画文件')} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
   {!current&&<header className="nc-app-header">
    <button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button>
    <nav aria-label={msg('主导航')}>
     <button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book" size={28}/>{msg('我的漫画')}</button>
+    <button aria-current={view==='remote-library'?'page':undefined} onClick={()=>nav('remote-library')}><Icon name="cloud" size={28}/>{msg('远程书库')}</button>
     <button aria-current={view==='discover'?'page':undefined} onClick={()=>nav('discover')}><Icon name="spark" size={28}/>{msg('发现')}</button>
     <button aria-current={view==='search'?'page':undefined} onClick={()=>nav('search')}><Icon name="comic-search" size={28}/>{msg('搜索漫画')}</button>
     <button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe" size={28}/>{msg('漫画网站')}</button>
@@ -343,8 +358,8 @@ export function App(){
   </header>}
   <Scrollbars pageMode={!current&&(view==='settings'||view==='account')?'reserved':'overlay'}/>
   <div id="nc-workspace" className="nc-workspace">
-  {current?<Reader analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画')} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});nav('account','subscription');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
-  view!=='search'&&view!=='discover'&&view!=='library'?<main className="nc-main">
+  {current?<Reader analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={view==='remote-library'?msg('返回远程书库'):view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画')} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});nav('account','subscription');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
+  view!=='search'&&view!=='discover'&&view!=='library'&&view!=='remote-library'?<main className="nc-main">
   {view==='downloads'&&<BookDownloads controller={downloads} onRead={id=>void openComic(id).catch(e=>setError(e.message))} onManageStorage={()=>nav('settings')}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
   {view==='settings'&&<Preferences onOpenShortcuts={()=>setShortcutScope('global')} settings={settings} setSettings={setSettings} caps={channel?.capabilities}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
@@ -352,6 +367,7 @@ export function App(){
   <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
   <main className="nc-main nc-search-main" hidden={!!current||view!=='search'}>{(searchPageVisited||view==='search')&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:page`} presentation="page" open={!current&&view==='search'} seed={directSearchSeed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='search')}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
+  <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={async(connectionId,plan)=>{await queueRemoteFileDownload(connectionId,plan,{confirmed:true});downloads.refresh();notify(msg('已加入下载，可在离线中心查看进度。'));}}/>}</main>
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}

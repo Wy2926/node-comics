@@ -11,6 +11,7 @@ import { downloadKey, downloadStore } from '../../storage/downloads';
 import { SourceDatabaseSchemaError } from '../../storage/database';
 import { pageRenderProfile, pageReference, type PageReference } from './identity';
 import type { PageDescriptor, PageMaterialization } from '../domain';
+import {entryContentKind} from '../domain';
 
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
@@ -65,6 +66,10 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
         await assertSourceCurrent();
         blob=await readImage(renewed);
       }
+    }else if(entryContentKind(doc)==='pages'){
+      const provider=getSourceDriver(connection.provider);
+      if(!provider?.pages)throw Error('此来源不提供逐页读取。');
+      blob=await provider.pages.read({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,entry:doc,signal},descriptor);
     }else{
       const containerId=doc.containerId;
       const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});

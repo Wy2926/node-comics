@@ -5,7 +5,7 @@ import {getSourceDriver, listSourceDrivers, onSourceAccountsChanged, requireSour
 export type {SourceSelection} from '../sources/contracts';
 
 export function sourceImportOptions(): {id: string; label: string; configured: boolean}[] {
-  return listSourceDrivers().filter(driver => !!driver.select).map(driver => ({
+  return listSourceDrivers().filter(driver => !!driver.files?.select).map(driver => ({
     id: driver.id, label: driver.label, configured: driver.isConfigured?.() ?? true,
   }));
 }
@@ -13,9 +13,9 @@ export function sourceImportOptions(): {id: string; label: string; configured: b
 export async function selectSourceFiles(providerId: string, connection?: SourceAccount, signal?: AbortSignal): Promise<SourceSelection> {
   signal?.throwIfAborted();
   const driver = requireSourceDriver(providerId);
-  if (!driver.select) throw Error('此来源不提供文件选择入口。');
+  if (!driver.files?.select) throw Error('此来源不提供文件选择入口。');
   if (driver.isConfigured?.() === false) throw Error('此来源尚未配置。');
-  const selection = await driver.select(connection, signal);
+  const selection = await driver.files.select(connection, signal);
   signal?.throwIfAborted();
   if (selection.connection.provider !== driver.id || !selection.connection.id)
     throw Error('所选文件的来源身份不匹配。');
@@ -29,20 +29,24 @@ export const chooseSourceFiles = (providerId: string, signal?: AbortSignal) => s
 export function connectionCapabilities(connection: SourceAccount) {
   const driver = getSourceDriver(connection.provider);
   return {providerLabel: driver?.label ?? connection.provider,
-    accountDetails: driver?.describeAccount?.(connection) ?? [],
-    canReconnect: !!driver?.select && driver.isConfigured?.() !== false,
-    canDisconnect: !!driver?.disconnect};
+    accountDetails: driver?.connection?.describe?.(connection) ?? [],
+    canReconnect: !!(driver?.connection?.reconnect||driver?.files?.select) && driver?.isConfigured?.() !== false,
+    ...(driver?.connection?.connect?{canConfigure:true}:{}),
+    ...(driver?.catalog?{canBrowse:true}:{}),
+    canDisconnect: !!driver?.connection?.disconnect};
 }
 
 /** Account choices belong to source providers, even before any comic has been imported. */
-export async function listSourceAccounts() {
-  const providers=listSourceDrivers().filter(driver=>driver.listAccounts&&driver.isConfigured?.()!==false);
-  const [saved,...results]=await Promise.allSettled([catalog.list('connections',{limit:1000}),...providers.map(async driver=>driver.listAccounts!())]);
+export async function listSourceAccounts(providerIds?:readonly string[]) {
+  const included=providerIds?new Set(providerIds):undefined;
+  const providers=listSourceDrivers().filter(driver=>(!included||included.has(driver.id))&&driver.connection?.list&&driver.isConfigured?.()!==false);
+  const [saved,...results]=await Promise.allSettled([catalog.list('connections',{limit:1000}),...providers.map(async driver=>driver.connection!.list!())]);
   const accounts=new Map<string,SourceAccount>(),errors:{providerLabel:string;error:string}[]=[];
   if(saved.status==='rejected')throw saved.reason;
   for(const connection of saved.value) {
+    if(included&&!included.has(connection.provider))continue;
     const driver=getSourceDriver(connection.provider);
-    if(connection.accountId||driver?.listAccounts||driver?.select||driver?.disconnect||driver?.describeAccount)accounts.set(connection.id,connection);
+    if(connection.accountId||driver?.connection?.list||driver?.files?.select||driver?.connection?.disconnect||driver?.connection?.describe)accounts.set(connection.id,connection);
   }
   for(const [index,result] of results.entries()) {
     const driver=providers[index];
@@ -60,7 +64,7 @@ export async function listSourceAccounts() {
   const items=[...accounts.values()].map(account=>{
     try{return {...account,...connectionCapabilities(account)};}
     catch(error){errors.push({providerLabel:getSourceDriver(account.provider)?.label??account.provider,error:error instanceof Error?error.message:String(error)});
-      return {...account,providerLabel:getSourceDriver(account.provider)?.label??account.provider,accountDetails:[],canReconnect:false,canDisconnect:false};}
+      return {...account,providerLabel:getSourceDriver(account.provider)?.label??account.provider,accountDetails:[],canReconnect:false,canConfigure:false,canBrowse:false,canDisconnect:false};}
   });
   return {accounts:items,errors};
 }

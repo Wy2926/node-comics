@@ -12,14 +12,14 @@ const IMPORT_MS = 300_000;
 const ALL = ['objects', 'chunks', 'operations', 'references', 'leases'];
 const missing = () => new Error('本地源文件已移除，请重新导入。');
 
-async function reserve(file: File, format: ComicFormat, referenceId?: string): Promise<ImportOperation> {
+async function reserve(file: Pick<File, 'name' | 'size'>, format: ComicFormat, referenceId?: string): Promise<ImportOperation> {
   const estimate = await globalThis.navigator?.storage?.estimate?.();
   return bytesTransaction(['operations'], 'readwrite', async tx => {
     const store = tx.objectStore('operations');
     const pending = await idbRequest(store.getAll()) as ImportOperation[];
     const reserved = pending.reduce((sum, item) => sum + Math.max(0, item.size - item.written), 0);
     if (estimate?.quota && estimate.quota - (estimate.usage ?? 0) < reserved + file.size + CHUNK_SIZE)
-      throw new Error('本地空间不足，无法保存完整源文件。请管理本地资料后重试。');
+      throw new DOMException('本地空间不足，无法保存完整源文件。请管理本地资料后重试。', 'QuotaExceededError');
     const operation: ImportOperation = {id: crypto.randomUUID(), format, fileName: file.name, referenceId, size: file.size, written: 0, expiresAt: Date.now() + IMPORT_MS, generation: 1, state: 'staging'};
     store.add(operation);
     return operation;
@@ -54,48 +54,99 @@ async function publish(operationId: string, signal?: AbortSignal): Promise<Manag
   });
 }
 
-/** Copy in bounded chunks, hashing exactly the bytes written during that one copy. */
-export async function importContainer(file: File, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, referenceId?: string): Promise<ManagedContainer> {
-  throwIfAborted(signal);
-  if (!file.size || file.size > 512 * CHUNK_SIZE) throw new Error('本地源文件需为 1 字节至 512 MB。');
-  const prefix = new Uint8Array(await file.slice(0, 80).arrayBuffer());
-  const format = detectFormat(file.name, prefix);
-  if (!format) throw new Error('请选择 CBZ/ZIP、CBR/RAR、PDF 或未加密 MOBI 漫画文件，不支持散图。');
-  if (format === 'cbr' && file.size > 128 * CHUNK_SIZE) throw new Error('CBR 解码会话最多支持 128 MB，请转换为 CBZ。');
-  const op = await reserve(file, format, referenceId);
+export interface ContainerStreamOptions {
+  name: string; size?: number; signal?: AbortSignal; referenceId?: string;
+  onProgress?: (done: number, total?: number) => void | Promise<void>;
+}
+/** Network input is consumed once; only one fixed-size staging buffer is retained. */
+export async function importContainerStream(stream: ReadableStream<Uint8Array>, options: ContainerStreamOptions): Promise<ManagedContainer> {
+  const {name, size, signal, referenceId, onProgress} = options;
+  const maximum = 512 * CHUNK_SIZE;
   try {
-    const hash = new Sha256();
-    for (let offset = 0; offset < file.size; offset += CHUNK_SIZE) {
-      throwIfAborted(signal);
-      const bytes = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
-      hash.update(new Uint8Array(bytes));
-      await bytesTransaction(['operations', 'chunks'], 'readwrite', async tx => {
-        throwIfAborted(signal);
-        const operations = tx.objectStore('operations');
-        const current = await idbRequest(operations.get(op.id)) as ImportOperation | undefined;
-        if (!current || current.generation !== op.generation || current.written !== offset) throw new Error('源文件复制已中断。');
-        tx.objectStore('chunks').add({id: chunkId(op.id, offset / CHUNK_SIZE), objectId: op.id, ordinal: offset / CHUNK_SIZE, bytes});
-        operations.put({...current, written: offset + bytes.byteLength, expiresAt: Date.now() + IMPORT_MS});
-      });
-      onProgress?.(Math.min(file.size, offset + CHUNK_SIZE), file.size);
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    throwIfAborted(signal);
+    if (size !== undefined && (!Number.isSafeInteger(size) || size <= 0 || size > maximum))
+      throw new Error('本地源文件需为 1 字节至 512 MB。');
+  } catch (error) { await stream.cancel(error).catch(() => {}); throw error; }
+  const reader = stream.getReader();
+  const abort = () => { void reader.cancel(signal?.reason).catch(() => {}); };
+  signal?.addEventListener('abort', abort, {once: true});
+  let op: ImportOperation | undefined, written = 0, used = 0, buffer = new Uint8Array(CHUNK_SIZE);
+  const hash = new Sha256();
+  const write = async (bytes: Uint8Array<ArrayBuffer>) => {
+    throwIfAborted(signal);
+    if (!op) {
+      const format = detectFormat(name, bytes.subarray(0, 80));
+      if (!format) throw new Error('请选择 CBZ/ZIP、CBR/RAR、PDF 或未加密 MOBI 漫画文件，不支持散图。');
+      if (format === 'cbr' && (size ?? bytes.byteLength) > 128 * CHUNK_SIZE)
+        throw new Error('CBR 解码会话最多支持 128 MB，请转换为 CBZ。');
+      op = await reserve({name, size: size ?? bytes.byteLength}, format, referenceId);
     }
+    if (op.format === 'cbr' && written + bytes.byteLength > 128 * CHUNK_SIZE)
+      throw new Error('CBR 解码会话最多支持 128 MB，请转换为 CBZ。');
+    // An unknown-length response reserves each next chunk before publishing it.
+    const estimate = size === undefined ? await globalThis.navigator?.storage?.estimate?.() : undefined;
+    const operation = op;
+    await bytesTransaction(['operations', 'chunks'], 'readwrite', async tx => {
+      throwIfAborted(signal);
+      const operations = tx.objectStore('operations');
+      const current = await idbRequest(operations.get(operation.id)) as ImportOperation | undefined;
+      if (!current || current.generation !== operation.generation || current.written !== written) throw new Error('源文件复制已中断。');
+      const nextSize = size ?? written + bytes.byteLength;
+      if (estimate?.quota && nextSize > current.size) {
+        const pending = await idbRequest(operations.getAll()) as ImportOperation[];
+        const reserved = pending.reduce((sum, item) => sum + Math.max(0, item.size - item.written), 0);
+        if (estimate.quota - (estimate.usage ?? 0) < reserved + nextSize - current.size + CHUNK_SIZE)
+          throw new DOMException('本地空间不足，无法保存完整源文件。请管理本地资料后重试。', 'QuotaExceededError');
+      }
+      tx.objectStore('chunks').add({id: chunkId(operation.id, written / CHUNK_SIZE), objectId: operation.id, ordinal: written / CHUNK_SIZE, bytes: bytes.buffer});
+      operations.put({...current, size: nextSize, written: written + bytes.byteLength, expiresAt: Date.now() + IMPORT_MS});
+    });
+    hash.update(bytes); written += bytes.byteLength;
+    await onProgress?.(written, size);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  };
+  try {
+    while (true) {
+      throwIfAborted(signal);
+      const {done, value} = await reader.read();
+      throwIfAborted(signal);
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error('源文件流返回了无效字节。');
+      if (written + used + value.byteLength > (size ?? maximum)) throw new Error('源文件字节超出声明大小或 512 MB 限制。');
+      for (let offset = 0; offset < value.byteLength;) {
+        const count = Math.min(CHUNK_SIZE - used, value.byteLength - offset);
+        buffer.set(value.subarray(offset, offset + count), used); used += count; offset += count;
+        if (used === CHUNK_SIZE) { await write(buffer); buffer = new Uint8Array(CHUNK_SIZE); used = 0; }
+      }
+    }
+    if (used) await write(buffer.slice(0, used));
+    throwIfAborted(signal);
+    if (!op || !written || size !== undefined && written !== size) throw new Error('源文件复制不完整。');
+    const operation = op;
     const sha256 = hash.digest();
     await bytesTransaction(['operations'], 'readwrite', async tx => {
       throwIfAborted(signal);
       const store = tx.objectStore('operations');
-      const current = await idbRequest(store.get(op.id)) as ImportOperation | undefined;
-      if (!current || current.written !== file.size) throw new Error('源文件复制不完整。');
+      const current = await idbRequest(store.get(operation.id)) as ImportOperation | undefined;
+      if (!current || current.generation !== operation.generation || current.written !== written || current.size !== written) throw new Error('源文件复制不完整。');
       store.put({...current, sha256, state: 'bytesClosed'});
     });
-    return await publish(op.id, signal);
+    return await publish(operation.id, signal);
   } catch (error) {
-    await bytesTransaction(['operations', 'chunks'], 'readwrite', async tx => {
-      tx.objectStore('operations').delete(op.id);
-      await removeChunks(tx, op.id);
-    }).catch(() => {});
+    await reader.cancel(error).catch(() => {});
+    if (op) {
+      const id = op.id;
+      await bytesTransaction(['operations', 'chunks'], 'readwrite', async tx => {
+        tx.objectStore('operations').delete(id); await removeChunks(tx, id);
+      }).catch(() => {});
+    }
     throw error;
-  }
+  } finally { signal?.removeEventListener('abort', abort); reader.releaseLock(); }
+}
+/** Local files use the same streaming writer and retain their existing public API. */
+export async function importContainer(file: File, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, referenceId?: string): Promise<ManagedContainer> {
+  return importContainerStream(file.stream(), {name: file.name, size: file.size, signal, referenceId,
+    onProgress: onProgress ? done => onProgress(done, file.size) : undefined});
 }
 
 export async function retainContainer(id: string, referenceId: string) {
@@ -137,6 +188,13 @@ export async function listContainerReferences(referenceId: string): Promise<(Man
     return items;
   });
 }
+/** Lightweight status for offline controls. Full byte validation stays on the read path. */
+export async function isContainerAvailable(id: string): Promise<boolean> {
+  return bytesTransaction(['objects'], 'readonly', async tx => {
+    const object = await idbRequest(tx.objectStore('objects').get(id)) as ContainerRecord | undefined;
+    return object?.state === 'ready' && object.availability === 'present';
+  });
+}
 async function collect(tx: IDBTransaction, id: string) {
   const objects = tx.objectStore('objects');
   const record = await idbRequest(objects.get(id)) as ContainerRecord | undefined;
@@ -152,6 +210,21 @@ export async function releaseContainer(id: string, referenceId: string) {
   await bytesTransaction(ALL, 'readwrite', async tx => {
     tx.objectStore('references').delete(JSON.stringify([id, referenceId]));
     await collect(tx, id);
+  });
+}
+
+/** Discard only an unclaimed import intent; never remove another reader's references. */
+export async function discardContainerImports(referenceId: string): Promise<void> {
+  await bytesTransaction(ALL, 'readwrite', async tx => {
+    const operations = tx.objectStore('operations');
+    for (const operation of await idbRequest(operations.getAll()) as ImportOperation[]) {
+      if (operation.referenceId !== referenceId) continue;
+      operations.delete(operation.id); await removeChunks(tx, operation.id);
+    }
+    const references = tx.objectStore('references');
+    const matches = await idbRequest(references.index('referenceId').getAll(referenceId)) as {id:string;containerId:string}[];
+    for (const reference of matches) references.delete(reference.id);
+    for (const id of new Set(matches.map(reference => reference.containerId))) await collect(tx, id);
   });
 }
 

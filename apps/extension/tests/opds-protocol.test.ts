@@ -1,0 +1,53 @@
+import {describe,expect,it} from 'vitest';
+import {expandSearch,isBitmap,jsonPublication,parseCatalog,parsePublication,parseSearchDescription,safePse} from '../src/comics/sources/opds/protocol';
+import {identityUrl,type PrivateConnection} from '../src/comics/sources/opds/private-store';
+import {installTestXmlParser} from './opds-protocol-dom';
+
+installTestXmlParser();
+
+const root='https://catalog.example/opds/root';
+const entry=(extra:string)=>`<entry><id>urn:book:1</id><title>Book &amp; 1</title>${extra}</entry>`;
+const feed=(inside:string)=>`<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog"><title>Library</title>${inside}</feed>`;
+describe('OPDS protocol normalization',()=>{
+  it('preserves namespaced Atom, xml:base, relative links and entry identity',()=>{
+    const result=parseCatalog(`<a:feed xmlns:a="http://www.w3.org/2005/Atom" xml:base="../"><a:title>Library</a:title><a:entry xml:base="books/"><a:id>urn:book:7</a:id><a:title>One</a:title><a:link rel="http://opds-spec.org/acquisition" type="application/zip" href="7.cbz"/></a:entry></a:feed>`,root);
+    expect(result.protocol).toBe('opds1');expect(result.publications[0].identity).toBe('urn:book:7');expect(result.publications[0].links[0].href).toBe('https://catalog.example/books/7.cbz');
+  });
+  it('separates navigation from partial entries and keeps facets/pagination',()=>{
+    const result=parseCatalog(feed(`<link rel="next" href="?page=2"/><link rel="http://opds-spec.org/facet" title="New" opds:facetGroup="Order" opds:activeFacet="true" href="?order=new"/>${entry('<link type="application/atom+xml;type=entry;profile=opds-catalog" rel="alternate" href="book/1"/>')}<entry><id>nav</id><title>Series</title><link type="application/atom+xml" href="series"/></entry>`),root);
+    expect(result.publications).toHaveLength(1);expect(result.publications[0].title).toBe('Book & 1');expect(result.navigation[0].title).toBe('Series');expect(result.facets[0]).toMatchObject({title:'Order',links:[{active:true}]});expect(result.links[0].href).toContain('?page=2');
+  });
+  it('recognizes PSE-only acquisitions and refuses known Kavita progress-writing image endpoints',()=>{
+    const pub=parseCatalog(feed(entry('<link xmlns:pse="http://vaemendis.net/opds-pse/ns" rel="http://vaemendis.net/opds-pse/stream" type="image/jpeg" href="pages/{pageNumber}" pse:count="4" pse:lastRead="2"/>')),root).publications[0];
+    expect(pub.links[0]).toMatchObject({count:4,lastRead:2});expect(safePse(pub.links[0])).toBe(true);
+    expect(safePse({...pub.links[0],href:'https://catalog.example/api/opds/secret/image?chapterId=2&pageNumber={pageNumber}&saveProgress=false'})).toBe(false);
+  });
+  it('does not fetch DTD/entities or accept mismatched XML',()=>{
+    expect(()=>parseCatalog('<!DOCTYPE feed [<!ENTITY x SYSTEM "file:///secret">]>'+feed('<title>&x;</title>'),root)).toThrow();
+    expect(()=>parseCatalog('<feed xmlns="http://www.w3.org/2005/Atom"><title>x</feed>',root)).toThrow();
+  });
+  it('preserves OPDS2 mixed groups/facets and never uses ISBN as record identity',()=>{
+    const pub={metadata:{title:'Issue',identifier:'urn:isbn:123',author:[{name:'Author'}]},links:[{rel:'self',href:'books/1',type:'application/opds-publication+json'},{rel:'download',href:'1.cbz',type:'application/vnd.comicbook+zip'}],images:[{href:'cover.jpg',type:'image/jpeg'}]};
+    const result=parseCatalog(JSON.stringify({metadata:{title:'Mixed'},links:[{rel:'self',href:root}],navigation:[{title:'All',href:'all'}],publications:[pub],groups:[{metadata:{title:'Featured'},links:[{rel:'self',href:'featured'}],publications:[pub]}],facets:[{metadata:{title:'Sort'},links:[{rel:'self',title:'Title',href:'?sort=title'}]}]}),root);
+    expect(result.publications[0].identity).toBe('https://catalog.example/opds/books/1');expect(result.publications[0].authors).toEqual(['Author']);expect(result.groups[0].publications).toHaveLength(1);expect(result.facets[0].links[0].rels).toEqual(['self']);expect(result.publications[0].readingOrder).toBeUndefined();
+  });
+  it('does not confuse cover images, EPUB XHTML, encrypted resources and an image manifest',()=>{
+    const p=jsonPublication({metadata:{title:'Image'},images:[{href:'cover.jpg',type:'image/jpeg'}],readingOrder:[{href:'page.png',type:'image/png'},{href:'chapter.xhtml',type:'application/xhtml+xml'},{href:'secret.jpg',type:'image/jpeg',properties:{encrypted:{scheme:'x'}}}]},root);
+    expect(p.readingOrder!.map(isBitmap)).toEqual([true,false,false]);expect(()=>parsePublication(JSON.stringify({metadata:{title:'Broken'},readingOrder:[{type:'image/jpeg'}]}),root)).toThrow();
+  });
+  it('expands advertised OpenSearch/OPDS2 query templates without inventing pagination',()=>{
+    const template=parseSearchDescription('<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"><Url type="application/atom+xml" template="search?q={searchTerms}&amp;page={startPage?}"/></OpenSearchDescription>',root);
+    expect(expandSearch(template,'猫 & dog')).toBe('https://catalog.example/opds/search?q=%E7%8C%AB%20%26%20dog&page=');
+    expect(expandSearch('https://catalog.example/search{?query}','a+b')).toBe('https://catalog.example/search?query=a%2Bb');
+    expect(()=>expandSearch('https://catalog.example/{unsupported}','q')).toThrow();
+  });
+  it('shows an unsupported auth flow instead of parsing an authentication document as a catalog',()=>{
+    expect(()=>parseCatalog(JSON.stringify({id:'auth',authentication:[{type:'http://opds-spec.org/auth/oauth/implicit'}]}),root)).toThrowError(/登录流程/);
+  });
+  it('removes only known URL-token credential positions for identity',()=>{
+    const connection:PrivateConnection={id:'conn',name:'Private',root:'https://catalog.example/api/opds/old-key',auth:{kind:'url-token'},revision:1,namespace:'opds1',createdAt:1};
+    expect(identityUrl('https://catalog.example/api/opds/new-key/book?id=17',connection)).toBe(identityUrl('https://catalog.example/api/opds/old-key/book?id=17',connection));
+    expect(identityUrl('https://catalog.example/api/opds/new-key/book?id=18',connection)).not.toBe(identityUrl('https://catalog.example/api/opds/old-key/book?id=17',connection));
+    expect(identityUrl('https://catalog.example/different/opaque-key/book',connection)).toContain('opaque-key');
+  });
+});

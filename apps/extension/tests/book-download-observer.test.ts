@@ -1,12 +1,13 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {CatalogChange} from '../src/comics/repositories';
 import type {BookDownloadView} from '../src/comics/acquisition/books';
+import type {FileDownloadView} from '../src/comics/acquisition/files';
 
 // Exercise the observer's effects and real refresh timer without a browser DOM.
 const hooks=vi.hoisted(()=>({stateCursor:0,refCursor:0,effectCursor:0,states:[] as unknown[],refs:[] as {current:unknown}[],
   effects:[] as {deps:unknown[];cleanup?:()=>void}[],pending:[] as (()=>void)[]}));
 const source=vi.hoisted(()=>({listener:undefined as ((change:CatalogChange)=>void)|undefined,
-  read:vi.fn<()=>Promise<BookDownloadView[]>>(),host:vi.fn<(signal:AbortSignal)=>Promise<void>>(),unsubscribe:vi.fn()}));
+  read:vi.fn<()=>Promise<BookDownloadView[]>>(),files:vi.fn<()=>Promise<FileDownloadView[]>>(),host:vi.fn<(signal:AbortSignal)=>Promise<void>>(),unsubscribe:vi.fn()}));
 vi.mock('react',()=>({
   useState:<T>(initial?:T|(()=>T))=>{
     const index=hooks.stateCursor++;if(!(index in hooks.states))hooks.states[index]=typeof initial==='function'?(initial as ()=>T)():initial;
@@ -24,8 +25,9 @@ vi.mock('react',()=>({
 vi.mock('../src/comics/application/library-service',()=>({subscribeLibrary:(listener:(change:CatalogChange)=>void)=>{
   source.listener=listener;return()=>{source.listener=undefined;source.unsubscribe();};
 }}));
-vi.mock('../src/comics/acquisition/books',()=>({listBookDownloads:source.read,hostBookDownloads:source.host,startBookDownload:vi.fn(),
+vi.mock('../src/comics/acquisition/books',()=>({listBookDownloads:source.read,hostBookDownloads:source.host,startBookDownload:vi.fn(),readComicOfflineCapability:vi.fn(),
   isBookDownloadActive:(status:string)=>['queued','preparing','running'].includes(status)}));
+vi.mock('../src/comics/acquisition/files',()=>({listRemoteFileDownloads:source.files,queueRemoteFileDownload:vi.fn(),prepareRemoteFileDownload:vi.fn()}));
 vi.mock('../src/i18n/runtime',()=>({msg:(value:string,params:Record<string,unknown>={})=>value.replace(/\{(\d+)\}/g,(_,key)=>String(params[key]??''))}));
 import {useBookDownloads} from '../src/ui/downloads/useBookDownloads';
 
@@ -49,6 +51,7 @@ beforeEach(()=>{
   vi.useFakeTimers();vi.stubGlobal('window',new EventTarget());
   hooks.states=[];hooks.refs=[];notify.mockClear();openCenter.mockClear();source.unsubscribe.mockClear();
   source.read.mockReset().mockResolvedValue([]);
+  source.files.mockReset().mockResolvedValue([]);
   source.host.mockReset().mockImplementation(signal=>new Promise(resolve=>signal.addEventListener('abort',()=>resolve(),{once:true})));
 });
 afterEach(async()=>{cleanup();await flush();vi.useRealTimers();vi.unstubAllGlobals();});
@@ -97,5 +100,12 @@ describe('book download observer',()=>{
   });
   it('stops the executing host when its page is hidden for navigation',async()=>{
     render();await flush();const signal=source.host.mock.calls[0][0];window.dispatchEvent(new Event('pagehide'));expect(signal.aborted).toBe(true);
+  });
+  it('observes complete-file intents without reacting to unrelated metadata',async()=>{
+    const file=(status:FileDownloadView['intent']['status'])=>({intent:{id:'file-download:remote',title:'Remote comic',status}} as FileDownloadView);
+    source.files.mockResolvedValueOnce([file('running')]);render();await flush();expect(render().activeCount).toBe(1);
+    source.files.mockResolvedValueOnce([file('complete')]);change('metadata','file-download:remote');await vi.advanceTimersByTimeAsync(750);
+    expect(render().activeCount).toBe(0);expect(notify).toHaveBeenCalledExactlyOnceWith('《Remote comic》的缓存已完成');
+    change('metadata','opds-private');await vi.advanceTimersByTimeAsync(750);expect(source.files).toHaveBeenCalledTimes(2);
   });
 });

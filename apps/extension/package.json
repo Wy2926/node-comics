@@ -34,6 +34,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",
     "@wxt-dev/module-react": "1.2.2",
+    "@xmldom/xmldom": "0.9.12",
     "fake-indexeddb": "^6.2.4",
     "typescript": "^5.9.3",
     "vite": "^7.2.0",

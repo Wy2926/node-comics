@@ -1,7 +1,7 @@
 import { catalog } from '../repositories';
 import { onSourceAccessChanged, requireSourceDriver } from '../sources/registry';
 import { getSourceAccount, selectSourceFiles } from './source-service';
-import { invalidateSourceAccess } from './source-access';
+import { invalidateSourceAccess, restoreSourceSelection } from './source-access';
 export { invalidateSourceAccess } from './source-access';
 import { sourcePageCache } from '../../storage/source-pages';
 import { sourceRangeCache } from '../../storage/source-ranges';
@@ -43,6 +43,12 @@ export async function initializeSources() {
 }
 export async function reconnectSource(connectionId: string) {
   const connection = await getSourceAccount(connectionId);
+  const reconnect=requireSourceDriver(connection.provider).connection?.reconnect;
+  if(reconnect){
+    const restored=await reconnect(connection);
+    if(restored.id!==connection.id||restored.provider!==connection.provider||restored.accountId!==connection.accountId)throw Error('来源账户身份不匹配。');
+    await restoreSourceSelection({connection:restored,files:[]});return;
+  }
   const selection = await selectSourceFiles(connection.provider, connection);
   const result=await importSourceFiles(selection);
   if(result.failures.length)throw Error(result.failures.map(item=>item.name+'：'+item.error).join('；'));
@@ -50,8 +56,8 @@ export async function reconnectSource(connectionId: string) {
 export async function disconnectSource(connectionId: string) {
   const connection = await getSourceAccount(connectionId);
   const driver = requireSourceDriver(connection.provider);
-  if (!driver.disconnect) throw Error('此来源不支持断开连接。');
-  await driver.disconnect(connection);
+  if (!driver.connection?.disconnect) throw Error('此来源不支持断开连接。');
+  await driver.connection.disconnect(connection);
   await invalidateSourceAccess({connectionId});
 }
 export async function storageOverview() {

@@ -1,14 +1,14 @@
 /** Product telemetry accepts categories and bounded counters, never content or identifiers. */
 export const parameterValues = {
   surface:['reader','popup','options','inline'],
-  screen:['library','discover','search','sites','downloads','settings','account','reader'],
-  source_type:['local','website','google_drive','unknown'],
-  format:['cbz','zip','cbr','rar','pdf','mobi','website','unknown'],
+  screen:['library','remote-library','discover','search','sites','downloads','settings','account','reader'],
+  source_type:['local','website','google_drive','opds','unknown'],
+  format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence','unknown'],
   entry_point:['library','search','discover','popup','context_menu','inline','downloads','settings','other'],
   method:['manual','automatic'],
   outcome:['success','failed','duplicate','cancelled','empty','partial','blocked','no_text'],
   channel:['official','local'],
-  mode:['original','classic','compare'],
+  mode:['original','classic','redraw','compare'],
   layout:['continuous','single'],
   search_mode:['direct','translated'],
   error_code:['network','permission','auth','quota','rate_limit','timeout','source_unavailable','unsupported','cancelled','unknown'],

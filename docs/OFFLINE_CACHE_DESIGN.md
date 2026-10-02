@@ -76,8 +76,19 @@
 
 ## 代码与验证
 
+### 远程书库离线
+
+远程图片序列按单条目的整本计划复用逐页下载与保留存储。支持完整文件下载的远程来源则使用独立的文件 intent：确认后流式写入 1 MiB 分块，完成格式校验与索引才登记可读内容；不把整包下载伪装为逐页任务，不一次读成整包 Blob。暂停／中断释放未完成容器，继续需明确确认并从头下载；重连不自动恢复。已保存的完整文件和主动保留的原图不受普通缓存清理影响。
+
+离线中心统一展示两类任务，但不混合其进度：逐页仍按完整条目统计，文件按已保存字节展示。清完整文件保留书架与位置，再次打开会提示下载；移除漫画清理任务与其容器引用，不影响其他漫画持有的相同容器。跨库清理使用既有 intent 的 `clearing` 状态恢复，不通过启动时全量清空解决残留。
+
+OPDS 安全限制及连接生命周期见[来源架构](COMIC_SOURCE_ARCHITECTURE.md#远程书库与-opds)。
+
+### 验证入口
+
 - [书级计划](../apps/extension/src/comics/acquisition/books.ts)、[范围与意图](../apps/extension/src/comics/acquisition/book-model.ts)：完整目录、语言范围、恢复、汇总及清理。
 - [章节采集](../apps/extension/src/comics/acquisition/index.ts)：复用原下载队列，逐页补缺、错误分类及批量领取；站点逻辑仍在适配器内。
+- [远程整包采集](../apps/extension/src/comics/acquisition/files.ts)：确认、流式保存、断开与删除代次、恢复和引用清理；回归见 `remote-file-downloads.test.ts`、`remote-page-downloads.test.ts`。
 - [离线中心](../apps/extension/src/ui/downloads/BookDownloads.tsx)：按漫画管理进度和语言；阅读器目录独立显示完整缓存标记。
 - [队列测试](../apps/extension/tests/book-downloads.test.ts)：范围、重复执行、暂停／清除的迟到写入、撤权、缺页核验、限流、空间不足、旧任务接管及超过 1000 章。
 - [浏览器验收](../scripts/verify_book_downloads.mjs)：构建扩展后，以隔离 MV3 配置、合成目录和本地图片服务验证真实 UI、存储、恢复及断网阅读。运行时可设置 PLAYWRIGHT_MODULE 与 TEST_CHROMIUM；截图输出到忽略目录 artifacts/book-downloads。

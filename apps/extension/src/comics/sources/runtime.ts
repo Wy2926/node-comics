@@ -4,6 +4,7 @@ import type {OpenFileSourceContext, SourceAccessChange} from './contracts';
 import {requireSourceDriver} from './registry';
 import {sourceRangeCache, sourceRangeKey} from '../../storage/source-ranges';
 import {SourceDatabaseSchemaError} from '../../storage/database';
+import {openContainer} from '../../storage/containers';
 
 interface ActiveSource { itemId: string; close(): Promise<void>; }
 const active = new Map<string, Set<ActiveSource>>();
@@ -33,7 +34,11 @@ export async function openFileSource(context: OpenFileSourceContext): Promise<Ra
     throw Error('来源连接或文件访问已断开，请重新连接。');
   const driver = requireSourceDriver(context.connection.provider);
   const version = accessVersion(context.connection.id, context.source.providerItemId);
-  const source = await driver.open(context);
+  // A retained replica does not change the remote binding or bypass the access gate above.
+  // File-only drivers keep their existing open contract; providers may opt into a local replica.
+  const source = context.containerId && driver.catalog
+    ? await openContainer(context.containerId)
+    : await (()=>{if(!driver.files)throw Error('此来源不提供文件读取能力。');return driver.files.open(context);})();
   if (context.signal?.aborted) { await source.close(); context.signal.throwIfAborted(); }
   if (accessVersion(context.connection.id, context.source.providerItemId) !== version) {
     await source.close(); throw new DOMException('来源访问已变化。', 'AbortError');

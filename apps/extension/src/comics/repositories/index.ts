@@ -3,6 +3,8 @@ import { openSourceDatabase, sourceDatabaseName, type DatabaseSchema } from '../
 import {openTranslationBindings} from './translation-bindings';
 
 export const CATALOG_DATABASE = sourceDatabaseName('catalog');
+/** A source identity can be reopened, but work begun before its deletion cannot republish it. */
+export const sourceRemovalKey = (sourceKey:string) => 'source-key:' + sourceKey;
 export interface CatalogChange { table: CatalogTable; ids: IDBValidKey[] }
 export type CatalogWrite = { [T in CatalogTable]: { table: T; value: CatalogTables[T] } }[CatalogTable];
 export interface ListOptions {
@@ -248,6 +250,16 @@ export const catalog = {
   },
   async deleteComic(comicId: string): Promise<CatalogTables['entries'][]> {
     return catalog.mutate(Object.keys(schema) as CatalogTable[], async tx => {
+      const comic=await tx.get('comics',comicId);
+      if(comic){
+        const id=sourceRemovalKey(comic.sourceKey),previous=await tx.get('tombstones',id);
+        await tx.put('tombstones',{id,deletedAt:Math.max(Date.now(),Number(previous?.deletedAt??0)+1)});
+        const downloadId='file-download:'+comic.sourceKey,download=await tx.get('metadata',downloadId);
+        if(download){
+          // Retain the existing intent as a cross-database cleanup journal until its file references are released.
+          await tx.put('metadata',{...download,comicId:comic.id,status:'clearing',generation:Number(download.generation??0)+1,owner:undefined,updatedAt:Date.now()});
+        }
+      }
       const entries = await tx.list('entries', {index: 'comicId', range: comicId, limit: 10000});
       for (const entry of entries) {
         for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);

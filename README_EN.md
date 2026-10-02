@@ -30,6 +30,7 @@ When you need translation, enable standard translation or AI redraw and compare 
 ## Features
 
 - **Import and read**: Open CBZ / ZIP, CBR / RAR, PDF, and DRM-free MOBI files, or import from Google Drive and supported websites.
+- **Remote libraries**: Connect multiple OPDS catalogs and browse or read on demand, without importing the entire catalog. Supported resources can be saved offline.
 - **Discover and search**: Browse trending, popular, top-rated, and new manga on AniList, then search supported websites by title, alternative title, or translated title.
 - **Read offline**: Cache every directory and chapter of a website comic, select multiple source languages, track progress, pause and resume, and retry missing pages.
 - **Read your way**: Choose continuous scrolling or single-page reading, reading direction, zoom, and a separate reading background.

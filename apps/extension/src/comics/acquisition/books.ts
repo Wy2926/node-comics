@@ -1,5 +1,5 @@
 import {catalog} from '../repositories';
-import type {Comic} from '../domain';
+import {entryContentKind, type Comic} from '../domain';
 import type {SourceCatalog} from '../application/types';
 import {readWebsiteCatalog} from '../application/website-catalog';
 import {reconcileCatalog} from '../application/catalog-service';
@@ -8,6 +8,8 @@ import {pauseDownloads,queueDownloads,runDownloads,stopDownloads,listDownloads,b
 import {msg} from '../../i18n/runtime';
 import {sourceFor} from '../../sources';
 import {track} from '../../analytics';
+import {getSourceDriver} from '../sources/registry';
+import {recoverRemoteFileDownloads,runRemoteFileDownloadCycle,stopRemoteFileDownloads} from './files';
 import {bookDownloadId,downloadTaskId,listBookPlans,readBookPlan,selectDownloadScope,suspendBook,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan,type DownloadLanguages,type DownloadScope} from './book-model';
 export {type BookDownloadPlan,type DownloadLanguages,type DownloadScope,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,isEntryFullyCached} from './book-model';
 
@@ -22,6 +24,14 @@ async function changeBook<T>(comicId:string,action:()=>Promise<T>):Promise<T>{
 }
 const interrupted=()=>new DOMException('缓存操作已停止。','AbortError');
 const active=(plan:BookDownloadPlan|undefined,generation:number):plan is BookDownloadPlan=>plan?.generation===generation&&isBookDownloadActive(plan.status);
+export async function readComicOfflineCapability(comicId:string):Promise<'pages'|'file'|'local'|'none'>{
+  const comic=await catalog.get('comics',comicId);if(!comic)return 'none';
+  const [connection,entries]=await Promise.all([catalog.get('connections',comic.source.connectionId),catalog.listEntries(comicId,{limit:1})]);
+  if(!connection||!entries[0])return 'none';
+  if(connection.provider==='local')return 'local';
+  if(entryContentKind(entries[0])==='pages')return 'pages';
+  return getSourceDriver(connection.provider)?.files?.download?'file':'none';
+}
 export async function downloadLanguages(comicId:string):Promise<DownloadLanguages>{
   const record=await catalog.get('metadata',preferencesId(comicId));
   return Array.isArray(record?.languages)?record.languages as string[]:null;
@@ -54,7 +64,7 @@ export async function startBookDownload(comicId:string,languages?:DownloadLangua
       const comic=await tx.get('comics',comicId),connection=comic&&await tx.get('connections',comic.source.connectionId);
       if(!comic||comic.source.status!=='active'||!connection||['disconnected','revoked'].includes(connection.status))throw Error('来源访问已断开，请重新连接。');
       const [entry]=await tx.list('entries',{index:'comicId',range:comicId,limit:1});
-      if(entry?.format!=='website')throw Error('此来源暂不支持整本缓存。');
+      if(!entry||entryContentKind(entry)!=='pages')throw Error('此来源暂不支持整本缓存。');
       const previous=await tx.get('metadata',bookDownloadId(comicId)) as BookDownloadPlan|undefined;
       if(expectedNetworkGeneration!==undefined&&(previous?.generation!==expectedNetworkGeneration||previous.status!=='paused'||previous.reason!=='network'))return false;
       if(previous?.retryAt&&previous.retryAt>Date.now())throw Error(msg('来源暂时限制请求，请在 {0} 后继续。',{'0':new Date(previous.retryAt).toLocaleTimeString()}));
@@ -77,6 +87,9 @@ export const pauseBookDownload=(id:string,expectedGeneration?:number)=>changeBoo
 export const cancelBookDownload=(id:string,expectedGeneration?:number)=>clearBookDownloads(id,expectedGeneration);
 
 async function ensureDirectory(plan:BookDownloadPlan,signal:AbortSignal){
+  const entries=await catalog.listEntries(plan.comicId,{limit:2});
+  // Remote page publications are already one complete resource, not an OPDS navigation tree.
+  if(entries.length===1&&entries[0].format==='image-sequence')return;
   let [source]=await catalog.list('catalogs',{index:'comicId',range:plan.comicId,limit:1}) as unknown as SourceCatalog[];
   if(source?.complete&&source.groups.every(group=>group.complete))return;
   const comic=await catalog.get('comics',plan.comicId);
@@ -193,6 +206,8 @@ async function settleBooks(){
 }
 /** A host iteration; production callers hold the book host lock for their full lifetime. */
 export async function runBookDownloadCycle(signal:AbortSignal,owner:string){
+  await runRemoteFileDownloadCycle(signal,owner);
+  if(signal.aborted)return;
   const queued=(await listBookPlans()).filter(plan=>plan.status==='queued').sort((a,b)=>a.createdAt-b.createdAt)[0];
   if(queued)await prepareBook(queued,owner,signal);
   if(signal.aborted)return;
@@ -204,6 +219,7 @@ export async function hostBookDownloads(signal:AbortSignal){
   const started=Date.now(),owner=crypto.randomUUID();
   const host=async()=>{
     await catalog.put('metadata',{id:hostId,owner});
+    await recoverRemoteFileDownloads(started);
     for(const plan of await listBookPlans())if(plan.status==='clearing')await clearBookDownloads(plan.comicId).catch(()=>{});
     for(const plan of await listBookPlans())if((isBookDownloadActive(plan.status)||plan.reason==='network')&&plan.owner!==owner&&(plan.owner||plan.createdAt<started))
       await suspendBook(plan.comicId,'paused','interrupted',undefined,plan.generation);
@@ -231,7 +247,7 @@ export async function hostBookDownloads(signal:AbortSignal){
         await runBookDownloadCycle(signal,owner);await sleep(signal);
       }
     }finally{
-      stopDownloads();
+      stopDownloads();stopRemoteFileDownloads();
       for(const plan of await listBookPlans())if(plan.owner===owner&&isBookDownloadActive(plan.status))
         await suspendBook(plan.comicId,'paused','interrupted',undefined,plan.generation);
     }

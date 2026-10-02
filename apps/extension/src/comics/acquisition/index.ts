@@ -1,7 +1,8 @@
 import { catalog } from '../repositories';
-import type {Entry} from '../domain';
+import {entryContentKind, type Entry} from '../domain';
 import type { DownloadTask } from '../application/types';
-import {discoverWebsiteContent,websiteContentError} from '../application/website-content';
+import {websiteContentError} from '../application/website-content';
+import {prepareEntryContent} from '../application/entry-content';
 import { acquirePage } from '../pages/service';
 import { pageRenderProfile } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
@@ -24,7 +25,7 @@ export async function discoverEntryContent(id: string, signal?: AbortSignal, opt
   signal?.throwIfAborted();
   const document = await catalog.get('entries', id);
   if (!document) throw Error('文档已移除。');
-  if (document.format !== 'website') return;
+  if (entryContentKind(document) !== 'pages') return;
   await discoverContent(document,signal,options);
 }
 async function discoverContent(document:Entry,signal:AbortSignal|undefined,{reload=false,refreshResources=false}:DiscoveryOptions,saved?:Awaited<ReturnType<typeof retainedPages>>):Promise<void>{
@@ -35,10 +36,12 @@ async function discoverContent(document:Entry,signal:AbortSignal|undefined,{relo
   if (document.sourceRemoved || document.readable === false) throw Error('源站此章节暂不可读，已保存的页面仍可阅读。');
   if (document.discoveryComplete&&!reload) {
     if(!refreshResources)return;
-    const pages=await catalog.listPages(document.contentId,{limit:1500});
-    if(!pages.some(page=>typeof page.locator.contentKey==='string'))return;
+    if(document.format==='website'){
+      const pages=await catalog.listPages(document.contentId,{limit:1500});
+      if(!pages.some(page=>typeof page.locator.contentKey==='string'))return;
+    }
   }
-  await discoverWebsiteContent(document,signal,reload);
+  await prepareEntryContent(document.id,signal,{reload,refreshResources});
 }
 
 /** Idempotent intent registration. It does not start network work or grant permissions. */
@@ -58,7 +61,7 @@ export async function queueDownloads(ids: string[], book?:{comicId:string;genera
       }
       for(let queueOrder=offset;queueOrder<Math.min(offset+100,unique.length);queueOrder++){
         const id=unique[queueOrder],document=await tx.get('entries',id);
-        if(document?.format!=='website'||book&&(document.comicId!==book.comicId||!members!.has(id)))continue;
+        if(!document||entryContentKind(document)!=='pages'||book&&(document.comicId!==book.comicId||!members!.has(id)))continue;
         const old=await tx.get('tasks',taskId(id)) as DownloadTask|undefined;
         if((old?.status==='running'||old?.status==='queued')&&(!book||old.bookGeneration===book.generation))continue;
         // An explicit fresh plan may recreate its tasks; stale preparations cannot cross the guard above.

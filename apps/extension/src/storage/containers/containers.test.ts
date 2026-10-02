@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {CHUNK_SIZE, bytesTransaction, chunkId, idbRequest} from '../bytes/database';
-import {importContainer, listContainerImports, openContainer, recoverContainerImports, releaseContainer, retainContainer} from './index';
+import {importContainer, importContainerStream, listContainerImports, openContainer, recoverContainerImports, releaseContainer, retainContainer} from './index';
 
 const tables = ['objects', 'chunks', 'operations', 'references', 'leases', 'settings'];
 beforeEach(async () => { await bytesTransaction(tables, 'readwrite', async tx => { for (const name of tables) tx.objectStore(name).clear(); }); });
@@ -110,5 +110,57 @@ describe('immutable local containers', () => {
       await bytesTransaction(['leases'],'readwrite',async tx=>{const leases=await idbRequest(tx.objectStore('leases').getAll());for(const lease of leases)tx.objectStore('leases').put({...lease,expiresAt:0});});
       await recoverContainerImports();expect(await rows('objects')).toEqual([]);expect(await rows('chunks')).toEqual([]);
     }finally{await source.close();}
+  });
+});
+
+describe('streamed remote containers', () => {
+  function streamed(bytes: Uint8Array, lengths = [3, 71, CHUNK_SIZE - 13, 4 * CHUNK_SIZE]) {
+    let offset = 0, part = 0;
+    return new ReadableStream<Uint8Array>({pull(controller) {
+      if (offset === bytes.byteLength) {controller.close(); return;}
+      const end = Math.min(bytes.byteLength, offset + lengths[part++ % lengths.length]);
+      controller.enqueue(bytes.slice(offset, end)); offset = end;
+    }}, {highWaterMark: 0});
+  }
+  it.each([true, false])('writes arbitrary network boundaries without buffering the complete file (known size: %s)', async known => {
+    const bytes = new Uint8Array(await file(CHUNK_SIZE * 3 + 17).arrayBuffer()), progress = vi.fn();
+    const result = await importContainerStream(streamed(bytes), {name: 'remote.cbz', size: known ? bytes.byteLength : undefined, referenceId: 'remote', onProgress: progress});
+    expect(result.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
+    expect(result.size).toBe(bytes.byteLength);
+    expect((await rows('chunks')).map(row => row.bytes.byteLength)).toEqual([CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, 17]);
+    expect(progress).toHaveBeenCalledTimes(4);
+    expect(await rows('operations')).toEqual([]);
+  });
+  it.each([-1, 1])('rejects a response different from its declared size (%s) without publishing', async delta => {
+    const bytes = new Uint8Array(await file(CHUNK_SIZE + 50).arrayBuffer());
+    await expect(importContainerStream(streamed(bytes), {name: 'remote.cbz', size: bytes.byteLength + delta, referenceId: 'bad'})).rejects.toThrow();
+    for (const table of ['operations', 'chunks', 'objects', 'references']) expect(await rows(table)).toEqual([]);
+  });
+  it('cancels a stalled stream immediately and releases staged bytes', async () => {
+    const bytes = new Uint8Array(await file(CHUNK_SIZE).arrayBuffer()), abort = new AbortController(), ready = Promise.withResolvers<void>();
+    let delivered = false;
+    const cancel = vi.fn(), stream = new ReadableStream<Uint8Array>({pull(controller) {
+      if (!delivered) {delivered = true; controller.enqueue(bytes);}
+    }, cancel}, {highWaterMark: 0});
+    const pending = importContainerStream(stream, {name: 'remote.cbz', signal: abort.signal, onProgress: () => ready.resolve()});
+    await ready.promise; abort.abort();
+    await expect(pending).rejects.toMatchObject({name: 'AbortError'});
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(await rows('chunks')).toEqual([]); expect(await rows('operations')).toEqual([]);
+  });
+  it('cancels unsupported and oversized responses before publishing any reference', async () => {
+    const cancel = vi.fn(), stream = new ReadableStream<Uint8Array>({cancel});
+    await expect(importContainerStream(stream, {name: 'remote.cbz', size: 513 * CHUNK_SIZE})).rejects.toThrow('512');
+    expect(cancel).toHaveBeenCalledOnce();
+    await expect(importContainerStream(streamed(new Uint8Array([1, 2, 3])), {name: 'remote.cbz'})).rejects.toThrow('请选择');
+    expect(await rows('operations')).toEqual([]); expect(await rows('references')).toEqual([]);
+  });
+  it('removes partial chunks after a mid-stream network failure', async () => {
+    const bytes = new Uint8Array(await file(CHUNK_SIZE).arrayBuffer()); let first = true;
+    const stream = new ReadableStream<Uint8Array>({pull(controller) {
+      if (first) {first = false; controller.enqueue(bytes);} else controller.error(new TypeError('network'));
+    }}, {highWaterMark: 0});
+    await expect(importContainerStream(stream, {name: 'remote.cbz', referenceId: 'failed'})).rejects.toThrow('network');
+    for (const table of ['operations', 'chunks', 'objects', 'references']) expect(await rows(table)).toEqual([]);
   });
 });
