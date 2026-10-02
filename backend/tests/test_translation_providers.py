@@ -177,7 +177,7 @@ def test_json_prompt_version_changes_cache_identity_without_changing_node_protoc
         current = snapshot(db)
         monkeypatch.setattr(classic_config, 'PROMPT_VERSION', 'previous-prompt')
         previous = snapshot(db)
-    assert current['prompt_version'] == 'comic-json-v7'
+    assert current['prompt_version'] == 'comic-json-v8'
     assert current['engine'] == previous['engine'] == {'protocol_version': 3}
     assert current['text'] == previous['text']
     assert digest(current) != digest(previous)

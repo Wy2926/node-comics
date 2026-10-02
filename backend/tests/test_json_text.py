@@ -29,8 +29,6 @@ def test_json_strings_round_trip_without_injecting_segments(value):
     '{"translations":{},"translations":{"a":"hello","b":"ok"}}',
     '{"translations":{"a":"hello","c":"unknown"}}',
     '{"translations":{"a":"hello","b":"ok","c":"extra"}}',
-    '{"translations":{"a":"hello","b":""}}',
-    '{"translations":{"a":"hello","b":" \\n\\t "}}',
     '{"translations":{"a":"hello","b":42}}',
     '{"translations":{"a":"hello","b":true}}',
     '{"translations":{"a":"hello","b":null}}',
@@ -62,6 +60,12 @@ def test_invalid_json_enters_bounded_retry_without_format_fallback(raw):
 def test_reordered_keys_and_json_whitespace_preserve_ids():
     raw = ' \r\n{\r\n  "translations": {"b": "second", "a": "first"}\r\n}\t'
     assert parse_translations(raw, [{'id': 'a'}, {'id': 'b'}]) == {'a': 'first', 'b': 'second'}
+
+
+@pytest.mark.parametrize('empty', ['', ' \n\t ', '\u3000\u00a0'])
+def test_empty_translation_preserves_its_id_and_other_translations(empty):
+    raw = json.dumps({'translations': {'a': empty, 'b': '  translated  '}})
+    assert parse_translations(raw, [{'id': 'a'}, {'id': 'b'}]) == {'a': '', 'b': 'translated'}
 
 
 def test_standard_json_escapes_are_accepted():

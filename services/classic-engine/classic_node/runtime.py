@@ -169,8 +169,10 @@ class Runtime:
         rendered = False
         for segment, region, area in zip(analysis['segments'], analysis['regions'], areas):
             text = translated['translations'][segment['id']]
-            if not isinstance(text, str) or not text.strip():
+            if not isinstance(text, str):
                 raise NodeFailure('CLASSIC_RENDER_MISMATCH')
+            if not text.strip():
+                continue
             fg, bg = resolve_colors(cleaned, region['bbox'])
             try:
                 layout = draw_region(image, text, region, self.engine.font, fg, bg,

@@ -95,7 +95,7 @@ def text_case(text_database, monkeypatch):
 
 
 @pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"translations":{"wrong":"好"}}',
-    '{"translations":{"b001":""}}', '{"translations":{"b001":2}}',
+    '{"translations":{"b001":2}}',
     '{"translations":{"b001":"好","b001":"好"}}',
     '{"translations":{"b001":"好"},"note":"injected"}', 'not json'])
 def test_rejects_incomplete_or_ambiguous_contract(content):
@@ -111,6 +111,34 @@ def test_text_stage_checkpoint_replay_never_repeats_paid_call(text_case):
         assert db.scalar(select(func.count()).select_from(TextCall)) == 1
         call = db.scalar(select(TextCall))
         assert (call.accounted_micros, call.cost_state) == (1100, 'estimated')
+
+
+@pytest.mark.parametrize('values', [
+    {'b001': ''}, {'b001': ' \n\t '}, {'b001': '', 'b002': 'translated'},
+])
+def test_empty_translation_checkpoint_replay_and_delivery_do_not_repeat_call(text_case, monkeypatch, values):
+    import json
+    from app.compute_v3 import translations_payload
+    job_id, lease_id = text_case
+    expected = {key: value.strip() for key, value in values.items()}
+    segments = [{'id': key, 'source': 'Source'} for key in values]
+    with session_factory()() as db:
+        db.get(ClassicState, job_id).analysis = analysis(segments)
+        db.commit()
+    monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
+        json.dumps({'translations': values}), {'input_tokens': 100, 'output_tokens': 5}, 'empty-translation'))
+    assert classic.run_text_stage(job_id, lease_id) == {'translations': expected}
+    assert classic.run_text_stage(job_id, lease_id) == {'translations': expected}
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall).where(TextCall.job_id == job_id)).all()
+        assert len(calls) == 1
+        assert calls[0].error_code is None and calls[0].accounted_micros == 650
+        assert db.get(ClassicState, job_id).translations == expected
+        stage = db.scalar(select(JobStage).where(JobStage.job_id == job_id, JobStage.name == 'text'))
+        stage.status = 'succeeded'
+        db.flush()
+        payload = translations_payload(db, job_id)
+        assert payload['translations'] == expected and payload['revision']
 
 
 def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case):

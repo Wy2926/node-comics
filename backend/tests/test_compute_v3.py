@@ -219,6 +219,33 @@ def test_analysis_text_revision_and_delivery_settle_once(v3, png):
         assert db.scalar(select(func.count()).select_from(TextCall)) == 1
 
 
+@pytest.mark.parametrize('representation', ['overlay-v1', 'original'])
+def test_all_empty_translations_deliver_and_settle_once(v3, png, monkeypatch, representation):
+    from app.models import Ledger
+    jobs = v3['create']()
+    lease = claim(v3).json()['leases'][0]
+    analyze(v3, lease)
+    monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
+        '{"translations":{"0":""}}', {'input_tokens': 10, 'output_tokens': 2}, 'empty-translation'))
+    text(lease)
+    translated = heartbeat(v3, [lease]).json()['leases'][0]['translations']
+    assert translated['translations'] == {'0': ''}
+    result, data = result_for(v3, lease, png)
+    if representation == 'original':
+        result.update(representation='original', bbox=None, output=None)
+        data = None
+    response = deliver(v3, lease, result, data)
+    assert response.status_code == 200, response.text
+    assert response.json()['job_status'] == 'succeeded'
+    assert deliver(v3, lease, result, data).json() == response.json()
+    with session_factory()() as db:
+        job = db.get(Job, jobs[0])
+        assert job.status == 'succeeded' and job.settlement == 'settled'
+        assert db.scalar(select(func.count()).select_from(TextCall).where(TextCall.job_id == job.id)) == 1
+        assert db.scalar(select(func.count()).select_from(Ledger).where(
+            Ledger.job_id == job.id, Ledger.kind == 'settle')) == 1
+
+
 def test_admitted_long_strip_and_tall_overlay_deliver_without_a_second_8192_ceiling(v3):
     source = BytesIO()
     Image.new('RGB', (64, 12000), 'white').save(source, 'PNG')

@@ -117,6 +117,71 @@ def test_all_removed_text_still_completes_with_cleaned_pixels(monkeypatch, chang
     assert result['result']['representation'] == ('overlay-v1' if changed else 'original')
 
 
+@pytest.mark.parametrize('empty', ['', ' \n\t ', '\u3000\u00a0'])
+@pytest.mark.parametrize('changed', [False, True])
+def test_all_empty_translations_keep_erasure_pixels_and_skip_lettering(monkeypatch, empty, changed):
+    import classic_node.runtime as module
+    runtime, data, metadata, analysis, translated = fixture()
+    translated['translations']['0'] = empty
+    rgb, alpha = runtime.decode(data, metadata)
+    cleaned = rgb.copy()
+    if changed:
+        cleaned[6, 7] = (31, 45, 60)
+    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
+    def unexpected(*args, **kwargs):
+        pytest.fail('Empty translations must skip colors and lettering')
+    monkeypatch.setattr(module, 'resolve_colors', unexpected)
+    monkeypatch.setattr(module, 'draw_region', unexpected)
+    packed = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
+    result = packed['result']
+    assert result['representation'] == ('overlay-v1' if changed else 'original')
+    if changed:
+        assert result['bbox'] == {'x': 7, 'y': 6, 'width': 1, 'height': 1}
+        with Image.open(BytesIO(packed['output_bytes'])) as patch:
+            with patch.convert('RGBA') as rgba:
+                assert rgba.getpixel((0, 0)) == (31, 45, 60, 255)
+    else:
+        assert packed['output_bytes'] is None
+
+
+def test_empty_segment_keeps_erasure_and_does_not_block_following_text(monkeypatch):
+    import classic_node.runtime as module
+    runtime, data, metadata, analysis, translated = fixture()
+    analysis['segments'].append({'id': '1'})
+    analysis['regions'].append({'bbox': [0, 0, 80, 64]})
+    translated.update(analysis_hash=digest(analysis), translations={'0': '', '1': 'Hello'})
+    rgb, alpha = runtime.decode(data, metadata)
+    cleaned = rgb.copy()
+    cleaned[6, 7] = (31, 45, 60)
+    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None, None])
+    monkeypatch.setattr(module, 'resolve_colors', lambda *args: ('black', 'white'))
+    drawn = []
+    def draw(canvas, text, *args, **kwargs):
+        drawn.append(text)
+        canvas.putpixel((10, 10), (100, 101, 102))
+        return {'rendered': True}
+    monkeypatch.setattr(module, 'draw_region', draw)
+    packed = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
+    assert drawn == ['Hello']
+    result = packed['result']
+    assert result['representation'] == 'overlay-v1'
+    assert result['bbox'] == {'x': 7, 'y': 6, 'width': 4, 'height': 5}
+    with Image.open(BytesIO(packed['output_bytes'])) as patch:
+        assert patch.getpixel((0, 0)) == (31, 45, 60, 255)
+        assert patch.getpixel((3, 4)) == (100, 101, 102, 255)
+
+
+@pytest.mark.parametrize('invalid', [None, 42, False])
+def test_nonstring_translation_still_fails(monkeypatch, invalid):
+    import classic_node.runtime as module
+    runtime, data, metadata, analysis, translated = fixture()
+    translated['translations']['0'] = invalid
+    rgb, alpha = runtime.decode(data, metadata)
+    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
+    with pytest.raises(NodeFailure, match='CLASSIC_RENDER_MISMATCH'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+
+
 def test_removed_segment_does_not_block_following_text(monkeypatch):
     import classic_node.runtime as module
     runtime, data, metadata, analysis, translated = fixture()
