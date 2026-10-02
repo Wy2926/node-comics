@@ -1,4 +1,4 @@
-// Real local API + worker + Chromium. Only the image supplier is synthetic.
+// Real local API + classic worker + Chromium, configured in an isolated acceptance environment.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -21,7 +21,7 @@ const context=await browser.newContext({viewport:{width:1280,height:900}});
 await context.addInitScript(({reader})=>{
  if(localStorage.getItem('fixture-auth-seeded'))return;
  localStorage.setItem('fixture-auth-seeded','1');
- localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',translationMode:'redraw',language:'zh-Hans',layout:'single',fit:'window'}));
+ localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',language:'zh-Hans',layout:'single',fit:'window'}));
  localStorage.setItem('nc-auth',JSON.stringify({session:{id:crypto.randomUUID(),token:reader.access_token,user:reader.user,apiOrigin:'https://comics.nodelane.net',credential:{kind:'development'},expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000}}));
 },{reader});
 const page=await context.newPage(),errors=[],requests=[],translations=[],checks=[];
@@ -33,9 +33,10 @@ const check=message=>{checks.push(message);console.log('PASS '+message);};
 try{
   await page.goto(web);await page.locator('input[type=file]').setInputFiles(path.join(fixture,'cluster-eight.cbz'));await completeLocalImport(page);
   await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
-  await page.getByRole('button',{name:'AI 重绘',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
+  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:45000});
-  assert(translations.some(p=>p.status===202));assert(translations.every(p=>[200,202].includes(p.status)),JSON.stringify(translations));
+  assert(translations.some(p=>p.status===202));assert(translations.every(p=>[200,202].includes(p.status)&&p.body.mode==='classic'),JSON.stringify(translations));
   check('actual independent translation requests, automatic-start original upload, worker settlement and result download deliver a translated image');
   await page.getByLabel('跳转页码',{exact:true}).fill('4');await page.getByLabel('跳转页码',{exact:true}).press('Enter');
   await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='4');

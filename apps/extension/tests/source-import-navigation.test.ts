@@ -48,30 +48,29 @@ describe('embedded import after same-document navigation', () => {
   it.each([catalogUrl, readerUrl])('imports the current page despite a stale homepage sender URL: %s', async url => {
     currentUrl = url;
     expect(await send()).toEqual({ok: true});
-    expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
+    expect(readCatalog).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledExactlyOnceWith({url: expect.stringMatching(/reader.html\?catalog=/)});
     const importId = new URL(create.mock.calls[0][0].url).searchParams.get('catalog');
-    expect(set).toHaveBeenCalledWith({['nc-import:' + importId]: {
-      ...(url === readerUrl ? {selectedEntryId:'episode-2'} : {}),catalog: snapshot,
-    }});
+    expect(set).toHaveBeenCalledWith({['nc-import:' + importId]: {url}});
   });
   it('keeps direct catalog imports working', async () => {
     expect(await send(sender(catalogUrl))).toEqual({ok: true});
-    expect(readCatalog).toHaveBeenCalledExactlyOnceWith(catalogUrl);
+    expect(readCatalog).not.toHaveBeenCalled();
   });
   it('imports after an unclaimed artwork page navigates to a catalog on the same origin', async () => {
     currentUrl = 'https://www.pixiv.net/users/7/artworks';
     readCatalog.mockResolvedValueOnce({...snapshot, id: 'pixiv:user:7:all', sourceId: 'pixiv', url: currentUrl, entries: [], defaultEntryId: undefined});
     expect(await send(sender('https://www.pixiv.net/artworks/101'))).toEqual({ok: true});
-    expect(readCatalog).toHaveBeenCalledExactlyOnceWith(currentUrl);
+    expect(readCatalog).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledOnce();
   });
-  it('rejects a URL-bound reader import when its requested chapter has been removed',async()=>{
+  it('preserves the exact reader URL so the reader can verify its requested chapter',async()=>{
     currentUrl=readerUrl.replace('no=2','no=3');
     readCatalog.mockResolvedValueOnce({...snapshot,defaultEntryId:'episode-2'});
-    expect(await send()).toMatchObject({ok:false});
-    expect(create).not.toHaveBeenCalled();
-    expect(set).not.toHaveBeenCalled();
+    expect(await send()).toMatchObject({ok:true});
+    expect(create).toHaveBeenCalledOnce();
+    expect(Object.values(set.mock.calls[0][0])).toEqual([{url:currentUrl}]);
+    expect(readCatalog).not.toHaveBeenCalled();
   });
   it.each(['https://comic.naver.com/webtoon', 'https://comic.naver.com/webtoon/list?titleId=invalid',
     'https://www.gunnerkrigg.com/?p=123', 'https://comic.naver.com.evil.test/webtoon/list?titleId=123'])
@@ -86,11 +85,10 @@ describe('embedded import after same-document navigation', () => {
     expect(await send({...sender(), ...changes})).toBeUndefined();
     expect(readCatalog).not.toHaveBeenCalled(); expect(create).not.toHaveBeenCalled();
   });
-  it('returns a failed catalog read without opening a reader, then allows retry', async () => {
+  it('opens the reader without starting a potentially slow background catalog read', async () => {
     readCatalog.mockRejectedValueOnce(Error('unavailable'));
-    expect(await send()).toMatchObject({ok: false});
-    expect(create).not.toHaveBeenCalled();
     expect(await send()).toEqual({ok: true});
     expect(create).toHaveBeenCalledOnce();
+    expect(readCatalog).not.toHaveBeenCalled();
   });
 });

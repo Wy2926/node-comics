@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://rawotaku.com/*", "https://*.freeimgmg.online/*", "https://mgoimg.view47.com/*", "https://f002.backblazeb2.com/*"],
+  "optionalContentMatches": ["https://rawotaku.com/*"]
+}

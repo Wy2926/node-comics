@@ -39,7 +39,7 @@ describe('interface dictionaries',()=>{
     const saved=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
     const input={...defaults,language:'en',uiLanguage:'ko' as const};await saveSettings(input);
-    expect(settings()).toMatchObject({uiLanguage:'ko',language:'en',translationMode:defaults.translationMode});
+    expect(settings()).toMatchObject({uiLanguage:'ko',language:'en'});
     localStorage.setItem('nc-settings',JSON.stringify({...input,uiLanguage:'../outside'}));
     expect(settings()).toMatchObject({uiLanguage:'auto',language:'en'});
   });

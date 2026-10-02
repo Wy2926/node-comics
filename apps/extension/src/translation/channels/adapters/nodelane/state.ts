@@ -11,7 +11,7 @@ export function translationState({page,mode,language,userId,origin,active,caps,r
   if(operation?.state==='blocked'){
     const code=operation.errorCode??'';
     if(quotaErrors.has(code))return {kind:'upgrade',message:msg("升级权益，继续翻译")};
-    return {kind:'error',message:operation.error??msg("此页暂不能翻译"),retryable:!['IDEMPOTENCY_CONFLICT','TRANSLATION_UNAVAILABLE','SOURCE_CHANGED','OUTCOME_UNKNOWN'].includes(code)};
+    return {kind:'error',message:operation.error??msg("此页暂不能翻译"),retryable:!['IDEMPOTENCY_CONFLICT','TRANSLATION_UNAVAILABLE','TRANSLATION_MODE_UNAVAILABLE','SOURCE_CHANGED','OUTCOME_UNKNOWN'].includes(code)};
   }
   if(t.pending)return {kind:t.pending.status==='queued'?'waiting':'translating',message:t.pending.status==='outcome_unknown'?msg("结果核实中"):t.pending.status==='queued'?msg("等待翻译"):msg("翻译中")};
   if(operation?.state==='uncertain')return {kind:'translating',message:msg("正在恢复翻译请求")};

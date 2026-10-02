@@ -4,6 +4,8 @@ import type {SourceSearchPage, SourceSearchRequest} from './search';
 export interface SourceNetworkContext {
   signal?: AbortSignal;
   previous?: SourceCatalogSnapshot;
+  /** Optional, validated partial observations; completion still comes from catalog's final result. */
+  onCatalogProgress?(snapshot: SourceCatalogSnapshot): Promise<void>;
   /** Same-origin Referer and explicitly parseable error statuses apply only to this request. */
   request(url:string, options?:{referer:string; acceptStatuses?:readonly number[]}):Promise<string>;
 }

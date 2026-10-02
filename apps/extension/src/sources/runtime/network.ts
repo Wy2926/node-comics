@@ -39,14 +39,22 @@ export async function resolveNetworkCatalog(url:string,signal?:AbortSignal):Prom
   signal.throwIfAborted();
   return parent.location.catalog.url;
 }
-export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal;previous?:SourceCatalogSnapshot}={}){
+export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal;previous?:SourceCatalogSnapshot;onCatalogProgress?:(snapshot:SourceCatalogSnapshot)=>Promise<void>}={}){
   let {signal}=options;
   signal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(120_000)]);
+  signal.throwIfAborted();
   const {location}=resolveSource(url,definitions),read=networkOperation(url,'catalog');
   if(!read)throw Error('SOURCE_CATALOG_UNSUPPORTED');
   const previous=options.previous&&validateCatalog(options.previous,definitions);
   if(previous&&previous.id!==location.catalog!.key)throw Error('SOURCE_CATALOG_CHANGED');
-  const snapshot=validateCatalog(await read(url,{...networkContext(url,signal),previous}),definitions);
+  const onCatalogProgress=options.onCatalogProgress ? async (value:SourceCatalogSnapshot)=>{
+    signal.throwIfAborted();
+    const snapshot=validateCatalog(value,definitions);
+    if(snapshot.id!==location.catalog!.key||snapshot.complete)throw Error('SOURCE_CATALOG_CHANGED');
+    await options.onCatalogProgress!(snapshot);
+    signal.throwIfAborted();
+  }:undefined;
+  const snapshot=validateCatalog(await read(url,{...networkContext(url,signal),previous,onCatalogProgress}),definitions);
   if(snapshot.id!==location.catalog!.key||!snapshot.complete||!snapshot.groups.every(group=>group.complete))throw Error('SOURCE_CATALOG_CHANGED');
   signal?.throwIfAborted();
   return snapshot;

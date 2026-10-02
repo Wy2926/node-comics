@@ -13,7 +13,7 @@ if(location.port!=='5192')throw Error('Use isolated port 5192.');
 window.fetch=async()=>{throw Error('No network allowed in billing fixture');};
 const scenario=new URLSearchParams(location.search).get('scenario');
 const monthly:BillingOffer={...billingOffer,channels:billingOffer.channels.filter(c=>c.provider==='creem')};
-const annual:BillingOffer={...monthly,id:'fixture-annual',interval:'year',unit_amount:9999};
+const annual:BillingOffer={...monthly,id:'fixture-annual',interval:'year',unit_amount:5999};
 const {channels:_channels,...subscriptionPrice}=annual;
 const status:BillingStatus={enabled:scenario!=='disabled',provider:scenario==='pending'||scenario==='managed'?'creem':null,
   providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],environment:'test',

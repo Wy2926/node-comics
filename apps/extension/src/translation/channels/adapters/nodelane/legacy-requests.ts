@@ -12,8 +12,6 @@ interface StoredReceipt {
   pageRef?: {contentId: string};
   mode: string;
   language: string;
-  state: string;
-  result?: {state: string};
 }
 
 interface Receipt {
@@ -23,7 +21,6 @@ interface Receipt {
   contentId?: string;
   mode: string;
   language: string;
-  unresolvedRedraw: boolean;
 }
 
 /** Read receipt identities only. Never copy old requests, results or source references. */
@@ -50,9 +47,7 @@ async function readReceipts(origin: string, userId: string): Promise<Receipt[]> 
         const value = current.value as StoredReceipt;
         if (value.scope === scope && typeof value.requestId === 'string') {
           rows.push({id: value.requestId, entryId: value.entryId, pageId: value.pageId,
-            contentId: value.pageRef?.contentId, mode: value.mode, language: value.language,
-            unresolvedRedraw: value.mode === 'redraw' && (value.state === 'uncertain' ||
-              !!value.result && ['needs_input', 'queued', 'running', 'needs_attention'].includes(value.result.state))});
+            contentId: value.pageRef?.contentId, mode: value.mode, language: value.language});
         }
         current.continue();
       };
@@ -73,8 +68,7 @@ export class LegacyRequestGuard {
     const matches = (receipt: Receipt) => receipt.entryId === target.entryId && receipt.pageId === target.page.id &&
       receipt.mode === target.mode && receipt.language === this.language &&
       (!receipt.contentId || receipt.contentId === target.page.contentId);
-    // Normalization can change image hashes. Old uncertain redraws must be checked even then.
-    const relevant = receipts.filter(receipt => matches(receipt) || target.mode === 'redraw' && receipt.unresolvedRedraw);
+    const relevant = receipts.filter(matches);
     const ids = [...new Set(relevant.filter(receipt => manual || !this.verified.has(receipt.id)).map(receipt => receipt.id))];
     for (let offset = 0; offset < ids.length; offset += 32) {
       const batch = ids.slice(offset, offset + 32);
@@ -82,13 +76,7 @@ export class LegacyRequestGuard {
       if (response.unchanged) throw new ApiError(msg('原请求结果待核实，暂不能重复翻译。'), 'LEGACY_REQUEST_PENDING');
       for (const id of batch) {
         const snapshot = response.items.find(item => item.id === id);
-        if (snapshot) {
-          const unresolved = relevant.some(receipt => receipt.id === id && receipt.unresolvedRedraw);
-          // Revocation alone cannot resolve an uncertain call; require explicit server evidence.
-          const unverifiedRevocation = unresolved && snapshot.error?.code === 'TRANSLATION_UNAVAILABLE' &&
-            snapshot.execution_resolved !== true;
-          this.verified.set(id, unverifiedRevocation ? 'needs_attention' : snapshot.state);
-        }
+        if (snapshot) this.verified.set(id, snapshot.state);
         else if (response.missing_ids.includes(id)) this.verified.set(id, 'missing');
       }
     }

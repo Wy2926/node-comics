@@ -9,29 +9,16 @@ const origin='https://api.example',scope=JSON.stringify([origin,'alice']);
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,result:status==='succeeded'?{key:`result-${id}`,recoverable:true}:undefined,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
 const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),translationScope:scope,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
 afterEach(()=>vi.unstubAllGlobals());
-describe('per-page redraw display',()=>{
-  it.each(['queued','running','failed','outcome_unknown','cancelled'] as const)('keeps classic while redraw is %s',status=>{
-    const p=page([job('first','succeeded',1),job('redraw',status,2,{mode:'redraw'})]);
-    expect(readingImage(p,'redraw',true,'zh-Hans',scope)).toMatchObject({key:'local-first',job:{id:'first',mode:'classic'}});
-  });
-  it('keeps classic before submission and until redraw bytes are downloaded',()=>{
-    const p=page([job('first','succeeded',1)]);
-    expect(readingImage(p,'redraw',true,'zh-Hans',scope).job?.id).toBe('first');
-    p.jobs.push(job('redraw','succeeded',2,{mode:'redraw'}));
-    expect(readingImage(p,'redraw',true,'zh-Hans',scope).job?.id).toBe('first');
-    p.outputBlobs.redraw='local-redraw';
-    expect(readingImage(p,'redraw',true,'zh-Hans',scope).job?.id).toBe('redraw');
-    expect(readingImage(p,'classic',true,'zh-Hans',scope).job?.id).toBe('first');
-  });
-  it('honors explicit original viewing even after redraw finishes',()=>{
-    const p={...page([job('first','succeeded',1),job('second','succeeded',2,{mode:'redraw'})]),blobKey:'original'};
-    expect(readingImage(p,'redraw',false,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
+describe('per-page display',()=>{
+  it('honors explicit original viewing even after translation finishes',()=>{
+    const p={...page([job('first','succeeded',1)]),blobKey:'original'};
+    expect(readingImage(p,'classic',false,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
   });
   it('never falls back across account, language, origin or an expired latest result',()=>{
     const p={...page([job('first','succeeded',1)]),blobKey:'original'};
-    for(const [language,key] of [['en',scope],['zh-Hans','other-channel'],['zh-Hans','other-revision']])expect(readingImage(p,'redraw',true,language,key)).toEqual({key:'original',job:undefined});
+    for(const [language,key] of [['en',scope],['zh-Hans','other-channel'],['zh-Hans','other-revision']])expect(readingImage(p,'classic',true,language,key)).toEqual({key:'original',job:undefined});
     p.jobs.push(job('expired','succeeded',2,{result_expired:true}));
-    expect(readingImage(p,'redraw',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
+    expect(readingImage(p,'classic',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
   });
 });
 describe('latest effect selection',()=>{
@@ -53,12 +40,12 @@ describe('latest effect selection',()=>{
     expect(pageTranslation(p,'classic','zh-Hans',scope)).toMatchObject({expired:true,ready:false,result:{id:'second'}});
     p.outputBlobs.second='same-latest-local-copy';expect(pageTranslation(p,'classic','zh-Hans',scope)).toMatchObject({expired:false,ready:true,blobKey:'same-latest-local-copy'});
   });
-  it('never crosses account, origin, mode or language',()=>{
+  it('never crosses account, origin or language',()=>{
     const p=page([job('first','succeeded',1)]);
-    for(const args of [['redraw','zh-Hans',scope],['classic','en',scope],['classic','zh-Hans','other-channel'],['classic','zh-Hans','other-revision']] as const)expect(pageTranslation(p,args[0],args[1],args[2]).result).toBeUndefined();
+    for(const args of [['classic','en',scope],['classic','zh-Hans','other-channel'],['classic','zh-Hans','other-revision']] as const)expect(pageTranslation(p,args[0],args[1],args[2]).result).toBeUndefined();
   });
-  it('downloads only one delivered effect for each mode and language',()=>{
-    expect(latestResults([job('first','succeeded',1),job('second','succeeded',2),job('redraw','succeeded',1,{mode:'redraw'}),job('pending','running',3)]).map(j=>j.id)).toEqual(['second','redraw']);
+  it('downloads only one delivered effect for each language',()=>{
+    expect(latestResults([job('first','succeeded',1),job('second','succeeded',2),job('english','succeeded',1,{target_language:'en'}),job('pending','running',3)]).map(j=>j.id)).toEqual(['second','english']);
   });
 });
 describe('display projection and submission',()=>{

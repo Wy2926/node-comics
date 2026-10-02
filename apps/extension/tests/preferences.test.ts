@@ -32,15 +32,34 @@ it('recovers search scope from malformed or unavailable optional preference stor
   expect(readSearchSiteSelection()).toEqual({});expect(()=>saveSearchSiteSelection('a:a',false)).not.toThrow();
 });
 it('keeps known preferences while discarding old concurrency and backend overrides', async () => {
-  localStorage.setItem('nc-settings', JSON.stringify({ requestConcurrency: 1, autoTranslate: true, apiBase: 'https://wrong.example', language: 'en' }));
+  localStorage.setItem('nc-settings', JSON.stringify({ requestConcurrency: 1, autoTranslate: true, apiBase: 'https://wrong.example', translationMode:'unsupported', language: 'en' }));
   await saveSettings(settings());
   const stored = JSON.parse(localStorage.getItem('nc-settings')!);
   expect(stored.language).toBe('en');
   expect(stored).not.toHaveProperty('requestConcurrency'); expect(stored).not.toHaveProperty('apiBase'); expect(stored).not.toHaveProperty('autoTranslate');
+  expect(stored).not.toHaveProperty('translationMode');
 });
 it('preserves disabled/unlimited translation budgets and rejects malformed preferences', async () => {
   await saveSettings({ ...defaults, cacheLimitMb: 0 }); expect(settings().cacheLimitMb).toBe(0);
   await saveSettings({ ...defaults, cacheLimitMb: -1 }); expect(settings().cacheLimitMb).toBe(-1);
-  localStorage.setItem('nc-settings', JSON.stringify({ cacheLimitMb: -999, textScale: -10 }));
+  localStorage.setItem('nc-settings', JSON.stringify({ cacheLimitMb: -999, textScale: -10, translationMode:'unsupported' }));
   expect(settings()).toMatchObject({ cacheLimitMb: defaults.cacheLimitMb, textScale: 1 });
+  expect(settings()).not.toHaveProperty('translationMode');
+});
+it('enables discovery text translation by default and preserves the saved choice across reloads', async () => {
+  expect(defaults.discoveryTextTranslation).toBe(true);
+  expect(settings().discoveryTextTranslation).toBe(true);
+  localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'auto',language:'ja'}));
+  expect(settings()).toMatchObject({discoveryTextTranslation:true,uiLanguage:'auto',language:'ja'});
+  await saveSettings({...settings(),discoveryTextTranslation:false});
+  expect(JSON.parse(localStorage.getItem('nc-settings')!).discoveryTextTranslation).toBe(false);
+  expect(settings()).toMatchObject({discoveryTextTranslation:false,uiLanguage:'auto',language:'ja'});
+  await saveSettings({...settings(),discoveryTextTranslation:true});
+  expect(settings().discoveryTextTranslation).toBe(true);
+});
+it('recovers malformed discovery text translation values to the enabled default', () => {
+  for(const value of ['false',0,1,null,{},[]]) {
+    localStorage.setItem('nc-settings',JSON.stringify({discoveryTextTranslation:value}));
+    expect(settings().discoveryTextTranslation).toBe(true);
+  }
 });

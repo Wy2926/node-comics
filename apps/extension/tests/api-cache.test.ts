@@ -6,7 +6,7 @@ const api=(base:string,session='account-a')=>new Api(base,'token',undefined,unde
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();vi.restoreAllMocks();});
 describe('session policy cache',()=>{
   it('merges concurrent readers and reuses capabilities entitlements across API instances',async()=>{
-    const base='https://'+crypto.randomUUID()+'.example',rights=entitlement(),caps={result_protocol:'overlay-v1',entitlements:rights};
+    const base='https://'+crypto.randomUUID()+'.example',rights=entitlement(),caps={result_protocol:'overlay-v1',modes:[{id:'classic',label:'Classic',enabled:true}],entitlements:rights};
     const fetch=vi.fn(async()=>Response.json(caps));vi.stubGlobal('fetch',fetch);
     const a=api(base),b=api(base);await Promise.all([a.capabilities(),b.capabilities()]);
     await Promise.all([a.entitlements(),b.entitlements(),a.capabilities()]);expect(fetch).toHaveBeenCalledOnce();

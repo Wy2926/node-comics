@@ -119,6 +119,49 @@ test('content growth, removal and resize update the same scrollbar without intro
   assert.deepEqual(missed,[]);
 });
 
+test('content growth during a held drag keeps the thumb at the latest bottom and preserves idle offsets', async () => {
+  await fillFixture('<div id="drag-growing" style="width:360px;height:200px;overflow:auto"><div id="drag-contents" style="height:2400px">Growing content</div></div>');
+  const viewport = page.locator('#drag-growing'), vertical = rail('drag-growing');
+  await vertical.waitFor();await nativeGutter('drag-growing');
+  await viewport.evaluate(element => {element.scrollTop = (element.scrollHeight - element.clientHeight) * .45;});
+  await page.waitForFunction(() => {
+    const element = document.getElementById('drag-growing'), bar = document.querySelector('.nc-scrollbar-y[aria-controls="drag-growing"]');
+    return Number(bar.getAttribute('aria-valuenow')) === Math.round(element.scrollTop);
+  });
+  const originalRail = await vertical.elementHandle(), box = await vertical.boundingBox(), thumb = await vertical.locator('.nc-scrollbar-thumb').boundingBox();
+  const x = thumb.x + thumb.width / 2, bottom = box.y + box.height - thumb.height / 2;
+  await page.mouse.move(x,thumb.y + thumb.height / 2);await page.mouse.down();
+  try {
+    await page.mouse.move(x,bottom,{steps:12});
+    await page.waitForFunction(() => {
+      const element = document.getElementById('drag-growing');
+      return element.scrollHeight - element.clientHeight - element.scrollTop <= 1;
+    });
+    await page.locator('#drag-contents').evaluate(element => {element.style.height = '4800px';});
+    // Keep the pointer still: the scrollbar must follow growth without another pointermove.
+    await page.waitForFunction(() => {
+      const element = document.getElementById('drag-growing'), bar = document.querySelector('.nc-scrollbar-y[aria-controls="drag-growing"]');
+      const max = element.scrollHeight - element.clientHeight;
+      return Number(bar.getAttribute('aria-valuemax')) === Math.round(max) && max - element.scrollTop <= 1;
+    });
+    assert(await vertical.evaluate((element,previous) => element === previous,originalRail));
+    const grownBox = await vertical.boundingBox(), grownThumb = await vertical.locator('.nc-scrollbar-thumb').boundingBox(), max = Number(await vertical.getAttribute('aria-valuemax'));
+    const upward = bottom - 50, expected = (upward - grownBox.y - grownThumb.height / 2) / (grownBox.height - grownThumb.height) * max;
+    await page.mouse.move(x,upward);
+    await page.waitForFunction(expected => Math.abs(document.getElementById('drag-growing').scrollTop - expected) <= 2,expected);
+    assert(await viewport.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop > 100));
+  } finally {
+    await page.mouse.up();
+  }
+  const offset = await viewport.evaluate(element => element.scrollTop);
+  await page.locator('#drag-contents').evaluate(element => {element.style.height = '7200px';});
+  await page.waitForFunction(() => {
+    const element = document.getElementById('drag-growing'), bar = document.querySelector('.nc-scrollbar-y[aria-controls="drag-growing"]');
+    return Number(bar.getAttribute('aria-valuemax')) === Math.round(element.scrollHeight - element.clientHeight);
+  });
+  assert(Math.abs(await viewport.evaluate(element => element.scrollTop) - offset) <= 1);
+});
+
 test('reserved mode allocates a stable gutter, while overlay mode retains the full content width', async () => {
   await fillFixture('<div id="reserved" style="width:260px;height:180px;overflow:auto"><div style="height:650px">Reserved content</div></div><div id="overlay" data-scrollbar-mode="overlay" style="width:260px;height:180px;overflow:auto"><div style="height:650px">Overlay content</div></div>');
   await rail('reserved').waitFor();await rail('overlay').waitFor();

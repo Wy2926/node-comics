@@ -15,15 +15,15 @@ import '../src/ui/theme/surfaces.css';
 if(location.port!=='5186')throw Error('Use isolated port 5186 for this fixture.');
 await initializeUiLanguage();
 const params=new URLSearchParams(location.search);
-let scenario=params.get('scenario')??'plus';
+let scenario=params.get('scenario')??'lite';
 let failSync=params.get('syncError')==='1';
 const session:Session={id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'synthetic-fixture',apiOrigin:API_ORIGIN,user:{id:'fixture-reader',name:'星野 · 漫画爱好者',role:'reader'}};
 if((await readAuth()).session&&!localStorage.getItem('nc-account-fixture'))throw Error('Existing session: refusing to seed.');
 localStorage.setItem('nc-account-fixture','true');
 await saveSession(scenario==='guest'?null:session);
 function rights():Entitlements {
- const plus=!['free','exhausted','grants'].includes(scenario);
- const data:Entitlements={plan:plus?'plus':'free',plus_started_at:null,plus_expires_at:plus?'2026-10-20T00:00:00Z':null,timezone:'Asia/Shanghai',image_rate_limit:{limit:plus?100:10,window_seconds:60},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:plus,quota_kind:plus?'classic_unlimited':'classic_daily',consent_version:'1',quota:plus?null:{id:'fixture-classic',kind:'classic_daily',granted:30,available:scenario==='exhausted'?0:6,used:scenario==='exhausted'?30:22,reserved:scenario==='exhausted'?0:2,starts_at:'2026-09-19T16:00:00Z',resets_at:'2026-09-20T16:00:00Z',next_expiry_at:'2026-09-20T16:00:00Z',buckets:[]}},redraw:{allowed:plus,unlimited:false,quota_kind:'redraw_monthly',consent_version:'1',quota:plus?{id:'fixture',kind:'redraw_monthly',granted:300,available:268,used:30,reserved:2,starts_at:'2026-09-20',resets_at:'2026-10-20',next_expiry_at:'2026-10-20',buckets:[]}:null}}};
+ const member=!['free','exhausted','grants'].includes(scenario);
+ const data:Entitlements={plan:member?'lite':'free',plus_started_at:null,plus_expires_at:member?'2026-10-20T00:00:00Z':null,timezone:'Asia/Shanghai',image_rate_limit:{limit:member?100:10,window_seconds:60},hourly_image_rate_limit:member?{limit:1200,window_seconds:3600}:null,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:member,quota_kind:member?'classic_unlimited':'classic_daily',consent_version:'1',quota:member?null:{id:'fixture-classic',kind:'classic_daily',granted:30,available:scenario==='exhausted'?0:6,used:scenario==='exhausted'?30:22,reserved:scenario==='exhausted'?0:2,starts_at:'2026-09-19T16:00:00Z',resets_at:'2026-09-20T16:00:00Z',next_expiry_at:'2026-09-20T16:00:00Z',buckets:[]}}}};
  if(scenario==='grants'){
   const quota=data.modes.classic.quota!;
   quota.granted+=305;quota.available+=305;
@@ -33,7 +33,7 @@ function rights():Entitlements {
  return data;
 }
 const monthly={...billingOffer,channels:billingOffer.channels.filter(c=>c.provider==='stripe')};
-const annual={...monthly,id:'fixture-annual',interval:'year' as const,unit_amount:9999};
+const annual={...monthly,id:'fixture-annual',interval:'year' as const,unit_amount:5999};
 window.fetch=async(input)=>{
  const url=new URL(String(input),location.href),path=url.pathname;
  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
@@ -50,8 +50,8 @@ window.fetch=async(input)=>{
   if(scenario==='error')return Response.json({error:{message:'模拟网络失败，请重试'}},{status:503});
   if(scenario==='loading')await new Promise(resolve=>setTimeout(resolve,4000));
   const count=Number(url.searchParams.get('days')??7),empty=scenario==='empty';
-  const days=Array.from({length:count},(_,n)=>({date:new Date(Date.UTC(2026,8,20-count+n+1)).toISOString().slice(0,10),classic:empty?0:n%4+2,redraw:empty?0:n%3,delivered:empty?0:n%4+2+n%3}));
-  return Response.json({entitlements:rights(),days,start_date:days[0].date,end_date:days.at(-1)!.date,timezone:'Asia/Shanghai',delivered:days.reduce((n,d)=>n+d.delivered,0),by_mode:{classic:days.reduce((n,d)=>n+d.classic,0),redraw:days.reduce((n,d)=>n+d.redraw,0)},included_delivered:empty?0:12,free_delivered:0,quota_used:{redraw:empty?0:6}});
+  const days=Array.from({length:count},(_,n)=>({date:new Date(Date.UTC(2026,8,20-count+n+1)).toISOString().slice(0,10),classic:empty?0:n%4+2,delivered:empty?0:n%4+2}));
+  return Response.json({entitlements:rights(),days,start_date:days[0].date,end_date:days.at(-1)!.date,timezone:'Asia/Shanghai',delivered:days.reduce((n,d)=>n+d.delivered,0),by_mode:{classic:days.reduce((n,d)=>n+d.classic,0)},included_delivered:empty?0:12,free_delivered:0,quota_used:{classic:empty?0:6}});
  }
  if(path==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
  throw Error('Unexpected fixture request: '+path);
@@ -62,7 +62,7 @@ function Fixture(){
  return <>
   <div style={{padding:8,display:'flex',flexWrap:'wrap',gap:12,background:'#edf2fc',color:'#202d43'}}>
    <b>隔离验收 · 模拟数据</b>
-   {[['plus','PLUS'],['free','普通'],['exhausted','额度耗尽'],['grants','赠送额度'],['error','失败'],['loading','加载'],['empty','零用量'],['guest','未登录']].map(([value,label])=><button key={value} onClick={async()=>{scenario=value;await saveSession(value==='guest'?null:session);location.hash='account';setVersion(v=>v+1);}}>{label}</button>)}
+   {[['lite','Lite'],['free','普通'],['exhausted','额度耗尽'],['grants','赠送额度'],['error','失败'],['loading','加载'],['empty','零用量'],['guest','未登录']].map(([value,label])=><button key={value} onClick={async()=>{scenario=value;await saveSession(value==='guest'?null:session);location.hash='account';setVersion(v=>v+1);}}>{label}</button>)}
    <button onClick={()=>{failSync=!failSync;setSyncError(failSync);}}>权益刷新：{syncError?'失败':'成功'}</button>
    <button onClick={()=>setNarrow(v=>!v)}>{narrow?'宽屏':'窄屏'}</button>
   </div>

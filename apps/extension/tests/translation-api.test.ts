@@ -4,6 +4,13 @@ import {deliveredBytes,deliveredSnapshot} from './overlay-fixture';
 afterEach(()=>vi.unstubAllGlobals());
 const id='11111111-1111-4111-8111-111111111111',body={image:{sha256:'a'.repeat(64),byte_size:4,content_type:'image/png'},mode:'classic' as const,target_language:'zh-Hans'};
 describe('translation resource API',()=>{
+ it('exposes only supported classic capabilities, retaining the server enabled flag',async()=>{
+  const fetch=vi.fn().mockResolvedValue(Response.json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:false,label:'Classic'},{id:'unsupported',enabled:true,label:'Unknown'}],languages:[],entitlements:null}));
+  vi.stubGlobal('fetch',fetch);
+  const api=new Api('https://capability-boundary.example');
+  expect((await api.capabilities()).modes).toEqual([{id:'classic',enabled:false,label:'Classic'}]);
+  expect((await api.capabilities()).modes).toHaveLength(1);expect(fetch).toHaveBeenCalledOnce();
+ });
  it.each([{body:120,header:'60',expected:120},{body:undefined,header:'75',expected:75}])('honors backpressure $expected',async({body:delay,header,expected})=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json({error:{code:'IMAGE_RATE_LIMITED',message:'稍后重试',retry_after_seconds:delay}},{status:429,headers:{'Retry-After':header}})));
   await expect(new Api('https://api.example').translate(id,body)).rejects.toMatchObject({status:429,code:'IMAGE_RATE_LIMITED',retryAfterSeconds:expected});
@@ -28,15 +35,15 @@ describe('translation resource API',()=>{
   await display.translationImage(id);expect(fetch).toHaveBeenCalledTimes(2);expect(String(fetch.mock.calls[1][0])).toBe('https://api.example/v1/translations/'+id+'/result');
  });
  it('identifies the protocol on reads, input, result, feedback, SSE and deletion as well as submission',async()=>{
-  const received:Headers[]=[];
+  const received:Headers[]=[],snapshot={...deliveredSnapshot(id),mode:'classic' as const};
   vi.stubGlobal('fetch',vi.fn(async(url:string|URL,init:RequestInit)=>{
    received.push(new Headers(init.headers));
    const path=new URL(url).pathname;
    if(path.endsWith('/events'))return new Response('event: end\ndata: {}\n\n',{headers:{'Content-Type':'text/event-stream'}});
    if(path.endsWith('/result'))return new Response(deliveredBytes);
-   if(path==='/v1/translations')return Response.json({items:[deliveredSnapshot(id)],missing_ids:[]});
+   if(path==='/v1/translations')return Response.json({items:[snapshot],missing_ids:[]});
    if(init.method==='DELETE')return new Response(null,{status:204});
-   return Response.json(deliveredSnapshot(id));
+   return Response.json(snapshot);
   }));
   const api=new Api('https://headers.example','account');
   await api.translate(id,body);await api.translation(id);await api.translations([id]);

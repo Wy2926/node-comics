@@ -6,14 +6,13 @@ import {importCatalog,importManifest} from '../../../../comics/application/impor
 import {importWebsiteLink} from '../../../../comics/application/website-import';
 import {readNetworkPages} from '../../../runtime/network';
 import {readImportCatalog} from '../../../runtime/import';
-import {parseCatalog} from '../network';
 import {catalogHtml, reader, readerHtml, url} from './fixtures';
 vi.mock('../../../../i18n/background', () => ({registerLocaleBackground: () => async () => {}}));
 vi.mock('../../../../inline/background', () => ({activateInline: vi.fn(), registerInlineBackground: vi.fn()}));
 afterEach(async () => {vi.unstubAllGlobals();for(const comic of await catalog.list('comics'))await catalog.deleteComic(comic.id);});
 
 describe.each(['embedded','popup'])('%s reader imports',entry=>{
-it.each(['valid', 'missing-chapter', 'foreign-parent', 'failed-request'])('resolves reader import over HTTP: %s', async mode => {
+it('hands the exact reader URL to the reader without waiting for HTTP catalog discovery', async () => {
   let listener: (message: unknown, sender: unknown, reply: (value: unknown) => void) => unknown;
   const create = vi.fn(async () => ({id: 8})), set = vi.fn(async (_values: Record<string, unknown>) => {});
   vi.stubGlobal('chrome', {
@@ -23,28 +22,18 @@ it.each(['valid', 'missing-chapter', 'foreign-parent', 'failed-request'])('resol
     contextMenus: {onClicked: {addListener() {}}}, storage: {local: {set}},
     tabs: {get: async () => ({id: 7, url: reader}), create},
   });
-  const fetcher = vi.fn(async () => {
-    if (mode === 'failed-request') throw Error('HTTP unavailable');
-    return new Response(mode === 'foreign-parent' ? readerHtml().replaceAll(url, 'https://evil.test/comic.php?id=123') : readerHtml());
-  });
+  const fetcher = vi.fn(async () => {throw Error('Background must not fetch the catalog');});
   vi.stubGlobal('fetch', fetcher);
-  const read = vi.fn(async () => parseCatalog(catalogHtml(mode === 'missing-chapter' ? ['7'] : ['11', '7']), url));
+  const read = vi.fn(async () => {throw Error('Background must not fetch the catalog');});
   registerSourceBackground(read);
   const result = await new Promise(resolve => listener({type: entry==='embedded'?'NC_IMPORT_CURRENT':'NC_DISCOVER_TAB',tabId:7}, {id: 'test', url: entry==='embedded'?reader:'chrome-extension://test/popup.html', frameId: 0, tab: {id: 7}}, resolve));
-  expect(fetcher).toHaveBeenCalledTimes(1);
-  if (mode === 'valid') {
+  expect(fetcher).not.toHaveBeenCalled();
     expect(result).toMatchObject({ok: true});
-    expect(read).toHaveBeenCalledWith(url);
+    expect(read).not.toHaveBeenCalled();
     if(entry==='embedded')expect(create).toHaveBeenCalledExactlyOnceWith({url: expect.stringContaining('reader.html?catalog=')});
     else {expect(create).not.toHaveBeenCalled();expect(result).toMatchObject({data:{kind:'catalog'}});expect(result).not.toHaveProperty('data.manifest');}
-    const stored = Object.values(set.mock.calls.at(-1)![0] as object)[0] as {catalog: {defaultEntryId: string};selectedEntryId?:string};
-    expect(stored.catalog).toEqual(await read.mock.results[0].value);
-    expect(stored.selectedEntryId).toBe('guazimanhua:chapter:11');
-  } else {
-    expect(result).toMatchObject({ok: false});
-    expect(create).not.toHaveBeenCalled();
-    expect(set).not.toHaveBeenCalled();
-  }
+    const stored = Object.values(set.mock.calls.at(-1)![0] as object)[0];
+    expect(stored).toEqual({url:reader});
 });
 });
 

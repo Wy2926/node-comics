@@ -8,9 +8,12 @@ import {DiscoveryControls} from './DiscoveryControls';
 import {DiscoveryDialog, type DiscoverySearchContext} from './DiscoveryDialog';
 import {DiscoveryNotice} from './DiscoveryNotice';
 import './discovery.css';
+import {createTextTranslationAdapters, TextTranslationSession} from '../../text-translation';
+import {useUiLocale} from '../../i18n/react';
 
-export function DiscoveryPage({active, renderSearch, onSearchSites}: {
+export function DiscoveryPage({active, translate, renderSearch, onSearchSites}: {
   active: boolean;
+  translate: boolean;
   renderSearch: (context: DiscoverySearchContext) => ReactNode;
   onSearchSites: () => void;
 }) {
@@ -19,6 +22,10 @@ export function DiscoveryPage({active, renderSearch, onSearchSites}: {
     return {session: new DiscoverySession(provider), genres: provider.genres};
   });
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const language = useUiLocale();
+  const [translator] = useState(() => new TextTranslationSession(createTextTranslationAdapters()[0]));
+  useEffect(() => () => translator.dispose(), [translator]);
+  useEffect(() => {if (!active || !translate) translator.cancel();}, [active, translate, translator]);
   const scroll = useRef(0);
   const loadMore = useRef<HTMLDivElement>(null);
   useEffect(() => {void session.search(); return () => session.dispose();}, [session]);
@@ -47,13 +54,13 @@ export function DiscoveryPage({active, renderSearch, onSearchSites}: {
       onChange={query => {void session.search(query);}} onRefresh={() => {void session.search(state.query, true);}}/>
     {!paginationError && notice}
     <div className="nc-discovery-grid" aria-busy={state.loading}>
-      {state.works.map(work => <DiscoveryCard key={work.id} work={work} onOpen={() => {void session.select(work);}}/>)}
+      {state.works.map(work => <DiscoveryCard key={work.id} work={work} translator={translator} language={language} translate={translate && active && !state.selected} onOpen={() => {void session.select(work);}}/>)}
       {state.loading && !state.works.length && Array.from({length: 12}, (_, index) => <div key={index} className="nc-discovery-skeleton" aria-hidden="true"/>)}
     </div>
     {!state.loading && !state.error && !state.works.length && <div className="nc-search-empty"><Icon name="search" size={36}/><h2>{msg('没有符合条件的作品')}</h2><p>{msg('试试原名、英文名，或清空筛选。')}</p><button className="button secondary" onClick={onSearchSites}><Icon name="comic-search"/>{msg('搜索漫画')}</button></div>}
     {state.hasMore && <div ref={loadMore} className="nc-discovery-pagination">
       {paginationError ? notice : state.loading && <span role="status">{msg('加载中…')}</span>}
     </div>}
-    {state.selected && <DiscoveryDialog key={state.selected.id} active={active} work={state.selected} detail={state.detail} loading={state.detailLoading} error={state.detailError} onRetry={() => {if (state.selected) void session.select(state.selected);}} onClose={() => session.close()} renderSearch={renderSearch}/>}
+    {state.selected && <DiscoveryDialog key={state.selected.id} active={active} work={state.selected} detail={state.detail} loading={state.detailLoading} error={state.detailError} translator={translator} language={language} translate={translate} onRetry={() => {if (state.selected) void session.select(state.selected);}} onClose={() => session.close()} renderSearch={renderSearch}/>}
   </div>;
 }

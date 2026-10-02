@@ -18,6 +18,11 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
       current.source.providerItemId !== source.id) throw Error('来源目录不属于此漫画。');
   const previous = await tx.get('catalogs', source.id) as SourceCatalog | undefined;
   if (previous && (previous.comicId !== current.id || previous.observedAt > source.observedAt || previous.complete && !source.complete)) return current;
+  // A retry may start from its first page; keep the larger accepted prefix until it catches up.
+  if (previous && !source.complete) {
+    const incoming=new Set(source.entries.map(entry=>entry.id));
+    if(previous.entries.some(entry=>!incoming.has(entry.id)))return current;
+  }
   const existing = await tx.list('entries', {index:'comicId', range:current.id, limit:10000});
   const bySource = new Map(existing.map(entry => [entry.sourceEntryId, entry]));
   const oldIds = new Set(previous?.entries.filter(entry => !entry.related).map(entry => entry.id));
@@ -46,8 +51,9 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
     sourceCover:source.cover,
     ...(added ? {updatedAt:now, catalogUpdates:{revision:(updates?.revision ?? 0) + 1,
       seenRevision:updates?.seenRevision ?? 0, count:(updates?.count ?? 0) + added}} : {}),
-    ...(policy && source.complete ? {catalogSync:{nextCheckAt:now + policy.intervalMinutes * 60_000,
-      lastAttemptAt:current.catalogSync?.lastAttemptAt, lastSuccessAt:now}} : {}),
+    // Claim the automatic check gate for an initial partial import too: its ongoing read already owns this work.
+    ...(policy && (source.complete || !current.catalogSync) ? {catalogSync:{nextCheckAt:now + policy.intervalMinutes * 60_000,
+      lastAttemptAt:current.catalogSync?.lastAttemptAt,...(source.complete?{lastSuccessAt:now}:{})}} : {}),
   };
   await tx.put('comics', next);
   await tx.put('catalogs', {...source, comicId:current.id});
@@ -64,6 +70,18 @@ export async function applyCatalogRefresh(comicId:string, generation:number, sna
     const connection = await tx.get('connections', current.source.connectionId);
     if (!connection || connection.status !== 'connected' || !catalogSyncPolicy(current)) return;
     return reconcileCatalog(tx, current, source);
+  });
+}
+
+/** Subsequent import batches stay bound to their original book, including after removal. */
+export async function applyCatalogImportProgress(comicId:string,generation:number,snapshot:SourceCatalogSnapshot) {
+  const source=validateSourceCatalog(snapshot);
+  if(source.complete&&!source.groups.every(group=>group.complete))throw Error('目录尚未完整加载。');
+  return catalog.mutate(['comics','entries','catalogs','connections'],async tx=>{
+    const current=await tx.get('comics',comicId),connection=current&&await tx.get('connections',current.source.connectionId);
+    if(!current||current.source.generation!==generation||current.source.status!=='active'||!connection||connection.status!=='connected')
+      throw Error('漫画已移除或来源已断开，请重新打开。');
+    return reconcileCatalog(tx,current,source);
   });
 }
 

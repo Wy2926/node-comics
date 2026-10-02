@@ -13,7 +13,6 @@ import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
 import type { InlineRequest, InlineResponse, InlineResult, InlineImageResponse } from './protocol';
 import { settingsKey } from './settings';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
-import {channelMode} from '../translation/channels/capabilities';
 import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
 
@@ -56,13 +55,12 @@ async function context(tabId:number,navigationId:string):Promise<Context|undefin
 }
 async function createContext(tabId:number,navigationId:string):Promise<Context>{
   const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>};
-  const key=JSON.stringify([settings.translationMode,settings.language,navigationId,configGeneration]);
-  const previous=contexts.get(tabId);if(previous?.key===key){previous.settings={...settings,translationMode:channelMode(previous.channel.capabilities,settings.translationMode)};return previous;}
+  const key=JSON.stringify([settings.language,navigationId,configGeneration]);
+  const previous=contexts.get(tabId);if(previous?.key===key){previous.settings=settings;return previous;}
   if(previous)disposeContext(previous);
   const generation=configGeneration,pages=new Map<string,Page>();let ctx:Context|undefined;
   const current=()=>generation===configGeneration&&(!ctx||ctx.active);
   const channel=await openActiveChannel(current),caps=channel.capabilities;
-  settings.translationMode=channelMode(caps,settings.translationMode);
   assertCurrent(current);
   const originals=new InlineOriginals('inline:'+key,Math.min(128*1024*1024,caps.limits.max_bytes*4));
   const attach=async(jobs:Job[])=>{
@@ -96,21 +94,20 @@ async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.M
       await ctx.originals.remember(page.blobKey!,blob,async()=>(await readInlineSource(ctx,request,image,sender)).blob);assertCurrent(ctx.channel.isCurrent);ctx.pages.set(key,page);
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
-    ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:ctx.settings.translationMode});
+    ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:'classic'});
    }catch(error){ctx.sourceErrors.set(pageKey(request,image),error instanceof ImagePermissionsRequired
      ?{kind:'error',message:error.message,retryable:false}
      :{kind:'error',message:(error as Error).message});}
   }
   return targets;
 }
-const resultScope=(ctx:Context)=>JSON.stringify([ctx.channel.scope.key,ctx.settings.translationMode,ctx.settings.language]);
+const resultScope=(ctx:Context)=>JSON.stringify([ctx.channel.scope.key,'classic',ctx.settings.language]);
 function pageResult(ctx:Context,page:Page){
-  const {translationMode:mode,language}=ctx.settings;
-  const current=pageTranslation(page,mode,language,ctx.channel.scope.key),fallback=mode==='redraw'?pageTranslation(page,'classic',language,ctx.channel.scope.key):undefined;
-  return current.result&&!current.expired?current.result:fallback?.result&&!fallback.expired?fallback.result:undefined;
+  const current=pageTranslation(page,'classic',ctx.settings.language,ctx.channel.scope.key);
+  return current.result&&!current.expired?current.result:undefined;
 }
 function response(ctx:Context,request:InlineRequest):InlineResponse{
-  const {translationMode:mode,language}=ctx.settings,scope=resultScope(ctx);
+  const mode='classic',language=ctx.settings.language,scope=resultScope(ctx);
   const items:InlineResult[]=[];
   for(const image of request.images){
     if(!ctx.channel.available){items.push({id:image.id,state:ctx.channel.unavailable});continue;}
@@ -155,7 +152,7 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender):P
     try{await ctx.core.wait(waiting.signal);}catch(error){if(waiting.signal.aborted)return response(ctx,request);throw error;}
   }else {
     ctx.waiting?.abort();
-    const {translationMode:mode,language}=ctx.settings;
+    const mode='classic',language=ctx.settings.language;
     if(!ctx.caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(ctx.caps,mode,language))return {mode,language,scope:ctx.key,items:request.images.map(i=>({id:i.id,state:{kind:'error',message:msg("此翻译方式暂不可用"),retryable:false}}))};
     if(request.refreshRights&&!request.retryId)await ctx.core.refresh();
     const currentKey=request.images[0]&&pageKey(request,request.images[0]);
@@ -174,7 +171,7 @@ export function registerInlineBackground(){
   registerAutomaticTabs(activateInline,stopAutomaticInline);
   const invalidate=()=>{configGeneration++;for(const ctx of contexts.values())disposeContext(ctx);contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));};
   subscribeChannels(invalidate);
-  chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&(before?.language!==after?.language||before?.translationMode!==after?.translationMode))invalidate();});
+  chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&before?.language!==after?.language)invalidate();});
   chrome.tabs.onRemoved.addListener(tabId=>{const ctx=contexts.get(tabId);if(ctx){disposeContext(ctx);}contexts.delete(tabId);windowGenerations.delete(tabId);void chrome.storage.session.remove(activationKey(tabId));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_IMAGE','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;

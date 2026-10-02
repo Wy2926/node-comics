@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {InlineAnalytics} from '../src/inline/analytics';
-const context={channel:'official' as const,mode:'redraw' as const,language:'zh-Hans'};
+const context={channel:'official' as const,mode:'classic' as const,language:'zh-Hans'};
 function createUsage(report:ConstructorParameters<typeof InlineAnalytics>[0]){
   const usage=new InlineAnalytics(report);usage.setConsent(true,0);return usage;
 }
@@ -20,7 +20,7 @@ describe('inline translation session usage',()=>{
     usage.accepted(context);usage.accepted(context);
     usage.shown({...context,mode:'classic'});usage.shown(context);
     expect(report.mock.calls.map(([name])=>name)).toEqual(['translation_requested','translation_viewed']);
-    expect(report.mock.calls[0][1]).toMatchObject({surface:'inline',method:'manual',mode:'redraw'});
+    expect(report.mock.calls[0][1]).toMatchObject({surface:'inline',method:'manual',mode:'classic'});
     expect(report.mock.calls[1][1]).toMatchObject({surface:'inline',method:'manual',mode:'classic'});
     expect(Object.keys(report.mock.calls[1][1]).sort()).toEqual(['channel','method','mode','surface','target_language']);
   });

@@ -1,7 +1,7 @@
 import {msg} from '../i18n/runtime';
 
 type Axis = 'x' | 'y';
-type Rail = {element: HTMLDivElement; thumb: HTMLSpanElement; length: number; size: number; max: number};
+type Rail = {element: HTMLDivElement; thumb: HTMLSpanElement; length: number; size: number; max: number; syncDrag: () => void};
 type Entry = {target: HTMLElement; layer: HTMLDivElement; rails: Record<Axis, Rail>; reserveX: boolean; reserveY: boolean; dispose: () => void};
 const axes: Axis[] = ['x', 'y'];
 const owned = '.nc-scrollbar-layer';
@@ -54,22 +54,28 @@ export function installScrollbars(scope: HTMLElement) {
       element.setAttribute('aria-valuemin', '0');
       element.tabIndex = preserveFocus ? -1 : 0;
       element.append(thumb);layer.append(element);
-      const rail = rails[axis] = {element, thumb, length: 0, size: 0, max: 0};
-      let drag: {pointer: number; coordinate: number; scroll: number} | undefined;
+      const rail = rails[axis] = {element, thumb, length: 0, size: 0, max: 0, syncDrag: () => {}};
+      let drag: {pointer: number; coordinate: number; grab: number} | undefined;
       const coordinate = (event: PointerEvent) => axis === 'x' ? event.clientX : event.clientY;
+      rail.syncDrag = () => {
+        if (!drag || rail.length <= rail.size) return;
+        const rect = element.getBoundingClientRect(), at = drag.coordinate - (axis === 'x' ? rect.left : rect.top);
+        move(target, axis, (at - drag.grab * rail.size) / (rail.length - rail.size) * rail.max);
+      };
       element.onpointerdown = event => {
         if (event.button !== 0 || !event.isPrimary || rail.length <= rail.size) return;
         event.preventDefault();event.stopPropagation();
         if (!preserveFocus) element.focus({preventScroll: true});
         const rect = element.getBoundingClientRect(), at = coordinate(event) - (axis === 'x' ? rect.left : rect.top);
         const scroll = position(target, axis), offset = scroll / rail.max * (rail.length - rail.size);
-        if (at < offset || at > offset + rail.size) move(target, axis, (at - rail.size / 2) / (rail.length - rail.size) * rail.max);
-        drag = {pointer: event.pointerId, coordinate: coordinate(event), scroll: position(target, axis)};
+        const onThumb = at >= offset && at <= offset + rail.size;
+        if (!onThumb) move(target, axis, (at - rail.size / 2) / (rail.length - rail.size) * rail.max);
+        drag = {pointer: event.pointerId, coordinate: coordinate(event), grab: onThumb ? (at - offset) / rail.size : .5};
         element.setPointerCapture(event.pointerId);element.dataset.dragging = 'true';
       };
       element.onpointermove = event => {
         if (!drag || event.pointerId !== drag.pointer || rail.length <= rail.size) return;
-        move(target, axis, drag.scroll + (coordinate(event) - drag.coordinate) / (rail.length - rail.size) * rail.max);
+        drag.coordinate = coordinate(event);rail.syncDrag();
       };
       const end = (event: PointerEvent) => {
         if (event.pointerId !== drag?.pointer) return;
@@ -198,6 +204,8 @@ export function installScrollbars(scope: HTMLElement) {
         rail.max = max;
         rail.length = Math.max(0, (axis === 'x' ? right - left : bottom - top) - 16 - ((axis === 'x' ? maxY : maxX) > 1 ? 14 : 0));
         rail.size = Math.min(rail.length, Math.max(32, rail.length * extent(target, axis) / (max + extent(target, axis))));
+        // Lazy content can grow while the pointer stays still; keep the grabbed thumb under it.
+        rail.syncDrag();
         const scroll = Math.max(0, Math.min(max, position(target, axis)));
         const x = axis === 'x' ? (left + right) / 2 : right - 10, y = axis === 'y' ? (top + bottom) / 2 : bottom - 10;
         const hit = document.elementsFromPoint(x, y).find(element => !element.closest(owned));

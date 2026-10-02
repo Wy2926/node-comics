@@ -30,7 +30,7 @@ it('encodes the documented form configuration without NodeLane account fields', 
   expect(request.imageField).toBe('image');
   expect(JSON.parse(request.fields.config)).toEqual({translator: {target_lang: 'CHT'}});
   expect(languages.vi).toBe('VIN');
-  expect(() => translationRequest('http://localhost/', 'token', 'redraw', 'zh-Hans')).toThrow('UNSUPPORTED_MODE');
+  expect(() => translationRequest('http://localhost/', 'token', 'unsupported' as Parameters<typeof translationRequest>[2], 'zh-Hans')).toThrow('UNSUPPORTED_MODE');
   expect(() => translationRequest('http://localhost/', 'token', 'classic', 'unsupported')).toThrow('UNSUPPORTED_LANGUAGE');
 });
 it('rejects ambiguous service addresses and never shows server-provided credential or OCR details', async () => {

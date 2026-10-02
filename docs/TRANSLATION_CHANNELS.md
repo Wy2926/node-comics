@@ -25,7 +25,7 @@
 
 ## 两个渠道的执行约定
 
-**NodeLane** 保留[官方翻译接口与恢复契约](READING_TRANSLATION_CONTRACT.md)：登录后受理请求、必要时补传原图、按 UUID 查询、从中心鉴权读取完成结果。能力声明 `overlay-v1`，全部 translation 请求携带同一协议头；常规返回覆盖文件，重绘返回完整图片，无字／无可见变化返回 `original` 无文件。旧输入与结果不进入新账户 scope，旧 UUID 仅保留最小信息用于只读核实，具体切换行为以官方契约为准。网络未知结果不能自动生成新 UUID；查询或下载失败不能触发重译。退出账号仍隔离该账号的结果。未登录时展示模式与登录入口，不发送翻译请求。
+**NodeLane** 保留[官方翻译接口与恢复契约](READING_TRANSLATION_CONTRACT.md)：登录后受理常规翻译、必要时补传原图、按 UUID 查询、从中心鉴权读取完成结果。能力声明 `overlay-v1`，全部 translation 请求携带同一协议头；常规返回覆盖文件，无字／无可见变化返回 `original` 无文件。插件仅支持 `classic`，重绘模式及其恢复分支已移除，网络边界拒绝未知模式。旧输入与结果不进入新账户 scope，具体切换行为以官方契约为准。网络未知结果不能自动生成新 UUID；查询或下载失败不能触发重译。退出账号仍隔离该账号的结果。未登录时展示常规翻译与登录入口，不发送翻译请求。
 
 **MTU** 仅实现以下接口，对照版本为 [`hgmzhn/manga-translator-ui@2130ccb`](https://github.com/hgmzhn/manga-translator-ui/tree/2130ccb108dea055e6e105e9aa7d3cfb52f4150d)：
 

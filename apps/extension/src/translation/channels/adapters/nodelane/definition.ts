@@ -18,7 +18,6 @@ import {loadTranslationInput} from '../../../input/load';
 // New requests still require a successful policy refresh; the server enforces its actual limits.
 const baselineCapabilities=():Capabilities=>({modes:[
   {id:'classic',label:modeLabels.classic,enabled:true,languages:fallbackLanguages.map(language=>language.id)},
-  {id:'redraw',label:modeLabels.redraw,enabled:true,languages:['zh-Hans','zh-Hant','en','ja','ko']},
 ],languages:fallbackLanguages,limits:{max_bytes:TRANSLATION_MAX_BYTES,max_pixels:TRANSLATION_MAX_PIXELS,max_dimension:TRANSLATION_MAX_DIMENSION,max_translation_ids:32},entitlements:null});
 
 export const definition:ChannelDefinition={

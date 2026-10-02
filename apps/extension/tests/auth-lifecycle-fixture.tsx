@@ -46,7 +46,7 @@ if(loginFixture){
 }
 let mode:'ok'|'offline'|'revoked'|'401'|'403'='ok',refreshes=0,requests=0,status='就绪';
 const changed=()=>window.dispatchEvent(new Event('auth-fixture-metrics'));
-const rights=():Entitlements=>({plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{limit:10,window_seconds:60},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:true,quota_kind:'classic_daily',consent_version:'fixture',quota:null},redraw:{allowed:false,unlimited:false,quota_kind:'redraw_monthly',consent_version:'fixture',quota:null}}});
+const rights=():Entitlements=>({plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{limit:10,window_seconds:60},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:true,quota_kind:'classic_daily',consent_version:'fixture',quota:null}}});
 window.fetch=async(input,init)=>{
   const url=new URL(String(input),location.href);
   if(url.href===endpoint){refreshes++;changed();if(mode==='offline')throw TypeError('Fixture offline');if(mode==='revoked')return Response.json({error:'invalid_grant'},{status:400});return Response.json({access_token:'fixture-access-'+refreshes,refresh_token:'fixture-refresh-'+refreshes,token_type:'Bearer',expires_in:3600});}
@@ -65,7 +65,7 @@ window.fetch=async(input,init)=>{
   if(token&&mode==='403')return Response.json({error:{code:'FORBIDDEN',message:'模拟业务权限不足'}},{status:403});
   if(url.pathname==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:token?rights():null});
   if(url.pathname==='/v1/me/entitlements')return Response.json(rights());
-  if(url.pathname==='/v1/me/usage/summary')return Response.json({entitlements:rights(),days:[],start_date:'2026-09-20',end_date:'2026-09-20',timezone:'Asia/Shanghai',delivered:0,by_mode:{classic:0,redraw:0},included_delivered:0,free_delivered:0,quota_used:{redraw:0}});
+  if(url.pathname==='/v1/me/usage/summary')return Response.json({entitlements:rights(),days:[],start_date:'2026-09-20',end_date:'2026-09-20',timezone:'Asia/Shanghai',delivered:0,by_mode:{classic:0},included_delivered:0,free_delivered:0,quota_used:{}});
   if(url.pathname==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
   if(url.pathname==='/v1/translations')return Response.json({items:[],missing_ids:(url.searchParams.get('ids')??'').split(',')});
   throw Error('Unexpected fixture route: '+url.pathname);

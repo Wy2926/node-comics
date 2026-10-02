@@ -7,9 +7,9 @@ import {chooseExportDestination,exportDocument,exportOriginalFile,exportName,ori
 import {Modal} from './components';
 import {Select} from './Select';
 
-export interface DocumentExportProps {document:Entry;channel?:ChannelConnection;settings:Pick<Settings,'language'|'translationMode'>;onClose():void}
+export interface DocumentExportProps {document:Entry;channel?:ChannelConnection;settings:Pick<Settings,'language'>;onClose():void}
 export function DocumentExport({document:doc,channel,settings,onClose}:DocumentExportProps){
-  const [options,setOptions]=useState<ExportOptions>({format:'cbz',images:'original',mode:settings.translationMode,language:settings.language});
+  const [options,setOptions]=useState<ExportOptions>({format:'cbz',images:'original',mode:'classic',language:settings.language});
   const [source,setSource]=useState<{name:string}>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState<ExportProgress>(),[done,setDone]=useState('');
   const active=useRef<AbortController|null>(null),identity=useRef(channel);identity.current=channel;
   useEffect(()=>{let alive=true;void originalFileInfo(doc.id).then(value=>{if(alive)setSource(value);});return()=>{alive=false;active.current?.abort();};},[doc.id]);

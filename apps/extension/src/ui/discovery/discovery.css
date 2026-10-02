@@ -15,6 +15,46 @@
 .nc-discovery-controls {
   margin-bottom: 24px;
 }
+.nc-discovery-card-entry {min-width: 0;}
+.nc-discovery-card-entry .nc-discovery-card {width: 100%;}
+.nc-discovery-text-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  line-height: 1.8;
+  min-height: 1.8em;
+}
+.nc-discovery-text-status > span {display: inline-flex; align-items: center; gap: 6px;}
+.nc-discovery-text-status .spinner {width: 12px; height: 12px;}
+.nc-discovery-publication-types > .nc-discovery-text-status {align-self: center;}
+.nc-discovery-inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: 550;
+  line-height: 1.8;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nc-discovery-inline-action > span {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.nc-discovery-inline-action:hover,
+.nc-discovery-inline-action:focus-visible {color: var(--accent);}
+.nc-discovery-inline-action:is(:hover, :focus-visible) > span {text-decoration-color: currentColor;}
+.nc-discovery-inline-action:focus-visible > span {text-decoration-thickness: 2px;}
 .nc-discovery-overview {
   gap: 24px;
 }
@@ -432,6 +472,8 @@
   flex: 1;
   min-height: 0;
   margin: 24px 0;
+  /* Keep room for the shared scrollbar rail before the description expands. */
+  padding-right: 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -563,6 +605,33 @@
 .nc-discovery-description {
   line-height: 1.8;
   font-size: var(--text-body);
+}
+.nc-discovery-description-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: var(--text-caption);
+  min-height: 1.8em;
+}
+.nc-discovery-description-controls .nc-discovery-text-status {
+  min-width: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.nc-discovery-description-controls .nc-discovery-text-status > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nc-discovery-description-controls .nc-discovery-text-status .spinner {margin-right: 6px;}
+.nc-discovery-description-controls .nc-discovery-text-status > button {flex: none;}
+.nc-discovery-description-controls > button {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
 }
 .nc-discovery-description p {
   margin: 0 0 8px;

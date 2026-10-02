@@ -3,18 +3,10 @@ import type {Job,Mode,Page} from '../types';
 import {newestFirst,pendingStatuses} from './jobs';
 
 export type PageView={mode:Mode;preference:'original'|'translation'};
-export function resolvePageView(view:PageView|undefined,defaultMode:Mode):PageView{
-  return view??{mode:defaultMode,preference:'original'};
-}
-/** Redraw may take a while: keep the valid classic result until redraw is available. */
-export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,scopeKey?:string,fallbackClassic=true){
+export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,scopeKey?:string){
   if(translated){
     const target=pageTranslation(page,mode,language,scopeKey);
     if(target.blobKey)return {key:target.blobKey,job:target.result};
-    if(mode==='redraw'&&fallbackClassic){
-      const classic=pageTranslation(page,'classic',language,scopeKey);
-      if(classic.blobKey)return {key:classic.blobKey,job:classic.result};
-    }
   }
   return {key:page.blobKey,job:undefined};
 }

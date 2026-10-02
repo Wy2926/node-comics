@@ -30,6 +30,7 @@ const discovered = new Map();
 const importErrors = [];
 const channelAdapter = (filename) => relative(filename).match(/^src\/translation\/channels\/adapters\/([^/]+)\//)?.[1];
 const channelRegistry = 'src/translation/channels/registry.ts';
+const textAdapter = filename => relative(filename).match(/^src\/text-translation\/adapters\/([^/.]+)(?:\/|\.ts$)/)?.[1];
 const removedTranslationModule = /(?:^|\/)translation\/(?:coordinator|store|state)(?:\.tsx?)?$/;
 const channelIds = new Set([...modules].map(channelAdapter).filter(Boolean));
 const channelUi = (filename) => /^src\/ui\//.test(filename) || filename === 'src/App.tsx' || /^src\/reader\/.*\.tsx$/.test(filename);
@@ -62,6 +63,9 @@ for (const filename of modules) {
         (/^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/)/.test(relative(target)) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target)))
       importErrors.push(`Discovery boundary (metadata must not depend on UI, account, reading or source services): ${relative(filename)} -> ${relative(target)}`);
     const targetAdapter = channelAdapter(target), adapter = channelAdapter(filename);
+    const targetTextAdapter = textAdapter(target);
+    if (targetTextAdapter && textAdapter(filename) !== targetTextAdapter && relative(filename) !== 'src/text-translation/registry.ts')
+      importErrors.push(`Text translation boundary (concrete adapters require their owner or registry): ${relative(filename)} -> ${relative(target)}`);
     if (targetAdapter && adapter !== targetAdapter &&
         !(relative(filename) === channelRegistry && relative(target) === `src/translation/channels/adapters/${targetAdapter}/definition.ts`))
       importErrors.push(`Translation boundary (concrete adapters require their own directory or the definition registry): ${relative(filename)} -> ${relative(target)}`);
@@ -232,6 +236,8 @@ function checkTransitiveBoundary(filename, predicate, label, seen = new Set(), b
 }
 for (const filename of modules) {
   const name = relative(filename);
+  if (name.startsWith('src/text-translation/'))
+    checkTransitiveBoundary(filename, target => /^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/|discovery\/)/.test(target) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target), 'text adapter/service depends on UI, account, image translation or website services', new Set(), 'Text translation');
   if (name === 'src/translation/channels/contracts.ts')
     checkTransitiveBoundary(filename, target => /^src\/translation\/channels\/(?!contracts\.ts$)/.test(target), 'contracts depend on composition or execution', new Set(), 'Translation');
   if (name.startsWith('src/translation/channels/transport/'))

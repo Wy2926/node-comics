@@ -10,7 +10,7 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,tran
 }){
   return <nav className="nc-reader-rail right nc-reader-controls" aria-label={msg("翻译与阅读工具")}>
     <div className="nc-page-versions" role="group" aria-label={msg("漫画查看方式")} data-shown-job={shownJob?.id??'original'}>
-      {(['original',...(modes??['classic','redraw'])] as ('original'|Mode)[]).map(value=><button key={value} aria-label={{original:msg("原图"),classic:msg("常规翻译"),redraw:msg("AI 重绘")}[value]} title={{original:msg("查看原图"),classic:msg("查看常规译图"),redraw:msg("查看 AI 重绘")}[value]} aria-pressed={selectedView===value} onClick={()=>onView(value)}><Icon name={{original:'image',classic:'translate',redraw:'spark'}[value]}/><span>{{original:msg("原图"),classic:msg("常规"),redraw:'AI'}[value]}</span></button>)}
+      {(['original',...(modes===undefined||modes.includes('classic')?['classic']:[])] as ('original'|'classic')[]).map(value=><button key={value} aria-label={{original:msg("原图"),classic:msg("常规翻译")}[value]} title={{original:msg("查看原图"),classic:msg("查看常规译图")}[value]} aria-pressed={selectedView===value} onClick={()=>onView(value)}><Icon name={{original:'image',classic:'translate'}[value]}/><span>{{original:msg("原图"),classic:msg("常规")}[value]}</span></button>)}
     </div>
     <span className="nc-rail-divider"/>
     {contentLanguageControl}

@@ -1,12 +1,7 @@
 import {Select,SelectOption} from './Select';
 import {LanguageFlag} from './LanguageFlag';
 import {msg} from '../i18n/runtime';
-import {fallbackLanguages,languageLabel,supportsLanguage,type Capabilities,type Settings} from '../types';
-
-/** The popup and preferences edit the same setting, including the mode fallback. */
-export function withTargetLanguage(settings:Settings,language:string,caps?:Capabilities):Settings{
-  return {...settings,language,translationMode:supportsLanguage(caps,settings.translationMode,language)?settings.translationMode:'classic'};
-}
+import {fallbackLanguages,languageLabel,type Capabilities} from '../types';
 
 export function TargetLanguage({value,onChange,caps,disabled,describedBy}:{value:string;onChange:(language:string)=>void;caps?:Capabilities;disabled?:boolean;describedBy?:string}){
   const languages=caps?.languages??fallbackLanguages;

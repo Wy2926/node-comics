@@ -19,6 +19,7 @@ import { isPageImageUrl } from '../shared/urls';
 import {networkOperation,readNetworkPages} from './network';
 import {readImportCatalog} from './import';
 import {sourceImages} from '../registry/images';
+import {sourceNetworks} from '../registry/networks';
 import {recoverImageHeaders} from './image-headers';
 import {registerDocumentManifest} from './manifests';
 import {readSourceCatalog} from './catalog-reader';
@@ -50,7 +51,13 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
     throw Error(msg('来源页面已变化，请重新发现。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
-  if (definition.capabilities.catalog && (loc.kind==='reader'||networkOperation(tab.url,'catalog'))) {
+  if(definition.capabilities.catalog&&sourceNetworks[definition.id]?.catalog){
+    // Reader owns this cancellable operation; a popup or worker must not wait for the entire directory first.
+    const id=crypto.randomUUID(),url=loc.url;
+    await chrome.storage.local.set({['nc-import:'+id]:{url}});
+    return {kind:'catalog',id,url};
+  }
+  if (definition.capabilities.catalog && loc.kind==='reader') {
     const catalog = await readImportCatalog(tab.url,readCatalog), id = crypto.randomUUID();
     const selectedEntryId = loc.kind === 'reader' ? catalog.entries.find(entry => !entry.related && sameSourcePage(entry.url, tab.url!))?.id : undefined;
     await chrome.storage.local.set({['nc-import:' + id]: {catalog, ...(selectedEntryId ? {selectedEntryId} : {})}});

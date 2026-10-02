@@ -10,9 +10,10 @@ it('loads public quotes without authentication and submits the selected price an
   vi.stubGlobal('fetch',fetch);
   const catalog=await new Api('https://billing.test').billingCatalog();
   expect(catalog.offers).toEqual([billingOffer]);
+  expect(catalog.offers[0]).toMatchObject({plan_id:'lite',hourly_image_limit:1200});
   expect(fetch.mock.calls[0][0]).toBe('https://billing.test/v1/billing/catalog');
   expect(fetch.mock.calls[0][1].headers.has('Authorization')).toBe(false);
-  for(const priceId of ['plus-month-v1','plus-year-v1']){
+  for(const priceId of [billingOffer.id,'fixture-lite-annual','plus-month-v1','plus-year-v1']){
     fetch.mockResolvedValueOnce(Response.json({provider:'creem',environment:'test',trial:true,checkout_url:'https://creem.io/test/checkout/fixture'}));
     await new Api('https://billing.test','fixture-token').startCheckout(priceId,'creem');
     const [url,init]=fetch.mock.calls.at(-1)!;

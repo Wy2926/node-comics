@@ -42,14 +42,14 @@ const translatedSha=await hashFile(translated);
 const delivery={kind:'translated' as const,representation:'full-image-v1' as const,input_sha256:imageSha256,normalization_version:1 as const,width:760,height:1140,artifact:{sha256:translatedSha,byte_size:translated.size,mime:translated.type,path:'/v1/translations/recorded-classic-en/result'}};
 const recordedJob:Job={id:'recorded-classic-en',result:{key:translatedSha,recoverable:true},delivery,mode:'classic',target_language:'en',status:'succeeded',phase:'completed',quota_pages:0,created_at:'2026-09-21T00:00:00Z',version:1,cache_hit:true,image_sha256:imageSha256};
 await catalog.put('translationBindings',{id:JSON.stringify([JSON.stringify([isolatedOrigin,userId,'overlay-v1']),imageSha256]),scope:JSON.stringify([isolatedOrigin,userId,'overlay-v1']),imageSha256,updatedAt:Date.now(),payload:{translationScope:JSON.stringify([isolatedOrigin,userId,'overlay-v1']),ownerId:userId,apiOrigin:isolatedOrigin,jobs:[recordedJob]}});
-const rights:Entitlements={plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{window_seconds:60,limit:10},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'local-demo',quota:null},redraw:{allowed:false,unlimited:false,quota_kind:'unavailable',consent_version:'local-demo',quota:null}}};
+const rights:Entitlements={plan:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{window_seconds:60,limit:10},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'local-demo',quota:null}}};
 const snapshot=(id:string):TranslationSnapshot=>({id,state:'succeeded',mode:'classic',target_language:'en',image_sha256:imageSha256,created_at:recordedJob.created_at,result:{...delivery,artifact:{...delivery.artifact,path:`/v1/translations/${id}/result`}}});
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
   const url=new URL(input instanceof Request?input.url:String(input),location.href);
   if(url.origin!==isolatedOrigin) throw Error('Cloud requests are disabled in the marketing demonstration.');
   if(!url.pathname.startsWith('/v1/'))return nativeFetch(input,init);
-  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,label:'Classic translation',languages:['en']},{id:'redraw',enabled:false,label:'AI redraw'}],languages:[{id:'en',label:'English'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights});
+  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,label:'Classic translation',languages:['en']}],languages:[{id:'en',label:'English'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights});
   if(url.pathname==='/v1/me/entitlements')return json(rights);
   if(url.pathname==='/v1/me')return json({user:{id:userId,name:'Demo reader',role:'reader'}});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});

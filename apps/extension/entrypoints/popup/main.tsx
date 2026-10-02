@@ -6,19 +6,17 @@ import { requireHostAccess } from '../../src/host-permissions';
 import { Icon } from '../../src/icons';
 import { connectReaderSettings } from '../../src/inline/settings';
 import { saveSettings, settings } from '../../src/comics/application/preferences';
-import type { SourceCatalog } from '../../src/comics/application/types';
 import '../../src/redesign.css';
-import type { PageManifest } from '../../src/sources';
 import { sourceFor, sourceMessage } from '../../src/sources';
 import '../../src/styles.css';
 import { useAppearance } from '../../src/ui/Appearance';
 import { AutoTranslateTabs } from '../../src/ui/AutoTranslateTabs';
 import { BrandLogo } from '../../src/ui/BrandLogo';
-import { TargetLanguage, withTargetLanguage } from '../../src/ui/TargetLanguage';
+import { TargetLanguage } from '../../src/ui/TargetLanguage';
 import './popup.css';
 import {Scrollbars} from '../../src/ui/Scrollbars';
 
-type Discovery={kind:'catalog';id:string;catalog:SourceCatalog}|{kind:'pages';id:string;manifest:PageManifest};
+type Discovery={kind:'catalog'|'pages';id:string};
 function Popup({initialError=''}:{initialError?:string}){
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
  const [error,setError]=useState(initialError),[discoveryError,setDiscoveryError]=useState('');
@@ -54,7 +52,7 @@ function Popup({initialError=''}:{initialError?:string}){
  },[]);
  async function changeLanguage(language:string){
   if(saveLock.current)return;saveLock.current=true;setSaving(true);setError('');
-  const next=withTargetLanguage(settings(),language);setPreferences(next);
+  const next={...settings(),language};setPreferences(next);
   try{await saveSettings(next);}catch{setError(msg("语言未能同步，请重新选择后再翻译。"));}
   finally{saveLock.current=false;setSaving(false);}
  }

@@ -129,6 +129,41 @@ describe('module boundary check', () => {
   });
 });
 
+describe('text translation boundaries', () => {
+  it('allows registry composition and helpers owned by an adapter', () => {
+    source('entrypoints/main.ts', "import '../src/text-translation';");
+    source('src/text-translation/index.ts', "export * from './registry';");
+    source('src/text-translation/registry.ts', "import './adapters/google';import './adapters/example/definition';");
+    source('src/text-translation/adapters/google.ts', 'export {};');
+    source('src/text-translation/adapters/example/definition.ts', "import './transport';");
+    source('src/text-translation/adapters/example/transport.ts', 'export {};');
+    const result = run();
+    expect(result.stderr).toBe('');expect(result.status).toBe(0);
+  });
+  it.each(["import './text-translation/adapters/google';", "export * from './text-translation/adapters/google';", "import('./text-translation/adapters/google');"])
+    ('rejects concrete adapters hidden behind application helpers: %s', code => {
+      source('entrypoints/main.ts', "import '../src/helper';");
+      source('src/helper.ts', code);
+      source('src/text-translation/adapters/google.ts', 'export {};');
+      expect(run().stderr).toContain('Text translation boundary (concrete adapters require their owner or registry)');
+    });
+  it('rejects cross-adapter helpers', () => {
+    source('entrypoints/main.ts', "import '../src/text-translation/registry';");
+    source('src/text-translation/registry.ts', "import './adapters/example/definition';");
+    source('src/text-translation/adapters/example/definition.ts', "import '../google';");
+    source('src/text-translation/adapters/google.ts', 'export {};');
+    expect(run().stderr).toContain('Text translation boundary (concrete adapters require their owner or registry)');
+  });
+  it.each(['src/api.ts', 'src/auth/session.ts', 'src/sources/index.ts', 'src/ui/Preferences.tsx', 'src/translation/channels/index.ts', 'src/discovery/session.ts'])
+    ('rejects text translation depending on %s through a shared helper', target => {
+      source('entrypoints/main.ts', "import '../src/text-translation/session';");
+      source('src/text-translation/session.ts', "import '../helper';");
+      source('src/helper.ts', `export * from './${target.replace(/^src\//, '').replace(/\.tsx?$/, '')}';`);
+      source(target, 'export {};');
+      expect(run().stderr).toContain('text adapter/service depends on UI, account, image translation or website services');
+    });
+});
+
 describe('translation channel boundaries',()=>{
   const channels='src/translation/channels/';
   const adapter=(id:string,file='definition')=>channels+`adapters/${id}/${file}.ts`;

@@ -41,7 +41,7 @@ const checks=[],errors=[];context.on('page',page=>page.on('pageerror',error=>err
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const origin='chrome-extension://'+new URL(worker.url()).hostname;
 const languageOptions=[['zh-Hans','简体中文'],['zh-Hant','繁體中文'],['en','English'],['ja','日本語'],['ko','한국어'],['fr','Français']];
-await context.route('https://**/*',route=>{const url=route.request().url();return route.fulfill({json:url.includes('/capabilities')?{modes:[{id:'classic',enabled:true},{id:'redraw',enabled:true}],languages:languageOptions.map(([id,label])=>({id,label})),limits:{},entitlements:null}:url.includes('/auth/config')?{dev_auth:true}:{}});});
+await context.route('https://**/*',route=>{const url=route.request().url();return route.fulfill({json:url.includes('/capabilities')?{result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true}],languages:languageOptions.map(([id,label])=>({id,label})),limits:{},entitlements:null}:url.includes('/auth/config')?{dev_auth:true}:{}});});
 const source=await context.newPage();
 const tabId=async url=>worker.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url)?.id,url);
 let popup;
@@ -64,9 +64,9 @@ try{
  const reader=await context.newPage();await reader.goto(origin+'/reader.html#settings');await selectOption(reader.getByRole('combobox',{name:'默认目标语言'}),'ja');
  await popup.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='ja');assert.equal((await preferences()).language,'ja');
  await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'en');await reader.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='en');assert.equal((await preferences()).language,'en');check('Popup 与已打开的设置页面双向同步同一默认语言');
- await reader.evaluate(()=>{const value=JSON.parse(localStorage.getItem('nc-settings'));value.translationMode='redraw';value.direction='ltr';value.cacheLimitMb=512;localStorage.setItem('nc-settings',JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key:'nc-settings'}));});
- await popup.waitForFunction(()=>JSON.parse(localStorage.getItem('nc-settings')).translationMode==='redraw');await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'fr');
- await popup.waitForFunction(()=>{const trigger=document.querySelector('[role="combobox"][aria-label="默认目标语言"]');return trigger&&!trigger.matches(':disabled,[aria-disabled="true"]');});const saved=await preferences();assert.equal(saved.translationMode,'classic');assert.equal(saved.direction,'ltr');assert.equal(saved.cacheLimitMb,512);check('新增语言回退常规模式，保留其他设置');
+ await reader.evaluate(()=>{const value=JSON.parse(localStorage.getItem('nc-settings'));value.direction='ltr';value.cacheLimitMb=512;localStorage.setItem('nc-settings',JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key:'nc-settings'}));});
+ await popup.waitForFunction(()=>JSON.parse(localStorage.getItem('nc-settings')).cacheLimitMb===512);await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'fr');
+ await popup.waitForFunction(()=>{const trigger=document.querySelector('[role="combobox"][aria-label="默认目标语言"]');return trigger&&!trigger.matches(':disabled,[aria-disabled="true"]');});const saved=await preferences();assert(!Object.hasOwn(saved,'translationMode'));assert.equal(saved.direction,'ltr');assert.equal(saved.cacheLimitMb,512);check('切换目标语言保留其他偏好，不持久化已移除的模式设置');
  await popup.close();await openPopup();assert.equal(await popup.getByRole('combobox').getAttribute('data-value'),'fr');assert.equal((await messages()).length,0);check('重新打开保留语言且仍不自动发现');
  await popup.evaluate(()=>globalThis.fixtureDenyPermission=true);await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'网站访问权限已被浏览器关闭'}).waitFor();assert.equal((await messages()).length,0);await screenshot('popup-permission-denied');check('模拟网站访问受限阻止启动，保留 Popup 和扩展设置提示');
  await popup.evaluate(()=>{globalThis.fixtureDenyPermission=false;globalThis.fixtureTranslateFailure=true;});await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.getByRole('alert').filter({hasText:'不允许注入'}).waitFor();check('启动失败保留语言和重试入口');
@@ -95,7 +95,7 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await popup.evaluate(()=>globalThis.fixtureDenyPermission=false);await autoSwitch(popup).click();await reader.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="标签页自动翻译"]').getAttribute('aria-checked')==='true');await source.bringToFront();
  const hostVisible=()=>source.waitForFunction(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
  const hostHidden=()=>source.waitForFunction(()=>![...document.documentElement.children].some(el=>el.style.zIndex==='2147483646'));
- await hostVisible();assert.equal((await preferences()).autoTranslateTabs,true);await popup.locator('.nc-auto-tabs').scrollIntoViewIfNeeded();await screenshot('popup-auto-enabled');await reader.locator('.nc-auto-tabs').scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'settings-auto-enabled.png')});check('Popup 开启自动翻译同步设置，并自动启动当前网页');
+ await hostVisible();assert.equal((await preferences()).autoTranslateTabs,true);await autoSwitch(popup).scrollIntoViewIfNeeded();await screenshot('popup-auto-enabled');await autoSwitch(reader).scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'settings-auto-enabled.png')});check('Popup 开启自动翻译同步设置，并自动启动当前网页');
  const sourceCDP=await context.newCDPSession(source);
  async function inlineButton(name,click=false){
   const {nodes}=await sourceCDP.send('Accessibility.getFullAXTree');const node=nodes.find(node=>node.role?.value==='button'&&node.name?.value===name);assert(node,'Missing inline button '+name);

@@ -1,11 +1,12 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {readSourceCatalog, recoverCatalogTabs} from '../src/sources/runtime/catalog-reader';
+import type {SourceCatalogSnapshot} from '../src/sources/contracts/source';
 
 // Exercise the generic DOM fallback independently of sites adding HTTP support.
 vi.mock('../src/sources/registry/networks', () => ({sourceNetworks: {}}));
 
 const url='https://www.copy4000.com/comic/fixture';
-const snapshot={id:'mangacopy:fixture',sourceId:'mangacopy',url,title:'Fixture',observedAt:1,complete:true,note:'',entries:[],groups:[]};
+const snapshot:SourceCatalogSnapshot={id:'mangacopy:fixture',sourceId:'mangacopy',url,title:'Fixture',observedAt:1,complete:true,note:'',entries:[],groups:[]};
 function browser() {
   const records:Record<string,unknown>={};
   const chrome={
@@ -22,6 +23,23 @@ describe('background catalog discovery lifecycle',()=>{
     const pending=readSourceCatalog(url);await vi.advanceTimersByTimeAsync(1000);expect(await pending).toEqual(snapshot);
     expect(chrome.tabs.create).toHaveBeenCalledWith({url,active:false});expect(chrome.tabs.remove).toHaveBeenCalledWith(7);
     expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2);expect(records).toEqual({});
+  });
+  it('reports only the first readable partial observation instead of repeating import transactions each poll',async()=>{
+    const {chrome}=browser(),remoteId=crypto.randomUUID(),entry={id:'one',remoteId,catalogId:snapshot.id,url:url+'/chapter/'+remoteId,title:'One',groupIds:[],rawTypes:[],order:0,related:false};
+    const complete={...snapshot,entries:[entry]},progress=vi.fn(async()=>{});
+    chrome.tabs.sendMessage.mockResolvedValueOnce({...complete,complete:false}).mockResolvedValueOnce({...complete,complete:false,observedAt:2}).mockResolvedValueOnce(complete);
+    const pending=readSourceCatalog(url,{onCatalogProgress:progress});await vi.advanceTimersByTimeAsync(1500);
+    expect(await pending).toEqual(complete);expect(progress).toHaveBeenCalledOnce();expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(3);
+  });
+  it('does not create a tab for an already cancelled operation',async()=>{
+    const {chrome}=browser(),controller=new AbortController();controller.abort();
+    await expect(readSourceCatalog(url,{signal:controller.signal})).rejects.toThrow();expect(chrome.tabs.create).not.toHaveBeenCalled();
+  });
+  it('rejects a complete response that arrives after cancellation and releases its tab',async()=>{
+    const {chrome}=browser(),controller=new AbortController();
+    chrome.tabs.sendMessage.mockImplementation(async()=>{controller.abort();return snapshot;});
+    const rejected=expect(readSourceCatalog(url,{signal:controller.signal})).rejects.toThrow();await vi.advanceTimersByTimeAsync(500);await rejected;
+    expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
   });
   it('rejects a pending cross-work navigation without closing the user navigation',async()=>{
     const {chrome,records}=browser();chrome.tabs.get.mockResolvedValue({id:7,url,status:'loading',pendingUrl:'https://www.copy4000.com/comic/different'});

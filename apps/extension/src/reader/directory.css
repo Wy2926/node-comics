@@ -1,6 +1,9 @@
 .nc-comic-directory-heading{display:flex;align-items:center;gap:12px;padding:18px 20px 14px;flex-shrink:0;background:linear-gradient(120deg,var(--surface),var(--accent-soft))}
 .nc-comic-directory-heading h3{flex:1;min-width:0;font-size:1.1rem;line-height:1.5;margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .nc-directory-source{flex-shrink:0;white-space:nowrap;font-size:.76rem}
+.nc-directory-loading{padding:12px 18px;flex-shrink:0;border-bottom:1px solid var(--line);font-size:.78rem;background:var(--accent-soft)}
+.nc-directory-loading>div{display:flex;align-items:center;gap:8px}
+.nc-directory-loading p{margin:7px 0;color:var(--muted);line-height:1.5}
 .nc-directory-tabs{display:flex;padding:0 18px;gap:20px;border-bottom:1px solid var(--line);flex-shrink:0}
 .nc-directory-tabs button{padding:14px 0 12px;border-bottom:2px solid transparent;font-weight:600;font-size:.86rem;color:var(--muted)}
 .nc-directory-tabs button[aria-selected=true]{border-color:var(--accent);color:var(--accent)}
@@ -9,6 +12,7 @@
 .nc-directory-search input{width:0;flex:1;min-width:0;background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:.78rem;color:var(--ink)}
 .nc-directory-search button{font-size:.76rem;white-space:nowrap}
 .nc-chapter-list{position:relative;overflow:auto;flex:1;min-height:0;padding:2px 14px 18px;overscroll-behavior:contain}
+.nc-directory-more{height:1px}
 .nc-directory-chapter{margin-bottom:8px;border:1px solid var(--line);border-radius:var(--comic-control-radius);background:var(--surface);transition:border-color .15s,background .15s}
 .nc-directory-chapter:hover{border-color:color-mix(in srgb,var(--ink) 35%,var(--line))}
 .nc-directory-chapter[data-current=true]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}

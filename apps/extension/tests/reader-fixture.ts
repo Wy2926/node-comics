@@ -16,24 +16,19 @@ const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,m
 const {copies:stored,ordinals,imageOrdinals}=await seedReaderFixture(origin,autoScenario,job,overlay.result);
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
 const operations=new Map<string,string>();
-const plus=new URLSearchParams(location.search).get('billing')==='paid'||new URLSearchParams(location.search).has('plus')||autoScenario==='plus';
-const rights:Entitlements={plan:plus?'plus':'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{window_seconds:60,limit:plus?100:10},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'fixture-v3',quota:{id:'daily',kind:'classic_daily',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}},redraw:{allowed:true,unlimited:false,quota_kind:'redraw_grant',consent_version:'fixture-v3',quota:{id:'redraw',kind:'redraw_grant',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}}}};
+const paid=parameters.get('billing')==='paid'||parameters.has('lite')||autoScenario==='lite';
+const rights:Entitlements={plan:paid?'lite':'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',image_rate_limit:{window_seconds:60,limit:paid?100:10},pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_daily',consent_version:'fixture-v3',quota:{id:'daily',kind:'classic_daily',granted:1000,used:0,reserved:0,available:1000,starts_at:'2026-09-15',resets_at:null,next_expiry_at:'2099-01-01',buckets:[]}}}};
 if(new URLSearchParams(location.search).has('billing')){
- rights.plus_expires_at=plus?'2026-10-20T00:00:00Z':null;
- rights.modes.classic.unlimited=plus;
- rights.modes.redraw.allowed=plus;
- if(rights.modes.redraw.quota){rights.modes.redraw.quota.available=plus?287:0;rights.modes.redraw.quota.granted=plus?300:0;rights.modes.redraw.quota.used=plus?13:0;}
+ rights.plus_expires_at=paid?'2026-10-20T00:00:00Z':null;
+ rights.modes.classic.unlimited=paid;
 }
+if(paid)rights.hourly_image_rate_limit={window_seconds:3600,limit:1200};
 if(autoScenario==='quota')rights.modes.classic.quota!.available=0;
-if(autoScenario==='plus')rights.modes.classic={...rights.modes.classic,unlimited:true,quota_kind:'classic_unlimited'};
+if(autoScenario==='lite')rights.modes.classic={...rights.modes.classic,unlimited:true,quota_kind:'classic_unlimited'};
 const activeCount=()=>[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length;
 for(const copy of stored)for(const page of copy.pages)for(const job of page.jobs)Object.assign(job,{image_sha256:page.imageSha256});
 
 const state={ordinals,imageOrdinals,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status='succeeded';state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
-// Optional deterministic redraw lifecycle for manual UI acceptance; no supplier calls.
-const redrawOutcome=new URLSearchParams(location.search).get('redrawOutcome');
-const redrawEnabled=new URLSearchParams(location.search).get('redrawEnabled')!=='false';
-const redrawPolls=new Map<string,number>();
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
@@ -44,7 +39,7 @@ window.fetch=async(input,init={})=>{
   if(state.offline||state.failDownloads&&url.pathname.endsWith('/result'))throw Error('网络连接失败（隔离验收）');
   if(state.failNext){state.failNext=false;throw Error('网络连接失败（隔离验收）');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
-  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,unit_cost:state.price},{id:'redraw',enabled:redrawEnabled,unit_cost:3}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights});
+  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
   const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:billingScenario!=='paid',gift:null,entitlement_expires_at:null,checkout_pending:false,subscription:billingScenario==='paid'?{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
@@ -65,13 +60,6 @@ window.fetch=async(input,init={})=>{
       let old='',closed=false;const encoder=new TextEncoder();
       close=()=>{if(closed)return;closed=true;clearInterval(timer);init.signal?.removeEventListener('abort',close);controller.close();};
       const update=()=>{
-        for(const id of ids){const j=jobs.get(operations.get(id)??id);if(!j)continue;
-          if(['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
-            const count=(redrawPolls.get(j.id)??0)+1;redrawPolls.set(j.id,count);j.status=count<3?'running':redrawOutcome==='success'?'succeeded':'failed';
-
-            if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟处理失败，已有译图仍可阅读。'};
-          }
-        }
         const items=ids.map(snapshot).filter((item):item is TranslationSnapshot=>!!item),data=JSON.stringify({items,missing_ids:ids.filter(id=>!snapshot(id))});
         if(data!==old){old=data;controller.enqueue(encoder.encode('event: snapshot\ndata: '+data+'\n\n'));}
         if(items.every(item=>['succeeded','failed'].includes(item.state))){controller.enqueue(encoder.encode('event: end\ndata: {"reason":"complete"}\n\n'));close();}
@@ -100,13 +88,6 @@ window.fetch=async(input,init={})=>{
   }
   if(url.pathname==='/v1/translations'){
     const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);
-    for(const id of ids){const j=jobs.get(operations.get(id)??id);if(!j)continue;
-      if(['queued','running'].includes(j.status)&&['success','failure'].includes(redrawOutcome??'')){
-        const count=(redrawPolls.get(j.id)??0)+1;redrawPolls.set(j.id,count);j.status=count<3?'running':redrawOutcome==='success'?'succeeded':'failed';
-
-        if(j.status==='failed')j.error={code:'FIXTURE_FAILURE',message:'模拟处理失败，已有译图仍可阅读。'};
-      }
-    }
     const values=()=>({items:ids.map(snapshot).filter((x):x is TranslationSnapshot=>!!x),missing_ids:ids.filter(id=>!snapshot(id))});
     const etag=()=>JSON.stringify(JSON.stringify(values())),old=new Headers(init.headers).get('If-None-Match');
     if(old===etag())return new Response(null,{status:304,headers:{ETag:etag()}});

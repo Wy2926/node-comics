@@ -3,12 +3,13 @@ import type {MembershipGift} from './types';
 
 export interface BillingPrice {
   id:string;plan_id:string;plan_revision_id:string;name:string;version:number;
-  currency:string;unit_amount:number;interval:'month'|'year';monthly_redraw_pages:number;trial_days:number;trial_redraw_pages:number;
+  currency:string;unit_amount:number;interval:'month'|'year';trial_days:number;
+  hourly_image_limit?:number|null;
 }
 export interface BillingOffer extends BillingPrice {channels:BillingChannel[]}
 export interface BillingCatalog {enabled:boolean;offers:BillingOffer[]}
 export type BillingProvider='stripe'|'creem';
-export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number;trial_redraw_pages:number}
+export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number}
 export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';
 export function selectedChannel(offer:BillingOffer|undefined,preferred:BillingProvider|'',pending:BillingProvider|null=null){
   return offer?.channels.find(channel=>channel.provider===(pending??preferred))??(pending?undefined:offer?.channels[0]);

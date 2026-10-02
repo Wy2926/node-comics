@@ -122,7 +122,7 @@ try {
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '我的漫画', exact: true}).click();
   const cover = reader.locator('.nc-book .nc-thumbnail img'); await cover.waitFor(); await cover.evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
-  await reader.getByRole('button', {name: '继续阅读', exact: true}).click(); await waitImage(3);
+  await reader.getByRole('button', {name: '打开漫画 ' + imported.comics[0].title, exact: true}).click(); await waitImage(3);
   assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3');
   assert.equal(await refresh(), imported.entries.length);
   checks.push('Dedicated cover, reader reopen and full refresh preserve the selected release and page 3');

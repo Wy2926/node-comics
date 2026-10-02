@@ -29,7 +29,7 @@ describe('NodeLane channel boundary',()=>{
     const caps=vi.spyOn(Api.prototype,'capabilities'),rights=vi.spyOn(Api.prototype,'entitlements'),translate=vi.spyOn(Api.prototype,'translate');
     const connection=await definition.open(profile,{},()=>true),runtime=connection.createRuntime(options());
     await runtime.init();expect(connection.available).toBe(false);
-    expect(connection.capabilities.modes.map(mode=>mode.id)).toEqual(['classic','redraw']);
+    expect(connection.capabilities.modes.map(mode=>mode.id)).toEqual(['classic']);
     expect(runtime.stateFor(target(0),true)).toEqual({kind:'login',message:'登录后自动翻译'});
     await expect(runtime.submit([target(0)])).rejects.toThrow('登录');
     expect(caps).not.toHaveBeenCalled();expect(rights).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();connection.dispose();
@@ -53,11 +53,11 @@ describe('NodeLane channel boundary',()=>{
   });
   it('reads official cached results without downloading again and keeps cancellation effective',async()=>{
     auth.value={session:session()};vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
-    const download=vi.spyOn(Api.prototype,'translationImage'),connection=await definition.open(profile,{},()=>true),result=job(0,{status:'succeeded',delivery:deliveredResult('job-0')});vi.stubGlobal('createImageBitmap',async()=>({width:800,height:1200,close(){}}));
+    const download=vi.spyOn(Api.prototype,'translationImage'),submit=vi.spyOn(Api.prototype,'translate'),connection=await definition.open(profile,{},()=>true),result=job(0,{status:'succeeded',delivery:deliveredResult('job-0')});vi.stubGlobal('createImageBitmap',async()=>({width:800,height:1200,close(){}}));
     await translationCache.put(resultBlobKey(connection.scope,result),deliveredBytes,{owner:connection.scope.key});
     expect(await(await connection.readResult(result)).text()).toBe('image');expect(download).not.toHaveBeenCalled();
     const controller=new AbortController();controller.abort();await expect(connection.readResult(result,controller.signal)).rejects.toThrow();
-    auth.value={session:null};await expect(connection.readResult(result)).rejects.toThrow();expect(download).not.toHaveBeenCalled();connection.dispose();
+    auth.value={session:null};await expect(connection.readResult(result)).rejects.toThrow();expect(download).not.toHaveBeenCalled();expect(submit).not.toHaveBeenCalled();connection.dispose();
   });
   it.each([false,true])('reads prepared input through the shared loader with cache hit=%s without submitting',async cached=>{
     auth.value={session:session()};vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());

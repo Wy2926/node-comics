@@ -9,14 +9,26 @@ import {forgetImportResponses} from './import-responses';
 import type {SourceCatalogSnapshot} from '../contracts/source';
 
 /** Every import entry point resolves a reader to its work before the application creates records. */
-export async function readImportCatalog(url:string,readCatalog:(url:string)=>Promise<SourceCatalogSnapshot>=readSourceCatalog){
+export async function readImportCatalog(url:string,readCatalog:(url:string,options?:{signal?:AbortSignal;onCatalogProgress?:(snapshot:SourceCatalogSnapshot)=>Promise<void>})=>Promise<SourceCatalogSnapshot>=readSourceCatalog,
+  options:{signal?:AbortSignal;onCatalogProgress?:(snapshot:SourceCatalogSnapshot)=>Promise<void>}={}){
   const {definition,location}=resolveSource(url,definitions);
   if(!definition.capabilities.importable||!definition.capabilities.catalog||location.kind==='other')throw Error('SOURCE_CATALOG_UNSUPPORTED');
   try{
-    const target=location.kind==='catalog'?location.url:await resolveNetworkCatalog(location.url);
+    options.signal?.throwIfAborted();
+    const target=location.kind==='catalog'?location.url:await resolveNetworkCatalog(location.url,options.signal);
     if(!target)throw Error('无法确定章节所属漫画，请使用作品详情页链接。');
     const parent=resolveSource(target,definitions).location;
-    const catalog=validateCatalog(await readCatalog(target),definitions);
+    const onCatalogProgress=options.onCatalogProgress ? async (value:SourceCatalogSnapshot)=>{
+      options.signal?.throwIfAborted();
+      const partial=validateCatalog(value,definitions);
+      if(partial.sourceId!==definition.id||partial.id!==parent.catalog?.key||partial.complete)throw Error('SOURCE_CATALOG_CHANGED');
+      // An explicit chapter can open early only after this exact release has been verified.
+      if(location.kind==='reader'&&!partial.entries.some(entry=>!entry.related&&sameSource(entry.url,location.url,definitions)))return;
+      await options.onCatalogProgress!(partial);
+      options.signal?.throwIfAborted();
+    }:undefined;
+    const catalog=validateCatalog(await (options.signal||onCatalogProgress?readCatalog(target,{signal:options.signal,onCatalogProgress}):readCatalog(target)),definitions);
+    options.signal?.throwIfAborted();
     if(catalog.sourceId!==definition.id||catalog.id!==parent.catalog?.key||!catalog.complete||catalog.groups.some(group=>!group.complete))throw Error('SOURCE_CATALOG_CHANGED');
     if(location.kind==='reader'){
       const current=catalog.entries.find(entry=>sameSource(entry.url,location.url,definitions));

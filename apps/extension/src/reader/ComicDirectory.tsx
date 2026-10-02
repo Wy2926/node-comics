@@ -14,14 +14,14 @@ export function matchesDirectoryChapter(chapter:DirectoryChapter,entries:Map<str
 }
 
 /** A source reading position is one row; its publications remain explicit, secondary choices. */
-export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode}){
+export function ComicDirectory({directory,index,pageCount,onNavigate,children,catalogLoading=false,onContinueCatalog}:{directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode;catalogLoading?:boolean;onContinueCatalog?:()=>void}){
  const directoryId=useId();
  const cached=useCachedEntries(directory.comicId,directory.entries.map(entry=>entry.id));
  const cacheState=(entry:DirectoryEntry)=>cached.has(entry.id)&&<span className="nc-chapter-cached" data-cache-status="complete"><Icon name="check" size={13}/>{msg('已缓存')}</span>;
  const [tab,setTab]=useState<'contents'|'pages'>(directory.entries.length===1&&pageCount?'pages':'contents'),[search,setSearch]=useState(''),[descending,setDescending]=useState(false),[limit,setLimit]=useState(200);
  const [expanded,setExpanded]=useState(()=>new Set(directory.chapters.filter(chapter=>chapter.current).map(chapter=>chapter.id))),[searchCollapsed,setSearchCollapsed]=useState(new Set<string>());
  const singleFile=!directory.sourceUrl&&directory.entries.length===1;
- const list=useRef<HTMLDivElement>(null),query=search.trim().toLocaleLowerCase();
+ const list=useRef<HTMLDivElement>(null),loadMore=useRef<HTMLDivElement>(null),query=search.trim().toLocaleLowerCase();
  const entries=useMemo(()=>new Map(directory.entries.map(entry=>[entry.id,entry])),[directory.entries]);
  const visible=useMemo(()=>{const chapters=directory.chapters.filter(chapter=>matchesDirectoryChapter(chapter,entries,query));return descending?chapters.reverse():chapters;},[directory.chapters,entries,query,descending]);
  const groups=useMemo(()=>descending?[...directory.groups].reverse():directory.groups,[directory.groups,descending]);
@@ -70,10 +70,25 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,children}:{
   let parent=active.parentElement;while(parent&&parent!==container){if(parent.tagName==='DETAILS')(parent as HTMLDetailsElement).open=true;parent=parent.parentElement;}
   const bounds=container.getBoundingClientRect(),row=active.getBoundingClientRect();container.scrollTop+=row.top-bounds.top-container.clientTop-(container.clientHeight-row.height)/2;
  },[tab,currentId,currentEntryId,currentIndex,query,descending,groupLayout,currentExpanded]);
+ useEffect(()=>{
+  const container=list.current,sentinel=loadMore.current;if(!container||!sentinel||tab!=='contents'||singleFile)return;
+  let observing=true;
+  const observer=new IntersectionObserver(items=>{
+   if(!observing||!items.some(item=>item.isIntersecting))return;
+   observing=false;observer.disconnect();setLimit(previous=>Math.max(previous,shownLimit)+200);
+  },{root:container,rootMargin:'200px 0px'});
+  observer.observe(sentinel);
+  return()=>{observing=false;observer.disconnect();};
+ },[tab,singleFile,shownLimit,visible.length,query,descending]);
  return <><div className="nc-comic-directory-heading"><h3>{directory.title}</h3>{directory.sourceUrl&&<a className="text-link nc-directory-source" href={directory.sourceUrl} target="_blank" rel="noreferrer">{msg('打开来源')}</a>}
   </div>
+  {directory.complete===false&&<div className="nc-directory-loading" role="status">
+    <div>{catalogLoading&&<span className="spinner"/>}<b>{catalogLoading?msg('正在获取全部章节…'):msg('目录尚未完整加载')}</b></div>
+    <p>{msg('已加载的章节可以继续阅读。')}</p>
+    {!catalogLoading&&onContinueCatalog&&<button className="button secondary small" onClick={onContinueCatalog}><Icon name="refresh" size={15}/>{msg('继续加载目录')}</button>}
+  </div>}
   {!!pageCount&&!singleFile&&<div className="nc-directory-tabs" role="tablist" aria-label={msg('目录')}><button role="tab" aria-selected={tab==='contents'} onClick={()=>setTab('contents')}>{msg('目录')}<span>{directory.chapters.length}</span></button><button role="tab" aria-selected={tab==='pages'} onClick={()=>setTab('pages')}>{msg('页面')}<span>{pageCount}</span></button></div>}
-  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={event=>{setSearch(event.target.value);setSearchCollapsed(new Set());setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(value=>!value)}><Icon name={descending?'sort-desc':'sort-asc'} size={16}/>{descending?msg('倒序'):msg('正序')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?shown.map(row):<>{groups.filter(group=>!group.parentId).map(item=>group(item))}{shown.filter(chapter=>!chapter.groupIds.length).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>shownLimit&&<button className="button secondary" onClick={()=>setLimit(shownLimit+200)}>{msg('显示更多')}</button>}</div></>}
+  {(singleFile||tab==='pages')&&pageCount?<><p className="nc-directory-intro">{msg('第 {0} / {1} 页',{'0':index+1,'1':pageCount})}</p>{children}</>:<><div className="nc-directory-search"><input type="search" aria-label={msg('搜索目录')} placeholder={msg('搜索目录')} value={search} onChange={event=>{setSearch(event.target.value);setSearchCollapsed(new Set());setLimit(200);}}/><button className="text-link" onClick={()=>setDescending(value=>!value)}><Icon name={descending?'sort-desc':'sort-asc'} size={16}/>{descending?msg('倒序'):msg('正序')}</button></div><div className="nc-chapter-list" ref={list} role="tabpanel" aria-label={msg('目录')}>{query?shown.map(row):<>{groups.filter(group=>!group.parentId).map(item=>group(item))}{shown.filter(chapter=>!chapter.groupIds.length).map(row)}</>}{!visible.length&&<p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}{visible.length>shownLimit&&<div ref={loadMore} className="nc-directory-more" aria-hidden="true"/>}</div></>}
   {!!directory.related?.length&&<div className="nc-directory-footer">{directory.related.map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noreferrer">{item.title} <Icon name="external" size={14}/></a></p>)}</div>}
  </>;
 }

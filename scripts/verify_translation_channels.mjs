@@ -12,7 +12,7 @@ const page=await browser.newPage({viewport:{width:1360,height:960}}),checks=[],e
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const read=()=>page.evaluate(async()=>({requests:window.channelFixture.requests,official:window.channelFixture.officialTranslations,auth:!!(await window.channelFixture.readAuth()).session,channels:await window.channelFixture.listChannels(),pageReads:window.channelFixture.pageReads,chapterContentIds:window.channelFixture.chapterContentIds}));
-async function openBook(){await page.getByRole('button',{name:'开始阅读',exact:true}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();}
+async function openBook(){await page.getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/channel-fixture.html#settings');
@@ -46,7 +46,7 @@ try{
   await page.evaluate(()=>{window.channelFixture.pageReads.length=0;});
   await page.evaluate(()=>window.channelFixture.selectChannel('nodelane'));
   await page.getByRole('button',{name:'登录后翻译',exact:true}).first().waitFor();
-  await page.getByRole('button',{name:'AI 重绘',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   await page.evaluate(id=>window.channelFixture.selectChannel(id),localId);
   await page.waitForTimeout(1200);
@@ -67,9 +67,10 @@ try{
   await page.locator('.setting-row').filter({has:page.locator('b',{hasText:/^译图缓存$/})}).getByRole('button',{name:'清理',exact:true}).click();
   await page.waitForTimeout(400);
   await page.evaluate(()=>{location.hash='library';});await openBook();
-  await page.getByTitle('本地译图缓存已清理，请手动重新翻译。',{exact:true}).first().waitFor();
+  const missingResult=page.getByTitle('本地译图缓存已清理，请手动重新翻译。',{exact:true}).first().getByRole('button',{name:'翻译失败 · 重新翻译',exact:true});
+  await missingResult.waitFor();
   assert.equal((await read()).requests.length,4);
-  await page.getByTitle('本地译图缓存已清理，请手动重新翻译。',{exact:true}).first().click();
+  await missingResult.click();
   await page.waitForFunction(()=>window.channelFixture.requests.length===5);
   await page.waitForTimeout(1200);
   assert.equal((await read()).requests.length,5);

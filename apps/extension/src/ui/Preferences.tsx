@@ -4,7 +4,7 @@ import { type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { type Capabilities, type Settings } from '../types';
 import {InterfaceLanguage} from './InterfaceLanguage';
 import {AutoTranslateTabs} from './AutoTranslateTabs';
-import {TargetLanguage,withTargetLanguage} from './TargetLanguage';
+import {TargetLanguage} from './TargetLanguage';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
@@ -21,13 +21,19 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
     <PageTitle icon="settings" eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
     <AppearanceSettings settings={settings} onChange={setSettings}>
       <InterfaceLanguage value={settings.uiLanguage} onChange={uiLanguage=>setSettings(s=>({...s,uiLanguage}))}/>
+      <div className="setting-row">
+        <div><b>{msg('翻译书名与简介')}</b></div>
+        <button type="button" className={'switch '+(settings.discoveryTextTranslation?'on':'')}
+          role="switch" aria-label={msg('翻译书名与简介')} aria-checked={settings.discoveryTextTranslation}
+          onClick={()=>setSettings(s=>({...s,discoveryTextTranslation:!s.discoveryTextTranslation}))}><i/></button>
+      </div>
     </AppearanceSettings>
     <TranslationChannels/>
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
       <SettingRow title={msg("默认目标语言")} description={msg("常规翻译支持 16 个语言选项；新增语言会采用常规翻译，已有译图版本保留。")}>
-        <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>withTargetLanguage(s,language,caps))}/>
+        <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
       </SettingRow>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <SettingRow title={msg("翻页方向")} description={msg("单页模式中的方向键遵循此设置。")}>

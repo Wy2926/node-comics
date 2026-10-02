@@ -60,7 +60,7 @@ describe('official translation overlays',()=>{
     }
     expect(convert).not.toHaveBeenCalled();
   });
-  it('accepts a full redraw whose output dimensions differ from the hashed source',async()=>{
+  it('accepts a full-image result whose output dimensions differ from the hashed source',async()=>{
     const descriptor={...result,representation:'full-image-v1' as const,width:4,height:5,bbox:undefined,composite:undefined};
     expect(await materializeResult(descriptor,original,patch)).toBe(patch);
     expect(convert).not.toHaveBeenCalled();expect(draw).not.toHaveBeenCalled();

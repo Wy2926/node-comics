@@ -63,7 +63,7 @@ export class Api {
       if(result.entitlements)this.rememberEntitlements(result.entitlements);
       return result;
     });
-    await this.assertAuthorized();return {...value,entitlements:peekCached<Entitlements>(this.cacheKey('/v1/me/entitlements'))??value.entitlements};
+    await this.assertAuthorized();return {...value,modes:value.modes.filter(mode=>mode.id==='classic'),entitlements:peekCached<Entitlements>(this.cacheKey('/v1/me/entitlements'))??value.entitlements};
   }
   async translateComicTitle(name:string,targetLanguage:string,signal?:AbortSignal):Promise<ComicTitleTranslation> {
     const title=name.trim();
@@ -89,7 +89,10 @@ export class Api {
     if(Api.snapshots.size>128)Api.snapshots.delete(Api.snapshots.keys().next().value!);
     return snapshot;
   }
-  async translate(id:string,body:TranslationInput){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body)}));}
+  async translate(id:string,body:TranslationInput){
+    if('image' in body&&body.mode!=='classic')throw new ApiError(msg('翻译服务暂不可用'),'TRANSLATION_MODE_UNAVAILABLE',410);
+    return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body)}));
+  }
   async translation(id:string,signal?:AbortSignal){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{signal}));}
   async translations(ids:string[],options:{etag?:string;signal?:AbortSignal}={}){
     if(!ids.length||ids.length>32)throw new ApiError('每次读取需提供 1–32 个翻译编号。','INVALID_TRANSLATION_COUNT');
@@ -120,7 +123,9 @@ export class Api {
     }
     if(!ended&&!signal.aborted)throw new ApiError(msg('翻译服务暂不可用'),'EVENT_STREAM_CLOSED');
   }
-  async translationInput(id:string,blob:Blob){return this.pool.run(async()=>this.remember(await this.fetchRequest<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}/input`,{method:'PUT',body:blob,headers:{'Content-Type':blob.type||'application/octet-stream'}})));}
+  async translationInput(id:string,blob:Blob){
+    return this.pool.run(async()=>this.remember(await this.fetchRequest<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}/input`,{method:'PUT',body:blob,headers:{'Content-Type':blob.type||'application/octet-stream'}})));
+  }
   async translationImage(id:string,signal?:AbortSignal):Promise<Blob>{
     const snapshot=Api.snapshots.get(this.snapshotKey(id))??await this.translation(id,signal);
     const result=snapshot.result,artifact=result?.artifact;

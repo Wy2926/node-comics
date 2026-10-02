@@ -12,14 +12,14 @@ import './account.css';
 
 export type AccountTab='overview'|'subscription';
 export function AccountPage({api,account,rights,testing,tab,onTabChange,onLogin,onLogout,onEntitlements,notify}:{api:Api;account:Session|null;rights?:Entitlements;testing:boolean;tab:AccountTab;onTabChange:(tab:AccountTab)=>void;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void;notify:(message:string)=>void}) {
-  const plus=!!account&&rights?.plan==='plus';
+  const member=!!account&&!!rights&&rights.plan!=='free';
   return <div className="nc-account-page">
     <header className="page-title nc-account-heading">
       <div><span className="eyebrow muted">{msg("YOUR READING SPACE")}</span><h1>{msg("我的账户")}</h1><p>{msg("会员权益、翻译用量与反馈，在这里一目了然。")}</p></div>
       {!account&&<Icon name="user" size={48}/>}
       {account&&<div className="nc-account-identity">
         <span className="nc-profile-avatar" aria-hidden="true">{account.user.name.slice(0,1).toUpperCase()}</span>
-        <div className="nc-account-user"><strong>{account.user.name}</strong><div className="nc-account-meta"><span className="nc-plan-badge"><Icon name={plus?'crown':'user'} size={14}/>{rights?(plus?msg("PLUS 会员"):msg("普通用户")):msg("权益读取中")}</span>{testing&&<span className="nc-muted">{msg("本地测试账户")}</span>}</div></div>
+        <div className="nc-account-user"><strong>{account.user.name}</strong><div className="nc-account-meta"><span className="nc-plan-badge"><Icon name={member?'crown':'user'} size={14}/>{rights?(rights.plan==='lite'?msg('Lite 会员'):member?msg('会员'):msg("普通用户")):msg("权益读取中")}</span>{testing&&<span className="nc-muted">{msg("本地测试账户")}</span>}</div></div>
         <button className="button quiet small" onClick={onLogout}><Icon name="logout" size={16}/>{msg("退出登录")}</button>
       </div>}
     </header>
@@ -34,6 +34,6 @@ export function AccountPage({api,account,rights,testing,tab,onTabChange,onLogin,
       <div className="nc-account-panel" id={`account-panel-${tab}`} role="tabpanel" aria-labelledby={`account-tab-${tab}`} tabIndex={0}>
         {tab==='overview'?<><EntitlementCards data={rights}/><section className="nc-account-activity" aria-label={msg("翻译用量")}><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/></section><FeedbackInbox api={api}/></>:<MembershipCard api={api} loggedIn rights={rights} onLogin={onLogin} onEntitlements={onEntitlements} notify={notify}/>}
       </div>
-    </Fragment>:<section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg("你的阅读足迹，即将在这里展开")}</h2><p>{msg("登录后查看重绘额度、每日交付和反馈进展。")}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}<Icon name="arrow" size={17}/></button></section>}
+    </Fragment>:<section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg("你的阅读足迹，即将在这里展开")}</h2><p>{msg('登录后查看翻译额度、每日交付和反馈进展。')}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}<Icon name="arrow" size={17}/></button></section>}
   </div>;
 }

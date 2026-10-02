@@ -46,7 +46,7 @@ export async function discoverEntry(
     await sourceMessage({ type: 'NC_CLOSE_SOURCE', tabId }).catch(() => {});
   }
 }
-export async function discoverCatalog(url: string,options:{previous?:SourceCatalogSnapshot;signal?:AbortSignal}={}): Promise<SourceCatalogSnapshot> {
+export async function discoverCatalog(url: string,options:{previous?:SourceCatalogSnapshot;signal?:AbortSignal;onCatalogProgress?:(snapshot:SourceCatalogSnapshot)=>Promise<void>}={}): Promise<SourceCatalogSnapshot> {
   if (!inExtension()) throw Error(msg('网站采集需在已安装的浏览器插件中执行。'));
   return readSourceCatalog(url,options);
 }

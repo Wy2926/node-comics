@@ -4,12 +4,18 @@ import type {Job,Page} from '../src/types';
 import {emptyPage} from '../src/reader/model';
 import {readingImage} from '../src/reader/presentation';
 import {ImageTranslationStatus} from '../src/reader/ImageTranslationStatus';
+import {PageTranslationBar} from '../src/reader/PageTranslationBar';
 import {translationNotice} from '../src/translation/notice';
 import {translationState} from '../src/translation/channels/adapters/nodelane/state';
 import type {LocalOperation} from '../src/translation/channels/adapters/nodelane/store';
 
 const origin='https://fixture.example';
 const noop=()=>{};
+it('offers originals and classic translation, respecting disabled channel capabilities',()=>{
+ const controls=(modes?:'classic'[])=>renderToStaticMarkup(<PageTranslationBar selectedView="original" modes={modes} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const available=controls();expect(available).toContain('aria-label="原图"');expect(available).toContain('aria-label="常规翻译"');
+ const disabled=controls([]);expect(disabled).toContain('aria-label="原图"');expect(disabled).not.toContain('aria-label="常规翻译"');
+});
 function statusMarkup(page:Page){
  function Status(){
   const state=translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:false});

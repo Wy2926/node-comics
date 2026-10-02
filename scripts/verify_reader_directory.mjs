@@ -18,6 +18,13 @@ const centered=()=>page.waitForFunction(()=>{
 const position=()=>page.locator('.nc-reading-viewport').evaluate(el=>el.scrollTop);
 const closePanel=()=>page.getByRole('button',{name:'关闭面板',exact:true}).click();
 const openPanel=()=>page.getByRole('button',{name:'打开目录',exact:true}).click();
+async function loadNextBatch(){
+ const count=await list.locator('[data-chapter-main]').count();
+ const top=await list.evaluate(el=>{el.scrollTop=el.scrollHeight;return el.scrollTop;});
+ await page.waitForFunction(count=>document.querySelectorAll('.nc-chapter-list [data-chapter-main]').length>count,count);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert(Math.abs(await list.evaluate(el=>el.scrollTop)-top)<1,'Lazy append moved the chapter browsing position');
+}
 try{
  await page.goto('http://127.0.0.1:5181/tests/reader-directory-fixture.html');
  await page.getByLabel('跳转页码').fill('80');await openPanel();await centered();
@@ -32,8 +39,25 @@ try{
  checks.push('Status refresh preserves manual directory scrolling');
  await closePanel();await openPanel();await centered();assert.equal(await position(),before);
  await page.getByRole('button',{name:'正序',exact:true}).click();await centered();assert.equal(await position(),before);
- await page.getByRole('button',{name:'显示更多',exact:true}).click();assert.equal(await page.locator('.nc-chapter-entry').count(),600);
- checks.push('Reopening and reversing locate the same chapter without moving the reading viewport; load more still advances');
+ assert.equal(await page.getByRole('button',{name:'显示更多',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'加载更多',exact:true}).count(),0);
+ await loadNextBatch();assert.equal(await page.locator('.nc-chapter-entry').count(),600);
+ await loadNextBatch();assert.equal(await page.locator('.nc-chapter-entry').count(),620);
+ assert.equal(await list.locator('.nc-directory-more').count(),0);assert.equal(await position(),before);
+ await page.screenshot({path:path.join(out,'lazy-directory.png')});
+ checks.push('Scrolling appends 200 chapters at a time through the last batch without buttons or a browsing-position jump');
+ await closePanel();await openPanel();await centered();
+ await page.getByRole('button',{name:'正序',exact:true}).click();await centered();
+ const listId=await list.getAttribute('id'),rail=page.locator(`.nc-scrollbar-y[aria-controls="${listId}"]`);
+ await rail.waitFor();
+ const track=await rail.boundingBox(),thumbBounds=await rail.locator('.nc-scrollbar-thumb').boundingBox();
+ await page.mouse.move(thumbBounds.x+thumbBounds.width/2,thumbBounds.y+thumbBounds.height/2);await page.mouse.down();
+ await page.mouse.move(track.x+track.width/2,track.y+track.height+20,{steps:12});
+ await page.waitForFunction(()=>{const el=document.querySelector('.nc-chapter-list');return el.querySelectorAll('[data-chapter-main]').length===620&&Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop)<1;});
+ await page.mouse.up();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert(await list.evaluate(el=>Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop)<1));assert.equal(await position(),before);
+ await page.screenshot({path:path.join(out,'drag-directory-end.png')});
+ checks.push('Holding the scrollbar at the end follows all lazy batches and remains at the final bottom after release');
  await page.getByLabel('搜索目录').fill('不存在');await page.getByText('没有匹配的内容',{exact:true}).waitFor();
  await page.getByLabel('搜索目录').fill('');await centered();
  await page.getByRole('button',{name:'切换分组',exact:true}).click();await centered();
@@ -42,7 +66,7 @@ try{
  assert.deepEqual(await groupTitles(':scope > .nc-source-group:first-child > .nc-source-group > summary .nc-source-group-title'),['分组 7','分组 6','分组 5']);
  assert.equal(await list.locator('[data-chapter-main] b').first().textContent(),'第 620 章');
  await page.getByRole('button',{name:'倒序',exact:true}).click();await centered();
- await page.getByRole('button',{name:'显示更多',exact:true}).click();
+ await loadNextBatch();
  assert.deepEqual(await groupTitles(':scope > .nc-source-group > summary .nc-source-group-title'),['来源分类','后续分类']);
  assert.deepEqual(await groupTitles(':scope > .nc-source-group:first-child > .nc-source-group > summary .nc-source-group-title'),['分组 1','分组 2','分组 3','分组 4']);
  assert.equal(await list.locator('[data-chapter-main] b').first().textContent(),'第 1 章');

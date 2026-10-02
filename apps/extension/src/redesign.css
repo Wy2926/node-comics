@@ -568,12 +568,6 @@ a {
   font-size: .875rem;
   color: var(--muted);
 }
-.nc-usage-charts {
-  display: grid;
-  grid-template-columns: minmax(0,1.8fr) minmax(260px,1fr);
-  gap: 24px;
-  margin-bottom: 22px;
-}
 .nc-chart-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -640,23 +634,6 @@ a {
   margin-top: 38px;
   color: var(--muted);
   font-size: .875rem;
-}
-.nc-mode-usage {
-  margin-top: 32px;
-}
-.nc-mode-usage>div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-.nc-mode-usage p {
-  font-size: .875rem;
-  color: var(--muted);
-  text-align: right;
-}
-.nc-mode-usage .nc-progress {
-  height: 10px;
-  margin: 14px 0 6px;
 }
 .nc-data-table {
   overflow: auto;
@@ -1397,9 +1374,6 @@ a {
   .nc-header-actions {
     gap: 8px;
   }
-  .nc-usage-charts {
-    grid-template-columns: 1fr 1fr;
-  }
   .nc-app .setting-row>div:first-child {
     min-width: 200px;
   }
@@ -1472,9 +1446,6 @@ a {
   .nc-live-quota small {
     margin-left: 0;
     width: 100%;
-  }
-  .nc-usage-charts {
-    grid-template-columns: 1fr;
   }
   .nc-chart-card {
     padding: 22px;

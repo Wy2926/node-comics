@@ -21,9 +21,9 @@ async function legacyDatabase() {
   });
 }
 
-async function seed(f: ReturnType<typeof fixture>, state: LocalOperation['state'] = 'uncertain', mode: 'classic' | 'redraw' = 'classic') {
+async function seed(f: ReturnType<typeof fixture>, state: LocalOperation['state'] = 'uncertain') {
   const reference = {entryId: 'book', contentId: 'revision', pageId: 'page-0', renderProfileId: 'original-v1-gif-first-frame'};
-  const oldTarget = {...target(0), mode, page: {...target(0).page, ...reference, blobKey: pageReference(reference)}};
+  const oldTarget = {...target(0), page: {...target(0).page, ...reference, blobKey: pageReference(reference)}};
   const scope = JSON.stringify([new URL(f.api.base).origin, f.userId]);
   const record = makeOperation(oldTarget, scope, 'zh-Hans', originalInput(0));
   record.state = state;
@@ -88,16 +88,6 @@ describe('overlay protocol upgrade receipts', () => {
     expect(f.submit).toHaveBeenCalledOnce();
   });
 
-  it('does not evade an old unknown redraw when normalization changes the source hash and inline page identity', async () => {
-    const f = fixture(), {record, current} = await seed(f, 'uncertain', 'redraw');
-    current.page.id = 'new-normalized-page';
-    current.page.imageSha256 = 'b'.repeat(64);
-    vi.mocked(f.api.translations).mockResolvedValue({unchanged: false, etag: undefined, items: [snapshot(record.requestId, record.request, {state: 'needs_attention'})], missing_ids: []});
-    await f.core.submit([current]);
-    await expect(f.core.manual(current)).rejects.toMatchObject({code: 'LEGACY_REQUEST_PENDING'});
-    expect(f.submit).not.toHaveBeenCalled();
-  });
-
   it('keeps response failures unresolved and retries only the old UUID lookup', async () => {
     const f = fixture(), {record, current} = await seed(f);
     vi.mocked(f.api.translations).mockRejectedValueOnce(Error('offline'));
@@ -109,55 +99,8 @@ describe('overlay protocol upgrade receipts', () => {
     expect(f.submit.mock.calls[0][0]).not.toBe(record.requestId);
   });
 
-  it.each([undefined, false])('keeps revoked unknown redraws blocked when execution resolution is %s', async execution_resolved => {
-    const f = fixture(), {record, current} = await seed(f, 'uncertain', 'redraw');
-    vi.mocked(f.api.translations).mockResolvedValue({unchanged: false, etag: undefined,
-      items: [snapshot(record.requestId, record.request, {state: 'failed', execution_resolved,
-        error: {code: 'TRANSLATION_UNAVAILABLE', message: 'revoked'}})], missing_ids: []});
-    await f.core.submit([current]);
-    await expect(f.core.manual(current)).rejects.toMatchObject({code: 'LEGACY_REQUEST_PENDING'});
-    const otherPage = {...target(1), mode: 'redraw' as const};
-    await f.core.submit([otherPage]);
-    await expect(f.core.manual(otherPage)).rejects.toMatchObject({code: 'LEGACY_REQUEST_PENDING'});
-    expect(f.submit).not.toHaveBeenCalled();
-  });
-
-  it('rechecks a revoked receipt manually and starts one current-profile task only after execution is resolved', async () => {
-    const f = fixture(), {record, current} = await seed(f, 'uncertain', 'redraw');
-    const revoked = snapshot(record.requestId, record.request, {state: 'failed', execution_resolved: false,
-      error: {code: 'TRANSLATION_UNAVAILABLE', message: 'revoked'}});
-    vi.mocked(f.api.translations).mockResolvedValue({unchanged: false, etag: undefined, items: [revoked], missing_ids: []});
-    await f.core.submit([current]);
-    await expect(f.core.manual(current)).rejects.toMatchObject({code: 'LEGACY_REQUEST_PENDING'});
-    revoked.execution_resolved = true;
-    await f.core.manual(current);
-    expect(f.submit).toHaveBeenCalledOnce();
-    expect(f.submit.mock.calls[0][0]).not.toBe(record.requestId);
-    expect(f.submit.mock.calls[0][1]).toMatchObject({mode: 'redraw', image: {sha256: current.page.imageSha256}});
-    expect(f.submit.mock.calls[0][1]).not.toHaveProperty('regenerate_of');
-    expect(f.submit.mock.calls[0][1]).not.toHaveProperty('retry_of');
-    expect((await readOperation(operationId(f.core.scope, 'zh-Hans', current)))?.pageRef?.renderProfileId).toBe(RENDER_PROFILE);
-    await expect(f.core.manual(current)).rejects.toThrow('原请求结果待核实');
-    expect(f.submit).toHaveBeenCalledOnce();
-  });
-
-  it('unblocks unrelated redraws after revoked execution is resolved but still requires manual action for the old page', async () => {
-    const f = fixture(), {record, current} = await seed(f, 'uncertain', 'redraw');
-    vi.mocked(f.api.translations).mockResolvedValue({unchanged: false, etag: undefined,
-      items: [snapshot(record.requestId, record.request, {state: 'failed', execution_resolved: true,
-        error: {code: 'TRANSLATION_UNAVAILABLE', message: 'revoked'}})], missing_ids: []});
-    await f.core.submit([current]);
-    expect(current.page.translationError).toContain('手动重新翻译');
-    expect(f.submit).not.toHaveBeenCalled();
-    const otherPage = {...target(1), mode: 'redraw' as const};
-    await f.core.submit([otherPage]);
-    expect(f.submit).toHaveBeenCalledOnce();
-    expect(f.submit.mock.calls[0][1]).toMatchObject({mode: 'redraw', image: {sha256: otherPage.page.imageSha256}});
-    expect(await readOperation(operationId(f.core.scope, 'zh-Hans', current))).toBeUndefined();
-  });
-
   it('isolates another account and never modifies the old database', async () => {
-    const owner = fixture(), {record, current} = await seed(owner, 'uncertain', 'redraw'), other = fixture();
+    const owner = fixture(), {record, current} = await seed(owner), other = fixture();
     await other.core.submit([current]);
     expect(other.submit).toHaveBeenCalledOnce();
     expect(other.api.translations).not.toHaveBeenCalled();
