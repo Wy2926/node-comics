@@ -56,22 +56,39 @@ describe('RawOtaku source contract', () => {
       ['page-0', 0, {kind: 'http', url: image}], ['page-1', 1, {kind: 'http', url: image}],
     ]);
   });
-  it.each(['hole', 'duplicate', 'foreign', 'directory', 'missing', 'auth', 'truncated', 'status'])('rejects %s page evidence without renumbering', kind => {
+  it('accepts extensionless pages and different CDN hosts within the source chapter directory', () => {
+    const images = [image.replace('.webp', ''), image.replace('sv1.freeimgmg.online', 'cdn.fixture.test').replace('1.webp', '2')];
+    const snapshot = validatePages(parsePages(pagesJson(pagesHtml(images)), reader, 'Chapter 1'), definition.identify(new URL(reader))!);
+    expect(snapshot).toMatchObject({discoveryComplete: true, knownTotal: 2});
+    expect(snapshot.items.map(i => i.resource)).toEqual(images.map(url => ({kind: 'http', url})));
+  });
+  it.each(['hole', 'duplicate', 'directory', 'missing', 'auth', 'truncated', 'status'])('rejects %s page evidence without renumbering', kind => {
     let html = pagesHtml();
     if (kind === 'hole') html = html.replace('alt="1"', 'alt="2"');
     if (kind === 'duplicate') html = html.replace('alt="1"', 'alt="0"');
-    if (kind === 'foreign') html = html.replace('sv1.freeimgmg.online', 'sv1.freeimgmg.online.evil.test');
     if (kind === 'directory') html = html.replace(/(alt="1"[\s\S]*)\/files\/7\/11\//, '$1/files/7/12/');
     if (kind === 'missing') html = '<div id="vertical-content"></div>';
     if (kind === 'auth') html = html.replace('class="iv-card', 'data-auth="unsupported" class="iv-card');
     if (kind === 'truncated') html = html.slice(0, -6);
     expect(() => parsePages(kind === 'status' ? '{"status":0}' : pagesJson(html), reader, 'Title')).toThrow();
   });
-  it('validates CDN paths and rejects credentials, placeholder and sibling-host images', () => {
-    expect(imageUrl(image.replace('sv1', 'sv5'))).toContain('sv5');
-    for (const target of [image.replace('https:', 'http:'), image + '?token=private', image.replace('sv1', 'other'), image.replace('/files/', '/ads/'), 'data:image/png;base64,a'])
+  it('accepts source-provided CDN hosts without a host allowlist', () => {
+    for (const host of ['sv5.freeimgmg.online', 'sv6.freeimgmg.online', 'cdn.fixture.test', 'other.freeimgmg.online']) {
+      const target = image.replace('sv1.freeimgmg.online', host);
+      expect(imageUrl(target)).toBe(target);
+      expect(imageUrl(target.replace('.webp', ''))).toBe(target.replace('.webp', ''));
+    }
+  });
+  it('validates image paths and rejects credentials, unsupported protocols and placeholders', () => {
+    for (const target of [image.replace('https:', 'http:'), image + '?token=private', image + '#fragment',
+      image.replace('https://', 'https://user:pass@'), image.replace('.online/', '.online:444/'),
+      image.replace('/files/', '/ads/'), image.replace('.webp', '.html'), 'data:image/png;base64,a'])
       expect(() => imageUrl(target)).toThrow();
     expect(coverUrl('https://f002.backblazeb2.com/file/WCMS-Images/MangaOnline/p7?v=1')).toBeDefined();
+    // Observed dedicated artwork: Backblaze AVIF with the source's version query.
+    expect(coverUrl('https://f002.backblazeb2.com/file/WCMS-Images/MangaOnline/p7.avif?v=1')).toBeDefined();
+    expect(coverUrl('https://f002.backblazeb2.com/file/WCMS-Images/MangaOnline/p7.html?v=1')).toBeUndefined();
+    expect(coverUrl('https://f002.backblazeb2.com.evil.test/file/WCMS-Images/MangaOnline/p7.avif')).toBeUndefined();
     expect(coverUrl('https://evil.test/thumb/300/upload/2026/10/a.jpeg')).toBeUndefined();
   });
   it('makes two bounded page requests with the chapter Referer and honors cancellation between them', async () => {

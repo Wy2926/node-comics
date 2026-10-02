@@ -15,7 +15,7 @@
 - 作品页的 `canonical`、`.anis-content`、`#chapters-list`、`.lang-item` 与 `.lang-chapters` 提供作品、专用封面、语言及完整章节列表；每条 `data-id` 是源站正文接口的章节 ID。
 - 章节页 `canonical`、`.hr-manga` 与当前语言目录共同核对作品、章节号和远端 ID。
 - 源站 `read.min.js` 的公开阅读流程请求 `/json/chapter?mode=vertical&id=<章节 ID>`，响应 `status: 1` 及正文 HTML 是整章列表。适配器仅解析这些数据，不执行源站脚本、不读取登录凭据。每章两次 HTTP 操作，逐页 `alt` 必须为连续零起始索引；重复图片地址保留不同页槽。
-- 正文仅允许 `sv1` 至 `sv5.freeimgmg.online/files/<漫画目录>/<章节目录>/<图片号>.<扩展名>`，同章目录须一致。封面取自作品专用海报，支持 `mgoimg.view47.com/thumb/.../upload/` 和 Backblaze `WCMS-Images/MangaOnline/p<id>`。无需图片解码钩子或专用 Referer，读取使用公共图片管线。
+- 正文使用源站清单给出的 HTTPS 图片地址，不限制 CDN 域名；路径为 `/files/<漫画目录>/<章节目录>/<图片号>`，可无后缀或带 WebP／JPEG／PNG 后缀，同章目录须一致。封面取自作品专用海报，支持 `mgoimg.view47.com/thumb/.../upload/` 和 Backblaze `WCMS-Images/MangaOnline/p<id>`（可带 `.avif` 后缀及源站版本查询）。无需图片解码钩子或专用 Referer，读取使用公共图片管线。
 - 名称搜索请求 `/?q=<名称>`，只解析主结果区；保留源站明确语言、封面与最新章节标签，重复作品链接按稳定身份去重。存在源站下一页链接时，游标限定同主机、同查询和页码。
 
 ## 验证
@@ -33,8 +33,8 @@ $env:INLINE_SITE_ONLY='rawotaku'; node scripts/verify_inline_translation.mjs
 $env:RUN_LIVE_RAWOTAKU='1'; node scripts/verify_inline_translation.mjs
 ```
 
-HTTP 验证使用公开源站和 CDN，核对完整目录、最早／最新章节及首图、封面、名称搜索与空结果；`RAWOTAKU_CATALOG_URL` 可指定其他作品。结果写入忽略的 `artifacts/rawotaku/http`，不保存源站全文或凭据。
+HTTP 验证默认使用 [24 部公开作品清单](tests/live-samples.mjs)，覆盖热门长连载、完结作品、新作与不同分类。目录和正文经过公共契约校验；每个语言组抽取首／中／末章节及首末小数章节，检查全章页槽、图片路径，并实际读取每章首／中／末原图字节，另检查专用封面、名称搜索和空结果。最多两部并发，失败样本继续记录，最终存在失败则以非零状态退出。`RAWOTAKU_CATALOG_URL` 可改为指定单部作品。结果写入忽略的 `artifacts/rawotaku/http`，汇总作品、章节、目录条目、页数、CDN、图片格式与失败位置，不保存源站全文或凭据。清单未覆盖的语言与图片协议不能据此宣称已真实验证。
 
-浏览器验证依赖已构建 MV3 扩展、`PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`，在隔离配置中完成公共搜索与候选封面、真实网页章节导入、整章图片解码、重开恢复、封面、无源站标签页刷新及重复导入；目录失败使用模拟 HTTP。结果和截图写入 `artifacts/rawotaku/browser`。
+浏览器验证依赖已构建 MV3 扩展、`PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`，`RAWOTAKU_READER_URL` 可指定章节，包括短章节和单页长图。在隔离配置中完成公共搜索与候选封面、真实网页章节导入、整章图片解码、重开恢复（第 10 页或不足 10 页时的最后一页）、封面、无源站标签页刷新及重复导入；目录失败使用模拟 HTTP。结果和截图写入 `artifacts/rawotaku/browser`。
 
-原位验证由公共脚本自动发现，使用 `CHROMIUM_PATH` 指定浏览器；默认采用合成页面、图片和翻译 API，覆盖两种阅读模式、懒加载、换图、原图恢复、正文筛选和几何／滚动位置。可选真实模式核对源站 DOM 与浏览器实际加载的图片，后台提交字节和覆盖结果仍为合成夹具。两种模式均不验证真实翻译模型、源站登录或浏览器安装／撤权恢复。
+原位验证由公共脚本自动发现，使用 `CHROMIUM_PATH` 指定浏览器；默认采用合成页面、任意 CDN 域名的无后缀图片和翻译 API，覆盖两种阅读模式、懒加载、换图、原图恢复、正文筛选和几何／滚动位置。可选真实模式核对源站 DOM 与浏览器实际加载的图片，`RAWOTAKU_READER_URL` 可指定章节，后台提交字节和覆盖结果仍为合成夹具。两种模式均不验证真实翻译模型、源站登录或浏览器安装／撤权恢复。

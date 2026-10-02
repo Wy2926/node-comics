@@ -48,15 +48,14 @@ export function coverUrl(value: unknown): {url: string} | undefined {
     const url = new URL(value, origin);
     if (url.protocol !== 'https:' || url.port || url.username || url.password || url.hash ||
         !(url.hostname === 'mgoimg.view47.com' && /^\/thumb\/\d+\/upload\/\d{4}\/\d{2}\/[\da-f]+\.(?:webp|jpe?g|png)$/i.test(url.pathname) ||
-          url.hostname === 'f002.backblazeb2.com' && /^\/file\/WCMS-Images\/MangaOnline\/p\d+$/.test(url.pathname))) return;
+          url.hostname === 'f002.backblazeb2.com' && /^\/file\/WCMS-Images\/MangaOnline\/p\d+(?:\.avif)?$/.test(url.pathname))) return;
     return {url: url.href};
   } catch {return;}
 }
 export function imageUrl(value: string) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || url.port || url.username || url.password || url.hash || url.search ||
-      !/^sv[1-5]\.freeimgmg\.online$/.test(url.hostname) ||
-      !/^\/files\/\d+\/\d+\/\d+\.(?:webp|jpe?g|png)$/i.test(url.pathname)) throw Error('RawOtaku 正文图片地址无效。');
+      !/^\/files\/\d+\/\d+\/\d+(?:\.(?:webp|jpe?g|png))?$/i.test(url.pathname)) throw Error('RawOtaku 正文图片地址无效。');
   return url.href;
 }
 export function readerInfo(html: string, loc: RawLocation) {

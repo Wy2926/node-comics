@@ -15,5 +15,6 @@ export function imageMimeFromBytes(bytes: Uint8Array): string | undefined {
   if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'image/jpeg';
   if (String.fromCharCode(...bytes.subarray(0, 4)) === 'GIF8') return 'image/gif';
   if (String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.subarray(8, 12)) === 'WEBP') return 'image/webp';
+  if (String.fromCharCode(...bytes.subarray(4, 8)) === 'ftyp' && String.fromCharCode(...bytes.subarray(8, 12)) === 'avif') return 'image/avif';
   return undefined;
 }

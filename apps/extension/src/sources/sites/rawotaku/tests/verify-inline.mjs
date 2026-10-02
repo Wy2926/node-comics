@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 export async function verifyInline({browser, page, activate, button, source, out, check}) {
-  const origin = 'https://rawotaku.com', cdn = 'https://sv1.freeimgmg.online/files/7/11/';
+  const origin = 'https://rawotaku.com', cdn = 'https://cdn.rawotaku-fixture.test/files/7/11/';
   const reader = origin + '/read/fixture/ja/chapter-1-raw/', catalog = origin + '/read/fixture-raw/';
   const worker = browser.serviceWorkers()[0];
   await worker.evaluate(({cdn, bytes}) => {
@@ -13,8 +13,8 @@ export async function verifyInline({browser, page, activate, button, source, out
   await browser.route(cdn + '**', route => route.fulfill({contentType: 'image/png', body: source}));
   await browser.route(origin + '/**', route => route.fulfill({contentType: 'text/html', body: `<!doctype html><meta charset="utf-8"><title>RawOtaku fixture</title>
     <style>body{margin:0;background:#eaf0f8}main{width:760px;margin:180px auto}img{display:block;width:760px;height:100px}#lazy{height:500px}#ad{position:absolute;top:0}</style>
-    <img id="ad" src="${cdn}1.webp"><main><div id="vertical-content"><div class="iv-card"><img id="first" class="image-vertical" alt="0" src="${cdn}1.webp" data-src="${cdn}1.webp"></div>
-    <div class="iv-card"><img id="lazy" class="image-vertical" alt="1" data-src="${cdn}2.webp"></div></div></main>`}));
+    <img id="ad" src="${cdn}1"><main><div id="vertical-content"><div class="iv-card"><img id="first" class="image-vertical" alt="0" src="${cdn}1" data-src="${cdn}1"></div>
+    <div class="iv-card"><img id="lazy" class="image-vertical" alt="1" data-src="${cdn}2"></div></div></main>`}));
   let liveSource = false;
   try {
     await page.goto(reader); const first = page.locator('#first'), lazy = page.locator('#lazy'); await first.evaluate(i => i.decode());
@@ -41,12 +41,7 @@ export async function verifyInline({browser, page, activate, button, source, out
     if (process.env.RUN_LIVE_RAWOTAKU === '1') {
       // Live DOM and browser CDN loading; submitted bytes/overlay remain the local synthetic fixture.
       // This keeps the common fixture API independent of the real image's encoding and dimensions.
-      await worker.evaluate(bytes => {
-        globalThis.fetch = (input, options) => /^https:\/\/sv[1-5]\.freeimgmg\.online\/files\//.test(String(typeof input === 'string' ? input : input.url ?? input))
-          ? Promise.resolve(new Response(new Uint8Array(bytes), {headers: {'Content-Type': 'image/png'}}))
-          : globalThis.rawotakuFixtureFetch(input, options);
-      }, [...source]);
-      await page.goto(origin + '/read/ブルーロック/ja/chapter-1-raw/');
+      await page.goto(process.env.RAWOTAKU_READER_URL || origin + '/read/ブルーロック/ja/chapter-1-raw/');
       const image = page.locator('#vertical-content > .iv-card > img.image-vertical').first();
       await image.waitFor();
       await page.waitForFunction(() => {
@@ -54,6 +49,14 @@ export async function verifyInline({browser, page, activate, button, source, out
         return img?.complete && img.naturalWidth > 80 && img.currentSrc === img.dataset.src;
       });
       await image.evaluate(i => i.decode()); const rect = await image.boundingBox();
+      const urls = await page.locator('#vertical-content > .iv-card > img.image-vertical').evaluateAll(images =>
+        images.map(image => image.getAttribute('data-src')).filter(Boolean));
+      await worker.evaluate(({urls, bytes}) => {
+        const originals = new Set(urls);
+        globalThis.fetch = (input, options) => originals.has(String(typeof input === 'string' ? input : input.url ?? input))
+          ? Promise.resolve(new Response(new Uint8Array(bytes), {headers: {'Content-Type': 'image/png'}}))
+          : globalThis.rawotakuFixtureFetch(input, options);
+      }, {urls, bytes: [...source]});
       await activate(); await page.waitForFunction(() => document.querySelector('#vertical-content .iv-card img').style.content.includes('blob:'));
       assert.deepEqual(await image.boundingBox(), rect); await page.screenshot({path: path.join(out, 'rawotaku-live-translated.png')});
       await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('#vertical-content .iv-card img').style.content);
