@@ -565,7 +565,7 @@ export default {
           "Fixed official translation submission failures with some AVIF images while keeping reading originals unchanged.",
           "Remembers zoom for each book and preloads adjacent high-resolution pages, with improvements to continuous chapter loading, scrolling and reading position retention.",
           "Added in-app release notes and dismissible notices for expired login sessions and image errors.",
-          "This update targets Chrome and Edge. Firefox downloads remain on the signed 0.8.0 release."
+          "Chrome and Edge 0.9.1 ZIP packages and the AMO-signed Firefox 0.9.1 XPI are available."
         ]
       },
       {

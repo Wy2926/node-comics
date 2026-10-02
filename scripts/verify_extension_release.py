@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import sys
 import zipfile
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
 
@@ -62,7 +62,8 @@ def main():
         parsed = urlsplit(url)
         assert parsed.scheme == 'https' and parsed.hostname
         assert not (parsed.username or parsed.password or parsed.query or parsed.fragment)
-        with urlopen(url, timeout=60) as response:
+        request = Request(url, headers={'User-Agent': 'Mozilla/5.0 NodeComicsReleaseCheck/1.0'})
+        with urlopen(request, timeout=60) as response:
             published = response.read(release['bytes'] + 1)
         assert len(published) == release['bytes']
         assert hashlib.sha256(published).hexdigest() == release['sha256']

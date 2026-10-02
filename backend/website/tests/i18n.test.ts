@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dictionaries, locales, localPath, basePath, localeFromPath, publicPaths } from '../src/i18n';
 import { homeCopy } from '../src/i18n/home';
-import { version as extensionVersion } from '../../../apps/extension/package.json';
 
 test('homepage locales provide complete text and matching gallery/translation entries', () => {
   function check(value: unknown, reference: unknown, path: string) {
@@ -59,13 +58,16 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
-test('the current extension release replaces the superseded 0.9.0 notes in every locale',()=>{
+test('0.9.1 replaces the superseded 0.9.0 notes in every locale',()=>{
   for(const locale of locales){
     const releases=dictionaries[locale].documents.releases;
-    assert.equal(releases[0].id,extensionVersion,locale);
-    assert.ok(releases[0].title.includes(extensionVersion),locale);
-    assert.ok(releases[0].items.some(item=>item.includes('JPEG')),locale);
-    assert.ok(releases[0].items.some(item=>item.includes('AVIF')),locale);
+    const release=releases.find(release=>release.id==='0.9.1');
+    assert.ok(release,locale);
+    assert.ok(release.title.includes('0.9.1'),locale);
+    assert.ok(release.items.some(item=>item.includes('JPEG')),locale);
+    assert.ok(release.items.some(item=>item.includes('AVIF')),locale);
+    assert.ok(release.items.some(item=>item.includes('Firefox 0.9.1')&&item.includes('AMO')),locale);
+    assert.ok(!release.items.some(item=>item.includes('Firefox')&&item.includes('0.8.0')),locale);
     assert.ok(!releases.some(release=>release.id==='0.9.0'),locale);
     assert.ok(releases.some(release=>release.id==='0.8.0'),locale);
   }

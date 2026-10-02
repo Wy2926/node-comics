@@ -1,5 +1,5 @@
 {
-  "current": "0.9.0",
+  "current": "0.9.1",
   "releases": [
     {
       "version": "0.1.0",
@@ -210,7 +210,7 @@
       "sha256": "e1341ee845da41a51da44fd0e8508c04c3340eab71aaed7050fe8fded54ac121",
       "bytes": 7859189,
       "path": "/downloads/node-comics-0.9.1-chrome.zip",
-      "download_url": ""
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.9.1/e1341ee845da41a51da44fd0e8508c04c3340eab71aaed7050fe8fded54ac121/node-comics-0.9.1-chrome.zip"
     },
     {
       "version": "0.9.1",
@@ -219,12 +219,22 @@
       "sha256": "86e12c0194a6f7ead5567ec2c7f0f7890f5ce98d5223e1de836d1584d51b320b",
       "bytes": 7859188,
       "path": "/downloads/node-comics-0.9.1-edge.zip",
-      "download_url": ""
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.9.1/86e12c0194a6f7ead5567ec2c7f0f7890f5ce98d5223e1de836d1584d51b320b/node-comics-0.9.1-edge.zip"
+    },
+    {
+      "version": "0.9.1",
+      "browser": "firefox",
+      "filename": "node-comics-0.9.1-firefox.xpi",
+      "sha256": "f955958bb0cb6b09b47bc735407083e0586a06f53d1b00d1894664b91d3f0c50",
+      "bytes": 7983236,
+      "path": "/downloads/node-comics-0.9.1-firefox.xpi",
+      "content_type": "application/x-xpinstall",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.9.1/f955958bb0cb6b09b47bc735407083e0586a06f53d1b00d1894664b91d3f0c50/node-comics-0.9.1-firefox.xpi"
     }
   ],
   "current_by_browser": {
-    "chrome": "0.9.0",
-    "edge": "0.9.0",
-    "firefox": "0.8.0"
+    "chrome": "0.9.1",
+    "edge": "0.9.1",
+    "firefox": "0.9.1"
   }
 }
