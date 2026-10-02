@@ -60,3 +60,14 @@ Google 已从 2026 年 5 月 7 日起停止展示 FAQ 富摘要，并在 6 月�
 `npm test` 校验五语结构、FAQ 主题和相关页面；`npm run build` 校验全部静态 HTML 的唯一标题、公开页面摘要、canonical、多语言链接、站点地图、FAQ 正文与结构化数据一致性、三个浏览器入口及站内锚点。
 
 发布后在有权限的 Google Search Console／Bing Webmaster Tools 中提交 `/sitemap.xml`，检查首页、下载、FAQ 及各语言代表页的抓取与 canonical；按查询查看展示、点击和点击率，判断是否需要调整文案。构建通过或本地浏览器验证不能证明线上已部署、已收录、实际排名提升或真实用户 Core Web Vitals 达标。
+
+### IndexNow 变更通知
+
+公开验证文件 [public/b1518b5f47e4461c9b5e379c3ebbfecb.txt](public/b1518b5f47e4461c9b5e379c3ebbfecb.txt) 随官网静态产物发布到同名根路径。发布后从仓库根目录运行 [scripts/submit_indexnow.py](../../scripts/submit_indexnow.py)，显式传入已发布的新增或有实质更新的页面 URL；各语言分别传入。默认干运行，检查线上 key 的 HTTP 200 与文本、所选 URL 与公开 sitemap 的同源精确匹配，然后输出待提交载荷；追加 `--submit` 才发送一次官方 API 请求。
+
+```powershell
+python scripts/submit_indexnow.py https://comics.nodelane.net/
+python scripts/submit_indexnow.py --submit https://comics.nodelane.net/
+```
+
+旧页面发现与全站清单使用 `/sitemap.xml`，不默认向 IndexNow 回溯提交全站。HTTP 200 表示收到通知，202 表示收到但 key 验证待完成，均不能证明已收录；仍通过搜索引擎站长平台观察。[IndexNow 官方协议](https://www.indexnow.org/documentation)

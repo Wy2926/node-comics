@@ -30,7 +30,9 @@ context.on('page', page => {sourceTabs.push(page); page.on('pageerror', error =>
 context.on('response', response => {if (response.url().startsWith('https://atsu.moe') && response.status() >= 400) failures.push({path: new URL(response.url()).pathname, status: response.status()});});
 await context.route('https://**.nodelane.net/**', route => route.fulfill({status: 503, body: '{}', contentType: 'application/json'}));
 let failCatalog = false, addChapter = false;
-const mangaId = live ? 'sVC2A' : 'Work1', title = live ? 'One Piece' : 'Atsumaru grouped fixture';
+const liveUrl = process.env.ATSU_CATALOG_URL || 'https://atsu.moe/manga/RkOOE';
+let title = 'Atsumaru grouped fixture', sourceCatalog;
+let firstSourceId = 'atsu:Work1:chapter:Chap1', secondSourceId = 'atsu:Work1:chapter:Chap3';
 const chapter = (id, index, scanlator = 'Scan1') => ({id, scanlationMangaId: scanlator, title: 'Chapter ' + (index + 1),
   index, number: index + 1, pageCount: 3});
 const rows = () => [chapter('Chap2', 1), chapter('Chap3', 0, 'Scan2'), chapter('Chap1', 0), ...(addChapter ? [chapter('Chap4', 2)] : [])];
@@ -42,7 +44,8 @@ if (!live) {
     if (url.pathname === '/collections/manga/documents/search') value = {found: 1, page: 1, hits: [{document: {id: 'Work1', title,
       authors: ['Fixture author'], medium: 'Comic', poster: '/static/posters/fixture.png'}}]};
     else if (url.pathname === '/api/manga/page') value = {mangaPage: {id: 'Work1', title, medium: 'Comic', type: 'Manga',
-      poster: {image: 'posters/fixture.png'}, totalChapterCount: rows().length,
+      poster: {image: 'posters/fixture.png'}, totalChapterCount: addChapter ? 3 : 2,
+      chapters: rows().map(({id, scanlationMangaId}) => ({id, scanlationMangaId})), hasMoreChapters: false,
       scanlators: [{id: 'Scan1', name: 'First group'}, {id: 'Scan2', name: 'Second group'}]}};
     else if (url.pathname === '/api/manga/allChapters') {
       if (failCatalog) return route.fulfill({status: 503, body: 'Unavailable'});
@@ -59,11 +62,18 @@ if (!live) {
 }
 let reader, activeEntry, worker;
 const state = () => reader.evaluate(async () => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js')); return {
-  comics: await catalog.list('comics'), entries: await catalog.list('entries', {limit: 10000}), positions: await catalog.list('positions')};});
+  comics: await catalog.list('comics'), entries: await catalog.list('entries', {limit: 10000}),
+  catalogs: await catalog.list('catalogs'), positions: await catalog.list('positions')};});
 async function waitImage(page = 1) {
   await reader.waitForFunction(({entry, page}) => document.querySelector(`[data-copy-id="${entry}"] [data-page-index="${page - 1}"] img.nc-page-image`)?.naturalWidth > 0,
     {entry: activeEntry, page}, {timeout: 60000});
+  await reader.evaluate(async ({entry, page}) => {
+    const image = document.querySelector(`[data-copy-id="${entry}"] [data-page-index="${page - 1}"] img.nc-page-image`);
+    await image.decode();
+  }, {entry: activeEntry, page});
 }
+async function pageCount(entry) {return reader.evaluate(async id => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
+  return (await catalog.listPages((await catalog.get('entries', id)).contentId)).length;}, entry.id);}
 async function jump(page) {
   await reader.getByLabel('跳转页码', {exact: true}).fill(String(page)); await waitImage(page);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -103,7 +113,8 @@ try {
         return Promise.resolve(new Response(body, {status: 200, headers: {'Content-Type': 'image/png'}}));
       if (url.origin !== 'https://atsu.moe') return original(input, options);
       if (url.pathname === '/collections/manga/documents/search') value = {found: 1, page: 1, hits: [{document: {id: 'Work1', title, authors: ['Fixture author'], medium: 'Comic', poster: '/static/posters/fixture.png'}}]};
-      else if (url.pathname === '/api/manga/page' && url.searchParams.get('id') === 'Work1') value = {mangaPage: {id: 'Work1', title, medium: 'Comic', type: 'Manga', poster: {image: 'posters/fixture.png'}, totalChapterCount: rows().length,
+      else if (url.pathname === '/api/manga/page' && url.searchParams.get('id') === 'Work1') value = {mangaPage: {id: 'Work1', title, medium: 'Comic', type: 'Manga', poster: {image: 'posters/fixture.png'}, totalChapterCount: globalThis.atsuReaderFixture.addChapter ? 3 : 2,
+        chapters: rows().map(({id, scanlationMangaId}) => ({id, scanlationMangaId})), hasMoreChapters: false,
         scanlators: [{id: 'Scan1', name: 'First group'}, {id: 'Scan2', name: 'Second group'}]}};
       else if (url.pathname === '/api/manga/allChapters' && url.searchParams.get('mangaId') === 'Work1') {
         if (globalThis.atsuReaderFixture.failCatalog) return Promise.resolve(new Response('Unavailable', {status: 503}));
@@ -120,46 +131,75 @@ try {
   reader = await context.newPage(); await reader.goto(home);
   await reader.evaluate(async () => {const settings = {uiLanguage: 'zh-CN', language: 'en', layout: 'single', fit: 'window'};
     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
+  if (live) {
+    // Use the production catalog transport/parser to choose current public work and chapter identities.
+    sourceCatalog = await reader.evaluate(async url => {const {readWebsiteCatalog} = await import(chrome.runtime.getURL('verify-source.js'));
+      return readWebsiteCatalog(url);}, liveUrl);
+    assert(sourceCatalog.complete && sourceCatalog.groups.every(group => group.complete));
+    const readable = sourceCatalog.entries.filter(entry => entry.readable !== false);
+    assert(readable.length >= 2, 'Reader verification needs at least two readable source chapters');
+    const first = readable[0], second = readable.find(entry => entry.id !== first.id && entry.sequenceId !== first.sequenceId) || readable[1];
+    title = sourceCatalog.title; firstSourceId = first.id; secondSourceId = second.id;
+  }
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
   for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('Atsumaru'));
-  const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? 'One Piece' : 'fixture'); await input.press('Enter');
+  const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? title : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: title, exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
   await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
   const imported = await state(); assert.equal(imported.comics.length, 1);
-  const first = imported.entries.find(entry => entry.sourceEntryId === `atsu:${mangaId}:chapter:${live ? '9L82jefe' : 'Chap1'}`);
-  assert(first); activeEntry = first.id; await waitImage(); await jump(3);
+  if (live) {
+    assert.equal(imported.entries.length, sourceCatalog.entries.length);
+    assert.deepEqual(new Set(imported.entries.map(entry => entry.sourceEntryId)), new Set(sourceCatalog.entries.map(entry => entry.id)));
+    const stored = imported.catalogs.find(catalog => catalog.id === sourceCatalog.id); assert(stored?.complete);
+    assert.deepEqual(stored.groups, sourceCatalog.groups);
+    for (const sourceEntry of sourceCatalog.entries) {
+      const entry = imported.entries.find(entry => entry.sourceEntryId === sourceEntry.id);
+      assert.equal(entry.sequenceId, sourceEntry.sequenceId);
+    }
+  } else assert.equal(imported.entries.length, rows().length);
+  const first = imported.entries.find(entry => entry.sourceEntryId === firstSourceId);
+  assert(first); activeEntry = first.id; await waitImage();
+  const firstPage = Math.min(3, await pageCount(first)); assert(firstPage > 0); await jump(firstPage);
   checks.push('Name search, source candidate import and actual reader image decoding without a source tab');
-  const second = imported.entries.find(entry => entry.sourceEntryId === `atsu:${mangaId}:chapter:${live ? 'L8uH2ZsI' : 'Chap3'}`);
-  assert(second); await choose(second); await jump(2); await choose(first, 3); await choose(second, 2); await choose(first, 3);
+  const second = imported.entries.find(entry => entry.sourceEntryId === secondSourceId);
+  assert(second); await choose(second);
+  const secondPage = Math.min(2, await pageCount(second)); assert(secondPage > 0);
+  await jump(secondPage); await choose(first, firstPage); await choose(second, secondPage); await choose(first, firstPage);
   await directory(); await reader.screenshot({path: path.join(out, 'directory.png')}); await closePanel();
-  checks.push(live ? 'Two public chapters decode and preserve independent page 2/page 3 positions' : 'Source groups keep independent chapter chains and selected chapters preserve page 2/page 3');
+  checks.push(live ? `Two public chapters decode and preserve independent page ${secondPage}/page ${firstPage} positions` : 'Source groups keep independent chapter chains and selected chapters preserve page 2/page 3');
   await reader.getByRole('button', {name: '返回搜索', exact: true}).click();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '我的漫画', exact: true}).click();
   const cover = reader.locator('.nc-book .nc-thumbnail img'); await cover.waitFor(); await cover.evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
-  await reader.getByRole('button', {name: '打开漫画 ' + title, exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3');
+  await reader.getByRole('button', {name: '打开漫画 ' + title, exact: true}).click(); await waitImage(firstPage);
+  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), String(firstPage));
   assert.equal(await refresh(), imported.entries.length);
-  checks.push('Dedicated cover decoding, reader reopening and a complete refresh retain chapter/page 3');
+  checks.push(`Dedicated cover decoding, reader reopening and a complete refresh retain chapter/page ${firstPage}`);
   if (!live) {
     failCatalog = true; await worker.evaluate(() => {globalThis.atsuReaderFixture.failCatalog = true;});
-    const before = await state(); await assert.rejects(refresh()); assert.deepEqual((await state()).entries, before.entries);
+    const beforePage = await reader.getByLabel('跳转页码', {exact: true}).inputValue(), before = await state();
+    await assert.rejects(refresh()); const after = await state();
+    assert.deepEqual(after.entries, before.entries); assert.deepEqual(after.positions, before.positions);
+    assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), beforePage); await waitImage(Number(beforePage));
     failCatalog = false; addChapter = true; await worker.evaluate(() => {globalThis.atsuReaderFixture.failCatalog = false; globalThis.atsuReaderFixture.addChapter = true;});
     assert.equal(await refresh(), imported.entries.length + 1);
     const updated = await state(); assert.equal(updated.comics[0].catalogUpdates.count, 1); assert(updated.comics[0].catalogSync.nextCheckAt > Date.now());
     await refresh(); assert.equal((await state()).comics[0].catalogUpdates.count, 1);
-    checks.push('Failed full catalogs preserve old entries; one new stable chapter creates one update notification');
+    checks.push('Failed full catalogs preserve entries, positions and the current decoded page; one new stable chapter creates one update notification');
   }
   await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.getByRole('button', {name: '漫画网站', exact: true}).click();
   await reader.getByLabel('通过链接添加漫画').fill(second.sourceUrl); await reader.getByRole('button', {name: '添加到书架', exact: true}).click();
-  activeEntry = second.id; await waitImage(2); assert.equal((await state()).comics.length, 1);
-  checks.push('Explicit chapter import verifies membership and restores that exact chapter/page 2 without a duplicate comic');
+  activeEntry = second.id; await waitImage(secondPage); assert.equal((await state()).comics.length, 1);
+  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), String(secondPage));
+  checks.push(`Explicit chapter import verifies membership and restores that exact chapter/page ${secondPage} without a duplicate comic`);
   assert(sourceTabs.every(page => !page.url().startsWith('https://atsu.moe'))); assert.deepEqual(errors, []);
   await reader.screenshot({path: path.join(out, 'reader.png')});
-  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', live, checks, failures, errors, sourceTabs: false, nativePermissions: false, models: false}, null, 2));
+  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', live, catalog: live ? {url: sourceCatalog.url, title, releases: sourceCatalog.entries.length,
+    groups: sourceCatalog.groups.length, selectedChapters: [firstSourceId, secondSourceId]} : undefined,
+    checks, failures, errors, sourceTabs: false, nativePermissions: false, models: false}, null, 2));
   console.log(JSON.stringify({out, live, checks}, null, 2));
 } catch (error) {
   await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'failed', live, checks, failures, errors, error: error.message}, null, 2));

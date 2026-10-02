@@ -7,13 +7,15 @@ import {hashFile} from '../src/importers/hash';
 import {materializeResult} from '../src/translation/materialize';
 import type {Page,TranslationResult} from '../src/types';
 import * as png from '../../../backend/shared/translation-images/png';
+import {resizeInput} from '../src/translation/input/resize';
+import {jpegWithSize} from './image-encoding-fixture';
 
 const workerFactory=vi.hoisted(()=>vi.fn());
 vi.mock('../src/translation/input/resize.worker?worker',()=>({default:class {constructor(){return workerFactory();}}}));
 const source=new Blob([new Uint8Array([255,216,255,224]),new Uint8Array(1024*1024)],{type:'image/jpeg'});
 const page=(width=1800,height=26000):Page=>({id:'boundary',name:'Synthetic long source',width,height,imageByteSize:source.size,imageMime:source.type,jobs:[],outputBlobs:{}});
 const close=vi.fn(),draw=vi.fn(),fill=vi.fn();
-const jpeg=new Blob([new Uint8Array([255,216,255,218]),'encoded JPEG'],{type:'image/jpeg'}),encode=vi.fn(async()=>jpeg);
+const jpeg=jpegWithSize(1800,26000),encode=vi.fn(async()=>jpeg);
 const canvases:{width:number;height:number}[]=[];
 beforeEach(()=>{
   close.mockReset();draw.mockReset();fill.mockReset();
@@ -36,6 +38,20 @@ function replyingWorker(error:string,beforeReply=()=>{}){
 }
 
 describe('optional input encoding boundaries',()=>{
+  it.each([[64,65500],[65500,64]])('preserves the actual JPEG encoder boundary %i x %i',async(width,height)=>{
+    const output=jpegWithSize(width,height);encode.mockResolvedValueOnce(output);
+    expect(await resizeInput(source,width,height)).toEqual({blob:output,sha256:await hashFile(output)});
+    expect(createImageBitmap).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
+  });
+  it.each([[64,65501],[65501,64],[64,65535],[65535,64]])('rejects JPEG encoding beyond its implementation boundary %i x %i before decoding',async(width,height)=>{
+    await expect(resizeInput(source,width,height)).rejects.toThrow('IMAGE_DIMENSIONS_LIMIT');
+    expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+  });
+  it.each([[1799,26000],[1800,25999]])('rejects a successful encoder that silently crops to %i x %i',async(width,height)=>{
+    encode.mockResolvedValueOnce(jpegWithSize(width,height));
+    await expect(prepareTranslationInput(page(),async()=>source,()=>true)).rejects.toThrow('dimensions');
+    expect(close).toHaveBeenCalledOnce();expect(canvases[0]).toMatchObject({width:1,height:1});
+  });
   it('encodes a long new input as JPEG without a PNG attempt and releases the full canvas',async()=>{
     const pngEncode=vi.spyOn(png,'bitmapPng');
     const prepared=await prepareTranslationInput(page(),async()=>source,()=>true);
@@ -51,7 +67,7 @@ describe('optional input encoding boundaries',()=>{
     expect(close).toHaveBeenCalledOnce();expect(canvases.every(canvas=>canvas.width===1&&canvas.height===1)).toBe(true);
   });
   it('checks the service byte budget for both resized JPEG and unchanged source fallback',async()=>{
-    encode.mockResolvedValue(new Blob([new Uint8Array([255,216,255,218]),new Uint8Array(source.size)],{type:'image/jpeg'}));
+    encode.mockResolvedValueOnce(jpegWithSize(1800,19500,source.size)).mockResolvedValueOnce(jpegWithSize(1800,26000,source.size));
     const limits={max_bytes:source.size-1,max_dimension:100000,max_pixels:100000**2,max_translation_ids:100};
     await expect(prepareTranslationInput(page(2400,26000),async()=>source,()=>true,limits)).rejects.toThrow('大小限制');
     await expect(prepareTranslationInput(page(),async()=>source,()=>true,limits)).rejects.toThrow('大小限制');

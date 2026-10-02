@@ -58,6 +58,15 @@ with (root / 'optional-long.jpg').open('ab') as handle:
 Image.new('RGB', (800, 1200), (240, 230, 220)).save(root / 'large-bytes.jpg', quality=90)
 with (root / 'large-bytes.jpg').open('ab') as handle:
     for _ in range(41): handle.write(bytes(1024 * 1024))
+for edge in (65500, 65501, 65535):
+    for direction, size in [('vertical', (64, edge)), ('horizontal', (edge, 64))]:
+        boundary = Image.new('RGB', size, (240, 230, 220)); draw = ImageDraw.Draw(boundary)
+        draw.rectangle((0, 0, 31, 31), fill=(32, 80, 144))
+        draw.rectangle((size[0]-32, size[1]-32, size[0]-1, size[1]-1), fill=(144, 80, 32))
+        fixture = root / f'encoding-{direction}-{edge}.png'; boundary.save(fixture)
+        # Force optional compression to be considered without increasing decoded memory.
+        with fixture.open('ab') as handle: handle.write(bytes(1024 * 1024))
+Image.new('RGB', (800, 1200), (240, 230, 220)).save(root / 'small-source.avif', quality=80)
 `,root],{stdio:'pipe'});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 try{
@@ -65,8 +74,8 @@ try{
   await page.route(web+'/tiles-validation',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><title>WebP tile verification</title><body style="font:16px sans-serif;padding:24px;background:#eee"><h1>WebP tiles · native pixels</h1></body>'}));
   const serveFixture=async route=>{
     const name=new URL(route.request().url()).pathname.split('/').pop();
-    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long)\.png$|^(optional-long|large-bytes|representative-long)\.jpg$/.test(name));
-    await route.fulfill({body:await readFile(path.join(root,name)),contentType:name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':name.endsWith('.json')?'application/json':name.startsWith('single')?'image/webp':'application/vnd.nodelane.overlay-tiles'});
+    assert(/^(long|wide|alpha|single|single-wide)(-original\.png|-expected\.png|\.tiles|\.json)$|^(high-pixels|icc-long|encoding-(vertical|horizontal)-(65500|65501|65535))\.png$|^(optional-long|large-bytes|representative-long)\.jpg$|^small-source\.avif$/.test(name));
+    await route.fulfill({body:await readFile(path.join(root,name)),contentType:name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':name.endsWith('.avif')?'image/avif':name.endsWith('.json')?'application/json':name.startsWith('single')?'image/webp':'application/vnd.nodelane.overlay-tiles'});
   };
   await page.route(web+'/tile-fixture/*',serveFixture);
   await page.goto(web+'/tiles-validation');
@@ -184,7 +193,60 @@ try{
     }
     base.close();patch.close();reference.close();actual.close();lettering.width=lettering.height=compare.width=compare.height=1;
     checks.push('800 × 30000 illustrated long JPEG keeps native dimensions, Chinese/small text and alpha; actual encoded size and error measured against the old PNG path');
-    return {checks,cases,encoding:{width:800,height:30000,inputBytes:representative.size,baselineBytes:baseline.size,optimizedBytes:optimized.size,mime:optimized.type,baselineMs,optimizedMs,rmse,textRmse},largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
+    const boundaries=[],swatch=new OffscreenCanvas(32,32),swatchContext=swatch.getContext('2d');
+    swatchContext.fillStyle='rgb(40,160,72)';swatchContext.fillRect(0,0,32,32);
+    const endPatch=await createImageBitmap(swatch),pixelCanvas=new OffscreenCanvas(1,1),pixelContext=pixelCanvas.getContext('2d',{willReadFrequently:true});
+    const checkPixel=(bitmap,x,y,rgb,tolerance=0)=>{
+      pixelContext.clearRect(0,0,1,1);pixelContext.drawImage(bitmap,x,y,1,1,0,0,1,1);
+      const pixel=pixelContext.getImageData(0,0,1,1).data;
+      if(pixel[3]!==255||rgb.some((value,index)=>Math.abs(pixel[index]-value)>tolerance))throw Error('Boundary pixels changed: '+JSON.stringify({x,y,pixel:[...pixel],expected:rgb}));
+    };
+    try{
+      for(const edge of [65500,65501,65535])for(const direction of ['vertical','horizontal']){
+        const source=await(await fetch('/tile-fixture/encoding-'+direction+'-'+edge+'.png')).blob();
+        const normalized=await prepareComicPage({name:'Encoding boundary',blob:source}),{width,height}=normalized;
+        if(width!==(direction==='vertical'?64:edge)||height!==(direction==='vertical'?edge:64)||normalized.blob!==source)throw Error('Boundary source was resized');
+        const prepared=await prepareTranslationInput({...normalized,imageByteSize:source.size,imageMime:source.type},async()=>source,()=>true);
+        if(edge===65500){
+          if(prepared.image.content_type!=='image/jpeg'||!prepared.blob)throw Error('Last supported JPEG edge was not encoded');
+          const encoded=await createImageBitmap(prepared.blob);
+          try{if(encoded.width!==width||encoded.height!==height)throw Error('JPEG upload was cropped');checkPixel(encoded,width-16,height-16,[144,80,32],12);}finally{encoded.close();}
+        }else{
+          if(prepared.blob||prepared.profile||prepared.image.sha256!==normalized.imageSha256||prepared.image.byte_size!==source.size||prepared.image.content_type!=='image/png')throw Error('Unencodable same-size source was not retained exactly');
+          let rejected=false;try{await resizeInput(source,width,height);}catch{rejected=true;}
+          if(!rejected)throw Error('JPEG encoder accepted an unsupported edge');
+        }
+        const bitmap=await createImageBitmap(source);
+        try{
+          const output=await compositeImage(bitmap,[{x:width-32,y:height-32,width:32,height:32,bitmap:endPatch}],'image/png');
+          if(output.type!==(edge===65500?'image/jpeg':'image/png'))throw Error('Result encoder selected an unsafe boundary format');
+          const decoded=await createImageBitmap(output);
+          try{if(decoded.width!==width||decoded.height!==height)throw Error('Boundary result was cropped');checkPixel(decoded,16,16,[32,80,144],edge===65500?6:0);checkPixel(decoded,width-16,height-16,[40,160,72],edge===65500?6:0);}finally{decoded.close();}
+          boundaries.push({width,height,inputBytes:source.size,uploadMime:prepared.image.content_type,uploadBytes:prepared.image.byte_size,resultMime:output.type,resultBytes:output.size,sourceRetained:!prepared.blob});
+        }finally{bitmap.close();}
+      }
+      const cropped=await pixelCanvas.convertToBlob({type:'image/jpeg'}),nativeEncode=OffscreenCanvas.prototype.convertToBlob;
+      let resizedRejected=false,recovered;
+      const source=await(await fetch('/tile-fixture/encoding-vertical-65500.png')).blob(),bitmap=await createImageBitmap(source);
+      OffscreenCanvas.prototype.convertToBlob=async()=>cropped;
+      try{
+        try{await resizeInput(source,64,65500);}catch{resizedRejected=true;}
+        if(!resizedRejected)throw Error('A valid JPEG with cropped dimensions was accepted for upload');
+        recovered=await compositeImage(bitmap,[],'image/jpeg');
+      }finally{OffscreenCanvas.prototype.convertToBlob=nativeEncode;bitmap.close();}
+      const decoded=await createImageBitmap(recovered);
+      try{if(recovered.type!=='image/png'||decoded.width!==64||decoded.height!==65500)throw Error('Cropped result did not recover through full-size PNG');checkPixel(decoded,48,65484,[144,80,32]);}finally{decoded.close();}
+      checks.push('Real Chromium codecs preserve both axes at 65500 pixels; 65501/65535-pixel inputs retain source bytes and full-size results use PNG, including end-of-page overlay pixels');
+      checks.push('Injected valid-but-cropped native JPEG output is rejected for upload and recovered as full-size PNG for display');
+    }finally{endPatch.close();swatch.width=swatch.height=pixelCanvas.width=pixelCanvas.height=1;}
+    const avif=await(await fetch('/tile-fixture/small-source.avif')).blob(),avifPage=await prepareComicPage({name:'Small AVIF',blob:avif});
+    if(avif.size>=1024*1024||avifPage.blob!==avif)throw Error('Small AVIF source fixture changed');
+    const avifInput=await prepareTranslationInput({...avifPage,imageByteSize:avif.size,imageMime:avif.type},async()=>avif,()=>true);
+    if(!['image/png','image/jpeg','image/webp'].includes(avifInput.image.content_type)||!avifInput.blob||avifInput.sourceSha256!==avifPage.imageSha256||avifInput.image.sha256===avifPage.imageSha256)throw Error('Small AVIF was not converted to an accepted official upload format');
+    const avifBitmap=await createImageBitmap(avifInput.blob);
+    try{if(avifBitmap.width!==800||avifBitmap.height!==1200)throw Error('Small AVIF conversion changed dimensions');}finally{avifBitmap.close();}
+    checks.push('A real sub-1-MiB AVIF keeps its source identity and produces a supported same-size official upload MIME');
+    return {checks,cases,boundaries,avif:{sourceBytes:avif.size,uploadBytes:avifInput.image.byte_size,uploadMime:avifInput.image.content_type},encoding:{width:800,height:30000,inputBytes:representative.size,baselineBytes:baseline.size,optimizedBytes:optimized.size,mime:optimized.type,baselineMs,optimizedMs,rmse,textRmse},largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
   },'/@fs/'+path.resolve('backend/shared/translation-images').replaceAll('\\','/'));
   // Lower only translation-input encoding's budget; original normalization and result composition stay unrestricted.
   const limited=await browser.newContext();

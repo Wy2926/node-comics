@@ -554,6 +554,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.9.1",
+        "date": "2026-10-02",
+        "title": "0.9.1: More sources and better support for long comics",
+        "items": [
+          "Added Atsumaru, MangaBall, RawOtaku and JF00 sources, with direct manga import for reading.",
+          "Translate titles and descriptions on the Discover page, switch between original and translated text, check translation status and retry failures.",
+          "Improved classic translation for very long comic strips, including saving complete translated images and recovering interrupted tasks.",
+          "Fixed dimension truncation when encoding extremely long images as JPEG. Complete translated images use PNG when needed.",
+          "Fixed official translation submission failures with some AVIF images while keeping reading originals unchanged.",
+          "Remembers zoom for each book and preloads adjacent high-resolution pages, with improvements to continuous chapter loading, scrolling and reading position retention.",
+          "Added in-app release notes and dismissible notices for expired login sessions and image errors.",
+          "This update targets Chrome and Edge. Firefox downloads remain on the signed 0.8.0 release."
+        ]
+      },
+      {
         "id": "0.8.0",
         "date": "2026-09-30",
         "title": "0.8.0: Save complete translations for smoother reading",

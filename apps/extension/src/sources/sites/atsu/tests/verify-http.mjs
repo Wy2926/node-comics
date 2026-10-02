@@ -27,16 +27,30 @@ async function image(url, referer) {
   assert.match(response.headers.get('content-type') ?? '', /^image\//);
   const bytes = (await response.arrayBuffer()).byteLength; assert(bytes > 0); return bytes;
 }
-const source = await network.catalog(process.env.ATSU_CATALOG_URL || 'https://atsu.moe/manga/sVC2A', context);
-assert(source.complete && source.entries.length > 20);
+const source = await network.catalog(process.env.ATSU_CATALOG_URL || 'https://atsu.moe/manga/RkOOE', context);
+assert(source.complete && source.groups.every(group => group.complete));
+assert(source.entries.length > 0, 'Public source catalog has no chapter entries');
 assert.equal(new Set(source.entries.map(entry => entry.id)).size, source.entries.length);
+const readable = source.entries.filter(entry => entry.readable !== false);
+assert(readable.length > 0, 'Public source catalog has no readable chapter entries');
+const selected = new Map();
+for (const group of source.groups) {
+  const entries = readable.filter(entry => group.entryIds.includes(entry.id));
+  for (const entry of entries.length ? [entries[0], entries.at(-1)] : []) selected.set(entry.id, {entry, groupId: group.id});
+}
+assert(selected.size > 0, 'Readable source chapters have no release groups');
 const chapters = [];
-for (const entry of [source.entries[0], source.entries.at(-1)]) {
+for (const {entry, groupId} of selected.values()) {
   const snapshot = await network.pages(entry.url, context);
   assert(snapshot.discoveryComplete && snapshot.knownTotal > 0);
+  assert.equal(snapshot.knownTotal, snapshot.items.length);
   assert(snapshot.items.every((item, index) => item.order === index));
-  chapters.push({chapterId: entry.id, pages: snapshot.knownTotal, firstImageBytes: await image(snapshot.items[0].resource.url, entry.url)});
+  assert(snapshot.items.every(item => item.resource.kind === 'http'));
+  assert.equal(new Set(snapshot.items.map(item => item.id)).size, snapshot.items.length);
+  chapters.push({chapterId: entry.id, groupId, title: entry.title, pages: snapshot.knownTotal,
+    firstImageBytes: await image(snapshot.items[0].resource.url, entry.url)});
 }
+assert(source.cover, 'Public source catalog has no dedicated cover');
 const coverBytes = await image(source.cover.url, source.url);
 const request = {siteId: 'atsu', query: source.title}, first = await network.search(request, context);
 assert(first.items.some(hit => hit.catalogId === source.id));

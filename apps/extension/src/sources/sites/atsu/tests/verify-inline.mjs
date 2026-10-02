@@ -10,7 +10,7 @@ export async function verifyInline({browser, page, activate, button, source, out
     const body = Uint8Array.from(atob(bytes), character => character.charCodeAt(0));
     globalThis.fetch = (input, options) => {
       const target = new URL(typeof input === 'string' ? input : input.url ?? String(input));
-      return target.origin === cdn && /^\/static\/pages\/Work1\/Chap1\/[01]\.png$/.test(target.pathname) && !target.search
+      return target.origin === cdn && /^\/static\/pages\/(?:Work1\/)?Chap1\/[01]\.png$/.test(target.pathname) && !target.search
         ? Promise.resolve(new Response(body, {status: 200, headers: {'Content-Type': 'image/png'}}))
         : globalThis.atsuInlineOriginalFetch(input, options);
     };
@@ -30,7 +30,7 @@ export async function verifyInline({browser, page, activate, button, source, out
   await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('#first').style.content);
   assert.equal(await first.getAttribute('src'), image); assert.deepEqual(await first.boundingBox(), box);
   await button('显示译图');
-  await page.locator('#lazy').evaluate((img, url) => {img.src = url;}, cdn + '/static/pages/Work1/Chap1/1.png');
+  await page.locator('#lazy').evaluate((img, url) => {img.src = url;}, cdn + '/static/pages/Chap1/1.png');
   await page.waitForFunction(() => document.querySelector('#lazy').style.content.includes('blob:'));
   await first.evaluate((img, url) => {img.src = url;}, cdn + '/static/pages/Work1/Other/0.png');
   await page.waitForFunction(() => !document.querySelector('#first').style.content);
@@ -39,7 +39,7 @@ export async function verifyInline({browser, page, activate, button, source, out
   await button('恢复原图'); await page.screenshot({path: path.join(out, 'atsu-restored.png')});
   await page.goto(origin + '/manga/Work1'); await activate();
   assert.equal(await first.evaluate(img => img.style.content), '');
-  check('Atsumaru: loaded reader images translate; ads, unloaded images and foreign chapter images are excluded; lazy targets and restoration retain geometry; catalog does not acquire reader images.');
+  check('Atsumaru: namespaced and chapter-only reader images translate; ads, unloaded images and foreign chapters are excluded; lazy targets and restoration retain geometry; catalog does not acquire reader images.');
   await browser.unroute(origin + '/**'); await browser.unroute(cdn + '/**');
   await worker.evaluate(() => {globalThis.fetch = globalThis.atsuInlineOriginalFetch; delete globalThis.atsuInlineOriginalFetch;});
   return {liveSource: false};

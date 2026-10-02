@@ -1,5 +1,5 @@
 {
-  "current": "0.8.0",
+  "current": "0.9.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -184,11 +184,47 @@
       "path": "/downloads/node-comics-0.8.0-firefox.xpi",
       "content_type": "application/x-xpinstall",
       "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.8.0/01dbdfa6568ce333fe72db4deab0b1c696a162ab82107994028c53b11b23bd16/node-comics-0.8.0-firefox.xpi"
+    },
+    {
+      "version": "0.9.0",
+      "browser": "chrome",
+      "filename": "node-comics-0.9.0-chrome.zip",
+      "sha256": "6b79459ef7552bd254f9adca19199330980b572332d183effacfac874a21ece5",
+      "bytes": 7841676,
+      "path": "/downloads/node-comics-0.9.0-chrome.zip",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.9.0/6b79459ef7552bd254f9adca19199330980b572332d183effacfac874a21ece5/node-comics-0.9.0-chrome.zip"
+    },
+    {
+      "version": "0.9.0",
+      "browser": "edge",
+      "filename": "node-comics-0.9.0-edge.zip",
+      "sha256": "1c4e03a3ab4f8d3b80f9f8b3bfc38cc3f841237b9900c0d01310435b75b8e6f6",
+      "bytes": 7841676,
+      "path": "/downloads/node-comics-0.9.0-edge.zip",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/0.9.0/1c4e03a3ab4f8d3b80f9f8b3bfc38cc3f841237b9900c0d01310435b75b8e6f6/node-comics-0.9.0-edge.zip"
+    },
+    {
+      "version": "0.9.1",
+      "browser": "chrome",
+      "filename": "node-comics-0.9.1-chrome.zip",
+      "sha256": "e1341ee845da41a51da44fd0e8508c04c3340eab71aaed7050fe8fded54ac121",
+      "bytes": 7859189,
+      "path": "/downloads/node-comics-0.9.1-chrome.zip",
+      "download_url": ""
+    },
+    {
+      "version": "0.9.1",
+      "browser": "edge",
+      "filename": "node-comics-0.9.1-edge.zip",
+      "sha256": "86e12c0194a6f7ead5567ec2c7f0f7890f5ce98d5223e1de836d1584d51b320b",
+      "bytes": 7859188,
+      "path": "/downloads/node-comics-0.9.1-edge.zip",
+      "download_url": ""
     }
   ],
   "current_by_browser": {
-    "chrome": "0.8.0",
-    "edge": "0.8.0",
+    "chrome": "0.9.0",
+    "edge": "0.9.0",
     "firefox": "0.8.0"
   }
 }

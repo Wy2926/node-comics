@@ -8,19 +8,18 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(new URL('../backend/website/package.json', import.meta.url));
 const sharp = require('sharp');
-const out = path.resolve(root, process.argv[3] || 'output/imagegen/blue-manga-store');
+const out = path.resolve(root, process.argv[3] || 'output/chrome-web-store-current/screenshots');
 const background = path.resolve(root, process.argv[2] || 'output/imagegen/blue-manga-store/background.png');
 const svg = body => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800">${body}</svg>`);
 const escape = s => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
 const text = (s, x, y, size, color = '#1c2d44', weight = 400) => `<text x="${x}" y="${y}" font-family="Microsoft YaHei, Segoe UI, sans-serif" font-size="${size}" font-weight="${weight}" fill="${color}">${escape(s)}</text>`;
 const rect = (left, top, width, height) => ({left, top, width, height});
 const specs = [
-  {name: 'library', zh: ['你的漫画，随时接着看。', '整理书架、导入漫画，继续上次的阅读进度。'], en: ['Your comics. Ready to read.', 'Organize your library and pick up where you left off.'], crops: [[rect(170,108,1386,716),100,174,1080]]},
-  {name: 'discovery', zh: ['发现下一部喜欢的漫画。', '查看作品详情、评分与别名，再查找阅读来源。'], en: ['Discover your next favorite.', 'Explore title details, ratings and aliases, then find a reading source.'], crops: [[rect(238,194,1242,922),263,174,754]]},
+  {name: 'translation-comparison', zh: ['用熟悉的语言，读懂漫画。', '对照原文与译文，随时切回原图继续阅读。'], en: ['Read manga in your language.', 'Compare the original with a Chinese translation, side by side.'], crops: [[rect(0,90,1718,960),128,174,1024]]},
   {name: 'cross-language-search', zh: ['跨越语言，找到想看的。', '按名称与别名搜索，选择网站，确认后导入阅读。'], en: ['Find stories across languages.', 'Search by title or alias, choose websites, and import a result.'], crops: [[rect(170,206,775,401),64,188,550],[rect(960,206,576,484),654,188,562],[rect(170,1020,675,212),64,526,550]]},
-  {name: 'offline-center', zh: ['提前缓存，离线也能看。', '查看缓存进度与空间占用，随时暂停或继续。'], en: ['Cache now. Read offline.', 'Track cache progress and storage use. Pause and resume anytime.'], crops: [[rect(170,108,1386,409),64,270,1152]]},
   {name: 'reader-directory', zh: ['章节与语言，一目了然。', '在阅读器中浏览目录，查看缓存与阅读状态。'], en: ['Chapters at a glance.', 'Browse the chapter list, languages, cache status and reading progress.'], crops: [[rect(0,0,1718,1307),272,174,736]]},
-  {name: 'translation-comparison', zh: ['原图译图，并排读懂。', '对照原文与译文，也可切回原图继续阅读。'], en: ['Original and translation, together.', 'Compare the original with a Chinese translation, side by side.'], crops: [[rect(0,0,1718,1140),220,174,840]]},
+  {name: 'library', zh: ['你的漫画，随时接着看。', '整理书架、导入漫画，继续上次的阅读进度。'], en: ['Your comics. Ready to read.', 'Organize your library and pick up where you left off.'], crops: [[rect(170,108,1386,716),100,174,1080]]},
+  {name: 'offline-center', zh: ['提前缓存，离线也能看。', '查看缓存进度与空间占用，随时暂停或继续。'], en: ['Cache now. Read offline.', 'Track cache progress and storage use. Pause and resume anytime.'], crops: [[rect(170,108,1386,409),64,270,1152]]},
 ];
 await mkdir(out, {recursive:true});
 const base = await sharp(background).resize(1280,800,{fit:'cover'}).flatten({background:'#f4f8ff'}).png().toBuffer();
@@ -38,7 +37,7 @@ for (const [language, readme] of [['zh-CN','README.md'],['en','README_EN.md']]) 
     const meta = await sharp(input).metadata();
     if (meta.width !== 1718 || meta.height !== 1307) throw Error(`Recheck crop coordinates for ${source}`);
     const [title,subtitle] = language === 'en' ? spec.en : spec.zh;
-    const layers = [{input:logo,left:64,top:26},{input:svg('<rect x="54" y="759" width="155" height="29" rx="8" fill="#f4f8ff" fill-opacity=".94"/><rect x="1136" y="28" width="80" height="31" rx="8" fill="#f4f8ff" fill-opacity=".94"/>'+text(title,64,108,language === 'en' ? 36 : 38,'#1c2d44',700)+text(subtitle,66,145,18,'#526981')+text('comics.nodelane.net',64,779,13,'#526981')+text(`${String(index+1).padStart(2,'0')} / 06`,1150,49,14,'#1769b3',700)),left:0,top:0}];
+    const layers = [{input:logo,left:64,top:26},{input:svg('<rect x="54" y="759" width="155" height="29" rx="8" fill="#f4f8ff" fill-opacity=".94"/><rect x="1136" y="28" width="80" height="31" rx="8" fill="#f4f8ff" fill-opacity=".94"/>'+text(title,64,108,language === 'en' ? 36 : 38,'#1c2d44',700)+text(subtitle,66,145,18,'#526981')+text('comics.nodelane.net',64,779,13,'#526981')+text(`${String(index+1).padStart(2,'0')} / ${String(specs.length).padStart(2,'0')}`,1150,49,14,'#1769b3',700)),left:0,top:0}];
     const placements = [];
     // English search capture has a back button and a taller header than Chinese.
     const crops = language === 'en' && spec.name === 'cross-language-search'
@@ -61,6 +60,7 @@ for (const [language, readme] of [['zh-CN','README.md'],['en','README_EN.md']]) 
     thumbs.push({input:await sharp(result).resize(640,400).png().toBuffer(),left:language === 'en' ? 640 : 0,top:index*400});
   }
 }
-await sharp({create:{width:1280,height:2400,channels:3,background:'#f4f8ff'}}).composite(thumbs).jpeg({quality:92}).toFile(path.join(out,'contact-sheet.jpg'));
+await sharp({create:{width:1280,height:specs.length*400,channels:3,background:'#f4f8ff'}}).composite(thumbs).jpeg({quality:92}).toFile(path.join(out,'contact-sheet.jpg'));
 await writeFile(path.join(out,'asset-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+await writeFile(path.join(out,'README.md'),`# Chrome Web Store 截图\n\n复用现有蓝色漫画风背景，产品界面和漫画内容均裁剪自根目录中英文 README 的真实截图；未生成或修改界面与对白。\n\n- zh-CN/、en/：各 5 张 1280×800 RGB PNG，无透明通道。\n- 上传顺序：翻译对照、跨语言搜索、阅读目录、书架、离线中心。\n- contact-sheet.jpg：左中文、右英文的总览。\n- asset-manifest.json：来源摘要、裁剪坐标和摆放尺寸。\n\n首图保留阅读器两侧工具栏。英文原截图展示的是英文原图与中文译文，副标题据此明确写为 Chinese translation。离线中心保持原截图的实际进度。\n\n重建：\n\n\`\`\`powershell\nnode scripts/prepare_readme_store_screenshots.mjs\n\`\`\`\n\n背景：output/imagegen/blue-manga-store/background.png。默认输出：output/chrome-web-store-current/screenshots。\n`);
 console.log(JSON.stringify({output:out,images:manifest.outputs.length,dimensions:'1280x800',channels:'RGB, no alpha'},null,2));

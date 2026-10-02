@@ -15,6 +15,7 @@ import {ApiError} from '../src/api';
 import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
 import * as png from '../../../backend/shared/translation-images/png';
 import {fixture,target,snapshot,originalInput,originalBytes} from './translation-fixture';
+import {jpegWithSize} from './image-encoding-fixture';
 
 const encoded=new Blob(['RIFF',new Uint8Array([14,0,0,0]),'WEBPVP8 ',new Uint8Array([2,0,0,0]),'ok'],{type:'image/webp'}),close=vi.fn(),draw=vi.fn(),encode=vi.fn(async()=>encoded);
 const inputs=new ByteCache({name:'translation-inputs-v1',budgetBytes:INPUT_BUDGET_BYTES});
@@ -77,11 +78,11 @@ it('uses the current center dimension ceiling without an independent source-pixe
   await expect(prepareTranslationInput({...strip,height:100001},read,()=>true)).rejects.toThrow('尺寸');
   expect(read).not.toHaveBeenCalled();
 });
-it('reuses admissible same-size input beyond the JPEG limit without decoding or encoding it',async()=>{
+it.each([65501,65535,100000])('reuses admissible same-size input with edge %i beyond the JPEG limit without decoding or encoding it',async height=>{
   const source=new Blob([new Uint8Array(1024*1024+1)],{type:'image/png'}),sha=await hashFile(source);
-  const page={...target(1).page,width:800,height:100000,imageByteSize:source.size,imageSha256:sha,imageMime:source.type};
+  const page={...target(1).page,width:800,height,imageByteSize:source.size,imageSha256:sha,imageMime:source.type};
   const result=await prepareTranslationInput(page,async()=>source,()=>true);
-  expect(result).toMatchObject({width:800,height:100000,image:{sha256:sha,byte_size:source.size,content_type:'image/png'}});
+  expect(result).toMatchObject({width:800,height,image:{sha256:sha,byte_size:source.size,content_type:'image/png'}});
   expect(result.blob).toBeUndefined();expect(result.profile).toBeUndefined();expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
 });
 it('rejects required resized input beyond the JPEG limit before reading or decoding its source',async()=>{
@@ -147,7 +148,7 @@ it('shared input loading rebuilds once and then skips the source on a cache hit'
 });
 it.each([LEGACY_INPUT_PROFILE,INPUT_PROFILE])('restores evicted long input with its frozen encoder profile %s',async profile=>{
   const scope=crypto.randomUUID(),source=originalBytes(0),read=vi.fn(async()=>source);
-  const legacy=new Blob(['frozen legacy PNG'],{type:'image/png'}),current=new Blob([new Uint8Array([255,216,255,218]),'frozen current JPEG'],{type:'image/jpeg'});
+  const legacy=new Blob(['frozen legacy PNG'],{type:'image/png'}),current=jpegWithSize(800,20000);
   const pngEncode=vi.spyOn(png,'bitmapPng').mockResolvedValue(legacy);encode.mockResolvedValueOnce(current);
   vi.mocked(createImageBitmap).mockResolvedValue({width:800,height:20000,close} as unknown as ImageBitmap);
   const output=profile===LEGACY_INPUT_PROFILE?legacy:current;

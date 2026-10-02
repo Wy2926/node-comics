@@ -2,7 +2,7 @@ import {msg} from '../../i18n/runtime';
 import {assertCurrent} from '../../concurrency';
 import type {Capabilities,Page,TranslationImage} from '../../types';
 import {hashFile} from '../../importers/hash';
-import {INPUT_PROFILE,TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS,TRANSLATION_REENCODE_BYTES,TRANSLATION_JPEG_MAX_DIMENSION,translationSize,type InputProfile} from './limits';
+import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS,TRANSLATION_REENCODE_BYTES,TRANSLATION_JPEG_MAX_DIMENSION,translationSize,type InputProfile} from './limits';
 import {imageWork} from './work';
 import {ImageOutputTooLargeError,resizeInput} from './resize';
 import ResizeWorker from './resize.worker?worker';
@@ -33,6 +33,7 @@ function resized(blob:Blob,width:number,height:number,profile:InputProfile=INPUT
 export async function restoreTranslationInput(source:Blob,width:number,height:number,sourceSha:string|undefined,expectedSha:string,current:()=>boolean,profile:InputProfile=INPUT_PROFILE){
   return imageWork(async()=>{
     assertCurrent(current);
+    if(profile!==LEGACY_INPUT_PROFILE&&Math.max(width,height)>TRANSLATION_JPEG_MAX_DIMENSION)throw new InputChangedError();
     if(!sourceSha||await hashFile(source)!==sourceSha)throw new InputChangedError();
     assertCurrent(current);
     const result=await resized(source,width,height,profile);assertCurrent(current);
@@ -45,11 +46,12 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
   if(!Number.isSafeInteger(page.width)||!Number.isSafeInteger(page.height)||page.width<1||page.height<1||!Number.isSafeInteger(page.width*page.height)
     ||size.width*size.height>Math.min(TRANSLATION_MAX_PIXELS,limits?.max_pixels??Infinity)
     ||Math.max(size.width,size.height)>Math.min(TRANSLATION_MAX_DIMENSION,limits?.max_dimension??Infinity))throw Error(msg('图片尺寸超过翻译服务限制。'));
-  const changed=size.width!==page.width||size.height!==page.height;
+  // AVIF is readable locally but is not an accepted official upload format.
+  const required=size.width!==page.width||size.height!==page.height||page.imageMime==='image/avif';
   const encodable=Math.max(size.width,size.height)<=TRANSLATION_JPEG_MAX_DIMENSION;
-  if(changed&&!encodable)throw Error(msg('图片尺寸超过翻译服务限制。'));
+  if(required&&!encodable)throw Error(msg('图片尺寸超过翻译服务限制。'));
   const maxBytes=Math.min(TRANSLATION_MAX_BYTES,limits?.max_bytes??Infinity);
-  if(!changed&&page.imageSha256&&page.imageByteSize&&page.imageByteSize<=TRANSLATION_REENCODE_BYTES){
+  if(!required&&page.imageSha256&&page.imageByteSize&&page.imageByteSize<=TRANSLATION_REENCODE_BYTES){
     if(page.imageByteSize>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
     assertCurrent(current);
     return {...size,sourceSha256:page.imageSha256,image:{sha256:page.imageSha256,byte_size:page.imageByteSize,content_type:page.imageMime||'image/png',normalization_version:1}};
@@ -61,15 +63,15 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     assertCurrent(current);
     if(page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     let encoded:Awaited<ReturnType<typeof resized>>|undefined;
-    if(encodable&&(changed||source.size>TRANSLATION_REENCODE_BYTES)){
+    if(encodable&&(required||source.size>TRANSLATION_REENCODE_BYTES)){
       try{encoded=await resized(source,size.width,size.height);}
       catch(error){
         // Only optional same-size compression may keep the already normalized source.
-        if(changed||source.size>maxBytes||!(error instanceof ImageOutputTooLargeError))throw error;
+        if(required||source.size>maxBytes||!(error instanceof ImageOutputTooLargeError))throw error;
       }
     }
-    // Keep original bytes if re-encoding an unchanged-sized image saves no space.
-    const result=encoded&&(changed||encoded.blob.size<source.size)?encoded:{blob:source,sha256:sourceSha256};
+    // Only optional compression may keep the source when it saves no space.
+    const result=encoded&&(required||encoded.blob.size<source.size)?encoded:{blob:source,sha256:sourceSha256};
     const prepared=result.blob!==source;
     assertCurrent(current);
     if(result.blob.size>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));

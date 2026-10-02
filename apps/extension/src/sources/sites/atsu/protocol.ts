@@ -27,11 +27,11 @@ export function assetUrl(value: unknown, kind: 'cover' | 'page', mangaId?: strin
   if (/[\\%]/.test(raw)) return invalid();
   const path = raw.startsWith('https://') ? new URL(raw).pathname : raw.startsWith('/static/') ? raw : '/static/' + raw;
   const url = new URL(raw.startsWith('https://') ? raw : path, cdnOrigin);
-  // New uploads use the scanlation namespace; older imported images use the manga namespace.
+  // Public images use manga/scanlation namespaces or the chapter ID directly.
   // Inline DOM already binds the source chapter, but cannot expose its API-only scanlation ID.
   const owner = mangaId ? scanlatorId ? `(?:${mangaId}|${scanlatorId})` : mangaId : identifier;
   const pattern = kind === 'cover' ? /^\/static\/posters\/[A-Za-z0-9_-]+(?:-(?:small|medium|large))?\.(?:webp|png|jpe?g|avif)$/i :
-    new RegExp(`^/static/pages/${owner}/${chapterId}/[A-Za-z0-9_-]+\\.(?:webp|png|jpe?g|avif|gif)$`);
+    new RegExp(`^/static/pages/(?:${owner}/)?${chapterId}/[A-Za-z0-9_-]+\\.(?:webp|png|jpe?g|avif|gif)$`);
   if (url.origin !== cdnOrigin || url.username || url.password || url.search || url.hash || !pattern.test(url.pathname)) return invalid();
   return url.href;
 }

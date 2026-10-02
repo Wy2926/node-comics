@@ -1,9 +1,11 @@
 import {bitmapPng, type PngPatch} from './png';
+import {TRANSLATION_JPEG_MAX_DIMENSION} from './limits';
+import {probeImageMetadata} from './image-metadata';
 
 // An encoding working-set budget, not an image admission limit. Larger pages use
 // the bounded scanline encoder instead of allocating another full-page surface.
 const canvasPixels = 64 * 1024 * 1024;
-const webpEdge = 16383, jpegEdge = 65535;
+const webpEdge = 16383;
 const displayQuality = 0.95;
 
 function opaque(context: OffscreenCanvasRenderingContext2D, width: number, height: number) {
@@ -19,7 +21,7 @@ export async function compositeImage(base: ImageBitmap, patches: PngPatch[], sou
   const {width, height} = base, edge = Math.max(width, height);
   let canvas: OffscreenCanvas | undefined;
   try {
-    if (edge <= jpegEdge && width * height <= canvasPixels) {
+    if (edge <= TRANSLATION_JPEG_MAX_DIMENSION && width * height <= canvasPixels) {
       canvas = new OffscreenCanvas(width, height);
       const context = canvas.getContext('2d', {colorSpace: 'srgb'});
       if (context) {
@@ -41,7 +43,10 @@ export async function compositeImage(base: ImageBitmap, patches: PngPatch[], sou
         try {
           const output = await canvas.convertToBlob({type, quality: displayQuality});
           // Browsers without this encoder may legitimately return PNG instead.
-          if (output.size && (output.type === type || output.type === 'image/png')) return output;
+          if (output.size && (output.type === type || output.type === 'image/png')) {
+            const dimensions = output.type === 'image/jpeg' ? await probeImageMetadata(output) : undefined;
+            if (output.type !== 'image/jpeg' || dimensions?.width === width && dimensions.height === height) return output;
+          }
         } catch { /* Native encoder/surface limits differ by browser. Stream the same pixels below. */ }
       }
     }

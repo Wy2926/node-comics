@@ -168,7 +168,14 @@ export class TranslationCoordinator {
       if(!previous)await this.legacy.check(target,true);
       if(previous?.state==='uncertain'||previous&&active(previous)||latest.pending||latest.latest?.status==='unknown_released')throw Error(msg('原请求结果待核实，暂不能重复翻译。'));
       const source=previous?.result?.id??latest.latest?.id,state=previous?.result?.state??latest.latest?.status;
-      if(previous?.state==='blocked'&&!previous.result){previous.state='local';previous.error=undefined;previous.retryAt=undefined;await saveOperation(previous);return;}
+      if(previous?.state==='blocked'&&!previous.result){
+        if(previous.errorCode==='INVALID_REQUEST'&&'image' in previous.request&&previous.request.image.content_type==='image/avif'){
+          // The old descriptor was rejected before admission. An explicit retry may
+          // prepare supported bytes, under a new UUID rather than mutating its input.
+          const record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent());this.remember(record);
+        }else{previous.state='local';previous.error=undefined;previous.retryAt=undefined;await saveOperation(previous);}
+        return;
+      }
       const action=source?(state==='failed'||state==='cancelled'?{retry_of:source}:{regenerate_of:source}):undefined;
       const record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent(),action,previous);this.remember(record);
     });await this.submit([target],requestCurrent);

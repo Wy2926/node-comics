@@ -30,7 +30,7 @@ function jpeg(width: number, height: number, normalize = false) {
 }
 
 async function withWorker(run: (state: {
-  actual?: [number, number]; failDecodeAt?: number; overflow: boolean; unavailableJpeg: boolean;
+  actual?: [number, number]; encodedSize?: [number, number]; failDecodeAt?: number; overflow: boolean; unavailableJpeg: boolean;
   decodes: { blob: Blob; options?: ImageBitmapOptions }[];
   bitmaps: { width: number; height: number; closed: boolean }[];
   canvases: { width: number; height: number }[];
@@ -43,7 +43,8 @@ async function withWorker(run: (state: {
   );
   const replies: Reply[] = [], port = { onmessage: undefined as Handler | undefined, postMessage: (reply: Reply) => replies.push(reply) };
   const state = {
-    actual: undefined as [number, number] | undefined, failDecodeAt: undefined as number | undefined, overflow: false, unavailableJpeg: false,
+    actual: undefined as [number, number] | undefined, encodedSize: undefined as [number, number] | undefined,
+    failDecodeAt: undefined as number | undefined, overflow: false, unavailableJpeg: false,
     decodes: [] as { blob: Blob; options?: ImageBitmapOptions }[],
     bitmaps: [] as { width: number; height: number; closed: boolean }[],
     canvases: [] as { width: number; height: number }[], surfaces: [] as number[][], encodings: [] as ImageEncodeOptions[], fills: [] as { color: string; rect: number[] }[],
@@ -74,7 +75,8 @@ async function withWorker(run: (state: {
       async convertToBlob(options: ImageEncodeOptions) {
         state.encodings.push(options);
         if (state.overflow) throw new ImageOutputTooLargeError();
-        if (options.type === 'image/jpeg') return state.unavailableJpeg ? png(this.width, this.height) : jpeg(this.width, this.height, true);
+        if (options.type === 'image/jpeg') return state.unavailableJpeg ? png(this.width, this.height)
+          : jpeg(state.encodedSize?.[0] ?? this.width, state.encodedSize?.[1] ?? this.height, true);
         return options.type === 'image/png' ? png(this.width, this.height) : new Blob(['RIFF\x04\x00\x00\x00WEBP'], { type: options.type });
       }
     },
@@ -169,8 +171,17 @@ test('compresses an admissible large strip as JPEG without changing its dimensio
   assert.ok(state.canvases.every(canvas => canvas.width === 1 && canvas.height === 1));
 }));
 
-test('skips optional compression beyond the JPEG dimension limit and keeps original bytes', async () => withWorker(async state => {
-  const source = png(64, 100000, false, 1024 * 1024);
+for (const [width, height] of [[64, 65500], [65500, 64]]) test(`encodes the exact JPEG boundary ${width} x ${height}`, async () => withWorker(async state => {
+  const reply = await state.send({ source: png(width, height, false, 1024 * 1024), allowTiles: true });
+  assert.equal(reply.error, undefined);
+  assert.deepEqual(await probeImageMetadata(reply.input!), { mime: 'image/jpeg', width, height });
+  assert.equal(state.decodes.length, 2); assert.equal(state.encodings.length, 1);
+  assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
+}));
+
+for (const [width, height] of [[64, 65501], [65501, 64], [64, 65535], [65535, 64], [64, 100000]])
+test(`keeps exact original bytes beyond the JPEG boundary ${width} x ${height}`, async () => withWorker(async state => {
+  const source = png(width, height, false, 1024 * 1024);
   const reply = await state.send({ source, allowTiles: true });
   assert.equal(reply.error, undefined); assert.equal(reply.mime, 'image/png');
   assert.equal(reply.sha256, await hashFile(source));
@@ -184,7 +195,7 @@ test('skips optional compression beyond the JPEG dimension limit and keeps origi
 
 test('rejects mandatory resizing or normalization beyond the JPEG dimension limit without a PNG fallback', async () => withWorker(async state => {
   assert.deepEqual(await state.send({ source: png(2400, 100000), allowTiles: true }), { error: 'IMAGE_DIMENSIONS_LIMIT' });
-  assert.deepEqual(await state.send({ source: png(64, 65536, true), allowTiles: true }), { error: 'IMAGE_DIMENSIONS_LIMIT' });
+  assert.deepEqual(await state.send({ source: png(64, 65501, true), allowTiles: true }), { error: 'IMAGE_DIMENSIONS_LIMIT' });
   assert.equal(state.decodes.length, 2); assert.equal(state.canvases.length, 0); assert.equal(state.encodings.length, 0);
   assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
 }));
@@ -193,6 +204,14 @@ test('reports JPEG encoder failure without retaining an uncompressed original or
   state.unavailableJpeg = true;
   assert.deepEqual(await state.send({ source: png(64, 20000, false, 1024 * 1024), allowTiles: true }), { error: 'IMAGE_PROCESSING_FAILED' });
   assert.deepEqual(state.encodings, [{ type: 'image/jpeg', quality: 0.3 }]);
+  assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
+  assert.ok(state.canvases.every(canvas => canvas.width === 1 && canvas.height === 1));
+}));
+
+test('rejects a successful JPEG encoder that silently changes dimensions before freezing the input', async () => withWorker(async state => {
+  state.encodedSize = [64, 19999];
+  assert.deepEqual(await state.send({ source: png(64, 20000, false, 1024 * 1024), allowTiles: true }), { error: 'IMAGE_PROCESSING_FAILED' });
+  assert.equal(state.decodes.length, 2); assert.equal(state.encodings.length, 1);
   assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
   assert.ok(state.canvases.every(canvas => canvas.width === 1 && canvas.height === 1));
 }));

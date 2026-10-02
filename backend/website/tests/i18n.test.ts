@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dictionaries, locales, localPath, basePath, localeFromPath, publicPaths } from '../src/i18n';
 import { homeCopy } from '../src/i18n/home';
+import { version as extensionVersion } from '../../../apps/extension/package.json';
 
 test('homepage locales provide complete text and matching gallery/translation entries', () => {
   function check(value: unknown, reference: unknown, path: string) {
@@ -55,5 +56,17 @@ test('localized releases have stable unique anchors and matching entries',()=>{
     assert.equal(new Set(anchors).size,anchors.length,locale);
     assert.deepEqual(anchors,reference.map(release=>release.id??release.date),locale);
     assert.deepEqual(releases.map(release=>release.date),reference.map(release=>release.date),locale);
+  }
+});
+
+test('the current extension release replaces the superseded 0.9.0 notes in every locale',()=>{
+  for(const locale of locales){
+    const releases=dictionaries[locale].documents.releases;
+    assert.equal(releases[0].id,extensionVersion,locale);
+    assert.ok(releases[0].title.includes(extensionVersion),locale);
+    assert.ok(releases[0].items.some(item=>item.includes('JPEG')),locale);
+    assert.ok(releases[0].items.some(item=>item.includes('AVIF')),locale);
+    assert.ok(!releases.some(release=>release.id==='0.9.0'),locale);
+    assert.ok(releases.some(release=>release.id==='0.8.0'),locale);
   }
 });

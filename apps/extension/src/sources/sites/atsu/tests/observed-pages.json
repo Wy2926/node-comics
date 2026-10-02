@@ -1,0 +1,146 @@
+{
+  "source": "https://atsu.moe/read/RkOOE/xt4LXl",
+  "projection": "Public chapter-only image path response; title replaced and unrelated fields removed. No image bytes.",
+  "response": {
+    "readChapter": {
+      "id": "xt4LXl",
+      "title": "Chapter 0",
+      "scanlationMangaId": "cmpzhzbcz0000xfqh6d40x5os",
+      "pages": [
+        {
+          "id": "xt4LXl-0",
+          "image": "/static/pages/xt4LXl/0.webp",
+          "number": 0,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-1",
+          "image": "/static/pages/xt4LXl/1.webp",
+          "number": 1,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-2",
+          "image": "/static/pages/xt4LXl/2.webp",
+          "number": 2,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-3",
+          "image": "/static/pages/xt4LXl/3.webp",
+          "number": 3,
+          "width": 1040,
+          "height": 1475
+        },
+        {
+          "id": "xt4LXl-4",
+          "image": "/static/pages/xt4LXl/4.webp",
+          "number": 4,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-5",
+          "image": "/static/pages/xt4LXl/5.webp",
+          "number": 5,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-6",
+          "image": "/static/pages/xt4LXl/6.webp",
+          "number": 6,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-7",
+          "image": "/static/pages/xt4LXl/7.webp",
+          "number": 7,
+          "width": 1040,
+          "height": 1475
+        },
+        {
+          "id": "xt4LXl-8",
+          "image": "/static/pages/xt4LXl/8.webp",
+          "number": 8,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-9",
+          "image": "/static/pages/xt4LXl/9.webp",
+          "number": 9,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-10",
+          "image": "/static/pages/xt4LXl/10.webp",
+          "number": 10,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-11",
+          "image": "/static/pages/xt4LXl/11.webp",
+          "number": 11,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-12",
+          "image": "/static/pages/xt4LXl/12.webp",
+          "number": 12,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-13",
+          "image": "/static/pages/xt4LXl/13.webp",
+          "number": 13,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-14",
+          "image": "/static/pages/xt4LXl/14.webp",
+          "number": 14,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-15",
+          "image": "/static/pages/xt4LXl/15.webp",
+          "number": 15,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-16",
+          "image": "/static/pages/xt4LXl/16.webp",
+          "number": 16,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-17",
+          "image": "/static/pages/xt4LXl/17.webp",
+          "number": 17,
+          "width": 1040,
+          "height": 1478
+        },
+        {
+          "id": "xt4LXl-18",
+          "image": "/static/pages/xt4LXl/18.webp",
+          "number": 18,
+          "width": 1200,
+          "height": 675
+        }
+      ]
+    }
+  }
+}

@@ -6,9 +6,27 @@ import {assetUrl} from '../protocol';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
 import {chapter, chapters, hits, metadata, pages} from './fixtures';
+import observed from './observed-catalog.json';
+import observedPages from './observed-pages.json';
 
 const catalog = catalogUrl('Work1'), reader = chapterUrl('Work1', 'Chap1');
 describe('Atsumaru isolated HTTP adapter', () => {
+  it('preserves valid page dimensions above the former source edge ceiling', () => {
+    const data = pages(); Object.assign(data.readChapter.pages[0], {width: 100001, height: 100001});
+    expect(parsePages(data, reader).items[0]).toMatchObject({width: 100001, height: 100001});
+  });
+  it('imports the observed fractional chapter number and independent scanlation releases through the production network', async () => {
+    const url = catalogUrl('RkOOE');
+    const request = vi.fn(async (target: string) => JSON.stringify(target.includes('allChapters') ? observed.allChapters : observed.metadata));
+    const result = validateCatalog(await network.catalog(url, {request}), [definition]);
+    expect(observed.metadata.mangaPage.totalChapterCount).toBe(56.3);
+    expect(result.complete).toBe(true);
+    expect(result.entries).toHaveLength(8);
+    expect(result.groups.map(group => group.entryIds.length)).toEqual([2, 2, 2, 2]);
+    expect(result.entries.map(entry => entry.remoteId)).toEqual(['GkBrbF', 'odCBf0', 'xt4LXl', 'ONZ2jn', 'q1nXpb', 'Y1WZ3F', 'WMn7cP5A', 'ekJDj']);
+    expect(new Set(result.entries.map(entry => entry.sequenceId)).size).toBe(4);
+    expect(request.mock.calls.map(([target]) => new URL(target).pathname)).toEqual(['/api/manga/page', '/api/manga/allChapters']);
+  });
   it('claims exact HTTPS host and binds readers to the work already present in their URLs', () => {
     expect(definition.identify(new URL(catalog))?.catalog?.key).toBe('atsu:Work1');
     expect(definition.identify(new URL(catalogUrl('K_k-')))?.catalog?.key).toBe('atsu:K_k-');
@@ -21,7 +39,7 @@ describe('Atsumaru isolated HTTP adapter', () => {
     expect(definition.installation.optionalOrigins).toEqual(['https://atsu.moe/*', 'https://cdn.atsu.moe/*']);
     expect(definition.sites![0].search!.requestOrigins.every(origin => definition.installation.optionalOrigins!.includes(origin))).toBe(true);
   });
-  it('checks total count, orders by the source index and keeps scanlation chains independent', () => {
+  it('checks preview membership, orders by the source index and keeps scanlation chains independent', () => {
     const result = validateCatalog(parseCatalog(metadata(), chapters(), 'Work1'), [definition]);
     expect(result.complete).toBe(true);
     expect(result.entries.map(row => row.remoteId)).toEqual(['Chap1', 'Chap2', 'Chap3']);
@@ -35,9 +53,9 @@ describe('Atsumaru isolated HTTP adapter', () => {
   it('preserves group order and reading chains at the catalog budget without changing input rows', () => {
     const meta = metadata(), groupCount = 1000, chapterCount = 10000;
     meta.mangaPage.scanlators = Array.from({length: groupCount}, (_, index) => ({id: 'Scan' + index, name: 'Group ' + index}));
-    meta.mangaPage.totalChapterCount = chapterCount;
     const rows = {chapters: Array.from({length: chapterCount}, (_, index) =>
       chapter('Chap' + index, index % 10, 'Scan' + Math.floor(index / 10))).reverse()};
+    meta.mangaPage.chapters = rows.chapters.slice(0, 80);
     const before = structuredClone(rows);
     const result = validateCatalog(parseCatalog(meta, rows, 'Work1'), [definition]);
     expect(result.entries).toHaveLength(chapterCount); expect(result.groups).toHaveLength(groupCount);
@@ -49,11 +67,12 @@ describe('Atsumaru isolated HTTP adapter', () => {
     const empty = metadata(); empty.mangaPage.scanlators.push({id: 'Empty', name: 'Empty group'});
     expect(parseCatalog(empty, chapters(), 'Work1').groups.at(-1)?.entryIds).toEqual([]);
   });
-  it.each(['owner', 'novel', 'count', 'duplicate', 'scanlator', 'index', 'cover'])('rejects %s catalog evidence', mode => {
+  it.each(['owner', 'novel', 'missing-preview', 'preview-group', 'duplicate', 'scanlator', 'index', 'cover'])('rejects %s catalog evidence', mode => {
     const meta = metadata(), rows = chapters();
     if (mode === 'owner') meta.mangaPage.id = 'Other';
     if (mode === 'novel') meta.mangaPage.medium = 'Novel';
-    if (mode === 'count') meta.mangaPage.totalChapterCount++;
+    if (mode === 'missing-preview') rows.chapters.pop();
+    if (mode === 'preview-group') meta.mangaPage.chapters[0].scanlationMangaId = 'Scan2';
     if (mode === 'duplicate') rows.chapters[1].id = rows.chapters[0].id;
     if (mode === 'scanlator') rows.chapters[0].scanlationMangaId = 'Other';
     if (mode === 'index') rows.chapters[0].index = rows.chapters[2].index;
@@ -71,14 +90,17 @@ describe('Atsumaru isolated HTTP adapter', () => {
     await expect(network.catalog(catalog, {previous, request: async () => 'Just a moment...'})).rejects.toThrow('验证');
     expect(previous).toEqual(before);
   });
-  it.each(['owner', 'novel', 'budget'])('stops before requesting the full directory for invalid %s metadata', async mode => {
+  it.each(['owner', 'novel'])('stops before requesting the full directory for invalid %s metadata', async mode => {
     const meta = metadata();
     if (mode === 'owner') meta.mangaPage.id = 'Other';
     if (mode === 'novel') meta.mangaPage.medium = 'Novel';
-    if (mode === 'budget') meta.mangaPage.totalChapterCount = 10001;
     const fetcher = vi.fn(async () => JSON.stringify(meta));
     await expect(network.catalog(catalog, {request: fetcher})).rejects.toThrow();
     expect(fetcher).toHaveBeenCalledExactlyOnceWith('https://atsu.moe/api/manga/page?id=Work1', {referer: catalog});
+  });
+  it('rejects full directories beyond the actual release budget', () => {
+    const rows = {chapters: Array.from({length: 10001}, (_, index) => chapter('Chap' + index, index))};
+    expect(() => parseCatalog(metadata(), rows, 'Work1')).toThrow();
   });
   it('preserves complete page order and duplicate URLs as distinct source page slots', () => {
     const result = validatePages(parsePages(pages(), reader), definition.identify(new URL(reader))!);
@@ -99,6 +121,26 @@ describe('Atsumaru isolated HTTP adapter', () => {
     expect((await network.pages(reader, {request})).items).toHaveLength(3);
     expect(request.mock.calls.map(call => call[0])).toEqual(['https://atsu.moe/api/read/chapter?mangaId=Work1&chapterId=Chap1', 'https://atsu.moe/api/manga/page?id=Work1']);
     await expect(network.pages(chapterUrl('Other', 'Chap1'), {request})).rejects.toThrow();
+  });
+  it('reads observed chapter-only image paths only after independently confirming work ownership', async () => {
+    const request = vi.fn(async (url: string) => JSON.stringify(url.includes('/api/manga/') ? observed.metadata : observedPages.response));
+    const result = validatePages(await network.pages(observedPages.source, {request}), definition.identify(new URL(observedPages.source))!);
+    expect(result.discoveryComplete).toBe(true);
+    expect(result.knownTotal).toBe(19);
+    expect(result.items[0].resource).toEqual({kind: 'http', url: 'https://cdn.atsu.moe/static/pages/xt4LXl/0.webp'});
+    expect(result.items.at(-1)?.id).toBe('xt4LXl-18');
+    expect(request.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(['/api/read/chapter', '/api/manga/page']);
+    expect(() => parsePages(observedPages.response, observedPages.source)).toThrow();
+    const wrong = structuredClone(observed.metadata); wrong.mangaPage.scanlators.splice(1, 1);
+    expect(() => parsePages(observedPages.response, observedPages.source, wrong)).toThrow();
+    expect(() => parsePages(observedPages.response, chapterUrl('Other', 'xt4LXl'), observed.metadata)).toThrow();
+    const collision = chapterUrl('xt4LXl', 'xt4LXl');
+    expect(() => parsePages(observedPages.response, collision)).toThrow();
+    request.mockClear();
+    await expect(network.pages(collision, {request})).rejects.toThrow();
+    expect(request.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(['/api/read/chapter', '/api/manga/page']);
+    const foreign = structuredClone(observedPages.response); foreign.readChapter.pages[0].image = '/static/pages/Other/0.webp';
+    expect(() => parsePages(foreign, observedPages.source, observed.metadata)).toThrow();
   });
   it.each(['page-id', 'order', 'dimensions'])('rejects malformed scanlation-owned %s pages before another HTTP request', async mode => {
     const data = pages(); data.readChapter.pages[0].image = '/static/pages/Scan1/Chap1/0.webp';

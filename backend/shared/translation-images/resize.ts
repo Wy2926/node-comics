@@ -1,6 +1,7 @@
 import {hashFile} from './hash';
 import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,TRANSLATION_JPEG_MAX_DIMENSION,TRANSLATION_JPEG_QUALITY,TRANSLATION_MAX_BYTES,TRANSLATION_WEBP_QUALITY,type InputProfile} from './limits';
 import {bitmapPng} from './png';
+import {probeImageMetadata} from './image-metadata';
 export {ImageOutputTooLargeError} from './png';
 
 /** Only for our sRGB canvas output: remove redundant profiles without re-encoding pixels. */
@@ -68,6 +69,10 @@ export async function resizeInput(blob:Blob,width:number,height:number,profile:I
     const output=long
       ?await canvasJpeg(await canvas.convertToBlob({type:'image/jpeg',quality:TRANSLATION_JPEG_QUALITY}))
       :await canvasWebp(await canvas.convertToBlob({type:'image/webp',quality:TRANSLATION_WEBP_QUALITY}));
+    if(long){
+      const dimensions=await probeImageMetadata(output);
+      if(dimensions?.width!==width||dimensions.height!==height)throw Error('JPEG encoder changed image dimensions');
+    }
     return {blob:output,sha256:await hashFile(output)};
   } finally {bitmap.close();if(canvas)canvas.width=canvas.height=1;}
 }

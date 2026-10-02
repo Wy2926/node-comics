@@ -1,6 +1,6 @@
 // Small synthetic fixtures following the public Atsumaru API, without copied comic text or image bytes.
 export const metadata = () => ({mangaPage: {id: 'Work1', title: 'Fixture work', medium: 'Comic', type: 'Manga',
-  poster: {image: 'posters/fixture.jpg'}, totalChapterCount: 3,
+  poster: {image: 'posters/fixture.jpg'}, totalChapterCount: 2, chapters: chapters().chapters,
   scanlators: [{id: 'Scan1', name: 'First group'}, {id: 'Scan2', name: 'Second group'}]}});
 export const chapter = (id: string, index: number, scanlator = 'Scan1') => ({id, scanlationMangaId: scanlator,
   title: 'Chapter ' + (index + 1), index, number: index + 1, pageCount: 3});

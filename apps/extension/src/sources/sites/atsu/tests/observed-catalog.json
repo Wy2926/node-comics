@@ -1,0 +1,136 @@
+{
+  "source": "https://atsu.moe/manga/RkOOE",
+  "projection": "First and last release of each scanlation from the public API; work/group titles and poster replaced. Chapter numbers, IDs, indices and counts preserved. Original full response has 224 releases; the metadata number is 56.3.",
+  "metadata": {
+    "mangaPage": {
+      "id": "RkOOE",
+      "title": "Observed work fixture",
+      "medium": "Comic",
+      "poster": {
+        "image": "posters/fixture.jpg"
+      },
+      "totalChapterCount": 56.3,
+      "hasMoreChapters": true,
+      "scanlators": [
+        {
+          "id": "cmqki67zc0000i7o28aw8dtsp",
+          "name": "Group 1"
+        },
+        {
+          "id": "cmpzhzbcz0000xfqh6d40x5os",
+          "name": "Group 2"
+        },
+        {
+          "id": "cmowdiz880000d4mpm8m6y3wl",
+          "name": "Group 3"
+        },
+        {
+          "id": "cmgzlpdtbej65m191o55ti5i9",
+          "name": "Group 4"
+        }
+      ],
+      "chapters": [
+        {
+          "id": "odCBf0",
+          "scanlationMangaId": "cmqki67zc0000i7o28aw8dtsp",
+          "title": "Chapter 56.3",
+          "number": 56.3,
+          "index": 72,
+          "pageCount": 18
+        },
+        {
+          "id": "ONZ2jn",
+          "scanlationMangaId": "cmpzhzbcz0000xfqh6d40x5os",
+          "title": "Chapter 52",
+          "number": 52,
+          "index": 66,
+          "pageCount": 37
+        },
+        {
+          "id": "Y1WZ3F",
+          "scanlationMangaId": "cmowdiz880000d4mpm8m6y3wl",
+          "title": "Chapter 35.5",
+          "number": 35.5,
+          "index": 49,
+          "pageCount": 24
+        },
+        {
+          "id": "ekJDj",
+          "scanlationMangaId": "cmgzlpdtbej65m191o55ti5i9",
+          "title": "Chapter 39",
+          "number": 39,
+          "index": 38,
+          "pageCount": 50
+        }
+      ]
+    }
+  },
+  "allChapters": {
+    "chapters": [
+      {
+        "id": "odCBf0",
+        "scanlationMangaId": "cmqki67zc0000i7o28aw8dtsp",
+        "title": "Chapter 56.3",
+        "number": 56.3,
+        "index": 72,
+        "pageCount": 18
+      },
+      {
+        "id": "GkBrbF",
+        "scanlationMangaId": "cmqki67zc0000i7o28aw8dtsp",
+        "title": "Chapter 0",
+        "number": 0,
+        "index": 0,
+        "pageCount": 19
+      },
+      {
+        "id": "ONZ2jn",
+        "scanlationMangaId": "cmpzhzbcz0000xfqh6d40x5os",
+        "title": "Chapter 52",
+        "number": 52,
+        "index": 66,
+        "pageCount": 37
+      },
+      {
+        "id": "xt4LXl",
+        "scanlationMangaId": "cmpzhzbcz0000xfqh6d40x5os",
+        "title": "Chapter 0",
+        "number": 0,
+        "index": 0,
+        "pageCount": 19
+      },
+      {
+        "id": "Y1WZ3F",
+        "scanlationMangaId": "cmowdiz880000d4mpm8m6y3wl",
+        "title": "Chapter 35.5",
+        "number": 35.5,
+        "index": 49,
+        "pageCount": 24
+      },
+      {
+        "id": "q1nXpb",
+        "scanlationMangaId": "cmowdiz880000d4mpm8m6y3wl",
+        "title": "Chapter 7",
+        "number": 7,
+        "index": 5,
+        "pageCount": 62
+      },
+      {
+        "id": "ekJDj",
+        "scanlationMangaId": "cmgzlpdtbej65m191o55ti5i9",
+        "title": "Chapter 39",
+        "number": 39,
+        "index": 38,
+        "pageCount": 50
+      },
+      {
+        "id": "WMn7cP5A",
+        "scanlationMangaId": "cmgzlpdtbej65m191o55ti5i9",
+        "title": "Chapter 1",
+        "number": 1,
+        "index": 0,
+        "pageCount": 22
+      }
+    ]
+  }
+}

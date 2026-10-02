@@ -2,7 +2,7 @@
 
 ## 商店截图
 
-`node scripts/prepare_readme_store_screenshots.mjs [背景图路径] [输出目录]` 使用根目录中英文 README 引用的真实截图裁剪排版，输出两种语言各 6 张 1280×800 RGB PNG、总览与记录来源摘要和裁剪坐标的清单。默认背景为 `output/imagegen/blue-manga-store/background.png`，默认输出目录为该背景所在的 `output/imagegen/blue-manga-store/`。需先安装官网模块的 `sharp` 依赖。脚本不调用模型；背景需单独准备，截图尺寸改变时必须重新核对裁剪区域。输出文件会覆盖同目录内的同名产物。
+`node scripts/prepare_readme_store_screenshots.mjs [背景图路径] [输出目录]` 使用根目录中英文 README 引用的真实截图裁剪排版，输出两种语言各 5 张 1280×800 RGB PNG、总览与记录来源摘要和裁剪坐标的清单。顺序为翻译对照、跨语言搜索、阅读目录、书架、离线中心。默认背景为 `output/imagegen/blue-manga-store/background.png`，默认输出目录为 `output/chrome-web-store-current/screenshots/`。需先安装官网模块的 `sharp` 依赖。脚本不调用模型；背景需单独准备，截图尺寸改变时必须重新核对裁剪区域。输出文件会覆盖同目录内的同名产物。
 
 从仓库根目录执行。Python 工具按[后端](../backend/README.md)安装依赖；浏览器工具需要 Node.js、Playwright 和支持解压扩展的 Chromium。脚本启动条件以下表和文件内配置为准，结果写入忽略的 `artifacts/`。
 
@@ -13,6 +13,7 @@
 | `bootstrap.ps1` | 本地控制服务初始化与启动，见[后端](../backend/README.md) |
 | `switch_release.py` / `retire_release.py` | OpenResty 事务式 API／静态切换、失败回退及旧进程安全排空，见[部署规范](../docs/DEPLOYMENT.md) |
 | `prepare_static_release.py` | 准备独立官网／后台的不可变目录、安全头与资源保留池，不自动激活 |
+| `submit_indexnow.py <公开 URL>... [--submit]` | 官网新增或实质更新页面的 IndexNow 通知；默认干运行并检查线上 key 与 sitemap，`--submit` 才发送，见[官网 SEO 规范](../backend/website/SEO.md#indexnow-变更通知) |
 | `tests/rehearse_deployment.py` | 隔离 Docker 中真实代理切换、慢上传、SSE、合成供应商任务与回退；默认清理本轮资源，报告写入 artifacts |
 | `database_backup.py` / `verify_database_restore.py` | [备份与隔离恢复](../docs/OPERATIONS.md) |
 | `export_openapi.py` | [导出 API 契约](../contracts/README.md) |
