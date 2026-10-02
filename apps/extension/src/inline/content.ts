@@ -13,6 +13,7 @@ import { connectInlineTheme } from './theme';
 import {track} from '../analytics';
 import {readAnalyticsPreferences} from '../analytics/client';
 import {InlineAnalytics} from './analytics';
+import {bindWebShortcuts} from '../shortcuts/web-content';
 
 interface Candidate {
   id: string;
@@ -97,30 +98,35 @@ export function installInline() {
     for (const transfer of transfers) transfer.abort();
     void send('NC_INLINE_INVALIDATE').catch(() => {});
   };
-  const pause = button(msg('暂停'), () => {
+  const togglePause = () => {
     paused = !paused;
     pause.textContent = paused ? msg('继续') : msg('暂停');
     invalidate();
     if (!paused) schedule();
     paint();
-  });
-  const originals = button(msg('恢复原图'), () => {
+  };
+  const pause = button(msg('暂停'), togglePause);
+  const toggleOriginal = () => {
     original = !original;
     originals.textContent = original ? msg('显示译图') : msg('恢复原图');
     invalidate();
     if (original) for (const item of tracked.values()) item.display.restore();
     schedule();
     paint();
-  });
+  };
+  const originals = button(msg('恢复原图'), toggleOriginal);
   pause.className = 'pause';
   originals.className = 'originals';
   const settingsButton = button(msg('设置'), () => {
     void send('NC_INLINE_OPEN', { view: 'settings' });
   });
-  const closeButton = button(msg('关闭'), () => {
+  const close = () => {
     dismissedUrl = location.href;
     stop();
-  });
+  };
+  const closeButton = button(msg('关闭'), close);
+  bindWebShortcuts({'web.pause':togglePause,'web.original':toggleOriginal,'web.close':close},
+    ()=>enabled&&initialUrl===location.href);
   subscribeLocale(() => {
     settingsButton.textContent = msg('设置');
     closeButton.textContent = msg('关闭');

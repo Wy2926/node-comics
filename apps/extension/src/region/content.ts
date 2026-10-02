@@ -7,6 +7,7 @@ import type {TranslationState} from '../translation/automatic';
 import {capturePlacement,imagePlacementValid,placementBox,RegionDisplay,type RegionPlacement} from './display';
 import {REGION_IMAGE_PORT,type RegionIdentity,type RegionImageRequest,type RegionRect,type RegionRequest,type RegionResponse,type RegionViewport} from './protocol';
 import styles from './styles.css?inline';
+import {bindWebShortcuts} from '../shortcuts/web-content';
 
 const viewport=():RegionViewport=>({width:innerWidth,height:innerHeight,devicePixelRatio,scrollX,scrollY,...(visualViewport?{visualViewport:{width:visualViewport.width,height:visualViewport.height,offsetLeft:visualViewport.offsetLeft,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}}:{})});
 const twoFrames=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
@@ -51,7 +52,8 @@ export function installRegion(){
     loadError=undefined;
     state={kind:'translating',message:msg('重试中…')};paint();void progress('NC_REGION_RETRY');
   });
-  const originals=button(()=>{original=!original;paint();});
+  const toggleOriginal=()=>{if(!resultUrl)return false;original=!original;paint();};
+  const originals=button(toggleOriginal);
   const previews=button(()=>{
     previewOpen=!previewOpen;
     if(!previewOpen){cancelSource();sourceError=undefined;}
@@ -60,6 +62,8 @@ export function installRegion(){
   const reselect=button(()=>beginSelection());
   const settings=button(()=>{void send('NC_REGION_OPEN',{view:'settings'}).catch(()=>{});});
   const close=button(()=>stop(true,true));surface.append(bar);
+  bindWebShortcuts({'web.original':toggleOriginal,'web.close':()=>stop(true,true)},
+    ()=>enabled&&initialUrl===location.href);
   const preview=document.createElement('section');preview.className='preview';preview.setAttribute('role','region');
   const previewTitle=document.createElement('h2'),previewImage=document.createElement('img'),notice=document.createElement('p');notice.className='notice';
   const previewRetry=document.createElement('button');previewRetry.type='button';

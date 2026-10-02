@@ -3,10 +3,13 @@ import {receiveImage} from '../src/inline/blob-transfer';
 import {installRegion} from '../src/region/content';
 import {capturePlacement,RegionDisplay} from '../src/region/display';
 import type {RegionImageRequest,RegionRequest,RegionResponse} from '../src/region/protocol';
+import {bindWebShortcuts} from '../src/shortcuts/web-content';
+import type {ShortcutId} from '../src/shortcuts/catalog';
 
 vi.mock('../src/inline/blob-transfer',()=>({receiveImage:vi.fn()}));
 vi.mock('../src/inline/theme',()=>({connectInlineTheme:vi.fn()}));
 vi.mock('../src/inline/shadow',()=>({shadowThemeStyles:()=>''}));
+vi.mock('../src/shortcuts/web-content',()=>({bindWebShortcuts:vi.fn(()=>()=>{})}));
 vi.mock('../src/i18n/runtime',()=>({msg:(value:string)=>value,subscribeLocale:()=>()=>{}}));
 vi.mock('../src/translation/notice',()=>({translationNotice:(state:{message:string;kind:string;retryAction?:string})=>({
   message:state.message,detail:state.message,label:state.retryAction==='translate'?'重新翻译':'点击重新加载',
@@ -102,6 +105,7 @@ function fixture(){
   const preview=find(node=>node.className==='preview');
   const frame=()=>{const callbacks=[...frames.values()];frames.clear();for(const callback of callbacks)callback(0);};
   return {messages,reads,documentNode,preview,create,revoke,button,
+    shortcut(id:ShortcutId){const [handlers,enabled]=vi.mocked(bindWebShortcuts).mock.calls.at(-1)!;return enabled()?handlers[id]?.({isTrusted:true} as KeyboardEvent):false;},
     setReply(value:typeof reply){reply=value;},setRead(value:typeof read){read=value;},
     async select(){
       const mask=find(node=>node.className==='selector');
@@ -117,6 +121,16 @@ function fixture(){
 afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 
 describe('region crop preview and explicit retries',()=>{
+  it('uses current region controls for shortcuts without screenshotting or retrying',async()=>{
+    const f=fixture();expect(f.shortcut('web.original')).toBe(false);
+    expect(f.messages.some(message=>message.type==='NC_REGION_CAPTURE'||message.type==='NC_REGION_SUBMIT')).toBe(false);
+    await f.select();f.shortcut('web.original');expect(f.button('显示译图')).toBeDefined();
+    f.shortcut('web.original');expect(f.button('恢复原图')).toBeDefined();
+    expect(f.messages.filter(message=>message.type==='NC_REGION_SUBMIT')).toHaveLength(1);
+    expect(f.messages.some(message=>message.type==='NC_REGION_RETRY')).toBe(false);
+    f.shortcut('web.close');expect(f.documentNode.documentElement.children).toHaveLength(0);
+    expect(f.shortcut('web.original')).toBe(false);
+  });
   it('submits immediately without transferring the source, and reads an original preview only when opened',async()=>{
     const f=fixture();await f.select();
     expect(f.messages.filter(message=>message.type==='NC_REGION_SUBMIT')).toHaveLength(1);

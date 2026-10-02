@@ -4,6 +4,8 @@ import {useCallback,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {Reader} from '../src/reader/Reader';
+import {ShortcutPanel} from '../src/ui/shortcuts/ShortcutPanel';
+import {useShortcuts} from '../src/shortcuts/react';
 import {Api} from '../src/api';
 import {defaults,type ReadingEntry,type Settings} from '../src/types';
 import {sourcePageCache} from '../src/storage/source-pages';
@@ -31,6 +33,8 @@ const initial:ReadingEntry[]=Array.from({length:chapterCount},(_,chapter)=>({id:
 if(highResolution)for(const chapter of initial)for(const page of chapter.pages){if(page.blobKey)await sourcePageCache.put(page.blobKey,originalBlob);await sourcePageCache.put(resultKey(page.id),translatedBlob);}
 canvas.width=canvas.height=1;
 function Fixture(){
+ const [shortcutsOpen,setShortcutsOpen]=useState(false);
+ useShortcuts({'app.shortcuts':()=>setShortcutsOpen(true)});
  const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[0].id),[config,setConfig]=useState<Settings>({...defaults,layout:'continuous',fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
  const copy=copies.find(value=>value.id===id)!;
  const update=useCallback((next:ReadingEntry)=>setCopies(previous=>previous.map(value=>value.id===next.id?next:value)),[]);
@@ -43,7 +47,8 @@ function Fixture(){
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:8,display:'flex',gap:12,alignItems:'center',background:'#fff',zIndex:20}}><strong>隔离阅读器验收</strong><span>{copy.title}</span><button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button><output aria-label="保存位置">{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
-  {mounted&&<Reader key={mounted?'reader':'closed'} viewKey="isolated-window-fixture" translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} notify={setStatus} onReadingWindow={noop} api={api} busy={false}/>}
+  {mounted&&<Reader key={mounted?'reader':'closed'} viewKey="isolated-window-fixture" translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} notify={setStatus} onReadingWindow={noop} api={api} busy={false}/>}
+  {shortcutsOpen&&<ShortcutPanel initialScope="reader" onClose={()=>setShortcutsOpen(false)}/>}
  </div>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

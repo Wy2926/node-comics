@@ -1,0 +1,165 @@
+.nc-app dialog.nc-shortcut-panel {
+  width: min(1120px, calc(100vw - 48px));
+  height: min(820px, calc(100dvh - 48px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--comic-border);
+  border-radius: var(--comic-panel-radius);
+  box-shadow: var(--comic-dialog-shadow);
+}
+.nc-app dialog.nc-shortcut-panel[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.nc-shortcut-panel::backdrop { background: var(--dialog-backdrop); backdrop-filter: blur(3px); }
+.nc-shortcut-panel :is(button, kbd) { font-family: inherit; }
+.nc-shortcut-panel button { cursor: pointer; }
+.nc-shortcut-panel button:disabled { cursor: not-allowed; opacity: 1; }
+.nc-shortcut-panel button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.nc-shortcut-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 26px; border-bottom: var(--comic-border); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
+.nc-shortcut-heading { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.nc-shortcut-heading > div { min-width: 0; }
+.nc-shortcut-emblem { display: grid; place-items: center; flex: 0 0 46px; width: 46px; height: 46px; margin-top: 2px; border: var(--comic-border); border-radius: var(--comic-control-radius); background: var(--surface); box-shadow: var(--comic-shadow-small); transform: rotate(-4deg); }
+.nc-shortcut-header h2 { margin: 0; color: var(--ink); font-size: 1.5rem; font-weight: 850; line-height: 1.4; letter-spacing: -.025em; }
+.nc-shortcut-subtitle { max-width: 56em; margin: 6px 0 0; color: var(--muted); font-size: var(--text-small); line-height: 1.65; }
+
+/* Navigation and actions use the same stamped controls as the app masthead. */
+.nc-shortcut-anchor,
+.nc-shortcut-binding,
+.nc-shortcut-close,
+.nc-shortcut-action { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); transition: transform .12s, box-shadow .12s, background .12s; }
+.nc-shortcut-close,
+.nc-shortcut-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 44px; max-width: 100%; padding: 8px 12px; color: var(--ink); background: var(--surface); font-size: var(--text-small); font-weight: 700; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+.nc-shortcut-close { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; }
+.nc-shortcut-action { --icon-stroke: currentColor; }
+.nc-shortcut-action > .nc-icon { flex-shrink: 0; }
+.nc-shortcut-action.is-primary { color: var(--accent-on); background: var(--accent); }
+.nc-shortcut-action.is-primary:not(:disabled):hover { background: var(--accent-hover); }
+.nc-shortcut-close:not(:disabled):hover,
+.nc-shortcut-action:not(:disabled):hover { transform: translate(-1px, -1px); box-shadow: var(--comic-shadow-hover); }
+.nc-shortcut-close:not(:disabled):active,
+.nc-shortcut-action:not(:disabled):active { transform: translate(2px, 2px); box-shadow: var(--comic-shadow-active); }
+.nc-shortcut-close:disabled,
+.nc-shortcut-action:disabled,
+.nc-shortcut-binding.is-disabled { border-color: var(--line); color: var(--muted); background: var(--surface-soft); box-shadow: var(--comic-shadow-disabled); }
+
+.nc-shortcut-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-width: 0; min-height: 0; }
+.nc-shortcut-nav { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-width: 0; min-height: 0; padding: 22px 14px; overflow-y: auto; border-right: 1px solid var(--line); background: var(--surface); }
+.nc-shortcut-nav-title { margin: 0 10px 4px; color: var(--muted); font-size: var(--text-caption); font-weight: 700; line-height: 1.6; }
+.nc-shortcut-anchor { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 48px; padding: 11px 10px; border-color: transparent; box-shadow: none; color: var(--ink); background: transparent; font-size: var(--text-small); font-weight: 700; line-height: 1.5; text-align: left; }
+.nc-shortcut-anchor > .nc-icon { flex-shrink: 0; }
+.nc-shortcut-anchor-label { min-width: 0; overflow-wrap: anywhere; }
+.nc-shortcut-anchor:not(:disabled):hover { border: var(--comic-border); background: var(--surface-soft); transform: translate(-1px, -1px); box-shadow: var(--comic-shadow-hover); }
+.nc-shortcut-anchor[aria-current="location"] { border: var(--comic-border); color: var(--ink); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
+.nc-shortcut-anchor[aria-current="location"]:hover { background: var(--accent-soft); box-shadow: var(--comic-shadow-hover); }
+.nc-shortcut-anchor:not(:disabled):active { transform: translate(2px, 2px); box-shadow: var(--comic-shadow-active); }
+
+.nc-shortcut-scroll { min-width: 0; min-height: 0; padding: 20px 26px 28px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scroll-padding-block: 20px; background: var(--canvas); }
+.nc-shortcut-scroll:focus-visible { outline: 3px solid var(--accent); outline-offset: -4px; }
+.nc-shortcut-intro { margin-bottom: 22px; }
+.nc-shortcut-hint { margin: 8px 0 0; color: var(--muted); font-size: var(--text-small); line-height: 1.75; }
+.nc-shortcut-intro .nc-shortcut-hint:first-child { margin-top: 0; }
+.nc-shortcut-group { min-width: 0; scroll-margin-top: 20px; border: var(--comic-border); border-radius: var(--comic-card-radius); background: var(--surface); box-shadow: var(--comic-shadow-small); }
+.nc-shortcut-group + .nc-shortcut-group { margin-top: 24px; }
+.nc-shortcut-group-heading { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 16px 20px; border-bottom: var(--comic-perforation); }
+.nc-shortcut-group-heading > .nc-icon { flex-shrink: 0; }
+.nc-shortcut-group-heading h3 { min-width: 0; margin: 0; color: var(--ink); font-size: var(--text-body); font-weight: 800; line-height: 1.5; overflow-wrap: anywhere; }
+.nc-shortcut-count { display: inline-grid; place-items: center; flex-shrink: 0; min-width: 1.65rem; min-height: 1.45rem; margin-left: auto; padding: 1px 5px; border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); color: var(--ink); background: var(--surface); font-size: var(--text-caption); font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.4; }
+.nc-shortcut-group-body { min-width: 0; padding: 0 20px; }
+.nc-shortcut-group-body > .nc-shortcut-hint { margin: 16px 0 4px; }
+.nc-shortcut-command { display: grid; grid-template-columns: minmax(130px, .85fr) minmax(0, 1.6fr); align-items: center; gap: 20px; min-width: 0; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.nc-shortcut-command:last-child { border-bottom: 0; }
+.nc-shortcut-command-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.nc-shortcut-command-label { min-width: 0; color: var(--ink); font-size: var(--text-small); font-weight: 700; line-height: 1.65; overflow-wrap: anywhere; }
+.nc-shortcut-unassigned { color: var(--muted); font-size: var(--text-caption); line-height: 1.5; }
+.nc-shortcut-assignment { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 12px; min-width: 0; }
+.nc-shortcut-bindings { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.nc-shortcut-restore { width: 44px; height: 44px; padding: 0; }
+
+/* One frame per binding: editing and removing are distinct actions inside it. */
+.nc-shortcut-binding { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; min-height: 44px; color: var(--ink); background: var(--surface); }
+.nc-shortcut-binding:has(button:hover:not(:disabled)) { transform: translate(-1px, -1px); box-shadow: var(--comic-shadow-hover); }
+.nc-shortcut-binding:has(button:active:not(:disabled)) { transform: translate(2px, 2px); box-shadow: var(--comic-shadow-active); }
+.nc-shortcut-key { display: inline-flex; align-items: center; justify-content: center; flex: 1 1 auto; gap: 8px; min-width: 0; min-height: 40px; max-width: 100%; padding: 8px 10px; border: 0; border-radius: var(--comic-control-radius); color: inherit; background: transparent; font-size: var(--text-small); font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.nc-shortcut-key > .nc-icon { flex-shrink: 0; }
+.nc-shortcut-key:not(:disabled):hover { background: var(--accent-soft); }
+.nc-shortcut-keycaps { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 5px; min-width: 0; }
+.nc-shortcut-key-part { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.nc-app .nc-shortcut-panel kbd { display: inline-block; min-width: 0; padding: 0; border: 0; border-radius: 0; color: inherit; background: transparent; box-shadow: none; font-family: inherit; font-size: inherit; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+.nc-shortcut-plus { color: var(--muted); font-size: var(--text-caption); font-weight: 500; }
+.nc-shortcut-binding.is-empty { color: var(--muted); }
+.nc-shortcut-binding.is-compact { width: 44px; }
+.nc-shortcut-binding.is-compact .nc-shortcut-key { padding: 0; }
+.nc-shortcut-binding.is-recording:not(.is-disabled) { color: var(--ink); background: var(--accent-soft); }
+.nc-shortcut-binding.is-recording .nc-shortcut-key { justify-content: flex-start; }
+.nc-shortcut-remove { display: inline-grid; place-items: center; align-self: stretch; flex: 0 0 40px; width: 40px; min-height: 40px; padding: 0; border: 0; border-left: var(--comic-badge-border); border-radius: 0; color: var(--muted); background: transparent; }
+.nc-shortcut-remove:not(:disabled):hover { color: var(--danger); background: var(--danger-soft); }
+.nc-shortcut-binding.is-disabled .nc-shortcut-remove { border-color: var(--line); }
+.nc-shortcut-binding :is(.nc-shortcut-key, .nc-shortcut-remove):focus-visible { outline-offset: -4px; }
+.nc-shortcut-native .nc-shortcut-assignment { grid-template-columns: minmax(0, 1fr) auto; }
+.nc-shortcut-native-key { min-width: 0; color: var(--muted); font-size: var(--text-small); line-height: 1.65; overflow-wrap: anywhere; }
+.nc-app .nc-shortcut-native-key kbd { color: var(--ink); }
+
+.nc-shortcut-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 20px; padding: 16px 26px; border-top: var(--comic-border); background: var(--surface); }
+.nc-shortcut-feedback { min-width: 0; }
+.nc-shortcut-feedback > p:not(.nc-shortcut-error) { margin: 0; color: var(--muted); font-size: var(--text-small); line-height: 1.6; }
+.nc-shortcut-status { min-height: 22px; color: var(--muted); font-size: var(--text-small); line-height: 1.65; }
+.nc-shortcut-saved { display: inline-flex; align-items: center; gap: 6px; color: var(--success); }
+.nc-shortcut-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; padding: 10px 12px; border: var(--comic-border); border-color: var(--danger); border-radius: var(--comic-control-radius); color: var(--danger); background: var(--danger-soft); font-size: var(--text-small); line-height: 1.6; }
+.nc-shortcut-error + .nc-shortcut-error { margin-top: 8px; }
+.nc-shortcut-recording { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.nc-shortcut-recording p { margin: 0; color: var(--ink); font-size: var(--text-small); line-height: 1.6; }
+.nc-shortcut-footer-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 960px) {
+  .nc-shortcut-layout { grid-template-columns: 188px minmax(0, 1fr); }
+  .nc-shortcut-nav { padding-inline: 12px; }
+  .nc-shortcut-command { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+@media (max-width: 700px) {
+  .nc-app dialog.nc-shortcut-panel { width: calc(100vw - 24px); height: calc(100dvh - 24px); border-radius: var(--comic-control-radius); }
+  .nc-shortcut-header { gap: 12px; padding: 18px; }
+  .nc-shortcut-heading { gap: 12px; }
+  .nc-shortcut-emblem { flex-basis: 36px; width: 36px; height: 36px; }
+  .nc-shortcut-header h2 { font-size: var(--text-title); }
+  .nc-shortcut-subtitle { font-size: var(--text-caption); }
+  .nc-shortcut-layout { grid-template-columns: 112px minmax(0, 1fr); }
+  .nc-shortcut-nav { gap: 10px; padding: 16px 8px; }
+  .nc-shortcut-nav-title { margin-inline: 4px; }
+  .nc-shortcut-anchor { flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; padding: 10px 8px; font-size: var(--text-caption); }
+  .nc-shortcut-scroll { padding: 20px 16px 24px; }
+  .nc-shortcut-intro { margin-bottom: 20px; }
+  .nc-shortcut-group-heading { gap: 8px; padding: 14px; }
+  .nc-shortcut-group-body { padding-inline: 14px; }
+  .nc-shortcut-command { padding-block: 16px; }
+  .nc-shortcut-assignment { gap: 10px; }
+  .nc-shortcut-native .nc-shortcut-assignment { grid-template-columns: minmax(0, 1fr); }
+  .nc-shortcut-native .nc-shortcut-action { justify-self: start; }
+  .nc-shortcut-footer { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 18px; }
+  .nc-shortcut-footer-actions { justify-content: flex-start; }
+}
+@media (max-width: 460px) {
+  .nc-shortcut-header { padding: 14px; }
+  .nc-shortcut-heading { gap: 9px; }
+  .nc-shortcut-emblem { display: none; }
+  .nc-shortcut-layout { grid-template-columns: 88px minmax(0, 1fr); }
+  .nc-shortcut-nav { padding-inline: 6px; }
+  .nc-shortcut-anchor { padding-inline: 6px; }
+  .nc-shortcut-scroll { padding-inline: 12px; }
+  .nc-shortcut-group-heading { flex-wrap: wrap; gap: 6px; padding: 12px; }
+  .nc-shortcut-group-body { padding-inline: 12px; }
+  .nc-shortcut-assignment { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .nc-shortcut-restore { justify-self: end; }
+}
+@media (max-height: 600px) and (min-width: 701px) {
+  .nc-app dialog.nc-shortcut-panel { height: calc(100dvh - 24px); }
+  .nc-shortcut-header { padding-block: 14px; }
+  .nc-shortcut-footer { padding-block: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nc-shortcut-anchor, .nc-shortcut-binding, .nc-shortcut-close, .nc-shortcut-action { transition: none; }
+  .nc-shortcut-anchor:not(:disabled):is(:hover, :active), .nc-shortcut-binding:has(button:is(:hover, :active):not(:disabled)), .nc-shortcut-close:not(:disabled):is(:hover, :active), .nc-shortcut-action:not(:disabled):is(:hover, :active) { transform: none; }
+}

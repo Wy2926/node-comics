@@ -1,5 +1,7 @@
-.nc-app .modal.nc-local-import-modal{width:800px;padding:var(--comic-panel-padding);overflow:hidden;display:flex;flex-direction:column;gap:20px}
-.nc-app .nc-local-import-modal>h2{flex-shrink:0;margin:0 32px 0 0}
+.nc-app .modal.nc-local-import-modal{width:800px}
+.nc-local-import-modal>.nc-modal-body{display:flex;flex-direction:column;gap:20px}
+.nc-app .nc-local-import-modal>.nc-modal-body>h2{flex-shrink:0;margin:0}
+.nc-local-import-modal>.nc-modal-body>.nc-local-import{flex-shrink:0}
 .nc-local-import{display:flex;flex-direction:column;gap:18px;min-height:0}
 .nc-import-summary{display:flex;flex-wrap:wrap;gap:16px 24px;margin:0;padding:18px 22px;border:var(--comic-border);border-radius:var(--comic-card-radius);box-shadow:var(--comic-shadow-small);flex-shrink:0}
 .nc-import-summary>div{flex:1 1 120px;min-width:0}
@@ -45,7 +47,7 @@
 .nc-import-dock-main>.text-link{flex-shrink:0}
 .nc-import-dock-icon{display:flex;color:var(--accent)}
 @media(max-width:640px){
- .nc-app .modal.nc-local-import-modal{gap:16px}
+ .nc-local-import-modal>.nc-modal-body{gap:16px}
  .nc-import-summary{padding:14px;gap:12px}
  .nc-import-summary>div{flex-basis:100px}
  .nc-app .nc-import-item{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:start;gap:12px 10px}

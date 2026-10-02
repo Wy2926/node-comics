@@ -79,6 +79,7 @@ beforeEach(async () => {
     storage: {local: storage(local), session: storage(session), onChanged: event()},
     alarms: {get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:event()},
     contextMenus: {onClicked: event(), update: vi.fn(async () => {})},
+    commands:{onCommand:event()},
     permissions: {onRemoved: event(), contains: vi.fn(async () => false), request: vi.fn(async () => true)},
     scripting: {executeScript: vi.fn(async () => [])},
     windows: {
@@ -96,7 +97,7 @@ beforeEach(async () => {
   });
   const {default:background}=await import('../entrypoints/background');
   background.main();
-  expect(listeners).toHaveLength(8); // Locale, inline theme, inline reader, region, website sources, Drive, catalog sync, analytics.
+  expect(listeners).toHaveLength(9); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts.
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});

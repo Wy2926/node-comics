@@ -236,6 +236,8 @@ function checkTransitiveBoundary(filename, predicate, label, seen = new Set(), b
 }
 for (const filename of modules) {
   const name = relative(filename);
+  if (/^src\/shortcuts\/(?:catalog|keys|model|runtime|store|react|native)\.ts$/.test(name))
+    checkTransitiveBoundary(filename, target => /^src\/(?:App\.tsx|api\.ts|reader\/|ui\/|comics\/|sources\/|inline\/|region\/|translation\/)/.test(target), 'shortcut core depends on a business surface', new Set(), 'Shortcut');
   if (name.startsWith('src/text-translation/'))
     checkTransitiveBoundary(filename, target => /^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/|discovery\/)/.test(target) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target), 'text adapter/service depends on UI, account, image translation or website services', new Set(), 'Text translation');
   if (name === 'src/translation/channels/contracts.ts')

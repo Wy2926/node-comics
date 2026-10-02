@@ -1,6 +1,7 @@
 import {msg} from '../i18n/runtime';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '../icons';
+import './modal.css';
 export function Modal({ title, subtitle, children, onClose, className='', closeLabel=msg("关闭弹窗") }: {
   title: string;
   subtitle?: string;
@@ -10,13 +11,26 @@ export function Modal({ title, subtitle, children, onClose, className='', closeL
   closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className={'modal '+className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
-    <button className="modal-close icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
-    <span className="modal-spark"><Icon name="spark" size={24}/></span>
-    <h2>{title}</h2>
-    {subtitle && <p className="modal-subtitle">{subtitle}</p>}
-    {children}
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const previous = document.activeElement;
+    element.showModal();
+    return () => {
+      element.close();
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({preventScroll: true});
+    };
+  }, []);
+  return <dialog ref={ref} className={'modal nc-generic-modal '+className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
+    <div className="nc-modal-controls">
+      <span className="modal-spark"><Icon name="spark" size={24}/></span>
+      <button type="button" className="modal-close icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
+    </div>
+    <div className="nc-modal-body" tabIndex={0}>
+      <h2>{title}</h2>
+      {subtitle && <p className="modal-subtitle">{subtitle}</p>}
+      {children}
+    </div>
   </dialog>;
 }
 export function PageTitle({ eyebrow, title, description, icon='spark' }: {

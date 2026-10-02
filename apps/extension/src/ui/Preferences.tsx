@@ -15,8 +15,9 @@ type Props = {
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
   children?: ReactNode;
+  onOpenShortcuts?: () => void;
 };
-export function Preferences({ settings, setSettings, caps, children }: Props) {
+export function Preferences({ settings, setSettings, caps, children, onOpenShortcuts }: Props) {
   return <div className="nc-preferences">
     <PageTitle icon="settings" eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
     <AppearanceSettings settings={settings} onChange={setSettings}>
@@ -28,6 +29,12 @@ export function Preferences({ settings, setSettings, caps, children }: Props) {
           onClick={()=>setSettings(s=>({...s,discoveryTextTranslation:!s.discoveryTextTranslation}))}><i/></button>
       </div>
     </AppearanceSettings>
+    {onOpenShortcuts && <section className="settings-card">
+      <h3><Icon name="keyboard"/>{msg('键盘快捷键')}</h3>
+      <SettingRow title={msg('自定义快捷键')} description={msg('快捷键保存在本机，按键盘位置识别，只在当前页面生效。输入文字时不会触发。')}>
+        <button type="button" className="button secondary" aria-haspopup="dialog" onClick={onOpenShortcuts}><Icon name="keyboard"/>{msg('自定义快捷键')}</button>
+      </SettingRow>
+    </section>}
     <TranslationChannels/>
     <section className="settings-card">
       <h3>

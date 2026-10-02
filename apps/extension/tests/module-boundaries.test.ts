@@ -21,6 +21,12 @@ const source = (name: string, code: string) => {mkdirSync(path.dirname(path.join
 const run = () => spawnSync(process.execPath, [script, root], {encoding: 'utf8'});
 
 describe('module boundary check', () => {
+  it.each(['reader/Reader','inline/content','ui/Preferences','comics/application/preferences'])('keeps the shortcut core independent of %s',target=>{
+    source('entrypoints/main.ts',"import '../src/shortcuts/runtime';");
+    source('src/shortcuts/runtime.ts',`import '../${target}';`);
+    source(`src/${target}.ts`,'export {};');
+    expect(run().stderr).toContain('shortcut core depends on a business surface');
+  });
   it.each(['ui/ComicSites', 'comics/application/import-service', 'sources/index', 'api'])('keeps discovery metadata independent of %s', target => {
     source('entrypoints/main.ts', "import '../src/discovery/session';");
     source('src/discovery/session.ts', `import '../${target}';`);

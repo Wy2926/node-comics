@@ -33,6 +33,7 @@ export default defineConfig({
     permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity', 'alarms', 'declarativeNetRequestWithHostAccess', 'webRequest'],
     host_permissions: ['https://*/*', 'http://*/*'],
     action: { default_title: '__MSG_actionTitle__', default_icon: {16:'brand/icon-16.png',24:'brand/icon-24.png',32:'brand/icon-32.png'} },
+    commands: {'nc-translate-region':{suggested_key:{default:'Alt+Shift+R'},description:'__MSG_commandTranslateRegion__'}},
     content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';" },
   }),
 });
