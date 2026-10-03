@@ -5,7 +5,7 @@ import {Api,ApiError} from '../../../../api';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
 import {pageTranslation} from '../../../../reader/presentation';
 import type {Capabilities,Entitlements,Job,TranslationSnapshot,TranslationBatch} from '../../../../types';
-import type {ReadingTarget} from '../../../automatic';
+import {MAX_READING_TARGETS,type ReadingTarget} from '../../../automatic';
 import {makeOperation,operationId,quotaErrors} from './operations';
 import {readOperation,readOperations,readJobs,readSync,saveOperation,updateOperation,saveReceipt,saveSync,translationScope,withTranslationLock,type LocalOperation,type SyncState} from './store';
 import {LegacyRequestGuard} from './legacy-requests';
@@ -136,13 +136,13 @@ export class TranslationCoordinator {
   }
   private async recover(){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
   async submit(targets:ReadingTarget[],requestCurrent=()=>true){
-    await this.init();const window=targets.slice(0,4),previous=[...this.wanted].join(',');this.wanted=new Set(window.map(t=>operationId(this.scope,this.options.language,t)));if(previous!==[...this.wanted].join(','))this.options.onChange();this.state=await readSync(this.scope)??this.state;
+    await this.init();const window=targets.slice(0,MAX_READING_TARGETS),previous=[...this.wanted].join(',');this.wanted=new Set(window.map(t=>operationId(this.scope,this.options.language,t)));if(previous!==[...this.wanted].join(','))this.options.onChange();this.state=await readSync(this.scope)??this.state;
     for(const record of this.records)if(!this.wanted.has(record.id)){this.refreshed.delete(record.requestId);this.monotonic.delete('retry:'+record.requestId);}
     this.records=(await readOperations([...this.wanted])).filter(record=>this.wanted.has(record.id));
     await this.restoreHistory(window);
     if(this.controlDelay)return;
     await this.recover();
-    for(const target of targets.slice(0,4)){
+    for(const target of window){
       if(!requestCurrent()||this.controlDelay)break;
       const id=operationId(this.scope,this.options.language,target);
       try{await withTranslationLock(id,async()=>{

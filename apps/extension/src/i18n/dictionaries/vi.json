@@ -1,4 +1,5 @@
 {
+  "准备翻译…": "Đang chuẩn bị dịch…",
   "字号": "Cỡ chữ",
   "跳转章节": "Đến chương",
   "第 {0} 章，共 {1} 章": "Chương {0} trên {1}",
@@ -284,7 +285,6 @@
   "下一页": "Trang tiếp theo",
   "默认翻译 · {0} · {1}": "Bản dịch mặc định · {0} · {1}",
   "接着阅读": "Đọc tiếp",
-  "第 {0} 页 · 滚动到此处时加载": "Trang {0} · Đang tải khi cuộn vào đây",
   "已到当前内容末尾": "Đã đến phần cuối của nội dung hiện tại",
   "翻译选项": "Tùy chọn dịch thuật",
   "完成管理": "Quản lý hoàn chỉnh",
@@ -1051,7 +1051,7 @@
   "其中会员权益内交付 {0} 页": "Gồm {0} trang được giao theo quyền lợi thành viên",
   "成功交付后扣减有限额度。": "Hạn mức hữu hạn được trừ sau khi giao thành công.",
   "{0}：交付 {1} 页": "{0}: đã giao {1} trang",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Chọn ảnh đã dịch để dịch trang hiện tại và ba trang tiếp theo khi đọc. Cách xem này chỉ áp dụng cho truyện này.",
+  "选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。": "Chọn ảnh đã dịch để dịch trước các trang tiếp theo trong khi đọc. Chế độ xem này chỉ áp dụng cho truyện tranh này.",
   "划图翻译": "Dịch vùng đã chọn",
   "拖动框选，松手翻译；右键或 Esc 取消。": "Kéo để chọn, thả để dịch. Nhấp chuột phải hoặc nhấn Esc để hủy.",
   "重新框选": "Chọn lại",

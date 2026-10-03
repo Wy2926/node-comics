@@ -17,7 +17,7 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||selectedSite==='generic'||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||['generic','feedback','prefetch'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -38,6 +38,7 @@ let output,api,site,complete=true;
 const resultRequests=[];
 const eventStreams=new Set();
 let heldResult,releaseResult,failResult;
+let preparationGate,releasePreparation;
 const accessCount=()=>requests.filter(r=>r.path.startsWith('/v1/images/')&&r.path.endsWith('/access')).length;
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',output_asset_id:'output-'+job.id,updated_at:new Date().toISOString()});};
@@ -57,7 +58,8 @@ const server=createServer(async(req,res)=>{
     if(url.pathname.startsWith('/source/')){
       sourceRequests.push({path:url.pathname,referer:req.headers.referer??null});
       if(req.headers.referer!==site+'/'){res.writeHead(403,{'Cache-Control':'no-store'});res.end();return;}
-      const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png'});res.end(source);return;
+      await preparationGate;
+      const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(source);return;
     }
     if(/^\/v1\/translations\/[^/]+\/result$/.test(url.pathname)){
       assert(req.headers.authorization,'result requires bearer authentication');
@@ -68,7 +70,7 @@ const server=createServer(async(req,res)=>{
     }
     requests.push({method:req.method,path:url.pathname,authorization:!!req.headers.authorization});refresh();
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
-    if(url.pathname==='/v1/capabilities')return json(caps);
+    if(url.pathname==='/v1/capabilities'){await preparationGate;return json(caps);}
     if(url.pathname==='/v1/me/entitlements')return json(rights);
     if(url.pathname==='/v1/translations/events'&&req.method==='GET'){
       const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);let previous='';
@@ -124,8 +126,9 @@ const web=createServer((req,res)=>{
       <script>window.drawFixture=(c,n=0)=>{const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle=['#20304b','#983844','#487030'][n];x.font='90px sans-serif';x.fillText('Original '+n,50,250);x.fillRect(40,500,600,100);};drawFixture(document.querySelector('#ready'));drawFixture(document.querySelector('#small'));drawFixture(document.querySelector('#offscreen'));
       const foreign=new Image();foreign.onload=()=>document.querySelector('#tainted').getContext('2d').drawImage(foreign,0,0,800,1100);foreign.src='https://canvas-fixture-cdn.test/image.png';document.querySelector('#ready').onclick=()=>document.body.dataset.clicked='yes';</script>`);return;
   }
-  if(req.url==='/rolling'){
-    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>滚动预翻译验收</title><style>body{margin:0;background:#edf2f8}img{display:block;width:600px;height:825px;margin:24px auto}</style>${Array.from({length:7},(_,n)=>`<img id="rolling-${n+1}" src="${api}/source/${n+7}.png">`).join('')}`);return;
+  if(req.url.startsWith('/rolling')){
+    const parameters=new URL(req.url,'http://fixture').searchParams,height=parameters.has('long')?3000:825,first=parameters.has('short')?15:7;
+    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>滚动预翻译验收</title><style>body{margin:0;background:#edf2f8}img{display:block;width:600px;height:${height}px;margin:24px auto}</style>${Array.from({length:7},(_,n)=>`<img id="rolling-${n+1}" src="${api}/source/${n+first}.png">`).join('')}`);return;
   }
   if(req.url==='/strict')res.setHeader('Content-Security-Policy',`default-src 'self'; img-src ${api}; style-src 'unsafe-inline'; script-src 'none'; connect-src 'self';`);
   res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><html><head><title>网页漫画翻译验收</title><style>body{margin:0;background:#edf2f8;font:16px system-ui;color:#20304b}header{padding:16px 28px;background:white}main{width:min(600px,90vw);margin:auto}img.comic{display:block;width:100%;height:auto;margin:24px 0}button{padding:10px}footer{height:800px}#thumb{width:80px;height:110px}#banner{width:900px;height:120px}#hidden{display:none}#third{aspect-ratio:1/1;object-fit:cover}</style></head><body><header><b>原网站 · 漫画阅读页</b>　<button id=site-button>网站按钮</button><a id=site-link href=#bottom>原有链接</a></header><main><img id=thumb src=${api}/source/1.png><p>下方漫画完成后原位显示，链接和滚动应保持正常。</p><picture><source srcset="${api}/source/1.png"><img id=first class=comic src=${api}/source/1.png></picture><img id=second class=comic src=${api}/source/2.png><img id=third class=comic src=${api}/source/3.png><img id=lazy class=comic><img id=hidden class=comic src=${api}/source/4.png></main><footer id=bottom>原网站页尾</footer></body></html>`);
@@ -151,10 +154,84 @@ try{
   await page.setContent('<body style="margin:0;width:800px;height:1100px;background:#fff5df;font:42px system-ui"><div style="margin:50px;border:6px solid #20304b;height:880px;padding:35px">Original comic panel<br><br>HELLO!<br><br>READ THE STORY</div></body>');
   const source=await page.screenshot({clip:{x:0,y:0,width:800,height:1100},captureBeyondViewport:true});
   console.log(`Fixture input ${source.readUInt32BE(16)}x${source.readUInt32BE(20)}`);
-  for(let n=1;n<=14;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
+  for(let n=1;n<=21;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
   output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  if(selectedSite==='feedback') {
+    const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&node.name?.value===text);
+    const waitNotice=async(text,visible=true)=>{
+      const until=Date.now()+10000;
+      while(await notice(text)!==visible&&Date.now()<until)await page.waitForTimeout(25);
+      assert.equal(await notice(text),visible,`notice ${text} visible=${visible}`);
+    };
+    const holdPreparation=()=>{preparationGate=new Promise(resolve=>{releasePreparation=resolve;});};
+    const finishPreparation=()=>{releasePreparation();preparationGate=undefined;releasePreparation=undefined;};
+    jobs.get('seed-1').status='no_text';
+    await page.goto(site);await page.locator('#first').evaluate(image=>image.decode());
+    const before=await geometry();holdPreparation();
+    const started=Date.now();await activate();await waitNotice('准备翻译…');
+    const feedbackMs=Date.now()-started;
+    assert.equal(translations.size,0);assert.deepEqual(await geometry(),before);
+    await page.screenshot({path:path.join(out,'preparing-translation.png')});
+    check(`visible image gets preparation feedback before the held capabilities response (${feedbackMs} ms including activation and observation), without layout or scroll changes`);
+    await button('暂停');await waitNotice('准备翻译…',false);
+    await button('继续');await waitNotice('准备翻译…');
+    await button('恢复原图');await waitNotice('准备翻译…',false);
+    await button('显示译图');await waitNotice('准备翻译…');
+    assert.equal(translations.size,0);
+    check('pause and original view hide preparation feedback; resuming restores it without bypassing pending preparation');
+    finishPreparation();await waitNotice('准备翻译…',false);
+    assert.equal(await page.locator('#first').evaluate(image=>image.style.content),'');
+    await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await page.waitForTimeout(200);
+    assert.equal(await notice('准备翻译…'),false);
+    check('a no-text response clears preparation and rescanning does not resurrect it');
+    await page.waitForFunction(()=>document.querySelector('#second').style.content.includes('blob:'),null,{timeout:15000});
+    await page.locator('#second').scrollIntoViewIfNeeded();await page.waitForTimeout(200);
+    assert.equal(await notice('准备翻译…'),false);
+    await page.locator('#third').scrollIntoViewIfNeeded();await waitNotice('翻译失败 · 重试');
+    await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await page.waitForTimeout(200);
+    assert.equal(await notice('准备翻译…'),false);assert.equal(await notice('翻译失败 · 重试'),true);
+    await page.screenshot({path:path.join(out,'preparation-replaced-by-error.png')});
+    await page.locator('#first').scrollIntoViewIfNeeded();await page.waitForTimeout(200);
+    assert.equal(await notice('准备翻译…'),false);
+    assert.equal((await geometry()).height,before.height);assert.equal(createdJobs,1);
+    check('completed, failed and no-text images keep their actual states across scrolling; only the uncached second image creates a job');
+    holdPreparation();
+    await worker.evaluate(async()=>{
+      const saved=(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'];
+      await chrome.storage.local.set({'nc-reader-settings':{...saved,language:'en'}});
+    });
+    await waitNotice('准备翻译…');
+    await page.screenshot({path:path.join(out,'preparing-new-language.png')});
+    check('changing translation language immediately restores preparation feedback while source reads are held, even with cached channel capabilities');
+    await button('关闭');await waitNotice('准备翻译…',false);finishPreparation();
+    await page.waitForTimeout(500);assert.equal(await notice('准备翻译…'),false);assert.equal(createdJobs,1);
+    check('closing during preparation removes feedback and ignores the late response without submitting another job');
+  }
+  if(selectedSite==='prefetch'){
+    complete=false;await page.goto(site+'/rolling?long');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();
+    const hasJob=n=>[...jobs.values()].some(j=>j.image_sha256===sha(images.get(n)));
+    const waitJob=async n=>{const until=Date.now()+15000;while(!hasJob(n)&&Date.now()<until)await page.waitForTimeout(25);assert(hasJob(n),'missing page '+n);};
+    await waitJob(10);assert(!hasJob(11));
+    for(const current of [1,2]){
+      await page.locator('#rolling-'+current).evaluate(i=>window.scrollTo(0,i.offsetTop+i.clientHeight/3-4));
+      await page.waitForTimeout(300);assert(!hasJob(current+10));
+      const started=Date.now();await page.locator('#rolling-'+current).evaluate(i=>window.scrollTo(0,i.offsetTop+i.clientHeight/3+4));
+      await waitJob(current+10);assert(Date.now()-started<1000);
+      assert(await page.locator('#rolling-'+current).evaluate(i=>i.getBoundingClientRect().top<0&&i.getBoundingClientRect().bottom>innerHeight));
+      await page.waitForTimeout(300);assert(!hasJob(current+11));
+      await page.locator('#rolling-'+current).evaluate(i=>window.scrollTo(0,i.offsetTop+i.clientHeight/3-4));
+      await page.waitForTimeout(100);
+    }
+    assert.equal(createdJobs,6);check('one-third scrolling admits exactly one extra page per current image in under one second, before any earlier job completes');
+    await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
+    await page.goto(site+'/rolling?short');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();
+    await waitJob(19);await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>scrollY),0);assert(!hasJob(20));
+    check('a short image fills its fifth slot without scrolling, and does not recursively expand the chapter');
+    await button('暂停');await page.locator('#rolling-3').scrollIntoViewIfNeeded();await page.waitForTimeout(300);assert(!hasJob(20));
+    await button('继续');await waitJob(21);check('pause suppresses expansion and resume processes the latest bounded window');
+  }
   if(!selectedSite) {
   await page.goto(site);await page.locator('#first').evaluate(i=>i.decode());await page.evaluate(()=>{window.fixtureClicks=0;document.querySelector('#site-button').addEventListener('click',()=>window.fixtureClicks++);});
   const before=await geometry();assert.equal(await page.locator('#first').evaluate(i=>i.style.content),'');
@@ -252,13 +329,13 @@ try{
   complete=false;await page.locator('#lazy').evaluate((i,bytes)=>i.src=URL.createObjectURL(new Blob([new Uint8Array(bytes),new Uint8Array(65*1024*1024)],{type:'image/png'})),[...images.get(6)]);await page.waitForFunction(()=>document.querySelector('#lazy').style.content==='');complete=true;await page.waitForFunction(()=>document.querySelector('#lazy').style.content.includes('blob:'),{},{timeout:45000});check('page-owned Blob input over 65 MiB crosses bounded source ports, prepares a separate upload and displays without exposing credentials');
   const jobsBeforeReturn=createdJobs;
   const firstDownloadsBeforeReturn=resultRequests.filter(id=>id==='output-seed-1').length;
-  await page.waitForFunction(()=>document.querySelector('#first').style.content==='');
+  assert(await page.locator('#first').evaluate(i=>i.style.content.includes('blob:')),'nearby decoded results remain retained');
   await page.locator('#first').scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>document.querySelector('#first').style.content.includes('blob:'),{},{timeout:15000});
   assert.equal(createdJobs,jobsBeforeReturn);assert.equal((await geometry()).height,before.height);
   assert.equal(resultRequests.filter(id=>id==='output-seed-1').length,firstDownloadsBeforeReturn);
   await page.screenshot({path:path.join(out,'scroll-return.png')});
-  check('scrolling back restores an evicted translation without creating another translation job or changing geometry');
+  check('scrolling back reuses the retained translation without creating another translation job or changing geometry');
   await worker.evaluate(async()=>{await chrome.storage.local.set({'nc-auth':{session:null}});});await page.waitForFunction(()=>document.querySelector('#first').style.content==='');await page.waitForTimeout(800);assert.equal(await page.locator('#lazy').evaluate(i=>i.style.content),'');await page.screenshot({path:path.join(out,'logged-out.png')});check('logout immediately restores every image and stops authenticated work');
   await button('关闭');assert.equal(await page.locator('#lazy').evaluate(i=>i.style.content),'');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
@@ -281,14 +358,14 @@ try{
   complete=false;await page.goto(site+'/rolling');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();
   const hasJob=n=>[...jobs.values()].some(j=>j.image_sha256===sha(images.get(n)));
   const waitJob=async n=>{const until=Date.now()+15000;while(!hasJob(n)&&Date.now()<until)await page.waitForTimeout(50);assert(hasJob(n),'missing rolling page '+(n-6));};
-  await waitJob(10);assert(!hasJob(11));
+  await waitJob(11);assert(!hasJob(12));
   for(const current of [2,3]){
     await page.locator('#rolling-'+current).evaluate(i=>window.scrollTo(0,i.offsetTop));
-    await waitJob(current+9);assert(!hasJob(current+10),'must not exceed three lookahead pages');
+    await waitJob(current+10);assert(!hasJob(current+11),'must not exceed four lookahead pages');
   }
   assert([...jobs.values()].filter(j=>[7,8,9,10,11,12].some(n=>j.image_sha256===sha(images.get(n)))).every(j=>j.status!=='succeeded'));
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
-  check('scrolling to page 2 admits page 5 and page 3 admits page 6 while previous translations remain unfinished');
+  check('short pages prefetch the extra slot immediately and keep refilling while previous translations remain unfinished');
   const network=online=>worker.evaluate(async({url,online})=>{
     const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
     await chrome.scripting.executeScript({target:{tabId:tab.id},func:online=>{
@@ -310,7 +387,7 @@ try{
   assert.equal(await page.locator('#rolling-2').evaluate(i=>i.style.content),'');
   await page.screenshot({path:path.join(out,'independent-downloads.png')});
   heldResult=undefined;releaseResult();releaseResult=undefined;
-  await page.waitForFunction(()=>[1,2,3,4].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
+  await page.waitForFunction(()=>[1,2,3,4,5].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
   check('current and other completed pages display while a neighbour download is still blocked');
   const cacheAccesses=accessCount(),cacheDownloads=resultRequests.length,cacheJobs=createdJobs;
   // Headless Chromium keeps tabs visible. Drive the real content-script visibility handler
@@ -326,7 +403,7 @@ try{
   await visibility(true);
   await page.waitForFunction(()=>!document.querySelector('#rolling-1').style.content);
   await visibility(false);
-  await page.waitForFunction(()=>[1,2,3,4].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
+  await page.waitForFunction(()=>[1,2,3,4,5].every(n=>document.querySelector('#rolling-'+n).style.content.includes('blob:')));
   assert.equal(accessCount(),cacheAccesses);assert.equal(resultRequests.length,cacheDownloads);
   check('simulated hide/return releases decoded images but performs zero image HTTP requests');
   await page.reload();await activate();
@@ -493,4 +570,4 @@ try{
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,transfers,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests,resultRequests,accessibility:await cdp.send('Accessibility.getFullAXTree').then(v=>v.nodes.filter(n=>n.role?.value==='button').map(n=>({name:n.name?.value,description:n.description?.value}))).catch(()=>[])},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
-finally{releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}
+finally{releasePreparation?.();releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

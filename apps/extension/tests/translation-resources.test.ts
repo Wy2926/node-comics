@@ -8,6 +8,14 @@ import {fixture,target,snapshot,entitlement} from './translation-fixture';
 afterEach(()=>vi.restoreAllMocks());
 function controlledClock(){let wall=Date.now(),monotonic=performance.now();vi.spyOn(Date,'now').mockImplementation(()=>wall);vi.spyOn(performance,'now').mockImplementation(()=>monotonic);return (milliseconds:number)=>{wall+=milliseconds;monotonic+=milliseconds;};}
 describe('independent translation resources',()=>{
+ it('admits the fifth page during the first page and continues rolling before pending jobs finish',async()=>{
+  const f=fixture();await f.core.submit([0,1,2,3].map(target));
+  await f.core.submit([0,1,2,3,4].map(target));expect(f.submit).toHaveBeenCalledTimes(5);
+  await f.core.submit([1,2,3,4].map(target));expect(f.submit).toHaveBeenCalledTimes(5);
+  await f.core.submit([1,2,3,4,5].map(target));expect(f.submit).toHaveBeenCalledTimes(6);
+  expect(new Set(f.submit.mock.calls.map(([id])=>id)).size).toBe(6);
+  await f.core.submit([0,1,2,3,4,99].map(target));expect(f.submit).toHaveBeenCalledTimes(6);
+ });
  it('submits only newly entered pages without reprioritizing accepted requests',async()=>{
   const f=fixture();await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledTimes(4);
   await f.core.submit([0,1,2,3].map(target));expect(f.submit).toHaveBeenCalledTimes(4);

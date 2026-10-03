@@ -1,4 +1,4 @@
-import type { TranslationState } from '../translation/automatic';
+import {MAX_READING_TARGETS,type TranslationState} from '../translation/automatic';
 import type { Mode } from '../types';
 
 export interface InlineImage {id:string;url:string;width:number;height:number;referrerPolicy?:ReferrerPolicy;}
@@ -15,5 +15,5 @@ export function readingImages<T extends {rect:{top:number;bottom:number;left:num
   // Include the visible peer on the same row before taking the bounded lookahead.
   const spread=new Set(visible.filter(i=>i.rect.top<current.rect.bottom&&i.rect.bottom>current.rect.top));
   const start=items.findIndex(i=>spread.has(i));
-  return items.slice(start,start+4);
+  return items.slice(start,start+MAX_READING_TARGETS);
 }

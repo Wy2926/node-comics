@@ -75,6 +75,30 @@ beforeEach(async()=>{
 afterEach(()=>{vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('admits prepared images incrementally and preserves the whole five-image window',async()=>{
+    const pending=gate();let number=0;
+    mocks.prepareImage.mockImplementation(async({blob}:{blob:Blob})=>({blob,width:500,height:700,imageSha256:String(++number).repeat(64)}));
+    mocks.readImage.mockImplementation(async(url:string)=>{if(url.endsWith('/2.png'))await pending.promise;return new Blob([url]);});
+    const images=Array.from({length:5},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
+    const response=send({...request(),images});
+    await vi.waitFor(()=>expect(mocks.readImage).toHaveBeenCalledTimes(3));
+    expect(cores[0].submit).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(cores[0].submit).mock.calls.map(([targets])=>targets.length)).toEqual([1,2]);
+    pending.finish();expect(await response).toMatchObject({ok:true});
+    expect(vi.mocked(cores[0].submit).mock.calls.map(([targets])=>targets.length)).toEqual([1,2,3,4,5]);
+    expect(await send({...request(),images})).toMatchObject({ok:true});
+    expect(mocks.readImage).toHaveBeenCalledTimes(5);expect(cores[0].submit).toHaveBeenCalledTimes(6);
+    expect(await send({...request(),images:[...images,{...images[0],id:'sixth'}]})).toMatchObject({ok:false});
+  });
+  it('stops old source preparation after a jump without reading its remaining tail',async()=>{
+    const pending=gate();mocks.readImage.mockImplementationOnce(async()=>{await pending.promise;return new Blob(['old']);});
+    const images=Array.from({length:5},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
+    const old=send({...request(),images});await vi.waitFor(()=>expect(mocks.readImage).toHaveBeenCalledOnce());
+    await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:2});
+    pending.finish();expect(await old).toMatchObject({ok:false});
+    expect(mocks.prepareImage).not.toHaveBeenCalled();expect(mocks.readImage).toHaveBeenCalledOnce();expect(cores[0].submit).not.toHaveBeenCalled();
+    expect(await send(request(2))).toMatchObject({ok:true});expect(cores[0].submit).toHaveBeenCalledOnce();
+  });
   it('rejects an authorization that resumes from tabs.get after region suspension',async()=>{
     const pending=gate();mocks.getTab.mockImplementationOnce(async()=>{await pending.promise;return {...tab};});
     const response=send(request());await vi.waitFor(()=>expect(mocks.getTab).toHaveBeenCalledOnce());

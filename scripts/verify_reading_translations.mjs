@@ -14,7 +14,7 @@ const snapshot=()=>page.evaluate(()=>({submitted:window.readerFixture.submitted,
 async function jump(n){const input=page.getByLabel('跳转页码',{exact:true});await input.fill(String(n));await input.press('Enter');}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
-  await page.goto(web+'/tests/reader-fixture.html?auto=pipeline');
+  await page.goto(web+'/tests/reader-fixture.html?auto=pipeline&long');
   await page.locator('.nc-release-notes[open] .nc-release-close').click();
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'常规翻译',exact:true}).click();
@@ -28,34 +28,46 @@ try{
   await page.evaluate(()=>{document.querySelector('.nc-reading-viewport').scrollTop+=4;});
   await page.waitForTimeout(400);assert.equal((await snapshot()).translations.length,state.translations.length);
   check('same-image scrolling sends no duplicate translation request');
-  for(const current of [2,3]){
-    const connectionsBefore=(await snapshot()).requests.filter(p=>p==='/v1/translations/events').length;
-    await jump(current);await page.waitForFunction(n=>window.readerFixture.submitted.includes(n+2),current);
-    await page.waitForTimeout(300);
-    const rolling=await snapshot();
-    assert.equal(rolling.submitted.filter(n=>n===current+2).length,1);
-    assert.equal(rolling.requests.filter(p=>p==='/v1/translations/events').length,connectionsBefore+1,'one replacement SSE per settled reading window');
+  for(const current of [1,2]){
+    const metrics=await page.locator(`[data-page-index="${current-1}"]`).evaluate(cell=>{
+      const v=cell.closest('.nc-reading-viewport'),r=cell.querySelector('.nc-page-picture').getBoundingClientRect();
+      return {top:r.top-v.getBoundingClientRect().top+v.scrollTop,height:r.height,viewport:v.clientHeight};
+    });
+    const threshold=Math.max(0,Math.min(metrics.height/3,metrics.height-metrics.viewport));assert(threshold>0);
+    await page.locator('.nc-reading-viewport').evaluate((v,top)=>{v.scrollTop=top;},metrics.top+threshold-3);
+    await page.waitForTimeout(300);assert(!(await snapshot()).submitted.includes(current+3));
+    const started=Date.now();
+    await page.locator('.nc-reading-viewport').evaluate((v,top)=>{v.scrollTop=top;},metrics.top+threshold+3);
+    await page.waitForFunction(n=>window.readerFixture.submitted.includes(n),current+3);
+    assert(Date.now()-started<1000,'threshold refill should not wait for previous translations');
+    assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),String(current));
+    await page.waitForTimeout(300);const rolling=await snapshot();
+    assert.equal(rolling.submitted.filter(n=>n===current+3).length,1);assert(!rolling.submitted.includes(current+4));
   }
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
-  check('page 2 admits page 5 and page 3 admits page 6 without waiting for the original jobs');
+  check('one-third progress on pages 1 and 2 admits pages 5 and 6 within one second, without moving the current page or waiting for earlier jobs');
+  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await page.getByRole('button',{name:'适应窗口',exact:true}).click();
+  await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const started=Date.now();await jump(10);await page.waitForFunction(()=>window.readerFixture.submitted.includes(9));
-  assert(Date.now()-started<1000);await page.waitForFunction(()=>window.readerFixture.submitted.includes(12));
-  check('explicit navigation admits a fresh current image within one second while earlier jobs remain active');
+  assert(Date.now()-started<1000);await page.waitForFunction(()=>window.readerFixture.submitted.includes(13));
+  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'10');
+  check('a fit-to-window short page admits its extra slot before scrolling, while a direct jump still starts the current page within one second');
   await page.evaluate(()=>window.readerFixture.unknown=true);await jump(14);
   await page.waitForFunction(()=>!window.readerFixture.unknown&&window.readerFixture.requests.includes('/v1/translations'));
   await page.waitForFunction(()=>window.readerFixture.submitted.includes(14));
   state=await snapshot();assert.equal(state.submitted.filter(n=>n===13).length,1);
   check('lost acceptance response recovers the original UUID from a snapshot without duplicate translation');
-  await page.evaluate(()=>window.readerFixture.rateBlockedUntil=Date.now()+4000);await jump(18);
+  await page.evaluate(()=>window.readerFixture.rateBlockedUntil=Date.now()+4000);await jump(19);
   const beforeLimit=state.translations.length;
   await page.waitForFunction(count=>window.readerFixture.translationRequests.length>count,beforeLimit);
-  await page.waitForTimeout(350);const limited=await snapshot();assert(!limited.submitted.includes(17));
+  await page.waitForTimeout(350);const limited=await snapshot();assert(!limited.submitted.includes(18));
   await page.evaluate(()=>window.readerFixture.finishNext());await page.waitForTimeout(600);
   assert.equal((await snapshot()).translations.length,limited.translations.length);
   check('job completion does not reopen the minute gate or cause a request loop');
-  await page.waitForFunction(()=>window.readerFixture.submitted.includes(17),null,{timeout:8000});
+  await page.waitForFunction(()=>window.readerFixture.submitted.includes(18),null,{timeout:8000});
   check('deferred current image resumes automatically at its retry deadline');
-  await page.waitForFunction(()=>window.readerFixture.submitted.includes(20));
+  await page.waitForFunction(()=>window.readerFixture.submitted.includes(22));
   await page.waitForTimeout(600);
   const beforeState=await snapshot(),beforeIdle=beforeState.requests.filter(p=>p==='/v1/translations'||p==='/v1/translations/events').length;
   const beforePolicy=beforeState.requests.filter(p=>p==='/v1/capabilities'||p==='/v1/me/entitlements').length;

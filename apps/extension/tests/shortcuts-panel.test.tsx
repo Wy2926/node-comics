@@ -43,7 +43,7 @@ describe('shortcut preference panel presentation', () => {
     expect(html).toContain('Page Down');
     expect(html).toContain('本章首页');
     expect(html).toContain('本章末页');
-    expect(html).toContain('随读翻译当前页与后三页');
+    expect(html).toContain('随读预翻译后续页面');
     expect(html).toContain('暂停或继续网页翻译');
     expect(html).toContain('导入漫画');
     expect(preferences.save).not.toHaveBeenCalled();

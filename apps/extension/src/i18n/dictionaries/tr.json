@@ -1,4 +1,5 @@
 {
+  "准备翻译…": "Çeviri hazırlanıyor…",
   "字号": "Yazı boyutu",
   "跳转章节": "Bölüme git",
   "第 {0} 章，共 {1} 章": "Bölüm {0} / {1}",
@@ -284,7 +285,6 @@
   "下一页": "Sonraki sayfa",
   "默认翻译 · {0} · {1}": "Varsayılan çeviri · {0} · {1}",
   "接着阅读": "Sonrakini oku",
-  "第 {0} 页 · 滚动到此处时加载": "Sayfa {0} · Buraya kaydırıldığında yükleniyor",
   "已到当前内容末尾": "Mevcut içeriğin sonuna ulaşıldı",
   "翻译选项": "Çeviri seçenekleri",
   "完成管理": "Tam yönetim",
@@ -1051,7 +1051,7 @@
   "其中会员权益内交付 {0} 页": "Üyelik kapsamında teslim edilen {0} sayfa dahil",
   "成功交付后扣减有限额度。": "Sınırlı kotalar başarılı teslimden sonra düşülür.",
   "{0}：交付 {1} 页": "{0}: {1} sayfa teslim edildi",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Okurken mevcut sayfayı ve sonraki üç sayfayı çevirmek için çevrilmiş görselleri seçin. Bu görünüm yalnızca bu çizgi roman için geçerlidir.",
+  "选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。": "Okurken sonraki sayfaları önceden çevirmek için çevrilmiş görselleri seçin. Bu görünüm yalnızca bu çizgi roman için geçerlidir.",
   "划图翻译": "Seçili alanı çevir",
   "拖动框选，松手翻译；右键或 Esc 取消。": "Seçmek için sürükleyin, çevirmek için bırakın. İptal etmek için sağ tıklayın veya Esc tuşuna basın.",
   "重新框选": "Yeniden seç",

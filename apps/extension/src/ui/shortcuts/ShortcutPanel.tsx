@@ -194,7 +194,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
           className="nc-shortcut-group" data-shortcut-scope={group} aria-label={scopeLabel(group)}>
           <header className="nc-shortcut-group-heading"><Icon name={scopeIcons[group]} size={20}/><h3>{scopeLabel(group)}</h3><span className="nc-shortcut-count" aria-hidden="true">{commands.length + (group === 'web' ? 1 : 0)}</span></header>
           <div className="nc-shortcut-group-body">
-          {group === 'reader' && <p className="nc-shortcut-hint">{msg('选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。')}</p>}
+          {group === 'reader' && <p className="nc-shortcut-hint">{msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}</p>}
           {group === 'web' && <>
             <p className="nc-shortcut-hint">{msg('开始划图由浏览器管理，以取得截图授权；不会随此面板恢复默认。')}</p>
             <div className="nc-shortcut-command nc-shortcut-native">

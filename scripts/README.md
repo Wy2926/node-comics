@@ -54,7 +54,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有 Komga 测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
 | `verify_notifications.mjs` | Vite 5187 的隔离身份与提示夹具；全局登录过期／错误／成功提示的关闭、自动收起、交互暂停、亮暗主题，以及逐图提示收起、重试与原图位置恢复；不访问外网 |
-| `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
+| `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；`INLINE_SITE_ONLY=prefetch` 检查页内 1/3／短图补位与暂停；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
 | `verify_region_translation.mjs` | 真实可见标签页截图、选区精确裁片与松手自动上传；生产 MV3 的隔离副本／合成网页／模拟 API 检查拖动中右键／Esc 取消、处理边框、范围外像素、原图恢复、滚动定位与预览降级、后台重启时冻结字节与 UUID 恢复及切标签竞态。无头浏览器不能触发原生 action／菜单授予 `activeTab`，仅测试副本临时增加 `<all_urls>`，不改正式权限、不证明原生授权手势；`REGION_CAPTURE_FIXTURE_PERMISSION=0` 可复现未获手势授权的截图拒绝。默认 `REGION_DPR=2`，可取 `1`、`1.25`、`1.5`、`2`；沿用 `PLAYWRIGHT_MODULE`、`TEST_EXTENSION_DIR` 与 `TEST_CHROMIUM`／`CHROMIUM_PATH`，产物写入 `artifacts/region-validation/`，不调用真实账号或模型 |
 | `verify_analytics.mjs` | 隔离 Chromium MV3 检查默认关闭、书架卡片拒绝／关闭不重弹、搜索与导入入口可用、12 种主题组合及窄宽大字、主动同意、跨标签同步、白名单无凭据请求、失败留队列、撤回清理与重新同意；后台及页面 HTTP(S) 全部模拟，不向真实 API 或 GA4 发送；截图写入 `artifacts/analytics/` |
 | `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节归属与完整目录 |

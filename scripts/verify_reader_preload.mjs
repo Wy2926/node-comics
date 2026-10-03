@@ -52,7 +52,7 @@ async function sample(label,panes=1){
   return {label,currentPage:Number(document.querySelector('[aria-label="跳转页码"]').value),selectedPages:Number(v.dataset.decodedPages),mountedPages:v.querySelectorAll('.nc-manga-page').length,displayedImages:images.length,liveUrls:m.liveUrls,distinctReadKeys:new Set(m.reads.map(item=>item.key)).size,heldEncodedBytes:m.liveKeys.reduce((total,key)=>total+(m.reads.find(item=>item.key===key)?.bytes??0),0),estimatedDisplayedRgbaBytes:images.reduce((total,image)=>total+image.naturalWidth*image.naturalHeight*4,0)};
  },label);
  assert(value.mountedPages<=11,`${label}: page DOM exceeded its window`);
- assert(value.selectedPages<=4,`${label}: selected pages exceeded current/neighbor/visible window`);
+ assert(value.selectedPages<=11,`${label}: selected pages exceeded the decoded window`);
  assert(value.liveUrls<=value.selectedPages*panes,`${label}: retained Blob URLs outgrew the selected image window`);
  samples.push(value);return value;
 }
@@ -61,11 +61,11 @@ try{
  const start=performance.now();await page.goto(origin+'/tests/reader-window-fixture.html?highres=1');
  await decoded([0,1]);
  const initial=await sample('initial');
- assert.equal(initial.currentPage,1);assert.equal(initial.selectedPages,2);assert.equal(initial.distinctReadKeys,2);
+ assert.equal(initial.currentPage,1);assert.equal(initial.selectedPages,11);assert.equal(initial.distinctReadKeys,10);
  const firstReadyMilliseconds=performance.now()-start;
- checks.push('Actual 4000 x 6000 original PNGs load current and next page without a cumulative pixel cap');
+ checks.push('Actual 4000 x 6000 PNGs preload the eleven-page window without excluding high-resolution neighbors');
  await input.fill('4');await decoded([2,3,4]);
- const middle=await sample('middle');assert.equal(middle.selectedPages,3);
+ const middle=await sample('middle');assert.equal(middle.selectedPages,11);
  checks.push('Navigating into the chapter preloads both previous and next high-resolution pages');
  const middleTop=await position();
  await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();assert(Math.abs(await position()-middleTop)<1);
@@ -74,22 +74,22 @@ try{
  await decoded([2,3,4,5]);
  assert.equal(await input.inputValue(),'4');
  assert(await cell(5).evaluate(node=>{const a=node.getBoundingClientRect(),v=node.closest('.nc-reading-viewport').getBoundingClientRect();return a.bottom>v.top&&a.top<v.bottom;}));
- const visible=await sample('zoom40-visible-extra');assert.equal(visible.selectedPages,4);
+ const visible=await sample('zoom40-visible-extra');assert.equal(visible.selectedPages,11);
  await viewport.evaluate(node=>{node.scrollTop+=20;node.dispatchEvent(new Event('scroll',{bubbles:true}));});await settle();
  await decoded([2,3,4,5]);assert.equal(await input.inputValue(),'4');await sample('scroll-visible-extra');
  await page.screenshot({path:path.join(out,'visible-neighbor.png')});
  checks.push('At 40% zoom a further visible page loads before and during scrolling while page 4 remains current');
  await settings(async()=>{for(let i=0;i<6;i++)await page.getByRole('button',{name:'放大',exact:true}).click();});
  await decoded([2,3,4]);
- await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport').dataset.decodedPages==='3');
+ await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport').dataset.decodedPages==='11');
  await page.getByRole('button',{name:'完成模拟翻译',exact:true}).click();
  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
  await settings(()=>page.getByRole('switch',{name:'并排对照',exact:true}).click());
  await decoded([2,3,4],2);
  await page.waitForFunction(()=>[...document.querySelectorAll('[data-page-index="3"] .nc-page-image')].some(image=>image.dataset.resultJob!=='original'));
- const compared=await sample('comparison',2);assert.equal(compared.liveUrls,6);
+ const compared=await sample('comparison',2);assert.equal(compared.liveUrls,20);
  await page.screenshot({path:path.join(out,'comparison.png')});
- checks.push('Comparison retains full-resolution originals and translated PNGs for only three selected pages');
+ checks.push('Comparison retains full-resolution originals and translations within eleven pages; the bad page stays isolated');
  await settings(async()=>{await page.getByRole('switch',{name:'并排对照',exact:true}).click();await page.getByRole('button',{name:'单页阅读',exact:true}).click();});
  await decoded([3]);
  await page.waitForFunction(()=>document.querySelectorAll('.nc-reading-viewport .nc-manga-page').length===1&&window.readerPreloadMetrics().liveUrls===1);
@@ -110,7 +110,7 @@ try{
  await page.waitForFunction(()=>window.readerPreloadMetrics().liveUrls===0);checks.push('Closing the reader releases all Blob URLs');
  await page.getByRole('button',{name:'重开阅读器',exact:true}).click();await decoded([10,11,12]);
  assert.equal(await input.inputValue(),savedPage);assert(Math.abs(await position()-saved)<1);await sample('reopened');
- checks.push('Reopening restores the same in-page position with a bounded three-page image window');
+ checks.push('Reopening restores the same in-page position with a bounded eleven-page image window');
  for(const number of [18,3,21,5,15]){await input.fill(String(number));await decoded([number-2,number-1,number]);await sample(`jump-${number}`);}
  checks.push('Repeated far jumps release old images while keeping the DOM and held URLs bounded');
  await page.screenshot({path:path.join(out,'reopened.png')});
@@ -118,7 +118,7 @@ try{
  // Cancelled preloads clear their src immediately; a late native decode resolution can then have zero dimensions.
  const completedDecodes=metrics.decodes.filter(item=>!item.cancelled);
  assert(completedDecodes.every(item=>item.width===4000&&item.height===6000));
- assert(metrics.peakUrls<=12,`Transient Blob URL peak grew beyond two comparison windows: ${metrics.peakUrls}`);
+ assert(metrics.peakUrls<=44,`Transient Blob URL peak grew beyond two comparison windows: ${metrics.peakUrls}`);
  assert.deepEqual(errors,[]);
  const timings=completedDecodes.map(item=>item.milliseconds).sort((a,b)=>a-b),percentile=q=>timings[Math.min(timings.length-1,Math.floor((timings.length-1)*q))];
  const decodeFallbacks=metrics.decodeFailures.filter(item=>!item.cancelled&&item.name==='EncodingError');

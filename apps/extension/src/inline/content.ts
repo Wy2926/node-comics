@@ -1,9 +1,10 @@
 import { msg, subscribeLocale } from '../i18n/runtime';
 import { RequestPool } from '../concurrency';
+import {DECODED_PAGE_WINDOW} from '../image-resources';
 import { sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
 import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
-import { advancesReadingWindow } from '../translation/automatic';
+import { ReadingProgress, ReadingWindow } from '../translation/automatic';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
 import { imageDisplay, inlineStyles } from './display';
@@ -49,12 +50,9 @@ export function installInline() {
     generation = 0,
     sequence = 0,
     scope = '',
-    signature = '',
     retryId: string | undefined;
-  let prefetchAt = 0,
-    burstAt = 0,
-    scheduledAt = 0,
-    failures = 0;
+  let failures = 0;
+  let readingWindow = new ReadingWindow<Candidate>(item=>item.id), readingProgress = new ReadingProgress();
   let refreshRights = true, hasPending = false, pendingPrefetch = false;
   let candidates: Candidate[] = [],
     windowImages: Candidate[] = [],
@@ -277,6 +275,7 @@ export function installInline() {
           read: target.read,
           rect,
           display: imageDisplay(image),
+          state: { kind: 'waiting', message: msg('准备翻译…') },
         };
         tracked.set(image, item);
       }
@@ -290,21 +289,18 @@ export function installInline() {
         tracked.delete(image);
       }
     candidates = next;
-    const previousWindow = windowImages.map((i) => i.id);
     windowImages = document.hidden
       ? []
       : readingImages(candidates, innerWidth, innerHeight, sourcePage().direction);
-    // As in the reader, keep only a small decoded window on long chapters.
-    const current = candidates.indexOf(windowImages[0]),
-      retained = new Set(current < 0 ? [] : candidates.slice(Math.max(0, current - 1), current + 4));
+    const head=windowImages[0],rect=head?.rect;
+    if(head&&rect)windowImages=windowImages.slice(0,readingProgress.update(head.id,rect.top,rect.height,innerHeight));
+    // Retain eleven decoded displays, matching the reader's bounded DOM window.
+    const current = candidates.indexOf(windowImages[0]),radius=Math.floor(DECODED_PAGE_WINDOW/2),
+      retained = new Set(current < 0 ? [] : candidates.slice(Math.max(0, current - radius), current + radius + 1));
     for (const item of candidates) if (!retained.has(item)) item.display.restore();
-    const nextSignature = JSON.stringify(windowImages.map((i) => i.id));
-    if (signature !== nextSignature) {
-      const first = !signature;
-      signature = nextSignature;
-      prefetchAt = performance.now() + (advancesReadingWindow(previousWindow, windowImages[0]?.id) ? 0 : 150);
+    if (readingWindow.update(windowImages)) {
       invalidate();
-      schedule(first ? 0 : 80);
+      schedule(Math.max(0,readingWindow.readyAt-performance.now()));
     }
     if (!scope)
       label.textContent = candidates.length
@@ -321,19 +317,9 @@ export function installInline() {
       });
   }
   function schedule(delay = 0) {
-    const now = performance.now();
-    if (!scheduledAt || now >= scheduledAt) burstAt = now;
-    const due = delay === 80 ? Math.min(now + 80, burstAt + 200) : now + delay;
     clearTimeout(timer);
-    scheduledAt = due;
     if (enabled && !paused && !original && !document.hidden && (translatedView?.requiresInternet !== true || navigator.onLine !== false))
-      timer = setTimeout(
-        () => {
-          scheduledAt = 0;
-          void tick();
-        },
-        Math.max(0, due - now),
-      );
+      timer = setTimeout(() => void tick(), Math.max(0,delay));
   }
   const payload = (targets: Candidate[]) => ({
     images: targets.map((i) => ({
@@ -453,7 +439,8 @@ export function installInline() {
     scan();
     if (!windowImages.length) return;
     const stamp = generation, observedAt = Date.now(),
-      targets = windowImages.slice(0, performance.now() < prefetchAt ? 1 : 4);
+      targets = readingWindow.ready();
+    if(!targets.length){schedule(Math.max(0,readingWindow.readyAt-performance.now()));return;}
     pendingPrefetch = targets.length < windowImages.length;
     running = true;
     const retry = retryId;
@@ -477,7 +464,7 @@ export function installInline() {
       running = false;
       paint();
       if (stamp !== generation) schedule();
-      else if (targets.length < windowImages.length) schedule(Math.max(0, prefetchAt - performance.now()));
+      else if (targets.length < windowImages.length) schedule(Math.max(0, readingWindow.prefetchAt - performance.now()));
       void watch();
     }
   }
@@ -497,7 +484,8 @@ export function installInline() {
     paused = false;
     original = false;
     scope = '';
-    signature = '';
+    readingWindow = new ReadingWindow<Candidate>(item=>item.id);
+    readingProgress = new ReadingProgress();
     pause.textContent = msg('暂停');
     originals.textContent = msg('恢复原图');
     document.documentElement.append(host);
@@ -593,11 +581,12 @@ export function installInline() {
       invalidate();
       for (const item of tracked.values()) {
         item.display.restore();
-        item.state = undefined;
+        item.state = { kind: 'waiting', message: msg('准备翻译…') };
         item.resultKey = undefined;
         item.loadError = undefined;
       }
       schedule();
+      paint();
     }
   });
   chrome.runtime.onConnect.addListener(port => {

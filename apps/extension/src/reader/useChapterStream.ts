@@ -5,6 +5,7 @@ import {scrollAnchorFor} from './model';
 import {completePageList} from '../comics/application/library-service';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
 import {ChapterResourceWindow} from './chapter-resources';
+import {ReadingProgress,READING_TARGETS} from '../translation/automatic';
 
 export const pageKey=(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`;
 export const completeManifest=completePageList;
@@ -24,6 +25,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
  const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
  const navigationReason=useRef<'scroll'|'direct'>('direct');
+ const [readingProgress]=useState(()=>new ReadingProgress());
+ const [ahead,setAhead]=useState({key:'',count:READING_TARGETS});
  const nextOf=(chapter:ReadingEntry)=>{const at=sequence.findIndex(item=>item.id===chapter.id);return at<0?undefined:sequence[at+1];};
  const next=completeManifest(copy)?nextOf(copy):undefined;
  const elementTop=(element:HTMLElement)=>{const v=viewport.current!;return element.getBoundingClientRect().top-v.getBoundingClientRect().top+v.scrollTop-v.clientTop;};
@@ -35,6 +38,12 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  function preserve(){
   const chapter=copyRef.current,n=indexRef.current,page=chapter.pages[n],p=position(chapter,n),v=viewport.current;
   if(page&&p&&v)anchor.current={entryId:chapter.id,pageId:page.id,...scrollAnchorFor(p.top,p.height,v.scrollTop)};
+ }
+ function updateReadingProgress(){
+  const chapter=copyRef.current,n=indexRef.current,page=chapter.pages[n],p=position(chapter,n),v=viewport.current;
+  if(!page||!p||!v)return;
+  const key=pageKey(chapter,page.id),count=readingProgress.update(key,p.top-v.scrollTop,p.height,v.clientHeight);
+  setAhead(previous=>previous.key===key&&previous.count===count?previous:{key,count});
  }
  function persist(){
   clearTimeout(saveTimer.current);const chapter=copyRef.current;
@@ -74,7 +83,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
    for(const chapter of stream){const stack=stacks.current.get(chapter.id),metrics=geometry.current.get(chapter.id);if(!stack||!metrics||!chapter.pages.length)continue;const top=elementTop(stack);if(top<=line||!selected)selected={chapter,index:pageAtHeight(metrics.offsets,line-top)};}
    if(selected)activate(selected.chapter,selected.index);
   }
-  preserve();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(persist,350);
+  preserve();updateReadingProgress();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(persist,350);
   if(forward){
    for(const chapter of stream){const end=ends.current.get(chapter.id);if(!end)continue;const top=elementTop(end),crossed=top>previous&&top+end.offsetHeight<=v.scrollTop+v.clientHeight+1;if(crossed&&(layout==='continuous'||indexRef.current===chapter.pages.length-1))markRead(chapter);}
   }
@@ -99,10 +108,12 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
   // Status/image updates must not replay a stale anchor while a native scroll event is pending.
   if(restorePending.current||restoredGeometry.current!==signature)restore();
   restoredGeometry.current=signature;restorePending.current=false;
+  updateReadingProgress();
  });
  useEffect(()=>{
   resources.prepare(stream,onLoadEntry,()=>setResourceVersion(value=>value+1));
  },[stream,onLoadEntry,resources]);
  useEffect(()=>()=>{resources.clear();clearTimeout(saveTimer.current);if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);},[]);
- return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,resources,resourceVersion};
+ const readingAhead=ahead.key===pageKey(copy,copy.pages[index]?.id??'')?ahead.count:READING_TARGETS;
+ return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,resources,resourceVersion,readingAhead};
 }

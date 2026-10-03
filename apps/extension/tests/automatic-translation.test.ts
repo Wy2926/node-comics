@@ -1,9 +1,29 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect} from 'vitest';
-import {ReadingWindow,needsTranslation,targetKey} from '../src/translation/automatic';
+import {ReadingProgress,ReadingWindow,needsTranslation,targetKey} from '../src/translation/automatic';
 import {makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {job,origin,target,originalInput} from './translation-fixture';
 describe('local reading timing',()=>{
+ it.each([[3000,900,1000],[1200,900,300],[901,900,1],[600,900,0]])('expands height %i in viewport %i after %i pixels, at most once per page',(height,viewport,threshold)=>{
+  const progress=new ReadingProgress();
+  if(threshold)expect(progress.update('first',-threshold+1,height,viewport)).toBe(4);
+  expect(progress.update('first',-threshold,height,viewport)).toBe(5);
+  expect(progress.update('first',0,height,viewport)).toBe(5);
+  expect(progress.update('first',-height,height,viewport)).toBe(5);
+  expect(progress.update('second',0,3000,viewport)).toBe(4);
+ });
+ it('does not consume the extra slot before entering the viewport or with unknown geometry',()=>{
+  const progress=new ReadingProgress();expect(progress.update('first',900,500,900)).toBe(4);
+  expect(progress.update('first',0,0,900)).toBe(4);expect(progress.update('first',24,500,900)).toBe(5);
+ });
+ it('adds the fifth slot without restarting warmup or moving the current target',()=>{
+  const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
+  window.update([0,1,2,3,4].map(target),50);expect(window.prefetchAt).toBe(150);
+  expect(window.ready(149)).toHaveLength(1);expect(window.ready(150)).toHaveLength(5);
+  window.update([1,2,3,4].map(target),1000);expect(window.ready(1080)).toHaveLength(4);
+  window.update([1,2,3,4,5,6].map(target),1100);
+  expect(window.ready(1100).map(t=>t.page.id)).toEqual([1,2,3,4,5].map(n=>`page-${n}`));
+ });
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
   const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
   expect(window.ready(150).map(t=>Number(t.page.id.replace('page-','')))).toEqual([0,1,2,3]);

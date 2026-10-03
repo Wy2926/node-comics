@@ -18,11 +18,10 @@ vi.mock('react',async original=>({
 vi.mock('../src/shortcuts/react',()=>({useShortcuts:(handlers:typeof hooks.handlers,options:{enabled:boolean})=>{hooks.handlers=handlers;hooks.enabled=options.enabled;}}));
 vi.mock('../src/reader/useReaderAnalytics',()=>({useReaderAnalytics:()=>({requestTranslation:actions.requestTranslation})}));
 vi.mock('../src/analytics',()=>({track:actions.track}));
-vi.mock('../src/reader/useImageWindow',()=>({useImageWindow:()=>new Set()}));
 vi.mock('../src/reader/useChapterStream',()=>({
  pageKey:(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`,completeManifest:()=>true,
  useChapterStream:({copy}:{copy:ReadingEntry})=>({
-  index:2,indexRef:{current:2},viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
+  index:2,indexRef:{current:2},readingAhead:4,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
   stream:[copy],next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
  }),
 }));

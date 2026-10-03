@@ -6,7 +6,7 @@ import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
 import { safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
-import { type ReadingTarget } from '../translation/automatic';
+import {MAX_READING_TARGETS,type ReadingTarget} from '../translation/automatic';
 import { matchesPage } from '../translation/sync';
 import { defaults, supportsLanguage, type Capabilities, type Job, type Page, type Settings } from '../types';
 import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
@@ -18,7 +18,7 @@ import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
 import {regionActivationKey} from '../region/protocol';
 
-interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;currentKey?:string;waiting?:AbortController;active:boolean;abort:AbortController;}
+interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;active:boolean;abort:AbortController;}
 interface RequestActivity {active:()=>boolean;current:()=>boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
@@ -109,34 +109,38 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
 function disposeContext(ctx:Context){if(!ctx.active)return;ctx.active=false;ctx.abort.abort();ctx.waiting?.abort();ctx.core?.dispose();ctx.channel.dispose();ctx.originals.clear();}
 
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
-async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender){
-  assertCurrent(ctx.channel.isCurrent);let blob:Blob;
+async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender,current=ctx.channel.isCurrent){
+  assertCurrent(current);let blob:Blob;
   if(image.url==='page-image:'+image.id){
     const port=chrome.tabs.connect(sender.tab!.id!,{name:INLINE_SOURCE_PORT,frameId:0,...(sender.documentId?{documentId:sender.documentId}:{})});
-    blob=await receiveImage(port,{navigationId:request.navigationId,id:image.id},ctx.abort.signal,ctx.channel.isCurrent);
+    blob=await receiveImage(port,{navigationId:request.navigationId,id:image.id},ctx.abort.signal,current);
   }
   else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy);
-  assertCurrent(ctx.channel.isCurrent);
-  const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(ctx.channel.isCurrent);
+  assertCurrent(current);
+  const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(current);
   return prepared;
 }
-async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.MessageSender){
-  const targets:ReadingTarget[]=[];
+async function prepare(ctx:Context,request:InlineRequest,sender:chrome.runtime.MessageSender,current:()=>boolean,onReady?:(targets:ReadingTarget[])=>Promise<void>){
+  const targets:ReadingTarget[]=[];let submitted=-1;
   for(const image of request.images){
+   assertCurrent(current);const key=pageKey(request,image),fresh=!ctx.pages.has(key);
    try{
-    const key=pageKey(request,image);let page=ctx.pages.get(key);
+    let page=ctx.pages.get(key);
     if(!page){
-      const {blob,width,height,imageSha256}=await readInlineSource(ctx,request,image,sender);
+      const {blob,width,height,imageSha256}=await readInlineSource(ctx,request,image,sender,current);
       page={...emptyPage(msg("网页漫画"),width,height),imageSha256,id:imageSha256,imageByteSize:blob.size,imageMime:blob.type,blobKey:'inline-original:'+ctx.channel.scope.key+':'+imageSha256,translationScope:ctx.channel.scope.key};
       page.jobs=ctx.jobs.filter(job=>matchesPage(page!,job));
-      await ctx.originals.remember(page.blobKey!,blob,async()=>(await readInlineSource(ctx,request,image,sender)).blob);assertCurrent(ctx.channel.isCurrent);ctx.pages.set(key,page);
+      await ctx.originals.remember(page.blobKey!,blob,async()=>(await readInlineSource(ctx,request,image,sender)).blob);assertCurrent(current);ctx.pages.set(key,page);
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }
     ctx.sourceErrors.delete(key);targets.push({entryId:'inline',page,mode:'classic'});
-   }catch(error){ctx.sourceErrors.set(pageKey(request,image),error instanceof ImagePermissionsRequired
+   }catch(error){assertCurrent(current);ctx.sourceErrors.set(key,error instanceof ImagePermissionsRequired
      ?{kind:'error',message:error.message,retryable:false}
-     :{kind:'error',message:(error as Error).message});}
+     :{kind:'error',message:(error as Error).message});continue;}
+   // Admit each newly prepared page before reading the next; submit keeps the accumulated window.
+   if(fresh&&onReady){assertCurrent(current);await onReady([...targets]);submitted=targets.length;}
   }
+  assertCurrent(current);if(onReady&&submitted!==targets.length)await onReady(targets);
   return targets;
 }
 const resultScope=(ctx:Context)=>JSON.stringify([ctx.channel.scope.key,'classic',ctx.settings.language]);
@@ -200,7 +204,7 @@ async function checkedRequest(message:InlineRequest,sender:chrome.runtime.Messag
   });
   const activity={active,current:()=>active()&&message.generation===(windowGenerations.get(tabId)??0)};
   if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity};
-  if(!Array.isArray(message.images)||message.images.length>4||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg('图片范围无效。'));
+  if(!Array.isArray(message.images)||message.images.length>MAX_READING_TARGETS||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg('图片范围无效。'));
   if(message.type==='NC_INLINE_IMAGE'&&(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048))throw Error(msg('图片范围无效。'));
   return {tabId,tab,...activity};
 }
@@ -218,14 +222,9 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender,ac
     if(!ctx.caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(ctx.caps,mode,language))return {mode,language,scope:ctx.key,items:request.images.map(i=>({id:i.id,state:{kind:'error',message:msg("此翻译方式暂不可用"),retryable:false}}))};
     if(request.refreshRights&&!request.retryId)await ctx.core.refresh();
     if(!current())return response(ctx,request);
-    const currentKey=request.images[0]&&pageKey(request,request.images[0]);
-    if(!request.retryId&&currentKey!==ctx.currentKey&&request.images.length>1){const targets=await prepare(ctx,{...request,images:request.images.slice(0,1)},sender);if(!current())return response(ctx,request);await ctx.core.submit(targets,current);if(!current())return response(ctx,request);ctx.currentKey=currentKey;}
-    const targets=await prepare(ctx,request,sender);
+    const targets=await prepare(ctx,request,sender,current,request.retryId?undefined:targets=>ctx.core!.submit(targets,current));
     if(!current())return response(ctx,request);
     if(request.retryId){const image=request.images.find(i=>i.id===request.retryId),page=image&&ctx.pages.get(pageKey(request,image));const target=targets.find(t=>t.page.id===page?.id);if(target)await ctx.core.manual(target);}
-    else await ctx.core.submit(targets,current);
-    ctx.currentKey=currentKey;
-
   }
   return response(ctx,request);
 }

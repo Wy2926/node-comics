@@ -1,4 +1,5 @@
 {
+  "准备翻译…": "Preparazione della traduzione…",
   "字号": "Dimensione del testo",
   "跳转章节": "Vai al capitolo",
   "第 {0} 章，共 {1} 章": "Capitolo {0} di {1}",
@@ -284,7 +285,6 @@
   "下一页": "Pagina successiva",
   "默认翻译 · {0} · {1}": "Traduzione predefinita · {0} · {1}",
   "接着阅读": "Leggi dopo",
-  "第 {0} 页 · 滚动到此处时加载": "Pagina {0} · Caricamento durante lo scorrimento qui",
   "已到当前内容末尾": "è stata raggiunta la fine del contenuto corrente",
   "翻译选项": "Opzioni di traduzione",
   "完成管理": "Gestione completa",
@@ -1051,7 +1051,7 @@
   "其中会员权益内交付 {0} 页": "Incluse {0} pagine consegnate con i vantaggi dell’abbonamento",
   "成功交付后扣减有限额度。": "Le quote limitate vengono addebitate dopo la consegna riuscita.",
   "{0}：交付 {1} 页": "{0}: {1} pagine consegnate",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Seleziona le immagini tradotte per tradurre la pagina attuale e le tre successive durante la lettura. Questa vista vale solo per questo fumetto.",
+  "选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。": "Seleziona le immagini tradotte per tradurre in anticipo le pagine successive durante la lettura. Questa vista vale solo per questo fumetto.",
   "划图翻译": "Traduci area selezionata",
   "拖动框选，松手翻译；右键或 Esc 取消。": "Trascina per selezionare, rilascia per tradurre. Clic destro o Esc per annullare.",
   "重新框选": "Seleziona di nuovo",

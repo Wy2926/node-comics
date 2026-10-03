@@ -1,4 +1,5 @@
 import type {CacheToken} from '../cache';
+import {IMAGE_MEMORY_BYTES,IMAGE_MEMORY_ENTRIES} from '../../image-resources';
 interface MemoryResult {blob:Blob;token?:CacheToken}
 const memory=new Map<string,MemoryResult>();
 const requests=new Map<string,{key:string;token:CacheToken;finish:(blob?:Blob)=>void}>();
@@ -28,7 +29,7 @@ export function resultInMemory(key:string,token?:CacheToken){const value=memory.
 export function retainResult(key:string,blob:Blob,token?:CacheToken){
   channel();memory.delete(key);memory.set(key,{blob,token});
   let size=[...memory.values()].reduce((sum,value)=>sum+value.blob.size,0);
-  while(memory.size>1&&(memory.size>4||size>96*1024*1024)){
+  while(memory.size>1&&(memory.size>IMAGE_MEMORY_ENTRIES||size>IMAGE_MEMORY_BYTES)){
     const oldest=memory.keys().next().value!;size-=memory.get(oldest)!.blob.size;memory.delete(oldest);
   }
 }

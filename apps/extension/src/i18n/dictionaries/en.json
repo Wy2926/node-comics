@@ -1,4 +1,5 @@
 {
+  "准备翻译…": "Preparing translation…",
   "字号": "Font size",
   "跳转章节": "Go to chapter",
   "第 {0} 章，共 {1} 章": "Chapter {0} of {1}",
@@ -284,7 +285,6 @@
   "下一页": "Next page",
   "默认翻译 · {0} · {1}": "Default translation · {0} · {1}",
   "接着阅读": "Read next",
-  "第 {0} 页 · 滚动到此处时加载": "Page {0} · Loading when scrolling here",
   "已到当前内容末尾": "The end of the current content has been reached",
   "翻译选项": "Translation options",
   "完成管理": "Complete management",
@@ -1051,7 +1051,7 @@
   "其中会员权益内交付 {0} 页": "Including {0} pages delivered under membership benefits",
   "成功交付后扣减有限额度。": "Finite quotas are charged after successful delivery.",
   "{0}：交付 {1} 页": "{0}: {1} pages delivered",
-  "选择译图后，随读翻译当前页与后三页；查看方式仅对此漫画生效。": "Select translated images to translate the current page and the next three as you read. This view applies only to this comic.",
+  "选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。": "Select translated images to translate upcoming pages ahead of your reading. This view applies only to this comic.",
   "划图翻译": "Translate selected area",
   "拖动框选，松手翻译；右键或 Esc 取消。": "Drag to select, release to translate. Right-click or press Esc to cancel.",
   "重新框选": "Select again",

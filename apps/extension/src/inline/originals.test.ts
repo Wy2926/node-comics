@@ -33,11 +33,17 @@ describe('bounded inline upload originals',()=>{
     await store.remember('b',new Blob(['b']),restore);
     expect(await(await store.read('a'))!.text()).toBe('a');expect(await(await store.read('b'))!.text()).toBe('b');expect(restore).not.toHaveBeenCalled();
   });
-  it('keeps at most four original images and reacquires evicted bytes on demand',async()=>{
+  it('retains 24 originals across rolling windows and reacquires evicted bytes on demand',async()=>{
     const store=new InlineOriginals('account-a'),restore=vi.fn(async()=>new Blob(['old'])) ;
-    for(let i=0;i<5;i++)await store.remember('key-'+i,new Blob([String(i)]),restore);
+    for(let i=0;i<25;i++)await store.remember('key-'+i,new Blob([String(i)]),restore);
     expect(await(await store.read('key-4'))!.text()).toBe('4');expect(restore).not.toHaveBeenCalled();
     expect(await(await store.read('key-0'))!.text()).toBe('old');expect(restore).toHaveBeenCalledOnce();
+  });
+  it('raises the default byte budget to 512 MiB without allocating a test-sized working set',async()=>{
+    const store=new InlineOriginals('account-a'),restore=vi.fn(async()=>new Blob(['restored']));
+    for(let i=0;i<4;i++){const blob=new Blob([String(i)]);Object.defineProperty(blob,'size',{value:160*1024*1024});await store.remember(String(i),blob,restore);}
+    expect(await(await store.read('1'))!.text()).toBe('1');expect(restore).not.toHaveBeenCalled();
+    expect(await(await store.read('0'))!.text()).toBe('restored');expect(restore).toHaveBeenCalledOnce();
   });
   it('enforces a byte budget and coalesces source restoration',async()=>{
     const store=new InlineOriginals('account-a',3);let finish!:(blob:Blob)=>void;

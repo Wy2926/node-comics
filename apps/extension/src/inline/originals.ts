@@ -1,5 +1,6 @@
 import {sourcePageCache} from '../storage/source-pages';
 import {SourceDatabaseSchemaError} from '../storage/database';
+import {IMAGE_MEMORY_BYTES,IMAGE_MEMORY_ENTRIES} from '../image-resources';
 
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 
@@ -9,11 +10,11 @@ export class InlineOriginals {
   private restorers=new Map<string,()=>Promise<Blob>>();
   private pending=new Map<string,Promise<Blob|undefined>>();
   private generation=0;
-  constructor(private readonly owner:string,private readonly maxBytes=128*1024*1024){}
+  constructor(private readonly owner:string,private readonly maxBytes=IMAGE_MEMORY_BYTES){}
   private retain(key:string,blob:Blob){
     this.memory.delete(key);if(blob.size<=this.maxBytes)this.memory.set(key,blob);
     let size=[...this.memory.values()].reduce((sum,value)=>sum+value.size,0);
-    while(this.memory.size>4||size>this.maxBytes){const oldest=this.memory.keys().next().value!;size-=this.memory.get(oldest)!.size;this.memory.delete(oldest);}
+    while(this.memory.size>IMAGE_MEMORY_ENTRIES||size>this.maxBytes){const oldest=this.memory.keys().next().value!;size-=this.memory.get(oldest)!.size;this.memory.delete(oldest);}
   }
   async remember(key:string,blob:Blob,restore:()=>Promise<Blob>){
     const generation=this.generation;this.retain(key,blob);this.restorers.delete(key);this.restorers.set(key,restore);

@@ -8,7 +8,7 @@ import {seedReaderFixture} from './reader-fixture-data';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a new profile on the isolated http://127.0.0.1:5176 origin.');
 const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScenario=parameters.get('auto');
-await saveSettings({...defaults,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
+await saveSettings({...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
 await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:autoScenario?'fixture-'+autoScenario:'fixture-reader',name:'隔离阅读验收',role:'reader'},apiOrigin:origin});
 const originalFetch=window.fetch.bind(window);
 const overlay=await browserOverlay(),blob=overlay.blob;

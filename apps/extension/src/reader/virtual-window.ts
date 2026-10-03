@@ -1,4 +1,5 @@
 import type {Page, ReadingEntry} from '../types';
+import {DECODED_PAGE_WINDOW} from '../image-resources';
 
 export interface ChapterWindow {
   copy: ReadingEntry;
@@ -14,7 +15,7 @@ export function chapterWindow(sequence: ReadingEntry[], current: ReadingEntry): 
   if (at < 0) return [current];
   return sequence.slice(Math.max(0, at - 1), at + 2).map(copy => copy.id === current.id ? current : copy);
 }
-export function pageWindow(copies: ReadingEntry[], entryId: string, index: number, height: (page: Page) => number, limit = 11): ChapterWindow[] {
+export function pageWindow(copies: ReadingEntry[], entryId: string, index: number, height: (page: Page) => number, limit = DECODED_PAGE_WINDOW): ChapterWindow[] {
   let active = 0, count = 0;
   for (const copy of copies) {
     if (copy.id === entryId) active = count + Math.max(0, Math.min(index, copy.pages.length - 1));

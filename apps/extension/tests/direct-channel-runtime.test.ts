@@ -41,6 +41,16 @@ function setup(scope = {key: crypto.randomUUID()}) {
   runtimes.push(runtime); return {runtime, jobs, scope, driver, consumed};
 }
 
+it('processes the fifth slot without dropping the current request or duplicating completed pages',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(new Blob(['translated'],{type:'image/png'}))));
+  const {runtime,driver}=setup();
+  await runtime.submit(['a','b','c','d','e','ignored'].map(target));
+  await vi.waitFor(async()=>{await runtime.refresh();expect(driver.start).toHaveBeenCalledTimes(5);},5000);
+  expect(await Promise.all(driver.start.mock.calls.map(([,blob])=>blob.text()))).toEqual(['a','b','c','d','e'].map(id=>'original-'+id));
+  await runtime.submit(['b','c','d','e','f'].map(target));
+  await vi.waitFor(async()=>{await runtime.refresh();expect(driver.start).toHaveBeenCalledTimes(6);},5000);
+  expect(await driver.start.mock.calls[5][1].text()).toBe('original-f');
+});
 it('returns from submit before completion, uses one slot and replaces only the unstarted reading tail', async () => {
   const responses: Array<(response: Response) => void> = [];
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => responses.push(resolve))));
