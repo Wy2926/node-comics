@@ -5,12 +5,13 @@ import styles from './import-button.css?inline';
 
 export function mountSourceImportButton(parent: Element, {floating = false, findAlternatives = true}: {floating?: boolean; findAlternatives?: boolean} = {}) {
   const host = document.createElement('span');
-  host.style.cssText =
-    'all:initial!important;display:inline-block!important;max-width:100%!important;margin:12px 0!important';
-  if (floating) host.style.cssText += 'position:fixed!important;left:16px!important;bottom:20px!important;z-index:2147483645!important;max-width:calc(100vw - 32px)!important;margin:0!important';
+  let hostStyles =
+    'all:initial!important;display:inline-block!important;max-width:100%!important;margin:12px 0!important;';
+  if (floating) hostStyles += 'position:fixed!important;left:16px!important;bottom:20px!important;z-index:2147483645!important;max-width:calc(100vw - 32px)!important;margin:0!important';
   const shadow = host.attachShadow({ mode: 'open' }),
     style = document.createElement('style');
-  style.textContent = shadowThemeStyles(styles);
+  // Avoid inline-style selectors used by page cosmetic filters, including user-origin rules.
+  style.textContent = `:host{${hostStyles}}\n${shadowThemeStyles(styles)}`;
   const surface = document.createElement('div');
   surface.className = 'theme';
   const disconnectTheme = connectInlineTheme(surface);
