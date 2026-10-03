@@ -17,7 +17,7 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||selectedSite==='generic'||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -116,6 +116,14 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));api=`http://127
 // Redirect the build-time service only inside the isolated fixture copy.
 for(const file of await readdir(extension,{recursive:true}))if(file.endsWith('.js')){const target=path.join(extension,file),source=await readFile(target,'utf8');await writeFile(target,source.replaceAll(process.env.INLINE_BUILD_API||'https://comics.nodelane.net',api));}
 const web=createServer((req,res)=>{
+  if(req.url==='/generic-canvas'){
+    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>Generic canvas fixture</title>
+      <style>body{margin:0;background:#edf2f8}main{display:flex;gap:16px;padding:16px}.slot{position:relative;width:400px;height:550px;flex:none}canvas{width:400px;height:550px}#small{width:40px;height:55px}#offscreen{position:absolute;left:-2000px}</style>
+      <main>${['ready','lazy','tainted'].map(id=>'<div class="slot"><canvas id="'+id+'" width="800" height="1100"></canvas></div>').join('')}</main>
+      <canvas id="small" width="800" height="1100"></canvas><canvas id="offscreen" width="800" height="1100"></canvas>
+      <script>window.drawFixture=(c,n=0)=>{const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle=['#20304b','#983844','#487030'][n];x.font='90px sans-serif';x.fillText('Original '+n,50,250);x.fillRect(40,500,600,100);};drawFixture(document.querySelector('#ready'));drawFixture(document.querySelector('#small'));drawFixture(document.querySelector('#offscreen'));
+      const foreign=new Image();foreign.onload=()=>document.querySelector('#tainted').getContext('2d').drawImage(foreign,0,0,800,1100);foreign.src='https://canvas-fixture-cdn.test/image.png';document.querySelector('#ready').onclick=()=>document.body.dataset.clicked='yes';</script>`);return;
+  }
   if(req.url==='/rolling'){
     res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>滚动预翻译验收</title><style>body{margin:0;background:#edf2f8}img{display:block;width:600px;height:825px;margin:24px auto}</style>${Array.from({length:7},(_,n)=>`<img id="rolling-${n+1}" src="${api}/source/${n+7}.png">`).join('')}`);return;
   }
@@ -391,8 +399,87 @@ try{
     check('Live Comic PASH source recognizes canvases, displays fixture translations, turns pages and restores originals; no live provider used');
   }
   }
+  if(!selectedSite||selectedSite==='generic') {
+    complete=true;
+    await browser.route('https://canvas-fixture-cdn.test/image.png',route=>route.fulfill({contentType:'image/png',body:images.get(2)}));
+    await page.goto(site+'/generic-canvas');
+    const original=await page.locator('#ready').evaluate(c=>c.toDataURL()),box=await page.locator('#ready').boundingBox();
+    const originalPixels=await page.locator('#ready').screenshot(),initialJobs=createdJobs;
+    const metrics=()=>worker.evaluate(async url=>{
+      const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
+      return (await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.fixtureCanvasMetrics}))[0].result;
+    },page.url());
+    const measureCanvases=()=>worker.evaluate(async url=>{
+      const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
+      await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
+        globalThis.fixtureCanvasMetrics={samples:0,sampleMs:0,drawMs:0,encodes:0};
+        const get=OffscreenCanvasRenderingContext2D.prototype.getImageData;
+        OffscreenCanvasRenderingContext2D.prototype.getImageData=function(...args){const start=performance.now();try{return get.apply(this,args);}finally{fixtureCanvasMetrics.samples++;fixtureCanvasMetrics.sampleMs+=performance.now()-start;}};
+        const draw=OffscreenCanvasRenderingContext2D.prototype.drawImage;
+        OffscreenCanvasRenderingContext2D.prototype.drawImage=function(...args){const start=performance.now();try{return draw.apply(this,args);}finally{fixtureCanvasMetrics.drawMs+=performance.now()-start;}};
+        const encode=HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob=function(...args){fixtureCanvasMetrics.encodes++;return encode.apply(this,args);};
+      }});
+    },page.url());
+    await measureCanvases();
+    const hasOverlay=id=>page.waitForFunction(id=>document.getElementById(id)?.nextElementSibling?.hasAttribute('data-nc-canvas-translation'),id,{timeout:20000});
+    const aligned=()=>page.waitForFunction(()=>[...document.querySelectorAll('[data-nc-canvas-translation]')].every(i=>{const a=i.getBoundingClientRect(),b=i.previousElementSibling.getBoundingClientRect();return ['x','y','width','height'].every(k=>Math.abs(a[k]-b[k])<=1);}));
+    await activate();await hasOverlay('ready');await aligned();
+    assert.equal(createdJobs,initialJobs+1);
+    assert.deepEqual(await page.locator('#ready').boundingBox(),box);
+    assert.equal(await page.locator('#ready').evaluate(c=>c.toDataURL()),original);
+    assert.notDeepEqual(await page.locator('#ready').screenshot(),originalPixels);
+    for(const id of ['lazy','tainted','small','offscreen'])assert.equal(await page.locator('#'+id).evaluate(c=>!!c.nextElementSibling?.hasAttribute('data-nc-canvas-translation')),false);
+    await page.locator('#ready').click();assert.equal(await page.locator('body').getAttribute('data-clicked'),'yes');
+    await page.waitForTimeout(1100);assert.equal(createdJobs,initialJobs+1,'overlays must not become new image targets');
+    check('Generic canvases translate only stable visible pixels, skip blank/tainted/small/offscreen surfaces and preserve original pixels, clicks and geometry');
+    const previous=await page.locator('#ready').evaluate(c=>c.nextElementSibling.src);
+    await page.locator('#ready').evaluate(c=>window.drawFixture(c,1));
+    await page.waitForFunction(previous=>{const i=document.querySelector('#ready').nextElementSibling;return i?.hasAttribute('data-nc-canvas-translation')&&i.src!==previous;},previous,{timeout:20000});
+    assert.equal(createdJobs,initialJobs+2);
+    await page.locator('#lazy').evaluate(c=>window.drawFixture(c,2));await hasOverlay('lazy');
+    assert.equal(createdJobs,initialJobs+3);await aligned();
+    await page.screenshot({path:path.join(out,'generic-canvas-translated.png')});
+    const beforeRestore=await page.locator('#ready').evaluate(c=>c.toDataURL()),cachedJobs=createdJobs;
+    await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('[data-nc-canvas-translation]'));
+    assert.equal(await page.locator('#ready').evaluate(c=>c.toDataURL()),beforeRestore);
+    assert.deepEqual(await page.locator('#ready').boundingBox(),box);
+    await button('显示译图');await hasOverlay('ready');await hasOverlay('lazy');assert.equal(createdJobs,cachedJobs);
+    check('Generic same-element redraws and delayed canvas drawings refresh without DOM mutations; restoring and returning reuse cached translations');
+    await writeFile(path.join(out,'generic-canvas-metrics.json'),JSON.stringify(await metrics(),null,2));
+    if(process.env.RUN_LIVE_COMICWALKER==='1') {
+      // Public source page is live; original pixels are sent only to this local API fixture.
+      await page.goto('https://comic-walker.com/detail/KC_008597_S/episodes/KC_0085970000200011_E',{waitUntil:'domcontentloaded'});
+      await page.locator('canvas').first().waitFor({timeout:45000});
+      await page.waitForFunction(()=>{const c=document.querySelector('canvas');if(!c||c.width<80||c.height<80)return false;try{const p=new OffscreenCanvas(32,32),x=p.getContext('2d');x.drawImage(c,0,0,32,32);const d=x.getImageData(0,0,32,32).data;return d.some((v,i)=>v!==d[i%4]);}catch{return false;}},null,{timeout:45000});
+      await measureCanvases();
+      const sourcePixels=await page.locator('canvas').first().evaluate(c=>c.toDataURL());
+      const sourceBox=await page.locator('canvas').first().boundingBox();
+      await page.screenshot({path:path.join(out,'comicwalker-live-original.png')});
+      await activate();
+      await page.waitForFunction(()=>[...document.querySelectorAll('canvas')].some(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0&&c.nextElementSibling?.hasAttribute('data-nc-canvas-translation');}),null,{timeout:30000});
+      await aligned();
+      assert.equal(await page.locator('canvas').first().evaluate(c=>c.toDataURL()),sourcePixels);
+      assert.deepEqual(await page.locator('canvas').first().boundingBox(),sourceBox);
+      await page.screenshot({path:path.join(out,'comicwalker-live-translated.png')});
+      await page.getByRole('slider').press('ArrowLeft');
+      await page.waitForFunction(()=>document.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')==='2');
+      await page.waitForFunction(()=>{const visible=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0;});return visible.length===2&&visible.every(c=>c.nextElementSibling?.hasAttribute('data-nc-canvas-translation'));},null,{timeout:30000});
+      await aligned();await page.screenshot({path:path.join(out,'comicwalker-live-next-spread.png')});
+      await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('[data-nc-canvas-translation]'));
+      assert.equal(await page.locator('canvas').first().evaluate(c=>c.toDataURL()),sourcePixels);
+      await page.screenshot({path:path.join(out,'comicwalker-live-restored.png')});
+      await page.getByRole('button',{name:/タテ読み|縦読み|竖向阅读/}).click();
+      await button('显示译图');
+      await page.waitForFunction(()=>[...document.querySelectorAll('canvas[mode="vertical"]')].some(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0&&c.nextElementSibling?.hasAttribute('data-nc-canvas-translation');}),null,{timeout:30000});
+      await aligned();await page.screenshot({path:path.join(out,'comicwalker-live-vertical.png')});
+      await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('[data-nc-canvas-translation]'));
+      await writeFile(path.join(out,'comicwalker-canvas-metrics.json'),JSON.stringify(await metrics(),null,2));
+      check('Live Comic Walker generic canvases display local fixture results in horizontal and vertical readers, translate both next-spread pages and restore original pixels/geometry; no live provider used');
+    }
+  }
   complete=true;
-  let liveSource=process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite;
+  let liveSource=(process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite)||(process.env.RUN_LIVE_COMICWALKER==='1'&&(!selectedSite||selectedSite==='generic'));
   for(const site of siteChecks.filter(site=>!selectedSite||site.id===selectedSite)) {
     const {verifyInline}=await import(site.url);
     const result=await verifyInline({browser,page,activate,button,source:images.get(2),out,check});

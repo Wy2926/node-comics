@@ -11,5 +11,9 @@ export function readingImages<T extends {rect:{top:number;bottom:number;left:num
   if(!visible.length)return [];
   const focus=Math.min(height*.3,240);
   const current=[...visible].sort((a,b)=>Math.max(0,a.rect.top-focus,focus-a.rect.bottom)-Math.max(0,b.rect.top-focus,focus-b.rect.bottom)||a.rect.top-b.rect.top||(direction==='rtl'?b.rect.right-a.rect.right:a.rect.left-b.rect.left))[0];
-  return items.slice(items.indexOf(current),items.indexOf(current)+4);
+  // DOM order need not match the visual reading direction of a two-page spread.
+  // Include the visible peer on the same row before taking the bounded lookahead.
+  const spread=new Set(visible.filter(i=>i.rect.top<current.rect.bottom&&i.rect.bottom>current.rect.top));
+  const start=items.findIndex(i=>spread.has(i));
+  return items.slice(start,start+4);
 }
