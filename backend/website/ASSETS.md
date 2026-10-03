@@ -22,6 +22,17 @@
 | [src/assets/flags/us.svg](src/assets/flags/us.svg) | English | `e7be4240cf57987926673708f09233be1ab6bdf35acc7b86bd32a263f197a2a7` |
 | [src/assets/flags/jp.svg](src/assets/flags/jp.svg) | 日本語 | `bfea80baf9989383dc4bf7ca594ed95be0df0ff125bfc88d0bfa878eb0198022` |
 | [src/assets/flags/kr.svg](src/assets/flags/kr.svg) | 한국어 | `7a6cd5b51d0e2841ed8b79b1147ad8a66cf3c09f6344d4a63b5e4413ffa5d15b` |
+| [src/assets/flags/fr.svg](src/assets/flags/fr.svg) | Français | `8cdacc8d79bcf210cdca2777a2c0de1f9e5862526877bd3026c9d59ecdcd4578` |
+| [src/assets/flags/es.svg](src/assets/flags/es.svg) | Español | `f9cfaff858e95f830733ade9591037b5322dfb5827a53b70956a3d190bb49b9a` |
+| [src/assets/flags/br.svg](src/assets/flags/br.svg) | Português (Brasil) | `b0a912826c3ffd7287435ebed66e18fe058e992309c00dc10b430dd41a29ba91` |
+| [src/assets/flags/de.svg](src/assets/flags/de.svg) | Deutsch | `efd480af5a154a7651f29da23ee0d09dbc892410fb4041898ddf8face336c575` |
+| [src/assets/flags/it.svg](src/assets/flags/it.svg) | Italiano | `9fa88118818d9b64838f578e2babcca3d0630aed21b5c33b34aff7ac5ce506bc` |
+| [src/assets/flags/ru.svg](src/assets/flags/ru.svg) | Русский | `7100aaae51ff3b6a2bf0ca932b3bc518bdc760814725e7cca31d821a26c3dd7c` |
+| [src/assets/flags/pl.svg](src/assets/flags/pl.svg) | Polski | `369bb3e14ee718df1ee15fd2fb3ad0dae713f78f622e277710fb2b30a313f2aa` |
+| [src/assets/flags/ua.svg](src/assets/flags/ua.svg) | Українська | `2d869c23ebfefb2ae0a633297c11dee06fcb666ce7b3ca75eba09b7a1a3a03ac` |
+| [src/assets/flags/tr.svg](src/assets/flags/tr.svg) | Türkçe | `256a1d6afbedb9f731566982331a1cd1ad14aba211b8a61d338855879505e74f` |
+| [src/assets/flags/vn.svg](src/assets/flags/vn.svg) | Tiếng Việt | `2355037201315d74581ab0ad60b5587a29a087d26b0525bdeb8676e64fae5b86` |
+| [src/assets/flags/id.svg](src/assets/flags/id.svg) | Bahasa Indonesia | `5cd3acc4939dd7eae6318c8d75df8c0d1733f650e2504a2635b0dbf3dfabb040` |
 
 | 产物 | SHA-256 |
 | --- | --- |

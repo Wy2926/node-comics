@@ -71,7 +71,7 @@ const trustTargets = [site.github, href('/download/'), href('/guides/comic-reade
     <div class="home-translate-panel">
       <p class="home-path-label"><span aria-hidden="true">02</span>{h.guestEyebrow}</p>
       <h2>{tr.title}</h2><p class="home-translate-intro">{tr.intro}</p>
-      <ImageDropzone client:load locale={locale}/>
+      <ImageDropzone client:load locale={locale} copy={tr}/>
       <p class="home-access-note">{h.webAccess}</p>
       <a class="text-link home-workspace-link" href={href('/translate/')}>{tr.open} <span aria-hidden="true">→</span></a>
     </div>

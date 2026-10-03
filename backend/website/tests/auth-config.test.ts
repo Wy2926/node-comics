@@ -1,7 +1,12 @@
+import {locales,localPath} from '../src/i18n/locales';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { accountReturnPath, oidcSettings, checkoutUrl, type AuthConfig } from '../src/lib/auth-config';
 const config: AuthConfig = { mode:'oidc', dev_auth:false, issuer:'https://identity.example/oidc', client_id:'same-extension-client', audience:'https://comics.nodelane.net/api', authorization_endpoint:'https://identity.example/oidc/auth', token_endpoint:'https://identity.example/oidc/token', scopes:'openid profile offline_access' };
+test('every language keeps account and translator return paths',()=>{
+  for(const locale of locales) for(const path of ['/account/','/account/?price=lite-year','/translate/']) assert.equal(accountReturnPath(localPath(path,locale)),localPath(path,locale));
+});
+
 test('login preserves the selected quote without accepting arbitrary redirects', () => {
   for (const path of ['/account/','/en/account/?price=plus-annual','/zh-tw/account/?price=quote_123','/translate/','/en/translate/','/zh-tw/translate/','/ja/translate/','/ko/translate/']) assert.equal(accountReturnPath(path),path);
   for (const path of ['//evil.example/account/','https://evil.example/account/','/account/?price=x&redirect=evil','/account/?price=../x','/account/?price='+ 'a'.repeat(37),'/translate/?redirect=evil','//evil.example/translate/']) assert.equal(accountReturnPath(path),'/account/');

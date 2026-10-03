@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import ImageDropzone from './ImageDropzone';
 import Turnstile from './Turnstile';
-import { translationCopy, translationError } from '../i18n/translate';
-import { localPath, type Locale } from '../i18n';
+import { translationError } from '../i18n/translation-error';
+import type { TranslationCopy } from '../i18n/translate';
+import { localPath, type Locale } from '../i18n/locales';
 import { signIn } from '../lib/auth';
 import {
   blobBytes,
@@ -146,8 +147,7 @@ function Preview({
   );
 }
 
-export default function TranslationWorkbench({ locale }: { locale: Locale }) {
-  const t = translationCopy[locale];
+export default function TranslationWorkbench({ locale, copy: t }: { locale: Locale; copy: TranslationCopy }) {
   const [rows, setRows] = useState<RecordMeta[]>([]),
     [selected, setSelected] = useState(''),
     [account, setAccount] = useState<Account>(),
@@ -160,7 +160,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
     [zoom, setZoom] = useState(100),
     [mode, setMode] = useState<Mode>('classic'),
     [language, setLanguage] = useState(
-      locale === 'zh-CN' ? 'zh-Hans' : locale === 'zh-TW' ? 'zh-Hant' : locale,
+      locale === 'zh-CN' ? 'zh-Hans' : locale === 'zh-TW' ? 'zh-Hant' : locale === 'pt-BR' ? 'pt' : locale,
     ),
     [showGuest, setShowGuest] = useState(false),
     [volatile, setVolatile] = useState<{ id: string; blob: Blob }>();
@@ -851,6 +851,7 @@ export default function TranslationWorkbench({ locale }: { locale: Locale }) {
         <aside className="translation-sidebar">
           <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">01</span>{t.uploadTitle}</h2>
           <ImageDropzone
+            copy={t}
             locale={locale}
             compact
             disabled={busy || !ready}

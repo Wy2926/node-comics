@@ -19,9 +19,10 @@ def website(tmp_path, monkeypatch):
     (tmp_path / '_astro' / 'page.abc.js').write_text('export{}', encoding='utf-8')
     (tmp_path / '.env').write_text('DO_NOT_SERVE', encoding='utf-8')
     (tmp_path / 'source.map').write_text('DO_NOT_SERVE', encoding='utf-8')
-    translated_error = tmp_path / 'en' / '404' / 'index.html'
-    translated_error.parent.mkdir(parents=True)
-    translated_error.write_text('<!doctype html><h1>Localized error page</h1>', encoding='utf-8')
+    for locale in ('zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'):
+        translated_error = tmp_path / locale / '404' / 'index.html'
+        translated_error.parent.mkdir(parents=True)
+        translated_error.write_text('<!doctype html><h1>Localized error page</h1>', encoding='utf-8')
     app = FastAPI()
 
     @app.get('/v1/me')
@@ -75,12 +76,13 @@ def test_canonical_redirects_and_localized_real_404(website):
     redirect = website.get('/en/pricing/index.html?source=guide', follow_redirects=False)
     assert redirect.status_code == 308
     assert redirect.headers['location'] == '/en/pricing/?source=guide'
-    for path in ['/en/missing/', '/en/404/']:
-        response = website.get(path)
-        assert response.status_code == 404
-        assert 'Localized error page' in response.text
-        assert response.headers['cache-control'] == 'private, no-store'
-        assert response.headers['x-robots-tag'] == 'noindex, nofollow'
+    for locale in ('zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'):
+        for suffix in ('missing/', '404/'):
+            response = website.get('/' + locale + '/' + suffix)
+            assert response.status_code == 404
+            assert 'Localized error page' in response.text
+            assert response.headers['cache-control'] == 'private, no-store'
+            assert response.headers['x-robots-tag'] == 'noindex, nofollow'
 
 
 def test_no_spa_fallback_or_private_source_disclosure(website):

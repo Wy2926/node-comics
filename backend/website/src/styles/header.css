@@ -40,6 +40,7 @@
 .language-menu[open] .language-chevron { transform: rotate(180deg); }
 .language-menu nav {
   position: absolute; top: calc(100% + 12px); right: 0; min-width: 175px; padding: 7px;
+  max-height: min(70vh, 560px); max-width: calc(100vw - 32px); overflow-y: auto; overscroll-behavior: contain;
   display: grid; gap: 3px; background: var(--surface); border: var(--comic-border);
   border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow);
 }

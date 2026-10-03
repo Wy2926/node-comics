@@ -1,4 +1,4 @@
-export type Locale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko';
+export type Locale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr' | 'es' | 'pt-BR' | 'de' | 'it' | 'ru' | 'pl' | 'uk' | 'tr' | 'vi' | 'id';
 export interface GuideSection {
   title:string;paragraphs:string[];steps?:string[];
   code?:string;

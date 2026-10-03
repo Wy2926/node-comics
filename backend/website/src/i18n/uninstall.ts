@@ -1,13 +1,36 @@
+import {uninstall as fr} from './extra/fr';
+import {uninstall as es} from './extra/es';
+import {uninstall as ptBR} from './extra/pt-BR';
+import {uninstall as de} from './extra/de';
+import {uninstall as it} from './extra/it';
+import {uninstall as ru} from './extra/ru';
+import {uninstall as pl} from './extra/pl';
+import {uninstall as uk} from './extra/uk';
+import {uninstall as tr} from './extra/tr';
+import {uninstall as vi} from './extra/vi';
+import {uninstall as id} from './extra/id';
 import type {Locale} from './types';
 
-export const reasonIds = ['unused', 'sites', 'reading', 'translation', 'performance', 'pricing', 'privacy', 'other'] as const;
-export type Reason = typeof reasonIds[number];
-interface Copy {
+import type {Reason} from './uninstall-reasons';
+export {reasonIds, type Reason} from './uninstall-reasons';
+export interface UninstallCopy {
   title: string; description: string; reason: string; reasons: Record<Reason, string>;
   comment: string; privacy: string; submit: string; sending: string; retry: string;
   error: string; limited: string; invalid: string; success: string; thanks: string; skip: string; skipped: string; noScript: string;
 }
-export const uninstallCopy: Record<Locale, Copy> = {
+export const uninstallCopy: Record<Locale, UninstallCopy> = {
+  'fr':fr,
+  'es':es,
+  'pt-BR':ptBR,
+  'de':de,
+  'it':it,
+  'ru':ru,
+  'pl':pl,
+  'uk':uk,
+  'tr':tr,
+  'vi':vi,
+  'id':id,
+
   'zh-CN': {
     title: '感谢你试用 NodeLane 漫译', description: '愿意告诉我们卸载的原因吗？反馈完全自愿，无需登录，也可以直接关闭此页。',
     reason: '主要卸载原因', reasons: {unused: '暂时不需要了', sites: '找不到想看的漫画或不支持常用网站', reading: '导入或阅读不好用', translation: '翻译效果不符合预期', performance: '运行出错、卡顿或占用过高', pricing: '价格或免费额度不合适', privacy: '对权限或隐私有顾虑', other: '其他原因'},

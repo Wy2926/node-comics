@@ -8,6 +8,6 @@ const { locale } = Astro.props;
 const t = translationCopy[locale];
 ---
 <Base title={t.title} description={t.intro} noindex>
-  <TranslationWorkbench client:load locale={locale} />
+  <TranslationWorkbench client:load locale={locale} copy={t} />
   <noscript><p class="container translation-noscript">{t.local}</p></noscript>
 </Base>

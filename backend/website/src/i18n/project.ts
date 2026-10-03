@@ -1,3 +1,14 @@
+import {project as fr} from './extra/fr';
+import {project as es} from './extra/es';
+import {project as ptBR} from './extra/pt-BR';
+import {project as de} from './extra/de';
+import {project as it} from './extra/it';
+import {project as ru} from './extra/ru';
+import {project as pl} from './extra/pl';
+import {project as uk} from './extra/uk';
+import {project as tr} from './extra/tr';
+import {project as vi} from './extra/vi';
+import {project as id} from './extra/id';
 import type { Locale } from './types';
 
 interface ProjectCopy {
@@ -23,6 +34,18 @@ interface ProjectCopy {
 }
 
 export const projectCopy: Record<Locale, ProjectCopy> = {
+  'fr':fr,
+  'es':es,
+  'pt-BR':ptBR,
+  'de':de,
+  'it':it,
+  'ru':ru,
+  'pl':pl,
+  'uk':uk,
+  'tr':tr,
+  'vi':vi,
+  'id':id,
+
   'zh-CN': {
     identityTitle: '为漫画阅读与翻译而做的开源项目。',
     identityBody: 'NodeLane Comics 的源码与问题记录公开于 GitHub，项目代码采用 GPL-3.0-only 许可证。你可以查看实现、跟进版本变化，并通过官方渠道联系维护者。',

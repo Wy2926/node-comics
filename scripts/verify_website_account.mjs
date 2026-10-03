@@ -38,7 +38,7 @@ try{
  for(const scenario of ['expired','revoked']){await visit('?scenario='+scenario);assert.equal(await page.locator('.account-upgrade').count(),1);}
  await visit('?scenario=disabled');await page.getByText(/订阅服务当前不可用/).waitFor();
  await visit('?scenario=error');assert(await page.locator('.account-summary').isVisible());await page.getByRole('alert').waitFor();await shot('error');
- for(const locale of ['zh-CN','zh-TW','en','ja','ko']){
+ for(const locale of ['zh-CN','zh-TW','en','ja','ko','fr','es','pt-BR','de','it','ru','pl','uk','tr','vi','id']){
   for(const scenario of ['active','lite','free','gift-active','gift-pending']){
    await visit(`?locale=${locale}&scenario=${scenario}`);
    for(const width of [1200,760,390,320]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${locale} ${scenario} ${width} overflow`);}
@@ -46,5 +46,5 @@ try{
  }
  await page.setViewportSize({width:390,height:850});await visit('?scenario=active');await shot('mobile-plus');
  await page.getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('button',{name:/登录 \/ 注册/}).waitFor();await shot('signed-out');
- assert.deepEqual(errors,[]);console.log('PASS: Free/Lite and existing PLUS, canceled/expired, disabled/error, logout, 5 locales/4 widths, Lite-only new purchases, selected quote and pending checkout; no external payment requests. Screenshots: '+out);
+ assert.deepEqual(errors,[]);console.log('PASS: Free/Lite and existing PLUS, canceled/expired, disabled/error, logout, 16 locales/4 widths, Lite-only new purchases, selected quote and pending checkout; no external payment requests. Screenshots: '+out);
 }finally{await browser.close();}

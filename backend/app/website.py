@@ -83,7 +83,7 @@ class WebsiteFiles(StaticFiles):
             query = scope.get('query_string', b'').decode('latin-1')
             return RedirectResponse(target + ('?' + query if query else ''), status_code=308)
         response = await super().get_response(path, scope)
-        if response.status_code == 404 and segments[0] in {'zh-tw', 'en', 'ja', 'ko'}:
+        if response.status_code == 404 and segments[0]:
             localized, info = self.lookup_path(segments[0] + '/404/index.html')
             if info:
                 response = FileResponse(localized, status_code=404, stat_result=info)

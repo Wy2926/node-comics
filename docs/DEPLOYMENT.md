@@ -83,7 +83,7 @@ maintenance 保持单活：先退休旧实例（含计费维护线程结束）�
 
 在 `.env.server` 配置 `GUEST_ORIGIN`（精确官网 HTTPS origin，无尾斜线）、真实 `TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY`、至少 32 字符的独立随机 `GUEST_HASH_SECRET`，最后设置 `GUEST_ENABLED=true`。全部 API 槽位共享稳定 HMAC 密钥；更换会重置网络身份，不应随发布轮换。密钥缺失或生产使用测试密钥拒绝启动。三项每日预算的环境变量仅用于首次初始化，日常通过[后台系统设置](SYSTEM_SETTINGS.md)调整并即时生效，默认值为每位访客 5、同网 100、全站 10000；`GUEST_GLOBAL_CONCURRENCY` 仍由环境变量配置，默认 4。关闭开关拒绝新任务但保留已有任务读取。
 
-Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为五语翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
+Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为16 语翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
 
 上线前必须核实真实 IP 信任链：公网请求只进入 OpenResty／受信 Cloudflare，API 槽位不开放公网；代理覆盖 `X-Forwarded-For`，仅受信 Cloudflare 网段可提供 CF-Connecting-IP。应用只读取处理后的 `request.client.host`，不自行信任用户头。当前容器内 Uvicorn 信任代理头的前提是回环端口和私网访问隔离；若改变拓扑，改为精确可信代理地址。不可用 Cookie 或 Turnstile 替代该检查。
 
@@ -102,7 +102,7 @@ python scripts/prepare_static_release.py admin --source artifacts/admin-export/s
   --oidc-origin https://auth.nodelane.net
 ```
 
-产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、五语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 继续复用既有独立位置。
+产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、16 语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 继续复用既有独立位置。
 
 将候选 `release.inc` 通过同一事务式脚本激活：
 
@@ -143,11 +143,11 @@ python scripts/verify_extension_release.py --browser <chrome|edge|firefox> --zip
 
 脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。独立重建并发布官网以更新发行清单和下载重定向，无需重启后端；商店提交包不作为手动安装包交付。
 
-官网按钮直接链接各包的 `download_url`，旧 `/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，五语官网显示暂不可下载，旧路径返回 503；填写并验真后再提供下载，不使用占位地址。
+官网按钮直接链接各包的 `download_url`，旧 `/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，16 语官网显示暂不可下载，旧路径返回 503；填写并验真后再提供下载，不使用占位地址。
 
 ## 上线检查
 
 - 核对镜像、数据库、控制进程、节点版本与心跳，分别确认 `/health/ready` 与 `/health/cluster`。
 - 实际完成 OIDC 登录、临时原图上传、v3 节点直读/交付、原图终态删除与中心鉴权下载；支付按配置渠道独立验证。
-- 检查五语页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
+- 检查16 语页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
 - 运行记录保存在部署环境或忽略的产物目录；仓库文档只维护流程。

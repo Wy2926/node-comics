@@ -1,3 +1,4 @@
+import {basePath} from '../i18n/locales';
 import type { UserManagerSettings } from 'oidc-client-ts';
 export interface AuthConfig { mode: string; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
 export function oidcSettings(config: AuthConfig, origin: string): UserManagerSettings {
@@ -33,5 +34,5 @@ export function checkoutUrl(value: string, provider:'stripe'|'creem', portal = f
 }
 
 export function accountReturnPath(value: string) {
-  return /^\/(?:zh-tw\/|en\/|ja\/|ko\/)?(?:account\/(?:\?price=[a-zA-Z0-9_-]{1,36})?|translate\/)$/.test(value) ? value : '/account/';
+  return /^\/(?:account\/(?:\?price=[a-zA-Z0-9_-]{1,36})?|translate\/)$/.test(basePath(value)) ? value : '/account/';
 }

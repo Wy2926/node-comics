@@ -91,12 +91,13 @@ Kavita 公开服务联调在插件目录执行 `$env:RUN_OPDS_LIVE_KAVITA='1'; n
 
 | 工具 | 范围 |
 | --- | --- |
-| `verify_website_download.mjs` | 五语下载页；指向公开服务时真实下载并核对摘要 |
-| `verify_website_pricing.mjs` | 五语无 JavaScript 公示月年价格与开放日期、双卡及六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
+| `verify_website_languages.mjs` | 16 语公开页面、桌面／手机布局、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；不调用真实身份、计费或模型服务 |
+| `verify_website_download.mjs` | 16 语下载页；指向公开服务时真实下载并核对摘要 |
+| `verify_website_pricing.mjs` | 16 语无 JavaScript 公示月年价格与开放日期、双卡及六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 四种图片、切换、加载失败与恢复 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |
 | `verify_website_translation_tiles.mjs` | 先构建官网并启动上述夹具 `--port 4323`；验证单边 100000 的长／宽图、分块跨边界文字像素、完整下载、本地历史恢复、同 UUID 重放、能力缺失及普通翻译；仅允许本机回环地址 |
-| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、结账与退出，覆盖五语及窄屏 |
+| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、结账与退出，覆盖 16 语及窄屏 |
 
 完整同源账户流程见[官网 README](../backend/website/README.md)。模拟响应验证交互，真实身份、付款和模型效果分别验证。
 

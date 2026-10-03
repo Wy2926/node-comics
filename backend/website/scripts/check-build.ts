@@ -120,10 +120,11 @@ for (const file of htmlFiles) {
   }
   if (/(sk-[a-zA-Z0-9]{20,}|sub2api\.nodelane\.net)/.test(html)) errors.push(`${label}: private generation config leaked`);
 }
-if (homePreviews.get('zh-CN') !== homePreviews.get('zh-TW')
-  || homePreviews.get('en') !== homePreviews.get('ja')
-  || homePreviews.get('en') !== homePreviews.get('ko')
-  || homePreviews.get('zh-CN') === homePreviews.get('en')) errors.push('Homepage screenshots must use Chinese for both Chinese locales and English for the other locales');
+for (const locale of locales) {
+  const expected = locale.startsWith('zh') ? homePreviews.get('zh-CN') : homePreviews.get('en');
+  if (homePreviews.get(locale) !== expected) errors.push(`${locale}: incorrect screenshot language`);
+}
+if (homePreviews.get('zh-CN') === homePreviews.get('en')) errors.push('Chinese and English screenshot sets must differ');
 const sitemap = await readFile(join(root,'sitemap.xml'),'utf8');
 const xml = load(sitemap, { xmlMode: true });
 const locations = xml('url > loc').toArray().map(node => xml(node).text());

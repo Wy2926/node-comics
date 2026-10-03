@@ -1,21 +1,23 @@
 import { useId, useRef, useState } from 'react';
-import { translationCopy, translationError } from '../i18n/translate';
-import { localPath, type Locale } from '../i18n';
+import { translationError } from '../i18n/translation-error';
+import type { TranslationCopy } from '../i18n/translate';
+import { localPath, type Locale } from '../i18n/locales';
 import { importImages } from '../lib/translation-store';
 import '../styles/translate.css';
 export default function ImageDropzone({
   locale,
+  copy: t,
   onAdded,
   disabled = false,
   compact = false,
 }: {
   locale: Locale;
+  copy: TranslationCopy;
   onAdded?: () => Promise<void>;
   disabled?: boolean;
   compact?: boolean;
 }) {
-  const t = translationCopy[locale],
-    input = useRef<HTMLInputElement>(null),
+  const input = useRef<HTMLInputElement>(null),
     descriptionId = useId();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),

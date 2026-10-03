@@ -3,7 +3,7 @@ import type { HomeCopy } from '../i18n/home/types';
 
 type Example = { id: string; src: string; width: number; height: number; label: string };
 export default function Compare({ examples, locale, copy }: { examples: Example[]; locale: string; copy: HomeCopy['comparison'] }) {
-  const [selected, setSelected] = useState(locale === 'en' || locale === 'ko' ? locale : locale === 'ja' ? 'original' : 'zh');
+  const [selected, setSelected] = useState(locale === 'en' || locale === 'ko' ? locale : locale === 'ja' ? 'original' : locale.startsWith('zh') ? 'zh' : 'en');
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const imgRef = useRef<HTMLImageElement>(null);

@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState, type FormEvent} from 'react';
-import {reasonIds, uninstallCopy, type Reason} from '../i18n/uninstall';
-import type {Locale} from '../i18n';
+import {reasonIds, type Reason} from '../i18n/uninstall-reasons';
+import type {UninstallCopy} from '../i18n/uninstall';
+import type {Locale} from '../i18n/locales';
 import '../styles/uninstall.css';
 
 const storageKey = 'nc-uninstall-feedback';
@@ -10,8 +11,7 @@ function save(draft: Draft) {
   try { sessionStorage.setItem(storageKey, JSON.stringify(draft)); } catch { /* In-memory retry still works. */ }
 }
 
-export default function UninstallForm({locale}: {locale: Locale}) {
-  const t = uninstallCopy[locale];
+export default function UninstallForm({locale, copy:t, reasonLabels}: {locale: Locale;copy:UninstallCopy;reasonLabels:Record<Reason,string>}) {
   const [draft, setDraft] = useState<Draft>(empty);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [skipped, setSkipped] = useState(false), [error, setError] = useState('');
   const sending = useRef(false);
@@ -31,7 +31,7 @@ export default function UninstallForm({locale}: {locale: Locale}) {
     sending.current = true; setBusy(true); setError('');
     // Keep the exact body across language switches, reloads and unknown responses.
     const pending = {...draft, key: draft.key || crypto.randomUUID(), payload: draft.payload || JSON.stringify({
-      kind: 'uninstall', comment: `${uninstallCopy['zh-CN'].reasons[draft.reason]}${draft.comment.trim() ? '\n\n' + draft.comment.trim() : ''}`,
+      kind: 'uninstall', comment: `${reasonLabels[draft.reason]}${draft.comment.trim() ? '\n\n' + draft.comment.trim() : ''}`,
     })};
     edit(pending);
     try {

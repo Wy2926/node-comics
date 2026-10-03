@@ -89,6 +89,19 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("img-src 'self' data: blob:", page)
             self.assertIn("worker-src 'self'", page)
 
+    def test_built_languages_get_localized_not_found_routes(self):
+        source = self.root / 'build'
+        source.mkdir()
+        (source / 'index.html').write_text('<h1>Home</h1>', encoding='utf-8')
+        for locale in ('zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'):
+            error = source / locale / '404' / 'index.html'
+            error.parent.mkdir(parents=True)
+            error.write_text('<h1>Not found</h1>', encoding='utf-8')
+        config = prepare('website', source, self.root / 'static', 'v1', '/www/node-comics').read_text()
+        for error in source.glob('*/404/index.html'):
+            locale = error.parent.parent.name
+            self.assertIn(f'location /{locale}/ {{ error_page 404 /__static_errors/{locale}/404/index.html;', config)
+
     def test_static_release_is_immutable_and_old_chunks_remain(self):
         source = self.root / 'build'
         source.mkdir()

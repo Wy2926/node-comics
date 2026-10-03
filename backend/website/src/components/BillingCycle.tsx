@@ -1,3 +1,4 @@
+import {commerceCopy} from '../i18n/commerce';
 import {useId} from 'react';
 import {billingCopy,annualSavings,type BillingOffer} from '../lib/billing';
 import {pricingCopy} from '../lib/pricing';
@@ -14,7 +15,7 @@ export function selectedInterval(offers:BillingOffer[],preferred:BillingInterval
   return offers.some(p=>p.interval===preferred)?preferred:offers[0]?.interval??preferred;
 }
 export default function BillingCycle({offers,value,onChange,locale,disabled=false}:{offers:BillingOffer[];value:BillingInterval;onChange:(value:BillingInterval)=>void;locale:string;disabled?:boolean}){
-  const id=useId(),copy=billingCopy(locale),text=labels[locale]??labels.en;
+  const id=useId(),copy=billingCopy(locale),text=commerceCopy(locale)?.billingCycle??labels[locale]??labels.en;
   const annualOffers=offers.filter(p=>p.interval==='year');
   const discount=annualOffers.length?Math.min(...annualOffers.map(p=>annualSavings(p,offers)?.percent??0)):0;
   return <fieldset className="billing-cycle" disabled={disabled}><legend>{copy.plan}</legend>{(['month','year'] as const).map((cycle,index)=>{

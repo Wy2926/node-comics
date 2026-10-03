@@ -1,7 +1,30 @@
+import {paymentSuccess as fr} from './extra/fr';
+import {paymentSuccess as es} from './extra/es';
+import {paymentSuccess as ptBR} from './extra/pt-BR';
+import {paymentSuccess as de} from './extra/de';
+import {paymentSuccess as it} from './extra/it';
+import {paymentSuccess as ru} from './extra/ru';
+import {paymentSuccess as pl} from './extra/pl';
+import {paymentSuccess as uk} from './extra/uk';
+import {paymentSuccess as tr} from './extra/tr';
+import {paymentSuccess as vi} from './extra/vi';
+import {paymentSuccess as id} from './extra/id';
 import type {Locale} from './types';
 
 interface Copy {title:string;description:string;heading:string;body:string;hint:string;home:string;footer:string}
 export const paymentSuccess:Record<Locale,Copy> = {
+  'fr':fr,
+  'es':es,
+  'pt-BR':ptBR,
+  'de':de,
+  'it':it,
+  'ru':ru,
+  'pl':pl,
+  'uk':uk,
+  'tr':tr,
+  'vi':vi,
+  'id':id,
+
   'zh-CN': {title:'支付成功',description:'已完成 订阅流程，回到插件继续阅读。',heading:'回到故事里，继续精彩。',body:'感谢你选择 NodeLane Comics。现在可以切回插件，继续你的漫画旅程。',hint:'会员权益会自动同步。若暂未更新，请在插件「我的账户」中点击刷新。',home:'返回官网',footer:'你可以放心关闭此页面。'},
   'zh-TW': {title:'支付成功',description:'已完成 訂閱流程，回到擴充功能繼續閱讀。',heading:'回到故事裡，繼續精彩。',body:'感謝你選擇 NodeLane Comics。現在可以切回擴充功能，繼續你的漫畫旅程。',hint:'會員權益會自動同步。若尚未更新，請在擴充功能「我的帳戶」中點擊重新整理。',home:'返回官網',footer:'你可以放心關閉此頁面。'},
   en: {title:'Checkout complete',description:'Your subscription checkout is complete. Return to the extension to keep reading.',heading:'Your next chapter awaits.',body:'Thank you for choosing NodeLane Comics. Switch back to the extension and pick up where you left off.',hint:'Your membership updates automatically. If it has not appeared yet, refresh My account in the extension.',home:'Back to home',footer:'You can safely close this page.'},

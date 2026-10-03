@@ -64,7 +64,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
         raise ValueError('OIDC origin must be a bare HTTPS origin')
     reserved = {'admin', 'v1', 'internal', 'health', 'docs', 'redoc', 'api', 'openapi', 'account', 'auth',
                 'features', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
-                'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'webhooks', 'billing', 'payment',
+                'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'webhooks', 'billing', 'payment',
                 'uninstall', 'drive-connect', 'translate'}
     if kind == 'admin' and (not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/', admin_path)
                             or admin_path.strip('/').lower() in reserved):
@@ -156,7 +156,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
                            '    if ($uri !~ "^/_astro/[A-Za-z0-9_][A-Za-z0-9_.-]*\\.(js|css|woff2|webp|png|jpg|svg)$") { return 404; }\n'
                            f'    alias {nginx_root}/assets/website/_astro/;\n' + headers(release, immutable=True) + '\n}\n')
             configs.append('location @website_asset_missing {\n    return 404;\n' + headers(release, private=True) + '\n}\n')
-            for locale in ('en', 'ja', 'ko', 'zh-tw'):
+            for locale in sorted(path.parent.parent.name for path in source.glob('*/404/index.html')):
                 error = locale + '/404/index.html'
                 if (source / error).is_file():
                     configs.append(f'location /{locale}/ {{ error_page 404 /__static_errors/{error}; return 404; }}\n')

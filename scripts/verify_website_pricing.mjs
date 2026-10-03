@@ -6,7 +6,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4321';
 const out=path.resolve('artifacts/website-pricing');
 await mkdir(out,{recursive:true});
-const locales=['','en/','zh-tw/','ja/','ko/'];
+const locales=['','zh-tw/','en/','ja/','ko/','fr/','es/','pt-br/','de/','it/','ru/','pl/','uk/','tr/','vi/','id/'];
 const month={id:'lite-month',plan_id:'lite',plan_revision_id:'lite-v1',name:'Lite',currency:'usd',unit_amount:599,interval:'month',monthly_redraw_pages:0,hourly_image_limit:1200,trial_days:7,trial_redraw_pages:0,channels:[{provider:'stripe',binding_id:'fixture',trial_days:7,trial_redraw_pages:0}]};
 const year={...month,id:'lite-year',interval:'year',unit_amount:5999};
 let offers=[month,year],status=200,release=null,onCatalogRequest=null;
@@ -19,7 +19,7 @@ await page.route('**/v1/billing/catalog',async route=>{
  await route.fulfill({status,json:{offers}});
 });
 const shot=async name=>{await page.evaluate(()=>{document.activeElement?.blur();scrollTo({top:0,behavior:'instant'});});await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});};
-const noOverflow=async(target=page)=>assert(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow');
+const noOverflow=async(target=page)=>assert(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow '+target.url()+' width='+target.viewportSize().width);
 const comparison=async(target,hourlyPages)=>{
  const frame=target.locator('.pricing-comparison');
  assert.equal(await frame.count(),1,'one connected pricing comparison');
@@ -64,7 +64,7 @@ try {
   }
  }finally{await staticContext.close();}
  await page.goto(origin+'/pricing/');await live();
- assert.equal(await page.locator('.account-link').innerText(),'我的账户');
+ assert.equal(await page.locator('.account-link').getAttribute('aria-label'),'我的账户');
  assert.match(await page.locator('.billing-offer .price').innerText(),/5.99/);
  await page.locator('input[value="year"]').check({force:true});
  assert.match(await page.locator('.billing-total').innerText(),/59.99/);
@@ -75,12 +75,14 @@ try {
  await page.locator('.language-menu summary').click();await shot('desktop-language');
  await page.locator('.language-menu a[lang="en"]').click();await live();
  assert.match(page.url(),/\/en\/pricing\//);
- assert.equal(await page.locator('.account-link').innerText(),'My account');
+ assert.equal(await page.locator('.account-link').getAttribute('aria-label'),'My account');
  for(const locale of locales){
   await page.goto(origin+'/'+locale+'pricing/');await live();await comparison(page,1200);
   for(const width of [1440,1100,990,980,820,760,390,320]){
    await page.setViewportSize({width,height:1000});await noOverflow();
-   const header=await page.locator('.header-tools').boundingBox();assert(header.x+header.width<=width,`header overflow ${locale} ${width}`);
+   for(const control of await page.locator('.language-menu summary,.github-link,.mobile-nav summary,.header-actions a').all()) {
+    if(await control.isVisible()){const box=await control.boundingBox();assert(box.x>=0&&box.x+box.width<=width,`header overflow ${locale} ${width}`);}
+   }
   }
  }
  await page.setViewportSize({width:390,height:900});await page.goto(origin+'/pricing/');await live();await page.locator('input[value="year"]').check({force:true});await shot('mobile-year');
@@ -118,5 +120,5 @@ try {
  done();release=null;onCatalogRequest=null;await live();
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
  assert.deepEqual(errors,[]);
- console.log('PASS: five locales with and without JavaScript, eight widths, connected six-feature comparison, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected six-feature comparison, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

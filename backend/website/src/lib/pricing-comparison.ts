@@ -1,3 +1,4 @@
+import { commerceCopy, formatCopy } from '../i18n/commerce';
 import {billingBenefitCopy} from './billing';
 
 interface ComparisonRow {label:string;free:string;lite:string}
@@ -59,4 +60,7 @@ const labels:Record<string,PricingComparisonCopy>={
     note:'한도는 같은 계정의 모든 기기·모드·언어에서 최근 시간 기준으로 공유됩니다. 중복 요청과 완료된 결과의 재사용은 다시 계산하지 않습니다. 요청 한도와 우선 배정은 완료 속도나 고정 처리 비율을 보장하지 않습니다. Lite에는 AI 다시 그리기가 포함되지 않으며 별도 증정 페이지는 각 유효기간까지 사용할 수 있습니다. 새 기능은 릴리스 노트를 확인하세요.',
   },
 };
-export const comparisonCopy=(locale:string):PricingComparisonCopy=>labels[locale]??labels.en;
+export function comparisonCopy(locale:string):PricingComparisonCopy {
+ const copy=commerceCopy(locale)?.comparison;
+ return copy ? {...copy,rate:{...copy.rate,lite:(n:number)=>formatCopy(copy.rate.lite,{n:n.toLocaleString(locale)})}} : labels[locale]??labels.en;
+}

@@ -4,8 +4,9 @@ import logoZh from '../assets/logo-zh.webp';
 import logoEn from '../assets/logo-en.webp';
 import GitHubMark from '../components/GitHubMark.astro';
 import LanguageFlag from '../components/LanguageFlag.astro';
+import LanguageNotice from '../components/LanguageNotice.astro';
 import { site, absolute } from '../data/site';
-import { dictionaries, localeFromPath, basePath, localPath, locales, languageNames } from '../i18n';
+import { dictionaries, localeFromPath, basePath, localPath, locales, languageNames, type Locale } from '../i18n';
 import '../styles/global.css';
 import '../styles/controls.css';
 import '../styles/header.css';
@@ -28,7 +29,7 @@ const navigation=[{href:href('/translate/'),label:translationCopy[locale].open},
 const canonical = absolute(path);
 const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
 const pageSchema = schema.find(item => item['@id'] === canonical);
-const ogLocales = {'zh-CN':'zh_CN','zh-TW':'zh_TW',en:'en_US',ja:'ja_JP',ko:'ko_KR'};
+const ogLocales: Record<Locale,string> = {"zh-CN": "zh_CN", "zh-TW": "zh_TW", "en": "en_US", "ja": "ja_JP", "ko": "ko_KR", "fr": "fr_FR", "es": "es_ES", "pt-BR": "pt_BR", "de": "de_DE", "it": "it_IT", "ru": "ru_RU", "pl": "pl_PL", "uk": "uk_UA", "tr": "tr_TR", "vi": "vi_VN", "id": "id_ID"};
 const graph = [
   { '@type': 'Organization', '@id': absolute('/#organization'), name: site.name, url: site.url, email: site.email, logo: absolute('/icon-128.png'), sameAs: [site.github, site.youtube], contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: site.email } },
   { '@type': 'WebSite', '@id': absolute('/#website'), url: site.url, name: site.name, alternateName: ['NodeLane 漫译', 'NodeLane 漫譯'], inLanguage: locales, publisher: { '@id': absolute('/#organization') } },
@@ -80,6 +81,7 @@ const graph = [
         <details class="mobile-nav" name="header-menu"><summary aria-label={t.menu}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h12M4 18h16"/></svg></summary><nav aria-label={t.mobileNavigation}>{navigation.map(item => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}<a href={href('/account/')} aria-current={route === '/account/' ? 'page' : undefined}>{t.account}</a><a class="mobile-download" href={href('/download/')}>{t.download} <span aria-hidden="true">↗</span></a></nav></details></div>
       </div>
     </header>
+    <LanguageNotice locale={locale} enabled={!noindex}/>
     <main id="main"><slot /></main>
     <footer class="site-footer">
       <div class="container footer-top">

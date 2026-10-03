@@ -1,0 +1,18 @@
+---
+import {languageNoticeCopy} from '../i18n/language-notice';
+import type {Locale} from '../i18n/types';
+interface Props {locale:Locale;enabled?:boolean}
+const {locale,enabled=true}=Astro.props;
+const copy=languageNoticeCopy[locale];
+---
+<aside hidden data-language-notice data-enabled={String(enabled)} data-locale={locale} data-message={copy.message} class="language-notice">
+  <p data-language-message role="status" aria-live="polite"></p>
+  <div><a class="button compact" href="#">{copy.switch}</a><button class="button compact secondary" type="button">{copy.dismiss}</button></div>
+</aside>
+<script>import '../lib/language-notice';</script>
+<style>
+  .language-notice { position:fixed; inset:auto 16px 16px auto; z-index:25; width:min(380px,calc(100vw - 32px)); padding:16px; background:var(--surface); border:var(--comic-border); border-radius:var(--comic-panel-radius); box-shadow:var(--comic-shadow); }
+  .language-notice[hidden] { display:none; }
+  .language-notice p { margin:0 0 12px; font-size:.9rem; }
+  .language-notice div { display:flex; flex-wrap:wrap; gap:8px; }
+</style>

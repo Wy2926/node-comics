@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dictionaries, locales, localPath, basePath, localeFromPath, publicPaths } from '../src/i18n';
+import {translationCopy} from '../src/i18n/translate';
+import {uninstallCopy} from '../src/i18n/uninstall';
+import {paymentSuccess} from '../src/i18n/payment-success';
+import {projectCopy} from '../src/i18n/project';
+import {languageNoticeCopy} from '../src/i18n/language-notice';
+import {commerceCopy} from '../src/i18n/commerce';
 import { homeCopy } from '../src/i18n/home';
 
 test('homepage locales provide complete text and matching gallery/translation entries', () => {
@@ -20,7 +26,7 @@ test('homepage locales provide complete text and matching gallery/translation en
   }
   for (const locale of locales) check(homeCopy[locale], homeCopy.en, locale);
 });
-test('five independent dictionaries cover all public content and account messages',()=>{
+test('sixteen independent dictionaries cover all public content and account messages',()=>{
   const reference=dictionaries['zh-CN'];
   for(const locale of locales){
     const value=dictionaries[locale];
@@ -70,5 +76,48 @@ test('0.9.1 replaces the superseded 0.9.0 notes in every locale',()=>{
     assert.ok(!release.items.some(item=>item.includes('Firefox')&&item.includes('0.8.0')),locale);
     assert.ok(!releases.some(release=>release.id==='0.9.0'),locale);
     assert.ok(releases.some(release=>release.id==='0.8.0'),locale);
+  }
+});
+
+
+test('sixteen locales include workspace, feedback, payment, project and browser-language copy',()=>{
+  assert.equal(locales.length,16);
+  for(const table of [translationCopy,uninstallCopy,paymentSuccess,projectCopy,languageNoticeCopy]) {
+    assert.deepEqual(Object.keys(table).sort(),[...locales].sort());
+    for(const locale of locales) assert.deepEqual(Object.keys(table[locale]).sort(),Object.keys(table.en).sort(),locale);
+  }
+});
+
+test('new dictionaries translate all prose and preserve structures and technical identifiers',()=>{
+  const structural = new Set(['slug','id','published','updated','date','relatedPath','href','code','related']);
+  function check(value:unknown,reference:unknown,path:string,key='') {
+    if(typeof reference==='string') {
+      assert.equal(typeof value,'string',path);
+      assert.ok((value as string).trim(),path);
+      if(structural.has(key) && !path.includes('.ui.')) assert.equal(value,reference,path);
+      else {
+        assert.deepEqual((value as string).match(/\{\w+\}/g)?.sort()??[],reference.match(/\{\w+\}/g)?.sort()??[],path);
+        if(reference.length>100) assert.notEqual(value,reference,`untranslated prose: ${path}`);
+      }
+    } else if(Array.isArray(reference)) {
+      assert.ok(Array.isArray(value),path);
+      assert.equal(value.length,reference.length,path);
+      reference.forEach((item,index)=>check(value[index],item,`${path}.${index}`,key));
+    } else if(reference&&typeof reference==='object') {
+      assert.ok(value&&typeof value==='object',path);
+      assert.deepEqual(Object.keys(value).sort(),Object.keys(reference).sort(),path);
+      for(const [field,item] of Object.entries(reference)) check((value as Record<string,unknown>)[field],item,`${path}.${field}`,field);
+    } else assert.equal(value,reference,path);
+  }
+  const original=['zh-CN','zh-TW','en','ja','ko'];
+  const referenceCommerce=commerceCopy('fr');
+  for(const locale of locales.filter(locale=>!original.includes(locale))) {
+    check(dictionaries[locale],dictionaries.en,locale);
+    check(homeCopy[locale],homeCopy.en,locale+'.home');
+    check(translationCopy[locale],translationCopy.en,locale+'.translate');
+    check(uninstallCopy[locale],uninstallCopy.en,locale+'.uninstall');
+    check(paymentSuccess[locale],paymentSuccess.en,locale+'.payment');
+    check(projectCopy[locale],projectCopy.en,locale+'.project');
+    assert.deepEqual(Object.keys(commerceCopy(locale)).sort(),Object.keys(referenceCommerce).sort(),locale+'.commerce');
   }
 });

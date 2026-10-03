@@ -1,4 +1,15 @@
 ---
+import fr from '../assets/flags/fr.svg?raw';
+import es from '../assets/flags/es.svg?raw';
+import ptBR from '../assets/flags/br.svg?raw';
+import de from '../assets/flags/de.svg?raw';
+import it from '../assets/flags/it.svg?raw';
+import ru from '../assets/flags/ru.svg?raw';
+import pl from '../assets/flags/pl.svg?raw';
+import uk from '../assets/flags/ua.svg?raw';
+import tr from '../assets/flags/tr.svg?raw';
+import vi from '../assets/flags/vn.svg?raw';
+import id from '../assets/flags/id.svg?raw';
 import type {Locale} from '../i18n';
 import china from '../assets/flags/cn.svg?raw';
 import taiwan from '../assets/flags/tw.svg?raw';
@@ -10,6 +21,7 @@ interface Props { locale: Locale }
 const {locale} = Astro.props;
 const flags: Record<Locale, string> = {
   'zh-CN': china, 'zh-TW': taiwan, en: unitedStates, ja: japan, ko: southKorea,
+  'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id,
 };
 // Local flag-icons 7.5.0 artwork. MIT license: /licenses/flag-icons.txt.
 // Data URLs keep each flag's internal SVG references isolated without image requests.

@@ -1,10 +1,20 @@
 import type { Locale } from '../types';
 import type { HomeCopy } from './types';
-import en from './en';
 import zhCN from './zh-CN';
 import zhTW from './zh-TW';
+import en from './en';
 import ja from './ja';
 import ko from './ko';
-
+import fr from './fr';
+import es from './es';
+import ptBR from './pt-BR';
+import de from './de';
+import it from './it';
+import ru from './ru';
+import pl from './pl';
+import uk from './uk';
+import tr from './tr';
+import vi from './vi';
+import id from './id';
 export type { HomeCopy } from './types';
-export const homeCopy: Record<Locale, HomeCopy> = { en, 'zh-CN': zhCN, 'zh-TW': zhTW, ja, ko };
+export const homeCopy: Record<Locale,HomeCopy> = {'zh-CN':zhCN, 'zh-TW':zhTW, 'en':en, 'ja':ja, 'ko':ko, 'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id};

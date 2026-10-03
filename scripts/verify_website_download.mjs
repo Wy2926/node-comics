@@ -12,7 +12,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:1100},acceptDownloads:true});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try{
- for(const locale of ['','en/','zh-tw/','ja/','ko/']){
+ for(const locale of ['','zh-tw/','en/','ja/','ko/','fr/','es/','pt-br/','de/','it/','ru/','pl/','uk/','tr/','vi/','id/']){
   await page.goto(origin+'/'+locale+'download/');
   for(const release of releases){
    const card=page.locator(`[data-browser="${release.browser}"]`),link=card.locator('.package-download');
@@ -52,5 +52,5 @@ try{
    console.log(`PASS ${release.browser} real browser download, filename, byte size and SHA-256`);
   }
  }
- assert.deepEqual(errors,[]);console.log('PASS five language download pages, versioned link, installation steps and screenshots');
+ assert.deepEqual(errors,[]);console.log('PASS sixteen language download pages, versioned link, installation steps and screenshots');
 }finally{await browser.close();}

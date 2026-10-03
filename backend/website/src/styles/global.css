@@ -156,3 +156,4 @@
   .pricing-actions .trial-note,.pricing-actions .free-action>p,.pricing-actions .purchase-timing{font-size:.72rem}
   .pricing-comparison>.comparison-note{padding:14px 16px;font-size:.7rem}
 }
+.footer-top :is(a,strong){overflow-wrap:anywhere}

@@ -1,4 +1,5 @@
 ---
+import LanguageNotice from './LanguageNotice.astro';
 import UninstallForm from './UninstallForm';
 import LanguageFlag from './LanguageFlag.astro';
 import {uninstallCopy} from '../i18n/uninstall';
@@ -24,6 +25,7 @@ const t = uninstallCopy[locale];
     <link rel="icon" href="/favicon.ico" />
   </head>
   <body>
+    <LanguageNotice locale={locale} enabled={false}/>
     <main class="uninstall-shell">
       <div class="uninstall-language">
         <details class="language-menu">
@@ -34,7 +36,7 @@ const t = uninstallCopy[locale];
       <p class="eyebrow">NODELANE COMICS</p>
       <h1>{t.title}</h1>
       <p class="uninstall-description">{t.description}</p>
-      <UninstallForm locale={locale} client:load/>
+      <UninstallForm locale={locale} copy={t} reasonLabels={uninstallCopy['zh-CN'].reasons} client:load/>
     </main>
   </body>
 </html>
