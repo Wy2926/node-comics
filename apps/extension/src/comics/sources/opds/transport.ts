@@ -296,18 +296,19 @@ export class OpdsTransport {
     connection: PrivateConnection,
     url: string,
     signal?: AbortSignal,
-    binding?: { etag?: string; size?: number },
+    binding?: { etag?: string; lastModified?:string; size?: number },
   ) {
     const { response, release } = await this.response(connection, url, {
       signal,
       timeoutMs: 300000,
-      headers: binding?.etag ? { 'If-Match': binding.etag } : undefined,
+      headers: binding?.etag ? { 'If-Match': binding.etag } : binding?.lastModified ? {'If-Unmodified-Since':binding.lastModified} : undefined,
     });
     const reader = response.body?.getReader();
     const size = Number(response.headers.get('Content-Length')) || undefined;
     if (
       response.status !== 200 ||
       (binding?.etag && response.headers.get('ETag') !== binding.etag) ||
+      (binding?.lastModified && response.headers.get('Last-Modified') !== binding.lastModified) ||
       (binding?.size && size && binding.size !== size)
     ) {
       await reader?.cancel();

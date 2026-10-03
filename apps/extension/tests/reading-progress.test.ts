@@ -27,7 +27,7 @@ afterEach(()=>vi.useRealTimers());
 
 describe('visible reading position coordinator',()=>{
   it('restores the remote page but never writes during read or unchanged render updates',async()=>{
-    mocks.read.mockResolvedValue({pageIndex:2});const sync=new ReadingProgress();
+    mocks.read.mockResolvedValue({pageIndex:2,updatedAt:2});const sync=new ReadingProgress();
     const restored=await sync.open(copy());expect(restored.pageId).toBe('p2');
     sync.update({...restored,lastReadAt:restored.lastReadAt!+1});await sync.flush();
     expect(mocks.write).not.toHaveBeenCalled();await sync.close();
@@ -64,17 +64,50 @@ describe('visible reading position coordinator',()=>{
       expect(mocks.write).not.toHaveBeenCalled();
     },
   );
-  it.each([undefined, 10])(
-    'still prefers a live API response even when its timestamp %s predates the local position',
+  it.each([undefined, 10, 20, NaN, Infinity])(
+    'keeps the newer local page even when the live API responds, with remote timestamp %s',
     async (updatedAt) => {
       mocks.read.mockResolvedValue({pageIndex: 0, updatedAt});
       const sync = new ReadingProgress();
       const restored = await sync.open(copy(2, 20));
-      expect(restored.pageId).toBe('p0');
+      expect(restored.pageId).toBe('p2');
+      expect(restored.lastReadAt).toBe(20);
       await sync.close();
-      expect(mocks.write).not.toHaveBeenCalled();
+      if(updatedAt===10)expect(mocks.write).toHaveBeenCalledWith(expect.anything(),{pageIndex:2,updatedAt:20});
+      else expect(mocks.write).not.toHaveBeenCalled();
     },
   );
+  it.each([undefined, 10, 20, 30])('uses the same timestamp policy for EPUB (remote %s)',async(updatedAt)=>{
+    const local=epubCopy({href:'/one.xhtml',cfi:'epubcfi(/6/2!/4/2:8)',progression:.6},20);
+    const documentLocation={href:'/one.xhtml',cfi:'epubcfi(/6/2!/4/2:4)',progression:.3};
+    mocks.read.mockResolvedValue({documentLocation,updatedAt});
+    const sync=new ReadingProgress();
+    const restored=await sync.open(local);
+    expect(restored.documentLocation).toEqual(updatedAt===30?documentLocation:local.documentLocation);
+    expect(restored.lastReadAt).toBe(updatedAt===30?30:20);
+    await sync.close();
+    if(updatedAt===10)expect(mocks.write).toHaveBeenCalledWith(expect.anything(),{documentLocation:local.documentLocation,updatedAt:20});
+    else expect(mocks.write).not.toHaveBeenCalled();
+  });
+  it.each([null,{pageIndex:0,snapshot:true}])('does not queue writes to read-only or unsupported progress endpoints (%s)',async(remote)=>{
+    mocks.read.mockResolvedValue(remote);
+    const error=vi.fn(),status=vi.fn(),sync=new ReadingProgress(error,status);
+    await sync.open(copy(1,20));
+    sync.update(copy(2,30));await vi.advanceTimersByTimeAsync(500);await sync.close();
+    expect(status).toHaveBeenLastCalledWith('local');
+    expect(error).not.toHaveBeenCalled();expect(mocks.write).not.toHaveBeenCalled();
+  });
+  it('reports quiet pending status on failure and clears it after the next acknowledged change',async()=>{
+    mocks.read.mockRejectedValueOnce(Error('offline'));
+    mocks.write.mockRejectedValueOnce(Error('offline'));
+    const status=vi.fn(),sync=new ReadingProgress(undefined,status);
+    const local=copy(1,20);
+    expect(await sync.open(local)).toBe(local);
+    expect(status).toHaveBeenLastCalledWith('pending');
+    sync.update(copy(2,30));await sync.flush();expect(status).toHaveBeenLastCalledWith('pending');
+    sync.update(copy(0,40));await sync.flush();expect(status).toHaveBeenLastCalledWith('synced');
+    await sync.close();
+  });
   it('coalesces movement into the latest actual visible page',async()=>{
     const sync=new ReadingProgress();await sync.open(copy());sync.update(copy(1,2));sync.update(copy(2,3));
     await vi.advanceTimersByTimeAsync(499);expect(mocks.write).not.toHaveBeenCalled();
@@ -269,7 +302,7 @@ describe('visible reading position coordinator',()=>{
   it('uses independent EPUB resource and total progress, with no fake image pages',async()=>{
     const document={kind:'epub' as const,title:'Text',chapters:[{id:'one',href:'/one.xhtml',label:'One'}],toc:[]};
     const book={...copy(),pages:[],pageId:'',document,documentLocation:{href:'/one.xhtml',progression:0}};
-    mocks.read.mockResolvedValue({documentLocation:{href:'/one.xhtml',progression:.4,totalProgression:.2}});
+    mocks.read.mockResolvedValue({documentLocation:{href:'/one.xhtml',progression:.4,totalProgression:.2},updatedAt:2});
     const sync=new ReadingProgress(),restored=await sync.open(book);
     expect(restored.documentLocation).toEqual({href:'/one.xhtml',progression:.4,totalProgression:.2});
     sync.update({...restored,lastReadAt:restored.lastReadAt!+1,documentLocation:{href:'/one.xhtml',progression:.5,totalProgression:.25}});await sync.close();
@@ -308,7 +341,7 @@ describe('visible reading position coordinator',()=>{
     mocks.read.mockImplementationOnce(() => {
       started.resolve();
       return remote.promise;
-    }).mockResolvedValueOnce({ pageIndex: 1 });
+    }).mockResolvedValueOnce({ pageIndex: 1, updatedAt: 2 });
     const sync = new ReadingProgress();
     const previous = sync.open(copy());
     await started.promise;

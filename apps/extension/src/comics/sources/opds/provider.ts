@@ -46,7 +46,7 @@ import {
   type PrivateResource,
   type OpdsAuth,
 } from './private-store';
-import { OpdsRangeSource, probeRange } from './range-source';
+import { OpdsRangeSource, probeRange, rangeVersion } from './range-source';
 import { allowedUrl, IMAGE_LIMIT, OpdsTransport, validateRoot } from './transport';
 
 const PROVIDER = 'opds';
@@ -59,6 +59,7 @@ type Opening = {
   template?: OpdsLink;
   url?: string;
   etag?: string;
+  lastModified?: string;
   size?: number;
   title: string;
   progress?: OpdsProgressBinding | null;
@@ -352,9 +353,9 @@ export function createOpdsProvider(
     opening: Opening,
     id: string,
     signal?: AbortSignal,
-  ): Promise<SourceReadingProgress | undefined> {
+  ): Promise<SourceReadingProgress | undefined | null> {
     signal?.throwIfAborted();
-    if (!opening.progress) return pseProgress(opening, opening.progress);
+    if (!opening.progress) return pseProgress(opening, opening.progress) ?? null;
     try {
       const progress = await readOpdsProgress(
         transport,
@@ -368,11 +369,13 @@ export function createOpdsProvider(
       return progress;
     } catch (error) {
       signal?.throwIfAborted();
+      if (opening.progress.kind === 'readium' && error instanceof OpdsError &&
+        [404, 405, 501].includes(Number(error.details?.status))) return null;
       if (opening.progress.kind !== 'kavita' || !unavailableProgressEndpoint(error)) throw error;
       // Optional Reader API failure must not block the advertised PSE route. Keep the
       // profile identity and zero-based lastRead, but never use its unverified endpoints.
       await markProgressVerification(connection, opening, id, false);
-      return pseProgress(opening, opening.progress);
+      return pseProgress(opening, opening.progress) ?? null;
     }
   }
   return {
@@ -651,7 +654,7 @@ export function createOpdsProvider(
             kind: range ? 'range-file' : 'download-file',
             format,
             version:
-              range?.etag ??
+              range ? rangeVersion(range) :
               (await opaqueId(
                 connection.id,
                 'version',
@@ -659,6 +662,7 @@ export function createOpdsProvider(
               )),
             url: file.href,
             etag: range?.etag,
+            lastModified: range?.lastModified,
             size: range?.size,
             title: publication.title,
           };
@@ -820,7 +824,7 @@ export function createOpdsProvider(
     files: {
       async open(context) {
         const { connection, opening } = await openingFor(context);
-        if (opening.kind !== 'range-file' || !opening.url || !opening.etag || !opening.size)
+        if (opening.kind !== 'range-file' || !opening.url || (!opening.etag && !opening.lastModified) || !opening.size)
           throw new OpdsError('range-unsupported', '此文件需要先下载再阅读。');
         return new OpdsRangeSource(
           transport,
@@ -828,6 +832,7 @@ export function createOpdsProvider(
           {
             url: opening.url,
             etag: opening.etag,
+            lastModified: opening.lastModified,
             size: opening.size,
             identity: `${connection.id}:${opening.publicationId}`,
           },
@@ -844,6 +849,7 @@ export function createOpdsProvider(
         allowedUrl(connection, opening.url);
         const result = await transport.download(connection, opening.url, context.signal, {
           etag: opening.etag,
+          lastModified: opening.lastModified,
           size: opening.size,
         });
         return {

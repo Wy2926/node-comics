@@ -7,6 +7,8 @@ export interface EpubIndex {
   kind: 'epub'; title: string;
   chapters: {id: string; href: string; label: string}[];
   toc: EpubTocItem[];
+  /** Manifest image assets, not text pages. Bytes are read only when requested. */
+  images?: {href: string; mediaType: string}[];
   cover?: {href: string; mediaType: string};
 }
 export type FileIndex = {kind: 'images'; pages: IndexedPage[]} | EpubIndex;

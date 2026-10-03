@@ -2,6 +2,7 @@ import { catalog } from '../repositories';
 import { openFileSource } from '../sources/runtime';
 import { getSourceDriver } from '../sources/registry';
 import { openDocument } from '../formats';
+import {epubImageDescriptor} from '../domain/epub-images';
 import type { ComicFormat, IndexedPage } from '../formats/contracts';
 import { prepareComicPage } from './normalize';
 import { ImagePermissionsRequired, readSourceImage } from '../../sources';
@@ -30,7 +31,8 @@ export const onMaterialized=(listener:(identity:PageMaterialization)=>void)=>{li
 
 async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
   signal.throwIfAborted();
-  const [descriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
+  const [storedDescriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
+  const descriptor=doc?.format==='epub'?epubImageDescriptor(doc.document,request.contentId,request.pageId):storedDescriptor;
   if(!descriptor||!doc||doc.contentId!==request.contentId)throw Error('页面已移除或来源内容已变化。');
   if(request.renderProfileId!==pageRenderProfile(doc.format))throw Error('不支持的页面渲染版本，请重新打开漫画。');
   const comic=await catalog.get('comics',doc.comicId),binding=comic?.source;
@@ -74,8 +76,11 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
       const containerId=doc.containerId;
       const source=await openFileSource({connection,source:binding,entryId:doc.id,contentId:doc.contentId,sourceSnapshot:doc.sourceSnapshot,format:doc.format,containerId,signal});
       try{
-        const session=await openDocument(doc.format as ComicFormat,source,signal);
-        try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
+        if(doc.format==='epub')blob=await (await import('../formats/epub')).readEpubImage(source,descriptor.locator.epubImage as string,signal);
+        else {
+          const session=await openDocument(doc.format as ComicFormat,source,signal);
+          try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
+        }
       }finally{await source.close();}
     }
   }

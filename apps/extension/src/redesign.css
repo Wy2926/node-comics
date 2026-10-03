@@ -670,16 +670,19 @@ a {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #e9edf2;
-  --reading-ink: #536177;
+  background: var(--reading-background);
+  --reading-background: var(--reader-gray);
+  --reading-ink: var(--reader-gray-ink);
+  --reading-link: var(--accent);
 }
 .nc-reader[data-background=paper] {
-  background: #f5f2ec;
-  --reading-ink: #665f53;
+  --reading-background: var(--reader-paper);
+  --reading-ink: var(--reader-paper-ink);
 }
 .nc-reader[data-background=night] {
-  background: #121820;
-  --reading-ink: #c0ccdc;
+  --reading-background: var(--reader-night);
+  --reading-ink: var(--reader-night-ink);
+  --reading-link: var(--reader-night-link);
 }
 .nc-status-dot {
   width: 7px;

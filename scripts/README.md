@@ -83,7 +83,9 @@ Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；
 
 OPDS 界面验收可在插件目录执行 `npx vite --config tests/opds-live-ui.config.ts`，使用独立的 `127.0.0.1:5197` 来源。公开 Komga 拒绝普通网页 Origin，测试配置转发该演示站的真实目录／图片／文件响应，并仅允许已声明 progression 路由的有界 PUT，其余外部请求阻断。不存在模拟目录或图片，不代表 MV3 网络权限已验证。正式扩展网络以 `verify_opds_live.mjs` 为准。转发只监听回环，不随构建发布，不用于私有书库。EPUB 需在支持沙箱 Blob 文档的桌面浏览器验收正文、目录、字号及重开续读；不以索引或下载成功代替实际阅读。
 
-EPUB 懒加载回归在插件目录执行 `npx vitest run tests/opds-epub-range.test.ts`，使用真实回环 HTTP 和自制 EPUB，检查 ZIP 压缩／存储模式、按需读取与缓存复用、请求数／传输量、文件变化、撤权，以及 401／403 和不支持稳定 Range 的显式下载回退。界面验证执行 `npx vite --config tests/opds-epub-ui.config.ts`，在 `http://127.0.0.1:5198/` 匿名连接同源 `/opds`；`/metrics` 提供合成文件的请求记录。此夹具不访问真实书库，不代表公网服务或 MV3 权限验收。
+EPUB 懒加载回归在插件目录执行 `npx vitest run tests/opds-epub-range.test.ts tests/reading-progress.test.ts`，使用真实回环 HTTP 和自制 EPUB，检查 ZIP 压缩／存储模式、强 ETag／可靠 Last-Modified 的按需读取与缓存复用、请求数／传输量、文件变化、撤权，以及 401／403 和不支持稳定 Range 的显式下载回退；覆盖无进度接口、接口不支持／故障时的本地保存与快速重开。界面验证执行 `npx vite --config tests/opds-epub-ui.config.ts`，在 `http://127.0.0.1:5198/` 匿名连接同源 `/opds`；`/metrics` 提供合成文件的请求记录。使用 `EPUB last-modified` 验证流式，`EPUB sync-fails` 验证静默待同步及重开续读。此夹具不访问真实书库，不代表公网服务或 MV3 权限验收。
+
+同一服务器的 `/tests/epub-reader-fixture.html` 使用真实 EPUB、Range、物化与自动阅读窗口，只有翻译渠道为本地无付费模拟；`?failure` 可验证单图失败与重试。检查共享两侧工具栏、目录／设置、字号和布局切换、原译图切换时正文及尺寸不变、四图窗口、账号／语言隔离，以及远端 503 时退出重开保留 CFI。模拟译图刻意使用原图一半尺寸，不代表真实模型效果；对应回归为 `tests/epub-images.test.ts`、`tests/epub-service.test.ts` 和 `src/comics/formats/epub/epub.test.ts`。
 
 远程书库交互夹具在插件目录执行 `npx vite --config tests/remote-library-ui.config.ts`，在 `http://127.0.0.1:5199/` 匿名连接同源 `/opds` 与 `/opds-other`。使用真实 OPDS provider、模拟目录和本地 PNG／CBZ，覆盖书库切换、两层分类、分组封面、分页、连续搜索、空目录、失败重试、不可读详情及阅读返回位置；`?theme=dark` 检查深色界面。`/__remote_ui_metrics` 提供有界请求记录，外部 API、翻译和写请求均阻断。协议夹具校验执行 `npx vitest run tests/remote-library-ui-fixture.test.ts`；浏览器交互需单独检查，不代表真实服务或扩展权限验收。
 

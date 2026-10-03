@@ -6,7 +6,10 @@ import type { CatalogTable, Comic, Entry, SourceConnection } from '../src/comics
 import type { EpubIndex, RandomAccessSource } from '../src/comics/formats/contracts';
 import { openEpubArchive } from '../src/comics/formats/epub/archive';
 import { entrySource } from '../src/comics/application/entry-source';
-import { openEpubEntry } from '../src/comics/application/epub-service';
+import { openEpubEntry, loadEpubImagePages } from '../src/comics/application/epub-service';
+import {saveReaderState, loadEntry} from '../src/comics/application/library-service';
+import {RENDER_PROFILE} from '../src/comics/pages/identity';
+import {epubImageId} from '../src/comics/domain/epub-images';
 import {
   coverReference,
   openSourceCover,
@@ -276,6 +279,37 @@ describe('retained EPUB package covers', () => {
 });
 
 describe('EPUB source and document lifetime', () => {
+  it('enriches old document indexes with image metadata without changing their identity or reading position', async () => {
+    const {entry} = await fixture();
+    await catalog.savePosition({id:entry.id,entryId:entry.id,comicId:entry.comicId,contentId:entry.contentId,pageId:'',relativeOffset:0,documentLocation:{href:'OPS/chapter.xhtml',progression:.4,totalProgression:.4},updatedAt:10});
+    mocks.openDocument.mockResolvedValueOnce({index:{...document,images:[{href:'OPS/cover.png',mediaType:'image/png'}]},close:closeDocument});
+    const session = await openEpubEntry(entry.id, entry.contentId);
+    expect(await catalog.get('entries',entry.id)).toMatchObject({contentId:entry.contentId,generation:entry.generation,document:{images:[{href:'OPS/cover.png',mediaType:'image/png'}]}});
+    expect((await loadEntry(entry.id)).documentLocation?.progression).toBe(.4);
+    await session.close();
+  });
+
+  it('recovers scoped artwork jobs in a four-image window while persisting only the document location', async () => {
+    const images = Array.from({length:6},(_,i)=>({href:`OPS/${i}.png`,mediaType:'image/png'}));
+    const {entry} = await fixture({...document,images});
+    const pageId = epubImageId(images[0].href), id = JSON.stringify([entry.contentId,pageId,RENDER_PROFILE]);
+    expect(await catalog.putMaterialization({id,pageId,contentId:entry.contentId,renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),width:240,height:360,byteSize:30,mime:'image/png',updatedAt:1},entry.generation)).toBe(true);
+    expect(await catalog.putMaterialization({id:'forged',pageId:epubImageId('OPS/chapter.xhtml'),contentId:entry.contentId,renderProfileId:RENDER_PROFILE,imageSha256:'b'.repeat(64),width:240,height:360,byteSize:30,mime:'image/png',updatedAt:1},entry.generation)).toBe(false);
+    const pages = await loadEpubImagePages(entry.id,entry.contentId,images.map(image=>image.href),'account-a');
+    expect(pages).toHaveLength(4);
+    expect(pages[0]).toMatchObject({id:pageId,imageSha256:'a'.repeat(64)});
+    const job = {id:'artwork-job',mode:'classic' as const,target_language:'en',status:'succeeded' as const,phase:'done',quota_pages:0,created_at:'2026-01-01',version:1,cache_hit:false};
+    const copy = {...await loadEntry(entry.id),pages:[{...pages[0],translationScope:'account-a',jobs:[job]}],documentLocation:{href:'OPS/chapter.xhtml',progression:.6,totalProgression:.6},lastReadAt:20};
+    await saveReaderState(copy);
+    const recovered = await loadEpubImagePages(entry.id,entry.contentId,[images[0].href],'account-a');
+    expect(recovered[0].jobs).toEqual([job]);
+    expect((await loadEpubImagePages(entry.id,entry.contentId,[images[0].href],'account-b'))[0].jobs).toEqual([]);
+    expect(await catalog.listPages(entry.contentId)).toEqual([]);
+    const resumed = await loadEntry(entry.id);
+    expect(resumed.pages).toEqual([]);
+    expect(resumed.documentLocation?.progression).toBe(.6);
+    await catalog.remove('translationBindings',JSON.stringify(['account-a','a'.repeat(64)]));
+  });
   it('rejects cancellation while capturing the initial source binding', async () => {
     const { connection, entry } = await fixture();
     const pause = pauseRead('connections', connection.id);

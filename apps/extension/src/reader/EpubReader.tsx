@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type Rendition from "epubjs/types/rendition";
 import type { Location } from "epubjs/types/rendition";
-import type { EpubTocItem } from "../comics/formats/contracts";
 import type { EpubSession } from "../comics/formats/epub";
 import {
   currentEpubLocation,
@@ -10,83 +9,120 @@ import {
   resizeEpub,
   restoreEpubLocation,
   settleEpubLayout,
+  turnEpub,
 } from "../comics/formats/epub/location";
 import { openEpubEntry } from "../comics/application/epub-service";
 import { Icon } from "../icons";
 import { msg } from "../i18n/runtime";
-import type { ReadingEntry, Settings } from "../types";
+import {languageLabel, modeLabels, type Capabilities, type Mode, type Page, type ReadingEntry, type Settings} from "../types";
+import type {ReadingTarget, TranslationState} from '../translation/automatic';
 import { useShortcuts } from "../shortcuts/react";
+import type {ReadingProgressStatus} from '../comics/application/reading-progress';
+import {ReaderShell, ReaderNavigation, ReaderDrawer} from './ReaderChrome';
+import {ReaderSettings, ReaderScale, ReaderTranslationSettings} from './ReaderSettings';
+import {PageTranslationBar} from './PageTranslationBar';
+import {EpubDirectory} from './EpubDirectory';
+import {ImageTranslationStatus} from './ImageTranslationStatus';
+import {useReaderControls} from './useReaderControls';
+import {useEpubImages} from './useEpubImages';
+import {readReadingView, saveReadingView} from './view';
 import "./epub.css";
 
 interface Props {
   copy: ReadingEntry;
   settings: Settings;
+  setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   update(next: ReadingEntry): void;
   onBack(): void;
   backLabel: string;
+  backText: string;
+  viewKey: string;
+  controlsBlocked?: boolean;
+  onOpenShortcuts(): void;
+  notify(message: string): void;
+  caps?: Capabilities;
+  channelLabel?: string;
+  translationScope?: string;
+  onReadingWindow(targets: ReadingTarget[], visible: Page[], immediate?: boolean): void;
+  translationState(entryId: string, page: Page, mode: Mode): TranslationState | undefined;
+  onRetry(page: Page, mode: Mode): void | Promise<void>;
+  onLogin(): void;
+  onUpgrade(): void;
+  progressStatus?: ReadingProgressStatus;
 }
 
 function applyAppearance(
   view: Rendition,
   settings: Settings,
   fontSize: number,
+  root: HTMLElement,
 ) {
-  const dark = settings.readerBackground === "night";
+  const tokens = getComputedStyle(root);
   view.themes.default({
     body: {
-      color: `${dark ? "#e2e2e6" : "#25262b"} !important`,
-      background: `${dark ? "#202126" : settings.readerBackground === "paper" ? "#f7f2e6" : "#fff"} !important`,
+      color: `${tokens.getPropertyValue('--reading-ink').trim()} !important`,
+      background: `${tokens.getPropertyValue('--reading-background').trim()} !important`,
       "line-height": "1.65 !important",
     },
-    a: { color: `${dark ? "#b1cfff" : "#32699c"} !important` },
+    a: { color: `${tokens.getPropertyValue('--reading-link').trim()} !important` },
   });
-  view.themes.fontSize(`${fontSize}%`);
-}
-
-function ContentsList({
-  items,
-  select,
-}: {
-  items: EpubTocItem[];
-  select(href: string): void;
-}) {
-  return (
-    <ol>
-      {items.map((item, index) => (
-        <li key={`${item.href}:${index}`}>
-          <button onClick={() => select(item.href)}>{item.label}</button>
-          {item.children?.length ? (
-            <ContentsList items={item.children} select={select} />
-          ) : null}
-        </li>
-      ))}
-    </ol>
-  );
+  view.themes.fontSize(`${fontSize * settings.textScale}%`);
 }
 
 /** EPUB text is a document. It never enters bitmap page/translation materialization. */
 export function EpubReader({
   copy,
   settings,
+  setSettings,
   update,
   onBack,
   backLabel,
+  backText,
+  viewKey,
+  controlsBlocked = false,
+  onOpenShortcuts,
+  notify,
+  caps,
+  channelLabel,
+  translationScope,
+  onReadingWindow,
+  translationState,
+  onRetry,
+  onLogin,
+  onUpgrade,
+  progressStatus,
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
   const session = useRef<EpubSession | undefined>(undefined);
   const rendition = useRef<Rendition | undefined>(undefined);
   const positioning = useRef(true);
+  const capturePosition = useRef<(() => void) | undefined>(undefined);
   const reflow = useRef<(() => void) | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [directory, setDirectory] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [fontSize, setFontSize] = useState(
-    Math.round(100 * settings.textScale),
-  );
-  const latest = useRef({ copy, update, settings, fontSize });
-  latest.current = { copy, update, settings, fontSize };
+  const [view, setView] = useState(() => readReadingView(viewKey));
+  const fontSize = Math.max(70, view.zoom);
+  const setFontSize = (value: number | ((previous: number) => number)) => setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));
+  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
+  const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
+  const latest = useRef({ copy, update, settings, fontSize, images, panel, reveal, setPanel });
+  latest.current = { copy, update, settings, fontSize, images, panel, reveal, setPanel };
   const [position, setPosition] = useState<Location>();
+  const leaveReader = () => {capturePosition.current?.();onBack();};
+  const chapterCount = copy.document?.chapters.length ?? 0;
+  const chapter = position?.start.index ?? 0;
+  const progress = Math.round((copy.documentLocation?.totalProgression ?? 0) * 100);
+  const language = caps?.languages.find(value => value.id === settings.language)?.label ?? languageLabel(settings.language);
+  function selectView(value: 'original' | Mode) {
+    if (value !== 'original' && caps && !caps.modes.some(mode => mode.id === value && mode.enabled)) return false;
+    setView(previous => ({...previous, mode: value === 'original' ? previous.mode : value, preference: value === 'original' ? 'original' : 'translation'}));
+  }
+  function jumpChapter(index: number) {
+    const chapter = copy.document?.chapters[Math.max(0, Math.min(chapterCount - 1, index))];
+    if (chapter) run(() => rendition.current!.display(`/${chapter.href}`));
+  }
+  useEffect(() => saveReadingView(viewKey, view), [viewKey, view]);
 
   const run = (operation: () => Promise<unknown>) => {
     if (loading || positioning.current || session.current?.signal?.aborted)
@@ -95,26 +131,32 @@ export function EpubReader({
   };
   useShortcuts(
     {
-      "reader.previous": () => run(() => rendition.current!.prev()),
-      "reader.next": () => run(() => rendition.current!.next()),
+      "reader.previous": () => run(() => turnEpub(rendition.current!, -1)),
+      "reader.next": () => run(() => turnEpub(rendition.current!, 1)),
       "reader.left": () =>
         run(() =>
-          settings.direction === "rtl"
-            ? rendition.current!.next()
-            : rendition.current!.prev(),
+          turnEpub(rendition.current!, settings.direction === "rtl" ? 1 : -1),
         ),
       "reader.right": () =>
         run(() =>
-          settings.direction === "rtl"
-            ? rendition.current!.prev()
-            : rendition.current!.next(),
+          turnEpub(rendition.current!, settings.direction === "rtl" ? -1 : 1),
         ),
-      "reader.directory": () => setDirectory((value) => !value),
+      "reader.first": () => jumpChapter(0),
+      "reader.last": () => jumpChapter(chapterCount - 1),
+      "reader.directory": () => togglePanel('directory'),
+      "reader.settings": () => togglePanel('settings'),
+      "reader.translationSettings": () => togglePanel('translation'),
+      "reader.original": () => selectView('original'),
+      "reader.translation": () => selectView('classic'),
+      "reader.immersive": () => setImmersive(value => !value),
+      "reader.fullscreen": () => {void fullscreen();},
+      "reader.layout": () => setSettings(value => ({...value, layout: value.layout === 'continuous' ? 'single' : 'continuous'})),
       "reader.zoomIn": () => setFontSize((value) => Math.min(200, value + 10)),
       "reader.zoomOut": () => setFontSize((value) => Math.max(70, value - 10)),
-      "reader.back": onBack,
+      "reader.zoomReset": () => setFontSize(100),
+      "reader.back": leaveReader,
     },
-    { enabled: !loading && !error },
+    { enabled: !controlsBlocked },
   );
 
   useEffect(() => {
@@ -170,15 +212,17 @@ export function EpubReader({
         width: element.clientWidth,
         height: element.clientHeight,
         spread: "none",
+        defaultDirection: latest.current.settings.direction,
         flow:
           latest.current.settings.layout === "continuous"
             ? "scrolled-doc"
             : "paginated",
       });
       rendition.current = view;
+      latest.current.images.connect(view, current.signal ?? controller.signal);
       view.on("displayError", fail);
       displayTimeout = setTimeout(fail, 30_000);
-      view.on("relocated", (location: Location) => {
+      const recordPosition = (location: Location) => {
         if (
           controller.signal.aborted ||
           current?.signal?.aborted ||
@@ -188,6 +232,8 @@ export function EpubReader({
         setPosition(location);
         if (positioning.current) return;
         const { copy: latestCopy, update: persist } = latest.current;
+        // Layout/initial restoration is not a new reading action or a newer sync timestamp.
+        if(latestCopy.documentLocation?.cfi===location.start.cfi)return;
         const total = current!.index.chapters.length;
         const withinChapter = epubProgression(view);
         const totalProgression = location.atEnd
@@ -199,7 +245,7 @@ export function EpubReader({
                 (location.start.index + withinChapter) / Math.max(1, total),
               ),
             );
-        persist({
+        const next: ReadingEntry = {
           ...latestCopy,
           documentLocation: {
             cfi: location.start.cfi,
@@ -208,9 +254,18 @@ export function EpubReader({
             totalProgression,
           },
           lastReadAt: Date.now(),
-        });
-      });
+        };
+        latest.current.copy=next;
+        persist(next);
+      };
+      view.on("relocated", recordPosition);
+      capturePosition.current=()=>{
+        if(positioning.current||failed||controller.signal.aborted||current?.signal?.aborted)return;
+        const location=currentEpubLocation(view);
+        if(location?.start)recordPosition(location);
+      };
       view.on("keydown", (event: KeyboardEvent) => {
+        if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
         // Iframe keyboard events do not bubble; keep the existing customizable shortcut registry.
         const forwarded = new KeyboardEvent("keydown", {
           ...event,
@@ -232,9 +287,19 @@ export function EpubReader({
           new KeyboardEvent("keyup", { key: event.key, code: event.code }),
         ),
       );
+      view.on('click', (event: MouseEvent) => {
+        const target = event.target as Element | null;
+        if (target?.closest('a') || target?.ownerDocument.getSelection()?.toString()) return;
+        if (latest.current.panel) latest.current.setPanel(undefined);
+        else latest.current.reveal();
+      });
+      await view.started;
+      view.direction(latest.current.settings.direction);
+      let appliedLayout = latest.current.settings.layout;
+      let appliedDirection = latest.current.settings.direction;
       const saved = latest.current.copy.documentLocation;
       await initializeEpubLocation(current, view, saved, () =>
-        applyAppearance(view, latest.current.settings, latest.current.fontSize),
+        applyAppearance(view, latest.current.settings, latest.current.fontSize, root.current!),
       );
       if (!failed && !controller.signal.aborted && !current.signal?.aborted) {
         let pendingAppearance = false;
@@ -256,10 +321,20 @@ export function EpubReader({
           void (async () => {
             do {
               pendingAppearance = false;
+              const settings = latest.current.settings;
+              if (appliedLayout !== settings.layout) {
+                appliedLayout = settings.layout;
+                view.flow(settings.layout === 'continuous' ? 'scrolled-doc' : 'paginated');
+              }
+              if (appliedDirection !== settings.direction) {
+                appliedDirection = settings.direction;
+                view.direction(settings.direction);
+              }
               applyAppearance(
                 view,
                 latest.current.settings,
                 latest.current.fontSize,
+                root.current!,
               );
               await settleEpubLayout(view, current!.signal);
               await restoreEpubLocation(current!, view, anchor);
@@ -304,6 +379,8 @@ export function EpubReader({
       .catch(fail)
       .finally(() => clearTimeout(displayTimeout));
     return () => {
+      capturePosition.current?.();
+      capturePosition.current=undefined;
       clearTimeout(displayTimeout);
       removeAbort?.();
       resize?.disconnect();
@@ -316,103 +393,65 @@ export function EpubReader({
     };
   }, [copy.id, copy.contentId, retry]);
 
+  useEffect(()=>{
+    const save=()=>capturePosition.current?.();
+    const hidden=()=>{if(document.visibilityState==='hidden')save();};
+    document.addEventListener('visibilitychange',hidden,true);
+    window.addEventListener('pagehide',save);
+    return()=>{document.removeEventListener('visibilitychange',hidden,true);window.removeEventListener('pagehide',save);};
+  },[]);
+
   useEffect(() => {
     reflow.current?.();
-  }, [fontSize, settings.readerBackground]);
+  }, [fontSize, settings.readerBackground, settings.layout, settings.direction, settings.textScale, settings.appearance, settings.accentTheme]);
 
-  const toc = copy.document?.toc.length
-    ? copy.document.toc
-    : (copy.document?.chapters.map((chapter) => ({
-        href: chapter.href,
-        label: chapter.label,
-      })) ?? []);
-  return (
-    <div
-      className="epub-reader"
-      data-reader-background={settings.readerBackground}
-      data-epub-flow={
-        settings.layout === "continuous" ? "scrolled-doc" : "paginated"
-      }
-    >
-      <header className="epub-toolbar">
-        <button className="epub-back" aria-label={backLabel} onClick={onBack}>
-          <Icon name="arrow" style={{ transform: "rotate(180deg)" }} />
-          <span>{backLabel}</span>
-        </button>
-        <h1>{copy.title}</h1>
-        <button
-          aria-label={msg("目录")}
-          aria-expanded={directory}
-          onClick={() => setDirectory((value) => !value)}
-        >
-          <Icon name="list" />
-        </button>
-        <button
-          aria-label={msg("缩小")}
-          disabled={loading || !!error || fontSize <= 70}
-          onClick={() => setFontSize((value) => Math.max(70, value - 10))}
-        >
-          A−
-        </button>
-        <span className="epub-font-size">{fontSize}%</span>
-        <button
-          aria-label={msg("放大")}
-          disabled={loading || !!error || fontSize >= 200}
-          onClick={() => setFontSize((value) => Math.min(200, value + 10))}
-        >
-          A+
-        </button>
-      </header>
-      <div className="epub-body">
-        {directory ? (
-          <nav className="epub-toc" aria-label={msg("目录")}>
-            <ContentsList
-              items={toc}
-              select={(href) => {
-                run(() => rendition.current!.display(`/${href}`));
-                setDirectory(false);
-              }}
-            />
-          </nav>
-        ) : null}
-        <main className="epub-stage">
-          <div ref={viewport} className="epub-viewport" aria-busy={loading} />
-          {loading ? (
-            <div className="epub-status" role="status">
-              <span className="spinner" />
-              {msg("加载中…")}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="epub-status" role="alert">
-              <p>{error}</p>
-              <button
-                className="button"
-                onClick={() => setRetry((value) => value + 1)}
-              >
-                {msg("重试")}
-              </button>
-            </div>
-          ) : null}
-        </main>
+  const disabled = loading || !!error;
+  return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
+    <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} onBack={leaveReader}
+      progressStatus={progressStatus} directoryOpen={panel === 'directory'} onDirectory={() => togglePanel('directory')}>
+      <div className="nc-reader-navigation">
+        <button aria-label={msg('上一页')} title={msg('上一页')} disabled={disabled || position?.atStart}
+          onClick={() => run(() => turnEpub(rendition.current!, -1))}><Icon name="chevron" style={{transform: 'rotate(-90deg)'}}/></button>
+        <label title={msg('第 {0} 章，共 {1} 章', {'0': chapter + 1, '1': chapterCount})}>
+          <input aria-label={msg('跳转章节')} type="number" min={1} max={chapterCount} value={chapter + 1} disabled={disabled}
+            onChange={event => jumpChapter(Number(event.target.value) - 1)}/><span>/ {chapterCount}</span>
+        </label>
+        <input className="nc-reader-progress" type="range" aria-label={msg('阅读进度')} aria-valuetext={`${progress}%`}
+          min={0} max={100} step={1} value={progress} disabled={disabled}
+          onChange={event => {
+            const target = Number(event.target.value) / 100 * chapterCount;
+            const index = Math.min(chapterCount - 1, Math.floor(target));
+            const href = copy.document?.chapters[index]?.href;
+            if (href) run(() => restoreEpubLocation(session.current!, rendition.current!, {href, progression: target - index}));
+          }}/>
+        <span className="nc-epub-progress-label">{progress}%</span>
+        <button aria-label={msg('下一页')} title={msg('下一页')} disabled={disabled || position?.atEnd}
+          onClick={() => run(() => turnEpub(rendition.current!, 1))}><Icon name="chevron" style={{transform: 'rotate(90deg)'}}/></button>
       </div>
-      <footer className="epub-footer">
-        <button
-          disabled={loading || !!error || position?.atStart}
-          onClick={() => run(() => rendition.current!.prev())}
-        >
-          {msg("上一页")}
-        </button>
-        <span>
-          {Math.round((copy.documentLocation?.totalProgression ?? 0) * 100)}%
-        </span>
-        <button
-          disabled={loading || !!error || position?.atEnd}
-          onClick={() => run(() => rendition.current!.next())}
-        >
-          {msg("下一页")}
-        </button>
-      </footer>
-    </div>
-  );
+    </ReaderNavigation>
+    <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
+      modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)} allowsFeedback={false} onFeedback={() => {}}
+      translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
+    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={settings.layout === 'continuous' ? 'scrolled-doc' : 'paginated'}>
+      <div ref={viewport} className="nc-epub-viewport" aria-busy={loading}/>
+      {loading && <div className="nc-epub-status" role="status"><span className="spinner"/>{msg('加载中…')}</div>}
+      {error && <div className="nc-epub-status" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>{msg('重试')}</button></div>}
+      {!disabled && view.preference === 'translation' && (images.page || images.error) &&
+        <ImageTranslationStatus state={images.error ? {kind: 'error', message: images.error} : translationState(copy.id, images.page!, view.mode)}
+          onLogin={onLogin} onUpgrade={onUpgrade} onRetry={() => images.error ? images.retry() : onRetry(images.page!, view.mode)}/>}
+    </main>
+    {panel && <ReaderDrawer kind={panel} title={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}
+      label={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译选项')}[panel]} onClose={closePanel}>
+      {panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
+        href={position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
+        : <div className="nc-drawer-content">{panel === 'translation'
+          ? <ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel}
+            note={msg('仅翻译 EPUB 内的图片，正文文字保持原文。选择译图后，随读翻译可见图片与最多三张后续图片。')}/>
+          : <ReaderSettings settings={settings} setSettings={setSettings} onLayout={layout => setSettings(value => ({...value, layout}))}
+            sizing={<ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}
+            immersive={immersive} onImmersive={() => setImmersive(value => !value)} onFullscreen={() => void fullscreen()}
+            onShortcuts={() => {setPanel(undefined); reveal(); onOpenShortcuts();}} onReload={() => {capturePosition.current?.(); setRetry(value => value + 1);}}
+            sourceUrl={copy.sourceUrl} busy={loading}/>}</div>}
+    </ReaderDrawer>}
+  </ReaderShell>;
 }

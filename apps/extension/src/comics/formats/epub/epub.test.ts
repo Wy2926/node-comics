@@ -16,7 +16,7 @@ import {
   parseEpubXml,
   type EpubArchive,
 } from "./archive";
-import { indexEpub } from "./index";
+import { indexEpub, readEpubImage } from "./index";
 import { EpubResources } from "./resources";
 import {
   epubProgression,
@@ -24,6 +24,7 @@ import {
   resizeEpub,
   restoreEpubLocation,
   settleEpubLayout,
+  turnEpub,
 } from "./location";
 import type Rendition from "epubjs/types/rendition";
 import type { EpubSession } from "./index";
@@ -46,6 +47,20 @@ beforeAll(() => {
   vi.stubGlobal("cancelAnimationFrame", clearTimeout);
 });
 afterEach(() => vi.restoreAllMocks());
+
+it('uses viewport page turns in continuous EPUB and only crosses chapters at an edge', async () => {
+  const container = {scrollTop: 0, scrollHeight: 2500, clientHeight: 900};
+  const rendition = {manager: {container, isPaginated: false, settings: {axis: 'vertical'}, scrollTo: vi.fn((_left, top) => {container.scrollTop = top;})},
+    next: vi.fn(), prev: vi.fn(), reportLocation: vi.fn()} as unknown as Rendition;
+  await turnEpub(rendition, 1); expect(container.scrollTop).toBe(900); expect(rendition.next).not.toHaveBeenCalled();
+  await turnEpub(rendition, 1); expect(container.scrollTop).toBe(1600);
+  await turnEpub(rendition, 1); expect(rendition.next).toHaveBeenCalledOnce();
+  await turnEpub(rendition, -1); expect(container.scrollTop).toBe(700);
+  await turnEpub(rendition, -1); expect(container.scrollTop).toBe(0);
+  await turnEpub(rendition, -1); expect(rendition.prev).toHaveBeenCalledOnce();
+  (rendition as unknown as {manager: {isPaginated: boolean}}).manager.isPaginated = true;
+  await turnEpub(rendition, 1); expect(rendition.next).toHaveBeenCalledTimes(2);
+});
 
 const xml = (body: string) => `<?xml version="1.0" encoding="UTF-8"?>${body}`;
 const opf =
@@ -116,6 +131,7 @@ describe("EPUB package bridge", () => {
       href: "OPS/cover.png",
       mediaType: "image/png",
     });
+    expect(index.images).toEqual([{href: 'OPS/cover.png', mediaType: 'image/png'}]);
     expect(reads.reduce((size, [, length]) => size + length, 0)).toBeLessThan(
       bytes.length / 2,
     );
@@ -127,6 +143,16 @@ describe("EPUB package bridge", () => {
     await expect(indexEpub({ ...source, snapshot: { ...source.snapshot, local: false } }))
       .resolves.toMatchObject({ kind: 'epub', title: 'Text fixture' });
     expect(reads.reduce((size, [, length]) => size + length, 0)).toBeLessThan(bytes.length / 2);
+  });
+
+  it('materializes only a manifest image and rejects text, unknown and external locators', async () => {
+    const {source} = await fixture();
+    const image = await readEpubImage(source, 'OPS/cover.png');
+    expect(image.type).toBe('image/png');
+    expect(image.size).toBe(200_000);
+    for (const href of ['OPS/chapter.xhtml', 'OPS/unknown.png', 'https://external.test/image.png'])
+      await expect(readEpubImage(source, href)).rejects.toThrow('图片不在内容清单');
+    expect(source.close).not.toHaveBeenCalled();
   });
 
   it("rejects malformed XML, custom entities, DRM and missing spine resources", async () => {
@@ -245,6 +271,7 @@ describe("EPUB resource isolation", () => {
     expect(document.getElementsByTagName("img")[0].getAttribute("src")).toMatch(
       /^blob:/,
     );
+    expect(document.getElementsByTagName('img')[0].getAttribute('data-nc-epub-image')).toBe('OPS/image.png');
     expect(document.getElementsByTagName("img")[1].hasAttribute("src")).toBe(
       false,
     );
@@ -258,6 +285,18 @@ describe("EPUB resource isolation", () => {
     const revoke = vi.spyOn(URL, "revokeObjectURL");
     resources.release("chapter");
     expect(revoke).toHaveBeenCalledTimes(1);
+    resources.close();
+  });
+
+  it('annotates only real internal artwork, including SVG image elements, and strips forged identities', async () => {
+    const resources = new EpubResources(resourceArchive(async () => new Blob(['image'], {type: 'image/png'})), new Map([['OPS/real.png', 'image/png']]));
+    const document = parseEpubXml('<html xmlns="http://www.w3.org/1999/xhtml"><head/><body><p contenteditable="true" data-nc-epub-image="OPS/real.png">Original text</p><img src="https://external.test/image.png" data-nc-epub-image="OPS/real.png"/><svg xmlns="http://www.w3.org/2000/svg"><image href="real.png" data-nc-epub-image="OPS/forged.png"/></svg></body></html>');
+    await resources.sanitize(document, epubUrl('OPS/chapter.xhtml'), 'chapter');
+    expect(document.getElementsByTagName('p')[0].textContent).toBe('Original text');
+    expect(document.getElementsByTagName('p')[0].hasAttribute('data-nc-epub-image')).toBe(false);
+    expect(document.getElementsByTagName('p')[0].hasAttribute('contenteditable')).toBe(false);
+    expect(document.getElementsByTagName('img')[0].hasAttribute('data-nc-epub-image')).toBe(false);
+    expect(document.getElementsByTagName('image')[0].getAttribute('data-nc-epub-image')).toBe('OPS/real.png');
     resources.close();
   });
 

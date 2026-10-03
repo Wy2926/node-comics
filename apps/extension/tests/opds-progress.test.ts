@@ -312,7 +312,7 @@ describe('OPDS reading progress profiles', () => {
         lastRead,
       );
       expect(await provider.progress!.read(ctx)).toEqual(
-        pageIndex === undefined ? undefined : { pageIndex, snapshot: true },
+        pageIndex === undefined ? null : { pageIndex, snapshot: true },
       );
     },
   );
@@ -396,7 +396,7 @@ describe('OPDS reading progress profiles', () => {
 
       expect(await provider.progress!.read(ctx)).toEqual(
         pageIndex === undefined
-          ? undefined
+          ? null
           : { pageIndex, snapshot: true, updatedAt: Date.parse('2026-01-01T00:00:00Z') },
       );
       await provider.progress!.write(ctx, { pageIndex: 2 });

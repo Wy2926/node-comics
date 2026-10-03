@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOpdsProvider } from '../src/comics/sources/opds/provider';
 import { PrivateOpdsStore } from '../src/comics/sources/opds/private-store';
 import { registerSourceDriver } from '../src/comics/sources/registry';
@@ -8,7 +8,8 @@ import { connectRemoteLibrary, browseRemoteLibrary, openRemotePublication } from
 import { openEpubArchive } from '../src/comics/formats/epub/archive';
 import { entrySource } from '../src/comics/application/entry-source';
 import { catalog } from '../src/comics/repositories';
-import { removeComic } from '../src/comics/application/library-service';
+import { removeComic, loadEntry, saveReaderState } from '../src/comics/application/library-service';
+import {ReadingProgress} from '../src/comics/application/reading-progress';
 import { installTestXmlParser } from './opds-protocol-dom';
 import { startEpubRangeServer } from './fixtures/opds-epub-server';
 
@@ -61,12 +62,57 @@ describe('EPUB lazy loading over real loopback HTTP', () => {
     console.info(JSON.stringify({ fixture: 'epub-range', level, fileBytes: server.bytes.length, indexedBytes, indexRequests: requestsAfterIndex, twoChapterBytes: server.requests.reduce((total, request) => total + request.bytes, 0), requests: server.requests.length }));
   });
 
-  it.each(['no-range', 'weak'])('asks for an explicit download when %s cannot prove a stable snapshot', async (name) => {
+  it.each(['no-range', 'weak', 'fresh-modified'])('asks for an explicit download when %s cannot prove a stable snapshot', async (name) => {
     const { server, connection, publication } = await setup();
     const opened = await openRemotePublication(connection.id, publication(name).id);
     expect(opened).toMatchObject({ kind: 'download-required', plan: { format: 'epub' } });
     expect(server.requests).toHaveLength(1);
     expect(server.requests[0].range).toBe('bytes=0-0');
+  });
+
+  it.each(['last-modified','weak-modified'])('streams %s without a strong ETag or a local container',async(name)=>{
+    const {server,connection,publication}=await setup();
+    const opened=await openRemotePublication(connection.id,publication(name).id);
+    if(opened.kind!=='opened')throw Error('Expected streaming EPUB');
+    cleanup.push(()=>removeComic(opened.comicId));
+    const {context,entry}=await entrySource(opened.entryId);
+    expect(entry.containerId).toBeUndefined();
+    expect(entry.acquisition?.kind).toBe('range-file');
+    const source=await openFileSource(context);cleanup.push(()=>source.close());
+    const archive=await openEpubArchive(source);cleanup.push(()=>archive.close());
+    expect(await archive.text('OPS/one.xhtml')).toContain('Chapter One');
+    expect(server.requests.every(request=>request.status===206&&request.range)).toBe(true);
+    expect(server.requests.slice(1).every(request=>request.ifUnmodifiedSince===server.state.lastModified&&!request.ifMatch)).toBe(true);
+    expect(server.requests.reduce((total,request)=>total+request.bytes,0)).toBeLessThan(server.bytes.length/5);
+    server.state.lastModified='Tue, 02 Jan 2024 00:00:00 GMT';
+    await expect(archive.text('OPS/two.xhtml')).rejects.toMatchObject({code:'source-changed',details:{status:412}});
+  });
+
+  it.each(['book','sync-unsupported','sync-fails'])('retains EPUB local progress on immediate reopen with %s',async(name)=>{
+    const {server,connection,publication}=await setup();
+    const opened=await openRemotePublication(connection.id,publication(name).id);
+    if(opened.kind!=='opened')throw Error('Expected streaming EPUB');
+    cleanup.push(()=>removeComic(opened.comicId));
+    const status=vi.fn(),sync=new ReadingProgress(undefined,status);
+    cleanup.push(()=>sync.close());
+    const copy=await sync.open(await loadEntry(opened.entryId));
+    const moved={...copy,documentLocation:{href:'OPS/two.xhtml',cfi:'epubcfi(/6/4!/4/4/1:12)',progression:.45,totalProgression:.725},lastReadAt:Date.now()};
+    const started=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
+    const savePosition=catalog.savePosition.bind(catalog);
+    const save=vi.spyOn(catalog,'savePosition').mockImplementationOnce(async(position)=>{started.resolve();await release.promise;await savePosition(position);});
+    cleanup.push(()=>save.mockRestore());
+    const saving=saveReaderState(moved);
+    await started.promise;
+    sync.update(moved);
+    let loaded=false;
+    const reopening=loadEntry(copy.id).then(value=>{loaded=true;return value;});
+    await Promise.resolve();expect(loaded).toBe(false);
+    release.resolve();await saving;await sync.close();
+    const restored=await sync.open(await reopening);
+    expect(restored.documentLocation).toEqual(moved.documentLocation);
+    expect(restored.lastReadAt).toBe(moved.lastReadAt);
+    expect(status).toHaveBeenLastCalledWith(name==='sync-fails'?'pending':'local');
+    expect(server.requests.filter(request=>request.path.startsWith('/progress/'))).toHaveLength(name==='book'?0:name==='sync-unsupported'?2:3);
   });
 
   it('keeps large reads in one request and caches them without small-block fanout', async () => {

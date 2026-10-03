@@ -28,7 +28,7 @@ function chunk(name: string, bytes: Uint8Array) {
   return Buffer.concat([header, body, checksum]);
 }
 /** Small code-generated PNG covers keep the UI fixture independent of external artwork. */
-function cover(index: number) {
+export function cover(index: number) {
   const width = 240, height = 360, pixels = Buffer.alloc((width * 3 + 1) * height), color = palettes[index % palettes.length];
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const offset = y * (width * 3 + 1) + 1 + x * 3;

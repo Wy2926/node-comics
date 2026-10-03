@@ -2,6 +2,7 @@ import type { CatalogTable, CatalogTables, PageDescriptor } from '../domain';
 import { openSourceDatabase, sourceDatabaseName, type DatabaseSchema } from '../../storage/database';
 import {openTranslationBindings} from './translation-bindings';
 import {epubLocation} from '../formats/epub-location';
+import {epubImageDescriptor} from '../domain/epub-images';
 
 export const CATALOG_DATABASE = sourceDatabaseName('catalog');
 /** A source identity can be reopened, but work begun before its deletion cannot republish it. */
@@ -244,7 +245,8 @@ export const catalog = {
   async putMaterialization(value: CatalogTables['materializations'], expectedGeneration?: number): Promise<boolean> {
     return catalog.mutate(['entries', 'comics', 'connections', 'pageDescriptors', 'materializations'], async tx => {
       const [entry] = await tx.list('entries', {index: 'contentId', range: value.contentId, limit: 1});
-      if (!entry || expectedGeneration !== undefined && entry.generation !== expectedGeneration || !await tx.get('pageDescriptors', [value.contentId, value.pageId])) return false;
+      if (!entry || expectedGeneration !== undefined && entry.generation !== expectedGeneration) return false;
+      if (!(entry.format === 'epub' ? epubImageDescriptor(entry.document, value.contentId, value.pageId) : await tx.get('pageDescriptors', [value.contentId, value.pageId]))) return false;
       const comic = await tx.get('comics', entry.comicId), connection = comic && await tx.get('connections', comic.source.connectionId);
       if (!comic || !connection || comic.source.status !== 'active' || ['disconnected', 'revoked'].includes(connection.status)) return false;
       await tx.put('materializations', value); return true;

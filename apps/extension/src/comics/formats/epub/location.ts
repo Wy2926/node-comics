@@ -31,6 +31,22 @@ function managerFor(rendition: Rendition): LayoutManager {
   return (rendition as Rendition & { manager: LayoutManager }).manager;
 }
 
+/** In scrolled-doc, EPUB.js next/prev jump chapters; reader page controls move one viewport first. */
+export async function turnEpub(rendition: Rendition, direction: -1 | 1) {
+  const manager = managerFor(rendition);
+  const {container} = manager;
+  if (!manager.isPaginated && manager.settings.axis !== 'horizontal') {
+    const maximum = Math.max(0, container.scrollHeight - container.clientHeight);
+    const top = Math.max(0, Math.min(maximum, container.scrollTop + direction * container.clientHeight));
+    if (Math.abs(top - container.scrollTop) > 1) {
+      manager.scrollTo(0, top, false);
+      await rendition.reportLocation();
+      return;
+    }
+  }
+  await (direction === 1 ? rendition.next() : rendition.prev());
+}
+
 /** EPUB.js 0.3.93 accepts a CFI in resize; its declarations omit that parameter. */
 export function resizeEpub(
   rendition: Rendition,
@@ -41,7 +57,7 @@ export function resizeEpub(
   // reportLocation updates its cache on RAF, after chapter display has already resolved.
   const location = view.currentLocation();
   if (location?.start) view.location = location;
-  view.resize(width, height, location?.start.cfi);
+  view.resize(width, height, location?.start?.cfi);
 }
 
 function withSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {

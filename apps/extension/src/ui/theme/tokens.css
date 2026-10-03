@@ -23,6 +23,13 @@
   --dialog-backdrop: #101c32a0;
   --cover-overlay-ink: #fff;
   --cover-overlay-base: #101823;
+  --reader-gray: #e9edf2;
+  --reader-gray-ink: #536177;
+  --reader-paper: #f5f2ec;
+  --reader-paper-ink: #665f53;
+  --reader-night: #121820;
+  --reader-night-ink: #c0ccdc;
+  --reader-night-link: #8dc7ff;
   --icon-comic-ink: #25314b;
   --icon-comic-paper: #fffaf0;
   --icon-comic-blue: #64c5f5;

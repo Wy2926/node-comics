@@ -5,7 +5,8 @@ import {epubLocation} from '../formats/epub-location';
 import {entrySource} from './entry-source';
 
 type Binding=Awaited<ReturnType<typeof entrySource>>;
-type Session={binding:Binding;capability:ProgressCapability;controller:AbortController;observed:number;sent:string;pending?:{value:SourceReadingProgress;key:string};timer?:ReturnType<typeof setTimeout>;running?:Promise<void>};
+export type ReadingProgressStatus='local'|'pending'|'syncing'|'synced';
+type Session={binding:Binding;capability:ProgressCapability;controller:AbortController;observed:number;sent:string;confirmed:boolean;pending?:{value:SourceReadingProgress;key:string};timer?:ReturnType<typeof setTimeout>;running?:Promise<void>};
 function key(value:SourceReadingProgress):string {
   const location=value.documentLocation;
   // A precise anchor survives layout and server-derived percentage normalization.
@@ -25,7 +26,7 @@ export class ReadingProgress {
   private opening?:AbortController;
   private epoch=0;
   private closing:Promise<void>=Promise.resolve();
-  constructor(private readonly onError:(error:unknown)=>void=()=>{}){}
+  constructor(private readonly onError:(error:unknown)=>void=()=>{},private readonly onStatus:(status:ReadingProgressStatus)=>void=()=>{}){}
 
   async open(copy:ReadingEntry,signal?:AbortSignal):Promise<ReadingEntry> {
     const closing=this.close(),epoch=this.epoch;
@@ -39,21 +40,36 @@ export class ReadingProgress {
       const capability=getSourceDriver(binding.connection.provider)?.progress;
       assertOpen();
       if(!capability){controller.abort();return copy;}
-      let restored=copy,remote:SourceReadingProgress|undefined;
+      this.onStatus('syncing');
+      let restored=copy,remote:SourceReadingProgress|undefined|null,readFailed=false;
       try{remote=await capability.read({...binding.context,signal:readSignal});}
-      catch(error){assertOpen();this.onError(error);}
+      catch(error){assertOpen();readFailed=true;this.onError(error);}
       // Revocation is not an offline resume. Never activate a stale source binding.
       await binding.assertCurrent();assertOpen();
       const hasLocalPosition=Number.isFinite(copy.lastReadAt)&&!!position(copy);
-      // A cached directory can predate local reading; a live API response remains authoritative.
-      if(remote&&(!remote.snapshot||!hasLocalPosition||
+      // Network availability does not make a remote location newer than offline reading.
+      // Missing/equal timestamps never replace an existing local anchor, for either format.
+      if(remote&&(!hasLocalPosition||
         Number.isFinite(remote.updatedAt)&&remote.updatedAt!>copy.lastReadAt!)){
-        if(copy.document){const location=epubLocation(copy.document,remote.documentLocation);if(location)restored={...copy,documentLocation:location,lastReadAt:Date.now()};}
+        const lastReadAt=Number.isFinite(remote.updatedAt)?remote.updatedAt:0;
+        if(copy.document){const location=epubLocation(copy.document,remote.documentLocation);if(location)restored={...copy,documentLocation:location,lastReadAt};}
         else if(Number.isSafeInteger(remote.pageIndex)&&remote.pageIndex!>=0&&remote.pageIndex!<copy.pages.length)
-          restored={...copy,pageId:copy.pages[remote.pageIndex!].id,relativeOffset:0,lastReadAt:Date.now()};
+          restored={...copy,pageId:copy.pages[remote.pageIndex!].id,relativeOffset:0,lastReadAt};
       }
+      if(remote===null||remote?.snapshot){controller.abort();this.onStatus('local');return restored;}
       const initial=position(restored);
-      this.active={binding,capability,controller,observed:restored.lastReadAt??0,sent:initial?key(initial):''};
+      const confirmed=!!remote&&!!initial&&key(remote)===key(initial);
+      this.active={binding,capability,controller,observed:restored.lastReadAt??0,sent:initial?key(initial):'',confirmed};
+      this.onStatus(readFailed?'pending':confirmed?'synced':'local');
+      // A known older remote location can be updated with already-persisted local reading.
+      // Never push on an unsuccessful read or when the server supplied no comparable date.
+      if(remote&&hasLocalPosition&&Number.isFinite(remote.updatedAt)&&copy.lastReadAt!>remote.updatedAt!&&initial&&key(initial)!==key(remote)){
+        this.active.sent=key(remote);
+        this.active.pending={value:initial,key:key(initial)};
+        this.onStatus('pending');
+        const session=this.active;
+        session.timer=setTimeout(()=>void this.send(session),500);
+      }
       return restored;
     }catch(error){controller.abort();throw error;}
     finally{if(this.opening===controller)this.opening=undefined;}
@@ -68,7 +84,8 @@ export class ReadingProgress {
     // Returning to the sent location must also supersede an earlier queued page.
     session.pending=signature===session.sent&&!session.running?undefined:{value,key:signature};
     clearTimeout(session.timer);
-    if(session.pending)session.timer=setTimeout(()=>void this.send(session),500);
+    if(session.pending){this.onStatus('pending');session.timer=setTimeout(()=>void this.send(session),500);}
+    else this.onStatus(session.confirmed?'synced':'local');
   }
 
   private send(session:Session):Promise<void> {
@@ -80,11 +97,13 @@ export class ReadingProgress {
         if(pending.key===session.sent)continue;
         try{
           await session.binding.assertCurrent();
+          if(this.active===session)this.onStatus('syncing');
           // An unacknowledged write may have reached the source; the old position is no longer known.
-          session.sent='';
+          session.sent='';session.confirmed=false;
           await session.capability.write(session.binding.context,pending.value);
-          await session.binding.assertCurrent();session.sent=pending.key;
-        }catch(error){if(!session.controller.signal.aborted)this.onError(error);}
+          await session.binding.assertCurrent();session.sent=pending.key;session.confirmed=true;
+          if(this.active===session)this.onStatus('synced');
+        }catch(error){if(!session.controller.signal.aborted){this.onError(error);if(this.active===session)this.onStatus('pending');}}
       }
     })();
     session.running=running.finally(()=>{session.running=undefined;});
@@ -95,6 +114,7 @@ export class ReadingProgress {
   close():Promise<void> {
     this.epoch++;this.opening?.abort();this.opening=undefined;
     const session=this.active;this.active=undefined;
+    this.onStatus('local');
     if(session)this.closing=Promise.all([this.closing,this.send(session)]).then(()=>{session.controller.abort();});
     return this.closing;
   }

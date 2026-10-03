@@ -19,7 +19,7 @@ import {
   openEpubArchive,
   type EpubArchive,
 } from "./archive";
-import { EpubResources } from "./resources";
+import { EpubResources, TRANSLATABLE_EPUB_IMAGE } from "./resources";
 
 export interface EpubSession {
   readonly index: EpubIndex;
@@ -62,7 +62,7 @@ async function metadata(archive: EpubArchive, signal?: AbortSignal) {
     identifiers.add(id);
     try {
       const path = epubPath(item.getAttribute("href") ?? "", packageUrl);
-      const type = item.getAttribute("media-type") ?? "";
+      const type = (item.getAttribute("media-type") ?? "").split(";")[0].trim().toLowerCase();
       mediaTypes.set(path, type);
       // One canonical package-relative address space also gives the renderer stable hrefs.
       item.setAttribute("href", new URL(epubUrl(path)).pathname);
@@ -133,6 +133,8 @@ async function metadata(archive: EpubArchive, signal?: AbortSignal) {
     title: packaging.metadata.title?.trim() || "",
     chapters,
     toc,
+    images: [...mediaTypes].filter(([href, type]) => TRANSLATABLE_EPUB_IMAGE.test(type) && archive.has(href))
+      .map(([href, mediaType]) => ({href, mediaType})),
   };
   if (packaging.coverPath) {
     try {
@@ -161,6 +163,19 @@ export async function indexEpub(
   const archive = await openEpubArchive(source, signal);
   try {
     return (await metadata(archive, signal)).index;
+  } finally {
+    await archive.close();
+  }
+}
+
+/** Materialize a real embedded image, never a screenshot of EPUB text. */
+export async function readEpubImage(source: RandomAccessSource, href: string, signal?: AbortSignal): Promise<Blob> {
+  const archive = await openEpubArchive(source, signal);
+  try {
+    const parsed = await metadata(archive, signal);
+    const image = parsed.index.images?.find(image => image.href === href);
+    if (!image) throw new Error("EPUB 图片不在内容清单中。");
+    return await archive.read(image.href, image.mediaType, signal);
   } finally {
     await archive.close();
   }
@@ -207,10 +222,12 @@ export async function openEpub(
     throwIfAborted(signal);
     const activeBook = book;
     const activeResources = resources;
+    const loadedSections = new Map<string, Section>();
     book.spine.hooks.content.register(
       async (document: Document, section: Section) => {
         throwIfAborted(signal);
         await activeResources.sanitize(document, section.url, section.href);
+        loadedSections.set(section.href, section);
         throwIfAborted(signal);
       },
     );
@@ -259,7 +276,19 @@ export async function openEpub(
         });
         rendition.hooks.unloaded.register((view: { section: Section }) => {
           activeResources.release(view.section.href);
+          loadedSections.delete(view.section.href);
           view.section.unload();
+        });
+        // DefaultViewManager.clear() destroys frames without an unloaded event.
+        // Retain only currently displayed sections, including their source blob URLs.
+        rendition.on('rendered', () => {
+          const visible = new Set<string>();
+          rendition.views().forEach(view => visible.add((view as unknown as {section: Section}).section.href));
+          for (const [href, section] of loadedSections) if (!visible.has(href)) {
+            activeResources.release(href);
+            section.unload();
+            loadedSections.delete(href);
+          }
         });
         return rendition;
       },

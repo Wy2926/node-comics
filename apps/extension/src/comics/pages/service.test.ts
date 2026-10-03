@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({records: new Map<string, unknown>(), cache: new Map<string, Blob>(),
   sourceImage: vi.fn(), refresh:vi.fn(), prepare: vi.fn(), put: vi.fn(),
-  token: vi.fn(), cacheGet: vi.fn(), cachePut: vi.fn(), downloadGet:vi.fn(), openContainer:vi.fn(),
+  token: vi.fn(), cacheGet: vi.fn(), cachePut: vi.fn(), downloadGet:vi.fn(), openContainer:vi.fn(), epubImage:vi.fn(),
 }));
 vi.mock('../repositories', () => ({catalog: {
   get: async (table: string, id: unknown) => mocks.records.get(JSON.stringify([table,id])),
@@ -12,6 +12,7 @@ vi.mock('../application/website-content',()=>({refreshWebsitePage:mocks.refresh}
 vi.mock('./normalize', () => ({prepareComicPage: mocks.prepare}));
 vi.mock('../sources/local', () => ({openContainer: mocks.openContainer}));
 vi.mock('../formats', () => ({openDocument: vi.fn()}));
+vi.mock('../formats/epub', () => ({readEpubImage: mocks.epubImage}));
 vi.mock('../../storage/downloads', async original => ({...await original<typeof import('../../storage/downloads')>(),downloadStore: {get: mocks.downloadGet}}));
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
@@ -46,6 +47,28 @@ beforeEach(() => {
 });
 afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
+  it('routes EPUB artwork through the shared original pipeline without rasterizing text or storing fake page descriptors', async () => {
+    const image = new Blob(['epub pixels'], {type: 'image/png'});
+    put('entries', 'document', {id:'document',comicId:'comic',contentId:'revision',containerId:'container',generation:1,format:'epub',document:{kind:'epub',images:[{href:'OPS/art.png',mediaType:'image/png'}]}});
+    put('connections', 'connection', {id:'connection',generation:1,provider:'local',status:'connected'});
+    const close = vi.fn().mockResolvedValue(undefined);
+    mocks.openContainer.mockResolvedValue({snapshot:{identity:'source',version:'1',size:100,local:true},close});
+    mocks.epubImage.mockResolvedValue(image);
+    const ref = {...request, pageId:'epub-image:OPS/art.png'};
+    const lease = await acquirePage(ref);
+    expect(lease.blob).toBe(image);
+    expect(mocks.epubImage).toHaveBeenCalledWith(expect.objectContaining({snapshot:expect.any(Object)}), 'OPS/art.png', expect.any(AbortSignal));
+    expect(mocks.prepare).toHaveBeenCalledWith({name:'art.png',blob:image},expect.any(AbortSignal));
+    expect(mocks.put).toHaveBeenCalledWith(expect.objectContaining({pageId:ref.pageId,imageSha256:'a'.repeat(64)}),1);
+    expect(openDocument).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+    lease.release();
+    for (const pageId of ['epub-image:OPS/chapter.xhtml','epub-image:https://outside.test/art.png','epub-image:OPS/missing.png'])
+      await expect(acquirePage({...request,pageId})).rejects.toThrow('页面已移除');
+    expect(mocks.epubImage).toHaveBeenCalledOnce();
+    put('connections', 'connection', {id:'connection',generation:2,provider:'local',status:'revoked'});
+    await expect(acquirePage(ref)).rejects.toThrow('来源访问已断开');
+  });
   it('materializes the current PDF profile without reusing retained bytes or metadata from the old profile',async()=>{
     put('entries','document',{id:'document',comicId:'comic',contentId:'revision',containerId:'container',generation:1,format:'pdf'});
     put('connections','connection',{id:'connection',generation:1,provider:'local',status:'connected'});

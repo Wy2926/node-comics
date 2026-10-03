@@ -18,6 +18,7 @@ export {selectReadingEntry,setSourceLanguagePreference} from './reading-preferen
 
 type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs'>;
 const savedPages=new WeakMap<Page,string>();
+const savingReaderStates=new Map<string,Promise<void>>();
 const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs});
 export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
 export const hasCatalogUpdates=(comic:Comic)=>!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision;
@@ -62,22 +63,28 @@ function readingEntry(entry:Entry,pages:Page[]=[],position?:Pick<ReadingPosition
     discoveryComplete:entry.discoveryComplete??false,knownTotal:entry.knownTotal??entry.pageCount};
 }
 export async function loadEntry(id:string,scope?:TranslationScope):Promise<ReadingEntry> {
+  // A quick exit/reopen must wait for the last local save, independently of remote sync.
+  await savingReaderStates.get(id);
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
   const [descriptors,position,comic]=await Promise.all([entry.format==='epub'?Promise.resolve([]):catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
   if(entry.format==='epub')return {...readingEntry(entry,[],position),document:entry.document,documentLocation:position?.contentId===entry.contentId?position.documentLocation:undefined};
-  const pages=await Promise.all(descriptors.map(async descriptor=>{
-    const identity=await catalog.get('materializations',materializationId({entryId:id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(entry.format)}));
+  const pages=await loadPageViews(entry,descriptors,scope?.key);
+  return {...readingEntry(entry,pages,position),catalogUpdateRevision:comic?.catalogUpdates?.revision};
+}
+/** Image readers and EPUB artwork share materialization and account-scoped result recovery. */
+export async function loadPageViews(entry:Entry,descriptors:PageDescriptor[],scopeKey?:string):Promise<Page[]> {
+  return Promise.all(descriptors.map(async descriptor=>{
+    const identity=await catalog.get('materializations',materializationId({entryId:entry.id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(entry.format)}));
     const page=descriptorView(entry,descriptor,identity);
-    if(scope&&identity){
-      const saved=await catalog.get('translationBindings',JSON.stringify([scope.key,identity.imageSha256]));
-      if(saved?.scope===scope.key){
+    if(scopeKey&&identity){
+      const saved=await catalog.get('translationBindings',JSON.stringify([scopeKey,identity.imageSha256]));
+      if(saved?.scope===scopeKey){
         const value=saved.payload as TranslationPayload;
-        page.translationScope=scope.key;page.ownerId=value.ownerId;page.apiOrigin=value.apiOrigin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];
+        page.translationScope=scopeKey;page.ownerId=value.ownerId;page.apiOrigin=value.apiOrigin;page.jobs=Array.isArray(value.jobs)?value.jobs:[];
       }
     }
     savedPages.set(page,JSON.stringify(payload(page)));return page;
   }));
-  return {...readingEntry(entry,pages,position),catalogUpdateRevision:comic?.catalogUpdates?.revision};
 }
 export interface DirectoryEntry {id:string;title:string;tags:string[];current:boolean;read:boolean;readable:boolean;total?:number;status:string;error?:string;contentLanguage?:string;sourceRemoved?:boolean}
 export interface DirectoryGroup {id:string;title:string;entryIds:string[];parentId?:string}
@@ -118,7 +125,12 @@ export async function readerSequence(entryId:string,scope?:TranslationScope,targ
     :Math.abs(index-at)<=1?loadEntry(item.id,scope):Promise.resolve(readingEntry(item))));
   return {copies,directory:await comicDirectory(entry.comicId,entryId,targetLanguage)};
 }
-export async function saveReaderState(copy:ReadingEntry) {
+export function saveReaderState(copy:ReadingEntry):Promise<void> {
+  const saving=persistReaderState(copy).finally(()=>{if(savingReaderStates.get(copy.id)===saving)savingReaderStates.delete(copy.id);});
+  savingReaderStates.set(copy.id,saving);
+  return saving;
+}
+async function persistReaderState(copy:ReadingEntry) {
   if(!copy.contentId||!copy.comicId)return;
   const entry=await catalog.get('entries',copy.id);if(!entry||entry.contentId!==copy.contentId||entry.comicId!==copy.comicId)return;
   if((copy.pageId||copy.documentLocation)&&copy.lastReadAt!==undefined)await catalog.savePosition({id:copy.id,comicId:copy.comicId,entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,relativeOffset:Math.max(0,Math.min(1,copy.relativeOffset)),documentLocation:copy.documentLocation,updatedAt:copy.lastReadAt});

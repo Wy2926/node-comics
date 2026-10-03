@@ -25,6 +25,8 @@ const REMOVED_ELEMENTS = new Set([
   "set",
 ]);
 const IMAGE = /^(?:image\/(?:png|jpeg|gif|webp|avif|bmp|svg\+xml))$/;
+/** Same raster formats as the shared original-image normalization pipeline. */
+export const TRANSLATABLE_EPUB_IMAGE = /^image\/(?:png|jpeg|gif|webp|avif)$/;
 const FONT =
   /^(?:font\/(?:woff2?|ttf|otf)|application\/(?:font-woff|vnd\.ms-opentype|x-font-(?:ttf|opentype)))$/;
 const CSP =
@@ -231,6 +233,8 @@ export class EpubResources {
             "poster",
             "xml:base",
             "data-nc-epub-href",
+            "data-nc-epub-image",
+            "contenteditable",
           ].includes(key) ||
           (attribute.namespaceURI === "http://www.w3.org/XML/1998/namespace" &&
             key === "base")
@@ -272,9 +276,14 @@ export class EpubResources {
           name === "image"
         ) {
           const url = await this.resourceOrEmpty(value, base, scope, chain);
-          if (url)
+          if (url) {
             element.setAttributeNS(attribute.namespaceURI, attribute.name, url);
-          else element.removeAttributeNode(attribute);
+            if (name === "img" || name === "image") {
+              const path = epubPath(value, base);
+              if (TRANSLATABLE_EPUB_IMAGE.test(this.mediaTypes.get(path) ?? ""))
+                element.setAttribute("data-nc-epub-image", path);
+            }
+          } else element.removeAttributeNode(attribute);
         } else if (name === "use" && value.startsWith("#")) {
           // SVG fragments never leave the current resource.
         } else {

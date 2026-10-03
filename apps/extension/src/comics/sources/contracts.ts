@@ -72,11 +72,12 @@ export interface ArtworkCapability {
 /** Provider-owned synchronization of the actual reading location, never a prefetched page. */
 export interface SourceReadingProgress {
   pageIndex?:number;documentLocation?:EpubLocation;updatedAt?:number;
-  /** A catalog or cached snapshot, not an authoritative live reading-position response. */
+  /** A read-only catalog snapshot, not a writable reading-position endpoint. */
   snapshot?:boolean;
 }
 export interface ProgressCapability {
-  read(context:OpenFileSourceContext):Promise<SourceReadingProgress|undefined>;
+  /** null means synchronization is unavailable; undefined means a writable endpoint has no position yet. */
+  read(context:OpenFileSourceContext):Promise<SourceReadingProgress|undefined|null>;
   write(context:OpenFileSourceContext,progress:SourceReadingProgress):Promise<void>;
 }
 export interface SourceProvider {

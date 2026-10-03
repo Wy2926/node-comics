@@ -27,6 +27,8 @@ vi.mock('../src/reader/useChapterStream',()=>({
  }),
 }));
 import {Reader} from '../src/reader/Reader';
+import {ReaderShell, ReaderDrawer, ReaderNavigation, ReaderSettingsButton, ReaderTools} from '../src/reader/ReaderChrome';
+import {ReaderSettings, ReaderScale, ReaderChoice, ReaderTranslationSettings} from '../src/reader/ReaderSettings';
 import {defaults} from '../src/types';
 import {installDictionary} from '../src/i18n/runtime';
 
@@ -48,6 +50,7 @@ function nodes(node:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(node))return node.flatMap(nodes);
  if(!node||typeof node!=='object'||!('props' in node))return [];
  const element=node as ReactElement<Record<string,unknown>>;
+ if([ReaderShell,ReaderDrawer,ReaderNavigation,ReaderSettingsButton,ReaderTools,ReaderSettings,ReaderScale,ReaderChoice,ReaderTranslationSettings].includes(element.type as never))return [element,...nodes((element.type as (props:Record<string,unknown>)=>unknown)(element.props))];
  return [element,...nodes(element.props.children)];
 }
 function click(tree:ReactElement,match:(node:ReactElement<Record<string,unknown>>)=>boolean){

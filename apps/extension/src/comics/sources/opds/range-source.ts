@@ -6,9 +6,13 @@ import { OpdsTransport } from './transport';
 
 export interface RangeBinding {
   url: string;
-  etag: string;
+  etag?: string;
+  lastModified?: string;
   size: number;
   identity: string;
+}
+export function rangeVersion(binding: Pick<RangeBinding,'etag'|'lastModified'|'size'>):string {
+  return binding.etag ?? `modified:${binding.lastModified}:${binding.size}`;
 }
 export async function probeRange(
   transport: OpdsTransport,
@@ -24,22 +28,27 @@ export async function probeRange(
         signal,
       }),
       match = /^bytes 0-0\/(\d+)$/.exec(result.headers.get('Content-Range') ?? ''),
-      etag = result.headers.get('ETag');
+      tag = result.headers.get('ETag'),
+      etag = tag && /^"[^\r\n]+"$/.test(tag) ? tag : undefined,
+      modified = result.headers.get('Last-Modified'),
+      date = Date.parse(result.headers.get('Date') ?? ''),
+      // RFC 9110 requires sufficiently separated server dates for a strong validator;
+      // use a conservative 60-second margin for clock skew, never a weak ETag alone.
+      lastModified = modified && Number.isFinite(Date.parse(modified)) &&
+        Number.isFinite(date) && date-Date.parse(modified)>=60_000 ? modified : undefined;
     if (
       !match ||
       result.bytes.length !== 1 ||
-      !etag ||
-      etag.startsWith('W/') ||
-      !/^"[^\r\n]+"$/.test(etag)
+      (!etag && !lastModified)
     )
       return;
     const size = Number(match[1]);
-    if (Number.isSafeInteger(size) && size > 0) return { etag, size };
+    if (Number.isSafeInteger(size) && size > 0) return { ...(etag ? {etag} : {lastModified}), size };
   } catch (error) {
     if (!(error instanceof OpdsError) || error.code !== 'range-unsupported') throw error;
   }
 }
-/** A server's strong entity tag and exact 206 response bind every range to one immutable file. */
+/** A verified HTTP validator and exact 206 response bind every range to one file. */
 export class OpdsRangeSource implements RandomAccessSource {
   readonly snapshot: SourceSnapshot;
   private controller = new AbortController();
@@ -53,7 +62,7 @@ export class OpdsRangeSource implements RandomAccessSource {
   ) {
     this.snapshot = {
       identity: binding.identity,
-      version: binding.etag,
+      version: rangeVersion(binding),
       size: binding.size,
       local: false,
     };
@@ -74,14 +83,15 @@ export class OpdsRangeSource implements RandomAccessSource {
     const result = await this.transport.bytes(this.connection, this.binding.url, {
       headers: {
         Range: `bytes=${offset}-${offset + length - 1}`,
-        'If-Match': this.binding.etag,
+        ...(this.binding.etag ? {'If-Match':this.binding.etag} : {'If-Unmodified-Since':this.binding.lastModified!}),
       },
       status: 206,
       maxBytes: length,
       signal: combined,
     });
     if (
-      result.headers.get('ETag') !== this.binding.etag ||
+      (this.binding.etag ? result.headers.get('ETag') !== this.binding.etag :
+        result.headers.get('Last-Modified') !== this.binding.lastModified) ||
       result.headers.get('Content-Range') !==
         `bytes ${offset}-${offset + length - 1}/${this.binding.size}` ||
       result.bytes.length !== length
@@ -99,7 +109,7 @@ export class OpdsRangeSource implements RandomAccessSource {
     try {
       const probe = await probeRange(this.transport, this.connection, this.binding.url, signal);
       if (!probe) return 'unavailable';
-      if (probe.etag !== this.binding.etag || probe.size !== this.binding.size) {
+      if (rangeVersion(probe) !== rangeVersion(this.binding) || probe.size !== this.binding.size) {
         this.changed = true;
         return 'changed';
       }
