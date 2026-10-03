@@ -60,6 +60,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     pageRequest = useRef<AbortController | undefined>(undefined);
   const savedScroll = useRef(0),
     restoreScroll = useRef(false);
+  const completedPage = useRef<string|undefined>(undefined);
   const reloadAccounts = useCallback(async () => {
     const epoch = ++listEpoch.current;
     try {
@@ -88,10 +89,14 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   }, [reloadAccounts]);
   useEffect(() => {
     if (!accountId || blocked) {
+      completedPage.current = undefined;
       setPage(undefined);
       setBusy(false);
       return;
     }
+    if (!active) return;
+    const pageKey = JSON.stringify([accountId, location, refresh]);
+    if (completedPage.current === pageKey) return;
     const controller = new AbortController();
     pageRequest.current = controller;
     setBusy(true);
@@ -99,6 +104,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     void browseRemoteLibrary(accountId, { ...location, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
+        completedPage.current = pageKey;
         setPage(result);
         restoreScroll.current = true;
       })
@@ -109,7 +115,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
-  }, [accountId, location, refresh, blocked]);
+  }, [accountId, location, refresh, blocked, active]);
   useLayoutEffect(() => {
     if (active && restoreScroll.current) {
       restoreScroll.current = false;
@@ -141,6 +147,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   );
   function reset(id: string) {
     cancelOpening();
+    completedPage.current = undefined;
     setAccountId(id);
     setPage(undefined);
     setHistory([]);

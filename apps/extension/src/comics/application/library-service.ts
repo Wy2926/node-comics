@@ -1,5 +1,5 @@
 import {catalog} from '../repositories';
-import type {Comic,Entry,PageDescriptor,PageMaterialization} from '../domain';
+import type {Comic,Entry,PageDescriptor,PageMaterialization,ReadingPosition} from '../domain';
 import type {Page,ReadingEntry} from '../../types';
 import {pageRenderProfile,pageReference} from '../pages/identity';
 import {materializationId} from '../pages/service';
@@ -55,7 +55,7 @@ export function descriptorView(entry:Entry,page:PageDescriptor,identity?:PageMat
     ...(identity?{imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime}:{}),
     sourceUrl:typeof page.locator.url==='string'?page.locator.url:undefined,jobs:[],outputBlobs:{}};
 }
-function readingEntry(entry:Entry,pages:Page[]=[],position?:{contentId:string;pageId:string;relativeOffset:number;updatedAt:number}):ReadingEntry {
+function readingEntry(entry:Entry,pages:Page[]=[],position?:Pick<ReadingPosition,'contentId'|'pageId'|'relativeOffset'|'updatedAt'|'documentLocation'>):ReadingEntry {
   return {id:entry.id,comicId:entry.comicId,contentId:entry.contentId,title:entry.title,source:entry.format,sourceKey:entry.id,sourceUrl:entry.sourceUrl,sourceEntryId:entry.sourceEntryId,generation:entry.generation,
     createdAt:entry.createdAt,updatedAt:entry.updatedAt,lastReadAt:position?.updatedAt,coverPageId:entry.coverPageId,pages,
     pageId:position?.contentId===entry.contentId?position.pageId:pages[0]?.id??'',relativeOffset:position?.contentId===entry.contentId?position.relativeOffset:0,
@@ -63,7 +63,8 @@ function readingEntry(entry:Entry,pages:Page[]=[],position?:{contentId:string;pa
 }
 export async function loadEntry(id:string,scope?:TranslationScope):Promise<ReadingEntry> {
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
-  const [descriptors,position,comic]=await Promise.all([catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
+  const [descriptors,position,comic]=await Promise.all([entry.format==='epub'?Promise.resolve([]):catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
+  if(entry.format==='epub')return {...readingEntry(entry,[],position),document:entry.document,documentLocation:position?.contentId===entry.contentId?position.documentLocation:undefined};
   const pages=await Promise.all(descriptors.map(async descriptor=>{
     const identity=await catalog.get('materializations',materializationId({entryId:id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(entry.format)}));
     const page=descriptorView(entry,descriptor,identity);
@@ -120,7 +121,7 @@ export async function readerSequence(entryId:string,scope?:TranslationScope,targ
 export async function saveReaderState(copy:ReadingEntry) {
   if(!copy.contentId||!copy.comicId)return;
   const entry=await catalog.get('entries',copy.id);if(!entry||entry.contentId!==copy.contentId||entry.comicId!==copy.comicId)return;
-  if(copy.pageId&&copy.lastReadAt!==undefined)await catalog.savePosition({id:copy.id,comicId:copy.comicId,entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,relativeOffset:Math.max(0,Math.min(1,copy.relativeOffset)),updatedAt:copy.lastReadAt});
+  if((copy.pageId||copy.documentLocation)&&copy.lastReadAt!==undefined)await catalog.savePosition({id:copy.id,comicId:copy.comicId,entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,relativeOffset:Math.max(0,Math.min(1,copy.relativeOffset)),documentLocation:copy.documentLocation,updatedAt:copy.lastReadAt});
   for(const page of copy.pages){
     if(!page.translationScope||!page.imageSha256||!page.jobs.length)continue;
     const incoming=payload(page),signature=JSON.stringify(incoming);if(savedPages.get(page)===signature)continue;

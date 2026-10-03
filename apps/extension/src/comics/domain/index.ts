@@ -1,5 +1,6 @@
+import type {EpubIndex, EpubLocation} from '../formats/contracts';
 /** Persistent metadata. Bytes, credentials and live browser handles have separate owners. */
-export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'website' | 'image-sequence';
+export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'epub' | 'website' | 'image-sequence';
 /** Opaque provider-owned artwork reference, never a credential-bearing URL. */
 export interface SourceArtwork {id:string;locator:Record<string,unknown>}
 export const entryContentKind=(entry:Pick<Entry,'format'>):'file'|'pages'=>entry.format==='website'||entry.format==='image-sequence'?'pages':'file';
@@ -14,6 +15,8 @@ export interface Comic {
   startEntryId?: string; sourceName: string; sourceUrl?: string;
   lastPage?: number; lastPageCount?: number;
   cover?: { entryId: string; contentId: string; pageId: string; format?: EntryFormat };
+  /** Package cover, independent of bitmap page descriptors. */
+  documentCover?: {entryId:string;contentId:string};
   /** Dedicated website artwork; independent of the file/first-page cover. */
   sourceCover?: {url: string};
   /** Remote library artwork is separate from the legacy website cover reference. */
@@ -34,6 +37,8 @@ export interface Entry {
   knownTotal?: number; pageCount?: number; error?: string; coverPageId?: string;
   /** Current content only. There is no revision history or alternative document relation. */
   containerId?: string; sourceSnapshot?: Record<string, unknown>;
+  /** Structured document navigation, never HTML or synthetic image pages. */
+  document?: EpubIndex;
   /** Chosen remote representation; availability of a local replica does not change its source. */
   acquisition?:{kind:'pages'|'range-file'|'download-file';representationId:string};
   /** Retain reading data and its slot when the source removes this release. */
@@ -57,6 +62,7 @@ export interface PageMaterialization {
 export interface ReadingPosition {
   id: string; comicId: string; entryId: string; contentId: string; pageId: string;
   relativeOffset: number; updatedAt: number;
+  documentLocation?: EpubLocation;
 }
 export interface TranslationBinding {
   id: string; scope: string; imageSha256: string;

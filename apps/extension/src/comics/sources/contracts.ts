@@ -1,5 +1,5 @@
 import type {Entry, ComicSource, SourceConnection, PageDescriptor, SourceArtwork} from '../domain';
-import type {ComicFormat, RandomAccessSource, IndexedPage} from '../formats/contracts';
+import type {ComicFormat, RandomAccessSource, IndexedPage, EpubLocation} from '../formats/contracts';
 
 export interface SelectedSourceFile {
   id: string; name: string; format: ComicFormat;
@@ -69,9 +69,19 @@ export interface PageCapability {
 export interface ArtworkCapability {
   read(connection:SourceConnection,artwork:SourceArtwork,signal?:AbortSignal):Promise<Blob>;
 }
+/** Provider-owned synchronization of the actual reading location, never a prefetched page. */
+export interface SourceReadingProgress {
+  pageIndex?:number;documentLocation?:EpubLocation;updatedAt?:number;
+  /** A catalog or cached snapshot, not an authoritative live reading-position response. */
+  snapshot?:boolean;
+}
+export interface ProgressCapability {
+  read(context:OpenFileSourceContext):Promise<SourceReadingProgress|undefined>;
+  write(context:OpenFileSourceContext,progress:SourceReadingProgress):Promise<void>;
+}
 export interface SourceProvider {
   id:string;label:string;cachePages:boolean;cacheRanges:boolean;isConfigured?():boolean;
-  connection?:ConnectionCapability;catalog?:CatalogCapability;files?:FileCapability;pages?:PageCapability;artwork?:ArtworkCapability;
+  connection?:ConnectionCapability;catalog?:CatalogCapability;files?:FileCapability;pages?:PageCapability;artwork?:ArtworkCapability;progress?:ProgressCapability;
   subscribe?(listener:(change:SourceAccessChange)=>Promise<void>):()=>void;
 }
 /** File-only registration input; the registry adapts it into the same capability record. */

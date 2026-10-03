@@ -1,7 +1,8 @@
 import { catalog, sourceRemovalKey } from '../repositories';
 import type { Comic, Entry, SourceArtwork, SourceConnection } from '../domain';
-import type { IndexedPage } from '../formats/contracts';
-import { openDocument } from '../formats';
+import type { IndexedPage, FileIndex } from '../formats/contracts';
+import { MAX_ENTRIES } from '../formats/limits';
+import { indexFile } from '../formats';
 import { openFileSource, closeSourceAccess } from '../sources/runtime';
 import { getSourceDriver, listSourceDrivers, requireSourceDriver } from '../sources/registry';
 import type {
@@ -194,7 +195,7 @@ function validatePlan(plan: RemoteReadingPlan, publicationId: string) {
     !['pages', 'range-file', 'download-file'].includes(plan.kind) ||
     (plan.kind === 'pages'
       ? plan.format !== 'image-sequence'
-      : !['cbz', 'cbr', 'mobi', 'pdf'].includes(plan.format))
+      : !['cbz', 'cbr', 'mobi', 'pdf', 'epub'].includes(plan.format))
   )
     throw Error('来源返回了无效的阅读资源。');
   if (plan.publication.readable === false)
@@ -238,6 +239,11 @@ function sameRepresentation(entry: Entry, plan: RemoteReadingPlan) {
     JSON.stringify(entry.sourceSnapshot) === JSON.stringify(plan.snapshot)
   );
 }
+function validateIndex(index: FileIndex) {
+  if(index.kind==='images')return validatePages(index.pages);
+  if(!index.chapters.length||index.chapters.length>MAX_ENTRIES||new Set(index.chapters.map(chapter=>chapter.id)).size!==index.chapters.length)
+    throw Error('电子书没有有效的完整章节索引。');
+}
 async function indexRemotePlan(
   context: RemoteRegistrationContext,
   contentId: string,
@@ -253,31 +259,27 @@ async function indexRemotePlan(
     if (!index.complete || (index.total !== undefined && index.total !== index.pages.length))
       throw Error('来源页数尚未完整确认。');
     validatePages(index.pages);
-    return index.pages;
+    return {kind:'images' as const,pages:index.pages};
   }
   const source = await openFileSource(input);
   try {
-    const session = await openDocument(context.plan.format, source, signal);
-    try {
-      const pages = await session.index(signal);
-      validatePages(pages);
-      return pages;
-    } finally {
-      await session.close();
-    }
+    const index = await indexFile(context.plan.format, source, signal);
+    validateIndex(index);
+    return index;
   } finally {
     await source.close();
   }
 }
 async function publishRemote(
   context: RemoteRegistrationContext,
-  pages: IndexedPage[],
+  index: FileIndex,
   contentId: string,
   containerId?: string,
   guard?: RemoteDownloadGuard,
   signal?: AbortSignal,
 ) {
-  validatePages(pages);
+  validateIndex(index);
+  const pages=index.kind==='images'?index.pages:[],document=index.kind==='epub'?index:undefined;
   return catalog.mutate(
     ['connections', 'comics', 'entries', 'pageDescriptors', 'metadata'],
     async (tx) => {
@@ -369,7 +371,8 @@ async function publishRemote(
         },
         sourceArtwork: plan.publication.artwork,
         startEntryId: entryId,
-        cover: { entryId, contentId, pageId: values[0].pageId, format: plan.format },
+        cover: values.length?{ entryId, contentId, pageId: values[0].pageId, format: plan.format }:undefined,
+        documentCover:document?.cover?{entryId,contentId}:undefined,
         createdAt: now,
         updatedAt: now,
       };
@@ -384,13 +387,14 @@ async function publishRemote(
         indexState: 'ready',
         containerId,
         sourceSnapshot: plan.snapshot,
+        document,
         acquisition: { kind: plan.kind, representationId: plan.representationId },
         createdAt: now,
         updatedAt: now,
         pageCount: pages.length,
         knownTotal: pages.length,
         discoveryComplete: true,
-        coverPageId: values[0].pageId,
+        coverPageId: values[0]?.pageId,
       };
       await tx.put('comics', comic);
       await tx.put('entries', entry);
@@ -452,10 +456,10 @@ async function openPublication(
     context = { connection, plan, sourceRemovalVersion },
     input = remoteSourceContext(context, contentId, undefined, signal);
   try {
-    const pages = await indexRemotePlan(context, contentId, input.entryId, signal);
+    const index = await indexRemotePlan(context, contentId, input.entryId, signal);
     await assertConnection(connection, signal);
     const result = await sourceLock(() =>
-      publishRemote(context, pages, contentId, undefined, undefined, signal),
+      publishRemote(context, index, contentId, undefined, undefined, signal),
     );
     await sourceRangeCache.adoptOwner(input.entryId, result.entryId, result.contentId);
     return { kind: 'opened', ...result };
@@ -488,7 +492,8 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
     owner = 'pending:' + preparedContentId,
     context = { connection, plan };
   try {
-    const pages = await indexRemotePlan(context, preparedContentId, owner, signal, containerId),
+    const index = await indexRemotePlan(context, preparedContentId, owner, signal, containerId),
+      pages=index.kind==='images'?index.pages:[],document=index.kind==='epub'?index:undefined,
       incoming = descriptors(entry.contentId, pages);
     const result = await sourceLock(() =>
       catalog.mutate(
@@ -538,7 +543,8 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
               await tx.put('positions', {
                 ...position,
                 contentId,
-                pageId: values[0].pageId,
+                pageId: values[0]?.pageId??'',
+                documentLocation:undefined,
                 relativeOffset: 0,
               });
           }
@@ -550,6 +556,7 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
             contentId,
             containerId: changed ? undefined : containerId,
             sourceSnapshot: plan.snapshot,
+            document,
             acquisition: { kind: plan.kind, representationId: plan.representationId },
             generation: current.generation + 1,
             indexState: 'ready',
@@ -558,7 +565,7 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
             pageCount: pages.length,
             knownTotal: pages.length,
             discoveryComplete: true,
-            coverPageId: values[0].pageId,
+            coverPageId: values[0]?.pageId,
             updatedAt: now,
           });
           await tx.put('comics', {
@@ -569,14 +576,15 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
               generation: book.source.generation + 1,
             },
             sourceArtwork: plan.publication.artwork,
+            documentCover:document?.cover?{entryId:entry.id,contentId}:undefined,
             ...(book.cover?.entryId === entry.id
               ? {
-                  cover: {
+                  cover: values.length ? {
                     entryId: entry.id,
                     contentId,
                     pageId: values[0].pageId,
                     format: plan.format,
-                  },
+                  } : undefined,
                 }
               : {}),
             ...(changed && book.lastEntryId === entry.id
@@ -702,14 +710,9 @@ export async function registerRemoteContainer(
   const key = sourceKey(context.connection.id, context.plan.publication.id);
   const sourceRemovalVersion = context.sourceRemovalVersion ?? (await removalVersion(key));
   const source = await openContainer(container.id);
-  let pages: IndexedPage[];
+  let index: FileIndex;
   try {
-    const session = await openDocument(container.format, source, signal);
-    try {
-      pages = await session.index(signal);
-    } finally {
-      await session.close();
-    }
+    index = await indexFile(container.format, source, signal);
   } finally {
     await source.close();
   }
@@ -738,7 +741,7 @@ export async function registerRemoteContainer(
       signal?.throwIfAborted();
       const result = await publishRemote(
         { ...context, sourceRemovalVersion },
-        pages,
+        index,
         contentId,
         container.id,
         guard,

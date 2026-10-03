@@ -4,7 +4,7 @@ import base from '../vite.config';
 
 /** UI-only relay for the public demo's CORS restriction. No fixtures or fabricated responses.
  * Production MV3 networking is separately verified by scripts/verify_opds_live.mjs.
- * Loopback only, fixed upstream, read-only methods, no redirects or product API traffic.
+ * Loopback only, fixed upstream. Only the advertised progression route allows bounded PUT.
  */
 export default mergeConfig(
   base,
@@ -26,9 +26,10 @@ export default mergeConfig(
               const target = new URL(
                 new URL(req.url ?? '/', 'http://127.0.0.1').searchParams.get('url') ?? '',
               );
+              const progressWrite=req.method==='PUT'&&/^\/opds\/v2\/books\/[^/]+\/progression$/.test(target.pathname);
               if (
                 target.origin !== 'https://demo.komga.org' ||
-                !['GET', 'HEAD'].includes(req.method ?? '') ||
+                (!['GET', 'HEAD'].includes(req.method ?? '')&&!progressWrite) ||
                 (!target.pathname.startsWith('/opds/') &&
                   !target.pathname.startsWith('/api/v1/books/'))
               ) {
@@ -37,14 +38,17 @@ export default mergeConfig(
                 return;
               }
               const headers = new Headers();
-              for (const name of ['authorization', 'accept', 'range', 'if-match', 'if-range']) {
+              for (const name of ['authorization', 'accept', 'content-type', 'range', 'if-match', 'if-range']) {
                 const value = req.headers[name];
                 if (typeof value === 'string') headers.set(name, value);
               }
               const controller = new AbortController();
               res.on('close', () => controller.abort());
+              let body:Buffer|undefined;
+              if(progressWrite){const chunks:Buffer[]=[];let size=0;for await(const chunk of req){const bytes=Buffer.from(chunk);size+=bytes.length;if(size>16384){res.statusCode=413;res.end();return;}chunks.push(bytes);}body=Buffer.concat(chunks);}
               const response = await fetch(target, {
                 method: req.method,
+                body:body?.toString('utf8'),
                 headers,
                 redirect: 'manual',
                 signal: AbortSignal.any([controller.signal, AbortSignal.timeout(300000)]),

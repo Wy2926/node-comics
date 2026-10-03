@@ -9,15 +9,16 @@ import {registerSourceDriver} from '../src/comics/sources/registry';
 import {openFileSource} from '../src/comics/sources/runtime';
 import type {OpenFileSourceContext,SelectedSourceFile,SourceAccessChange,SourceAccount,SourceSelection} from '../src/comics/sources/contracts';
 import {sourcePageCache} from '../src/storage/source-pages';
-const format=vi.hoisted(()=>({index:vi.fn(),close:vi.fn()}));
-vi.mock('../src/comics/formats',()=>({openDocument:async()=>({index:format.index,close:format.close})}));
+import type {FileIndex} from '../src/comics/formats/contracts';
+const format=vi.hoisted(()=>({index:vi.fn()}));
+vi.mock('../src/comics/formats',()=>({indexFile:format.index}));
 const select=vi.fn(),disconnect=vi.fn(),close=vi.fn();let open=vi.fn(),disposers:(()=>void)[]=[],changed:((change:SourceAccessChange)=>Promise<void>)|undefined;
 const file=(id:string=crypto.randomUUID(),version='one'):SelectedSourceFile=>({id,name:id+'.cbz',format:'cbz',locator:{opaqueResource:id},snapshot:{opaqueResource:id,version,size:16}});
 const selection=():SourceSelection=>({connection:{id:'opaque-'+crypto.randomUUID(),provider:'fixture-cloud',accountId:crypto.randomUUID(),displayName:'Private account'},files:[file()]});
 const importIds=async(value:SourceSelection)=>{const result=await importSourceFiles(value);expect(result.failures).toEqual([]);return result.results.map(item=>item.id);};
 async function record(id:string){const entry=(await catalog.get('entries',id))!,comic=(await catalog.get('comics',entry.comicId))!;return {entry,comic,source:comic.source,connection:(await catalog.get('connections',comic.source.connectionId))!,entryId:id,contentId:entry.contentId,sourceSnapshot:entry.sourceSnapshot,format:entry.format};}
 beforeEach(()=>{
- format.index.mockReset().mockResolvedValue([{ordinal:0,name:'page.png',locator:{entry:0}}]);format.close.mockReset().mockResolvedValue(undefined);close.mockReset().mockResolvedValue(undefined);select.mockReset();disconnect.mockReset().mockResolvedValue(undefined);
+ format.index.mockReset().mockResolvedValue({kind:'images',pages:[{ordinal:0,name:'page.png',locator:{entry:0}}]});close.mockReset().mockResolvedValue(undefined);select.mockReset();disconnect.mockReset().mockResolvedValue(undefined);
  open=vi.fn(async(context:OpenFileSourceContext)=>({snapshot:{identity:context.source.providerItemId,version:String(context.sourceSnapshot?.version),size:16,local:false},readAt:async(_o:number,length:number)=>new Uint8Array(length),validate:async()=>'unchanged' as const,close}));
  disposers=[registerSourceDriver({id:'fixture-cloud',label:'Fixture cloud',cachePages:true,cacheRanges:false,open,select,disconnect,subscribe(listener){changed=listener;return()=>{changed=undefined;};}})];
 });
@@ -34,6 +35,7 @@ describe('single-source files and access lifecycle',()=>{
  });
  it('leaves no comic on a failed index and retries independently of successful files',async()=>{
   const selected=selection();selected.files.push(file());format.index.mockRejectedValueOnce(Error('temporary failure'));const result=await importSourceFiles(selected);expect(result.results).toHaveLength(1);expect(result.failures).toEqual([{name:selected.files[0].name,error:'temporary failure'}]);expect(await importIds(selected)).toHaveLength(2);
+  expect(close).toHaveBeenCalledTimes(4);
  });
  it('updates the same cloud resource in place and discards its old page identities and position',async()=>{
   const selected=selection(),[id]=await importIds(selected),old=await record(id),[page]=await catalog.listPages(old.contentId);await catalog.savePosition({id,entryId:id,comicId:old.comic.id,contentId:old.contentId,pageId:page.pageId,relativeOffset:.5,updatedAt:1});
@@ -56,7 +58,7 @@ describe('single-source files and access lifecycle',()=>{
   const selected=selection(),[id]=await importIds(selected),saved=await record(id);await initializeSources();const source=await openFileSource(saved),token=await sourcePageCache.token(id);await sourcePageCache.put(id,new Blob(['cached']),{owner:id,token});await changed!({connectionId:saved.connection.id,itemId:saved.source.providerItemId});expect(await sourcePageCache.get(id)).toBeUndefined();await expect(source.readAt(0,1)).rejects.toThrow('来源已关闭');const generation=(await record(id)).entry.generation;await changed!({connectionId:saved.connection.id,itemId:saved.source.providerItemId});expect((await record(id)).entry.generation).toBe(generation);await source.close();
  });
  it('does not resurrect a comic after deletion during reindexing',async()=>{
-  const [id]=await importIds(selection()),saved=await record(id),started=Promise.withResolvers<void>(),pending=Promise.withResolvers<[]>();format.index.mockImplementationOnce(()=>{started.resolve();return pending.promise;});const running=reindexEntry(id);const rejected=expect(running).rejects.toThrow();await started.promise;await removeComic(saved.comic.id);pending.resolve([]);await rejected;expect(await catalog.get('entries',id)).toBeUndefined();
+  const [id]=await importIds(selection()),saved=await record(id),started=Promise.withResolvers<void>(),pending=Promise.withResolvers<FileIndex>();format.index.mockImplementationOnce(()=>{started.resolve();return pending.promise;});const running=reindexEntry(id);const rejected=expect(running).rejects.toThrow();await started.promise;await removeComic(saved.comic.id);pending.resolve({kind:'images',pages:[]});await rejected;expect(await catalog.get('entries',id)).toBeUndefined();
  });
  it('rejects images and unregistered sources before publishing a comic',async()=>{
   const selected=selection();const bad={...selected,files:[{...selected.files[0],format:'image'}]} as unknown as SourceSelection;await expect(importSourceFiles(bad)).rejects.toThrow('不支持图片');const result=await importSourceFiles({...selected,connection:{...selected.connection,provider:'unregistered'}});expect(result.results).toEqual([]);expect(result.failures[0].error).toContain('来源未启用');expect(open).not.toHaveBeenCalled();

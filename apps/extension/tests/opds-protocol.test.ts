@@ -80,7 +80,7 @@ describe('OPDS protocol normalization', () => {
     expect(result.publications).toHaveLength(2);
     expect(result.publications[1].links[0].indirect).toBe(true);
   });
-  it('recognizes PSE-only acquisitions and refuses known Kavita progress-writing image endpoints', () => {
+  it('recognizes PSE-only acquisitions without a server-specific reading restriction', () => {
     const pub = parseCatalog(
       feed(
         entry(
@@ -96,7 +96,7 @@ describe('OPDS protocol normalization', () => {
         ...pub.links[0],
         href: 'https://catalog.example/api/opds/secret/image?chapterId=2&pageNumber={pageNumber}&saveProgress=false',
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
   it.each([
     '/api/opds/example-key/image',
@@ -104,7 +104,7 @@ describe('OPDS protocol normalization', () => {
     '/base/%61pi/o%70ds/example-key/%69mage',
     '/api/opds/key%20with%2Fslash/image',
     '/api/opds/%E6%B5%8B%E8%AF%95/image/',
-  ])('blocks canonical and encoded progress-writing PSE routes: %s', (path) => {
+  ])('accepts canonical and encoded image routes as ordinary PSE templates: %s', (path) => {
     const publication = jsonPublication(
       {
         metadata: { title: 'Pages' },
@@ -119,10 +119,11 @@ describe('OPDS protocol normalization', () => {
       root,
     );
     const link = { ...publication.links[0], count: 4 };
-    expect(safePse(link)).toBe(false);
-    expect(publicationAccess({ ...publication, links: [link] }).unavailableReason).toBe(
-      '此条目的页流可能修改服务端进度，暂不支持直接阅读。',
-    );
+    expect(safePse(link)).toBe(true);
+    expect(publicationAccess({ ...publication, links: [link] })).toMatchObject({
+      readable: true,
+      template: link,
+    });
   });
   it.each([
     '/opds/books/bad%/pages/{pageNumber}',
@@ -132,7 +133,13 @@ describe('OPDS protocol normalization', () => {
     const publication = jsonPublication(
       {
         metadata: { title: 'Pages' },
-        links: [{ href: path, rel: 'http://vaemendis.net/opds-pse/stream', type: 'image/jpeg' }],
+        links: [
+          {
+            href: path,
+            rel: 'http://vaemendis.net/opds-pse/stream',
+            type: 'image/jpeg',
+          },
+        ],
       },
       root,
     );
@@ -147,16 +154,65 @@ describe('OPDS protocol normalization', () => {
     '/reader/opds/v1.2/books/%E6%B5%8B%E8%AF%95/pages/{pageNumber}',
     '/api%2Fopds/example-key/image?pageNumber={pageNumber}',
     '/api/opds/example-key/%2569mage?pageNumber={pageNumber}',
-  ])('keeps ordinary image templates and ASP.NET path segment boundaries: %s', (path) => {
+  ])('keeps ordinary and encoded image templates: %s', (path) => {
     const publication = jsonPublication(
       {
         metadata: { title: 'Pages' },
-        links: [{ href: path, rel: 'http://vaemendis.net/opds-pse/stream', type: 'image/jpeg' }],
+        links: [
+          {
+            href: path,
+            rel: 'http://vaemendis.net/opds-pse/stream',
+            type: 'image/jpeg',
+          },
+        ],
       },
       root,
     );
     expect(safePse({ ...publication.links[0], count: 4 })).toBe(true);
   });
+  it.each([
+    'pages/{pageNumber}/{unsupported}',
+    'pages/{pageNumber}?width={maxWidth',
+    'pages/{pageNumber}?extra=%7Bunsupported%7D',
+    'pages/0?width={maxWidth}',
+  ])('rejects missing page variables and unsupported or malformed templates: %s', (href) => {
+    const publication = jsonPublication(
+      {
+        metadata: { title: 'Pages' },
+        links: [
+          {
+            href,
+            rel: 'http://vaemendis.net/opds-pse/stream',
+            type: 'image/jpeg',
+          },
+        ],
+      },
+      root,
+    );
+    expect(safePse({ ...publication.links[0], count: 4 })).toBe(false);
+  });
+  it.each([undefined, 0, -1, 1.5, 20001, Number.POSITIVE_INFINITY])(
+    'rejects missing or unbounded PSE page counts: %s',
+    (count) => {
+      const publication = jsonPublication(
+        {
+          metadata: { title: 'Pages' },
+          links: [
+            {
+              href: 'pages/{pageNumber}?width={maxWidth}&height={maxHeight}',
+              rel: 'http://vaemendis.net/opds-pse/stream',
+              type: 'image/jpeg',
+            },
+          ],
+        },
+        root,
+      );
+      expect(safePse({ ...publication.links[0], count })).toBe(false);
+      expect(safePse({ ...publication.links[0], count: 4 })).toBe(true);
+      expect(safePse({ ...publication.links[0], count: 4, encrypted: true })).toBe(false);
+      expect(safePse({ ...publication.links[0], count: 4, indirect: true })).toBe(false);
+    },
+  );
   it('does not fetch DTD/entities or accept mismatched XML', () => {
     expect(() =>
       parseCatalog(
@@ -244,6 +300,44 @@ describe('OPDS protocol normalization', () => {
         root,
       ),
     ).toThrow();
+  });
+  it('recognizes direct EPUB acquisition without treating XHTML as image pages', () => {
+    const publication = jsonPublication(
+      {
+        metadata: { title: 'EPUB' },
+        links: [
+          {
+            rel: 'http://opds-spec.org/acquisition',
+            type: 'application/epub+zip',
+            href: 'book.epub',
+          },
+        ],
+        readingOrder: [{ href: 'chapter.xhtml', type: 'application/xhtml+xml' }],
+      },
+      root,
+    );
+    const access = publicationAccess(publication);
+    expect(access.readable).toBe(true);
+    expect(access.pages).toBeUndefined();
+    expect(access.files.map((file) => file.format)).toEqual(['epub']);
+    expect(
+      publicationAccess({
+        ...publication,
+        readingOrder: [
+          {
+            ...publication.links[0],
+            href: root + '/page.jpg',
+            type: 'image/jpeg',
+          },
+        ],
+      }).pages,
+    ).toHaveLength(1);
+    expect(
+      publicationAccess({
+        ...publication,
+        links: [{ ...publication.links[0], encrypted: true }],
+      }).files,
+    ).toHaveLength(0);
   });
   it('expands advertised OpenSearch/OPDS2 query templates without inventing pagination', () => {
     const template = parseSearchDescription(

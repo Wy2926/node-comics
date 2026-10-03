@@ -1,6 +1,7 @@
 import type { CatalogTable, CatalogTables, PageDescriptor } from '../domain';
 import { openSourceDatabase, sourceDatabaseName, type DatabaseSchema } from '../../storage/database';
 import {openTranslationBindings} from './translation-bindings';
+import {epubLocation} from '../formats/epub-location';
 
 export const CATALOG_DATABASE = sourceDatabaseName('catalog');
 /** A source identity can be reopened, but work begun before its deletion cannot republish it. */
@@ -193,7 +194,7 @@ export const catalog = {
     });
   },
   /** Atomically replace the current index after preparing it; no history is retained. */
-  async replaceContent(entryId: string, generation: number, content: Pick<CatalogTables['entries'], 'contentId' | 'containerId' | 'sourceSnapshot' | 'format'>, pages: PageDescriptor[], complete: boolean, total?: number): Promise<void> {
+  async replaceContent(entryId: string, generation: number, content: Pick<CatalogTables['entries'], 'contentId' | 'containerId' | 'sourceSnapshot' | 'format' | 'document'>, pages: PageDescriptor[], complete: boolean, total?: number): Promise<void> {
     await catalog.mutate(['entries', 'comics', 'connections', 'pageDescriptors', 'materializations', 'positions'], async tx => {
       const entry = await tx.get('entries', entryId);
       if (!entry || entry.generation !== generation) throw new StaleCatalogWriteError();
@@ -205,10 +206,11 @@ export const catalog = {
       await tx.put('entries', {...entry, ...content, generation: entry.generation + 1, indexState: 'ready', error: undefined, readAt: undefined, pageCount: pages.length, knownTotal: total ?? (complete ? pages.length : undefined), discoveryComplete: complete, coverPageId: pages[0]?.pageId, updatedAt: Date.now()});
       const position = await tx.get('positions', entryId);
       // An old ordinal does not prove that changed source bytes identify the same page.
-      if (position && pages.length) await tx.put('positions', {...position, contentId: content.contentId, pageId: pages[0].pageId, relativeOffset: 0});
+      if (position) await tx.put('positions', {...position, contentId: content.contentId, pageId: pages[0]?.pageId??'', relativeOffset: 0,documentLocation:undefined});
       if (comic) await tx.put('comics', {...comic,
         ...(comic.lastEntryId === entryId ? {lastPage: pages.length ? 1 : undefined, lastPageCount: total ?? (complete ? pages.length : undefined)} : {}),
         ...(comic.cover?.entryId === entryId ? {cover: pages.length ? {entryId, contentId: content.contentId, pageId: pages[0].pageId} : undefined} : {}),
+        documentCover:content.document?.cover?{entryId,contentId:content.contentId}:undefined,
       });
     });
   },
@@ -216,6 +218,15 @@ export const catalog = {
     await catalog.mutate(['entries', 'positions', 'comics', 'pageDescriptors'], async tx => {
       const entry = await tx.get('entries', position.entryId), previous = await tx.get('positions', position.entryId);
       if (!entry || entry.comicId !== position.comicId || entry.contentId !== position.contentId || previous && previous.updatedAt > position.updatedAt) return;
+      if(entry.format==='epub') {
+        const location=entry.document&&epubLocation(entry.document,position.documentLocation);
+        if(!location)return;
+        await tx.put('positions',{...position,id:entry.id,pageId:'',relativeOffset:0,documentLocation:location});
+        if(location.totalProgression===1&&!entry.readAt)await tx.put('entries',{...entry,readAt:position.updatedAt});
+        const comic=await tx.get('comics',position.comicId);
+        if(comic&&(comic.lastReadAt??0)<=position.updatedAt)await tx.put('comics',{...comic,lastEntryId:entry.id,lastReadAt:position.updatedAt,lastPage:location.totalProgression??0,lastPageCount:1});
+        return;
+      }
       const page = await tx.get('pageDescriptors', [position.contentId, position.pageId]);
       if (!page) return;
       if (previous && previous.pageId === position.pageId && previous.contentId === position.contentId && previous.relativeOffset === position.relativeOffset && previous.updatedAt === position.updatedAt) return;
@@ -227,7 +238,7 @@ export const catalog = {
   async markRead(entryId: string): Promise<void> {
     await catalog.mutate(['entries'], async tx => {
       const entry = await tx.get('entries', entryId);
-      if (entry && !entry.readAt && entry.discoveryComplete && entry.pageCount && !entry.error) await tx.put('entries', {...entry, readAt: Date.now()});
+      if (entry && !entry.readAt && entry.discoveryComplete && (entry.pageCount||entry.document?.chapters.length) && !entry.error) await tx.put('entries', {...entry, readAt: Date.now()});
     });
   },
   async putMaterialization(value: CatalogTables['materializations'], expectedGeneration?: number): Promise<boolean> {

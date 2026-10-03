@@ -21,11 +21,15 @@
   },
   "dependencies": {
     "@zip.js/zip.js": "2.15.0",
+    "epubjs": "0.3.93",
     "node-unrar-js": "2.0.2",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.3.289",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "overrides": {
+    "epubjs": { "@xmldom/xmldom": "0.9.12" }
   },
   "devDependencies": {
     "@types/chrome": "^0.1.6",

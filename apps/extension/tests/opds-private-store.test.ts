@@ -1,6 +1,10 @@
 import 'fake-indexeddb/auto';
-import { describe, expect, it } from 'vitest';
-import { PrivateOpdsStore, type PrivateConnection } from '../src/comics/sources/opds/private-store';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  PrivateOpdsStore,
+  type PrivateConnection,
+  type PrivateResource,
+} from '../src/comics/sources/opds/private-store';
 
 const origin = 'https://catalog.example';
 
@@ -191,4 +195,160 @@ describe('OPDS credential restoration', () => {
     );
     expect(await savedUrl()).toBe('opds-unavailable:credential-refresh');
   });
+});
+
+describe('OPDS resource authorization fence', () => {
+  function resource(current: PrivateConnection, id: string, pinned = true): PrivateResource {
+    return {
+      id,
+      kind: 'artwork',
+      connectionId: current.id,
+      revision: current.revision,
+      value: { link: { href: current.root + '/cover' } },
+      pinned,
+      updatedAt: 1,
+    };
+  }
+
+  it.each([false, true])('rejects a late resource after disconnect (pinned=%s)', async (pinned) => {
+    const databaseName = `opds-late-resource-${crypto.randomUUID()}`;
+    const store = new PrivateOpdsStore(databaseName);
+    const current = connection('/api/opds/old-secret');
+    const original = resource(current, 'artwork', pinned);
+    await store.saveConnection(current);
+    await store.saveResources([original]);
+    await store.disconnect(current.id);
+    const sanitized = await store.resource(original.id);
+
+    await expect(store.saveResources([original])).rejects.toMatchObject({ code: 'disconnected' });
+
+    expect(await store.resource(original.id)).toEqual(sanitized);
+    expect(await new PrivateOpdsStore(databaseName).resource(original.id)).toEqual(sanitized);
+    if (pinned) expect(JSON.stringify(sanitized)).not.toContain('old-secret');
+    else expect(sanitized).toBeUndefined();
+  });
+
+  it.each([false, true])(
+    'does not overwrite resources rebound to a new credential (disconnect=%s)',
+    async (disconnect) => {
+      const { store, current, savedUrl, databaseName } = await saveArtwork(
+        '/api/opds/old-secret',
+        '/api/image/chapter-cover?apiKey=old-secret',
+      );
+      const stale = (await store.resource('artwork'))!;
+      if (disconnect) await store.disconnect(current.id);
+      const previous = (await store.connection(current.id))!;
+      await store.saveConnection(
+        { ...current, root: origin + '/api/opds/new-secret', revision: previous.revision + 1 },
+        previous,
+      );
+      const rebound = await store.resource('artwork');
+
+      await expect(store.saveResources([stale])).rejects.toMatchObject({ code: 'disconnected' });
+
+      expect(await store.resource('artwork')).toEqual(rebound);
+      expect(await new PrivateOpdsStore(databaseName).resource('artwork')).toEqual(rebound);
+      expect(await savedUrl()).toBe(origin + '/api/image/chapter-cover?apiKey=new-secret');
+    },
+  );
+
+  it('rejects an entire batch before publishing any transient or pinned result', async () => {
+    const databaseName = `opds-resource-batch-${crypto.randomUUID()}`;
+    const store = new PrivateOpdsStore(databaseName);
+    const active = connection('/api/opds/active-secret');
+    const missing = connection('/api/opds/missing-secret');
+    await store.saveConnection(active);
+
+    await expect(
+      store.saveResources([
+        resource(active, 'transient', false),
+        resource(active, 'pinned'),
+        resource(missing, 'missing'),
+      ]),
+    ).rejects.toMatchObject({ code: 'disconnected' });
+
+    const reopened = new PrivateOpdsStore(databaseName);
+    for (const id of ['transient', 'pinned', 'missing']) {
+      expect(await store.resource(id)).toBeUndefined();
+      expect(await reopened.resource(id)).toBeUndefined();
+    }
+  });
+
+  it('checks each connection once for a bounded transient batch', async () => {
+    const databaseName = `opds-resource-batch-${crypto.randomUUID()}`;
+    const store = new PrivateOpdsStore(databaseName);
+    const current = connection('/api/opds/current-secret');
+    await store.saveConnection(current);
+    const get = vi.spyOn(IDBObjectStore.prototype, 'get');
+    try {
+      await store.saveResources(
+        Array.from({ length: 2001 }, (_, index) => resource(current, `artwork-${index}`, false)),
+      );
+      const connectionReads = get.mock.contexts.filter(
+        (objectStore) => (objectStore as IDBObjectStore).name === 'connections',
+      );
+      expect(connectionReads).toHaveLength(1);
+    } finally {
+      get.mockRestore();
+    }
+    expect(await store.resource('artwork-0')).toBeUndefined();
+    expect(await store.resource('artwork-1')).toBeDefined();
+    expect(await store.resource('artwork-2000')).toBeDefined();
+    expect(await new PrivateOpdsStore(databaseName).resource('artwork-2000')).toBeUndefined();
+  });
+
+  it.each([false, true])(
+    'clears resources committed before a concurrent disconnect (pinned=%s)',
+    async (pinned) => {
+      const databaseName = `opds-concurrent-resource-${crypto.randomUUID()}`;
+      const store = new PrivateOpdsStore(databaseName);
+      const current = connection('/api/opds/old-secret');
+      await store.saveConnection(current);
+
+      await Promise.all([
+        store.saveResources([resource(current, 'artwork', pinned)]),
+        store.disconnect(current.id),
+      ]);
+
+      const saved = await store.resource('artwork');
+      expect((await store.connection(current.id))?.disconnected).toBe(true);
+      expect(saved).toEqual(await new PrivateOpdsStore(databaseName).resource('artwork'));
+      if (pinned) expect(JSON.stringify(saved)).not.toContain('old-secret');
+      else expect(saved).toBeUndefined();
+    },
+  );
+
+  it.each([false, true])(
+    'serializes disconnect with credential replacement (disconnect first=%s)',
+    async (disconnectFirst) => {
+      const { store, current, savedUrl } = await saveArtwork(
+        '/api/opds/old-secret',
+        '/api/image/chapter-cover?apiKey=old-secret',
+      );
+      const refresh = () =>
+        store.saveConnection(
+          { ...current, root: origin + '/api/opds/new-secret', revision: 2 },
+          current,
+        );
+      const operations = disconnectFirst
+        ? [store.disconnect(current.id), refresh()]
+        : [refresh(), store.disconnect(current.id)];
+      const results = await Promise.allSettled(operations);
+      const disconnected = (await store.connection(current.id))!;
+
+      expect(results[disconnectFirst ? 0 : 1].status).toBe('fulfilled');
+      expect(disconnected.disconnected).toBe(true);
+      expect(disconnected.revision).toBe(disconnectFirst ? 2 : 3);
+      expect(JSON.stringify(await store.resource('artwork'))).not.toContain('secret');
+      await store.saveConnection(
+        {
+          ...current,
+          root: origin + '/api/opds/final-secret',
+          revision: disconnected.revision + 1,
+        },
+        disconnected,
+      );
+      expect(await savedUrl()).toBe(origin + '/api/image/chapter-cover?apiKey=final-secret');
+    },
+  );
 });

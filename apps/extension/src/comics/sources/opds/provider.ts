@@ -8,6 +8,7 @@ import type {
   SourceAccount,
   SourceAccessChange,
   SourceProvider,
+  SourceReadingProgress,
 } from '../contracts';
 import { OpdsError } from './errors';
 import {
@@ -27,6 +28,15 @@ import {
   type OpdsPublication,
 } from './protocol';
 import { publicationAccess } from './publication-access';
+import {
+  discoverProgressBinding,
+  originalPageUrl,
+  pseProgress,
+  readOpdsProgress,
+  unavailableProgressEndpoint,
+  writeOpdsProgress,
+  type OpdsProgressBinding,
+} from './progress';
 import {
   identityUrl,
   opaqueId,
@@ -51,6 +61,7 @@ type Opening = {
   etag?: string;
   size?: number;
   title: string;
+  progress?: OpdsProgressBinding | null;
 };
 const cleanText = (v: string, max = 4000) => v.replace(/<[^>]*>/g, '').slice(0, max);
 function account(connection: PrivateConnection): SourceAccount {
@@ -74,6 +85,8 @@ export function createOpdsProvider(
   const store = options.store ?? new PrivateOpdsStore(),
     listeners = new Set<() => void>(),
     accessListeners = new Set<(change: SourceAccessChange) => Promise<void>>();
+  // One-use connect result, not a general catalog cache. Never retain complete histories.
+  const connectedCatalogs = new Map<string, { revision: number; page: RemoteCatalogPage }>();
   const transport = new OpdsTransport(options.fetch, async (connection) => {
     const current = await store.connection(connection.id);
     if (!current || current.disconnected || current.revision !== connection.revision)
@@ -93,6 +106,7 @@ export function createOpdsProvider(
     }
   }
   async function changed(id: string, notify = true, accessLost = true) {
+    connectedCatalogs.delete(id);
     transport.abortConnection(id);
     if (!notify || accessLost) store.clearTransient?.(id);
     for (const listener of listeners) listener();
@@ -208,11 +222,11 @@ export function createOpdsProvider(
       reason: access.readable === false ? access.unavailableReason : undefined,
     };
   }
-  async function normalized(
+  async function prepareCatalog(
     connection: PrivateConnection,
     catalog: OpdsCatalog,
     url: string,
-  ): Promise<RemoteCatalogPage> {
+  ): Promise<{ page: RemoteCatalogPage; records: PrivateResource[] }> {
     const records: PrivateResource[] = [],
       location = await catalogReference(connection, url, records);
     const navigation = async (links: OpdsLink[]) =>
@@ -274,10 +288,24 @@ export function createOpdsProvider(
     // Duplicate self/root records must not overwrite the search discovery above.
     const unique = new Map<string, PrivateResource>();
     for (const item of records) if (!unique.has(item.id)) unique.set(item.id, item);
+    if (rootLocation !== location) {
+      const root = await store.resource(rootLocation),
+        reference = unique.get(rootLocation)!;
+      if (
+        root?.kind === 'catalog' &&
+        root.connectionId === connection.id &&
+        root.revision === connection.revision
+      )
+        reference.value = { ...root.value, ...reference.value };
+    }
     if (unique.size > 2000)
       throw new OpdsError('too-large', 'OPDS 单页目录过大，请在服务端缩小目录分页。');
-    await store.saveResources([...unique.values()]);
-    return result;
+    return { page: result, records: [...unique.values()] };
+  }
+  async function normalized(connection: PrivateConnection, catalog: OpdsCatalog, url: string) {
+    const prepared = await prepareCatalog(connection, catalog, url);
+    await store.saveResources(prepared.records);
+    return prepared.page;
   }
   async function openingFor(context: OpenFileSourceContext) {
     const connection = await connectionFor(context.connection),
@@ -294,7 +322,58 @@ export function createOpdsProvider(
       context.sourceSnapshot?.version !== opening.version
     )
       throw new OpdsError('source-changed', 'OPDS 读取版本已变更，请重新打开。');
+    if (opening.progress === undefined) {
+      const publication = await resourceFor(connection, opening.publicationId, 'publication');
+      opening.progress = discoverProgressBinding(
+        connection,
+        publication.value.publication as unknown as OpdsPublication,
+        opening,
+      );
+      await store.saveResources([
+        { ...resource, value: opening as unknown as Record<string, unknown> },
+      ]);
+    }
     return { connection, opening, id };
+  }
+  async function markProgressVerification(
+    connection: PrivateConnection,
+    opening: Opening,
+    id: string,
+    verified: boolean,
+  ) {
+    if (opening.progress?.kind !== 'kavita' || opening.progress.verified === verified) return;
+    opening.progress.verified = verified;
+    await store.saveResources([
+      record(connection, id, 'opening', opening as unknown as Record<string, unknown>, true),
+    ]);
+  }
+  async function readOpeningProgress(
+    connection: PrivateConnection,
+    opening: Opening,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<SourceReadingProgress | undefined> {
+    signal?.throwIfAborted();
+    if (!opening.progress) return pseProgress(opening, opening.progress);
+    try {
+      const progress = await readOpdsProgress(
+        transport,
+        connection,
+        opening.progress,
+        opening,
+        signal,
+      );
+      signal?.throwIfAborted();
+      await markProgressVerification(connection, opening, id, true);
+      return progress;
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (opening.progress.kind !== 'kavita' || !unavailableProgressEndpoint(error)) throw error;
+      // Optional Reader API failure must not block the advertised PSE route. Keep the
+      // profile identity and zero-based lastRead, but never use its unverified endpoints.
+      await markProgressVerification(connection, opening, id, false);
+      return pseProgress(opening, opening.progress);
+    }
   }
   return {
     id: PROVIDER,
@@ -381,11 +460,18 @@ export function createOpdsProvider(
         connection.namespace = `${catalog.protocol}:${connection.endpointKey}`;
         if (previous && connection.namespace !== previous.namespace)
           throw new OpdsError('scope-blocked', '不同 OPDS 版本或目录需要单独连接。');
+        const prepared = await prepareCatalog(connection, catalog, root);
         signal?.throwIfAborted();
         await store.saveConnection(connection, previous, signal);
-        await normalized(connection, catalog, root);
+        await store.saveResources(prepared.records);
         listen();
         await changed(connection.id, true, false);
+        connectedCatalogs.set(connection.id, {
+          revision: connection.revision,
+          page: prepared.page,
+        });
+        if (connectedCatalogs.size > 16)
+          connectedCatalogs.delete(connectedCatalogs.keys().next().value!);
         return account(connection);
       },
       list: async () => {
@@ -423,22 +509,51 @@ export function createOpdsProvider(
       async browse(request) {
         const connection = await connectionFor(request.connection),
           ref = request.cursor ?? request.location;
+        const initial = connectedCatalogs.get(connection.id);
+        connectedCatalogs.delete(connection.id);
+        if (!ref && !request.search?.trim() && initial?.revision === connection.revision) {
+          request.signal?.throwIfAborted();
+          return initial.page;
+        }
         let url = connection.root;
-        if (ref) url = String((await resourceFor(connection, ref, 'catalog')).value.url);
-        let document = await transport.document(connection, url, request.signal),
-          catalog = parseCatalog(document.text, url, document.contentType);
+        let reference = ref ? await resourceFor(connection, ref, 'catalog') : undefined;
+        if (reference) url = String(reference.value.url);
         if (!request.cursor && request.search?.trim()) {
-          const search = catalog.links.find((l) => hasRel(l, 'search'));
+          if (!reference) {
+            const id = await opaqueId(
+              connection.id,
+              'catalog',
+              `${connection.namespace}:${identityUrl(url, connection)}`,
+            );
+            reference = await resourceFor(connection, id, 'catalog');
+          }
+          let search = reference.value.search as OpdsLink | undefined;
+          if (!search) {
+            const document = await transport.document(connection, url, request.signal);
+            search = parseCatalog(document.text, url, document.contentType).links.find((link) =>
+              hasRel(link, 'search'),
+            );
+          }
           if (!search) throw new OpdsError('unsupported', '此目录没有提供搜索。');
-          let template = search.href;
-          if (mediaType(search.type) === 'application/opensearchdescription+xml') {
+          let template =
+            typeof reference.value.searchTemplate === 'string'
+              ? reference.value.searchTemplate
+              : search.href;
+          if (
+            !reference.value.searchTemplate &&
+            mediaType(search.type) === 'application/opensearchdescription+xml'
+          ) {
             const description = await transport.document(connection, search.href, request.signal);
             template = parseSearchDescription(description.text, search.href);
           }
+          if (!reference.value.searchTemplate)
+            await store.saveResources([
+              { ...reference, value: { ...reference.value, search, searchTemplate: template } },
+            ]);
           url = expandSearch(template, request.search.trim());
-          document = await transport.document(connection, url, request.signal);
-          catalog = parseCatalog(document.text, url, document.contentType);
         }
+        const document = await transport.document(connection, url, request.signal),
+          catalog = parseCatalog(document.text, url, document.contentType);
         return normalized(connection, catalog, url);
       },
       async resolve(publicConnection, publicationId, options = {}) {
@@ -466,6 +581,7 @@ export function createOpdsProvider(
             throw new OpdsError('source-changed', '出版物已不在原目录页，请重新浏览目录定位。');
           publication = fresh;
         }
+        let progressPublication = publication;
         let opening: Opening | undefined,
           access = publicationAccess(publication);
         if (options.purpose !== 'download') {
@@ -474,10 +590,11 @@ export function createOpdsProvider(
           if (access.manifest) {
             const doc = await transport.document(connection, access.manifest.href, options.signal);
             imagePublication = parsePublication(doc.text, access.manifest.href);
-            imageAccess = publicationAccess({
+            progressPublication = {
               ...imagePublication,
               links: [...imagePublication.links, ...publication.links],
-            });
+            };
+            imageAccess = publicationAccess(progressPublication);
           }
           if (imageAccess.pages)
             opening = {
@@ -546,6 +663,7 @@ export function createOpdsProvider(
             title: publication.title,
           };
         }
+        opening.progress = discoverProgressBinding(connection, progressPublication, opening);
         const representationId = await opaqueId(
             connection.id,
             'opening',
@@ -644,7 +762,14 @@ export function createOpdsProvider(
               }
             : undefined);
         if (!link) throw new OpdsError('source-changed', 'OPDS 页已不存在。');
-        const result = await transport.bytes(connection, link.href, {
+        if (opening.progress?.kind === 'kavita' && opening.progress.verified === undefined) {
+          await readOpeningProgress(connection, opening, id, context.signal);
+        }
+        const href =
+          opening.progress?.kind === 'kavita' && opening.progress.verified
+            ? originalPageUrl(connection, opening.progress, ordinal)!
+            : link.href;
+        const result = await transport.bytes(connection, href, {
           signal: context.signal,
           maxBytes: IMAGE_LIMIT,
         });
@@ -652,6 +777,29 @@ export function createOpdsProvider(
         if (!isBitmap({ ...link, type }))
           throw new OpdsError('unsupported', '源站没有返回支持的原图。');
         return new Blob([result.bytes], { type });
+      },
+    },
+    progress: {
+      async read(context) {
+        const { connection, opening, id } = await openingFor(context);
+        return readOpeningProgress(connection, opening, id, context.signal);
+      },
+      async write(context, progress) {
+        const { connection, opening, id } = await openingFor(context);
+        if (!opening.progress) return;
+        if (opening.progress.kind === 'kavita') {
+          if (opening.progress.verified === undefined)
+            await readOpeningProgress(connection, opening, id, context.signal);
+          if (!opening.progress.verified) return;
+        }
+        await writeOpdsProgress(
+          transport,
+          connection,
+          opening.progress,
+          opening,
+          progress,
+          context.signal,
+        );
       },
     },
     artwork: {

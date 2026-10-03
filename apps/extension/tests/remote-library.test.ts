@@ -43,8 +43,14 @@ import {
 import * as pageIdentity from '../src/comics/pages/identity';
 import { localSourceDriver } from '../src/comics/sources/local/driver';
 import * as formats from '../src/comics/formats';
+import type { EpubIndex } from '../src/comics/formats/contracts';
+import { loadEntry, saveReaderState } from '../src/comics/application/library-service';
 
 vi.mock('../src/comics/formats', () => ({
+  indexFile: async () => ({
+    kind: 'images',
+    pages: [{ ordinal: 0, name: 'page.png', locator: { entryIndex: 0 } }],
+  }),
   openDocument: async () => ({
     index: async () => [{ ordinal: 0, name: 'page.png', locator: { entryIndex: 0 } }],
     materialize: async () => new Blob(['original'], { type: 'image/png' }),
@@ -715,6 +721,93 @@ describe('remote library capability integration', () => {
     },
   );
 
+  it.each([1, 1501])('keeps a %i-chapter EPUB and its saved position under its remote source identity', async (chapterCount) => {
+    const f = fixture('download-file');
+    f.plan.format = 'epub';
+    const connection = await f.connect();
+    const document: EpubIndex = {
+      kind: 'epub',
+      title: 'Remote document',
+      chapters: Array.from({ length: chapterCount }, (_, index) => ({
+        id: `chapter-${index + 1}`,
+        href: index === 0 ? '/OPS/chapter.xhtml' : `/OPS/chapter-${index + 1}.xhtml`,
+        label: `Chapter ${index + 1}`,
+      })),
+      toc: [{ href: '/OPS/chapter.xhtml', label: 'Chapter One' }],
+    };
+    let sourceClose: ReturnType<typeof vi.fn> | undefined;
+    const index = vi.spyOn(formats, 'indexFile').mockImplementation(async (format, source) => {
+      expect(format).toBe('epub');
+      expect(source.snapshot.local).toBe(true);
+      sourceClose = vi.spyOn(source, 'close');
+      return document;
+    });
+    try {
+      expect((await openRemotePublication(f.connectionId, f.publicationId)).kind).toBe(
+        'download-required',
+      );
+      expect(await comicsFor(f.connectionId)).toEqual([]);
+      const contentId = crypto.randomUUID();
+      const container = await importContainer(
+        new File(['PK', crypto.randomUUID()], 'book.epub'),
+        undefined,
+        undefined,
+        contentId,
+      );
+      const imported = await registerRemoteContainer(
+        { connection, plan: f.plan },
+        container,
+        contentId,
+      );
+      expect(index).toHaveBeenCalledOnce();
+      expect(sourceClose).toHaveBeenCalledOnce();
+      const comic = (await catalog.get('comics', imported.comicId))!;
+      const entry = (await catalog.get('entries', imported.entryId))!;
+      expect(comic.source).toMatchObject({
+        connectionId: f.connectionId,
+        providerItemId: f.publicationId,
+      });
+      expect(comic.cover).toBeUndefined();
+      expect(entry).toMatchObject({
+        format: 'epub',
+        document,
+        containerId: container.id,
+        pageCount: 0,
+      });
+      expect(await catalog.listPages(contentId)).toEqual([]);
+      const copy = await loadEntry(entry.id);
+      const documentLocation = {
+        cfi: 'epubcfi(/6/2!/4/2/1:24)',
+        href: '/OPS/chapter.xhtml',
+        progression: 0.45,
+        totalProgression: 0.45,
+      };
+      await saveReaderState({ ...copy, documentLocation, lastReadAt: 300 });
+      f.resolve.mockClear();
+      await disconnectSource(f.connectionId);
+      await f.connect(true);
+      const reopened = await openRegisteredRemoteComic(comic.id);
+      expect(reopened).toMatchObject({ kind: 'opened', entryId: entry.id, created: false });
+      expect(await loadEntry(entry.id)).toMatchObject({
+        document,
+        documentLocation,
+        pageId: '',
+        pages: [],
+      });
+      expect(await catalog.get('positions', entry.id)).toMatchObject({
+        contentId,
+        documentLocation,
+        pageId: '',
+        relativeOffset: 0,
+      });
+      expect(f.resolve).not.toHaveBeenCalled();
+      expect(f.open).not.toHaveBeenCalled();
+      expect(index).toHaveBeenCalledOnce();
+    } finally {
+      index.mockRestore();
+    }
+  });
+
   it('keeps source identity while publishing a retained archive and an atomic completed intent', async () => {
     const f = fixture('download-file'),
       connection = await f.connect();
@@ -895,18 +988,12 @@ describe('remote library capability integration', () => {
     const proceed = deferred<void>();
     const indexed = deferred<void>();
     const retainContainer = containers.retainContainer;
-    const openDocument = formats.openDocument;
+    const indexFile = formats.indexFile;
     let indexes = 0;
-    const index = vi.spyOn(formats, 'openDocument').mockImplementation(async (...args) => {
-      const session = await openDocument(...args);
-      return {
-        ...session,
-        index: async (...args) => {
-          const pages = await session.index(...args);
-          if (++indexes === 2) indexed.resolve();
-          return pages;
-        },
-      };
+    const index = vi.spyOn(formats, 'indexFile').mockImplementation(async (...args) => {
+      const result = await indexFile(...args);
+      if (++indexes === 2) indexed.resolve();
+      return result;
     });
     const retain = vi.spyOn(containers, 'retainContainer').mockImplementation(async (id, owner) => {
       if (owner === firstContentId) {

@@ -38,6 +38,27 @@ const cycle=()=>runBookDownloadCycle(new AbortController().signal,'test-host');
 const view=async(id:string)=>(await listBookDownloads(true)).find(book=>book.comic.id===id)!;
 
 describe('whole comic retained downloads',()=>{
+  it('does not treat an indexed EPUB document as an empty image download', async () => {
+    const fixtureBook = await fixture(1, 0);
+    const entry: Entry = {
+      ...fixtureBook.entries[0],
+      format: 'epub',
+      document: {
+        kind: 'epub',
+        title: 'Text book',
+        chapters: [{ id: 'chapter-1', href: '/one.xhtml', label: 'One' }],
+        toc: [],
+      },
+    };
+    await catalog.put('entries', entry);
+    expect(selectDownloadScope([entry], fixtureBook.source, null).selected).toEqual([]);
+    await queueDownloads([entry.id]);
+    expect(await catalog.list('tasks')).toEqual([]);
+    await expect(startBookDownload(fixtureBook.comic.id)).rejects.toThrow('不支持整本缓存');
+    expect(await readBookPlan(fixtureBook.comic.id)).toBeUndefined();
+    expect(mocks.discover).not.toHaveBeenCalled();
+    expect(mocks.acquire).not.toHaveBeenCalled();
+  });
   it('selects all groups and releases, deduplicates identity, and applies only cache-language selection',async()=>{
     const f=await fixture();
     const scope=selectDownloadScope([...f.entries,f.entries[1]],f.source,null);

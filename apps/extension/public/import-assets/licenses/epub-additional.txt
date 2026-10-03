@@ -1,0 +1,68 @@
+EPUB reader: additional upstream notices
+
+The exact npm versions, source archives and integrity digests are recorded in
+apps/extension/package-lock.json. Other EPUB dependency licenses are emitted
+alongside this file from their unmodified installed packages.
+
+marks-pane 1.0.9
+Source: https://github.com/fchasen/marks
+Author declared by upstream: Fred Chasen
+License declared by upstream package.json: MIT
+The published package has no separate license file or copyright notice.
+
+path-webpack 0.0.3
+Source: https://github.com/fchasen/path-webpack
+Author declared by upstream: fchasen@gmail.com
+License declared by upstream package.json: MIT
+The published package has no separate license file. Its README identifies
+Node.js v7.0.0 lib/path.js as the source; the Node.js notices are retained below.
+
+localforage 1.10.0 includes code from base64-arraybuffer:
+Source: https://github.com/niklasvh/base64-arraybuffer
+Copyright (c) 2012 Niklas von Hertzen
+Licensed under the MIT license, as stated in localforage/dist/localforage.js.
+
+MIT license terms for the above MIT-licensed components:
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Node.js v7.0.0 path implementation
+Source: https://github.com/nodejs/node/blob/v7.0.0/lib/path.js
+License: https://github.com/nodejs/node/blob/v7.0.0/LICENSE
+
+Copyright Node.js contributors. All rights reserved.
+Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.

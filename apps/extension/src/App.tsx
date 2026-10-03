@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Api } from './api';
 import { expiredMessage } from './auth/model';
 import { sessionAuthorization } from './auth/session';
@@ -62,6 +62,9 @@ import {ShortcutPanel} from './ui/shortcuts/ShortcutPanel';
 import {RemoteLibrary} from './ui/remote-library/RemoteLibrary';
 import {openRegisteredRemoteComic} from './comics/application/remote-library-service';
 import {FileDownloadPrompt} from './ui/downloads/FileDownloads';
+import {ReadingProgress} from './comics/application/reading-progress';
+
+const EpubReader=lazy(()=>import('./reader/EpubReader').then(module=>({default:module.EpubReader})));
 
 type View='downloads'|'library'|'remote-library'|'sites'|'search'|'discover'|'settings'|'account';
 const directSearchSeed:SearchSeed={title:''};
@@ -105,6 +108,9 @@ export function App(){
  const [settings,setSettings]=useState<Settings>(readSettings),auth=useSession(),account=auth.session;
  const settingsRef=useRef(settings);settingsRef.current=settings;
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState(''),[drag,setDrag]=useState(false);
+ const [readingProgress]=useState(()=>new ReadingProgress(()=>setError(msg('阅读位置同步失败，已保留本地位置。'))));
+ const readingOpen=useRef<AbortController|undefined>(undefined);
+ useEffect(()=>{const flush=()=>{if(document.visibilityState==='hidden')void readingProgress.flush();};document.addEventListener('visibilitychange',flush);return()=>{document.removeEventListener('visibilitychange',flush);readingOpen.current?.abort();void readingProgress.close();};},[readingProgress]);
  const expiredError=auth.reason==='expired'&&(error===expiredMessage()||error===msg('登录已过期，请重新登录。'));
  useEffect(()=>{if(expiredError)setError('');},[expiredError]);
  const [dismissedExpiry,setDismissedExpiry]=useState(false);
@@ -129,12 +135,20 @@ export function App(){
  const readSequence=useCallback(async(id:string)=>{
    for(;;){const language=settingsRef.current.language,scope=channelRef.current?.scope,result=await readerSequence(id,scope,language);if(language===settingsRef.current.language&&scope?.key===channelRef.current?.scope.key)return result;}
  },[]);
- const leaveReader=useCallback(()=>{readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[]);
- const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));},[]);
+ const leaveReader=useCallback(()=>{readingOpen.current?.abort();void readingProgress.close();readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[readingProgress]);
+ const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));if(currentRef.current===copy.id)readingProgress.update(copy);void saveReaderState(copy).catch(e=>setError(e.message));},[readingProgress]);
  const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false,requestIsCurrent?:()=>boolean)=>{
-   const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>request===readingEpoch.current&&api.isCurrent()&&(requestIsCurrent?.()??true);setReadingBusy(true);setError('');
-   try{await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;const result=await readSequence(id);if(!isCurrent())return;if(pageId)result.copies=result.copies.map(c=>c.id===id?{...c,pageId,relativeOffset:0}:c);setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);}catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
- },[api]);
+   readingOpen.current?.abort();const controller=new AbortController();readingOpen.current=controller;
+   const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>!controller.signal.aborted&&request===readingEpoch.current&&api.isCurrent()&&(requestIsCurrent?.()??true);setReadingBusy(true);setError('');
+   try{
+     await selectReadingEntry(id,rememberChoice);if(!isCurrent())return;
+     try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;
+     const result=await readSequence(id);if(!isCurrent())return;
+     const selected=result.copies.find(copy=>copy.id===id);
+     if(selected){const restored=await readingProgress.open(selected,controller.signal);if(!isCurrent())return;const opened=pageId?{...restored,pageId,relativeOffset:0}:restored;result.copies=result.copies.map(copy=>copy.id===id?opened:copy);if(opened!==selected)await saveReaderState(opened);}
+     if(!isCurrent())return;setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);setNavigationKey(n=>n+1);
+   }catch(e){if(isCurrent())setError((e as Error).message);}finally{if(request===readingEpoch.current)setReadingBusy(false);}
+ },[api,readingProgress]);
  function activateEntry(id:string){
    const request=++readingEpoch.current;currentRef.current=id;setCurrentId(id);setReadingBusy(false);
    void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
@@ -236,7 +250,7 @@ export function App(){
    }
    if(change.table==='entries'&&id&&change.ids.includes(id)){
      const request=readingEpoch.current,refresh=++documentRefreshEpoch.current,isCurrent=()=>request===readingEpoch.current&&refresh===documentRefreshEpoch.current&&currentRef.current===id&&api.isCurrent();
-     void readEntry(id,translationScope).then(copy=>{if(isCurrent()){if(copiesRef.current.find(c=>c.id===copy.id)?.contentId!==copy.contentId){setNavigationKey(n=>n+1);notify(msg('来源内容已变化，已回到第一页。'));}setCopies(values=>values.map(c=>c.id!==copy.id?c:c.contentId===copy.contentId&&copy.pages.some(page=>page.id===c.pageId)?{...copy,pageId:c.pageId,relativeOffset:c.relativeOffset,lastReadAt:c.lastReadAt,catalogUpdateRevision:c.catalogUpdateRevision}:copy));}}).catch(()=>{if(isCurrent())leaveReader();});
+     void readEntry(id,translationScope).then(copy=>{if(isCurrent()){if(copiesRef.current.find(c=>c.id===copy.id)?.contentId!==copy.contentId){setNavigationKey(n=>n+1);notify(msg('来源内容已变化，已回到第一页。'));}setCopies(values=>values.map(c=>c.id!==copy.id?c:c.contentId===copy.contentId&&(!!copy.document||copy.pages.some(page=>page.id===c.pageId))?{...copy,pageId:c.pageId,relativeOffset:c.relativeOffset,documentLocation:c.documentLocation,lastReadAt:c.lastReadAt,catalogUpdateRevision:c.catalogUpdateRevision}:copy));}}).catch(()=>{if(isCurrent())leaveReader();});
    }
   });
   return()=>{live=false;unsubscribe();};
@@ -320,6 +334,7 @@ export function App(){
  },{enabled:!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!shortcutScope&&!busy&&!readingBusy&&!drag});
  function closeShortcuts(){setShortcutScope(undefined);if(location.hash==='#settings/shortcuts')history.replaceState(null,'',location.pathname+location.search+'#settings');}
  const rights=usage??caps?.entitlements;
+ const readerBackLabel=view==='remote-library'?msg('返回远程书库'):view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画');
  const searchPanelProps={api,defaultLanguage:readSearchLanguage(settings.language),onLanguageChange:saveSearchLanguage,onLogin:()=>login.setOpen(true),existingSourceKeys:existingSearchKeys};
  async function importWebsiteUrl(url:string){
    const request=readingEpoch.current,intent=searchIntent.current;let opened=false,importedId:string|undefined;
@@ -357,7 +372,7 @@ export function App(){
   </header>}
   <Scrollbars pageMode={!current&&(view==='settings'||view==='account')?'reserved':'overlay'}/>
   <div id="nc-workspace" className="nc-workspace">
-  {current?<Reader analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={view==='remote-library'?msg('返回远程书库'):view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画')} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});nav('account','subscription');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
+  {current?.document?<Suspense fallback={<div role="status">{msg('正在打开漫画')}</div>}><EpubReader key={`${current.id}:${current.contentId}:${navigationKey}`} copy={current} settings={settings} update={updateEntry} onBack={leaveReader} backLabel={readerBackLabel}/></Suspense>:current?<Reader analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={readerBackLabel} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={()=>void reloadCurrent()} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} api={api} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});nav('account','subscription');}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} translationScope={channel?.scope.key} allowsFeedback={channel?.allowsFeedback??false} channelLabel={channel?.label}/>:
   view!=='search'&&view!=='discover'&&view!=='library'&&view!=='remote-library'?<main className="nc-main">
   {view==='downloads'&&<BookDownloads controller={downloads} onRead={id=>void openComic(id).catch(e=>setError(e.message))} onManageStorage={()=>nav('settings')}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
@@ -368,7 +383,7 @@ export function App(){
   <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={downloads.promptFileDownload}/>}</main>
   </div>
-  {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI'}</p></div>}
+  {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}
   <div className="nc-notifications">
    {auth.reason==='expired'&&!dismissedExpiry&&<Notification tone="info" message={expiredMessage()} onClose={()=>setDismissedExpiry(true)} action={{label:msg('重新登录'),onClick:()=>login.setOpen(true)}}/>}

@@ -1,6 +1,15 @@
-import {throwIfAborted, type ComicFormat, type DocumentSession, type RandomAccessSource} from './contracts';
+import {throwIfAborted, type ComicFormat, type DocumentSession, type RandomAccessSource, type FileIndex} from './contracts';
 export {detectFormat} from './identify';
 export type {ComicFormat, DocumentSession, IndexedPage, RandomAccessSource} from './contracts';
+
+/** File indexing is shared; EPUB documents never enter image materialization. */
+export async function indexFile(format: ComicFormat | string, source: RandomAccessSource, signal?: AbortSignal): Promise<FileIndex> {
+  throwIfAborted(signal);
+  if (format === 'epub') return (await import('./epub')).indexEpub(source, signal);
+  const session = await openDocument(format, source, signal);
+  try { return {kind: 'images', pages: await session.index(signal)}; }
+  finally { await session.close(); }
+}
 
 export async function openDocument(format: ComicFormat | string, source: RandomAccessSource, signal?: AbortSignal): Promise<DocumentSession> {
   throwIfAborted(signal);

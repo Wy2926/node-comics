@@ -76,7 +76,7 @@ export async function importContainerStream(stream: ReadableStream<Uint8Array>, 
     throwIfAborted(signal);
     if (!op) {
       const format = detectFormat(name, bytes.subarray(0, 80));
-      if (!format) throw new Error('请选择 CBZ/ZIP、CBR/RAR、PDF 或未加密 MOBI 漫画文件，不支持散图。');
+      if (!format) throw new Error('请选择 CBZ/ZIP、CBR/RAR、PDF、MOBI 或 EPUB 文件，不支持散图。');
       if (format === 'cbr' && (size ?? bytes.byteLength) > 128 * CHUNK_SIZE)
         throw new Error('CBR 解码会话最多支持 128 MB，请转换为 CBZ。');
       op = await reserve({name, size: size ?? bytes.byteLength}, format, referenceId);

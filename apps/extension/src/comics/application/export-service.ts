@@ -6,6 +6,7 @@ import {acquirePage} from '../pages/service';
 import {openContainer} from '../../storage/containers';
 import {planExport, MAX_EXPORT_BYTES, safeName, type ExportOptions} from '../../export/plan';
 import {writeExport, type ExportProgress, type ExportResult} from '../../export/files';
+import {entrySource} from './entry-source';
 export type {ExportOptions,ExportProgress,ExportResult};
 export {exportName} from '../../export/plan';
 export interface ExportContext {signal:AbortSignal;scope?:TranslationScope;readResult?:(job:Job,signal?:AbortSignal,original?:()=>Promise<Blob|undefined>)=>Promise<Blob>;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
@@ -33,34 +34,74 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
   }},signal,context.destination);
 }
 
-export async function originalFileInfo(entryId:string):Promise<{name:string;size?:number}|undefined>{
-  const document=await catalog.get('entries',entryId);if(!document)return;
-  if(!document.containerId)return;
-  const binding=(await catalog.get('comics',document.comicId))?.source;
-  const raw=typeof binding?.locator.name==='string'?binding.locator.name:`${document.title}.${document.format}`;
-  return {name:safeName(raw)};
+function originalFileName({entry, comic}: Awaited<ReturnType<typeof entrySource>>) {
+  const raw = typeof comic.source.locator.name === 'string'
+    ? comic.source.locator.name
+    : `${entry.title}.${entry.format}`;
+  return safeName(raw);
+}
+
+export async function originalFileInfo(
+  entryId: string,
+): Promise<{name: string; size?: number} | undefined> {
+  const binding = await entrySource(entryId);
+  await binding.assertCurrent();
+  if (!binding.entry.containerId) return;
+  return {name: originalFileName(binding)};
 }
 
 /** A byte-for-byte local source export. It never opens a format driver or creates a second container. */
-export async function exportOriginalFile(entryId:string,context:Pick<ExportContext,'signal'|'destination'|'progress'>):Promise<ExportResult>{
-  context.signal.throwIfAborted();
-  const doc=await catalog.get('entries',entryId);if(!doc)throw Error('文档已移除。');
-  if(!doc.containerId)throw Error('此内容没有本地源文件，请使用页面导出。');
-  const name=(await originalFileInfo(entryId))?.name??safeName(doc.title);
-  const source=await openContainer(doc.containerId);
-  const target=context.destination?.getWriter(),chunks:Uint8Array<ArrayBuffer>[]=[];let closed=false;
-  try{
-    if(!target&&source.snapshot.size>MAX_EXPORT_BYTES)throw Error('此浏览器直接下载源文件最多支持 128 MiB，请使用支持直接写入文件的浏览器。');
-    for(let offset=0;offset<source.snapshot.size;offset+=1024*1024){
-      context.signal.throwIfAborted();
-      const bytes=await source.readAt(offset,Math.min(1024*1024,source.snapshot.size-offset),context.signal);
-      if(target)await target.write(bytes);else chunks.push(new Uint8Array(bytes));
-      context.progress?.({completed:offset+bytes.length,total:source.snapshot.size,file:name,phase:msg('保存完整源文件')});
+export async function exportOriginalFile(
+  entryId: string,
+  context: Pick<ExportContext, 'signal' | 'destination' | 'progress'>,
+): Promise<ExportResult> {
+  const binding = await entrySource(entryId, undefined, context.signal);
+  if (!binding.entry.containerId) {
+    throw Error('此内容没有本地源文件，请使用页面导出。');
+  }
+  const name = originalFileName(binding);
+  const source = await openContainer(binding.entry.containerId);
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let target: WritableStreamDefaultWriter<Uint8Array> | undefined;
+  let closed = false;
+  try {
+    target = context.destination?.getWriter();
+    await binding.assertCurrent();
+    if (!target && source.snapshot.size > MAX_EXPORT_BYTES) {
+      throw Error('此浏览器直接下载源文件最多支持 128 MiB，请使用支持直接写入文件的浏览器。');
     }
-    context.signal.throwIfAborted();await target?.close();closed=true;
-    return {name,bytes:source.snapshot.size,...(!target?{blob:new Blob(chunks,{type:'application/octet-stream'})}:{})};
-  }catch(error){if(!closed)await target?.abort(error).catch(()=>{});throw error;}
-  finally{target?.releaseLock();await source.close();}
+    for (let offset = 0; offset < source.snapshot.size; offset += 1024 * 1024) {
+      context.signal.throwIfAborted();
+      const bytes = await source.readAt(
+        offset,
+        Math.min(1024 * 1024, source.snapshot.size - offset),
+        context.signal,
+      );
+      await binding.assertCurrent();
+      if (target) await target.write(bytes);
+      else chunks.push(new Uint8Array(bytes));
+      context.progress?.({
+        completed: offset + bytes.length,
+        total: source.snapshot.size,
+        file: name,
+        phase: msg('保存完整源文件'),
+      });
+    }
+    await binding.assertCurrent();
+    await target?.close();
+    closed = true;
+    return {
+      name,
+      bytes: source.snapshot.size,
+      ...(!target ? {blob: new Blob(chunks, {type: 'application/octet-stream'})} : {}),
+    };
+  } catch (error) {
+    if (!closed) await target?.abort(error).catch(() => {});
+    throw error;
+  } finally {
+    target?.releaseLock();
+    await source.close();
+  }
 }
 
 interface SavePickerWindow {showSaveFilePicker?(options:{suggestedName:string}):Promise<{createWritable():Promise<WritableStream<Uint8Array>>}>}

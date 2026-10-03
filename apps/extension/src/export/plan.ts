@@ -32,6 +32,7 @@ export async function planExport(entryId: string, options: ExportOptions, scope?
   signal?.throwIfAborted();
   const document = await catalog.get('entries',entryId);
   if (!document || document.indexState !== 'ready') throw new Error('文档尚未建立可读目录，请先完成索引。');
+  if (document.format === 'epub') throw new Error('EPUB 请使用保存完整源文件。');
   if (options.images === 'translation' && !scope) throw new Error(msg('请先选择已有译图所属的翻译渠道。'));
   const descriptors = [];
   for (let offset = 0;; offset += 100) {

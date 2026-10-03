@@ -1,5 +1,6 @@
 import {msg} from './i18n/runtime';
 import type {UiLanguage} from './i18n/locales';
+import type {EpubIndex, EpubLocation} from './comics/formats/contracts';
 import type {TranslationResult} from '../../../backend/shared/translation-images/types';
 import type {InputProfile} from '../../../backend/shared/translation-images/limits';
 export type {TranslationArtifact,TranslationResult} from '../../../backend/shared/translation-images/types';
@@ -23,6 +24,7 @@ export interface ReadingEntry {
   lastReadAt?:number; coverPageId?:string; pages:Page[]; pageId:string; relativeOffset:number;
   demo?:boolean; discoveryComplete:boolean; knownTotal?:number;
   catalogUpdateRevision?:number;
+  document?:EpubIndex; documentLocation?:EpubLocation;
 }
 export interface User { id: string; name: string; role: string; }
 export type QuotaKind='classic_daily'|'classic_unlimited'|'classic_grant'|'unavailable';

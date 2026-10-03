@@ -81,9 +81,11 @@ node scripts/verify_simple_reading.mjs
 
 Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；授权页、Google 与 Drive 均由本机 TLS 模拟，真实 Google 授权另验。登录生命周期夹具使用 Vite 5187 的 `auth-lifecycle-fixture.html`；订阅焦点夹具使用 Vite 5192 的 `billing-focus-fixture.html`。
 
-OPDS 界面验收可在插件目录执行 `npx vite --config tests/opds-live-ui.config.ts`，使用独立的 `127.0.0.1:5197` 来源。公开 Komga 拒绝普通网页 Origin，测试配置仅转发该演示站的真实只读目录／图片／文件响应，并阻断其他外部请求；不存在模拟目录或图片，不代表 MV3 网络权限已验证。正式扩展网络以 `verify_opds_live.mjs` 为准。转发只监听回环，不随构建发布，不用于私有书库。
+OPDS 界面验收可在插件目录执行 `npx vite --config tests/opds-live-ui.config.ts`，使用独立的 `127.0.0.1:5197` 来源。公开 Komga 拒绝普通网页 Origin，测试配置转发该演示站的真实目录／图片／文件响应，并仅允许已声明 progression 路由的有界 PUT，其余外部请求阻断。不存在模拟目录或图片，不代表 MV3 网络权限已验证。正式扩展网络以 `verify_opds_live.mjs` 为准。转发只监听回环，不随构建发布，不用于私有书库。EPUB 需在支持沙箱 Blob 文档的桌面浏览器验收正文、目录、字号及重开续读；不以索引或下载成功代替实际阅读。
 
-Kavita 公开服务联调在插件目录执行 `$env:RUN_OPDS_LIVE_KAVITA='1'; npx vitest run tests/opds-kavita.live.test.ts`，结束后清除此环境变量。测试使用官方公布的演示账户登录并只读取已有 OPDS 地址，不创建密钥或修改设置；JWT、目录令牌仅在测试进程内存中使用，日志不输出地址或原始响应。真实 HTTP 验证目录、搜索、封面、连接隔离与当前演示账户的下载权限拒绝；本地 IndexedDB 使用测试存储，不伪造服务响应。不会调用写进度的 PSE，不把 403 拒绝场景当作完整文件阅读成功，也不替代 MV3 权限或私人实例验收。
+Kavita 公开服务联调在插件目录执行 `$env:RUN_OPDS_LIVE_KAVITA='1'; npx vitest run tests/opds-kavita.live.test.ts`，结束后清除此环境变量。可通过 `OPDS_KAVITA_URL` 在进程内传入已授权的演示地址；未提供时使用官方公开账户读取已有 OPDS 地址，不创建密钥或修改设置。JWT、目录令牌只在测试进程内存中使用，日志不输出地址或原始响应。真实 HTTP 验证目录、搜索、封面、原图、连接隔离和当前账户的下载权限拒绝；进度用例仅在原位置可读取时写入测试位置，并在 finally 恢复原值及复核。本地 IndexedDB 使用测试存储，不伪造服务响应，不把 403 当作完整文件阅读成功，也不替代 MV3 权限或私人实例验收。
+
+Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests/opds-progress.test.ts`，结束后清除此变量。它通过真实 OPDS 2 目录发现公开 EPUB 和其 progression 链接，重存已有 locator 后重新读取确认，不下载正文；浏览器正文与交互另验。默认单元测试不执行以上联网用例。
 
 ## 官网验收
 

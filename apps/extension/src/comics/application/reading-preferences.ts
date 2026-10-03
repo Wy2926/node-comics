@@ -41,7 +41,7 @@ async function requireActiveComic(tx:CatalogMutation, comicId:string, generation
 }
 
 export const entryReadable=(entry:Entry)=>!entry.sourceRemoved&&entry.readable!==false;
-export const entryRetained=(entry:Entry)=>(entry.pageCount??0)>0;
+export const entryRetained=(entry:Entry)=>(entry.pageCount??0)>0||(entry.document?.chapters.length??0)>0;
 export const sourceOrder=(a:Entry,b:Entry)=>(a.sourceOrder??a.order)-(b.sourceOrder??b.order);
 
 /** Automatic opening records recency; only a deliberate candidate choice pins a slot. */

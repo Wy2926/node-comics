@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createOpdsProvider } from '../src/comics/sources/opds/provider';
 import { PrivateOpdsStore, type PrivateConnection } from '../src/comics/sources/opds/private-store';
 import { allowedUrl, OpdsTransport, readBounded } from '../src/comics/sources/opds/transport';
+import type { OpdsProgressTarget } from '../src/comics/sources/opds/progress';
 import type { SourceConnection, PageDescriptor } from '../src/comics/domain';
 import type {
   OpenFileSourceContext,
@@ -90,12 +91,12 @@ function pageDescriptor(page: {
 }
 describe('OPDS connection/provider', () => {
   it('browses without importing/fetching covers or pages and exposes no transport URL or credentials', async () => {
-    const { provider, fetcher } = setup([Response.json(catalog), Response.json(catalog)]),
+    const { provider, fetcher } = setup([Response.json(catalog)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(page.publications).toHaveLength(1);
     expect(page.searchable).toBe(true);
     const publicState = JSON.stringify({ a, page });
@@ -111,9 +112,80 @@ describe('OPDS connection/provider', () => {
       ),
     ).toBe(true);
   });
+  it('uses the validated connect result once and fetches an explicit refresh', async () => {
+    const refreshed = { ...catalog, metadata: { title: 'Refreshed library' } };
+    const { provider, fetcher } = setup([Response.json(catalog), Response.json(refreshed)]);
+    const account = await provider.connection!.connect!(values);
+    const connection = publicConnection(account);
+
+    expect((await provider.catalog!.browse({ connection })).title).toBe('Library');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect((await provider.catalog!.browse({ connection })).title).toBe('Refreshed library');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([ROOT, ROOT]);
+  });
+  it.each([
+    {
+      name: 'a publication without an identity or acquisition link',
+      feed: { metadata: { title: 'Invalid' }, publications: [{ metadata: { title: 'Unknown' } }] },
+      code: 'unsupported',
+    },
+    {
+      name: 'more than 2000 normalized references',
+      feed: {
+        metadata: { title: 'Too large' },
+        navigation: Array.from({ length: 2000 }, (_, index) => ({
+          title: `Directory ${index}`,
+          href: `/directory/${index}`,
+        })),
+      },
+      code: 'too-large',
+    },
+  ])('does not persist credentials for $name', async ({ feed, code }) => {
+    const { provider, store } = setup([Response.json(feed)]);
+    const save = vi.spyOn(store, 'saveConnection');
+
+    await expect(provider.connection!.connect!(values)).rejects.toMatchObject({ code });
+
+    expect(save).not.toHaveBeenCalled();
+    expect(await store.connections()).toEqual([]);
+  });
+  it('reuses the discovered OpenSearch template across different searches', async () => {
+    const feed = {
+      metadata: { title: 'Searchable library' },
+      links: [
+        { rel: 'search', href: '/opensearch', type: 'application/opensearchdescription+xml' },
+      ],
+      publications: [],
+    };
+    const description =
+      '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"><Url type="application/opds+json" template="https://catalog.example/search?query={searchTerms}"/></OpenSearchDescription>';
+    const { provider, fetcher } = setup([
+      Response.json(feed),
+      new Response(description),
+      Response.json({ metadata: { title: 'Duck results' }, publications: [] }),
+      Response.json({ metadata: { title: 'Whale results' }, publications: [] }),
+    ]);
+    const account = await provider.connection!.connect!(values);
+    const connection = publicConnection(account);
+    await provider.catalog!.browse({ connection });
+
+    expect((await provider.catalog!.browse({ connection, search: 'duck' })).title).toBe(
+      'Duck results',
+    );
+    expect((await provider.catalog!.browse({ connection, search: 'whale' })).title).toBe(
+      'Whale results',
+    );
+
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      ROOT,
+      'https://catalog.example/opensearch',
+      'https://catalog.example/search?query=duck',
+      'https://catalog.example/search?query=whale',
+    ]);
+  });
   it('resolves image-only manifest and reads originals through opaque descriptors', async () => {
     const { provider } = setup([
-        Response.json(catalog),
         Response.json(catalog),
         Response.json(manifest),
         new Response(new Uint8Array([255, 216, 255, 217]), {
@@ -137,7 +209,6 @@ describe('OPDS connection/provider', () => {
   });
   it('retains selected locators after provider reload, credential rotation and disconnect/reconnect', async () => {
     const { provider, store, fetcher, name } = setup([
-        Response.json(catalog),
         Response.json(catalog),
         Response.json(manifest),
       ]),
@@ -198,7 +269,6 @@ describe('OPDS connection/provider', () => {
         readingOrder: [{ href: '/page.jpg?token=old-secret', type: 'image/jpeg' }],
       };
     const { provider, store, fetcher } = setup([
-        Response.json(tokenCatalog),
         Response.json(tokenCatalog),
         Response.json(tokenManifest),
       ]),
@@ -284,7 +354,7 @@ describe('OPDS connection/provider', () => {
         Response.json(second),
       ]),
       a = await provider.connection!.connect!(values),
-      one = await provider.catalog!.browse({ connection: publicConnection(a) });
+      one = await provider.catalog!.browse({ connection: publicConnection(a), search: 'duck' });
     const two = await provider.catalog!.browse({
       connection: publicConnection(a),
       cursor: one.next,
@@ -296,7 +366,6 @@ describe('OPDS connection/provider', () => {
   });
   it('pins only selected records and does not downgrade them when browsing again', async () => {
     const { provider, store, fetcher, name } = setup([
-        Response.json(catalog),
         Response.json(catalog),
         Response.json(manifest),
       ]),
@@ -314,8 +383,8 @@ describe('OPDS connection/provider', () => {
     expect((await reload.resource(id))?.pinned).toBe(true);
     expect((await store.resource(plan.representationId))?.pinned).toBe(true);
   });
-  it('does not fetch EPUB body or license/indirect acquisition as a comic', async () => {
-    const unsupported = {
+  it('returns an explicit EPUB download plan without fetching its body', async () => {
+    const feed = {
       metadata: { title: 'Library' },
       publications: [
         {
@@ -330,15 +399,15 @@ describe('OPDS connection/provider', () => {
         },
       ],
     };
-    const { provider, fetcher } = setup([Response.json(unsupported), Response.json(unsupported)]),
+    const { provider, fetcher } = setup([Response.json(feed)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
     await expect(
       provider.catalog!.resolve(publicConnection(a), page.publications[0].id),
-    ).rejects.toMatchObject({ code: 'unsupported' });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    ).resolves.toMatchObject({ kind: 'download-file', format: 'epub' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('resolves WebPub with an EPUB alternate before deciding whether the body is an image sequence', async () => {
     const feed = {
@@ -362,23 +431,19 @@ describe('OPDS connection/provider', () => {
           },
         ],
       },
-      { provider, fetcher } = setup([
-        Response.json(feed),
-        Response.json(feed),
-        Response.json(manifest),
-      ]),
+      { provider, fetcher } = setup([Response.json(feed), Response.json(manifest)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
-    expect(page.publications[0].readable).toBeUndefined();
+    expect(page.publications[0].readable).toBe(true);
     expect(page.publications[0].reason).toBeUndefined();
     const plan = await provider.catalog!.resolve(publicConnection(a), page.publications[0].id);
     expect(plan.kind).toBe('pages');
     expect(plan.publication.readable).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
-  it('reports EPUB after a real-shaped XHTML WebPub manifest without fetching its body', async () => {
+  it('chooses an EPUB download after a real-shaped XHTML manifest without fetching document content', async () => {
     const book = {
         metadata: { title: 'Moby Dick' },
         links: [
@@ -395,19 +460,15 @@ describe('OPDS connection/provider', () => {
         ...book,
         readingOrder: [{ href: '/chapter.xhtml', type: 'application/xhtml+xml' }],
       };
-    const { provider, fetcher } = setup([
-        Response.json(feed),
-        Response.json(feed),
-        Response.json(full),
-      ]),
+    const { provider, fetcher } = setup([Response.json(feed), Response.json(full)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
     await expect(
       provider.catalog!.resolve(publicConnection(a), page.publications[0].id),
-    ).rejects.toThrow('此条目仅提供 EPUB，暂不支持阅读。');
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    ).resolves.toMatchObject({ kind: 'download-file', format: 'epub' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
     expect(fetcher.mock.lastCall?.[0]).toBe('https://catalog.example/manifest');
   });
   it('resolves an Atom partial entry with quoted MIME parameters and an EPUB alternative', async () => {
@@ -415,16 +476,12 @@ describe('OPDS connection/provider', () => {
       '<feed xmlns="http://www.w3.org/2005/Atom"><title>Books</title><entry><id>book:1</id><title>Book</title><link rel="alternate" type="application/atom+xml; TYPE=&quot;entry&quot;; profile=opds-catalog" href="/complete"/><link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/book.epub"/></entry></feed>';
     const full =
       '<entry xmlns="http://www.w3.org/2005/Atom"><id>book:1</id><title>Book</title><link rel="http://opds-spec.org/acquisition" type="application/pdf" href="/book.pdf"/></entry>';
-    const { provider, fetcher } = setup([
-        new Response(feed),
-        new Response(feed),
-        new Response(full),
-      ]),
+    const { provider, fetcher } = setup([new Response(feed), new Response(full)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
-    expect(page.publications[0].readable).toBeUndefined();
+    expect(page.publications[0].readable).toBe(true);
     const plan = await provider.catalog!.resolve(publicConnection(a), page.publications[0].id);
     expect(plan.format).toBe('pdf');
     expect(plan.publication.id).toBe(page.publications[0].id);
@@ -433,11 +490,7 @@ describe('OPDS connection/provider', () => {
   it('supports embedded image readingOrder and does not use covers as pages', async () => {
     const book = { ...manifest, links: [{ href: '/book/1', rel: 'self' }] },
       feed = { metadata: { title: 'Books' }, publications: [book] };
-    const { provider, fetcher } = setup([
-        Response.json(feed),
-        Response.json(feed),
-        Response.json(feed),
-      ]),
+    const { provider, fetcher } = setup([Response.json(feed), Response.json(feed)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
@@ -445,7 +498,7 @@ describe('OPDS connection/provider', () => {
     expect(page.publications[0].readable).toBe(true);
     const plan = await provider.catalog!.resolve(publicConnection(a), page.publications[0].id);
     expect((await provider.pages!.index(context(a, plan))).total).toBe(2);
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
   it.each([
     'application/vnd.rar',
@@ -462,7 +515,7 @@ describe('OPDS connection/provider', () => {
         },
       ],
     };
-    const { provider, fetcher } = setup([Response.json(feed), Response.json(feed)]),
+    const { provider, fetcher } = setup([Response.json(feed)]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
@@ -474,7 +527,7 @@ describe('OPDS connection/provider', () => {
     const plan = await provider.catalog!.resolve(publicConnection(a), page.publications[0].id);
     expect(plan.format).toBe('cbr');
     expect(plan.kind).toBe('download-file');
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it.each([
     { rel: 'borrow', type: 'application/pdf' },
@@ -501,7 +554,7 @@ describe('OPDS connection/provider', () => {
           },
         ],
       };
-      const { provider, fetcher } = setup([Response.json(feed), Response.json(feed)]),
+      const { provider, fetcher } = setup([Response.json(feed)]),
         a = await provider.connection!.connect!(values),
         page = await provider.catalog!.browse({
           connection: publicConnection(a),
@@ -513,7 +566,7 @@ describe('OPDS connection/provider', () => {
       await expect(
         provider.catalog!.resolve(publicConnection(a), page.publications[0].id),
       ).rejects.toThrow(/DRM/);
-      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(fetcher).toHaveBeenCalledTimes(1);
     },
   );
   it('keeps a Range representation identical when explicitly downloading the same file', async () => {
@@ -540,7 +593,6 @@ describe('OPDS connection/provider', () => {
           headers: { 'Content-Range': 'bytes 0-0/100', ETag: '"revision-1"' },
         });
     const { provider } = setup([
-        Response.json(feed),
         Response.json(feed),
         Response.json(book),
         range(),
@@ -579,7 +631,6 @@ describe('OPDS connection/provider', () => {
       },
       cancel = vi.fn();
     const { provider } = setup([
-        Response.json(feed),
         Response.json(feed),
         new Response(new ReadableStream({ cancel }), { status: 200 }),
       ]),
@@ -672,6 +723,156 @@ describe('OPDS transport security', () => {
       code: 'network',
     });
   });
+  it('does not let late cleanup detach requests made after reconnect', async () => {
+    const requests: { signal: AbortSignal; reject: (error: Error) => void }[] = [];
+    const fetcher = vi.fn<typeof fetch>(
+      async (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          requests.push({ signal: init!.signal!, reject });
+        }),
+    );
+    const transport = new OpdsTransport(fetcher);
+    const pending: Promise<unknown>[] = [];
+    try {
+      const first = transport.bytes(connection, ROOT).catch((error: unknown) => error);
+      pending.push(first);
+      await vi.waitFor(() => expect(requests).toHaveLength(1));
+      transport.abortConnection(connection.id);
+      expect(requests[0].signal.aborted).toBe(true);
+
+      pending.push(
+        transport.bytes({ ...connection, revision: 2 }, ROOT).catch((error: unknown) => error),
+        transport
+          .bytes({ ...connection, id: 'independent-connection' }, ROOT)
+          .catch((error: unknown) => error),
+      );
+      await vi.waitFor(() => expect(requests).toHaveLength(3));
+      requests[0].reject(new DOMException('Stopped', 'AbortError'));
+      await first;
+
+      transport.abortConnection(connection.id);
+      expect(requests[1].signal.aborted).toBe(true);
+      expect(requests[2].signal.aborted).toBe(false);
+    } finally {
+      for (const request of requests) request.reject(new DOMException('Stopped', 'AbortError'));
+      await Promise.all(pending);
+    }
+  });
+  it('validates queued credentials after admission without a second preflight read', async () => {
+    const responses: ((response: Response) => void)[] = [];
+    const fetcher = vi.fn<typeof fetch>(
+      async () => new Promise<Response>((resolve) => responses.push(resolve)),
+    );
+    let queuedConnectionActive = true;
+    const validate = vi.fn(async (current: PrivateConnection) => {
+      if (current.id === 'queued' && !queuedConnectionActive) throw Error('revoked');
+    });
+    const transport = new OpdsTransport(fetcher, validate);
+    const running = Array.from({ length: 4 }, (_, index) =>
+      transport.bytes({ ...connection, id: `occupied-${index}` }, ROOT),
+    );
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+    const queued = transport
+      .bytes({ ...connection, id: 'queued' }, ROOT)
+      .catch((error: unknown) => error);
+    try {
+      queuedConnectionActive = false;
+      responses[0](new Response('ready'));
+      await running[0];
+      await expect(queued).resolves.toMatchObject({ code: 'network' });
+      expect(fetcher).toHaveBeenCalledTimes(4);
+      expect(validate.mock.calls.filter(([current]) => current.id === 'queued')).toHaveLength(1);
+    } finally {
+      for (const respond of responses) respond(new Response('ready'));
+      await Promise.all(running);
+    }
+  });
+  it('does not fetch when disconnect occurs during the authorization check', async () => {
+    let authorized!: () => void;
+    const checking = new Promise<void>((resolve) => {
+      authorized = resolve;
+    });
+    const fetcher = vi.fn<typeof fetch>(async () => new Response('unused'));
+    const validate = vi.fn(async () => checking);
+    const transport = new OpdsTransport(fetcher, validate);
+    const pending = transport.bytes(connection, ROOT).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(validate).toHaveBeenCalledOnce());
+    transport.abortConnection(connection.id);
+    authorized();
+    await expect(pending).resolves.toMatchObject({ code: 'network' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(['POST', 'PUT', 'PATCH'] as const)(
+    'uses the credential-scoped transport for discovered %s progress targets',
+    async (method) => {
+      const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+      const validate = vi.fn(async () => {});
+      const transport = new OpdsTransport(fetcher, validate);
+      const target = { method, url: ROOT + '/progress' } as OpdsProgressTarget;
+      const payload = { page: 4, completed: false };
+
+      await expect(transport.writeProgress(connection, target, payload)).resolves.toBeUndefined();
+
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(validate).toHaveBeenCalledTimes(2);
+      const [url, init] = fetcher.mock.calls[0];
+      expect(url).toBe(target.url);
+      expect(init).toMatchObject({
+        method,
+        body: JSON.stringify(payload),
+        redirect: 'error',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
+      const headers = new Headers(init!.headers);
+      expect(headers.get('Content-Type')).toBe('application/json');
+      expect(headers.get('Authorization')).toBe('Basic ' + btoa('user:secret'));
+      expect(headers.has('Cookie')).toBe(false);
+    },
+  );
+  it('rejects an external progress target and oversized progress payload before fetching', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const transport = new OpdsTransport(fetcher);
+    await expect(
+      transport.writeProgress(
+        connection,
+        { method: 'POST', url: 'https://other.example/progress' } as OpdsProgressTarget,
+        { page: 4 },
+      ),
+    ).rejects.toMatchObject({ code: 'scope-blocked' });
+    await expect(
+      transport.writeProgress(
+        connection,
+        { method: 'POST', url: ROOT + '/progress' } as OpdsProgressTarget,
+        { value: 'x'.repeat(128 * 1024) },
+      ),
+    ).rejects.toMatchObject({ code: 'too-large' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('bounds progress responses without retaining the response body', async () => {
+    const cancel = vi.fn();
+    const transport = new OpdsTransport(
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(128 * 1024 + 1));
+              },
+              cancel,
+            }),
+          ),
+      ),
+    );
+    await expect(
+      transport.writeProgress(
+        connection,
+        { method: 'PATCH', url: ROOT + '/progress' } as OpdsProgressTarget,
+        { page: 4 },
+      ),
+    ).rejects.toMatchObject({ code: 'too-large' });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
   it('propagates 401 and 429 Retry-After to the generic source/download classification', async () => {
     const responses = [
         new Response('', { status: 401 }),
@@ -755,19 +956,20 @@ describe.skipIf(process.env.OPDS_LIVE !== '1')('OPDS public Komga demo (real net
       ...(catalog.groups?.flatMap((group) => group.publications) ?? []),
     ].find((publication) => publication.title.startsWith('Moby Dick'));
     expect(book).toBeDefined();
-    expect(book!.readable).toBeUndefined();
-    await expect(provider.catalog!.resolve(connection, book!.id)).rejects.toThrow(
-      '此条目仅提供 EPUB，暂不支持阅读。',
-    );
+    expect(book!.readable).toBe(true);
+    await expect(provider.catalog!.resolve(connection, book!.id)).resolves.toMatchObject({
+      kind: 'download-file',
+      format: 'epub',
+    });
     expect(Object.keys(readingTypes)).toEqual(['application/xhtml+xml']);
-    expect(methods).toEqual(['GET', 'GET', 'GET']);
+    expect(methods).toEqual(['GET', 'GET']);
     console.info(
       JSON.stringify({
         service: 'official-komga-demo',
         title: book!.title,
         readingTypes,
         getRequests: methods.length,
-        rejectedAsEpub: true,
+        requiresExplicitEpubDownload: true,
       }),
     );
   }, 60000);

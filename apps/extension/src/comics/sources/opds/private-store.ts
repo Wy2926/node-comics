@@ -293,60 +293,107 @@ export class PrivateOpdsStore implements OpdsStore {
     >;
   }
   async saveResources(values: PrivateResource[]) {
-    for (const value of values) {
-      this.transient.delete(value.id);
-      this.transient.set(value.id, structuredClone(value));
+    if (!values.length) return;
+    const resources = values.map((value) => structuredClone(value));
+    const revisions = new Map<string, number>();
+    for (const value of resources) {
+      const revision = revisions.get(value.connectionId);
+      if (revision !== undefined && revision !== value.revision)
+        throw new OpdsError('disconnected', 'OPDS 连接授权已变更，请重新打开。');
+      revisions.set(value.connectionId, value.revision);
     }
-    while (this.transient.size > 2000) this.transient.delete(this.transient.keys().next().value!);
-    const pinned = values.filter((v) => v.pinned);
-    if (!pinned.length) return;
+    const pinned = resources.filter((value) => value.pinned);
     const db = await this.database();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('resources', 'readwrite');
-      for (const value of pinned) tx.objectStore('resources').put(value);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      const tx = db.transaction(
+        ['connections', 'resources'],
+        pinned.length ? 'readwrite' : 'readonly',
+      );
+      let remaining = revisions.size;
+      let failure: unknown;
+      for (const [id, revision] of revisions) {
+        const request = tx.objectStore('connections').get(id);
+        request.onsuccess = () => {
+          try {
+            const connection = request.result as PrivateConnection | undefined;
+            if (!connection || connection.disconnected || connection.revision !== revision)
+              throw new OpdsError('disconnected', 'OPDS 连接授权已变更，请重新打开。');
+            if (--remaining === 0)
+              for (const value of pinned) tx.objectStore('resources').put(value);
+          } catch (error) {
+            failure = error;
+            tx.abort();
+          }
+        };
+      }
+      tx.oncomplete = () => {
+        // Publish transient records only after the same authorization fence as pinned records.
+        for (const value of resources) {
+          this.transient.delete(value.id);
+          this.transient.set(value.id, value);
+        }
+        while (this.transient.size > 2000)
+          this.transient.delete(this.transient.keys().next().value!);
+        resolve();
+      };
+      tx.onerror = () => reject(failure ?? tx.error);
+      tx.onabort = () => reject(failure ?? tx.error);
     });
   }
   async disconnect(id: string) {
-    const connection = await this.connection(id),
-      db = await this.database();
-    this.clearTransient(id);
+    const db = await this.database();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(['connections', 'resources'], 'readwrite');
-      if (connection)
-        tx.objectStore('connections').put({
-          ...connection,
-          root: '',
-          auth:
-            connection.auth.kind === 'basic'
-              ? { kind: 'basic', username: '', password: '' }
-              : connection.auth,
-          revision: connection.revision + 1,
-          disconnected: true,
-        });
-      const request = tx
-        .objectStore('resources')
-        .index('connectionId')
-        .openCursor(IDBKeyRange.only(id));
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (cursor) {
-          const row = cursor.value as PrivateResource;
-          if (connection && row.pinned)
-            cursor.update({
-              ...row,
+      let failure: unknown;
+      const current = tx.objectStore('connections').get(id);
+      current.onsuccess = () => {
+        try {
+          const connection = current.result as PrivateConnection | undefined;
+          if (connection)
+            tx.objectStore('connections').put({
+              ...connection,
+              root: '',
+              auth:
+                connection.auth.kind === 'basic'
+                  ? { kind: 'basic', username: '', password: '' }
+                  : connection.auth,
               revision: connection.revision + 1,
-              value: transformUrls(row.value, connection),
+              disconnected: true,
             });
-          else cursor.delete();
-          cursor.continue();
+          const request = tx
+            .objectStore('resources')
+            .index('connectionId')
+            .openCursor(IDBKeyRange.only(id));
+          request.onsuccess = () => {
+            try {
+              const cursor = request.result;
+              if (cursor) {
+                const row = cursor.value as PrivateResource;
+                if (connection && row.pinned)
+                  cursor.update({
+                    ...row,
+                    revision: connection.revision + 1,
+                    value: transformUrls(row.value, connection),
+                  });
+                else cursor.delete();
+                cursor.continue();
+              }
+            } catch (error) {
+              failure = error;
+              tx.abort();
+            }
+          };
+        } catch (error) {
+          failure = error;
+          tx.abort();
         }
       };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      tx.oncomplete = () => {
+        this.clearTransient(id);
+        resolve();
+      };
+      tx.onerror = () => reject(failure ?? tx.error);
+      tx.onabort = () => reject(failure ?? tx.error);
     });
   }
 }

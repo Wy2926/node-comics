@@ -1,7 +1,7 @@
 {
-  "此条目仅提供 EPUB，暂不支持阅读。": "Mục này chỉ cung cấp EPUB, hiện chưa được hỗ trợ.",
+  "完整源文件不可用，请重新获取后再导出。": "Không có tệp nguồn đầy đủ. Vui lòng lấy lại tệp trước khi xuất.",
+  "阅读位置同步失败，已保留本地位置。": "Không thể đồng bộ vị trí đọc. Vị trí trên thiết bị đã được lưu.",
   "此条目需要 DRM 解锁、借阅、购买或其他获取流程，暂不支持阅读。": "Mục này yêu cầu xác thực DRM, mượn, mua hoặc quy trình nhận nội dung khác hiện chưa được hỗ trợ.",
-  "此条目的页流可能修改服务端进度，暂不支持直接阅读。": "Luồng trang này có thể thay đổi tiến độ đọc trên máy chủ, nên hiện chưa hỗ trợ đọc trực tiếp.",
   "此条目的图片清单或页流格式暂不支持。": "Định dạng bản kê hình ảnh hoặc luồng trang này hiện chưa được hỗ trợ.",
   "此条目未提供可识别的漫画文件、图片清单或完整条目链接。": "Mục này không cung cấp tệp truyện tranh được nhận diện, bản kê hình ảnh hoặc liên kết đến mục đầy đủ.",
   "OPDS 目录地址": "URL danh mục OPDS",

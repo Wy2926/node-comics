@@ -39,25 +39,23 @@ function fileFormat(link: OpdsLink): ComicFormat | undefined {
       return 'pdf';
     case 'application/x-mobipocket-ebook':
       return 'mobi';
+    case 'application/epub+zip':
+      return 'epub';
   }
 }
 
-function psePathRisk(href: string): 'progress-write' | 'invalid-path' | undefined {
-  let path: string;
+function validPseTemplate(href: string): boolean {
   try {
-    // ASP.NET decodes the request path once, except %2F which remains inside its segment.
-    // Preserve that exception while decoding encoded route literals such as %69mage.
-    path = decodeURIComponent(new URL(href).pathname.replace(/%2f/gi, '%252F'));
+    // Reject malformed paths and unsupported variables before publishing a readable hint.
+    decodeURIComponent(new URL(href).pathname);
   } catch {
-    return 'invalid-path';
+    return false;
   }
-  // Kavita's OPDS GET image handler writes progress for ordinary reader clients.
-  // Do not probe it or spoof another reader's user-agent to bypass that behavior.
-  if (/\/api\/opds\/[^/]+\/image(?:\/|$)/i.test(path)) return 'progress-write';
-}
-
-function progressWritingPse(link: OpdsLink): boolean {
-  return hasRel(link, PSE_REL) && psePathRisk(link.href) === 'progress-write';
+  const expanded = href
+    .replaceAll('{pageNumber}', '0')
+    .replaceAll('{maxWidth}', '')
+    .replaceAll('{maxHeight}', '');
+  return !/[{}]|%7[bd]/i.test(expanded);
 }
 
 export function safePse(link: OpdsLink): boolean {
@@ -65,10 +63,12 @@ export function safePse(link: OpdsLink): boolean {
     hasRel(link, PSE_REL) &&
     !link.indirect &&
     isBitmap(link) &&
-    !!link.count &&
+    typeof link.count === 'number' &&
+    Number.isSafeInteger(link.count) &&
+    link.count > 0 &&
     link.count <= 20000 &&
     link.href.includes('{pageNumber}') &&
-    psePathRisk(link.href) === undefined
+    validPseTemplate(link.href)
   );
 }
 
@@ -89,15 +89,6 @@ function unavailableReason(publication: OpdsPublication): string {
       ),
   );
   if (restricted) return msg('此条目需要 DRM 解锁、借阅、购买或其他获取流程，暂不支持阅读。');
-  if (publication.links.some(progressWritingPse))
-    return msg('此条目的页流可能修改服务端进度，暂不支持直接阅读。');
-  if (
-    publication.links.some(
-      (link) => isDirectAcquisition(link) && mediaType(link.type) === 'application/epub+zip',
-    )
-  ) {
-    return msg('此条目仅提供 EPUB，暂不支持阅读。');
-  }
   if (publication.readingOrder || publication.links.some((link) => hasRel(link, PSE_REL))) {
     return msg('此条目的图片清单或页流格式暂不支持。');
   }

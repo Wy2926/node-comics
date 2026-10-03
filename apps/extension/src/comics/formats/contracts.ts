@@ -1,5 +1,15 @@
 /** Persistent locators contain JSON only; sessions own every disposable resource. */
-export type ComicFormat = 'cbz' | 'cbr' | 'pdf' | 'mobi';
+export type ComicFormat = 'cbz' | 'cbr' | 'pdf' | 'mobi' | 'epub';
+/** EPUB locations belong to the document, not to rasterized screen pages. */
+export interface EpubLocation { cfi?: string; href?: string; progression?: number; totalProgression?: number }
+export interface EpubTocItem { href: string; label: string; children?: EpubTocItem[] }
+export interface EpubIndex {
+  kind: 'epub'; title: string;
+  chapters: {id: string; href: string; label: string}[];
+  toc: EpubTocItem[];
+  cover?: {href: string; mediaType: string};
+}
+export type FileIndex = {kind: 'images'; pages: IndexedPage[]} | EpubIndex;
 export interface SourceSnapshot { identity: string; version: string; size: number; local: boolean }
 export interface RandomAccessSource {
   readonly snapshot: SourceSnapshot;

@@ -2,7 +2,7 @@ import { track, type AnalyticsFields } from '../../analytics';
 
 export function importFormat(name: string): AnalyticsFields['format'] {
   const suffix = name.slice(name.lastIndexOf('.') + 1).toLowerCase();
-  return suffix === 'cbz' || suffix === 'zip' || suffix === 'cbr' || suffix === 'rar' || suffix === 'pdf' || suffix === 'mobi' ? suffix : 'unknown';
+  return suffix === 'cbz' || suffix === 'zip' || suffix === 'cbr' || suffix === 'rar' || suffix === 'pdf' || suffix === 'mobi' || suffix === 'epub' ? suffix : 'unknown';
 }
 /** Only the operation boundary is measured; file names, URLs and results never leave this function. */
 export async function observeImport<T>(source_type: AnalyticsFields['source_type'], format: AnalyticsFields['format'], work: () => Promise<T>, created?: (result: T) => boolean): Promise<T> {

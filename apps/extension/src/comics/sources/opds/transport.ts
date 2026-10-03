@@ -1,5 +1,6 @@
 import { OpdsError } from './errors';
 import type { PrivateConnection } from './private-store';
+import type { OpdsProgressTarget } from './progress';
 
 // Originals follow the reader's existing resource/decode budget; never resize or truncate them here.
 export const CATALOG_LIMIT = 4 * 1024 * 1024,
@@ -18,6 +19,11 @@ export interface RequestOptions {
   status?: number;
   timeoutMs?: number;
 }
+type TransportRequestOptions = Omit<RequestOptions, 'method'> &
+  (
+    | { method?: 'GET' | 'HEAD'; body?: never }
+    | { method: 'POST' | 'PUT' | 'PATCH'; body: string }
+  );
 function retryAfter(value: string | null): number | undefined {
   if (!value) return;
   const seconds = /^\d+$/.test(value.trim())
@@ -83,7 +89,7 @@ export async function readBounded(
   }
   return output;
 }
-/** Bounded credential-scoped GET/HEAD; no cookies, redirects or Referer. Provider policy excludes known progress-writing routes. */
+/** Credential-scoped reads and discovered progress writes; no cookies, redirects or Referer. */
 export class OpdsTransport {
   private active = 0;
   private waiters: (() => void)[] = [];
@@ -93,8 +99,9 @@ export class OpdsTransport {
     private readonly validateCurrent?: (connection: PrivateConnection) => Promise<void>,
   ) {}
   abortConnection(id: string) {
-    for (const controller of this.controllers.get(id) ?? []) controller.abort();
+    const controllers = this.controllers.get(id);
     this.controllers.delete(id);
+    for (const controller of controllers ?? []) controller.abort();
   }
   private async enter(signal?: AbortSignal) {
     while (this.active >= 4) {
@@ -126,10 +133,9 @@ export class OpdsTransport {
   private async response(
     connection: PrivateConnection,
     url: string,
-    options: RequestOptions,
+    options: TransportRequestOptions,
   ): Promise<{ response: Response; release: () => void }> {
     const href = allowedUrl(connection, url);
-    await this.validateCurrent?.(connection);
     const controller = new AbortController(),
       set = this.controllers.get(connection.id) ?? new Set<AbortController>();
     set.add(controller);
@@ -143,10 +149,13 @@ export class OpdsTransport {
     const release = () => {
       leave?.();
       set.delete(controller);
-      if (!set.size) this.controllers.delete(connection.id);
+      if (!set.size && this.controllers.get(connection.id) === set)
+        this.controllers.delete(connection.id);
     };
     try {
       leave = await this.enter(signal);
+      await this.validateCurrent?.(connection);
+      signal.throwIfAborted();
       const headers = new Headers(options.headers);
       headers.delete('Cookie');
       headers.delete('Authorization');
@@ -162,6 +171,7 @@ export class OpdsTransport {
       const response = await this.request.call(globalThis, href, {
         method: options.method ?? 'GET',
         headers,
+        ...(options.body === undefined ? {} : { body: options.body }),
         signal,
         redirect: 'error',
         credentials: 'omit',
@@ -222,10 +232,10 @@ export class OpdsTransport {
       throw new OpdsError('network', 'OPDS 网络请求失败，请检查地址、网络或服务器重定向设置。');
     }
   }
-  async bytes(
+  private async buffered(
     connection: PrivateConnection,
     url: string,
-    options: RequestOptions = {},
+    options: TransportRequestOptions,
   ): Promise<NetworkResult> {
     const { response, release } = await this.response(connection, url, options);
     try {
@@ -239,6 +249,27 @@ export class OpdsTransport {
     } finally {
       release();
     }
+  }
+  bytes(connection: PrivateConnection, url: string, options: RequestOptions = {}) {
+    return this.buffered(connection, url, options);
+  }
+  async writeProgress(
+    connection: PrivateConnection,
+    target: OpdsProgressTarget,
+    payload: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const body = JSON.stringify(payload);
+    const limit = 128 * 1024;
+    if (new TextEncoder().encode(body).byteLength > limit)
+      throw new OpdsError('too-large', 'OPDS 阅读进度请求超出大小限制。');
+    await this.buffered(connection, target.url, {
+      method: target.method,
+      body,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      maxBytes: limit,
+      signal,
+    });
   }
   async document(connection: PrivateConnection, url: string, signal?: AbortSignal) {
     const result = await this.bytes(connection, url, {

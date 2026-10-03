@@ -3,7 +3,7 @@ export const parameterValues = {
   surface:['reader','popup','options','inline'],
   screen:['library','remote-library','discover','search','sites','downloads','settings','account','reader'],
   source_type:['local','website','google_drive','opds','unknown'],
-  format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence','unknown'],
+  format:['cbz','zip','cbr','rar','pdf','mobi','epub','website','image-sequence','unknown'],
   entry_point:['library','search','discover','popup','context_menu','inline','downloads','settings','other'],
   method:['manual','automatic'],
   outcome:['success','failed','duplicate','cancelled','empty','partial','blocked','no_text'],

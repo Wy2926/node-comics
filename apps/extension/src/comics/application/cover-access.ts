@@ -5,12 +5,15 @@ import {detectFormat} from '../formats/identify';
 import {readSourceCover} from '../../sources';
 import type {SourceCatalog} from './types';
 import {getSourceDriver} from '../sources/registry';
+import {entrySource} from './entry-source';
+import {openFileSource} from '../sources/runtime';
 
 const prefix = 'source-cover:';
 export const sourceCoverOwner = (comicId: string) => prefix + comicId;
 export function coverReference(comic: Comic): string | undefined {
   if(comic.sourceArtwork)return prefix+JSON.stringify([comic.id,'provider',comic.sourceArtwork.id,String(comic.source.generation)]);
   if (comic.sourceCover) return prefix + JSON.stringify([comic.id, comic.sourceCover.url]);
+  if(comic.documentCover)return prefix+JSON.stringify([comic.id,'epub',comic.documentCover.entryId,comic.documentCover.contentId,String(comic.source.generation)]);
   const name=typeof comic.source.locator.name==='string' ? comic.source.locator.name : '';
   return comic.cover ? pageReference({
     ...comic.cover,
@@ -23,11 +26,29 @@ export async function openSourceCover(key: string) {
   try {
     reference = JSON.parse(key.slice(prefix.length));
   } catch { /* Reject a malformed reference before accessing a source. */ }
-  if (!Array.isArray(reference) || ![2,4].includes(reference.length) || reference.some(item => typeof item !== 'string' || !item))
+  if (!Array.isArray(reference) || ![2,4,5].includes(reference.length) || reference.some(item => typeof item !== 'string' || !item))
     throw Error('封面引用无效。');
   const [comicId, url] = reference as [string, string];
   const comic = await catalog.get('comics', comicId);
   const connection = comic && await catalog.get('connections', comic.source.connectionId);
+  if(reference.length===5){
+    if(reference[1]!=='epub'||!comic||!connection||comic.documentCover?.entryId!==reference[2]||comic.documentCover?.contentId!==reference[3]||String(comic.source.generation)!==reference[4])throw Error('封面来源已变化，请重新打开漫画。');
+    const binding=await entrySource(reference[2],reference[3]);
+    const cover=binding.entry.document?.cover;
+    if(!cover||cover.mediaType==='image/svg+xml')return;
+    return {owner:sourceCoverOwner(comic.id),connectionId:connection.id,validate:binding.assertCurrent,
+      async read(signal?:AbortSignal){
+        await binding.assertCurrent();
+        const source=await openFileSource({...binding.context,signal});
+        try{
+          const {openEpubArchive}=await import('../formats/epub/archive');
+          const archive=await openEpubArchive(source,signal);
+          try{const blob=await archive.read(cover.href,cover.mediaType,signal);await binding.assertCurrent();return blob;}
+          finally{await archive.close();}
+        }finally{await source.close();}
+      },
+    };
+  }
   if(reference.length===4){
     if(reference[1]!=='provider'||!comic||!connection||comic.source.status!=='active'||['disconnected','revoked'].includes(connection.status)||!comic.sourceArtwork||comic.sourceArtwork.id!==reference[2]||String(comic.source.generation)!==reference[3])throw Error('封面来源已变化，请重新打开漫画。');
     const artwork=comic.sourceArtwork,reader=getSourceDriver(connection.provider)?.artwork;
