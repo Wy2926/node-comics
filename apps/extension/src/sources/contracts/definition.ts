@@ -6,6 +6,7 @@ export interface SourceLocation {
   url: string;
   catalog?: { key: string; url: string };
 }
+export type SourceSiteContentTag = 'manga' | 'manhwa' | 'manhua' | 'webtoon' | 'doujin';
 export interface SourceSite {
   id: string;
   name: string;
@@ -14,6 +15,12 @@ export interface SourceSite {
   icon: string;
   /** Main content languages (BCP 47), in display order; not an exhaustive catalog filter. */
   primaryLanguages: readonly string[];
+  /** First supported date, YYYY-MM-DD; independent of later adapter fixes. */
+  adaptedOn: string;
+  /** True only when all comics on this site can be read for free. */
+  isFree?: boolean;
+  /** Main comic types, not exhaustive; 1–3 display tags independent of the free status. */
+  contentTags: readonly SourceSiteContentTag[];
   search?: SourceSearchCapability;
 }
 /** Pure metadata: safe in build tools, UI and the service worker. */

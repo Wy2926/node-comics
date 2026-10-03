@@ -23,7 +23,7 @@ export const chapterKey = (loc: RawLocation) => `${catalogKey(loc.slug)}:${loc.l
 export const chapterUrl = (loc: RawLocation) => `${origin}/read/${encodeURIComponent(loc.slug)}/${loc.language}/chapter-${loc.chapter}-raw/`;
 export const definition: SourceDefinition = {
   id: 'rawotaku', name: 'RawOtaku', installation,
-  sites: [{id: 'rawotaku', name: 'RawOtaku', url: origin + '/', icon, primaryLanguages: ['ja'],
+  sites: [{id: 'rawotaku', name: 'RawOtaku', url: origin + '/', icon, adaptedOn: '2026-10-02', isFree: true, contentTags: ['manga'], primaryLanguages: ['ja'],
     search: {requestOrigins: [origin + '/*']}}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},

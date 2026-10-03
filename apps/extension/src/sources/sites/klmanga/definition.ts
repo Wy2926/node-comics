@@ -19,7 +19,7 @@ export const chapterKey = (loc: KlLocation) => `${catalogKey(loc.slug)}:${loc.ch
 export const chapterUrl = (loc: KlLocation) => `${catalogUrl(loc.slug)}${loc.chapter}/`;
 export const definition: SourceDefinition = {
   id: 'klmanga', name: 'KLManga', installation,
-  sites: [{id: 'klmanga', name: 'KLManga', url: origin + '/', icon, primaryLanguages: ['ja'],
+  sites: [{id: 'klmanga', name: 'KLManga', url: origin + '/', icon, adaptedOn: '2026-10-03', isFree: true, contentTags: ['manga'], primaryLanguages: ['ja'],
     search: {requestOrigins: [origin + '/*']}}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

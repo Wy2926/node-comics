@@ -18,7 +18,7 @@ const hit = (extra: Partial<SourceSearchHit> = {}): SourceSearchHit => ({catalog
 const definition = (): SourceDefinition => ({id: 'fixture', name: 'Fixture',
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: false},
   installation: {requiredOrigins: [], optionalOrigins: ['https://*.fixture.test/*', 'https://mirror.test/*'], autoContentMatches: []},
-  sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'],
+  sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'],
     search: {requestOrigins: ['https://fixture.test/*']}}],
   identify(url) {
     if (!['fixture.test', 'mirror.test'].includes(url.hostname)) return null;

@@ -5,5 +5,5 @@ import { definitions } from './definitions';
 export function listSupportedSites(registry: readonly SourceDefinition[] = definitions) {
   return registry.filter(adapter => adapter.capabilities.importable).flatMap(adapter =>
     (adapter.sites ?? []).map(site => ({ ...site, adapterId: adapter.id, key: `${adapter.id}:${site.id}` })),
-  );
+  ).sort((a, b) => b.adaptedOn.localeCompare(a.adaptedOn));
 }
