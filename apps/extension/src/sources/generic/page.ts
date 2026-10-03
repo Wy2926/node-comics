@@ -10,7 +10,7 @@ export const createPage: CreateSourcePage = (context) => {
   const session = imageSession(context, {
     snapshot: imageDiscovery(context.document, context.location.url, {id: context.location.sourceId, selector: imageSelector, singlePage: false}),
     targets() {
-      const images = renderedImages(context.document, context.location.url, imageSelector)
+      const images = renderedImages(context.document, context.location.url, imageSelector, context.signal)
         .filter(({ element }) => comicImageRect(element));
       const targets = new Map([...images, ...canvases.targets()].map(image => [image.element, image]));
       return [...context.document.querySelectorAll<HTMLImageElement | HTMLCanvasElement>('img,canvas')]

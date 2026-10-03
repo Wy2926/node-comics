@@ -3,6 +3,7 @@ import type { PageImage } from '../contracts/page';
 import type { DiscoveredPage, SourceSnapshot } from '../contracts/source';
 import { comicImageRect, MAX_COMIC_IMAGES } from './geometry';
 import { safeImageUrl } from './urls';
+import { readBlobImage } from './blob-image';
 export function imageDiscovery(
   doc: Document,
   pageUrl: string,
@@ -70,14 +71,17 @@ export function imageDiscovery(
   };
 }
 /** Enumeration only; discovery and inline use the same site-selected elements. */
-export function renderedImages(doc: Document, url: string, selector = 'img'): PageImage[] {
+export function renderedImages(doc: Document, url: string, selector = 'img', signal?: AbortSignal): PageImage[] {
   return [...doc.querySelectorAll<HTMLImageElement>(selector)].flatMap((element) => {
     const raw = element.currentSrc || element.src;
+    let localBlob = false;
+    try {localBlob = raw.startsWith('blob:') && new URL(raw).origin === new URL(url).origin;} catch {return [];}
     const source =
-      (raw.startsWith('blob:') && new URL(raw).origin === new URL(url).origin) ||
+      localBlob ||
       /^data:image\/(?:png|jpeg|webp|gif|avif);/i.test(raw)
         ? raw
         : safeImageUrl(raw, url);
-    return source ? [{ element, key: source, url: source }] : [];
+    return source ? [{ element, key: source, url: source,
+      ...(localBlob ? {read: () => readBlobImage(element, source, url, signal)} : {}) }] : [];
   });
 }

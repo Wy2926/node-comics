@@ -18,6 +18,22 @@ function image(name: string, options: Record<string, unknown> = {}) {
   } as unknown as HTMLImageElement;
 }
 describe('shared webpage image candidates', () => {
+  it('already supports same-origin decoded Blobs on unknown sites without importing temporary addresses', () => {
+    vi.stubGlobal('getComputedStyle', () => ({visibility: 'visible', opacity: '1'}));
+    const url = 'https://example.test/chapter/1';
+    const images = [image('first', {src: 'blob:https://example.test/decoded', tagName: 'IMG'}),
+      image('duplicate', {src: 'blob:https://example.test/decoded', tagName: 'IMG'}),
+      image('foreign', {src: 'blob:https://foreign.test/decoded', tagName: 'IMG'}),
+      image('loading', {src: 'blob:https://example.test/loading', complete: false, tagName: 'IMG'})];
+    const doc = {title: 'Decoded reader', querySelectorAll: (selector: string) => selector === 'canvas' ? [] : images} as unknown as Document;
+    const navigation = createSourceNavigation(doc), session = navigation.get(url).session;
+    expect(session.inlineTargets().map(t => t.element)).toEqual(images.slice(0, 2));
+    expect(session.inlineTargets().every(t => t.read && t.url.startsWith('blob:'))).toBe(true);
+    expect(session.snapshot().items).toEqual([]);
+    expect(session.snapshot().discoveryComplete).toBe(false);
+    navigation.dispose();
+    expect(() => session.inlineTargets()).toThrow();
+  });
   it('keeps image identities across remounts without merging duplicate URLs or stealing a surviving slot', () => {
     vi.stubGlobal('getComputedStyle', () => ({ visibility: 'visible', opacity: '1' }));
     let images = [image('same'), image('same'), image('last')];

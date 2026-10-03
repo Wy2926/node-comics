@@ -49,6 +49,8 @@ HTTP 页面可提供源站证明的 `contentKey`，用于内容不变而临时�
 
 HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅读器由受信扩展页面请求，均先检查实际图片域名权限，再根据已校验的来源页生成 Referer。原位入口传递图片属性／meta 中的显式引用策略，缺省为 `strict-origin-when-cross-origin`；仅 HTTP 响应头声明的页面策略未回溯读取。站点 `image.headers` 只覆盖必要差异，不再为普通来源 Referer 增加专用适配。Blob／Data／Canvas 保留页面读取与导航版本校验。
 
+同源 Blob 图片通过 `shared/blob-image.ts` 优先读取原字节；源站加载后撤销 URL、但已加载 `<img>` 仍可读时，按自然尺寸从该元素导出 PNG。读取前后核对元素、URL、尺寸、文档导航及取消状态，临时画布完成即释放；识别阶段不编码，也不保留全尺寸像素缓存。该能力由通用及显式站点的 `renderedImages` 共用，不适用于 HTTP 失败、跨域图片或污染画布，不改变 Blob 的临时资源边界。
+
 展示画布无法导出但有可靠原图映射时，站点可返回 HTTP 原位目标，并通过 `image.decodeInline` 解码公共取图管线返回的字节；该钩子负责核对本站图片范围。网络解析器可按单次请求声明 `acceptStatuses` 以读取源站使用错误状态承载的结构化响应，仍须验证响应结构；权限、请求范围、响应大小和取消检查不变。
 
 原位正文筛选由 `inlineTargets()` 负责：大图启发式集中在 `generic` 适配器，显示层统一检查渲染状态。网络适配器可通过 `inlineRecognition: 'generic'` 显式复用通用已加载大图识别，无需空 `page.ts`；注册表保持来源身份与通用尺寸检查，并禁止以此读取完整正文。这不是 HTTP 失败后的兜底。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
@@ -93,5 +95,6 @@ npm run build
 | [RawOtaku](../apps/extension/src/sources/sites/rawotaku/README.md) | HTTP 名称搜索、完整语言目录／章节原图／封面、12 小时更新；作品与章节网页导入、两种阅读模式的正文原位翻译 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | 复用 GigaViewer 引擎识别并还原已加载正文，支持原位翻译；不提供导入或目录 |
+| [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 阅读器内已解码同源 Blob 正文原位翻译，复用公共取图与动态页生命周期；不提供导入或目录 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |
