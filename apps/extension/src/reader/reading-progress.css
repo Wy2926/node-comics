@@ -6,7 +6,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: min(8.5rem, calc(50% - 16px));
+  width: max-content;
   max-width: calc(50% - 16px);
   padding: 0 10px 0 0;
   border: var(--comic-badge-border);
