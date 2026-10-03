@@ -6,9 +6,11 @@ import {defaults, type Job, type ReadingEntry, type Settings} from '../src/types
 import {useAppearance} from '../src/ui/Appearance';
 import {Scrollbars} from '../src/ui/Scrollbars';
 import {registerSourceDriver} from '../src/comics/sources/registry';
+import {localSourceDriver} from '../src/comics/sources/local/driver';
 import {createOpdsProvider} from '../src/comics/sources/opds/provider';
 import {connectRemoteLibrary, browseRemoteLibrary, openRemotePublication} from '../src/comics/application/remote-library-service';
 import {loadEntry, saveReaderState} from '../src/comics/application/library-service';
+import {importLocalFile} from '../src/comics/application/import-service';
 import {onMaterialized} from '../src/comics/pages/service';
 import {useEffect} from 'react';
 import {ReadingProgress, type ReadingProgressStatus} from '../src/comics/application/reading-progress';
@@ -25,10 +27,19 @@ import '../src/ui/theme/surfaces.css';
 
 if (location.hostname !== '127.0.0.1' || location.port !== '5198') throw Error('Use the isolated 127.0.0.1:5198 fixture origin.');
 const unregister = registerSourceDriver(createOpdsProvider());
+const unregisterLocal = registerSourceDriver(localSourceDriver);
 if (import.meta.hot) import.meta.hot.dispose(unregister);
+if (import.meta.hot) import.meta.hot.dispose(unregisterLocal);
 const failFirst = new URLSearchParams(location.search).has('failure');
-const marker = 'epub-reader-artwork-fixture' + (failFirst ? '-failure' : '');
+const localSample = new URLSearchParams(location.search).get('local');
+const marker = 'epub-reader-artwork-fixture' + (localSample ? ':local:' + localSample : failFirst ? '-failure' : '');
 let entryId = (await catalog.get('metadata', marker))?.entryId as string | undefined;
+if (!entryId && localSample) {
+  const response = await fetch('/local.epub');
+  if (!response.ok) throw Error('Set NC_EPUB_SAMPLE to an explicitly selected local EPUB.');
+  entryId = (await importLocalFile(new File([await response.blob()], 'sample.epub'))).id;
+  await catalog.put('metadata', {id: marker, entryId});
+}
 if (!entryId) {
   const connection = await connectRemoteLibrary('opds', {name: 'Illustrated EPUB fixture', auth: 'anonymous', url: location.origin + '/opds'});
   const publications = await browseRemoteLibrary(connection.id);
@@ -112,7 +123,7 @@ function Fixture() {
   useEffect(() => {if (mounted) void progress.open(copyRef.current); return () => {void progress.close();};}, [progress, mounted]);
   return <div className="nc-app">
     <Scrollbars/>
-    {mounted ? <EpubReader copy={copy} settings={settings} setSettings={setSettings} update={update} viewKey="epub-artwork-ui-fixture"
+    {mounted ? <EpubReader copy={copy} settings={settings} setSettings={setSettings} update={update} viewKey={localSample ? 'epub-local-' + localSample : 'epub-artwork-ui-fixture'}
       progressStatus={status} backLabel="关闭阅读器" backText="书架" onBack={() => setMounted(false)} onOpenShortcuts={() => setNotice('已打开快捷键入口')}
       notify={setNotice} caps={channel.capabilities} channelLabel={channel.label} translationScope={channel.scope.key} onReadingWindow={onWindow}
       translationState={translation.stateFor} onRetry={(page, mode) => translation.retry(copy.id, page, mode)} onLogin={() => {}} onUpgrade={() => {}}/>

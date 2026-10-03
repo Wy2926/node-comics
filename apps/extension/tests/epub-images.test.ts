@@ -74,14 +74,26 @@ describe('EPUB embedded image window', () => {
     window.show([page('OPS/0.png')],true,'classic','fr','account-a');expect(mocks.acquire).toHaveBeenCalledOnce();window.close();
   });
 
-  it('keeps one image failure independent, retries it, and releases the old chapter even without an unloaded event', async () => {
+  it('keeps one image failure independent, retries it, and releases an unloaded chapter', async () => {
     mocks.acquire.mockRejectedValueOnce(new Error('One image failed'));
     const changed=vi.fn(),errors=vi.fn(),{document,images}=artwork(),window=new EpubImageWindow(changed,errors);window.add(document);visible(images,0);
     window.show(images.map(image=>page(image.getAttribute('data-nc-epub-image')!)),true,'classic','en','account-a');
     await vi.waitFor(()=>expect(images[1].getAttribute('src')).toMatch(/^blob:translated/));
     expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(errors).toHaveBeenCalledWith('OPS/0.png','One image failed');
     window.retry('OPS/0.png');await vi.waitFor(()=>expect(images[0].getAttribute('src')).toMatch(/^blob:translated/));
-    window.add(artwork([]).document);expect(changed).toHaveBeenLastCalledWith([]);
+    window.remove(document);expect(changed).toHaveBeenLastCalledWith([]);
     expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(revoke).toHaveBeenCalledTimes(4);window.close();
+  });
+
+  it('keeps adjacent documents in spine order when scrolling backwards and limits the combined window', () => {
+    const changed = vi.fn(), window = new EpubImageWindow(changed, vi.fn());
+    const next = artwork(['OPS/3.png', 'OPS/4.png', 'OPS/5.png']);
+    const previous = artwork(['OPS/0.png', 'OPS/1.png', 'OPS/2.png']);
+    window.add(next.document, 2); visible(next.images, 0);
+    window.add(previous.document, 1); visible(previous.images, 1);
+    expect(changed).toHaveBeenLastCalledWith(['OPS/1.png', 'OPS/2.png', 'OPS/3.png', 'OPS/4.png']);
+    window.remove(previous.document);
+    expect(changed).toHaveBeenLastCalledWith(['OPS/3.png', 'OPS/4.png', 'OPS/5.png']);
+    window.close();
   });
 });

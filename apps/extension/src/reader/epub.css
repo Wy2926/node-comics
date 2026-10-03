@@ -8,8 +8,10 @@
   inset: 0;
 }
 
-.nc-epub-stage[data-epub-flow="scrolled-doc"] .epub-container {
+.nc-epub-stage[data-epub-flow="scrolled-continuous"] .epub-container {
   overflow-x: hidden !important;
+  /* EPUB.js compensates for prepended/trimmed chapters itself. */
+  overflow-anchor: none;
 }
 
 .nc-epub-status {

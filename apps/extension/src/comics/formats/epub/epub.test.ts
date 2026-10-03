@@ -28,6 +28,14 @@ import {
 } from "./location";
 import type Rendition from "epubjs/types/rendition";
 import type { EpubSession } from "./index";
+import {EpubNavigation} from './navigation';
+import {centerFixedPage, epubView} from './view';
+import {EpubContinuousManager} from './manager';
+import ContinuousViewManager from 'epubjs/src/managers/continuous/index.js';
+import IframeView from 'epubjs/src/managers/views/iframe.js';
+import type Contents from 'epubjs/types/contents';
+import type {EpubIndex} from '../contracts';
+import type {Location} from 'epubjs/types/rendition';
 
 beforeAll(() => {
   class StrictXmlParser extends XmlDomParser {
@@ -48,18 +56,77 @@ beforeAll(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-it('uses viewport page turns in continuous EPUB and only crosses chapters at an edge', async () => {
-  const container = {scrollTop: 0, scrollHeight: 2500, clientHeight: 900};
-  const rendition = {manager: {container, isPaginated: false, settings: {axis: 'vertical'}, scrollTo: vi.fn((_left, top) => {container.scrollTop = top;})},
-    next: vi.fn(), prev: vi.fn(), reportLocation: vi.fn()} as unknown as Rendition;
-  await turnEpub(rendition, 1); expect(container.scrollTop).toBe(900); expect(rendition.next).not.toHaveBeenCalled();
-  await turnEpub(rendition, 1); expect(container.scrollTop).toBe(1600);
-  await turnEpub(rendition, 1); expect(rendition.next).toHaveBeenCalledOnce();
-  await turnEpub(rendition, -1); expect(container.scrollTop).toBe(700);
-  await turnEpub(rendition, -1); expect(container.scrollTop).toBe(0);
-  await turnEpub(rendition, -1); expect(rendition.prev).toHaveBeenCalledOnce();
-  (rendition as unknown as {manager: {isPaginated: boolean}}).manager.isPaginated = true;
-  await turnEpub(rendition, 1); expect(rendition.next).toHaveBeenCalledTimes(2);
+it('queues viewport turns with the continuous manager so a cold adjacent page does not swallow a click', async () => {
+  const events: string[] = [];
+  const manager = new EpubContinuousManager({settings: {}});
+  vi.spyOn(manager, 'fill').mockImplementation(async () => {events.push('ready');});
+  vi.spyOn(ContinuousViewManager.prototype, 'next').mockImplementation(() => {events.push('next');});
+  vi.spyOn(ContinuousViewManager.prototype, 'prev').mockImplementation(() => {events.push('prev');});
+  const rendition = {next: () => manager.next(), prev: () => manager.prev()} as Rendition;
+  await turnEpub(rendition, 1); await turnEpub(rendition, -1);
+  expect(events).toEqual(['ready', 'next', 'ready', 'ready', 'prev', 'ready']);
+});
+
+it('does not reverse vertical scroll offsets for RTL books or lose the first real scroll after restoration', async () => {
+  const manager = new EpubContinuousManager({settings: {axis: 'vertical', direction: 'rtl'}});
+  const directions: string[] = [];
+  manager.container = {scrollTop: 1600, scrollLeft: 0} as HTMLElement;
+  vi.spyOn(ContinuousViewManager.prototype, 'check').mockImplementation(function(this: ContinuousViewManager) {
+    directions.push(this.settings.direction); return Promise.resolve(false);
+  });
+  await manager.check(); expect(directions).toEqual(['ltr']); expect(manager.settings.direction).toBe('rtl');
+  expect(manager.scrollTop).toBe(1600);
+  manager.settings.axis = 'horizontal'; await manager.check(); expect(directions).toEqual(['ltr', 'rtl']);
+  const scrolled = Object.assign(vi.fn(), {cancel: vi.fn()}); manager._scrolled = scrolled;
+  vi.spyOn(ContinuousViewManager.prototype, 'onScroll').mockImplementation(() => {});
+  manager.ignore = true; manager.onScroll(); expect(scrolled).toHaveBeenCalledOnce();
+});
+
+it('centers a fixed viewport regardless of spread-edge hints, without stretching or rewriting content', () => {
+  const css = vi.fn();
+  const contents = {viewport: () => ({width: '960', height: '1280'}), css} as unknown as Contents;
+  centerFixedPage(contents, 1500, 800);
+  expect(css).toHaveBeenCalledWith('margin-left', '450px', true);
+  expect(css).toHaveBeenCalledWith('margin-top', '0px', true);
+  css.mockClear(); centerFixedPage(contents, 600, 1000);
+  expect(css).toHaveBeenCalledWith('margin-left', '0px', true);
+  expect(css).toHaveBeenCalledWith('margin-top', '100px', true);
+});
+
+it('unloads original and translation resources before frame disposal and invalidates recycled HTML', () => {
+  const contents = {} as Contents, unload = vi.fn();
+  const View = epubView(unload), view = Object.create(View.prototype) as InstanceType<typeof View>;
+  view.contents = contents; view.sectionRender = Promise.resolve('HTML with old blob URLs');
+  vi.spyOn(IframeView.prototype, 'destroy').mockImplementation(function(this: IframeView) {
+    expect(unload).toHaveBeenCalledWith(this); expect(this.contents).toBe(contents); this.contents = undefined;
+  });
+  view.destroy(); expect(view.sectionRender).toBeUndefined(); expect(unload).toHaveBeenCalledOnce();
+});
+
+it('shares one iframe load between overlapping visibility updates and CFI navigation', async () => {
+  const ready = Promise.withResolvers<void>(), display = vi.spyOn(IframeView.prototype, 'display').mockReturnValue(ready.promise);
+  const View = epubView(vi.fn()), view = Object.create(View.prototype) as InstanceType<typeof View>;
+  const first = view.display(); expect(view.display()).toBe(first); expect(display).toHaveBeenCalledOnce();
+  ready.resolve(); await first;
+  await view.display(); expect(display).toHaveBeenCalledTimes(2);
+});
+
+it('follows distinct TOC fragments in the same XHTML, including backwards movement and encoded ids', () => {
+  const navigation = new EpubNavigation({kind: 'epub', title: 'Shared XHTML',
+    chapters: [{id: '0', href: 'OPS/one.xhtml', label: 'One'}, {id: '1', href: 'OPS/two.xhtml', label: 'Two'}],
+    toc: [{href: 'OPS/one.xhtml#a', label: 'One', children: [{href: 'OPS/one.xhtml#%E4%BA%8C', label: 'Two'}]}],
+  } satisfies EpubIndex);
+  const document = {getElementById: (id: string) => ({a: 10, '二': 100})[id], createRange: () => ({
+    value: 0, selectNodeContents(node: number) {this.value = node;}, collapse() {},
+    compareBoundaryPoints(_how: number, other: {value: number}) {return this.value - other.value;},
+  })};
+  const rendition = {getContents: () => [{sectionIndex: 0, document, range: (cfi: string) => ({value: Number(cfi)})}]} as unknown as Rendition;
+  const current = (cfi: string) => navigation.current(rendition, {start: {index: 0, href: '/OPS/one.xhtml', cfi}} as Location);
+  expect(current('50')).toBe('OPS/one.xhtml#a');
+  expect(current('120')).toBe('OPS/one.xhtml#%E4%BA%8C');
+  expect(current('100')).toBe('OPS/one.xhtml#%E4%BA%8C');
+  expect(current('20')).toBe('OPS/one.xhtml#a');
+  expect(navigation.current(rendition, {start: {index: 1, href: '/OPS/two.xhtml', cfi: '10'}} as Location)).toBe('OPS/one.xhtml#%E4%BA%8C');
 });
 
 const xml = (body: string) => `<?xml version="1.0" encoding="UTF-8"?>${body}`;
@@ -492,6 +559,21 @@ describe("EPUB source position restoration", () => {
     expect(rendition.display).toHaveBeenLastCalledWith(undefined);
   });
 
+  it('restores a fixed page offset within the CFI section, not an adjacent visible page', async () => {
+    const rendition = view(), current = session(true);
+    Object.assign(rendition, {settings: {layout: 'pre-paginated'}, currentLocation: () => ({start: {index: 1}})});
+    Object.assign(rendition.manager.container, {scrollTop: 1200, getBoundingClientRect: () => ({top: 0})});
+    Object.assign(rendition.manager, {views: {all: () => [
+      {section: {index: 1}, element: {getBoundingClientRect: () => ({top: -1200, height: 1200})}},
+      {section: {index: 2}, element: {getBoundingClientRect: () => ({top: 0, height: 800})}},
+    ]}});
+    vi.spyOn(current.book.spine, 'get').mockReturnValue({href: '/OPS/chapter.xhtml', index: 2} as never);
+    await restoreEpubLocation(current, rendition as unknown as Rendition, {cfi: 'valid', progression: 0.5});
+    expect(rendition.display).toHaveBeenCalledWith('valid');
+    expect(current.book.spine.get).toHaveBeenCalledWith('valid');
+    expect(rendition.manager.scrollTo).toHaveBeenLastCalledWith(0, 1600, true);
+  });
+
   it("round-trips source fraction in horizontal RTL layouts", async () => {
     const rendition = view("horizontal", "rtl");
     await restoreEpubLocation(
@@ -501,5 +583,19 @@ describe("EPUB source position restoration", () => {
     );
     expect(rendition.manager.scrollTo).toHaveBeenCalledWith(-3000, 0, true);
     expect(epubProgression(rendition as unknown as Rendition)).toBe(0.5);
+  });
+
+  it('keeps a resource-relative fraction stable when adjacent sections are prepended or trimmed', async () => {
+    const rendition = view();
+    const container = rendition.manager.container;
+    Object.assign(container, {scrollTop: 2200, getBoundingClientRect: () => ({top: 0})});
+    Object.assign(rendition.manager, {views: {all: () => [{section: {index: 2}, element: {getBoundingClientRect: () => ({top: -1000, height: 2000})}}]}});
+    const location = {start: {index: 2}} as Location;
+    expect(epubProgression(rendition as unknown as Rendition, location)).toBe(0.5);
+    container.scrollTop -= 800; container.scrollHeight -= 800;
+    expect(epubProgression(rendition as unknown as Rendition, location)).toBe(0.5);
+    const current = session(false); vi.spyOn(current.book.spine, 'get').mockReturnValue({href: '/OPS/chapter.xhtml', index: 2} as never);
+    await restoreEpubLocation(current, rendition as unknown as Rendition, {href: 'OPS/chapter.xhtml', progression: 0.25});
+    expect(rendition.manager.scrollTo).toHaveBeenLastCalledWith(0, 900, true);
   });
 });

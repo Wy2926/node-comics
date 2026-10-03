@@ -20,6 +20,8 @@ import {
   type EpubArchive,
 } from "./archive";
 import { EpubResources, TRANSLATABLE_EPUB_IMAGE } from "./resources";
+import {epubView} from './view';
+import {EpubContinuousManager} from './manager';
 
 export interface EpubSession {
   readonly index: EpubIndex;
@@ -243,8 +245,8 @@ export async function openEpub(
           method: string;
         } = {
           ...options,
-          manager: "default",
-          view: "iframe",
+          manager: EpubContinuousManager,
+          view: epubView(view => {void rendition.hooks.unloaded.trigger(view, rendition);}),
           // Preserve XML parsing semantics; srcdoc would reparse untrusted XHTML as HTML.
           method: "blobUrl",
           script: undefined,
@@ -279,8 +281,7 @@ export async function openEpub(
           loadedSections.delete(view.section.href);
           view.section.unload();
         });
-        // DefaultViewManager.clear() destroys frames without an unloaded event.
-        // Retain only currently displayed sections, including their source blob URLs.
+        // Also release sections loaded only to validate a stale CFI, not rendered in a frame.
         rendition.on('rendered', () => {
           const visible = new Set<string>();
           rendition.views().forEach(view => visible.add((view as unknown as {section: Section}).section.href));

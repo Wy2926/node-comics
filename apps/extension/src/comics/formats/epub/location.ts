@@ -9,6 +9,7 @@ interface LayoutManager {
   settings: { axis: string; direction: string; rtlScrollType: string };
   isPaginated: boolean;
   layout: { delta: number; height: number };
+  views?: {all(): {section: {index: number}; element: HTMLElement}[]};
   scrollTo(left: number, top: number, silent: boolean): void;
 }
 
@@ -31,19 +32,8 @@ function managerFor(rendition: Rendition): LayoutManager {
   return (rendition as Rendition & { manager: LayoutManager }).manager;
 }
 
-/** In scrolled-doc, EPUB.js next/prev jump chapters; reader page controls move one viewport first. */
+/** Move by one viewport in the continuous document, not by a whole XHTML resource. */
 export async function turnEpub(rendition: Rendition, direction: -1 | 1) {
-  const manager = managerFor(rendition);
-  const {container} = manager;
-  if (!manager.isPaginated && manager.settings.axis !== 'horizontal') {
-    const maximum = Math.max(0, container.scrollHeight - container.clientHeight);
-    const top = Math.max(0, Math.min(maximum, container.scrollTop + direction * container.clientHeight));
-    if (Math.abs(top - container.scrollTop) > 1) {
-      manager.scrollTo(0, top, false);
-      await rendition.reportLocation();
-      return;
-    }
-  }
   await (direction === 1 ? rendition.next() : rendition.prev());
 }
 
@@ -126,15 +116,15 @@ export async function initializeEpubLocation(
     rendition.off("rendered", rendered);
   }
   await settleEpubLayout(rendition, session.signal);
-  await restoreEpubLocation(session, rendition, location);
+  // Fixed pages never reflow with fonts/themes; do not destroy and load the same
+  // fixed frame a second time just to restore its unchanged element CFI.
+  if (rendition.settings?.layout !== 'pre-paginated') await restoreEpubLocation(session, rendition, location);
 }
 
-/** Resource-relative progress, independent of the number of sections in the book. */
-export function epubProgression(rendition: Rendition): number {
+function sectionGeometry(rendition: Rendition, index?: number) {
   const manager = managerFor(rendition);
   const { container, settings } = manager;
   const vertical = settings.axis !== "horizontal";
-  const extent = vertical ? container.scrollHeight : container.scrollWidth;
   let offset = vertical ? container.scrollTop : container.scrollLeft;
   if (!vertical && settings.direction === "rtl") {
     offset =
@@ -142,25 +132,39 @@ export function epubProgression(rendition: Rendition): number {
         ? container.scrollWidth - container.clientWidth - offset
         : Math.abs(offset);
   }
-  return Math.max(0, Math.min(1, offset / Math.max(1, extent)));
+  const frame = manager.views?.all().find(view => view.section.index === index);
+  if (frame) {
+    const bounds = frame.element.getBoundingClientRect(), viewport = container.getBoundingClientRect();
+    const origin = offset + (vertical ? bounds.top - viewport.top : settings.direction === 'rtl' ? viewport.right - bounds.right : bounds.left - viewport.left);
+    return {origin, offset, extent: vertical ? bounds.height : bounds.width};
+  }
+  return {origin: 0, offset, extent: vertical ? container.scrollHeight : container.scrollWidth};
 }
 
-function restoreProgression(rendition: Rendition, progression: number) {
+/** Progress belongs to one resource, never to the changing virtual-window scroll height. */
+export function epubProgression(rendition: Rendition, location?: Location): number {
+  const index = location?.start?.index ?? (managerFor(rendition).views ? currentEpubLocation(rendition)?.start?.index : undefined);
+  const {origin, offset, extent} = sectionGeometry(rendition, index);
+  return Math.max(0, Math.min(1, (offset - origin) / Math.max(1, extent)));
+}
+
+function restoreProgression(rendition: Rendition, progression: number, index: number) {
   const manager = managerFor(rendition);
   const { container, settings } = manager;
   const vertical = settings.axis !== "horizontal";
-  const extent = vertical ? container.scrollHeight : container.scrollWidth;
+  const {extent, origin} = sectionGeometry(rendition, index);
+  const scrollExtent = vertical ? container.scrollHeight : container.scrollWidth;
   const visible = vertical ? container.clientHeight : container.clientWidth;
   let offset = Math.max(0, Math.min(1, progression)) * extent;
   if (manager.isPaginated) {
     const step = vertical ? manager.layout.height : manager.layout.delta;
     if (step > 0) offset = Math.floor(offset / step) * step;
   }
-  offset = Math.min(Math.max(0, extent - visible), offset);
+  offset = Math.min(Math.max(0, scrollExtent - visible), origin + offset);
   if (!vertical && settings.direction === "rtl") {
     offset =
       settings.rtlScrollType === "default"
-        ? extent - visible - offset
+        ? scrollExtent - visible - offset
         : -offset;
   }
   manager.scrollTo(vertical ? 0 : offset, vertical ? offset : 0, true);
@@ -179,6 +183,12 @@ export async function restoreEpubLocation(
       if (await session.book.getRange(location.cfi)) {
         session.signal?.throwIfAborted();
         await rendition.display(location.cfi);
+        // A fixed page's element CFI identifies the page, not the viewport's offset
+        // inside it. Preserve that offset independently (image-only pages have no text).
+        if (rendition.settings?.layout === 'pre-paginated' && Number.isFinite(location.progression)) {
+          const index = session.book.spine.get(location.cfi)?.index;
+          if (index !== undefined) restoreProgression(rendition, location.progression!, index);
+        }
         return;
       }
     } catch {
@@ -197,5 +207,5 @@ export async function restoreEpubLocation(
   await rendition.display(target);
   session.signal?.throwIfAborted();
   if (section && Number.isFinite(location?.progression))
-    restoreProgression(rendition, location!.progression!);
+    restoreProgression(rendition, location!.progression!, section.index);
 }

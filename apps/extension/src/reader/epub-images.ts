@@ -7,6 +7,7 @@ import {readingImage} from './presentation';
 import {prepareReaderImage} from './prepare-image';
 
 interface Artwork {
+  section: number;
   element: Element;
   href: string;
   attribute: Attr;
@@ -45,28 +46,28 @@ export class EpubImageWindow {
   }
 
   connect(view: Rendition) {
-    view.hooks.content.register((contents: Contents) => this.add(contents.document));
+    view.hooks.content.register((contents: Contents) => this.add(contents.document, contents.sectionIndex));
     view.hooks.unloaded.register((frame: {contents?: Contents}) => {
       if (frame.contents) this.remove(frame.contents.document);
     });
   }
 
-  add(document: Document) {
+  add(document: Document, section = 0) {
     if (this.closed || this.artwork.some(value => value.element.ownerDocument === document)) return;
-    // The default EPUB manager displays one section (spread: none). It does not emit
-    // an unloaded hook on clear, so release the previous document here as well.
-    for (const previous of new Set(this.artwork.map(value => value.element.ownerDocument))) if (previous !== document) this.remove(previous);
     for (const element of document.querySelectorAll('img[data-nc-epub-image], image[data-nc-epub-image]')) {
       const attribute = Array.from(element.attributes).find(attr => attr.localName === (element.localName === 'img' ? 'src' : 'href'));
       const href = element.getAttribute('data-nc-epub-image');
       if (!attribute || !href) continue;
-      const artwork = {element, href, attribute, original: attribute.value,
+      const artwork = {section, element, href, attribute, original: attribute.value,
         width: element.getAttribute('width'), height: element.getAttribute('height'), visible: false};
       this.artwork.push(artwork);
       this.byElement.set(element, artwork);
       this.observer.observe(element);
     }
+    // A backwards scroll prepends frames; request completion order is not reading order.
+    this.artwork.sort((a, b) => a.section - b.section);
     document.addEventListener('load', this.loaded, true);
+    this.select();
   }
 
   private loaded = () => this.apply();

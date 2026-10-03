@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type Rendition from "epubjs/types/rendition";
 import type { Location } from "epubjs/types/rendition";
 import type { EpubSession } from "../comics/formats/epub";
+import {EpubNavigation, flattenEpubToc} from '../comics/formats/epub/navigation';
 import {
   currentEpubLocation,
   epubProgression,
@@ -58,15 +59,17 @@ function applyAppearance(
   root: HTMLElement,
 ) {
   const tokens = getComputedStyle(root);
+  const fixed = view.settings.layout === 'pre-paginated';
   view.themes.default({
+    html: {background: `${tokens.getPropertyValue('--reading-background').trim()} !important`},
     body: {
       color: `${tokens.getPropertyValue('--reading-ink').trim()} !important`,
       background: `${tokens.getPropertyValue('--reading-background').trim()} !important`,
-      "line-height": "1.65 !important",
+      ...(!fixed ? {"line-height": "1.65 !important"} : {}),
     },
     a: { color: `${tokens.getPropertyValue('--reading-link').trim()} !important` },
   });
-  view.themes.fontSize(`${fontSize * settings.textScale}%`);
+  if (!fixed) view.themes.fontSize(`${fontSize * settings.textScale}%`);
 }
 
 /** EPUB text is a document. It never enters bitmap page/translation materialization. */
@@ -101,17 +104,21 @@ export function EpubReader({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [fixedLayout, setFixedLayout] = useState(false);
   const [view, setView] = useState(() => readReadingView(viewKey));
   const fontSize = Math.max(70, view.zoom);
-  const setFontSize = (value: number | ((previous: number) => number)) => setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));
+  const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
   const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
   const latest = useRef({ copy, update, settings, fontSize, images, panel, reveal, setPanel });
   latest.current = { copy, update, settings, fontSize, images, panel, reveal, setPanel };
   const [position, setPosition] = useState<Location>();
+  const [tocHref, setTocHref] = useState<string>();
   const leaveReader = () => {capturePosition.current?.();onBack();};
-  const chapterCount = copy.document?.chapters.length ?? 0;
-  const chapter = position?.start.index ?? 0;
+  const chapters = useMemo(() => copy.document ? flattenEpubToc(copy.document.toc.length ? copy.document.toc : copy.document.chapters) : [], [copy.document]);
+  const chapterCount = chapters.length;
+  const activeHref = tocHref ?? position?.start.href.replace(/^\//, '') ?? copy.documentLocation?.href;
+  const chapter = Math.max(0, chapters.findIndex(item => item.href === activeHref));
   const progress = Math.round((copy.documentLocation?.totalProgression ?? 0) * 100);
   const language = caps?.languages.find(value => value.id === settings.language)?.label ?? languageLabel(settings.language);
   function selectView(value: 'original' | Mode) {
@@ -119,7 +126,7 @@ export function EpubReader({
     setView(previous => ({...previous, mode: value === 'original' ? previous.mode : value, preference: value === 'original' ? 'original' : 'translation'}));
   }
   function jumpChapter(index: number) {
-    const chapter = copy.document?.chapters[Math.max(0, Math.min(chapterCount - 1, index))];
+    const chapter = chapters[Math.max(0, Math.min(chapterCount - 1, index))];
     if (chapter) run(() => rendition.current!.display(`/${chapter.href}`));
   }
   useEffect(() => saveReadingView(viewKey, view), [viewKey, view]);
@@ -173,6 +180,7 @@ export function EpubReader({
     setLoading(true);
     setError("");
     setPosition(undefined);
+    setTocHref(undefined);
     const fail = () => {
       if (controller.signal.aborted || failed) return;
       failed = true;
@@ -215,13 +223,14 @@ export function EpubReader({
         defaultDirection: latest.current.settings.direction,
         flow:
           latest.current.settings.layout === "continuous"
-            ? "scrolled-doc"
+            ? "scrolled-continuous"
             : "paginated",
       });
       rendition.current = view;
       latest.current.images.connect(view, current.signal ?? controller.signal);
       view.on("displayError", fail);
       displayTimeout = setTimeout(fail, 30_000);
+      const navigation = new EpubNavigation(current.index);
       const recordPosition = (location: Location) => {
         if (
           controller.signal.aborted ||
@@ -230,12 +239,14 @@ export function EpubReader({
         )
           return;
         setPosition(location);
+        setTocHref(navigation.current(view, location));
         if (positioning.current) return;
         const { copy: latestCopy, update: persist } = latest.current;
         // Layout/initial restoration is not a new reading action or a newer sync timestamp.
-        if(latestCopy.documentLocation?.cfi===location.start.cfi)return;
         const total = current!.index.chapters.length;
-        const withinChapter = epubProgression(view);
+        const withinChapter = epubProgression(view, location);
+        if (latestCopy.documentLocation?.cfi === location.start.cfi &&
+          (view.settings.layout !== 'pre-paginated' || Math.abs((latestCopy.documentLocation.progression ?? 0) - withinChapter) < 0.001)) return;
         const totalProgression = location.atEnd
           ? 1
           : Math.max(
@@ -294,9 +305,9 @@ export function EpubReader({
         else latest.current.reveal();
       });
       await view.started;
+      current.signal?.throwIfAborted();
+      setFixedLayout(view.settings.layout === 'pre-paginated');
       view.direction(latest.current.settings.direction);
-      let appliedLayout = latest.current.settings.layout;
-      let appliedDirection = latest.current.settings.direction;
       const saved = latest.current.copy.documentLocation;
       await initializeEpubLocation(current, view, saved, () =>
         applyAppearance(view, latest.current.settings, latest.current.fontSize, root.current!),
@@ -316,20 +327,12 @@ export function EpubReader({
             ? {
                 cfi: location.start.cfi,
                 href: location.start.href.replace(/^\//, ""),
+                progression: epubProgression(view, location),
               }
             : latest.current.copy.documentLocation;
           void (async () => {
             do {
               pendingAppearance = false;
-              const settings = latest.current.settings;
-              if (appliedLayout !== settings.layout) {
-                appliedLayout = settings.layout;
-                view.flow(settings.layout === 'continuous' ? 'scrolled-doc' : 'paginated');
-              }
-              if (appliedDirection !== settings.direction) {
-                appliedDirection = settings.direction;
-                view.direction(settings.direction);
-              }
               applyAppearance(
                 view,
                 latest.current.settings,
@@ -391,7 +394,10 @@ export function EpubReader({
       element.replaceChildren();
       void current?.close();
     };
-  }, [copy.id, copy.contentId, retry]);
+    // EPUB.js changes flow/direction through overlapping clear/display operations,
+    // especially for fixed layouts. Reopen the bounded session around the captured
+    // source location instead; this runs only on an explicit layout/direction change.
+  }, [copy.id, copy.contentId, retry, settings.layout, settings.direction]);
 
   useEffect(()=>{
     const save=()=>capturePosition.current?.();
@@ -403,7 +409,7 @@ export function EpubReader({
 
   useEffect(() => {
     reflow.current?.();
-  }, [fontSize, settings.readerBackground, settings.layout, settings.direction, settings.textScale, settings.appearance, settings.accentTheme]);
+  }, [fontSize, settings.readerBackground, settings.textScale, settings.appearance, settings.accentTheme]);
 
   const disabled = loading || !!error;
   return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
@@ -419,8 +425,9 @@ export function EpubReader({
         <input className="nc-reader-progress" type="range" aria-label={msg('阅读进度')} aria-valuetext={`${progress}%`}
           min={0} max={100} step={1} value={progress} disabled={disabled}
           onChange={event => {
-            const target = Number(event.target.value) / 100 * chapterCount;
-            const index = Math.min(chapterCount - 1, Math.floor(target));
+            const count = copy.document?.chapters.length ?? 0;
+            const target = Number(event.target.value) / 100 * count;
+            const index = Math.min(count - 1, Math.floor(target));
             const href = copy.document?.chapters[index]?.href;
             if (href) run(() => restoreEpubLocation(session.current!, rendition.current!, {href, progression: target - index}));
           }}/>
@@ -432,7 +439,7 @@ export function EpubReader({
     <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
       modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)} allowsFeedback={false} onFeedback={() => {}}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
-    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={settings.layout === 'continuous' ? 'scrolled-doc' : 'paginated'}>
+    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={settings.layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
       <div ref={viewport} className="nc-epub-viewport" aria-busy={loading}/>
       {loading && <div className="nc-epub-status" role="status"><span className="spinner"/>{msg('加载中…')}</div>}
       {error && <div className="nc-epub-status" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>{msg('重试')}</button></div>}
@@ -443,12 +450,12 @@ export function EpubReader({
     {panel && <ReaderDrawer kind={panel} title={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}
       label={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译选项')}[panel]} onClose={closePanel}>
       {panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
-        href={position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
+        href={tocHref ?? position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
         : <div className="nc-drawer-content">{panel === 'translation'
           ? <ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel}
             note={msg('仅翻译 EPUB 内的图片，正文文字保持原文。选择译图后，随读翻译可见图片与最多三张后续图片。')}/>
           : <ReaderSettings settings={settings} setSettings={setSettings} onLayout={layout => setSettings(value => ({...value, layout}))}
-            sizing={<ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}
+            sizing={fixedLayout ? null : <ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}
             immersive={immersive} onImmersive={() => setImmersive(value => !value)} onFullscreen={() => void fullscreen()}
             onShortcuts={() => {setPanel(undefined); reveal(); onOpenShortcuts();}} onReload={() => {capturePosition.current?.(); setRetry(value => value + 1);}}
             sourceUrl={copy.sourceUrl} busy={loading}/>}</div>}

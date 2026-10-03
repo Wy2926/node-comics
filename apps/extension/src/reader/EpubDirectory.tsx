@@ -1,12 +1,9 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import type {EpubIndex, EpubTocItem} from '../comics/formats/contracts';
+import type {EpubIndex} from '../comics/formats/contracts';
+import {flattenEpubToc} from '../comics/formats/epub/navigation';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import './directory.css';
-
-function flatten(items: EpubTocItem[], depth = 0): {href: string; label: string; depth: number}[] {
-  return items.flatMap(item => [{href: item.href, label: item.label, depth}, ...flatten(item.children ?? [], depth + 1)]);
-}
 
 export function EpubDirectory({title, index, href, select}: {
   title: string;
@@ -19,8 +16,9 @@ export function EpubDirectory({title, index, href, select}: {
   const [limit, setLimit] = useState(200);
   const list = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLDivElement>(null);
-  const items = useMemo(() => flatten(index.toc.length ? index.toc : index.chapters), [index]);
-  const active = items.find(item => item.href.split('#')[0] === href?.replace(/^\//, '').split('#')[0]);
+  const items = useMemo(() => flattenEpubToc(index.toc.length ? index.toc : index.chapters), [index]);
+  const current = href?.replace(/^\//, '');
+  const active = items.find(item => item.href === current) ?? items.find(item => item.href.split('#')[0] === current?.split('#')[0]);
   const visible = useMemo(() => {
     const found = items.filter(item => item.label.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
     return descending ? found.reverse() : found;

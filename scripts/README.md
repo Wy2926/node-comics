@@ -87,6 +87,8 @@ EPUB 懒加载回归在插件目录执行 `npx vitest run tests/opds-epub-range.
 
 同一服务器的 `/tests/epub-reader-fixture.html` 使用真实 EPUB、Range、物化与自动阅读窗口，只有翻译渠道为本地无付费模拟；`?failure` 可验证单图失败与重试。检查共享两侧工具栏、目录／设置、字号和布局切换、原译图切换时正文及尺寸不变、四图窗口、账号／语言隔离，以及远端 503 时退出重开保留 CFI。模拟译图刻意使用原图一半尺寸，不代表真实模型效果；对应回归为 `tests/epub-images.test.ts`、`tests/epub-service.test.ts` 和 `src/comics/formats/epub/epub.test.ts`。
 
+测试自有 EPUB 时，只在启动上述夹具的进程中设置 `NC_EPUB_SAMPLE` 为该文件的绝对路径，再使用 `/tests/epub-reader-fixture.html?local=<该样本的唯一标识>`；文件经本机回环导入隔离来源，不进入仓库、不调用外部翻译。额外检查固定版式居中、连续跨文档滚动／反向回收、同文件目录锚点跟随和页内位置恢复。结束后停止服务并清除该环境变量。
+
 远程书库交互夹具在插件目录执行 `npx vite --config tests/remote-library-ui.config.ts`，在 `http://127.0.0.1:5199/` 匿名连接同源 `/opds` 与 `/opds-other`。使用真实 OPDS provider、模拟目录和本地 PNG／CBZ，覆盖书库切换、两层分类、分组封面、分页、连续搜索、空目录、失败重试、不可读详情及阅读返回位置；`?theme=dark` 检查深色界面。`/__remote_ui_metrics` 提供有界请求记录，外部 API、翻译和写请求均阻断。协议夹具校验执行 `npx vitest run tests/remote-library-ui-fixture.test.ts`；浏览器交互需单独检查，不代表真实服务或扩展权限验收。
 
 Kavita 公开服务联调在插件目录执行 `$env:RUN_OPDS_LIVE_KAVITA='1'; npx vitest run tests/opds-kavita.live.test.ts`，结束后清除此环境变量。可通过 `OPDS_KAVITA_URL` 在进程内传入已授权的演示地址；未提供时使用官方公开账户读取已有 OPDS 地址，不创建密钥或修改设置。JWT、目录令牌只在测试进程内存中使用，日志不输出地址或原始响应。真实 HTTP 验证目录、搜索、封面、原图、连接隔离和当前账户的下载权限拒绝；进度用例仅在原位置可读取时写入测试位置，并在 finally 恢复原值及复核。本地 IndexedDB 使用测试存储，不伪造服务响应，不把 403 当作完整文件阅读成功，也不替代 MV3 权限或私人实例验收。
