@@ -59,7 +59,7 @@ export async function remoteLibraryUiFixture() {
         { rel: ACQUISITION + '/borrow', href: `${root}/borrow/${index + 1}`, type: 'application/epub+zip' },
       ] : [
         { rel: 'self', href: `${root}/items/${index + 1}`, type: 'application/atom+xml;type=entry' },
-        { rel: ACQUISITION, href: '/fixture-assets/book.cbz', type: 'application/vnd.comicbook+zip' },
+        { rel: ACQUISITION, href: '/fixture-assets/book.cbz', type: 'application/vnd.comicbook+zip', ...(index % 6 !== 5 ? { size: archive.byteLength } : {}) },
       ],
       images: [{ href: index === 7 ? '/fixture-assets/missing-cover.png' : `/fixture-assets/covers/${index + 1}.png`, type: 'image/png' }],
     };
@@ -124,7 +124,7 @@ export async function remoteLibraryUiFixture() {
         if (index >= 0 && index < titles.length - 1) {
           const pub = publication(root, index);
           // OPDS 2 entry links to a standard Atom detail so native PSE count is preserved.
-          send(200, `<entry xmlns="http://www.w3.org/2005/Atom" xmlns:pse="http://vaemendis.net/opds-pse/ns"><id>${root}/items/${index + 1}</id><title>${escapeXml(titles[index])}</title><updated>2026-01-01T00:00:00Z</updated><author><name>${escapeXml(pub.metadata.author[0].name)}</name></author><summary>${escapeXml(pub.metadata.description)}</summary><link rel="http://opds-spec.org/image" href="/fixture-assets/covers/${index + 1}.png" type="image/png"/><link rel="http://vaemendis.net/opds-pse/stream" href="/fixture-assets/pages/{pageNumber}.png" type="image/png" pse:count="3"/><link rel="${ACQUISITION}" href="/fixture-assets/book.cbz" type="application/vnd.comicbook+zip"/></entry>`, 'application/atom+xml;type=entry'); return;
+          send(200, `<entry xmlns="http://www.w3.org/2005/Atom" xmlns:pse="http://vaemendis.net/opds-pse/ns"><id>${root}/items/${index + 1}</id><title>${escapeXml(titles[index])}</title><updated>2026-01-01T00:00:00Z</updated><author><name>${escapeXml(pub.metadata.author[0].name)}</name></author><summary>${escapeXml(pub.metadata.description)}</summary><link rel="http://opds-spec.org/image" href="/fixture-assets/covers/${index + 1}.png" type="image/png"/><link rel="http://vaemendis.net/opds-pse/stream" href="/fixture-assets/pages/{pageNumber}.png" type="image/png" pse:count="3"/><link rel="${ACQUISITION}" href="/fixture-assets/book.cbz" type="application/vnd.comicbook+zip" length="${archive.byteLength}"/></entry>`, 'application/atom+xml;type=entry'); return;
         }
       }
       const catalog = feed(root, path, url.searchParams);

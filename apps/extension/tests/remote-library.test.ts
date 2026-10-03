@@ -44,7 +44,7 @@ import * as pageIdentity from '../src/comics/pages/identity';
 import { localSourceDriver } from '../src/comics/sources/local/driver';
 import * as formats from '../src/comics/formats';
 import type { EpubIndex } from '../src/comics/formats/contracts';
-import { loadEntry, saveReaderState } from '../src/comics/application/library-service';
+import { listShelfIndex, loadEntry, saveReaderState } from '../src/comics/application/library-service';
 
 vi.mock('../src/comics/formats', () => ({
   indexFile: async () => ({
@@ -176,6 +176,42 @@ describe('remote library capability integration', () => {
     expect(page.publications).toHaveLength(1);
     expect(await comicsFor(f.connectionId)).toEqual([]);
     expect(f.resolve).not.toHaveBeenCalled();
+  });
+
+  it('labels new and existing shelf comics with the current remote library name, reading each connection once', async () => {
+    const f=fixture();
+    await f.connect();
+    await openRemotePublication(f.connectionId,f.publicationId);
+    const [comic]=await comicsFor(f.connectionId);
+    expect(comic.sourceName).toBe('Private library');
+    await catalog.patch('comics',comic.id,{sourceName:'Fixture library'});
+    await catalog.put('comics',{...comic,id:comic.id+':second',sourceKey:JSON.stringify([f.connectionId,f.publicationId+':second']),sourceName:'Fixture library',source:{...comic.source,providerItemId:f.publicationId+':second'}});
+    const [account]=await f.provider.connection!.list!();
+    account.displayName='Renamed library';
+    await f.connect(true);
+    const reads=vi.spyOn(catalog,'get');
+    try {
+      const shelf=await listShelfIndex();
+      expect(shelf.comics.filter(value=>value.source.connectionId===f.connectionId).map(value=>value.sourceName))
+        .toEqual(['Renamed library','Renamed library']);
+      expect(reads.mock.calls.filter(([table,id])=>table==='connections'&&id===f.connectionId)).toHaveLength(1);
+      expect(f.index).toHaveBeenCalledOnce();
+      expect(f.resolve).toHaveBeenCalledOnce();
+    } finally {reads.mockRestore();}
+  });
+
+  it('keeps ordinary source labels and saved labels when a connection is unavailable', async () => {
+    const f=fixture();
+    await f.connect();
+    await openRemotePublication(f.connectionId,f.publicationId);
+    const [comic]=await comicsFor(f.connectionId),provider='file-only-'+crypto.randomUUID(),connectionId=crypto.randomUUID();
+    stops.push(registerSourceDriver({id:provider,label:'File only',cachePages:false,cacheRanges:false}));
+    await catalog.put('connections',{id:connectionId,provider,displayName:'File account',status:'connected',generation:1,createdAt:1,updatedAt:1});
+    await catalog.put('comics',{...comic,id:'ordinary:'+comic.id,sourceKey:JSON.stringify([connectionId,f.publicationId]),sourceName:'CBZ',source:{...comic.source,connectionId}});
+    await catalog.put('comics',{...comic,id:'missing:'+comic.id,sourceKey:JSON.stringify(['missing:'+connectionId,f.publicationId]),sourceName:'Saved library',source:{...comic.source,connectionId:'missing:'+connectionId}});
+    const shelf=await listShelfIndex();
+    expect(shelf.comics.find(value=>value.id==='ordinary:'+comic.id)?.sourceName).toBe('CBZ');
+    expect(shelf.comics.find(value=>value.id==='missing:'+comic.id)?.sourceName).toBe('Saved library');
   });
 
   it('isolates equal publication and artwork IDs across multiple providers and connections', async () => {

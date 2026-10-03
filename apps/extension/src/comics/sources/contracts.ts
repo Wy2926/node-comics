@@ -21,6 +21,7 @@ export type SourceAccount = Pick<SourceConnection,'id'|'provider'|'accountId'|'d
 export interface SourceConnectionField {
   id:string; label:string; type:'text'|'url'|'password'|'select'; required?:boolean;
   placeholder?:string; description?:string; options?:readonly {value:string;label:string}[];
+  showWhen?:{field:string;values:readonly string[]}; sensitive?:boolean;
 }
 export interface ConnectionCapability {
   fields?:readonly SourceConnectionField[];
@@ -29,11 +30,16 @@ export interface ConnectionCapability {
   list?():Promise<SourceAccount[]>;
   subscribe?(listener:()=>void):()=>void;
   describe?(account:SourceAccount):SourceAccountField[];
+  /** Only editable, non-secret values. Empty sensitive inputs preserve provider-owned credentials. */
+  configuration?(account:SourceAccount):Promise<Record<string,string>>;
   disconnect?(account:SourceAccount):Promise<void>;
+  remove?(account:SourceAccount):Promise<void>;
 }
 export interface RemotePublication {
   id:string; title:string; authors?:string[]; summary?:string; artwork?:SourceArtwork;
   formats?:string[]; readable?:boolean; reason?:string;
+  /** Catalog hint in bytes for the preferred direct file (the first format), if declared. */
+  size?:number;
 }
 export interface RemoteCatalogRequest {
   connection:SourceConnection; location?:string; cursor?:string; search?:string; signal?:AbortSignal;

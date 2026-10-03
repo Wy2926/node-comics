@@ -2,9 +2,56 @@ import {msg} from '../../i18n/runtime';
 import {requireHostAccess} from '../../host-permissions';
 import {channelDefinition,channelDefinitions} from './registry';
 import {channelSettingsKey,defaultChannel,deleteChannelSecrets,readChannelSecrets,readChannelSettings,subscribeChannelSettings,writeChannelSecrets,updateChannelSettings} from './configuration';
-import type {ChannelConnection,ChannelConnectionInput,ChannelProfile} from './contracts';
+import type {ChannelConnection,ChannelConnectionInput,ChannelProfile,LocalTranslationResultReference} from './contracts';
+import {blockEntryDirectOperations,readEntryDirectOperations,removeEntryDirectOperations,transferDirectOperation,type DirectOperationOwner} from './transport/operations';
+import {removeTransferReceipts} from './transport/receipts';
+import {resultBlobKey} from '../../storage/translations/results';
 export type {ChannelConnection,ChannelDefinition,ChannelField,ChannelProfile,ChannelRuntime,TranslationScope} from './contracts';
 export {channelSettingsKey};
+
+export async function inspectLocalTranslationEntry(entryId:string):Promise<LocalTranslationResultReference[]>{
+  const refs:LocalTranslationResultReference[]=[];let after:string|undefined;
+  do{
+    const records=await readEntryDirectOperations(entryId,after);
+    for(const record of records){
+      const imageSha256=record.job.source_image_sha256??record.job.image_sha256;
+      // A direct result's UUID is known before the HTTP response arrives.
+      refs.push({imageSha256,scope:record.scope,key:resultBlobKey({key:record.scope},{...record.job,result:{key:record.job.id,recoverable:false}})});
+      if(record.previousResult?.result)refs.push({imageSha256:record.previousResult.source_image_sha256??record.previousResult.image_sha256??imageSha256,scope:record.scope,key:resultBlobKey({key:record.scope},record.previousResult)});
+    }
+    after=records.length===100?records.at(-1)!.id:undefined;
+  }while(after);
+  for(const definition of channelDefinitions())if(definition.inspectLocalEntry)refs.push(...await definition.inspectLocalEntry(entryId));
+  return [...new Map(refs.map(ref=>[ref.key,ref])).values()];
+}
+export async function blockLocalTranslationEntry(entryId:string,resolveShared?:(imageSha256:string)=>Promise<DirectOperationOwner|undefined>):Promise<void>{
+  if(resolveShared){
+    let after:string|undefined;
+    do{
+      const records=await readEntryDirectOperations(entryId,after);
+      for(const record of records){
+        const hash=record.job.image_sha256;
+        // Only digest identities are shared across entries; page identities remain entry-local.
+        if(!hash||record.id!==JSON.stringify([record.scope,record.job.target_language,record.job.mode,['sha256',hash]]))continue;
+        const owner=await resolveShared(hash);
+        if(owner)await transferDirectOperation(record,owner);
+      }
+      after=records.length===100?records.at(-1)!.id:undefined;
+    }while(after);
+  }
+  await blockEntryDirectOperations(entryId);
+  for(const definition of channelDefinitions())await definition.blockLocalEntry?.(entryId);
+}
+export async function removeLocalTranslationEntry(entryId:string):Promise<void>{
+  await blockLocalTranslationEntry(entryId);let after:string|undefined;
+  do{
+    const records=await readEntryDirectOperations(entryId,after);
+    await removeTransferReceipts(records.flatMap(record=>[record.job.id,...(record.previousResult?[record.previousResult.id]:[])]));
+    after=records.length===100?records.at(-1)!.id:undefined;
+  }while(after);
+  await removeEntryDirectOperations(entryId);
+  for(const definition of channelDefinitions())await definition.removeLocalEntry?.(entryId);
+}
 
 export function availableChannelProtocols(){return channelDefinitions().filter(d=>d.configurable).map(({id,label,fields})=>({id,label,fields}));}
 export async function listChannels(){const settings=await readChannelSettings();return {...settings,profiles:[defaultChannel,...settings.profiles]};}

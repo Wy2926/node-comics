@@ -43,15 +43,16 @@ async function publish(request:ResultRequest,blob:Blob,token:CacheToken|undefine
 }
 async function retainCurrent(request:ResultRequest,key:string,blob:Blob,token:CacheToken|undefined){
   if(token){
-    const current=await translationCache.token(request.scope.key).catch(cacheUnavailable);
-    if(current&&(current.epoch!==token.epoch||current.ownerGeneration!==token.ownerGeneration))throw new LocalResultUnavailableError();
+    const current=await translationCache.token(request.scope.key,key).catch(cacheUnavailable);
+    if(current&&(current.epoch!==token.epoch||current.ownerGeneration!==token.ownerGeneration||(current.keyGeneration??0)>(token.keyEpoch??0)))throw new LocalResultUnavailableError();
+    token=current??token;
   }
   assertCurrent(request.isCurrent);retainResult(key,blob,token);return blob;
 }
 /** Validate before publishing; disk budget zero still permits bounded current-session display. */
 export async function saveResultBlob(request:ResultRequest&{blob:Blob;cacheToken?:CacheToken}):Promise<Blob>{
   assertResult(request);const {scope,blob,isCurrent}=request;
-  const token=request.cacheToken??await translationCache.token(scope.key).catch(cacheUnavailable);
+  const token=request.cacheToken??await translationCache.token(scope.key,resultBlobKey(scope,request.job)).catch(cacheUnavailable);
   if(token&&token.owner!==scope.key)throw new LocalResultUnavailableError();
   await validate(blob);assertCurrent(isCurrent);
   return publish(request,blob,token);
@@ -69,7 +70,7 @@ async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>})
   if(!pending){
     const read=async()=>{
       assertCurrent(isCurrent);
-      const token=await translationCache.token(scope.key).catch(cacheUnavailable);
+      const token=await translationCache.token(scope.key,key).catch(cacheUnavailable);
       const cached=await translationCache.get(key).catch(cacheUnavailable);
       const retained=cached??resultInMemory(key,token)??(!job.result!.recoverable?await readResultFromContexts(key,token):undefined);
       if(retained)return retainCurrent(request,key,retained,token);

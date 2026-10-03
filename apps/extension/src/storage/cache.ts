@@ -10,12 +10,13 @@ const schema: DatabaseSchema = {
 };
 export interface CacheUsage { bytes: number; reservedBytes: number; count: number; budgetBytes: number }
 export interface CacheScope { owner?: string; connectionId?: string; contentId?: string }
-export interface CacheToken { epoch: number; ownerGeneration: number; owner?: string }
+export interface CacheToken { epoch: number; ownerGeneration: number; owner?: string; keyEpoch?: number; keyGeneration?: number }
 export interface CacheWriteOptions extends CacheScope { token?: CacheToken }
 interface CacheMeta extends CacheScope { key: string; size: number; usedAt: number }
-interface UsageRecord { id: 'usage'; bytes: number; reservedBytes: number; count: number; epoch: number }
+interface UsageRecord { id: 'usage'; bytes: number; reservedBytes: number; count: number; epoch: number; keyEpoch?: number }
 interface ScopeRecord { id: string; generation: number; blocked: boolean }
-export interface CacheReservation extends CacheWriteOptions { id: string; key: string; size: number; expiresAt: number; epoch: number; ownerGeneration: number }
+interface KeyRecord { id: string; generation: number }
+export interface CacheReservation extends CacheWriteOptions { id: string; key: string; size: number; expiresAt: number; epoch: number; ownerGeneration: number; keyEpoch?: number }
 interface CacheConfiguration { name: string; budgetBytes: number | (() => number); retained?: boolean }
 const request = <T>(value: IDBRequest<T>): Promise<T> => new Promise((resolve, reject) => { value.onsuccess = () => resolve(value.result); value.onerror = () => reject(value.error); });
 const completed = (tx: IDBTransaction): Promise<void> => {
@@ -58,10 +59,14 @@ export class ByteCache {
     for(const key of missing)await this.get(key);
     return batches.flat();
   }
-  async token(owner?: string): Promise<CacheToken> {
+  async token(owner?: string, key?: string): Promise<CacheToken> {
     const db = await this.open(), state = db.transaction('state').objectStore('state');
-    const [usage, scope] = await Promise.all([request(state.get('usage')) as Promise<UsageRecord | undefined>, owner ? request(state.get('owner:' + owner)) as Promise<ScopeRecord | undefined> : undefined]);
-    return { epoch: usage?.epoch ?? 0, ownerGeneration: scope?.generation ?? 0, owner };
+    const [usage, scope, object] = await Promise.all([
+      request(state.get('usage')) as Promise<UsageRecord | undefined>,
+      owner ? request(state.get('owner:' + owner)) as Promise<ScopeRecord | undefined> : undefined,
+      key ? request(state.get('key:' + key)) as Promise<KeyRecord | undefined> : undefined,
+    ]);
+    return { epoch: usage?.epoch ?? 0, ownerGeneration: scope?.generation ?? 0, owner, keyEpoch:usage?.keyEpoch??0, ...(key?{keyGeneration:object?.generation??0}:{}) };
   }
   async get(key: string): Promise<Blob | undefined> {
     try {
@@ -90,7 +95,7 @@ export class ByteCache {
       return !scope?.blocked;
     } catch (error) { if (this.retained || error instanceof SourceDatabaseSchemaError) throw error; return false; }
   }
-  /** Capture a token before fetching bytes to fence a response arriving after clear/deleteOwner. */
+  /** Capture a token before fetching bytes to fence a response arriving after clear or deletion. */
   async reserve(key: string, size: number, options: CacheWriteOptions = {}): Promise<CacheReservation | undefined> {
     if (!Number.isSafeInteger(size) || size < 0) throw Error('Invalid cache byte size');
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx);
@@ -98,21 +103,27 @@ export class ByteCache {
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();
     await this.expire(tx, usage);
     const owner = options.owner ?? options.token?.owner;
-    const scope = owner ? await request(state.get('owner:' + owner)) as ScopeRecord | undefined : undefined;
-    if (scope?.blocked || (options.token && (options.token.epoch !== usage.epoch || options.token.ownerGeneration !== (scope?.generation ?? 0) || options.token.owner !== owner))) { state.put(usage); await done; return undefined; }
+    const [scope, object] = await Promise.all([
+      owner ? request(state.get('owner:' + owner)) as Promise<ScopeRecord | undefined> : undefined,
+      request(state.get('key:' + key)) as Promise<KeyRecord | undefined>,
+    ]);
+    if (scope?.blocked || (options.token && (options.token.epoch !== usage.epoch || options.token.ownerGeneration !== (scope?.generation ?? 0) || options.token.owner !== owner || (options.token.keyEpoch??0)<(object?.generation??0)))) { state.put(usage); await done; return undefined; }
     if (!this.retained && size > this.budget()) { state.put(usage); await done; return undefined; }
     // A reservation includes the old object plus replacement bytes until commit, matching actual disk needs.
     if (!this.retained) await this.evict(tx, usage, Math.max(0, usage.bytes + usage.reservedBytes + size - this.budget()), key);
     if (!this.retained && (size > this.budget() || usage.bytes + usage.reservedBytes + size > this.budget())) { state.put(usage); await done; return undefined; }
-    const reservation: CacheReservation = { ...options, owner, id: crypto.randomUUID(), key, size, expiresAt: Date.now() + 60_000, epoch: usage.epoch, ownerGeneration: scope?.generation ?? 0 };
+    const reservation: CacheReservation = { ...options, owner, id: crypto.randomUUID(), key, size, expiresAt: Date.now() + 60_000, epoch: usage.epoch, ownerGeneration: scope?.generation ?? 0, keyEpoch:usage.keyEpoch??0 };
     reservations.put(reservation); usage.reservedBytes += size; state.put(usage); await done; return reservation;
   }
   async commit(reservation: CacheReservation, blob: Blob): Promise<boolean> {
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx), state = tx.objectStore('state');
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();
     const current = await request(tx.objectStore('reservations').get(reservation.id)) as CacheReservation | undefined;
-    const scope = current?.owner ? await request(state.get('owner:' + current.owner)) as ScopeRecord | undefined : undefined;
-    const valid = current && current.size === blob.size && current.expiresAt > Date.now() && current.epoch === usage.epoch && current.ownerGeneration === (scope?.generation ?? 0) && !scope?.blocked;
+    const [scope, object] = await Promise.all([
+      current?.owner ? request(state.get('owner:' + current.owner)) as Promise<ScopeRecord | undefined> : undefined,
+      current ? request(state.get('key:' + current.key)) as Promise<KeyRecord | undefined> : undefined,
+    ]);
+    const valid = current && current.size === blob.size && current.expiresAt > Date.now() && current.epoch === usage.epoch && current.ownerGeneration === (scope?.generation ?? 0) && !scope?.blocked && (current.keyEpoch??0)>=(object?.generation??0);
     if (current) { usage.reservedBytes = Math.max(0, usage.reservedBytes - current.size); tx.objectStore('reservations').delete(current.id); }
     if (!valid) { state.put(usage); await done; return false; }
     const previous = await request(tx.objectStore('metadata').get(current.key)) as CacheMeta | undefined;
@@ -151,12 +162,19 @@ export class ByteCache {
   private async removeMatching(index: 'key' | 'owner' | 'connectionId' | 'contentId', value: string, block = false): Promise<void> {
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx), metadata = tx.objectStore('metadata'), state = tx.objectStore('state');
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();
-    const records = index === 'key' ? [await request(metadata.get(value))].filter(Boolean) as CacheMeta[] : await request(metadata.index(index).getAll(value)) as CacheMeta[];
-    for (const entry of records) { metadata.delete(entry.key); tx.objectStore('objects').delete(entry.key); usage.bytes -= entry.size; usage.count--; }
+    for(;;){
+      const records = index === 'key' ? [await request(metadata.get(value))].filter(Boolean) as CacheMeta[] : await request(metadata.index(index).getAll(value,100)) as CacheMeta[];
+      for (const entry of records) { metadata.delete(entry.key); tx.objectStore('objects').delete(entry.key); usage.bytes -= entry.size; usage.count--; }
+      if(index==='key'||records.length<100)break;
+    }
     // A local object deletion also invalidates pending writers, without reading any Blob values.
     if (index === 'owner') {
       const scope = await request(state.get('owner:' + value)) as ScopeRecord | undefined;
       state.put({ id: 'owner:' + value, generation: (scope?.generation ?? 0) + 1, blocked: block } satisfies ScopeRecord);
+    } else if(index==='key') {
+      // A key fence rejects its old tokens/reservations while other objects stay writable.
+      usage.keyEpoch=(usage.keyEpoch??0)+1;
+      state.put({id:'key:'+value,generation:usage.keyEpoch} satisfies KeyRecord);
     } else { usage.epoch++; }
     state.put(usage); await done;
   }
@@ -175,6 +193,7 @@ export class ByteCache {
     const db = await this.open(), tx = db.transaction(storeNames, 'readwrite'), done = completed(tx), state = tx.objectStore('state');
     const usage = await request(state.get('usage')) as UsageRecord ?? emptyUsage();
     tx.objectStore('metadata').clear(); tx.objectStore('objects').clear(); tx.objectStore('reservations').clear();
+    state.delete(IDBKeyRange.bound('key:','key:\uffff'));
     state.put({ ...emptyUsage(), epoch: usage.epoch + 1 }); await done;
   }
   async setBudget(bytes: number): Promise<void> {

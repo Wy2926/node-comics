@@ -1068,5 +1068,20 @@
   "截图失败，请保持当前标签页可见后重试。": "Gagal mengambil tangkapan layar. Pastikan tab ini tetap terlihat, lalu coba lagi.",
   "无法保存截图，请释放本地存储空间后重试。": "Tidak dapat menyimpan tangkapan layar. Kosongkan ruang penyimpanan lokal, lalu coba lagi.",
   "选区已失效，请重新框选。": "Pilihan area ini tidak lagi tersedia. Pilih area lagi.",
-  "翻译设置已变化，请重新框选。": "Pengaturan terjemahan telah berubah. Pilih area lagi."
+  "翻译设置已变化，请重新框选。": "Pengaturan terjemahan telah berubah. Pilih area lagi.",
+  "编辑书库": "Edit pustaka",
+  "保存修改": "Simpan perubahan",
+  "留空表示不修改": "Biarkan kosong agar tidak diubah",
+  "授权信息留空时保留原设置；已断开的书库需要重新填写授权信息。": "Biarkan kolom autentikasi kosong untuk mempertahankan pengaturan saat ini. Pustaka yang terputus memerlukan informasi autentikasi untuk diisi kembali.",
+  "含访问令牌的 OPDS 地址": "URL OPDS dengan token akses",
+  "移除书库": "Hapus pustaka",
+  "此操作无法撤销": "Tindakan ini tidak dapat dibatalkan",
+  "将移除《{0}》及其全部关联漫画、阅读记录和下载任务。": "“{0}” beserta semua komik terkait, riwayat baca, dan tugas unduhnya akan dihapus.",
+  "此书库持有的原图、译图缓存和离线文件将一并清理。": "Cache gambar asli dan terjemahan serta berkas offline milik pustaka ini juga akan dihapus.",
+  "仅清理本机资料，远端书库文件保留。": "Hanya data lokal yang akan dihapus. Berkas pustaka jarak jauh akan tetap disimpan.",
+  "关联漫画：{0} 本": "Komik terkait: {0}",
+  "下载任务：{0} 个": "Tugas unduh: {0}",
+  "移除书库及关联资料": "Hapus pustaka dan data terkait",
+  "正在移除书库…": "Menghapus pustaka…",
+  "更换服务器或账户时，请新增书库连接。": "Tambahkan koneksi pustaka baru untuk menggunakan server atau akun lain."
 }

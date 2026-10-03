@@ -21,6 +21,7 @@ export interface OpdsLink {
   active?: boolean;
   width?: number;
   height?: number;
+  size?: number;
 }
 export interface OpdsPublication {
   identity?: string;
@@ -51,6 +52,8 @@ const localized = (v: unknown): string =>
   string(v) ?? (Object.values(object(v)).find((x) => typeof x === 'string') as string) ?? '';
 const integer = (v: unknown) =>
   Number.isSafeInteger(Number(v)) && Number(v) >= 0 ? Number(v) : undefined;
+const byteSize = (v: unknown) =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : undefined;
 export const mediaType = (v?: string) => v?.split(';')[0].trim().toLowerCase() ?? '';
 export const hasRel = (link: OpdsLink, rel: string) => link.rels.includes(rel);
 export const isAcquisition = (link: OpdsLink) =>
@@ -118,6 +121,7 @@ function jsonLink(value: unknown, base: string): OpdsLink | undefined {
     encrypted: !!properties.encrypted,
     width: integer(link.width),
     height: integer(link.height),
+    size: byteSize(link.size),
   };
 }
 const jsonLinks = (value: unknown, base: string) =>
@@ -163,7 +167,8 @@ function jsonSection(value: unknown, base: string): OpdsSection {
 function xmlLink(node: XmlNode): OpdsLink | undefined {
   const href = attribute(node, 'href');
   if (!href) return;
-  const rel = attribute(node, 'rel') ?? 'alternate';
+  const rel = attribute(node, 'rel') ?? 'alternate',
+    length = attribute(node, 'length');
   return {
     href: absoluteHref(href, node.base),
     type: attribute(node, 'type'),
@@ -175,6 +180,7 @@ function xmlLink(node: XmlNode): OpdsLink | undefined {
     lastReadDate: attribute(node, 'lastReadDate', PSE),
     facetGroup: attribute(node, 'facetGroup', OPDS),
     active: attribute(node, 'activeFacet', OPDS) === 'true',
+    size: length && /^\d+$/.test(length) ? byteSize(Number(length)) : undefined,
   };
 }
 const xmlLinks = (node: XmlNode) =>

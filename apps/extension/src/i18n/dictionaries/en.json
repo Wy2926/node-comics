@@ -1068,5 +1068,20 @@
   "截图失败，请保持当前标签页可见后重试。": "Capture failed. Keep this tab visible and try again.",
   "无法保存截图，请释放本地存储空间后重试。": "Could not save the capture. Free up local storage and try again.",
   "选区已失效，请重新框选。": "This selection is no longer available. Select the area again.",
-  "翻译设置已变化，请重新框选。": "Translation settings have changed. Select the area again."
+  "翻译设置已变化，请重新框选。": "Translation settings have changed. Select the area again.",
+  "编辑书库": "Edit library",
+  "保存修改": "Save changes",
+  "留空表示不修改": "Leave blank to keep unchanged",
+  "授权信息留空时保留原设置；已断开的书库需要重新填写授权信息。": "Leave authentication fields blank to keep the current settings. Disconnected libraries require authentication details to be entered again.",
+  "含访问令牌的 OPDS 地址": "OPDS URL with access token",
+  "移除书库": "Remove library",
+  "此操作无法撤销": "This action cannot be undone",
+  "将移除《{0}》及其全部关联漫画、阅读记录和下载任务。": "“{0}” and all its linked comics, reading history and download tasks will be removed.",
+  "此书库持有的原图、译图缓存和离线文件将一并清理。": "Original and translated image caches and offline files held by this library will also be cleared.",
+  "仅清理本机资料，远端书库文件保留。": "Only local data will be cleared. Remote library files will be kept.",
+  "关联漫画：{0} 本": "Linked comics: {0}",
+  "下载任务：{0} 个": "Download tasks: {0}",
+  "移除书库及关联资料": "Remove library and linked data",
+  "正在移除书库…": "Removing library…",
+  "更换服务器或账户时，请新增书库连接。": "Add a new library connection to use a different server or account."
 }

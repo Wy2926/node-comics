@@ -352,3 +352,44 @@ describe('OPDS resource authorization fence', () => {
     },
   );
 });
+
+describe('explicit OPDS private removal',()=>{
+  it('deletes credentials and every indexed resource in bounded batches, preserving another connection',async()=>{
+    const databaseName='opds-remove-'+crypto.randomUUID(),store=new PrivateOpdsStore(databaseName);
+    const current=connection('/api/opds/private-secret'),other=connection('/api/opds/other-secret');
+    await store.saveConnection(current);await store.saveConnection(other);
+    const resource=(value:PrivateConnection,id:string,pinned=true):PrivateResource=>({id,connectionId:value.id,revision:1,kind:'artwork',value:{link:{href:value.root+'/cover'}},pinned,updatedAt:1});
+    await store.saveResources([
+      ...Array.from({length:205},(_,index)=>resource(current,'removed:'+index)),
+      resource(current,'transient',false),resource(other,'other'),
+    ]);
+    const reads=vi.spyOn(IDBIndex.prototype,'getAllKeys');
+    await store.remove(current.id);
+    const scoped=reads.mock.calls.filter((_,index)=>(reads.mock.contexts[index] as IDBIndex).name==='connectionId');
+    expect(scoped).toEqual([[current.id,100],[current.id,100],[current.id,100]]);
+    reads.mockRestore();
+    const reopened=new PrivateOpdsStore(databaseName);
+    expect(await reopened.connection(current.id)).toBeUndefined();
+    expect(await store.resource('transient')).toBeUndefined();
+    for(let index=0;index<205;index++)expect(await reopened.resource('removed:'+index)).toBeUndefined();
+    expect(await reopened.connection(other.id)).toEqual(other);expect(await reopened.resource('other')).toBeDefined();
+    await expect(store.saveConnection({...current,revision:2},current)).rejects.toMatchObject({code:'disconnected'});
+    await expect(store.saveResources([resource(current,'late')])).rejects.toMatchObject({code:'disconnected'});
+    await store.remove(current.id);expect(await reopened.resource('late')).toBeUndefined();
+  });
+
+  it.each([true,false])('serializes a credential edit with removal (remove first=%s)',async removeFirst=>{
+    const databaseName='opds-remove-race-'+crypto.randomUUID(),store=new PrivateOpdsStore(databaseName),current=connection('/api/opds/private-secret');
+    await store.saveConnection(current);
+    const edit=()=>store.saveConnection({...current,root:origin+'/api/opds/new-secret',revision:2},current);
+    await Promise.allSettled(removeFirst?[store.remove(current.id),edit()]:[edit(),store.remove(current.id)]);
+    expect(await store.connection(current.id)).toBeUndefined();
+  });
+
+  it('retains the safe directory address of a legacy Basic connection after disconnect',async()=>{
+    const store=new PrivateOpdsStore('opds-safe-configuration-'+crypto.randomUUID());
+    const current={...connection('/opds?lang=zh'),auth:{kind:'basic' as const,username:'reader',password:'secret'}};
+    await store.saveConnection(current);await store.disconnect(current.id);
+    expect(await store.connection(current.id)).toMatchObject({root:'',configurationUrl:origin+'/opds?lang=zh',auth:{kind:'basic',username:'',password:''}});
+  });
+});

@@ -18,6 +18,7 @@ export interface PrivateConnection {
   origin?: string;
   endpointKey?: string;
   accountKey?: string;
+  configurationUrl?: string;
 }
 export interface PrivateResource {
   id: string;
@@ -43,12 +44,24 @@ export interface OpdsStore {
   resource(id: string): Promise<PrivateResource | undefined>;
   saveResources(values: PrivateResource[]): Promise<void>;
   disconnect(id: string): Promise<void>;
+  remove(id: string): Promise<void>;
   clearTransient?(connectionId: string): void;
 }
 const credentialKey = (key: string) => /^(?:api_?key|token|access_token|auth|password)$/i.test(key);
 const pathCredential = /(\/api\/opds\/)([^/]+)(?=\/|$)/i;
 const pathPlaceholder = '__opds_path_credential__';
 const queryPlaceholder = '__opds_query_credential__';
+export function editableUrl(connection: PrivateConnection): string | undefined {
+  if (connection.auth.kind === 'url-token') return;
+  const root = connection.configurationUrl ?? connection.root;
+  if (!root) return;
+  try {
+    const url = new URL(root);
+    if (url.username || url.password || /\/api\/opds\/[^/]+(?:\/|$)/i.test(url.pathname) ||
+      [...url.searchParams.keys()].some(key => /^(?:api_?key|token|access_token|auth|password|sig(?:nature)?|expires|x-amz-.+|x-goog-.+)$/i.test(key))) return;
+    return url.href;
+  } catch { return; }
+}
 const pathToken = (url?: URL) => url?.pathname.match(pathCredential)?.[2];
 function decodedToken(value?: string): string | undefined {
   try {
@@ -202,6 +215,28 @@ export class PrivateOpdsStore implements OpdsStore {
     for (const [key, row] of this.transient)
       if (row.connectionId === id) this.transient.delete(key);
   }
+  async remove(id: string) {
+    const db = await this.database();
+    this.clearTransient(id);
+    // Deleting authorization first makes pending CAS/resource writes fail before resource cleanup.
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('connections', 'readwrite');
+      tx.objectStore('connections').delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
+    for (;;) {
+      const removed = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction('resources', 'readwrite'), store = tx.objectStore('resources');
+        const request = store.index('connectionId').getAllKeys(id, 100);
+        request.onsuccess = () => { for (const key of request.result) store.delete(key); };
+        tx.oncomplete = () => resolve(request.result.length);
+        tx.onerror = tx.onabort = () => reject(tx.error);
+      });
+      if (removed < 100) break;
+    }
+    this.clearTransient(id);
+  }
   async saveConnection(
     value: PrivateConnection,
     expected?: Pick<PrivateConnection, 'revision' | 'disconnected'>,
@@ -352,6 +387,7 @@ export class PrivateOpdsStore implements OpdsStore {
           if (connection)
             tx.objectStore('connections').put({
               ...connection,
+              configurationUrl: editableUrl(connection),
               root: '',
               auth:
                 connection.auth.kind === 'basic'

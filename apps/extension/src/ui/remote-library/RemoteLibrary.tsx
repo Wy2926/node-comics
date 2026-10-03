@@ -14,14 +14,23 @@ import {
   openRemotePublication,
   readRemoteArtwork,
 } from '../../comics/application/remote-library-service';
-import { subscribeSourceAccounts } from '../../comics/application/source-service';
+import { connectionCapabilities, subscribeSourceAccounts } from '../../comics/application/source-service';
 import { disconnectSource } from '../../comics/application/source-lifecycle';
 import { Modal } from '../components';
 import { useContextMenu } from '../ContextMenu';
 import { ConnectionDialog } from './ConnectionDialog';
+import { RemoveConnectionDialog } from './RemoveConnectionDialog';
 import './remote-library.css';
 
 const artworkPool = new RequestPool(2);
+const fileSize = (bytes: number) =>
+  bytes >= 1024 ** 3
+    ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
+    : bytes >= 1024 ** 2
+      ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
+      : bytes >= 1024
+        ? `${Math.round(bytes / 1024)} KB`
+        : `${bytes} B`;
 type Location = {
   location?: string;
   cursor?: string;
@@ -50,7 +59,8 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     [busy, setBusy] = useState(false),
     [opening, setOpening] = useState<string>();
   const [editing, setEditing] = useState<SourceAccount | null | undefined>(),
-    [disconnecting, setDisconnecting] = useState<SourceAccount>();
+    [disconnecting, setDisconnecting] = useState<SourceAccount>(),
+    [removing, setRemoving] = useState<SourceAccount>();
   const [refresh, setRefresh] = useState(0),
     [actionError, setActionError] = useState(''),
     [details, setDetails] = useState<RemotePublication>();
@@ -63,8 +73,10 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     openRequest = useRef<AbortController | undefined>(undefined),
     pageRequest = useRef<AbortController | undefined>(undefined);
   const savedScroll = useRef(0),
-    restoreScroll = useRef(false);
-  const completedPage = useRef<string | undefined>(undefined);
+    restoreScroll = useRef(false),
+    breadcrumbTrail = useRef<HTMLOListElement>(null);
+  const completedPage = useRef<string | undefined>(undefined),
+    catalogRoot = useRef<string | undefined>(undefined);
   const reloadAccounts = useCallback(async () => {
     const epoch = ++listEpoch.current;
     try {
@@ -109,6 +121,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
       .then((result) => {
         if (controller.signal.aborted) return;
         completedPage.current = pageKey;
+        catalogRoot.current = result.breadcrumbs?.[0]?.location;
         setPage(result);
         restoreScroll.current = true;
       })
@@ -153,6 +166,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   function reset(id: string) {
     cancelOpening();
     completedPage.current = undefined;
+    catalogRoot.current = undefined;
     setAccountId(id);
     setPage(undefined);
     setHistory([]);
@@ -230,7 +244,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     }
   }
   const publications = page?.publications ?? [];
-  const rootLocation = page?.breadcrumbs?.[0]?.location;
+  const rootLocation = page?.breadcrumbs?.[0]?.location ?? catalogRoot.current;
   const breadcrumbs = history.flatMap((item, index) =>
     item.location &&
     item.location !== rootLocation &&
@@ -247,9 +261,13 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   const pageTitle = location.search
     ? msg('搜索结果')
     : page?.title ?? location.title ?? account?.displayName;
+  useLayoutEffect(() => {
+    const trail = breadcrumbTrail.current;
+    if (trail) trail.scrollLeft = document.documentElement.dir === 'rtl' ? -trail.scrollWidth : trail.scrollWidth;
+  }, [accountId, history.length, pageTitle]);
   const connectionActions = account
     ? [
-        { label: msg('重新连接'), icon: 'settings', onSelect: () => setEditing(account) },
+        { label: account.status === 'connected' ? msg('编辑书库') : msg('重新连接'), icon: 'settings', onSelect: () => setEditing(account) },
         ...(account.status !== 'disconnected'
           ? [
               {
@@ -260,14 +278,28 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
               },
             ]
           : []),
+        ...(connectionCapabilities(account).canRemove
+          ? [{ label: msg('移除书库'), icon: 'trash' as const, danger: true, onSelect: () => setRemoving(account) }]
+          : []),
       ]
     : [];
-  const searchForm = !blocked && (page?.searchable || location.search) && (
+  const searchable = !blocked && !!(page?.searchable || location.search);
+  const searchForm = (
     <form
       className="nc-remote-search"
+      data-unavailable={!searchable || undefined}
+      aria-hidden={!searchable || undefined}
       onSubmit={(event) => {
         event.preventDefault();
-        if (page && search.trim() && search.trim() !== location.search)
+        if (!page || !searchable || busy) return;
+        if (!search.trim()) {
+          if (location.search) {
+            if (history.length) back();
+            else reset(accountId);
+          }
+          return;
+        }
+        if (search.trim() !== location.search)
           navigate(
             {
               location: location.searchLocation ?? page.location,
@@ -288,25 +320,10 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
           placeholder={msg('搜索书库')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          disabled={!searchable || busy}
           maxLength={256}
         />
       </label>
-      <button className="button secondary small" disabled={busy || !search.trim()}>
-        {msg('搜索')}
-      </button>
-      {location.search && (
-        <button
-          type="button"
-          className="text-link"
-          disabled={busy}
-          onClick={() => {
-            if (history.length) back();
-            else reset(accountId);
-          }}
-        >
-          {msg('清除搜索')}
-        </button>
-      )}
     </form>
   );
   return (
@@ -381,18 +398,18 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
               <>
                 <nav className="nc-remote-breadcrumbs" aria-label={msg('书库目录')}>
                   <button
-                    className="icon-button"
+                    className="nc-remote-back"
                     disabled={!history.length || busy}
                     onClick={() => back()}
                     aria-label={msg('返回上级')}
                     title={msg('返回上级')}
                   >
-                    <Icon name="arrow" style={{ transform: 'rotate(180deg)' }} size={16} />
+                    <Icon name="arrow" style={{ transform: 'rotate(180deg)' }} size={18} />
                   </button>
-                  <ol>
+                  <ol ref={breadcrumbTrail}>
                     <li>
-                      <button className="text-link" disabled={busy} onClick={() => reset(accountId)}>
-                        <Icon name="home" size={16} />
+                      <button className="nc-remote-crumb" disabled={busy} onClick={() => reset(accountId)}>
+                        <Icon name="home" size={18} />
                         {msg('书库首页')}
                       </button>
                     </li>
@@ -400,29 +417,40 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                       <li key={item.index}>
                         <Icon name="chevron" size={14} />
                         <button
-                          className="text-link"
+                          className="nc-remote-crumb"
                           disabled={busy}
                           onClick={() => back(item.index)}
+                          title={item.search ? msg('搜索结果') : item.title}
                         >
-                          {item.search ? msg('搜索结果') : item.title}
+                          <span>{item.search ? msg('搜索结果') : item.title}</span>
                         </button>
                       </li>
                     ))}
                     <li aria-current="page">
                       <Icon name="chevron" size={14} />
-                      <span>{pageTitle}</span>
+                      <span className="nc-remote-crumb nc-remote-crumb-current" title={pageTitle}>
+                        <Icon name={location.search ? 'search' : 'folder'} size={18} />
+                        <span>{pageTitle}</span>
+                      </span>
                     </li>
                   </ol>
                 </nav>
                 <div className="nc-remote-toolbar">
                   <div className="nc-remote-title">
-                    <h2>{pageTitle}</h2>
-                    {page && !busy && !blocked && (
-                      <span>{msg('本页 {0} 本', { '0': count })}</span>
-                    )}
+                    <h2 title={pageTitle}>{pageTitle}</h2>
+                    <span
+                      className="nc-remote-count"
+                      data-pending={!page || busy || blocked || undefined}
+                      title={msg('本页 {0} 本', { '0': count })}
+                    >
+                      <span className="nc-remote-count-width" aria-hidden="true">
+                        {msg('本页 {0} 本', { '0': '00000' })}
+                      </span>
+                      <span className="nc-remote-count-value">{msg('本页 {0} 本', { '0': count })}</span>
+                    </span>
                   </div>
                   {searchForm}
-                  <div className="nc-inline">
+                  <div className="nc-remote-toolbar-actions">
                     <button
                       className="icon-button"
                       aria-label={msg('刷新')}
@@ -518,7 +546,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                               key={link.id}
                               className={'button small ' + (link.active ? 'primary' : 'secondary')}
                               disabled={busy || link.active}
-                              onClick={() => navigate({ location: link.location, scrollTop: 0 })}
+                              onClick={() => navigate({ location: link.location, title: page.title, scrollTop: 0 })}
                             >
                               {link.title}
                             </button>
@@ -617,6 +645,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                           navigate(
                             {
                               location: page.location,
+                              title: page.title,
                               cursor: page.previous,
                               search: location.search,
                               searchLocation: location.searchLocation,
@@ -637,6 +666,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                           navigate(
                             {
                               location: page.location,
+                              title: page.title,
                               cursor: page.next,
                               search: location.search,
                               searchLocation: location.searchLocation,
@@ -702,6 +732,17 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
           onConnected={(connection) => {
             setEditing(undefined);
             void reloadAccounts().then(() => reset(connection.id));
+          }}
+        />
+      )}
+      {removing && (
+        <RemoveConnectionDialog
+          account={removing}
+          onClose={() => setRemoving(undefined)}
+          onRemoved={() => {
+            setRemoving(undefined);
+            if (accountId === removing.id) reset('');
+            void reloadAccounts();
           }}
         />
       )}
@@ -794,43 +835,57 @@ function PublicationCard({
   }, [active, visible, connectionId, publication.artwork]);
   return (
     <article ref={ref} className="nc-remote-publication" data-publication-id={publication.id}>
-      <button
-        className="nc-remote-cover"
-        disabled={busy || publication.readable === false}
-        onClick={onRead}
-        aria-label={msg('打开漫画 {0}', { '0': publication.title })}
-      >
-        {url ? <img src={url} alt="" loading="lazy" /> : <Icon name="book" size={48} />}
-        {publication.readable === false ? (
-          <span className="nc-remote-cover-badge">{msg('暂不可读')}</span>
-        ) : (
-          <span className="nc-remote-cover-action">
-            <Icon name="book" size={18} />
-            {msg('开始阅读')}
-          </span>
+      <div className="nc-remote-cover-frame">
+        <button
+          className="nc-remote-cover"
+          disabled={busy || publication.readable === false}
+          onClick={onRead}
+          aria-label={msg('打开漫画 {0}', { '0': publication.title })}
+          title={publication.reason || publication.title}
+        >
+          {url ? <img src={url} alt="" loading="lazy" /> : <Icon name="book" size={48} />}
+          {publication.readable !== false && (
+            <span className="nc-remote-cover-action">
+              <Icon name="book" size={18} />
+              {msg('开始阅读')}
+            </span>
+          )}
+        </button>
+        {!!publication.formats?.length && (
+          <div className="nc-remote-cover-formats">
+            {publication.formats.map((format) => (
+              <span className="nc-remote-cover-tag" key={format}>{format.toUpperCase()}</span>
+            ))}
+          </div>
         )}
-      </button>
+        <div className="nc-remote-cover-caption">
+          {!!publication.size && (
+            <span
+              className="nc-remote-cover-tag nc-remote-cover-size"
+              title={[publication.formats?.[0]?.toUpperCase(), fileSize(publication.size)].filter(Boolean).join(' · ')}
+            >
+              {fileSize(publication.size)}
+            </span>
+          )}
+          {publication.readable === false && (
+            <span className="nc-remote-cover-tag nc-remote-cover-unavailable">{msg('暂不可读')}</span>
+          )}
+        </div>
+        <button
+          className="icon-button nc-remote-details-button"
+          aria-label={msg('查看详情：{0}', { '0': publication.title })}
+          title={msg('查看详情：{0}', { '0': publication.title })}
+          onClick={onDetails}
+        >
+          <Icon name="info" size={16} />
+        </button>
+      </div>
       <div className="nc-remote-publication-info">
         <h3>
-          <button disabled={busy || publication.readable === false} onClick={onRead}>
+          <button disabled={busy || publication.readable === false} onClick={onRead} title={publication.title}>
             {publication.title}
           </button>
         </h3>
-        {!!publication.authors?.length && (
-          <p className="nc-muted">{publication.authors.join(' · ')}</p>
-        )}
-        <div className="nc-remote-card-footer">
-          <span className="nc-remote-formats">{publication.formats?.join(' · ')}</span>
-          <button
-            className="icon-button"
-            aria-label={msg('查看详情：{0}', { '0': publication.title })}
-            title={msg('查看详情：{0}', { '0': publication.title })}
-            onClick={onDetails}
-          >
-            <Icon name="info" size={16} />
-          </button>
-        </div>
-        {publication.reason && <p className="nc-remote-unavailable">{publication.reason}</p>}
       </div>
     </article>
   );

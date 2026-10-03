@@ -38,6 +38,7 @@ import {
   type OpdsProgressBinding,
 } from './progress';
 import {
+  editableUrl,
   identityUrl,
   opaqueId,
   PrivateOpdsStore,
@@ -219,6 +220,7 @@ export function createOpdsProvider(
       summary: pub.summary ? cleanText(pub.summary) : undefined,
       artwork,
       formats: [...new Set(access.files.map((file) => file.format))],
+      size: access.files[0]?.link.size,
       readable: access.readable,
       reason: access.readable === false ? access.unavailableReason : undefined,
     };
@@ -398,6 +400,7 @@ export function createOpdsProvider(
             type: 'url' as const,
             required: true,
             placeholder: 'https://server.example/opds',
+            showWhen: { field: 'auth', values: ['anonymous', 'basic'] },
           },
           {
             id: 'auth',
@@ -409,19 +412,59 @@ export function createOpdsProvider(
               { value: 'url-token', label: msg('地址已包含访问令牌') },
             ],
           },
-          { id: 'username', label: msg('用户名'), type: 'text' as const },
-          { id: 'password', label: msg('密码'), type: 'password' as const },
+          {
+            id: 'tokenUrl',
+            label: msg('含访问令牌的 OPDS 地址'),
+            type: 'password' as const,
+            required: true,
+            sensitive: true,
+            showWhen: { field: 'auth', values: ['url-token'] },
+          },
+          {
+            id: 'username',
+            label: msg('用户名'),
+            type: 'text' as const,
+            required: true,
+            sensitive: true,
+            showWhen: { field: 'auth', values: ['basic'] },
+          },
+          {
+            id: 'password',
+            label: msg('密码'),
+            type: 'password' as const,
+            required: true,
+            sensitive: true,
+            showWhen: { field: 'auth', values: ['basic'] },
+          },
         ];
       },
+      async configuration(value) {
+        const connection = await connectionFor(value, true);
+        const url = editableUrl(connection);
+        return {
+          name: connection.name,
+          auth: connection.auth.kind,
+          _revision: String(connection.revision),
+          ...(url ? { url } : {}),
+        };
+      },
       async connect(values, existing, signal) {
+        const previous = existing ? await connectionFor(existing, true) : undefined;
+        if (previous && values._revision !== undefined && values._revision !== String(previous.revision))
+          throw new OpdsError('disconnected', 'OPDS 授权已在其他页面变更，请重新连接。');
+        const kind = values.auth ?? previous?.auth.kind ?? 'anonymous';
+        if (!['anonymous', 'basic', 'url-token'].includes(kind))
+          throw new OpdsError('unsupported-auth', 'OPDS 授权方式不受支持。');
+        const previousBasic = previous?.auth.kind === 'basic' && !previous.disconnected
+          ? previous.auth : undefined;
         const auth: OpdsAuth =
-          values.auth === 'basic'
+          kind === 'basic'
             ? {
                 kind: 'basic',
-                username: values.username ?? '',
-                password: values.password ?? '',
+                username: values.username || previousBasic?.username || '',
+                password: values.password || previousBasic?.password || '',
               }
-            : values.auth === 'url-token'
+            : kind === 'url-token'
               ? { kind: 'url-token' }
               : { kind: 'anonymous' };
         if (
@@ -429,8 +472,14 @@ export function createOpdsProvider(
           (!auth.username || !auth.password || auth.username.includes(':'))
         )
           throw new OpdsError('authentication-required', '请填写有效的 Basic 用户名和密码。');
-        const root = validateRoot(values.url?.trim() ?? '', auth.kind !== 'anonymous'),
-          previous = existing ? await connectionFor(existing, true) : undefined;
+        const inputUrl = auth.kind === 'url-token'
+          ? (values.tokenUrl !== undefined ? values.tokenUrl : values.url)?.trim()
+          : values.url?.trim();
+        const retainedUrl = previous?.auth.kind === auth.kind && !previous.disconnected
+          ? previous.root : previous?.configurationUrl;
+        if (auth.kind === 'url-token' && !inputUrl && !retainedUrl)
+          throw new OpdsError('authentication-required', '请填写含访问令牌的 OPDS 地址。');
+        const root = validateRoot(inputUrl || retainedUrl || '', auth.kind !== 'anonymous');
         const connection: PrivateConnection = {
           id: previous?.id ?? `opds:${crypto.randomUUID()}`,
           name: cleanText(values.name?.trim() || new URL(root).hostname, 100),
@@ -441,6 +490,7 @@ export function createOpdsProvider(
           createdAt: previous?.createdAt ?? Date.now(),
         };
         connection.origin = new URL(root).origin;
+        connection.configurationUrl = editableUrl(connection);
         connection.endpointKey = await opaqueId(
           connection.id,
           'endpoint',
@@ -506,6 +556,13 @@ export function createOpdsProvider(
         const connection = await connectionFor(value, true);
         await store.disconnect(connection.id);
         await changed(connection.id);
+      },
+      async remove(value) {
+        if (value.provider !== PROVIDER)
+          throw new OpdsError('disconnected', 'OPDS 连接已断开，请重新添加。');
+        transport.abortConnection(value.id);
+        await store.remove(value.id);
+        await changed(value.id);
       },
     },
     catalog: {

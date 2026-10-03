@@ -6,11 +6,11 @@ import {msg} from '../../../../i18n/runtime';
 import {API_BASE,API_ORIGIN} from '../../../../service';
 import {fallbackLanguages,modeLabels,type Capabilities,type Entitlements} from '../../../../types';
 import type {ChannelDefinition,ChannelConnection,ChannelRuntime,RuntimeOptions} from '../../contracts';
-import {TranslationCoordinator} from './coordinator';
+import {TranslationCoordinator,translationJob} from './coordinator';
 import {operationId} from './operations';
 import {translationState} from './state';
-import {translationScope} from './store';
-import {loadDeliveredResult,registerResultReader,releaseResultReaders} from '../../../../storage/translations/results';
+import {translationScope,readEntryOperations,blockEntryOperations,removeEntryOperations,readImageJobsPage} from './store';
+import {loadDeliveredResult,registerResultReader,releaseResultReaders,resultBlobKey} from '../../../../storage/translations/results';
 import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from '../../../input/limits';
 import {loadTranslationInput} from '../../../input/load';
 
@@ -22,6 +22,24 @@ const baselineCapabilities=():Capabilities=>({modes:[
 
 export const definition:ChannelDefinition={
   id:'nodelane',label:'NodeLane',configurable:false,fields:[],
+  async inspectLocalEntry(entryId){
+    const refs=new Map<string,{imageSha256?:string;scope:string;key:string}>(),images=new Set<string>();let after:string|undefined;
+    do{
+      const records=await readEntryOperations(entryId,after);
+      for(const record of records){
+        const imageSha256=record.sourceSha256??record.image.sha256;
+        const add=(job:Parameters<typeof resultBlobKey>[1])=>{if(job.result){const key=resultBlobKey({key:record.scope},job);refs.set(key,{imageSha256:job.source_image_sha256??imageSha256,scope:record.scope,key});}};
+        if(record.result)add(translationJob(record.result,record));
+        const imageKey=JSON.stringify([record.scope,imageSha256]);if(images.has(imageKey))continue;images.add(imageKey);
+        let jobAfter:string|undefined;
+        do{const jobs=await readImageJobsPage(record.scope,imageSha256,jobAfter);jobs.forEach(add);jobAfter=jobs.length===100?jobs.at(-1)!.id:undefined;}while(jobAfter);
+      }
+      after=records.length===100?records.at(-1)!.id:undefined;
+    }while(after);
+    return [...refs.values()];
+  },
+  removeLocalEntry:removeEntryOperations,
+  blockLocalEntry:blockEntryOperations,
   subscribe(listener){
     let stopped=false,revision=0;
     const initial=readAuth().then(value=>value.session?.id??null);

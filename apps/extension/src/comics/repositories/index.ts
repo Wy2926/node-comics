@@ -7,6 +7,11 @@ import {epubImageDescriptor} from '../domain/epub-images';
 export const CATALOG_DATABASE = sourceDatabaseName('catalog');
 /** A source identity can be reopened, but work begun before its deletion cannot republish it. */
 export const sourceRemovalKey = (sourceKey:string) => 'source-key:' + sourceKey;
+export const sourceCleanupKey = (kind:'entry'|'image'|'cover',connectionId:string,id:string) => `source-cleanup-${kind}:` + JSON.stringify([connectionId,id]);
+export const sourceCleanupRange = (kind:'entry'|'image'|'cover',connectionId:string) => {
+  const prefix = `source-cleanup-${kind}:[` + JSON.stringify(connectionId) + ',';
+  return IDBKeyRange.bound(prefix,prefix+'\uffff');
+};
 export interface CatalogChange { table: CatalogTable; ids: IDBValidKey[] }
 export type CatalogWrite = { [T in CatalogTable]: { table: T; value: CatalogTables[T] } }[CatalogTable];
 export interface ListOptions {
@@ -104,11 +109,12 @@ export const catalog = {
       async put(table, record) {
         const key = table === 'pageDescriptors' ? [(record as PageDescriptor).contentId, (record as PageDescriptor).pageId] : (record as {id: string}).id;
         if (await idbRequest(tx.objectStore('tombstones').get([table, key].join(':')))) throw new StaleCatalogWriteError();
-        tx.objectStore(table).put(record); writes.set(table, [...writes.get(table) ?? [], key]);
+        tx.objectStore(table).put(record);
+        const ids=writes.get(table);if(ids)ids.push(key);else writes.set(table,[key]);
       },
       async remove(table, id) {
         tx.objectStore(table).delete(id); if(table!=='catalogs'&&table!=='tombstones')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
-        writes.set(table, [...writes.get(table) ?? [], id]);
+        const ids=writes.get(table);if(ids)ids.push(id);else writes.set(table,[id]);
       },
     };
     try {
@@ -130,8 +136,9 @@ export const catalog = {
       return true;
     });
   },
-  async editTranslationBinding(id: string, edit: (previous: CatalogTables['translationBindings'] | undefined) => CatalogTables['translationBindings'] | undefined): Promise<CatalogTables['translationBindings'] | undefined> {
-    const db = await openTranslationBindings(), tx = db.transaction('translationBindings', 'readwrite'), done = idbCompleted(tx);
+  async editTranslationBinding(id: string, edit: (previous: CatalogTables['translationBindings'] | undefined) => CatalogTables['translationBindings'] | undefined, entryId?:string): Promise<CatalogTables['translationBindings'] | undefined> {
+    const db = await openTranslationBindings(), tx = db.transaction(['translationBindings','tombstones'], 'readwrite'), done = idbCompleted(tx);
+    if(entryId&&await idbRequest(tx.objectStore('tombstones').get('entry:'+entryId))){await done;return undefined;}
     const store = tx.objectStore('translationBindings'), previous = await idbRequest(store.get(id)) as CatalogTables['translationBindings'] | undefined;
     const next = edit(previous); if (next) store.put(next); await done;
     if (next) changed('translationBindings', [id]); return next ?? previous;
@@ -176,6 +183,38 @@ export const catalog = {
   async count(table: CatalogTable, options: Pick<ListOptions, 'index' | 'range'> = {}): Promise<number> {
     const db = await openTables([table]), store = db.transaction(table).objectStore(table);
     return idbRequest((options.index ? store.index(options.index) : store).count(options.range));
+  },
+  async listConnectionComics(connectionId:string,limit=100,after?:string):Promise<CatalogTables['comics'][]> {
+    const db=await openCatalog(),index=db.transaction('comics').objectStore('comics').index('connectionId');
+    if(!after)return idbRequest(index.getAll(connectionId,limit));
+    return new Promise((resolve,reject)=>{
+      const values:CatalogTables['comics'][]=[],request=index.openCursor(connectionId);
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const cursor=request.result;
+        if(!cursor||values.length>=limit){resolve(values);return;}
+        const primaryKey=String(cursor.primaryKey);
+        if(primaryKey<after){cursor.continuePrimaryKey(connectionId,after);return;}
+        if(primaryKey===after){cursor.continue();return;}
+        values.push(cursor.value);if(values.length===limit)resolve(values);else cursor.continue();
+      };
+    });
+  },
+  async listComicEntries(comicId:string,limit=100,after?:string):Promise<CatalogTables['entries'][]> {
+    const db=await openCatalog(),index=db.transaction('entries').objectStore('entries').index('comicId');
+    if(!after)return idbRequest(index.getAll(comicId,limit));
+    return new Promise((resolve,reject)=>{
+      const values:CatalogTables['entries'][]=[],request=index.openCursor(comicId);
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const cursor=request.result;
+        if(!cursor||values.length>=limit){resolve(values);return;}
+        const primaryKey=String(cursor.primaryKey);
+        if(primaryKey<after){cursor.continuePrimaryKey(comicId,after);return;}
+        if(primaryKey===after){cursor.continue();return;}
+        values.push(cursor.value);if(values.length===limit)resolve(values);else cursor.continue();
+      };
+    });
   },
   listEntries(comicId: string, options: {offset?: number; limit?: number} = {}) {
     return catalog.list('entries', {limit: 10000, ...options, index: 'comicOrder', range: IDBKeyRange.bound([comicId, -Infinity], [comicId, Infinity])});
@@ -261,10 +300,12 @@ export const catalog = {
     if (next) tx.objectStore('tasks').put({ ...next, id, entryId }); await done;
     if (next) changed('tasks', [id]); return next;
   },
-  async deleteComic(comicId: string): Promise<CatalogTables['entries'][]> {
+  async deleteComic(comicId: string,removalConnectionId?:string): Promise<CatalogTables['entries'][]> {
     return catalog.mutate(Object.keys(schema) as CatalogTable[], async tx => {
       const comic=await tx.get('comics',comicId);
       if(comic){
+        if(removalConnectionId&&comic.source.connectionId!==removalConnectionId)throw Error('漫画来源与待移除书库不匹配。');
+        if(removalConnectionId)await tx.put('metadata',{id:sourceCleanupKey('cover',removalConnectionId,comic.id),comicId:comic.id});
         const id=sourceRemovalKey(comic.sourceKey),previous=await tx.get('tombstones',id);
         await tx.put('tombstones',{id,deletedAt:Math.max(Date.now(),Number(previous?.deletedAt??0)+1)});
         const downloadId='file-download:'+comic.sourceKey,download=await tx.get('metadata',downloadId);
@@ -273,12 +314,36 @@ export const catalog = {
           await tx.put('metadata',{...download,comicId:comic.id,status:'clearing',generation:Number(download.generation??0)+1,owner:undefined,updatedAt:Date.now()});
         }
       }
-      const entries = await tx.list('entries', {index: 'comicId', range: comicId, limit: 10000});
-      for (const entry of entries) {
-        for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
-        for (const value of await tx.list('materializations', {index: 'contentId', range: entry.contentId, limit: 5000})) await tx.remove('materializations', value.id);
-        for (const table of ['positions', 'tasks'] as const) for (const value of await tx.list(table, {index: 'entryId', range: entry.id, limit: 10000})) await tx.remove(table, value.id);
+      const entries:CatalogTables['entries'][]=[];
+      for(;;){
+      const batch=await tx.list('entries',{index:'comicId',range:comicId,limit:removalConnectionId?100:10000});
+      for (const entry of batch) {
+        if(removalConnectionId){
+          const id=sourceCleanupKey('entry',removalConnectionId,entry.id);
+          if(!await tx.get('metadata',id))await tx.put('metadata',{id,entryId:entry.id,contentId:entry.contentId,containerId:entry.containerId});
+        }
+        for(;;){
+          const batch=await tx.list('pageDescriptors',{index:'contentId',range:entry.contentId,limit:100});
+          for(const page of batch)await tx.remove('pageDescriptors',[page.contentId,page.pageId]);
+          if(batch.length<100)break;
+        }
+        for(;;){
+          const batch=await tx.list('materializations',{index:'contentId',range:entry.contentId,limit:100});
+          for(const value of batch){
+            if(removalConnectionId)await tx.put('metadata',{id:sourceCleanupKey('image',removalConnectionId,value.imageSha256),imageSha256:value.imageSha256});
+            await tx.remove('materializations',value.id);
+          }
+          if(batch.length<100)break;
+        }
+        for(const table of ['positions','tasks'] as const)for(;;){
+          const batch=await tx.list(table,{index:'entryId',range:entry.id,limit:100});
+          for(const value of batch)await tx.remove(table,value.id);
+          if(batch.length<100)break;
+        }
         await tx.remove('entries', entry.id);
+      }
+      if(!removalConnectionId){entries.push(...batch);break;}
+      if(batch.length<100)break;
       }
       for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);
       await tx.remove('metadata', 'reading-preferences:' + comicId);

@@ -28,6 +28,38 @@ describe('OPDS protocol normalization', () => {
     expect(result.publications[0].identity).toBe('urn:book:7');
     expect(result.publications[0].links[0].href).toBe('https://catalog.example/books/7.cbz');
   });
+  it('normalizes Atom length and Readium JSON size as byte hints', () => {
+    const atom = parseCatalog(
+      feed(entry('<link rel="http://opds-spec.org/acquisition" type="application/zip" href="book.cbz" length="123456"/>')),
+      root,
+    ).publications[0];
+    const json = jsonPublication({
+      metadata: { title: 'Book' },
+      links: [{ rel: 'download', href: 'book.cbz', type: 'application/zip', size: 123456 }],
+    }, root);
+    expect(atom.links[0].size).toBe(123456);
+    expect(json.links[0].size).toBe(123456);
+  });
+  it.each([undefined, null, '', '123', true, [], {}, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'ignores invalid or absent JSON byte sizes: %s',
+    (size) => {
+      const publication = jsonPublication({
+        metadata: { title: 'Book' },
+        links: [{ rel: 'download', href: 'book.cbz', size, length: 123, properties: { size: 456 } }],
+      }, root);
+      expect(publication.links[0].size).toBeUndefined();
+    },
+  );
+  it.each(['', '0', '-1', '1.5', '1e3', '0x10', 'invalid', '9007199254740992'])(
+    'ignores invalid Atom byte lengths: %s',
+    (length) => {
+      const publication = parseCatalog(
+        feed(entry(`<link rel="http://opds-spec.org/acquisition" type="application/zip" href="book.cbz" length="${length}"/>`)),
+        root,
+      ).publications[0];
+      expect(publication.links[0].size).toBeUndefined();
+    },
+  );
   it('separates navigation from partial entries and keeps facets/pagination', () => {
     const result = parseCatalog(
       feed(

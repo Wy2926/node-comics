@@ -217,14 +217,18 @@ export async function releaseContainer(id: string, referenceId: string) {
 export async function discardContainerImports(referenceId: string): Promise<void> {
   await bytesTransaction(ALL, 'readwrite', async tx => {
     const operations = tx.objectStore('operations');
-    for (const operation of await idbRequest(operations.getAll()) as ImportOperation[]) {
-      if (operation.referenceId !== referenceId) continue;
-      operations.delete(operation.id); await removeChunks(tx, operation.id);
+    for (;;) {
+      const batch = await idbRequest(operations.index('referenceId').getAll(referenceId, 100)) as ImportOperation[];
+      for (const operation of batch) { operations.delete(operation.id); await removeChunks(tx, operation.id); }
+      if (batch.length < 100) break;
     }
     const references = tx.objectStore('references');
-    const matches = await idbRequest(references.index('referenceId').getAll(referenceId)) as {id:string;containerId:string}[];
-    for (const reference of matches) references.delete(reference.id);
-    for (const id of new Set(matches.map(reference => reference.containerId))) await collect(tx, id);
+    for(;;){
+      const matches = await idbRequest(references.index('referenceId').getAll(referenceId,100)) as {id:string;containerId:string}[];
+      for (const reference of matches) references.delete(reference.id);
+      for (const id of new Set(matches.map(reference => reference.containerId))) await collect(tx, id);
+      if(matches.length<100)break;
+    }
   });
 }
 

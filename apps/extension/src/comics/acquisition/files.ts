@@ -49,6 +49,10 @@ export interface FileDownloadView {
 const prefix = 'file-download:';
 export const remoteFileDownloadId = (connectionId: string, publicationId: string) =>
   prefix + JSON.stringify([connectionId, publicationId]);
+export const remoteFileDownloadConnectionRange = (connectionId: string) => {
+  const start = prefix + '[' + JSON.stringify(connectionId) + ',';
+  return IDBKeyRange.bound(start, start + '\uffff');
+};
 const controllers = new Map<string, AbortController>();
 const executions = new Map<string, Promise<void>>();
 const changes = new Map<string, Promise<unknown>>();
@@ -365,6 +369,8 @@ export async function clearRemoteFileDownload(
     });
     if (!clearing) return;
     try {
+      // Keep the clearing intent until aborted local writers have finished releasing staging refs.
+      await executions.get(id);
       await discardUnclaimedTarget(clearing);
       await discardContainerImports(clearing.contentId);
       if (clearing.importReferenceId && clearing.importReferenceId !== clearing.contentId)
@@ -391,6 +397,15 @@ export async function clearRemoteFileDownload(
       throw error;
     }
   });
+}
+
+/** Use the same durable clearing intent for connection-scoped removal and retries. */
+export async function removeRemoteFileDownloads(connectionId: string): Promise<void> {
+  for (;;) {
+    const batch = await catalog.list('metadata', { range: remoteFileDownloadConnectionRange(connectionId), limit: 100 }) as FileDownloadIntent[];
+    if (!batch.length) return;
+    for (const intent of batch) await clearRemoteFileDownload(intent.id);
+  }
 }
 
 async function execute(intent: FileDownloadIntent, outer: AbortSignal): Promise<void> {

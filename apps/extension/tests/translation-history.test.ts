@@ -42,7 +42,7 @@ describe('translation request database upgrade',()=>{
     expect(await m.readJobs(f.core.scope,[t.page.imageSha256!])).toEqual([extended]);
     expect(await m.readJobs(f.core.scope,[],[unmapped.id])).toEqual([unmapped]);
     expect(await m.readJobs(other.core.scope,[],[original.id])).toEqual([otherJob]);
-    const db=await request(indexedDB.open(databaseName));expect(db.version).toBe(2);expect([...db.objectStoreNames]).toEqual(['jobs','operations','sync']);db.close();
+    const db=await request(indexedDB.open(databaseName));expect(db.version).toBe(3);expect([...db.objectStoreNames]).toEqual(['jobs','operations','sync','tombstones']);db.close();
     vi.resetModules();const reopened=await import('../src/translation/channels/adapters/nodelane/store');
     expect(await reopened.readJobs(f.core.scope,[],[original.id])).toEqual([extended]);
     expect((await reopened.readOperation(record.id))?.requestId).toBe(record.requestId);

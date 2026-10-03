@@ -4,7 +4,7 @@ import {initializeTranslationBudget,overrideTranslationBudget,translationBudgetB
 class TranslationCache extends ByteCache {
   private ready?:Promise<void>;
   private initialize(){return this.ready??=initializeTranslationBudget(()=>{void this.enforceBudget().catch(()=>{});}).then(async()=>{const usage=await super.usage();await super.trim(Math.max(0,usage.bytes+usage.reservedBytes-translationBudgetBytes()));});}
-  override async token(owner?:string){await this.initialize();return super.token(owner);}
+  override async token(owner?:string,key?:string){await this.initialize();return super.token(owner,key);}
   override async usage(){await this.initialize();return super.usage();}
   override async get(key:string){await this.initialize();return super.get(key);}
   override async has(key:string){await this.initialize();return super.has(key);}

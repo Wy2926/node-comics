@@ -6,7 +6,7 @@ export const BYTE_BACKEND = 'chunked-idb-v1';
 const schema: DatabaseSchema = {
   objects: {keyPath:'id',indexes:[{name:'state',keyPath:'state'}]},
   chunks: {keyPath:'id',indexes:[{name:'objectId',keyPath:'objectId'}]},
-  operations: {keyPath:'id',indexes:[{name:'expiresAt',keyPath:'expiresAt'}]},
+  operations: {keyPath:'id',indexes:[{name:'expiresAt',keyPath:'expiresAt'},{name:'referenceId',keyPath:'referenceId'}]},
   references: {keyPath:'id',indexes:[{name:'containerId',keyPath:'containerId'},{name:'referenceId',keyPath:'referenceId'}]},
   leases: {keyPath:'id',indexes:[{name:'containerId',keyPath:'containerId'}]},
   settings: {keyPath:'id'},
@@ -18,7 +18,10 @@ export function byteDatabase(): Promise<IDBDatabase> {
   }, async database => {
     const backend = await idbRequest(database.transaction('settings').objectStore('settings').get('backend'));
     if (backend?.value !== BYTE_BACKEND) throw new SourceDatabaseSchemaError(database.name, '源文件字节格式不匹配');
-  }).catch(error => { pending = undefined; throw error; });
+  }, {version:2,upgrade(tx,oldVersion){
+    if(oldVersion!==1)throw Error('Unsupported container database version');
+    tx.objectStore('operations').createIndex('referenceId','referenceId');
+  }}).catch(error => { pending = undefined; throw error; });
 }
 export function idbRequest<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
@@ -33,8 +36,11 @@ export interface ByteChunk { id: string; objectId: string; ordinal: number; byte
 export const chunkId = (objectId: string, ordinal: number) => `${objectId}:${ordinal}`;
 export async function removeChunks(tx: IDBTransaction, objectId: string) {
   const store = tx.objectStore('chunks');
-  const keys = await idbRequest(store.index('objectId').getAllKeys(objectId));
-  for (const key of keys) store.delete(key);
+  for(;;){
+    const keys = await idbRequest(store.index('objectId').getAllKeys(objectId,100));
+    for (const key of keys) store.delete(key);
+    if(keys.length<100)break;
+  }
 }
 export async function objectComplete(tx: IDBTransaction, objectId: string, size: number) {
   const store = tx.objectStore('chunks');

@@ -33,6 +33,7 @@ export function connectionCapabilities(connection: SourceAccount) {
     canReconnect: !!(driver?.connection?.reconnect||driver?.files?.select) && driver?.isConfigured?.() !== false,
     ...(driver?.connection?.connect?{canConfigure:true}:{}),
     ...(driver?.catalog?{canBrowse:true}:{}),
+    ...(driver?.connection?.remove?{canRemove:true}:{}),
     canDisconnect: !!driver?.connection?.disconnect};
 }
 
@@ -57,7 +58,8 @@ export async function listSourceAccounts(providerIds?:readonly string[]) {
       if(!account.id||account.provider!==driver.id||existing&&(existing.provider!==driver.id||existing.accountId!==account.accountId)) {
         errors.push({providerLabel:driver.label,error:'来源账户身份不匹配。'});continue;
       }
-      received.add(account.id);accounts.set(account.id,account);
+      const removing=existing&&await catalog.get('tombstones','connections:'+account.id);
+      received.add(account.id);accounts.set(account.id,removing?{...account,status:'disconnected'}:account);
     }
     for(const [id,account] of accounts)if(account.provider===driver.id&&!received.has(id)&&account.status==='connected')accounts.set(id,{...account,status:'reauth-required'});
   }

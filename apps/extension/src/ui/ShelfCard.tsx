@@ -22,7 +22,7 @@ export function ShelfCard({active,comic,onOpen,menu,selection}:{active:boolean;c
   {selection&&<input className="nc-card-select" type="checkbox" aria-label={selectLabel} checked={selection.checked} disabled={selection.disabled} onChange={selection.onToggle}/>}
   <button className="nc-book-cover" aria-label={selection?selectLabel:msg('打开漫画 {0}',{'0':comic.title})} aria-pressed={selection?.checked} disabled={selection?.disabled} onClick={action}>
    <Thumbnail key={comic.source.generation+':'+comic.source.status} blobKey={comic.source.status==='active'?coverKey:undefined} alt={msg('{0}封面',{'0':comic.title})} retryKey={retry} onError={comic.sourceCover?error=>setCoverFailure({key:coverKey!,error}):undefined}/>
-   <span className="nc-card-source">{comic.sourceName}</span>
+   <span className="nc-card-source" title={comic.sourceName}>{comic.sourceName}</span>
    <span className="nc-card-reading-time"><Icon name="clock" size={14}/>{lastRead?<time dateTime={new Date(lastRead).toISOString()} title={formatDate(lastRead,true)}>{formatDate(lastRead,true)}</time>:<span>{msg('还没阅读')}</span>}</span>
   </button>
   <div className="nc-card-progress" role="progressbar" aria-label={msg('阅读进度')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} title={`${msg('阅读进度')} · ${Math.round(progress)}%`}><span style={{width:`${progress}%`}}/></div>

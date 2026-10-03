@@ -90,6 +90,176 @@ function pageDescriptor(page: {
   };
 }
 describe('OPDS connection/provider', () => {
+  it('prefills editable configuration without exposing authentication inputs', async () => {
+    const { provider, store } = setup([Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    expect(await provider.connection!.configuration!(a)).toEqual({
+      name: values.name,
+      url: ROOT,
+      auth: 'basic',
+      _revision: String((await store.connection(a.id))!.revision),
+    });
+    const fields = provider.connection!.fields!;
+    expect(fields.find((field) => field.id === 'url')?.showWhen).toEqual({ field: 'auth', values: ['anonymous', 'basic'] });
+    for (const id of ['username', 'password']) {
+      expect(fields.find((field) => field.id === id)).toMatchObject({
+        required: true,
+        sensitive: true,
+        showWhen: { field: 'auth', values: ['basic'] },
+      });
+    }
+    expect(fields.find((field) => field.id === 'tokenUrl')).toMatchObject({
+      type: 'password', required: true, sensitive: true,
+      showWhen: { field: 'auth', values: ['url-token'] },
+    });
+  });
+  it('retains blank Basic credentials and permits independent password replacement', async () => {
+    const { provider, store, fetcher } = setup([
+      Response.json(catalog), Response.json(catalog), Response.json(catalog), Response.json(catalog),
+    ]);
+    const a = await provider.connection!.connect!(values);
+    const original = await provider.connection!.configuration!(a);
+    await provider.connection!.connect!({ ...original, name: 'Renamed', username: '', password: '' }, a);
+    expect((await store.connection(a.id))!.auth).toEqual({ kind: 'basic', username: values.username, password: values.password });
+    const rotated = await provider.connection!.connect!({
+      ...(await provider.connection!.configuration!(a)), username: '', password: 'new-password',
+    }, a);
+    await provider.connection!.connect!({
+      ...(await provider.connection!.configuration!(rotated)), username: values.username, password: '',
+    }, rotated);
+    const saved = (await store.connection(a.id))!;
+    expect(saved.name).toBe('Renamed');
+    expect(saved.auth).toEqual({ kind: 'basic', username: values.username, password: 'new-password' });
+    expect(new Headers(fetcher.mock.lastCall?.[1]?.headers).get('Authorization')).toBe(`Basic ${btoa(values.username + ':new-password')}`);
+  });
+  it('retains token URLs only privately when authentication input is blank', async () => {
+    const { provider, store, fetcher } = setup([Response.json(catalog), Response.json(catalog)]);
+    const tokenUrl = ROOT + '?token=private-token';
+    const a = await provider.connection!.connect!({ name: 'Token', auth: 'url-token', tokenUrl });
+    const configuration = await provider.connection!.configuration!(a);
+    expect(configuration).toEqual({ name: 'Token', auth: 'url-token', _revision: '1' });
+    expect(JSON.stringify({ configuration, a })).not.toContain('private-token');
+    await provider.connection!.connect!({ ...configuration, name: 'Token renamed', tokenUrl: '' }, a);
+    expect((await store.connection(a.id))!.root).toBe(tokenUrl);
+    expect((await store.connection(a.id))!.configurationUrl).toBeUndefined();
+    expect(fetcher.mock.lastCall?.[0]).toBe(tokenUrl);
+  });
+  it('does not prefill a known credential URL even when its stored authentication mode differs', async () => {
+    const { provider } = setup([Response.json(catalog)]);
+    const a = await provider.connection!.connect!({ ...values, url: ROOT + '?token=private-token' });
+    expect(await provider.connection!.configuration!(a)).not.toHaveProperty('url');
+  });
+  it('preserves safe directory configuration after disconnect but requires erased credentials again', async () => {
+    const { provider, store, fetcher } = setup([Response.json(catalog), Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    await provider.connection!.disconnect!(a);
+    const configuration = await provider.connection!.configuration!(a);
+    expect(configuration).toEqual({ name: values.name, auth: 'basic', url: ROOT, _revision: '2' });
+    for (const authentication of [{ username: '', password: '' }, { username: values.username, password: '' }, { username: '', password: 'new-password' }]) {
+      await expect(provider.connection!.connect!({ ...configuration, ...authentication }, a)).rejects.toMatchObject({ code: 'authentication-required' });
+    }
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await provider.connection!.connect!({ ...configuration, username: values.username, password: 'new-password' }, a);
+    expect((await store.connection(a.id))!.disconnected).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('requires token authorization after disconnect instead of retaining the cleared URL', async () => {
+    const { provider, fetcher } = setup([Response.json(catalog), Response.json(catalog)]);
+    const a = await provider.connection!.connect!({ name: 'Token', auth: 'url-token', tokenUrl: ROOT + '?token=secret' });
+    await provider.connection!.disconnect!(a);
+    const configuration = await provider.connection!.configuration!(a);
+    await expect(provider.connection!.connect!({ ...configuration, tokenUrl: '' }, a)).rejects.toMatchObject({ code: 'authentication-required' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await provider.connection!.connect!({ ...configuration, tokenUrl: ROOT + '?token=replaced' }, a);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it.each<Record<string, string>>([
+    { ...values, username: '' },
+    { ...values, password: '' },
+    { ...values, username: 'invalid:username' },
+    { name: 'Token', auth: 'url-token', tokenUrl: '' },
+  ])('rejects missing or invalid authentication for a new connection', async (input) => {
+    const { provider, store, fetcher } = setup();
+    await expect(provider.connection!.connect!(input)).rejects.toMatchObject({ code: 'authentication-required' });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await store.connections()).toEqual([]);
+  });
+  it('rejects unknown authentication instead of silently making a new anonymous connection', async () => {
+    const { provider, fetcher } = setup();
+    await expect(provider.connection!.connect!({ ...values, auth: 'unknown' })).rejects.toMatchObject({ code: 'unsupported-auth' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('does not switch an existing authentication scope or account through blank credentials', async () => {
+    const { provider, fetcher } = setup([Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    const configuration = await provider.connection!.configuration!(a);
+    await expect(provider.connection!.connect!({ ...configuration, auth: 'anonymous' }, a)).rejects.toMatchObject({ code: 'scope-blocked' });
+    await expect(provider.connection!.connect!({ ...configuration, auth: 'url-token', tokenUrl: ROOT }, a)).rejects.toMatchObject({ code: 'scope-blocked' });
+    await expect(provider.connection!.connect!({ ...configuration, username: 'another-account', password: '' }, a)).rejects.toMatchObject({ code: 'scope-blocked' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('rejects a stale edit configuration before making another request', async () => {
+    const { provider, store, fetcher } = setup([Response.json(catalog), Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    const stale = await provider.connection!.configuration!(a);
+    await provider.connection!.connect!({ ...stale, name: 'Latest', password: 'new-password' }, a);
+    await expect(provider.connection!.connect!({ ...stale, name: 'Outdated', password: '' }, a)).rejects.toMatchObject({ code: 'disconnected' });
+    expect((await store.connection(a.id))!.name).toBe('Latest');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('does not overwrite a concurrent edit when an earlier validation request finishes late', async () => {
+    const { provider, store, fetcher } = setup([Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    const configuration = await provider.connection!.configuration!(a);
+    let resolveRequest!: (response: Response) => void;
+    let started!: () => void;
+    const pending = new Promise<Response>((resolve) => { resolveRequest = resolve; });
+    const requested = new Promise<void>((resolve) => { started = resolve; });
+    fetcher.mockImplementationOnce(async () => { started(); return pending; });
+    fetcher.mockResolvedValueOnce(Response.json(catalog));
+    const earlier = provider.connection!.connect!({ ...configuration, name: 'Earlier', password: 'earlier-password' }, a);
+    await requested;
+    await provider.connection!.connect!({ ...configuration, name: 'Latest', password: 'latest-password' }, a);
+    resolveRequest(Response.json(catalog));
+    await expect(earlier).rejects.toMatchObject({ code: 'disconnected' });
+    expect((await store.connection(a.id))!.name).toBe('Latest');
+    expect((await store.connection(a.id))!.auth).toMatchObject({ password: 'latest-password' });
+  });
+  it('removes private reading bindings and accounts with retry-safe notifications', async () => {
+    const { provider, store } = setup([Response.json(catalog), Response.json(manifest)]);
+    const a = await provider.connection!.connect!(values);
+    const page = await provider.catalog!.browse({ connection: publicConnection(a) });
+    const plan = await provider.catalog!.resolve(publicConnection(a), page.publications[0].id);
+    const changed = vi.fn();
+    const accessLost = vi.fn(async () => {});
+    provider.connection!.subscribe!(changed);
+    provider.subscribe!(accessLost);
+    await provider.connection!.remove!(a);
+    expect(await store.connection(a.id)).toBeUndefined();
+    expect(await store.resource(plan.representationId)).toBeUndefined();
+    expect(await store.resource(page.publications[0].id)).toBeUndefined();
+    expect(await provider.connection!.list!()).toEqual([]);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(accessLost).toHaveBeenCalledWith({ connectionId: a.id });
+    await provider.connection!.remove!(a);
+    expect(await store.connections()).toEqual([]);
+  });
+  it('does not recreate a removed connection when a pending edit finishes late', async () => {
+    const { provider, store, fetcher } = setup([Response.json(catalog)]);
+    const a = await provider.connection!.connect!(values);
+    const configuration = await provider.connection!.configuration!(a);
+    let resolveRequest!: (response: Response) => void;
+    let started!: () => void;
+    const pending = new Promise<Response>((resolve) => { resolveRequest = resolve; });
+    const requested = new Promise<void>((resolve) => { started = resolve; });
+    fetcher.mockImplementationOnce(async () => { started(); return pending; });
+    const reconnect = provider.connection!.connect!({ ...configuration, password: 'late-password' }, a);
+    await requested;
+    await provider.connection!.remove!(a);
+    resolveRequest(Response.json(catalog));
+    await expect(reconnect).rejects.toMatchObject({ code: 'disconnected' });
+    expect(await store.connections()).toEqual([]);
+  });
   it('browses without importing/fetching covers or pages and exposes no transport URL or credentials', async () => {
     const { provider, fetcher } = setup([Response.json(catalog)]),
       a = await provider.connection!.connect!(values),
@@ -111,6 +281,39 @@ describe('OPDS connection/provider', () => {
           init?.referrerPolicy === 'no-referrer',
       ),
     ).toBe(true);
+  });
+  it('uses only the preferred direct file size without fetching details or borrowing alternate sizes', async () => {
+    const book = (title: string, links: unknown[]) => ({ metadata: { title }, links });
+    const pdf = { rel: 'download', href: '/book.pdf', type: 'application/pdf' };
+    const cbz = { rel: 'download', href: '/book.cbz', type: 'application/zip', size: 987654 };
+    const sized = {
+      metadata: { title: 'Sizes' },
+      publications: [
+        book('Preferred PDF', [{ rel: 'self', href: '/book', size: 1 }, { ...pdf, size: 123456 }, cbz]),
+        book('Unknown preferred size', [pdf, cbz]),
+        book('Invalid preferred size', [{ ...pdf, size: -1 }, cbz]),
+        book('Direct file only', [
+          { ...pdf, rel: 'borrow', size: 11 },
+          { ...pdf, size: 22, properties: { indirectAcquisition: [{ type: 'application/pdf' }] } },
+          { ...pdf, size: 33, properties: { encrypted: { scheme: 'drm' } } },
+          cbz,
+        ]),
+        book('Borrow only', [{ ...pdf, rel: 'borrow', size: 44 }]),
+      ],
+    };
+    const { provider, fetcher } = setup([Response.json(sized)]);
+    const account = await provider.connection!.connect!(values);
+    const connection = publicConnection(account);
+    const page = await provider.catalog!.browse({ connection });
+    expect(page.publications.map((item) => item.size)).toEqual([123456, undefined, undefined, 987654, undefined]);
+    expect(page.publications[0].formats).toEqual(['pdf', 'cbz']);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const plan = await provider.catalog!.resolve(connection, page.publications[0].id);
+    expect(plan.format).toBe('pdf');
+    expect(plan.publication.size).toBe(123456);
+    // Catalog lengths are display hints; range/download bindings still use verified transport sizes.
+    expect(plan.size).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('uses the validated connect result once and fetches an explicit refresh', async () => {
     const refreshed = { ...catalog, metadata: { title: 'Refreshed library' } };

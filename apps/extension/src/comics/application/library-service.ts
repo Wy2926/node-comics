@@ -12,6 +12,7 @@ import type {LibraryViewModel,SourceCatalog} from './types';
 import {mergeJobs} from '../../reader/jobs';
 import {sourceCoverOwner} from './cover-access';
 import type {TranslationScope} from '../../translation/channels/contracts';
+import {getSourceDriver} from '../sources/registry';
 import {readReadingPreferences, readingSelectionKey, readingSlots, chooseReadingEntry, resolveReadingSequence, entryReadable, entryRetained, sourceOrder} from './reading-preferences';
 export {coverReference} from './cover-access';
 export {selectReadingEntry,setSourceLanguagePreference} from './reading-preferences';
@@ -20,7 +21,17 @@ type TranslationPayload=Pick<Page,'translationScope'|'ownerId'|'apiOrigin'|'jobs
 const savedPages=new WeakMap<Page,string>();
 const savingReaderStates=new Map<string,Promise<void>>();
 const payload=(page:Page):TranslationPayload=>({translationScope:page.translationScope,ownerId:page.ownerId,apiOrigin:page.apiOrigin,jobs:page.jobs});
-export const listShelfIndex=async():Promise<LibraryViewModel>=>({comics:await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER})});
+export async function listShelfIndex():Promise<LibraryViewModel> {
+  const comics=await catalog.list('comics',{index:'updatedAt',direction:'prev',limit:Number.MAX_SAFE_INTEGER});
+  const connections=await Promise.all([...new Set(comics.map(comic=>comic.source.connectionId))].map(id=>catalog.get('connections',id)));
+  const names=new Map<string,string>();
+  for(const connection of connections)if(connection&&getSourceDriver(connection.provider)?.catalog)
+    names.set(connection.id,connection.displayName);
+  return {comics:comics.map(comic=>{
+    const sourceName=names.get(comic.source.connectionId);
+    return sourceName&&sourceName!==comic.sourceName?{...comic,sourceName}:comic;
+  })};
+}
 export const hasCatalogUpdates=(comic:Comic)=>!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision;
 /** Match directory chapter grouping without loading page descriptors or image data. */
 export async function shelfReadingProgress(comic:Comic):Promise<number> {
@@ -143,13 +154,13 @@ async function persistReaderState(copy:ReadingEntry) {
       const merged:TranslationPayload={...incoming,jobs};
       if(previous&&JSON.stringify(old)===JSON.stringify(merged))return undefined;
       return {id,scope:page.translationScope!,imageSha256:page.imageSha256!,payload:merged,updatedAt:Date.now()};
-    });
+    },copy.id);
     savedPages.set(page,signature);
   }
 }
-export async function removeComic(id:string) {
-  const entries=await catalog.deleteComic(id);
-  await thumbnailCache.deleteOwner(sourceCoverOwner(id),true);
+export async function removeComic(id:string,removalConnectionId?:string) {
+  const entries=await catalog.deleteComic(id,removalConnectionId);
+  if(!removalConnectionId)await thumbnailCache.deleteOwner(sourceCoverOwner(id),true);
   for(const entry of entries) {
     await Promise.all([sourcePageCache.deleteOwner(entry.id,true),sourceRangeCache.deleteOwner(entry.id,true),thumbnailCache.deleteOwner(entry.id,true),downloadStore.deleteOwner(entry.id,true)]);
     if(entry.containerId)await releaseContainer(entry.containerId,entry.contentId);

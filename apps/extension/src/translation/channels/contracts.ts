@@ -5,6 +5,7 @@ import type {PreparedInput} from '../input/prepare';
 
 /** Stable namespace for requests, results and page bindings. Never a credential. */
 export interface TranslationScope { key: string }
+export interface LocalTranslationResultReference {imageSha256?:string;scope:string;key:string}
 export interface ChannelProfile {
   id: string;
   adapterId: string;
@@ -65,4 +66,8 @@ export interface ChannelDefinition {
   connect?(input:ChannelConnectionInput):Promise<ChannelConnectionResult>;
   open(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean):Promise<ChannelConnection>;
   subscribe?(listener:()=>void):()=>void;
+  /** Local source removal only; neither method may contact the translation service. */
+  inspectLocalEntry?(entryId:string):Promise<LocalTranslationResultReference[]>;
+  blockLocalEntry?(entryId:string):Promise<void>;
+  removeLocalEntry?(entryId:string):Promise<void>;
 }

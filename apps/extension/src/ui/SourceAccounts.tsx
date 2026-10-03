@@ -4,11 +4,12 @@ import {Icon} from '../icons';
 import {listSourceAccounts,subscribeSourceAccounts} from '../comics/application/source-service';
 import {reconnectSource,disconnectSource} from '../comics/application/source-lifecycle';
 import {ConnectionDialog} from './remote-library/ConnectionDialog';
+import {RemoveConnectionDialog} from './remote-library/RemoveConnectionDialog';
 import type {SourceAccount} from '../comics/sources/contracts';
 
 export function SourceAccounts({onNotice,onChanged}:{onNotice:(message:string)=>void;onChanged:()=>void}){
  const [value,setValue]=useState<Awaited<ReturnType<typeof listSourceAccounts>>>(),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const [editing,setEditing]=useState<SourceAccount>();
+ const [editing,setEditing]=useState<SourceAccount>(),[removing,setRemoving]=useState<SourceAccount>();
  const request=useRef(0),running=useRef(false),locale=getLocale();
  const reload=useCallback(async()=>{
   const current=++request.current;
@@ -38,11 +39,13 @@ export function SourceAccounts({onNotice,onChanged}:{onNotice:(message:string)=>
    </div>
    <div className="nc-inline nc-source-account-actions">
     <span className="nc-source-account-status" data-status={connection.status}>{states[connection.status]}</span>
-    {(connection.canReconnect||connection.canConfigure)&&<button className="button secondary small" disabled={busy} onClick={()=>connection.canConfigure?setEditing(connection):void run(()=>reconnectSource(connection.id))}>{msg('重新连接')}</button>}
+    {(connection.canReconnect||connection.canConfigure)&&<button className="button secondary small" disabled={busy} onClick={()=>connection.canConfigure?setEditing(connection):void run(()=>reconnectSource(connection.id))}>{connection.canConfigure&&connection.status==='connected'?msg('编辑书库'):msg('重新连接')}</button>}
     {connection.canBrowse&&<a className="button secondary small" href="#remote-library">{msg('浏览书库')}</a>}
     {connection.canDisconnect&&connection.status!=='disconnected'&&<button className="button danger small" disabled={busy} onClick={()=>void run(()=>disconnectSource(connection.id))}>{msg('断开连接')}</button>}
+    {connection.canRemove&&<button className="button danger small" disabled={busy} onClick={()=>setRemoving(connection)}>{msg('移除书库')}</button>}
    </div>
   </article>)}
  {editing&&<ConnectionDialog account={editing} onClose={()=>setEditing(undefined)} onConnected={()=>{setEditing(undefined);onChanged();void reload();}}/>}
+ {removing&&<RemoveConnectionDialog account={removing} onClose={()=>setRemoving(undefined)} onRemoved={()=>{setRemoving(undefined);onChanged();void reload();}}/>}
  </section>;
 }

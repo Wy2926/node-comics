@@ -1068,5 +1068,20 @@
   "截图失败，请保持当前标签页可见后重试。": "Ekran görüntüsü alınamadı. Bu sekmeyi görünür tutup yeniden deneyin.",
   "无法保存截图，请释放本地存储空间后重试。": "Ekran görüntüsü kaydedilemedi. Yerel depolamada yer açıp yeniden deneyin.",
   "选区已失效，请重新框选。": "Bu seçim artık kullanılamıyor. Alanı yeniden seçin.",
-  "翻译设置已变化，请重新框选。": "Çeviri ayarları değişti. Alanı yeniden seçin."
+  "翻译设置已变化，请重新框选。": "Çeviri ayarları değişti. Alanı yeniden seçin.",
+  "编辑书库": "Kitaplığı düzenle",
+  "保存修改": "Değişiklikleri kaydet",
+  "留空表示不修改": "Değiştirmemek için boş bırakın",
+  "授权信息留空时保留原设置；已断开的书库需要重新填写授权信息。": "Mevcut ayarları korumak için kimlik doğrulama alanlarını boş bırakın. Bağlantısı kesilmiş kitaplıklar için kimlik doğrulama bilgilerini yeniden girmeniz gerekir.",
+  "含访问令牌的 OPDS 地址": "Erişim belirteci içeren OPDS adresi",
+  "移除书库": "Kitaplığı kaldır",
+  "此操作无法撤销": "Bu işlem geri alınamaz",
+  "将移除《{0}》及其全部关联漫画、阅读记录和下载任务。": "“{0}” ve ilişkili tüm çizgi romanlar, okuma kayıtları ve indirme görevleri kaldırılacak.",
+  "此书库持有的原图、译图缓存和离线文件将一并清理。": "Bu kitaplığın orijinal ve çevrilmiş görsel önbellekleri ile çevrimdışı dosyaları da silinecek.",
+  "仅清理本机资料，远端书库文件保留。": "Yalnızca yerel veriler silinecek. Uzak kitaplık dosyaları korunacak.",
+  "关联漫画：{0} 本": "İlişkili çizgi romanlar: {0}",
+  "下载任务：{0} 个": "İndirme görevleri: {0}",
+  "移除书库及关联资料": "Kitaplığı ve ilişkili verileri kaldır",
+  "正在移除书库…": "Kitaplık kaldırılıyor…",
+  "更换服务器或账户时，请新增书库连接。": "Farklı bir sunucu veya hesap kullanmak için yeni bir kitaplık bağlantısı ekleyin."
 }

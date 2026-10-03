@@ -173,7 +173,8 @@ describe('cache and complete-source baseline errors', () => {
     await done; database.close(); vi.resetModules();
     const fresh = await import('../src/storage/bytes/database');
     await expect(fresh.byteDatabase()).rejects.toMatchObject({ name: 'SourceDatabaseSchemaError' });
-    const unchanged = await rawDatabase(sourceDatabaseName('container-bytes'));
+    const unchanged = track(await request(indexedDB.open(sourceDatabaseName('container-bytes'))));
+    expect(unchanged.version).toBe(2);
     expect(await request(unchanged.transaction('settings').objectStore('settings').get('backend'))).toEqual(variant === 'missing' ? undefined : { id: 'backend', value: 'different-backend' });
   });
 });

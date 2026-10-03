@@ -93,6 +93,15 @@ export async function listRemoteLibraries() {
   };
 }
 
+export async function remoteLibraryConfiguration(connectionId: string) {
+  const account = await getSourceAccount(connectionId),
+    provider = requireSourceDriver(account.provider);
+  if (!provider.catalog) throw Error('此来源不支持书库浏览。');
+  return provider.connection?.configuration
+    ? provider.connection.configuration(account)
+    : { name: account.displayName };
+}
+
 export async function connectRemoteLibrary(
   providerId: string,
   values: Record<string, string>,
@@ -102,6 +111,7 @@ export async function connectRemoteLibrary(
   signal?.throwIfAborted();
   const provider = requireSourceDriver(providerId);
   if (!provider.catalog || !provider.connection?.connect) throw Error('此来源不支持连接远端书库。');
+  if(existingId&&await catalog.get('tombstones','connections:'+existingId))throw stopped();
   const previous = existingId ? await catalog.get('connections', existingId) : undefined;
   const account = existingId ? await getSourceAccount(existingId) : undefined;
   if (account && account.provider !== providerId) throw Error('来源账户身份不匹配。');
@@ -117,6 +127,7 @@ export async function connectRemoteLibrary(
   if (previous) await closeSourceAccess({ connectionId: previous.id });
   const saved = await catalog.mutate(['connections'], async (tx) => {
     signal?.throwIfAborted();
+    if(await tx.get('tombstones','connections:'+connected.id))throw stopped();
     const current = await tx.get('connections', connected.id);
     if (
       previous &&
@@ -140,7 +151,9 @@ export async function connectRemoteLibrary(
     return result;
   });
   await restoreSourceResources(saved, [], saved.generation);
-  return (await catalog.get('connections', saved.id))!;
+  const current=await catalog.get('connections',saved.id);
+  if(!current||current.status!=='connected'||current.generation!==saved.generation)throw stopped();
+  return current;
 }
 
 async function remoteConnection(id: string): Promise<SourceConnection> {
@@ -361,7 +374,7 @@ async function publishRemote(
         id: comicId,
         sourceKey: key,
         title: plan.publication.title,
-        sourceName: requireSourceDriver(connection.provider).label,
+        sourceName: connection.displayName,
         source: {
           connectionId: connection.id,
           providerItemId: plan.publication.id,

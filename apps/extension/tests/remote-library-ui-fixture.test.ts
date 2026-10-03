@@ -26,6 +26,8 @@ describe('remote library UI fixture over real loopback HTTP', () => {
       const publications = root.groups!.flatMap((group) => group.publications);
       expect(publications).toHaveLength(24);
       expect(publications[0]).toMatchObject({ title: '星灯书店', authors: ['星野绘', '青禾'], formats: ['cbz'] });
+      expect(publications[0].size).toBeGreaterThan(10000);
+      expect(publications[5].size).toBeUndefined();
       expect(publications[0].summary).toContain('原创测试故事');
       expect(publications.at(-1)).toMatchObject({ readable: false });
       expect(publications.at(-1)!.reason).toBeTruthy();
@@ -64,6 +66,7 @@ describe('remote library UI fixture over real loopback HTTP', () => {
       expect(new Uint8Array(await artwork.slice(0, 8).arrayBuffer())).toEqual(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]));
       const plan = await provider.catalog!.resolve(connection, publications[0].id);
       expect(plan.kind).toBe('pages');
+      expect(plan.publication.size).toBe(publications[0].size);
       const context: OpenFileSourceContext = {
         connection, source: { connectionId: connection.id, providerItemId: plan.publication.id, locator: plan.locator, generation: 1, status: 'active' },
         entryId: 'fixture-entry', contentId: 'fixture-content', sourceSnapshot: plan.snapshot, format: plan.format,

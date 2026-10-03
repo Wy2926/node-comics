@@ -4,7 +4,7 @@ interface MemoryResult {blob:Blob;token?:CacheToken}
 const memory=new Map<string,MemoryResult>();
 const requests=new Map<string,{key:string;token:CacheToken;finish:(blob?:Blob)=>void}>();
 let changes:BroadcastChannel|undefined;
-const sameToken=(a:CacheToken|undefined,b:CacheToken|undefined)=>!!a&&!!b&&a.epoch===b.epoch&&a.owner===b.owner&&a.ownerGeneration===b.ownerGeneration;
+const sameToken=(a:CacheToken|undefined,b:CacheToken|undefined)=>!!a&&!!b&&a.epoch===b.epoch&&a.owner===b.owner&&a.ownerGeneration===b.ownerGeneration&&(a.keyGeneration??0)===(b.keyGeneration??0);
 function channel(){
   if(!changes&&typeof BroadcastChannel!=='undefined'&&typeof navigator!=='undefined'){
     changes=new BroadcastChannel('nc-translation-memory-v1');

@@ -1068,5 +1068,20 @@
   "截图失败，请保持当前标签页可见后重试。": "Die Aufnahme ist fehlgeschlagen. Lass diesen Tab sichtbar und versuche es erneut.",
   "无法保存截图，请释放本地存储空间后重试。": "Die Aufnahme konnte nicht gespeichert werden. Gib lokalen Speicherplatz frei und versuche es erneut.",
   "选区已失效，请重新框选。": "Diese Auswahl ist nicht mehr verfügbar. Wähle den Bereich erneut aus.",
-  "翻译设置已变化，请重新框选。": "Die Übersetzungseinstellungen haben sich geändert. Wähle den Bereich erneut aus."
+  "翻译设置已变化，请重新框选。": "Die Übersetzungseinstellungen haben sich geändert. Wähle den Bereich erneut aus.",
+  "编辑书库": "Bibliothek bearbeiten",
+  "保存修改": "Änderungen speichern",
+  "留空表示不修改": "Leer lassen, um nichts zu ändern",
+  "授权信息留空时保留原设置；已断开的书库需要重新填写授权信息。": "Leere Authentifizierungsfelder behalten die aktuellen Einstellungen bei. Bei getrennten Bibliotheken müssen die Authentifizierungsdaten erneut eingegeben werden.",
+  "含访问令牌的 OPDS 地址": "OPDS-URL mit Zugriffstoken",
+  "移除书库": "Bibliothek entfernen",
+  "此操作无法撤销": "Diese Aktion kann nicht rückgängig gemacht werden",
+  "将移除《{0}》及其全部关联漫画、阅读记录和下载任务。": "„{0}“ und alle zugehörigen Comics, Lesedaten und Downloadaufgaben werden entfernt.",
+  "此书库持有的原图、译图缓存和离线文件将一并清理。": "Die Original- und übersetzten Bildcaches sowie Offlinedateien dieser Bibliothek werden ebenfalls gelöscht.",
+  "仅清理本机资料，远端书库文件保留。": "Nur lokale Daten werden gelöscht. Die Dateien der Bibliothek auf dem Server bleiben erhalten.",
+  "关联漫画：{0} 本": "Zugehörige Comics: {0}",
+  "下载任务：{0} 个": "Downloadaufgaben: {0}",
+  "移除书库及关联资料": "Bibliothek und zugehörige Daten entfernen",
+  "正在移除书库…": "Bibliothek wird entfernt…",
+  "更换服务器或账户时，请新增书库连接。": "Fügen Sie eine neue Bibliotheksverbindung hinzu, um einen anderen Server oder ein anderes Konto zu verwenden."
 }

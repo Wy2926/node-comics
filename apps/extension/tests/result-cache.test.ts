@@ -181,6 +181,31 @@ it('rejects results completed after a clear using the token captured before the 
   const key=resultBlobKey(input.scope,input.job);expect(await translationCache.has(key)).toBe(false);expect(resultInMemory(key)).toBeUndefined();
 });
 
+it.each([false,true])('deleting one result preserves an unrelated in-flight result with another scope=%s',async(otherScope)=>{
+  const removed=request(),unrelated=request();if(!otherScope)unrelated.scope=removed.scope;
+  unrelated.job={...unrelated.job,id:'unrelated-'+crypto.randomUUID()};
+  const removedToken=await translationCache.token(removed.scope.key),unrelatedToken=await translationCache.token(unrelated.scope.key);
+  const key=resultBlobKey(removed.scope,removed.job);await translationCache.delete(key);
+  await expect(saveResultBlob({...removed,cacheToken:removedToken,blob:new Blob(['late removed result'])})).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
+  const bytes=new Blob(['unrelated translation']);await expect(saveResultBlob({...unrelated,cacheToken:unrelatedToken,blob:bytes})).resolves.toBe(bytes);
+  expect(await translationCache.has(resultBlobKey(unrelated.scope,unrelated.job))).toBe(true);expect(await translationCache.has(key)).toBe(false);
+});
+
+it('shares unrelated memory results across contexts after a key deletion and rejects the removed result',async()=>{
+  await setTranslationCacheLimitMb(0);
+  const removed=request(),retained=request();retained.scope=removed.scope;
+  removed.job={...removed.job,result:{key:crypto.randomUUID(),recoverable:false}};
+  retained.job={...retained.job,id:'retained-memory-'+crypto.randomUUID(),result:{key:crypto.randomUUID(),recoverable:false}};
+  await saveResultBlob({...removed,blob:new Blob(['removed-memory'])});await saveResultBlob({...retained,blob:new Blob(['retained-memory'])});
+  vi.resetModules();const other=await import('../src/storage/translations/results'),otherCache=await import('../src/storage/translations');await otherCache.setTranslationCacheLimitMb(0);
+  expect(await (await other.loadResultBlob(retained)).text()).toBe('retained-memory');
+  await otherCache.translationCache.delete(resultBlobKey(removed.scope,removed.job));
+  await expect(loadResultBlob(removed)).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
+  expect(await (await loadResultBlob(retained)).text()).toBe('retained-memory');
+  expect(await (await other.loadResultBlob(retained)).text()).toBe('retained-memory');
+  expect(removed.download).not.toHaveBeenCalled();expect(retained.download).not.toHaveBeenCalled();
+});
+
 it('hands off memory-only local results across module contexts and rejects old bytes after clearing',async()=>{
   await setTranslationCacheLimitMb(0);
   const input=request();input.job={...input.job,result:{key:crypto.randomUUID(),recoverable:false}};
