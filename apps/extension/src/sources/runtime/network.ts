@@ -27,8 +27,10 @@ export async function resolveNetworkCatalog(url:string,signal?:AbortSignal):Prom
   let retained=0;
   const target=await resolve(url,{...context,async request(target,options){
     const body=await context.request(target,options);
-    retained+=body.length*2;
-    if(retained<=importResponseLimits.bytes&&responses.length<importResponseLimits.count)responses.push({url:target,referer:options?.referer,body});
+    if(options?.form===undefined){
+      retained+=body.length*2;
+      if(retained<=importResponseLimits.bytes&&responses.length<importResponseLimits.count)responses.push({url:target,referer:options?.referer,body});
+    }
     return body;
   }});
   signal.throwIfAborted();

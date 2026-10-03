@@ -53,6 +53,8 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 展示画布无法导出但有可靠原图映射时，站点可返回 HTTP 原位目标，并通过 `image.decodeInline` 解码公共取图管线返回的字节；该钩子负责核对本站图片范围。网络解析器可按单次请求声明 `acceptStatuses` 以读取源站使用错误状态承载的结构化响应，仍须验证响应结构；权限、请求范围、响应大小和取消检查不变。
 
+源站以表单 POST 提供只读目录或正文时，网络解析器可在 `request` 选项中传入 `form` 字符串字段；公共层编码为 `application/x-www-form-urlencoded`，编码后的请求体上限为 1 MiB，仍检查权限、Referer 归属、取消及响应大小。表单请求不使用或进入导入响应交接，防止同一 URL 的不同请求体误复用；未提供 `form` 的请求保持 GET。不得借此修改源站账户、内容或设置。
+
 原位正文筛选由 `inlineTargets()` 负责：大图启发式集中在 `generic` 适配器，显示层统一检查渲染状态。网络适配器可通过 `inlineRecognition: 'generic'` 显式复用通用已加载大图识别，无需空 `page.ts`；注册表保持来源身份与通用尺寸检查，并禁止以此读取完整正文。这不是 HTTP 失败后的兜底。消息中的尺寸与来源能力由公共来源入口校验，翻译协议不解析站点。浏览器原位回归按 `sites/*/tests/verify-inline.mjs` 自动发现，各站导出 `verifyInline(context)`，站点专用开关与断言留在本站。
 
 目录可选提供 `cover`，必须取自作品专门封面，不能使用推荐图或章节缩略图。`readSourceCover` 校验目录归属、HTTP(S) 地址与主机权限，经公共取图管线读取；防盗链规则不同时使用 `image.coverHeaders`。新增 CDN 仍须校验地址与当前访问权限，不单独弹出授权。封面不进入正文、翻译或下载清单，缩略图沿用缓存预算与访问失效规则；换封面不触发章节更新徽章。展示行为见[单来源阅读设计](SIMPLE_COMIC_READING_DESIGN.md)。
@@ -93,6 +95,7 @@ npm run build
 | [MangaBall](../apps/extension/src/sources/sites/mangaball/README.md) | HTTP 搜索、完整多语言分页目录／正文、封面定位和 12 小时更新；同话发布候选、裸章节归属、浮动入口和直接 CDN 正文原位翻译 |
 | [Atsumaru](../apps/extension/src/sources/sites/atsu/README.md) | HTTP 名称搜索、完整目录／正文／封面、12 小时更新；按发布组独立连读、网页浮动入口和已加载正文原位翻译 |
 | [RawOtaku](../apps/extension/src/sources/sites/rawotaku/README.md) | HTTP 名称搜索、完整语言目录／章节原图／封面、12 小时更新；作品与章节网页导入、两种阅读模式的正文原位翻译 |
+| [KLManga](../apps/extension/src/sources/sites/klmanga/README.md) | HTTP 名称搜索、完整静态目录／封面与分批 POST 正文、12 小时更新；作品与章节导入、浮动入口，标签页翻译复用通用大图识别 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | 复用 GigaViewer 引擎识别并还原已加载正文，支持原位翻译；不提供导入或目录 |
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 阅读器内已解码同源 Blob 正文原位翻译，复用公共取图与动态页生命周期；不提供导入或目录 |

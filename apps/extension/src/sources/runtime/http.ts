@@ -20,6 +20,23 @@ export function sourceRetryAfter(value: string | null): number | undefined {
   const seconds = /^\d+$/.test(value.trim()) ? Number(value) : (Date.parse(value) - Date.now()) / 1000;
   return Number.isFinite(seconds) ? Math.min(3600, Math.max(1, Math.ceil(seconds))) : undefined;
 }
+function encodeForm(form: Readonly<Record<string, string>>): string {
+  const invalid = () => {throw new SourceHttpError('request-denied', '来源请求表单无效或超过限制。');};
+  if (!form || typeof form !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(form))) return invalid();
+  const body = new URLSearchParams(), limit = 1024 * 1024;
+  let length = 0;
+  for (const key of Reflect.ownKeys(form)) {
+    const field = Object.getOwnPropertyDescriptor(form, key)!;
+    if (typeof key !== 'string' || !key || /[\u0000-\u001f\u007f]/.test(key) || !field.enumerable || !('value' in field) ||
+      typeof field.value !== 'string') return invalid();
+    length += key.length + field.value.length + 1 + (length ? 1 : 0);
+    if (length > limit) return invalid();
+    body.append(key, field.value);
+  }
+  const encoded = body.toString();
+  if (encoded.length > limit) return invalid();
+  return encoded;
+}
 /** Packaged source parsers share a bounded transport, with an optional operation-specific allowlist. */
 export function createSourceNetworkContext(sourceUrl: string, signal?: AbortSignal, replay: ImportResponse[] = [],
   allowedOrigins?: readonly string[]): SourceNetworkContext {
@@ -37,11 +54,14 @@ export function createSourceNetworkContext(sourceUrl: string, signal?: AbortSign
     if (options && (safeImageUrl(options.referer, options.referer) !== options.referer || new URL(options.referer).origin !== new URL(url).origin ||
       resolveSource(options.referer, definitions).definition.id !== resolveSource(sourceUrl, definitions).definition.id))
       throw new SourceHttpError('request-denied', '来源请求头归属无效。');
-    const cached = replay.findIndex(response => response.url === url && response.referer === options?.referer);
+    const body = options?.form === undefined ? undefined : encodeForm(options.form);
+    const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer) : -1;
     if (cached >= 0) return replay.splice(cached, 1)[0].body;
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
-      const response = await fetch(url, {credentials: 'include', redirect: 'error', headers: {Accept: 'application/json, text/html'}, signal: lifetime});
+      const response = await fetch(url, {credentials: 'include', redirect: 'error', headers: {Accept: 'application/json, text/html',
+        ...(body === undefined ? {} : {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
+        ...(body === undefined ? {} : {method: 'POST', body})});
       // Some sources return a structured empty result with a non-success status.
       // Only explicitly requested error responses reach the owning parser.
       if (!response.ok && !(response.status >= 400 && response.status <= 599 && options?.acceptStatuses?.includes(response.status))) {

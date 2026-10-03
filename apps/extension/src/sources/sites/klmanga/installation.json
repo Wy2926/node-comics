@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://klmanga.zone/*", "https://p1.pubg-img.si/*"],
+  "optionalContentMatches": ["https://klmanga.zone/*"]
+}
