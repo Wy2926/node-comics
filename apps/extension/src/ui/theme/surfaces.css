@@ -149,6 +149,7 @@
 
 /* Reader chrome adopts the tokens without changing the image canvas or gutters. */
 .nc-app .nc-reader-rail { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-reader { --reader-rail-border: 2px; }
 .nc-app .nc-reader-rail button { border-radius: var(--comic-control-radius); }
 .nc-app .nc-reader-rail :is(button[aria-expanded=true], button[aria-pressed=true]) { background: var(--accent-soft); outline: 1px solid var(--ink); outline-offset: -1px; color: var(--accent); }
 .nc-app .nc-reader-drawer, .nc-app .nc-translation-popover { z-index: 35; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }

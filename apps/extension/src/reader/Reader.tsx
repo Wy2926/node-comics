@@ -22,7 +22,7 @@ import {ComicDirectory,contentLanguageLabel} from './ComicDirectory';
 import {acknowledgeCatalogUpdates} from '../comics/application/catalog-service';
 import type {ReadingDirectory} from '../comics/application/library-service';
 import {PageTranslationBar} from './PageTranslationBar';
-import {readReadingView,saveReadingView,type ReadingView} from './view';
+import {initialReadingView,readingViewDefaults,readStoredReadingView,saveReadingView,type ReadingView} from './view';
 import {track,type AnalyticsFields} from '../analytics';
 import type {ReaderAnalytics} from './analytics';
 import {useReaderAnalytics} from './useReaderAnalytics';
@@ -36,14 +36,17 @@ export function Reader({progressStatus,analyticsSession,analyticsSource='unknown
 const {index,indexRef,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
-const [savedView,setView]=useState<ReadingView>(()=>readReadingView(viewKey));const [compare,setCompare]=useState(false);
-const view=savedView;
+const page=copy.pages[Math.min(index,copy.pages.length-1)];
+// Descriptor views can contain placeholder dimensions; materialization supplies the real image identity and size.
+const initialView=page?.imageSha256?initialReadingView(page):undefined;
+const [savedView,setView]=useState<ReadingView|undefined>(()=>readStoredReadingView(viewKey)??initialView);const [compare,setCompare]=useState(false);
+const view=savedView??readingViewDefaults();
 const [feedback,setFeedback]=useState<{job:Job;page:Page;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
 const {root,panel,setPanel,togglePanel,closePanel,immersive,setImmersive,hidden,reveal,fullscreen}=useReaderControls<Panel>({blocked:!!feedback||analyticsBlocked||searchOpen,notify});
 const [viewportSize,setViewportSize]=useState({width:900,height:700});
 const previousSearch=useRef(searchOpen);
 useEffect(()=>{if(previousSearch.current&&!searchOpen)root.current?.querySelector<HTMLButtonElement>('[data-reader-settings-trigger]')?.focus();previousSearch.current=searchOpen;},[searchOpen]);
-const page=copy.pages[Math.min(index,copy.pages.length-1)];const {mode,preference,zoom}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
+const {mode,preference,zoom,fit}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
 const scopeBase=`${translationScope??''}:${settings.language}`;const scope=(p:Page,c=copy)=>`${scopeBase}:${pageKey(c,p.id)}`;
 const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;const shownJob=shown?.job;
 const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:analyticsBlocked||searchOpen||!!panel||!!feedback,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
@@ -51,14 +54,15 @@ useEffect(()=>{if(shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowled
 const streamPages=useMemo(()=>stream.filter(chapter=>resources.ready(chapter)).flatMap(c=>c.pages.map(p=>({page:p,key:pageKey(c,p.id),entryId:c.id}))),[stream,resourceVersion]);
 useEffect(()=>{setFeedback(undefined);},[copy.id]);
 useEffect(()=>{setActual({});setFeedback(undefined);},[scopeBase]);
-useEffect(()=>{saveReadingView(viewKey,savedView);},[viewKey,savedView]);
+useEffect(()=>{if(!savedView&&initialView){preserve();setView(previous=>previous??initialView);}},[savedView,page?.id,page?.imageSha256,page?.width,page?.height]);
+useEffect(()=>{if(savedView)saveReadingView(viewKey,savedView);},[viewKey,savedView]);
 useEffect(()=>{if(!viewport.current)return;const observer=new ResizeObserver(([entry])=>{preserve();setViewportSize({width:entry.contentRect.width,height:entry.contentRect.height});});observer.observe(viewport.current);return()=>observer.disconnect();},[!!page]);
-const frame=(p:Page)=>pageFrame(p,viewportSize,settings.fit,zoom,compare);
-const windows=useMemo(()=>pageWindow(stream,copy.id,index,p=>frame(p).height,settings.layout==='single'?1:DECODED_PAGE_WINDOW),[stream,copy.id,index,viewportSize,settings.fit,zoom,compare,settings.layout]);
+const frame=(p:Page)=>pageFrame(p,viewportSize,fit,zoom,compare);
+const windows=useMemo(()=>pageWindow(stream,copy.id,index,p=>frame(p).height,settings.layout==='single'?1:DECODED_PAGE_WINDOW),[stream,copy.id,index,viewportSize,fit,zoom,compare,settings.layout]);
 const decodedSet=useMemo(()=>new Set(windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).map(p=>pageKey(chapter,p.id)))),[windows,resourceVersion]);
 geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=stream.reduce((width,chapter)=>chapter.pages.reduce((width,page)=>Math.max(width,frame(page).width),width),0);
-useLayoutEffect(()=>{restore();},[viewportSize,settings.fit,zoom,compare,settings.layout,!!page]);
+useLayoutEffect(()=>{restore();},[viewportSize,fit,zoom,compare,settings.layout,!!page]);
 // Bindings and event arbitration belong to the shared runner; these are the same reader actions as the controls.
 useShortcuts({
  'reader.previous':()=>navigate(-1),
@@ -77,7 +81,7 @@ useShortcuts({
  'reader.zoomOut':()=>changeZoom(value=>value-10),
  'reader.zoomReset':()=>changeZoom(100),
  'reader.layout':()=>changeLayout(settings.layout==='continuous'?'single':'continuous'),
- 'reader.fit':()=>changeFit(settings.fit==='window'?'width':'window'),
+ 'reader.fit':()=>changeFit(fit==='window'?'width':'window'),
  'reader.immersive':()=>setImmersive(value=>!value),
  'reader.fullscreen':()=>{void fullscreen();},
  'reader.back':leaveReader,
@@ -94,16 +98,17 @@ function leaveReader(){preserve();persist();onBack();}
 function openShortcuts(){setPanel(undefined);reveal();onOpenShortcuts();}
 function findComic(){preserve();persist();setPanel(undefined);onFind?.();}
 function changeLayout(layout:Settings['layout']){preserve();setSettings(s=>({...s,layout}));}
-function changeFit(fit:Settings['fit']){preserve();setSettings(s=>({...s,fit}));}
+function updateView(change:(view:ReadingView)=>ReadingView){setView(previous=>change(previous??view));}
+function changeFit(fit:Settings['fit']){preserve();updateView(view=>({...view,fit}));}
 function changeZoom(value:number|((zoom:number)=>number)){
  if(!page)return false;preserve();
- setView(view=>{const nextZoom=Math.max(40,Math.min(200,typeof value==='function'?value(view.zoom):value));return nextZoom===view.zoom?view:{...view,zoom:nextZoom};});
+ updateView(view=>{const nextZoom=Math.max(40,Math.min(200,typeof value==='function'?value(view.zoom):value));return nextZoom===view.zoom?view:{...view,zoom:nextZoom};});
 }
 function toggleCompare(){
  if(!page||!compare&&caps&&!caps.modes.some(item=>item.id==='classic'&&item.enabled))return false;
  preserve();recordView(compare?(preference==='original'?'original':mode):'compare');
  setCompare(value=>!value);
- if(!compare)setView(view=>({...view,preference:'translation'}));
+ if(!compare)updateView(view=>({...view,preference:'translation'}));
 }
 function recordView(value:'original'|Mode|'compare'){
   track('translation_view_changed',{surface:'reader',mode:value,...(analyticsChannel?{channel:analyticsChannel}:{}),target_language:settings.language as AnalyticsFields['target_language']});
@@ -113,7 +118,7 @@ function selectView(value:'original'|Mode){
   if(!page||value!=='original'&&caps&&!caps.modes.some(item=>item.id===value&&item.enabled))return false;
   if(value!==(preference==='original'?'original':mode))recordView(value);
   preserve();
-  setView(view=>({...view,mode:value==='original'?mode:value,preference:value==='original'?'original':'translation'}));
+  updateView(view=>({...view,mode:value==='original'?mode:value,preference:value==='original'?'original':'translation'}));
   if(value==='original')setCompare(false);
 }
 const contentLanguageControl=onSourceLanguageChange&&directory?.entries.some(entry=>entry.contentLanguage)&&<Select className="nc-reader-language" placement="left" menuWidth={280} aria-label={msg('内容语言偏好')} title={msg('内容语言偏好')} value={directory.sourceLanguagePreference??''} onFocus={()=>setPanel(undefined)} onChange={event=>onSourceLanguageChange(event.target.value||undefined)} trigger={<><LanguageFlag language={directory.sourceLanguagePreference??settings.language}/><span>{msg('内容语言偏好')}</span></>}>
@@ -124,7 +129,7 @@ const readerPanel=panel&&<ReaderDrawer kind={panel} title={{directory:msg('目�
 {panel==='directory'&&sourceStatus&&<div className="nc-source-status" role="status"><span>{sourceStatus}</span><button disabled={busy} onClick={onReload}>{msg('重新载入')}</button></div>}
 {panel==='directory'?<ComicDirectory catalogLoading={catalogLoading} onContinueCatalog={onContinueCatalog} directory={directory??{title:copy.title,entries:[],groups:[],chapters:[]}} index={index} pageCount={copy.pages.length} onNavigate={(id,pageId,rememberChoice)=>{preserve();persist();onNavigate(id,pageId,rememberChoice);}}><ThumbnailDirectory pages={resources.ready(copy)?copy.pages:[]} index={index} mode='classic' language={settings.language} translationScope={translationScope} onJump={n=>{jump(n);if(window.innerWidth<760)setPanel(undefined);}}/></ComicDirectory>:<div className="nc-drawer-content">
 {panel==='translation'?<ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} note={msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}/>:<ReaderSettings settings={settings} setSettings={setSettings} onLayout={changeLayout}
- sizing={<><Choice label={msg('图片适应方式')} value={settings.fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/><ReaderScale label={msg('缩放')} value={zoom} min={40} max={200} onChange={changeZoom}/></>}
+ sizing={<><Choice label={msg('图片适应方式')} value={fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/><ReaderScale label={msg('缩放')} value={zoom} min={40} max={200} onChange={changeZoom}/></>}
  immersive={immersive} onImmersive={()=>setImmersive(v=>!v)} onFullscreen={()=>void fullscreen()} onShortcuts={openShortcuts} onReload={onReload} sourceUrl={copy.sourceUrl} busy={busy}
  extraActions={onFind&&<button className="button secondary" onClick={findComic}><Icon name="translate"/>{msg('寻找其他语言')}</button>}>
  <div className="nc-reader-option"><div><b>{msg('并排对照')}</b><p>{msg('原图与当前模式最新译图')}</p></div><button className={`switch ${compare?'on':''}`} role="switch" aria-label={msg('并排对照')} aria-checked={compare} onClick={toggleCompare}><i/></button></div>
@@ -133,7 +138,7 @@ const readerPanel=panel&&<ReaderDrawer kind={panel} title={{directory:msg('目�
 </ReaderDrawer>;
 if(!page)return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
  <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} onBack={leaveReader} progressStatus={progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}/>
- <ReaderTools label={msg("翻译与阅读工具")}>{contentLanguageControl}<ReaderSettingsButton open={panel==='settings'} onClick={()=>togglePanel('settings')}/></ReaderTools>
+ <ReaderTools label={msg("翻译与阅读工具")} above={Number(!!contentLanguageControl)} below={1}><div className="nc-reader-tool-group">{contentLanguageControl}</div><span className="nc-rail-divider" aria-hidden="true"/><div className="nc-reader-tool-group"><ReaderSettingsButton open={panel==='settings'} onClick={()=>togglePanel('settings')}/></div></ReaderTools>
  <div className="nc-empty"><h1>{copy.title}</h1><h2>{sourceStatus??msg("页面尚未就绪")}</h2><button className="button primary" disabled={busy} onClick={onReload}><Icon name="refresh"/>{msg('重新载入')}</button><button className="button secondary" onClick={()=>setPanel('directory')}>{msg("查看作品目录")}</button></div>{readerPanel}
 </ReaderShell>;
 return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
@@ -151,7 +156,7 @@ const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey
 </div></div>)}</div></div>
 {readerPanel}
 
-{allowsFeedback&&feedback&&<FeedbackForm key={feedback.job.id} api={api} job={feedback.job} pageNumber={feedback.number} onClose={()=>setFeedback(undefined)} canRerun={!pageTranslation(copy.pages.find(p=>p.id===feedback.page.id)??feedback.page,feedback.job.mode,feedback.job.target_language,translationScope).pending&&!!caps?.modes.find(m=>m.id===feedback.job.mode)?.enabled&&!busy} onRerun={()=>{const p=copy.pages.find(p=>p.id===feedback.page.id);setFeedback(undefined);if(p){setView(view=>({...view,mode:feedback.job.mode,preference:'translation'}));void Promise.resolve(onRetry(p,feedback.job.mode)).catch(error=>notify(translationNotice({kind:'error',message:error.message}).label));}}}/>}
+{allowsFeedback&&feedback&&<FeedbackForm key={feedback.job.id} api={api} job={feedback.job} pageNumber={feedback.number} onClose={()=>setFeedback(undefined)} canRerun={!pageTranslation(copy.pages.find(p=>p.id===feedback.page.id)??feedback.page,feedback.job.mode,feedback.job.target_language,translationScope).pending&&!!caps?.modes.find(m=>m.id===feedback.job.mode)?.enabled&&!busy} onRerun={()=>{const p=copy.pages.find(p=>p.id===feedback.page.id);setFeedback(undefined);if(p){updateView(view=>({...view,mode:feedback.job.mode,preference:'translation'}));void Promise.resolve(onRetry(p,feedback.job.mode)).catch(error=>notify(translationNotice({kind:'error',message:error.message}).label));}}}/>}
 
 </ReaderShell>;
 }

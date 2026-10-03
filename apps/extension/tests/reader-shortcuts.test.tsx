@@ -33,7 +33,7 @@ import {installDictionary} from '../src/i18n/runtime';
 
 type Props=Parameters<typeof Reader>[0];
 const copy:ReadingEntry={id:'reader-fixture',title:'Fixture',source:'zip',sourceKey:'fixture',generation:1,createdAt:0,updatedAt:0,pageId:'page-2',relativeOffset:.35,discoveryComplete:true,
- pages:Array.from({length:5},(_,index)=>({id:`page-${index}`,name:`Page ${index+1}`,width:1000,height:1500,jobs:[],outputBlobs:{}}))};
+ pages:Array.from({length:5},(_,index)=>({id:`page-${index}`,name:`Page ${index+1}`,width:1000,height:1500,imageSha256:`source-image-${index}`,jobs:[],outputBlobs:{}}))};
 function fixture(extra:Partial<Props>={}){
  const props:Props={
   viewKey:'fixture',copy,sequence:[copy],settings:{...defaults},setSettings:vi.fn(),update:vi.fn(),onBack:vi.fn(),onOpenShortcuts:vi.fn(),onRetry:vi.fn(),onFind:vi.fn(),
@@ -44,6 +44,7 @@ function fixture(extra:Partial<Props>={}){
  return props;
 }
 function render(props:Props){hooks.cursor=0;hooks.effects=[];return Reader(props);}
+function flushEffects(){for(const effect of hooks.effects)effect();}
 function view(){return hooks.states.find((value):value is ReadingView=>!!value&&typeof value==='object'&&'zoom' in value)!;}
 function nodes(node:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(node))return node.flatMap(nodes);
@@ -60,6 +61,8 @@ beforeEach(()=>{
  for(const action of Object.values(actions))action.mockClear();
  installDictionary('zh-CN',{});
  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});
+ vi.stubGlobal('document',{querySelector:()=>null,addEventListener:vi.fn(),removeEventListener:vi.fn()});
+ vi.stubGlobal('window',{addEventListener:vi.fn(),removeEventListener:vi.fn()});
 });
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -87,17 +90,69 @@ describe('reader shortcut action integration',()=>{
  it('bounds repeated zoom keys, resets to 100%, and keeps the comic viewing preference',()=>{
   render(fixture());
   for(let index=0;index<15;index++)hooks.handlers['reader.zoomIn']();
-  expect(view()).toEqual({mode:'classic',preference:'original',zoom:200});
+  expect(view()).toEqual({mode:'classic',preference:'original',zoom:200,fit:'window'});
   for(let index=0;index<25;index++)hooks.handlers['reader.zoomOut']();
   expect(view().zoom).toBe(40);hooks.handlers['reader.zoomReset']();expect(view().zoom).toBe(100);
   expect(actions.preserve).toHaveBeenCalledTimes(41);
  });
  it('changes layout and fit through the same preserving controls while retaining unrelated settings',()=>{
   const props=fixture();render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();
-  expect(props.settings).toEqual({...defaults,layout:'single',fit:'width'});
+  expect(props.settings).toEqual({...defaults,layout:'single'});expect(view().fit).toBe('width');
   expect(actions.preserve).toHaveBeenCalledTimes(2);
   expect(actions.preserve.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(props.setSettings).mock.invocationCallOrder[0]);
-  render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();expect(props.settings).toEqual(defaults);
+  render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();expect(props.settings).toEqual(defaults);expect(view().fit).toBe('window');
+ });
+ it('defaults fit to window independently of global settings and restores the comic fit for geometry and controls',()=>{
+  const props=fixture({settings:{...defaults,fit:'width'}});const initial=render(props);
+  expect(view().fit).toBe('window');
+  const pageWidth=(tree:ReactElement)=>nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number};
+  expect(pageWidth(initial).width).toBe(440);
+  hooks.handlers['reader.fit']();const fitted=render(props);expect(pageWidth(fitted).width).toBe(876);
+  expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings.fit).toBe('width');
+  hooks.handlers['reader.settings']();const settings=render(props);
+  const choice=nodes(settings).find(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式')!;
+  expect(choice.props.value).toBe('width');(choice.props.onChange as (value:string)=>void)('window');
+  expect(view().fit).toBe('window');expect(props.setSettings).not.toHaveBeenCalled();expect(actions.preserve).toHaveBeenCalledTimes(2);
+  hooks.states=[];vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:100,fit:'width'}),setItem:vi.fn()});
+  const restored=render(props);expect(view()).toEqual({mode:'classic',preference:'translation',zoom:100,fit:'width'});expect(pageWidth(restored).width).toBe(876);
+ });
+ it('applies a first long-image preset once and preserves the saved view across reopening and ordinary chapters',()=>{
+  const stored=new Map<string,string>(),setItem=vi.fn((key:string,value:string)=>stored.set(key,value));
+  vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem});
+  const long=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
+  const tree=render(long);expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  expect((nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(438);
+  flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual(view());
+  hooks.states=[];render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  expect(long.setSettings).not.toHaveBeenCalled();
+ });
+ it('waits through unloaded pages and placeholder dimensions before saving the first actual long-image preset',()=>{
+  const setItem=vi.fn();vi.stubGlobal('localStorage',{getItem:()=>null,setItem});
+  const props=fixture({copy:{...copy,pages:[]}});render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
+  props.copy={...copy,pages:copy.pages.map(page=>({...page,width:900,height:1300,imageSha256:undefined}))};
+  render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
+  props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,width:800,height:24000,imageSha256:`real-${page.id}`}))};
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  expect(actions.preserve).toHaveBeenCalledOnce();expect(setItem).not.toHaveBeenCalled();
+  render(props);flushEffects();expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
+ });
+ it.each(['fit','zoomIn'] as const)('preserves a manual %s change made before the actual long-image dimensions arrive',command=>{
+  const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});
+  render(props);flushEffects();hooks.handlers[`reader.${command}`]();
+  const selected={...view()};
+  props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
+  render(props);flushEffects();expect(view()).toEqual(selected);
+  expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it('preserves a manual choice even when a queued initialization effect sees the newly loaded dimensions',()=>{
+  const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});render(props);
+  props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
+  render(props);hooks.handlers['reader.fit']();const selected={...view()};flushEffects();expect(view()).toEqual(selected);
+ });
+ it('keeps an existing legacy view and its zoom when opening a long-image comic',()=>{
+  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:140}),setItem:vi.fn()});
+  const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'translation',fit:'window',zoom:140});
  });
  it('shares drawer controls and replaces the old help modal with the app-owned panel',()=>{
   const props=fixture();render(props);hooks.handlers['reader.directory']();

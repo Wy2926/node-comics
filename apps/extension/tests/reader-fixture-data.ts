@@ -11,24 +11,24 @@ import {localSourceDriver} from '../src/comics/sources/local/driver';
 const unregisterLocal=registerSourceDriver(localSourceDriver);
 
 /** Synthetic image bytes go through the actual container/index/PageService pipeline. */
-export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job,delivery?:(id:string,sha:string)=>TranslationResult):Promise<{copies:ReadingEntry[];ordinals:Record<string,number>;imageOrdinals:Record<string,number>}> {
+export async function seedReaderFixture(origin:string,scenario:string|null,makeJob:(index:number,status:Job['status'])=>Job,delivery?:(id:string,sha:string)=>TranslationResult,height=900,fixtureKey?:string):Promise<{copies:ReadingEntry[];ordinals:Record<string,number>;imageOrdinals:Record<string,number>}> {
   const marker='reader-fixture-source-v2';
   const imageOrdinals:Record<string,number>={};
   if(await catalog.count('comics')&&!await catalog.get('metadata',marker))throw Error('This origin contains non-fixture data. Use a new browser profile.');
   await catalog.put('metadata',{id:marker,synthetic:true});
   const account={origin,userId:scenario?'fixture-'+scenario:'fixture-reader'},scope={key:JSON.stringify([origin,scenario?'fixture-'+scenario:'fixture-reader','overlay-v1'])};
-  const titles=scenario?['自动翻译 · '+scenario]:['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'];
+  const titles=scenario?['自动翻译 · '+scenario+(fixtureKey?' · '+fixtureKey:'')]:['星光书店','星光书店与长长的夏日来信：一段会跨越两行标题的故事','星光书店 · 第三卷'];
   const existing=await catalog.list('metadata',{range:IDBKeyRange.bound(marker+':',marker+':\uffff'),limit:10});
   const ids:string[]=[];
   for(const [bookIndex,title] of titles.entries()) {
-    const id=marker+':'+(scenario??'default')+':'+bookIndex;
+    const id=marker+':'+(fixtureKey??scenario??'default')+':'+bookIndex;
     const saved=existing.find(value=>value.id===id);
     if(typeof saved?.entryId==='string'){Object.assign(imageOrdinals,saved.imageOrdinals);ids.push(saved.entryId);continue;}
     const count=scenario?(['retry','connection'].includes(scenario)?1:30):bookIndex===0?120:9;
     const files:File[]=[];
     for(let index=0;index<count;index++) {
-      const canvas=new OffscreenCanvas(640,900),context=canvas.getContext('2d')!;
-      context.fillStyle=`hsl(${(index*37+bookIndex*83)%360} 65% 88%)`;context.fillRect(0,0,640,900);
+      const canvas=new OffscreenCanvas(640,height),context=canvas.getContext('2d')!;
+      context.fillStyle=`hsl(${(index*37+bookIndex*83)%360} 65% 88%)`;context.fillRect(0,0,640,height);
       context.fillStyle='#fff';context.fillRect(40,45,560,810);
       context.fillStyle='#25334a';context.font='32px sans-serif';context.fillText('ORIGINAL READER FIXTURE',65,125);
       context.font='60px sans-serif';context.fillText(`PAGE ${index+1}`,95,425);

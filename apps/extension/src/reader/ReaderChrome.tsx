@@ -1,4 +1,4 @@
-import type {ReactNode, Ref} from 'react';
+import type {CSSProperties, ReactNode, Ref} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import type {Settings} from '../types';
@@ -48,8 +48,9 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
   </nav><ReadingProgressBadge status={progressStatus}/></>;
 }
 
-export function ReaderTools({label, children}: {label: string; children: ReactNode}) {
-  return <nav className="nc-reader-rail right nc-reader-controls" aria-label={label}>{children}</nav>;
+export function ReaderTools({label, above, below, children}: {label: string; above: number; below: number; children: ReactNode}) {
+  return <nav id="nc-reader-translation-tools" className="nc-reader-rail right nc-reader-controls" data-scrollbar-mode="overlay" aria-label={label}
+    style={{'--reader-tools-above': above, '--reader-tools-below': below} as CSSProperties}>{children}</nav>;
 }
 
 export function ReaderSettingsButton({open, onClick}: {open: boolean; onClick(): void}) {

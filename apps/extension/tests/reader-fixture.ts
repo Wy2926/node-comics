@@ -11,9 +11,9 @@ const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScen
 await saveSettings({...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
 await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:autoScenario?'fixture-'+autoScenario:'fixture-reader',name:'隔离阅读验收',role:'reader'},apiOrigin:origin});
 const originalFetch=window.fetch.bind(window);
-const overlay=await browserOverlay(),blob=overlay.blob;
+const height=parameters.has('native-long')?20000:900,overlay=await browserOverlay(),blob=overlay.blob;
 const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',quota_pages:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
-const {copies:stored,ordinals,imageOrdinals}=await seedReaderFixture(origin,autoScenario,job,overlay.result);
+const {copies:stored,ordinals,imageOrdinals}=await seedReaderFixture(origin,autoScenario,job,overlay.result,height,parameters.get('fixture-key')??undefined);
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
 const operations=new Map<string,string>();
 const paid=parameters.get('billing')==='paid'||parameters.has('lite')||autoScenario==='lite';

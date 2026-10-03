@@ -16,6 +16,18 @@ it('offers originals and classic translation, respecting disabled channel capabi
  const available=controls();expect(available).toContain('aria-label="原图"');expect(available).toContain('aria-label="常规翻译"');
  const disabled=controls([]);expect(disabled).toContain('aria-label="原图"');expect(disabled).not.toContain('aria-label="常规翻译"');
 });
+it('keeps development diagnostics out of the reading toolbar',()=>{
+ const html=renderToStaticMarkup(<PageTranslationBar selectedView="classic" allowsFeedback={false} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ expect(html).not.toContain('aria-label="翻译状态"');expect(html).not.toContain('aria-label="译图有问题"');
+});
+it('offers an explicit rerun only when it can run',()=>{
+ const controls=(canRetry:boolean)=>renderToStaticMarkup(<PageTranslationBar selectedView="classic" allowsFeedback={false} onRetry={async()=>{}} canRetry={canRetry} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const available=controls(true),disabled=controls(false);
+ expect(available).toContain('data-reader-retry-trigger="true"');expect(available).toContain('aria-label="重新翻译此页"');
+ expect(available).not.toContain('disabled');expect(available).not.toContain('aria-label="译图有问题"');
+ expect(disabled).not.toContain('data-reader-retry-trigger');
+ expect(available.indexOf('data-reader-retry-trigger')).toBeLessThan(available.indexOf('nc-page-versions'));
+});
 function statusMarkup(page:Page){
  function Status(){
   const state=translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:false});
