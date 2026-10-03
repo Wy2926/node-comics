@@ -26,6 +26,7 @@ type Location = {
   location?: string;
   cursor?: string;
   search?: string;
+  searchLocation?: string;
   title?: string;
   scrollTop: number;
 };
@@ -63,7 +64,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     pageRequest = useRef<AbortController | undefined>(undefined);
   const savedScroll = useRef(0),
     restoreScroll = useRef(false);
-  const completedPage = useRef<string|undefined>(undefined);
+  const completedPage = useRef<string | undefined>(undefined);
   const reloadAccounts = useCallback(async () => {
     const epoch = ++listEpoch.current;
     try {
@@ -137,7 +138,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
       return;
     }
     const save = () => {
-      savedScroll.current = window.scrollY;
+      if (current.current.active) savedScroll.current = window.scrollY;
     };
     window.addEventListener('scroll', save, { passive: true });
     return () => window.removeEventListener('scroll', save);
@@ -169,9 +170,19 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   }
   function navigate(next: Location, replace = false) {
     cancelOpening();
-    if (!replace) setHistory((previous) =>
-      [...previous, { ...location, location: page?.location ?? location.location, title: page?.title ?? location.title, scrollTop: window.scrollY }].slice(-32),
-    );
+    completedPage.current = undefined;
+    if (!replace)
+      setHistory((previous) =>
+        [
+          ...previous,
+          {
+            ...location,
+            location: page?.location ?? location.location,
+            title: page?.title ?? location.title,
+            scrollTop: window.scrollY,
+          },
+        ].slice(-32),
+      );
     setPage(undefined);
     savedScroll.current = next.scrollTop;
     setLocation(next);
@@ -183,6 +194,7 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
     const previous = history[index];
     if (!previous) return;
     cancelOpening();
+    completedPage.current = undefined;
     setHistory((value) => value.slice(0, index));
     setPage(undefined);
     savedScroll.current = previous.scrollTop;
@@ -220,19 +232,86 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
   const publications = page?.publications ?? [];
   const rootLocation = page?.breadcrumbs?.[0]?.location;
   const breadcrumbs = history.flatMap((item, index) =>
-    item.location && item.location !== rootLocation && item.title &&
-    !history.slice(0, index).some((value) => value.location === item.location && value.search === item.search)
-      ? [{ ...item, index }] : [],
+    item.location &&
+    item.location !== rootLocation &&
+    item.title &&
+    !history
+      .slice(0, index)
+      .some((value) => value.location === item.location && value.search === item.search)
+      ? [{ ...item, index }]
+      : [],
   );
-  const count = publications.length + (page?.groups?.reduce((total, group) => total + group.publications.length, 0) ?? 0);
-  const pageTitle = location.search ? msg('搜索结果') : page?.title ?? location.title ?? account?.displayName;
-  const connectionActions = account ? [
-    { label: msg('重新连接'), icon: 'settings', onSelect: () => setEditing(account) },
-    ...(account.status !== 'disconnected' ? [{ label: msg('断开连接'), icon: 'close', danger: true, onSelect: () => setDisconnecting(account) }] : []),
-  ] : [];
+  const count =
+    publications.length +
+    (page?.groups?.reduce((total, group) => total + group.publications.length, 0) ?? 0);
+  const pageTitle = location.search
+    ? msg('搜索结果')
+    : page?.title ?? location.title ?? account?.displayName;
+  const connectionActions = account
+    ? [
+        { label: msg('重新连接'), icon: 'settings', onSelect: () => setEditing(account) },
+        ...(account.status !== 'disconnected'
+          ? [
+              {
+                label: msg('断开连接'),
+                icon: 'close',
+                danger: true,
+                onSelect: () => setDisconnecting(account),
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const searchForm = !blocked && (page?.searchable || location.search) && (
+    <form
+      className="nc-remote-search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (page && search.trim() && search.trim() !== location.search)
+          navigate(
+            {
+              location: location.searchLocation ?? page.location,
+              searchLocation: location.searchLocation ?? page.location,
+              search: search.trim(),
+              title: msg('搜索结果'),
+              scrollTop: 0,
+            },
+            !!location.search,
+          );
+      }}
+    >
+      <label className="nc-search">
+        <Icon name="search" size={18} />
+        <input
+          type="search"
+          aria-label={msg('搜索书库')}
+          placeholder={msg('搜索书库')}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          maxLength={256}
+        />
+      </label>
+      <button className="button secondary small" disabled={busy || !search.trim()}>
+        {msg('搜索')}
+      </button>
+      {location.search && (
+        <button
+          type="button"
+          className="text-link"
+          disabled={busy}
+          onClick={() => {
+            if (history.length) back();
+            else reset(accountId);
+          }}
+        >
+          {msg('清除搜索')}
+        </button>
+      )}
+    </form>
+  );
   return (
     <section className="nc-remote-library" aria-label={msg('远程书库')}>
-      <div className="nc-page-heading">
+      <div className="nc-page-heading nc-remote-heading">
         <div>
           <h1>{msg('远程书库')}</h1>
           <p>{msg('连接书库即可浏览，点开漫画直接阅读。')}</p>
@@ -264,193 +343,220 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
       ) : (
         <div className="nc-remote-layout">
           <aside className="nc-remote-sidebar">
-            <h2>{msg('已连接的书库')}<span>{accounts.length}</span></h2>
+            <h2>
+              {msg('已连接的书库')}
+              <span>{accounts.length}</span>
+            </h2>
             <nav className="nc-remote-connections" aria-label={msg('已连接的书库')}>
-            {accounts.map((item) => (
-              <button
-                key={item.id}
-                className="nc-remote-connection"
-                aria-pressed={item.id === accountId}
-                onClick={() => { if (item.id !== accountId) reset(item.id); }}
-              >
-                <Icon name="cloud" size={22} />
-                <span><strong>{item.displayName}</strong><small data-blocked={item.status !== 'connected' || undefined}>{item.status === 'disconnected' ? msg('已断开连接') : item.status === 'connected' ? msg('已连接') : msg('需要重新连接')}</small></span>
-                {item.id === accountId && <Icon name="chevron" size={16} />}
-              </button>
-            ))}
+              {accounts.map((item) => (
+                <button
+                  key={item.id}
+                  className="nc-remote-connection"
+                  aria-pressed={item.id === accountId}
+                  onClick={() => {
+                    if (item.id !== accountId) reset(item.id);
+                  }}
+                >
+                  <Icon name="cloud" size={22} />
+                  <span>
+                    <strong>{item.displayName}</strong>
+                    <small data-blocked={item.status !== 'connected' || undefined}>
+                      {item.status === 'disconnected'
+                        ? msg('已断开连接')
+                        : item.status === 'connected'
+                          ? msg('已连接')
+                          : msg('需要重新连接')}
+                    </small>
+                  </span>
+                  {item.id === accountId && <Icon name="chevron" size={16} />}
+                </button>
+              ))}
             </nav>
-            <p className="nc-remote-sidebar-note">{msg('连接后浏览远程目录，打开时才加入我的漫画。')}</p>
+            <p className="nc-remote-sidebar-note">
+              {msg('连接后浏览远程目录，打开时才加入我的漫画。')}
+            </p>
           </aside>
           <div className="nc-remote-content" aria-busy={busy}>
-          {account && (
-            <>
-              <nav className="nc-remote-breadcrumbs" aria-label={msg('书库目录')}>
-                <button
-                  className="icon-button"
-                  disabled={!history.length || busy}
-                  onClick={() => back()}
-                  aria-label={msg('返回上级')}
-                  title={msg('返回上级')}
-                >
-                  <Icon name="arrow" style={{ transform: 'rotate(180deg)' }} size={16} />
-                </button>
-                <ol>
-                  <li><button className="text-link" disabled={busy} onClick={() => reset(accountId)}><Icon name="home" size={16} />{msg('书库首页')}</button></li>
-                  {breadcrumbs.map((item) => <li key={item.index}><Icon name="chevron" size={14} /><button className="text-link" disabled={busy} onClick={() => back(item.index)}>{item.search ? msg('搜索结果') : item.title}</button></li>)}
-                  <li aria-current="page"><Icon name="chevron" size={14} /><span>{pageTitle}</span></li>
-                </ol>
-              </nav>
-              <div className="nc-remote-toolbar">
-                <div className="nc-remote-title"><h2>{pageTitle}</h2>{page && !busy && !blocked && <span>{msg('本页 {0} 本', { '0': count })}</span>}</div>
-                <div className="nc-inline">
-                <button
-                  className="icon-button"
-                  aria-label={msg('刷新')}
-                  title={msg('刷新')}
-                  disabled={busy || blocked}
-                  onClick={() => {
-                    setLocation((value) => ({ ...value, scrollTop: window.scrollY }));
-                    setRefresh((value) => value + 1);
-                  }}
-                >
-                  <Icon name="refresh" size={18} />
-                </button>
-                <button className="icon-button" aria-label={msg('管理书库')} title={msg('管理书库')} aria-haspopup="menu" onClick={(event) => menu.open(event.currentTarget, account.displayName, connectionActions)}><Icon name="more" size={20} /></button>
-                </div>
-              </div>
-            </>
-          )}
-          {blocked ? (
-            <div className="nc-empty nc-remote-empty" role="status"><Icon name="cloud" size={40} /><h3>{msg('需要重新连接')}</h3><p>{msg('书库需要重新连接，请更新授权后继续。')}</p><button className="button primary" onClick={() => setEditing(account)}>{msg('重新连接')}</button></div>
-          ) : (
-            <>
-              {(page?.searchable || location.search) && (
-                <form
-                  className="nc-remote-search"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (page && search.trim() && search.trim() !== location.search)
-                      navigate({ location: page.location, search: search.trim(), title: msg('搜索结果'), scrollTop: 0 }, !!location.search);
-                  }}
-                >
-                  <label className="nc-search">
-                    <Icon name="search" size={18} />
-                    <input
-                      type="search"
-                      aria-label={msg('搜索书库')}
-                      placeholder={msg('搜索书库')}
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      maxLength={256}
-                    />
-                  </label>
-                  <button className="button secondary" disabled={busy || !search.trim()}>
-                    {msg('搜索')}
-                  </button>
-                  {location.search && <button type="button" className="text-link" disabled={busy} onClick={() => { if (history.length) back(); else reset(accountId); }}>{msg('清除搜索')}</button>}
-                </form>
-              )}
-              {location.search && <p className="nc-remote-query">{msg('搜索结果')}<strong>{location.search}</strong></p>}
-              {busy && (
-                <p role="status" className="nc-remote-status">
-                  <span className="spinner" />
-                  {msg('正在读取书库…')}
-                </p>
-              )}
-              {error && (
-                <div role="alert" className="nc-remote-error">
-                  <p>{error}</p>
+            {account && (
+              <>
+                <nav className="nc-remote-breadcrumbs" aria-label={msg('书库目录')}>
                   <button
-                    className="button secondary small"
-                    onClick={() => setRefresh((value) => value + 1)}
+                    className="icon-button"
+                    disabled={!history.length || busy}
+                    onClick={() => back()}
+                    aria-label={msg('返回上级')}
+                    title={msg('返回上级')}
                   >
-                    {msg('重试')}
+                    <Icon name="arrow" style={{ transform: 'rotate(180deg)' }} size={16} />
                   </button>
-                </div>
-              )}
-              {actionError && (
-                <p role="alert" className="nc-remote-error">
-                  {actionError}
-                </p>
-              )}
-              {!!page?.navigation.length && (
-                <nav className="nc-remote-navigation" aria-label={msg('书库目录')}>
-                  {page.navigation.map((item) => (
-                    <button
-                      key={item.id}
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() => navigate({ location: item.location, title: item.title, scrollTop: 0 })}
-                    >
-                      <Icon name="folder" size={24} /><span>{item.title}</span>
-                      <Icon name="chevron" size={16} />
-                    </button>
-                  ))}
-                </nav>
-              )}
-              {!!page?.facets?.length && (
-                <div className="nc-remote-facets">
-                  {page.facets.map((facet, index) => (
-                    <details key={index}>
-                      <summary>{facet.title}</summary>
-                      <div className="nc-remote-navigation">
-                        {facet.links.map((link) => (
-                          <button
-                            key={link.id}
-                            className={'button small ' + (link.active ? 'primary' : 'secondary')}
-                            disabled={busy || link.active}
-                            onClick={() => navigate({ location: link.location, scrollTop: 0 })}
-                          >
-                            {link.title}
-                          </button>
-                        ))}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              )}
-              {page &&
-                !busy &&
-                !publications.length &&
-                !page.navigation.length &&
-                !page.groups?.length && (
-                  <div className="nc-empty nc-remote-empty"><Icon name={location.search ? 'search' : 'folder'} size={40} /><h3>{location.search ? msg('没有找到匹配的漫画。') : msg('此目录暂无可显示的内容。')}</h3>{location.search && <button className="button secondary" onClick={() => { if (history.length) back(); else reset(accountId); }}>{msg('清除搜索')}</button>}</div>
-                )}
-              {!!publications.length && (
-                <div className="nc-remote-grid">
-                  {publications.map((publication) => (
-                    <PublicationCard
-                      key={publication.id}
-                      active={active && !blocked}
-                      connectionId={accountId}
-                      publication={publication}
-                      busy={!!opening || busy}
-                      onRead={() => void read(publication)}
-                      onDetails={() => setDetails(publication)}
-                    />
-                  ))}
-                </div>
-              )}
-              {page?.groups?.map((group, index) => (
-                <section className="nc-remote-group" key={index}>
-                  <div className="nc-remote-group-heading"><h3>{group.title}</h3><span>{group.publications.length}</span></div>
-                  {!!group.navigation.length && (
-                    <nav className="nc-remote-navigation">
-                      {group.navigation.map((item) => (
+                  <ol>
+                    <li>
+                      <button className="text-link" disabled={busy} onClick={() => reset(accountId)}>
+                        <Icon name="home" size={16} />
+                        {msg('书库首页')}
+                      </button>
+                    </li>
+                    {breadcrumbs.map((item) => (
+                      <li key={item.index}>
+                        <Icon name="chevron" size={14} />
                         <button
-                          key={item.id}
-                          className="button secondary"
+                          className="text-link"
                           disabled={busy}
-                          onClick={() => navigate({ location: item.location, title: item.title, scrollTop: 0 })}
+                          onClick={() => back(item.index)}
                         >
-                          {item.title}
-                          <Icon name="arrow" size={16} />
+                          {item.search ? msg('搜索结果') : item.title}
                         </button>
-                      ))}
-                    </nav>
+                      </li>
+                    ))}
+                    <li aria-current="page">
+                      <Icon name="chevron" size={14} />
+                      <span>{pageTitle}</span>
+                    </li>
+                  </ol>
+                </nav>
+                <div className="nc-remote-toolbar">
+                  <div className="nc-remote-title">
+                    <h2>{pageTitle}</h2>
+                    {page && !busy && !blocked && (
+                      <span>{msg('本页 {0} 本', { '0': count })}</span>
+                    )}
+                  </div>
+                  {searchForm}
+                  <div className="nc-inline">
+                    <button
+                      className="icon-button"
+                      aria-label={msg('刷新')}
+                      title={msg('刷新')}
+                      disabled={busy || blocked}
+                      onClick={() => {
+                        setLocation((value) => ({ ...value, scrollTop: window.scrollY }));
+                        setRefresh((value) => value + 1);
+                      }}
+                    >
+                      <Icon name="refresh" size={18} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label={msg('管理书库')}
+                      title={msg('管理书库')}
+                      aria-haspopup="menu"
+                      onClick={(event) =>
+                        menu.open(event.currentTarget, account.displayName, connectionActions)
+                      }
+                    >
+                      <Icon name="more" size={20} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            {blocked ? (
+              <div className="nc-empty nc-remote-empty" role="status">
+                <Icon name="cloud" size={40} />
+                <h3>{msg('需要重新连接')}</h3>
+                <p>{msg('书库需要重新连接，请更新授权后继续。')}</p>
+                <button className="button primary" onClick={() => setEditing(account)}>
+                  {msg('重新连接')}
+                </button>
+              </div>
+            ) : (
+              <>
+                {location.search && (
+                  <p className="nc-remote-query">
+                    {msg('搜索结果')}
+                    <strong>{location.search}</strong>
+                  </p>
+                )}
+                {busy && (
+                  <p role="status" className="nc-remote-status">
+                    <span className="spinner" />
+                    {msg('正在读取书库…')}
+                  </p>
+                )}
+                {error && (
+                  <div role="alert" className="nc-remote-error">
+                    <p>{error}</p>
+                    <button
+                      className="button secondary small"
+                      onClick={() => setRefresh((value) => value + 1)}
+                    >
+                      {msg('重试')}
+                    </button>
+                  </div>
+                )}
+                {actionError && (
+                  <p role="alert" className="nc-remote-error">
+                    {actionError}
+                  </p>
+                )}
+                {!!page?.navigation.length && (
+                  <nav className="nc-remote-navigation" aria-label={msg('书库目录')}>
+                    {page.navigation.map((item) => (
+                      <button
+                        key={item.id}
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          navigate({ location: item.location, title: item.title, scrollTop: 0 })
+                        }
+                      >
+                        <Icon name="folder" size={24} />
+                        <span>{item.title}</span>
+                        <Icon name="chevron" size={16} />
+                      </button>
+                    ))}
+                  </nav>
+                )}
+                {!!page?.facets?.length && (
+                  <div className="nc-remote-facets">
+                    {page.facets.map((facet, index) => (
+                      <details key={index}>
+                        <summary>{facet.title}</summary>
+                        <div className="nc-remote-navigation">
+                          {facet.links.map((link) => (
+                            <button
+                              key={link.id}
+                              className={'button small ' + (link.active ? 'primary' : 'secondary')}
+                              disabled={busy || link.active}
+                              onClick={() => navigate({ location: link.location, scrollTop: 0 })}
+                            >
+                              {link.title}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
+                {page &&
+                  !busy &&
+                  !error &&
+                  !publications.length &&
+                  !page.navigation.length &&
+                  !page.groups?.length && (
+                    <div className="nc-empty nc-remote-empty">
+                      <Icon name={location.search ? 'search' : 'folder'} size={40} />
+                      <h3>
+                        {location.search
+                          ? msg('没有找到匹配的漫画。')
+                          : msg('此目录暂无可显示的内容。')}
+                      </h3>
+                      {location.search && (
+                        <button
+                          className="button secondary"
+                          onClick={() => {
+                            if (history.length) back();
+                            else reset(accountId);
+                          }}
+                        >
+                          {msg('清除搜索')}
+                        </button>
+                      )}
+                    </div>
                   )}
+                {!!publications.length && (
                   <div className="nc-remote-grid">
-                    {group.publications.map((publication) => (
+                    {publications.map((publication) => (
                       <PublicationCard
                         key={publication.id}
                         active={active && !blocked}
@@ -462,67 +568,133 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                       />
                     ))}
                   </div>
-                </section>
-              ))}
-              {(page?.next || page?.previous) && (
-                <div className="nc-remote-pagination">
-                  {page.previous && (
-                    <button
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() =>
-                        navigate({
-                          location: page.location,
-                          cursor: page.previous,
-                          search: location.search,
-                          scrollTop: 0,
-                        }, true)
-                      }
-                    >
-                      {msg('上一页')}
+                )}
+                {page?.groups?.map((group, index) => (
+                  <section className="nc-remote-group" key={index}>
+                    <div className="nc-remote-group-heading">
+                      <h3>{group.title}</h3>
+                      <span>{group.publications.length}</span>
+                      {!!group.navigation.length && (
+                        <nav className="nc-remote-group-links">
+                          {group.navigation.map((item) => (
+                            <button
+                              key={item.id}
+                              className="text-link"
+                              disabled={busy}
+                              onClick={() =>
+                                navigate({ location: item.location, title: item.title, scrollTop: 0 })
+                              }
+                            >
+                              {item.title}
+                              <Icon name="arrow" size={16} />
+                            </button>
+                          ))}
+                        </nav>
+                      )}
+                    </div>
+                    <div className="nc-remote-grid">
+                      {group.publications.map((publication) => (
+                        <PublicationCard
+                          key={publication.id}
+                          active={active && !blocked}
+                          connectionId={accountId}
+                          publication={publication}
+                          busy={!!opening || busy}
+                          onRead={() => void read(publication)}
+                          onDetails={() => setDetails(publication)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+                {(page?.next || page?.previous) && (
+                  <div className="nc-remote-pagination">
+                    {page.previous && (
+                      <button
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          navigate(
+                            {
+                              location: page.location,
+                              cursor: page.previous,
+                              search: location.search,
+                              searchLocation: location.searchLocation,
+                              scrollTop: 0,
+                            },
+                            true,
+                          )
+                        }
+                      >
+                        {msg('上一页')}
+                      </button>
+                    )}
+                    {page.next && (
+                      <button
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          navigate(
+                            {
+                              location: page.location,
+                              cursor: page.next,
+                              search: location.search,
+                              searchLocation: location.searchLocation,
+                              scrollTop: 0,
+                            },
+                            true,
+                          )
+                        }
+                      >
+                        {msg('下一页')}
+                        <Icon name="arrow" size={18} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                {opening && (
+                  <div className="busy-pill" role="status">
+                    <span className="spinner" />
+                    {msg('正在打开漫画')}
+                    <button className="text-link" onClick={cancelOpening}>
+                      {msg('取消')}
                     </button>
-                  )}
-                  {page.next && (
-                    <button
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() =>
-                        navigate({
-                          location: page.location,
-                          cursor: page.next,
-                          search: location.search,
-                          scrollTop: 0,
-                        }, true)
-                      }
-                    >
-                      {msg('下一页')}
-                      <Icon name="arrow" size={18} />
-                    </button>
-                  )}
-                </div>
-              )}
-              {opening && (
-                <div className="busy-pill" role="status">
-                  <span className="spinner" />
-                  {msg('正在打开漫画')}
-                  <button className="text-link" onClick={cancelOpening}>
-                    {msg('取消')}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
       {menu.menu}
-      {details && <Modal title={details.title} onClose={() => setDetails(undefined)} className="nc-remote-details">
-        {!!details.authors?.length && <p className="nc-muted">{details.authors.join(' · ')}</p>}
-        {!!details.formats?.length && <p className="nc-remote-formats">{details.formats.join(' · ')}</p>}
-        {details.summary && <p className="nc-remote-summary">{details.summary}</p>}
-        {details.reason && <p className="nc-remote-unavailable">{details.reason}</p>}
-        {details.readable !== false && <button className="button primary" disabled={!!opening} onClick={() => { const publication = details; setDetails(undefined); void read(publication); }}><Icon name="book" size={18} />{msg('开始阅读')}</button>}
-      </Modal>}
+      {details && (
+        <Modal
+          title={details.title}
+          onClose={() => setDetails(undefined)}
+          className="nc-remote-details"
+        >
+          {!!details.authors?.length && <p className="nc-muted">{details.authors.join(' · ')}</p>}
+          {!!details.formats?.length && (
+            <p className="nc-remote-formats">{details.formats.join(' · ')}</p>
+          )}
+          {details.summary && <p className="nc-remote-summary">{details.summary}</p>}
+          {details.reason && <p className="nc-remote-unavailable">{details.reason}</p>}
+          {details.readable !== false && (
+            <button
+              className="button primary"
+              disabled={!!opening}
+              onClick={() => {
+                const publication = details;
+                setDetails(undefined);
+                void read(publication);
+              }}
+            >
+              <Icon name="book" size={18} />
+              {msg('开始阅读')}
+            </button>
+          )}
+        </Modal>
+      )}
       {editing !== undefined && (
         <ConnectionDialog
           account={editing ?? undefined}
@@ -548,7 +720,10 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                 setDisconnecting(undefined);
                 void disconnectSource(item.id)
                   .then(reloadAccounts)
-                  .catch((error) => setActionError(error.message));
+                  .catch((error) => {
+                    if (current.current.active && current.current.accountId === item.id)
+                      setActionError(error.message);
+                  });
               }}
             >
               {msg('断开连接')}
@@ -626,7 +801,14 @@ function PublicationCard({
         aria-label={msg('打开漫画 {0}', { '0': publication.title })}
       >
         {url ? <img src={url} alt="" loading="lazy" /> : <Icon name="book" size={48} />}
-        {publication.readable === false ? <span className="nc-remote-cover-badge">{msg('暂不可读')}</span> : <span className="nc-remote-cover-action"><Icon name="book" size={18} />{msg('开始阅读')}</span>}
+        {publication.readable === false ? (
+          <span className="nc-remote-cover-badge">{msg('暂不可读')}</span>
+        ) : (
+          <span className="nc-remote-cover-action">
+            <Icon name="book" size={18} />
+            {msg('开始阅读')}
+          </span>
+        )}
       </button>
       <div className="nc-remote-publication-info">
         <h3>
@@ -637,7 +819,17 @@ function PublicationCard({
         {!!publication.authors?.length && (
           <p className="nc-muted">{publication.authors.join(' · ')}</p>
         )}
-        <div className="nc-remote-card-footer"><span className="nc-remote-formats">{publication.formats?.join(' · ')}</span><button className="icon-button" aria-label={msg('查看详情：{0}', { '0': publication.title })} title={msg('查看详情：{0}', { '0': publication.title })} onClick={onDetails}><Icon name="info" size={16} /></button></div>
+        <div className="nc-remote-card-footer">
+          <span className="nc-remote-formats">{publication.formats?.join(' · ')}</span>
+          <button
+            className="icon-button"
+            aria-label={msg('查看详情：{0}', { '0': publication.title })}
+            title={msg('查看详情：{0}', { '0': publication.title })}
+            onClick={onDetails}
+          >
+            <Icon name="info" size={16} />
+          </button>
+        </div>
         {publication.reason && <p className="nc-remote-unavailable">{publication.reason}</p>}
       </div>
     </article>

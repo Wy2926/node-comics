@@ -69,8 +69,9 @@ export async function remoteLibraryUiFixture() {
     const pageNumber = query.get('page') === '2' ? 2 : 1;
     const links: Record<string, unknown>[] = [
       { rel: 'self', href: path + (query.size ? '?' + query.toString() : ''), type: OPDS },
-      { rel: 'search', href: `${root}/search{?query}`, type: OPDS, templated: true },
     ];
+    // Search results need not advertise search again; replacements must use the source catalog.
+    if (path !== root + '/search') links.push({ rel: 'search', href: `${root}/search{?query}`, type: OPDS, templated: true });
     const navigation = (label: string, route: string) => ({ title: label, href: root + route, type: OPDS });
     if (path === root) return {
       metadata: { title }, links,
@@ -85,7 +86,8 @@ export async function remoteLibraryUiFixture() {
     let categories: ReturnType<typeof navigation>[] = [];
     if (path === root + '/adventure') { indices = indices.slice(8, 16); pageTitle = '冒险与奇幻'; categories = [navigation('星海系列', '/adventure/stars')]; }
     else if (path === root + '/adventure/stars') { indices = [8, 14, 22]; pageTitle = '星海系列'; }
-    else if (path === root + '/everyday') { indices = indices.slice(16); pageTitle = '日常与短篇'; }
+    else if (path === root + '/everyday') { indices = indices.slice(16); pageTitle = '日常与短篇'; categories = [navigation('空目录', '/everyday/empty')]; }
+    else if (path === root + '/everyday/empty') { indices = []; pageTitle = '空目录'; }
     else if (path === root + '/retry') { indices = [0, 7]; pageTitle = '重试成功'; }
     else if (path === root + '/search') { const value = (query.get('query') ?? '').trim().toLowerCase(); indices = indices.filter((index) => titles[index].toLowerCase().includes(value)); pageTitle = `搜索：${value}`; }
     else if (path !== root + '/all') return;
