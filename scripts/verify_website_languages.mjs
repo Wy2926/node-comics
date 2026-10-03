@@ -83,6 +83,8 @@ try {
     assert.equal(new URL(privatePage.url()).pathname,'/'+route);
   }
   await privatePage.goto(origin+'/fr/account/?price=lite-year#account');
+  // Production may defer modules through Cloudflare Rocket Loader after load.
+  await privatePage.waitForFunction(()=>document.querySelector('.language-menu a[lang=de]')?.getAttribute('href')==='/de/account/?price=lite-year#account');
   assert.equal(await privatePage.locator('.language-menu a[lang=de]').getAttribute('href'),'/de/account/?price=lite-year#account');
   await privateContext.close();
   // Optional browser storage must not disable the suggestion or manual link.
