@@ -154,9 +154,14 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
   for(const image of request.images){
     if(!ctx.channel.available){items.push({id:image.id,state:ctx.channel.unavailable});continue;}
     const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);if(error)items.push({id:image.id,state:error});continue;}
-    const result=pageResult(ctx,page),item:InlineResult={id:image.id};
+    const result=pageResult(ctx,page),state=ctx.core?.stateFor({entryId:'inline',page,mode},true);
+    // A delivered result may still report "loading the translation" until decoded.
+    // Display work must not occupy a translation slot; a newer request/backoff must.
+    const waiting=state?.kind==='waiting'||state?.kind==='translating';
+    const item:InlineResult={id:image.id,pending:!!pageTranslation(page,mode,language,ctx.channel.scope.key).pending||
+      waiting&&(!result||!!ctx.core?.retryDelay)};
     if(result?.result&&!ctx.missingResults.has(result.id)){item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;}
-    else item.state=ctx.core?.stateFor({entryId:'inline',page,mode},true);
+    else item.state=state;
     items.push(item);
   }
   return {mode,language,scope,items,analyticsChannel:ctx.channel.analyticsCategory,requiresInternet:ctx.channel.requiresInternet,retryAfterMs:ctx.core?.retryDelay||undefined,hasPending:ctx.core?.hasPending,

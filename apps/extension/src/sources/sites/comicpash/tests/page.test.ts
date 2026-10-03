@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sourceFor } from '../../..';
-import { readingImages } from '../../../../inline/protocol';
+import { readingImages } from '../../../../inline/window';
 import type { PageImage } from '../../../contracts/page';
 import { PageImageRegistry, canvasImage, createSourceNavigation } from '../../../page';
 

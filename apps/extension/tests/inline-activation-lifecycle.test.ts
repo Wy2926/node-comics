@@ -1,5 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ChannelConnection,ChannelRuntime,RuntimeOptions} from '../src/translation/channels/contracts';
+import type {Job} from '../src/types';
 
 const mocks=vi.hoisted(()=>({
   getTab:vi.fn(),tabMessage:vi.fn(),localSettings:vi.fn(),openChannel:vi.fn(),init:vi.fn(),
@@ -75,6 +76,24 @@ beforeEach(async()=>{
 afterEach(()=>{vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('frees a delivered image slot before decoding, but keeps a newer pending request or recovery backoff',async()=>{
+    await send(request());
+    vi.mocked(cores[0].stateFor).mockReturnValue({kind:'translating',message:'Loading result'});
+    const completed:Job={id:'completed',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'result',recoverable:true}};
+    await options[0].onJobs([completed]);
+    expect(await send({...request(),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{id:'image-7',pending:false,resultKey:expect.any(String)}]}});
+    Object.defineProperty(cores[0],'retryDelay',{value:5000,configurable:true});
+    expect(await send({...request(),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{pending:true}]}});
+    Object.defineProperty(cores[0],'retryDelay',{value:0,configurable:true});
+    await options[0].onJobs([{...completed,id:'new-request',status:'queued',result:undefined,created_at:'2026-01-02T00:00:00Z'}]);
+    expect(await send({...request(),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{pending:true,resultKey:expect.any(String)}]}});
+  });
+  it('still rejects execution messages larger than five images',async()=>{
+    const images=Array.from({length:6},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
+    expect(await send({...request(),images})).toMatchObject({ok:false});
+    expect(mocks.readImage).not.toHaveBeenCalled();
+  });
   it('admits prepared images incrementally and preserves the whole five-image window',async()=>{
     const pending=gate();let number=0;
     mocks.prepareImage.mockImplementation(async({blob}:{blob:Blob})=>({blob,width:500,height:700,imageSha256:String(++number).repeat(64)}));

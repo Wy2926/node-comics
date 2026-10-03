@@ -17,7 +17,7 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||['generic','feedback','prefetch'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||['generic','feedback','prefetch','window'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -35,6 +35,7 @@ const mode='classic',language='zh-Hans',checks=[],errors=[];
 const rights={plan:'free',image_rate_limit:{window_seconds:60,limit:10},timezone:'Asia/Shanghai',plus_started_at:null,plus_expires_at:null,pending_previous_period_pages:0,modes:Object.fromEntries(['classic'].map(m=>[m,{allowed:true,unlimited:true,quota_kind:'classic_unlimited',consent_version:'fixture',quota:null}]))};
 const caps={result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,label:'常规翻译',languages:['zh-Hans','en']}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'}],limits:{max_bytes:41943040,max_pixels:60000000,max_dimension:20000},entitlements:rights};
 let output,api,site,complete=true;
+let liveWindowSource=false;
 const resultRequests=[];
 const eventStreams=new Set();
 let heldResult,releaseResult,failResult;
@@ -118,6 +119,13 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));api=`http://127
 // Redirect the build-time service only inside the isolated fixture copy.
 for(const file of await readdir(extension,{recursive:true}))if(file.endsWith('.js')){const target=path.join(extension,file),source=await readFile(target,'utf8');await writeFile(target,source.replaceAll(process.env.INLINE_BUILD_API||'https://comics.nodelane.net',api));}
 const web=createServer((req,res)=>{
+  if(req.url==='/sliced'){
+    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>Sliced reading surface</title>
+      <style>body{margin:0;background:#edf2f8}main{height:810px;overflow:hidden;position:relative}.sheet{position:absolute;top:0;width:500px;height:810px}img{display:block;width:500px;height:270px}nav{position:fixed;bottom:8px;left:16px}button{padding:8px}</style>
+      <main>${Array.from({length:8},(_,p)=>`<section class="sheet" id="sheet-${p}" style="left:${p<2?p*500:-1500-p*500}px">${Array.from({length:3},(_,n)=>`<img id="slice-${p*3+n+22}" src="${api}/source/${p*3+n+22}.png">`).join('')}</section>`).join('')}</main>
+      <nav><button id="forward">Next spread</button><button id="back">Previous spread</button></nav>
+      <script>window.turn=pair=>{for(const p of document.querySelectorAll('.sheet')){const id=Number(p.id.split('-')[1]);p.style.left=(id===pair?0:id===pair+1?500:id<pair?1500+id*500:-1500-id*500)+'px';}for(const id of [pair+1,pair])document.querySelector('main').append(document.querySelector('#sheet-'+id));};document.querySelector('#forward').onclick=()=>turn(2);document.querySelector('#back').onclick=()=>turn(0);</script>`);return;
+  }
   if(req.url==='/generic-canvas'){
     res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>Generic canvas fixture</title>
       <style>body{margin:0;background:#edf2f8}main{display:flex;gap:16px;padding:16px}.slot{position:relative;width:400px;height:550px;flex:none}canvas{width:400px;height:550px}#small{width:40px;height:55px}#offscreen{position:absolute;left:-2000px}</style>
@@ -154,7 +162,7 @@ try{
   await page.setContent('<body style="margin:0;width:800px;height:1100px;background:#fff5df;font:42px system-ui"><div style="margin:50px;border:6px solid #20304b;height:880px;padding:35px">Original comic panel<br><br>HELLO!<br><br>READ THE STORY</div></body>');
   const source=await page.screenshot({clip:{x:0,y:0,width:800,height:1100},captureBeyondViewport:true});
   console.log(`Fixture input ${source.readUInt32BE(16)}x${source.readUInt32BE(20)}`);
-  for(let n=1;n<=21;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
+  for(let n=1;n<=45;n++)images.set(n,Buffer.concat([source,Buffer.from(`fixture-${n}`)]));
   output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
@@ -230,7 +238,65 @@ try{
     await waitJob(19);await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>scrollY),0);assert(!hasJob(20));
     check('a short image fills its fifth slot without scrolling, and does not recursively expand the chapter');
     await button('暂停');await page.locator('#rolling-3').scrollIntoViewIfNeeded();await page.waitForTimeout(300);assert(!hasJob(20));
-    await button('继续');await waitJob(21);check('pause suppresses expansion and resume processes the latest bounded window');
+    await button('继续');await waitJob(20);assert(!hasJob(21));
+    check('pause suppresses expansion; resume prioritizes the still-visible previous-page sliver within the bounded lookahead');
+  }
+  if(selectedSite==='window'){
+    const hasJob=n=>[...jobs.values()].find(j=>j.image_sha256===sha(images.get(n)));
+    const waitUntil=async(condition,message)=>{const until=Date.now()+20000;while(!condition()&&Date.now()<until)await page.waitForTimeout(25);assert(condition(),message);};
+    const finish=job=>Object.assign(job,{status:'succeeded',updated_at:new Date().toISOString()});
+    const shown=async(first,count)=>page.waitForFunction(({first,count})=>Array.from({length:count},(_,n)=>document.querySelector('#slice-'+(first+n))).every(i=>i.style.content.includes('blob:')),{first,count},{timeout:25000});
+    const beforeWindowJobs=createdJobs;
+    complete=false;await page.goto(site+'/sliced');await page.locator('#slice-22').evaluate(i=>i.decode());await activate();
+    await waitUntil(()=>[22,23,25,26,27].every(n=>hasJob(n)?.status==='queued'),'first bounded slice batch was uploaded');
+    assert(!hasJob(24),'sixth slice waits for a batch slot');
+    for(const n of [22,23,26,27])finish(hasJob(n));
+    await waitUntil(()=>hasJob(24)?.status==='queued','sixth visible slice fills a freed slot while its peer is still pending');finish(hasJob(24));
+    await page.waitForFunction(()=>[22,23,24,26,27].every(n=>document.querySelector('#slice-'+n).style.content.includes('blob:')),null,{timeout:20000});
+    assert.equal(hasJob(25).status,'queued');finish(hasJob(25));await shown(22,6);
+    assert.equal(createdJobs-beforeWindowJobs,6,'only the visible slices were translated');
+    await page.screenshot({path:path.join(out,'sliced-both-pages.png')});
+    check('six interleaved visible slices display completely through five-image batches; a slow peer does not block the remaining slices');
+    const original=await page.locator('#slice-22').evaluate(i=>({src:i.src,width:i.clientWidth,height:i.clientHeight}));
+    await button('暂停');await page.locator('#forward').click();await page.waitForTimeout(400);
+    assert.equal(createdJobs-beforeWindowJobs,6);complete=true;await button('继续');await shown(28,6);
+    assert.equal(createdJobs-beforeWindowJobs,12);const downloads=resultRequests.length;
+    await page.locator('#back').click();await shown(22,6);await page.waitForTimeout(300);
+    assert.equal(createdJobs-beforeWindowJobs,12);assert.equal(resultRequests.length,downloads);
+    assert.deepEqual(await page.locator('#slice-22').evaluate(i=>({src:i.src,width:i.clientWidth,height:i.clientHeight})),original);
+    await page.screenshot({path:path.join(out,'sliced-reverse-restored.png')});
+    check('pause, next spread and reverse DOM reordering preserve both pages, geometry and cached results without another job or image download');
+    await button('恢复原图');assert.equal(await page.locator('#slice-22').evaluate(i=>i.style.content),'');
+    await button('显示译图');await shown(22,6);assert.equal(createdJobs-beforeWindowJobs,12);assert.equal(resultRequests.length,downloads);
+    await button('关闭');
+    check('original/translation toggles restore all six slices without changing source attributes or re-translating');
+    if(process.env.INLINE_LIVE_URL){
+      // Public source rendering only. This isolated extension sends pixels to the local fixture, never a real provider.
+      const visible=()=>[...document.querySelectorAll('img:not([data-nc-canvas-translation])')].filter(i=>{
+        const r=i.getBoundingClientRect();return i.complete&&i.naturalWidth>=80&&i.naturalHeight>=80&&
+          i.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})&&r.width>=240&&r.height>=180&&r.width*r.height>=100000&&r.width/r.height<=2.8&&
+          r.right>0&&r.left<innerWidth&&r.bottom>0&&r.top<innerHeight;
+      }).map(i=>({source:i.currentSrc||i.src,translated:i.style.content.includes('blob:')}));
+      const current=()=>page.evaluate(visible);
+      const translated=async minimum=>{const until=Date.now()+45000;let values;
+        do{values=await current();if(values.length>=minimum&&values.every(i=>i.translated))return;await page.waitForTimeout(100);}while(Date.now()<until);
+        assert.fail(`live visible translations: ${values.filter(i=>i.translated).length}/${values.length}, expected at least ${minimum}`);
+      };
+      const turn=async key=>{const before=JSON.stringify((await current()).map(i=>i.source).sort());await page.keyboard.press(key);
+        const until=Date.now()+15000;while(JSON.stringify((await current()).map(i=>i.source).sort())===before&&Date.now()<until)await page.waitForTimeout(100);
+        assert.notEqual(JSON.stringify((await current()).map(i=>i.source).sort()),before,'visible sources changed after paging');
+      };
+      await page.goto(process.env.INLINE_LIVE_URL);await activate();await translated(3);
+      await turn('ArrowLeft');await translated(6);await page.screenshot({path:path.join(out,'generic-live-forward-spread.png')});
+      await turn('ArrowLeft');await translated(6);
+      const liveJobs=createdJobs,liveDownloads=resultRequests.length;
+      await turn('ArrowRight');await translated(6);assert.equal(createdJobs,liveJobs);assert.equal(resultRequests.length,liveDownloads);
+      await page.screenshot({path:path.join(out,'generic-live-reverse-spread.png')});
+      await button('恢复原图');assert((await current()).every(i=>!i.translated));
+      await button('显示译图');await translated(6);assert.equal(createdJobs,liveJobs);assert.equal(resultRequests.length,liveDownloads);
+      await button('关闭');liveWindowSource=true;
+      check('live generic source displays all visible slices in both paging directions and reuses cached local-fixture results; no live provider used');
+    }
   }
   if(!selectedSite) {
   await page.goto(site);await page.locator('#first').evaluate(i=>i.decode());await page.evaluate(()=>{window.fixtureClicks=0;document.querySelector('#site-button').addEventListener('click',()=>window.fixtureClicks++);});
@@ -556,7 +622,7 @@ try{
     }
   }
   complete=true;
-  let liveSource=(process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite)||(process.env.RUN_LIVE_COMICWALKER==='1'&&(!selectedSite||selectedSite==='generic'));
+  let liveSource=liveWindowSource||(process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite)||(process.env.RUN_LIVE_COMICWALKER==='1'&&(!selectedSite||selectedSite==='generic'));
   for(const site of siteChecks.filter(site=>!selectedSite||site.id===selectedSite)) {
     const {verifyInline}=await import(site.url);
     const result=await verifyInline({browser,page,activate,button,source:images.get(2),out,check});
