@@ -26,7 +26,17 @@ export class CanvasDisplay {
    parent.style.setProperty('position','relative','important');
   }
   const css=getComputedStyle(this.canvas);
-  const properties:Record<string,string>={all:'initial',position:'absolute',display:'block',left:`${this.canvas.offsetLeft}px`,top:`${this.canvas.offsetTop}px`,width:`${this.canvas.offsetWidth}px`,height:`${this.canvas.offsetHeight}px`,'max-width':'none','max-height':'none','object-fit':'fill','pointer-events':'none','user-select':'none','z-index':'1'};
+  // offsetWidth/Height round to integers. GigaViewer scales pages to fractional
+  // CSS heights; rounding changes the image scale and shifts small text/line art.
+  // Use the untransformed CSS border box so ancestor/site transforms still apply once.
+  const size=(axis:'width'|'height')=>{
+   const value=Number.parseFloat(css[axis]);
+   if(!css[axis].endsWith('px')||!Number.isFinite(value))return axis==='width'?this.canvas.offsetWidth:this.canvas.offsetHeight;
+   const edges=axis==='width'?['left','right']:['top','bottom'];
+   return value+(css.boxSizing==='border-box'?0:edges.reduce((sum,edge)=>sum+
+    (Number.parseFloat(css.getPropertyValue('padding-'+edge))||0)+(Number.parseFloat(css.getPropertyValue('border-'+edge+'-width'))||0),0));
+  };
+  const properties:Record<string,string>={all:'initial',position:'absolute',display:'block',left:`${this.canvas.offsetLeft}px`,top:`${this.canvas.offsetTop}px`,width:`${size('width')}px`,height:`${size('height')}px`,'max-width':'none','max-height':'none','object-fit':'fill','pointer-events':'none','user-select':'none','z-index':'1'};
   // Comici centers each canvas with top:50% + translateY(-50%). Its offset box
   // alone is not the displayed box; keep all site-authored transforms as well.
   for(const name of ['transform','transform-origin','translate','rotate','scale'])properties[name]=css.getPropertyValue(name);

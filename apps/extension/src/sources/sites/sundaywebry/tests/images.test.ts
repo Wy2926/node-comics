@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
 import {image} from '../image';
-import {decodeBaku, parseProcessing} from '../images';
+import {decodeBaku, bakuDimensions} from '../../../shared/gigaviewer/image';
 import {imageUrl} from './fixtures';
 afterEach(() => vi.unstubAllGlobals());
 it('preserves remainder pixels, transposes whole 8-aligned tiles and releases bitmaps', async () => {
@@ -16,7 +16,7 @@ it('preserves remainder pixels, transposes whole 8-aligned tiles and releases bi
 it('rejects malformed recipes, wrong dimensions and invalid inline hosts; cancellation never leaks bitmaps', async () => {
   const bitmap = {width: 67, height: 99, close: vi.fn()};
   vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
-  for (const value of ['unknown', 'webry-baku:0:10', 'webry-baku:9007199254740992:10']) expect(() => parseProcessing(value)).toThrow();
+  for (const value of ['unknown', 'webry-baku:0:10', 'webry-baku:9007199254740992:10']) expect(() => bakuDimensions(value, 'webry-baku')).toThrow();
   await expect(decodeBaku(new Blob(), {width: 68, height: 99})).rejects.toThrow(); expect(bitmap.close).toHaveBeenCalledOnce();
   await expect(image.decodeInline!(new Blob(), new Headers(), 'https://evil.test/image')).rejects.toThrow();
   const controller = new AbortController(); controller.abort();

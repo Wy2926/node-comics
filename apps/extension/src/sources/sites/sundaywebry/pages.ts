@@ -1,26 +1,11 @@
-import type {DiscoveredPage} from '../../contracts/source';
-import {changed, count, object, pageUrl, parseEpisode} from './protocol';
+import {gigaViewerPages} from '../../shared/gigaviewer/pages';
+import {pageUrl, parseEpisode} from './protocol';
 
 export function parsePages(value: unknown, url: string) {
   const reader = parseEpisode(value, url), rawStructure = reader.product.pageStructure;
   if (!rawStructure) throw Error('Sunday Webry 未提供可读取的正文，请在源站确认公开范围或访问状态。');
-  const structure = object(rawStructure), rows = structure.pages;
-  if (!Array.isArray(rows) || !rows.length || rows.length > 1600 ||
-      !['rtl', 'ltr', 'ttb'].includes(String(structure.readingDirection)) ||
-      ![undefined, null, '', 'usagi', 'baku'].includes(structure.choJuGiga as string)) throw changed();
-  const items: DiscoveredPage[] = [];
-  for (const [index, value] of rows.entries()) {
-    const row = object(value);
-    if (row.type !== 'main') {
-      if (!['link', 'other', 'backMatter'].includes(String(row.type))) throw changed();
-      continue;
-    }
-    const width = count(row.width, Number.MAX_SAFE_INTEGER), height = count(row.height, Number.MAX_SAFE_INTEGER), src = pageUrl(row.src);
-    if (!width || !height || items.length >= 1500) throw changed();
-    items.push({id: 'page-' + index, order: items.length, width, height,
-      resource: {kind: 'http', url: src, ...(structure.choJuGiga === 'baku' ? {processing: `webry-baku:${width}:${height}`} : {})}});
-  }
-  if (!items.length) throw changed();
-  return {url, adapter: 'sundaywebry', title: reader.chapter, direction: structure.readingDirection === 'rtl' ? 'rtl' as const : 'ltr' as const,
+  // Keep the persisted source recipe namespace used by existing Webry manifests.
+  const {items, direction} = gigaViewerPages(rawStructure, pageUrl, 'webry-baku');
+  return {url, adapter: 'sundaywebry', title: reader.chapter, direction,
     discoveryComplete: true, knownTotal: items.length, note: '', items};
 }

@@ -1,5 +1,6 @@
 import type {SourceNetworkContext} from '../../contracts/network';
 import {attributes, tags} from '../../shared/html';
+import {gigaViewerProduct} from '../../shared/gigaviewer/pages';
 import {webryLocation} from './definition';
 
 export const changed = () => Error('Sunday Webry 目录或阅读协议已变化，请回源确认后重试。');
@@ -41,10 +42,9 @@ export function episodeData(raw: string) {
   return json(text(scripts[0]['data-value'], 4_000_000));
 }
 export function parseEpisode(value: unknown, url: string) {
-  const loc = location(url), product = object(object(value).readableProduct), series = object(product.series);
-  const episode = id(product.id), seriesId = id(series.id), permalink = location(text(product.permalink));
-  if (product.typeName !== 'episode' || episode !== loc.episode || permalink.episode !== episode ||
-      loc.series && loc.series !== seriesId) throw changed();
+  const loc = location(url), product = gigaViewerProduct(value, loc.episode, url => webryLocation(url)?.episode), series = object(product.series);
+  const episode = loc.episode, seriesId = id(series.id);
+  if (loc.series && loc.series !== seriesId) throw changed();
   return {episode, series: seriesId, title: text(series.title), chapter: text(product.title), product};
 }
 export function parseReader(raw: string, url: string) {

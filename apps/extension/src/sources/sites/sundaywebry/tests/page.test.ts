@@ -13,7 +13,7 @@ it('maps loaded main canvases to HTTP originals, excludes unrendered pages, and 
   Object.assign(second, {width: 67, height: 99});
   const targets = session.inlineTargets(); expect(targets).toHaveLength(2); expect(targets[0].key).not.toBe(targets[1].key);
   expect(session.describeWork?.()).toMatchObject({status: 'ready', value: {title: 'テスト作品', catalogId: 'sundaywebry:series:7'}});
-  expect(await session.discoverPages()).toEqual({status: 'unsupported', code: 'NETWORK_SOURCE_REQUIRED'});
+  expect(await session.discoverPages()).toEqual({status: 'unsupported', code: 'SOURCE_PAGE_UNSUPPORTED'});
   data = readerData('12'); expect(session.inlineTargets()).toEqual([]); expect(session.describeWork?.().status).toBe('not-ready');
   navigation.get(episodeUrl('12')); expect(() => session.inlineTargets()).toThrow(); navigation.dispose();
 });

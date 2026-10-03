@@ -9,7 +9,7 @@
 - 搜索使用源站 `/search?q=` 的完整结果页，读取作品名、作者与专用封面；不推断结果未提供的内容语言或最新话编号。空结果的 HTTP 404 必须仍带匹配查询和空结果结构。多于 50 项时在完整搜索结果内分页，游标绑定查询和结果摘要。
 - GigaViewer 的 `/api/viewer/readable_product_pagination_information` 提供总数和分页大小，`/api/viewer/pagination_readable_products` 按 `aggregate_id`、`offset`、`limit`、`sort_order=asc` 获取目录。多页读取后复核总数和首页，拒绝缺页、重复条目及读取期间的变化。`purchase_info.can_read` 保留源站可读状态；仅限 App、非公开或已过免费期限的条目不伪装成可读。
 - 正文使用章节 HTML 的 `episode-json`，只保留 `pageStructure.pages` 中 `type=main` 的页面；广告、链接和后记控制界面不作为正文。源页槽 ID 保留数组下标，重复图片地址仍是不同页。缺少正文、未知结构和图片来源不符明确失败。
-- `baku` 图片按源站公开阅读器的 4×4 转置规则还原，块宽高向下对齐到 8 的倍数，右／下剩余像素保留。无混淆及 `usagi` 原图直接读取。算法为独立实现，不执行或打包源站脚本；协议依据来自[公开章节页](https://www.sunday-webry.com/episode/12207421984241764591)及其 GigaViewer 前端资源。随包图标为自制文字标识。
+- 正文解析、原位页槽绑定与 `baku` 还原复用 [GigaViewer 引擎](../../shared/gigaviewer/README.md)，保留既有清单的 `webry-baku` 处理标记。无混淆及 `usagi` 网络原图直接读取。协议依据来自[公开章节页](https://www.sunday-webry.com/episode/12207421984241764591)及其 GigaViewer 前端资源。随包图标为自制文字标识。
 - 网页只选择 `.js-viewer-content > p.js-page-area` 的已加载正文。GigaViewer 的展示画布可能无法导出，因此 `baku` 目标通过公共取图权限与 Referer 管线读取 HTTP 原图，再调用本站 `image.decodeInline`；无混淆的页面资源继续绑定文档、元素和导航生命周期。译图显示与恢复由公共层维护，换章或元数据失配后旧目标失效。
 
 网站公开目录和当前会话实际提供的正文是支持边界，不调用 App 私有接口，不执行购买、租借或解锁。官网的商店／宣传链接不是漫画来源。网络导入与刷新不需要保留源站标签页。

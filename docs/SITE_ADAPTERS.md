@@ -19,7 +19,7 @@
 
 ## 必须保持的约束
 
-1. **站点隔离。** 域名、路径、选择器、特殊观察属性、协议与分类规则只在本站目录；站点之间不互相导入。复用无站点语义的 `shared/` 工具，不调用整个 `generic` 作隐式兜底。
+1. **站点隔离。** 域名、路径、资源归属及站点特有选择器／协议只在本站目录；站点之间不互相导入。同一阅读器引擎经多个站点验证的结构、观察规则及解码算法可集中到 `shared/<engine>/`，由站点显式调用并传入身份／资源校验器（如 [GigaViewer](../apps/extension/src/sources/shared/gigaviewer/README.md)）；共享引擎不声明主机、不自行请求、不自动认领未知网站。其余复用无站点语义的 `shared/` 工具，不调用整个 `generic` 作隐式兜底。
 2. **依赖方向。** 站点只依赖自身、`contracts/`、`shared/` 和现有 i18n；不调用 `chrome.*`／`browser.*`，不导入 UI、漫画仓储、缓存、翻译或来源运行时。`definition.ts` 的传递依赖不访问 DOM、浏览器全局或 CSS。
 3. **公共入口。** UI、漫画应用与页面服务使用 `sources/index.ts`；内容脚本使用 `sources/page.ts`。公共层负责权限、网络、消息、标签页、清单登记和生命周期，注册表不得直接引用具体站点文件。
 4. **明确认领。** 先校验 HTTP(S) URL，再精确核对主机、路径与资源归属。一个站点匹配才使用；冲突报错。未知站点仅用通用原位翻译，不能导入漫画。已认领站点等待、失败或能力缺失时不退回通用规则或另一读取通道。
@@ -92,5 +92,6 @@ npm run build
 | [Atsumaru](../apps/extension/src/sources/sites/atsu/README.md) | HTTP 名称搜索、完整目录／正文／封面、12 小时更新；按发布组独立连读、网页浮动入口和已加载正文原位翻译 |
 | [RawOtaku](../apps/extension/src/sources/sites/rawotaku/README.md) | HTTP 名称搜索、完整语言目录／章节原图／封面、12 小时更新；作品与章节网页导入、两种阅读模式的正文原位翻译 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
+| [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | 复用 GigaViewer 引擎识别并还原已加载正文，支持原位翻译；不提供导入或目录 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

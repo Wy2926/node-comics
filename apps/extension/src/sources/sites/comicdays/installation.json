@@ -1,0 +1,5 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://comic-days.com/*", "https://cdn-img.comic-days.com/*"]
+}
