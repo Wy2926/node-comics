@@ -42,12 +42,22 @@ function fileFormat(link: OpdsLink): ComicFormat | undefined {
   }
 }
 
-function progressWritingPse(link: OpdsLink): boolean {
+function psePathRisk(href: string): 'progress-write' | 'invalid-path' | undefined {
+  let path: string;
+  try {
+    // ASP.NET decodes the request path once, except %2F which remains inside its segment.
+    // Preserve that exception while decoding encoded route literals such as %69mage.
+    path = decodeURIComponent(new URL(href).pathname.replace(/%2f/gi, '%252F'));
+  } catch {
+    return 'invalid-path';
+  }
   // Kavita's OPDS GET image handler writes progress for ordinary reader clients.
   // Do not probe it or spoof another reader's user-agent to bypass that behavior.
-  return (
-    hasRel(link, PSE_REL) && /\/api\/opds\/[^/]+\/image(?:\/|$)/i.test(new URL(link.href).pathname)
-  );
+  if (/\/api\/opds\/[^/]+\/image(?:\/|$)/i.test(path)) return 'progress-write';
+}
+
+function progressWritingPse(link: OpdsLink): boolean {
+  return hasRel(link, PSE_REL) && psePathRisk(link.href) === 'progress-write';
 }
 
 export function safePse(link: OpdsLink): boolean {
@@ -58,7 +68,7 @@ export function safePse(link: OpdsLink): boolean {
     !!link.count &&
     link.count <= 20000 &&
     link.href.includes('{pageNumber}') &&
-    !progressWritingPse(link)
+    psePathRisk(link.href) === undefined
   );
 }
 

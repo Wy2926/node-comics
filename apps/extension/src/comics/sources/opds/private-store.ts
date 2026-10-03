@@ -46,6 +46,25 @@ export interface OpdsStore {
   clearTransient?(connectionId: string): void;
 }
 const credentialKey = (key: string) => /^(?:api_?key|token|access_token|auth|password)$/i.test(key);
+const pathCredential = /(\/api\/opds\/)([^/]+)(?=\/|$)/i;
+const pathPlaceholder = '__opds_path_credential__';
+const queryPlaceholder = '__opds_query_credential__';
+const pathToken = (url?: URL) => url?.pathname.match(pathCredential)?.[2];
+function decodedToken(value?: string): string | undefined {
+  try {
+    return value === undefined ? undefined : decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
+}
+function boundCredential(
+  value: string | null | undefined,
+  previous: string | null | undefined,
+  placeholder: string,
+  disconnected?: boolean,
+): boolean {
+  return (!!previous && value === previous) || (disconnected === true && value === placeholder);
+}
 /** Keep only reconstructible credential placeholders after disconnect, not signed URLs. */
 function transformUrls(
   value: unknown,
@@ -66,26 +85,59 @@ function transformUrls(
           oldRoot = connection.root ? new URL(connection.root) : undefined;
         if (url.origin !== (connection.origin ?? oldRoot?.origin))
           return [key, 'opds-unavailable:external-resource'];
+        let usesBoundQuery = false;
         for (const name of [...url.searchParams.keys()]) {
           if (/^(?:sig(?:nature)?|expires|x-amz-.+|x-goog-.+)$/i.test(name))
             return [key, 'opds-unavailable:expired-signature'];
           if (credentialKey(name)) {
-            const newValue = newRoot?.searchParams.get(name);
+            // Kavita advertises the same key in the OPDS path and artwork's apiKey query.
+            // Preserve that proven binding, not an arbitrary credential found in a feed.
+            const fromPath =
+              connection.auth.kind === 'url-token' &&
+              name.toLowerCase() === 'apikey' &&
+              boundCredential(
+                url.searchParams.get(name),
+                decodedToken(pathToken(oldRoot)),
+                pathPlaceholder,
+                connection.disconnected,
+              );
+            const fromQuery = boundCredential(
+              url.searchParams.get(name),
+              oldRoot?.searchParams.get(name),
+              queryPlaceholder,
+              connection.disconnected,
+            );
+            if (!fromPath && !fromQuery) return [key, 'opds-unavailable:credential-refresh'];
+            const newValue = fromPath
+              ? decodedToken(pathToken(newRoot))
+              : newRoot?.searchParams.get(name);
             if (replacement && !newValue) return [key, 'opds-unavailable:credential-refresh'];
-            url.searchParams.set(name, newValue ?? '__opds_credential__');
+            url.searchParams.set(name, newValue ?? (fromPath ? pathPlaceholder : queryPlaceholder));
+            usesBoundQuery = true;
           }
         }
-        const pathToken = /\/api\/opds\/([^/]+)(?=\/|$)/i.exec(url.pathname);
-        if (pathToken) {
-          const newToken = newRoot
-            ? /\/api\/opds\/([^/]+)(?=\/|$)/i.exec(newRoot.pathname)?.[1]
-            : undefined;
+        const resourceToken = pathToken(url);
+        if (resourceToken) {
+          if (
+            !boundCredential(
+              decodedToken(resourceToken),
+              decodedToken(pathToken(oldRoot)),
+              pathPlaceholder,
+              connection.disconnected,
+            )
+          )
+            return [key, 'opds-unavailable:credential-refresh'];
+          const newToken = pathToken(newRoot);
           if (replacement && !newToken) return [key, 'opds-unavailable:credential-refresh'];
-          url.pathname = url.pathname.replace(pathToken[1], newToken ?? '__opds_credential__');
+          url.pathname = url.pathname.replace(
+            pathCredential,
+            (_match, prefix: string) => prefix + (newToken ?? pathPlaceholder),
+          );
         }
         if (
           connection.auth.kind === 'url-token' &&
-          !pathToken &&
+          !resourceToken &&
+          !usesBoundQuery &&
           ![...((oldRoot ?? newRoot)?.searchParams.keys() ?? [])].some(credentialKey)
         )
           return [key, 'opds-unavailable:credential-refresh'];
@@ -316,6 +368,6 @@ export function identityUrl(value: string, connection: PrivateConnection): strin
   for (const key of [...url.searchParams.keys()])
     if (/^(?:api_?key|token|access_token|auth|password)$/i.test(key))
       url.searchParams.set(key, '[credential]');
-  url.pathname = url.pathname.replace(/(\/api\/opds\/)[^/]+(?=\/|$)/i, '$1[credential]');
+  url.pathname = url.pathname.replace(pathCredential, '$1[credential]');
   return url.href;
 }

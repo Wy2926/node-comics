@@ -7,7 +7,7 @@ import {
   parsePublication,
   parseSearchDescription,
 } from '../src/comics/sources/opds/protocol';
-import { safePse } from '../src/comics/sources/opds/publication-access';
+import { publicationAccess, safePse } from '../src/comics/sources/opds/publication-access';
 import { identityUrl, type PrivateConnection } from '../src/comics/sources/opds/private-store';
 import { installTestXmlParser } from './opds-protocol-dom';
 
@@ -97,6 +97,65 @@ describe('OPDS protocol normalization', () => {
         href: 'https://catalog.example/api/opds/secret/image?chapterId=2&pageNumber={pageNumber}&saveProgress=false',
       }),
     ).toBe(false);
+  });
+  it.each([
+    '/api/opds/example-key/image',
+    '/kavita/API/OpDs/example-key/IMAGE',
+    '/base/%61pi/o%70ds/example-key/%69mage',
+    '/api/opds/key%20with%2Fslash/image',
+    '/api/opds/%E6%B5%8B%E8%AF%95/image/',
+  ])('blocks canonical and encoded progress-writing PSE routes: %s', (path) => {
+    const publication = jsonPublication(
+      {
+        metadata: { title: 'Pages' },
+        links: [
+          {
+            href: `${path}?pageNumber={pageNumber}&saveProgress=false`,
+            rel: 'http://vaemendis.net/opds-pse/stream',
+            type: 'image/jpeg',
+          },
+        ],
+      },
+      root,
+    );
+    const link = { ...publication.links[0], count: 4 };
+    expect(safePse(link)).toBe(false);
+    expect(publicationAccess({ ...publication, links: [link] }).unavailableReason).toBe(
+      '此条目的页流可能修改服务端进度，暂不支持直接阅读。',
+    );
+  });
+  it.each([
+    '/opds/books/bad%/pages/{pageNumber}',
+    '/opds/books/bad%GG/pages/{pageNumber}',
+    '/opds/books/bad%E0%A4/pages/{pageNumber}',
+  ])('rejects malformed PSE path encoding without requesting or guessing its route: %s', (path) => {
+    const publication = jsonPublication(
+      {
+        metadata: { title: 'Pages' },
+        links: [{ href: path, rel: 'http://vaemendis.net/opds-pse/stream', type: 'image/jpeg' }],
+      },
+      root,
+    );
+    const link = { ...publication.links[0], count: 4 };
+    expect(safePse(link)).toBe(false);
+    expect(publicationAccess({ ...publication, links: [link] }).unavailableReason).toBe(
+      '此条目的图片清单或页流格式暂不支持。',
+    );
+  });
+  it.each([
+    '/opds/v1.2/books/book%20name/pages/{pageNumber}',
+    '/reader/opds/v1.2/books/%E6%B5%8B%E8%AF%95/pages/{pageNumber}',
+    '/api%2Fopds/example-key/image?pageNumber={pageNumber}',
+    '/api/opds/example-key/%2569mage?pageNumber={pageNumber}',
+  ])('keeps ordinary image templates and ASP.NET path segment boundaries: %s', (path) => {
+    const publication = jsonPublication(
+      {
+        metadata: { title: 'Pages' },
+        links: [{ href: path, rel: 'http://vaemendis.net/opds-pse/stream', type: 'image/jpeg' }],
+      },
+      root,
+    );
+    expect(safePse({ ...publication.links[0], count: 4 })).toBe(true);
   });
   it('does not fetch DTD/entities or accept mismatched XML', () => {
     expect(() =>

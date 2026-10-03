@@ -51,7 +51,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |
 | `verify_image_transport.mjs` / `verify_source_image_cache.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与缓存重试 |
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
-| `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |
+| `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有 Komga 测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
 | `verify_notifications.mjs` | Vite 5187 的隔离身份与提示夹具；全局登录过期／错误／成功提示的关闭、自动收起、交互暂停、亮暗主题，以及逐图提示收起、重试与原图位置恢复；不访问外网 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
@@ -82,6 +82,8 @@ node scripts/verify_simple_reading.mjs
 Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；授权页、Google 与 Drive 均由本机 TLS 模拟，真实 Google 授权另验。登录生命周期夹具使用 Vite 5187 的 `auth-lifecycle-fixture.html`；订阅焦点夹具使用 Vite 5192 的 `billing-focus-fixture.html`。
 
 OPDS 界面验收可在插件目录执行 `npx vite --config tests/opds-live-ui.config.ts`，使用独立的 `127.0.0.1:5197` 来源。公开 Komga 拒绝普通网页 Origin，测试配置仅转发该演示站的真实只读目录／图片／文件响应，并阻断其他外部请求；不存在模拟目录或图片，不代表 MV3 网络权限已验证。正式扩展网络以 `verify_opds_live.mjs` 为准。转发只监听回环，不随构建发布，不用于私有书库。
+
+Kavita 公开服务联调在插件目录执行 `$env:RUN_OPDS_LIVE_KAVITA='1'; npx vitest run tests/opds-kavita.live.test.ts`，结束后清除此环境变量。测试使用官方公布的演示账户登录并只读取已有 OPDS 地址，不创建密钥或修改设置；JWT、目录令牌仅在测试进程内存中使用，日志不输出地址或原始响应。真实 HTTP 验证目录、搜索、封面、连接隔离与当前演示账户的下载权限拒绝；本地 IndexedDB 使用测试存储，不伪造服务响应。不会调用写进度的 PSE，不把 403 拒绝场景当作完整文件阅读成功，也不替代 MV3 权限或私人实例验收。
 
 ## 官网验收
 

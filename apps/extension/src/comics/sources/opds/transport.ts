@@ -83,7 +83,7 @@ export async function readBounded(
   }
   return output;
 }
-/** Bounded, credential-scoped GET/HEAD only; no cookies, redirects, Referer or server writes. */
+/** Bounded credential-scoped GET/HEAD; no cookies, redirects or Referer. Provider policy excludes known progress-writing routes. */
 export class OpdsTransport {
   private active = 0;
   private waiters: (() => void)[] = [];
