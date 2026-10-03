@@ -479,7 +479,7 @@ describe.skipIf(process.env.RUN_OPDS_LIVE_KAVITA !== '1')(
         } catch (error) {
           if (!(
             error instanceof OpdsError &&
-            error.code === 'authentication-required' &&
+            error.code === 'access-denied' &&
             error.details.status === 403
           ))
             throw error;

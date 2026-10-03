@@ -643,7 +643,7 @@ export function createOpdsProvider(
           const candidate = access.files[0];
           if (!candidate) throw new OpdsError('unsupported', access.unavailableReason);
           const { link: file, format } = candidate,
-            range = !['cbz', 'mobi'].includes(format)
+            range = !['cbz', 'mobi', 'epub'].includes(format)
               ? undefined
               : await probeRange(transport, connection, file.href, options.signal);
           opening = {

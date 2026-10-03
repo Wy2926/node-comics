@@ -64,7 +64,6 @@ export async function openEpubArchive(
   signal?: AbortSignal,
 ): Promise<EpubArchive> {
   throwIfAborted(signal);
-  if (!source.snapshot.local) throw new Error("EPUB 需要先下载完整源文件。");
   if (
     !Number.isSafeInteger(source.snapshot.size) ||
     source.snapshot.size <= 0 ||

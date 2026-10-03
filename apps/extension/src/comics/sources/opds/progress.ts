@@ -68,7 +68,7 @@ export function pseProgress(
 
 export function unavailableProgressEndpoint(error: unknown): boolean {
   if (!(error instanceof OpdsError)) return false;
-  if (error.code === 'authentication-required') return error.details.status === 403;
+  if (error.code === 'access-denied') return true;
   return ['invalid-catalog', 'unsupported', 'network'].includes(error.code);
 }
 

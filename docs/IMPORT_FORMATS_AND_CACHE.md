@@ -10,7 +10,7 @@
 | CBR / RAR | RAR4 / RAR5，独立 Worker 按自然路径索引 | 本地及 OPDS 明确下载的完整文件；128 MiB，展开 256 MiB、1500 页；不支持加密和分卷 |
 | PDF | 原始页序与旋转，按需以 144 dpi 渲染 PNG | 本地及 OPDS 明确下载的完整文件；512 MiB、1500 页；拒绝加密文件；大幅面页面受浏览器画布能力与设备内存约束 |
 | 未加密 MOBI | MOBI6 / MOBI6+KF8，按正文 recindex 引用顺序；索引不读图片，逐页读图片记录 | 本地、Google Drive、OPDS；本地容器 512 MiB、1500 页；索引/正文 16 MiB；不支持独立 KF8/AZW3、HUFF/CDIC 和 DRM |
-| EPUB | EPUB 2／3 的 OPF、spine、NCX／导航文档；独立阅读器显示可选择的 XHTML 原文、目录与字号，按包内 CSS 重排 | 本地及 OPDS 明确下载的完整原包；512 MiB、10000 项，声明展开总量 1024 MiB，单份 XML／CSS 16 MiB；不支持 DRM、字体混淆、加密、分卷与 ZIP64 |
+| EPUB | EPUB 2／3 的 OPF、spine、NCX／导航文档；独立阅读器显示可选择的 XHTML 原文、目录与字号，按包内 CSS 重排 | 本地、OPDS 可靠 Range 或明确下载的完整原包；512 MiB、10000 项，声明展开总量 1024 MiB，单份 XML／CSS 16 MiB；不支持 DRM、字体混淆、加密、分卷与 ZIP64 |
 
 压缩包内可包含 PNG、JPEG、WebP、GIF；带 EXIF、ICC 或动画语义的页面统一到静态 sRGB PNG 首帧，其余图片保留原字节。容器索引成功即能阅读，不等待全部解码；某页损坏不妨碍其他页。全本格式错误或受保护文件不创建空漫画。
 

@@ -122,14 +122,14 @@ describe("EPUB package bridge", () => {
     expect(source.close).not.toHaveBeenCalled();
   });
 
-  it("rejects remote containers, malformed XML, custom entities, DRM and missing spine resources", async () => {
-    const { source } = await fixture();
-    await expect(
-      openEpubArchive({
-        ...source,
-        snapshot: { ...source.snapshot, local: false },
-      }),
-    ).rejects.toThrow("先下载");
+  it("indexes a remote random-access source without fetching the whole container", async () => {
+    const { source, reads, bytes } = await fixture();
+    await expect(indexEpub({ ...source, snapshot: { ...source.snapshot, local: false } }))
+      .resolves.toMatchObject({ kind: 'epub', title: 'Text fixture' });
+    expect(reads.reduce((size, [, length]) => size + length, 0)).toBeLessThan(bytes.length / 2);
+  });
+
+  it("rejects malformed XML, custom entities, DRM and missing spine resources", async () => {
     expect(() => parseEpubXml("<x>")).toThrow();
     expect(() =>
       parseEpubXml('<!DOCTYPE x [<!ENTITY e "bad">]><x>&e;</x>'),

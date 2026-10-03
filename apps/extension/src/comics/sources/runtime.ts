@@ -44,6 +44,9 @@ export async function openFileSource(context: OpenFileSourceContext): Promise<Ra
     await source.close(); throw new DOMException('来源访问已变化。', 'AbortError');
   }
   const cachedRanges = driver.cacheRanges && !source.snapshot.local;
+  // EPUB ZIP headers and small XML resources are adjacent. Bound small-read prefetch
+  // to 64 KiB blocks; leave larger reads intact instead of multiplying network requests.
+  const rangeBlock = context.format === 'epub' ? 64 * 1024 : 0;
   const {connection, source: binding, entryId} = context;
   let closed = false;
   const assertOpen = (signal?: AbortSignal) => {
@@ -59,27 +62,39 @@ export async function openFileSource(context: OpenFileSourceContext): Promise<Ra
     await source.close();
   }};
   sources.add(entry);
+  const readCached = async (offset: number, length: number, signal?: AbortSignal) => {
+    const key = sourceRangeKey(connection.id, binding.providerItemId, source.snapshot.version, offset, length);
+    const cached = await sourceRangeCache.get(key).catch(cacheFailure);
+    assertOpen(signal);
+    if (cached && cached.size === length) {
+      const bytes = new Uint8Array(await cached.arrayBuffer());
+      assertOpen(signal); return bytes;
+    }
+    const token = await sourceRangeCache.token(entryId).catch(cacheFailure);
+    assertOpen(signal);
+    const bytes = await source.readAt(offset, length, signal);
+    assertOpen(signal);
+    if (token) await sourceRangeCache.put(key, new Blob([bytes as Uint8Array<ArrayBuffer>]), {
+      owner: entryId, connectionId: connection.id, contentId: context.contentId, token,
+    }).catch(cacheFailure);
+    assertOpen(signal); return bytes;
+  };
   return {
     snapshot: source.snapshot,
     async readAt(offset, length, signal) {
       assertOpen(signal);
       checkRange(source, offset, length);
       if (!cachedRanges) { const bytes = await source.readAt(offset, length, signal); assertOpen(signal); return bytes; }
-      const key = sourceRangeKey(connection.id, binding.providerItemId, source.snapshot.version, offset, length);
-      const cached = await sourceRangeCache.get(key).catch(cacheFailure);
-      assertOpen(signal);
-      if (cached && cached.size === length) {
-        const bytes = new Uint8Array(await cached.arrayBuffer());
-        assertOpen(signal); return bytes;
+      if (!length) return new Uint8Array();
+      if (!rangeBlock || length > rangeBlock) return readCached(offset, length, signal);
+      const output = new Uint8Array(length);
+      for (let start = Math.floor(offset / rangeBlock) * rangeBlock; start < offset + length; start += rangeBlock) {
+        const size = Math.min(rangeBlock, source.snapshot.size - start);
+        const bytes = await readCached(start, size, signal);
+        const from = Math.max(start, offset), to = Math.min(start + size, offset + length);
+        output.set(bytes.subarray(from - start, to - start), from - offset);
       }
-      const token = await sourceRangeCache.token(entryId).catch(cacheFailure);
-      assertOpen(signal);
-      const bytes = await source.readAt(offset, length, signal);
-      assertOpen(signal);
-      if (token) await sourceRangeCache.put(key, new Blob([bytes as Uint8Array<ArrayBuffer>]), {
-        owner: entryId, connectionId: connection.id, contentId: context.contentId, token,
-      }).catch(cacheFailure);
-      assertOpen(signal); return bytes;
+      return output;
     },
     async validate(signal) { assertOpen(signal); const state = await source.validate(signal); assertOpen(signal); return state; },
     close: entry.close,

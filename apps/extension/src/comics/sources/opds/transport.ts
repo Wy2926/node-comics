@@ -178,7 +178,15 @@ export class OpdsTransport {
         referrerPolicy: 'no-referrer',
         cache: 'no-store',
       });
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 403) {
+        await response.body?.cancel();
+        throw new OpdsError(
+          'access-denied',
+          'OPDS 服务器拒绝访问此资源（HTTP 403），请检查账号的资源访问或文件下载权限。',
+          { status: response.status },
+        );
+      }
+      if (response.status === 401) {
         if (
           response.headers.get('Content-Type')?.split(';')[0].trim() ===
           'application/opds-authentication+json'
@@ -204,7 +212,7 @@ export class OpdsTransport {
         } else await response.body?.cancel();
         throw new OpdsError(
           'authentication-required',
-          'OPDS 授权失效或没有访问权限，请更新连接授权。',
+          'OPDS 身份认证失败（HTTP 401），请更新连接授权。',
           { status: response.status },
         );
       }

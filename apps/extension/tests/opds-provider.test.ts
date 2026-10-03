@@ -383,7 +383,7 @@ describe('OPDS connection/provider', () => {
     expect((await reload.resource(id))?.pinned).toBe(true);
     expect((await store.resource(plan.representationId))?.pinned).toBe(true);
   });
-  it('returns an explicit EPUB download plan without fetching its body', async () => {
+  it('returns an explicit EPUB download plan when Range is unsupported without consuming its body', async () => {
     const feed = {
       metadata: { title: 'Library' },
       publications: [
@@ -399,7 +399,10 @@ describe('OPDS connection/provider', () => {
         },
       ],
     };
-    const { provider, fetcher } = setup([Response.json(feed)]),
+    const cancel = vi.fn();
+    const { provider, fetcher } = setup([
+        Response.json(feed), new Response(new ReadableStream({ cancel }), { status: 200 }),
+      ]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
@@ -407,7 +410,9 @@ describe('OPDS connection/provider', () => {
     await expect(
       provider.catalog!.resolve(publicConnection(a), page.publications[0].id),
     ).resolves.toMatchObject({ kind: 'download-file', format: 'epub' });
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetcher.mock.lastCall?.[1]?.headers).get('Range')).toBe('bytes=0-0');
+    expect(cancel).toHaveBeenCalledOnce();
   });
   it('resolves WebPub with an EPUB alternate before deciding whether the body is an image sequence', async () => {
     const feed = {
@@ -443,7 +448,7 @@ describe('OPDS connection/provider', () => {
     expect(plan.publication.readable).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
-  it('chooses an EPUB download after a real-shaped XHTML manifest without fetching document content', async () => {
+  it('chooses EPUB Range reading after an XHTML manifest without fetching document content', async () => {
     const book = {
         metadata: { title: 'Moby Dick' },
         links: [
@@ -460,16 +465,20 @@ describe('OPDS connection/provider', () => {
         ...book,
         readingOrder: [{ href: '/chapter.xhtml', type: 'application/xhtml+xml' }],
       };
-    const { provider, fetcher } = setup([Response.json(feed), Response.json(full)]),
+    const { provider, fetcher } = setup([
+        Response.json(feed), Response.json(full),
+        new Response(new Uint8Array([80]), { status: 206, headers: { 'Content-Range': 'bytes 0-0/100', ETag: '"epub-1"' } }),
+      ]),
       a = await provider.connection!.connect!(values),
       page = await provider.catalog!.browse({
         connection: publicConnection(a),
       });
     await expect(
       provider.catalog!.resolve(publicConnection(a), page.publications[0].id),
-    ).resolves.toMatchObject({ kind: 'download-file', format: 'epub' });
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(fetcher.mock.lastCall?.[0]).toBe('https://catalog.example/manifest');
+    ).resolves.toMatchObject({ kind: 'range-file', format: 'epub' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.lastCall?.[0]).toBe('https://catalog.example/book.epub');
+    expect(new Headers(fetcher.mock.lastCall?.[1]?.headers).get('Range')).toBe('bytes=0-0');
   });
   it('resolves an Atom partial entry with quoted MIME parameters and an EPUB alternative', async () => {
     const feed =
@@ -569,7 +578,10 @@ describe('OPDS connection/provider', () => {
       expect(fetcher).toHaveBeenCalledTimes(1);
     },
   );
-  it('keeps a Range representation identical when explicitly downloading the same file', async () => {
+  it.each([
+    { format: 'cbz', type: 'application/zip' },
+    { format: 'epub', type: 'application/epub+zip' },
+  ])('keeps a $format Range representation identical when explicitly downloading the same file', async ({ format, type }) => {
     const feed = {
       metadata: { title: 'Files' },
       publications: [
@@ -581,7 +593,7 @@ describe('OPDS connection/provider', () => {
               href: '/entry',
               type: 'application/opds-publication+json',
             },
-            { rel: 'acquisition', href: '/file.cbz', type: 'application/zip' },
+            { rel: 'acquisition', href: '/file.' + format, type },
           ],
         },
       ],
@@ -888,6 +900,24 @@ describe('OPDS transport security', () => {
       details: { status: 429, retryAfter: 17 },
     });
   });
+  it.each([
+    { status: 401, code: 'authentication-required', message: '身份认证失败' },
+    { status: 403, code: 'access-denied', message: '文件下载权限' },
+  ])('keeps HTTP $status distinct for catalog, Range and complete-file reads', async ({ status, code, message }) => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response('private server response', { status }));
+    const transport = new OpdsTransport(fetcher);
+    for (const operation of [
+      () => transport.document(connection, ROOT),
+      () => transport.bytes(connection, ROOT, { headers: { Range: 'bytes=0-0' }, status: 206 }),
+      () => transport.download(connection, ROOT),
+    ]) {
+      const error = await operation().catch((value: unknown) => value);
+      expect(error).toMatchObject({ code, details: { status }, message: expect.stringContaining(message) });
+      expect((error as Error).message).not.toContain('private');
+      if (status === 403) expect((error as Error).message).not.toContain('更新连接授权');
+    }
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
   it('binds full downloads with If-Match and rejects changed or truncated bodies', async () => {
     const cancel = vi.fn(),
       responses = [
@@ -921,7 +951,7 @@ describe('OPDS transport security', () => {
 // Opt-in real-service contract check: official Komga demo's publicly documented credentials.
 // No simulated feed, writes, progression endpoints, uploads or paid resources are used.
 describe.skipIf(process.env.OPDS_LIVE !== '1')('OPDS public Komga demo (real network)', () => {
-  it('identifies the public Moby Dick EPUB from its manifest without fetching XHTML or EPUB content', async () => {
+  it('identifies the public Moby Dick EPUB and probes Range without downloading its body', async () => {
     const methods: string[] = [];
     const readingTypes: Record<string, number> = {};
     const request: typeof fetch = async (input, init) => {
@@ -957,19 +987,18 @@ describe.skipIf(process.env.OPDS_LIVE !== '1')('OPDS public Komga demo (real net
     ].find((publication) => publication.title.startsWith('Moby Dick'));
     expect(book).toBeDefined();
     expect(book!.readable).toBe(true);
-    await expect(provider.catalog!.resolve(connection, book!.id)).resolves.toMatchObject({
-      kind: 'download-file',
-      format: 'epub',
-    });
+    const plan = await provider.catalog!.resolve(connection, book!.id);
+    expect(plan.format).toBe('epub');
+    expect(['range-file', 'download-file']).toContain(plan.kind);
     expect(Object.keys(readingTypes)).toEqual(['application/xhtml+xml']);
-    expect(methods).toEqual(['GET', 'GET']);
+    expect(methods).toEqual(['GET', 'GET', 'GET']);
     console.info(
       JSON.stringify({
         service: 'official-komga-demo',
         title: book!.title,
         readingTypes,
         getRequests: methods.length,
-        requiresExplicitEpubDownload: true,
+        requiresExplicitEpubDownload: plan.kind === 'download-file',
       }),
     );
   }, 60000);

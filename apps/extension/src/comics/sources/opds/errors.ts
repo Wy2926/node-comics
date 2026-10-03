@@ -1,6 +1,7 @@
 export type OpdsErrorCode =
   | 'invalid-catalog'
   | 'authentication-required'
+  | 'access-denied'
   | 'unsupported-auth'
   | 'scope-blocked'
   | 'network'

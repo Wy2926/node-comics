@@ -1,11 +1,11 @@
 import { catalog } from '../repositories';
 import {entryContentKind, type Entry} from '../domain';
 import type { DownloadTask } from '../application/types';
-import {websiteContentError} from '../application/website-content';
 import {prepareEntryContent} from '../application/entry-content';
 import { acquirePage } from '../pages/service';
 import { pageRenderProfile } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
+import {blockingReason, downloadErrorMessage, downloadRetryAt} from './errors';
 import { ImagePermissionsRequired } from '../../sources';
 import {bookDownloadId,downloadTaskId as taskId,bookTaskActive,suspendBook,listBookPlans,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan} from './book-model';
 
@@ -14,7 +14,6 @@ const sameTask=(current:DownloadTask|undefined,expected:DownloadTask)=>current?.
 const LEASE_MS = 90_000;
 let running: Promise<void> | undefined;
 let runController: AbortController | undefined;
-export const downloadErrorMessage = websiteContentError;
 const message=downloadErrorMessage;
 const aborted = () => new DOMException('下载已暂停或文档已移除。', 'AbortError');
 const retainedPages=async(document:Entry)=>(await downloadStore.inventory([document.id],true)).filter(item=>item.contentId===document.contentId);
@@ -168,20 +167,6 @@ async function drain(holdsLock: boolean, signal?: AbortSignal): Promise<void> {
       else if (!await catalog.get('entries', next.entryId)) await catalog.remove('tasks', next.id);
     }
   }
-}
-export function blockingReason(error:unknown):DownloadTask['reason']{
-  if(error instanceof ImagePermissionsRequired||(error as {kind?:string})?.kind==='permission-required')return 'permission';
-  if(error instanceof DOMException&&error.name==='QuotaExceededError')return 'space';
-  if(typeof navigator!=='undefined'&&navigator.onLine===false)return 'network';
-  if(error instanceof Error&&(error.name==='TimeoutError'||error.cause instanceof TypeError)||error instanceof TypeError)return 'network';
-  const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
-  if(details?.status===401||details?.status===403||details?.status===429||details?.retryAfter)return 'source';
-  return undefined;
-}
-export function downloadRetryAt(error:unknown):number|undefined{
-  const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
-  const seconds=details?.retryAfter??(details?.status===429?60:0);
-  return seconds>0?Date.now()+seconds*1000:undefined;
 }
 export async function pauseBlockedDownloads(comicId:string,error:unknown){
   const reason=blockingReason(error);if(!reason)return;

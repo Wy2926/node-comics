@@ -24,6 +24,7 @@ import {
 } from '../src/comics/application/source-access';
 import { removeComic } from '../src/comics/application/library-service';
 import { openFileSource } from '../src/comics/sources/runtime';
+import { OpdsError } from '../src/comics/sources/opds/errors';
 import {
   clearRemoteFileDownload,
   listRemoteFileDownloads,
@@ -297,6 +298,23 @@ describe('confirmed remote file intents', () => {
     });
     expect((await readRemoteFileDownload(intent.id))?.error).not.toContain('secret');
     expect(f.download).toHaveBeenCalledOnce();
+  });
+  it.each([
+    { status: 401, code: 'authentication-required', message: 'OPDS 身份认证失败（HTTP 401），请更新连接授权。' },
+    { status: 403, code: 'access-denied', message: 'OPDS 服务器拒绝访问此资源（HTTP 403），请检查账号的资源访问或文件下载权限。' },
+  ] as const)('preserves the distinct HTTP $status error in the EPUB download task', async ({ status, code, message }) => {
+    const f = await fixture();
+    f.plan.format = 'epub';
+    f.download.mockRejectedValue(new OpdsError(code, message, { status }));
+    const intent = await queueRemoteFileDownload(f.connectionId, f.plan, { confirmed: true });
+    await cycle();
+    await cycle();
+    expect(await readRemoteFileDownload(intent.id)).toMatchObject({
+      status: 'paused', reason: 'source', error: message, bytes: 0,
+    });
+    expect(f.download).toHaveBeenCalledOnce();
+    expect(await rows('chunks')).toEqual([]);
+    expect(await catalog.list('comics')).toEqual([]);
   });
   it('pauses old queued intents on page restart, and removes a published but unregistered staging reference', async () => {
     const f = await fixture(),

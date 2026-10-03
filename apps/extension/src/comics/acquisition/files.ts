@@ -13,7 +13,7 @@ import {
   isContainerAvailable,
   releaseContainer,
 } from '../../storage/containers';
-import { blockingReason, downloadErrorMessage, downloadRetryAt } from './index';
+import { blockingReason, downloadErrorMessage, downloadRetryAt } from './errors';
 
 export type FileDownloadStatus =
   'queued' | 'running' | 'paused' | 'failed' | 'complete' | 'clearing';
