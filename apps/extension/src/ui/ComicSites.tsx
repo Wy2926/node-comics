@@ -5,7 +5,7 @@ import { SupportRequestForm } from './SupportRequestForm';
 import { LanguageFlag } from './LanguageFlag';
 import { languageLabel } from '../types';
 import './comic-sites.css';
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 
 const sites = listSupportedSites();
 
@@ -19,6 +19,22 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
     'paid-content': {label: msg('部分收费'), description: msg('部分漫画或章节需要付费阅读')},
   };
   const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const requestSection=useRef<HTMLElement>(null);
+  useEffect(()=>{
+    let frame=0;
+    const locateRequest=()=>{
+      cancelAnimationFrame(frame);
+      if(location.hash!=='#sites/request')return;
+      frame=requestAnimationFrame(()=>{
+        if(location.hash!=='#sites/request')return;
+        requestSection.current?.scrollIntoView({block:'center'});
+        requestSection.current?.querySelector<HTMLInputElement>('.nc-support-form fieldset input')?.focus({preventScroll:true});
+      });
+    };
+    locateRequest();
+    window.addEventListener('hashchange',locateRequest);
+    return()=>{cancelAnimationFrame(frame);window.removeEventListener('hashchange',locateRequest);};
+  },[]);
   return <div className="nc-sites-page">
     <div className="nc-page-heading"><div><span className="nc-eyebrow">{msg('DISCOVER YOUR NEXT STORY')}</span><h1>{msg('漫画网站')}</h1><p>{msg('打开已适配的网站，把喜欢的故事带回书架。')}</p></div><span className="nc-sites-heading-icon" aria-hidden="true"><Icon name="globe" size={42}/><Icon name="spark" size={20}/></span></div>
     {onImport&&<form className="nc-site-link-import" onSubmit={event=>{event.preventDefault();if(busy)return;setError('');setBusy(true);void onImport(url.trim()).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}>
@@ -43,7 +59,7 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
         </li>)}</ul>
         <p className="nc-sites-hint"><Icon name="info" size={19}/><span>{msg('进入漫画阅读页后，通过插件添加到书架。')}</span></p>
       </section>
-      <section className="nc-site-request" aria-labelledby="nc-site-request-title">
+      <section ref={requestSection} className="nc-site-request" aria-labelledby="nc-site-request-title">
         <div className="nc-site-request-icon"><Icon name="message" size={26}/></div>
         <h2 id="nc-site-request-title">{msg('申请适配网站')}</h2><p className="nc-site-request-intro">{msg('想读的网站还不在这里？告诉我们，无需登录。')}</p>
         <SupportRequestForm kind="website"/>

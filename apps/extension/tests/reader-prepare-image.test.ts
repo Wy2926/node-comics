@@ -56,9 +56,25 @@ beforeEach(() => {
   FakeImage.instances = []; FakeImage.onSource = undefined;
   vi.stubGlobal('Image', FakeImage);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('reader image preparation', () => {
+  it.each(['predecode','fallback'] as const)('times out stalled %s and ignores late completion', async phase => {
+    vi.useFakeTimers();
+    const {ready,image,settled}=start();
+    if(phase==='fallback'){image.decoding.reject(encodingError());await Promise.resolve();}
+    const rejected=expect(ready).rejects.toThrow('图片解码超时，请重试。');
+    await vi.advanceTimersByTimeAsync(119999);expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);await rejected;
+    expectReleasedListeners(image);expect(image.removeAttribute).toHaveBeenCalledExactlyOnceWith('src');
+    image.load();image.decoding.resolve();await Promise.resolve();expect(settled).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('clears the deadline after a successful decode',async()=>{
+    vi.useFakeTimers();const {ready,image}=start();image.load();image.decoding.resolve();await ready;
+    expect(vi.getTimerCount()).toBe(0);await vi.advanceTimersByTimeAsync(120000);expect(image.src).toBe(source);
+  });
   it('waits for successful predecode even after native loading finishes', async () => {
     const { ready, image, settled, controller } = start();
     image.load(); await Promise.resolve();

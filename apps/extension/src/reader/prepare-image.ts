@@ -1,3 +1,5 @@
+import {msg} from '../i18n/runtime';
+
 /** Predecode when possible; Chromium may reject valid images when its decode cache is full. */
 export function prepareReaderImage(url:string,signal:AbortSignal):Promise<void>{
   signal.throwIfAborted();
@@ -7,12 +9,13 @@ export function prepareReaderImage(url:string,signal:AbortSignal):Promise<void>{
     const valid=()=>image.naturalWidth>0&&image.naturalHeight>0;
     const finish=(error?:unknown)=>{
       if(settled)return;settled=true;
-      image.removeEventListener('load',onLoad);image.removeEventListener('error',onError);signal.removeEventListener('abort',onAbort);
+      clearTimeout(timer);image.removeEventListener('load',onLoad);image.removeEventListener('error',onError);signal.removeEventListener('abort',onAbort);
       if(error!==undefined)reject(error);else resolve();
     };
     const onLoad=()=>{loaded=true;if(fallback)finish(valid()?undefined:invalid());};
     const onError=()=>finish(invalid());
     const onAbort=()=>{finish(signal.reason);image.removeAttribute('src');};
+    const timer=setTimeout(()=>{finish(Error(msg('图片解码超时，请重试。')));image.removeAttribute('src');},120000);
     // Loading can finish before decode rejects, so install these before assigning src.
     image.addEventListener('load',onLoad);image.addEventListener('error',onError);signal.addEventListener('abort',onAbort,{once:true});
     image.src=url;

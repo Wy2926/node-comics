@@ -32,6 +32,12 @@ beforeEach(()=>{
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();});
 
 describe('official AVIF input conversion',()=>{
+  it('resolves an unidentified AVIF from its bitmap rather than layout dimensions',async()=>{
+    const inputPage={...await page(),width:900,height:1300,imageSha256:undefined,imageByteSize:undefined};
+    const result=await prepareTranslationInput(inputPage,async()=>source,()=>true);
+    expect(result).toMatchObject({width:800,height:1200,profile:INPUT_PROFILE,image:{content_type:'image/webp'}});
+    expect(createImageBitmap).toHaveBeenCalledTimes(2);expect(close).toHaveBeenCalledTimes(2);expect(encode).toHaveBeenCalledOnce();
+  });
   it.each([false,true])('keeps a larger supported encoding for an AVIF above 1 MiB=%s without changing its original identity',async large=>{
     const original=large?new Blob([new Uint8Array(TRANSLATION_REENCODE_BYTES+1)],{type:'image/avif'}):source;
     const output=large?webp(original.size+1):encoded;encode.mockResolvedValue(output);

@@ -2,6 +2,14 @@ import {msg} from '../i18n/runtime';
 import type {Job,Mode,Page} from '../types';
 import {newestFirst,pendingStatuses} from './jobs';
 import type {TranslationState} from '../translation/automatic';
+export type ImageLoadState={scope:string;key?:string;phase:'reading'|'decoding'|'displaying'|'ready'|'error';error?:string;retry:()=>void};
+
+/** Loading retries never change the translation request or its billing identity. */
+export function displayTranslationState(state:TranslationState|undefined,load:ImageLoadState|undefined,resultKey?:string):TranslationState|undefined{
+  if(load?.phase==='error')return {kind:'error',message:load.error??msg('图片暂不可用'),retryLabel:msg('点击重新加载')};
+  if(resultKey&&load?.key===resultKey&&load.phase!=='ready')return {kind:'translating',message:load.phase==='reading'?msg('正在读取译图'):msg('正在解码译图')};
+  return state;
+}
 
 export type PageView={mode:Mode;preference:'original'|'translation'};
 export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,scopeKey?:string){

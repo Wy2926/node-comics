@@ -13,11 +13,13 @@ import {jpegWithSize} from './image-encoding-fixture';
 const workerFactory=vi.hoisted(()=>vi.fn());
 vi.mock('../src/translation/input/resize.worker?worker',()=>({default:class {constructor(){return workerFactory();}}}));
 const source=new Blob([new Uint8Array([255,216,255,224]),new Uint8Array(1024*1024)],{type:'image/jpeg'});
-const page=(width=1800,height=26000):Page=>({id:'boundary',name:'Synthetic long source',width,height,imageByteSize:source.size,imageMime:source.type,jobs:[],outputBlobs:{}});
+let sourceSha:string;
+const page=(width=1800,height=26000):Page=>({id:'boundary',name:'Synthetic long source',width,height,imageSha256:sourceSha,imageByteSize:source.size,imageMime:source.type,jobs:[],outputBlobs:{}});
 const close=vi.fn(),draw=vi.fn(),fill=vi.fn();
 const jpeg=jpegWithSize(1800,26000),encode=vi.fn(async()=>jpeg);
 const canvases:{width:number;height:number}[]=[];
-beforeEach(()=>{
+beforeEach(async()=>{
+  sourceSha=await hashFile(source);
   close.mockReset();draw.mockReset();fill.mockReset();
   encode.mockReset();encode.mockResolvedValue(jpeg);
   vi.stubGlobal('Worker',undefined);

@@ -35,16 +35,15 @@ export class TranslationCoordinator {
   constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope};this.imageLimit=options.rights()?.image_rate_limit.limit;this.rightsKey=policyKey(options.rights());this.legacy=new LegacyRequestGuard(options.api,options.userId,options.language);}
   async init(){return this.initializing??=(async()=>{this.state=await readSync(this.scope)??this.state;})();}
   private async createOperation(target:ReadingTarget,current:()=>boolean,action?:{retry_of:string}|{regenerate_of:string},previous?:LocalOperation){
-    const planned=translationSize(target.page.width,target.page.height);
-    if(!action&&Math.max(planned.width,planned.height)>16383&&!this.options.tiles?.())
-      throw new ApiError(msg('翻译服务暂不可用'),'RESULT_FORMAT_UNAVAILABLE',503);
     // retry_of/regenerate_of inherit the server's frozen image, including requests made before resizing.
-    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previous.inputSize?.width??target.page.width,height:previous.inputSize?.height??target.page.height,profile:previous.inputProfile}:this.options.prepareInput?await this.options.prepareInput(target,current,this.options.limits?.()):await prepareTranslationInput(target.page,async()=>{
+    const previousSize=previous?.result?.result??previous?.inputSize;
+    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previousSize?.width??target.page.width,height:previousSize?.height??target.page.height,profile:previous.inputProfile}:this.options.prepareInput?await this.options.prepareInput(target,current,this.options.limits?.()):await prepareTranslationInput(target.page,async()=>{
       const ref=target.page.blobKey;
       return ref?this.options.getBlob(ref):undefined;
-    },current,this.options.limits?.());
+    },current,this.options.limits?.(),!!action||!!this.options.tiles?.());
     if(action&&previous&&target.page.imageSha256&&prepared.sourceSha256!==target.page.imageSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     if(!action&&Math.max(prepared.width,prepared.height)>16383){
+      if(!this.options.tiles?.())throw new ApiError(msg('翻译服务暂不可用'),'RESULT_FORMAT_UNAVAILABLE',503);
       prepared.resultFormat='overlay-tiles-v1';
     }
     const record=makeOperation(target,this.scope,this.options.language,prepared,action);
@@ -168,15 +167,19 @@ export class TranslationCoordinator {
       if(!previous)await this.legacy.check(target,true);
       if(previous?.state==='uncertain'||previous&&active(previous)||latest.pending||latest.latest?.status==='unknown_released')throw Error(msg('原请求结果待核实，暂不能重复翻译。'));
       const source=previous?.result?.id??latest.latest?.id,state=previous?.result?.state??latest.latest?.status;
+      const frozen=previous?.result?.result??previous?.inputSize??latest.latest?.delivery,profile=previous?.inputProfile??latest.latest?.input_profile;
+      const sourceSha=previous?.sourceSha256??latest.latest?.source_image_sha256,planned=translationSize(target.page.width,target.page.height);
+      // Only an explicit retry with the same materialized source may replace a mis-sized input.
+      // Normal retries and unknown outcomes keep their frozen bytes and request semantics.
+      const rebuild=!!profile&&!!target.page.imageSha256&&sourceSha===target.page.imageSha256&&!!frozen&&(frozen.width!==planned.width||frozen.height!==planned.height);
       if(previous?.state==='blocked'&&!previous.result){
-        if(previous.errorCode==='INVALID_REQUEST'&&'image' in previous.request&&previous.request.image.content_type==='image/avif'){
-          // The old descriptor was rejected before admission. An explicit retry may
-          // prepare supported bytes, under a new UUID rather than mutating its input.
+        if(rebuild||previous.errorCode==='INVALID_REQUEST'&&'image' in previous.request&&previous.request.image.content_type==='image/avif'){
+          // Rejected descriptors may be corrected only under a new explicit UUID.
           const record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent());this.remember(record);
         }else{previous.state='local';previous.error=undefined;previous.retryAt=undefined;await saveOperation(previous);}
         return;
       }
-      const action=source?(state==='failed'||state==='cancelled'?{retry_of:source}:{regenerate_of:source}):undefined;
+      const action=source&&!rebuild?(state==='failed'||state==='cancelled'?{retry_of:source}:{regenerate_of:source}):undefined;
       const record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent(),action,previous);this.remember(record);
     });await this.submit([target],requestCurrent);
   }

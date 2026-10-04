@@ -11,7 +11,7 @@ const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScen
 await saveSettings({...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
 await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:autoScenario?'fixture-'+autoScenario:'fixture-reader',name:'隔离阅读验收',role:'reader'},apiOrigin:origin});
 const originalFetch=window.fetch.bind(window);
-const height=parameters.has('native-long')?20000:900,overlay=await browserOverlay(),blob=overlay.blob;
+const height=parameters.has('native-long')?20000:900,overlay=await browserOverlay(height),blob=overlay.blob;
 const job=(index:number,status:Job['status']):Job=>({id:`fixture-job-${index}`,mode:'classic',target_language:'zh-Hans',status,phase:status==='running'?'translating_text':'queued',quota_pages:1,version:1,cache_hit:false,created_at:'2026-09-14T00:00:00Z',...(status==='failed'?{error:{code:'FIXTURE_FAILURE',message:'模拟文字识别失败，可手动重试。'}}:{})});
 const {copies:stored,ordinals,imageOrdinals}=await seedReaderFixture(origin,autoScenario,job,overlay.result,height,parameters.get('fixture-key')??undefined);
 const jobs=new Map(stored.flatMap(c=>c.pages.flatMap(p=>p.jobs.map(j=>[j.id,j] as const))));
@@ -39,7 +39,7 @@ window.fetch=async(input,init={})=>{
   if(state.offline||state.failDownloads&&url.pathname.endsWith('/result'))throw Error('网络连接失败（隔离验收）');
   if(state.failNext){state.failNext=false;throw Error('网络连接失败（隔离验收）');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
-  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:40000000,max_dimension:12000},entitlements:rights});
+  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',representations:['overlay-v1','overlay-tiles-v1'],modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:10000000000,max_dimension:100000},entitlements:rights});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
   const billing={offers:[billingOffer],checkout_price:null,enabled:!!billingScenario&&billingScenario!=='disabled',providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:'stripe',environment:'test',checkout_provider:null,trial_eligible:billingScenario!=='paid',gift:null,entitlement_expires_at:null,checkout_pending:false,subscription:billingScenario==='paid'?{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
@@ -52,7 +52,7 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   const snapshot=(id:string):TranslationSnapshot|undefined=>{
     const j=jobs.get(operations.get(id)??id);if(!j)return;
-    return {id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height:900}:j.status==='succeeded'?overlay.result(id,j.image_sha256!):null};
+    return {id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?overlay.result(id,j.image_sha256!):null};
   };
   if(url.pathname==='/v1/translations/events'){
     const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};

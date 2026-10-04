@@ -69,6 +69,21 @@ describe('independent translation resources',()=>{
  it('explicit failure retry creates a UUID with only retry_of',async()=>{
   const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'failed',error:{code:'FAILED',message:'failed'}}));await f.core.submit([target(0)]);const id=f.submit.mock.calls[0][0];await f.core.manual(target(0));expect(f.submit.mock.calls[1][0]).not.toBe(id);expect(f.submit.mock.calls[1][1]).toEqual({retry_of:id});
  });
+ it('keeps no-text terminal automatically and explicitly regenerates it with a new UUID and the original identity',async()=>{
+  const f=fixture(),page=target(0);
+  f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'succeeded',result:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:page.page.imageSha256,width:800,height:1200}}));
+  await f.core.submit([page]);const id=f.submit.mock.calls[0][0];
+  const previous=await readOperation(operationId(f.core.scope,'zh-Hans',page));
+  expect(previous?.result?.result?.kind).toBe('no_text');
+  await f.core.submit([page]);expect(f.submit).toHaveBeenCalledOnce();
+  await f.core.manual(page);expect(f.submit).toHaveBeenCalledTimes(2);
+  const [retryId,request]=f.submit.mock.calls[1];
+  expect(retryId).not.toBe(id);expect(request).toEqual({regenerate_of:id});
+  const retry=await readOperation(operationId(f.core.scope,'zh-Hans',page));
+  expect(retry?.image).toEqual(previous?.image);expect(retry?.language).toBe('zh-Hans');
+  expect(retry?.requestId).toBe(retryId);
+  await f.core.submit([page]);expect(f.submit).toHaveBeenCalledTimes(2);
+ });
  it('never automatically retries uncertain upstream results',async()=>{
   const f=fixture();f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'needs_attention'}));await f.core.submit([target(0)]);await f.core.submit([target(0)]);await expect(f.core.manual(target(0))).rejects.toThrow('核实');expect(f.submit).toHaveBeenCalledOnce();
  });

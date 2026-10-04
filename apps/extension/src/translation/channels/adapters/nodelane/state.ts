@@ -1,5 +1,5 @@
 import {msg} from '../../../../i18n/runtime';
-import {pageTranslation} from '../../../../reader/presentation';
+import {pageTranslation,taskText} from '../../../../reader/presentation';
 import {supportsLanguage,type Page,type Mode,type Capabilities,type Entitlements} from '../../../../types';
 import type {TranslationState} from '../../../automatic';
 import {quotaErrors,exhausted} from './operations';
@@ -13,8 +13,8 @@ export function translationState({page,mode,language,userId,origin,active,caps,r
     if(quotaErrors.has(code))return {kind:'upgrade',message:msg("升级权益，继续翻译")};
     return {kind:'error',message:operation.error??msg("此页暂不能翻译"),retryable:!['IDEMPOTENCY_CONFLICT','TRANSLATION_UNAVAILABLE','TRANSLATION_MODE_UNAVAILABLE','SOURCE_CHANGED','OUTCOME_UNKNOWN'].includes(code)};
   }
-  if(t.pending)return {kind:t.pending.status==='queued'?'waiting':'translating',message:t.pending.status==='outcome_unknown'?msg("结果核实中"):t.pending.status==='queued'?msg("等待翻译"):msg("翻译中")};
   if(operation?.state==='uncertain')return {kind:'translating',message:msg("正在恢复翻译请求")};
+  if(t.pending)return {kind:t.pending.status==='queued'?'waiting':'translating',message:t.pending.status==='outcome_unknown'?msg("结果核实中"):taskText(t.pending)};
   if(t.latest?.status==='unknown_released')return {kind:'error',message:msg("原请求结果待核实"),retryable:false};
   if(active&&error&&!t.ready)return {kind:'error',message:error};
   if(operation?.state==='local'||operation?.state==='deferred')return {kind:'waiting',message:msg("等待翻译")};

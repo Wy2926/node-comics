@@ -7,10 +7,10 @@ afterEach(()=>vi.clearAllMocks());
 const chapter='https://comix.to/title/nr83-the-sword-bearing-flower/11372843-chapter-60';
 const url='https://images.wowpic2.store/fixture.webp';
 describe('site-specific inline HTTP image requests',()=>{
-  it('uses the selected adapter Referer for real HTTP images',async()=>{
+  it.each([undefined,'no-referrer','origin','unsafe-url'] as const)('preserves the page Referer policy %s without a site override',async referrerPolicy=>{
     const signal=new AbortController().signal;
-    expect(await readInlineSourceImage(url,chapter,signal)).toEqual(new Blob(['image'],{type:'image/webp'}));
-    expect(fetchSourceImage).toHaveBeenCalledExactlyOnceWith(url,signal,{referer:'https://comix.to/'},{pageUrl:chapter,referrerPolicy:undefined});
+    expect(await readInlineSourceImage(url,chapter,signal,referrerPolicy)).toEqual(new Blob(['image'],{type:'image/webp'}));
+    expect(fetchSourceImage).toHaveBeenCalledExactlyOnceWith(url,signal,undefined,{pageUrl:chapter,referrerPolicy});
   });
   it('does not lend site headers to unknown or spoofed websites',async()=>{
     await readInlineSourceImage(url,'https://unknown.test/comic');

@@ -15,7 +15,9 @@ async function open(offline=false){
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   const scenario=offline?'connection':'retry';
   await page.goto(web+'/tests/reader-fixture.html?auto='+scenario+(offline?'&offline':''));
-  await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · '+scenario,exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
+  const entry=page.getByRole('button',{name:'打开漫画 自动翻译 · '+scenario,exact:true});await entry.waitFor();
+  const releaseNotes=page.getByRole('button',{name:'知道了',exact:true});if(await releaseNotes.count())await releaseNotes.click();
+  await entry.click();
   await page.locator('.nc-page-image').waitFor();
   await page.getByRole('button',{name:'常规翻译',exact:true}).click();
 }
@@ -47,6 +49,7 @@ try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=connection');
   await page.getByRole('button',{name:'打开漫画 自动翻译 · connection',exact:true}).waitFor();
+  const releaseNotes=page.getByRole('button',{name:'知道了',exact:true});if(await releaseNotes.count())await releaseNotes.click();
   await page.evaluate(async()=>{
     const {catalog}=await import('/src/comics/repositories/index.ts');
     const [comic]=await catalog.list('comics');

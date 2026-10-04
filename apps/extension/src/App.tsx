@@ -321,6 +321,7 @@ export function App(){
  const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag&&!shortcutScope
    &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  const releaseNotesActive=!current&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag&&!shortcutScope
+   &&location.hash!=='#sites/request'
    &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  function nav(value:View,tab:AccountTab='overview'){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);setAccountTab(tab);location.hash=value==='account'&&tab==='subscription'?'account/subscription':value;setError('');}
  useShortcuts({

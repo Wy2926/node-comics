@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {fetchSourceImage} from '../src/sources/runtime/image-fetch';
 import {ImagePermissionsRequired} from '../src/sources/runtime/permissions';
-import {imageReferer} from '../src/sources/shared/referrer';
+import {imageReferer,pageImageReferrerPolicy} from '../src/sources/shared/referrer';
 import {imageDataUrl} from '../src/sources/shared/bytes';
 const fixture=vi.hoisted(()=>({headers:[] as Record<string,string>[]}));
 vi.mock('../src/sources/runtime/image-headers',()=>({withImageHeaders:async(_url:string,headers:Record<string,string>,_signal:AbortSignal,read:()=>Promise<unknown>)=>{fixture.headers.push(headers);return read();}}));
@@ -18,6 +18,29 @@ describe('common image request context',()=>{
     expect(await(await fetchSourceImage(image,undefined,undefined,{pageUrl:source})).blob.text()).toBe('image');
     expect(fixture.headers).toEqual([{referer:'https://reader.test/'}]);
     expect(fetch).toHaveBeenCalledWith(image,expect.objectContaining({redirect:'manual',cache:'no-store',credentials:'include',referrerPolicy:'no-referrer'}));
+  });
+  it.each([
+    ['no-referrer',undefined],['origin','https://reader.test/'],['unsafe-url',source.split('#')[0]],
+  ] as const)('applies the image element policy %s to the actual request',async(policy,referer)=>{
+    const fetch=vi.fn(async()=>new Response('image'));vi.stubGlobal('fetch',fetch);
+    const element={getAttribute:()=>policy} as unknown as Element;
+    await fetchSourceImage(image,undefined,undefined,{pageUrl:source,referrerPolicy:pageImageReferrerPolicy(element)});
+    expect(fixture.headers).toEqual([referer?{referer}:{}]);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(image,expect.objectContaining({referrerPolicy:'no-referrer'}));
+  });
+  it('keeps no-referrer across same-origin and cross-origin redirects',async()=>{
+    vi.stubGlobal('fetch',vi.fn()
+      .mockResolvedValueOnce(new Response(null,{status:302,headers:{location:'/next.png'}}))
+      .mockResolvedValueOnce(new Response(null,{status:302,headers:{location:'https://new-cdn.test/image'}}))
+      .mockResolvedValueOnce(new Response('image')));
+    await fetchSourceImage(image,undefined,undefined,{pageUrl:source,referrerPolicy:'no-referrer'});
+    expect(fixture.headers).toEqual([{},{},{}]);
+    expect(chrome.permissions.contains).toHaveBeenLastCalledWith({origins:['https://new-cdn.test/*']});
+  });
+  it('reports a denied no-referrer read without retrying with a more revealing policy',async()=>{
+    const fetch=vi.fn(async()=>new Response('denied',{status:403}));vi.stubGlobal('fetch',fetch);
+    await expect(fetchSourceImage(image,undefined,undefined,{pageUrl:source,referrerPolicy:'no-referrer'})).rejects.toThrow('403');
+    expect(fixture.headers).toEqual([{}]);expect(fetch).toHaveBeenCalledOnce();
   });
   it('checks permission at every redirect hop, before requesting the next host',async()=>{
     const fetch=vi.fn(async()=>new Response(null,{status:302,headers:{location:'https://ungranted.test/next.png'}}));vi.stubGlobal('fetch',fetch);

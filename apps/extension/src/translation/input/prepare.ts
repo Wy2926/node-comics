@@ -2,6 +2,7 @@ import {msg} from '../../i18n/runtime';
 import {assertCurrent} from '../../concurrency';
 import type {Capabilities,Page,TranslationImage} from '../../types';
 import {hashFile} from '../../importers/hash';
+import {probeImageMetadata} from '../../comics/pages/image-metadata';
 import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS,TRANSLATION_REENCODE_BYTES,TRANSLATION_JPEG_MAX_DIMENSION,translationSize,type InputProfile} from './limits';
 import {imageWork} from './work';
 import {ImageOutputTooLargeError,resizeInput} from './resize';
@@ -41,24 +42,42 @@ export async function restoreTranslationInput(source:Blob,width:number,height:nu
     return result.blob;
   });
 }
-export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits']):Promise<PreparedInput> {
-  const size=translationSize(page.width,page.height);
-  if(!Number.isSafeInteger(page.width)||!Number.isSafeInteger(page.height)||page.width<1||page.height<1||!Number.isSafeInteger(page.width*page.height)
-    ||size.width*size.height>Math.min(TRANSLATION_MAX_PIXELS,limits?.max_pixels??Infinity)
-    ||Math.max(size.width,size.height)>Math.min(TRANSLATION_MAX_DIMENSION,limits?.max_dimension??Infinity))throw Error(msg('图片尺寸超过翻译服务限制。'));
-  // AVIF is readable locally but is not an accepted official upload format.
-  const required=size.width!==page.width||size.height!==page.height||page.imageMime==='image/avif';
-  const encodable=Math.max(size.width,size.height)<=TRANSLATION_JPEG_MAX_DIMENSION;
-  if(required&&!encodable)throw Error(msg('图片尺寸超过翻译服务限制。'));
+export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits'],supportsLong=true):Promise<PreparedInput> {
+  function plan(width:number,height:number,mime?:string){
+    const size=translationSize(width,height);
+    if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||!Number.isSafeInteger(width*height)
+      ||size.width*size.height>Math.min(TRANSLATION_MAX_PIXELS,limits?.max_pixels??Infinity)
+      ||Math.max(size.width,size.height)>Math.min(TRANSLATION_MAX_DIMENSION,limits?.max_dimension??Infinity))throw Error(msg('图片尺寸超过翻译服务限制。'));
+    if(!supportsLong&&Math.max(size.width,size.height)>16383)throw Error(msg('翻译服务暂不可用'));
+    // AVIF is readable locally but is not an accepted official upload format.
+    const required=size.width!==width||size.height!==height||mime==='image/avif';
+    const encodable=Math.max(size.width,size.height)<=TRANSLATION_JPEG_MAX_DIMENSION;
+    if(required&&!encodable)throw Error(msg('图片尺寸超过翻译服务限制。'));
+    return {size,required,encodable};
+  }
+  // A digest identifies materialized dimensions; descriptor/layout placeholders do not.
+  const known=page.imageSha256?plan(page.width,page.height,page.imageMime):undefined;
   const maxBytes=Math.min(TRANSLATION_MAX_BYTES,limits?.max_bytes??Infinity);
-  if(!required&&page.imageSha256&&page.imageByteSize&&page.imageByteSize<=TRANSLATION_REENCODE_BYTES){
+  if(known&&!known.required&&page.imageSha256&&page.imageByteSize&&page.imageByteSize<=TRANSLATION_REENCODE_BYTES){
     if(page.imageByteSize>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
     assertCurrent(current);
-    return {...size,sourceSha256:page.imageSha256,image:{sha256:page.imageSha256,byte_size:page.imageByteSize,content_type:page.imageMime||'image/png',normalization_version:1}};
+    return {...known.size,sourceSha256:page.imageSha256,image:{sha256:page.imageSha256,byte_size:page.imageByteSize,content_type:page.imageMime||'image/png',normalization_version:1}};
   }
   return imageWork(async()=>{
     assertCurrent(current);const source=await read();assertCurrent(current);
     if(!source)throw Error(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
+    let resolved=known;
+    if(!resolved){
+      const metadata=await probeImageMetadata(source);
+      assertCurrent(current);
+      if(metadata)resolved=plan(metadata.width,metadata.height,metadata.mime);
+      else if(source.type==='image/avif'){
+        const bitmap=await createImageBitmap(source);
+        try{resolved=plan(bitmap.width,bitmap.height,source.type);}finally{bitmap.close();}
+      }else throw Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('原图')}));
+    }
+    assertCurrent(current);
+    const {size,required,encodable}=resolved;
     const sourceSha256=await hashFile(source);
     assertCurrent(current);
     if(page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));

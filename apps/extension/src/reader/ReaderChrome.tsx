@@ -43,8 +43,8 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
   onDirectory(): void;
   children?: ReactNode;
 }) {
-  return <><nav className="nc-reader-rail left nc-reader-controls" aria-label={msg('阅读导航')}>
-    <button aria-label={backLabel} title={backLabel} onClick={onBack}><Icon name="arrow" style={{transform: 'rotate(180deg)'}}/><span>{backText}</span></button>
+  return <><nav id="nc-reader-navigation-tools" className="nc-reader-rail left nc-reader-controls" data-scrollbar-mode="overlay" aria-label={msg('阅读导航')}>
+    <button data-reader-back-trigger="true" aria-label={backLabel} title={backLabel} onClick={onBack}><Icon name="arrow" style={{transform: 'rotate(180deg)'}}/><span>{backText}</span></button>
     <button data-reader-directory-trigger="true" aria-label={msg('打开目录')} title={notice ? `${title} · ${notice}` : title}
       aria-expanded={directoryOpen} onClick={onDirectory}>
       <Icon name="list"/><span>{msg('目录')}</span>{notice && <i className="nc-rail-notice" aria-hidden="true"/>}

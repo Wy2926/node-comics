@@ -2,12 +2,13 @@ import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {Job,Page} from '../src/types';
 import {emptyPage} from '../src/reader/model';
-import {readingImage} from '../src/reader/presentation';
+import {canRetryPage,displayTranslationState,pageTranslation,readingImage,type ImageLoadState} from '../src/reader/presentation';
 import {ImageTranslationStatus} from '../src/reader/ImageTranslationStatus';
 import {PageTranslationBar} from '../src/reader/PageTranslationBar';
 import {translationNotice} from '../src/translation/notice';
 import {translationState} from '../src/translation/channels/adapters/nodelane/state';
 import type {LocalOperation} from '../src/translation/channels/adapters/nodelane/store';
+import {needsTranslation,type TranslationState} from '../src/translation/automatic';
 
 const origin='https://fixture.example';
 const noop=()=>{};
@@ -39,7 +40,55 @@ function fixture(status:Job['status']):Page{
  const delivered:Job={id:'delivered',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
  return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader','overlay-v1']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
+describe('explicit page rerun eligibility',()=>{
+ const eligible=(page:Page,state?:TranslationState,scope=page.translationScope)=>canRetryPage(pageTranslation(page,'classic','zh-Hans',scope),state);
+ it.each(['no_text','failed','cancelled'] as const)('allows explicit %s recovery without any translated image',status=>{
+  const page=fixture(status);page.jobs=page.jobs.slice(1);page.outputBlobs={};
+  expect(eligible(page)).toBe(true);
+  expect(eligible(page,{kind:'error',message:'翻译失败'})).toBe(true);
+ });
+ it.each(['awaiting_upload','validating_upload','queued','running','outcome_unknown','unknown_released'] as const)('blocks %s even with an older cached result',status=>{
+  expect(eligible(fixture(status))).toBe(false);
+ });
+ it('checks every pending task, not only the newest one',()=>{
+  const page=fixture('no_text');page.jobs[0].status='running';
+  expect(eligible(page)).toBe(false);
+ });
+ it('requires current language, account and result bytes for a successful rerun',()=>{
+  const page=fixture('succeeded');page.jobs=page.jobs.slice(0,1);
+  expect(eligible(page)).toBe(true);
+  expect(eligible(page,undefined,'other-account')).toBe(false);
+  expect(canRetryPage(pageTranslation(page,'classic','en',page.translationScope))).toBe(false);
+  page.outputBlobs={};expect(eligible(page)).toBe(false);
+  page.jobs=[];expect(eligible(page)).toBe(false);
+ });
+ it.each<TranslationState>([
+  {kind:'waiting',message:'等待翻译'},
+  {kind:'translating',message:'正在解码译图'},
+  {kind:'login',message:'登录后自动翻译'},
+  {kind:'upgrade',message:'升级权益'},
+  {kind:'error',message:'结果待核实',retryable:false},
+  {kind:'error',message:'译图加载失败',retryLabel:'点击重新加载'},
+ ])('keeps $kind state recovery separate from model reruns',state=>{
+  expect(eligible(fixture('no_text'),state)).toBe(false);
+ });
+});
+
 describe('in-image retry status',()=>{
+ it('leaves no-text terminal behavior unchanged with no in-image notice or automatic regeneration',()=>{
+  const page=fixture('no_text');page.jobs=page.jobs.slice(1);page.outputBlobs={};
+  expect(statusMarkup(page)).toBe('');
+  expect(needsTranslation(page,'classic','zh-Hans',page.translationScope!)).toBe(false);
+ });
+ it.each(['awaiting_upload','validating_upload'] as const)('names the actual %s stage',status=>{
+  const page=fixture(status),state=translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true});
+  expect(state?.message).toBe(status==='awaiting_upload'?'等待原图上传':'正在校验原图');
+ });
+ it('reports recovery when a failed upload left an older pending snapshot',()=>{
+  const operation={requestId:'request-id',state:'uncertain',result:{state:'needs_input'},errorCode:'NETWORK_ERROR',retryAt:123} as LocalOperation;
+  const state=translationState({page:fixture('awaiting_upload'),mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,operation});
+  expect(state).toEqual({kind:'translating',message:'正在恢复翻译请求'});
+ });
  it('explicitly names a new translation when local result bytes cannot be recovered',()=>{
   expect(translationNotice({kind:'error',message:'本地译图缓存已清理，请手动重新翻译。',retryAction:'translate'}).action).toBe('重新翻译');
  });
@@ -76,5 +125,24 @@ describe('in-image retry status',()=>{
   expect(state?.kind).toBe('waiting');
   const page=fixture('failed');page.outputBlobs={};
   expect(translationState({page,mode:'classic',language:'zh-Hans',userId:'reader',origin,active:true,error:'连接失败',operation})?.message).toBe('连接失败');
+ });
+});
+
+describe('reader display state',()=>{
+ const load=(phase:ImageLoadState['phase']):ImageLoadState=>({scope:'current',key:'translated',phase,retry:noop});
+ it.each(['reading','decoding','displaying'] as const)('keeps feedback during %s without treating cached bytes as a displayed result',phase=>{
+  const page=fixture('succeeded');page.jobs=page.jobs.slice(0,1);
+  expect(statusMarkup(page)).toBe('');
+  expect(displayTranslationState(undefined,load(phase),'translated')).toEqual({kind:'translating',message:phase==='reading'?'正在读取译图':'正在解码译图'});
+  expect(needsTranslation(page,'classic','zh-Hans',page.translationScope!)).toBe(false);
+ });
+ it('clears loading only after DOM confirmation and ignores a different image identity',()=>{
+  expect(displayTranslationState(undefined,load('ready'),'translated')).toBeUndefined();
+  expect(displayTranslationState(undefined,load('decoding'),'other-result')).toBeUndefined();
+ });
+ it('exposes a reload error without converting it to a new translation action',()=>{
+  const state=displayTranslationState(undefined,{...load('error'),error:'图片解码超时，请重试。'},'translated')!;
+  expect(state.retryAction).toBeUndefined();expect(translationNotice(state).action).toBe('重试');
+  expect(state).toMatchObject({kind:'error',retryLabel:'点击重新加载'});
  });
 });

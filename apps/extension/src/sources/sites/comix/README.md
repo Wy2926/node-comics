@@ -9,9 +9,9 @@
 ## 实现约定
 
 - `definition.ts` 定义 URL、HID 身份与权限；`network.ts` 读取 initial-data 和签名 API，核对分页、总数、上传 ID 与归属。章节按话号去重，保留 0 和小数话；优先保留已有上传，首次选择官方上传后取最小 ID。
-- `protocol.ts` 独立实现请求签名和响应解码；`image.ts` 声明请求头，`images.ts` 还原 `X-Scramble-Algo: 3` 网格，保留边缘像素。Hash `03632`、`02900` 分别修正种子 XOR 58414、117532；未知协议明确失败。
+- `protocol.ts` 独立实现请求签名和响应解码；`image.ts` 接入图片解码，`images.ts` 还原 `X-Scramble-Algo: 3` 网格，保留边缘像素。Hash `03632`、`02900` 分别修正种子 XOR 58414、117532；未知协议明确失败。
 - `page.ts` 识别 `.rpage-main` 内 `data-page` 正文槽及已加载图片／画布；导入入口挂在 `.mpage__actions`、`.rpage-floatctl`。导航、重绘和容器替换清理旧引用。
-- 封面读取 `poster.large` / `poster.medium`；图片经公共管线使用来源 Referer。目录与章节请求不创建来源标签页，不以 DOM 窗口代替完整清单。
+- 封面读取 `poster.large` / `poster.medium`；图片经公共管线处理 Referer，原位 HTTP 图片遵循元素／页面的引用策略（包括 `no-referrer`），本站不强制覆盖。目录与章节请求不创建来源标签页，不以 DOM 窗口代替完整清单。
 
 协议参考源站 `secure-tlrpwb-M_-Wx-pz.js`，SHA-256 `5d271fc9c344c4386cab17c1589964fa447f3384191ea7fde92648e8edbdfa24`；不分发或执行该脚本。公共边界见[适配规范](../../../../../../docs/SITE_ADAPTERS.md)。
 

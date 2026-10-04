@@ -63,29 +63,36 @@ try{
     const {ByteCache}=await import('/src/storage/cache.ts');
     const inputCache=new ByteCache({name:'translation-inputs-v1',budgetBytes:INPUT_BUDGET_BYTES});
     const timings=[];
-    for(const [width,height] of [[2400,3600],[2400,12000],[800,12000]]){
+    for(const [width,height] of [[2400,3600],[2400,12000],[800,12000],[800,20687]]){
       const surface=new OffscreenCanvas(width,height),draw=surface.getContext('2d');
       draw.fillStyle='#faf5ed';draw.fillRect(0,0,width,height);draw.font='48px sans-serif';
       for(let y=20;y<height;y+=100){draw.fillStyle=y%200?'#222':'#5487ad';draw.fillRect(30,y,width-60,8);draw.fillText('漫画 translation fixture '+y,60,y+60);}
-      const source=await surface.convertToBlob({type:'image/jpeg',quality:.92});surface.width=surface.height=1;
-      const sourceHash=await hashFile(source),page={width,height,imageSha256:sourceHash,imageByteSize:source.size,imageMime:source.type};
+      const unmaterialized=height===20687;
+      if(unmaterialized){
+        const noise=draw.createImageData(width,600);let seed=20261003;
+        for(let i=0;i<noise.data.length;i+=4){for(let j=0;j<3;j++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;noise.data[i+j]=seed>>>24;}noise.data[i+3]=255;}
+        draw.putImageData(noise,0,0);
+      }
+      const source=await surface.convertToBlob({type:unmaterialized?'image/png':'image/jpeg',quality:.92});surface.width=surface.height=1;
+      const sourceHash=await hashFile(source),page=unmaterialized?{width:900,height:1300}:{width,height,imageSha256:sourceHash,imageByteSize:source.size,imageMime:source.type};
+      if(unmaterialized)assert(source.size>1024*1024,'unmaterialized long image exercises optional compression above 1 MiB');
       let last=performance.now(),maxTimerGap=0;const timer=setInterval(()=>{const now=performance.now();maxTimerGap=Math.max(maxTimerGap,now-last);last=now;},16);
       const start=performance.now();const prepared=await prepareTranslationInput(page,async()=>source,()=>true);
       const elapsed=performance.now()-start;clearInterval(timer);
       const input=prepared.blob??source,decoded=await createImageBitmap(input);
       assert(decoded.width===prepared.width&&decoded.height===prepared.height,`${width}x${height}: actual encoded size matches prepared metadata`);decoded.close();
-      if(prepared.blob)assert(input.type==='image/webp'&&!await needsNormalization(input),'prepared WebP is static and normalized without ICC or orientation');
+      if(prepared.blob)assert(input.type===(height>16383?'image/jpeg':'image/webp')&&!await needsNormalization(input),'prepared image uses the actual dimensions to select its normalized encoding');
       assert(await hashFile(input)===prepared.image.sha256&&await hashFile(source)===sourceHash,`${width}x${height}: upload hash is frozen and original bytes are unchanged`);
       if(width===800){
         assert(prepared.width===800&&prepared.height===height,'narrow strip keeps its original dimensions');
         if(source.size<=1024*1024){assert(!prepared.blob&&!prepared.profile,'small narrow strip reuses original bytes without encoding');continue;}
         assert(!!prepared.blob,'large narrow strip also gets one same-size compression pass');
       }else assert(prepared.width===1800&&prepared.height===height*.75,'large page uses short-edge 1800 with unchanged aspect ratio');
-      assert(input.size<source.size,'high-quality WebP is smaller than this representative JPEG fixture');
-      if(height===3600){
-        for(const [label,bytes] of [['Source at upload size',source],['WebP quality 0.90',input]]){
+      assert(input.size<source.size,'single-pass encoding is smaller than this representative source fixture');
+      if(height===3600||unmaterialized){
+        for(const [label,bytes] of [['Source '+height+'px',source],['Upload '+input.type,input]]){
           const decoded=await createImageBitmap(bytes,{resizeWidth:prepared.width,resizeHeight:prepared.height,resizeQuality:'high'});
-          const crop=document.createElement('canvas');crop.width=600;crop.height=220;crop.getContext('2d').drawImage(decoded,0,0);decoded.close();
+          const crop=document.createElement('canvas');crop.width=600;crop.height=220;crop.getContext('2d').drawImage(decoded,0,unmaterialized?-20000:0);decoded.close();
           const card=document.createElement('figure');card.style='display:inline-block;margin:12px';const caption=document.createElement('figcaption');caption.textContent=label;card.append(caption,crop);document.body.append(card);
         }
       }
@@ -104,7 +111,7 @@ try{
       assert(await hashFile(rebuilt)===prepared.image.sha256,'same-browser recovery reproduces frozen input bytes');
       const reused=await loadTranslationInput(scope.key,frozen,async()=>{throw Error('Restored input reread source');},()=>true);
       assert(await hashFile(reused)===prepared.image.sha256,'shared loader persists restored input and reuses it without reading source again');
-      timings.push({width,height,inputBytes:source.size,uploadBytes:input.size,prepareMs:Math.round(elapsed),restoreMs,maxTimerGapMs:Math.round(maxTimerGap)});
+      timings.push({width,height,unmaterialized,inputBytes:source.size,uploadBytes:input.size,prepareMs:Math.round(elapsed),restoreMs,maxTimerGapMs:Math.round(maxTimerGap)});
     }
     checks.push('synthetic resize timings (single samples, not GPU/model validation): '+JSON.stringify(timings));
     for(const [label,blob] of [['Original',original],['Patch',patch],['Composed',rendered]]){const card=document.createElement('figure');card.style='display:inline-block';card.innerHTML='<figcaption>'+label+'</figcaption>';const image=document.createElement('img');image.src=URL.createObjectURL(blob);image.style='width:240px;height:240px;image-rendering:pixelated;background:repeating-conic-gradient(#aaa 0% 25%,#fff 0% 50%) 50% / 24px 24px';card.append(image);document.body.append(card);}

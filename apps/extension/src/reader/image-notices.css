@@ -70,3 +70,16 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.nc-image-status-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nc-image-status-layer > .nc-image-translation {
+  position: sticky;
+  top: 10px;
+  left: auto;
+  width: fit-content;
+  margin: 10px;
+  pointer-events: auto;
+}

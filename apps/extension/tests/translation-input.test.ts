@@ -9,7 +9,7 @@ import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,translationSize} from '../src/transla
 import {hashFile} from '../src/importers/hash';
 import {matchesPage} from '../src/translation/sync';
 import {TranslationCoordinator,translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
-import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
+import {readOperation,saveOperation,saveReceipt,readJobs} from '../src/translation/channels/adapters/nodelane/store';
 import {operationId,makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {ApiError} from '../src/api';
 import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
@@ -38,6 +38,40 @@ it('reuses unchanged bytes without reading, decoding or saving another input',as
   const read=vi.fn(),prepared=await prepareTranslationInput(target(1).page,read,()=>true);
   expect(prepared.image.sha256).toBe(target(1).page.imageSha256);expect(prepared.blob).toBeUndefined();
   expect(read).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
+it.each([[900,1300],[0,0],[900,100001]])('uses actual source dimensions instead of unmaterialized layout %s x %s',async(width,height)=>{
+  const source=jpegWithSize(800,20687,2*1024*1024),output=jpegWithSize(800,20687,128);
+  const page={...target(1).page,width,height,imageSha256:undefined,imageByteSize:undefined,imageMime:undefined},before={...page};
+  encode.mockResolvedValueOnce(output);
+  const read=vi.fn(async()=>source),prepared=await prepareTranslationInput(page,read,()=>true);
+  expect(prepared).toMatchObject({width:800,height:20687,sourceSha256:await hashFile(source),profile:INPUT_PROFILE,image:{byte_size:output.size,content_type:'image/jpeg'}});
+  expect(page).toEqual(before);expect(read).toHaveBeenCalledOnce();expect(createImageBitmap).toHaveBeenCalledExactlyOnceWith(source,expect.objectContaining({resizeWidth:800,resizeHeight:20687}));
+  expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/jpeg',quality:0.3});expect(close).toHaveBeenCalledOnce();
+});
+it('reads only bounded headers without decoding an unidentified small image',async()=>{
+  const source=jpegWithSize(800,20687),page={...target(1).page,width:900,height:1300,imageSha256:undefined,imageByteSize:undefined};
+  const prepared=await prepareTranslationInput(page,async()=>source,()=>true);
+  expect(prepared).toMatchObject({width:800,height:20687,image:{sha256:await hashFile(source),byte_size:source.size,content_type:'image/jpeg'}});
+  expect(prepared.blob).toBeUndefined();expect(prepared.profile).toBeUndefined();expect(createImageBitmap).not.toHaveBeenCalled();
+});
+it('rejects unreadable unidentified input instead of encoding layout placeholders',async()=>{
+  const page={...target(1).page,imageSha256:undefined};
+  await expect(prepareTranslationInput(page,async()=>new Blob(['invalid'],{type:'image/png'}),()=>true)).rejects.toThrow('无法解码');
+  expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+});
+it.each([false,true])('negotiates actual unmaterialized long-image dimensions with tiles=%s before encoding or admission',async tiles=>{
+  const f=fixture(),t=target(1),source=jpegWithSize(800,20687,2*1024*1024);
+  const page={...t.page,width:900,height:1300,imageSha256:undefined,imageByteSize:undefined};
+  encode.mockResolvedValueOnce(jpegWithSize(800,20687));
+  const core=new TranslationCoordinator({...f.core.options,tiles:()=>tiles,getBlob:async()=>source});
+  await core.submit([{...t,page}]);
+  if(tiles){
+    expect(f.submit).toHaveBeenCalledExactlyOnceWith(expect.any(String),expect.objectContaining({result_format:'overlay-tiles-v1',image:expect.objectContaining({content_type:'image/jpeg'})}));
+    expect(encode).toHaveBeenCalledOnce();
+  }else{
+    expect(page.translationError).toBe('翻译服务暂不可用');expect(f.submit).not.toHaveBeenCalled();
+    expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+  }
 });
 it('uses durably prepared screenshot bytes without re-encoding on submit or recovery',async()=>{
   const f=fixture(),wanted=target(1),prepareInput=vi.fn(async()=>originalInput(1));
@@ -282,6 +316,41 @@ it.each(['failed','succeeded'] as const)('reuses frozen scaled metadata and cach
   expect(next.requestId).not.toBe(previous.requestId);expect(next.request).toEqual(state==='failed'?{retry_of:previous.requestId}:{regenerate_of:previous.requestId});
   expect(next.image).toEqual(previous.image);expect(next.inputSize).toEqual(previous.inputSize);expect(next.inputProfile).toBe(previous.inputProfile);
   expect(upload).toHaveBeenCalledOnce();expect(await hashFile(upload.mock.calls[0][1])).toBe(previous.image.sha256);expect(encode).toHaveBeenCalledOnce();
+});
+it.each([true,false])('rebuilds a mis-sized no-text upload only on explicit retry, with local operation=%s',async stored=>{
+  const f=fixture(),t=target(1),source=jpegWithSize(800,20687,2*1024*1024),sha=await hashFile(source),output=jpegWithSize(800,20687);
+  Object.assign(t.page,{width:800,height:20687,imageSha256:sha,imageByteSize:source.size,imageMime:source.type,translationScope:f.core.scope});
+  const previous=makeOperation(t,f.core.scope,'zh-Hans',{image:{sha256:await hashFile(encoded),byte_size:encoded.size,content_type:'image/webp'},sourceSha256:sha,width:900,height:1300,profile:INPUT_PROFILE});
+  previous.state='accepted';previous.result=snapshot(previous.requestId,previous.request,{state:'succeeded',result:{kind:'no_text',representation:'original',width:900,height:1300,input_sha256:previous.image.sha256,normalization_version:1}});
+  t.page.jobs=[translationJob(previous.result,previous)];
+  const core=new TranslationCoordinator({...f.core.options,tiles:()=>true,getBlob:async()=>source});
+  if(stored){
+    await saveReceipt(previous,t.page.jobs[0]);
+    vi.mocked(f.api.translations).mockResolvedValue({items:[previous.result],missing_ids:[],unchanged:false,etag:'no-text'});
+    await core.submit([t]);await core.submit([t]);
+    expect(f.submit).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+    expect((await readOperation(previous.id))?.requestId).toBe(previous.requestId);
+  }
+  encode.mockResolvedValueOnce(output);
+  f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'needs_input'}));
+  const upload=vi.spyOn(f.api,'translationInput').mockImplementation(async(id,blob)=>{
+    expect(await hashFile(blob)).toBe(await hashFile(output));return snapshot(id,f.submit.mock.calls[0][1]);
+  });
+  await core.manual(t);await core.finishUploads();
+  const next=(await readOperation(previous.id))!;
+  expect(next.requestId).not.toBe(previous.requestId);expect(next.sourceSha256).toBe(sha);
+  expect(next.inputSize).toEqual({width:800,height:20687});expect(next.image.sha256).not.toBe(previous.image.sha256);
+  expect(f.submit).toHaveBeenCalledExactlyOnceWith(next.requestId,expect.objectContaining({image:next.image,result_format:'overlay-tiles-v1'}));
+  expect(next.request).not.toHaveProperty('regenerate_of');expect(upload).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledOnce();
+  expect(next.image).toMatchObject({byte_size:output.size,content_type:'image/jpeg'});
+  if(stored)expect((await readJobs(core.scope,[sha])).map(job=>job.id)).toContain(previous.requestId);
+  await expect(core.manual(t)).rejects.toThrow('核实');expect(f.submit).toHaveBeenCalledOnce();
+});
+it.each(['needs_input','queued','running','needs_attention'] as const)('never replaces a mis-sized upload while the original is %s',async state=>{
+  const f=fixture(),t=large(),previous=makeOperation(t,f.core.scope,'zh-Hans',{...originalInput(1),width:900,height:1300,profile:INPUT_PROFILE});
+  previous.state='accepted';previous.result=snapshot(previous.requestId,previous.request,{state});await saveOperation(previous);
+  await expect(f.core.manual(t)).rejects.toThrow('核实');
+  expect((await readOperation(previous.id))?.requestId).toBe(previous.requestId);expect(f.submit).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
 });
 it('rejects changed page identity before reusing frozen input for a manual retry',async()=>{
   const f=fixture(),t=large();await f.core.submit([t]);
