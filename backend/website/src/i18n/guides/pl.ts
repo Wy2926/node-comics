@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Samouczek tłumaczenia lokalnego",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Dodaj kanał tłumaczeniowy w rozszerzeniu",
         "paragraphs": [
-          "Otwórz ustawienia rozszerzenia i znajdź kanały tłumaczeń. Po udanym połączeniu rozszerzenie zapisuje hasło i token usługi lokalnie na tym komputerze. Przy ponownym łączeniu z tym samym adresem usługi i nazwą użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika albo hasło zostało zmienione lub przestało działać. Starsze profile zawierające tylko token wymagają jednorazowego wpisania hasła przy pierwszym ponownym połączeniu. Etykiety poniżej opisują odpowiednie elementy sterujące w języku interfejsu."
+          "Otwórz ustawienia rozszerzenia i znajdź kanały tłumaczeń. Po udanym połączeniu rozszerzenie zapisuje hasło i token usługi lokalnie na tym komputerze. Przy ponownym łączeniu z tym samym adresem usługi i nazwą użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika albo hasło zostało zmienione lub przestało działać. Starsze profile zawierające tylko token wymagają jednorazowego wpisania hasła przy pierwszym ponownym połączeniu. Etykiety poniżej opisują odpowiednie elementy sterujące w języku interfejsu. Zapisywanie hasła i ponowne łączenie z pustym polem wymagają rozszerzenia w wersji 0.10.2 lub nowszej; w starszych wersjach hasło trzeba wpisać przy każdym ponownym połączeniu."
         ],
         "steps": [
           "Wybierz opcję Dodaj kanał tłumaczeniowy i potwierdź manga-translator-ui jako usługę. Opcjonalnie nadaj mu rozpoznawalną nazwę, na przykład „Mój komputer”.",
@@ -78,8 +78,8 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Przeczytaj swoją pierwszą przetłumaczoną stronę",
         "paragraphs": [
-          "Zaimportuj lokalny komiks lub otwórz obsługiwaną witrynę internetową w czytniku. Wybierz język docelowy i tłumaczenie klasyczne, a następnie poczekaj na bieżącą stronę. Kanał MTU obsługuje obecnie tylko tłumaczenie klasyczne, a nie oficjalny tryb przerysowywania AI NodeLane.",
-          "Bieżąca strona ma pierwszeństwo, po niej następują trzy kolejne strony. Obrazy są wyświetlane pojedynczo na tym samym kanale MTU. Wróć do oryginału lub porównaj obok siebie, nie tracąc pozycji do czytania. Czytelnik i tłumaczenie na stronie korzystają z tego samego wybranego kanału.",
+          "Importuj komiks lokalny, otwórz EPUB, OPDS lub obsługiwaną stronę. Wybierz język docelowy i włącz zwykłe tłumaczenie. Bieżące rozszerzenie używa zwykłego tłumaczenia dla oficjalnego kanału i MTU.",
+          "Bieżące i pobliskie obrazy mają priorytet w ograniczonym oknie; w jednym kanale MTU obrazy są wysyłane pojedynczo. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone. Porównuj bez utraty pozycji; czytnik i tłumaczenie na stronie używają wybranego kanału.",
           "Jeśli strona nie powiedzie się, rozwiąż zgłoszony problem przed ponowną próbą ręczną. Zamknięcie strony lub utrata połączenia nie oznacza, że ​​MTU przestał działać. Unikaj wielokrotnego przesyłania zgłoszeń, gdy usługa może być nadal zajęta."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Poprzednie połączenie zgłasza teraz wygasły login",
-              "W ustawieniach kanału wybierz Połącz ponownie. Przy tym samym adresie usługi i nazwie użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika, hasło zostało zmienione lub przestało działać albo starszy profil zawiera tylko token. Rozszerzenie nie wysyła ponownie w trybie cichym poprzedniego tłumaczenia."
+              "W ustawieniach kanału wybierz Połącz ponownie. Przy tym samym adresie usługi i nazwie użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika, hasło zostało zmienione lub przestało działać albo starszy profil zawiera tylko token. Rozszerzenie nie wysyła ponownie w trybie cichym poprzedniego tłumaczenia. Zapisywanie hasła i ponowne łączenie z pustym polem wymagają rozszerzenia w wersji 0.10.2 lub nowszej; w starszych wersjach hasło trzeba wpisać przy każdym ponownym połączeniu."
             ],
             [
               "Połączono, ale tłumaczenie wciąż czeka",
@@ -145,11 +145,11 @@ export const localTranslationGuides: Guide[] = [
   {
     "slug": "local-manga-translator",
     "title": "Wybór lokalnego tłumacza mangi do czytania w przeglądarce",
-    "description": "Użyj manga-translator-ui z czytnikiem komiksów w przeglądarce: poznaj lokalne tłumaczenie mangi, koszty sprzętu i API, prywatność, wymagania offline oraz obsługę czytania CBZ i PDF.",
+    "description": "Połącz manga-translator-ui z czytnikiem w przeglądarce: lokalne komiksy, EPUB i OPDS, koszty sprzętu oraz API, prywatność i warunki tłumaczenia offline.",
     "category": "Lokalny przewodnik tłumaczeniowy",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Lokalne czytanie komiksów",
-              "Zaimportuj do przeglądarki pliki CBZ / ZIP, CBR / RAR, PDF lub obsługiwane pliki MOBI bez DRM. Czytanie oryginałów nie wymaga usług tłumaczeniowych."
+              "Importuj CBZ/ZIP, CBR/RAR, PDF, obsługiwane MOBI bez DRM lub EPUB. Oryginały można czytać bez usługi tłumaczenia; w EPUB tłumaczone są tylko osadzone obrazy rastrowe."
             ],
             [
               "Lokalna usługa MTU",
@@ -213,8 +213,8 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Tryby rozszerzeń",
-              "Obecnie tylko tłumaczenie klasyczne",
-              "Tłumaczenie klasyczne i przerysowanie AI, pod warunkiem dostępu do konta"
+              "Zwykłe tłumaczenie",
+              "Zwykłe tłumaczenie w rozszerzeniu; przerysowywanie AI tylko w internetowym obszarze roboczym przy odpowiednich uprawnieniach"
             ],
             [
               "Koszty",

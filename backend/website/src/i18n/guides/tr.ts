@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Yerel çeviri eğitimi",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Uzantıya bir çeviri kanalı ekleyin",
         "paragraphs": [
-          "Uzantının ayarlarını açın ve Çeviri kanallarını bulun. Bağlantı başarılı olduğunda uzantı parolayı ve hizmet belirtecini bu bilgisayarda saklar. Aynı hizmet adresi ve kullanıcı adıyla yeniden bağlanırken parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Aşağıdaki etiketler arayüz dilinizdeki ilgili kontrolleri açıklamaktadır."
+          "Uzantının ayarlarını açın ve Çeviri kanallarını bulun. Bağlantı başarılı olduğunda uzantı parolayı ve hizmet belirtecini bu bilgisayarda saklar. Aynı hizmet adresi ve kullanıcı adıyla yeniden bağlanırken parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Aşağıdaki etiketler arayüz dilinizdeki ilgili kontrolleri açıklamaktadır. Parolayı kaydetmek ve alanı boş bırakarak yeniden bağlanmak için uzantı 0.10.2 veya üzeri gerekir; eski sürümlerde her yeniden bağlantıda parola girilmelidir."
         ],
         "steps": [
           "Çeviri kanalı ekle'yi seçin ve hizmet olarak manga-translator-ui'yi onaylayın. İsteğe bağlı olarak “Bilgisayarım” gibi tanınabilir bir ad verin.",
@@ -78,8 +78,8 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Çevrilmiş ilk sayfanızı okuyun",
         "paragraphs": [
-          "Yerel bir çizgi romanı içe aktarın veya okuyucuda desteklenen bir web sitesini açın. Bir hedef dil ve standart çeviri seçin, ardından geçerli sayfayı bekleyin. MTU kanalı şu anda resmi NodeLane yapay zekâ ile yeniden çizim modunu değil, yalnızca standart çeviriyi desteklemektedir.",
-          "Geçerli sayfa önceliklidir ve bunu sonraki üç sayfa takip eder. Görüntüler aynı MTU kanalında teker teker çalıştırılır. Orijinale geri dönün veya okuma konumunuzu kaybetmeden yan yana karşılaştırın. Okuyucu ve sayfa içi çeviri aynı seçilen kanalı kullanır.",
+          "Yerel çizgi roman içe aktarın, EPUB, OPDS veya desteklenen bir site açın. Hedef dili seçip normal çeviriyi açın. Güncel uzantı hem resmî kanalda hem MTU’da normal çeviri kullanır.",
+          "Geçerli ve yakındaki görseller sınırlı pencerede öncelik alır; aynı MTU kanalında görseller tek tek başlatılır. Yeni çizgi roman orijinal olarak açılır ve otomatik çeviri varsayılan olarak kapalıdır. Konumu kaybetmeden karşılaştırın; okuyucu ve sayfa çevirisi seçilen kanalı kullanır.",
           "Bir sayfa başarısız olursa manuel olarak yeniden denemeden önce bildirilen sorunu çözün. Bir sayfayı kapatmak veya bağlantıyı kaybetmek MTU'nin hesaplamayı durdurduğunu kanıtlamaz. Hizmet hala meşgulken tekrarlanan gönderimlerden kaçının."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Önceki bir bağlantı artık süresi dolmuş bir oturum açma bilgisini rapor ediyor",
-              "Kanal ayarlarında Yeniden Bağlan'ı seçin. Aynı hizmet adresi ve kullanıcı adı için parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Yalnızca belirteç saklayan eski sürüm ayarlarında, ilk yeniden bağlantıda parolayı bir kez girmeniz gerekir. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Uzantı önceki çeviriyi sessizce yeniden göndermez."
+              "Kanal ayarlarında Yeniden Bağlan'ı seçin. Aynı hizmet adresi ve kullanıcı adı için parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Yalnızca belirteç saklayan eski sürüm ayarlarında, ilk yeniden bağlantıda parolayı bir kez girmeniz gerekir. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Uzantı önceki çeviriyi sessizce yeniden göndermez. Parolayı kaydetmek ve alanı boş bırakarak yeniden bağlanmak için uzantı 0.10.2 veya üzeri gerekir; eski sürümlerde her yeniden bağlantıda parola girilmelidir."
             ],
             [
               "Bağlandı ancak çeviri beklemeye devam ediyor",
@@ -145,11 +145,11 @@ export const localTranslationGuides: Guide[] = [
   {
     "slug": "local-manga-translator",
     "title": "Tarayıcıda okumak için yerel bir manga çevirmeni seçme",
-    "description": "manga-translator-ui'yi bir tarayıcı çizgi roman okuyucusu ile kullanın: yerel manga çevirisini, donanımı ve API maliyetlerini, gizliliği, çevrimdışı gereksinimleri ve CBZ ve PDF okuma desteğini anlayın.",
+    "description": "manga-translator-ui’yi tarayıcı okuyucusuna bağlayın: yerel çizgi romanlar, EPUB ve OPDS, donanım ve API maliyetleri, gizlilik ve çevrimdışı çeviri koşulları.",
     "category": "Yerel çeviri kılavuzu",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Yerel çizgi roman okuması",
-              "CBZ / ZIP, CBR / RAR, PDF veya desteklenen DRM içermeyen MOBI dosyalarını tarayıcıya aktarın. Orijinalleri okumak için çeviri hizmetine gerek yoktur."
+              "CBZ/ZIP, CBR/RAR, PDF, desteklenen DRM’siz MOBI veya EPUB içe aktarın. Orijinaller çeviri hizmeti olmadan okunur; EPUB içinde yalnızca gömülü bitmap görseller çevrilir."
             ],
             [
               "Yerel bir MTU hizmeti",
@@ -213,8 +213,8 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Uzatma modları",
-              "Şu anda yalnızca standart çeviri",
-              "Hesap erişimine bağlı olarak standart çeviri ve yapay zeka yeniden çizimi"
+              "Normal çeviri",
+              "Uzantıda normal çeviri; AI yeniden çizim yalnızca web çalışma alanında uygun haklarla"
             ],
             [
               "Maliyetler",

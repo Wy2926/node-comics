@@ -20,11 +20,11 @@ const copy: HomeCopy = {
     "Baca dan terjemahkan manga.",
     "Langsung di browser."
   ],
-  "description": "Baca manga dengan terjemahan AI di Chrome, Edge dan Firefox. Buka situs web yang didukung atau file CBZ, CBR, PDF, dan MOBI tanpa DRM milik Anda sendiri, dan bandingkan setiap halaman terjemahan dengan halaman aslinya.",
+  "description": "Baca dan terjemahkan manga di Chrome, Edge, dan Firefox. Buka komik lokal dan EPUB, Google Drive, pustaka OPDS, atau situs yang didukung. Terjemahkan halaman dan area terlihat sambil tetap dapat melihat aslinya.",
   "install": "Dapatkan ekstensi",
   "seeReader": "Jelajahi pembaca",
   "readerPath": "Baca komik dengan ekstensi",
-  "readerAccess": "Baca dokumen asli lokal gratis, tanpa akun. Terjemahan resmi menggunakan kuota akun Anda; Anda juga dapat menghubungkan layanan lokal Anda sendiri.",
+  "readerAccess": "Baca gambar asli lokal gratis tanpa akun. Terjemahan resmi memakai kuota akun; manga-translator-ui sendiri tidak memerlukan akun NodeLane atau kuota resmi.",
   "webAccess": "Coba sebagai tamu, atau masuk untuk menggunakan kuota akun Anda. Ruang kerja gambar menunjukkan penggunaan yang tersedia.",
   "desktop": "Dirancang untuk membaca di desktop",
   "popupAlt": "NodeLane Comics munculan toolbar dengan bahasa Inggris dipilih dan tombol Terjemahkan tab saat ini.",
@@ -68,16 +68,16 @@ const copy: HomeCopy = {
   "stepsIntro": "Instal ekstensi, tambahkan komik, dan baca sesuai keinginan Anda.",
   "steps": [
     [
-      "Instal ekstensi",
-      "Instal dari toko Chrome atau Firefox, atau dapatkan paket Edge."
+      "Pasang ekstensi",
+      "Pasang dari toko Chrome atau Firefox, atau unduh paket Edge."
     ],
     [
-      "Impor atau tambahkan komik",
-      "Impor file atau komik lokal dari Google Drive, atau tambahkan komik dari situs web yang didukung."
+      "Buka sumber Anda",
+      "Impor file lokal, pilih komik di Google Drive, hubungkan OPDS, atau tambahkan situs yang didukung."
     ],
     [
-      "Terjemahkan kapan pun Anda mau",
-      "Baca dokumen asli tanpa akun. Pilih layanan terjemahan dan bandingkan dengan aslinya saat Anda membaca."
+      "Baca dan terjemahkan",
+      "Komik baru dibuka sebagai gambar asli. Pilih saluran resmi atau MTU dan aktifkan terjemahan saat diperlukan."
     ]
   ],
   "compareEyebrow": "LIHAT LEBIH DEKAT",
@@ -87,7 +87,7 @@ const copy: HomeCopy = {
   "compareLink": "Cara kerja terjemahan",
   "readerEyebrow": "ENAM TAMPILAN. JELAJAHI ISINYA.",
   "readerTitle": "Komik berikutnya. Halaman berikutnya.",
-  "readerBody": "Temukan cerita baru, tambahkan ke rak Anda, dan simpan dalam cache untuk dibaca secara offline. Jelajahi antarmuka sebenarnya dari ikhtisar proyek.",
+  "readerBody": "Temukan komik, hubungkan sumber Anda, dan lanjutkan dari posisi tersimpan. Simpan bab dari situs yang didukung ke cache terlebih dahulu untuk membaca offline.",
   "galleryLabels": [
     "Komik saya",
     "Temukan komik",
@@ -97,12 +97,12 @@ const copy: HomeCopy = {
     "Asli dan terjemahan"
   ],
   "galleryBodies": [
-    "Impor, cari, dan kelola komik, lalu lanjutkan dari bagian terakhir yang Anda tinggalkan.",
-    "Jelajahi grafik, baca sinopsis, periksa peringkat dan judul alternatif, dan temukan komik Anda berikutnya.",
-    "Telusuri situs web berdasarkan judul atau judul alternatif, atau terjemahkan judul tersebut sebelum memilih sumber.",
-    "Lacak penggunaan cache dan penyimpanan bab, dan jeda atau lanjutkan kapan pun Anda membutuhkannya.",
-    "Buka direktori bab untuk memeriksa bahasa, jumlah halaman, cache, dan status membaca.",
-    "Bandingkan dokumen asli dan terjemahan secara berdampingan, atau kembali ke tampilan asli."
+    "Buka file lokal dan sumber terhubung, cari komik di rak, dan lanjutkan dari posisi tersimpan.",
+    "Jelajahi rekomendasi, deskripsi, penilaian, dan judul alternatif untuk memilih cerita berikutnya.",
+    "Cari judul di berbagai situs yang didukung dan pilih sumbernya.",
+    "Simpan semua bab dalam bahasa yang dipilih, jeda, dan lengkapi unduhan. Menutup halaman tugas menjeda rencana penyimpanan cache.",
+    "Lihat bab, bahasa, halaman, dan status cache; sesuaikan tampilan pembaca.",
+    "Bandingkan gambar asli dan terjemahan berdampingan atau kembali ke aslinya tanpa kehilangan posisi."
   ],
   "galleryAlt": [
     "Antarmuka perpustakaan komik bahasa Inggris dan kemajuan membaca.",
@@ -117,32 +117,42 @@ const copy: HomeCopy = {
   "galleryName": "Jelajahi tangkapan layar ekstensi",
   "screenshotNote": "Tangkapan layar nyata yang dibagikan dengan ikhtisar proyek, ditampilkan dalam bahasa Inggris. Buka tangkapan layar apa pun untuk melihat aslinya secara lengkap. Fitur mungkin berbeda menurut versi; karya seni komik milik pemiliknya masing-masing.",
   "sourcesEyebrow": "DARI FILE ANDA ATAU WEB",
-  "sourcesTitle": "Tambahkan komik yang boleh Anda akses.",
+  "sourcesTitle": "File Anda, pustaka, dan situs yang didukung.",
   "sources": [
     [
-      "File komik Anda",
-      "Impor arsip dan dokumen komik yang didukung ke rak Anda. Baca yang asli secara lokal, tanpa masuk.",
-      "Impor komik lokal"
+      "Komik lokal dan EPUB",
+      "CBZ/ZIP, CBR/RAR, PDF, MOBI tanpa DRM yang didukung, dan EPUB. Di EPUB, hanya gambar bitmap tertanam yang diterjemahkan.",
+      "Format dan pembacaan lokal"
     ],
     [
-      "Situs web yang didukung",
-      "Tambahkan tautan komik dari situs yang didukung. Impor situs web menggunakan adaptor khusus; dukungan bervariasi menurut situs.",
-      "Lihat petunjuk impor situs web"
+      "Google Drive",
+      "Pilih CBZ/ZIP atau MOBI tanpa DRM yang didukung dari Google Drive Anda. Format lokal lainnya tidak didukung di sini.",
+      "Cara membuka file Anda"
+    ],
+    [
+      "Pustaka OPDS",
+      "Hubungkan beberapa pustaka, telusuri katalog, dan cari buku. Baca dengan pengambilan data sesuai kebutuhan atau pilih mengunduh seluruh file.",
+      "Menghubungkan pustaka jarak jauh"
+    ],
+    [
+      "Situs yang didukung",
+      "Temukan dan tambahkan komik melalui adaptor situs. Tanpa adaptor, impor tidak tersedia, tetapi gambar web yang dapat diakses bisa diterjemahkan di halaman.",
+      "Terjemahan di halaman web"
     ]
   ],
   "modesEyebrow": "TERJEMAHKAN SAAT ANDA MAU",
-  "modesTitle": "Dua cara membaca lintas bahasa.",
+  "modesTitle": "Terjemahan biasa. Pilih saluran Anda.",
   "modes": [
     [
-      "Terjemahan standar",
-      "Mendeteksi dan menerjemahkan teks, lalu menempatkannya kembali ke halaman dengan perbaikan latar pada area terkait."
+      "Saluran resmi NodeLane",
+      "OCR, terjemahan teks, pemulihan latar, dan tata letak tanpa menyiapkan server. Memerlukan akun NodeLane; hak akses dan kuota akun berlaku."
     ],
     [
-      "Gambar ulang AI",
-      "Menggunakan model gambar untuk menerjemahkan dan menggambar ulang halaman. Detail dalam ilustrasi juga dapat berubah."
+      "manga-translator-ui Anda",
+      "Hubungkan layanan MTU sendiri tanpa akun NodeLane dan kuota resmi. Anda dapat menyimpan beberapa profil; hanya saluran yang dipilih digunakan pada satu waktu."
     ]
   ],
-  "controlNote": "Komik baru dibuka di tampilan aslinya. Pilih mode terjemahan saat Anda siap.",
+  "controlNote": "Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default. Saat diaktifkan, gambar saat ini dan yang berdekatan diproses dalam jendela terbatas. Gambar ulang AI hanya tersedia di ruang kerja gambar web sesuai hak akses akun.",
   "privacyTitle": "Ketahui cara halaman Anda diproses.",
   "privacyBody": "Terjemahan resmi mengirimkan gambar yang dipilih ke server; dokumen asli dihapus setelah tugas selesai, gagal, atau dibatalkan. Hasil akun pribadi dipertahankan sementara permintaan yang valid tetap ada; Hasil server tamu disimpan selama 24 jam setelah tugas berakhir, dan terjemahan yang disimpan secara lokal tidak terpengaruh oleh batas tersebut. Saat Anda menghubungkan layanan terjemahan lokal, layanan tersebut menentukan pemrosesan dan retensi gambar.",
   "privacy": "Kebijakan privasi",

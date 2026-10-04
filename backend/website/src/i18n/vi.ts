@@ -6,8 +6,8 @@ export default {
     "seoChangelogTitle": "Nhật ký cập nhật tiện ích dịch manga",
     "seoAboutTitle": "Giới thiệu về Trình dịch Manga & Trình đọc truyện tranh của chúng tôi",
     "seoHelpTitle": "Khắc phục sự cố về dịch thuật và tiện ích mở rộng Manga",
-    "seoFaqTitle": "Câu hỏi thường gặp về dịch manga: Cài đặt, tệp và hạn mức",
-    "seoGuidesTitle": "Hướng dẫn dịch manga và đọc CBZ, PDF",
+    "seoFaqTitle": "FAQ dịch truyện: định dạng, OPDS, vùng chọn và ngoại tuyến",
+    "seoGuidesTitle": "Hướng dẫn dịch truyện, EPUB, OPDS và đọc ngoại tuyến",
     "features": "Tính năng",
     "pricing": "Bảng giá",
     "guides": "Hướng dẫn",
@@ -35,7 +35,7 @@ export default {
     "artNote": "Ảnh chụp màn hình sản phẩm & hình minh họa AI gốc · Tác phẩm nghệ thuật truyện tranh thuộc về chủ sở hữu tương ứng",
     "ogAlt": "Bản gốc NodeLane Comics minh họa manga bên bờ biển",
     "heroTitle": "Vượt qua ngôn từ. Bước vào câu chuyện.",
-    "heroDescription": "Cung cấp cho manga yêu thích của bạn một phiên bản mà bạn có thể hiểu được. Đọc và dịch truyện tranh trên web và bộ sưu tập cục bộ của bạn, mỗi lần một trang.",
+    "heroDescription": "Đọc truyện từ tệp cục bộ, Google Drive, thư viện OPDS và website được hỗ trợ ngay trong trình duyệt. Dịch ảnh khi cần, so sánh bản gốc và tiếp tục nơi đã dừng.",
     "heroEyebrow": "TRANG TIẾP THEO, BẰNG NGÔN NGỮ CỦA BẠN",
     "freeStart": "Bắt đầu đọc miễn phí",
     "seeHow": "Xem cách hoạt động",
@@ -43,23 +43,29 @@ export default {
     "heroCaption": "Tác phẩm nghệ thuật AI gốc cho NodeLane Comics",
     "heroAlt": "Manga gốc: một du khách chờ đợi trên sân ga bên bờ biển",
     "nextStop": "ĐIỂM ĐẾN TIẾP THEO / MỘT THẾ GIỚI MỚI",
-    "featureHeading": "Dịch truyện tranh. Đọc và so sánh bản gốc.",
-    "featureDescription": "Dịch từng trang truyện trên các website được hỗ trợ và trong tệp cục bộ, đối chiếu bản gốc và giữ nguyên vị trí đọc. Khám phá dịch thông thường, vẽ lại bằng AI và đọc CBZ, CBR, PDF cùng MOBI không có DRM.",
+    "featureHeading": "Từ thư viện của bạn đến trang web đang mở",
+    "featureDescription": "Mở tệp truyện và EPUB, kết nối OPDS hoặc dịch ảnh và vùng chọn trên web. Chọn dịch thông thường qua NodeLane hoặc MTU tự triển khai; vị trí đọc và nội dung đã lưu nằm trong trình duyệt này.",
     "featureTitles": [
-      "Bản dịch theo sau bài đọc của bạn",
-      "Hai cách để đọc cùng một trang",
-      "Một chương mới cho bộ sưu tập của bạn"
+      "Truyện cục bộ và EPUB",
+      "Thư viện OPDS",
+      "Khám phá và tìm trên website",
+      "Dịch ảnh và vùng chọn trên web",
+      "Chọn kênh dịch",
+      "Đọc ngoại tuyến và tùy chỉnh"
     ],
     "featureBodies": [
-      "Chọn dịch để xử lý ảnh hiện tại và ba ảnh tiếp theo khi đọc. Vị trí đọc được giữ nguyên khi kết quả xuất hiện.",
-      "Dùng dịch thông thường để đọc hằng ngày hoặc thử vẽ lại bằng AI để có cách hiển thị khác. Bạn luôn có thể quay về bản gốc chỉ bằng một lần nhấp.",
-      "Chọn CBZ/ZIP, CBR/RAR, PDF hoặc MOBI không có DRM được hỗ trợ để nhập và đọc ngay. Mỗi tệp là một bộ truyện; không hỗ trợ nhập ảnh rời."
+      "Nhập CBZ/ZIP, CBR/RAR, PDF, MOBI không DRM và EPUB. EPUB giữ nguyên văn bản; chỉ ảnh nằm trong sách được dịch.",
+      "Kết nối nhiều thư viện OPDS để duyệt, tìm kiếm và đọc theo nhu cầu. Nguồn hỗ trợ có thể đồng bộ tiến độ; nếu đọc từng phần đáng tin cậy, không cần tải cả sách trước.",
+      "Khám phá bảng xếp hạng, tóm tắt và tên khác trên AniList; tìm website được hỗ trợ theo tên tác phẩm hoặc tên đã dịch.",
+      "Dịch tab hiện tại, ảnh được nhấp chuột phải hoặc vùng chữ nhật trên màn hình. Khởi động bằng phím tắt của trình duyệt và tùy chỉnh phím thao tác đọc, dịch trên web.",
+      "Tiện ích chỉ cung cấp dịch thông thường. Chọn NodeLane hoặc manga-translator-ui tự triển khai; MTU không cần tài khoản NodeLane và không dùng hạn mức chính thức.",
+      "Lưu toàn bộ chương từ website theo ngôn ngữ đã chọn, tạm dừng, tiếp tục và bổ sung phần thiếu. Điều chỉnh hướng đọc, thu phóng, nền, giao diện và ngôn ngữ."
     ],
     "ribbon": [
-      "Dịch thông thường và vẽ lại bằng AI",
-      "Truyện trên web và trong tệp cục bộ",
-      "Luôn có thể xem bản gốc",
-      "Giữ nguyên vị trí đọc"
+      "Dịch thông thường·kênh tùy chọn",
+      "Tệp·Drive·OPDS·website",
+      "Luôn có bản gốc để so sánh",
+      "Tiếp tục vị trí đã đọc"
     ],
     "compareTitle": "Hiểu đoạn hội thoại. Giữ cảm giác.",
     "compareDescription": "Không nhảy giữa manga của bạn và cửa sổ dịch. Đặt các từ trở lại hình ảnh và ở lại với các nhân vật.",
@@ -81,12 +87,12 @@ export default {
     "month": "tháng",
     "freeBenefits": [
       "30 trang dịch thông thường mỗi ngày",
-      "Đọc truyện trên web và trong tệp cục bộ",
+      "Đọc tệp cục bộ, Drive, OPDS và website tương thích",
       "Đối chiếu bản gốc và giữ nguyên vị trí đọc",
       "Truy cập kết quả hiện có còn hợp lệ",
       "Tối đa 10 ảnh dịch mới trong mỗi khoảng 60 giây trượt"
     ],
-    "freeNote": "Vẽ lại bằng AI trên gói Miễn phí yêu cầu trang khuyến mại còn hợp lệ. Hạn mức hằng ngày được đặt lại theo múi giờ Asia/Shanghai và phần chưa dùng không được cộng dồn.",
+    "freeNote": "Hạn mức ngày đặt lại theo giờ Asia/Shanghai, không cộng dồn. Tiện ích cung cấp dịch thông thường; chế độ khác trong công cụ dịch ảnh website tùy quyền thực tế của tài khoản.",
     "quotaNote": "Một phiên bản hình ảnh được tạo thành công ở chế độ và ngôn ngữ đã chọn được tính là một trang. Yêu cầu trùng lặp và sử dụng lại kết quả hợp lệ không bị tính phí hai lần. Một bản dịch mới rõ ràng sử dụng quyền hiện tại. Tổng số không giới hạn vẫn phải tuân theo các giới hạn về tốc độ, hình ảnh và dung lượng dịch vụ ngắn hạn; không có tốc độ hoàn thành được đảm bảo.",
     "downloadTitle": "Cài đặt tiện ích mở rộng dịch truyện tranh manga của bạn",
     "downloadDescription": "Nhận NodeLane Comics cho Chrome, Edge hoặc Firefox. Mở Cửa hàng trực tuyến Chrome hoặc Tiện ích bổ sung Firefox hoặc tải xuống gói trình duyệt. Danh sách cửa hàng Edge đang được xem xét.",
@@ -104,16 +110,16 @@ export default {
     "downloadXpi": "Tải XPI đã ký",
     "storeHeading": "Liên kết cửa hàng trình duyệt",
     "storeNote": "Danh sách Edge đang được xem xét; hãy sử dụng gói Edge ZIP ngay bây giờ. Cài đặt Firefox từ cửa hàng của nó hoặc với XPI đã ký. Phản hồi:",
-    "guidesTitle": "Dịch truyện tranh và hướng dẫn đọc truyện tranh cục bộ",
-    "guidesDescription": "Tìm hiểu cách dịch truyện tranh trong trình duyệt của bạn, mở các tệp CBZ, CBR, PDF và MOBI, so sánh bản gốc tiếng Nhật, khắc phục sự cố dịch thuật và hiểu quyền riêng tư của hình ảnh.",
+    "guidesTitle": "Hướng dẫn theo nguồn và nhu cầu đọc",
+    "guidesDescription": "Tìm hiểu truyện cục bộ và EPUB, Google Drive, OPDS, dịch trên web và vùng chọn, kênh dịch, lưu ngoại tuyến và quyền riêng tư hình ảnh.",
     "contents": "Nội dung trang này",
     "editor": "NodeLane Comics nhóm biên tập",
     "updated": "Cập nhật",
     "related": "Đọc tiếp",
     "faqTitle": "Câu hỏi thường gặp về tiện ích mở rộng trình dịch truyện tranh",
-    "faqDescription": "Câu trả lời về cài đặt Chrome, Edge và Firefox, bản dịch truyện tranh miễn phí, tệp CBZ và PDF, các trang web được hỗ trợ, bản dịch cục bộ, quyền riêng tư và hủy bỏ hình ảnh.",
+    "faqDescription": "Giải đáp cài đặt trình duyệt, định dạng, tiến độ OPDS, dịch ảnh EPUB, vùng chọn, đọc ngoại tuyến, hạn mức NodeLane và dịch vụ tự triển khai.",
     "helpTitle": "Trợ giúp dịch thuật và mở rộng manga",
-    "helpDescription": "Khắc phục sự cố tải hình ảnh manga, bản dịch bị đình trệ, quyền và đăng nhập. Tìm hướng dẫn cài đặt và truyện tranh cục bộ hoặc liên hệ với bộ phận hỗ trợ NodeLane Comics.",
+    "helpDescription": "Kiểm tra lỗi lấy ảnh, truy cập OPDS, chờ bản dịch, quyền website và đăng nhập. Xem hướng dẫn đọc, dịch cục bộ hoặc liên hệ hỗ trợ.",
     "contactTitle": "Mọi phản hồi đều xứng đáng được đọc kỹ.",
     "videoTutorials": "Video hướng dẫn",
     "githubSource": "Xem nguồn trên GitHub",
@@ -122,8 +128,8 @@ export default {
     "contactDescription": "Sử dụng tùy chọn phản hồi trên mỗi trang trong tiện ích mở rộng để biết chất lượng bản dịch. Đối với các vấn đề khác, hãy gửi email cho chúng tôi kèm theo trình duyệt, phiên bản tiện ích mở rộng, các bước và thông báo lỗi của bạn. Không gửi mật khẩu, mã thông báo, chi tiết thẻ thanh toán, URL đã ký hoặc toàn bộ truyện tranh mà bạn không có quyền chia sẻ.",
     "emailButton": "Gửi email",
     "aboutTitle": "Về NodeLane Comics",
-    "aboutDescription": "NodeLane Comics là một dịch giả truyện tranh và tiện ích mở rộng trình đọc truyện tranh cho Chrome, Edge và Firefox, với tính năng đọc trên web và cục bộ cũng như so sánh bản gốc. Nó không lưu trữ một danh mục truyện tranh.",
-    "aboutBody": "NodeLane Comics kết hợp dịch ảnh, đọc tệp cục bộ và tìm ảnh trên web trong một tiện ích trình duyệt. Chúng tôi muốn bạn ít phải chuyển cửa sổ và tập trung hơn vào tác phẩm. AI có thể mắc lỗi, vì vậy việc giữ bản gốc, có quy tắc rõ ràng và tôn trọng người sáng tạo rất quan trọng. Chúng tôi không cung cấp danh mục truyện, bán tác phẩm hay vượt qua tường phí, yêu cầu đăng nhập hoặc DRM. Chỉ sử dụng nội dung bạn có quyền truy cập và xử lý.",
+    "aboutDescription": "Tiện ích đọc truyện và dịch ảnh cho Chrome, Edge, Firefox; hỗ trợ tệp cục bộ, Google Drive, OPDS, website được tích hợp và vùng chọn trên web.",
+    "aboutBody": "NodeLane Comics kết hợp kệ sách, trình đọc truyện và EPUB, thư viện từ xa và dịch ảnh web trong một tiện ích. Bắt đầu từ tệp của bạn hoặc nguồn có quyền truy cập, chọn dịch thông thường qua NodeLane hay dịch vụ riêng và so sánh bản gốc. Bản dịch có thể sai. Chúng tôi không cung cấp hay bán truyện, không vượt giới hạn trả phí, đăng nhập hoặc DRM.",
     "changelogTitle": "NodeLane Comics ghi chú phát hành",
     "changelogDescription": "Theo dõi các cập nhật của dịch giả manga, hỗ trợ trang web mới, khả năng tương thích trình duyệt và sửa lỗi đọc. Chrome, Edge và Firefox phê duyệt cửa hàng có thể khác nhau; kiểm tra phiên bản đã cài đặt của bạn.",
     "rss": "Theo dõi cập nhật qua RSS",
@@ -132,12 +138,12 @@ export default {
     "callbackTitle": "Mở thẻ đọc của bạn.",
     "callbackDescription": "Bạn sẽ quay lại tài khoản của mình khi đăng nhập hoàn tất.",
     "noscript": "Cần có JavaScript để đăng nhập tài khoản. Các trang sản phẩm, giá cả và hướng dẫn hoạt động mà không cần đến nó.",
-    "seoHomeTitle": "Tiện ích mở rộng trình dịch truyện tranh và trình đọc truyện tranh AI | NodeLane Comics",
+    "seoHomeTitle": "Dịch truyện, đọc EPUB và OPDS | NodeLane Comics",
     "heroLines": [
       "Ngoài lời nói.",
       "Vào câu chuyện."
     ],
-    "seoFeaturesTitle": "Tính năng dịch truyện tranh và đọc truyện tranh",
+    "seoFeaturesTitle": "Tính năng đọc truyện, EPUB, OPDS và dịch ảnh web",
     "seoPricingTitle": "Dịch truyện tranh miễn phí và các gói Lite",
     "seoDownloadTitle": "Dịch truyện tranh cho Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
@@ -148,30 +154,31 @@ export default {
     "guides": [
 {
   "slug": "manga-translation",
+        "updated": "2026-10-04",
   "minutes": 4,
-  "title": "Cách dịch truyện tranh trong trình duyệt của bạn",
-  "description": "Từ cài đặt tiện ích mở rộng đến kiểm tra trang dịch đầu tiên của bạn: hướng dẫn thực tế để khám phá và đọc hình ảnh trên web.",
+  "title": "Đọc truyện và dịch ảnh, vùng chọn trong trình duyệt",
+  "description": "Tìm hiểu nguồn, EPUB, dịch trên web và vùng chọn, kênh dịch cùng phím tắt để đọc và so sánh bản gốc.",
   "category": "Bắt đầu",
   "sections": [
     {
-      "title": "Tại sao dịch hình ảnh lại khác",
+      "title": "Chọn nguồn và kênh dịch",
       "paragraphs": [
-        "Bản dịch trình duyệt thông thường xử lý văn bản trang web. Lời thoại trong manga thường là một phần của hình ảnh nên cần xử lý hình ảnh và sắp xếp văn bản. NodeLane Comics kết hợp bản dịch và trình đọc trong một tiện ích mở rộng.",
-        "Cài đặt thông qua cửa hàng trình duyệt thích hợp, ghim tiện ích mở rộng và mở truyện tranh mà bạn có quyền truy cập. Trang web và tiện ích mở rộng sử dụng cùng một dịch vụ nhận dạng và lợi ích tài khoản."
+        "Truyện cục bộ, Google Drive, OPDS và website tương thích dùng chung kệ và trình đọc. EPUB giữ văn bản nguyên gốc và chỉ dịch ảnh trong sách. Dịch trên website khác không đưa trang vào kệ.",
+        "Cài tiện ích và mở tác phẩm bạn có quyền xử lý. Dịch thông thường qua NodeLane cần đăng nhập, dùng cùng hạn mức với website. MTU dùng tài khoản và dịch vụ riêng."
       ]
     },
     {
-      "title": "Khám phá, kiểm tra, sau đó đọc",
+      "title": "Ảnh web và vùng chọn",
       "paragraphs": [
-        "Trên trang web có bộ chuyển đổi chuyên dụng, hãy nhấp vào Bắt đầu đọc để mở trực tiếp trình đọc. Các trang web khác có thể sử dụng tab hiện tại Dịch nhưng không thể nhập vào thư viện. Cấp quyền cho trang web và máy chủ lưu trữ hình ảnh khi cần thiết. Nội dung nguồn ở chế độ chỉ đọc; không có lựa chọn hình ảnh, biểu mẫu siêu dữ liệu hoặc phân công chương.",
-        "Sau khi bạn chọn bản dịch, nó sẽ hoạt động trên hình ảnh hiện tại và ba hình ảnh tiếp theo. Việc phát hiện các URL hình ảnh không có nghĩa là toàn bộ chương đã được tải xuống: tải chậm, thay đổi điều hướng và CDN riêng biệt có thể ảnh hưởng đến việc truy xuất."
+        "Website có bộ điều hợp mở thẳng vào trình đọc. Trang HTTP/HTTPS khác có dịch cả tab, ảnh nhấp chuột phải hoặc vùng chữ nhật. Quyền website được khai báo khi cài và vẫn kiểm tra quyền hiện tại của trình duyệt.",
+        "Ảnh hiện tại được ưu tiên, bổ sung vùng lân cận có giới hạn mà không tự cuộn hoặc thu thập cả chương. Dịch vùng chỉ dùng phần màn hình đã chọn. Đặt phím khởi động trong trình duyệt và tùy chỉnh phím đọc, thao tác web trong tiện ích."
       ]
     },
     {
-      "title": "Giữ nguyên bản gốc",
+      "title": "Giữ vị trí và so sánh bản gốc",
       "paragraphs": [
-        "Khi có bản dịch, vị trí đọc của bạn được giữ nguyên. Chuyển về bản gốc để có đoạn hội thoại không rõ ràng, văn bản nhỏ hoặc hiệu ứng âm thanh. AI có thể bỏ qua hoặc hiểu sai nội dung; cách diễn đạt trôi chảy không phải là bằng chứng về tính chính xác.",
-        "Một trang bị lỗi không chặn các trang khác. Sử dụng phản hồi trên mỗi trang khi có sự cố. Việc yêu cầu một bản dịch mới một cách rõ ràng sẽ tạo ra một phiên bản mới và sử dụng quyền có liên quan."
+        "Khi kết quả xuất hiện hoặc chuyển bản gốc, vị trí đọc được giữ. Kiểm tra chữ nhỏ hay câu khó hiểu trên nguyên bản; câu dịch trôi chảy không chứng minh độ chính xác.",
+        "Lỗi một ảnh không chặn ảnh khác. Tải lại kết quả và dịch lại là hai thao tác riêng. Chỉ dịch lại rõ ràng khi cần và báo lỗi qua phản hồi từng ảnh."
       ]
     }
   ]
@@ -184,39 +191,39 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Dịch thông thường hoặc vẽ lại bằng AI: bạn nên chọn cái nào?",
-  "description": "So sánh bản dịch truyện tranh OCR thông thường với bản vẽ lại bằng AI, kiểm tra bản gốc và tìm hiểu cách kết nối dịch vụ manga-translator-ui cục bộ. Chọn chế độ và dịch vụ cho việc đọc của bạn.",
+  "title": "Dịch thông thường và chọn kênh: NodeLane hay MTU",
+  "description": "Hiểu dịch ảnh thông thường, hạn mức chính thức, manga-translator-ui và so sánh bản gốc trước khi chọn dịch vụ.",
   "category": "Mẹo dịch thuật",
   "sections": [
     {
-      "title": "Hai quy trình công việc khác nhau",
+      "title": "Tiện ích dùng dịch thông thường",
       "paragraphs": [
-        "Dịch thông thường phát hiện và nhận dạng văn bản, dịch nó bằng mô hình văn bản, làm sạch các vùng văn bản và sắp chữ kết quả. AI redraw cung cấp hình ảnh và ngôn ngữ đích cho mô hình hình ảnh để tạo ra hình ảnh được dịch.",
-        "Không phải lúc nào cũng tốt hơn. Cổ điển tập trung vào các vùng văn bản; vẽ lại có nhiều tự do hơn và có thể thay đổi ký tự, hình nền hoặc đường nét. So sánh các trang đại diện thay vì dựa vào một hình minh họa."
+        "Nhận diện/OCR, dịch văn bản, xóa chữ cục bộ và dàn chữ tạo ảnh dịch. Tiện ích hiển thị bản gốc và bản dịch thông thường, cho phép chuyển hoặc so sánh cạnh nhau.",
+        "Trình đọc, tab, ảnh nhấp chuột phải và vùng chọn dùng chung kênh, ngôn ngữ. EPUB không dịch văn bản, chỉ xử lý ảnh tương thích trong sách."
       ]
     },
     {
-      "title": "Bắt đầu với dịch thông thường để đọc hàng ngày",
+      "title": "Kênh NodeLane và hạn mức",
       "paragraphs": [
-        "Đối thoại rõ ràng và bong bóng thông thường là điểm khởi đầu hữu ích. Chữ viết tay, phối cảnh, văn bản nhỏ và hiệu ứng âm thanh vẫn có thể bị bỏ sót. Kiểm tra tin nhắn kết quả một phần và so sánh với bản gốc.",
-        "Miễn phí bao gồm 30 trang dịch thông thường mỗi ngày. Lite không có giới hạn tổng số trang hàng ngày hoặc hàng tháng, lên tới 1.200 trang mới mỗi giờ và không bao gồm tính năng vẽ lại bằng AI. Các giới hạn về tốc độ, hình ảnh và dung lượng dịch vụ ngắn hạn vẫn được áp dụng."
+        "Chọn NodeLane và đăng nhập để dịch qua dịch vụ chính thức. Kết quả hiển thị từng ảnh, lỗi được xử lý riêng và vị trí đọc không đổi.",
+        "Tài khoản thường có 30 trang dịch thông thường mỗi ngày. Lite không có tổng trần ngày/tháng, tối đa 1.200 yêu cầu mới trong một giờ liên tục. Vẫn có giới hạn tần suất, ảnh và năng lực dịch vụ; không bảo đảm tốc độ hoàn thành."
       ]
     },
     {
-      "title": "Cố gắng vẽ lại một cách có chủ ý",
+      "title": "Dùng MTU tự triển khai",
       "paragraphs": [
-        "Hạn mức vẽ lại được cấp hằng tháng, kể cả với gói năm; phần chưa dùng không được cộng dồn. Tài khoản đủ điều kiện có thể bắt đầu bản dùng thử yêu cầu thẻ được hiển thị cho gói của mình. Đăng ký lại hoặc đổi gói không đặt lại điều kiện dùng thử.",
-        "Các chế độ và ngôn ngữ khác nhau có kết quả riêng biệt. Bạn có thể giữ kết quả thông thường hợp lệ trong khi chờ đợi hoặc vẽ lại và quay lại bản gốc bất cứ khi nào có chi tiết quan trọng."
+        "Nhập địa chỉ gốc, tên người dùng và mật khẩu manga-translator-ui. Lưu nhiều cấu hình nhưng chọn một kênh; không cần tài khoản hoặc hạn mức NodeLane. Sau kết nối thành công, mật khẩu và mã lưu trên thiết bị. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại.",
+        "Bạn tự chạy dịch vụ; tiện ích đặt ngôn ngữ đích, còn lại dùng mặc định máy chủ. Internet và xử lý ảnh tùy cấu hình. Cùng địa chỉ và người dùng có thể kết nối lại bằng mật khẩu đã lưu; thay thông tin cần nhập lại. Gián đoạn không tự gửi lại bản dịch. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
       ]
     },
     {
-      "title": "Sử dụng dịch vụ dịch truyện tranh cục bộ",
+      "title": "Công cụ ảnh trên website",
       "paragraphs": [
-        "Kết nối dịch vụ manga-translator-ui của riêng bạn bằng cách thêm và chọn kênh dịch cục bộ trong cài đặt tiện ích mở rộng. Điều này không yêu cầu tài khoản NodeLane hoặc phụ cấp dịch thuật chính thức. Bạn phải tự mình chạy dịch vụ; yêu cầu mạng, các chế độ khả dụng và xử lý hình ảnh tùy thuộc vào dịch vụ đó."
+        "Website có dịch JPG, PNG, WebP, tải ảnh hoàn chỉnh và lịch sử cục bộ. Vẽ lại bằng AI chỉ dùng khi tài khoản thực tế đủ quyền; đây không phải chế độ tiện ích và không thêm sách vào kệ."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "local-comics",
@@ -226,36 +233,37 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Đọc truyện tranh CBZ, CBR, PDF và MOBI tại cục bộ",
-  "description": "Các định dạng truyện tranh được hỗ trợ, kiểm tra nhập khẩu, các giới hạn MOBI không có DRM và ranh giới giữa đọc cục bộ và dịch trực tuyến.",
+  "title": "Đọc CBZ, CBR, PDF, MOBI và EPUB cục bộ",
+  "description": "Kiểm tra định dạng cục bộ và Drive, dịch ảnh EPUB và khác biệt giữa đọc nguyên bản với dịch chính thức hay tự triển khai.",
   "category": "Đọc cục bộ",
   "sections": [
     {
-      "title": "Biết định dạng tập tin",
+      "title": "Kiểm tra định dạng và nguồn",
       "paragraphs": [
-        "CBZ thường đóng gói hình ảnh trong ZIP; CBR sử dụng RAR. Các trang PDF phải được hiển thị và MOBI chứa các bản ghi sách và hình ảnh tham khảo. Thay đổi phần mở rộng không chuyển đổi một tập tin.",
-        "CBZ/ZIP, CBR/RAR, PDF và hỗ trợ truyện tranh MOBI6/MOBI6+KF8 không có DRM. Không thể nhập ảnh rời. Nhập trang web yêu cầu một bộ chuyển đổi chuyên dụng."
+        "CBZ/ZIP, CBR/RAR là gói ảnh; PDF hiển thị từng trang; MOBI tương thích dùng tham chiếu ảnh trong nội dung. EPUB đọc nguyên văn theo chương. Đổi đuôi tệp không chuyển định dạng.",
+        "Cục bộ có CBZ/ZIP, CBR/RAR, PDF, MOBI không mã hóa và EPUB. Drive có CBZ/ZIP và MOBI không mã hóa. KF8/AZW3 độc lập, sách mã hóa, ảnh rời không hỗ trợ; nhập website cần bộ điều hợp riêng."
       ]
     },
     {
-      "title": "Kiểm tra nhập khẩu",
+      "title": "Đọc MOBI và EPUB",
       "paragraphs": [
-        "Sử dụng một tập tin hoàn chỉnh mà bạn có quyền xử lý. Kiểm tra mật khẩu, hư hỏng hoặc tính năng nén không được hỗ trợ. Sau khi nhập, hãy xác minh bìa, thứ tự chương, hình thu nhỏ và độ rõ của hình ảnh.",
-        "Nội dung nhập MOBI được giới hạn ở 512 MB và 1.500 trang và phải vượt qua kiểm tra cấu trúc. Các tham chiếu hình ảnh cơ thể được hỗ trợ xác định thứ tự; cuốn sách HTML không được thực thi. Có thể đọc được ảnh GIF nhúng nhưng bản dịch sử dụng khung đầu tiên được chuẩn hóa. DRM không bị xóa."
+        "Dùng tệp đầy đủ mà bạn có quyền xử lý, kiểm tra mã hóa, hỏng và nén không tương thích. MOBI tối đa 512 MB,1.500 trang, theo tham chiếu ảnh nội dung; GIF dịch khung đầu. Không gỡ DRM.",
+        "EPUB có mục lục, cỡ chữ, đọc liên tục và khôi phục vị trí. Văn bản và chữ vector không dịch, chỉ ảnh tương thích trong sách được xử lý. Không hỗ trợ DRM hay phông chữ làm rối; script và yêu cầu mạng ngoài bị vô hiệu hóa."
       ]
     },
     {
-      "title": "Nhập cục bộ không phải là dịch ngoại tuyến",
+      "title": "Đọc cục bộ và dịch vụ dịch",
       "paragraphs": [
-        "Phân tích truyện tranh cục bộ và đọc bản gốc diễn ra trong trình duyệt. Bản dịch chính thức tải lên các hình ảnh trang đã chọn để xử lý và lưu trữ kết quả một cách riêng tư. Thay vào đó, bạn có thể chọn dịch vụ manga-translator-ui của riêng mình; cấu hình của nó xác định quyền truy cập mạng và xử lý hình ảnh.",
-        "Thư viện và vị trí đọc sách vẫn ở cục bộ. Việc nhập lại cùng một nội dung trong cùng một tài khoản có thể khớp với các kết quả hợp lệ hiện có. Đây không phải là sự đồng bộ hóa tự động của toàn bộ thư viện hoặc tệp nguồn của bạn."
+        "Phân tích tệp và đọc ảnh, văn bản gốc diễn ra trong trình duyệt, không gửi cả tệp đến dịch vụ dịch. NodeLane nhận ảnh đã chọn; yêu cầu kết nối MTU theo cấu hình dịch vụ riêng.",
+        "Kệ sách và vị trí ở trình duyệt này. OPDS có đọc từng phần tin cậy thì không phải tải cả tệp trước; chỉ nguồn hỗ trợ tiến độ mới đồng bộ. Không phải đồng bộ tự động toàn bộ kệ sách."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "japanese-manga",
+        "updated": "2026-10-04",
   "minutes": 4,
   "title": "Tại sao so sánh bản dịch truyện tranh Nhật Bản với bản gốc?",
   "description": "Đọc đoạn hội thoại dọc, chủ đề ngụ ý và hiệu ứng âm thanh với nhiều ngữ cảnh hơn và ít hiểu lầm hơn.",
@@ -276,9 +284,9 @@ export default {
       ]
     },
     {
-      "title": "Kiểm tra cả từ ngữ và hình ảnh",
+      "title": "Kiểm tra bản dịch, hình và khung liền kề",
       "paragraphs": [
-        "Dịch thông thường và vẽ lại bằng AI có thể tạo ra các kết quả khác nhau. Vẽ lại cũng có thể thay đổi chi tiết hình ảnh. So sánh cách diễn đạt, chữ viết tay và hình nền khi chúng ảnh hưởng đến câu chuyện.",
+        "Dịch thông thường vẫn có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng. Khi nét mặt, chữ viết tay hay nền ảnh ảnh hưởng câu chuyện, hãy so sánh bản gốc và các khung trước, sau.",
         "NodeLane Comics giữ nguyên bản gốc. Bản dịch hạ thấp rào cản hiểu biết mà không lấy đi khả năng xác minh tác phẩm."
       ]
     }
@@ -286,6 +294,7 @@ export default {
 },
 {
   "slug": "translation-troubleshooting",
+        "updated": "2026-10-04",
   "related": [
     "local-translation",
     "local-manga-translator",
@@ -297,30 +306,31 @@ export default {
   "category": "Khắc phục sự cố",
   "sections": [
     {
-      "title": "Xác định giai đoạn",
+      "title": "Kiểm tra bước lỗi và quyền nguồn",
       "paragraphs": [
-        "Không thể tìm nạp hình ảnh, một tác vụ đã gửi vẫn đang được xử lý và một bản dịch rõ ràng không thành công là các trạng thái khác nhau. Đọc tin nhắn trang đầu tiên. Một trang có vấn đề không chặn các trang khác.",
-        "Đối với các sự cố truy xuất, hãy xác nhận hình ảnh mở bình thường trên trang nguồn và kiểm tra quyền của trang/CDN. Việc tải chậm, điều hướng hoặc hạn chế nguồn có thể ảnh hưởng đến quyền truy cập."
+        "Phân biệt lấy ảnh gốc, tiếp nhận tác vụ, lấy kết quả và hiển thị theo thông báo từng ảnh. Lỗi tải bản dịch nên tải lại trước thay vì tạo tác vụ dịch mới.",
+        "Mở ảnh trên website gốc, kiểm tra quyền site/CDN, đăng nhập và giới hạn. Thấy danh mục OPDS không có nghĩa được đọc nội dung. Lỗi một ảnh không dừng việc đọc ảnh khác."
       ]
     },
     {
-      "title": "Giải quyết nhiệm vụ ban đầu trước",
+      "title": "Xác minh yêu cầu cũ và dịch vụ",
       "paragraphs": [
-        "Nhiệm vụ vẫn tồn tại ở phần phụ trợ. Đóng trang hoặc mất kết nối trong thời gian ngắn không có nghĩa là tác vụ đã biến mất. Hãy để tiện ích mở rộng giải quyết trạng thái ban đầu sau khi kết nối lại.",
-        "Nhà cung cấp hình ảnh có thể đã chấp nhận việc vẽ lại trong khi chưa xác định được kết quả. Việc xác minh là ưu tiên hàng đầu; phụ cấp trang có thể được bảo lưu tạm thời. Liên tục tạo các phiên bản mới không phải là cách an toàn để kiểm tra việc hoàn thành."
+        "Tác vụ NodeLane được giữ trên máy chủ. Đóng trang hoặc mất mạng không có nghĩa tác vụ bị xóa. Sau kết nối lại, kiểm tra yêu cầu cũ trước khi thử lại.",
+        "MTU gián đoạn không chứng minh đã ngừng tính toán và không tự khôi phục từ lịch sử. Kiểm tra dịch vụ, sửa nguyên nhân rồi thử lại thủ công. Kết nối lại không tự gửi lại bản dịch."
       ]
     },
     {
-      "title": "Kiểm tra quyền truy cập và báo cáo rõ ràng",
+      "title": "Đăng nhập, ngôn ngữ và báo lỗi",
       "paragraphs": [
-        "Đăng nhập lại nếu ủy quyền hết hạn, xác minh danh sách ngôn ngữ của chế độ và kiểm tra hạn mức hiện tại hoặc hết hạn khuyến mại. Lỗi rõ ràng sẽ giải phóng phần đặt trước liên quan.",
-        "Báo cáo trình duyệt, phiên bản tiện ích mở rộng, các bước, thông báo lỗi và ID tác vụ nếu có. Chỉ sử dụng ảnh chụp màn hình cần thiết, được biên tập lại. Không bao giờ gửi cookie nguồn, mã thông báo hoặc URL hình ảnh đã ký. Liên hệ comics@nodelane.net."
+        "NodeLane hết phiên cần đăng nhập lại; MTU cần kết nối lại trong cài đặt kênh, cập nhật mật khẩu nếu cần. Ngôn ngữ theo danh sách kênh đang dùng, hạn mức theo tài khoản.",
+        "Báo trình duyệt, phiên bản tiện ích, bước thực hiện, lỗi và mã tác vụ cần thiết. Ảnh chỉ giữ phần cần để giải thích và che dữ liệu riêng; không gửi Cookie, mã đăng nhập hay địa chỉ riêng. Liên hệ comics@nodelane.net."
       ]
     }
   ]
 },
 {
   "slug": "comic-reader-privacy",
+        "updated": "2026-10-04",
   "minutes": 4,
   "title": "Phần mở rộng dịch truyện tranh tải lên những gì?",
   "description": "Hiểu các quyền của trang web, phân tích cú pháp cục bộ, tải lên bản dịch, bản gốc tạm thời, kết quả riêng tư và xóa.",
@@ -329,14 +339,14 @@ export default {
     {
       "title": "Quyền và tập tin cục bộ",
       "paragraphs": [
-        "Trang và hình ảnh của nó có thể tồn tại trên các tên miền khác nhau. NodeLane Comics yêu cầu quyền truy cập liên quan khi bạn sử dụng tính năng dịch thuật hoặc khám phá hình ảnh. Nó không tải lên cookie của trang nguồn, mã thông báo đăng nhập hoặc lịch sử duyệt web.",
+        "Quyền website được khai báo trong cấu hình cài tiện ích và kiểm tra theo quyền trình duyệt hiện tại. Bạn có thể giới hạn từng website. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
         "Phân tích truyện tranh cục bộ xảy ra trong trình duyệt. Đặt tệp trên kệ cục bộ của bạn không có nghĩa là tải toàn bộ tệp nguồn lên. Hình ảnh trang có liên quan và thông tin nhiệm vụ sẽ được gửi khi cần dịch."
       ]
     },
     {
       "title": "Dịch và lưu giữ",
       "paragraphs": [
-        "Dịch thông thường sử dụng tính năng nhận dạng, dịch văn bản, dọn dẹp và sắp chữ. Vẽ lại gửi hình ảnh trang tới mô hình hình ảnh. Bản gốc là các tệp tạm thời trên máy chủ trung tâm và các nút điện toán, bị xóa sau khi một tác vụ hoàn thành, bị lỗi hoặc bị hủy. Dịch thông thường giữ các tệp lớp phủ; Vẽ lại bằng AI giữ kết quả đầy đủ. Kết quả vẫn được giữ kín trong khi tài khoản của bạn có yêu cầu hợp lệ. Văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu.",
+        "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả thông thường lưu lớp phủ. AI trong công cụ website khi đủ quyền lưu ảnh đầy đủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
         "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn."
       ]
     },
@@ -349,7 +359,51 @@ export default {
     }
   ]
 },
-...localTranslationGuides
+{
+        "slug": "remote-library",
+        "title": "Thư viện OPDS: kết nối, EPUB và tiến độ đọc",
+        "description": "Kết nối OPDS của bạn và tìm hiểu đọc từng phần, tải toàn bộ, dịch ảnh EPUB, đồng bộ tiến độ và lưu ngoại tuyến.",
+        "category": "Thư viện từ xa",
+        "minutes": 5,
+        "published": "2026-10-04",
+        "updated": "2026-10-04",
+        "related": [
+          "local-comics",
+          "manga-translation",
+          "translation-troubleshooting"
+        ],
+        "sections": [
+          {
+            "title": "Kết nối và quyền truy cập",
+            "paragraphs": [
+              "Thêm tên và địa chỉ danh mục OPDS trong thư viện từ xa. Chọn truy cập khách, HTTPS Basic hoặc địa chỉ có mã theo yêu cầu nguồn. Nhiều kết nối và thông tin đăng nhập được lưu trên thiết bị, không gửi đến máy chủ dịch.",
+              "Kiểm tra quyền với danh mục, bìa và nội dung riêng. Duyệt được danh mục không có nghĩa tải được sách. Đăng nhập, nội dung trả phí, DRM, tài nguyên khác miền hoặc kiểu xác thực chưa hỗ trợ có thể khiến nội dung không đọc được."
+            ]
+          },
+          {
+            "title": "Đọc theo nhu cầu và tải toàn bộ",
+            "paragraphs": [
+              "Danh mục và kết quả tìm kiếm tải khi cần; tác phẩm chỉ được thêm vào kệ khi mở lần đầu. Nếu nguồn hỗ trợ đọc từng phần đáng tin cậy, CBZ/ZIP, MOBI không DRM và EPUB không cần tải toàn bộ trước.",
+              "PDF, CBR và tệp tương thích không có đọc từng phần tin cậy cần xác nhận tải toàn bộ. Tệp chỉ đọc được sau khi lưu và kiểm tra định dạng. Bộ nhớ đệm thông thường hay đọc từng phần không phải lưu cả sách ngoại tuyến."
+            ]
+          },
+          {
+            "title": "Văn bản EPUB và ảnh trong sách",
+            "paragraphs": [
+              "EPUB hiển thị từng chương trong cùng trình đọc, có mục lục, cỡ chữ, đọc liên tục và khôi phục vị trí. Văn bản giữ nguyên; không dịch toàn văn hoặc chụp văn bản để dịch.",
+              "Chỉ ảnh bitmap tương thích trong sách được dịch qua kênh hiện tại; chuyển bản gốc, bản dịch giữ bố cục và vị trí. Không hỗ trợ chữ vector, DRM hay làm rối phông chữ; không chạy script hoặc tải tài nguyên ngoài sách."
+            ]
+          },
+          {
+            "title": "Vị trí cục bộ, đồng bộ và ngoại tuyến",
+            "paragraphs": [
+              "Vị trí đọc lưu trong trình duyệt này. Chỉ đọc và ghi tiến độ khi nguồn cung cấp chức năng đã xác minh; đồng bộ lỗi vẫn giữ vị trí cục bộ. Đọc trước và tải xuống không chủ động gửi tiến độ.",
+              "Muốn đọc ngoại tuyến, lưu tệp tương thích hoàn chỉnh hoặc chủ động lưu ảnh gốc; kiểm tra nội dung đủ và quyền nguồn còn hiệu lực. Kệ sách không tự đồng bộ. Bản dịch đã lưu được dùng lại nhưng dịch mới phụ thuộc yêu cầu mạng của dịch vụ."
+            ]
+          }
+        ]
+      },
+      ...localTranslationGuides
 ],
     "policies": {
       "privacy": {
@@ -367,7 +421,7 @@ export default {
           {
             "title": "Phạm vi và liên hệ",
             "paragraphs": [
-              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 28 tháng 9 năm 2026. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
+              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 4 tháng 10 năm 2026. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
             ]
           },
           {
@@ -388,21 +442,21 @@ export default {
           {
             "title": "Quyền và lưu trữ cục bộ",
             "paragraphs": [
-              "Quyền truy cập vào trang web và máy chủ lưu trữ hình ảnh được yêu cầu khi cần thiết khi bạn chủ động sử dụng các tính năng liên quan. Cookie nguồn của trang web, mã thông báo đăng nhập và lịch sử duyệt web không được tải lên. Phần phụ trợ không ủy quyền các URL truyện tranh tùy ý. Nội dung trang web và hình ảnh là đầu vào không đáng tin cậy.",
-              "Thư viện, vị trí đọc, tùy chọn và dữ liệu cục bộ được nhập trực tiếp trong trình duyệt; phân tích cú pháp là cục bộ và hình ảnh có liên quan sẽ được gửi khi yêu cầu dịch. Thư viện không được đồng bộ hóa tự động. Trang web giữ trạng thái tài khoản và ủy quyền, truy cập và làm mới mã thông báo trong bộ lưu trữ phiên của tab hiện tại. Tiện ích mở rộng có quy tắc lưu trữ phiên riêng. Việc xóa dữ liệu trình duyệt có thể khiến bạn đăng xuất hoặc xóa thông tin đọc cục bộ."
+              "Quyền website được khai báo trong cấu hình cài tiện ích và kiểm tra theo quyền trình duyệt hiện tại. Bạn có thể giới hạn từng website. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
+              "Kệ sách, vị trí đọc, cài đặt và dữ liệu đã nhập nằm trong trình duyệt; toàn bộ kệ không tự đồng bộ. Website giữ thông tin xác thực trong bộ nhớ phiên của tab hiện tại. Sau khi kết nối MTU thành công, mật khẩu và mã được lưu trong kho thông tin đăng nhập cục bộ của tiện ích, xóa cùng kênh. Thông tin OPDS cũng lưu cục bộ. Xóa dữ liệu trình duyệt có thể làm mất đăng nhập, vị trí đọc và cấu hình kết nối. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
             ]
           },
           {
             "title": "Nhà cung cấp dịch vụ và chuyển giao",
             "paragraphs": [
-              "Quá trình xử lý thông thường có thể liên quan đến việc phát hiện/OCR, mô hình văn bản, sửa chữa nền cục bộ và sắp chữ. Nhà cung cấp văn bản xử lý văn bản được nhận dạng cần thiết để dịch; nhà cung cấp vẽ lại xử lý hình ảnh và ngôn ngữ trang. Các nhà cung cấp thực tế được cấu hình trên máy chủ cho nhiệm vụ.",
+              "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Vẽ lại bằng AI trong công cụ website chỉ dùng khi đủ quyền và gửi ảnh cùng ngôn ngữ đích đến nhà cung cấp ảnh. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
               "Hình ảnh dịch sử dụng file riêng tư trên máy chủ trung tâm; văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Các dịch vụ nhận dạng, cơ sở hạ tầng, dịch thuật và thanh toán xử lý dữ liệu khi cần thiết theo chính sách hiện hành của họ. Quá trình xử lý có thể diễn ra bên ngoài khu vực của bạn. Chúng tôi không bán thông tin cá nhân hoặc sử dụng truyện tranh đã gửi để nhắm mục tiêu quảng cáo. Chúng tôi không hứa rằng tất cả các nhà cung cấp sẽ không giữ lại gì hoặc không bao giờ sử dụng dữ liệu để đào tạo; điều này phụ thuộc vào nhà cung cấp và thỏa thuận. Không gửi nội dung nhạy cảm trái phép hoặc không phù hợp."
             ]
           },
           {
             "title": "Giữ lại và xóa",
             "paragraphs": [
-              "Bản gốc là các tệp tạm thời trên máy chủ trung tâm và các nút điện toán, bị xóa sau khi một tác vụ hoàn thành, bị lỗi hoặc bị hủy. Dịch thông thường giữ các tệp lớp phủ; Vẽ lại bằng AI giữ kết quả đầy đủ. Kết quả vẫn được giữ kín trong khi tài khoản của bạn có yêu cầu hợp lệ. Văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu.",
+              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ; AI trong công cụ website khi khả dụng lưu kết quả hoàn chỉnh. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
               "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
               "Đối với các yêu cầu xóa tài khoản hoặc phạm vi rộng hơn, hãy liên hệ với chúng tôi để xác minh danh tính và phạm vi. Hồ sơ giao dịch, kiểm toán hoặc bảo mật có thể cần được lưu giữ để phục vụ các nghĩa vụ dịch vụ, tranh chấp hoặc các yêu cầu hiện hành. Không có thời hạn xóa duy nhất nào được hứa hẹn cho tất cả hồ sơ; câu trả lời sẽ giải thích kết quả và những hạn chế."
             ]
@@ -423,7 +477,7 @@ export default {
           {
             "title": "Dịch vụ và tài khoản",
             "paragraphs": [
-              "NodeLane Comics cung cấp dịch vụ mở rộng, đọc và dịch thuật. Đọc các điều khoản này và chính sách quyền riêng tư trước khi sử dụng; ngừng sử dụng dịch vụ nếu bạn không đồng ý. Cập nhật ngày 20 tháng 9 năm 2026. Trang web cung cấp thông tin sản phẩm, hướng dẫn, tải xuống và quản lý tài khoản, không phải danh mục truyện tranh hay bán truyện tranh.",
+              "NodeLane Comics cung cấp dịch vụ mở rộng, đọc và dịch thuật. Đọc các điều khoản này và chính sách quyền riêng tư trước khi sử dụng; ngừng sử dụng dịch vụ nếu bạn không đồng ý. Cập nhật ngày 4 tháng 10 năm 2026. Trang web cung cấp thông tin sản phẩm, hướng dẫn, tải xuống và quản lý tài khoản, không phải danh mục truyện tranh hay bán truyện tranh.",
               "Sử dụng tài khoản bạn có quyền sử dụng và bảo vệ thông tin xác thực cũng như thiết bị của bạn. Lợi ích và quyền truy cập được xác minh trên máy chủ. Không mạo danh người khác, truy cập hồ sơ riêng tư của họ, tỷ lệ bỏ qua hoặc giới hạn hình ảnh, làm gián đoạn các dịch vụ bằng cách tự động hóa lạm dụng hoặc tấn công sản phẩm và các nhà cung cấp của nó. Việc sử dụng sai có thể dẫn đến hạn chế truy cập."
             ]
           },
@@ -431,7 +485,7 @@ export default {
             "title": "Quyền nội dung và kết quả AI",
             "paragraphs": [
               "Bạn phải có quyền truy cập, tải lên, dịch và xử lý nội dung đã chọn cũng như tuân theo các yêu cầu về trang nguồn và chủ bản quyền. Tiện ích mở rộng không cấp bản quyền hoặc quyền tự động xuất bản hình ảnh đã dịch. Không bỏ qua tường phí, yêu cầu đăng nhập hoặc DRM. Chúng tôi không đảm bảo tính hợp pháp hoặc đầy đủ của nội dung nguồn. Các yêu cầu về bản quyền phải xác định tác phẩm, quyền, vấn đề và thông tin liên hệ.",
-              "AI có thể bỏ sót, dịch sai hoặc đặt sai văn bản; vẽ lại cũng có thể thay đổi tác phẩm nghệ thuật. Kết quả hỗ trợ việc đọc và không thay thế bản gốc hoặc đánh giá chuyên môn. Hình minh họa trang web và so sánh ngôn ngữ là những minh chứng do AI tạo ra, không hứa hẹn về độ chính xác, tốc độ hoặc kết quả trên mỗi hình ảnh. Bạn có thể so sánh bản gốc và gửi phản hồi."
+              "AI có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng; vẽ lại khi khả dụng trên website còn có thể thay đổi hình. Kết quả hỗ trợ đọc, không thay nguyên bản hay đánh giá chuyên môn. Minh họa gốc trên website được tạo bằng AI, còn so sánh dịch là mẫu đã ghi nhận. Không bảo đảm chính xác, tốc độ hay kết quả cho mọi ảnh; bạn có thể so sánh nguyên bản và gửi phản hồi."
             ]
           },
           {
@@ -488,7 +542,7 @@ export default {
       {
         "id": "overview",
         "question": "NodeLane Comics là gì?",
-        "answer": "NodeLane Comics cung cấp tiện ích mở rộng trình đọc truyện tranh và dịch hình ảnh trang web. Đọc truyện tranh trên web hoặc cục bộ trong tiện ích mở rộng hoặc tải hình ảnh JPG, PNG và WebP lên trang web. Hãy thử dịch khách hoặc đăng nhập bằng hạn mức hiện có của bạn, tải xuống kết quả hoàn chỉnh và lưu giữ lịch sử cục bộ. Chúng tôi không cung cấp một danh mục truyện tranh.",
+        "answer": "Tiện ích đọc truyện và EPUB, dịch ảnh cho trình duyệt máy tính. Hỗ trợ tệp cục bộ, Google Drive, OPDS, website được tích hợp và ảnh hoặc vùng chọn trên web. Website có công cụ riêng để dịch JPG, PNG, WebP bằng lượt khách hoặc hạn mức tài khoản, tải ảnh hoàn chỉnh và lưu lịch sử cục bộ. Sản phẩm không cung cấp nội dung truyện.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
@@ -511,32 +565,32 @@ export default {
       },
       {
         "id": "translation-modes",
-        "question": "Tôi nên sử dụng bản dịch manga thông thường hay vẽ lại bằng AI?",
-        "answer": "Dịch thông thường phát hiện văn bản, dịch nó và đặt nó trở lại bằng tính năng sửa chữa nền cục bộ. Vẽ lại bằng AI sử dụng mô hình hình ảnh và có thể thay đổi chi tiết tác phẩm nghệ thuật. Chọn dịch thông thường để đọc hàng ngày, so sánh kết quả với bản gốc và thử vẽ lại khi thích hợp. Kết quả từ hai chế độ được lưu giữ riêng biệt.",
+        "question": "Chọn dịch thông thường qua NodeLane hay MTU thế nào?",
+        "answer": "Tiện ích chỉ dùng dịch thông thường: nhận diện chữ, dịch, xóa chữ cục bộ và dàn chữ. Kênh NodeLane cần đăng nhập và hạn mức tài khoản; MTU dùng dịch vụ riêng nên không cần tài khoản NodeLane. Cả hai đều so sánh được bản gốc. Vẽ lại bằng AI chỉ có trong công cụ ảnh website khi tài khoản đủ quyền, không phải chế độ của tiện ích.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
         "id": "file-formats",
-        "question": "Tôi có thể nhập những tập tin nào?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF và hỗ trợ truyện tranh MOBI6/MOBI6+KF8 không có DRM. Sách KF8/AZW3, EPUB và sách mã hóa độc lập không được hỗ trợ. Không thể nhập ảnh rời. Nhập trang web yêu cầu một bộ chuyển đổi chuyên dụng.",
+        "question": "Tệp cục bộ và Drive hỗ trợ định dạng nào?",
+        "answer": "Cục bộ hỗ trợ CBZ/ZIP, CBR/RAR, PDF, phiên bản MOBI không DRM tương thích và EPUB. Drive hiện hỗ trợ CBZ/ZIP cùng MOBI không DRM. EPUB giữ văn bản gốc, chỉ dịch ảnh trong sách. Không nhập ảnh rời, KF8/AZW3 độc lập hay tệp mã hóa; nhập từ website cần bộ điều hợp riêng.",
         "relatedPath": "/guides/local-comics/"
       },
       {
         "id": "website-permissions",
-        "question": "Tiện ích mở rộng có tải lên cookie trang web hoặc lịch sử duyệt web không?",
-        "answer": "Cookie nguồn của trang web, mã thông báo đăng nhập và lịch sử duyệt web không được tải lên phần phụ trợ dịch thuật. Quyền truy cập trang web và hình ảnh được yêu cầu khi cần thiết. Bản dịch chính thức gửi hình ảnh đã chọn và dữ liệu nhiệm vụ cần thiết để xử lý; xem hướng dẫn về quyền riêng tư để biết chi tiết.",
+        "question": "Có gửi Cookie hoặc lịch sử của website gốc không?",
+        "answer": "Cookie, mã đăng nhập và lịch sử duyệt của website gốc không gửi đến máy chủ dịch. Quyền website được khai báo khi cài tiện ích và kiểm tra theo quyền hiện tại; bạn có thể giới hạn từng website trong trình duyệt. Kết nối MTU yêu cầu quyền địa chỉ dịch vụ. Dịch chỉ gửi ảnh được chọn; dịch vùng chỉ gửi điểm ảnh trong vùng đó.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
         "id": "image-privacy",
         "question": "Hình ảnh có được tải lên hoặc giữ lại không?",
-        "answer": "Bản dịch sẽ gửi hình ảnh trang đã chọn tới nhà cung cấp phụ trợ và các nhà cung cấp có liên quan. Bản gốc là các tệp tạm thời trên máy chủ trung tâm và các nút điện toán, bị xóa sau khi một tác vụ hoàn thành, bị lỗi hoặc bị hủy. Dịch thông thường giữ các tệp lớp phủ; Vẽ lại bằng AI giữ kết quả đầy đủ. Kết quả vẫn được giữ kín trong khi tài khoản của bạn có yêu cầu hợp lệ. Văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng. Cookie nguồn, mã thông báo đăng nhập và lịch sử duyệt web không được tải lên.",
+        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ; AI trong công cụ website khi đủ quyền lưu kết quả đầy đủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Các bản dịch không thành công có sử dụng các trang không?",
-        "answer": "Các trang có thể được đặt trước và giải quyết khi giao hàng thành công. Các lỗi rõ ràng sẽ giải phóng phần đặt trước, cũng như các kết quả thông thường được xác nhận là không có văn bản hoặc nhận dạng một phần với văn bản gốc được giữ lại. Kết quả vẽ lại không xác định được xác minh trước và có thể giữ các trang tạm thời.",
+        "answer": "Tác vụ chính thức giữ hạn mức tạm thời rồi quyết toán khi cung cấp thành công. Lỗi rõ ràng, không có chữ hoặc nhận diện một phần giữ nguyên văn sẽ trả phần đã giữ. Lượt tiếp nhận và giới hạn ngắn hạn tính riêng. Kết quả AI chưa rõ trong công cụ website được xác minh trước, không tự tạo lại. MTU không dùng hạn mức NodeLane nhưng chi phí dịch vụ vẫn áp dụng.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -553,15 +607,33 @@ export default {
       },
       {
         "id": "supported-sites",
-        "question": "Nó có hoạt động trên mọi trang web và ngôn ngữ không?",
-        "answer": "Tính khả dụng phụ thuộc vào cấu trúc trang web, quyền, quyền truy cập hình ảnh và bộ điều hợp. Hỗ trợ ngôn ngữ có thể khác nhau tùy theo chế độ dịch; sử dụng danh sách trong phần mở rộng. Chúng tôi không đảm bảo mọi trang web, ngôn ngữ hoặc tập tin.",
+        "question": "Có thể đưa mọi website vào kệ sách hoặc dịch không?",
+        "answer": "Thêm vào kệ sách cần bộ điều hợp riêng. Trang HTTP/HTTPS khác có thể dịch ảnh đã tải đáp ứng điều kiện, ảnh nhấp chuột phải hoặc vùng chọn thủ công. Khả năng dùng phụ thuộc cấu trúc, quyền trình duyệt, đăng nhập và truy cập ảnh; không vượt trả phí hay DRM. Ngôn ngữ tùy danh sách của kênh đang chọn.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
         "id": "local-translation",
-        "question": "Tôi có thể dịch truyện tranh bằng dịch vụ cục bộ mà không cần tài khoản NodeLane không?",
-        "answer": "Vâng. Kết nối dịch vụ manga-translator-ui của riêng bạn bằng cách thêm và chọn kênh dịch cục bộ trong cài đặt tiện ích mở rộng. Điều này không yêu cầu tài khoản NodeLane hoặc phụ cấp dịch thuật chính thức. Bạn phải tự mình chạy dịch vụ; yêu cầu mạng, các chế độ khả dụng và xử lý hình ảnh tùy thuộc vào dịch vụ đó.",
+        "question": "Dùng dịch vụ riêng mà không đăng nhập NodeLane được không?",
+        "answer": "Có. Thêm và chọn manga-translator-ui tự triển khai trong cài đặt. Có thể lưu nhiều cấu hình nhưng chỉ dùng một kênh tại một thời điểm. Tiện ích chỉ dịch thông thường và không dùng hạn mức NodeLane. Sau khi kết nối thành công, mật khẩu và mã MTU được lưu trên thiết bị. Internet và xử lý ảnh tùy cấu hình dịch vụ. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại.",
         "relatedPath": "/guides/local-translation/"
+      },
+      {
+        "id": "remote-library",
+        "question": "OPDS có đồng bộ tiến độ đọc không?",
+        "answer": "Bạn có thể kết nối nhiều thư viện OPDS, duyệt, tìm và mở theo nhu cầu mà không nhập toàn bộ danh mục. Vị trí lưu trên thiết bị trước; chỉ nguồn có chức năng tiến độ đã xác minh mới được đọc và ghi lại. Không phải mọi OPDS đều đồng bộ. Nếu đồng bộ lỗi, vị trí cục bộ vẫn dùng được; đây không phải đồng bộ toàn bộ kệ sách giữa thiết bị.",
+        "relatedPath": "/guides/remote-library/"
+      },
+      {
+        "id": "region-translation",
+        "question": "Dịch một ảnh hoặc một phần màn hình thế nào?",
+        "answer": "Nhấp chuột phải vào ảnh đã tải để chỉ dịch ảnh gốc đó. Dịch vùng cho phép kéo hình chữ nhật trên màn hình hiện tại và gửi khi thả chuột. Nội dung tĩnh có thể so sánh tại chỗ; nếu không theo dõi vị trí tin cậy được, kết quả hiện ở bản xem trước. Đặt phím khởi động trong trình duyệt. Không tự cuộn hoặc ghép ảnh chụp dài; trang bị hạn chế không dùng được.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "offline-reading",
+        "question": "Sau khi lưu có đọc và dịch ngoại tuyến không?",
+        "answer": "Tệp cục bộ đã nhập, tệp từ xa đã lưu hoàn chỉnh và chương website đã lưu có thể đọc khi quyền nguồn còn hiệu lực. Lưu toàn bộ chương có chọn ngôn ngữ, tạm dừng, tiếp tục và bổ sung phần thiếu. Bộ nhớ đệm đọc thông thường không có nghĩa cả sách đã lưu. Bản dịch đã lưu được dùng lại; dịch mới qua NodeLane cần internet, còn dịch vụ riêng phải kiểm tra toàn bộ quy trình ngoại tuyến.",
+        "relatedPath": "/guides/remote-library/"
       }
     ],
     "releases": [
@@ -720,7 +792,7 @@ export default {
     "账户信息": "Thông tin tài khoản",
     "退出登录": "Đăng xuất",
     "会员有效期至": "Quyền lợi thành viên có hiệu lực đến ",
-    "阅读、翻译和用量查看，请前往浏览器插件。": "Sử dụng tiện ích mở rộng của trình duyệt để đọc, dịch và kiểm tra mức sử dụng.",
+    "阅读、翻译和用量查看，请前往浏览器插件。": "Đọc liên tục và xem chi tiết mức dùng của tiện ích trong tiện ích; dịch ảnh trên website cũng dùng hạn mức của tài khoản này.",
     "下载插件": "Tải xuống tiện ích mở rộng",
     "会员订阅": "Tư cách thành viên",
     "刷新": "Làm mới",

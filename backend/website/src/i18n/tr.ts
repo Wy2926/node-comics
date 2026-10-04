@@ -6,8 +6,8 @@ export default {
     "seoChangelogTitle": "Manga çeviri uzantısı sürüm notları",
     "seoAboutTitle": "Manga Çevirmenimiz ve Çizgi Roman Okuyucumuz Hakkında",
     "seoHelpTitle": "Manga Çeviri ve Uzantı Sorunlarını Giderme",
-    "seoFaqTitle": "Manga çevirisi hakkında sık sorulan sorular: Kurulum, dosyalar ve sınırlar",
-    "seoGuidesTitle": "Manga Çevirisi ve CBZ, PDF Okuyucu Kılavuzları",
+    "seoFaqTitle": "Manga çevirisi, EPUB, OPDS ve çevrimdışı okuma soruları",
+    "seoGuidesTitle": "Manga çevirisi, EPUB ve OPDS kitaplığı kılavuzları",
     "features": "Özellikler",
     "pricing": "Fiyatlar",
     "guides": "Rehberler",
@@ -27,7 +27,7 @@ export default {
     "menu": "Gezinme menüsünü aç",
     "language": "Dil",
     "tagline": "Güzel hikâyeler dil sınırlarını aşar",
-    "footerStory": "Dil engelini başka bir sayfaya çevirin. Bir sonraki hikayeniz sizi bekliyor.",
+    "footerStory": "Koleksiyonunuzu açın, kitaplığınızı bağlayın ve kendi dilinizde okuyun.",
     "startReading": "Okumaya başla",
     "support": "Okuyucu desteği",
     "company": "Hakkımızda",
@@ -35,7 +35,7 @@ export default {
     "artNote": "Ürün ekran görüntüleri ve orijinal AI illüstrasyonları · Karikatür çizimleri ilgili sahiplerine aittir",
     "ogAlt": "Orijinal NodeLane Comics sahil manga illüstrasyonu",
     "heroTitle": "Kelimelerin ötesine. Hikâyenin içine.",
-    "heroDescription": "En sevdiğiniz manganın anlayabileceğiniz bir versiyonunu verin. Web çizgi romanlarını ve yerel koleksiyonunuzu her seferinde bir sayfa olarak okuyun ve çevirin.",
+    "heroDescription": "Tarayıcınızda manga okuyun ve çevirin: yerel dosyalar ve EPUB, OPDS kitaplıkları, desteklenen siteler ve web sayfalarındaki görseller.",
     "heroEyebrow": "SONRAKİ SAYFAN, SENİN DİLİNDE",
     "freeStart": "Ücretsiz okumaya başla",
     "seeHow": "Nasıl çalıştığını gör",
@@ -43,28 +43,34 @@ export default {
     "heroCaption": "NodeLane Comics için orijinal AI çizimi",
     "heroAlt": "Orijinal manga: Deniz kenarındaki demiryolu platformunda bekleyen bir gezgin",
     "nextStop": "SONRAKİ DURAK / YENİ BİR DÜNYA",
-    "featureHeading": "Mangayı çevir. Orijinalleri okuyun ve karşılaştırın.",
-    "featureDescription": "Desteklenen web çizgi romanlarını ve yerel dosyaları sayfa sayfa çevirin, orijinalleri karşılaştırın ve okuma konumunuzu koruyun. Standart çeviri, yapay zekâ ile yeniden çizim ve CBZ, CBR, PDF ile DRM koruması olmayan MOBI okuma seçeneklerini keşfedin.",
+    "featureHeading": "Çizgi romanlarınız, rahat okuma ve ihtiyaç duyduğunuzda çeviri.",
+    "featureDescription": "Yerel çizgi roman ve EPUB açın, OPDS bağlayın ve desteklenen sitelerde yeni hikâyeler bulun. Okuyucudaki sayfaları, web görsellerini veya seçtiğiniz görünür alanı çevirip orijinaliyle karşılaştırın.",
     "featureTitles": [
-      "Çeviri okumanızı takip eder",
-      "Aynı sayfayı okumanın iki yolu",
-      "Koleksiyonunuz için yeni bir bölüm"
+      "Yerel çizgi romanlar ve EPUB",
+      "OPDS kitaplıkları",
+      "Keşfetme ve siteler arası arama",
+      "Web sayfasında çeviri",
+      "Resmî kanal veya kendi MTU’nuz",
+      "Çevrimdışı okuma ve ayarlar"
     ],
     "featureBodies": [
-      "Okurken mevcut görseli ve sonraki üç görseli işlemek için çeviriyi seçin. Sonuçlar geldiğinde okuma konumunuz korunur.",
-      "Günlük okuma için standart çeviriyi kullanın veya farklı bir görüntüleme için yapay zekâ ile yeniden çizimi deneyin. Orijinale tek tıkla dönebilirsiniz.",
-      "CBZ/ZIP, CBR/RAR, PDF veya desteklenen DRM koruması olmayan MOBI dosyalarını içe aktarın ve doğrudan okumaya başlayın. Her dosya bir çizgi romandır; tek tek görsellerin içe aktarılması desteklenmez."
+      "CBZ/ZIP, CBR/RAR, PDF, desteklenen DRM’siz MOBI ve EPUB içe aktarın. EPUB içinde yalnızca gömülü bitmap görseller çevrilir; kitap metni ve vektör grafikler çevrilmez, DRM kaldırılmaz.",
+      "Birden fazla OPDS kitaplığı bağlayın, katalogları gezin, arayın ve okuyun. Güvenilir Range desteği varsa veriler okudukça alınır; aksi hâlde dosyanın tamamını açıkça indirmeniz gerekir.",
+      "Önerileri keşfedin ve desteklenen farklı sitelerde başlığa göre arayın. Okuyucuya eklemek için site bağdaştırıcısı gerekir; kaynak kataloğu salt okunur kalır.",
+      "Geçerli sayfanın görsellerini, sağ tık menüsüyle tek bir görseli veya görünür dikdörtgen alanı çevirin. Alan seçimi kaydırarak uzun görsel birleştirmez; kısayollar tarayıcıdan ayarlanır.",
+      "Uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. Resmî kanalı veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi roman orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır.",
+      "Bir sitede seçilen dilin tüm bölümlerini önbelleğe alın. İndirmeyi duraklatıp eksikleri tamamlayarak sürdürün. Tamamlanan bölümler çevrimdışı okunabilir; okuma görünümünü, ölçeği ve orijinal karşılaştırmasını ayarlayın."
     ],
     "ribbon": [
-      "Standart çeviri ve yapay zekâ ile yeniden çizim",
-      "Web ve yerel çizgi romanlar",
-      "Orijinaller her zaman erişilebilir",
-      "Okuma konumunuz korunur"
+      "Yerel dosyalar, EPUB ve OPDS",
+      "Desteklenen siteler ve web görselleri",
+      "Orijinal ve çeviri yan yana",
+      "Resmî kanal veya kendi MTU’nuz"
     ],
     "compareTitle": "Diyaloğu anlayın. Duyguyu koru.",
     "compareDescription": "Manganız ile çeviri penceresi arasında geçiş yapmak yok. Kelimeleri tekrar resme koyun ve karakterlerle kalın.",
     "readingTitle": "Koleksiyonunuz. Okumanın yeni bir yolu.",
-    "readingDescription": "Bir çizgi roman açın ve kaldığınız yerden devam edin. Salt okunur bir kaynak dizini olan ve bölüm veya baskı yönetimi olmayan çizgi roman başına bir kaynak.",
+    "readingDescription": "Yerel dosya, Google Drive, OPDS kitaplığı veya desteklenen bir site açın. Kaydedilen konumdan devam edin, okuyucuyu ayarlayın ve orijinalle karşılaştırın. İlerleme eşitlemesi yalnızca bu özelliği destekleyen ve uyumluluğu doğrulanmış kaynaklarda kullanılabilir.",
     "readingAlt": "Denize bakan bir pencerenin yanında açık bir manganın orijinal illüstrasyonu",
     "guideHeading": "Bir sonraki sayfadan önce birkaç not.",
     "allGuides": "Tüm okuma kılavuzları",
@@ -104,16 +110,16 @@ export default {
     "downloadXpi": "İmzalı XPI indir",
     "storeHeading": "Tarayıcı mağazası bağlantıları",
     "storeNote": "Edge listesi inceleniyor; şimdilik Edge ZIP paketini kullanın. Firefox'yi mağazasından veya imzalı XPI ile yükleyin. Geribildirim:",
-    "guidesTitle": "Manga çevirisi ve yerel çizgi roman okuma kılavuzları",
-    "guidesDescription": "Tarayıcınızda mangayı çevirmeyi öğrenin, CBZ, CBR, PDF ve MOBI dosyalarını açın, Japonca orijinalleri karşılaştırın, çeviri sorunlarını giderin ve görüntü gizliliğini anlayın.",
+    "guidesTitle": "Manga çevirisi ve çizgi roman okuma kılavuzları",
+    "guidesDescription": "CBZ, CBR, PDF, MOBI ve EPUB açın, OPDS bağlayın, web görselleri ve seçilen alanları çevirin. Resmî kanal veya MTU seçin ve bölümleri çevrimdışı okumaya hazırlayın.",
     "contents": "Bu sayfada",
     "editor": "NodeLane Comics editör ekibi",
     "updated": "Güncellendi",
     "related": "Sıradaki rehber",
     "faqTitle": "Manga çevirmen uzantısı SSS",
-    "faqDescription": "Chrome, Edge ve Firefox kurulumu, ücretsiz manga çevirisi, CBZ ve PDF dosyaları, desteklenen siteler, yerel çeviri, görüntü gizliliği ve iptali ile ilgili yanıtlar.",
+    "faqDescription": "Kurulum, çizgi roman ve EPUB biçimleri, OPDS, alan çevirisi, çevrimdışı okuma, izinler, MTU ve resmî çeviri kotaları.",
     "helpTitle": "Manga çevirisi ve uzantı yardımı",
-    "helpDescription": "Manga görseli yükleme, duraklayan çeviriler, izinler ve oturum açma sorunlarını giderin. Kurulum ve yerel çizgi roman kılavuzlarını bulun veya NodeLane Comics desteğiyle iletişime geçin.",
+    "helpDescription": "İçe aktarma, OPDS, görsel indirme, çeviri, izinler ve MTU bağlantısı sorunlarını çözün. Kılavuzlardan yararlanın veya destekle iletişime geçin.",
     "contactTitle": "Her geri bildirim dikkatle okunmayı hak ediyor.",
     "videoTutorials": "Video eğitimleri",
     "githubSource": "Kaynağı GitHub üzerinde görüntüle",
@@ -122,8 +128,8 @@ export default {
     "contactDescription": "Çeviri kalitesi için uzantıdaki sayfa başına geri bildirim seçeneğini kullanın. Diğer sorunlar için tarayıcınızı, uzantı sürümünüzü, adımlarınızı ve hata mesajınızı bize e-posta ile gönderin. Paylaşma hakkınız olmayan şifreleri, jetonları, ödeme kartı ayrıntılarını, imzalı URL'leri veya çizgi romanların tamamını göndermeyin.",
     "emailButton": "E-posta gönder",
     "aboutTitle": "NodeLane Comics hakkında",
-    "aboutDescription": "NodeLane Comics, Chrome, Edge ve Firefox için web ve yerel okuma ve orijinal karşılaştırma içeren bir manga çevirmeni ve çizgi roman okuyucu uzantısıdır. Bir manga kataloğuna ev sahipliği yapmıyor.",
-    "aboutBody": "NodeLane Comics görsel çevirisini, yerel okumayı ve web görseli keşfini tek bir tarayıcı uzantısında birleştirir. Pencereler arasında daha az geçiş yaparak esere daha çok odaklanmanızı istiyoruz. Yapay zekâ hata yapabilir; bu yüzden orijinallere erişim, açık kurallar ve eser sahiplerine saygı önemlidir. Çizgi roman kataloğu sunmuyoruz, eser satmıyoruz ve ödeme duvarlarını, oturum açma şartlarını veya DRM korumasını aşmıyoruz. Yalnızca erişme ve işleme hakkınız olan içerikleri kullanın.",
+    "aboutDescription": "NodeLane Comics, Chrome, Edge ve Firefox için manga okuma ve çeviri uzantısıdır: yerel çizgi romanlar, EPUB, Google Drive, OPDS ve desteklenen siteler.",
+    "aboutBody": "NodeLane Comics, çizgi roman okumayı ve görsel çevirisini tarayıcıda bir araya getirir. Dosyalarınızı açın, Drive veya OPDS bağlayın, desteklenen sitelerde hikâyeler bulun ve sayfaları ya da görünür alanları çevirin. Normal çeviri resmî kanal veya kendi manga-translator-ui hizmetinizle çalışır. Tanıma ve çeviri hata yapabildiği için orijinal her zaman kontrol edilebilir. Çizgi roman kataloğu sunmuyoruz, çizgi roman satmıyoruz ve ödeme duvarı, giriş veya DRM engellerini aşmıyoruz. Yalnızca erişme ve işleme hakkınız olan içeriği kullanın.",
     "changelogTitle": "NodeLane Comics sürüm notları",
     "changelogDescription": "Manga çevirmen güncellemelerini, yeni site desteğini, tarayıcı uyumluluğunu ve okuma düzeltmelerini takip edin. Chrome, Edge ve Firefox mağaza onayları farklı olabilir; yüklü sürümünüzü kontrol edin.",
     "rss": "Güncellemeleri RSS ile takip et",
@@ -150,31 +156,32 @@ export default {
   "slug": "manga-translation",
   "minutes": 4,
   "title": "Tarayıcınızda manga nasıl çevrilir",
-  "description": "Uzantıyı yüklemekten ilk çevrilmiş sayfanızı kontrol etmeye kadar: web görsellerini keşfetmeye ve okumaya yönelik pratik bir kılavuz.",
+  "description": "Okuyucuda manga, sağ tık menüsüyle görseller ve sayfanın görünür alanlarını çevirin. Kanalı seçin ve sonucu orijinalle kontrol edin.",
   "category": "Başlarken",
   "sections": [
     {
-      "title": "Görüntü çevirisi neden farklıdır?",
+      "title": "Uzantıyı ve kaynağı hazırlayın",
       "paragraphs": [
-        "Sıradan tarayıcı çevirisi web sayfası metnini işler. Manga diyaloğu genellikle görüntünün bir parçasıdır, bu nedenle görüntü işlemeye ve metin yerleştirmeye ihtiyaç duyar. NodeLane Comics çeviriyi ve okuyucuyu tek bir uzantıda birleştirir.",
-        "Uygun tarayıcı mağazası aracılığıyla yükleyin, uzantıyı sabitleyin ve erişim hakkınız olan bir çizgi romanı açın. Web sitesi ve uzantı aynı kimlik hizmetini ve hesap avantajlarını kullanır."
+        "Masaüstü tarayıcı uzantısını kurun ve erişme hakkınız olan bir çizgi roman açın. Desteklenen site bağdaştırıcısı okuyucuyu açabilir; desteklenmeyen siteler rafa aktarılamaz.",
+        "Site erişimi kurulumda bildirilir. Tarayıcı erişimi sınırlayabilir: sayfa ve görsel alan adının izinlerini kontrol edin. Kaynak sitenin çerezleri ve giriş belirteçleri çeviri hizmetine gönderilmez."
       ]
     },
     {
-      "title": "Keşfedin, kontrol edin ve okuyun",
+      "title": "Neyi çevireceğinizi seçin",
       "paragraphs": [
-        "Özel bağdaştırıcısı olan bir web sitesinde, okuyucuyu doğrudan açmak için Okumayı başlat'ı tıklayın. Diğer web sayfaları Geçerli sekmeyi çevir'i kullanabilir ancak kitaplığa aktarılamaz. Gerektiğinde siteye ve resim barındırıcısına izin verin. Kaynak içerikleri salt okunurdur; resim seçimi, meta veri formu veya bölüm ataması yoktur.",
-        "Çeviriyi seçtikten sonra mevcut görüntü ve sonraki üç görüntü üzerinde çalışır. Resim URL'lerini keşfetmek tüm bölümün indirildiği anlamına gelmez: geç yükleme, gezinme değişiklikleri ve ayrı CDN'ler alımı etkileyebilir."
+        "Geçerli sayfayı çevirin, tek görselin sağ tık menüsünü kullanın veya görünür bir dikdörtgen seçin. Seçim yalnızca görünen alanı alır; kaydırarak uzun sayfa birleştirmez. Kısayolları tarayıcının uzantı ayarlarında belirleyin.",
+        "Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır. Açıldığında geçerli ve yakındaki görseller sınırlı bir pencere oluşturur; tüm kitap gönderilmez. Resmî kanal veya bağlı MTU ile hedef dili seçin."
       ]
     },
     {
-      "title": "Orijinali yakın tutun",
+      "title": "Çeviriyi kontrol edin ve konumu koruyun",
       "paragraphs": [
-        "Bir çeviri geldiğinde okuma konumunuz korunur. Net olmayan diyaloglar, küçük metinler veya ses efektleri için orijinale geçin. Yapay zeka içeriği atlayabilir veya yanlış anlayabilir; Akıcı ifadeler doğruluğun kanıtı değildir.",
-        "Başarısız bir sayfa diğerlerini engellemez. Bir şeyler ters gittiğinde sayfa başına geri bildirimi kullanın. Açıkça yeni bir çeviri talep edildiğinde yeni bir sürüm oluşturulur ve ilgili yetki kullanılır."
+        "Konumu kaybetmeden orijinal, çeviri ve karşılaştırma arasında geçiş yapın. OCR küçük yazıları, el yazısını veya ses efektlerini atlayabilir; adları ve anlamı orijinalden kontrol edin.",
+        "Bir sayfanın hatası diğerlerini durdurmaz. Önce bildirilen nedeni giderin, sonra tekrar deneyin. Yeni bir resmî çeviriyi açıkça istemek yeni sürüm oluşturur ve hesabın güncel haklarını kullanır."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-modes",
@@ -184,39 +191,39 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Standart çeviri veya yapay zeka yeniden çizimi: hangisini seçmelisiniz?",
-  "description": "Klasik OCR manga çevirisini yapay zeka yeniden çizimiyle karşılaştırın, orijinalleri kontrol edin ve yerel bir manga-translator-ui hizmetine nasıl bağlanacağınızı öğrenin. Okumanız için modu ve hizmeti seçin.",
+  "title": "Normal manga çevirisi: resmî kanal mı, kendi MTU’nuz mu?",
+  "description": "Uzantıda normal çevirinin işleyişi, resmî kanal ve manga-translator-ui arasındaki farklar ve AI yeniden çizimin nerede kullanılabildiği.",
   "category": "Çeviri ipuçları",
   "sections": [
     {
-      "title": "İki farklı iş akışı",
+      "title": "Normal çeviri nasıl çalışır?",
       "paragraphs": [
-        "Standart çeviri, metni algılar ve tanır, bir metin modeliyle çevirir, metin bölgelerini temizler ve sonucu dizer. yapay zekâ ile yeniden çizim, çevrilmiş bir görüntü oluşturmak için görüntüyü ve hedef dili bir görüntü modeline verir.",
-        "İkisi de her zaman daha iyi değildir. Klasik metin bölgelerine odaklanır; yeniden çizme daha fazla özgürlüğe sahiptir ve karakterleri, arka planları veya satırları değiştirebilir. Tek bir resme güvenmek yerine temsili sayfaları karşılaştırın."
+        "Uzantı metni bulur, OCR ile tanır, çevirir, metin alanındaki arka planı onarır ve sonucu sayfaya yerleştirir. Orijinal karşılaştırma için erişilebilir kalır.",
+        "Güncel uzantı yalnızca normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web görsel çalışma alanında kalır; web sitesinde bulunması okuyucuda desteklendiği anlamına gelmez."
       ]
     },
     {
-      "title": "Günlük okumaya klasikle başlayın",
+      "title": "NodeLane resmî kanalı",
       "paragraphs": [
-        "Açık diyalog ve düzenli baloncuklar yararlı bir başlangıç noktasıdır. El yazısı, perspektif, küçük metin ve ses efektleri yine de gözden kaçabilir. Kısmi sonuç mesajlarını kontrol edin ve orijinaliyle karşılaştırın.",
-        "Ücretsiz, günde 30 standart çeviri sayfası içerir. Lite'nin günlük veya aylık toplam sınırı yoktur; her kayan bir saatlik dönemde 1.200'e kadar yeni sayfa ve yapay zekâ ile yeniden çizim dahil değildir. Kısa vadeli ücret, görüntü ve hizmet kapasitesi sınırları hâlâ geçerlidir."
+        "NodeLane hesabınıza girin, dili seçin ve çeviriyi açın. Hizmet seçilen görselleri işler; erişim ve kota hesabınıza bağlıdır. Geçerli sonucu yeniden kullanmak kotadan tekrar düşmez.",
+        "Orijinalleri okumak için hesap gerekmez. Ücretsiz plan ve Lite yayımlanan kurallarını korur: güncel haklarınızı hesap sayfasında, fiyatları planlar sayfasında kontrol edin. İstek sıklığı ve kapasite sınırları tamamlanma hızını garanti etmez."
       ]
     },
     {
-      "title": "Kasıtlı olarak yeniden çizmeyi deneyin",
+      "title": "Kendi manga-translator-ui hizmetinizi bağlayın",
       "paragraphs": [
-        "Yeniden çizim sayfaları yıllık planlar dahil her ay açılır; kullanılmayanlar sonraki aya devretmez. Koşulları sağlayan hesaplar, planlarında gösterilen ve kart gerektiren denemeyi başlatabilir. Yeniden abone olmak veya başka bir plan seçmek deneme hakkını sıfırlamaz.",
-        "Farklı modların ve dillerin ayrı sonuçları vardır. Yeniden çizim beklerken veya başarısız olurken geçerli bir klasik sonucu koruyabilir ve ayrıntılar önemli olduğunda orijinaline dönebilirsiniz."
+        "MTU web hizmetini başlatın, bir görsel çevirisini doğrulayın, sonra kanal ayarlarına adres ve giriş bilgilerini ekleyin. NodeLane hesabı ve resmî kota gerekmez; donanım, modeller ve dış API maliyetleri size aittir.",
+        "Birden fazla profil kaydedilebilir, ancak seçilen tek kanal kullanılır. Parola ve belirteç yerelde saklanır; aynı adres ve kullanıcıyla yeniden bağlanırken parolayı boş bırakabilirsiniz. Yerel MTU tamamen çevrimdışı işlemeyi garanti etmez. Parolayı kaydetmek ve alanı boş bırakarak yeniden bağlanmak için uzantı 0.10.2 veya üzeri gerekir; eski sürümlerde her yeniden bağlantıda parola girilmelidir."
       ]
     },
     {
-      "title": "Yerel bir manga çeviri hizmeti kullanın",
+      "title": "Kendi sayfalarınızda karşılaştırın",
       "paragraphs": [
-        "Uzantı ayarlarında yerel bir çeviri kanalı ekleyip seçerek kendi manga-translator-ui hizmetinizi bağlayın. Bu, NodeLane hesabı veya resmi çeviri kullanım hakki gerektirmez. Hizmeti kendiniz çalıştırmalısınız; ağ gereksinimleri, mevcut modlar ve görüntü işleme, söz konusu hizmete bağlıdır."
+        "Birkaç tipik sayfayla başlayıp eksik metni, adları, anlamı ve dizgiyi kontrol edin. Yeni çizgi roman orijinal olarak açılır ve otomatik çeviri kapalıdır; gerektiğinde açın ve orijinale erişimi koruyun."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "local-comics",
@@ -226,33 +233,33 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "CBZ, CBR, PDF ve MOBI çizgi romanlarını yerel olarak okuyun",
-  "description": "Desteklenen çizgi roman formatları, içe aktarma kontrolleri, DRM içermeyen MOBI sınırlamaları ve yerel okuma ile çevrimiçi çeviri arasındaki sınır.",
+  "title": "Tarayıcıda CBZ, CBR, PDF, MOBI ve EPUB okuyun",
+  "description": "Desteklenen yerel biçimler, Google Drive içe aktarması, EPUB sınırları ve çevrimdışı okuma ile çeviri koşulları.",
   "category": "Yerel okuma",
   "sections": [
     {
-      "title": "Dosya formatını bilin",
+      "title": "Desteklenen biçimi seçin",
       "paragraphs": [
-        "CBZ genellikle görüntüleri ZIP biçiminde paketler; CBR, RAR'yi kullanır. PDF sayfalarının oluşturulması gerekir ve MOBI kitap kayıtlarını ve resim referanslarını içerir. Bir uzantıyı değiştirmek dosyayı dönüştürmez.",
-        "CBZ/ZIP, CBR/RAR, PDF ve DRM içermeyen MOBI6/MOBI6+KF8 çizgi romanlarını destekler. Gevşek görüntüler içe aktarılamaz. Web sitesi içe aktarmaları özel bir adaptör gerektirir."
+        "Yerel içe aktarma CBZ/ZIP, CBR/RAR, PDF, desteklenen DRM’siz MOBI ve EPUB biçimlerini destekler. ZIP ve RAR görseller içerir, PDF sayfa olarak görüntülenir, EPUB e-kitap olarak açılır. Dosya uzantısını değiştirmek dönüştürme yapmaz.",
+        "Yalnızca okuma ve işleme hakkınız olan dosyaları içe aktarın. Tekil görseller rafa aktarılamaz. Google Drive, CBZ/ZIP ve DRM’siz MOBI destekler; siteden içe aktarma bağdaştırıcı gerektirir."
       ]
     },
     {
-      "title": "İçe aktarmayı kontrol edin",
+      "title": "İçe aktarmayı ve çevrimdışı erişimi kontrol edin",
       "paragraphs": [
-        "İşleme hakkına sahip olduğunuz eksiksiz bir dosyayı kullanın. Şifreleri, hasarı veya desteklenmeyen sıkıştırmayı kontrol edin. İçe aktarmanın ardından kapakları, bölüm sırasını, küçük resimleri ve görüntünün netliğini doğrulayın.",
-        "MOBI içe aktarmalar 512 MB ve 1.500 sayfa ile sınırlıdır ve yapısal kontrollerden geçmelidir. Desteklenen vücut görüntüsü referansları sırayı belirler; kitap HTML'si yürütülmüyor. Gömülü GIF'ler okunabilir ancak çeviri, normalleştirilmiş bir ilk kare kullanır. DRM kaldırılmaz."
+        "Tam dosya kullanın; bozulma, parola ve sayfa sırasını kontrol edin. İçe aktardıktan sonra kapak, içindekiler ve görsellere bakın. Orijinaller yerelde hesapsız okunur; resmî çeviri seçilen görselleri gönderir, MTU ise kendi hizmetinize gönderir.",
+        "Sitelerde seçilen dilin tüm bölümleri önbelleğe alınabilir; indirme duraklatılıp eksikler tamamlanarak sürdürülebilir. Tamamlanan bölümler çevrimdışı açılır; görev sayfasını kapatmak planı duraklatır. Yerel dosya çevrimdışı çeviri anlamına gelmez."
       ]
     },
     {
-      "title": "Yerel içe aktarma çevrimdışı çeviri değildir",
+      "title": "MOBI ve EPUB: neler çevrilir?",
       "paragraphs": [
-        "Yerel çizgi roman ayrıştırma ve orijinal okuma tarayıcıda gerçekleşir. Resmi çeviri, seçilen sayfa resimlerini işlenmek üzere yükler ve sonuçları özel olarak saklar. Bunun yerine kendi manga-translator-ui hizmetinizi seçebilirsiniz; yapılandırması ağ erişimini ve görüntü işlemeyi belirler.",
-        "Kütüphane ve okuma konumu yerel kalır. Aynı içeriğin aynı hesap altında yeniden içe aktarılması, geçerli mevcut sonuçlarla eşleşebilir. Bu, tüm kitaplığınızın veya kaynak dosyalarınızın otomatik senkronizasyonu değildir."
+        "Yapı kontrolünden geçen DRM’siz MOBI6/MOBI6+KF8 çizgi romanlar desteklenir; bağımsız KF8/AZW3 desteklenmez. EPUB içinde kitap içeriğine gömülü bitmap görseller çevrilir; ana metin, vektör grafikler ve korumalı içerik çevrilmez. DRM kaldırılmaz.",
+        "EPUB içinde gezinmek için içindekileri ve okuma ayarlarını kullanın; görsel çevirisini orijinalle kontrol edin. Kitaplık ve yerel konum tarayıcıda saklanır. Uzak ilerleme eşitlemesi yalnızca bu özelliği destekleyen, doğrulanmış OPDS kaynaklarında mümkündür; tüm rafı eşitlemez."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "japanese-manga",
@@ -278,11 +285,12 @@ export default {
     {
       "title": "Hem kelimeleri hem de görselleri kontrol edin",
       "paragraphs": [
-        "Standart çeviri ve yapay zeka yeniden çizimi farklı sonuçlar üretebilir. Yeniden çizme görüntü ayrıntılarını da değiştirebilir. Hikayeyi etkilediklerinde ifadeleri, el yazısını ve arka planları karşılaştırın.",
+        "Normal çeviri metni atlayabilir veya arka planı ve yazı yerleşimini hatalı onarabilir. Hikâyeyi etkilediklerinde yüz ifadelerini, el yazısını ve arka planı karşılaştırın.",
         "NodeLane Comics orijinali kullanılabilir durumda tutar. Çeviri, eserin kendisini doğrulama yeteneğini ortadan kaldırmadan anlama engelini azaltır."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-troubleshooting",
@@ -306,18 +314,19 @@ export default {
     {
       "title": "Önce asıl görevi çözün",
       "paragraphs": [
-        "Görevler arka uçta devam eder. Sayfanın kapatılması veya bağlantının kısa süreliğine kesilmesi, görevin ortadan kalktığı anlamına gelmez. Yeniden bağlandıktan sonra uzantının orijinal durumunu çözmesine izin verin.",
-        "Sonuç bilinmediği halde görüntü sağlayıcı yeniden çizimi kabul etmiş olabilir. Doğrulama önce gelir; sayfa hakkı geçici olarak ayrılmış olarak kalabilir. Tekrar tekrar yeni sürümler oluşturmak, tamamlanmayı kontrol etmenin güvenli bir yolu değildir."
+        "Resmî görevler sunucuda saklanır: sayfayı kapatmak veya kısa bağlantı kaybı iptal anlamına gelmez. Bağlantı dönünce ilk görevin durumunu bekleyin. MTU seçildiyse işlemi doğrudan hizmette kontrol edin.",
+        "Sonuç bilinmiyorsa tekrar sürümler oluşturmak yerine önce görev durumunu kontrol edin. Web çalışma alanındaki AI yeniden çizim, sonuç doğrulanana kadar kotayı geçici olarak ayırabilir; uzantı normal çeviri kullanır."
       ]
     },
     {
       "title": "Erişimi kontrol edin ve net bir şekilde raporlayın",
       "paragraphs": [
-        "Yetkilendirmenin süresi dolmuşsa tekrar oturum açın, modun dil listesini doğrulayın ve mevcut izin veya promosyonun sona erme tarihini kontrol edin. Açık hata, ilgili ayırmayı serbest bırakır.",
+        "Resmî hesabın girişini ve güncel haklarını, seçilen kanalın dillerini ve tarayıcı izinlerini kontrol edin. MTU için adresi, girişi ve hizmetin kendi arayüzünde tek görsel çevirisini deneyin. Neden giderilince hatalı sayfayı elle yeniden deneyin.",
         "Tarayıcınızı, uzantı sürümünüzü, adımları, hata mesajını ve varsa görev kimliğini bildirin. Yalnızca gerekli, düzeltilmiş ekran görüntülerini kullanın. Hiçbir zaman kaynak çerezleri, belirteçleri veya imzalı resim URL'lerini göndermeyin. comics@nodelane.net ile iletişime geçin."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "comic-reader-privacy",
@@ -329,14 +338,14 @@ export default {
     {
       "title": "İzinler ve yerel dosyalar",
       "paragraphs": [
-        "Sayfa ve görselleri farklı alan adlarında yaşayabilir. NodeLane Comics, görüntü keşfetme veya çeviri özelliklerini kullandığınızda ilgili erişimi talep eder. Kaynak site çerezlerini, oturum açma belirteçlerini veya göz atma geçmişini yüklemez.",
+        "Site ve görsel alan adı erişimi kurulumda bildirilir. Tarayıcı erişimi sınırlayabilir; keşif veya çeviri çalışmıyorsa sayfa ve görsel izinlerini kontrol edin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
         "Yerel çizgi roman ayrıştırma tarayıcıda gerçekleşir. Bir dosyayı yerel rafınıza koymak, kaynak dosyanın tamamını yüklemek anlamına gelmez. Çeviri gerektiğinde ilgili sayfa görselleri ve görev bilgileri gönderilir."
       ]
     },
     {
       "title": "Çeviri ve saklama",
       "paragraphs": [
-        "Standart çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Yeniden Çizim, sayfa görüntülerini bir görüntü modeline gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+        "Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Standart çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Yeniden Çizim, sayfa görüntülerini bir görüntü modeline gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
         "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz."
       ]
     },
@@ -347,6 +356,51 @@ export default {
         "Erişim, düzeltme veya silme talepleri için comics@nodelane.net ile iletişime geçin. Başka bir kişinin verileri kullanılmadan önce kimlik ve kapsam doğrulanmalıdır. Ayrıntılar için gizlilik politikasının tamamını okuyun."
       ]
     }
+  ],
+  "updated": "2026-10-04"
+},
+{
+  "title": "OPDS kitaplığı bağlayın: okuma, EPUB ve ilerleme",
+  "description": "OPDS kitaplıkları ekleyin, gerektikçe veri alarak okuyun ve tam dosya indirme ya da ilerleme eşitlemesinin hangi koşullarda kullanılabildiğini öğrenin.",
+  "category": "Uzak kitaplıklar",
+  "sections": [
+    {
+      "title": "Bağlantı ve izinler",
+      "paragraphs": [
+        "Uzak kitaplıklara OPDS katalog adresini ekleyin ve kaynak istiyorsa giriş bilgilerini girin. Birden fazla bağlantı saklayabilir, katalogları gezebilir ve kitap arayabilirsiniz.",
+        "Yalnızca erişme hakkınız olan kitaplıkları ve kitapları kullanın. Kaynak izinleri, tarayıcı erişimi ve biçim desteği geçerlidir; bağlantı giriş, ödeme veya DRM engellerini aşmaz."
+      ]
+    },
+    {
+      "title": "Okudukça indirme veya tam dosya",
+      "paragraphs": [
+        "Güvenilir Range desteği ve dosya doğrulaması varsa okuyucu verileri ihtiyaç oldukça alır. İlk indirme azalır, ancak okumaya devam etmek için kaynağa erişim gerekir.",
+        "Kaynak güvenilir kısmi okumayı sağlayamıyorsa açmadan önce dosyanın tamamını açıkça indirin. Akışla okuma, bütün kitabın çevrimdışı kullanım için kaydedildiği anlamına gelmez."
+      ]
+    },
+    {
+      "title": "EPUB ve gömülü görseller",
+      "paragraphs": [
+        "EPUB, içindekiler ve okuma ayarlarıyla açılır. Çeviri kitap içeriğine gömülü bitmap görselleri destekler ve karşılaştırma için orijinali korur.",
+        "EPUB metni, vektör grafikler ve DRM ile korunan içerik bu yöntemle çevrilmez. EPUB erişimi her düzenin desteklendiği veya korumanın kaldırılabildiği anlamına gelmez."
+      ]
+    },
+    {
+      "title": "İlerleme ve çevrimdışı okuma",
+      "paragraphs": [
+        "Konum yerelde saklanır. Kaynakla eşitleme yalnızca kaynak bu özelliği destekliyorsa ve uyumluluk doğrulanmışsa kullanılabilir. Eşitleme hatasında yerel konum korunur.",
+        "Bu, bütün kitaplığın bulut eşitlemesi değildir. Çevrimdışı okuma için kaynak veriler ve sonuçlar önceden kaydedilmiş olmalıdır. Yeni resmî çeviri internet gerektirir; MTU’nun çevrimdışı çalışması tüm yapılandırmasına bağlıdır."
+      ]
+    }
+  ],
+  "slug": "remote-library",
+  "minutes": 5,
+  "published": "2026-10-04",
+  "updated": "2026-10-04",
+  "related": [
+    "local-comics",
+    "manga-translation",
+    "translation-troubleshooting"
   ]
 },
 ...localTranslationGuides
@@ -367,7 +421,7 @@ export default {
           {
             "title": "Kapsam ve iletişim",
             "paragraphs": [
-              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 28 Eylül 2026'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
+              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 4 Ekim 2026'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
             ]
           },
           {
@@ -388,14 +442,14 @@ export default {
           {
             "title": "İzinler ve yerel depolama",
             "paragraphs": [
-              "İlgili özellikleri aktif olarak kullandığınızda ihtiyaç halinde site ve görsel ana bilgisayar erişimi talep edilmektedir. Kaynak site çerezleri, oturum açma belirteçleri ve tarama geçmişi yüklenmez. Arka uç, rastgele çizgi roman URL'lerin proxy'sini kullanmaz. Web sayfası ve resim içeriği güvenilmeyen girdidir.",
-              "Kitaplık, okuma konumu, tercihler ve içe aktarılan yerel veriler tarayıcıda canlı olarak bulunur; ayrıştırma yereldir ve çeviri istendiğinde ilgili görseller gönderilir. Kitaplık otomatik olarak senkronize edilmez. Web sitesi, hesap ve yetkilendirme durumunu, erişim ve yenileme belirteçlerini mevcut sekmenin oturum deposunda tutar. Uzantının kendi oturum depolama kuralları vardır. Tarayıcı verilerini temizlemek oturumunuzu kapatabilir veya yerel okuma bilgilerini kaldırabilir."
+              "Site ve görsel alan adı erişimi kurulumda bildirilir. Tarayıcı erişimi sınırlayabilir; keşif veya çeviri çalışmıyorsa sayfa ve görsel izinlerini kontrol edin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
+              "Konum yerelde saklanır. Kaynakla eşitleme yalnızca kaynak bu özelliği destekliyorsa ve uyumluluk doğrulanmışsa kullanılabilir. Eşitleme hatasında yerel konum korunur. Kitaplık, okuma konumu, tercihler ve içe aktarılan yerel veriler tarayıcıda canlı olarak bulunur; ayrıştırma yereldir ve çeviri istendiğinde ilgili görseller gönderilir. Kitaplık otomatik olarak senkronize edilmez. Web sitesi, hesap ve yetkilendirme durumunu, erişim ve yenileme belirteçlerini mevcut sekmenin oturum deposunda tutar. Uzantının kendi oturum depolama kuralları vardır. Tarayıcı verilerini temizlemek oturumunuzu kapatabilir veya yerel okuma bilgilerini kaldırabilir."
             ]
           },
           {
             "title": "Servis sağlayıcılar ve transferler",
             "paragraphs": [
-              "Klasik işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler; yeniden çizim sağlayıcıları sayfa görüntüsünü ve dilini işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
+              "Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Klasik işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler; yeniden çizim sağlayıcıları sayfa görüntüsünü ve dilini işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
               "Çeviri görselleri merkezi sunucudaki özel dosyaları kullanır; tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Kimlik, altyapı, çeviri ve ödeme hizmetleri, verileri gerektiği şekilde geçerli politikaları kapsamında işler. İşleme bölgenizin dışında gerçekleşebilir. Reklam hedefleme için kişisel bilgileri satmıyoruz veya gönderilen çizgi romanları kullanmıyoruz. Tüm sağlayıcıların hiçbir şeyi saklamayacağını veya verileri eğitim için asla kullanmayacağını garanti etmiyoruz; bu sağlayıcıya ve anlaşmaya bağlıdır. Yetkisiz veya uygun olmayan hassas içerik göndermeyin."
             ]
           },
@@ -423,7 +477,7 @@ export default {
           {
             "title": "Hizmet ve hesaplar",
             "paragraphs": [
-              "NodeLane Comics uzantı, okuyucu ve çeviri hizmetleri sağlar. Kullanmadan önce bu şartları ve gizlilik politikasını okuyun; katılmıyorsanız hizmeti kullanmayı bırakın. 20 Eylül 2026'da güncellendi. Web sitesi, çizgi roman kataloğu veya çizgi roman satışları değil, ürün bilgileri, kılavuzlar, indirmeler ve hesap yönetimi sağlar.",
+              "NodeLane Comics uzantı, okuyucu ve çeviri hizmetleri sağlar. Kullanmadan önce bu şartları ve gizlilik politikasını okuyun; katılmıyorsanız hizmeti kullanmayı bırakın. 4 Ekim 2026'da güncellendi. Web sitesi, çizgi roman kataloğu veya çizgi roman satışları değil, ürün bilgileri, kılavuzlar, indirmeler ve hesap yönetimi sağlar.",
               "Kullanma hakkına sahip olduğunuz bir hesap kullanın ve kimlik bilgilerinizi ve cihazınızı koruyun. Avantajlar ve erişim sunucuda doğrulanır. Başkalarının kimliğine bürünmeyin, onların özel kayıtlarına erişmeyin, hız veya görüntü sınırlarını atlamayın, kötü amaçlı otomasyonla hizmetleri kesintiye uğratmayın veya ürüne ve sağlayıcılarına saldırmayın. Yanlış kullanım erişimin kısıtlanmasına neden olabilir."
             ]
           },
@@ -431,7 +485,7 @@ export default {
             "title": "İçerik hakları ve yapay zeka sonuçları",
             "paragraphs": [
               "Seçilen içeriğe erişme, yükleme, tercüme etme ve işleme hakkına sahip olmanız ve kaynak site ve hak sahibinin gerekliliklerini takip etmeniz gerekir. Uzantı, çevrilmiş görüntüleri yayınlamak için hiçbir telif hakkı veya otomatik izin vermez. Ödeme duvarlarını, oturum açma gerekliliklerini veya DRM'yi atlamayın. Kaynak içeriğinin yasallığını veya eksiksizliğini garanti etmiyoruz. Telif hakkı sorgularında eser, haklar, sorun ve iletişim bilgileri belirtilmelidir.",
-              "Yapay zeka metni atlayabilir, yanlış tercüme edebilir veya yanlış yerleştirebilir; yeniden çizme aynı zamanda resmi de değiştirebilir. Sonuçlar okumaya yardımcı olur ve orijinallerin veya profesyonel incelemelerin yerini almaz. Web sitesi çizimleri ve dil karşılaştırmaları yapay zeka tarafından oluşturulan gösterimlerdir; doğruluk, hız veya görüntü başına sonuçlar vaat etmez. Orijinalleri karşılaştırabilir ve geri bildirim gönderebilirsiniz."
+              "Yapay zekâ metni atlayabilir, yanlış çevirebilir veya yanlış yerleştirebilir. Hesabınız için kullanılabilen web çalışma alanındaki AI yeniden çizim, görseli de değiştirebilir. Sonuçlar okumaya yardımcı olur; orijinalin veya uzman incelemesinin yerini almaz. Sitenin özgün illüstrasyonları yapay zekâ ile üretilmiştir; dil karşılaştırmaları kaydedilmiş normal çeviri örneklerini gösterir. Her görsel için doğruluk, hız veya sonuç garantisi vermez. Orijinalle karşılaştırın ve geri bildirim gönderin."
             ]
           },
           {
@@ -488,7 +542,7 @@ export default {
       {
         "id": "overview",
         "question": "NodeLane Comics nedir?",
-        "answer": "NodeLane Comics bir manga okuyucu uzantısı ve web sitesi görsel çevirisi sunar. Uzantıdaki web veya yerel çizgi romanları okuyun veya web sitesine JPG, PNG ve WebP resimlerini yükleyin. Konuk çevirisini deneyin veya mevcut kullanım hakkınizle oturum açın, sonuçların tamamını indirin ve yerel geçmişi saklayın. Çizgi roman kataloğu sağlamıyoruz.",
+        "answer": "NodeLane Comics okuyucuyu ve görsel çevirisini bir araya getirir. Uzantı yerel dosya, EPUB, Google Drive, OPDS ve desteklenen sitelerin yanı sıra web görselleri ve görünür alan çevirisi sunar. Web çalışma alanı JPG, PNG ve WebP kabul eder; sonucu indirmenize ve yerel geçmiş saklamanıza olanak verir. Çizgi roman kataloğu sunmuyoruz.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
@@ -511,32 +565,32 @@ export default {
       },
       {
         "id": "translation-modes",
-        "question": "Klasik manga çevirisini mi yoksa yapay zeka yeniden çizimini mi kullanmalıyım?",
-        "answer": "Standart çeviri metni algılar, çevirir ve yerel arka plan onarımıyla geri yerleştirir. yapay zekâ ile yeniden çizim bir görüntü modeli kullanır ve çizim ayrıntılarını değiştirebilir. Günlük okumalar için klasik olanı seçin, sonuçları orijinaliyle karşılaştırın ve uygun olduğunda yeniden çizmeyi deneyin. İki modun sonuçları ayrı ayrı tutulur.",
+        "question": "Uzantıda hangi çeviri ve kanallar kullanılabilir?",
+        "answer": "Güncel uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. NodeLane resmî kanalını veya kendi manga-translator-ui hizmetinizi seçin. AI yeniden çizim yalnızca web çalışma alanında uygun haklarla kullanılabilir. Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri kapalıdır.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
         "id": "file-formats",
         "question": "Hangi dosyaları içe aktarabilirim?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF ve DRM içermeyen MOBI6/MOBI6+KF8 çizgi romanlarını destekler. Bağımsız KF8/AZW3, EPUB ve şifreli kitaplar desteklenmez. Gevşek görüntüler içe aktarılamaz. Web sitesi içe aktarmaları özel bir adaptör gerektirir.",
+        "answer": "Yerelde CBZ/ZIP, CBR/RAR, PDF, desteklenen DRM’siz MOBI6/MOBI6+KF8 ve EPUB kullanılabilir. EPUB içinde yalnızca gömülü bitmap görseller çevrilir; ana metin ve vektörler çevrilmez. Google Drive CBZ/ZIP ve DRM’siz MOBI destekler. Bağımsız KF8/AZW3, korumalı kitaplar ve tekil görsel içe aktarması desteklenmez; site içe aktarması bağdaştırıcı gerektirir.",
         "relatedPath": "/guides/local-comics/"
       },
       {
         "id": "website-permissions",
         "question": "Uzantı web sitesi çerezlerini veya tarama geçmişini yüklüyor mu?",
-        "answer": "Kaynak web sitesi çerezleri, oturum açma belirteçleri ve göz atma geçmişi, çeviri arka ucuna yüklenmez. Gerektiğinde web sitesi ve görsel izinleri talep edilir. Resmi çeviri, seçilen görselleri ve gerekli görev verilerini işlenmek üzere gönderir; ayrıntılar için gizlilik kılavuzuna bakın.",
+        "answer": "Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez. Site erişimi kurulumda bildirilir; tarayıcı bunu sınırlayabilir, bu nedenle sayfa ve görsel alan adının erişimini kontrol edin. Çeviriye seçilen görseller ve gerekli görev verileri gönderilir.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
         "id": "image-privacy",
         "question": "Resimler yükleniyor mu yoksa saklanıyor mu?",
-        "answer": "Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
+        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Başarısız olan çeviriler sayfa kullanıyor mu?",
-        "answer": "Sayfalar önce rezerve edilebilir ve başarılı teslimatla sonuçlandırılabilir. Açık hatalar, çekinceyi iptal eder; tıpkı metin içermediği veya orijinal metin korunarak kısmen tanınmadığı doğrulanan klasik sonuçlarda olduğu gibi. Bilinmeyen yeniden çizim sonuçları öncelikle doğrulanır ve sayfaların geçici olarak ayrılmış halde tutulmasına neden olabilir.",
+        "answer": "Hesapla yapılan resmî çeviride sayfalar önce ayrılabilir ve başarılı teslimden sonra kotadan düşülür. Açık bir hata ayrılan kotayı serbest bırakır; metin bulunmayan veya kısmi tanımada orijinal metnin korunduğu normal sonuçlar için de aynı kural geçerlidir. Sonucu bilinmeyen AI yeniden çizim yalnızca web çalışma alanında hesabınıza sunulan modla ilgilidir: önce görev durumu doğrulanır ve ayrılan kota geçici olarak tutulabilir. MTU, NodeLane resmî kotasını kullanmaz. Anonim denemelerde çalışma alanının yeni istek sayımı kuralları ayrıca geçerlidir; başarısız denemeler de sayılır.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -554,14 +608,32 @@ export default {
       {
         "id": "supported-sites",
         "question": "Her sitede ve dilde çalışıyor mu?",
-        "answer": "Kullanılabilirlik site yapısına, izinlere, görüntü erişimine ve bağdaştırıcılara bağlıdır. Dil desteği çeviri moduna göre farklılık gösterebilir; uzantıdaki listeyi kullanın. Her siteyi, dili veya dosyayı garanti etmiyoruz.",
+        "answer": "Rafa aktarma için site bağdaştırıcısı gerekir. Diğer sayfalarda erişilebilen görselleri veya seçilen görünür alanı çevirebilirsiniz; sonuç yapıya, tarayıcı erişimine ve kaynak sınırlamalarına bağlıdır. Dilleri seçilen kanalda kontrol edin. Her site, dil ve dosya için destek garanti edilmez.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
         "id": "local-translation",
         "question": "NodeLane hesabı olmadan mangayı yerel bir hizmetle çevirebilir miyim?",
-        "answer": "Evet. Uzantı ayarlarında yerel bir çeviri kanalı ekleyip seçerek kendi manga-translator-ui hizmetinizi bağlayın. Bu, NodeLane hesabı veya resmi çeviri kullanım hakki gerektirmez. Hizmeti kendiniz çalıştırmalısınız; ağ gereksinimleri, mevcut modlar ve görüntü işleme, söz konusu hizmete bağlıdır.",
+        "answer": "Evet. Kendi manga-translator-ui hizmetinizi başlatıp adres ve giriş bilgilerini kanal ayarlarına ekleyin. Birden fazla profil saklanabilir, ancak seçilen tek kanal kullanılır. NodeLane hesabı veya resmî kota gerekmez; parola ve belirteç yerelde tutulur. Aynı adres ve kullanıcıyla yeniden bağlanırken parolayı boş bırakabilirsiniz. Çevrimdışı çalışma MTU modellerine ve API’lerine bağlıdır. Parolayı kaydetmek ve alanı boş bırakarak yeniden bağlanmak için uzantı 0.10.2 veya üzeri gerekir; eski sürümlerde her yeniden bağlantıda parola girilmelidir.",
         "relatedPath": "/guides/local-translation/"
+      },
+      {
+        "id": "remote-library",
+        "question": "Bir OPDS kitaplığı bağlayabilir miyim?",
+        "answer": "Evet. Birden fazla OPDS bağlantısı ekleyebilir, katalogları gezebilir, arayabilir ve okuyabilirsiniz. Güvenilir Range gerekli parçaları almayı sağlar; aksi hâlde dosyanın tamamı açıkça indirilmelidir. İlerleme yalnızca bu özelliği destekleyen, doğrulanmış kaynakla eşitlenir.",
+        "relatedPath": "/guides/remote-library/"
+      },
+      {
+        "id": "region-translation",
+        "question": "Tek bir görseli veya sayfa alanını nasıl çeviririm?",
+        "answer": "Görselin sağ tık menüsünü kullanın veya görünür bir dikdörtgen seçin. Geçerli sayfanın görsellerini çevirme de kullanılabilir. Alan kaydırarak birleştirilmez; kısayollar tarayıcıdan ayarlanır. Sonucu orijinalle karşılaştırabilirsiniz.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "offline-reading",
+        "question": "Çevrimdışı ne okuyabilir ve çevirebilirim?",
+        "answer": "Yerel dosyalar ve tamamen önbelleğe alınmış bölümler, veriler cihazda kaldığı sürece açılır. Sitelerde seçilen dilin tüm bölümlerini önbelleğe alıp eksikleri tamamlayın; görev sayfasını kapatmak planı duraklatır. Uzak kısmi okuma bütün kitabı otomatik kaydetmez. Yeni resmî çeviri internet, MTU ise tamamen yerel bir yapılandırma gerektirir.",
+        "relatedPath": "/guides/remote-library/"
       }
     ],
     "releases": [
@@ -720,7 +792,7 @@ export default {
     "账户信息": "Hesap bilgileri",
     "退出登录": "Oturumu kapat",
     "会员有效期至": "Üyelik şu tarihe kadar geçerlidir: ",
-    "阅读、翻译和用量查看，请前往浏览器插件。": "Okumak, çeviri yapmak ve kullanımı kontrol etmek için tarayıcı uzantısını açın.",
+    "阅读、翻译和用量查看，请前往浏览器插件。": "Kesintisiz okuma ve uzantı kullanım ayrıntıları için uzantıya gidin; web sitesindeki görsel çevirisi de bu hesabın kotasını kullanır.",
     "下载插件": "Uzantıyı indir",
     "会员订阅": "Üyelik",
     "刷新": "Yenile",

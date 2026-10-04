@@ -30,7 +30,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。
 
 - [src/i18n](src/i18n)：简中、繁中、英、日、韩、法、西、巴西葡萄牙、德、意、俄、波兰、乌克兰、土耳其、越南、印尼语独立字典；新增页面或文案同步 16 语。语言由 URL 决定，切换保留当前页面；[语言偏好方案](../../docs/WEBSITE_LANGUAGE_DESIGN.md)说明浏览器语言提示、手动偏好和匹配规则。
-- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；由指南列表、帮助、FAQ 和相关文章进入。正文支持步骤、命令、对照表及来源链接。
+- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。插件仅提供常规图片翻译，官网工作台模式按实际能力与账户权益显示；EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
 - 卸载反馈页 `/uninstall/` 提供16 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
 - [src/data/published-lite.ts](src/data/published-lite.ts)：官网静态公布的 Lite 价格与权益；购买状态和正式结账报价来自账单 API。更新规则见[支付规则](../../docs/STRIPE_BILLING.md#已确认的产品规则)。

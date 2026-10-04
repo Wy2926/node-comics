@@ -35,6 +35,7 @@ const h = homeCopy[locale];
 const tr = translationCopy[locale];
 const { ui: t, documents } = dictionaries[locale];
 const href = (path: string) => localPath(path, locale);
+const sourceGuides = ['local-comics', 'remote-library', 'remote-library', 'manga-translation'];
 const examples = await Promise.all([
   { id: 'original', image: original },
   { id: 'zh', image: chinese },
@@ -91,7 +92,7 @@ const trustTargets = [site.github, href('/download/'), href('/guides/comic-reade
     <Compare client:visible examples={examples} locale={locale} copy={h.comparison}/>
   </section>
   <section class="container product-section product-sources"><div class="product-section-heading"><div><p class="eyebrow">{h.sourcesEyebrow}</p><h2>{h.sourcesTitle}</h2></div></div>
-    <div class="source-grid">{h.sources.map(([title, body, link], i) => <article><span class="source-number">0{i + 1}</span><h3>{title}</h3><p>{body}</p>{i === 0 && <div class="format-tags">{['CBZ / ZIP', 'CBR / RAR', 'PDF', 'DRM-free MOBI'].map(format => <span>{format}</span>)}</div>}<a class="text-link" href={href(i === 0 ? '/guides/local-comics/' : '/guides/manga-translation/')}>{link}</a></article>)}</div>
+    <div class="source-grid">{h.sources.map(([title, body, link], i) => <article><span class="source-number">0{i + 1}</span><h3>{title}</h3><p>{body}</p>{i === 0 && <div class="format-tags">{['CBZ / ZIP', 'CBR / RAR', 'PDF', 'MOBI', 'EPUB'].map(format => <span>{format}</span>)}</div>}<a class="text-link" href={href(`/guides/${sourceGuides[i]}/`)}>{link}</a></article>)}</div>
   </section>
   <section class="container product-section product-modes"><div class="product-section-heading"><div><p class="eyebrow">{h.modesEyebrow}</p><h2>{h.modesTitle}</h2></div><p>{h.controlNote}</p></div>
     <div class="mode-grid">{h.modes.map(([title, body]) => <article><h3>{title}</h3><p>{body}</p></article>)}</div>

@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Hướng dẫn dịch thuật cục bộ",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Thêm kênh dịch trong tiện ích mở rộng",
         "paragraphs": [
-          "Mở cài đặt của tiện ích mở rộng và tìm Kênh dịch. Sau khi kết nối thành công, tiện ích lưu mật khẩu và mã thông báo dịch vụ trên máy tính này. Khi kết nối lại với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Các nhãn bên dưới mô tả các điều khiển tương ứng bằng ngôn ngữ giao diện của bạn."
+          "Mở cài đặt của tiện ích mở rộng và tìm Kênh dịch. Sau khi kết nối thành công, tiện ích lưu mật khẩu và mã thông báo dịch vụ trên máy tính này. Khi kết nối lại với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Các nhãn bên dưới mô tả các điều khiển tương ứng bằng ngôn ngữ giao diện của bạn. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
         ],
         "steps": [
           "Chọn Thêm kênh dịch và xác nhận manga-translator-ui làm dịch vụ. Tùy ý đặt cho nó một cái tên dễ nhận biết, chẳng hạn như “Máy tính của tôi”.",
@@ -78,8 +78,8 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Đọc trang dịch đầu tiên của bạn",
         "paragraphs": [
-          "Nhập truyện tranh cục bộ hoặc mở một trang web được hỗ trợ trong trình đọc. Chọn ngôn ngữ đích và dịch thông thường, sau đó đợi trang hiện tại. Kênh MTU hiện chỉ hỗ trợ dịch thông thường chứ không hỗ trợ chế độ vẽ lại bằng AI NodeLane chính thức.",
-          "Trang hiện tại được ưu tiên, tiếp theo là ba trang tiếp theo. Hình ảnh chạy lần lượt trên cùng một kênh MTU. Chuyển về bản gốc hoặc so sánh cạnh nhau mà không làm mất vị trí đọc của bạn. Trình đọc và tính năng dịch trong trang sử dụng cùng một kênh đã chọn.",
+          "Nhập truyện cục bộ hoặc EPUB, hay mở website tương thích và OPDS trong trình đọc. Chọn ngôn ngữ, dịch thông thường và kiểm tra ảnh hiện tại. Cả kênh NodeLane lẫn MTU trong tiện ích chỉ dùng dịch thông thường; EPUB không dịch văn bản.",
+          "Ảnh hiện tại được ưu tiên rồi bổ sung vùng lân cận có giới hạn theo vị trí đọc. Cùng một MTU xử lý lần lượt từng ảnh. Chuyển hoặc so sánh bản gốc giữ vị trí; dịch tab, ảnh nhấp chuột phải và vùng chọn cũng dùng kênh hiện tại.",
           "Nếu một trang bị lỗi, hãy giải quyết vấn đề được báo cáo trước khi thử lại theo cách thủ công. Việc đóng một trang hoặc mất kết nối không chứng tỏ rằng MTU đã ngừng tính toán. Tránh gửi đi lặp lại trong khi dịch vụ có thể vẫn đang bận."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Kết nối trước đó hiện báo cáo thông tin đăng nhập đã hết hạn",
-              "Chọn Kết nối lại trong cài đặt kênh. Với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Cấu hình từ phiên bản cũ chỉ lưu mã thông báo cần nhập mật khẩu một lần khi kết nối lại lần đầu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Tiện ích mở rộng không âm thầm gửi lại bản dịch trước đó."
+              "Chọn Kết nối lại trong cài đặt kênh. Với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Cấu hình từ phiên bản cũ chỉ lưu mã thông báo cần nhập mật khẩu một lần khi kết nối lại lần đầu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Tiện ích mở rộng không âm thầm gửi lại bản dịch trước đó. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
             ],
             [
               "Đã kết nối nhưng bản dịch vẫn đang chờ",
@@ -149,7 +149,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Hướng dẫn dịch cục bộ",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Đọc truyện tranh cục bộ",
-              "Nhập CBZ / ZIP, CBR / RAR, PDF hoặc các tệp MOBI không có DRM được hỗ trợ vào trình duyệt. Đọc bản gốc không cần dịch vụ dịch thuật."
+              "Nhập CBZ/ZIP, CBR/RAR, PDF, MOBI không DRM tương thích hoặc EPUB. Đọc ảnh và văn bản gốc không cần dịch vụ; EPUB chỉ dịch ảnh trong sách."
             ],
             [
               "Dịch vụ MTU cục bộ",
@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Chế độ mở rộng",
               "Hiện tại chỉ có dịch thông thường",
-              "Dịch thông thường và vẽ lại bằng AI, tùy thuộc vào quyền truy cập tài khoản"
+              "Tiện ích chỉ dịch thông thường, dùng hạn mức tài khoản"
             ],
             [
               "Chi phí",

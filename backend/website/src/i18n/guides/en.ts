@@ -5,7 +5,7 @@ export const localTranslationGuides: Guide[] = [
     slug: 'local-translation',
     title: 'Local manga translation: connect manga-translator-ui to NodeLane',
     description: 'Set up the manga-translator-ui Web service, connect it to NodeLane, and translate your first comic page. Includes connection, login, waiting and cache troubleshooting.',
-    category: 'Local translation tutorial', minutes: 8, published: '2026-09-28', updated: '2026-09-28',
+    category: 'Local translation tutorial', minutes: 8, published: '2026-09-28', updated: "2026-10-04",
     related: ['local-manga-translator', 'local-comics', 'translation-troubleshooting'],
     sections: [
       { title: 'Before you start', paragraphs: [
@@ -21,7 +21,7 @@ export const localTranslationGuides: Guide[] = [
         'Configure the translator, models and any required API keys on the server, then confirm that a test image produces a translated image. The extension sets the target language and uses server defaults for other translation settings. Make sure the Web service uses the intended defaults. Do not enter a model API key in the extension’s password field.'
       ], links: [{label: 'Official MTU project and documentation', href: 'https://github.com/hgmzhn/manga-translator-ui'}] },
       { title: '3. Add a translation channel in the extension', paragraphs: [
-        'Open the extension’s settings and find Translation channels. After a successful connection, the extension saves the service password and token locally on this computer. When reconnecting with the same service address and username, leave the password blank to reuse the saved password. Enter it again if the address or username changes, or if the password has changed or is no longer valid. Older profiles that only contain a token need a password once on their first reconnection. Labels below describe the corresponding controls in your interface language.'
+        'Open the extension’s settings and find Translation channels. After a successful connection, the extension saves the service password and token locally on this computer. When reconnecting with the same service address and username, leave the password blank to reuse the saved password. Enter it again if the address or username changes, or if the password has changed or is no longer valid. Older profiles that only contain a token need a password once on their first reconnection. Labels below describe the corresponding controls in your interface language. Saving passwords and reconnecting with a blank password require extension 0.10.2 or later; earlier versions require the password on each reconnection.'
       ], steps: [
         'Choose Add translation channel and confirm manga-translator-ui as the service. Optionally give it a recognizable name, such as “My computer”.',
         'Enter http://127.0.0.1:8000 as the service address. Use the service root, without /auth/login, /translate/with-form/image or an administration page path.',
@@ -29,8 +29,8 @@ export const localTranslationGuides: Guide[] = [
         'Check that Current channel shows the new service. You may save multiple service profiles, but only the selected channel is used at a time.'
       ] },
       { title: '4. Read your first translated page', paragraphs: [
-        'Import a local comic or open a supported website in the reader. Choose a target language and classic translation, then wait for the current page. The MTU channel currently supports classic translation only, not the official NodeLane AI redraw mode.',
-        'The current page takes priority, followed by the next three pages. Images run one at a time on the same MTU channel. Switch back to the original or compare side by side without losing your reading position. The reader and in-page translation use the same selected channel.',
+        "Open a local book, OPDS item or supported website in the reader. Choose your target language and the MTU channel, then test the current image. Both official and MTU channels provide standard image translation in the current extension.",
+        "Current images take priority within a limited nearby reading window. One MTU channel processes images serially. Switch back to originals or compare side by side without losing your position; reader, website and region translation share the selected channel.",
         'If a page fails, resolve its reported issue before retrying manually. Closing a page or losing the connection does not prove that MTU stopped computing. Avoid repeated submissions while the service may still be busy.'
       ], links: [{label: 'Importing local comics and supported formats', href: '/guides/local-comics/'}] },
       { title: 'Troubleshoot connections, login and long waits', paragraphs: [
@@ -39,7 +39,7 @@ export const localTranslationGuides: Guide[] = [
         ['The service address does not open', 'Check that the Web service is running and the port is correct. 127.0.0.1 means the computer running the browser; a different device needs its own reachable address.'],
         ['The page opens, but the extension cannot connect', 'Check the root address, browser access permission and whether your MTU version provides compatible account login and image translation endpoints.'],
         ['Wrong credentials or initial password change required', 'Sign in to MTU or change the initial password there, then reconnect. Use MTU credentials, not a NodeLane password or model API key.'],
-        ['A previous connection now reports an expired login', 'Choose Reconnect in channel settings. For the same service address and username, leave the password blank to reuse it. Enter it again if the address or username changes, the password has changed or is no longer valid, or an older profile only has a token. The extension does not silently resend the previous translation.'],
+        ['A previous connection now reports an expired login', 'Choose Reconnect in channel settings. For the same service address and username, leave the password blank to reuse it. Enter it again if the address or username changes, the password has changed or is no longer valid, or an older profile only has a token. The extension does not silently resend the previous translation. Saving passwords and reconnecting with a blank password require extension 0.10.2 or later; earlier versions require the password on each reconnection.'],
         ['Connected, but translation keeps waiting', 'Check model downloads, engine loading, queues, API balance and hardware resources. Test the same configuration in MTU. Connecting only verifies login.'],
         ['Interrupted, timed out or returned something other than an image', 'Check the MTU task, proxy timeout and response. Retry the failed page manually after fixing the cause. The extension does not restore results automatically from MTU history.']
       ] } },
@@ -53,7 +53,7 @@ export const localTranslationGuides: Guide[] = [
     slug: 'local-manga-translator',
     title: 'Choosing a local manga translator for browser reading',
     description: 'Use manga-translator-ui with a browser comic reader: understand local manga translation, hardware and API costs, privacy, offline requirements, and support for CBZ and PDF reading.',
-    category: 'Local translation guide', minutes: 6, published: '2026-09-28', updated: '2026-09-28',
+    category: 'Local translation guide', minutes: 6, published: '2026-09-28', updated: "2026-10-04",
     related: ['local-translation', 'translation-modes', 'local-comics'],
     sections: [
       { title: 'Manga translation needs an image workflow', paragraphs: [
@@ -63,7 +63,7 @@ export const localTranslationGuides: Guide[] = [
       { title: 'Local reading, a local service and offline translation', paragraphs: [
         '“Local” can describe where a file lives or where a service runs. Follow the entire processing path to understand what happens to the content.'
       ], table: { headers: ['Term', 'What it means'], rows: [
-        ['Local comic reading', 'Import CBZ / ZIP, CBR / RAR, PDF or supported DRM-free MOBI files into the browser. Reading originals needs no translation service.'],
+        ['Local comic reading', "Import CBZ/ZIP, CBR/RAR, PDF, supported DRM-free MOBI or EPUB in the browser. Original reading does not call a translation service; EPUB translation covers embedded bitmap images only."],
         ['A local MTU service', 'Images go to your MTU installation, which may use local models or external APIs.'],
         ['Fully offline translation', 'Originals, models and dependencies are available locally, and every processing stage works without online services. Verify the whole pipeline yourself.']
       ] } },
@@ -72,7 +72,7 @@ export const localTranslationGuides: Guide[] = [
       ], table: { headers: ['Consideration', 'Your MTU channel', 'Official NodeLane channel'], rows: [
         ['Account', 'MTU credentials; no NodeLane login', 'NodeLane login required'],
         ['Setup', 'Install, run and configure your service', 'Translation service maintained by NodeLane'],
-        ['Extension modes', 'Currently classic translation only', 'Classic translation and AI redraw, subject to account access'],
+        ['Extension modes', 'Currently classic translation only', "Standard image translation with the current account allowance"],
         ['Costs', 'No official allowance used; hardware, power and chosen APIs are yours', 'Official plans and allowance rules'],
         ['Missing result cache', 'Manual retranslation required', 'Eligible official results can be downloaded again while available']
       ] }, links: [{label: 'Connect your local service', href: '/guides/local-translation/'}, {label: 'Official plans and allowances', href: '/pricing/'}] },

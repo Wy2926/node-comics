@@ -20,11 +20,11 @@ const copy: HomeCopy = {
     "Lisez et traduisez des mangas.",
     "Dans votre navigateur."
   ],
-  "description": "Lisez des mangas avec la traduction par IA dans Chrome, Edge et Firefox. Ouvrez les sites compatibles ou vos fichiers CBZ, CBR, PDF et MOBI sans DRM, puis comparez chaque page traduite avec son original.",
+  "description": "Lisez et traduisez dans Chrome, Edge et Firefox : fichiers locaux, EPUB, Google Drive, bibliothèques OPDS et sites compatibles. Découvrez des mangas, comparez les originaux et préparez votre lecture hors ligne.",
   "install": "Obtenez l'extension",
   "seeReader": "Découvrez le lecteur",
   "readerPath": "Lire des bandes dessinées avec l'extension",
-  "readerAccess": "Lisez les originaux locaux gratuitement, sans compte. La traduction officielle utilise le quota de votre compte ; vous pouvez aussi connecter votre propre service local.",
+  "readerAccess": "Lisez gratuitement vos originaux locaux sans compte. Le service officiel utilise votre quota de compte ; votre propre MTU n’exige ni compte NodeLane ni quota officiel.",
   "webAccess": "Essayez en tant qu’invité ou connectez-vous pour utiliser le quota de votre compte. L’espace de traduction d’images affiche le nombre d’utilisations disponibles.",
   "desktop": "Pensé pour la lecture sur ordinateur",
   "popupAlt": "Fenêtre contextuelle de la barre d'outils NodeLane Comics avec l'anglais sélectionné et le bouton de l'onglet Traduire actuel.",
@@ -68,16 +68,16 @@ const copy: HomeCopy = {
   "stepsIntro": "Installez l'extension, ajoutez une bande dessinée et lisez à votre rythme.",
   "steps": [
     [
-      "Installer l'extension",
-      "Installez à partir du magasin Chrome ou Firefox, ou obtenez le package Edge."
+      "Installer l’extension",
+      "Choisissez la boutique Chrome ou Firefox, ou le paquet Edge. Vérifiez les restrictions d’accès aux sites dans votre navigateur."
     ],
     [
-      "Importer ou ajouter une bande dessinée",
-      "Importez des fichiers locaux ou des bandes dessinées depuis Google Drive, ou ajoutez une bande dessinée à partir d'un site Web pris en charge."
+      "Ouvrir une histoire",
+      "Importez un fichier, choisissez un fichier Drive, connectez une bibliothèque OPDS ou ajoutez un manga depuis un site compatible."
     ],
     [
-      "Traduisez quand vous le souhaitez",
-      "Lisez les originaux sans compte. Choisissez un service de traduction et comparez avec l’original pendant que vous lisez."
+      "Lire et traduire au besoin",
+      "Gardez l’original, choisissez le service officiel ou votre MTU et mettez les chapitres en cache pour les lire hors ligne."
     ]
   ],
   "compareEyebrow": "REGARDEZ DE PLUS PRÈS",
@@ -87,7 +87,7 @@ const copy: HomeCopy = {
   "compareLink": "Comment fonctionne la traduction",
   "readerEyebrow": "SIX ÉCRANS POUR DÉCOUVRIR LE LECTEUR",
   "readerTitle": "Votre prochaine bande dessinée. Votre prochaine page.",
-  "readerBody": "Trouvez une nouvelle histoire, ajoutez-la à votre étagère et mettez-la en cache pour la lire hors ligne. Explorez les interfaces réelles à partir de l'aperçu du projet.",
+  "readerBody": "Importez vos fichiers, ouvrez une bibliothèque OPDS ou ajoutez un manga depuis un site compatible. Retrouvez votre progression, comparez les originaux et les traductions, puis mettez les chapitres en cache pour les lire hors ligne.",
   "galleryLabels": [
     "Mes BD",
     "Découvrez les bandes dessinées",
@@ -120,29 +120,39 @@ const copy: HomeCopy = {
   "sourcesTitle": "Apportez une bande dessinée à laquelle vous pouvez accéder.",
   "sources": [
     [
-      "Vos fichiers BD",
-      "Importez des archives de bandes dessinées et des documents pris en charge dans votre étagère. Lisez l'original localement, sans vous connecter.",
-      "Importer une bande dessinée locale"
+      "Fichiers locaux",
+      "Importez CBZ/ZIP, CBR/RAR, PDF, MOBI ou EPUB sans DRM. Lisez les originaux localement ; EPUB traduit uniquement les images matricielles intégrées.",
+      "Importer un fichier local"
     ],
     [
-      "Sites Web pris en charge",
-      "Ajoutez un lien de bande dessinée à partir d'un site pris en charge. Les importations de sites Web utilisent des adaptateurs dédiés ; le support varie selon le site.",
-      "Voir les instructions d'importation du site Web"
+      "Google Drive",
+      "Depuis Google Drive, sélectionnez des fichiers CBZ/ZIP ou MOBI sans DRM compatibles. La connexion Drive n’ajoute pas la prise en charge de tous les formats locaux.",
+      "Voir les fichiers compatibles avec Drive"
+    ],
+    [
+      "Bibliothèques OPDS",
+      "Connectez plusieurs bibliothèques OPDS pour parcourir, rechercher et lire à la demande. Si une ressource permet une lecture fiable par plages HTTP, seules les parties nécessaires sont récupérées ; sinon, un téléchargement complet explicite est requis.",
+      "Connecter une bibliothèque OPDS"
+    ],
+    [
+      "Sites compatibles",
+      "Ajoutez un manga depuis un site doté d’un adaptateur. Sur d’autres pages, traduisez les images sur place ou sélectionnez une zone visible, sans importation dans la bibliothèque.",
+      "Lire sur un site compatible"
     ]
   ],
-  "modesEyebrow": "TRADUIRE QUAND VOUS LE VOULEZ",
-  "modesTitle": "Deux façons de lire dans plusieurs langues.",
+  "modesEyebrow": "CHOISISSEZ VOTRE SERVICE DE TRADUCTION",
+  "modesTitle": "Une traduction classique, deux choix de service.",
   "modes": [
     [
-      "Traduction standard",
-      "Détecte le texte, le traduit et le replace dans l’image après avoir retouché localement le fond."
+      "Service officiel NodeLane",
+      "Connectez votre compte NodeLane pour utiliser le service officiel. Les images sélectionnées sont traitées à distance selon les droits et les limites affichés dans votre compte. Les résultats valides peuvent être réutilisés selon les règles de conservation."
     ],
     [
-      "Redessin par IA",
-      "Utilise un modèle d'image pour traduire et redessiner la page. Cela peut également modifier les détails de l’œuvre d’art."
+      "Votre service manga-translator-ui",
+      "Connectez votre propre MTU sans compte NodeLane ni quota officiel. Enregistrez plusieurs profils et utilisez un seul service sélectionné à la fois. Les modèles et les dépendances réseau dépendent de votre installation."
     ]
   ],
-  "controlNote": "Les nouvelles bandes dessinées s'ouvrent dans la vue originale. Choisissez un mode de traduction lorsque vous êtes prêt.",
+  "controlNote": "Les nouveaux mangas s’ouvrent sur les originaux. La traduction automatique est désactivée par défaut ; choisissez une langue et le service souhaité au moment de traduire.",
   "privacyTitle": "Sachez ce qui arrive à vos pages.",
   "privacyBody": "La traduction officielle envoie les images sélectionnées au serveur ; les originaux sont supprimés une fois la tâche terminée, échouée ou annulée. Les résultats privés du compte sont conservés tant qu’il reste des demandes valides. Les résultats des invités restent sur le serveur pendant 24 heures après la fin de la tâche ; cette limite n’affecte pas les traductions enregistrées localement. Si vous connectez un service de traduction local, le traitement et la conservation des images dépendent de ce service.",
   "privacy": "Politique de confidentialité",

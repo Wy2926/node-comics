@@ -7,7 +7,7 @@ export default {
     "seoAboutTitle": "Über unseren Manga-Übersetzer und Comic-Reader",
     "seoHelpTitle": "Fehlerbehebung bei Manga-Übersetzungen und -Erweiterungen",
     "seoFaqTitle": "FAQ zum Manga-Übersetzer: Installation, Dateien und Einschränkungen",
-    "seoGuidesTitle": "Manga-Übersetzung und CBZ-, PDF-Leserhandbücher",
+    "seoGuidesTitle": "Anleitungen zu Übersetzung, EPUB, OPDS und Offline-Lesen",
     "features": "Funktionen",
     "pricing": "Preise",
     "guides": "Anleitungen",
@@ -27,15 +27,15 @@ export default {
     "menu": "Navigation öffnen",
     "language": "Sprache",
     "tagline": "Gute Geschichten, jenseits der Sprache",
-    "footerStory": "Verwandeln Sie die Sprachbarriere in eine andere Seite. Ihre nächste Geschichte wartet auf Sie.",
+    "footerStory": "Finde Geschichten, setze deine Lektüre fort und übersetze Bilder, wenn du sie brauchst.",
     "startReading": "Lesen starten",
     "support": "Leserunterstützung",
     "company": "Über uns",
     "copyright": "Gemacht für Menschen, die Geschichten lieben.",
     "artNote": "Produkt-Screenshots und Original-KI-Illustrationen · Comic-Artwork gehört den jeweiligen Eigentümern",
     "ogAlt": "Originale NodeLane Comics-Manga-Illustration am Meer",
-    "heroTitle": "Jenseits von Worten. In die Geschichte.",
-    "heroDescription": "Geben Sie Ihrem Lieblingsmanga eine Version, die Sie verstehen können. Lesen und übersetzen Sie Webcomics und Ihre lokale Sammlung Seite für Seite.",
+    "heroTitle": "Deine Mangas. Dein Tempo. Deine Sprache.",
+    "heroDescription": "Lies und übersetze in Chrome, Edge und Firefox: lokale Dateien, EPUB, Google Drive, OPDS-Bibliotheken und unterstützte Websites. Entdecke Mangas, vergleiche die Originale und bereite das Lesen ohne Internet vor.",
     "heroEyebrow": "IHRE NÄCHSTE SEITE, IN IHRER SPRACHE",
     "freeStart": "Beginnen Sie kostenlos mit dem Lesen",
     "seeHow": "Sehen Sie, wie es funktioniert",
@@ -43,35 +43,41 @@ export default {
     "heroCaption": "Originale KI-Kunstwerke für NodeLane Comics",
     "heroAlt": "Original-Manga: Ein Reisender wartet auf einem Bahnsteig am Meer",
     "nextStop": "NÄCHSTER STOP / EINE NEUE WELT",
-    "featureHeading": "Manga übersetzen. Originale lesen und vergleichen.",
-    "featureDescription": "Übersetzen Sie unterstützte Webcomics und lokale Dateien Seite für Seite, vergleichen Sie Originale und behalten Sie Ihre Leseposition. Nutzen Sie Standardübersetzung, KI-Neuzeichnung sowie das Lesen von CBZ, CBR, PDF und MOBI ohne DRM.",
+    "featureHeading": "Entdecken, lesen und übersetzen in deinem Tempo.",
+    "featureDescription": "Importiere Dateien, öffne eine OPDS-Bibliothek oder füge einen Manga von einer unterstützten Website hinzu. Setze deine Lektüre fort, vergleiche Original und Übersetzung und speichere Kapitel für das Lesen ohne Internet.",
     "featureTitles": [
-      "Die Übersetzung folgt Ihrer Lektüre",
-      "Zwei Möglichkeiten, dieselbe Seite zu lesen",
-      "Ein neues Kapitel für Ihre Sammlung"
+      "Lokale Dateien und EPUB",
+      "OPDS-Bibliotheken",
+      "Entdecken und auf mehreren Websites suchen",
+      "Bilder und sichtbare Bereiche übersetzen",
+      "Offizieller Dienst oder manga-translator-ui",
+      "Offline lesen und Leseansicht anpassen"
     ],
     "featureBodies": [
-      "Wählen Sie „Übersetzung“, um das aktuelle Bild und die nächsten drei beim Lesen zu verarbeiten. Ihre Leseposition bleibt erhalten, wenn Ergebnisse eintreffen.",
-      "Verwenden Sie die klassische Übersetzung für die alltägliche Lektüre oder versuchen Sie es mit der KI-Neuzeichnung für eine andere Darstellung. Das Original bleibt einen Klick entfernt.",
-      "Wählen Sie CBZ/ZIP, CBR/RAR, PDF oder unterstützte MOBI-Dateien ohne DRM. Nach dem Import können Sie sofort lesen. Jede Datei bildet einen Comic; einzelne Bilder werden nicht unterstützt."
+      "Importiere CBZ/ZIP, CBR/RAR, PDF, MOBI oder EPUB ohne DRM. Lies Originale lokal; bei EPUB werden nur eingebettete Rasterbilder übersetzt.",
+      "Verbinde mehrere OPDS-Bibliotheken zum Durchsuchen, Suchen und Lesen bei Bedarf. Unterstützt eine Ressource zuverlässige HTTP-Bereichsabfragen, werden nur benötigte Teile abgerufen; andernfalls ist ein ausdrücklich gewählter vollständiger Download nötig.",
+      "Entdecke Trends, Neuerscheinungen und Ranglisten von AniList. Suche auf unterstützten Websites nach Titel, Alternativnamen oder übersetztem Namen und prüfe die Quelle vor dem Hinzufügen.",
+      "Übersetze die Seite, ein Bild per Rechtsklick oder ein sichtbares Rechteck. Die Bereichsauswahl scrollt nicht für ein zusammengesetztes langes Bild. Passe Tastenkürzel im Browser an.",
+      "Klassische Übersetzung, Rückkehr zum Original und Vergleich nebeneinander. Wähle den offiziellen Dienst mit deinem Konto oder dein eigenes manga-translator-ui ohne offizielles Kontingent.",
+      "Speichere Kapitel, pausiere, setze fort und ergänze fehlende Seiten. Passe fortlaufendes Lesen oder Seitenansicht, Leserichtung, Zoom und Hintergrund an."
     ],
     "ribbon": [
-      "Klassisch + KI-Neuzeichnung",
-      "Web- und lokale Comics",
-      "Originale immer verfügbar",
-      "Behalten Sie Ihren Leseplatz"
+      "Dateien, EPUB und OPDS",
+      "Klassische Übersetzung",
+      "Originale und Vergleich",
+      "Gespeicherte Kapitel offline lesen"
     ],
     "compareTitle": "Verstehen Sie den Dialog. Behalte das Gefühl.",
     "compareDescription": "Kein Springen zwischen Ihrem Manga und einem Übersetzungsfenster. Fügen Sie die Wörter wieder ins Bild ein und bleiben Sie bei den Charakteren.",
     "readingTitle": "Ihre Sammlung. Eine frische Art zu lesen.",
-    "readingDescription": "Öffnen Sie einen Comic und machen Sie dort weiter, wo Sie aufgehört haben. Eine Quelle pro Comic, mit einem schreibgeschützten Quellenverzeichnis und ohne Kapitel- oder Editionsverwaltung.",
+    "readingDescription": "Importiere Dateien, öffne eine OPDS-Bibliothek oder füge einen Manga von einer unterstützten Website hinzu. Setze deine Lektüre fort, vergleiche Original und Übersetzung und speichere Kapitel für das Lesen ohne Internet.",
     "readingAlt": "Originalillustration eines offenen Mangas an einem Fenster mit Blick auf das Meer",
     "guideHeading": "Ein paar Anmerkungen vor der nächsten Seite.",
     "allGuides": "Alle Leseführer",
     "readGuide": "Leitfaden lesen",
     "minutes": "min",
     "ctaTitle": "Gute Geschichten verdienen es, verstanden zu werden.",
-    "ctaDescription": "Überlassen Sie die Übersetzung NodeLane Comics. Speichern Sie Ihre Aufmerksamkeit für die nächste Seite.",
+    "ctaDescription": "Öffne eine Geschichte, die du lesen darfst. Übersetze bei Bedarf und behalte das Original griffbereit.",
     "ctaButton": "Beginnen Sie Ihre Lesereise",
     "pricingTitle": "Kostenlos lesen. Wählen Sie Ihren Übersetzungsplan.",
     "pricingDescription": "Vergleichen Sie den kostenlosen Tarif und Lite: kostenlose Seiten pro Tag, bis zu 1.200 neue Anfragen in jedem gleitenden Stundenfenster sowie monatliche oder jährliche Abrechnung. Lite enthält keine KI-Neuzeichnung. Berechtigte Erstnutzer erhalten eine 7-tägige Testphase.",
@@ -104,16 +110,16 @@ export default {
     "downloadXpi": "Signiert herunterladen XPI",
     "storeHeading": "Browser-Store-Links",
     "storeNote": "Die Edge-Eintragung wird derzeit überprüft; Verwenden Sie vorerst das Paket Edge ZIP. Installieren Sie Firefox aus dem Store oder mit dem signierten XPI. Feedback:",
-    "guidesTitle": "Manga-Übersetzung und lokale Comic-Leseführer",
-    "guidesDescription": "Erfahren Sie, wie Sie Mangas in Ihrem Browser übersetzen, CBZ-, CBR-, PDF- und MOBI-Dateien öffnen, japanische Originale vergleichen, Übersetzungsfehler beheben und den Datenschutz bei Bildern verstehen.",
+    "guidesTitle": "Anleitungen zu Übersetzung, EPUB, OPDS und Offline-Lesen",
+    "guidesDescription": "Importiere CBZ, CBR, PDF, MOBI und EPUB, verbinde OPDS-Bibliotheken, übersetze Bilder oder einen sichtbaren Bereich und bereite das Lesen ohne Internet vor. Vergleiche die Originale und wähle deinen Dienst.",
     "contents": "Auf dieser Seite",
     "editor": "NodeLane Comics-Redaktion",
     "updated": "Aktualisiert",
     "related": "Lesen Sie weiter",
     "faqTitle": "Häufig gestellte Fragen zur Manga-Übersetzer-Erweiterung",
-    "faqDescription": "Antworten zur Installation von Chrome, Edge und Firefox, zur kostenlosen Manga-Übersetzung, zu CBZ- und PDF-Dateien, zu unterstützten Websites, zur lokalen Übersetzung, zum Datenschutz und zur Kündigung von Bildern.",
+    "faqDescription": "Antworten zu Installation, lokalen Dateien und EPUB, Google Drive, OPDS, Bereichsübersetzung, Offline-Lesen, Übersetzungsdiensten und Datenschutz.",
     "helpTitle": "Hilfe bei der Manga-Übersetzung und -Erweiterung",
-    "helpDescription": "Beheben Sie Probleme beim Laden von Manga-Bildern, blockierten Übersetzungen, Berechtigungen und der Anmeldung. Finden Sie Installations- und lokale Comic-Anleitungen oder wenden Sie sich an den NodeLane Comics-Support.",
+    "helpDescription": "Hilfe beim Dateiimport, mit OPDS, Website-Bildern, Bereichsübersetzung, Berechtigungen und der Verbindung zu einem Übersetzungsdienst.",
     "contactTitle": "Jedes Feedback verdient eine sorgfältige Lektüre.",
     "videoTutorials": "Video-Tutorials",
     "githubSource": "Quelle ansehen auf GitHub",
@@ -122,8 +128,8 @@ export default {
     "contactDescription": "Nutzen Sie die Feedback-Option pro Seite in der Erweiterung für die Übersetzungsqualität. Bei anderen Problemen senden Sie uns eine E-Mail mit Ihrem Browser, der Erweiterungsversion, den Schritten und der Fehlermeldung. Senden Sie keine Passwörter, Token, Zahlungskartendaten, signierten URLs oder vollständigen Comics, zu deren Weitergabe Sie nicht berechtigt sind.",
     "emailButton": "Senden Sie eine E-Mail",
     "aboutTitle": "Über NodeLane Comics",
-    "aboutDescription": "NodeLane Comics ist eine Manga-Übersetzer- und Comic-Reader-Erweiterung für Chrome, Edge und Firefox, mit Web- und lokaler Lektüre und Originalvergleich. Es wird kein Manga-Katalog gehostet.",
-    "aboutBody": "NodeLane Comics vereint Bildübersetzung, lokales Lesen und Web-Bilderkennung in einer Browser-Erweiterung. Wir wollen weniger Fensterschalter und mehr Aufmerksamkeit für die Arbeit selbst. KI kann Fehler machen, daher sind Zugang zu Originalen, klare Regeln und Respekt gegenüber den Urhebern wichtig. Wir stellen keinen Comic-Katalog zur Verfügung, verkaufen keine Comic-Werke und umgehen keine Paywalls, Anmeldeanforderungen oder DRM. Verwenden Sie nur Inhalte, auf deren Zugriff und Verarbeitung Sie berechtigt sind.",
+    "aboutDescription": "Eine Erweiterung zum Entdecken, Lesen und Übersetzen von Mangas: lokale Dateien, EPUB, Drive, OPDS und unterstützte Websites. Die Website bietet außerdem einen Arbeitsbereich zur Bildübersetzung.",
+    "aboutBody": "NodeLane Comics verbindet Entdeckung, Suche auf mehreren Websites, Lesen und klassische Übersetzung in einer Erweiterung für Chrome, Edge und Firefox. Importiere lokale Dateien, verbinde Google Drive oder mehrere OPDS-Bibliotheken und lies auf unterstützten Websites. Vergleiche Originalbilder, behalte deine Leseposition und speichere Kapitel für unterwegs. Wähle den offiziellen Dienst oder dein eigenes manga-translator-ui. Die Website bietet einen separaten Arbeitsbereich zur Bildübersetzung. Wir stellen keinen Manga-Katalog bereit und umgehen keine Anmeldung, Bezahlschranken oder DRM. Verwende nur Inhalte, die du lesen und verarbeiten darfst.",
     "changelogTitle": "NodeLane Comics Versionshinweise",
     "changelogDescription": "Verfolgen Sie Manga-Übersetzer-Updates, neue Website-Unterstützung, Browserkompatibilität und Lesekorrekturen. Die Filialgenehmigungen für Chrome, Edge und Firefox können unterschiedlich sein. Überprüfen Sie Ihre installierte Version.",
     "rss": "Verfolgen Sie Updates per RSS",
@@ -132,10 +138,10 @@ export default {
     "callbackTitle": "Öffnen Sie Ihren Leserausweis.",
     "callbackDescription": "Sobald die Anmeldung abgeschlossen ist, kehren Sie zu Ihrem Konto zurück.",
     "noscript": "Für die Kontoanmeldung ist JavaScript erforderlich. Produktseiten, Preise und Leitfäden funktionieren auch ohne.",
-    "seoHomeTitle": "KI-Manga-Übersetzer und Comic-Reader-Erweiterung | NodeLane Comics",
+    "seoHomeTitle": "Manga-Übersetzer und EPUB-, OPDS-Leser | NodeLane Comics",
     "heroLines": [
-      "Jenseits von Worten.",
-      "In die Geschichte."
+      "Deine Mangas. Dein Tempo.",
+      "Deine Sprache."
     ],
     "seoFeaturesTitle": "Funktionen für Manga-Übersetzung und Comic-Reader",
     "seoPricingTitle": "Kostenlose Manga-Übersetzung und Lite-Pläne",
@@ -150,7 +156,7 @@ export default {
   "slug": "manga-translation",
   "minutes": 4,
   "title": "So übersetzen Sie Mangas in Ihrem Browser",
-  "description": "Von der Installation der Erweiterung bis zur Überprüfung Ihrer ersten übersetzten Seite: eine praktische Anleitung zum Erkennen und Lesen von Webbildern.",
+  "description": "Übersetze Bilder einer Seite, ein Bild per Rechtsklick oder einen sichtbaren Bereich. Nutze den Leser auf unterstützten Websites, wähle einen Dienst und vergleiche die Originale.",
   "category": "Erste Schritte",
   "sections": [
     {
@@ -161,10 +167,10 @@ export default {
       ]
     },
     {
-      "title": "Entdecken, prüfen und dann lesen",
+      "title": "Eine Seite, ein Bild oder ein sichtbarer Bereich",
       "paragraphs": [
-        "Klicken Sie auf einer Website mit einem dedizierten Adapter auf „Mit dem Lesen beginnen“, um den Reader direkt zu öffnen. Andere Webseiten können „Aktuelle Registerkarte übersetzen“ verwenden, können jedoch nicht in die Bibliothek importiert werden. Erteilen Sie bei Bedarf Site- und Image-Host-Berechtigungen. Quellinhalte sind schreibgeschützt; Es gibt keine Bildauswahl, Metadatenform oder Kapitelzuordnung.",
-        "Nachdem Sie die Übersetzung ausgewählt haben, wirkt sie sich auf das aktuelle Bild und die nächsten drei aus. Das Erkennen von Bild-URLs bedeutet nicht, dass das gesamte Kapitel heruntergeladen wurde: Lazy Loading, Navigationsänderungen und separate CDNs können den Abruf beeinträchtigen."
+        "Öffne auf einer Website mit Adapter den Leser oder importiere den Manga. Auf anderen Seiten kannst du die Seitenübersetzung, den Rechtsklick auf ein Bild oder ein sichtbares Rechteck verwenden. Die Bereichsauswahl scrollt nicht, um eine lange Aufnahme zusammenzusetzen. Seiten ohne Adapter lassen sich nicht in die Bibliothek importieren. Tastenkürzel stellst du in den nativen Browser-Einstellungen ein.",
+        "Neue Mangas öffnen sich mit den Originalen; automatische Übersetzung ist standardmäßig deaktiviert. Aktiviere sie bei Bedarf: Die aktuelle Seite und ein begrenzter Bereich benachbarter Bilder werden verarbeitet. Ergebnisse und Ansichtswechsel erhalten die Leseposition; eine fehlgeschlagene Seite blockiert die anderen nicht."
       ]
     },
     {
@@ -174,7 +180,8 @@ export default {
         "Eine fehlgeschlagene Seite blockiert die anderen nicht. Nutzen Sie Feedback pro Seite, wenn etwas nicht stimmt. Durch die explizite Anforderung einer neuen Übersetzung wird eine neue Version erstellt und die entsprechende Berechtigung verwendet."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-modes",
@@ -184,39 +191,39 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Klassische Übersetzung oder KI-Neuzeichnung: Wofür sollten Sie sich entscheiden?",
-  "description": "Vergleichen Sie die klassische OCR-Manga-Übersetzung mit KI-Neuzeichnung, überprüfen Sie Originale und erfahren Sie, wie Sie einen lokalen manga-translator-ui-Dienst verbinden. Wählen Sie den Modus und Service für Ihre Lektüre.",
+  "title": "Klassische Übersetzung: offizieller Dienst oder manga-translator-ui?",
+  "description": "Lerne die klassische Übersetzung der Erweiterung kennen, wähle den offiziellen Dienst oder dein eigenes MTU und unterscheide die Funktionen des Web-Arbeitsbereichs.",
   "category": "Übersetzungstipps",
   "sections": [
     {
-      "title": "Zwei verschiedene Arbeitsabläufe",
+      "title": "Klassische Übersetzung in der Erweiterung",
       "paragraphs": [
-        "Die klassische Übersetzung erkennt und erkennt Text, übersetzt ihn mit einem Textmodell, bereinigt die Textbereiche und setzt das Ergebnis. Die KI-Neuzeichnung übergibt das Bild und die Zielsprache an ein Bildmodell, um ein übersetztes Bild zu generieren.",
-        "Keines ist immer besser. Classic konzentriert sich auf Textbereiche; Neuzeichnen bietet mehr Freiheit und kann Zeichen, Hintergründe oder Linien ändern. Vergleichen Sie repräsentative Seiten, anstatt sich auf eine Abbildung zu verlassen."
+        "Die Erweiterung bietet klassische Übersetzung: Texterkennung, OCR, Übersetzung, Entfernen und erneutes Einsetzen des Textes. Du kannst zum Original zurückkehren oder beide Bilder nebeneinander vergleichen. KI-Neuzeichnen wurde aus der Erweiterung entfernt.",
+        "Erkennung und Übersetzung können Wörter auslassen oder Namen, Geräusche und Zusammenhänge falsch verstehen. Prüfe auch die Textplatzierung. Vergleiche mehrere typische Seiten mit den Originalen; flüssige Formulierungen garantieren keine Genauigkeit."
       ]
     },
     {
-      "title": "Beginnen Sie mit der klassischen Lektüre für den Alltag",
+      "title": "Offizieller NodeLane-Dienst",
       "paragraphs": [
-        "Klare Dialoge und regelmäßige Sprechblasen sind ein nützlicher Ausgangspunkt. Handschrift, Perspektive, kleiner Text und Soundeffekte können weiterhin fehlen. Teilergebnismeldungen prüfen und mit dem Original vergleichen.",
+        "Melde dich bei NodeLane an, um den offiziellen Dienst zu nutzen. Ausgewählte Bilder werden auf dem Server entsprechend den in deinem Konto angezeigten Leistungen und Grenzen verarbeitet. Gültige Ergebnisse können gemäß den Aufbewahrungsregeln wiederverwendet werden.",
         "Kostenlos beinhaltet 30 klassische Seiten pro Tag. Lite hat keine tägliche oder monatliche Gesamtobergrenze, mit bis zu 1.200 neuen Seiten pro rollierender Stunde und ohne inbegriffene KI-Neuzeichnung. Es gelten weiterhin kurzfristige Tarif-, Image- und Leistungskapazitätsgrenzen."
       ]
     },
     {
-      "title": "Versuchen Sie es bewusst neu zu zeichnen",
+      "title": "Der Web-Arbeitsbereich zur Bildübersetzung",
       "paragraphs": [
-        "Neugestaltete Seiten sind monatlich ohne Verlängerung verfügbar, auch bei Jahresplänen. Berechtigte Konten können die für ihren Plan angezeigte kartenpflichtige Testversion starten. Durch ein erneutes Abonnieren oder Auswählen eines anderen Plans wird die Testberechtigung nicht zurückgesetzt.",
-        "Verschiedene Modi und Sprachen haben unterschiedliche Ergebnisse. Sie können ein gültiges klassisches Ergebnis beibehalten, während eine Neuzeichnung wartet oder fehlschlägt, und zum Original zurückkehren, wenn es auf Details ankommt."
+        "Die Website nimmt JPG, PNG und WebP an, mit Gasttest oder deinem Kontokontingent. KI-Neuzeichnen ist dort weiterhin verfügbar, wenn deine Berechtigungen es erlauben; die aktuelle Erweiterung bietet diese Funktion nicht.",
+        "Im Web-Arbeitsbereich kann das Neuzeichnen Linien, Figuren oder Hintergründe verändern. Vergleiche immer mit dem Original. Modi und Sprachen haben getrennte Ergebnisse; die angezeigten Zugriffs- und Abrechnungsregeln gelten weiterhin."
       ]
     },
     {
-      "title": "Nutzen Sie einen lokalen Manga-Übersetzungsdienst",
+      "title": "Dein manga-translator-ui-Dienst",
       "paragraphs": [
-        "Verbinden Sie Ihren eigenen manga-translator-ui-Dienst, indem Sie in den Erweiterungseinstellungen einen lokalen Übersetzungskanal hinzufügen und auswählen. Hierfür sind weder ein NodeLane-Konto noch offizielle Übersetzungszulagen erforderlich. Sie müssen den Dienst selbst ausführen; Netzwerkanforderungen, verfügbare Modi und Bildverarbeitung hängen von diesem Dienst ab."
+        "Füge deinen manga-translator-ui-Dienst in den Einstellungen hinzu und wähle ihn für die klassische Übersetzung aus. Du kannst mehrere Profile speichern; jeweils eines ist aktiv. Ein NodeLane-Konto oder offizielles Kontingent ist nicht nötig. MTU-Passwort und Token werden auf diesem Computer gespeichert. Verarbeitung, Modellkosten und Netzwerkbedarf hängen von deinem Dienst ab; ein lokales MTU garantiert keine vollständig netzfreie Übersetzung. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "local-comics",
@@ -226,33 +233,33 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Lesen Sie die Comics CBZ, CBR, PDF und MOBI vor Ort",
-  "description": "Unterstützte Comicformate, Importprüfungen, DRM-freie MOBI-Einschränkungen und die Grenze zwischen lokaler Lektüre und Online-Übersetzung.",
+  "title": "CBZ-, CBR-, PDF-, MOBI- und EPUB-Dateien lesen",
+  "description": "Unterstützte lokale Formate, Import, MOBI und EPUB ohne DRM sowie Grenzen beim Übersetzen eingebetteter Bilder.",
   "category": "Lokale Lektüre",
   "sections": [
     {
       "title": "Kennen Sie das Dateiformat",
       "paragraphs": [
         "CBZ packt Bilder normalerweise in ZIP; CBR verwendet RAR. PDF-Seiten müssen gerendert werden und MOBI enthält Bucheinträge und Bildverweise. Durch das Ändern einer Erweiterung wird keine Datei konvertiert.",
-        "CBZ/ZIP, CBR/RAR, PDF und unterstützte DRM-freie MOBI6/MOBI6+KF8-Comics. Lose Bilder können nicht importiert werden. Website-Importe erfordern einen dedizierten Adapter."
+        "Importiere unterstützte CBZ/ZIP-, CBR/RAR- und PDF-Dateien sowie MOBI und EPUB ohne DRM. Bei EPUB bleibt das Dokument lesbar; nur eingebettete Rasterbilder werden übersetzt, nicht der Buchtext oder Vektorelemente. Einzelbilder, eigenständige KF8/AZW3-Dateien und verschlüsselte Bücher werden nicht importiert. Websites benötigen einen eigenen Adapter."
       ]
     },
     {
       "title": "Überprüfen Sie den Import",
       "paragraphs": [
         "Verwenden Sie eine vollständige Datei, zu deren Bearbeitung Sie berechtigt sind. Suchen Sie nach Passwörtern, Beschädigungen oder nicht unterstützter Komprimierung. Überprüfen Sie nach dem Import Cover, Kapitelreihenfolge, Miniaturansichten und Bildklarheit.",
-        "MOBI-Importe sind auf 512 MB und 1.500 Seiten beschränkt und müssen Strukturprüfungen bestehen. Unterstützte Körperbildreferenzen bestimmen die Reihenfolge; Buch-HTML wird nicht ausgeführt. Eingebettete GIFs können gelesen werden, die Übersetzung verwendet jedoch einen normalisierten ersten Frame. DRM wird nicht entfernt."
+        "Import und Lesen der Originale erfolgen im Browser ohne NodeLane-Konto. Die offizielle Übersetzung sendet ausgewählte Bilder zur Verarbeitung; der MTU-Kanal sendet sie an deinen Dienst. Lokaler Speicher garantiert weder netzfreie Übersetzung noch die Synchronisierung deiner gesamten Bibliothek."
       ]
     },
     {
-      "title": "Beim lokalen Import handelt es sich nicht um eine Offline-Übersetzung",
+      "title": "MOBI und EPUB: das Buch lesen und Bilder übersetzen",
       "paragraphs": [
-        "Das lokale Parsen von Comics und das Lesen des Originals erfolgen im Browser. Die offizielle Übersetzung lädt ausgewählte Seitenbilder zur Verarbeitung hoch und speichert die Ergebnisse privat. Sie können stattdessen Ihren eigenen manga-translator-ui-Dienst auswählen; Seine Konfiguration bestimmt den Netzwerkzugriff und die Bildverarbeitung.",
-        "Die Bibliothek und der Leseplatz bleiben vor Ort. Das erneute Importieren desselben Inhalts unter demselben Konto kann zu gültigen vorhandenen Ergebnissen führen. Hierbei handelt es sich nicht um eine automatische Synchronisierung Ihrer gesamten Bibliothek oder Quelldateien."
+        "MOBI-Importe sind auf 512 MB und 1.500 Seiten beschränkt und müssen Strukturprüfungen bestehen. Unterstützte Körperbildreferenzen bestimmen die Reihenfolge; Buch-HTML wird nicht ausgeführt. Eingebettete GIFs können gelesen werden, die Übersetzung verwendet jedoch einen normalisierten ersten Frame. DRM wird nicht entfernt.",
+        "EPUB ohne DRM behält den Text und die Dokumentnavigation. Übersetzt werden nur Rasterbilder innerhalb des Buches; ihre Originale bleiben zugänglich. Dokumenttext und Vektorelemente werden nicht übersetzt, DRM wird nicht entfernt. Prüfe nach dem Import Lesereihenfolge, Navigation und Bilder."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "japanese-manga",
@@ -278,11 +285,12 @@ export default {
     {
       "title": "Überprüfen Sie sowohl Wörter als auch Bilder",
       "paragraphs": [
-        "Klassische Übersetzung und KI-Neuzeichnung können zu unterschiedlichen Ergebnissen führen. Durch das Neuzeichnen können sich auch Bilddetails ändern. Vergleichen Sie Gesichtsausdrücke, Handschrift und Hintergründe, wenn sie sich auf die Geschichte auswirken.",
+        "Erkennung und Übersetzung können Wörter auslassen oder Namen, Geräusche und Zusammenhänge falsch verstehen. Prüfe auch die Textplatzierung. Vergleiche mehrere typische Seiten mit den Originalen; flüssige Formulierungen garantieren keine Genauigkeit.",
         "NodeLane Comics hält das Original verfügbar. Die Übersetzung senkt die Hürde für das Verständnis, ohne die Möglichkeit zu nehmen, das Werk selbst zu überprüfen."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-troubleshooting",
@@ -306,8 +314,8 @@ export default {
     {
       "title": "Lösen Sie zuerst die ursprüngliche Aufgabe",
       "paragraphs": [
-        "Aufgaben bleiben im Backend bestehen. Das Schließen der Seite oder ein kurzzeitiger Verbindungsverlust bedeutet nicht, dass die Aufgabe verschwunden ist. Lassen Sie die Erweiterung nach der erneuten Verbindung ihren ursprünglichen Status auflösen.",
-        "Ein Bildanbieter hat möglicherweise eine Neuzeichnung akzeptiert, obwohl das Ergebnis unbekannt ist. Die Verifizierung steht an erster Stelle; Das Seitenkontingent kann vorübergehend reserviert bleiben. Das wiederholte Generieren neuer Versionen ist keine sichere Möglichkeit, die Vollständigkeit zu überprüfen."
+        "Offizielle Aufgaben bleiben auf dem Server bestehen. Das Schließen der Seite oder ein kurzer Verbindungsabbruch löscht sie nicht. Lass die Erweiterung nach dem Wiederverbinden den Aufgabenstatus abrufen; prüfe bei MTU deinen Dienst direkt vor einem erneuten Versuch.",
+        "Lies die Meldung der Seite und prüfe Bild, Sprache und ausgewählten Dienst. Eine ausdrücklich angeforderte neue Übersetzung erstellt eine neue Version nach den Regeln des Dienstes. Wiederhole erst nach Beheben der Ursache; mehrfaches Senden bestätigt keinen Aufgabenstatus."
       ]
     },
     {
@@ -317,7 +325,8 @@ export default {
         "Melden Sie Ihren Browser, die Erweiterungsversion, die Schritte, die Fehlermeldung und eine Aufgaben-ID, falls verfügbar. Verwenden Sie nur notwendige, redigierte Screenshots. Senden Sie niemals Quellcookies, Token oder signierte Bild-URLs. Kontaktieren Sie comics@nodelane.net."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "comic-reader-privacy",
@@ -329,14 +338,14 @@ export default {
     {
       "title": "Berechtigungen und lokale Dateien",
       "paragraphs": [
-        "Die Seite und ihre Bilder können auf verschiedenen Domains leben. NodeLane Comics fordert relevanten Zugriff an, wenn Sie Bilderkennungs- oder Übersetzungsfunktionen verwenden. Es werden keine Quell-Site-Cookies, Login-Tokens oder Browserverlauf hochgeladen.",
+        "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
         "Das lokale Comic-Parsen erfolgt im Browser. Das Ablegen einer Datei in Ihrem lokalen Regal bedeutet nicht, dass die gesamte Quelldatei hochgeladen wird. Relevante Seitenbilder und Aufgabeninformationen werden gesendet, wenn eine Übersetzung erforderlich ist."
       ]
     },
     {
       "title": "Übersetzung und Aufbewahrung",
       "paragraphs": [
-        "Bei der klassischen Übersetzung kommen Erkennung, Textübersetzung, Bereinigung und Satz zum Einsatz. Redraw sendet Seitenbilder an ein Bildmodell. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
+        "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Bei der klassischen Übersetzung kommen Erkennung, Textübersetzung, Bereinigung und Satz zum Einsatz. Redraw sendet Seitenbilder an ein Bildmodell. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
         "Ergebnisse werden nur dann innerhalb desselben Kontos wiederverwendet, wenn Inhalt, Modus, Sprache und effektive Konfiguration übereinstimmen und eine gültige Anfrage verbleibt. Originale und Ergebnisse werden nicht zwischen Benutzern geteilt. Der Browser kombiniert Overlays mit seinem eigenen Originalbild; Der Server speichert keine dauerhaften Originalkopien."
       ]
     },
@@ -345,6 +354,51 @@ export default {
       "paragraphs": [
         "Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen.",
         "Für Zugriffs-, Korrektur- oder Löschungsanfragen wenden Sie sich an comics@nodelane.net. Vor dem Umgang mit Daten einer anderen Person müssen Identität und Umfang überprüft werden. Weitere Informationen finden Sie in der vollständigen Datenschutzrichtlinie."
+      ]
+    }
+  ],
+  "updated": "2026-10-04"
+},
+{
+  "slug": "remote-library",
+  "title": "OPDS-Bibliotheken, EPUB und Offline-Lesen",
+  "description": "Verbinde mehrere OPDS-Bibliotheken, durchsuche und lies bei Bedarf und verstehe EPUB-Downloads und die bedingte Synchronisierung des Lesefortschritts.",
+  "category": "Bibliotheken und Lesen",
+  "minutes": 5,
+  "published": "2026-10-04",
+  "updated": "2026-10-04",
+  "related": [
+    "local-comics",
+    "manga-translation",
+    "translation-troubleshooting"
+  ],
+  "sections": [
+    {
+      "title": "Eine erlaubte Bibliothek verbinden",
+      "paragraphs": [
+        "Trage Adresse und Zugangsdaten jeder OPDS-Bibliothek in der Erweiterung ein. Du kannst mehrere Verbindungen speichern und zwischen ihnen wechseln.",
+        "Verwende eine Quelle, auf die du zugreifen darfst. Browser-Berechtigungen, Anmeldung und Serverfunktionen können den Zugriff einschränken; OPDS umgeht weder Anmeldungen noch DRM."
+      ]
+    },
+    {
+      "title": "Bei Bedarf durchsuchen und lesen",
+      "paragraphs": [
+        "Durchsuche den Katalog und nutze die Suche, falls die Quelle sie anbietet. Öffne gewünschte Titel, ohne die ganze Bibliothek zu importieren.",
+        "Lesen mit HTTP-Bereichsabfragen benötigt eine geeignete Ressource und verlässliche Serverantworten. Sind diese Bedingungen nicht erfüllt, wähle vor dem Lesen ausdrücklich den vollständigen Download; ein OPDS-Katalog garantiert kein schrittweises Laden."
+      ]
+    },
+    {
+      "title": "EPUB: Buchtext und eingebettete Bilder",
+      "paragraphs": [
+        "EPUB ohne DRM behält Navigation und Text. Unterstützte eingebettete Rasterbilder können übersetzt werden, während das Original zugänglich bleibt.",
+        "Dokumenttext, Vektorelemente und DRM-geschützte Inhalte werden nicht übersetzt. Formate und Leseoptionen hängen von den angebotenen Ressourcen der Bibliothek ab."
+      ]
+    },
+    {
+      "title": "Lesefortschritt und Offline-Verfügbarkeit",
+      "paragraphs": [
+        "Der Fortschritt wird nur synchronisiert, wenn die Quelle dies unterstützt und die Kompatibilität geprüft wurde. Bei Fehlern bleibt dein lokaler Fortschritt erhalten; dies synchronisiert nicht die gesamte Bibliothek.",
+        "Vollständig heruntergeladene Ressourcen und gespeicherte Kapitel bleiben offline lesbar, solange sie im Browser vorhanden sind. Das Durchsuchen einer entfernten Bibliothek und neue Übersetzungen können weiterhin eine Verbindung erfordern."
       ]
     }
   ]
@@ -367,7 +421,7 @@ export default {
           {
             "title": "Umfang und Kontakt",
             "paragraphs": [
-              "Diese Richtlinie gilt für die NodeLane Comics-Website, Erweiterungs-, Lese- und Übersetzungsdienste, die vom NodeLane Comics-Team gepflegt werden. Kontaktieren Sie comics@nodelane.net bezüglich Datenschutz, Zugriff, Korrektur oder Löschung. Aktualisiert am 28. September 2026. Wesentliche Änderungen werden auf dieser Seite erläutert und entsprechend kommuniziert."
+              "Diese Richtlinie gilt für die NodeLane Comics-Website, Erweiterungs-, Lese- und Übersetzungsdienste, die vom NodeLane Comics-Team gepflegt werden. Kontaktieren Sie comics@nodelane.net bezüglich Datenschutz, Zugriff, Korrektur oder Löschung. Aktualisiert am 4. Oktober 2026. Wesentliche Änderungen werden auf dieser Seite erläutert und entsprechend kommuniziert."
             ]
           },
           {
@@ -388,14 +442,14 @@ export default {
           {
             "title": "Berechtigungen und lokaler Speicher",
             "paragraphs": [
-              "Der Zugriff auf die Website und den Bildhost wird bei Bedarf angefordert, wenn Sie relevante Funktionen aktiv nutzen. Cookies, Anmeldetokens und Browserverlauf der Quellseite werden nicht hochgeladen. Das Backend stellt keine Proxys für beliebige Comic-URLs dar. Webseiten- und Bildinhalte sind nicht vertrauenswürdige Eingaben.",
-              "Die Bibliothek, Leseposition, Präferenzen und importierten lokalen Daten leben im Browser; Die Analyse erfolgt lokal und relevante Bilder werden gesendet, wenn eine Übersetzung angefordert wird. Die Bibliothek wird nicht automatisch synchronisiert. Die Website speichert den Konto- und Autorisierungsstatus sowie Zugriffs- und Aktualisierungstoken im Sitzungsspeicher der aktuellen Registerkarte. Die Erweiterung verfügt über eigene Sitzungsspeicherregeln. Durch das Löschen von Browserdaten können Sie sich abmelden oder lokale Leseinformationen entfernen."
+              "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
+              "Die Bibliothek, Leseposition, Präferenzen und importierten lokalen Daten leben im Browser; Die Analyse erfolgt lokal und relevante Bilder werden gesendet, wenn eine Übersetzung angefordert wird. Die Bibliothek wird nicht automatisch synchronisiert. Die Website speichert den Konto- und Autorisierungsstatus sowie Zugriffs- und Aktualisierungstoken im Sitzungsspeicher der aktuellen Registerkarte. Die Erweiterung verfügt über eigene Sitzungsspeicherregeln. Durch das Löschen von Browserdaten können Sie sich abmelden oder lokale Leseinformationen entfernen. Der OPDS-Lesefortschritt wird nur synchronisiert, wenn die Quelle dies unterstützt und ihre Kompatibilität geprüft wurde. Bei einem Fehler bleibt der lokale Fortschritt erhalten. Die gesamte Bibliothek und Quelldateien werden dadurch nicht synchronisiert. Nach der Verbindung werden MTU-Passwort und Token lokal auf diesem Computer gespeichert. Bei gleicher Dienstadresse und gleichem Benutzernamen lässt du das Passwort leer, um das gespeicherte wiederzuverwenden. Gib es erneut ein, wenn sich Adresse, Benutzername oder Passwort ändern, es ungültig ist oder ein altes Profil nur einen Token enthält. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
             ]
           },
           {
             "title": "Dienstleister und Transfers",
             "paragraphs": [
-              "Die klassische Verarbeitung kann Erkennung/OCR, Textmodelle, lokale Hintergrundreparatur und Schriftsatz umfassen. Textanbieter verarbeiten den erkannten Text, der für die Übersetzung benötigt wird; Redraw-Anbieter verarbeiten das Seitenbild und die Sprache. Für die Aufgabe werden auf dem Server tatsächliche Anbieter konfiguriert.",
+              "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Die klassische Verarbeitung kann Erkennung/OCR, Textmodelle, lokale Hintergrundreparatur und Schriftsatz umfassen. Textanbieter verarbeiten den erkannten Text, der für die Übersetzung benötigt wird; Redraw-Anbieter verarbeiten das Seitenbild und die Sprache. Für die Aufgabe werden auf dem Server tatsächliche Anbieter konfiguriert.",
               "Für Übersetzungsbilder werden private Dateien auf dem zentralen Server verwendet. Erkannter Text, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Identitäts-, Infrastruktur-, Übersetzungs- und Zahlungsdienste verarbeiten Daten nach Bedarf gemäß ihren geltenden Richtlinien. Die Verarbeitung kann außerhalb Ihrer Region erfolgen. Wir verkaufen keine personenbezogenen Daten und verwenden die eingereichten Comics nicht für zielgerichtete Werbung. Wir versprechen nicht, dass alle Anbieter keine Daten speichern oder niemals für Schulungen verwenden. Dies hängt vom Anbieter und der Vereinbarung ab. Übermitteln Sie keine unautorisierten oder ungeeigneten sensiblen Inhalte."
             ]
           },
@@ -410,7 +464,7 @@ export default {
           {
             "title": "Sicherheit, Entscheidungen und Minderjährige",
             "paragraphs": [
-              "Der zentrale Server prüft die Kontoautorisierung und gibt Ergebnisdateien direkt zurück, ohne kurzlebige signierte Download-Links auszugeben. Anbieterschlüssel bleiben im Backend. Schützen Sie Ihr Konto und Ihr Gerät und geben Sie keine Zugriffstoken weiter. Sie können neue Berechtigungen ablehnen, die Übersetzung stoppen, sich abmelden oder lokale Browserdaten entfernen; Die erforderliche Funktionalität ist dann möglicherweise nicht verfügbar. Die Website verfügt über keine Werbe-Tracker oder Analyseskripte von Drittanbietern.",
+              "Der zentrale Server prüft die Kontoautorisierung und gibt Ergebnisdateien direkt zurück, ohne kurzlebige signierte Download-Links auszugeben. Anbieterschlüssel bleiben im Backend. Schützen Sie Ihr Konto und Ihr Gerät und geben Sie keine Zugriffstoken weiter. Sie können den Website-Zugriff im Browser einschränken, die Übersetzung stoppen, sich abmelden oder lokale Browserdaten entfernen; Die erforderliche Funktionalität ist dann möglicherweise nicht verfügbar. Die Website verfügt über keine Werbe-Tracker oder Analyseskripte von Drittanbietern.",
               "Minderjährige sollten den Dienst mit den entsprechenden Kenntnissen und Anleitungen eines Erziehungsberechtigten nutzen und die erforderliche Genehmigung für Abonnements einholen. Geben Sie keine sensiblen persönlichen Daten von Kindern weiter. Erziehungsberechtigte können sich mit uns in Verbindung setzen, um eine Überprüfung und Behandlung einer unangemessenen Verarbeitung anzufordern. Melden Sie Sicherheitsbedenken nur mit den erforderlichen, redigierten Informationen. Passwörter und Token sind nicht erforderlich."
             ]
           }
@@ -423,7 +477,7 @@ export default {
           {
             "title": "Service und Konten",
             "paragraphs": [
-              "NodeLane Comics bietet Erweiterungs-, Lese- und Übersetzungsdienste. Lesen Sie diese Bedingungen und die Datenschutzrichtlinie vor der Nutzung; Beenden Sie die Nutzung des Dienstes, wenn Sie damit nicht einverstanden sind. Aktualisiert am 20. September 2026. Die Website bietet Produktinformationen, Anleitungen, Downloads und Kontoverwaltung, keinen Comic-Katalog oder Comic-Verkäufe.",
+              "NodeLane Comics bietet Erweiterungs-, Lese- und Übersetzungsdienste. Lesen Sie diese Bedingungen und die Datenschutzrichtlinie vor der Nutzung; Beenden Sie die Nutzung des Dienstes, wenn Sie damit nicht einverstanden sind. Aktualisiert am 4. Oktober 2026. Die Website bietet Produktinformationen, Anleitungen, Downloads und Kontoverwaltung, keinen Comic-Katalog oder Comic-Verkäufe.",
               "Verwenden Sie ein Konto, zu dessen Nutzung Sie berechtigt sind, und schützen Sie Ihre Anmeldeinformationen und Ihr Gerät. Vorteile und Zugriff werden auf dem Server überprüft. Geben Sie sich nicht als andere aus, greifen Sie nicht auf deren private Aufzeichnungen zu, umgehen Sie keine Raten- oder Bildbeschränkungen, stören Sie Dienste nicht durch missbräuchliche Automatisierung und greifen Sie das Produkt und seine Anbieter nicht an. Bei Missbrauch kann es zu einer Zugangsbeschränkung kommen."
             ]
           },
@@ -431,7 +485,7 @@ export default {
             "title": "Inhaltsrechte und KI-Ergebnisse",
             "paragraphs": [
               "Sie müssen das Recht haben, auf ausgewählte Inhalte zuzugreifen, diese hochzuladen, zu übersetzen und zu verarbeiten und die Anforderungen der Quellseite und der Rechteinhaber einzuhalten. Die Erweiterung gewährt kein Urheberrecht oder eine automatische Erlaubnis zur Veröffentlichung übersetzter Bilder. Umgehen Sie keine Paywalls, Anmeldeanforderungen oder DRM. Wir übernehmen keine Gewähr für die Rechtmäßigkeit oder Vollständigkeit des Quellinhalts. Urheberrechtsanfragen sollten das Werk, die Rechte, das Problem und die Kontaktinformationen angeben.",
-              "KI kann Text auslassen, falsch übersetzen oder falsch platzieren. Auch das Neuzeichnen kann das Bildmaterial verändern. Die Ergebnisse dienen der Lektüre und ersetzen weder Originale noch eine professionelle Rezension. Website-Illustrationen und Sprachvergleiche sind KI-generierte Demonstrationen und keine Versprechungen von Genauigkeit, Geschwindigkeit oder Ergebnissen pro Bild. Sie können Originale vergleichen und Feedback senden."
+              "KI kann Text auslassen, falsch übersetzen oder falsch platzieren. Im Web-Arbeitsbereich zur Bildübersetzung kann KI-Neuzeichnen auch das Bildmaterial verändern, wenn dieser Modus gemäß Ihren Berechtigungen verfügbar ist. Die Ergebnisse helfen beim Lesen und ersetzen weder Originale noch eine fachliche Prüfung. Die Originalillustrationen der Website sind KI-generiert; die Sprachvergleiche zeigen aufgezeichnete Beispiele klassischer Übersetzung. Sie garantieren weder Genauigkeit noch Geschwindigkeit für jedes Bild. Sie können Originale vergleichen und Feedback senden."
             ]
           },
           {
@@ -488,7 +542,7 @@ export default {
       {
         "id": "overview",
         "question": "Was ist NodeLane Comics?",
-        "answer": "NodeLane Comics bietet eine Manga-Reader-Erweiterung und Website-Bildübersetzung. Lesen Sie Web- oder lokale Comics in der Erweiterung oder laden Sie Bilder von JPG, PNG und WebP auf die Website hoch. Probieren Sie eine Gastübersetzung aus oder melden Sie sich mit Ihrem vorhandenen Konto an, laden Sie die vollständigen Ergebnisse herunter und behalten Sie den lokalen Verlauf bei. Wir bieten keinen Comic-Katalog an.",
+        "answer": "NodeLane Comics bietet eine Erweiterung zum Entdecken, Lesen und Übersetzen von Mangas aus lokalen Dateien, EPUB, Google Drive, OPDS-Bibliotheken und unterstützten Websites. Sie übersetzt auch Website-Bilder und sichtbare Bereiche. Die Website bietet einen separaten Arbeitsbereich für JPG, PNG und WebP mit Gasttest, Kontokontingent und lokalem Verlauf. Wir stellen keinen Manga-Katalog bereit.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
@@ -511,32 +565,32 @@ export default {
       },
       {
         "id": "translation-modes",
-        "question": "Sollte ich die klassische Manga-Übersetzung oder die KI-Neuzeichnung verwenden?",
-        "answer": "Die klassische Übersetzung erkennt Text, übersetzt ihn und fügt ihn mit einer lokalen Hintergrundreparatur zurück. Die KI-Neuzeichnung verwendet ein Bildmodell und kann Bilddetails ändern. Wählen Sie „Klassisch“ für die alltägliche Lektüre, vergleichen Sie die Ergebnisse mit dem Original und versuchen Sie es gegebenenfalls mit einer Neuzeichnung. Die Ergebnisse der beiden Modi werden getrennt aufbewahrt.",
+        "question": "Welche Übersetzung bietet die Erweiterung und welchen Dienst kann ich wählen?",
+        "answer": "Die aktuelle Erweiterung bietet nur klassische Übersetzung mit Vergleich und Rückkehr zum Original. Nutze den offiziellen Dienst mit deinem Konto oder verbinde dein eigenes manga-translator-ui ohne offizielles Kontingent. KI-Neuzeichnen bleibt eine Funktion des Web-Arbeitsbereichs zur Bildübersetzung, wenn deine Berechtigungen es erlauben.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
         "id": "file-formats",
         "question": "Welche Dateien kann ich importieren?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF und unterstützte DRM-freie MOBI6/MOBI6+KF8-Comics. Eigenständige KF8/AZW3-, EPUB- und verschlüsselte Bücher werden nicht unterstützt. Lose Bilder können nicht importiert werden. Website-Importe erfordern einen dedizierten Adapter.",
+        "answer": "Importiere unterstützte CBZ/ZIP-, CBR/RAR- und PDF-Dateien sowie MOBI und EPUB ohne DRM. Bei EPUB bleibt das Dokument lesbar; nur eingebettete Rasterbilder werden übersetzt, nicht der Buchtext oder Vektorelemente. Einzelbilder, eigenständige KF8/AZW3-Dateien und verschlüsselte Bücher werden nicht importiert. Websites benötigen einen eigenen Adapter.",
         "relatedPath": "/guides/local-comics/"
       },
       {
         "id": "website-permissions",
         "question": "Lädt die Erweiterung Website-Cookies oder den Browserverlauf hoch?",
-        "answer": "Cookies der Quellwebsite, Anmeldetokens und Browserverlauf werden nicht in das Übersetzungs-Backend hochgeladen. Bei Bedarf werden Website- und Bildberechtigungen angefordert. Die offizielle Übersetzung sendet ausgewählte Bilder und erforderliche Aufgabendaten zur Verarbeitung; Weitere Informationen finden Sie im Datenschutzleitfaden.",
+        "answer": "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
         "id": "image-privacy",
         "question": "Werden Bilder hochgeladen oder gespeichert?",
-        "answer": "Die Übersetzung sendet ausgewählte Seitenbilder an das Backend und relevante Anbieter. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen. Quellcookies, Anmeldetokens und Browserverlauf werden nicht hochgeladen.",
+        "answer": "Bei Nutzung der offiziellen Übersetzung gelten die folgenden Aufbewahrungsregeln. Die Übersetzung sendet ausgewählte Seitenbilder an das Backend und relevante Anbieter. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen. Quellcookies, Anmeldetokens und Browserverlauf werden nicht hochgeladen. Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Bei MTU werden Bilder direkt an den ausgewählten Dienst gesendet; Verarbeitung und Aufbewahrung hängen von dessen Konfiguration ab.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Benutzen fehlgeschlagene Übersetzungen Seiten?",
-        "answer": "Seiten können zunächst reserviert und bei erfolgreicher Zustellung abgerechnet werden. Bei expliziten Fehlern wird der Vorbehalt aufgehoben, ebenso wie bei klassischen Ergebnissen, bei denen bestätigt wurde, dass sie keinen Text enthalten oder nur teilweise erkannt werden, wobei der Originaltext beibehalten wird. Unbekannte Neuzeichnungsergebnisse werden zuerst überprüft und können dazu führen, dass Seiten vorübergehend reserviert bleiben.",
+        "answer": "Bei offiziellen Aufgaben Ihres Kontos können Seiten vor der Verarbeitung reserviert und nach erfolgreicher Bereitstellung abgerechnet werden. Ein ausdrücklicher Fehler gibt die Reservierung frei, ebenso ein bestätigtes klassisches Ergebnis ohne Text oder mit nur teilweiser Erkennung und beibehaltenem Original. Ist das Ergebnis eines KI-Neuzeichnens im Web-Arbeitsbereich unbekannt und dieser Modus gemäß Ihren Berechtigungen verfügbar, wird es zuerst geprüft; die Seiten können vorübergehend reserviert bleiben. MTU verbraucht kein offizielles NodeLane-Kontingent. Für den Gasttest gelten separat die im Web-Arbeitsbereich angezeigten Regeln für angenommene Anfragen, bei denen auch Fehler zählen können.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -554,14 +608,32 @@ export default {
       {
         "id": "supported-sites",
         "question": "Funktioniert es auf jeder Website und Sprache?",
-        "answer": "Die Verfügbarkeit hängt von der Site-Struktur, den Berechtigungen, dem Bildzugriff und den Adaptern ab. Die Sprachunterstützung kann je nach Übersetzungsmodus unterschiedlich sein. Verwenden Sie die Liste in der Erweiterung. Wir übernehmen keine Garantie für jede Website, Sprache oder Datei.",
+        "answer": "Der Manga-Import von einer Website benötigt einen eigenen Adapter. Übersetzung auf der Seite, per Rechtsklick oder sichtbarer Bereichsauswahl kann auf weiteren Seiten funktionieren, abhängig vom Bildzugriff und den Browser-Berechtigungen. Verfügbare Sprachen hängen vom ausgewählten Dienst ab. Nicht jede Website, Datei oder Sprache wird garantiert unterstützt.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
         "id": "local-translation",
         "question": "Kann ich Mangas mit einem lokalen Dienst ohne NodeLane-Konto übersetzen?",
-        "answer": "Ja. Verbinden Sie Ihren eigenen manga-translator-ui-Dienst, indem Sie in den Erweiterungseinstellungen einen lokalen Übersetzungskanal hinzufügen und auswählen. Hierfür sind weder ein NodeLane-Konto noch offizielle Übersetzungszulagen erforderlich. Sie müssen den Dienst selbst ausführen; Netzwerkanforderungen, verfügbare Modi und Bildverarbeitung hängen von diesem Dienst ab.",
+        "answer": "Füge deinen manga-translator-ui-Dienst in den Einstellungen hinzu und wähle ihn für die klassische Übersetzung aus. Du kannst mehrere Profile speichern; jeweils eines ist aktiv. Ein NodeLane-Konto oder offizielles Kontingent ist nicht nötig. MTU-Passwort und Token werden auf diesem Computer gespeichert. Verarbeitung, Modellkosten und Netzwerkbedarf hängen von deinem Dienst ab; ein lokales MTU garantiert keine vollständig netzfreie Übersetzung. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden.",
         "relatedPath": "/guides/local-translation/"
+      },
+      {
+        "id": "remote-library",
+        "question": "Kann ich mehrere OPDS-Bibliotheken verbinden?",
+        "answer": "Ja. Füge mehrere Adressen und Zugangsdaten hinzu, um bei Bedarf zu durchsuchen, zu suchen und zu lesen. Suche und Formate hängen von der Quelle ab. Zuverlässige HTTP-Bereichsabfragen vermeiden einen vollständigen Download; andernfalls muss dieser ausdrücklich gewählt werden. Fortschritt wird nur bei unterstützten und geprüften Quellen synchronisiert; bei Fehlern bleibt der lokale Fortschritt erhalten.",
+        "relatedPath": "/guides/remote-library/"
+      },
+      {
+        "id": "region-translation",
+        "question": "Wie übersetze ich ein Bild oder einen Bereich der Seite?",
+        "answer": "Nutze die Seitenübersetzung, den Rechtsklick auf ein Bild oder die Auswahl eines sichtbaren Rechtecks. Die Bereichsauswahl scrollt nicht, um eine lange Aufnahme zusammenzusetzen. Tastenkürzel sind in den nativen Browser-Einstellungen konfigurierbar. Eine Seite ohne Adapter kann nicht als Manga importiert werden.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "offline-reading",
+        "question": "Was kann ich offline lesen?",
+        "answer": "Importierte lokale Dateien, vollständig heruntergeladene entfernte Ressourcen und komplett gespeicherte Kapitel sind lesbar, solange sie im Browser verfügbar sind. Website-Mangas können in ausgewählten Quellsprachen gespeichert werden, mit Pause, Fortsetzen und Ergänzen fehlender Seiten. Das Schließen der Aufgabenseite pausiert die Planung. Neue offizielle Übersetzungen benötigen Internet; ein lokales MTU braucht ebenfalls einen vollständig netzfreien Ablauf.",
+        "relatedPath": "/guides/remote-library/"
       }
     ],
     "releases": [
@@ -720,7 +792,7 @@ export default {
     "账户信息": "Kontoinformationen",
     "退出登录": "Abmelden",
     "会员有效期至": "Mitgliedschaft gültig bis ",
-    "阅读、翻译和用量查看，请前往浏览器插件。": "Verwenden Sie die Browsererweiterung, um die Nutzung zu lesen, zu übersetzen und zu überprüfen.",
+    "阅读、翻译和用量查看，请前往浏览器插件。": "Für fortlaufendes Lesen und die Nutzungsdetails der Erweiterung öffne die Erweiterung. Die Bildübersetzung auf der Website nutzt ebenfalls das Kontingent dieses Kontos.",
     "下载插件": "Erweiterung herunterladen",
     "会员订阅": "Mitgliedschaft",
     "刷新": "Aktualisieren",

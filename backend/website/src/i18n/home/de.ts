@@ -20,11 +20,11 @@ const copy: HomeCopy = {
     "Manga lesen und übersetzen.",
     "Direkt in Ihrem Browser."
   ],
-  "description": "Lesen Sie Manga mit KI-Übersetzung in Chrome, Edge und Firefox. Öffnen Sie unterstützte Websites oder eigene CBZ-, CBR-, PDF- und MOBI-Dateien ohne DRM und vergleichen Sie jede übersetzte Seite mit dem Original.",
+  "description": "Lies und übersetze in Chrome, Edge und Firefox: lokale Dateien, EPUB, Google Drive, OPDS-Bibliotheken und unterstützte Websites. Entdecke Mangas, vergleiche die Originale und bereite das Lesen ohne Internet vor.",
   "install": "Erweiterung installieren",
   "seeReader": "Leseansicht entdecken",
   "readerPath": "Lesen Sie Comics mit der Erweiterung",
-  "readerAccess": "Lesen Sie lokale Originale kostenlos und ohne Konto. Die offizielle Übersetzung verwendet Ihr Kontokontingent. Sie können auch einen eigenen lokalen Übersetzungsdienst verbinden.",
+  "readerAccess": "Lies lokale Originale kostenlos und ohne Konto. Der offizielle Dienst nutzt dein Kontokontingent; dein eigenes MTU benötigt weder ein NodeLane-Konto noch ein offizielles Kontingent.",
   "webAccess": "Probieren Sie die Übersetzung als Gast aus oder melden Sie sich an, um Ihr Kontokontingent zu verwenden. Im Bildarbeitsbereich sehen Sie Ihr verbleibendes Kontingent.",
   "desktop": "Für die Lektüre auf dem Desktop konzipiert",
   "popupAlt": "NodeLane Comics-Symbolleistenfenster mit ausgewählter englischer Sprache und der Schaltfläche „Aktuellen Tab übersetzen“.",
@@ -68,16 +68,16 @@ const copy: HomeCopy = {
   "stepsIntro": "Installieren Sie die Erweiterung, fügen Sie einen Comic hinzu und lesen Sie in Ihrem eigenen Tempo.",
   "steps": [
     [
-      "Installieren Sie die Erweiterung",
-      "Installieren Sie es aus dem Chrome- oder Firefox-Store oder holen Sie sich das Edge-Paket."
+      "Erweiterung installieren",
+      "Wähle den Chrome- oder Firefox-Store oder das Edge-Paket. Prüfe die Website-Zugriffseinschränkungen deines Browsers."
     ],
     [
-      "Importieren oder fügen Sie einen Comic hinzu",
-      "Importieren Sie lokale Dateien oder Comics von Google Drive oder fügen Sie einen Comic von einer unterstützten Website hinzu."
+      "Eine Geschichte öffnen",
+      "Importiere eine Datei, wähle eine Drive-Datei, verbinde eine OPDS-Bibliothek oder füge einen Manga von einer unterstützten Website hinzu."
     ],
     [
-      "Übersetzen Sie, wann Sie möchten",
-      "Lesen Sie Originale ohne Konto. Wählen Sie einen Übersetzungsdienst und vergleichen Sie ihn beim Lesen mit dem Original."
+      "Lesen und bei Bedarf übersetzen",
+      "Behalte das Original, wähle den offiziellen Dienst oder dein MTU und speichere Kapitel für das Lesen ohne Internet."
     ]
   ],
   "compareEyebrow": "Schauen Sie genauer hin",
@@ -87,7 +87,7 @@ const copy: HomeCopy = {
   "compareLink": "So funktioniert die Übersetzung",
   "readerEyebrow": "SECHS ANSICHTEN. EIN BLICK INS PRODUKT.",
   "readerTitle": "Ihr nächster Comic. Ihre nächste Seite.",
-  "readerBody": "Finden Sie eine neue Geschichte, fügen Sie sie Ihrem Regal hinzu und speichern Sie sie im Cache, um sie offline zu lesen. Entdecken Sie die realen Schnittstellen in der Projektübersicht.",
+  "readerBody": "Importiere Dateien, öffne eine OPDS-Bibliothek oder füge einen Manga von einer unterstützten Website hinzu. Setze deine Lektüre fort, vergleiche Original und Übersetzung und speichere Kapitel für das Lesen ohne Internet.",
   "galleryLabels": [
     "Meine Comics",
     "Entdecken Sie Comics",
@@ -120,29 +120,39 @@ const copy: HomeCopy = {
   "sourcesTitle": "Bringen Sie einen Comic mit, auf den Sie zugreifen können.",
   "sources": [
     [
-      "Ihre Comic-Dateien",
-      "Importieren Sie unterstützte Comic-Archive und Dokumente in Ihr Regal. Lesen Sie das Original vor Ort, ohne sich anzumelden.",
-      "Importieren Sie einen lokalen Comic"
+      "Lokale Dateien",
+      "Importiere CBZ/ZIP, CBR/RAR, PDF, MOBI oder EPUB ohne DRM. Lies Originale lokal; bei EPUB werden nur eingebettete Rasterbilder übersetzt.",
+      "Eine lokale Datei importieren"
+    ],
+    [
+      "Google Drive",
+      "Wähle in Google Drive unterstützte CBZ/ZIP-Dateien oder MOBI ohne DRM. Die Drive-Verbindung unterstützt nicht automatisch alle lokalen Dateiformate.",
+      "Unterstützte Drive-Dateien ansehen"
+    ],
+    [
+      "OPDS-Bibliotheken",
+      "Verbinde mehrere OPDS-Bibliotheken zum Durchsuchen, Suchen und Lesen bei Bedarf. Unterstützt eine Ressource zuverlässige HTTP-Bereichsabfragen, werden nur benötigte Teile abgerufen; andernfalls ist ein ausdrücklich gewählter vollständiger Download nötig.",
+      "Eine OPDS-Bibliothek verbinden"
     ],
     [
       "Unterstützte Websites",
-      "Fügen Sie einen Comic-Link von einer unterstützten Website hinzu. Für Website-Importe werden dedizierte Adapter verwendet. Der Support variiert je nach Standort.",
-      "Siehe Website-Importanweisungen"
+      "Füge einen Manga von einer Website mit Adapter hinzu. Auf anderen Seiten kannst du Bilder vor Ort oder einen sichtbaren Bereich übersetzen, ohne Bibliotheksimport.",
+      "Auf einer unterstützten Website lesen"
     ]
   ],
-  "modesEyebrow": "ÜBERSETZEN SIE, WANN SIE WOLLEN",
-  "modesTitle": "Zwei Möglichkeiten, sprachübergreifend zu lesen.",
+  "modesEyebrow": "WÄHLE DEINEN ÜBERSETZUNGSDIENST",
+  "modesTitle": "Eine klassische Übersetzung, zwei Dienste zur Wahl.",
   "modes": [
     [
-      "Standardübersetzung",
-      "Erkennt Text, übersetzt ihn und fügt ihn mit lokaler Hintergrundreparatur wieder auf der Seite ein."
+      "Offizieller NodeLane-Dienst",
+      "Melde dich bei NodeLane an, um den offiziellen Dienst zu nutzen. Ausgewählte Bilder werden auf dem Server entsprechend den in deinem Konto angezeigten Leistungen und Grenzen verarbeitet. Gültige Ergebnisse können gemäß den Aufbewahrungsregeln wiederverwendet werden."
     ],
     [
-      "KI-Neuzeichnung",
-      "Verwendet ein Bildmodell, um die Seite zu übersetzen und neu zu zeichnen. Es können auch Details im Bildmaterial verändert werden."
+      "Dein manga-translator-ui-Dienst",
+      "Verbinde dein eigenes MTU ohne NodeLane-Konto und offizielles Kontingent. Speichere mehrere Profile und nutze jeweils einen ausgewählten Dienst. Modelle und Netzwerkanforderungen hängen von deiner Installation ab."
     ]
   ],
-  "controlNote": "Neue Comics werden in der Originalansicht geöffnet. Wählen Sie einen Übersetzungsmodus, wenn Sie bereit sind.",
+  "controlNote": "Neue Mangas öffnen sich mit den Originalen. Automatische Übersetzung ist standardmäßig deaktiviert; wähle Sprache und Dienst, wenn du übersetzen möchtest.",
   "privacyTitle": "Erfahren Sie, was mit Ihren Seiten passiert.",
   "privacyBody": "Die offizielle Übersetzung sendet ausgewählte Bilder an den Server; Originale werden entfernt, nachdem die Aufgabe abgeschlossen ist, fehlschlägt oder abgebrochen wird. Die Ergebnisse privater Konten bleiben erhalten, solange gültige Anfragen bestehen bleiben. Die Ergebnisse des Gastservers werden nach Ende der Aufgabe 24 Stunden lang gespeichert und lokal gespeicherte Übersetzungen sind von dieser Beschränkung nicht betroffen. Wenn Sie einen lokalen Übersetzungsdienst verbinden, bestimmt dieser Dienst die Bildverarbeitung und -speicherung.",
   "privacy": "Datenschutzrichtlinie",

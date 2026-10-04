@@ -20,11 +20,11 @@ const copy: HomeCopy = {
     "Lee y traduce manga.",
     "En tu navegador."
   ],
-  "description": "Lee manga con traducción por IA en Chrome, Edge y Firefox. Abre sitios compatibles o tus archivos CBZ, CBR, PDF y MOBI sin DRM, y compara cada página traducida con su original.",
+  "description": "Lee y traduce en Chrome, Edge y Firefox: archivos locales, EPUB, Google Drive, bibliotecas OPDS y sitios compatibles. Descubre manga, compara los originales y prepara tu lectura sin conexión.",
   "install": "Obtener la extensión",
   "seeReader": "Explora el lector",
   "readerPath": "Leer cómics con la extensión.",
-  "readerAccess": "Lee originales locales gratis, sin una cuenta. La traducción oficial usa el cupo de tu cuenta; también puedes conectar tu propio servicio local.",
+  "readerAccess": "Lee tus originales locales gratis y sin cuenta. El servicio oficial utiliza tu cuota de cuenta; tu propio MTU no necesita cuenta NodeLane ni cuota oficial.",
   "webAccess": "Prueba como invitado o inicia sesión para usar el cupo de tu cuenta. El espacio de traducción de imágenes muestra los usos disponibles.",
   "desktop": "Diseñado para leer en el ordenador",
   "popupAlt": "NodeLane Comics ventana emergente de la barra de herramientas con inglés seleccionado y el botón Traducir de la pestaña actual.",
@@ -69,15 +69,15 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Instalar la extensión",
-      "Instálelo desde la tienda Chrome o Firefox, u obtenga el paquete Edge."
+      "Elige la tienda Chrome o Firefox, o el paquete Edge. Revisa las restricciones de acceso a sitios de tu navegador."
     ],
     [
-      "Importar o agregar un cómic",
-      "Importe archivos o cómics locales desde Google Drive, o agregue un cómic desde un sitio web compatible."
+      "Abrir una historia",
+      "Importa un archivo, elige uno de Drive, conecta una biblioteca OPDS o añade un manga de un sitio compatible."
     ],
     [
-      "Traduce cuando quieras",
-      "Leer originales sin una cuenta. Elija un servicio de traducción y compárelo con el original mientras lee."
+      "Leer y traducir cuando quieras",
+      "Conserva el original, elige el servicio oficial o tu MTU y guarda capítulos para leer sin conexión."
     ]
   ],
   "compareEyebrow": "MIRA MÁS DE CERCA",
@@ -87,7 +87,7 @@ const copy: HomeCopy = {
   "compareLink": "Cómo funciona la traducción",
   "readerEyebrow": "SEIS PANTALLAS PARA EXPLORAR",
   "readerTitle": "Tu próximo cómic. Tu próxima página.",
-  "readerBody": "Encuentre una nueva historia, agréguela a su estante y guárdela en caché para leerla sin conexión. Explore las interfaces reales desde la descripción general del proyecto.",
+  "readerBody": "Importa archivos, abre una biblioteca OPDS o añade un manga de un sitio compatible. Retoma tu progreso, compara originales y traducciones y guarda capítulos para leer sin conexión.",
   "galleryLabels": [
     "mis comics",
     "Descubre los cómics",
@@ -120,29 +120,39 @@ const copy: HomeCopy = {
   "sourcesTitle": "Trae un cómic al que puedas acceder.",
   "sources": [
     [
-      "Tus archivos de cómic",
-      "Importe archivos y documentos de cómics compatibles a su estantería. Lea el original localmente, sin iniciar sesión.",
-      "Importar un cómic local"
+      "Archivos locales",
+      "Importa CBZ/ZIP, CBR/RAR, PDF, MOBI o EPUB sin DRM. Lee originales localmente; EPUB solo traduce las imágenes de mapa de bits integradas.",
+      "Importar un archivo local"
     ],
     [
-      "Sitios web compatibles",
-      "Agregue un enlace de cómic desde un sitio compatible. Las importaciones de sitios web utilizan adaptadores dedicados; El soporte varía según el sitio.",
-      "Ver instrucciones de importación del sitio web"
+      "Google Drive",
+      "Desde Google Drive, selecciona archivos CBZ/ZIP o MOBI sin DRM compatibles. La conexión a Drive no añade compatibilidad con todos los formatos locales.",
+      "Ver archivos compatibles con Drive"
+    ],
+    [
+      "Bibliotecas OPDS",
+      "Conecta varias bibliotecas OPDS para explorar, buscar y leer bajo demanda. Si un recurso permite leer de forma fiable mediante rangos HTTP, solo se obtienen las partes necesarias; en caso contrario, se requiere una descarga completa explícita.",
+      "Conectar una biblioteca OPDS"
+    ],
+    [
+      "Sitios compatibles",
+      "Añade un manga desde un sitio con adaptador. En otras páginas, traduce imágenes sobre la página o selecciona un área visible, sin importarla a la biblioteca.",
+      "Leer en un sitio compatible"
     ]
   ],
-  "modesEyebrow": "TRADUCIR CUANDO QUIERAS",
-  "modesTitle": "Dos formas de leer en varios idiomas.",
+  "modesEyebrow": "ELIGE TU SERVICIO DE TRADUCCIÓN",
+  "modesTitle": "Una traducción clásica, dos opciones de servicio.",
   "modes": [
     [
-      "Traducción estándar",
-      "Detecta el texto, lo traduce y lo coloca de nuevo en la página tras reparar la zona del fondo."
+      "Servicio oficial de NodeLane",
+      "Inicia sesión en NodeLane para usar el servicio oficial. Las imágenes seleccionadas se procesan a distancia según los derechos y límites mostrados en tu cuenta. Los resultados válidos pueden reutilizarse según las reglas de conservación."
     ],
     [
-      "Redibujado con IA",
-      "Utiliza un modelo de imagen para traducir y volver a dibujar la página. También puede cambiar detalles en la obra de arte."
+      "Tu servicio manga-translator-ui",
+      "Conecta tu propio MTU sin cuenta NodeLane ni cuota oficial. Guarda varios perfiles y utiliza un único servicio seleccionado a la vez. Los modelos y las dependencias de red dependen de tu instalación."
     ]
   ],
-  "controlNote": "Los cómics nuevos se abren en la vista original. Elija un modo de traducción cuando esté listo.",
+  "controlNote": "Los mangas nuevos se abren con los originales. La traducción automática está desactivada por defecto; elige un idioma y un servicio cuando quieras traducir.",
   "privacyTitle": "Sepa qué sucede con sus páginas.",
   "privacyBody": "La traducción oficial envía las imágenes seleccionadas al servidor; los originales se eliminan cuando la tarea termina, falla o se cancela. Los resultados privados de la cuenta se conservan mientras queden solicitudes válidas. Los resultados de invitados se guardan en el servidor durante 24 horas después de terminar la tarea; este límite no afecta a las traducciones guardadas localmente. Si conectas un servicio de traducción local, ese servicio determina el tratamiento y la conservación de las imágenes.",
   "privacy": "Política de privacidad",

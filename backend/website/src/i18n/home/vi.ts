@@ -20,7 +20,7 @@ const copy: HomeCopy = {
     "Đọc và dịch manga.",
     "Ngay trong trình duyệt."
   ],
-  "description": "Đọc truyện tranh với bản dịch AI trong Chrome, Edge và Firefox. Mở các trang web được hỗ trợ hoặc các tệp CBZ, CBR, PDF và DRM không có MOBI của riêng bạn và so sánh mọi trang đã dịch với trang gốc.",
+  "description": "Đọc tệp truyện, Google Drive, OPDS và website được hỗ trợ trong Chrome, Edge, Firefox. Mở EPUB, dịch ảnh thông thường hoặc vùng chọn trên web và luôn so sánh được bản gốc.",
   "install": "Cài tiện ích",
   "seeReader": "Khám phá trình đọc",
   "readerPath": "Đọc truyện tranh với phần mở rộng",
@@ -67,19 +67,19 @@ const copy: HomeCopy = {
   "stepsTitle": "Ba bước để đọc bộ truyện tiếp theo.",
   "stepsIntro": "Cài đặt tiện ích mở rộng, thêm truyện tranh và đọc theo tốc độ của riêng bạn.",
   "steps": [
-    [
-      "Cài đặt tiện ích mở rộng",
-      "Cài đặt từ cửa hàng Chrome hoặc Firefox hoặc tải gói Edge."
+      [
+        "Cài tiện ích",
+        "Cài từ cửa hàng Chrome, Firefox hoặc lấy gói cài đặt Edge."
+      ],
+      [
+        "Thêm truyện hoặc kết nối thư viện",
+        "Nhập truyện cục bộ, Drive, kết nối OPDS hoặc bắt đầu từ website được hỗ trợ."
+      ],
+      [
+        "Dịch khi cần",
+        "Chọn kênh NodeLane hoặc dịch vụ riêng và ngôn ngữ để so sánh bản gốc, bản dịch trong trình đọc hoặc website."
+      ]
     ],
-    [
-      "Nhập hoặc thêm truyện tranh",
-      "Nhập tệp hoặc truyện tranh cục bộ từ Google Drive hoặc thêm truyện tranh từ trang web được hỗ trợ."
-    ],
-    [
-      "Dịch khi bạn muốn",
-      "Đọc bản gốc mà không cần tài khoản. Chọn một dịch vụ dịch thuật và so sánh với bản gốc khi bạn đọc."
-    ]
-  ],
   "compareEyebrow": "XEM KỸ HƠN",
   "compareTitle": "Kiểm tra bản dịch. Giữ lại bản gốc.",
   "compareBody": "Chuyển đổi giữa bản gốc tiếng Nhật và kết quả dịch đã ghi nhận. Trong trình đọc, bạn có thể xem bản gốc và bản dịch trong tầm tay.",
@@ -116,33 +116,43 @@ const copy: HomeCopy = {
   "close": "Đóng ảnh chụp màn hình",
   "galleryName": "Khám phá ảnh chụp màn hình tiện ích mở rộng",
   "screenshotNote": "Ảnh chụp màn hình thực được chia sẻ với tổng quan về dự án, hiển thị bằng tiếng Anh. Mở bất kỳ ảnh chụp màn hình nào để xem bản gốc đầy đủ. Các tính năng có thể khác nhau tùy theo phiên bản; tác phẩm nghệ thuật truyện tranh thuộc về chủ sở hữu tương ứng của nó.",
-  "sourcesEyebrow": "TỪ TỆP CỦA BẠN HOẶC TRÊN WEB",
+  "sourcesEyebrow": "Tệp·Drive·thư viện·website",
   "sourcesTitle": "Thêm bộ truyện bạn có quyền truy cập.",
   "sources": [
-    [
-      "Tệp truyện của bạn",
-      "Nhập các tệp nén và tài liệu truyện được hỗ trợ vào kệ sách. Đọc bản gốc ngay trên thiết bị mà không cần đăng nhập.",
-      "Nhập truyện từ tệp cục bộ"
+      [
+        "Truyện cục bộ và EPUB",
+        "Nhập CBZ/ZIP, CBR/RAR, PDF, MOBI không DRM và EPUB. Đọc ảnh và văn bản gốc miễn phí, không cần tài khoản.",
+        "Định dạng và cách nhập"
+      ],
+      [
+        "Google Drive",
+        "Ủy quyền qua Google và chọn CBZ/ZIP hoặc MOBI không DRM. Đọc từng phần khi cần, không phải tải toàn bộ tệp trước.",
+        "Nguồn và định dạng"
+      ],
+      [
+        "Thư viện OPDS",
+        "Kết nối danh mục OPDS của bạn để duyệt, tìm và đọc. Tải xuống và đồng bộ tiến độ tùy khả năng nguồn cùng quyền truy cập.",
+        "Kết nối thư viện từ xa"
+      ],
+      [
+        "Website truyện được hỗ trợ",
+        "Thêm truyện từ website có bộ điều hợp riêng. Mục lục, nội dung đọc được, đăng nhập và phí vẫn theo website gốc.",
+        "Đọc và dịch trên website"
+      ]
     ],
-    [
-      "Website được hỗ trợ",
-      "Thêm liên kết truyện từ website được hỗ trợ. Việc nhập dùng bộ điều hợp riêng cho từng website; mức hỗ trợ tùy website.",
-      "Xem hướng dẫn nhập từ website"
-    ]
-  ],
   "modesEyebrow": "DỊCH KHI BẠN MUỐN",
-  "modesTitle": "Hai cách đọc vượt qua rào cản ngôn ngữ.",
+  "modesTitle": "Chọn kênh dịch phù hợp với bạn",
   "modes": [
-    [
-      "Dịch thông thường",
-      "Nhận diện và dịch văn bản, rồi đặt lại vào trang sau khi sửa nền tại vùng cần xử lý."
+      [
+        "Kênh NodeLane",
+        "Đăng nhập để dùng dịch thông thường theo gói và hạn mức tài khoản. Kết quả xuất hiện theo từng ảnh; bạn luôn có thể trở về bản gốc."
+      ],
+      [
+        "manga-translator-ui tự triển khai",
+        "Thêm địa chỉ và tài khoản MTU, lưu nhiều cấu hình rồi chọn dịch vụ hiện tại. Không cần tài khoản NodeLane và không dùng hạn mức chính thức."
+      ]
     ],
-    [
-      "Vẽ lại bằng AI",
-      "Dùng mô hình ảnh để dịch và vẽ lại trang. Mô hình cũng có thể thay đổi chi tiết trong tranh."
-    ]
-  ],
-  "controlNote": "Truyện tranh mới mở ở chế độ xem ban đầu. Chọn chế độ dịch khi bạn đã sẵn sàng.",
+  "controlNote": "Truyện mới mở ở bản gốc. Chọn kênh và ngôn ngữ rồi bật dịch thông thường; trình đọc và dịch trên web dùng chung kênh đang chọn.",
   "privacyTitle": "Biết các trang truyện của bạn được xử lý thế nào.",
   "privacyBody": "Bản dịch chính thức gửi hình ảnh đã chọn đến máy chủ; bản gốc sẽ bị xóa sau khi tác vụ hoàn thành, không thành công hoặc bị hủy. Kết quả tài khoản cá nhân được giữ lại trong khi các yêu cầu hợp lệ vẫn còn; Kết quả của máy chủ khách được lưu giữ trong 24 giờ sau khi nhiệm vụ kết thúc và các bản dịch được lưu cục bộ không bị ảnh hưởng bởi giới hạn đó. Khi bạn kết nối một dịch vụ dịch thuật cục bộ, dịch vụ đó sẽ xác định việc xử lý và lưu giữ hình ảnh.",
   "privacy": "Chính sách quyền riêng tư",

@@ -20,11 +20,11 @@ const copy: HomeCopy = {
     "Czytaj i tłumacz mangę.",
     "Bezpośrednio w Twojej przeglądarce."
   ],
-  "description": "Czytaj mangę z tłumaczeniem AI w Chrome, Edge i Firefox. Otwieraj obsługiwane witryny lub własne pliki CBZ, CBR, PDF i MOBI bez DRM, a następnie porównuj każdą przetłumaczoną stronę z oryginałem.",
+  "description": "Czytaj i tłumacz mangę w Chrome, Edge i Firefox. Otwieraj lokalne komiksy i EPUB, Google Drive, biblioteki OPDS lub obsługiwane strony. Tłumacz strony i widoczne obszary, zachowując dostęp do oryginału.",
   "install": "Zainstaluj rozszerzenie",
   "seeReader": "Poznaj czytnik",
   "readerPath": "Czytaj komiksy z rozszerzeniem",
-  "readerAccess": "Czytaj lokalne oryginały bezpłatnie i bez konta. Oficjalne tłumaczenie wykorzystuje limit Twojego konta; możesz też podłączyć własną lokalną usługę.",
+  "readerAccess": "Czytaj lokalne oryginały bezpłatnie i bez konta. Oficjalne tłumaczenie korzysta z limitu konta; własny manga-translator-ui nie wymaga konta NodeLane ani oficjalnego limitu.",
   "webAccess": "Wypróbuj jako gość lub zaloguj się, aby wykorzystać limit konta. Obszar roboczy obrazów pokazuje dostępną liczbę tłumaczeń.",
   "desktop": "Stworzony do czytania na komputerze",
   "popupAlt": "Okno NodeLane Comics na pasku narzędzi z wybranym językiem angielskim i przyciskiem „Tłumacz bieżącą kartę”.",
@@ -69,15 +69,15 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Zainstaluj rozszerzenie",
-      "Zainstaluj ze sklepu Chrome lub Firefox lub pobierz pakiet Edge."
+      "Zainstaluj z Chrome Web Store lub sklepu Firefox albo pobierz pakiet Edge."
     ],
     [
-      "Zaimportuj lub dodaj komiks",
-      "Zaimportuj lokalne pliki lub komiksy z Google Drive lub dodaj komiks z obsługiwanej strony internetowej."
+      "Otwórz swoje źródło",
+      "Importuj plik lokalny, wybierz komiks w Google Drive, połącz OPDS lub dodaj obsługiwaną stronę."
     ],
     [
-      "Tłumacz, kiedy chcesz",
-      "Czytaj oryginały bez konta. Wybierz usługę tłumaczeniową i podczas czytania porównaj z oryginałem."
+      "Czytaj i tłumacz",
+      "Nowe komiksy otwierają się w oryginale. Wybierz oficjalny kanał lub MTU i włącz tłumaczenie, gdy go potrzebujesz."
     ]
   ],
   "compareEyebrow": "PRZYJRZYJ SIĘ BLIŻEJ",
@@ -87,7 +87,7 @@ const copy: HomeCopy = {
   "compareLink": "Jak działa tłumaczenie",
   "readerEyebrow": "SZEŚĆ WIDOKÓW. ZAJRZYJ DO ŚRODKA.",
   "readerTitle": "Twój następny komiks. Twoja następna strona.",
-  "readerBody": "Znajdź nową historię, dodaj ją do swojej półki i zapisz w pamięci podręcznej, aby przeczytać ją offline. Poznaj prawdziwe interfejsy z przeglądu projektu.",
+  "readerBody": "Odkrywaj komiksy, łącz własne źródła i kontynuuj od zapisanej pozycji. Wcześniej zapisz rozdziały obsługiwanych stron w pamięci podręcznej, aby czytać offline.",
   "galleryLabels": [
     "Moje komiksy",
     "Odkryj komiksy",
@@ -97,12 +97,12 @@ const copy: HomeCopy = {
     "Oryginał i tłumaczenie"
   ],
   "galleryBodies": [
-    "Importuj, wyszukuj i zarządzaj komiksami, a następnie kontynuuj od miejsca, w którym przerwałeś.",
-    "Przeglądaj rankingi, czytaj opisy, sprawdzaj oceny i alternatywne tytuły, aby znaleźć kolejny komiks.",
-    "Przeszukuj strony internetowe według tytułu lub alternatywnego tytułu albo przetłumacz tytuł przed wybraniem źródła.",
-    "Śledź buforowanie rozdziałów i zajęte miejsce; wstrzymuj lub wznawiaj pobieranie, kiedy potrzebujesz.",
-    "Otwórz katalog rozdziałów, aby sprawdzić języki, liczbę stron, pamięć podręczną i stan czytania.",
-    "Porównaj oryginał i tłumaczenie obok siebie lub wróć do widoku oryginalnego."
+    "Otwieraj pliki lokalne i połączone źródła, wyszukuj komiksy na półce i wracaj do zapisanej pozycji.",
+    "Przeglądaj propozycje, opisy, oceny i alternatywne tytuły, aby wybrać kolejną historię.",
+    "Wyszukuj tytuły na różnych obsługiwanych stronach i wybieraj źródło.",
+    "Zapisuj wszystkie rozdziały wybranego języka, wstrzymuj i uzupełniaj pobieranie. Zamknięcie strony zadania wstrzymuje plan zapisu.",
+    "Przeglądaj rozdziały, języki, strony i stan pamięci podręcznej; dopasuj widok czytnika.",
+    "Porównuj oryginał i tłumaczenie obok siebie albo wróć do oryginału bez utraty pozycji."
   ],
   "galleryAlt": [
     "Interfejs biblioteki komiksów w języku angielskim i postęp czytania.",
@@ -117,32 +117,42 @@ const copy: HomeCopy = {
   "galleryName": "Przeglądaj zrzuty ekranu rozszerzeń",
   "screenshotNote": "Prawdziwe zrzuty ekranu udostępnione w przeglądzie projektu, pokazane w języku angielskim. Otwórz dowolny zrzut ekranu, aby wyświetlić pełny oryginał. Funkcje mogą się różnić w zależności od wersji; grafika komiksowa należy do odpowiednich właścicieli.",
   "sourcesEyebrow": "Z TWOICH PLIKÓW LUB SIECI",
-  "sourcesTitle": "Przynieś komiks, do którego masz dostęp.",
+  "sourcesTitle": "Twoje pliki, biblioteki i obsługiwane strony.",
   "sources": [
     [
-      "Twoje pliki komiksowe",
-      "Importuj obsługiwane archiwa komiksów i dokumenty na swoją półkę. Przeczytaj oryginał lokalnie, bez logowania się.",
-      "Zaimportuj lokalny komiks"
+      "Lokalne komiksy i EPUB",
+      "CBZ/ZIP, CBR/RAR, PDF, obsługiwane MOBI bez DRM i EPUB. W EPUB tłumaczone są wyłącznie osadzone obrazy rastrowe.",
+      "Formaty i lokalne czytanie"
     ],
     [
-      "Obsługiwane strony internetowe",
-      "Dodaj link do komiksu z obsługiwanej witryny. Importy stron internetowych korzystają z dedykowanych adapterów; wsparcie różni się w zależności od witryny.",
-      "Zobacz instrukcje dotyczące importowania witryny internetowej"
+      "Google Drive",
+      "Wybieraj CBZ/ZIP lub obsługiwane MOBI bez DRM z własnego Google Drive. Pozostałe lokalne formaty nie są tu obsługiwane.",
+      "Jak otwierać własne pliki"
+    ],
+    [
+      "Biblioteki OPDS",
+      "Łącz wiele bibliotek, przeglądaj katalogi i wyszukuj książki. Czytaj z pobieraniem według potrzeb lub jawnie pobierz cały plik.",
+      "Połączenie z biblioteką zdalną"
+    ],
+    [
+      "Obsługiwane strony",
+      "Wyszukuj i dodawaj komiksy przez adapter strony. Bez adaptera import nie jest dostępny, lecz dostępne obrazy można tłumaczyć na stronie.",
+      "Tłumaczenie na stronach internetowych"
     ]
   ],
   "modesEyebrow": "TŁUMACZ KIEDY CHCESZ",
-  "modesTitle": "Dwa sposoby czytania w różnych językach.",
+  "modesTitle": "Zwykłe tłumaczenie. Ty wybierasz kanał.",
   "modes": [
     [
-      "Tłumaczenie standardowe",
-      "Wykrywa tekst, tłumaczy go i umieszcza z powrotem na stronie z lokalną naprawą tła."
+      "Oficjalny kanał NodeLane",
+      "OCR, tłumaczenie tekstu, odtworzenie tła i skład bez konfiguracji serwera. Wymaga konta NodeLane; obowiązują jego uprawnienia i limity."
     ],
     [
-      "Przerysowanie przez AI",
-      "Używa modelu obrazu do tłumaczenia i ponownego rysowania strony. Może także zmieniać szczegóły dzieła sztuki."
+      "Twój manga-translator-ui",
+      "Połącz własny MTU bez konta NodeLane i oficjalnego limitu. Możesz zapisać wiele profili; jednocześnie używany jest wybrany kanał."
     ]
   ],
-  "controlNote": "Nowe komiksy otwierają się w oryginalnym widoku. Gdy będziesz gotowy, wybierz tryb tłumaczenia.",
+  "controlNote": "Nowy komiks otwiera się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone. Po włączeniu przetwarzane są bieżące i pobliskie obrazy w ograniczonym oknie. Przerysowywanie AI jest dostępne tylko w internetowym obszarze roboczym przy odpowiednich uprawnieniach.",
   "privacyTitle": "Dowiedz się, co dzieje się z Twoimi stronami.",
   "privacyBody": "Oficjalne tłumaczenie wysyła wybrane obrazy na serwer; oryginały są usuwane po zakończeniu zadania, niepowodzeniu lub anulowaniu. Wyniki konta prywatnego są zachowywane tak długo, jak ważne wnioski pozostają ważne; Wyniki serwera gościa są przechowywane przez 24 godziny po zakończeniu zadania, a tłumaczenia zapisane lokalnie nie podlegają temu limitowi. Kiedy łączysz się z lokalną usługą tłumaczeniową, ta usługa określa przetwarzanie i przechowywanie obrazów.",
   "privacy": "Polityka prywatności",

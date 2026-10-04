@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Tutoriel de traduction locale",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,20 +66,20 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Ajoutez un canal de traduction dans l'extension",
         "paragraphs": [
-          "Ouvrez les paramètres de l'extension et recherchez les canaux de traduction. Après une connexion réussie, l'extension enregistre le mot de passe et le jeton du service localement sur cet ordinateur. Pour vous reconnecter avec la même adresse de service et le même nom d'utilisateur, laissez le mot de passe vide afin de réutiliser celui qui est enregistré. Saisissez-le à nouveau si l'adresse ou le nom d'utilisateur change, ou si le mot de passe a changé ou n'est plus valide. Les anciens profils qui ne contiennent qu'un jeton nécessitent de saisir le mot de passe une fois lors de leur première reconnexion. Les étiquettes ci-dessous décrivent les commandes correspondantes dans la langue de votre interface."
+          "Après connexion, le mot de passe et le jeton MTU sont conservés localement sur cet ordinateur. Avec la même adresse de service et le même nom d’utilisateur, laissez le mot de passe vide pour réutiliser celui enregistré. Saisissez-le à nouveau si l’adresse, le compte ou le mot de passe change, s’il n’est plus valide ou si un ancien profil ne contient qu’un jeton. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
         ],
         "steps": [
           "Choisissez Ajouter un canal de traduction et confirmez manga-translator-ui comme service. Donnez-lui éventuellement un nom reconnaissable, tel que « Mon ordinateur ».",
           "Entrez http://127.0.0.1:8000 comme adresse de service. Utilisez la racine du service, sans /auth/login, /translate/with-form/image ou un chemin de page d'administration.",
-          "Entrez votre nom d'utilisateur et votre mot de passe MTU, puis choisissez Se connecter et utiliser. Autorisez l'accès à l'adresse du service si le navigateur demande l'autorisation.",
+          "Entrez votre nom d’utilisateur et votre mot de passe MTU, puis choisissez Se connecter et utiliser. Vérifiez les restrictions d’accès à cette adresse dans les réglages du navigateur.",
           "Vérifiez que la chaîne actuelle affiche le nouveau service. Vous pouvez enregistrer plusieurs profils de service, mais seul le canal sélectionné est utilisé à la fois."
         ]
       },
       {
         "title": "4. Lisez votre première page traduite",
         "paragraphs": [
-          "Importez une bande dessinée locale ou ouvrez un site Web pris en charge dans le lecteur. Choisissez une langue cible et une traduction classique, puis attendez la page en cours. Le canal MTU prend actuellement en charge uniquement la traduction classique, pas le mode officiel de redessin par IA NodeLane.",
-          "La page actuelle est prioritaire, suivie des trois pages suivantes. Les images s'exécutent une par une sur le même canal MTU. Revenez à l'original ou comparez côte à côte sans perdre votre position de lecture. Le lecteur et la traduction sur la page utilisent le même canal sélectionné.",
+          "Importez un manga local ou ouvrez une source compatible dans le lecteur. Choisissez une langue cible et la traduction classique avec votre canal MTU sélectionné. L’extension actuelle propose uniquement cette traduction ; le redessin par IA de l’espace Web est une fonction distincte.",
+          "La page actuelle est prioritaire, suivie d’une fenêtre limitée d’images voisines. Les images sont traitées une par une sur le même canal MTU. Comparez l’original et la traduction sans perdre votre position ; le lecteur et la traduction sur la page utilisent le même service sélectionné.",
           "Si une page échoue, résolvez le problème signalé avant de réessayer manuellement. Fermer une page ou perdre la connexion ne prouve pas que MTU a arrêté le calcul. Évitez les soumissions répétées alors que le service est encore occupé."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Une connexion précédente signale désormais une connexion expirée",
-              "Choisissez Reconnecter dans les paramètres du canal. Avec la même adresse de service et le même nom d'utilisateur, laissez le mot de passe vide pour le réutiliser. Saisissez-le à nouveau si l'adresse ou le nom d'utilisateur change, si le mot de passe a changé ou n'est plus valide, ou si un ancien profil ne contient qu'un jeton. L'extension ne renvoie pas silencieusement la traduction précédente."
+              "Choisissez Reconnecter dans les paramètres du canal. Avec la même adresse de service et le même nom d'utilisateur, laissez le mot de passe vide pour le réutiliser. Saisissez-le à nouveau si l'adresse ou le nom d'utilisateur change, si le mot de passe a changé ou n'est plus valide, ou si un ancien profil ne contient qu'un jeton. L'extension ne renvoie pas silencieusement la traduction précédente. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
             ],
             [
               "Connecté, mais la traduction attend",
@@ -145,11 +145,11 @@ export const localTranslationGuides: Guide[] = [
   {
     "slug": "local-manga-translator",
     "title": "Choisir un traducteur de manga local pour la lecture sur navigateur",
-    "description": "Utilisez manga-translator-ui avec un lecteur de bandes dessinées sur navigateur : comprenez la traduction locale des mangas, les coûts matériels et API, la confidentialité, les exigences hors ligne et la prise en charge de la lecture CBZ et PDF.",
+    "description": "Connectez manga-translator-ui au lecteur de mangas : comptes, coûts, confidentialité et conditions de traduction hors ligne, avec fichiers locaux, EPUB et sources compatibles.",
     "category": "Guide de traduction local",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Lecture de BD locale",
-              "Importez des fichiers CBZ / ZIP, CBR / RAR, PDF ou MOBI sans DRM compatibles dans le navigateur. Lire les originaux ne nécessite aucun service de traduction."
+              "Importez des fichiers CBZ/ZIP, CBR/RAR, PDF et des MOBI ou EPUB sans DRM compatibles. L’EPUB conserve la lecture du document ; seules ses images matricielles intégrées peuvent être traduites, pas le texte du livre ni les éléments vectoriels. Les images individuelles, les fichiers KF8/AZW3 autonomes et les livres chiffrés ne sont pas importés. Les sites nécessitent un adaptateur dédié."
             ],
             [
               "Un service local MTU",
@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Modes d'extension",
               "Actuellement traduction classique uniquement",
-              "Traduction classique et redessin par IA, sous réserve d'accès au compte"
+              "L’extension actuelle propose uniquement la traduction classique. Le redessin par IA décrit ici concerne l’espace Web de traduction d’images, selon les droits disponibles."
             ],
             [
               "Coûts",

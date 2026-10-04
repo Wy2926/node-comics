@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Tutorial terjemahan lokal",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Tambahkan saluran terjemahan di ekstensi",
         "paragraphs": [
-          "Buka pengaturan ekstensi dan temukan saluran Terjemahan. Setelah koneksi berhasil, ekstensi menyimpan kata sandi dan token layanan di komputer ini. Saat menghubungkan kembali dengan alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Label di bawah menjelaskan kontrol yang sesuai dalam bahasa antarmuka Anda."
+          "Buka pengaturan ekstensi dan temukan saluran Terjemahan. Setelah koneksi berhasil, ekstensi menyimpan kata sandi dan token layanan di komputer ini. Saat menghubungkan kembali dengan alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Label di bawah menjelaskan kontrol yang sesuai dalam bahasa antarmuka Anda. Penyimpanan kata sandi dan koneksi ulang dengan kolom kosong memerlukan ekstensi 0.10.2 atau lebih baru; pada versi sebelumnya, masukkan kata sandi setiap kali menghubungkan ulang."
         ],
         "steps": [
           "Pilih Tambahkan saluran terjemahan dan konfirmasikan manga-translator-ui sebagai layanan. Secara opsional, beri nama yang dapat dikenali, seperti “Komputer saya”.",
@@ -78,8 +78,8 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Baca halaman terjemahan pertama Anda",
         "paragraphs": [
-          "Impor komik lokal atau buka situs web yang didukung di pembaca. Pilih bahasa target dan terjemahan standar, lalu tunggu halaman saat ini. Saluran MTU saat ini hanya mendukung terjemahan standar, bukan mode gambar ulang AI NodeLane resmi.",
-          "Halaman saat ini menjadi prioritas, diikuti oleh tiga halaman berikutnya. Gambar dijalankan satu per satu di saluran MTU yang sama. Beralih kembali ke versi asli atau bandingkan secara berdampingan tanpa kehilangan posisi membaca Anda. Pembaca dan terjemahan dalam halaman menggunakan saluran pilihan yang sama.",
+          "Impor komik lokal, buka EPUB, OPDS, atau situs yang didukung. Pilih bahasa tujuan dan aktifkan terjemahan biasa. Ekstensi saat ini memakai terjemahan biasa untuk saluran resmi maupun MTU.",
+          "Gambar saat ini dan yang berdekatan diprioritaskan dalam jendela terbatas; di satu saluran MTU, gambar dijalankan satu per satu. Komik baru dibuka sebagai gambar asli dan terjemahan otomatis nonaktif secara default. Bandingkan tanpa kehilangan posisi; pembaca dan terjemahan halaman memakai saluran pilihan.",
           "Jika suatu halaman gagal, selesaikan masalah yang dilaporkan sebelum mencoba lagi secara manual. Menutup halaman atau kehilangan koneksi tidak membuktikan bahwa MTU menghentikan komputasi. Hindari pengiriman berulang-ulang saat layanan mungkin masih sibuk."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Koneksi sebelumnya sekarang melaporkan login yang kedaluwarsa",
-              "Pilih Hubungkan kembali di pengaturan saluran. Untuk alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Konfigurasi dari versi lama yang hanya menyimpan token memerlukan kata sandi sekali saat pertama kali dihubungkan kembali. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Ekstensi tidak mengirimkan ulang terjemahan sebelumnya secara diam-diam."
+              "Pilih Hubungkan kembali di pengaturan saluran. Untuk alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Konfigurasi dari versi lama yang hanya menyimpan token memerlukan kata sandi sekali saat pertama kali dihubungkan kembali. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Ekstensi tidak mengirimkan ulang terjemahan sebelumnya secara diam-diam. Penyimpanan kata sandi dan koneksi ulang dengan kolom kosong memerlukan ekstensi 0.10.2 atau lebih baru; pada versi sebelumnya, masukkan kata sandi setiap kali menghubungkan ulang."
             ],
             [
               "Terhubung, tetapi terjemahan masih menunggu",
@@ -145,11 +145,11 @@ export const localTranslationGuides: Guide[] = [
   {
     "slug": "local-manga-translator",
     "title": "Memilih penerjemah manga lokal untuk membaca browser",
-    "description": "Gunakan manga-translator-ui dengan pembaca komik browser: pahami terjemahan manga lokal, biaya perangkat keras dan API, privasi, persyaratan offline, dan dukungan untuk membaca CBZ dan PDF.",
+    "description": "Hubungkan manga-translator-ui ke pembaca browser: komik lokal, EPUB dan OPDS, biaya perangkat keras serta API, privasi, dan syarat terjemahan offline.",
     "category": "Panduan terjemahan lokal",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Membaca komik lokal",
-              "Impor file CBZ / ZIP, CBR / RAR, PDF atau MOBI bebas DRM yang didukung ke dalam browser. Membaca dokumen asli tidak memerlukan layanan terjemahan."
+              "Impor CBZ/ZIP, CBR/RAR, PDF, MOBI tanpa DRM yang didukung, atau EPUB. Gambar asli dibaca tanpa layanan terjemahan; di EPUB hanya gambar bitmap tertanam yang diterjemahkan."
             ],
             [
               "Layanan MTU lokal",
@@ -213,8 +213,8 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Mode ekstensi",
-              "Saat ini terjemahan standar saja",
-              "Terjemahan standar dan gambar ulang AI, tergantung pada akses akun"
+              "Terjemahan biasa",
+              "Terjemahan biasa di ekstensi; gambar ulang AI hanya di ruang kerja web sesuai hak akses"
             ],
             [
               "Biaya",

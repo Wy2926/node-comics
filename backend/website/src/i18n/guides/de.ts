@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Tutorial zur lokalen Übersetzung",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -66,20 +66,20 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Fügen Sie in der Erweiterung einen Übersetzungskanal hinzu",
         "paragraphs": [
-          "Öffnen Sie die Einstellungen der Erweiterung und suchen Sie nach Übersetzungskanälen. Nach einer erfolgreichen Verbindung speichert die Erweiterung das Dienstpasswort und das Token lokal auf diesem Computer. Wenn Sie dieselbe Dienstadresse und denselben Benutzernamen erneut verbinden, lassen Sie das Passwortfeld leer, um das gespeicherte Passwort zu verwenden. Geben Sie das Passwort erneut ein, wenn sich die Adresse oder der Benutzername ändert oder das Passwort geändert wurde oder nicht mehr gültig ist. Bei älteren Profilen, die nur ein Token enthalten, müssen Sie das Passwort bei der ersten erneuten Verbindung einmal eingeben. Die folgenden Beschriftungen beschreiben die entsprechenden Steuerelemente in Ihrer Benutzeroberflächensprache."
+          "Nach der Verbindung werden MTU-Passwort und Token lokal auf diesem Computer gespeichert. Bei gleicher Dienstadresse und gleichem Benutzernamen lässt du das Passwort leer, um das gespeicherte wiederzuverwenden. Gib es erneut ein, wenn sich Adresse, Benutzername oder Passwort ändern, es ungültig ist oder ein altes Profil nur einen Token enthält. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
         ],
         "steps": [
           "Wählen Sie Übersetzungskanal hinzufügen und bestätigen Sie manga-translator-ui als Dienst. Geben Sie ihm optional einen erkennbaren Namen, z. B. „Mein Computer“.",
           "Geben Sie als Dienstadresse http://127.0.0.1:8000 ein. Verwenden Sie das Dienststammverzeichnis ohne /auth/login, /translate/with-form/image oder einen Verwaltungsseitenpfad.",
-          "Geben Sie Ihren MTU-Benutzernamen und Ihr Passwort ein und wählen Sie dann „Verbinden und verwenden“ aus. Erlauben Sie den Zugriff auf die Dienstadresse, wenn der Browser eine Erlaubnis anfordert.",
+          "Gib MTU-Benutzernamen und Passwort ein und wähle Verbinden und verwenden. Prüfe Einschränkungen für diese Adresse in den Browser-Einstellungen.",
           "Überprüfen Sie, ob im aktuellen Kanal der neue Dienst angezeigt wird. Sie können mehrere Dienstprofile speichern, es wird jedoch jeweils nur der ausgewählte Kanal verwendet."
         ]
       },
       {
         "title": "4. Lesen Sie Ihre erste übersetzte Seite",
         "paragraphs": [
-          "Importieren Sie einen lokalen Comic oder öffnen Sie eine unterstützte Website im Reader. Wählen Sie eine Zielsprache und eine klassische Übersetzung und warten Sie dann auf die aktuelle Seite. Der MTU-Kanal unterstützt derzeit nur die klassische Übersetzung, nicht den offiziellen NodeLane AI-Neuzeichnungsmodus.",
-          "Die aktuelle Seite hat Priorität, gefolgt von den nächsten drei Seiten. Die Bilder werden einzeln auf demselben MTU-Kanal ausgeführt. Wechseln Sie zurück zum Original oder vergleichen Sie nebeneinander, ohne Ihre Leseposition zu verlieren. Der Reader und die In-Page-Übersetzung nutzen denselben ausgewählten Kanal.",
+          "Importiere einen lokalen Manga oder öffne eine unterstützte Quelle im Leser. Wähle eine Sprache und klassische Übersetzung mit deinem ausgewählten MTU-Kanal. Die aktuelle Erweiterung bietet nur diese Übersetzung; KI-Neuzeichnen im Web-Arbeitsbereich ist eine separate Funktion.",
+          "Die aktuelle Seite hat Vorrang, danach folgt ein begrenzter Bereich benachbarter Bilder. Bilder werden im selben MTU-Kanal einzeln verarbeitet. Vergleiche Original und Übersetzung ohne Positionsverlust; Leser und Seitenübersetzung verwenden denselben ausgewählten Dienst.",
           "Wenn eine Seite fehlschlägt, beheben Sie das gemeldete Problem, bevor Sie es manuell erneut versuchen. Das Schließen einer Seite oder der Verlust der Verbindung beweist nicht, dass MTU die Berechnung gestoppt hat. Vermeiden Sie wiederholte Übermittlungen, solange der Dienst möglicherweise noch ausgelastet ist."
         ],
         "links": [
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Eine frühere Verbindung meldet nun einen abgelaufenen Login",
-              "Wählen Sie in den Kanaleinstellungen „Erneut verbinden“. Bei derselben Dienstadresse und demselben Benutzernamen können Sie das Passwortfeld leer lassen, um das gespeicherte Passwort zu verwenden. Geben Sie es erneut ein, wenn sich die Adresse oder der Benutzername ändert, das Passwort geändert wurde oder nicht mehr gültig ist oder ein älteres Profil nur ein Token enthält. Die Erweiterung sendet die vorherige Übersetzung nicht stillschweigend erneut."
+              "Wählen Sie in den Kanaleinstellungen „Erneut verbinden“. Bei derselben Dienstadresse und demselben Benutzernamen können Sie das Passwortfeld leer lassen, um das gespeicherte Passwort zu verwenden. Geben Sie es erneut ein, wenn sich die Adresse oder der Benutzername ändert, das Passwort geändert wurde oder nicht mehr gültig ist oder ein älteres Profil nur ein Token enthält. Die Erweiterung sendet die vorherige Übersetzung nicht stillschweigend erneut. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
             ],
             [
               "Verbunden, aber die Übersetzung wartet",
@@ -145,11 +145,11 @@ export const localTranslationGuides: Guide[] = [
   {
     "slug": "local-manga-translator",
     "title": "Wählen Sie einen lokalen Manga-Übersetzer zum Lesen im Browser",
-    "description": "Verwenden Sie manga-translator-ui mit einem Browser-Comic-Reader: Informieren Sie sich über die lokale Manga-Übersetzung, Hardware- und API-Kosten, Datenschutz, Offline-Anforderungen und Unterstützung für das Lesen von CBZ und PDF.",
+    "description": "Verbinde manga-translator-ui mit deinem Manga-Leser: Konten, Kosten, Datenschutz und Voraussetzungen für Offline-Übersetzung, mit lokalen Dateien, EPUB und unterstützten Quellen.",
     "category": "Lokaler Übersetzungsführer",
     "minutes": 6,
     "published": "2026-09-28",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "related": [
       "local-translation",
       "translation-modes",
@@ -176,7 +176,7 @@ export const localTranslationGuides: Guide[] = [
           "rows": [
             [
               "Lokale Comic-Lesung",
-              "Importieren Sie CBZ / ZIP, CBR / RAR, PDF oder unterstützte DRM-freie MOBI-Dateien in den Browser. Für das Lesen von Originalen ist kein Übersetzungsdienst erforderlich."
+              "Importiere unterstützte CBZ/ZIP-, CBR/RAR- und PDF-Dateien sowie MOBI und EPUB ohne DRM. Bei EPUB bleibt das Dokument lesbar; nur eingebettete Rasterbilder werden übersetzt, nicht der Buchtext oder Vektorelemente. Einzelbilder, eigenständige KF8/AZW3-Dateien und verschlüsselte Bücher werden nicht importiert. Websites benötigen einen eigenen Adapter."
             ],
             [
               "Ein lokaler MTU-Dienst",
@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Erweiterungsmodi",
               "Derzeit nur klassische Übersetzung",
-              "Klassische Übersetzung und KI-Neuzeichnung, vorbehaltlich des Kontozugriffs"
+              "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab."
             ],
             [
               "Kosten",

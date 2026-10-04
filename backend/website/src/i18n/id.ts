@@ -6,8 +6,8 @@ export default {
     "seoChangelogTitle": "Catatan Rilis Ekstensi Penerjemah Manga",
     "seoAboutTitle": "Tentang Penerjemah Manga & Pembaca Komik Kami",
     "seoHelpTitle": "Pemecahan Masalah Terjemahan & Ekstensi Manga",
-    "seoFaqTitle": "FAQ Penerjemah Manga: Instalasi, File & Batasan",
-    "seoGuidesTitle": "Terjemahan Manga & CBZ, PDF Panduan Pembaca",
+    "seoFaqTitle": "Pertanyaan tentang terjemahan manga, EPUB, OPDS, dan membaca offline",
+    "seoGuidesTitle": "Panduan terjemahan manga, EPUB, dan pustaka OPDS",
     "features": "Fitur",
     "pricing": "Harga",
     "guides": "Panduan",
@@ -27,7 +27,7 @@ export default {
     "menu": "Buka menu navigasi",
     "language": "Bahasa",
     "tagline": "Kisah yang bagus melampaui batas bahasa",
-    "footerStory": "Ubah hambatan bahasa menjadi halaman lain. Ceritamu selanjutnya menanti.",
+    "footerStory": "Buka koleksi Anda, hubungkan pustaka, dan baca dalam bahasa Anda.",
     "startReading": "Mulai membaca",
     "support": "Dukungan pembaca",
     "company": "Tentang kami",
@@ -35,7 +35,7 @@ export default {
     "artNote": "Tangkapan layar produk & ilustrasi AI asli · Karya seni komik milik pemiliknya masing-masing",
     "ogAlt": "Ilustrasi manga tepi laut NodeLane Comics asli",
     "heroTitle": "Melampaui kata. Memasuki cerita.",
-    "heroDescription": "Berikan manga favorit Anda versi yang dapat Anda pahami. Baca dan terjemahkan komik web dan koleksi lokal Anda, satu halaman dalam satu waktu.",
+    "heroDescription": "Baca dan terjemahkan manga di browser: file lokal dan EPUB, pustaka OPDS, situs yang didukung, serta gambar di halaman web.",
     "heroEyebrow": "HALAMAN BERIKUTNYA, DALAM BAHASAMU",
     "freeStart": "Mulai membaca gratis",
     "seeHow": "Lihat cara kerjanya",
@@ -43,28 +43,34 @@ export default {
     "heroCaption": "Karya seni AI asli untuk NodeLane Comics",
     "heroAlt": "Manga asli: seorang musafir menunggu di peron kereta tepi laut",
     "nextStop": "TUJUAN BERIKUTNYA / DUNIA BARU",
-    "featureHeading": "Terjemahkan manga. Baca dan bandingkan dokumen asli.",
-    "featureDescription": "Terjemahkan komik web yang didukung dan file lokal halaman demi halaman, bandingkan dengan aslinya, dan pertahankan posisi membaca. Jelajahi terjemahan standar, gambar ulang AI, serta pembacaan CBZ, CBR, PDF, dan MOBI tanpa DRM.",
+    "featureHeading": "Komik Anda, membaca dengan nyaman, dan terjemahan saat diperlukan.",
+    "featureDescription": "Buka komik lokal dan EPUB, hubungkan OPDS, dan temukan cerita di situs yang didukung. Terjemahkan halaman di pembaca, gambar web, atau area terlihat yang dipilih, lalu bandingkan dengan aslinya.",
     "featureTitles": [
-      "Terjemahan mengikuti bacaan Anda",
-      "Dua cara untuk membaca halaman yang sama",
-      "Babak baru untuk koleksi Anda"
+      "Komik lokal dan EPUB",
+      "Pustaka OPDS",
+      "Penemuan dan pencarian lintas situs",
+      "Terjemahan di halaman web",
+      "Saluran resmi atau MTU sendiri",
+      "Membaca offline dan pengaturan"
     ],
     "featureBodies": [
-      "Pilih terjemahan untuk memproses gambar saat ini dan tiga gambar berikutnya sambil membaca. Posisi membaca tetap terjaga saat hasil tiba.",
-      "Gunakan terjemahan standar untuk membaca sehari-hari, atau coba gambar ulang AI untuk hasil tampilan berbeda. Versi asli selalu dapat dibuka dengan satu klik.",
-      "Pilih CBZ/ZIP, CBR/RAR, PDF, atau MOBI tanpa DRM yang didukung untuk diimpor dan langsung dibaca. Setiap file menjadi satu komik; impor gambar terpisah tidak didukung."
+      "Impor CBZ/ZIP, CBR/RAR, PDF, MOBI tanpa DRM yang didukung, dan EPUB. Di EPUB, hanya gambar bitmap tertanam yang diterjemahkan, bukan teks buku atau grafis vektor; DRM tidak dihapus.",
+      "Hubungkan beberapa pustaka OPDS, telusuri katalog, cari, dan baca. Jika dukungan Range dapat diandalkan, data diambil sesuai kebutuhan; jika tidak, Anda harus memilih mengunduh seluruh file.",
+      "Jelajahi rekomendasi dan cari judul di berbagai situs yang didukung. Menambahkan ke pembaca memerlukan adaptor situs; katalog sumber tetap hanya dapat dibaca.",
+      "Terjemahkan gambar di halaman saat ini, satu gambar melalui menu klik kanan, atau area persegi panjang yang terlihat. Pemilihan area tidak menyambung gambar dengan menggulir; pintasan diatur melalui browser.",
+      "Ekstensi menggunakan terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default.",
+      "Simpan semua bab dalam bahasa yang dipilih ke cache. Jeda dan lanjutkan unduhan untuk melengkapi yang belum tersimpan. Bab yang selesai disimpan dapat dibaca offline; sesuaikan tampilan, skala, dan perbandingan dengan aslinya."
     ],
     "ribbon": [
-      "Terjemahan standar dan gambar ulang AI",
-      "Komik web dan lokal",
-      "Versi asli selalu tersedia",
-      "Posisi membaca tetap terjaga"
+      "File lokal, EPUB, dan OPDS",
+      "Situs yang didukung dan gambar web",
+      "Gambar asli dan terjemahan berdampingan",
+      "Saluran resmi atau MTU sendiri"
     ],
     "compareTitle": "Pahami dialognya. Pertahankan perasaan itu.",
     "compareDescription": "Jangan berpindah antara manga Anda dan jendela terjemahan. Masukkan kembali kata-kata ke dalam gambar dan pertahankan karakternya.",
     "readingTitle": "Koleksi Anda. Cara baru untuk membaca.",
-    "readingDescription": "Buka komik dan lanjutkan dari bagian terakhir yang Anda tinggalkan. Satu sumber per komik, dengan direktori sumber hanya-baca dan tidak ada manajemen bab atau edisi.",
+    "readingDescription": "Buka file lokal, Google Drive, pustaka OPDS, atau situs yang didukung. Lanjutkan dari posisi tersimpan, atur pembaca, dan bandingkan dengan aslinya. Sinkronisasi progres hanya tersedia untuk sumber yang mendukungnya dan telah diverifikasi kompatibilitasnya.",
     "readingAlt": "Ilustrasi asli manga terbuka di dekat jendela yang menghadap ke laut",
     "guideHeading": "Beberapa catatan sebelum halaman berikutnya.",
     "allGuides": "Semua panduan membaca",
@@ -104,16 +110,16 @@ export default {
     "downloadXpi": "Unduh XPI bertanda tangan",
     "storeHeading": "Tautan toko browser",
     "storeNote": "Daftar Edge sedang ditinjau; gunakan paket Edge ZIP untuk saat ini. Instal Firefox dari tokonya atau dengan XPI yang ditandatangani. Umpan balik:",
-    "guidesTitle": "Terjemahan manga & panduan membaca komik lokal",
-    "guidesDescription": "Belajar menerjemahkan manga di browser Anda, membuka file CBZ, CBR, PDF dan MOBI, membandingkan aslinya dalam bahasa Jepang, memecahkan masalah terjemahan, dan memahami privasi gambar.",
+    "guidesTitle": "Panduan terjemahan manga dan membaca komik",
+    "guidesDescription": "Buka CBZ, CBR, PDF, MOBI, dan EPUB, hubungkan OPDS, terjemahkan gambar web serta area pilihan. Pilih saluran resmi atau MTU dan siapkan bab untuk dibaca offline.",
     "contents": "Di halaman ini",
     "editor": "NodeLane Comics tim redaksi",
     "updated": "Diperbarui",
     "related": "Baca selanjutnya",
     "faqTitle": "FAQ ekstensi penerjemah manga",
-    "faqDescription": "Jawaban tentang instalasi Chrome, Edge dan Firefox, terjemahan manga gratis, file CBZ dan PDF, situs yang didukung, terjemahan lokal, privasi gambar, dan pembatalan.",
+    "faqDescription": "Instalasi, format komik dan EPUB, OPDS, terjemahan area, membaca offline, izin, MTU, dan kuota terjemahan resmi.",
     "helpTitle": "Bantuan terjemahan & ekstensi manga",
-    "helpDescription": "Memecahkan masalah pemuatan gambar manga, terjemahan terhenti, izin, dan proses masuk. Temukan instalasi dan panduan komik lokal atau hubungi dukungan NodeLane Comics.",
+    "helpDescription": "Atasi masalah impor, OPDS, pengambilan gambar, terjemahan, izin, dan koneksi MTU. Gunakan panduan atau hubungi dukungan.",
     "contactTitle": "Setiap masukan patut dibaca dengan cermat.",
     "videoTutorials": "Video tutorial",
     "githubSource": "Lihat sumber di GitHub",
@@ -122,8 +128,8 @@ export default {
     "contactDescription": "Gunakan opsi masukan per halaman di ekstensi untuk kualitas terjemahan. Untuk masalah lainnya, kirim email kepada kami dengan browser Anda, versi ekstensi, langkah-langkah dan pesan kesalahan. Jangan mengirimkan kata sandi, token, detail kartu pembayaran, URL bertanda tangan, atau komik lengkap yang tidak berhak Anda bagikan.",
     "emailButton": "Kirim email",
     "aboutTitle": "Tentang NodeLane Comics",
-    "aboutDescription": "NodeLane Comics adalah penerjemah manga dan ekstensi pembaca komik untuk Chrome, Edge dan Firefox, dengan bacaan web dan lokal serta perbandingan asli. Itu tidak menampung katalog manga.",
-    "aboutBody": "NodeLane Comics menyatukan terjemahan gambar, pembacaan lokal, dan penemuan gambar web dalam satu ekstensi browser. Kami ingin Anda lebih sedikit berpindah jendela dan lebih fokus pada karya. AI dapat membuat kesalahan, sehingga akses ke versi asli, aturan yang jelas, dan penghormatan kepada kreator sangat penting. Kami tidak menyediakan katalog komik, menjual karya komik, atau melewati paywall, persyaratan masuk, maupun DRM. Gunakan hanya konten yang boleh Anda akses dan proses.",
+    "aboutDescription": "NodeLane Comics adalah ekstensi pembaca dan penerjemah manga untuk Chrome, Edge, dan Firefox: komik lokal, EPUB, Google Drive, OPDS, serta situs yang didukung.",
+    "aboutBody": "NodeLane Comics menyatukan pembacaan komik dan terjemahan gambar di browser. Buka file sendiri, hubungkan Drive atau OPDS, temukan cerita di situs yang didukung, dan terjemahkan halaman atau area yang terlihat. Terjemahan biasa bekerja melalui saluran resmi atau manga-translator-ui Anda. Gambar asli tetap tersedia untuk diperiksa karena pengenalan dan terjemahan bisa salah. Kami tidak menyediakan katalog komik, menjual komik, atau melewati akses berbayar, login, maupun DRM. Gunakan hanya konten yang berhak Anda akses dan proses.",
     "changelogTitle": "NodeLane Comics catatan rilis",
     "changelogDescription": "Ikuti pembaruan penerjemah manga, dukungan situs baru, kompatibilitas browser, dan perbaikan membaca. Persetujuan toko Chrome, Edge dan Firefox mungkin berbeda; periksa versi yang Anda instal.",
     "rss": "Ikuti pembaruan melalui RSS",
@@ -150,31 +156,32 @@ export default {
   "slug": "manga-translation",
   "minutes": 4,
   "title": "Cara menerjemahkan manga di browser Anda",
-  "description": "Dari memasang ekstensi hingga memeriksa halaman terjemahan pertama Anda: panduan praktis untuk menemukan dan membaca gambar web.",
+  "description": "Terjemahkan manga di pembaca, gambar melalui menu klik kanan, dan area halaman yang terlihat. Pilih saluran lalu periksa hasil dengan aslinya.",
   "category": "Memulai",
   "sections": [
     {
-      "title": "Mengapa terjemahan gambar berbeda",
+      "title": "Siapkan ekstensi dan sumber",
       "paragraphs": [
-        "Terjemahan browser biasa menangani teks halaman web. Dialog manga biasanya merupakan bagian dari sebuah gambar, sehingga perlu pengolahan gambar dan penempatan teks. NodeLane Comics menggabungkan terjemahan dan pembaca dalam satu ekstensi.",
-        "Instal melalui toko browser yang sesuai, sematkan ekstensi, dan buka komik yang hak aksesnya Anda miliki. Situs web dan ekstensi menggunakan layanan identitas dan manfaat akun yang sama."
+        "Pasang ekstensi browser desktop dan buka komik yang berhak Anda akses. Adaptor situs yang didukung dapat membuka pembaca; situs tanpa adaptor tidak dapat diimpor ke rak.",
+        "Akses situs dideklarasikan saat instalasi. Browser dapat membatasinya: periksa akses halaman dan domain gambar. Cookie dan token login situs sumber tidak dikirim ke layanan terjemahan."
       ]
     },
     {
-      "title": "Temukan, periksa, lalu baca",
+      "title": "Pilih yang ingin diterjemahkan",
       "paragraphs": [
-        "Di situs web dengan adaptor khusus, klik Mulai membaca untuk membuka pembaca secara langsung. Halaman web lain dapat menggunakan tab Terjemahan saat ini tetapi tidak dapat diimpor ke perpustakaan. Berikan izin situs dan host gambar bila diperlukan. Konten sumber hanya dapat dibaca; tidak ada pemilihan gambar, formulir metadata, atau penetapan bab.",
-        "Setelah Anda memilih terjemahan, ini berfungsi pada gambar saat ini dan tiga gambar berikutnya. Menemukan URL gambar tidak berarti seluruh bab telah diunduh: pemuatan lambat, perubahan navigasi, dan CDN terpisah dapat memengaruhi pengambilan."
+        "Gunakan terjemahan halaman saat ini, menu klik kanan satu gambar, atau pilih persegi panjang yang terlihat. Pilihan hanya mengambil area yang terlihat dan tidak menyambung halaman panjang dengan menggulir. Atur pintasan di pengaturan ekstensi browser.",
+        "Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default. Saat diaktifkan, gambar saat ini dan yang berdekatan membentuk jendela terbatas; seluruh buku tidak dikirim. Pilih saluran resmi atau MTU terhubung dan bahasa tujuan."
       ]
     },
     {
-      "title": "Simpan yang asli di dekat Anda",
+      "title": "Periksa terjemahan dan pertahankan posisi",
       "paragraphs": [
-        "Ketika terjemahan tiba, posisi membaca Anda dipertahankan. Beralih ke versi asli untuk dialog yang tidak jelas, teks kecil, atau efek suara. AI dapat menghilangkan atau salah memahami konten; kata-kata yang lancar bukanlah bukti keakuratan.",
-        "Halaman yang gagal tidak memblokir halaman lainnya. Gunakan umpan balik per halaman jika ada yang salah. Meminta terjemahan baru secara eksplisit akan membuat versi baru dan menggunakan hak yang relevan."
+        "Beralih antara gambar asli, terjemahan, dan perbandingan tanpa kehilangan posisi. OCR bisa melewatkan teks kecil, tulisan tangan, dan efek suara; periksa nama serta makna pada aslinya.",
+        "Kegagalan satu halaman tidak menghalangi yang lain. Perbaiki penyebab yang ditampilkan lalu coba lagi. Permintaan baru untuk terjemahan resmi secara eksplisit membuat versi baru dan memakai hak akses akun saat ini."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-modes",
@@ -184,39 +191,39 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Terjemahan standar atau gambar ulang AI: mana yang harus Anda pilih?",
-  "description": "Bandingkan terjemahan manga OCR standar dengan gambar ulang AI, periksa aslinya, dan pelajari cara menghubungkan layanan manga-translator-ui lokal. Pilih mode dan layanan untuk membaca Anda.",
+  "title": "Terjemahan manga biasa: saluran resmi atau MTU sendiri?",
+  "description": "Cara kerja terjemahan biasa di ekstensi, perbedaan saluran resmi dan manga-translator-ui, serta tempat tersedianya gambar ulang AI.",
   "category": "Kiat terjemahan",
   "sections": [
     {
-      "title": "Dua alur kerja yang berbeda",
+      "title": "Cara kerja terjemahan biasa",
       "paragraphs": [
-        "Terjemahan standar mendeteksi dan mengenali teks, menerjemahkannya dengan model teks, membersihkan wilayah teks, dan mengeset hasilnya. Gambar ulang AI memberikan gambar dan bahasa target ke model gambar untuk menghasilkan gambar terjemahan.",
-        "Tidak ada yang selalu lebih baik. Klasik berfokus pada wilayah teks; menggambar ulang memiliki lebih banyak kebebasan dan dapat mengubah karakter, latar belakang, atau garis. Bandingkan halaman yang representatif daripada mengandalkan satu ilustrasi."
+        "Ekstensi menemukan teks, mengenalinya dengan OCR, menerjemahkan, memulihkan latar di area teks, dan menempatkan hasil pada halaman. Gambar asli tetap tersedia untuk dibandingkan.",
+        "Ekstensi saat ini hanya menggunakan terjemahan biasa. Gambar ulang AI tetap tersedia di ruang kerja gambar web sesuai hak akses akun; tersedianya di situs tidak berarti didukung oleh pembaca."
       ]
     },
     {
-      "title": "Mulailah dengan terjemahan standar untuk membaca sehari-hari",
+      "title": "Saluran resmi NodeLane",
       "paragraphs": [
-        "Dialog yang jelas dan gelembung yang teratur adalah titik awal yang berguna. Tulisan tangan, perspektif, teks kecil, dan efek suara mungkin masih terlewatkan. Periksa pesan hasil sebagian dan bandingkan dengan aslinya.",
-        "Gratis termasuk 30 halaman standar per hari. Lite tidak memiliki batas total harian atau bulanan, dengan hingga 1.200 halaman baru per jam bergulir dan tidak termasuk gambar ulang AI. Batas tarif, gambar, dan kapasitas layanan jangka pendek masih berlaku."
+        "Masuk ke akun NodeLane, pilih bahasa, lalu aktifkan terjemahan. Layanan memproses gambar pilihan; akun menentukan akses dan kuota. Menggunakan kembali hasil yang masih berlaku tidak memotong kuota lagi.",
+        "Membaca gambar asli tidak membutuhkan akun. Paket Gratis dan Lite mengikuti aturan yang dipublikasikan: periksa hak akses di halaman akun dan harga di halaman paket. Batas frekuensi serta kapasitas tidak menjamin kecepatan penyelesaian."
       ]
     },
     {
-      "title": "Coba gambar ulang dengan sengaja",
+      "title": "Hubungkan manga-translator-ui sendiri",
       "paragraphs": [
-        "Kuota gambar ulang tersedia setiap bulan, termasuk pada paket tahunan; sisanya tidak dibawa ke bulan berikutnya. Akun yang memenuhi syarat dapat memulai uji coba dengan kartu yang ditampilkan untuk paketnya. Berlangganan kembali atau memilih paket lain tidak mengatur ulang kelayakan uji coba.",
-        "Mode dan bahasa yang berbeda memiliki hasil yang berbeda pula. Anda dapat menyimpan hasil standar yang valid saat gambar ulang menunggu atau gagal, dan kembali ke hasil asli kapan pun detailnya penting."
+        "Jalankan layanan web MTU, uji terjemahan satu gambar, lalu tambahkan alamat dan kredensial di pengaturan saluran. Akun NodeLane dan kuota resmi tidak diperlukan; perangkat keras, model, dan API eksternal menjadi tanggungan Anda.",
+        "Beberapa profil dapat disimpan, tetapi hanya satu saluran pilihan yang digunakan. Kata sandi dan token tersimpan lokal; saat menghubungkan ulang alamat dan pengguna yang sama, kata sandi dapat dikosongkan. MTU lokal tidak menjamin pemrosesan sepenuhnya offline. Penyimpanan kata sandi dan koneksi ulang dengan kolom kosong memerlukan ekstensi 0.10.2 atau lebih baru; pada versi sebelumnya, masukkan kata sandi setiap kali menghubungkan ulang."
       ]
     },
     {
-      "title": "Gunakan layanan terjemahan manga lokal",
+      "title": "Bandingkan dengan halaman Anda",
       "paragraphs": [
-        "Hubungkan layanan manga-translator-ui Anda sendiri dengan menambahkan dan memilih saluran terjemahan lokal di pengaturan ekstensi. Ini tidak memerlukan akun NodeLane atau kuota terjemahan resmi. Anda harus menjalankan layanan itu sendiri; persyaratan jaringan, mode yang tersedia, dan penanganan gambar bergantung pada layanan tersebut."
+        "Mulai dari beberapa halaman yang mewakili koleksi Anda, lalu periksa teks terlewat, nama, makna, dan tata letak. Komik baru dibuka sebagai gambar asli dan terjemahan otomatis nonaktif; aktifkan saat diperlukan dan pertahankan akses ke gambar asli."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "local-comics",
@@ -226,33 +233,33 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Baca komik CBZ, CBR, PDF dan MOBI secara lokal",
-  "description": "Format komik yang didukung, pemeriksaan impor, batasan MOBI bebas DRM, dan batasan antara bacaan lokal dan terjemahan online.",
+  "title": "Baca CBZ, CBR, PDF, MOBI, dan EPUB di browser",
+  "description": "Format lokal yang didukung, impor dari Google Drive, batas EPUB, dan syarat membaca serta menerjemahkan offline.",
   "category": "Bacaan lokal",
   "sections": [
     {
-      "title": "Ketahui format filenya",
+      "title": "Pilih format yang didukung",
       "paragraphs": [
-        "CBZ biasanya mengemas gambar dalam ZIP; CBR menggunakan RAR. PDF halaman harus dirender, dan MOBI berisi catatan buku dan referensi gambar. Mengubah ekstensi tidak mengonversi file.",
-        "CBZ/ZIP, CBR/RAR, PDF dan mendukung komik MOBI6/MOBI6+KF8 bebas DRM. Gambar lepas tidak dapat diimpor. Impor situs web memerlukan adaptor khusus."
+        "Impor lokal mendukung CBZ/ZIP, CBR/RAR, PDF, MOBI tanpa DRM yang didukung, dan EPUB. ZIP serta RAR berisi gambar, PDF ditampilkan sebagai halaman, dan EPUB dibuka sebagai buku elektronik. Mengganti ekstensi file tidak mengonversinya.",
+        "Impor hanya file yang berhak Anda baca dan proses. Gambar satuan tidak dapat diimpor ke rak. Google Drive mendukung CBZ/ZIP dan MOBI tanpa DRM; impor situs memerlukan adaptor."
       ]
     },
     {
-      "title": "Periksa impor",
+      "title": "Periksa impor dan akses offline",
       "paragraphs": [
-        "Gunakan file lengkap yang berhak Anda proses. Periksa kata sandi, kerusakan, atau kompresi yang tidak didukung. Setelah mengimpor, verifikasi sampul, urutan bab, gambar mini, dan kejelasan gambar.",
-        "Impor MOBI dibatasi hingga 512 MB dan 1.500 halaman dan harus melewati pemeriksaan struktural. Referensi citra tubuh yang didukung menentukan urutan; buku HTML tidak dijalankan. GIF yang tersemat dapat dibaca, tetapi terjemahannya menggunakan bingkai pertama yang dinormalisasi. DRM tidak dihapus."
+        "Gunakan file lengkap, lalu periksa kerusakan, kata sandi, dan urutan halaman. Setelah impor, periksa sampul, daftar isi, dan gambar. Gambar asli dibaca lokal tanpa akun; terjemahan resmi mengirim gambar pilihan, sedangkan MTU mengirimnya ke layanan Anda.",
+        "Untuk situs, semua bab dalam bahasa yang dipilih dapat disimpan ke cache; jeda dan lanjutkan unduhan untuk melengkapi kekurangan. Bab yang selesai tersedia offline; menutup halaman tugas menjeda rencana. File lokal tidak berarti terjemahan offline."
       ]
     },
     {
-      "title": "Impor lokal bukan terjemahan offline",
+      "title": "MOBI dan EPUB: apa yang diterjemahkan",
       "paragraphs": [
-        "Penguraian komik lokal dan pembacaan asli terjadi di browser. Terjemahan resmi mengunggah gambar halaman yang dipilih untuk diproses dan menyimpan hasilnya secara pribadi. Anda malah dapat memilih layanan manga-translator-ui Anda sendiri; konfigurasinya menentukan akses jaringan dan penanganan gambar.",
-        "Perpustakaan dan posisi membaca tetap lokal. Mengimpor ulang konten yang sama dengan akun yang sama dapat mencocokkan hasil valid yang sudah ada. Ini bukan sinkronisasi otomatis seluruh perpustakaan atau file sumber Anda."
+        "Komik MOBI6/MOBI6+KF8 tanpa DRM didukung setelah pemeriksaan struktur; KF8/AZW3 mandiri tidak didukung. Di EPUB, gambar bitmap yang tertanam dalam isi buku dapat diterjemahkan, bukan teks utama, grafis vektor, atau konten terlindungi. DRM tidak dihapus.",
+        "Gunakan daftar isi dan pengaturan membaca EPUB untuk navigasi; periksa terjemahan gambar dengan aslinya. Pustaka dan posisi lokal disimpan di browser. Sinkronisasi progres jarak jauh hanya tersedia untuk sumber OPDS yang mendukungnya dan telah diverifikasi, bukan seluruh rak."
       ]
     }
   ],
-  "updated": "2026-09-26"
+  "updated": "2026-10-04"
 },
 {
   "slug": "japanese-manga",
@@ -278,11 +285,12 @@ export default {
     {
       "title": "Periksa kata-kata dan gambar",
       "paragraphs": [
-        "Terjemahan standar dan gambar ulang AI dapat memberikan hasil yang berbeda. Gambar ulang juga dapat mengubah detail gambar. Bandingkan ekspresi, tulisan tangan, dan latar belakang yang mempengaruhi cerita.",
+        "Terjemahan biasa dapat melewatkan teks atau kurang tepat memulihkan latar dan posisi tulisan. Bandingkan ekspresi, tulisan tangan, dan latar ketika detail tersebut memengaruhi cerita.",
         "NodeLane Comics menyimpan yang asli tetap tersedia. Penerjemahan menurunkan hambatan pemahaman tanpa menghilangkan kemampuan untuk memverifikasi karya itu sendiri."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "translation-troubleshooting",
@@ -306,18 +314,19 @@ export default {
     {
       "title": "Selesaikan tugas awal terlebih dahulu",
       "paragraphs": [
-        "Tugas tetap ada di backend. Menutup halaman atau kehilangan konektivitas sebentar tidak berarti tugas tersebut hilang. Biarkan ekstensi menyelesaikan status aslinya setelah tersambung kembali.",
-        "Penyedia gambar mungkin telah menerima gambar ulang sementara hasilnya tidak diketahui. Verifikasi didahulukan; kuota halaman dapat tetap dipesan untuk sementara. Membuat versi baru berulang kali bukanlah cara yang aman untuk memeriksa penyelesaian."
+        "Tugas resmi disimpan di server: menutup halaman atau kehilangan koneksi sebentar tidak berarti pembatalan. Setelah terhubung kembali, tunggu status tugas awal. Jika MTU dipilih, periksa prosesnya di layanan tersebut.",
+        "Jika hasil belum diketahui, periksa status tugas terlebih dahulu tanpa membuat versi berulang. Di ruang kerja web, gambar ulang AI dapat mencadangkan kuota sementara sampai hasil diverifikasi; ekstensi memakai terjemahan biasa."
       ]
     },
     {
       "title": "Periksa akses dan laporkan dengan jelas",
       "paragraphs": [
-        "Masuk lagi jika otorisasi telah habis masa berlakunya, verifikasi daftar bahasa mode, dan periksa batas waktu promosi atau masa berlaku promosi saat ini. Kegagalan eksplisit melepaskan reservasi terkait.",
+        "Periksa login dan hak akses akun resmi saat ini, bahasa saluran pilihan, serta izin browser. Untuk MTU, periksa alamat, login, dan terjemahan satu gambar di layanannya sendiri. Setelah penyebab diperbaiki, coba ulang halaman yang gagal secara manual.",
         "Laporkan browser Anda, versi ekstensi, langkah-langkah, pesan kesalahan, dan ID tugas jika tersedia. Gunakan hanya tangkapan layar yang diperlukan dan telah disunting. Jangan pernah mengirimkan cookie sumber, token, atau URL gambar yang ditandatangani. Hubungi comics@nodelane.net."
       ]
     }
-  ]
+  ],
+  "updated": "2026-10-04"
 },
 {
   "slug": "comic-reader-privacy",
@@ -329,14 +338,14 @@ export default {
     {
       "title": "Izin dan file lokal",
       "paragraphs": [
-        "Halaman dan gambarnya dapat berada di domain yang berbeda. NodeLane Comics meminta akses yang relevan saat Anda menggunakan fitur penemuan gambar atau terjemahan. Itu tidak mengunggah cookie situs sumber, token login, atau riwayat penelusuran.",
+        "Akses situs dan domain gambar dideklarasikan saat instalasi. Browser dapat membatasinya; jika penemuan atau terjemahan tidak berjalan, periksa akses halaman serta gambar. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
         "Penguraian komik lokal terjadi di browser. Menempatkan file di rak lokal Anda tidak berarti mengunggah seluruh file sumber. Gambar halaman yang relevan dan informasi tugas dikirim saat terjemahan diperlukan."
       ]
     },
     {
       "title": "Terjemahan dan retensi",
       "paragraphs": [
-        "Terjemahan standar menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Redraw mengirimkan gambar halaman ke model gambar. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+        "Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Terjemahan standar menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Redraw mengirimkan gambar halaman ke model gambar. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
         "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen."
       ]
     },
@@ -347,6 +356,51 @@ export default {
         "Untuk permintaan akses, koreksi atau penghapusan, hubungi comics@nodelane.net. Identitas dan ruang lingkup harus diverifikasi sebelum menangani data orang lain. Baca kebijakan privasi lengkap untuk detailnya."
       ]
     }
+  ],
+  "updated": "2026-10-04"
+},
+{
+  "title": "Hubungkan pustaka OPDS: membaca, EPUB, dan progres",
+  "description": "Tambahkan pustaka OPDS, baca dengan pengambilan data sesuai kebutuhan, dan ketahui kapan file lengkap atau sinkronisasi progres tersedia.",
+  "category": "Pustaka jarak jauh",
+  "sections": [
+    {
+      "title": "Koneksi dan izin",
+      "paragraphs": [
+        "Tambahkan alamat katalog OPDS di pustaka jarak jauh, lalu masukkan kredensial jika diminta sumber. Anda dapat menyimpan beberapa koneksi, menelusuri katalog, dan mencari buku.",
+        "Gunakan hanya pustaka dan buku yang berhak Anda akses. Izin sumber, akses browser, dan dukungan format tetap berlaku; koneksi tidak melewati login, pembayaran, atau DRM."
+      ]
+    },
+    {
+      "title": "Unduh sesuai kebutuhan atau seluruh file",
+      "paragraphs": [
+        "Jika dukungan Range dapat diandalkan dan file dapat diverifikasi, pembaca mengambil data sesuai kebutuhan saat membaca. Unduhan awal berkurang, tetapi membaca lebih lanjut masih memerlukan akses ke sumber.",
+        "Jika sumber tidak menyediakan pembacaan parsial yang dapat diandalkan, pilih mengunduh seluruh file sebelum membukanya. Pembacaan streaming tidak berarti seluruh buku sudah tersimpan untuk akses offline."
+      ]
+    },
+    {
+      "title": "EPUB dan gambar tertanam",
+      "paragraphs": [
+        "EPUB dibuka dengan daftar isi dan pengaturan membaca. Terjemahan mendukung gambar bitmap yang tertanam dalam isi buku dan mempertahankan aslinya untuk perbandingan.",
+        "Teks EPUB, grafis vektor, dan konten terlindungi DRM tidak diterjemahkan dengan mekanisme ini. Akses EPUB tidak berarti semua tata letak didukung atau perlindungan dapat dihapus."
+      ]
+    },
+    {
+      "title": "Progres dan membaca offline",
+      "paragraphs": [
+        "Posisi disimpan secara lokal. Sinkronisasi dengan sumber hanya tersedia jika sumber mendukungnya dan kompatibilitas telah diverifikasi. Jika sinkronisasi gagal, posisi lokal tetap tersimpan.",
+        "Ini bukan sinkronisasi seluruh pustaka ke cloud. Membaca offline memerlukan data sumber serta hasil yang sudah tersimpan. Terjemahan resmi baru membutuhkan internet; MTU hanya dapat offline jika seluruh konfigurasinya mendukung."
+      ]
+    }
+  ],
+  "slug": "remote-library",
+  "minutes": 5,
+  "published": "2026-10-04",
+  "updated": "2026-10-04",
+  "related": [
+    "local-comics",
+    "manga-translation",
+    "translation-troubleshooting"
   ]
 },
 ...localTranslationGuides
@@ -367,7 +421,7 @@ export default {
           {
             "title": "Ruang lingkup dan kontak",
             "paragraphs": [
-              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 28 September 2026. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
+              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 4 Oktober 2026. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
             ]
           },
           {
@@ -388,14 +442,14 @@ export default {
           {
             "title": "Izin dan penyimpanan lokal",
             "paragraphs": [
-              "Akses situs dan host gambar diminta sesuai kebutuhan saat Anda secara aktif menggunakan fitur yang relevan. Cookie situs sumber, token login, dan riwayat penelusuran tidak diunggah. Backend tidak mem-proxy URL komik sembarangan. Konten halaman web dan gambar adalah masukan yang tidak tepercaya.",
-              "Perpustakaan, posisi membaca, preferensi, dan data lokal yang diimpor ada di browser; penguraian bersifat lokal, dan gambar yang relevan dikirim saat terjemahan diminta. Perpustakaan tidak disinkronkan secara otomatis. Situs web menyimpan status akun dan otorisasi, mengakses dan menyegarkan token di penyimpanan sesi tab saat ini. Ekstensi ini memiliki aturan penyimpanan sesinya sendiri. Menghapus data browser dapat mengeluarkan Anda atau menghapus informasi bacaan lokal."
+              "Akses situs dan domain gambar dideklarasikan saat instalasi. Browser dapat membatasinya; jika penemuan atau terjemahan tidak berjalan, periksa akses halaman serta gambar. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
+              "Posisi disimpan secara lokal. Sinkronisasi dengan sumber hanya tersedia jika sumber mendukungnya dan kompatibilitas telah diverifikasi. Jika sinkronisasi gagal, posisi lokal tetap tersimpan. Perpustakaan, posisi membaca, preferensi, dan data lokal yang diimpor ada di browser; penguraian bersifat lokal, dan gambar yang relevan dikirim saat terjemahan diminta. Perpustakaan tidak disinkronkan secara otomatis. Situs web menyimpan status akun dan otorisasi, mengakses dan menyegarkan token di penyimpanan sesi tab saat ini. Ekstensi ini memiliki aturan penyimpanan sesinya sendiri. Menghapus data browser dapat mengeluarkan Anda atau menghapus informasi bacaan lokal."
             ]
           },
           {
             "title": "Penyedia layanan dan transfer",
             "paragraphs": [
-              "Pemrosesan standar mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan; penyedia gambar ulang memproses gambar halaman dan bahasa. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
+              "Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Pemrosesan standar mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan; penyedia gambar ulang memproses gambar halaman dan bahasa. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
               "Gambar terjemahan menggunakan file pribadi di server pusat; teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Layanan identitas, infrastruktur, penerjemahan, dan pembayaran memproses data sesuai kebutuhan, berdasarkan kebijakan yang berlaku. Pemrosesan mungkin terjadi di luar wilayah Anda. Kami tidak menjual informasi pribadi atau menggunakan komik yang dikirimkan untuk penargetan iklan. Kami tidak berjanji semua penyedia tidak menyimpan apa pun atau tidak pernah menggunakan data untuk pelatihan; ini tergantung pada penyedia dan perjanjian. Jangan mengirimkan konten sensitif yang tidak sah atau tidak sesuai."
             ]
           },
@@ -423,7 +477,7 @@ export default {
           {
             "title": "Layanan dan akun",
             "paragraphs": [
-              "NodeLane Comics menyediakan layanan ekstensi, pembaca dan terjemahan. Baca ketentuan ini dan kebijakan privasi sebelum digunakan; berhenti menggunakan layanan ini jika Anda tidak setuju. Diperbarui 20 September 2026. Situs web ini menyediakan informasi produk, panduan, unduhan, dan manajemen akun, bukan katalog komik atau penjualan komik.",
+              "NodeLane Comics menyediakan layanan ekstensi, pembaca dan terjemahan. Baca ketentuan ini dan kebijakan privasi sebelum digunakan; berhenti menggunakan layanan ini jika Anda tidak setuju. Diperbarui 4 Oktober 2026. Situs web ini menyediakan informasi produk, panduan, unduhan, dan manajemen akun, bukan katalog komik atau penjualan komik.",
               "Gunakan akun yang berhak Anda gunakan dan lindungi kredensial dan perangkat Anda. Manfaat dan akses diverifikasi di server. Jangan meniru identitas orang lain, mengakses catatan pribadi mereka, melewati batas kecepatan atau gambar, mengganggu layanan dengan otomatisasi yang menyesatkan, atau menyerang produk dan penyedianya. Penyalahgunaan dapat menyebabkan akses terbatas."
             ]
           },
@@ -431,7 +485,7 @@ export default {
             "title": "Hak konten dan hasil AI",
             "paragraphs": [
               "Anda harus memiliki hak untuk mengakses, mengunggah, menerjemahkan, dan memproses konten yang dipilih serta mengikuti persyaratan situs sumber dan pemegang hak. Ekstensi ini tidak memberikan hak cipta atau izin otomatis untuk mempublikasikan gambar terjemahan. Jangan mengabaikan paywall, persyaratan login, atau DRM. Kami tidak menjamin legalitas atau kelengkapan konten sumber. Penyelidikan hak cipta harus mengidentifikasi karya, hak, masalah, dan informasi kontak.",
-              "AI mungkin menghilangkan, salah menerjemahkan, atau salah menaruhkan teks; menggambar ulang juga dapat mengubah karya seni. Hasil membantu membaca dan tidak menggantikan dokumen asli atau ulasan profesional. Ilustrasi situs web dan perbandingan bahasa adalah demonstrasi yang dihasilkan AI, bukan janji akurasi, kecepatan, atau hasil per gambar. Anda dapat membandingkan dokumen asli dan mengirimkan masukan."
+              "AI dapat melewatkan, salah menerjemahkan, atau salah menempatkan teks. Gambar ulang AI di ruang kerja web, jika tersedia untuk akun Anda, juga dapat mengubah ilustrasi. Hasil membantu membaca dan tidak menggantikan gambar asli atau pemeriksaan profesional. Ilustrasi orisinal situs dibuat dengan AI; perbandingan bahasa menampilkan contoh terjemahan biasa yang direkam. Contoh tersebut tidak menjamin akurasi, kecepatan, atau hasil untuk setiap gambar. Bandingkan dengan aslinya dan kirim masukan."
             ]
           },
           {
@@ -488,7 +542,7 @@ export default {
       {
         "id": "overview",
         "question": "Apa itu NodeLane Comics?",
-        "answer": "NodeLane Comics menawarkan ekstensi pembaca manga dan terjemahan gambar situs web. Baca komik web atau lokal di ekstensi, atau unggah gambar JPG, PNG, dan WebP di situs web. Coba terjemahan tamu atau masuk dengan kuota yang ada, unduh hasil lengkapnya dan simpan riwayat lokal. Kami tidak menyediakan katalog komik.",
+        "answer": "NodeLane Comics menyatukan pembaca dan terjemahan gambar. Ekstensi mendukung file lokal, EPUB, Google Drive, OPDS, dan situs yang didukung, serta terjemahan gambar web dan area terlihat. Ruang kerja web menerima JPG, PNG, dan WebP, memungkinkan unduhan hasil serta riwayat lokal. Kami tidak menyediakan katalog komik.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
@@ -511,32 +565,32 @@ export default {
       },
       {
         "id": "translation-modes",
-        "question": "Haruskah saya menggunakan terjemahan manga standar atau gambar ulang AI?",
-        "answer": "Terjemahan standar mendeteksi teks, menerjemahkannya, dan menempatkannya kembali dengan perbaikan latar belakang lokal. Gambar ulang AI menggunakan model gambar dan dapat mengubah detail karya seni. Pilih terjemahan standar untuk bacaan sehari-hari, bandingkan hasilnya dengan aslinya, dan coba gambar ulang bila perlu. Hasil dari kedua mode disimpan secara terpisah.",
+        "question": "Terjemahan dan saluran apa yang tersedia di ekstensi?",
+        "answer": "Ekstensi saat ini memakai terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi NodeLane atau manga-translator-ui sendiri. Gambar ulang AI hanya tersedia di ruang kerja web sesuai hak akses. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
         "id": "file-formats",
         "question": "File mana yang dapat saya impor?",
-        "answer": "CBZ/ZIP, CBR/RAR, PDF dan mendukung komik MOBI6/MOBI6+KF8 bebas DRM. KF8/AZW3 mandiri, EPUB, dan buku terenkripsi tidak didukung. Gambar lepas tidak dapat diimpor. Impor situs web memerlukan adaptor khusus.",
+        "answer": "Secara lokal tersedia CBZ/ZIP, CBR/RAR, PDF, MOBI6/MOBI6+KF8 tanpa DRM yang didukung, dan EPUB. Di EPUB, hanya gambar bitmap tertanam yang diterjemahkan, bukan teks atau vektor. Google Drive mendukung CBZ/ZIP dan MOBI tanpa DRM. KF8/AZW3 mandiri, buku terlindungi, dan impor gambar satuan tidak didukung; impor situs memerlukan adaptor.",
         "relatedPath": "/guides/local-comics/"
       },
       {
         "id": "website-permissions",
         "question": "Apakah ekstensi mengunggah cookie situs web atau riwayat penelusuran?",
-        "answer": "Cookie situs web sumber, token login, dan riwayat penelusuran tidak diunggah ke backend terjemahan. Izin situs web dan gambar diminta bila diperlukan. Terjemahan resmi mengirimkan gambar yang dipilih dan data tugas yang diperlukan untuk diproses; lihat panduan privasi untuk detailnya.",
+        "answer": "Cookie, token login situs sumber, dan riwayat penelusuran tidak dikirim ke layanan terjemahan. Akses situs dideklarasikan saat instalasi; browser dapat membatasinya, jadi periksa akses halaman serta domain gambar. Terjemahan mengirim gambar pilihan dan data tugas yang diperlukan.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
         "id": "image-privacy",
         "question": "Apakah gambar diunggah atau disimpan?",
-        "answer": "Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
+        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Apakah terjemahan yang gagal menggunakan halaman?",
-        "answer": "Halaman dapat dipesan terlebih dahulu dan diselesaikan setelah pengiriman berhasil. Kegagalan eksplisit melepaskan reservasi, begitu pula hasil standar yang dikonfirmasi tidak memiliki teks atau pengenalan sebagian dengan teks asli dipertahankan. Hasil gambar ulang yang tidak diketahui akan diverifikasi terlebih dahulu dan halaman mungkin disimpan untuk sementara.",
+        "answer": "Pada terjemahan resmi dengan akun, halaman dapat dicadangkan terlebih dahulu lalu dipotong dari kuota setelah hasil berhasil diberikan. Kegagalan yang jelas melepaskan cadangan, begitu pula hasil biasa tanpa teks atau pengenalan parsial yang mempertahankan teks asli. Hasil gambar ulang AI yang belum diketahui hanya berlaku untuk mode yang tersedia bagi akun Anda di ruang kerja web: status tugas diperiksa terlebih dahulu dan cadangan dapat ditahan sementara. MTU tidak memakai kuota resmi NodeLane. Percobaan anonim mengikuti aturan penghitungan permintaan baru yang terpisah di ruang kerja; percobaan yang gagal juga dihitung.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -554,14 +608,32 @@ export default {
       {
         "id": "supported-sites",
         "question": "Apakah ini berfungsi di setiap situs dan bahasa?",
-        "answer": "Ketersediaan bergantung pada struktur situs, izin, akses gambar, dan adaptor. Dukungan bahasa dapat berbeda berdasarkan mode terjemahan; gunakan daftar di ekstensi. Kami tidak menjamin setiap situs, bahasa, atau file.",
+        "answer": "Impor ke rak memerlukan adaptor situs. Di halaman lain, gambar yang dapat diakses atau area terlihat yang dipilih bisa diterjemahkan; hasil tergantung struktur, akses browser, dan batasan sumber. Periksa bahasa pada saluran pilihan. Dukungan untuk semua situs, bahasa, atau file tidak dijamin.",
         "relatedPath": "/guides/manga-translation/"
       },
       {
         "id": "local-translation",
         "question": "Bisakah saya menerjemahkan manga dengan layanan lokal tanpa akun NodeLane?",
-        "answer": "Ya. Hubungkan layanan manga-translator-ui Anda sendiri dengan menambahkan dan memilih saluran terjemahan lokal di pengaturan ekstensi. Ini tidak memerlukan akun NodeLane atau kuota terjemahan resmi. Anda harus menjalankan layanan itu sendiri; persyaratan jaringan, mode yang tersedia, dan penanganan gambar bergantung pada layanan tersebut.",
+        "answer": "Ya. Jalankan manga-translator-ui sendiri dan tambahkan alamat serta kredensial di pengaturan saluran. Beberapa profil dapat disimpan, tetapi hanya satu yang dipilih digunakan. Akun NodeLane dan kuota resmi tidak diperlukan; kata sandi dan token tersimpan lokal. Saat menghubungkan ulang alamat serta pengguna yang sama, kata sandi bisa dikosongkan. Kemampuan offline bergantung pada model dan API MTU. Penyimpanan kata sandi dan koneksi ulang dengan kolom kosong memerlukan ekstensi 0.10.2 atau lebih baru; pada versi sebelumnya, masukkan kata sandi setiap kali menghubungkan ulang.",
         "relatedPath": "/guides/local-translation/"
+      },
+      {
+        "id": "remote-library",
+        "question": "Bisakah saya menghubungkan pustaka OPDS?",
+        "answer": "Ya. Tambahkan beberapa koneksi OPDS, telusuri katalog, cari, dan baca. Range yang dapat diandalkan memungkinkan pengambilan bagian yang diperlukan; jika tidak, seluruh file harus diunduh secara eksplisit. Progres hanya disinkronkan dengan sumber yang mendukungnya dan telah diverifikasi.",
+        "relatedPath": "/guides/remote-library/"
+      },
+      {
+        "id": "region-translation",
+        "question": "Bagaimana menerjemahkan satu gambar atau area halaman?",
+        "answer": "Gunakan menu klik kanan gambar atau pilih persegi panjang yang terlihat. Terjemahan gambar halaman saat ini juga tersedia. Area tidak disambung dengan menggulir; pintasan diatur melalui browser. Hasil dapat dibandingkan dengan aslinya.",
+        "relatedPath": "/guides/manga-translation/"
+      },
+      {
+        "id": "offline-reading",
+        "question": "Apa yang bisa dibaca dan diterjemahkan offline?",
+        "answer": "File lokal dan bab yang sepenuhnya tersimpan di cache tersedia selama datanya ada di perangkat. Untuk situs, simpan semua bab dalam bahasa pilihan dan lengkapi kekurangan; menutup halaman tugas menjeda rencana. Pembacaan parsial jarak jauh tidak otomatis menyimpan seluruh buku. Terjemahan resmi baru membutuhkan internet, sedangkan MTU memerlukan konfigurasi sepenuhnya lokal.",
+        "relatedPath": "/guides/remote-library/"
       }
     ],
     "releases": [
@@ -720,7 +792,7 @@ export default {
     "账户信息": "Informasi akun",
     "退出登录": "Keluar",
     "会员有效期至": "Keanggotaan berlaku sampai ",
-    "阅读、翻译和用量查看，请前往浏览器插件。": "Gunakan ekstensi browser untuk membaca, menerjemahkan, dan memeriksa penggunaan.",
+    "阅读、翻译和用量查看，请前往浏览器插件。": "Buka ekstensi untuk membaca berkelanjutan dan rincian penggunaan ekstensi; terjemahan gambar di situs web juga memakai kuota akun ini.",
     "下载插件": "Unduh ekstensi",
     "会员订阅": "Keanggotaan",
     "刷新": "Segarkan",
