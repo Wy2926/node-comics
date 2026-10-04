@@ -32,15 +32,22 @@ export function imageUrls(response: string, chapterId: string): string[] {
   if (!Array.isArray(items) || items.length > 1500) throw Error('DM5 图片列表数量无效。');
   // Accept only the observed concatenation contract, not arbitrary expressions from source code.
   const suffix = new RegExp('pvalue\\[i\\]=pix\\+pvalue\\[i\\]\\+('+literal+')').exec(program);
-  if (!suffix || stringLiteral(suffix[1]) !== `?cid=${chapterId}&key=${key}`) throw Error('DM5 图片拼接协议已变化。');
+  const signature = suffix ? stringLiteral(suffix[1]) : '', base = `?cid=${chapterId}&key=${key}`;
+  // Firefox responses include three extra CDN signatures; keep the source values intact.
+  if (!signature.startsWith(base) || signature !== base && !/^&uk=[a-f\d]{64}&hkey=[a-f\d]{40}&t=[1-9]\d{9}$/i.test(signature.slice(base.length)))
+    throw Error('DM5 图片拼接协议已变化。');
+  const parameters = new URLSearchParams(signature.slice(1));
   if (!items.length) throw new EmptyImageListError();
   return items.map(item => {
     const path = text(item), absolute = /^(https?:)?\/\//i.test(path);
-    const {url} = dm5ImageUrl(new URL(absolute ? path : prefix + path + stringLiteral(suffix[1]), 'https://www.dm5.com').href);
+    const {url} = dm5ImageUrl(new URL(absolute ? path : prefix + path + signature, 'https://www.dm5.com').href);
     // The response cid and signed URL bind the image to the verified chapter HTML.
     // DM5 reuses old storage directories across catalog IDs; those are not identity proof.
-    if (url.searchParams.get('cid') !== chapterId || url.searchParams.getAll('key').length !== 1 || url.searchParams.get('key') !== key)
-      throw Error('DM5 图片地址或归属无效。');
+    if (url.searchParams.size !== parameters.size) throw Error('DM5 图片地址或归属无效。');
+    for (const [name, value] of parameters) {
+      if (url.searchParams.getAll(name).length !== 1 || url.searchParams.get(name) !== value)
+        throw Error('DM5 图片地址或归属无效。');
+    }
     return url.href;
   });
 }

@@ -17,8 +17,8 @@ const url = 'https://www.dm5.com/manhua-fixture/';
 const reader = (bound: boolean) => `https://www.dm5.com/m1836194/${bound ? '#nodelane-dm5=fixture' : ''}`;
 const packed = readFileSync(new URL('./images.txt', import.meta.url), 'utf8');
 const accessKey = 'a'.repeat(32);
-function imageResponse(paths: string[], prefix = 'https://images.cdndm5.com/99/98761/1836194') {
-  const program = `var cid=1836194;var key='${accessKey}';var pix=${JSON.stringify(prefix)};var pvalue=${JSON.stringify(paths)};for(var i=0;i<pvalue.length;i++){pvalue[i]=pix+pvalue[i]+'?cid=1836194&key=${accessKey}'};`;
+function imageResponse(paths: string[], prefix = 'https://images.cdndm5.com/99/98761/1836194', extra = '') {
+  const program = `var cid=1836194;var key='${accessKey}';var pix=${JSON.stringify(prefix)};var pvalue=${JSON.stringify(paths)};for(var i=0;i<pvalue.length;i++){pvalue[i]=pix+pvalue[i]+'?cid=1836194&key=${accessKey}${extra}'};`;
   return `eval(function(p,a,c,k,e,d){}(${JSON.stringify(program)},2,1,''.split('|'),0,{}))`;
 }
 function html(ids = [1836194, 1836195], sort = 1) {
@@ -100,6 +100,30 @@ describe('DM5 HTTP adapter', () => {
       `https://images.cdndm5.com/99/98761/1836194/18.jpg?cid=1836194&key=${'b'.repeat(32)}`,
       `https://images.cdndm5.com.evil.test/99/98761/1836194/18.jpg?cid=1836194&key=${accessKey}`,
     ]) expect(() => imageUrls(imageResponse([url]), '1836194')).toThrow();
+  });
+  it('preserves Firefox CDN signatures through a complete chapter and validates absolute image URLs', async () => {
+    const extra = `&uk=${'b'.repeat(64)}&hkey=${'c'.repeat(40)}&t=1791043200`;
+    const response = imageResponse(['/1.jpg', '/2.jpg'], undefined, extra);
+    const snapshot = await network.pages!(reader(true), {request: async target => target.includes('chapterfun') ? response : readerHtml});
+    expect(snapshot).toMatchObject({knownTotal: 2, discoveryComplete: true});
+    const expected = [1, 2].map(n => `https://images.cdndm5.com/99/98761/1836194/${n}.jpg?cid=1836194&key=${accessKey}${extra}`);
+    expect(snapshot.items.map(item => item.resource)).toEqual(expected.map(url => ({kind: 'http', url})));
+    expect(typeof image.headers === 'function' && image.headers(expected[0])).toEqual({referer: reader(false)});
+    expect(imageUrls(imageResponse([expected[0]], undefined, extra), '1836194')).toEqual([expected[0]]);
+    for (const value of [expected[0].replace(extra, ''), expected[0].replace('uk=' + 'b'.repeat(64), 'uk=' + 'd'.repeat(64)), expected[0] + '&t=1791043200', expected[0] + '&unknown=1'])
+      expect(() => imageUrls(imageResponse([value], undefined, extra), '1836194')).toThrow('归属');
+    expect(() => imageUrls(imageResponse([expected[0]]), '1836194')).toThrow('归属');
+  });
+  it.each([
+    `&uk=${'b'.repeat(64)}`,
+    `&uk=${'b'.repeat(63)}&hkey=${'c'.repeat(40)}&t=1791043200`,
+    `&uk=${'b'.repeat(64)}&hkey=${'c'.repeat(39)}&t=1791043200`,
+    `&uk=${'g'.repeat(64)}&hkey=${'c'.repeat(40)}&t=1791043200`,
+    `&uk=${'b'.repeat(64)}&hkey=${'c'.repeat(40)}&t=invalid`,
+    `&uk=${'b'.repeat(64)}&hkey=${'c'.repeat(40)}&t=1791043200&key=${accessKey}`,
+    '&unknown=1',
+  ])('rejects incomplete or unknown image signing suffixes (%#)', extra => {
+    expect(() => imageUrls(imageResponse(['/1.jpg'], undefined, extra), '1836194')).toThrow('拼接协议');
   });
   it('advances through variable-sized batches without missing or renumbering page slots', async () => {
     const requested: number[] = [];
