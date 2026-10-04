@@ -7,6 +7,7 @@ export interface SourceLocation {
   catalog?: { key: string; url: string };
 }
 export type SourceSiteContentTag = 'manga' | 'manhwa' | 'manhua' | 'webtoon' | 'doujin';
+export type SourceSiteAccessTag = 'login-required' | 'partial-web' | 'paid-content';
 export interface SourceSite {
   id: string;
   name: string;
@@ -19,6 +20,8 @@ export interface SourceSite {
   adaptedOn: string;
   /** True only when all comics on this site can be read for free. */
   isFree?: boolean;
+  /** Confirmed reading conditions affecting at least part of the site's comics; not account extras. */
+  accessTags?: readonly SourceSiteAccessTag[];
   /** Main comic types, not exhaustive; 1–3 display tags independent of the free status. */
   contentTags: readonly SourceSiteContentTag[];
   search?: SourceSearchCapability;

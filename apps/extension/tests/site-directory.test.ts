@@ -43,6 +43,9 @@ describe('adapter-owned website directory', () => {
       expect(site.contentTags.length).toBeGreaterThan(0);
       expect(site.contentTags.length).toBeLessThanOrEqual(3);
       expect(new Set(site.contentTags).size).toBe(site.contentTags.length);
+      expect(new Set(site.accessTags).size).toBe(site.accessTags?.length ?? 0);
+      for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web', 'paid-content']).toContain(tag);
+      if (site.isFree) expect(site.accessTags ?? []).not.toContain('paid-content');
       if(site.icon.startsWith('data:image/svg+xml,')) {
         expect(decodeURIComponent(site.icon.slice('data:image/svg+xml,'.length))).toMatch(/^<svg\b/);
       } else {

@@ -18,7 +18,7 @@ export function webryLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'sundaywebry', name: 'Sunday Webry', installation,
   sites: [{id: 'sundaywebry', name: 'サンデーうぇぶり', url: origin + '/', icon,
-    adaptedOn: '2026-09-27', contentTags: ['manga'], primaryLanguages: ['ja'], search: {requestOrigins: [origin + '/*']}}],
+    adaptedOn: '2026-09-27', accessTags: ['partial-web', 'paid-content'], contentTags: ['manga'], primaryLanguages: ['ja'], search: {requestOrigins: [origin + '/*']}}],
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

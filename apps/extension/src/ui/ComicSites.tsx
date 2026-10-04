@@ -1,6 +1,6 @@
 import { formatDate, msg } from '../i18n/runtime';
 import { Icon } from '../icons';
-import { listSupportedSites, type SourceSiteContentTag } from '../sources';
+import { listSupportedSites, type SourceSiteAccessTag, type SourceSiteContentTag } from '../sources';
 import { SupportRequestForm } from './SupportRequestForm';
 import { LanguageFlag } from './LanguageFlag';
 import { languageLabel } from '../types';
@@ -12,6 +12,11 @@ const sites = listSupportedSites();
 export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
   const contentTagLabels: Record<SourceSiteContentTag, string> = {
     manga: msg('日漫'), manhwa: msg('韩漫'), manhua: msg('国漫'), webtoon: msg('条漫'), doujin: msg('同人'),
+  };
+  const accessTagLabels: Record<SourceSiteAccessTag, {label: string; description: string}> = {
+    'login-required': {label: msg('需要登录'), description: msg('部分漫画或章节需要登录账号才能阅读')},
+    'partial-web': {label: msg('网页只开放部分'), description: msg('网页仅开放部分章节，其余内容需在 App 阅读')},
+    'paid-content': {label: msg('部分收费'), description: msg('部分漫画或章节需要付费阅读')},
   };
   const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   return <div className="nc-sites-page">
@@ -30,7 +35,10 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
             <div className="nc-site-card-top"><span className="nc-site-monogram" aria-hidden="true"><img src={site.icon} alt="" width={44} height={44} onError={event => { event.currentTarget.hidden = true; }}/><Icon name="globe" size={27}/></span><span className="nc-site-languages">{site.primaryLanguages.map(language => <span key={language} role="img" aria-label={languageLabel(language)} title={languageLabel(language)}><LanguageFlag language={language}/></span>)}</span></div>
             <h3>{site.name}</h3><span className="nc-site-domain">{new URL(site.url).hostname.replace(/^www\./, '')}</span>
             <div className="nc-site-tags">{site.contentTags.map(tag=><span key={tag}>{contentTagLabels[tag]}</span>)}</div>
-            <div className="nc-site-card-footer"><span className="nc-site-adapted"><span><Icon name="check" size={15}/>{msg('已适配')}{site.isFree === true&&<span className="nc-site-free" title={msg('全站漫画免费阅读')} aria-label={msg('全站漫画免费阅读')}>{msg('免费')}</span>}</span><time dateTime={site.adaptedOn} title={msg('适配日期')}>{formatDate(site.adaptedOn + 'T00:00:00')}</time></span><Icon name="external" size={18}/></div>
+            <div className="nc-site-card-footer"><span className="nc-site-adapted">
+              <span><span className="nc-site-supported"><Icon name="check" size={15}/>{msg('已适配')}</span>{site.isFree === true&&<span className="nc-site-free" title={msg('全站漫画免费阅读')} aria-label={msg('全站漫画免费阅读')}>{msg('免费')}</span>}{site.accessTags?.map(tag => <span key={tag} className={'nc-site-access nc-site-access-' + tag} title={accessTagLabels[tag].description} aria-label={accessTagLabels[tag].description}>{accessTagLabels[tag].label}</span>)}</span>
+              <time dateTime={site.adaptedOn} title={msg('适配日期')}>{formatDate(site.adaptedOn + 'T00:00:00')}</time>
+            </span><Icon name="external" size={18}/></div>
           </a>
         </li>)}</ul>
         <p className="nc-sites-hint"><Icon name="info" size={19}/><span>{msg('进入漫画阅读页后，通过插件添加到书架。')}</span></p>

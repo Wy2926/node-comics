@@ -47,7 +47,7 @@ export function pixivLocation(url: URL): (PixivCollection & {artworkId?: string}
 }
 export const definition: SourceDefinition = {
   id: 'pixiv', name: 'pixiv', installation,
-  sites: [{id: 'pixiv', name: 'pixiv', url: origin + '/', icon, adaptedOn: '2026-09-29', contentTags: ['manga', 'doujin'], primaryLanguages: ['ja', 'zh-Hans', 'en']}],
+  sites: [{id: 'pixiv', name: 'pixiv', url: origin + '/', icon, adaptedOn: '2026-09-29', isFree: true, accessTags: ['login-required'], contentTags: ['manga', 'doujin'], primaryLanguages: ['ja', 'zh-Hans', 'en']}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true, findAlternatives: false},
   embeddedEntry: 'floating',
   inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
