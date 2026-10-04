@@ -1,9 +1,8 @@
 import type {SourceDefinition, SourceSite} from '../contracts/definition';
-import {SourceSearchError, type SourceSearchCapability,
+import {SourceSearchError,
   type SourceSearchHit, type SourceSearchPage, type SourceSearchRequest, type SourceSearchResult} from '../contracts/search';
 import {resolveSource} from './resolve';
 import {safeImageUrl} from '../shared/urls';
-import {originMatches} from '../shared/origins';
 
 export const sourceSearchLimits = {queryCharacters: 256, pageItems: 50, cursorCharacters: 4096, pageTimeoutMs: 15_000} as const;
 const invalid = (): never => {throw new SourceSearchError('SOURCE_SEARCH_INVALID');};
@@ -21,23 +20,9 @@ export function normalizeSourceSearchRequest(input: SourceSearchRequest): Source
     ...(input.cursor === undefined ? {} : {cursor: input.cursor})};
 }
 
-function originPatternContained(pattern: string, declared: string): boolean {
-  const parts = /^(https?|\*):\/\/(\*|\*\.[^/*:]+|[^/*:]+)(?::(\d+))?\/\*$/.exec(pattern);
-  if (!parts) return false;
-  const protocols = parts[1] === '*' ? ['http', 'https'] : [parts[1]];
-  const host = parts[2], port = parts[3] ? ':' + parts[3] : '';
-  if (host === '*') return declared === pattern || declared === '*://*/*';
-  // Wildcard requests must also be covered for arbitrary descendants.
-  return protocols.every(protocol => originMatches(declared, `${protocol}://${host.replace(/^\*\./, '')}${port}/`) &&
-    (!host.startsWith('*.') || originMatches(declared, `${protocol}://search-permission-check.${host.slice(2)}${port}/`)));
-}
-export function validateSearchCapability(definition: SourceDefinition, site: SourceSite): SourceSearchCapability {
-  const capability = site.search;
-  if (!capability || !definition.capabilities.importable || !definition.capabilities.catalog ||
-    !Array.isArray(capability.requestOrigins) || !capability.requestOrigins.length || capability.requestOrigins.length > 16) return invalid();
-  const declared = [...definition.installation.requiredOrigins, ...(definition.installation.optionalOrigins ?? [])];
-  if (capability.requestOrigins.some(origin => !declared.some(allowed => originPatternContained(origin, allowed)))) return invalid();
-  return capability;
+export function validateSearchCapability(definition: SourceDefinition, site: SourceSite): true {
+  if (site.search !== true || !definition.capabilities.importable || !definition.capabilities.catalog) return invalid();
+  return true;
 }
 function stringList(value: unknown, maxItems: number, maxLength: number): string[] | undefined {
   if (value === undefined) return undefined;

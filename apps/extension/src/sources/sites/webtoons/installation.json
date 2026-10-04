@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://www.webtoons.com/*", "https://webtoon-phinf.pstatic.net/*", "https://swebtoon-phinf.pstatic.net/*"],
   "optionalContentMatches": ["https://www.webtoons.com/*"]
 }

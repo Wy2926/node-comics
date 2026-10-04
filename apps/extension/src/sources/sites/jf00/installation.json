@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://www.00jf.com/*", "https://comic.5um.net/*", "https://manhua.5um.net/*", "https://manga.5um.net/*"],
   "optionalContentMatches": ["https://www.00jf.com/*"]
 }

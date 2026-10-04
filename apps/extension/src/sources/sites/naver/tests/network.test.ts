@@ -53,7 +53,6 @@ describe('NAVER Webtoon', () => {
       expect(definition.identify(new URL(invalid))).toBeNull();
     for (const invalid of [url + '&titleId=456', reader + '&no=2', url.replace('123', '0'), url.replace('/webtoon/', '/unknown/'), url + '&no=1'])
       expect(definition.identify(new URL(invalid))?.kind).toBe('other');
-    expect(definition.installation.requiredOrigins).toEqual([]);
     expect(definition.installation.autoContentMatches).toEqual([]);
     expect(sourceFor(url).definition.catalogSync?.intervalMinutes).toBe(720);
   });

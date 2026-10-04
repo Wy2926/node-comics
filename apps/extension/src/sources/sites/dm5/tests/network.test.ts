@@ -58,7 +58,7 @@ describe('DM5 HTTP adapter', () => {
     expect(definition.identify(new URL('https://www.dm5.com/m1836194-p2/#ipg2'))?.pageKey).toBe('dm5:chapter:1836194');
     for (const value of ['https://www.dm5.com.evil.test/manhua-fixture/', 'http://www.dm5.com/manhua-fixture/', 'https://u@www.dm5.com/manhua-fixture/', 'https://www.dm5.com:8443/manhua-fixture/']) expect(definition.identify(new URL(value))).toBeNull();
     expect(definition.identify(new URL('https://www.dm5.com/m1836194/#nodelane-dm5=bad%2Fpath'))?.kind).toBe('other');
-    expect(definition.installation.requiredOrigins).toEqual([]); expect(definition.catalogSync?.intervalMinutes).toBe(720);
+    expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });
   it('checks advertised counts and preserves source groups and ascending reading order', () => {
     const source = validateSourceCatalog(parseCatalog(html([1836195, 1836194], 2), url));

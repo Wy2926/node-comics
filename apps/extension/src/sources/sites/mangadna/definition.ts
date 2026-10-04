@@ -16,7 +16,7 @@ export const chapterUrl = (loc: MangaDnaLocation) => `${catalogUrl(loc.slug)}/${
 export const definition: SourceDefinition = {
   id: 'mangadna', name: 'MangaDNA', installation,
   sites: [{id: 'mangadna', name: 'MangaDNA', url: origin + '/', icon, adaptedOn: '2026-10-03', isFree: true, contentTags: ['manhwa', 'manhua'], primaryLanguages: ['en'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

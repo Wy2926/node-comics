@@ -1,20 +1,17 @@
 // Explicit live HTTP regression: bare reader -> complete work -> pages in an isolated MV3 profile.
 // Uses public samples only; no product APIs, user profile, image downloads or translation calls.
 import {createRequire} from 'node:module';
-import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {cp,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 const root=process.cwd(),out=path.join(root,'artifacts/chapter-imports');await mkdir(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const extension=await mkdtemp(path.join(out,'extension-')),profile=await mkdtemp(path.join(out,'profile-'));
 await cp(path.join(root,'apps/extension/.output/chrome-mv3'),extension,{recursive:true});
-const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 const samples=[
   {id:'dm5',url:'https://www.dm5.com/m518896/',work:'dm5:shanhainizhan1',pages:13},
   {id:'comicpash',url:'https://comicpash.jp/episodes/17f11c20955a2',work:'comicpash:series:1fafeeae328df',pages:22},
 ];
-for(const sample of samples){const install=JSON.parse(await readFile(path.join(root,`apps/extension/src/sources/sites/${sample.id}/installation.json`),'utf8'));manifest.host_permissions.push(...install.optionalOrigins);}
-await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
 const src=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=path.join(extension,'probe.js');
 await writeFile(probe,`export {readImportCatalog} from '${src}/sources/runtime/import.ts';export {readNetworkPages,readNetworkCatalog} from '${src}/sources/runtime/network.ts';`);
 const {build}=createRequire(path.join(root,'apps/extension/package.json'))('vite');

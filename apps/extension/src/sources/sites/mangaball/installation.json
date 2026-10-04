@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://mangaball.com/*", "https://api.mangaball.com/*", "https://bulbasaur.poke-black-and-white.net/*", "https://chikorita.red-and-blue.net/*", "https://uploads.mangadex.org/*"],
   "optionalContentMatches": ["https://mangaball.com/*"]
 }

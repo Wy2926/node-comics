@@ -53,7 +53,7 @@ describe('DM5 search', () => {
   });
   it('accepts the search 404 body through the HTTP transport and still rejects other failures', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(missingHtml, {status: 404})));
-    const context = createSourceNetworkContext('https://www.dm5.com/'), read = vi.spyOn(context, 'request');
+    const context = createSourceNetworkContext(), read = vi.spyOn(context, 'request');
     await expect(search(request, context)).resolves.toEqual({items: []});
     expect(read).toHaveBeenCalledWith(searchUrl(request).url, {referer: 'https://www.dm5.com/search', acceptStatuses: [404]});
     vi.mocked(fetch).mockResolvedValueOnce(new Response('<h1>404 Not Found</h1>', {status: 404}));

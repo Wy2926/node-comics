@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://cn.baozimh.com/*", "https://cn.twbzmg.com/*", "https://static-tw.baozimh.com/*", "https://*.bzcdn.net/*"],
   "optionalContentMatches": ["https://cn.baozimh.com/*", "https://cn.twbzmg.com/comic/chapter/*"]
 }

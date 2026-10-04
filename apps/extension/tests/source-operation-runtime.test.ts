@@ -6,7 +6,7 @@ const fixture=vi.hoisted(()=>({networks:{} as Record<string,SourceNetwork>,image
 vi.mock('../src/sources/registry/networks',()=>({sourceNetworks:fixture.networks}));
 vi.mock('../src/sources/registry/images',()=>({sourceImages:fixture.images}));
 vi.mock('../src/sources/registry/definitions',()=>({definitions:[{
-  id:'fixture',name:'Fixture',capabilities:{importable:true,pages:true,catalog:true,inline:false},installation:{requiredOrigins:[],autoContentMatches:[]},
+  id:'fixture',name:'Fixture',capabilities:{importable:true,pages:true,catalog:true,inline:false},installation:{autoContentMatches:[]},
   identify:(url:URL)=>url.hostname==='fixture.test'?{sourceId:'fixture',url:url.href,pageKey:url.pathname,kind:url.pathname==='/book'?'catalog':'reader',...(url.pathname==='/unbound'&&url.hash!=='#book'?{}:{catalog:{key:'fixture:book',url:'https://fixture.test/book'}})}:null,
 }]}));
 import {networkOperation,readNetworkCatalog,readNetworkPages,resolveNetworkCatalog} from '../src/sources/runtime/network';
@@ -132,13 +132,14 @@ describe('independent discovery operations and common manifest authority',()=>{
     expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect(await promise).toBe(book);expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
-  it('rejects cross-origin and foreign-source Referers before issuing a request',async()=>{
-    const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+  it('accepts adapter-selected API and Referer hosts while preserving chapter identity',async()=>{
+    const fetch=vi.fn(async()=>new Response('source'));vi.stubGlobal('fetch',fetch);
     for(const [target,referer] of [['https://other.test/api',url],['https://other.test/api','https://other.test/1']]) {
       fixture.networks.fixture={pages:async(_url,context)=>{await context.request(target,{referer});return pages();}};
-      await expect(readNetworkPages(url)).rejects.toThrow();
+      expect(await readNetworkPages(url)).toMatchObject({adapter:'fixture',url,knownTotal:1});
     }
-    expect(fetch).not.toHaveBeenCalled();expect(set).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);expect(set).toHaveBeenCalledTimes(2);
+    expect(chrome.permissions.contains).toHaveBeenCalledWith({origins:['https://other.test/*']});
   });
 });
 

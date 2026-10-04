@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://mangapill.com/*", "https://cdn.readdetectiveconan.com/*"],
   "optionalContentMatches": ["https://mangapill.com/*"]
 }

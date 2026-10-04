@@ -1,4 +1,3 @@
-import type {SourceSearchCapability} from './search';
 export interface SourceLocation {
   sourceId: string;
   pageKey: string;
@@ -24,7 +23,7 @@ export interface SourceSite {
   accessTags?: readonly SourceSiteAccessTag[];
   /** Main comic types, not exhaustive; 1–3 display tags independent of the free status. */
   contentTags: readonly SourceSiteContentTag[];
-  search?: SourceSearchCapability;
+  search?: true;
 }
 /** Pure metadata: safe in build tools, UI and the service worker. */
 export interface SourceDefinition {
@@ -40,9 +39,8 @@ export interface SourceDefinition {
   /** Explicit opt-in: only adapters with a verified complete directory may refresh it automatically. */
   catalogSync?: { intervalMinutes: number };
   installation: {
-    requiredOrigins: readonly string[];
+    /** Content-script placement only; network access uses the extension's host permissions. */
     autoContentMatches: readonly string[];
-    optionalOrigins?: readonly string[];
     /** Register embedded entries only after the matching host permission is granted. */
     optionalContentMatches?: readonly string[];
   };

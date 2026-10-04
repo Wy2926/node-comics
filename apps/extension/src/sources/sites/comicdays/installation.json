@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://comic-days.com/*", "https://cdn-img.comic-days.com/*"],
   "optionalContentMatches": ["https://comic-days.com/episode/*", "https://comic-days.com/series/*/first_episode"]
 }

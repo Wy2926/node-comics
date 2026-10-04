@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://*.mangadna.com/*"],
   "optionalContentMatches": ["https://mangadna.com/*"]
 }

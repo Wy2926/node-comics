@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://atsu.moe/*", "https://cdn.atsu.moe/*"],
   "optionalContentMatches": ["https://atsu.moe/*"]
 }

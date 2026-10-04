@@ -20,7 +20,7 @@ export const chapterUrl = (loc: KlLocation) => `${catalogUrl(loc.slug)}${loc.cha
 export const definition: SourceDefinition = {
   id: 'klmanga', name: 'KLManga', installation,
   sites: [{id: 'klmanga', name: 'KLManga', url: origin + '/', icon, adaptedOn: '2026-10-03', isFree: true, contentTags: ['manga'], primaryLanguages: ['ja'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

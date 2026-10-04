@@ -24,7 +24,7 @@ export const chapterUrl = (loc: RawLocation) => `${origin}/read/${encodeURICompo
 export const definition: SourceDefinition = {
   id: 'rawotaku', name: 'RawOtaku', installation,
   sites: [{id: 'rawotaku', name: 'RawOtaku', url: origin + '/', icon, adaptedOn: '2026-10-02', isFree: true, contentTags: ['manga'], primaryLanguages: ['ja'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://mangadot.net/*"],
   "optionalContentMatches": ["https://mangadot.net/*"]
 }

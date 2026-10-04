@@ -17,7 +17,7 @@ import {withPageNetworkContext} from '../../../runtime/page-network';
 // Parser/runtime routing coverage; real tab lifecycle is exercised by source-page-network.test.ts.
 vi.mock('../../../runtime/page-network',async()=>{
  const {createSourceNetworkContext}=await import('../../../runtime/http');
- return {withPageNetworkContext:vi.fn(async(url:string,signal:AbortSignal,read:any)=>read(createSourceNetworkContext(url,signal)))};
+ return {withPageNetworkContext:vi.fn(async(_url:string,signal:AbortSignal,read:any)=>read(createSourceNetworkContext(signal)))};
 });
 
 const url='https://comix.to/title/rrzm-sample';

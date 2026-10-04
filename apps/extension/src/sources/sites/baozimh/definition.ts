@@ -29,7 +29,7 @@ export const chapterUrl = (loc: BaoLocation, part = 1) => `${readerOrigin}/comic
 export const definition: SourceDefinition = {
   id: 'baozimh', name: '包子漫画', installation,
   sites: [{id: 'baozimh', name: '包子漫画', url: origin + '/', icon, adaptedOn: '2026-09-27', isFree: true, contentTags: ['manhua', 'manga', 'manhwa'], primaryLanguages: ['zh-Hans'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

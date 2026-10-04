@@ -15,7 +15,7 @@ describe('RawOtaku source contract', () => {
     expect(rawLocation(new URL(reader.replace('chapter-1-', 'chapter-1.5-')))?.chapter).toBe('1.5');
     expect(definition.sites![0].primaryLanguages).toEqual(['ja']);
     expect(definition.installation.optionalContentMatches).toEqual(['https://rawotaku.com/*']);
-    expect(definition.sites![0].search!.requestOrigins.every(o => definition.installation.optionalOrigins!.includes(o))).toBe(true);
+    expect(definition.sites![0].search).toBe(true);
   });
   it.each(['http://rawotaku.com', 'https://rawotaku.com.evil.test', 'https://rawotaku.com:444', 'https://user:pass@rawotaku.com', 'ftp://rawotaku.com'])
     ('rejects forged or unsupported origin %s', host => expect(definition.identify(new URL(host + '/read/work-raw/'))).toBeNull());

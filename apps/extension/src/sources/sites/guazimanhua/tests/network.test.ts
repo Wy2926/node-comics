@@ -20,7 +20,6 @@ describe('瓜子漫画 HTTP adapter', () => {
       expect(definition.identify(new URL(bad))).toBeNull();
     for (const bad of [url + '&id=321', url.replace('123', '0'), url.replace('/comic.php', '/unknown.php'), reader + '#nodelane-guazimanhua=bad'])
       expect(definition.identify(new URL(bad))?.kind).toBe('other');
-    expect(definition.installation.requiredOrigins).toEqual([]);
     expect(definition.installation.autoContentMatches).toEqual([]);
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });

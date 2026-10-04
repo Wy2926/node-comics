@@ -25,7 +25,7 @@ describe('MangaPill URL and source boundaries', () => {
     expect(definition.capabilities).toMatchObject({importable: true, catalog: true, pages: true, inline: true, completePageList: true});
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
     expect(definition.installation.optionalContentMatches).toEqual([origin + '/*']);
-    for (const pattern of definition.sites![0].search!.requestOrigins) expect(definition.installation.optionalOrigins).toContain(pattern);
+    expect(definition.sites![0].search).toBe(true);
   });
   it.each(['http://mangapill.com', 'https://mangapill.com.evil.test', 'https://mangapill.com:444', 'https://u:p@mangapill.com', 'ftp://mangapill.com', 'https://www.mangapill.com'])
     ('rejects unclaimed origin %s', host => expect(definition.identify(new URL(host + '/manga/42'))).toBeNull());
@@ -221,13 +221,13 @@ describe('MangaPill canonical parent resolution under the production HTTP transp
     });
     vi.stubGlobal('fetch', fetcher);
     // This guard makes a fabricated bare-route fixture fail just as the production fetch transport does.
-    await expect(createSourceNetworkContext(reader).request(bareUrl)).rejects.toThrow('redirect blocked'); fetcher.mockClear();
+    await expect(createSourceNetworkContext().request(bareUrl)).rejects.toThrow('redirect blocked'); fetcher.mockClear();
     const snapshot = await readImportCatalog(reader);
     expect(validateCatalog(snapshot, [definition])).toMatchObject({id: catalogKey(work), url, complete: true});
     expect(snapshot.entries[0].url).toBe(boundReader);
     expect(fetcher.mock.calls.map(([target]) => target)).toEqual([reader, quick.href, url]);
     expect(snapshot.entries.every(entry => definition.identify(new URL(entry.url))?.catalog?.url === url)).toBe(true);
-    const pages = await network.pages!(snapshot.entries[0].url, createSourceNetworkContext(snapshot.entries[0].url));
+    const pages = await network.pages!(snapshot.entries[0].url, createSourceNetworkContext());
     expect(validatePages(pages, definition.identify(new URL(boundReader))!)).toMatchObject({knownTotal: 3, discoveryComplete: true});
     expect(fetcher.mock.calls.at(-1)?.[0]).toBe(reader);
     expect(fetcher.mock.calls.every(([target]) => !target.includes('#nodelane-mangapill='))).toBe(true);
@@ -239,7 +239,7 @@ describe('MangaPill canonical parent resolution under the production HTTP transp
       expect(options?.redirect).toBe('error'); return new Response(searchHtml());
     });
     vi.stubGlobal('fetch', fetcher);
-    const result = await network.search!(request, createSourceNetworkContext(origin + '/'));
+    const result = await network.search!(request, createSourceNetworkContext());
     expect(result.items[0].catalogUrl).toBe(bareUrl + '/fixture-42');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });

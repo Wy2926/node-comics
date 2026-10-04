@@ -17,7 +17,7 @@ describe('MangaDNA identity and complete server catalog', () => {
   });
   it('registers automatically and keeps chapter slugs, fractional releases and ownership stable', () => {
     expect(sourceNetworks.mangadna).toBe(network);
-    expect(validateSearchCapability(definition, definition.sites![0])).toEqual({requestOrigins: ['https://mangadna.com/*']});
+    expect(validateSearchCapability(definition, definition.sites![0])).toBe(true);
     expect(mangaDnaLocation(new URL(reader))).toEqual({slug: 'fixture', chapter: 'chapter-175-8-8'});
     expect(definition.identify(new URL(reader + '?style=paged#page-3'))).toMatchObject({kind: 'reader', pageKey: 'mangadna:fixture:chapter-175-8-8', catalog: {key: 'mangadna:fixture', url}});
     expect(definition.identify(new URL(url + '/'))?.pageKey).toBe('mangadna:fixture');

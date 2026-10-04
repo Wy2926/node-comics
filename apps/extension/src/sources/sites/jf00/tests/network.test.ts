@@ -19,7 +19,7 @@ describe('漫画猫 isolated HTTP adapter', () => {
     for (const bad of [url.replace('123', '0'), url.replace('comic_', 'unknown_'), reader.replace('_11.', '_01.')])
       expect(definition.identify(new URL(bad))?.kind).toBe('other');
     expect(definition.installation.optionalContentMatches).toEqual(['https://www.00jf.com/*']);
-    for (const pattern of definition.sites![0].search!.requestOrigins) expect(definition.installation.optionalOrigins).toContain(pattern);
+    expect(definition.sites![0].search).toBe(true);
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });
   it('keeps source oldest-first order and dedicated cover, including empty complete directories', () => {

@@ -36,8 +36,7 @@ describe('Atsumaru isolated HTTP adapter', () => {
     for (const path of ['/novel/Work1', '/read/Chap1', '/manga/Work1/extra', '/manga/%57ork1'])
       expect(definition.identify(new URL('https://atsu.moe' + path))?.kind).toBe('other');
     expect(definition.embeddedEntry).toBe('floating');
-    expect(definition.installation.optionalOrigins).toEqual(['https://atsu.moe/*', 'https://cdn.atsu.moe/*']);
-    expect(definition.sites![0].search!.requestOrigins.every(origin => definition.installation.optionalOrigins!.includes(origin))).toBe(true);
+    expect(definition.sites![0].search).toBe(true);
   });
   it('checks preview membership, orders by the source index and keeps scanlation chains independent', () => {
     const result = validateCatalog(parseCatalog(metadata(), chapters(), 'Work1'), [definition]);

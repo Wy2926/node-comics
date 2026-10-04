@@ -13,7 +13,6 @@ describe('MangaBall HTTP isolation and catalog', () => {
     for (const url of ['http://mangaball.com/title-detail/' + titleId, 'https://mangaball.com.evil.test/title-detail/' + titleId,
       'https://user:pass@mangaball.com/title-detail/' + titleId, 'https://mangaball.com:444/title-detail/' + titleId]) expect(definition.identify(new URL(url))).toBeNull();
     for (const url of [catalogUrl('bad'), chapterUrl(chapterId) + '?chapter=1&chapter=2', chapterUrl(chapterId) + '#nodelane-mangaball=bad']) expect(mangaBallLocation(new URL(url))).toBeNull();
-    expect(definition.installation.optionalOrigins).toContain('https://api.mangaball.com/*');
     expect(definition.installation.optionalContentMatches).toEqual(['https://mangaball.com/*']);
     expect(definition.embeddedEntry).toBe('floating');
     expect(definition.catalogSync?.intervalMinutes).toBe(720);

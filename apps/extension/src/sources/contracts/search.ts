@@ -1,9 +1,5 @@
 import type {SourceSite} from './definition';
 
-export interface SourceSearchCapability {
-  /** Search requests must stay within these declared installation origins. */
-  requestOrigins: readonly string[];
-}
 export interface SourceSearchRequest {
   siteId: string;
   query: string;
@@ -37,7 +33,7 @@ export interface SourceSearchResults {
 export interface SourceSearchSite extends SourceSite {
   adapterId: string;
   key: string;
-  search: SourceSearchCapability;
+  search: true;
 }
 export interface SourceSearchOptions {
   /** A new value for every submitted query revision; never reuse across sessions. */

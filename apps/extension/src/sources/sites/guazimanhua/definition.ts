@@ -20,7 +20,7 @@ export const chapterUrl = (id: string, comicId?: string) => `${origin}/chapter.p
 export const definition: SourceDefinition = {
   id: 'guazimanhua', name: '瓜子漫画',
   sites: [{id: 'guazimanhua', name: '瓜子漫画', url: origin + '/', icon, adaptedOn: '2026-09-25', isFree: true, contentTags: ['manhua'], primaryLanguages: ['zh-Hans'],
-    search: {requestOrigins: [origin + '/*']} }],
+    search: true }],
   capabilities: {importable: true, pages: true, inline: false, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {

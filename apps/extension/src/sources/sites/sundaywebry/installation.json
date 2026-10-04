@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://www.sunday-webry.com/*", "https://cdn-img.www.sunday-webry.com/*", "https://cdn-scissors.gigaviewer.com/*"],
   "optionalContentMatches": ["https://www.sunday-webry.com/*"]
 }

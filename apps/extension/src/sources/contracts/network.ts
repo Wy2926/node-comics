@@ -6,7 +6,7 @@ export interface SourceNetworkContext {
   previous?: SourceCatalogSnapshot;
   /** Optional, validated partial observations; completion still comes from catalog's final result. */
   onCatalogProgress?(snapshot: SourceCatalogSnapshot): Promise<void>;
-  /** Same-origin Referer, parseable error statuses and optional bounded form POST apply only to this request. */
+  /** Adapter-selected Referer, parseable error statuses and bounded form POST apply only to this request. */
   request(url:string, options?:{referer:string; acceptStatuses?:readonly number[]; form?:Readonly<Record<string,string>>}):Promise<string>;
 }
 /** Packaged parsers only; adapters never execute downloaded site scripts. */

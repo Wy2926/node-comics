@@ -18,7 +18,7 @@ export function atsuLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'atsu', name: 'Atsumaru', installation,
   sites: [{id: 'atsu', name: 'Atsumaru', url: origin + '/', icon, adaptedOn: '2026-10-02', isFree: true, contentTags: ['manga', 'manhwa', 'manhua'], primaryLanguages: ['en'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, embeddedEntry: 'floating',
   identify(url) {

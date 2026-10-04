@@ -16,9 +16,7 @@ describe('MangaDex API source', () => {
       expect(definition.identify(new URL(bad))).toBeNull();
     for (const bad of [url + '/slug/extra', url.replace(mangaId, 'invalid'), chapterUrl(uuid(1)) + '/0', chapterUrl(uuid(1)) + '#nodelane-mangadex=invalid'])
       expect(definition.identify(new URL(bad))?.kind).toBe('other');
-    expect(definition.installation.requiredOrigins).toEqual([]);
     expect(definition.installation.autoContentMatches).toEqual([]);
-    expect(definition.installation.optionalOrigins).toContain('https://*.mangadex.network/*');
     expect(definition.installation.optionalContentMatches).toEqual(['https://mangadex.org/*']);
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });

@@ -18,7 +18,7 @@ describe('KLManga source contract', () => {
     expect(definition.catalogSync).toEqual({intervalMinutes: 720});
     expect(definition.sites![0].primaryLanguages).toEqual(['ja']);
     expect(definition.installation.optionalContentMatches).toEqual([origin + '/*']);
-    expect(definition.sites![0].search!.requestOrigins.every(pattern => definition.installation.optionalOrigins!.includes(pattern))).toBe(true);
+    expect(definition.sites![0].search).toBe(true);
   });
   it.each(['http://klmanga.zone', 'https://klmanga.zone.evil.test', 'https://klmanga.zone:444', 'https://user:pass@klmanga.zone', 'ftp://klmanga.zone'])
     ('rejects forged origin %s', host => expect(definition.identify(new URL(host + '/manga-raw/work/'))).toBeNull());

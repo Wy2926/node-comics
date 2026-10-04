@@ -40,7 +40,7 @@ export function boundChapterLocation(url: URL, catalogSlug: string): RawLocation
 export const definition: SourceDefinition = {
   id: 'rawlazy', name: 'RawLazy', installation,
   sites: [{id: 'rawlazy', name: 'RawLazy', url: origin + '/', icon, adaptedOn: '2026-10-04', isFree: true, contentTags: ['manga', 'doujin'], primaryLanguages: ['ja'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

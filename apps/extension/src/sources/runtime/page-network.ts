@@ -7,7 +7,7 @@ import { withPageDocument } from './page-document';
 import { msg } from '../../i18n/runtime';
 /** One bounded source-page session at a time across extension pages; no HTTP-failure fallback. */
 export async function withPageNetworkContext<T>(url: string, signal: AbortSignal, read: (context: SourceNetworkContext) => Promise<T>): Promise<T> {
-  await authorizeSourceRequest(url, url, undefined, signal);
+  await authorizeSourceRequest(url, undefined, signal);
   const source = resolveSource(url, definitions).location, origin = new URL(url).origin;
   // Open the work landing page, not the chapter reader with its eager image downloads.
   const pageSource = source.catalog?.url ?? url;
@@ -23,12 +23,15 @@ export async function withPageNetworkContext<T>(url: string, signal: AbortSignal
       return false;
     }
   };
-  const authorize = (signal: AbortSignal) => authorizeSourceRequest(url, pageSource, undefined, signal);
+  const authorize = (signal: AbortSignal) => authorizeSourceRequest(pageSource, undefined, signal);
   return withPageDocument({ url: pageSource, matches, authorize }, signal, page => read({
     signal: page.signal, async request(target, options) {
-      const body = await authorizeSourceRequest(url, target, options, page.signal, [origin + '/*']);
+      const body = await authorizeSourceRequest(target, options, page.signal);
+      // Page-context fetch is bound to its document origin, not an adapter host allowlist.
+      if (new URL(target).origin !== origin || options && new URL(options.referer).origin !== origin)
+        throw new SourceHttpError('request-denied', '网页上下文请求必须与来源页面同源。');
       const result = await page.request(requestInSourcePage, { url: target, referer: options?.referer, body });
-      await authorizeSourceRequest(url, target, undefined, page.signal, [origin + '/*']);
+      await authorizeSourceRequest(target, undefined, page.signal);
       if (!result || result.pageUrl !== page.url || typeof result.body !== 'string' || result.body.length > 8 * 1024 * 1024 ||
         !Number.isInteger(result.status) || result.status < 0 || result.status > 599)
         throw new SourceHttpError('invalid-response', '来源响应无效或超过限制。');

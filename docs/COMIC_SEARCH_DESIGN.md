@@ -39,7 +39,7 @@
 
 类型的唯一规范在 [search.ts](../apps/extension/src/sources/contracts/search.ts)、[work.ts](../apps/extension/src/sources/contracts/work.ts)、[network.ts](../apps/extension/src/sources/contracts/network.ts)。
 
-站点在 `definition.ts` 的具体 `SourceSite` 上可选声明 `search`，只声明必要 `requestOrigins`；`network.ts` 可选实现 `search(request, context)`，请求包含站点、名称和可选游标，复用现有静态注册体系。无搜索能力不影响导入、原位翻译或目录更新。搜索返回有界候选页与不透明游标，不返回或伪造完整 `SourceCatalogSnapshot`。
+站点在 `definition.ts` 的具体 `SourceSite` 上可选声明 `search: true`；`network.ts` 可选实现 `search(request, context)`，请求包含站点、名称和可选游标，复用现有静态注册体系。请求地址由本站适配器选择，不另列主机清单。无搜索能力不影响导入、原位翻译或目录更新。搜索返回有界候选页与不透明游标，不返回或伪造完整 `SourceCatalogSnapshot`。
 
 公共层校验候选作品 URL、适配器归属、`catalogId`、文本长度、可选语言标签和数量，并补入 `sourceId/siteId/key`。候选 key 序列化为 `[sourceId,catalogId]`：同适配器镜像可去重，不按标题合并不同站点。游标绑定会话、站点和关键词，10 分钟有效；新轮／销毁释放旧游标。
 
@@ -57,7 +57,7 @@
 | `comics/application/search/` | 名称校验与解析、单轮状态、3站并发、逐站结果、分页、重试、取消及代际隔离；搜索权限与整页超时交来源运行时负责 |
 | `ui/comic-search/` | 订阅会话、整页与底部面板、结果卡片、独立错误与懒加载封面，不解析站点协议 |
 | `sources/core/search.ts` | 能力／请求／候选及可选语言标签校验 |
-| `sources/runtime/search.ts` | 搜索权限与整页超时、游标、候选封面凭据、取消和搜索错误映射 |
+| `sources/runtime/search.ts` | 整页超时、游标、候选封面凭据、取消及权限／传输错误的搜索语义映射 |
 | `sources/runtime/http.ts` | 目录、正文和搜索共用的有界 HTTP 传输、逐请求权限／地址校验及通用传输错误，不依赖搜索业务 |
 | `sources/sites/<id>/` | 本站搜索URL、协议、字段、分页和可选语言信息；不调用Chrome、UI或仓库 |
 | `sources/runtime/search-entry.ts` | 来源标签页校验与短期一次性上下文；标题不放地址栏 |
@@ -65,7 +65,7 @@
 
 网页按钮只发送打开意图。后台核对同扩展 sender、顶层 tab、来源 URL 与适配器身份，再获取轻量作品信息；不为获取名称抓整套目录。上下文保存在受信 `storage.session`，5 分钟有效、最多 8 个，通过扩展同源 Web Lock 一次性消费，URL 只携带随机句柄。导航变化、畸形／过期数据拒绝；消费后的迟到结果不能覆盖后来的导航或查找意图。章节没有可靠作品信息时允许手填。
 
-网站访问由插件配置统一声明必需 HTTP／HTTPS 全站权限，规则见[网站适配](SITE_ADAPTERS.md#必须保持的约束)。搜索不会申请额外授权；本站 `requestOrigins` 仅限定本次操作可请求的地址范围。每次 HTTP 请求重新检查浏览器当前访问权限和声明范围并拒绝重定向，不开隐藏源站采集标签页。Cookie／令牌不上传到名称服务。
+网站访问由插件配置统一声明必需 HTTP／HTTPS 全站权限，规则见[网站适配](SITE_ADAPTERS.md#必须保持的约束)。搜索不会申请额外授权，也不按站点预查一组主机。每次 HTTP 请求由公共传输检查实际目标的地址格式与浏览器当前访问权限并拒绝重定向；搜索操作不开隐藏源站采集标签页。Cookie／令牌不上传到名称服务。
 
 `readSearchCover` 只接受本运行时校验、登记过的候选，复用现有取图和请求头管线。可见卡片才加载封面，整页以视口、模态以自身滚动区域判断可见性，独立限制 3 并发；封面请求以来源身份和图片 URL 为准，补充作者等信息不触发重下。224 px WebP 缩略图最多缓存100张，旧查询不再引用的图片及时释放。图片权限不足时保留占位，文字结果正常使用。已导入作品摘要封面复用书架缩略图。
 

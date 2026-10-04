@@ -117,6 +117,13 @@ describe('opt-in source-page catalog transport', () => {
     })).rejects.toMatchObject({ kind: 'permission-required' });
     expect(inject).toHaveBeenCalledTimes(2);
   });
+  it('keeps page-context Referer bound to the document origin without an adapter host declaration', async () => {
+    await expect(withPageNetworkContext(url, new AbortController().signal, context =>
+      context.request(target, {referer: 'https://reader.example.test/book'}))).rejects.toMatchObject({kind: 'request-denied'});
+    expect(inject).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(chrome.tabs.remove).toHaveBeenCalledOnce();
+  });
   it('rejects results after navigation and leaves user navigation open', async () => {
     inject.mockImplementation(async (options: any) => {
       if (options.func === requestInSourcePage)

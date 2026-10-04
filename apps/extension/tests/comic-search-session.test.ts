@@ -8,7 +8,7 @@ import type {SourceSearchResult,SourceSearchResults,SourceSearchSite} from '../s
 
 const flush=async()=>{for(let index=0;index<12;index++)await Promise.resolve();};
 const deferred=<T>()=>{let resolve!:(value:T)=>void,reject!:(reason?:unknown)=>void;const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
-const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adaptedOn:'2026-09-23',contentTags:['manga'],adapterId:id,key:id+':'+id,search:{requestOrigins:[`https://${id}.example/*`]}});
+const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adaptedOn:'2026-09-23',contentTags:['manga'],adapterId:id,key:id+':'+id,search: true});
 const hit=(id:string,name=id):SourceSearchResult=>({sourceId:id,siteId:id,key:JSON.stringify([id,name]),catalogId:name,catalogUrl:`https://${id}.example/comic/${name}`,title:name});
 const page=(id:string,name=id):SourceSearchResults=>({items:[hit(id,name)]});
 function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site('b')],selection:Record<string,boolean>={}){

@@ -25,7 +25,7 @@ export function mangaDexLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'mangadex', name: 'MangaDex',
   sites: [{id: 'mangadex', name: 'MangaDex', url: origin + '/', icon, adaptedOn: '2026-09-25', isFree: true, accessTags: ['login-required'], contentTags: ['manga', 'manhwa'], primaryLanguages: ['en', 'es', 'pt-BR', 'fr'],
-    search: {requestOrigins: [apiOrigin + '/*']} }],
+    search: true }],
   capabilities: {importable: true, pages: true, inline: false, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {

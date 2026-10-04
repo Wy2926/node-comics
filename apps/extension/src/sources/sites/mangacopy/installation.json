@@ -1,9 +1,4 @@
 {
-  "requiredOrigins": [
-    "https://*.mangacopy.com/*",
-    "https://*.copy4000.com/*"
-  ],
-  "optionalOrigins": ["https://*.mangafunb.fun/*"],
   "autoContentMatches": [],
   "optionalContentMatches": [
     "https://*.mangacopy.com/comic/*",

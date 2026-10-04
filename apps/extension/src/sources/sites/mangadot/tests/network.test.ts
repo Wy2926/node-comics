@@ -22,7 +22,6 @@ describe('MangaDot full HTTP source', () => {
       expect(definition.identify(new URL(bad))).toBeNull();
     for (const bad of ['/manga/0', '/manga/7/ch/1', '/chapter/1?source=unknown', '/chapter/1?source=user&source=scraper', '/volume/1?source=scraper', '/chapter/1#nodelane-mangadot=bad'])
       expect(definition.identify(new URL('https://mangadot.net' + bad))?.kind).toBe('other');
-    expect(definition.installation.optionalOrigins).toEqual(['https://mangadot.net/*']);
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });
   it('merges source-declared positions across languages while separating whole volumes and preserving release identity', () => {

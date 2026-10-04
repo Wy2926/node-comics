@@ -15,7 +15,7 @@ function fixture() {
   const definition: SourceDefinition = {
     id: 'generic',
     name: '',
-    installation: { requiredOrigins: [], autoContentMatches: [] },
+    installation: { autoContentMatches: [] },
     capabilities: { pages: true, inline: true, catalog: false, completePageList: false },
     identify: (url) => ({ sourceId: 'generic', pageKey: url.href, url: url.href, kind: 'reader' }),
   };

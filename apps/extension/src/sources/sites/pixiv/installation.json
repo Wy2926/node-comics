@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://www.pixiv.net/*", "https://i.pximg.net/*"],
   "optionalContentMatches": ["https://www.pixiv.net/*"]
 }

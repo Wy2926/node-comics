@@ -21,7 +21,7 @@ export function mangaBallLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'mangaball', name: 'MangaBall', installation, embeddedEntry: 'floating',
   sites: [{id: 'mangaball', name: 'MangaBall', url: origin + '/', icon, adaptedOn: '2026-10-02', isFree: true, contentTags: ['manga', 'manhwa'], primaryLanguages: ['en', 'vi', 'es', 'id'],
-    search: {requestOrigins: [apiOrigin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

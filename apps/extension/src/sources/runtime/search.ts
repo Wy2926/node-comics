@@ -47,7 +47,7 @@ function abortable<T>(value: Promise<T>, signal: AbortSignal): Promise<T> {
 export async function searchSource(sourceId: string, input: SourceSearchRequest, options: SourceSearchOptions): Promise<SourceSearchResults> {
   options.signal?.throwIfAborted();
   if (typeof options.sessionId !== 'string' || !options.sessionId || options.sessionId.length > 200) throw new SourceSearchError('SOURCE_SEARCH_INVALID');
-  const request = normalizeSourceSearchRequest(input), {definition, site, capability, operation} = authority(sourceId, request.siteId);
+  const request = normalizeSourceSearchRequest(input), {definition, site, operation} = authority(sourceId, request.siteId);
   prune();
   const binding = JSON.stringify([options.sessionId, sourceId, site.id, request.query]);
   let cursor: string | undefined;
@@ -62,10 +62,7 @@ export async function searchSource(sourceId: string, input: SourceSearchRequest,
   const timer = setTimeout(() => controller.abort(new SourceSearchError('SOURCE_SEARCH_TIMEOUT')), sourceSearchLimits.pageTimeoutMs);
   const signal = AbortSignal.any([controller.signal, ...(options.signal ? [options.signal] : [])]);
   try {
-    if (!await abortable(chrome.permissions.contains({origins: [...capability.requestOrigins]}), signal))
-      throw new SourceSearchError('SOURCE_SEARCH_PERMISSION_REQUIRED');
-    signal.throwIfAborted();
-    const raw = await abortable(operation({...request, cursor}, createSourceNetworkContext(site.url, signal, [], capability.requestOrigins)), signal);
+    const raw = await abortable(operation({...request, cursor}, createSourceNetworkContext(signal)), signal);
     signal.throwIfAborted();
     const page = validateSearchPage(raw, definition, site, definitions);
     signal.throwIfAborted();

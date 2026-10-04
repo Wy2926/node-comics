@@ -27,7 +27,7 @@ function fixture() {
 describe('Comic DAYS catalog identity and pagination', () => {
   it('registers network capabilities and binds a series separately from naked episode URLs', () => {
     expect(sourceNetworks.comicdays).toBe(network);
-    expect(validateSearchCapability(definition, definition.sites![0])).toEqual({requestOrigins: ['https://comic-days.com/*']});
+    expect(validateSearchCapability(definition, definition.sites![0])).toBe(true);
     expect(definition.identify(new URL(workUrl))).toMatchObject({kind: 'catalog', pageKey: 'comicdays:series:7',
       catalog: {key: 'comicdays:series:7', url: workUrl}});
     expect(definition.identify(new URL(episodeUrl()))?.catalog).toBeUndefined();

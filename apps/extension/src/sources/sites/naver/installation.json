@@ -1,6 +1,4 @@
 {
-  "requiredOrigins": [],
   "autoContentMatches": [],
-  "optionalOrigins": ["https://comic.naver.com/*", "https://image-comic.pstatic.net/*"],
   "optionalContentMatches": ["https://comic.naver.com/*"]
 }

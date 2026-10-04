@@ -22,7 +22,7 @@ export const chapterUrl = (loc: MangapillLocation, catalogSlug?: string) =>
 export const definition: SourceDefinition = {
   id: 'mangapill', name: 'MangaPill', installation,
   sites: [{id: 'mangapill', name: 'MangaPill', url: origin + '/', icon, adaptedOn: '2026-10-03', isFree: true, contentTags: ['manga'], primaryLanguages: ['en'],
-    search: {requestOrigins: [origin + '/*']}}],
+    search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

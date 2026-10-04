@@ -11,7 +11,6 @@ vi.mock('../src/sources/registry/images', () => ({sourceImages: fixture.images})
 vi.mock('../src/sources/runtime/page-cover', () => ({readPageCover: fixture.pageCover}));
 vi.mock('../src/sources/runtime/image-headers', () => ({withImageHeaders: async (_url: string, _headers: unknown, _signal: unknown, read: () => Promise<unknown>) => read()}));
 import {normalizeSourceSearchRequest, validateSearchCapability, validateSearchPage} from '../src/sources/core/search';
-import {originMatches} from '../src/sources/shared/origins';
 import {createSourceNetworkContext, SourceHttpError} from '../src/sources/runtime/http';
 import {listSearchSites, readSearchCover, releaseSourceSearchSession, searchSource} from '../src/sources/runtime/search';
 
@@ -19,9 +18,9 @@ const query = (): SourceSearchRequest => ({siteId: 'main', query: 'Example'});
 const hit = (extra: Partial<SourceSearchHit> = {}): SourceSearchHit => ({catalogId: 'fixture:one', catalogUrl: 'https://fixture.test/book/one', title: 'Example', ...extra});
 const definition = (): SourceDefinition => ({id: 'fixture', name: 'Fixture',
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: false},
-  installation: {requiredOrigins: [], optionalOrigins: ['https://*.fixture.test/*', 'https://mirror.test/*'], autoContentMatches: []},
+  installation: {autoContentMatches: []},
   sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'],
-    search: {requestOrigins: ['https://fixture.test/*']}}],
+    search: true}],
   identify(url) {
     if (!['fixture.test', 'mirror.test'].includes(url.hostname)) return null;
     const id = /^\/book\/([a-z]+)$/.exec(url.pathname)?.[1];
@@ -68,13 +67,16 @@ describe('name-only search and candidate authority', () => {
       expect(() => validate([hit(extra)])).toThrow();
     expect(() => validate(Array.from({length: 51}, () => hit()))).toThrow('SOURCE_SEARCH_INVALID');
   });
-  it('validates Unicode query budgets and only declared search permissions', () => {
+  it('validates Unicode query budgets and requires importable catalog search capability', () => {
     expect(normalizeSourceSearchRequest({...query(), query: ' 😀 '})).toEqual({siteId: 'main', query: '😀'});
     expect(() => normalizeSourceSearchRequest({...query(), query: '😀'.repeat(257)})).toThrow();
     expect(() => normalizeSourceSearchRequest({...query(), query: 'bad\nquery'})).toThrow();
-    expect(originMatches('https://*.fixture.test/*', 'https://sub.fixture.test/search')).toBe(true);
-    expect(originMatches('https://*.fixture.test/*', 'https://fixture.test.evil.test/')).toBe(false);
-    site().search!.requestOrigins = ['https://evil.test/*'];
+    expect(validateSearchCapability(fixture.definitions[0], site())).toBe(true);
+    for (const capability of ['importable', 'catalog'] as const) {
+      const definition = fixture.definitions[0];
+      expect(() => validateSearchCapability({...definition, capabilities: {...definition.capabilities, [capability]: false}}, site())).toThrow();
+    }
+    site().search = undefined;
     expect(() => validateSearchCapability(fixture.definitions[0], site())).toThrow();
   });
 });
@@ -95,17 +97,28 @@ describe('single-site search runtime', () => {
     await expect(searchSource('fixture', {...query(), cursor: first.nextCursor}, {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_CURSOR_EXPIRED'});
     expect(operation).toHaveBeenCalledTimes(2);
   });
-  it('reports revoked browser access without opening a per-site permission prompt or querying the adapter', async () => {
+  it('checks the actual API host before fetching without opening a per-site permission prompt', async () => {
+    fixture.networks.fixture.search = async (_request, context) => {await context.request('https://api.example.test/search'); return {items: []};};
     vi.mocked(chrome.permissions.contains).mockImplementation(async () => false);
     await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_PERMISSION_REQUIRED'});
-    expect(fixture.networks.fixture.search).not.toHaveBeenCalled();
+    expect(chrome.permissions.contains).toHaveBeenCalledExactlyOnceWith({origins: ['https://api.example.test/*']});
     expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('checks request allowlists even with broad grants and rechecks revoked permissions before each request', async () => {
-    fixture.networks.fixture.search = async (_request, context) => {await context.request('https://mirror.test/api'); return {items: []};};
-    await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_REQUEST_DENIED'});
-    expect(fetch).not.toHaveBeenCalled();
+  it('allows trusted adapters to select API hosts without a host declaration or an extra permission preflight', async () => {
+    fixture.networks.fixture.search = async (_request, context) => {
+      await context.request('https://api.example.test/search', {referer: 'https://fixture.test/'});
+      await context.request('https://mirror.test/api');
+      return {items: [hit()]};
+    };
+    expect((await searchSource('fixture', query(), {sessionId: 'session'})).items).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(chrome.permissions.contains).toHaveBeenCalledTimes(2);
+    expect(chrome.permissions.contains).toHaveBeenNthCalledWith(1, {origins: ['https://api.example.test/*']});
+    expect(chrome.permissions.contains).toHaveBeenNthCalledWith(2, {origins: ['https://mirror.test/*']});
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+  });
+  it('rechecks browser access before each request and stops a revoked search before its next fetch', async () => {
     fixture.networks.fixture.search = async (_request, context) => {
       await context.request('https://fixture.test/api');
       vi.mocked(chrome.permissions.contains).mockImplementation(async () => false);
@@ -176,7 +189,7 @@ describe('single-site search runtime', () => {
 
 describe('shared source HTTP transport', () => {
   it('reads explicitly accepted error bodies without relaxing other statuses or body limits', async () => {
-    const context = createSourceNetworkContext('https://fixture.test/book/one');
+    const context = createSourceNetworkContext();
     const options = {referer: 'https://fixture.test/book/one', acceptStatuses: [404]};
     vi.mocked(fetch).mockResolvedValueOnce(new Response('empty result', {status: 404}));
     await expect(context.request('https://fixture.test/search', options)).resolves.toBe('empty result');
@@ -186,7 +199,7 @@ describe('shared source HTTP transport', () => {
     await expect(context.request('https://fixture.test/search', options)).rejects.toMatchObject({kind: 'invalid-response'});
   });
   it('rechecks actual request hosts without an operation allowlist and preserves denied replay data', async () => {
-    const context = createSourceNetworkContext('https://fixture.test/book/one', undefined,
+    const context = createSourceNetworkContext(undefined,
       [{url: 'https://api.fixture.test/catalog', body: 'retained'}]);
     await expect(context.request('https://fixture.test/catalog')).resolves.toBe('fixture');
     vi.mocked(chrome.permissions.contains).mockImplementation(async () => false);
@@ -202,12 +215,12 @@ describe('shared source HTTP transport', () => {
   });
   it('keeps public HTTP available outside the extension without a browser permission API', async () => {
     vi.stubGlobal('chrome', undefined);
-    const context = createSourceNetworkContext('https://fixture.test/book/one');
+    const context = createSourceNetworkContext();
     await expect(context.request('https://fixture.test/catalog')).resolves.toBe('fixture');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('preserves directory HTTP error messages and reports status without search business codes', async () => {
-    const context = createSourceNetworkContext('https://fixture.test/book/one');
+    const context = createSourceNetworkContext();
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', {status: 403, headers: {'retry-after': '7'}}));
     const error = await context.request('https://fixture.test/catalog').catch(error => error);
     expect(error).toBeInstanceOf(SourceHttpError);
@@ -216,19 +229,18 @@ describe('shared source HTTP transport', () => {
     expect(fetch).toHaveBeenCalledWith('https://fixture.test/catalog', expect.objectContaining({credentials: 'include', redirect: 'error'}));
   });
   it('keeps invalid address, referer and body diagnostics for directory callers', async () => {
-    const context = createSourceNetworkContext('https://fixture.test/book/one');
+    const context = createSourceNetworkContext();
     await expect(context.request('javascript:alert(1)')).rejects.toMatchObject({kind: 'request-denied', message: '来源请求地址无效。'});
-    await expect(context.request('https://fixture.test/catalog', {referer: 'https://mirror.test/book/one'})).rejects.toMatchObject({kind: 'request-denied', message: '来源请求头归属无效。'});
+    await expect(context.request('https://fixture.test/catalog', {referer: 'javascript:alert(1)'})).rejects.toMatchObject({kind: 'request-denied', message: '来源请求 Referer 地址无效。'});
     expect(fetch).not.toHaveBeenCalled();
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null));
     await expect(context.request('https://fixture.test/catalog')).rejects.toMatchObject({kind: 'http', message: '来源响应为空。'});
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new Uint8Array(8 * 1024 * 1024 + 1)));
     await expect(context.request('https://fixture.test/catalog')).rejects.toMatchObject({kind: 'invalid-response', message: '来源响应超过限制。'});
   });
-  it('enforces an operation allowlist and current permissions before every request or replay', async () => {
-    const context = createSourceNetworkContext('https://fixture.test/book/one', undefined,
-      [{url: 'https://fixture.test/catalog', body: 'retained'}], ['https://fixture.test/*']);
-    await expect(context.request('https://mirror.test/catalog')).rejects.toMatchObject({kind: 'request-denied'});
+  it('checks browser access before consuming a replay and uses it only once', async () => {
+    const context = createSourceNetworkContext(undefined,
+      [{url: 'https://fixture.test/catalog', body: 'retained'}]);
     vi.mocked(chrome.permissions.contains).mockImplementationOnce(async () => false);
     await expect(context.request('https://fixture.test/catalog')).rejects.toMatchObject({kind: 'permission-required'});
     expect(fetch).not.toHaveBeenCalled();
