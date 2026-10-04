@@ -276,7 +276,7 @@ describe('OPDS connection/provider', () => {
     expect(
       fetcher.mock.calls.every(
         ([, init]) =>
-          init?.redirect === 'error' &&
+          init?.redirect === 'follow' &&
           init?.credentials === 'omit' &&
           init?.referrerPolicy === 'no-referrer',
       ),
@@ -868,11 +868,10 @@ describe('OPDS transport security', () => {
     namespace: 'opds2',
     createdAt: 1,
   };
-  it('blocks cross-origin, embedded credentials, scheme change and unexpanded templates before fetching', async () => {
+  it('blocks embedded credentials, scheme change and unexpanded templates before fetching', async () => {
     const fetcher = vi.fn<typeof fetch>(),
       transport = new OpdsTransport(fetcher);
     for (const url of [
-      'https://other.example/a',
       'http://catalog.example/a',
       'https://user:pass@catalog.example/a',
       'file:///secret',
@@ -883,6 +882,22 @@ describe('OPDS transport security', () => {
       });
     expect(fetcher).not.toHaveBeenCalled();
     expect(allowedUrl(connection, ROOT + '/book')).toBe(ROOT + '/book');
+  });
+  it('follows reads and only attaches Basic credentials to the original connection origin', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response('bytes'));
+    const transport = new OpdsTransport(fetcher);
+    for (const url of [ROOT + '/book', 'https://cdn.example/book']) {
+      await transport.bytes(connection, url, {
+        headers: { Authorization: 'caller-credential', Cookie: 'caller-cookie' },
+      });
+    }
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    for (const [index, [, init]] of fetcher.mock.calls.entries()) {
+      expect(init).toMatchObject({ redirect: 'follow', credentials: 'omit', referrerPolicy: 'no-referrer' });
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Authorization')).toBe(index === 0 ? 'Basic ' + btoa('user:secret') : null);
+      expect(headers.has('Cookie')).toBe(false);
+    }
   });
   it('redacts native network errors and reports unsupported 401 auth documents', async () => {
     const native = new OpdsTransport(

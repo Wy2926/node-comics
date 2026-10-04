@@ -10,6 +10,7 @@ export interface NetworkResult {
   bytes: Uint8Array<ArrayBuffer>;
   headers: Headers;
   status: number;
+  url: string;
 }
 export interface RequestOptions {
   signal?: AbortSignal;
@@ -45,11 +46,7 @@ export function validateRoot(value: string, authenticated: boolean): string {
   return url.href;
 }
 export function allowedUrl(connection: PrivateConnection, value: string): string {
-  const href = validateRoot(value, connection.auth.kind !== 'anonymous'),
-    url = new URL(href),
-    root = new URL(connection.root);
-  if (url.origin !== root.origin)
-    throw new OpdsError('scope-blocked', '目录指向未授权的外部地址，请为该服务单独添加连接。');
+  const href = validateRoot(value, connection.auth.kind !== 'anonymous');
   if (/[{}]|%7[bd]/i.test(href))
     throw new OpdsError('scope-blocked', '资源地址含有未展开的模板参数。');
   return href;
@@ -89,7 +86,7 @@ export async function readBounded(
   }
   return output;
 }
-/** Credential-scoped reads and discovered progress writes; no cookies, redirects or Referer. */
+/** Native redirects for reads; credentials and progress writes stay scoped to the connection. */
 export class OpdsTransport {
   private active = 0;
   private waiters: (() => void)[] = [];
@@ -159,7 +156,7 @@ export class OpdsTransport {
       const headers = new Headers(options.headers);
       headers.delete('Cookie');
       headers.delete('Authorization');
-      if (connection.auth.kind === 'basic') {
+      if (connection.auth.kind === 'basic' && new URL(href).origin === new URL(connection.root).origin) {
         const bytes = new TextEncoder().encode(
           `${connection.auth.username}:${connection.auth.password}`,
         );
@@ -173,7 +170,7 @@ export class OpdsTransport {
         headers,
         ...(options.body === undefined ? {} : { body: options.body }),
         signal,
-        redirect: 'error',
+        redirect: options.body === undefined ? 'follow' : 'error',
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
         cache: 'no-store',
@@ -249,7 +246,7 @@ export class OpdsTransport {
     try {
       const bytes = await readBounded(response, options.maxBytes ?? CATALOG_LIMIT);
       await this.validateCurrent?.(connection);
-      return { bytes, headers: response.headers, status: response.status };
+      return { bytes, headers: response.headers, status: response.status, url: response.url || url };
     } catch (error) {
       if (error instanceof OpdsError) throw error;
       if (options.signal?.aborted) throw options.signal.reason;
@@ -267,11 +264,14 @@ export class OpdsTransport {
     payload: Readonly<Record<string, unknown>>,
     signal?: AbortSignal,
   ): Promise<void> {
+    const url = allowedUrl(connection, target.url);
+    if (new URL(url).origin !== new URL(connection.root).origin)
+      throw new OpdsError('scope-blocked', '目录指向未授权的外部地址，请为该服务单独添加连接。');
     const body = JSON.stringify(payload);
     const limit = 128 * 1024;
     if (new TextEncoder().encode(body).byteLength > limit)
       throw new OpdsError('too-large', 'OPDS 阅读进度请求超出大小限制。');
-    await this.buffered(connection, target.url, {
+    await this.buffered(connection, url, {
       method: target.method,
       body,
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -290,6 +290,7 @@ export class OpdsTransport {
     return {
       text: new TextDecoder().decode(result.bytes),
       contentType: result.headers.get('Content-Type') ?? '',
+      url: result.url,
     };
   }
   async download(

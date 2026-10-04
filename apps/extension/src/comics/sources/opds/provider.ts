@@ -509,7 +509,7 @@ export function createOpdsProvider(
         )
           throw new OpdsError('scope-blocked', '不能将已有连接改为另一目录或账户，请添加新连接。');
         const document = await new OpdsTransport(options.fetch).document(connection, root, signal),
-          catalog = parseCatalog(document.text, root, document.contentType);
+          catalog = parseCatalog(document.text, document.url, document.contentType);
         connection.namespace = `${catalog.protocol}:${connection.endpointKey}`;
         if (previous && connection.namespace !== previous.namespace)
           throw new OpdsError('scope-blocked', '不同 OPDS 版本或目录需要单独连接。');
@@ -590,7 +590,7 @@ export function createOpdsProvider(
           let search = reference.value.search as OpdsLink | undefined;
           if (!search) {
             const document = await transport.document(connection, url, request.signal);
-            search = parseCatalog(document.text, url, document.contentType).links.find((link) =>
+            search = parseCatalog(document.text, document.url, document.contentType).links.find((link) =>
               hasRel(link, 'search'),
             );
           }
@@ -604,7 +604,7 @@ export function createOpdsProvider(
             mediaType(search.type) === 'application/opensearchdescription+xml'
           ) {
             const description = await transport.document(connection, search.href, request.signal);
-            template = parseSearchDescription(description.text, search.href);
+            template = parseSearchDescription(description.text, description.url);
           }
           if (!reference.value.searchTemplate)
             await store.saveResources([
@@ -613,7 +613,7 @@ export function createOpdsProvider(
           url = expandSearch(template, request.search.trim());
         }
         const document = await transport.document(connection, url, request.signal),
-          catalog = parseCatalog(document.text, url, document.contentType);
+          catalog = parseCatalog(document.text, document.url, document.contentType);
         return normalized(connection, catalog, url);
       },
       async resolve(publicConnection, publicationId, options = {}) {
@@ -624,7 +624,7 @@ export function createOpdsProvider(
           detail = initialAccess.detail;
         if (detail) {
           const doc = await transport.document(connection, detail.href, options.signal);
-          publication = parsePublication(doc.text, detail.href);
+          publication = parsePublication(doc.text, doc.url);
         } else if (
           (resource.value.protocol === 'opds1' ||
             (publication.readingOrder && !initialAccess.manifest)) &&
@@ -632,7 +632,7 @@ export function createOpdsProvider(
         ) {
           const catalogUrl = resource.value.catalogUrl,
             doc = await transport.document(connection, catalogUrl, options.signal),
-            current = parseCatalog(doc.text, catalogUrl, doc.contentType);
+            current = parseCatalog(doc.text, doc.url, doc.contentType);
           const fresh = [
             ...current.publications,
             ...current.groups.flatMap((group) => group.publications),
@@ -649,7 +649,7 @@ export function createOpdsProvider(
             imageAccess = access;
           if (access.manifest) {
             const doc = await transport.document(connection, access.manifest.href, options.signal);
-            imagePublication = parsePublication(doc.text, access.manifest.href);
+            imagePublication = parsePublication(doc.text, doc.url);
             progressPublication = {
               ...imagePublication,
               links: [...imagePublication.links, ...publication.links],
