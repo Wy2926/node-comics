@@ -187,7 +187,11 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
     <span ref={listRef} id={listId} popover="auto" role="listbox" className="nc-select-list"
       aria-labelledby={buttonId}
       onToggle={() => { if (!listRef.current?.matches(':popover-open')) close(); }}
-      onPointerDown={event => event.preventDefault()}>
+      onPointerDown={event => event.preventDefault()}
+      onMouseDown={event => {
+        // Firefox extension pages ignore pointerdown.preventDefault() (Mozilla bug 1484186).
+        event.preventDefault();
+      }}>
       {options.map((option, index) => <span key={option.value} id={`${listId}-${index}`} role="option" data-value={option.value}
         aria-selected={index === selected} aria-disabled={option.disabled || undefined}
         className="nc-select-option" data-active={expanded && index === activeIndex || undefined}

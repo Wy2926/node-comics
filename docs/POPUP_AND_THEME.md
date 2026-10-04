@@ -98,4 +98,6 @@ node scripts/verify_popup.mjs
 
 自定义下拉另有 8 项桌面 Chromium 交互测试；保持端口 5176 运行后，在 `apps/extension` 执行 `node --test tests/select.keyboard.mjs`。该测试覆盖精确标签名称、键盘和焦点、禁用与受控值、弹框内菜单、长列表滚动及主题，沿用上述环境变量。
 
-同一环境执行 `node --test tests/scrollbars.browser.mjs`，覆盖下拉拖动与焦点、嵌套双轴滚动、弹框与文本框隔离、RTL 横向端点、动态内容与清理，并检查没有原生滚动条占位；两组测试均可用 `SELECT_TEST_ORIGIN` 指定预览地址。
+Firefox 扩展页回归在同一目录执行 `node --test tests/select.firefox.mjs`，需用 `GECKODRIVER_PATH` 指定已安装的 geckodriver；`FIREFOX_PATH` 可指定 Firefox 可执行文件。测试构建隔离夹具并临时加载到 `moz-extension://`，检查真实鼠标选择、焦点、禁用项、弹框和语言下拉，截图写入已忽略的 `artifacts/firefox-select/`，无需启动 Vite 或连接后端。
+
+同一环境执行 `node --test tests/scrollbars.browser.mjs`，覆盖下拉拖动与焦点、嵌套双轴滚动、弹框与文本框隔离、RTL 横向端点、动态内容与清理，并检查没有原生滚动条占位；Chromium 下拉与滚动条测试均可用 `SELECT_TEST_ORIGIN` 指定预览地址。
