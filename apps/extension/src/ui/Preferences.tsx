@@ -31,7 +31,7 @@ export function Preferences({ settings, setSettings, caps, children, onOpenShort
     </AppearanceSettings>
     {onOpenShortcuts && <section className="settings-card">
       <h3><Icon name="keyboard"/>{msg('键盘快捷键')}</h3>
-      <SettingRow title={msg('自定义快捷键')} description={msg('快捷键保存在本机，按键盘位置识别，只在当前页面生效。输入文字时不会触发。')}>
+      <SettingRow title={msg('自定义快捷键')} description={msg('页面内快捷键保存在本机，按键盘位置识别；输入文字时不会触发。浏览器快捷键单独管理。')}>
         <button type="button" className="button secondary" aria-haspopup="dialog" onClick={onOpenShortcuts}><Icon name="keyboard"/>{msg('自定义快捷键')}</button>
       </SettingRow>
     </section>}

@@ -19,7 +19,7 @@ import {useShortcutPreferences,useShortcuts} from '../../src/shortcuts/react';
 import type {ShortcutId} from '../../src/shortcuts/catalog';
 import {activeBindings,resolveBindings} from '../../src/shortcuts/model';
 import {formatBinding} from '../../src/shortcuts/keys';
-import {browserShortcutBinding,readRegionShortcut} from '../../src/shortcuts/native';
+import {browserShortcutBinding,readBrowserShortcuts,type BrowserShortcuts} from '../../src/shortcuts/native';
 
 type Discovery={kind:'catalog'|'pages';id:string};
 function Popup({initialError=''}:{initialError?:string}){
@@ -28,7 +28,8 @@ function Popup({initialError=''}:{initialError?:string}){
  const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState<'tab'|'region'>(),[saving,setSaving]=useState(false);
  const lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
  const [preferences,setPreferences]=useState(settings);useAppearance(preferences);
- const shortcuts=useShortcutPreferences(),[regionShortcut,setRegionShortcut]=useState<string>();
+ const shortcuts=useShortcutPreferences(),[browserShortcuts,setBrowserShortcuts]=useState<BrowserShortcuts>({});
+ const nativeBindings=Object.values(browserShortcuts).map(browserShortcutBinding);
  const bindings=useMemo(()=>activeBindings(shortcuts.overrides),[shortcuts.overrides]);
  const disabled=busy||opening||!!translating||saving;
  const resolved=source?.url?sourceFor(source.url):undefined;
@@ -50,7 +51,7 @@ function Popup({initialError=''}:{initialError?:string}){
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{
-  let active=true;void readRegionShortcut().then(value=>{if(active)setRegionShortcut(browserShortcutBinding(value));}).catch(()=>{});
+  let active=true;void readBrowserShortcuts().then(value=>{if(active)setBrowserShortcuts(value);}).catch(()=>{});
   void chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}).catch(()=>{});
   void chrome.tabs.query({active:true,currentWindow:true}).then(([tab])=>{
    if(tab?.id==null||!tab.url||!['https:','http:'].includes(new URL(tab.url).protocol)){setSourceNotice(msg("请切换到普通漫画网页，再打开插件。"));return;}
@@ -78,15 +79,18 @@ function Popup({initialError=''}:{initialError?:string}){
  async function openSettings(){if(disabled||openLock.current)return;openLock.current=true;setOpening(true);try{await chrome.runtime.openOptionsPage();window.close();}catch{setError(msg("设置未能打开，请重试。"));}finally{openLock.current=false;setOpening(false);}}
  async function openPage(hash=''){if(disabled||openLock.current)return;openLock.current=true;setOpening(true);try{await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html'+(hash?'#'+hash:''))});window.close();}catch(e){setError((e as Error).message);}finally{openLock.current=false;setOpening(false);}}
  const handlers={
-  'web.translate':()=>{if(!source)return false;void translate();},
   'web.shortcuts':()=>{void openPage('settings/shortcuts');},
   'app.library':()=>{void openPage();},
   'app.settings':()=>{void openSettings();},
  };
  useShortcuts(handlers,{enabled:!disabled});
  function shortcutHint(id:ShortcutId){
-  const visible=shortcuts.ready?resolveBindings(id,shortcuts.overrides).filter(binding=>binding!==regionShortcut&&bindings.get(binding)?.find(candidate=>Object.hasOwn(handlers,candidate))===id):[];
+  const visible=shortcuts.ready?resolveBindings(id,shortcuts.overrides).filter(binding=>!nativeBindings.includes(binding)&&bindings.get(binding)?.find(candidate=>Object.hasOwn(handlers,candidate))===id):[];
   return visible.length?<span className="nc-popup-shortcut" aria-hidden="true">{visible.map(binding=><kbd key={binding}>{formatBinding(binding)}</kbd>)}</span>:null;
+ }
+ function nativeShortcutHint(name:keyof BrowserShortcuts){
+  const binding=browserShortcutBinding(browserShortcuts[name]);
+  return binding?<span className="nc-popup-shortcut" aria-hidden="true"><kbd>{formatBinding(binding)}</kbd></span>:null;
  }
  return <main className="nc-app nc-popup"><Scrollbars/>
   <header className="nc-popup-header"><button className="nc-popup-brand" disabled={disabled} onClick={()=>void openPage()} aria-label={msg('打开我的漫画')}><BrandLogo/></button><span className="nc-popup-tagline">{msg('随读随译')}</span></header>
@@ -96,7 +100,7 @@ function Popup({initialError=''}:{initialError?:string}){
     {sourceNotice&&<p className="nc-popup-notice" role="status">{sourceNotice}</p>}
     <div className="nc-popup-language"><div><b>{msg("翻译成")}</b><p id="popup-language-hint">{msg("与设置中的默认目标语言同步")}</p></div><TargetLanguage value={preferences.language} onChange={language=>void changeLanguage(language)} disabled={disabled} describedBy="popup-language-hint"/></div>
     <AutoTranslateTabs enabled={preferences.autoTranslateTabs} onSaved={setPreferences} disabled={disabled}/>
-    <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}><span className="nc-popup-action-label">{translating==='tab'?<><span className="spinner"/>{msg("正在启动翻译…")}</>:<><Icon name="spark" size={20}/>{msg("翻译当前标签页")}</>}</span>{shortcutHint('web.translate')}</button>
+    <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}><span className="nc-popup-action-label">{translating==='tab'?<><span className="spinner"/>{msg("正在启动翻译…")}</>:<><Icon name="spark" size={20}/>{msg("翻译当前标签页")}</>}</span>{nativeShortcutHint('nc-translate-tab')}</button>
     <p className="nc-popup-hint">{msg("留在原网页，当前图片与后三张随读随译。")}</p>
     {error&&<div className="nc-popup-error" role="alert">{error}</div>}
    </section>
@@ -109,7 +113,7 @@ function Popup({initialError=''}:{initialError?:string}){
    </section>}
    <section className="nc-popup-tools" aria-label={msg('我的漫画')}>
     <div className="nc-popup-tool-grid">
-     <button className="nc-popup-tool nc-popup-region" disabled={!source||disabled} onClick={()=>void translate('region')}><Icon name="expand" size={23}/><span>{translating==='region'?msg('正在启动翻译…'):msg('划图翻译')}</span>{regionShortcut&&<span className="nc-popup-shortcut" aria-hidden="true"><kbd>{formatBinding(regionShortcut)}</kbd></span>}</button>
+     <button className="nc-popup-tool nc-popup-region" disabled={!source||disabled} onClick={()=>void translate('region')}><Icon name="expand" size={23}/><span>{translating==='region'?msg('正在启动翻译…'):msg('划图翻译')}</span>{nativeShortcutHint('nc-translate-region')}</button>
      <button className="nc-popup-tool nc-popup-library nc-comic-paper" disabled={disabled} onClick={()=>void openPage()}><Icon name="folder" size={23}/><span>{msg('我的漫画')}</span>{shortcutHint('app.library')}</button>
      <button className="nc-popup-tool" disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={23}/><span>{msg('设置')}</span>{shortcutHint('app.settings')}</button>
      <button className="nc-popup-tool" disabled={disabled} onClick={()=>void openPage('settings/shortcuts')}><Icon name="keyboard" size={23}/><span>{msg('键盘快捷键')}</span>{shortcutHint('web.shortcuts')}</button>

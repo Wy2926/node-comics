@@ -110,15 +110,20 @@ describe('shortcut preference panel presentation', () => {
     expect(recording).toContain('按下组合键');
   });
 
-  it('keeps native region capture outside editable shortcuts and explains its reset exception', () => {
+  it('keeps both native starts outside editable shortcuts and explains their reset exception', () => {
     const html = renderToStaticMarkup(<ShortcutPanel initialScope="web" onClose={() => {}}/>);
     expect(html).toContain('nc-shortcut-native');
     expect(html).toContain('划图翻译');
     expect(html).toContain('在浏览器中修改');
-    expect(html).toContain('以取得截图授权');
+    expect(html.match(/class="nc-shortcut-command nc-shortcut-native"/g)).toHaveLength(2);
+    expect(html).toContain('翻译当前标签页');
+    expect(html).toContain('无需打开插件');
+    expect(html).toContain('取得截图授权');
     expect(html).toContain('不会随此面板恢复默认');
     expect(html).not.toContain('修改“划图翻译”的快捷键');
     expect(html).not.toContain('添加“划图翻译”的快捷键');
+    expect(html).not.toContain('修改“翻译当前标签页”的快捷键');
+    expect(html).not.toContain('添加“翻译当前标签页”的快捷键');
     expect(html).toContain('暂停或继续网页翻译');
   });
 

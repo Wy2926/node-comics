@@ -45,16 +45,15 @@ export function installWebShortcuts() {
     shadow.append(notice);document.documentElement.append(host);errorHost=host;
     errorTimer=setTimeout(()=>{host.remove();if(errorHost===host)errorHost=undefined;},7000);
   }
-  function execute(action:'web.translate'|'web.shortcuts'){
+  function execute(){
     if(busy)return false;
     busy=true;
-    void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_EXECUTE',action,url:location.href,instanceId})
+    void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_EXECUTE',action:'web.shortcuts',url:location.href,instanceId})
       .then(response=>{if(!response?.ok&&response?.error)showError(response.error);})
       .catch(()=>{}).finally(()=>{busy=false;});
   }
   const unbind=bindWebShortcuts({
-    'web.translate':()=>execute('web.translate'),
-    'web.shortcuts':()=>execute('web.shortcuts'),
+    'web.shortcuts':execute,
   },()=>!disposed);
   return ()=>{
     disposed=true;unbind();chrome.runtime.onMessage.removeListener(identity);

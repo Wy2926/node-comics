@@ -367,6 +367,62 @@ for (const [width, textScale] of [[560, 1], [560, 1.25], [390, 1.25]]) test(`a $
   await closePanel(); await samePosition(reading);
 });
 
+test('native starts display actual assignments, refresh on focus and reject conflicting page bindings', async () => {
+  await page.addInitScript(() => {
+    window.fixtureBrowserCommands = [{name: 'nc-translate-tab', shortcut: 'Alt+Shift+Z'}, {name: 'nc-translate-region', shortcut: 'Alt+Shift+R'}];
+    window.fixtureShortcutSettings = [];
+    Object.assign(window.chrome, {
+      commands: {getAll: async () => window.fixtureBrowserCommands},
+      tabs: {create: async options => {window.fixtureShortcutSettings.push(options.url);}},
+      runtime: {getURL: path => 'chrome-extension://fixture' + path},
+    });
+  });
+  await reader();
+  await openPanel(); await anchor('web').click(); await activeScope('web');
+  const tabStart = group('web').getByRole('group', {name: '翻译当前标签页', exact: true});
+  const regionStart = group('web').getByRole('group', {name: '划图翻译', exact: true});
+  assert.equal(await tabStart.locator('kbd').innerText(), 'Alt+Shift+Z');
+  assert.equal(await regionStart.locator('kbd').innerText(), 'Alt+Shift+R');
+  assert.equal(await tabStart.locator('.nc-shortcut-binding').count(), 0, 'Native starts must not keep a second in-page binding');
+  await tabStart.getByRole('button', {name: '在浏览器中修改', exact: true}).click();
+  assert.deepEqual(await page.evaluate(() => window.fixtureShortcutSettings), ['chrome://extensions/shortcuts']);
+  await group('web').getByRole('button', {name: '修改“暂停或继续网页翻译”的快捷键', exact: true}).click();
+  await page.keyboard.press('Alt+Shift+z');
+  await panel().getByText('快捷键与“翻译当前标签页”冲突，请先修改该操作。', {exact: true}).waitFor();
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => {
+    window.fixtureBrowserCommands = [{name: 'nc-translate-tab', shortcut: ''}, {name: 'nc-translate-region', shortcut: 'Alt+Shift+R'}];
+    window.dispatchEvent(new Event('focus'));
+  });
+  await tabStart.getByText('尚未设置', {exact: true}).waitFor();
+  assert.equal(await tabStart.locator('kbd').count(), 0, 'An unassigned command must not show its suggested key');
+  await closePanel();
+});
+
+test('native shortcut lookup errors recover without changing saved reader shortcuts or position', async () => {
+  await page.addInitScript(() => {
+    window.fixtureBrowserCommandsFail = true;
+    Object.assign(window.chrome, {
+      commands: {getAll: async () => {
+        if (window.fixtureBrowserCommandsFail) throw Error('fixture lookup failure');
+        return [{name: 'nc-translate-tab', shortcut: 'Alt+Shift+T'}];
+      }},
+      tabs: {create: async () => {throw Error('fixture settings failure');}},
+      runtime: {getURL: path => 'chrome-extension://fixture' + path},
+    });
+  });
+  await reader(); await page.keyboard.press('PageDown'); await waitPage(2);
+  const reading = await readingPosition();
+  await openPanel(); await anchor('web').click(); await activeScope('web');
+  const tabStart = group('web').getByRole('group', {name: '翻译当前标签页', exact: true});
+  await tabStart.getByText('无法读取浏览器快捷键。', {exact: true}).waitFor();
+  await tabStart.getByRole('button', {name: '在浏览器中修改', exact: true}).click();
+  await panel().getByText('无法打开浏览器快捷键设置，请在扩展管理页修改。', {exact: true}).waitFor();
+  await page.evaluate(() => {window.fixtureBrowserCommandsFail = false; window.dispatchEvent(new Event('focus'));});
+  await tabStart.getByText('Alt+Shift+T', {exact: true}).waitFor();
+  await samePosition(reading); await closePanel(); await samePosition(reading);
+});
+
 test('real DOM gating ignores passive scrollbar popovers but protects open menus, listboxes and dialogs', async () => {
   await page.goto(`${origin}/tests/select-fixture.html`);
   await page.getByRole('combobox', {name: '作品', exact: true}).waitFor();

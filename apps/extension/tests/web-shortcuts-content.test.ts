@@ -28,19 +28,19 @@ describe('public content shortcut preferences',()=>{
   it('waits for saved preferences instead of briefly enabling defaults',async()=>{
     const cleanup=bindWebShortcuts({},()=>true),options=binding()[2];
     expect(options.enabled!()).toBe(false);
-    initial.resolve({ok:true,overrides:{'web.translate':[]}});await flush();
-    expect(options.enabled!()).toBe(true);expect(options.getOverrides()).toEqual({'web.translate':[]});
+    initial.resolve({ok:true,overrides:{'web.shortcuts':[]}});await flush();
+    expect(options.enabled!()).toBe(true);expect(options.getOverrides()).toEqual({'web.shortcuts':[]});
     hidden=true;expect(options.enabled!()).toBe(false);cleanup();expect(listeners.size).toBe(0);
   });
   it('applies a trusted live change and ignores an older initialization response',async()=>{
     const cleanup=bindWebShortcuts({},()=>true),options=binding()[2];
-    broadcast({type:'NC_SHORTCUTS_CHANGED',overrides:{'web.translate':['Ctrl+Alt+KeyT']}});
+    broadcast({type:'NC_SHORTCUTS_CHANGED',overrides:{'web.shortcuts':['Ctrl+Alt+KeyT']}});
     initial.resolve({ok:true,overrides:{}});await flush();
-    expect(options.getOverrides()).toEqual({'web.translate':['Ctrl+Alt+KeyT']});cleanup();
+    expect(options.getOverrides()).toEqual({'web.shortcuts':['Ctrl+Alt+KeyT']});cleanup();
   });
   it.each([{id:'foreign'}, {tab:{id:7}}, {url:'https://source.test/chapter'}])('ignores a forged preferences broadcast %j',change=>{
     const cleanup=bindWebShortcuts({},()=>true),options=binding()[2];
-    broadcast({type:'NC_SHORTCUTS_CHANGED',overrides:{'web.translate':[]}}, {...background,...change} as chrome.runtime.MessageSender);
+    broadcast({type:'NC_SHORTCUTS_CHANGED',overrides:{'web.shortcuts':[]}}, {...background,...change} as chrome.runtime.MessageSender);
     expect(options.enabled!()).toBe(false);cleanup();
   });
   it('does not allow synthetic keyboard events to invoke content actions',async()=>{
@@ -59,19 +59,19 @@ describe('always-on shortcut entry',()=>{
     for(const listener of listeners)listener({type:'NC_SHORTCUTS_IDENTITY'},background,respond);
     expect(getRandomValues).toHaveBeenCalledOnce();
     expect(respond).toHaveBeenCalledExactlyOnceWith({instanceId:'000102030405060708090a0b0c0d0e0f',url:'http://source.test/chapter'});
-    expect(binding()[1]['web.translate']).toBeTypeOf('function');cleanup();
+    expect(binding()[1]['web.shortcuts']).toBeTypeOf('function');cleanup();
   });
-  it('registers only manual starts and the panel, leaving inactive translation controls untouched',()=>{
+  it('registers only the panel, leaving native translation starts and inactive controls untouched',()=>{
     const cleanup=installWebShortcuts();
-    expect(Object.keys(binding()[1])).toEqual(['web.translate','web.shortcuts']);cleanup();
+    expect(Object.keys(binding()[1])).toEqual(['web.shortcuts']);cleanup();
   });
   it('sends its own document identity and suppresses overlapping activations',async()=>{
     const cleanup=installWebShortcuts();initial.resolve({ok:true,overrides:{}});await flush();
     const handlers:ShortcutHandlers=binding()[1];
-    handlers['web.translate']!(key(false));handlers['web.shortcuts']!(key(false));
+    handlers['web.shortcuts']!(key(false));
     expect(chrome.runtime.sendMessage).toHaveBeenCalledExactlyOnceWith({type:'NC_SHORTCUTS_GET'});
-    handlers['web.translate']!(key());expect(handlers['web.translate']!(key())).toBe(false);
-    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({type:'NC_SHORTCUTS_EXECUTE',action:'web.translate',url:'https://source.test/chapter',instanceId:expect.any(String)});
+    handlers['web.shortcuts']!(key());expect(handlers['web.shortcuts']!(key())).toBe(false);
+    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({type:'NC_SHORTCUTS_EXECUTE',action:'web.shortcuts',url:'https://source.test/chapter',instanceId:expect.any(String)});
     await flush();handlers['web.shortcuts']!(key());
     expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({action:'web.shortcuts'}));cleanup();
   });

@@ -49,6 +49,10 @@ describe('shortcut catalog and normalization',()=>{
     expect(findConflict('reader.next','Shift+Slash',{})).toBe('app.shortcuts');
     expect(activeBindings({'reader.next':['KeyO']}).has('KeyO')).toBe(false);
   });
+  it('discards retired tab-translation page bindings without changing other preferences',()=>{
+    expect(normalizeOverrides({'web.translate':['Ctrl+Alt+KeyT'],'web.pause':[]})).toEqual({'web.pause':[]});
+    expect(activeBindings({}).has('Alt+Shift+KeyT')).toBe(false);
+  });
 });
 
 describe('shortcut dispatch',()=>{

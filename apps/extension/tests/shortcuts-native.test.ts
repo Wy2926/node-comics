@@ -1,17 +1,19 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {browserShortcutBinding,canManageBrowserShortcuts,openBrowserShortcutSettings,readRegionShortcut} from '../src/shortcuts/native';
+import {browserShortcutBinding,canManageBrowserShortcuts,openBrowserShortcutSettings,readBrowserShortcuts} from '../src/shortcuts/native';
 
 afterEach(()=>vi.unstubAllGlobals());
-describe('native screenshot shortcut',()=>{
+describe('native translation shortcuts',()=>{
   it('reads the browser-assigned command rather than assuming its suggested key',async()=>{
-    vi.stubGlobal('chrome',{commands:{getAll:async()=>[{name:'nc-translate-region',shortcut:'Ctrl+Shift+Y'}]},tabs:{create:vi.fn()}});
+    const getAll=vi.fn(async()=>[{name:'nc-translate-tab',shortcut:'Alt+Shift+Z'},{name:'nc-translate-region',shortcut:'Ctrl+Shift+Y'},{name:'other',shortcut:'Ctrl+Shift+O'}]);
+    vi.stubGlobal('chrome',{commands:{getAll},tabs:{create:vi.fn()}});
     expect(canManageBrowserShortcuts()).toBe(true);
-    expect(await readRegionShortcut()).toBe('Ctrl+Shift+Y');
+    expect(await readBrowserShortcuts()).toEqual({'nc-translate-tab':'Alt+Shift+Z','nc-translate-region':'Ctrl+Shift+Y'});
+    expect(getAll).toHaveBeenCalledOnce();
   });
   it('does not invent a binding in web previews or when the browser leaves it unassigned',async()=>{
-    vi.stubGlobal('chrome',undefined);expect(canManageBrowserShortcuts()).toBe(false);expect(await readRegionShortcut()).toBeUndefined();
+    vi.stubGlobal('chrome',undefined);expect(canManageBrowserShortcuts()).toBe(false);expect(await readBrowserShortcuts()).toEqual({});
     vi.stubGlobal('chrome',{commands:{getAll:async()=>[{name:'nc-translate-region',shortcut:''}]},tabs:{create:vi.fn()}});
-    expect(await readRegionShortcut()).toBeUndefined();
+    expect(await readBrowserShortcuts()).toEqual({});
   });
   it.each([
     ['chrome-extension://id/','Chrome/140','chrome://extensions/shortcuts'],

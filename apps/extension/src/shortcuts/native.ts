@@ -1,11 +1,18 @@
-/** Browser commands provide the activeTab gesture required by captureVisibleTab. */
-const regionCommandName='nc-translate-region';
+/** Starts run directly in the browser, independent of page focus and key handlers. */
+export const browserShortcutCommands=[
+  {name:'nc-translate-tab',label:'翻译当前标签页'},
+  {name:'nc-translate-region',label:'划图翻译'},
+] as const;
+export type BrowserShortcuts=Partial<Record<typeof browserShortcutCommands[number]['name'],string>>;
 export const canManageBrowserShortcuts=()=>typeof chrome!=='undefined'&&!!chrome.commands?.getAll&&!!chrome.tabs?.create;
 
-export async function readRegionShortcut():Promise<string|undefined> {
-  if(!canManageBrowserShortcuts())return;
+export async function readBrowserShortcuts():Promise<BrowserShortcuts> {
+  if(!canManageBrowserShortcuts())return {};
   const commands=await chrome.commands.getAll();
-  return commands.find(command=>command.name===regionCommandName)?.shortcut||undefined;
+  return Object.fromEntries(browserShortcutCommands.flatMap(({name})=>{
+    const shortcut=commands.find(command=>command.name===name)?.shortcut;
+    return shortcut?[[name,shortcut]]:[];
+  }));
 }
 export async function openBrowserShortcutSettings():Promise<void> {
   if(!canManageBrowserShortcuts())throw Error('Browser shortcut settings unavailable');

@@ -8,14 +8,14 @@ import {loadShortcutOverrides} from '../src/shortcuts/store';
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(async()=>{})}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(async()=>{})}));
 vi.mock('../src/host-permissions',()=>({requireHostAccess:vi.fn(async()=>{})}));
-vi.mock('../src/shortcuts/store',async original=>({...await original<typeof import('../src/shortcuts/store')>(),loadShortcutOverrides:vi.fn(async()=>({'web.translate':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB']}))}));
+vi.mock('../src/shortcuts/store',async original=>({...await original<typeof import('../src/shortcuts/store')>(),loadShortcutOverrides:vi.fn(async()=>({'web.shortcuts':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB']}))}));
 vi.mock('../src/i18n/runtime',()=>({msg:(value:string)=>value}));
 
 type Listener=(message:any,sender:chrome.runtime.MessageSender,respond:(value:any)=>void)=>unknown;
 const sender:chrome.runtime.MessageSender={id:'extension',url:'https://source.test/chapter',frameId:0,documentId:'document-7',tab:{id:7} as chrome.tabs.Tab};
 let listener:Listener,changed:(changes:Record<string,chrome.storage.StorageChange>,area:string)=>void,nativeCommand:(command:string,tab?:chrome.tabs.Tab)=>void;
 let tab:Partial<chrome.tabs.Tab>,identity:{instanceId:string;url:string};
-const command=(action='web.translate')=>({type:'NC_SHORTCUTS_EXECUTE',action,url:'https://source.test/chapter',instanceId:'instance-7'});
+const command=(action='web.shortcuts')=>({type:'NC_SHORTCUTS_EXECUTE',action,url:'https://source.test/chapter',instanceId:'instance-7'});
 const flush=async()=>{for(let count=0;count<10;count++)await Promise.resolve();};
 async function send(message:any,from=sender){
   let result:any;
@@ -44,20 +44,18 @@ describe('website shortcut protocol',()=>{
     expect(await send({type:'NC_TRANSLATE_REGION'})).toEqual({owned:undefined,result:undefined});
   });
   it('returns only sanitized preferences to a content script',async()=>{
-    expect(await send({type:'NC_SHORTCUTS_GET'})).toEqual({owned:true,result:{ok:true,overrides:{'web.translate':['Ctrl+Alt+KeyT']}}});
+    expect(await send({type:'NC_SHORTCUTS_GET'})).toEqual({owned:true,result:{ok:true,overrides:{'web.shortcuts':['Ctrl+Alt+KeyT']}}});
     expect(loadShortcutOverrides).toHaveBeenCalledOnce();expect(chrome.tabs.get).not.toHaveBeenCalled();
   });
-  it.each(['web.translate','web.shortcuts'])('executes only the own active document for %s',async action=>{
+  it('opens settings only for the own active document',async()=>{
+    const action='web.shortcuts';
     expect((await send({...command(action),tabId:99})).result).toEqual({ok:true});
     expect(chrome.tabs.get).toHaveBeenCalledWith(7);
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_IDENTITY'},{frameId:0,documentId:'document-7'});
-    if(action==='web.translate')expect(activateInline).toHaveBeenCalledExactlyOnceWith(7);
-    if(action==='web.shortcuts'){
-      expect(chrome.tabs.create).toHaveBeenCalledWith({url:'chrome-extension://extension/reader.html#settings/shortcuts'});
-      expect(requireHostAccess).not.toHaveBeenCalled();
-    }else expect(requireHostAccess).toHaveBeenCalledOnce();
+    expect(chrome.tabs.create).toHaveBeenCalledWith({url:'chrome-extension://extension/reader.html#settings/shortcuts'});
+    expect(requireHostAccess).not.toHaveBeenCalled();expect(activateInline).not.toHaveBeenCalled();
   });
-  it.each(['web.region','web.pause','web.close','reader.translation','anything'])('rejects unsupported backend action %s',async action=>{
+  it.each(['web.translate','web.region','web.pause','web.close','reader.translation','anything'])('rejects unsupported backend action %s',async action=>{
     expect((await send(command(action))).result).toMatchObject({ok:false});
     expect(activateInline).not.toHaveBeenCalled();expect(activateRegion).not.toHaveBeenCalled();
   });
@@ -69,39 +67,39 @@ describe('website shortcut protocol',()=>{
     const result=await send(command(),change==='origin'?{...sender,url:'https://foreign.test/chapter'}:sender);
     expect(result.result).toMatchObject({ok:false});expect(activateInline).not.toHaveBeenCalled();expect(activateRegion).not.toHaveBeenCalled();
   });
-  it('fails closed when permissions have been removed',async()=>{
-    vi.mocked(requireHostAccess).mockRejectedValueOnce(Error('restricted'));
-    expect((await send(command())).result).toEqual({ok:false,error:'restricted'});expect(activateRegion).not.toHaveBeenCalled();
-  });
   it('broadcasts only normalized versioned bindings, not unrelated storage',async()=>{
     changed({'nc-reader-settings':{newValue:{token:'secret'}}},'local');await flush();
     expect(chrome.tabs.query).not.toHaveBeenCalled();
-    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.translate':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB'],unknown:['KeyA']},token:'secret'}}},'local');await flush();
+    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.shortcuts':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB'],unknown:['KeyA']},token:'secret'}}},'local');await flush();
     expect(chrome.tabs.query).toHaveBeenCalledWith({url:['http://*/*','https://*/*']});
     expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2);
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_CHANGED',overrides:{'web.translate':['Ctrl+Alt+KeyT']}},{frameId:0});
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_CHANGED',overrides:{'web.shortcuts':['Ctrl+Alt+KeyT']}},{frameId:0});
   });
   it('resets content bindings when the stored version is unsupported',async()=>{
-    changed({'nc-shortcuts':{newValue:{version:2,overrides:{'web.translate':['Ctrl+Alt+KeyT']}}}},'local');await flush();
+    changed({'nc-shortcuts':{newValue:{version:2,overrides:{'web.shortcuts':['Ctrl+Alt+KeyT']}}}},'local');await flush();
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_CHANGED',overrides:{}},{frameId:0});
   });
   it('does not broadcast an older change after a slower tab lookup',async()=>{
     let finish!:(tabs:chrome.tabs.Tab[])=>void;
     const pending=new Promise<chrome.tabs.Tab[]>(resolve=>{finish=resolve;});
     vi.mocked(chrome.tabs.query).mockImplementationOnce(()=>pending);
-    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.translate':['Ctrl+Alt+KeyT']}}}},'local');
-    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.translate':[]}}}},'local');await flush();
+    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.shortcuts':['Ctrl+Alt+KeyT']}}}},'local');
+    changed({'nc-shortcuts':{newValue:{version:1,overrides:{'web.shortcuts':[]}}}},'local');await flush();
     expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2);
     finish([{id:7} as chrome.tabs.Tab]);await flush();
     expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2);
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_CHANGED',overrides:{'web.translate':[]}},{frameId:0});
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_CHANGED',overrides:{'web.shortcuts':[]}},{frameId:0});
   });
 });
 
-describe('native region shortcut authorization',()=>{
-  it('reuses region activation only from the registered native command',async()=>{
-    nativeCommand('nc-translate-region',tab as chrome.tabs.Tab);await flush();
-    expect(requireHostAccess).toHaveBeenCalledOnce();expect(activateRegion).toHaveBeenCalledExactlyOnceWith(7);
+describe.each([
+  ['nc-translate-tab',activateInline,activateRegion],
+  ['nc-translate-region',activateRegion,activateInline],
+] as const)('native shortcut authorization: %s',(name,activate,other)=>{
+  it('reuses the matching activation only from the registered native command',async()=>{
+    nativeCommand(name,tab as chrome.tabs.Tab);await flush();
+    expect(requireHostAccess).toHaveBeenCalledOnce();expect(activate).toHaveBeenCalledExactlyOnceWith(7);
+    expect(other).not.toHaveBeenCalled();
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
   });
   it.each(['unknown','inactive','restricted','navigated'])('ignores an invalid command target: %s',async reason=>{
@@ -109,30 +107,43 @@ describe('native region shortcut authorization',()=>{
     if(reason==='inactive')tab.active=false;
     if(reason==='restricted')tab.url='chrome://settings';
     if(reason==='navigated')tab.url='https://source.test/changed';
-    nativeCommand(reason==='unknown'?'unknown':'nc-translate-region',source);await flush();
-    expect(activateRegion).not.toHaveBeenCalled();expect(requireHostAccess).not.toHaveBeenCalled();
+    nativeCommand(reason==='unknown'?'unknown':name,source);await flush();
+    expect(activate).not.toHaveBeenCalled();expect(other).not.toHaveBeenCalled();expect(requireHostAccess).not.toHaveBeenCalled();
   });
   it('resolves the active focused tab when the browser omits the command tab',async()=>{
-    nativeCommand('nc-translate-region');await flush();
+    nativeCommand(name);await flush();
     expect(chrome.tabs.query).toHaveBeenCalledWith({active:true,lastFocusedWindow:true});
-    expect(activateRegion).toHaveBeenCalledExactlyOnceWith(7);
+    expect(activate).toHaveBeenCalledExactlyOnceWith(7);
   });
-  it('does not restart the same region while activation is pending',async()=>{
-    let finish!:()=>void;vi.mocked(activateRegion).mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;}));
-    nativeCommand('nc-translate-region',tab as chrome.tabs.Tab);nativeCommand('nc-translate-region',tab as chrome.tabs.Tab);await flush();
-    expect(activateRegion).toHaveBeenCalledOnce();finish();await flush();
+  it('does not restart the same tab while activation is pending',async()=>{
+    let finish!:()=>void;vi.mocked(activate).mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;}));
+    nativeCommand(name,tab as chrome.tabs.Tab);nativeCommand(name,tab as chrome.tabs.Tab);await flush();
+    expect(activate).toHaveBeenCalledOnce();finish();await flush();
+    nativeCommand(name,tab as chrome.tabs.Tab);await flush();expect(activate).toHaveBeenCalledTimes(2);
   });
   it('shows a permission failure on the current page without capturing',async()=>{
     vi.mocked(requireHostAccess).mockRejectedValueOnce(Error('restricted'));
-    nativeCommand('nc-translate-region',tab as chrome.tabs.Tab);await flush();
-    expect(activateRegion).not.toHaveBeenCalled();
+    nativeCommand(name,tab as chrome.tabs.Tab);await flush();
+    expect(activate).not.toHaveBeenCalled();
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_ERROR',error:'restricted'},{frameId:0});
     expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
   it('offers the existing settings page when an older page has no shortcut script',async()=>{
-    vi.mocked(activateRegion).mockRejectedValueOnce(Error('restricted'));
+    vi.mocked(activate).mockRejectedValueOnce(Error('restricted'));
     vi.mocked(chrome.tabs.sendMessage).mockImplementationOnce(()=>Promise.reject(Error('No receiver')));
-    nativeCommand('nc-translate-region',tab as chrome.tabs.Tab);await flush();
+    nativeCommand(name,tab as chrome.tabs.Tab);await flush();
     expect(chrome.tabs.create).toHaveBeenCalledWith({url:'chrome-extension://extension/reader.html#settings'});
+  });
+  it.each(['inactive','navigated'])('rechecks the target after permission lookup: %s',async reason=>{
+    const source={...tab} as chrome.tabs.Tab;
+    vi.mocked(requireHostAccess).mockImplementationOnce(async()=>{tab=reason==='inactive'?{...tab,active:false}:{...tab,url:'https://source.test/other'};});
+    nativeCommand(name,source);await flush();
+    expect(activate).not.toHaveBeenCalled();expect(other).not.toHaveBeenCalled();
+  });
+  it('does not surface an old failure on a newly navigated page',async()=>{
+    const source={...tab} as chrome.tabs.Tab;
+    vi.mocked(activate).mockImplementationOnce(async()=>{tab={...tab,url:'https://source.test/other'};throw Error('old failure');});
+    nativeCommand(name,source);await flush();
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
 });

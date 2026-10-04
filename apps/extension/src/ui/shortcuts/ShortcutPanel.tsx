@@ -4,7 +4,7 @@ import {Icon} from '../../icons';
 import {shortcutCommands, type ShortcutId, type ShortcutOverrides, type ShortcutScope as Scope} from '../../shortcuts/catalog';
 import {bindingFromEvent, validateBinding} from '../../shortcuts/keys';
 import {findConflict, resolveBindings} from '../../shortcuts/model';
-import {browserShortcutBinding, canManageBrowserShortcuts, openBrowserShortcutSettings, readRegionShortcut} from '../../shortcuts/native';
+import {browserShortcutBinding, browserShortcutCommands, canManageBrowserShortcuts, openBrowserShortcutSettings, readBrowserShortcuts, type BrowserShortcuts} from '../../shortcuts/native';
 import {useShortcutPreferences} from '../../shortcuts/react';
 import {ShortcutBindingControl} from './ShortcutBindingControl';
 import './shortcut-panel.css';
@@ -31,7 +31,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
   const [phase, setPhase] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [validation, setValidation] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
-  const [browserShortcut, setBrowserShortcut] = useState<{value?: string; loading: boolean; failed: boolean}>({loading: canManageBrowserShortcuts(), failed: false});
+  const [browserShortcut, setBrowserShortcut] = useState<{value: BrowserShortcuts; loading: boolean; failed: boolean}>({value: {}, loading: canManageBrowserShortcuts(), failed: false});
   const [browserSettingsError, setBrowserSettingsError] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null), viewport = useRef<HTMLDivElement>(null);
   const sections = useRef<Partial<Record<Scope, HTMLElement>>>({}), frame = useRef(0), firstScope = useRef(initialScope ?? 'global'), opening = useRef(true);
@@ -39,7 +39,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
   const previousFocus = useRef(typeof document === 'undefined' ? null : document.activeElement);
   const validationId = useId(), recordingHintId = useId(), titleId = useId(), sectionPrefix = useId();
   const current = pending ?? overrides, busy = phase === 'saving', loadFailed = error && !pending, disabled = !ready || busy || loadFailed;
-  const nativeBinding = browserShortcutBinding(browserShortcut.value);
+  const nativeBindings = browserShortcutCommands.map(command => ({...command, binding: browserShortcutBinding(browserShortcut.value[command.name])}));
 
   useLayoutEffect(() => {
     const node = dialog.current!, scroll = viewport.current!;
@@ -71,7 +71,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
     let active = true, request = 0;
     const refresh = () => {
       const latest = ++request;
-      void readRegionShortcut().then(value => {
+      void readBrowserShortcuts().then(value => {
         if (active && latest === request) setBrowserShortcut({value, loading: false, failed: false});
       }).catch(() => {
         if (active && latest === request) setBrowserShortcut(previous => ({...previous, loading: false, failed: true}));
@@ -126,8 +126,9 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
       setValidation(invalid === 'reserved' ? msg('此组合键由浏览器或输入操作保留，请换一个。') : msg('请使用字母、数字、方向键或功能键，可搭配修饰键。'));
       return;
     }
-    if (nativeBinding === binding) {
-      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg('划图翻译')}));
+    const nativeConflict = nativeBindings.find(command => command.binding === binding);
+    if (nativeConflict) {
+      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg(nativeConflict.label)}));
       return;
     }
     const conflict = findConflict(id, binding, current);
@@ -142,8 +143,9 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
   }
   function restore(id: ShortcutId) {
     const next = {...current}; delete next[id];
-    if (nativeBinding && resolveBindings(id, next).includes(nativeBinding)) {
-      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg('划图翻译')}));
+    const nativeConflict = nativeBindings.find(command => command.binding && resolveBindings(id, next).includes(command.binding));
+    if (nativeConflict) {
+      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg(nativeConflict.label)}));
       return;
     }
     const conflict = resolveBindings(id, next).map(binding => findConflict(id, binding, next)).find(Boolean);
@@ -155,8 +157,9 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
   }
   function cancelReset() { setConfirmReset(false); resetButton.current?.focus({preventScroll: true}); }
   function resetAll() {
-    if (nativeBinding && shortcutCommands.some(command => resolveBindings(command.id, {}).includes(nativeBinding))) {
-      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg('划图翻译')}));
+    const nativeConflict = nativeBindings.find(native => native.binding && shortcutCommands.some(command => resolveBindings(command.id, {}).includes(native.binding!)));
+    if (nativeConflict) {
+      setValidation(msg('快捷键与“{0}”冲突，请先修改该操作。', {'0': msg(nativeConflict.label)}));
       return;
     }
     void commit({});
@@ -173,7 +176,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
     <header className="nc-shortcut-header">
       <div className="nc-shortcut-heading"><span className="nc-shortcut-emblem"><Icon name="keyboard" size={28}/></span><div>
         <h2 id={titleId}>{msg('键盘快捷键')}</h2>
-        <p className="nc-shortcut-subtitle">{msg('快捷键保存在本机，按键盘位置识别，只在当前页面生效。输入文字时不会触发。')}</p>
+        <p className="nc-shortcut-subtitle">{msg('页面内快捷键保存在本机，按键盘位置识别；输入文字时不会触发。浏览器快捷键单独管理。')}</p>
       </div></div>
       <button type="button" className="nc-shortcut-close" aria-label={msg('关闭弹窗')} onClick={onClose}><Icon name="close"/></button>
     </header>
@@ -192,21 +195,21 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
         <div className="nc-shortcut-commands" aria-busy={busy}>
         {groups.map(({scope: group, commands}) => <section key={group} id={`${sectionPrefix}-${group}`} ref={node => {sections.current[group] = node ?? undefined;}}
           className="nc-shortcut-group" data-shortcut-scope={group} aria-label={scopeLabel(group)}>
-          <header className="nc-shortcut-group-heading"><Icon name={scopeIcons[group]} size={20}/><h3>{scopeLabel(group)}</h3><span className="nc-shortcut-count" aria-hidden="true">{commands.length + (group === 'web' ? 1 : 0)}</span></header>
+          <header className="nc-shortcut-group-heading"><Icon name={scopeIcons[group]} size={20}/><h3>{scopeLabel(group)}</h3><span className="nc-shortcut-count" aria-hidden="true">{commands.length + (group === 'web' ? browserShortcutCommands.length : 0)}</span></header>
           <div className="nc-shortcut-group-body">
           {group === 'reader' && <p className="nc-shortcut-hint">{msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}</p>}
           {group === 'web' && <>
-            <p className="nc-shortcut-hint">{msg('开始划图由浏览器管理，以取得截图授权；不会随此面板恢复默认。')}</p>
-            <div className="nc-shortcut-command nc-shortcut-native">
-              <span className="nc-shortcut-command-label">{msg('划图翻译')}</span>
+            <p className="nc-shortcut-hint">{msg('翻译标签页与划图翻译由浏览器快捷键直接启动，无需打开插件；划图同时取得截图授权。请在浏览器中修改，不会随此面板恢复默认。')}</p>
+            {browserShortcutCommands.map(command => <div className="nc-shortcut-command nc-shortcut-native" key={command.name} role="group" aria-label={msg(command.label)}>
+              <span className="nc-shortcut-command-label">{msg(command.label)}</span>
               <div className="nc-shortcut-assignment">
-              <span className="nc-shortcut-native-key">{!canManageBrowserShortcuts() ? '—' : browserShortcut.loading ? msg('正在加载快捷键…') : browserShortcut.failed ? msg('无法读取浏览器快捷键。') : browserShortcut.value ? <kbd>{browserShortcut.value}</kbd> : msg('尚未设置')}</span>
+              <span className="nc-shortcut-native-key">{!canManageBrowserShortcuts() ? '—' : browserShortcut.loading ? msg('正在加载快捷键…') : browserShortcut.failed ? msg('无法读取浏览器快捷键。') : browserShortcut.value[command.name] ? <kbd>{browserShortcut.value[command.name]}</kbd> : msg('尚未设置')}</span>
               <button type="button" className="nc-shortcut-action" disabled={!canManageBrowserShortcuts()} onClick={() => {
                 setBrowserSettingsError(false);
                 void openBrowserShortcutSettings().catch(() => setBrowserSettingsError(true));
               }}>{msg('在浏览器中修改')}<Icon name="external" size={16}/></button>
               </div>
-            </div>
+            </div>)}
             {browserSettingsError && <p className="nc-shortcut-error" role="alert">{msg('无法打开浏览器快捷键设置，请在扩展管理页修改。')}</p>}
           </>}
           {commands.map(command => {
