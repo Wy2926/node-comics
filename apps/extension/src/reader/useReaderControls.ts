@@ -18,13 +18,14 @@ export function useReaderControls<Panel extends string>({blocked, notify}: {
     clearTimeout(hideTimer.current);
     if (immersive && !panel && !blocked) {
       hideTimer.current = setTimeout(() => {
-        if (!root.current?.querySelector('.nc-reader-controls :focus')) setHidden(true);
-      }, 2400);
+        // Mouse-restored button focus must not pin the tools open. Keyboard
+        // focus and editable controls stay visible until focus leaves them.
+        if (!root.current?.querySelector('.nc-reader-controls :focus-visible')) setHidden(true);
+      }, 1200);
     }
   }
 
   function togglePanel(next: Panel) {
-    reveal();
     setPanel(value => value === next ? undefined : next);
   }
 
@@ -32,8 +33,7 @@ export function useReaderControls<Panel extends string>({blocked, notify}: {
     setPanel(undefined);
     const selector = panel === 'directory' ? '[data-reader-directory-trigger]'
       : panel === 'translation' ? '.nc-translation-trigger' : '[data-reader-settings-trigger]';
-    root.current?.querySelector<HTMLButtonElement>(selector)?.focus();
-    reveal();
+    root.current?.querySelector<HTMLButtonElement>(selector)?.focus({preventScroll: true});
   }
 
   async function fullscreen() {
@@ -45,12 +45,9 @@ export function useReaderControls<Panel extends string>({blocked, notify}: {
     }
   }
 
-  useEffect(() => () => clearTimeout(hideTimer.current), []);
   useEffect(() => {
-    if (!immersive || panel || blocked) {
-      setHidden(false);
-      clearTimeout(hideTimer.current);
-    } else reveal();
+    reveal();
+    return () => clearTimeout(hideTimer.current);
   }, [immersive, panel, blocked]);
   useEffect(() => {
     if (panel !== 'translation') return;

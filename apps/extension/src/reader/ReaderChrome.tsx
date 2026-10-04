@@ -14,14 +14,19 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
   reveal(): void;
   children: ReactNode;
 }) {
-  return <div ref={ref} className={`nc-reader ${immersive ? 'is-immersive' : ''} ${hidden ? 'controls-hidden' : ''}`}
+  const revealControl = immersive ? (event: {target: EventTarget}) => {
+    if ((event.target as Element).closest('.nc-reader-controls')) reveal();
+  } : undefined;
+  return <div ref={ref} className={`nc-reader ${hidden ? 'controls-hidden' : ''}`}
     data-background={background}
-    onPointerMove={event => {
-      const target = event.target as HTMLElement;
+    onPointerMove={immersive ? event => {
+      if ((event.target as Element).closest('.nc-reader-controls')) {reveal(); return;}
       const bounds = event.currentTarget.getBoundingClientRect();
-      if (target.closest('.nc-reader-controls') || event.clientX - bounds.left < 8 || bounds.right - event.clientX < 8) reveal();
-    }}
-    onFocusCapture={event => { if ((event.target as HTMLElement).closest('.nc-reader-controls')) reveal(); }}>
+      if (event.clientX - bounds.left < 8 || bounds.right - event.clientX < 8) reveal();
+    } : undefined}
+    onPointerDownCapture={revealControl}
+    onFocusCapture={revealControl}
+    onBlurCapture={revealControl}>
     {children}
     {hidden && <button className="nc-reveal" aria-label={msg('显示阅读工具')} onClick={reveal}><Icon name="settings" size={20}/></button>}
   </div>;

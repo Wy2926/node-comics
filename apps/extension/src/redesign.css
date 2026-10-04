@@ -1762,7 +1762,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
 .nc-reader-navigation input::-webkit-inner-spin-button {appearance:none}
 .nc-reader-navigation .nc-reader-progress {writing-mode:vertical-lr;direction:ltr;width:28px;height:clamp(50px,26dvh,240px);min-height:0;padding:0;accent-color:var(--accent);cursor:pointer}
 .nc-reader.controls-hidden .nc-reader-rail {opacity:0;pointer-events:none}
-.nc-reader.controls-hidden .nc-reader-rail:focus-within {opacity:1;pointer-events:auto}
+.nc-reader.controls-hidden .nc-reader-rail:has(:focus-visible) {opacity:1;pointer-events:auto}
 .nc-reader .nc-reader-drawer {top:12px;bottom:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;max-width:calc(100% - var(--reader-gutter) - 12px)}
 .nc-reader .nc-reader-drawer.left {left:var(--reader-gutter)}
 .nc-reader .nc-reader-drawer.right {right:var(--reader-gutter)}
