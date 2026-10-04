@@ -1,0 +1,6 @@
+{
+  "requiredOrigins": [],
+  "autoContentMatches": [],
+  "optionalOrigins": ["https://rawlazy.io/*", "https://p1.pubg-img.si/*"],
+  "optionalContentMatches": ["https://rawlazy.io/*"]
+}

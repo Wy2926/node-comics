@@ -17,55 +17,78 @@ export async function verifyInline({browser, page, activate, button, source, out
     for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) ctx.drawImage(bitmap, x * w, y * h, w, h, y * w, x * h, w, h);
     bitmap.close(); return Array.from(new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer()));
   }, source.toString('base64'));
-  let failedReads = 0;
-  await browser.route(cdn + '/**', route => {
-    if (route.request().url() === failedUrl) {failedReads++; return route.fulfill({status: 503, body: ''});}
-    return route.fulfill({contentType: 'image/png', body: Buffer.from(encoded)});
-  });
-  await browser.route(origin + '/**', route => route.fulfill({contentType: 'text/html', body: `<!doctype html><meta charset="utf-8">
-    <style>body{margin:0;background:#eef3fa}.js-viewer-content{display:flex;gap:12px;padding:80px 12px}p{margin:0;position:relative}canvas{display:block;width:380px;height:522.5px}#ad{position:absolute;left:-1500px}</style>
-    <script id="episode-json" type="text/json" data-value="${escape(JSON.stringify(data('11')))}"></script>
-    <canvas id="ad" width="${sourceWidth}" height="${sourceHeight}"></canvas><div class="js-viewer"><div class="js-viewer-content">
-    <p class="js-page-area"><canvas id="first" class="js-page-image" width="${sourceWidth}" height="${sourceHeight}"></canvas></p>
-    <p class="js-page-area"><canvas id="second" class="js-page-image" width="0" height="0"></canvas></p>
-    <p class="js-page-area"><canvas id="failed" class="js-page-image" width="${sourceWidth}" height="${sourceHeight}"></canvas></p></div></div>`}));
-  await page.goto(origin + '/episode/11');
-  await page.evaluate(async url => {const img = new Image(); img.src = url; await img.decode();
-    document.querySelector('#first').getContext('2d').drawImage(img, 0, 0);}, imageUrl);
-  const first = page.locator('#first'), before = await first.boundingBox();
-  assert(await first.evaluate(c => {try {c.toDataURL(); return false;} catch {return true;}}));
-  await activate();
-  await page.waitForFunction(() => document.querySelector('#first').nextElementSibling?.hasAttribute('data-nc-canvas-translation'), {}, {timeout: 30000});
-  assert.deepEqual(await first.boundingBox(), before);
-  assert(failedReads > 0);
-  assert.equal(await page.locator('#failed').evaluate(c => c.nextElementSibling?.hasAttribute('data-nc-canvas-translation') ?? false), false);
-  assert.equal(await page.locator('#ad').evaluate(c => c.nextElementSibling?.hasAttribute('data-nc-canvas-translation') ?? false), false);
-  // Compare the composite against the synthetic source outside the mock translated region.
-  const fixtureError = await page.locator('#first + [data-nc-canvas-translation]').evaluate(async (img, base64) => {
-    const expected = await createImageBitmap(await (await fetch('data:image/png;base64,' + base64)).blob());
-    const c = new OffscreenCanvas(expected.width, expected.height), x = c.getContext('2d'); x.drawImage(expected, 0, 0);
-    const a = x.getImageData(0, 0, c.width, c.height).data; x.clearRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0);
-    const b = x.getImageData(0, 0, c.width, c.height).data; expected.close();
-    let error = 0, count = 0;
-    for (let i = 0; i < a.length; i++) {const p = Math.floor(i / 4), px = p % c.width, py = Math.floor(p / c.width);
-      if (px >= 36 && px < 556 && py >= 36 && py < 236) continue;
-      error += Math.abs(a[i] - b[i]); count++;}
-    return error / count;
-  }, source.toString('base64'));
-  // Final display composites use the existing lossy WebP cache; decoder losslessness is tested separately.
-  assert(fixtureError < 2, 'reconstructed composite differs from the original: ' + fixtureError);
-  await page.locator('#second').evaluate((c, size) => {c.width = size.width; c.height = size.height;}, {width: sourceWidth, height: sourceHeight});
-  await page.waitForFunction(() => document.querySelector('#second').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
-  await page.screenshot({path: path.join(out, 'comicdays-fixture-translated.png')});
-  await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('[data-nc-canvas-translation]'));
-  assert.deepEqual(await first.boundingBox(), before);
-  await button('显示译图'); await page.waitForFunction(() => document.querySelector('[data-nc-canvas-translation]'));
-  await page.locator('#episode-json').evaluate(s => s.setAttribute('data-value', '{}'));
-  await page.waitForFunction(() => !document.querySelector('[data-nc-canvas-translation]'));
-  await page.evaluate(value => {history.pushState({}, '', '/episode/12'); document.querySelector('#episode-json').setAttribute('data-value', JSON.stringify(value));}, data('12'));
-  await activate(); await page.waitForFunction(() => document.querySelector('#first').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
-  check(`Comic DAYS: GigaViewer composite matches the original (mean channel error ${fixtureError.toFixed(4)}); tainted canvases, failed neighbour, lazy pages, restore and SPA invalidation preserve geometry`);
-  await browser.unroute(origin + '/**'); await browser.unroute(cdn + '/**');
+  const worker = browser.serviceWorkers()[0];
+  // Browser routing does not intercept every extension service-worker fetch.
+  // Intercept only the synthetic URLs; live artwork still uses the real transport.
+  await worker.evaluate(({imageUrl, failedUrl, encoded}) => {
+    globalThis.comicdaysFixtureFetch = globalThis.fetch;
+    globalThis.comicdaysFailedReads = 0;
+    globalThis.fetch = (input, options) => {
+      const url = String(typeof input === 'string' ? input : input.url ?? input);
+      if (url === failedUrl) {
+        globalThis.comicdaysFailedReads++;
+        return Promise.resolve(new Response('', {status: 503}));
+      }
+      if (url === imageUrl) return Promise.resolve(new Response(new Uint8Array(encoded), {headers: {'Content-Type': 'image/png'}}));
+      return globalThis.comicdaysFixtureFetch(input, options);
+    };
+  }, {imageUrl, failedUrl, encoded});
+  try {
+    let failedReads = 0;
+    await browser.route(cdn + '/**', route => {
+      if (route.request().url() === failedUrl) {failedReads++; return route.fulfill({status: 503, body: ''});}
+      return route.fulfill({contentType: 'image/png', body: Buffer.from(encoded)});
+    });
+    await browser.route(origin + '/**', route => route.fulfill({contentType: 'text/html', body: `<!doctype html><meta charset="utf-8">
+      <style>body{margin:0;background:#eef3fa}.js-viewer-content{display:flex;gap:12px;padding:80px 12px}p{margin:0;position:relative}canvas{display:block;width:380px;height:522.5px}#ad{position:absolute;left:-1500px}</style>
+      <script id="episode-json" type="text/json" data-value="${escape(JSON.stringify(data('11')))}"></script>
+      <canvas id="ad" width="${sourceWidth}" height="${sourceHeight}"></canvas><div class="js-viewer"><div class="js-viewer-content">
+      <p class="js-page-area"><canvas id="first" class="js-page-image" width="${sourceWidth}" height="${sourceHeight}"></canvas></p>
+      <p class="js-page-area"><canvas id="second" class="js-page-image" width="0" height="0"></canvas></p>
+      <p class="js-page-area"><canvas id="failed" class="js-page-image" width="${sourceWidth}" height="${sourceHeight}"></canvas></p></div></div>`}));
+    await page.goto(origin + '/episode/11');
+    await page.evaluate(async url => {const img = new Image(); img.src = url; await img.decode();
+      document.querySelector('#first').getContext('2d').drawImage(img, 0, 0);}, imageUrl);
+    const first = page.locator('#first'), before = await first.boundingBox();
+    assert(await first.evaluate(c => {try {c.toDataURL(); return false;} catch {return true;}}));
+    await activate();
+    await page.waitForFunction(() => document.querySelector('#first').nextElementSibling?.hasAttribute('data-nc-canvas-translation'), {}, {timeout: 30000});
+    assert.deepEqual(await first.boundingBox(), before);
+    assert(failedReads > 0 || await worker.evaluate(() => globalThis.comicdaysFailedReads > 0));
+    assert.equal(await page.locator('#failed').evaluate(c => c.nextElementSibling?.hasAttribute('data-nc-canvas-translation') ?? false), false);
+    assert.equal(await page.locator('#ad').evaluate(c => c.nextElementSibling?.hasAttribute('data-nc-canvas-translation') ?? false), false);
+    // Compare the composite against the synthetic source outside the mock translated region.
+    const fixtureError = await page.locator('#first + [data-nc-canvas-translation]').evaluate(async (img, base64) => {
+      const expected = await createImageBitmap(await (await fetch('data:image/png;base64,' + base64)).blob());
+      const c = new OffscreenCanvas(expected.width, expected.height), x = c.getContext('2d'); x.drawImage(expected, 0, 0);
+      const a = x.getImageData(0, 0, c.width, c.height).data; x.clearRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0);
+      const b = x.getImageData(0, 0, c.width, c.height).data; expected.close();
+      let error = 0, count = 0;
+      for (let i = 0; i < a.length; i++) {const p = Math.floor(i / 4), px = p % c.width, py = Math.floor(p / c.width);
+        if (px >= 36 && px < 556 && py >= 36 && py < 236) continue;
+        error += Math.abs(a[i] - b[i]); count++;}
+      return error / count;
+    }, source.toString('base64'));
+    // Final display composites use the existing lossy WebP cache; decoder losslessness is tested separately.
+    assert(fixtureError < 2, 'reconstructed composite differs from the original: ' + fixtureError);
+    await page.locator('#second').evaluate((c, size) => {c.width = size.width; c.height = size.height;}, {width: sourceWidth, height: sourceHeight});
+    await page.waitForFunction(() => document.querySelector('#second').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
+    await page.screenshot({path: path.join(out, 'comicdays-fixture-translated.png')});
+    await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('[data-nc-canvas-translation]'));
+    assert.deepEqual(await first.boundingBox(), before);
+    await button('显示译图'); await page.waitForFunction(() => document.querySelector('[data-nc-canvas-translation]'));
+    await page.locator('#episode-json').evaluate(s => s.setAttribute('data-value', '{}'));
+    await page.waitForFunction(() => !document.querySelector('[data-nc-canvas-translation]'));
+    await page.evaluate(value => {history.pushState({}, '', '/episode/12'); document.querySelector('#episode-json').setAttribute('data-value', JSON.stringify(value));}, data('12'));
+    await activate(); await page.waitForFunction(() => document.querySelector('#first').nextElementSibling?.hasAttribute('data-nc-canvas-translation'));
+    check(`Comic DAYS: GigaViewer composite matches the original (mean channel error ${fixtureError.toFixed(4)}); tainted canvases, failed neighbour, lazy pages, restore and SPA invalidation preserve geometry`);
+  } finally {
+    await browser.unroute(origin + '/**'); await browser.unroute(cdn + '/**');
+    await worker.evaluate(() => {
+      globalThis.fetch = globalThis.comicdaysFixtureFetch;
+      delete globalThis.comicdaysFixtureFetch; delete globalThis.comicdaysFailedReads;
+    });
+  }
   if (process.env.RUN_LIVE_COMICDAYS !== '1') return {liveSource: false};
 
   const selector = '.js-viewer .js-viewer-content > p.js-page-area canvas.js-page-image';
