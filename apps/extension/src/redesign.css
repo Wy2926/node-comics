@@ -493,15 +493,6 @@ a {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
-.nc-feedback-rerun {
-  border-top: 1px solid var(--line);
-  margin-top: 24px;
-  padding-top: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  gap: 12px;
-}
 .nc-feedback-success {
   display: flex;
   align-items: center;

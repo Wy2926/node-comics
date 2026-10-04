@@ -6,10 +6,10 @@ import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Icon} from '../icons';
 import {useShortcuts} from '../shortcuts/react';
 import type {Api} from '../api';
-import {languageLabel,modeLabels,type Capabilities,type ReadingEntry,type Job,type Mode,type Page,type Settings} from '../types';
+import {languageLabel,modeLabels,supportsLanguage,type Capabilities,type ReadingEntry,type Job,type Mode,type Page,type Settings} from '../types';
 
 import {BlobPicture,type ShownImage} from './Images';
-import {pageTranslation,readingImage} from './presentation';
+import {canRetryPage,pageTranslation,readingImage} from './presentation';
 import {pageFrame} from './geometry';
 import {pageWindow} from './virtual-window';
 import {DECODED_PAGE_WINDOW} from '../image-resources';
@@ -41,7 +41,7 @@ const page=copy.pages[Math.min(index,copy.pages.length-1)];
 const initialView=page?.imageSha256?initialReadingView(page):undefined;
 const [savedView,setView]=useState<ReadingView|undefined>(()=>readStoredReadingView(viewKey)??initialView);const [compare,setCompare]=useState(false);
 const view=savedView??readingViewDefaults();
-const [feedback,setFeedback]=useState<{job:Job;page:Page;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
+const [feedback,setFeedback]=useState<{job:Job;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
 const {root,panel,setPanel,togglePanel,closePanel,immersive,setImmersive,hidden,reveal,fullscreen}=useReaderControls<Panel>({blocked:!!feedback||analyticsBlocked||searchOpen,notify});
 const [viewportSize,setViewportSize]=useState({width:900,height:700});
 const previousSearch=useRef(searchOpen);
@@ -49,6 +49,12 @@ useEffect(()=>{if(previousSearch.current&&!searchOpen)root.current?.querySelecto
 const {mode,preference,zoom,fit}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
 const scopeBase=`${translationScope??''}:${settings.language}`;const scope=(p:Page,c=copy)=>`${scopeBase}:${pageKey(c,p.id)}`;
 const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;const shownJob=shown?.job;
+const canRetry=!!page&&!busy&&!!caps?.modes.find(m=>m.id===mode)?.enabled&&supportsLanguage(caps,mode,settings.language)&&canRetryPage(pageTranslation(page,mode,settings.language,translationScope),translationState(copy.id,page,mode));
+async function retryCurrentPage(){
+  if(!page||!canRetry)return;
+  selectView(mode);
+  try{await onRetry(page,mode,copy.id);}catch(error){notify(translationNotice({kind:'error',message:error instanceof Error?error.message:msg('重试失败')}).label);}
+}
 const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:analyticsBlocked||searchOpen||!!panel||!!feedback,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
 useEffect(()=>{if(shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowledgeCatalogUpdates(copy.comicId,copy.catalogUpdateRevision).catch(()=>{});},[!!shown,copy.comicId,copy.catalogUpdateRevision]);
 const streamPages=useMemo(()=>stream.filter(chapter=>resources.ready(chapter)).flatMap(c=>c.pages.map(p=>({page:p,key:pageKey(c,p.id),entryId:c.id}))),[stream,resourceVersion]);
@@ -145,7 +151,7 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} notice={sourceStatus} onBack={leaveReader} progressStatus={progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}>
 <div className="nc-reader-navigation"><button aria-label={msg("上一页")} title={msg("上一页")} disabled={index===0} onClick={()=>jump(index-1)}><Icon name="chevron" style={{transform:'rotate(-90deg)'}}/></button><label><input aria-label={msg("跳转页码")} type="number" min={1} max={copy.pages.length} value={index+1} onChange={e=>jump(Number(e.target.value)-1)}/><span>/ {copy.pages.length}</span></label><input className="nc-reader-progress" type="range" aria-label={msg("阅读进度")} aria-valuetext={msg("第 {0} 页，共 {1} 页", {"0": index+1, "1": copy.pages.length})} min={1} max={copy.pages.length} step={1} value={index+1} disabled={copy.pages.length===1} onChange={e=>jump(Number(e.target.value)-1)}/><button aria-label={msg("下一页")} title={msg("下一页")} disabled={index>=copy.pages.length-1&&!next} onClick={()=>jump(index+1)}><Icon name="chevron" style={{transform:'rotate(90deg)'}}/></button></div>
 </ReaderNavigation>
-<PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} allowsFeedback={allowsFeedback} selectedView={preference==='original'?'original':mode} shownJob={allowsFeedback?shownJob:undefined} onView={selectView} onFeedback={()=>shownJob&&setFeedback({job:{...shownJob},page,number:index+1})} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
+<PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} allowsFeedback={allowsFeedback} selectedView={preference==='original'?'original':mode} shownJob={allowsFeedback?shownJob:undefined} onView={selectView} onFeedback={()=>shownJob&&setFeedback({job:{...shownJob},number:index+1})} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
 {(sourceNeedsAction||sourceRemoved)&&sourceStatus&&panel!=='directory'&&<div className="nc-source-status nc-source-action nc-reader-controls" role="status"><span>{sourceStatus}</span>{sourceNeedsAction&&!sourceRemoved&&<button onClick={onReload}>{msg("重试")}</button>}</div>}
 <div className="nc-reading-viewport" data-scrollbar-mode="hidden" ref={viewport} onScroll={scroll} data-decoded-pages={decodedSet.size} data-page-count={copy.pages.length} onClick={e=>{if(e.target===e.currentTarget||(e.target as HTMLElement).classList.contains('nc-reading-surface')){if(panel)setPanel(undefined);else reveal();}}}>
 <div className="nc-reading-surface" style={{minWidth:contentWidth+24}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=><div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><span>{msg("接着阅读")}</span><h2>{chapter.title}</h2></div>}<div className="nc-page-stack" ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
@@ -156,7 +162,7 @@ const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey
 </div></div>)}</div></div>
 {readerPanel}
 
-{allowsFeedback&&feedback&&<FeedbackForm key={feedback.job.id} api={api} job={feedback.job} pageNumber={feedback.number} onClose={()=>setFeedback(undefined)} canRerun={!pageTranslation(copy.pages.find(p=>p.id===feedback.page.id)??feedback.page,feedback.job.mode,feedback.job.target_language,translationScope).pending&&!!caps?.modes.find(m=>m.id===feedback.job.mode)?.enabled&&!busy} onRerun={()=>{const p=copy.pages.find(p=>p.id===feedback.page.id);setFeedback(undefined);if(p){updateView(view=>({...view,mode:feedback.job.mode,preference:'translation'}));void Promise.resolve(onRetry(p,feedback.job.mode)).catch(error=>notify(translationNotice({kind:'error',message:error.message}).label));}}}/>}
+{allowsFeedback&&feedback&&<FeedbackForm key={feedback.job.id} api={api} job={feedback.job} pageNumber={feedback.number} onClose={()=>setFeedback(undefined)}/>}
 
 </ReaderShell>;
 }

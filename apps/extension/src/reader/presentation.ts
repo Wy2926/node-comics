@@ -1,6 +1,7 @@
 import {msg} from '../i18n/runtime';
 import type {Job,Mode,Page} from '../types';
 import {newestFirst,pendingStatuses} from './jobs';
+import type {TranslationState} from '../translation/automatic';
 
 export type PageView={mode:Mode;preference:'original'|'translation'};
 export function readingImage(page:Page,mode:Mode,translated:boolean,language:string,scopeKey?:string){
@@ -22,6 +23,13 @@ export function pageTranslation(page:Page,mode:Mode,language:string,scopeKey?:st
   const expired=!!result&&!blobKey&&(!result.result||result.result_expired===true||result.result_available===false);
   const ready=!!blobKey;
   return {jobs,latest,result,pending,blobKey,expired,ready};
+}
+/** Explicit reruns only; image-loading recovery and uncertain requests keep their existing actions. */
+export function canRetryPage(translation:ReturnType<typeof pageTranslation>,state?:TranslationState){
+  const {latest,pending,ready}=translation;
+  if(!latest||pending||!['failed','cancelled','no_text','succeeded'].includes(latest.status))return false;
+  if(state&&(state.kind!=='error'||state.retryable===false||state.retryLabel))return false;
+  return latest.status!=='succeeded'||ready;
 }
 export function taskText(job?:Job){
   if(!job)return msg("尚未翻译");
