@@ -1,6 +1,6 @@
 # Classic Engine
 
-常规漫画翻译的图像引擎和整页计算节点：输入解码与像素校验、NCNN Vulkan 检测／OCR、ONNX FP32 LaMa 抹字、字体嵌字及编码产物校验。Windows 使用 DirectML，Linux NVIDIA 使用 CUDA；中心只检查文件结构和摘要并执行文本翻译。
+常规漫画翻译的图像引擎和整页计算节点：输入解码与像素校验、NCNN Vulkan 检测／文字脚本探针、自动 small＋韩文 OCR、ONNX FP32 LaMa 抹字、字体嵌字及编码产物校验。LaMa 在 Windows 使用 DirectML，Linux NVIDIA 使用 CUDA；中心只检查文件结构和摘要并执行文本翻译。
 
 直接部署使用 [Windows 独立节点包](../compute-node/README.md)或 [Linux NVIDIA 镜像](../compute-node/linux/README.md)；本目录用于引擎与节点协议开发。
 

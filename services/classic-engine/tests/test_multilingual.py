@@ -101,11 +101,9 @@ def test_auto_mixed_regions_keep_spaces_and_original_manga_panel_order():
     assert results==[['明日は晴れる。','Where are you going?']]*12
 
 
-def test_auto_ocr_uses_the_existing_multilingual_ctc_path():
-    # No live weights needed: auto must use exactly the same CTC branch as ja,
-    # never instantiate a specialist or require a source-language selection.
+def test_explicit_ja_ocr_keeps_the_multilingual_ctc_reference_path():
     model=Recognizer.__new__(Recognizer)
-    model.language='auto'
+    model.language='ja'
     model.alphabet=['','A','<SP>','B']
     logits=np.array([[0,12,0,0],[12,0,0,0],[0,0,12,0],[0,0,0,12]],np.float32)
     model.infer=lambda crop:(logits,np.zeros((4,6),np.float32))

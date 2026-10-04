@@ -23,7 +23,7 @@ include = ["manhua_engine*", "classic_node*"]
 
 [tool.setuptools.package-data]
 manhua_engine = ["alphabet.txt", "models.json"]
-"manhua_engine.vendor" = ["LICENSE-lama-ancestry"]
+"manhua_engine.vendor" = ["LICENSE-lama-ancestry", "LICENSE-PaddleOCR"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

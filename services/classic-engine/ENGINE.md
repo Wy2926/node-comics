@@ -6,19 +6,20 @@
 
 | 来源 / `--ocr-language` | 识别方案 | 默认嵌字方向 |
 |---|---|---|
-| 自动 `auto`（默认）／`ja` | MIT 多语言 48px CTC：Vulkan 特征 + ONNX CPU 解码；使用上游原字表，`ja` 并非日文专用权重 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
+| 自动 `auto`（默认） | MIT 文字脚本／颜色探针 → PP-OCRv6 small（简繁中、日、英）或 PP-OCRv5 Korean；两个识别器均为 ONNX CPU FP32 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
+| 对照 `ja` | MIT 多语言 48px CTC：Vulkan 特征 + ONNX CPU 解码；使用上游原字表，`ja` 并非日文专用权重 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
 | 韩文 `ko` | RapidOCR PP-OCRv5 Korean mobile，ONNX CPU FP32 | 韩文目标横排 |
 | 英文 `en` | RapidOCR PP-OCRv5 English mobile，ONNX CPU FP32 | 英文目标横排、单词换行、离线断词 |
 | 中文 `zh` | RapidOCR PP-OCRv5 Chinese mobile，中英日混合字表 | 中文目标沿用原区域横 / 竖排 |
 | 拉丁文字 `latin` | RapidOCR PP-OCRv5 Latin mobile | 横排；带重音字符不拆散 |
 
-`--ocr-language auto` 直接使用上游多语言 `48px_ctc`，无需输入来源语言；`--source` 仅作为 CLI 文本翻译提示，默认 Auto。识别模型一次只加载一种，不根据目标语言选择 OCR，也不逐行轮跑语言模型。自动模式按区域文字类型拼接英文、韩文和 CJK 行，不修改漫画默认从右到左的区域顺序。显式 `ja/zh/en/ko/latin` 仍可用于模型对照与专项处理。
+`--ocr-language auto` 无需输入来源语言；`--source` 仅作为 CLI 文本翻译提示，默认 Auto。自动模式一次加载 MIT 探针、PP-OCRv6 small 和韩文 PP-OCRv5。每行先读取探针原始结果：置信度至少 0.30、存在韩文字母且其占字母字符的比例至少 25% 时选择韩文模型，其余选择 small；不根据目标语言选择 OCR。低于最终 0.50 过滤阈值的探针文字仍可用于分流，最终识别以所选模型置信度过滤，文字颜色沿用探针结果。自动模式按区域文字类型拼接英文、韩文和 CJK 行，不修改漫画默认从右到左的区域顺序。显式 `ja/zh/en/ko/latin` 用于模型对照与专项处理，只加载所选识别器。
 
-OCR 权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。识别范围对齐这个 `48px_ctc`，不等同于上游默认 `48px` 或所有可选模型能力的合集。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
+MIT 探针／`ja` 权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。small 和韩文权重、字典、版本及摘要见 `manhua_engine/models.json`，来源许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
 
 采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。不支持的字符先按固定表替换（例如 `❤` → `♥`），仍不支持则移除；整段移空时跳过该段嵌字，保留抹字结果并继续其他段。只调整绘制文本，不修改中心译文。字体覆盖表有界缓存，每段在字号试探前清理一次。`--direction horizontal/vertical` 可覆盖默认方向。
 
-长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每条 OCR 最多进行一次低置信度重裁剪；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
+长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每个识别器最多进行一次低置信度重裁剪，自动模式的尝试数包含探针与所选识别器；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
 
 LaMa 推理掩膜与最终回填掩膜独立：给模型的未知区域额外扩展 5 个原图像素，减轻紧贴文字形状导致的笔画残影；实际写入仍限于原去字掩膜。
 
@@ -32,7 +33,7 @@ uv sync --locked --extra test --extra build
 .\.venv-lama\Scripts\python -m manhua_engine.cli devices
 ```
 
-也可只下载所需模型，如 `download --ocr-language ko`。模型清单随包分发，支持从其他工作目录调用；下载时校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
+也可只下载所需模型，如 `download --ocr-language auto` 会准备 small 权重、配套 YAML 字典和韩文模型；现有节点升级自动模式也需补齐这三个文件。MIT 转换模型仍需保留。`download --ocr-language ko` 只准备韩文识别及通用模型。模型清单随包分发，支持从其他工作目录调用；下载和节点身份检查都校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
 
 MIT OCR 与 LaMa 的完整构建使用 [Windows 节点构建入口](../compute-node/README.md#开发构建与验证)或 [Linux NVIDIA 镜像构建](../compute-node/linux/README.md#构建)。两者复用转换器和锁文件，自动下载固定源码与检查点，分别创建锁定的 OCR 和 LaMa 转换环境，不依赖本机已有的 `models/` 或 `.venv-build`。构建不要求 Git 克隆上游完整应用；OCR 所需模型源码单文件以固定提交 URL 和 SHA-256 校验。
 
@@ -67,7 +68,7 @@ MIT OCR 与 LaMa 的完整构建使用 [Windows 节点构建入口](../compute-n
 ## 性能与验证
 
 - `--pages 1` 优先单页延迟，默认 `2` 重叠页间工作；更高并发不保证更快。
-- `--ocr-workers 8` 是全局 OCR 池，ORT 每次只用一个内部线程。日文 Vulkan 特征串行、CPU 解码并行；其他语言仅加载所选 PP-OCR 模型。
+- `--ocr-workers 8` 是全局 OCR 池，ORT 每次只用一个内部线程。自动模式的 MIT Vulkan 探针特征串行、CPU 解码和所选 PP-OCR 推理可并行；同一行不同时运行 small 和韩文识别器。三个模型常驻并在接单前全部预热。额外识别会增加 CPU 耗时与内存，应按目标机器验证并发吞吐。
 - `--threads 2` 控制 CPU 算子线程数；LaMa 同一 DirectML session 的 Run 串行，网络和其他阶段可以并发；`--detect-size 1280` 可选 1024 / 1536 / 2048。
 - `--tile 768` 是局部去字上限，当前 LaMa ONNX 进一步限制为 512，并保持裁剪比例；`--png-compression 1` 默认快速无损输出。
 - `--gpu -1` 显式使用 CPU。模型只加载一次，字体覆盖与网络预热在计时前完成。

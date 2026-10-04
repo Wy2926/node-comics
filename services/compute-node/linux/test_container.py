@@ -35,7 +35,10 @@ class ContainerTests(unittest.TestCase):
                 **asset, 'name': 'font.otf', 'notice': 'OFL',
                 'notice_url': asset['url'], 'notice_sha256': asset['sha256']}]}))
             (engine / 'manhua_engine/models.json').write_text(json.dumps({'models': [
-                dict(asset, name='detector.bin'), dict(asset, name='checkpoint', build_only=True)]}))
+                dict(asset, name='detector.bin'), dict(asset, name='checkpoint', build_only=True),
+                dict(asset, name='ppocr/v6-small.onnx', language='auto'),
+                dict(asset, name='ppocr/v6-small.yml', language='auto'),
+                dict(asset, name='ppocr/ko.onnx', language='ko')]}))
 
             def download(url, checksum, target):
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +67,8 @@ class ContainerTests(unittest.TestCase):
                 manifest = json.loads((output / 'release.json').read_text())
                 self.assertEqual(manifest['fonts'], ['fonts/font.otf'])
                 self.assertIn('models/lama-onnx/lama-large-512.onnx', manifest['files'])
+                for name in ('v6-small.onnx','v6-small.yml','ko.onnx'):
+                    self.assertIn('models/ppocr/'+name, manifest['files'])
                 with self.assertRaises(FileExistsError):
                     assets.build(output, root / 'cache')
 

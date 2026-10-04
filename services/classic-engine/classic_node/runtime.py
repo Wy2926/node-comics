@@ -39,7 +39,8 @@ def model_identity(models, language):
     root = Path(models)
     manifest = json.loads((Path(package_file).parent / 'models.json').read_text(encoding='utf-8'))
     expected = {item['name']: item['sha256'] for item in manifest['models']
-                if not item.get('build_only') and (not item.get('language') or item['language'] == language)}
+                if not item.get('build_only') and (not item.get('language') or item['language'] == language
+                    or (language == 'auto' and item['language'] == 'ko'))}
     from manhua_engine.inpainting import model_identity as inpaint_identity
     expected.update(inpaint_identity(models))
     if language in ('ja', 'auto'):

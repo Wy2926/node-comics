@@ -22,11 +22,12 @@ def validate_outputs(paths, output):
         raise ValueError('Output would overwrite an input image; choose another --output')
 
 
-def download(models,language='ja'):
+def download(models,language='auto'):
     root=Path(models);root.mkdir(parents=True,exist_ok=True)
     manifest=json.loads((Path(__file__).parent/'models.json').read_text(encoding='utf-8'))
     for item in manifest['models']:
-        if item.get('language') and language not in ('all',item['language']): continue
+        if (item.get('language') and language not in ('all',item['language'])
+                and not (language=='auto' and item['language']=='ko')): continue
         path=root/item['name']
         path.parent.mkdir(parents=True,exist_ok=True)
         if not path.exists():
@@ -71,7 +72,7 @@ def main():
     p.add_argument('--tile',type=int,default=768)
     p.add_argument('--detect-size',type=int,choices=[1024,1280,1536,2048],default=1280)
     p.add_argument('--font',action='append',help='Font path; repeat to add fallback fonts')
-    p.add_argument('--ocr-language',choices=['auto','ja','zh','en','ko','latin','all'],default='auto',help='auto uses MIT multilingual 48px CTC without requiring source language; all is for download only')
+    p.add_argument('--ocr-language',choices=['auto','ja','zh','en','ko','latin','all'],default='auto',help='auto routes PP-OCRv6 small/Korean using a MIT script probe; no source language required; all is for download only')
     p.add_argument('--direction',choices=['auto','horizontal','vertical'],default='auto',help='Target direction; auto keeps CJK direction and uses horizontal English/Korean')
     p.add_argument('--png-compression',type=int,choices=range(10),default=1)
     p.add_argument('--translation',choices=['online','offline'],default='offline')
