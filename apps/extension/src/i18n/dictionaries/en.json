@@ -1062,6 +1062,7 @@
   "{0}：交付 {1} 页": "{0}: {1} pages delivered",
   "选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。": "Select translated images to translate upcoming pages ahead of your reading. This view applies only to this comic.",
   "划图翻译": "Translate selected area",
+  "翻译图片": "Translate image",
   "拖动框选，松手翻译；右键或 Esc 取消。": "Drag to select, release to translate. Right-click or press Esc to cancel.",
   "重新框选": "Select again",
   "截图预览": "Capture preview",

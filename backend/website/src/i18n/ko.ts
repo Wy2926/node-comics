@@ -554,6 +554,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: 더 많은 출처, 더 다양한 읽기 방식.",
+        "items": [
+          "OPDS 서재와 읽기 진행 상황 동기화 추가",
+          "더 정확해진 OCR 문자 인식",
+          "기존 미리 번역 개선으로 페이지 전환 대기 시간 단축",
+          "EPUB 읽기와 이미지 번역",
+          "웹페이지 영역 선택 번역",
+          "읽기·번역 단축키 사용자 설정",
+          "만화 사이트 6곳 완전 지원 추가: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Chrome과 Edge 0.10.0 ZIP 패키지와 AMO 서명된 Firefox 0.10.0 XPI를 제공합니다."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1: 더 많은 사이트와 긴 만화 읽기·번역 개선",

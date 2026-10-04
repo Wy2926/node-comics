@@ -566,6 +566,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: Thêm nguồn truyện, thêm cách đọc.",
+        "items": [
+          "Thư viện OPDS và đồng bộ tiến độ đọc",
+          "OCR nhận dạng chữ chính xác hơn",
+          "Cải thiện dịch trước hiện có, bớt chờ khi chuyển trang",
+          "Đọc EPUB và dịch hình ảnh",
+          "Khoanh vùng dịch trên trang web",
+          "Tùy chỉnh phím tắt đọc và dịch",
+          "Thêm hỗ trợ đầy đủ cho 6 trang truyện tranh: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Các gói Chrome và Edge 0.10.0 ZIP và Firefox 0.10.0 XPI có chữ ký AMO đều có sẵn."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1: Nhiều nguồn hơn và hỗ trợ tốt hơn cho truyện tranh dài",

@@ -1,6 +1,6 @@
 import { msg, subscribeLocale } from '../i18n/runtime';
 import { RequestPool } from '../concurrency';
-import { sourceImage } from '../sources';
+import { safeImageUrl, sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
 import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
 import { ReadingProgress, ReadingWindow } from '../translation/automatic';
@@ -15,6 +15,8 @@ import {track} from '../analytics';
 import {readAnalyticsPreferences} from '../analytics/client';
 import {InlineAnalytics} from './analytics';
 import {bindWebShortcuts} from '../shortcuts/web-content';
+import {selectedImage,selectionCurrent,type ImageSelection} from './selection';
+import {readBlobImage} from '../sources/shared/blob-image';
 
 interface Candidate {
   id: string;
@@ -40,7 +42,11 @@ export function installInline() {
   const lifecycle = sourceDocument(document);
   const sourcePage = () => lifecycle.current().session;
   let stopObserving: (() => void) | undefined;
-  const sourcePageImages = () => sourcePage().inlineTargets();
+  let selection: {snapshot: ImageSelection; target: PageImage; id: string} | undefined;
+  let preparedSelection: typeof selection;
+  const sourcePageImages = () => selection
+    ? selectionCurrent(selection.snapshot,document) ? [selection.target] : []
+    : sourcePage().inlineTargets();
   let automatic = false,
     dismissedUrl = '';
   let translatedView: Pick<InlineResponse, 'mode' | 'language' | 'requiresInternet' | 'analyticsChannel'> | undefined;
@@ -275,7 +281,7 @@ export function installInline() {
       }
       if (!item) {
         item = {
-          id: 'image-' + ++sequence,
+          id: selection?.id ?? 'image-' + ++sequence,
           image,
           url,
           sourceKey: target.key,
@@ -298,6 +304,7 @@ export function installInline() {
     candidates = next;
     let nextWindow = document.hidden
       ? []
+      : selection ? candidates.filter(item=>visibleImage(item,innerWidth,innerHeight))
       : readingImages(candidates, innerWidth, innerHeight, sourcePage().direction);
     const head=nextWindow[0],rect=head?.rect;
     if(head&&rect)nextWindow=nextWindow.slice(0,Math.max(
@@ -314,7 +321,7 @@ export function installInline() {
       schedule(Math.max(0,readingWindow.readyAt-performance.now()));
     }
     if (!scope)
-      label.textContent = candidates.length
+      label.textContent = selection ? msg('翻译图片') : candidates.length
         ? msg('漫译 · 发现 {0} 张大图', { '0': candidates.length })
         : msg('漫译 · 未发现漫画大图，滚动页面继续识别');
     paint();
@@ -555,6 +562,7 @@ export function installInline() {
     window.removeEventListener('offline', visibility);
     for (const item of tracked.values()) item.display.restore();
     tracked.clear();
+    selection = undefined;
     candidates = [];
     windowImages = [];
     activeImages = [];
@@ -582,8 +590,26 @@ export function installInline() {
       respond({ url: location.href, navigationId, enabled, activeUrl: initialUrl, dismissedUrl });
       return;
     }
+    if (message?.type === 'NC_INLINE_SELECT_IMAGE') {
+      preparedSelection = undefined;
+      const snapshot = message.pageUrl===location.href&&(typeof message.srcUrl==='string'||message.dataImage===true)
+        ? selectedImage(document,message.srcUrl,message.dataImage===true) : undefined;
+      if (!snapshot || !renderedImageRect(snapshot.element)) { respond({ok:false}); return; }
+      const {element,url,pageUrl}=snapshot;
+      const localBlob=url.startsWith('blob:')&&new URL(url).origin===new URL(pageUrl).origin;
+      if (!localBlob&&!/^data:image\/(?:png|jpeg|webp|gif|avif);/i.test(url)&&safeImageUrl(url,pageUrl)!==url) {
+        respond({ok:false}); return;
+      }
+      const id='selected-'+ ++sequence;
+      preparedSelection={snapshot,id,target:{element,url,key:url,...(localBlob?{read:()=>readBlobImage(element,url,pageUrl)}:{})}};
+      respond({ok:true,image:{id,url:/^(blob:|data:)/.test(url)?'page-image:'+id:url}});
+      return;
+    }
     if (message?.type === 'NC_INLINE_START') {
       if (enabled && initialUrl !== location.href) stop();
+      if(message.imageId!==undefined&&(!preparedSelection||message.imageId!==preparedSelection.id||!selectionCurrent(preparedSelection.snapshot,document))){respond({ok:false});return;}
+      selection=message.imageId===undefined?undefined:preparedSelection;
+      preparedSelection=undefined;
       automatic = message.automatic === true;
       analyticsObservation++;
       analytics.start(automatic);

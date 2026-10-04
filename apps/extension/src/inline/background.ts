@@ -18,8 +18,8 @@ import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
 import {regionActivationKey} from '../region/protocol';
 
-interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;active:boolean;abort:AbortController;}
-interface RequestActivity {active:()=>boolean;current:()=>boolean;}
+interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;caps:Capabilities;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;active:boolean;abort:AbortController;explicitImage:boolean;}
+interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
 function activationEpoch(tabId:number){
@@ -33,9 +33,16 @@ function invalidateTab(tabId:number){
   windowGenerations.delete(tabId);return epoch;
 }
 export async function activateInline(tabId:number,automatic=false){
+  return activate(tabId,automatic);
+}
+export async function activateInlineImage(tabId:number,info:chrome.contextMenus.OnClickData){
+  return activate(tabId,false,info);
+}
+async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus.OnClickData){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
     const tab=await chrome.tabs.get(tabId);
     if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
+    if(info&&(info.frameId!==0||info.mediaType!=='image'||!info.srcUrl||info.pageUrl!==tab.url))throw Error(msg('图片范围无效。'));
     if(automatic){
       if(!tab.active||!await automaticTabsAllowed())return;
       const region=await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_IDENTITY'},{frameId:0}).catch(()=>null);
@@ -44,20 +51,27 @@ export async function activateInline(tabId:number,automatic=false){
       // Do not reset a manual pause, original-view choice, or dismissal on tab activation.
       if(existing?.url===tab.url&&(existing.dismissedUrl===tab.url||existing.enabled&&existing.activeUrl===tab.url))return;
     }
+    const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
+    const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    // data: originals stay in the page; only their bytes use the chunked source port.
+    const selection=info?await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_SELECT_IMAGE',
+      ...(/^data:image\//i.test(info.srcUrl!)?{dataImage:true}:{srcUrl:info.srcUrl}),pageUrl:tab.url},target):undefined;
+    if(info&&(!selection?.ok||!selection.image||typeof selection.image.id!=='string'||typeof selection.image.url!=='string'))throw Error(msg('图片范围无效。'));
     const epoch=invalidateTab(tabId),current=()=>activationEpochs.get(tabId)===epoch;
     await chrome.storage.session.remove(activationKey(tabId));
     await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_STOP'},{frameId:0}).catch(()=>{});
     await chrome.storage.session.remove(regionActivationKey(tabId));
-    const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
-    const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    // Stop before asking for identity: unsubscribing may retire the source navigation.
+    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},target);
     const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target);
     assertCurrent(current);
     if(!identity||identity.url!==tab.url)throw Error(msg("网页已变化，请重新启动翻译。"));
     if(automatic&&!await automaticTabsAllowed())return;
     assertCurrent(current);
-    await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic} satisfies Activation});
+    await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic,...(selection?{image:selection.image}:{})} satisfies Activation});
     assertCurrent(current);epoch.active=true;
-    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic},target);
+    const started=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic,imageId:selection?.image.id},target);
+    if(started?.ok===false){invalidateTab(tabId);await chrome.storage.session.remove(activationKey(tabId));throw Error(msg('图片范围无效。'));}
   });
 }
 /** A hand-selected crop owns this document until explicitly leaving region mode. */
@@ -98,7 +112,7 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
     assertCurrent(current);if(!ctx)return;ctx.jobs=mergeJobs(ctx.jobs,jobs);
     for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,translationScope:channel.scope.key,jobs:mergeJobs(page.jobs,incoming)});}
   };
-  ctx={key,channel,settings,caps,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController()};
+  ctx={key,channel,settings,caps,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true};
   if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:key=>originals.read(key),isCurrent:current,onJobs:attach,onChange:()=>{},onInputConsumed:key=>originals.uploaded(key)});
   contexts.set(tabId,ctx);await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
   }catch(error){
@@ -115,7 +129,7 @@ async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRe
     const port=chrome.tabs.connect(sender.tab!.id!,{name:INLINE_SOURCE_PORT,frameId:0,...(sender.documentId?{documentId:sender.documentId}:{})});
     blob=await receiveImage(port,{navigationId:request.navigationId,id:image.id},ctx.abort.signal,current);
   }
-  else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy);
+  else blob=await readInlineSourceImage(image.url,sender.tab!.url!,undefined,image.referrerPolicy,ctx.explicitImage);
   assertCurrent(current);
   const prepared=await prepareComicPage({name:msg('网页漫画'),blob});assertCurrent(current);
   return prepared;
@@ -208,10 +222,11 @@ async function checkedRequest(message:InlineRequest,sender:chrome.runtime.Messag
     await chrome.storage.session.set({[activationKey(tabId)]:activation});assertCurrent(active);
   });
   const activity={active,current:()=>active()&&message.generation===(windowGenerations.get(tabId)??0)};
-  if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity};
-  if(!Array.isArray(message.images)||message.images.length>MAX_READING_TARGETS||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||!inlineImageSize(v.width,v.height,activation.url);}))throw Error(msg('图片范围无效。'));
+  const explicitImage=!!activation.image;
+  if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity,explicitImage};
+  if(!Array.isArray(message.images)||message.images.length>MAX_READING_TARGETS||explicitImage&&(message.images.length!==1||message.images[0]?.id!==activation.image!.id||message.images[0]?.url!==activation.image!.url)||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||(explicitImage?!(Number.isFinite(v.width)&&Number.isFinite(v.height)&&v.width>0&&v.height>0):!inlineImageSize(v.width,v.height,activation.url));}))throw Error(msg('图片范围无效。'));
   if(message.type==='NC_INLINE_IMAGE'&&(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048))throw Error(msg('图片范围无效。'));
-  return {tabId,tab,...activity};
+  return {tabId,tab,...activity,explicitImage};
 }
 async function step(request:InlineRequest,sender:chrome.runtime.MessageSender,activity:RequestActivity):Promise<InlineResponse>{
   const ctx=await context(sender.tab!.id!,request.navigationId,activity);

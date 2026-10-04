@@ -22,15 +22,15 @@ export async function readSourceCover(snapshot: SourceCatalogSnapshot, signal?: 
 }
 
 /** Called after inline activation/document validation, for an HTTP original selected in that page. */
-export async function readInlineSourceImage(url:string,pageUrl:string,signal?:AbortSignal,referrerPolicy?:ReferrerPolicy):Promise<Blob> {
+export async function readInlineSourceImage(url:string,pageUrl:string,signal?:AbortSignal,referrerPolicy?:ReferrerPolicy,explicitImage=false):Promise<Blob> {
   signal?.throwIfAborted();
   const {definition,location}=resolveSource(pageUrl,definitions);
-  if(!definition.capabilities.inline||location.kind!=='reader'||safeImageUrl(url,pageUrl)!==url)
+  if((!explicitImage&&(!definition.capabilities.inline||location.kind!=='reader'))||safeImageUrl(url,pageUrl)!==url)
     throw Error('SOURCE_RESOURCE_EXPIRED');
   const adapter=sourceImages[definition.id];
   const headers=typeof adapter?.headers==='function'?adapter.headers(url):adapter?.headers;
   const response=await fetchSourceImage(url,signal,headers,{pageUrl,referrerPolicy});
-  const blob=adapter?.decodeInline?await adapter.decodeInline(response.blob,response.headers,url,signal):response.blob;
+  const blob=!explicitImage&&adapter?.decodeInline?await adapter.decodeInline(response.blob,response.headers,url,signal):response.blob;
   signal?.throwIfAborted();
   return blob;
 }

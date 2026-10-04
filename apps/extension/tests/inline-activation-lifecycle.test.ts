@@ -5,6 +5,7 @@ import type {Job} from '../src/types';
 const mocks=vi.hoisted(()=>({
   getTab:vi.fn(),tabMessage:vi.fn(),localSettings:vi.fn(),openChannel:vi.fn(),init:vi.fn(),
   automatic:vi.fn(),registerAutomatic:vi.fn(),subscribe:vi.fn(),readImage:vi.fn(),prepareImage:vi.fn(),
+  inlineSize:vi.fn(),
 }));
 vi.mock('../src/i18n/runtime',()=>({msg:(text:string)=>text}));
 vi.mock('../src/inline/auto-tabs',()=>({automaticTabsAllowed:mocks.automatic,registerAutomaticTabs:mocks.registerAutomatic}));
@@ -14,7 +15,7 @@ vi.mock('../src/inline/originals',()=>({InlineOriginals:class {
 }}));
 vi.mock('../src/sources',()=>({
   safeImageUrl:(url:string)=>url.startsWith('https://')?url:undefined,readInlineSourceImage:mocks.readImage,
-  inlineImageSize:()=>true,isImageReferrerPolicy:()=>true,ImagePermissionsRequired:class extends Error {},
+  inlineImageSize:mocks.inlineSize,isImageReferrerPolicy:()=>true,ImagePermissionsRequired:class extends Error {},
 }));
 vi.mock('../src/comics/pages/normalize',()=>({prepareComicPage:mocks.prepareImage}));
 vi.mock('../src/translation/channels',()=>({openActiveChannel:mocks.openChannel,subscribeChannels:mocks.subscribe}));
@@ -26,6 +27,8 @@ const tab={id:7,url,active:true,windowId:1} as chrome.tabs.Tab;
 const sender:chrome.runtime.MessageSender={id:'test',url,frameId:0,documentId:'doc-7',tab};
 const request=(generation=1)=>({type:'NC_INLINE_TICK',navigationId:'nav-7',generation,
   images:[{id:'image-7',url:'https://source.test/image.png',width:500,height:700}]});
+const imageClick=()=>({menuItemId:'nc-translate-image',editable:false,frameId:0,mediaType:'image',
+  srcUrl:request().images[0].url,pageUrl:url}) as chrome.contextMenus.OnClickData;
 const gate=()=>{let finish!:()=>void;const promise=new Promise<void>(resolve=>{finish=resolve;});return {promise,finish};};
 let listener:Listener,removed:(id:number)=>void;
 let session:Record<string,unknown>,cores:ChannelRuntime[],channels:ChannelConnection[],options:RuntimeOptions[];
@@ -41,6 +44,7 @@ beforeEach(async()=>{
     ?{url,enabled:false}:{url,navigationId:'nav-7',enabled:false});
   mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'}});
   mocks.automatic.mockResolvedValue(true);mocks.init.mockResolvedValue(undefined);
+  mocks.inlineSize.mockReturnValue(true);
   const image=new Blob(['synthetic inline source'],{type:'image/png'});
   mocks.readImage.mockResolvedValue(image);
   mocks.prepareImage.mockResolvedValue({blob:image,width:500,height:700,imageSha256:'a'.repeat(64)});
@@ -171,7 +175,7 @@ describe('inline activation lifetime',()=>{
     await background.activateInline(7);pending.finish();
     expect(await old).toMatchObject({ok:false});expect(mocks.openChannel).not.toHaveBeenCalled();
     expect(await send(request())).toMatchObject({ok:true});expect(cores[0].submit).toHaveBeenCalledOnce();
-    expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_INLINE_START',automatic:false},{frameId:0,documentId:'doc-7'});
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_START',automatic:false}),{frameId:0,documentId:'doc-7'});
   });
 
   it.each(['authorization','channel'])('a newer close/pause generation stops old %s without reviving work',async stage=>{
@@ -219,5 +223,100 @@ describe('inline activation lifetime',()=>{
     return background.activateInline(7,true).then(()=>{
       expect(chrome.scripting.executeScript).not.toHaveBeenCalled();expect(mocks.openChannel).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('selected image activation',()=>{
+  it('checks the selected image before stopping, then binds the identity created after stop',async()=>{
+    const image=request().images[0];let navigationId='nav-7';
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>{
+      if(message.type==='NC_INLINE_SELECT_IMAGE')return {ok:true,image:{id:image.id,url:image.url}};
+      if(message.type==='NC_INLINE_STOP'){navigationId='nav-after-stop';return {ok:true};}
+      if(message.type==='NC_INLINE_IDENTITY')return {url,navigationId,enabled:false};
+      return {ok:true};
+    });
+    await background.activateInlineImage(7,imageClick());
+    const types=mocks.tabMessage.mock.calls.map(([,message])=>message.type);
+    expect(types.indexOf('NC_INLINE_SELECT_IMAGE')).toBeLessThan(types.indexOf('NC_INLINE_STOP'));
+    expect(types.indexOf('NC_INLINE_STOP')).toBeLessThan(types.indexOf('NC_INLINE_IDENTITY'));
+    expect(types.indexOf('NC_INLINE_IDENTITY')).toBeLessThan(types.indexOf('NC_INLINE_START'));
+    expect(session['nc-inline:7']).toEqual({url,navigationId:'nav-after-stop',documentId:'doc-7',automatic:false,
+      image:{id:image.id,url:image.url}});
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_INLINE_START',automatic:false,imageId:image.id},
+      {frameId:0,documentId:'doc-7'});
+    expect(await send(request())).toMatchObject({ok:false});
+    expect(await send({...request(),navigationId:'nav-after-stop'})).toMatchObject({ok:true});
+    expect(mocks.readImage).toHaveBeenCalledWith(image.url,url,undefined,undefined,true);
+  });
+
+  it('keeps the current activation and channel when the selected element is no longer valid',async()=>{
+    expect(await send(request())).toMatchObject({ok:true});
+    const saved=structuredClone(session['nc-inline:7']);
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_INLINE_SELECT_IMAGE'
+      ?{ok:false}:{url,navigationId:'nav-7',enabled:true});
+    await expect(background.activateInlineImage(7,imageClick())).rejects.toThrow('图片范围无效。');
+    expect(session['nc-inline:7']).toEqual(saved);
+    expect(mocks.tabMessage.mock.calls.map(([,message])=>message.type)).toEqual(['NC_INLINE_SELECT_IMAGE']);
+    expect(channels[0].dispose).not.toHaveBeenCalled();
+    expect(options[0].isCurrent()).toBe(true);
+    expect(await send(request())).toMatchObject({ok:true});
+    expect(mocks.openChannel).toHaveBeenCalledOnce();
+  });
+
+  it.each(['id','url'] as const)('rejects a selected image whose %s differs from the stored binding',async field=>{
+    const image=request().images[0];
+    session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
+    const changed={...image,[field]:field==='id'?'another-image':'https://source.test/another.png'};
+    expect(await send({...request(),images:[changed]})).toMatchObject({ok:false});
+    expect(mocks.openChannel).not.toHaveBeenCalled();
+    expect(mocks.readImage).not.toHaveBeenCalled();
+  });
+
+  it.each([0,2])('rejects %i images in a selected image activation before reading bytes',async count=>{
+    const image=request().images[0];
+    session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
+    const images=count===0?[]:[image,{...image,id:'another-image',url:'https://source.test/another.png'}];
+    expect(await send({...request(),images})).toMatchObject({ok:false});
+    expect(mocks.openChannel).not.toHaveBeenCalled();
+    expect(mocks.readImage).not.toHaveBeenCalled();
+  });
+
+  it('allows a small selected image while retaining the normal page recognition threshold',async()=>{
+    const image={...request().images[0],width:64,height:32};
+    mocks.inlineSize.mockImplementation((width:number,height:number)=>width>=240&&height>=180);
+    const message={...request(),images:[image]};
+    expect(await send(message)).toMatchObject({ok:false});
+    expect(mocks.inlineSize).toHaveBeenCalledWith(64,32,url);
+    expect(mocks.readImage).not.toHaveBeenCalled();
+    session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
+    expect(await send(message)).toMatchObject({ok:true});
+    expect(mocks.inlineSize).toHaveBeenCalledOnce();
+    expect(mocks.readImage).toHaveBeenCalledWith(image.url,url,undefined,undefined,true);
+    expect(cores[0].submit).toHaveBeenCalledOnce();
+  });
+
+  it.each([{width:0,height:32},{width:64,height:-1},{width:NaN,height:32},{width:64,height:Infinity}])(
+    'rejects invalid geometry for a selected image: %j',async dimensions=>{
+      const image={...request().images[0],...dimensions};
+      session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
+      expect(await send({...request(),images:[image]})).toMatchObject({ok:false});
+      expect(mocks.readImage).not.toHaveBeenCalled();
+    });
+
+  it('restores only the stored image binding after the background worker restarts',async()=>{
+    const image=request().images[0];
+    session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
+    expect(await send(request())).toMatchObject({ok:true});
+    vi.resetModules();
+    background=await import('../src/inline/background');
+    background.registerInlineBackground();
+    const reads=mocks.readImage.mock.calls.length;
+    expect(await send({...request(),images:[{...image,id:'another-image'}]})).toMatchObject({ok:false});
+    expect(mocks.readImage).toHaveBeenCalledTimes(reads);
+    expect(await send(request())).toMatchObject({ok:true});
+    expect(mocks.readImage).toHaveBeenCalledTimes(reads+1);
+    expect(mocks.readImage).toHaveBeenLastCalledWith(image.url,url,undefined,undefined,true);
+    expect(mocks.openChannel).toHaveBeenCalledTimes(2);
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ export interface InlineActivation {
   navigationId: string;
   documentId?: string;
   automatic?: boolean;
+  image?: { id: string; url: string };
 }
 
 export const activationKey = (tabId: number) => 'nc-inline:' + tabId;

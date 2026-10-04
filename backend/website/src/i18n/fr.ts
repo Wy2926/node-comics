@@ -566,6 +566,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: Plus de sources, plus de façons de lire.",
+        "items": [
+          "Bibliothèques OPDS et synchronisation de la progression de lecture",
+          "Reconnaissance OCR du texte plus précise",
+          "Prétraduction améliorée, moins d’attente entre les pages",
+          "Lecture EPUB et traduction des images",
+          "Traduisez une zone sélectionnée sur le web",
+          "Raccourcis personnalisés pour lire et traduire",
+          "Prise en charge complète de 6 nouveaux sites de BD: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Les packages Chrome et Edge 0.10.0 ZIP et les packages Firefox 0.10.0 XPI signés AMO sont disponibles."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1 : Plus de sources et un meilleur support pour les bandes dessinées longues",

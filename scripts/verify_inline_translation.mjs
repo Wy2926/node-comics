@@ -17,7 +17,7 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||['generic','feedback','prefetch','window'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||['generic','feedback','prefetch','window','image'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -166,6 +166,110 @@ try{
   output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  if(selectedSite==='image') {
+    const translated=id=>page.waitForFunction(id=>document.getElementById(id).style.content.includes('blob:'),id,{timeout:20000});
+    const original=id=>page.waitForFunction(id=>!document.getElementById(id).style.content,id,{timeout:10000});
+    const attributes=()=>page.locator('main img').evaluateAll(images=>images.map(image=>({id:image.id,src:image.getAttribute('src'),srcset:image.getAttribute('srcset'),pictureSrcset:image.parentElement.tagName==='PICTURE'?image.parentElement.querySelector('source').getAttribute('srcset'):null})));
+    const metrics=id=>page.locator('#'+id).evaluate(image=>({width:image.getBoundingClientRect().width,height:image.getBoundingClientRect().height,scroll:scrollY}));
+    const untouched=async ids=>{for(const id of ids)assert.equal(await page.locator('#'+id).evaluate(image=>image.style.content),'',`${id} must remain original`);};
+    const waitUntil=async(condition,message)=>{const until=Date.now()+20000;while(!condition()&&Date.now()<until)await page.waitForTimeout(25);assert(condition(),message);};
+    const waitButton=async name=>{const until=Date.now()+15000;while(Date.now()<until){if((await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='button'&&node.name?.value===name))return;await page.waitForTimeout(25);}assert.fail('missing image-state button '+name);};
+    const activateImage=async(id,displayed=false)=>{
+      const image=page.locator('#'+id);await image.evaluate(image=>image.decode());await image.scrollIntoViewIfNeeded();
+      const srcUrl=await image.evaluate((image,displayed)=>displayed?getComputedStyle(image).content.match(/^url\(["']?(.*?)["']?\)$/)?.[1]:image.currentSrc||image.src,displayed),box=await image.boundingBox();assert(box,'right-click image has a box');
+      assert.equal(typeof srcUrl,'string');if(displayed)assert(srcUrl.startsWith('blob:'),'the image-menu source is the displayed translation Blob');
+      // This trusted DOM event selects the exact element in the lightweight entry.
+      // The native browser menu itself is dismissed; its registered callback is dispatched below.
+      await page.mouse.click(box.x+box.width/2,box.y+Math.min(box.height/2,100),{button:'right'});await page.keyboard.press('Escape');
+      await worker.evaluate(async({url,srcUrl})=>{const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);if(!tab)throw Error('missing image tab');await globalThis.fixtureMenu({menuItemId:'nc-translate-image',pageUrl:url,srcUrl,mediaType:'image',frameId:0},tab);},{url:page.url(),srcUrl});
+    };
+    await page.goto(site+'/image');await page.locator('#first').evaluate(image=>image.decode());
+    const menus=await worker.evaluate(()=>fixtureMenus),menu=menus.find(menu=>menu.id==='nc-translate-image');
+    assert(menu);assert.equal(menu.title,'翻译图片');assert.deepEqual(menu.contexts,['image']);assert.equal(menu.parentId,undefined);
+    await untouched(['thumb','first','second','third','hidden']);assert.equal(translations.size,0);
+    check('build registers the image-only top-level translation menu; the lightweight contextmenu entry performs no translation on its own');
+    const initialAttributes=await attributes(),thumbBefore=await metrics('thumb'),sourceReads=sourceRequests.length;
+    await activateImage('thumb');await translated('thumb');await page.waitForTimeout(900);
+    await untouched(['first','second','third','lazy','hidden']);assert.deepEqual(await attributes(),initialAttributes);assert.deepEqual(await metrics('thumb'),thumbBefore);
+    assert.equal(createdJobs,0);assert.equal(translations.size,1);assert.deepEqual(sourceRequests.slice(sourceReads).map(request=>request.path),['/source/1.png']);
+    await page.screenshot({path:path.join(out,'image-thumbnail-translated.png')});
+    check('a trusted right-click translates the selected 80x110 thumbnail despite the generic size filter; its same-URL full image and all neighbours remain original with one source read');
+    const thumbDownloads=resultRequests.length,thumbRequests=translations.size;
+    await button('恢复原图');await original('thumb');assert.deepEqual(await metrics('thumb'),thumbBefore);
+    await button('显示译图');await translated('thumb');assert.deepEqual(await metrics('thumb'),thumbBefore);
+    assert.equal(resultRequests.length,thumbDownloads);assert.equal(translations.size,thumbRequests);assert.deepEqual(await attributes(),initialAttributes);
+    check('selected-image original/translation toggles preserve geometry, source/srcset and scroll while reusing the cached result');
+    await activateImage('thumb',true);await translated('thumb');await page.waitForTimeout(500);
+    assert.equal(createdJobs,0);assert.equal(translations.size,thumbRequests);assert.equal(resultRequests.length,thumbDownloads);assert.deepEqual(await attributes(),initialAttributes);
+    const selectedSource=await worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url),key='nc-inline:'+tab.id;return (await chrome.storage.session.get(key))[key].image.url;},page.url());
+    assert.equal(selectedSource,api+'/source/1.png');assert.equal(jobs.get('seed-1').image_sha256,sha(images.get(1)));await untouched(['first','second','third','lazy','hidden']);
+    check('right-clicking an already translated thumbnail with its CSS replacement Blob URL retains the original HTTP input identity and reuses the existing request/result without another job');
+    await activateImage('first');await translated('first');await original('thumb');await untouched(['second','third','lazy','hidden']);
+    assert.equal(createdJobs,0);assert.deepEqual(await attributes(),initialAttributes);
+    await page.screenshot({path:path.join(out,'image-same-url-selected.png')});
+    check('a second right-click on the identical source URL replaces the selection and displays only the exact newly selected element');
+    const nextReads=sourceRequests.length,nextRequests=translations.size;complete=false;
+    await activateImage('second');await original('first');
+    await waitUntil(()=>[...jobs.values()].some(job=>job.image_sha256===sha(images.get(2))&&job.status==='queued'),'the selected second image uploads its input');
+    assert.equal(createdJobs,1);assert.equal(uploads.size,1);assert.equal(translations.size,nextRequests+1);
+    await page.locator('#third').scrollIntoViewIfNeeded();await page.waitForTimeout(900);await page.locator('#first').scrollIntoViewIfNeeded();await page.waitForTimeout(400);
+    assert.equal(createdJobs,1);assert.equal(translations.size,nextRequests+1);assert.deepEqual(sourceRequests.slice(nextReads).map(request=>request.path),['/source/2.png']);
+    await untouched(['thumb','first','third','lazy','hidden']);complete=true;
+    await page.locator('#second').scrollIntoViewIfNeeded();await translated('second');
+    await page.screenshot({path:path.join(out,'image-second-translated.png')});
+    check('selecting another image replaces the previous selection, uploads only that image and never admits or reads neighbours while scrolling');
+    await activateImage('third');await original('second');
+    await waitButton('翻译失败 · 重试');
+    assert.equal(createdJobs,1);await untouched(['thumb','first','second','lazy','hidden']);
+    const retryJobs=createdJobs,retryRequests=translations.size,retryReads=sourceRequests.length;
+    await button('翻译失败 · 重试');await translated('third');await page.waitForTimeout(500);
+    assert.equal(createdJobs,retryJobs+1);assert.equal(translations.size,retryRequests+1);assert.equal(sourceRequests.length,retryReads);
+    await untouched(['thumb','first','second','lazy','hidden']);assert.deepEqual(await attributes(),initialAttributes);
+    await page.screenshot({path:path.join(out,'image-failure-retried.png')});
+    check('a selected failed image retries once by explicit action, reuses its prepared input and leaves every other image original');
+    const changedJobs=createdJobs,changedRequests=translations.size,changedReads=sourceRequests.length;
+    await page.locator('#third').evaluate((image,url)=>image.src=url,api+'/source/5.png');await page.locator('#third').evaluate(image=>image.decode());await original('third');await page.waitForTimeout(1000);
+    assert.equal(createdJobs,changedJobs);assert.equal(translations.size,changedRequests);assert.deepEqual(sourceRequests.slice(changedReads).map(request=>request.path),['/source/5.png']);
+    await untouched(['thumb','first','second','third','lazy','hidden']);
+    check('changing the selected image source clears its stale overlay and does not translate or reread the new source without another selection');
+    await page.locator('#first').scrollIntoViewIfNeeded();await activate();await translated('first');await translated('second');
+    assert.equal(await page.locator('#thumb').evaluate(image=>image.style.content),'');
+    await page.screenshot({path:path.join(out,'image-to-page-mode.png')});await button('关闭');
+    check('the whole-page translation command can start after single-image mode and restores the normal multi-image reading window');
+    // Padding crosses the real extension-port chunk boundary while keeping the
+    // original PNG below the re-encode threshold. These are synthetic pixels.
+    const localInputs={blob:Buffer.concat([images.get(6),Buffer.alloc(600*1024)]),data:Buffer.concat([images.get(7),Buffer.alloc(600*1024)])};
+    for(const input of Object.values(localInputs))assert(input.length>512*1024&&input.length<1024*1024);
+    await page.evaluate(async inputs=>{
+      const group=document.createElement('div');group.style.cssText='display:flex;gap:20px;padding:12px 0';window.fixtureLocalImages={};
+      for(const [kind,bytes] of Object.entries(inputs)){
+        const blob=new Blob([new Uint8Array(bytes)],{type:'image/png'});
+        const url=kind==='blob'?URL.createObjectURL(blob):await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(blob);});
+        window.fixtureLocalImages[kind]=url;
+        for(const suffix of ['', '-peer']){const image=document.createElement('img');image.id='local-'+kind+suffix;image.style.cssText='display:block;width:80px;height:110px';image.src=url;group.append(image);}
+      }
+      document.querySelector('main').prepend(group);await Promise.all([...group.querySelectorAll('img')].map(image=>image.decode()));
+    },Object.fromEntries(Object.entries(localInputs).map(([kind,input])=>[kind,[...input]])));
+    const localIds=['local-blob','local-blob-peer','local-data','local-data-peer'];
+    for(const kind of ['blob','data']){
+      const id='local-'+kind,otherIds=['thumb','first','second','third','lazy','hidden',...localIds.filter(other=>other!==id)],jobsBefore=createdJobs,requestsBefore=translations.size,uploadsBefore=uploads.size,readsBefore=sourceRequests.length;
+      const transfersBefore=await worker.evaluate(()=>fixtureTransfers);await activateImage(id);await translated(id);await page.waitForTimeout(400);
+      const inputHash=sha(localInputs[kind]),job=[...jobs.values()].find(job=>job.image_sha256===inputHash);assert(job,'local image keeps the original PNG hash');
+      const requestId=[...translations].find(([,entry])=>entry.jobId===job.id)[0];assert.equal(sha(uploads.get(requestId)),inputHash);
+      assert.equal(createdJobs,jobsBefore+1);assert.equal(translations.size,requestsBefore+1);assert.equal(uploads.size,uploadsBefore+1);assert.equal(sourceRequests.length,readsBefore);await untouched(otherIds);
+      const sourceIntact=()=>page.locator('#'+id).evaluate((image,kind)=>image.getAttribute('src')===window.fixtureLocalImages[kind],kind);
+      assert.equal(await sourceIntact(),true);const transfersAfter=await worker.evaluate(()=>fixtureTransfers);
+      assert.equal(transfersAfter.sourceChunks-transfersBefore.sourceChunks,2);assert(transfersAfter.resultChunks>transfersBefore.resultChunks);assert(transfersAfter.maxMessageBytes<710000);
+      await page.screenshot({path:path.join(out,'image-'+kind+'-translated.png')});
+      check(`a selected 80x110 ${kind} image uploads its exact original PNG through two bounded source chunks; its identical-URL peer and all other images remain original without any source HTTP read`);
+      const repeatRequests=translations.size,repeatUploads=uploads.size,repeatJobs=createdJobs,repeatDownloads=resultRequests.length;
+      await activateImage(id,true);await translated(id);await page.waitForTimeout(400);
+      assert.equal(createdJobs,repeatJobs);assert.equal(translations.size,repeatRequests);assert.equal(uploads.size,repeatUploads);assert.equal(resultRequests.length,repeatDownloads);
+      assert.equal(job.image_sha256,inputHash);assert.equal(await sourceIntact(),true);await untouched(otherIds);
+      check(`right-clicking the translated ${kind} image with its CSS replacement Blob URL preserves the original upload hash and reuses its request/upload/result without translating the peer`);
+    }
+    await button('关闭');
+  }
   if(selectedSite==='feedback') {
     const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&node.name?.value===text);
     const waitNotice=async(text,visible=true)=>{

@@ -566,6 +566,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: Daha fazla kaynak, daha fazla okuma seçeneği.",
+        "items": [
+          "Yeni OPDS kütüphaneleri ve okuma ilerlemesi eşitleme",
+          "Daha doğru OCR metin tanıma",
+          "Mevcut ön çeviri iyileşti, sayfa geçişlerinde daha az bekleme",
+          "EPUB okuma ve görsel çevirisi",
+          "Web sayfasında alan seçerek çeviri",
+          "Okuma ve çeviri kısayollarını özelleştirin",
+          "6 yeni çizgi roman sitesi için tam destek: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Chrome ve Edge 0.10.0 ZIP paketleri ve AMO imzalı Firefox 0.10.0 XPI mevcuttur."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1: Uzun çizgi romanlar için daha fazla kaynak ve daha iyi destek",

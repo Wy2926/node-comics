@@ -554,6 +554,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: More sources. More ways to read.",
+        "items": [
+          "New OPDS libraries and reading progress sync",
+          "More accurate OCR text recognition",
+          "Improved existing pre-translation, less waiting",
+          "EPUB reading and image translation",
+          "Translate selected webpage areas",
+          "Custom reading and translation shortcuts",
+          "Full support for 6 more comic websites: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Chrome and Edge 0.10.0 ZIP packages and the AMO-signed Firefox 0.10.0 XPI are available."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1: More sources and better support for long comics",

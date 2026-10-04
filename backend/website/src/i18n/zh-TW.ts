@@ -647,6 +647,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: 更多來源，更多讀法。",
+        "items": [
+          "新增 OPDS 遠端書庫與閱讀進度同步",
+          "OCR 文字辨識更準確",
+          "最佳化既有預翻譯，翻頁少等待",
+          "EPUB 閱讀與圖片翻譯",
+          "網頁劃圖翻譯",
+          "自訂閱讀與翻譯快捷鍵",
+          "新增 6 個漫畫網站完整支援: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "提供 Chrome、Edge 0.10.0 ZIP 下載套件及 Firefox 0.10.0 的 AMO 已簽署 XPI。"
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1：更多來源，長篇條漫閱讀與翻譯更穩定",

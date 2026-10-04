@@ -10,6 +10,7 @@ export function registerLocaleBackground(){
     await setUiLanguage(validUiLanguage(language)?language:'auto');
     await Promise.allSettled([
       chrome.contextMenus.update('nc-translate-page',{title:msg('翻译当前页面')}),
+      chrome.contextMenus.update('nc-translate-image',{title:msg('翻译图片')}),
       chrome.contextMenus.update('nc-translate-region',{title:msg('划图翻译')}),
     ]);
   };

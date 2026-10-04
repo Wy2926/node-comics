@@ -566,6 +566,21 @@ export default {
     ],
     "releases": [
       {
+        "id": "0.10.0",
+        "date": "2026-10-04",
+        "title": "0.10.0: Lebih banyak sumber, lebih banyak cara membaca.",
+        "items": [
+          "Perpustakaan OPDS dan sinkronisasi progres membaca",
+          "Pengenalan teks OCR lebih akurat",
+          "Optimasi praterjemahan yang ada, lebih sedikit menunggu antarhalaman",
+          "Baca EPUB dan terjemahkan gambarnya",
+          "Terjemahkan area pilihan di halaman web",
+          "Sesuaikan pintasan membaca dan terjemahan",
+          "Dukungan lengkap untuk 6 situs komik baru: MangaPill, MangaDNA, KLManga, RawLazy, Comic DAYS, Manga One.",
+          "Paket Chrome dan Edge 0.10.0 ZIP dan Firefox 0.10.0 XPI yang ditandatangani AMO tersedia."
+        ]
+      },
+      {
         "id": "0.9.1",
         "date": "2026-10-02",
         "title": "0.9.1: Lebih banyak sumber dan dukungan yang lebih baik untuk komik panjang",

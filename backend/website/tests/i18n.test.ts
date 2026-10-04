@@ -64,6 +64,19 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
+test('0.10.0 leads every locale with all seven extension highlights',()=>{
+  for(const locale of locales){
+    const release=dictionaries[locale].documents.releases[0];
+    assert.equal(release.id,'0.10.0',locale);
+    assert.equal(release.date,'2026-10-04',locale);
+    assert.ok(release.title.includes('0.10.0'),locale);
+    assert.equal(release.items.length,8,locale);
+    assert.ok(release.items.some(item=>item.includes('Firefox 0.10.0') && item.includes('AMO')),locale);
+    for(const term of ['OPDS','OCR','EPUB','MangaPill','MangaDNA','KLManga','RawLazy','Comic DAYS','Manga One'])
+      assert.ok(release.items.some(item=>item.includes(term)),`${locale}: ${term}`);
+  }
+});
+
 test('0.9.1 replaces the superseded 0.9.0 notes in every locale',()=>{
   for(const locale of locales){
     const releases=dictionaries[locale].documents.releases;

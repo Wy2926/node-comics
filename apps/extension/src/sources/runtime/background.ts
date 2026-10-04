@@ -3,7 +3,7 @@ import { msg } from '../../i18n/runtime';
 import { requireHostAccess } from '../../host-permissions';
 import { sourceFailure } from './diagnostics';
 
-import { activateInline, registerInlineBackground } from '../../inline/background';
+import { activateInline, activateInlineImage, registerInlineBackground } from '../../inline/background';
 import { activateRegion, registerRegionBackground } from '../../region/background';
 import type { SourceCatalog } from '../../comics/application/types';
 import { pollSourceDiscovery } from '../core/discovery';
@@ -110,6 +110,12 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
           documentUrlPatterns: ['http://*/*', 'https://*/*'],
         });
         chrome.contextMenus.create({
+          id: 'nc-translate-image',
+          title: msg('翻译图片'),
+          contexts: ['image'],
+          documentUrlPatterns: ['http://*/*', 'https://*/*'],
+        });
+        chrome.contextMenus.create({
           id: 'nc-translate-region',
           title: msg('划图翻译'),
           contexts: ['page', 'image', 'link', 'selection'],
@@ -119,11 +125,19 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     );
   });
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-region') && tab?.id != null) {
+    if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-image' || info.menuItemId === 'nc-translate-region') && tab?.id != null) {
       try {
         await requireHostAccess();
         await localeReady();
-        if (info.menuItemId === 'nc-translate-region') {
+        if (info.menuItemId === 'nc-translate-image') {
+          const current = await chrome.tabs.get(tab.id);
+          if (info.frameId !== 0 || info.mediaType !== 'image' || !info.srcUrl ||
+              !current.url || !safeImageUrl(current.url, current.url))
+            throw Error(msg('请在普通网页中使用翻译。'));
+          if (current.url !== tab.url || current.url !== info.pageUrl)
+            throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
+          await activateInlineImage(tab.id, info);
+        } else if (info.menuItemId === 'nc-translate-region') {
           const current = await chrome.tabs.get(tab.id);
           if (!current.url || !safeImageUrl(current.url, current.url)) throw Error(msg('请在普通网页中使用翻译。'));
           if (current.url !== tab.url) throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
