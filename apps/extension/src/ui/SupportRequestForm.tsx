@@ -18,8 +18,11 @@ function readDraft(kind: Kind): Draft {
   return emptyDraft();
 }
 
-export function SupportRequestForm({kind}: {kind: Kind}) {
-  const [draft, setDraft] = useState(() => readDraft(kind)), [sending, setSending] = useState(false), [error, setError] = useState('');
+export function SupportRequestForm({kind, initialSite}: {kind: Kind; initialSite?: Pick<Draft, 'site_name' | 'url'>}) {
+  const [draft, setDraft] = useState(() => {
+    const saved=readDraft(kind);
+    return kind==='website'&&initialSite&&!saved.locked&&!saved.receipt&&!saved.site_name&&!saved.url?{...saved,...initialSite}:saved;
+  }), [sending, setSending] = useState(false), [error, setError] = useState('');
   const inFlight = useRef(false);
   useEffect(() => { try { sessionStorage.setItem(storageKey(kind), JSON.stringify(draft)); } catch { /* Keep the in-memory draft. */ } }, [draft, kind]);
   async function submit(event: FormEvent) {

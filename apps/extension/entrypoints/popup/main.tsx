@@ -77,7 +77,33 @@ function Popup({initialError=''}:{initialError?:string}){
   finally{openLock.current=false;setTranslating(undefined);}
  }
  async function openSettings(){if(disabled||openLock.current)return;openLock.current=true;setOpening(true);try{await chrome.runtime.openOptionsPage();window.close();}catch{setError(msg("设置未能打开，请重试。"));}finally{openLock.current=false;setOpening(false);}}
- async function openPage(hash=''){if(disabled||openLock.current)return;openLock.current=true;setOpening(true);try{await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html'+(hash?'#'+hash:''))});window.close();}catch(e){setError((e as Error).message);}finally{openLock.current=false;setOpening(false);}}
+ async function openPage(hash=''){
+  if(disabled||openLock.current)return;openLock.current=true;setOpening(true);
+  try{
+   const page=new URL(chrome.runtime.getURL('/reader.html'));page.hash=hash;
+   if(hash==='sites/request'){
+    const tab=source??(await chrome.tabs.query({active:true,currentWindow:true}).catch(()=>[]))[0];
+    if(tab?.url){
+     const url=new URL(tab.url);
+     if(['https:','http:'].includes(url.protocol)){
+      const definition=sourceFor(tab.url).definition;
+      let name=(definition.id!=='generic'?definition.sites?.find(site=>new URL(site.url).hostname===url.hostname)?.name??definition.name:tab.title)||url.hostname;
+      if(tab.id!=null)try{
+       const [{result}]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>({
+        origin:location.origin,
+        title:document.title.trim(),
+        name:document.querySelector('meta[property="og:site_name"]')?.getAttribute('content')?.trim()
+         ||document.querySelector('meta[name="application-name"]')?.getAttribute('content')?.trim(),
+       })});
+       if(result?.origin===url.origin)name=result.name||(definition.id==='generic'?result.title||url.hostname:name);
+      }catch{/* The tab title and adapter name remain available when page access is restricted. */}
+      page.search=new URLSearchParams({site_url:url.origin+'/',site_name:(name.replace(/\s+/g,' ').trim()||url.hostname).slice(0,100)}).toString();
+     }
+    }
+   }
+   await chrome.tabs.create({url:page.href});window.close();
+  }catch(e){setError((e as Error).message);}finally{openLock.current=false;setOpening(false);}
+ }
  const handlers={
   'web.shortcuts':()=>{void openPage('settings/shortcuts');},
   'app.library':()=>{void openPage();},

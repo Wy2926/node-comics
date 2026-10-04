@@ -19,12 +19,26 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
     'paid-content': {label: msg('部分收费'), description: msg('部分漫画或章节需要付费阅读')},
   };
   const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [requestSite]=useState(()=>{
+    if(location.hash!=='#sites/request')return;
+    const query=new URLSearchParams(location.search);
+    try{
+      const url=new URL(query.get('site_url')??'');
+      if(!['https:','http:'].includes(url.protocol))return;
+      return {site_name:(query.get('site_name')?.trim()||url.hostname).slice(0,100),url:url.origin+'/'};
+    }catch{return;}
+  });
   const requestSection=useRef<HTMLElement>(null);
   useEffect(()=>{
     let frame=0;
     const locateRequest=()=>{
       cancelAnimationFrame(frame);
       if(location.hash!=='#sites/request')return;
+      const page=new URL(location.href);
+      if(page.searchParams.has('site_url')||page.searchParams.has('site_name')){
+        page.searchParams.delete('site_url');page.searchParams.delete('site_name');
+        history.replaceState(null,'',page.href);
+      }
       frame=requestAnimationFrame(()=>{
         if(location.hash!=='#sites/request')return;
         requestSection.current?.scrollIntoView({block:'center'});
@@ -62,7 +76,7 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
       <section ref={requestSection} className="nc-site-request" aria-labelledby="nc-site-request-title">
         <div className="nc-site-request-icon"><Icon name="message" size={26}/></div>
         <h2 id="nc-site-request-title">{msg('申请适配网站')}</h2><p className="nc-site-request-intro">{msg('想读的网站还不在这里？告诉我们，无需登录。')}</p>
-        <SupportRequestForm kind="website"/>
+        <SupportRequestForm kind="website" initialSite={requestSite}/>
       </section>
     </div>
   </div>;
