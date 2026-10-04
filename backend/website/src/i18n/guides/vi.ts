@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Thêm kênh dịch trong tiện ích mở rộng",
         "paragraphs": [
-          "Mở cài đặt của tiện ích mở rộng và tìm Kênh dịch. Sau khi kết nối thành công, tiện ích mở rộng sẽ lưu mã thông báo dịch vụ chứ không phải mật khẩu bạn đã nhập. Các nhãn bên dưới mô tả các điều khiển tương ứng bằng ngôn ngữ giao diện của bạn."
+          "Mở cài đặt của tiện ích mở rộng và tìm Kênh dịch. Sau khi kết nối thành công, tiện ích lưu mật khẩu và mã thông báo dịch vụ trên máy tính này. Khi kết nối lại với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Các nhãn bên dưới mô tả các điều khiển tương ứng bằng ngôn ngữ giao diện của bạn."
         ],
         "steps": [
           "Chọn Thêm kênh dịch và xác nhận manga-translator-ui làm dịch vụ. Tùy ý đặt cho nó một cái tên dễ nhận biết, chẳng hạn như “Máy tính của tôi”.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Kết nối trước đó hiện báo cáo thông tin đăng nhập đã hết hạn",
-              "Chọn Kết nối lại trong cài đặt kênh và nhập lại mật khẩu dịch vụ. Tiện ích mở rộng không âm thầm gửi lại bản dịch trước đó."
+              "Chọn Kết nối lại trong cài đặt kênh. Với cùng địa chỉ dịch vụ và tên người dùng, bạn có thể để trống ô mật khẩu để dùng mật khẩu đã lưu. Cấu hình từ phiên bản cũ chỉ lưu mã thông báo cần nhập mật khẩu một lần khi kết nối lại lần đầu. Nếu đổi địa chỉ hoặc tên người dùng, hoặc mật khẩu đã thay đổi hay không còn hợp lệ, hãy nhập lại mật khẩu. Tiện ích mở rộng không âm thầm gửi lại bản dịch trước đó."
             ],
             [
               "Đã kết nối nhưng bản dịch vẫn đang chờ",

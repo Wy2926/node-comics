@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Agrega un canal de traducción en la extensión.",
         "paragraphs": [
-          "Abra la configuración de la extensión y busque Canales de traducción. Después de una conexión exitosa, la extensión almacena el token de servicio, no la contraseña que ingresaste. Las etiquetas a continuación describen los controles correspondientes en el idioma de su interfaz."
+          "Abra la configuración de la extensión y busque Canales de traducción. Después de una conexión exitosa, la extensión guarda la contraseña y el token del servicio localmente en esta computadora. Al volver a conectarse con la misma dirección de servicio y el mismo nombre de usuario, deje la contraseña en blanco para reutilizar la guardada. Vuelva a introducirla si cambia la dirección o el nombre de usuario, o si la contraseña ha cambiado o ya no es válida. Los perfiles antiguos que solo contienen un token requieren introducir la contraseña una vez al reconectarse por primera vez. Las etiquetas a continuación describen los controles correspondientes en el idioma de su interfaz."
         ],
         "steps": [
           "Elija Agregar canal de traducción y confirme manga-translator-ui como servicio. Opcionalmente, asígnele un nombre reconocible, como \"Mi computadora\".",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Una conexión anterior ahora informa un inicio de sesión caducado",
-              "Elija Reconectar en la configuración del canal e ingrese la contraseña del servicio nuevamente. La extensión no reenvía silenciosamente la traducción anterior."
+              "Elija Reconectar en la configuración del canal. Con la misma dirección de servicio y el mismo nombre de usuario, deje la contraseña en blanco para reutilizarla. Vuelva a introducirla si cambia la dirección o el nombre de usuario, si la contraseña ha cambiado o ya no es válida, o si un perfil antiguo solo contiene un token. La extensión no reenvía silenciosamente la traducción anterior."
             ],
             [
               "Conectado, pero la traducción sigue esperando",

@@ -1,7 +1,7 @@
 import {msg} from '../../i18n/runtime';
 import {requireHostAccess} from '../../host-permissions';
 import {channelDefinition,channelDefinitions} from './registry';
-import {channelSettingsKey,defaultChannel,deleteChannelSecrets,readChannelSecrets,readChannelSettings,subscribeChannelSettings,writeChannelSecrets,updateChannelSettings} from './configuration';
+import {channelSettingsKey,defaultChannel,deleteChannelSecrets,readChannelCredentials,readChannelSecrets,readChannelSettings,subscribeChannelSettings,writeChannelSecrets,updateChannelSettings} from './configuration';
 import type {ChannelConnection,ChannelConnectionInput,ChannelProfile,LocalTranslationResultReference} from './contracts';
 import {blockEntryDirectOperations,readEntryDirectOperations,removeEntryDirectOperations,transferDirectOperation,type DirectOperationOwner} from './transport/operations';
 import {removeTransferReceipts} from './transport/receipts';
@@ -53,28 +53,56 @@ export async function removeLocalTranslationEntry(entryId:string):Promise<void>{
   for(const definition of channelDefinitions())await definition.removeLocalEntry?.(entryId);
 }
 
-export function availableChannelProtocols(){return channelDefinitions().filter(d=>d.configurable).map(({id,label,fields})=>({id,label,fields}));}
+export function availableChannelProtocols(){
+  return channelDefinitions().map(({id,label,description,guideUrl,configurable,fields})=>({
+    id,label,description,guideUrl,configurable,fields,
+  }));
+}
 export async function listChannels(){const settings=await readChannelSettings();return {...settings,profiles:[defaultChannel,...settings.profiles]};}
+export async function savedChannelSecretFields(id:string){
+  return Object.keys((await readChannelCredentials(id)).secrets);
+}
 export async function selectChannel(id:string){await updateChannelSettings(value=>{if(id!==defaultChannel.id&&!value.profiles.some(p=>p.id===id))throw Error(msg('翻译渠道已移除'));return {...value,activeId:id};});}
 export async function removeChannel(id:string){if(id===defaultChannel.id)throw Error(msg('内置渠道不能移除'));await updateChannelSettings(async value=>{await deleteChannelSecrets(id);return {activeId:value.activeId===id?defaultChannel.id:value.activeId,profiles:value.profiles.filter(p=>p.id!==id)};});}
 export async function connectChannel(adapterId:string,name:string,input:ChannelConnectionInput,id?:string):Promise<ChannelProfile>{
-  const definition=channelDefinition(adapterId);if(!definition.configurable||!definition.connect)throw Error(msg('此渠道无需配置'));
+  const definition=channelDefinition(adapterId);
+  if(!definition.configurable||!definition.connect)throw Error(msg('此渠道无需配置'));
   const origins=definition.permissionOrigins?.(input)??[];
   if(origins.length)await requireHostAccess(origins);
-  const connected=await definition.connect(input);let profile!:ChannelProfile;
+  let credentials=input;
+  if(id){
+    const {profile,secrets}=await readChannelCredentials(id);
+    if(!profile)throw Error(msg('翻译渠道已移除'));
+    // Bind saved passwords to the original destination before any network call.
+    const unchanged=profile.adapterId===adapterId
+      &&Object.keys(profile.settings).length===Object.keys(input.settings).length
+      &&Object.entries(profile.settings).every(([key,value])=>input.settings[key]===value);
+    if(unchanged){
+      const reused={...input.secrets};
+      for(const field of definition.fields){
+        if(field.type==='password'&&!reused[field.key]&&secrets[field.key]){
+          reused[field.key]=secrets[field.key];
+        }
+      }
+      credentials={...input,secrets:reused};
+    }
+  }
+  const connected=await definition.connect(credentials);
+  let profile!:ChannelProfile;
   await updateChannelSettings(async value=>{
     const previous=id?value.profiles.find(p=>p.id===id):undefined;
     if(id&&!previous)throw Error(msg('翻译渠道已移除'));
     const key=previous?.id??crypto.randomUUID();
     const changed=previous?.adapterId!==adapterId||JSON.stringify(previous.settings)!==JSON.stringify(connected.settings);
     profile={id:key,adapterId,name:name.trim()||definition.label,settings:connected.settings,revision:previous?previous.revision+(changed?1:0):1};
-    await writeChannelSecrets(key,connected.secrets);
+    await writeChannelSecrets(key,connected.secrets,profile);
     return {...value,profiles:[...value.profiles.filter(p=>p.id!==key),profile]};
-  });return profile;
+  });
+  return profile;
 }
 export async function openActiveChannel(isCurrent:()=>boolean=()=>true):Promise<ChannelConnection>{
   const value=await listChannels(),profile=value.profiles.find(p=>p.id===value.activeId)!;
-  return channelDefinition(profile.adapterId).open(profile,await readChannelSecrets(profile.id),isCurrent);
+  return channelDefinition(profile.adapterId).open(profile,await readChannelSecrets(profile.id,profile),isCurrent);
 }
 export function subscribeChannels(listener:()=>void){
   let stopped=false,cleanup:undefined|(()=>void),generation=0;

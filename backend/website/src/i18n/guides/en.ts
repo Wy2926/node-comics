@@ -21,7 +21,7 @@ export const localTranslationGuides: Guide[] = [
         'Configure the translator, models and any required API keys on the server, then confirm that a test image produces a translated image. The extension sets the target language and uses server defaults for other translation settings. Make sure the Web service uses the intended defaults. Do not enter a model API key in the extension’s password field.'
       ], links: [{label: 'Official MTU project and documentation', href: 'https://github.com/hgmzhn/manga-translator-ui'}] },
       { title: '3. Add a translation channel in the extension', paragraphs: [
-        'Open the extension’s settings and find Translation channels. After a successful connection, the extension stores the service token, not the password you entered. Labels below describe the corresponding controls in your interface language.'
+        'Open the extension’s settings and find Translation channels. After a successful connection, the extension saves the service password and token locally on this computer. When reconnecting with the same service address and username, leave the password blank to reuse the saved password. Enter it again if the address or username changes, or if the password has changed or is no longer valid. Older profiles that only contain a token need a password once on their first reconnection. Labels below describe the corresponding controls in your interface language.'
       ], steps: [
         'Choose Add translation channel and confirm manga-translator-ui as the service. Optionally give it a recognizable name, such as “My computer”.',
         'Enter http://127.0.0.1:8000 as the service address. Use the service root, without /auth/login, /translate/with-form/image or an administration page path.',
@@ -39,7 +39,7 @@ export const localTranslationGuides: Guide[] = [
         ['The service address does not open', 'Check that the Web service is running and the port is correct. 127.0.0.1 means the computer running the browser; a different device needs its own reachable address.'],
         ['The page opens, but the extension cannot connect', 'Check the root address, browser access permission and whether your MTU version provides compatible account login and image translation endpoints.'],
         ['Wrong credentials or initial password change required', 'Sign in to MTU or change the initial password there, then reconnect. Use MTU credentials, not a NodeLane password or model API key.'],
-        ['A previous connection now reports an expired login', 'Choose Reconnect in channel settings and enter the service password again. The extension does not silently resend the previous translation.'],
+        ['A previous connection now reports an expired login', 'Choose Reconnect in channel settings. For the same service address and username, leave the password blank to reuse it. Enter it again if the address or username changes, the password has changed or is no longer valid, or an older profile only has a token. The extension does not silently resend the previous translation.'],
         ['Connected, but translation keeps waiting', 'Check model downloads, engine loading, queues, API balance and hardware resources. Test the same configuration in MTU. Connecting only verifies login.'],
         ['Interrupted, timed out or returned something other than an image', 'Check the MTU task, proxy timeout and response. Retry the failed page manually after fixing the cause. The extension does not restore results automatically from MTU history.']
       ] } },

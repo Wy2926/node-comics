@@ -60,6 +60,9 @@ export interface ChannelConnection {
 export interface ChannelDefinition {
   id:string;
   label:string;
+  /** User-facing setup information, owned by the adapter. */
+  description?:string;
+  guideUrl?:string;
   configurable:boolean;
   fields:readonly ChannelField[];
   permissionOrigins?(input:ChannelConnectionInput):string[];

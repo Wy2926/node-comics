@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Aggiungi un canale di traduzione nell'estensione",
         "paragraphs": [
-          "Apri le impostazioni dell'estensione e trova Canali di traduzione. Dopo una connessione riuscita, l'estensione memorizza il token del servizio, non la password inserita. Le etichette seguenti descrivono i controlli corrispondenti nella lingua dell'interfaccia."
+          "Apri le impostazioni dell'estensione e trova Canali di traduzione. Dopo una connessione riuscita, l'estensione salva la password e il token del servizio localmente su questo computer. Quando ti riconnetti con lo stesso indirizzo del servizio e lo stesso nome utente, lascia vuota la password per riutilizzare quella salvata. Inseriscila di nuovo se cambia l'indirizzo o il nome utente, oppure se la password è stata modificata o non è più valida. I vecchi profili che contengono solo un token richiedono di inserire la password una volta alla prima riconnessione. Le etichette seguenti descrivono i controlli corrispondenti nella lingua dell'interfaccia."
         ],
         "steps": [
           "Scegli Aggiungi canale di traduzione e conferma manga-translator-ui come servizio. Facoltativamente, assegnagli un nome riconoscibile, ad esempio \"Risorse del computer\".",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Una connessione precedente ora segnala un accesso scaduto",
-              "Scegli Riconnetti nelle impostazioni del canale e inserisci nuovamente la password del servizio. L'estensione non invia nuovamente in modo silenzioso la traduzione precedente."
+              "Scegli Riconnetti nelle impostazioni del canale. Con lo stesso indirizzo del servizio e lo stesso nome utente, lascia vuota la password per riutilizzarla. Inseriscila di nuovo se cambia l'indirizzo o il nome utente, se la password è stata modificata o non è più valida, oppure se un vecchio profilo contiene solo un token. L'estensione non invia nuovamente in modo silenzioso la traduzione precedente."
             ],
             [
               "Connesso, ma la traduzione continua ad aspettare",

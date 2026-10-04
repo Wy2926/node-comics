@@ -3,18 +3,25 @@ import {definition} from '../src/translation/channels/adapters/manga-translator-
 import {languages, login, safeError, serviceBase, translationRequest} from '../src/translation/channels/adapters/manga-translator-ui/protocol';
 
 afterEach(() => vi.unstubAllGlobals());
-it('connects with the MTU login JSON and retains only token plus non-secret settings', async () => {
+it('connects with the MTU login JSON and separates saved password and token from public settings', async () => {
   const fetcher = vi.fn(async () => Response.json({success: true, token: 'fixture-token', user: {role: 'user'}}));
   vi.stubGlobal('fetch', fetcher);
   const input = {settings: {baseUrl: 'http://127.0.0.1:8000/prefix', username: ' local '}, secrets: {password: 'fixture-password'}};
   expect(definition.permissionOrigins!(input)).toEqual(['http://127.0.0.1:8000/*']);
   const saved = await definition.connect!(input);
-  expect(saved).toEqual({settings: {baseUrl: 'http://127.0.0.1:8000/prefix/', username: 'local'}, secrets: {token: 'fixture-token'}});
-  expect(JSON.stringify(saved)).not.toContain('fixture-password');
+  expect(saved).toEqual({settings: {baseUrl: 'http://127.0.0.1:8000/prefix/', username: 'local'}, secrets: {token: 'fixture-token', password: 'fixture-password'}});
+  expect(JSON.stringify(saved.settings)).not.toContain('fixture-password');
+  expect(JSON.stringify(saved.settings)).not.toContain('fixture-token');
   const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
   expect(url).toBe('http://127.0.0.1:8000/prefix/auth/login');
   expect(init).toMatchObject({method: 'POST', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer'});
   expect(JSON.parse(init.body as string)).toEqual({username: 'local', password: 'fixture-password'});
+});
+it('requires supplied credentials before attempting a service login', async () => {
+  const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+  for(const secrets of [{}, {token:'legacy-token'}, {password:''}] as Record<string,string>[])
+    await expect(definition.connect!({settings:{baseUrl:'http://localhost/',username:'reader'},secrets})).rejects.toThrow('用户名和密码');
+  expect(fetcher).not.toHaveBeenCalled();
 });
 it('accepts successful session metadata with no required password change', async () => {
   const token = 'f'.repeat(43);

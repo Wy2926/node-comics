@@ -23,10 +23,26 @@ export async function writeChannelSettings(value:ChannelSettings){
   else {localStorage.setItem(channelSettingsKey,JSON.stringify(stored));for(const listener of localListeners)listener();}
 }
 let pendingMutation:Promise<unknown>=Promise.resolve();
+async function withChannelSettings<T>(run:()=>Promise<T>):Promise<T>{
+  if(typeof navigator!=='undefined'&&navigator.locks){
+    return await navigator.locks.request(channelSettingsKey,run);
+  }
+  const next=pendingMutation.then(run,run);
+  pendingMutation=next.catch(()=>{});
+  return next;
+}
 export async function updateChannelSettings(change:(value:ChannelSettings)=>Promise<ChannelSettings>|ChannelSettings):Promise<void>{
-  const run=async()=>{await writeChannelSettings(await change(await readChannelSettings()));};
-  if(typeof navigator!=='undefined'&&navigator.locks)return navigator.locks.request(channelSettingsKey,run);
-  const next=pendingMutation.then(run,run);pendingMutation=next.catch(()=>{});return next;
+  return withChannelSettings(async()=>{
+    await writeChannelSettings(await change(await readChannelSettings()));
+  });
+}
+export async function readChannelCredentials(id:string){
+  return withChannelSettings(async()=>{
+    const profile=(await readChannelSettings()).profiles.find(p=>p.id===id);
+    const record=await readCredentialRecord(id);
+    const secrets=profile&&record?.binding&&matchesBinding(record.binding,profile)?record.values:{};
+    return {profile,secrets};
+  });
 }
 export function subscribeChannelSettings(listener:()=>void){
   localListeners.add(listener);
@@ -38,10 +54,31 @@ export function subscribeChannelSettings(listener:()=>void){
 }
 // Credentials belong to the extension origin's IndexedDB, never content-script storage.
 let credentialDatabase:Promise<IDBDatabase>|undefined;
+type CredentialBinding=Pick<ChannelProfile,'adapterId'|'settings'>;
+interface CredentialRecord {
+  id:string;
+  values:Record<string,string>;
+  binding?:CredentialBinding;
+}
+function matchesBinding(binding:CredentialBinding,profile:CredentialBinding){
+  return binding.adapterId===profile.adapterId
+    &&Object.keys(binding.settings).length===Object.keys(profile.settings).length
+    &&Object.entries(binding.settings).every(([key,value])=>profile.settings[key]===value);
+}
 async function secretsStore<T>(mode:IDBTransactionMode,action:(store:IDBObjectStore)=>IDBRequest<T>):Promise<T>{
   const db=await (credentialDatabase??=openSourceDatabase('translation-channel-credentials',{credentials:{keyPath:'id'}},()=>{credentialDatabase=undefined;}).catch(error=>{credentialDatabase=undefined;throw error;}));
   return new Promise((resolve,reject)=>{const tx=db.transaction('credentials',mode),request=action(tx.objectStore('credentials'));tx.oncomplete=()=>resolve(request.result);tx.onerror=tx.onabort=()=>reject(tx.error);});
 }
-export async function readChannelSecrets(id:string):Promise<Record<string,string>>{return (await secretsStore<{id:string;values:Record<string,string>}|undefined>('readonly',s=>s.get(id)))?.values??{};}
-export async function writeChannelSecrets(id:string,values:Record<string,string>){await secretsStore('readwrite',s=>s.put({id,values}));}
+async function readCredentialRecord(id:string){
+  return secretsStore<CredentialRecord|undefined>('readonly',s=>s.get(id));
+}
+export async function readChannelSecrets(id:string,profile?:CredentialBinding):Promise<Record<string,string>>{
+  const record=await readCredentialRecord(id);
+  return record&&(!profile||!record.binding||matchesBinding(record.binding,profile))?record.values:{};
+}
+export async function writeChannelSecrets(id:string,values:Record<string,string>,binding?:CredentialBinding){
+  const record:CredentialRecord={id,values};
+  if(binding)record.binding={adapterId:binding.adapterId,settings:binding.settings};
+  await secretsStore('readwrite',s=>s.put(record));
+}
 export async function deleteChannelSecrets(id:string){await secretsStore('readwrite',s=>s.delete(id));}

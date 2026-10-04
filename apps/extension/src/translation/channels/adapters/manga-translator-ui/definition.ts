@@ -18,6 +18,8 @@ function capabilities(): Capabilities {
 
 export const definition: ChannelDefinition = {
   id: 'manga-translator-ui', label: 'manga-translator-ui', configurable: true,
+  get description() {return msg('连接自行部署的翻译服务，无需 NodeLane 账号。');},
+  guideUrl: 'https://comics.nodelane.net/guides/local-translation/',
   get fields(): readonly ChannelField[] {return [
     {key: 'baseUrl', label: msg('服务地址'), type: 'url', required: true, placeholder: 'http://127.0.0.1:8000'},
     {key: 'username', label: msg('用户名'), type: 'text', required: true},
@@ -29,7 +31,7 @@ export const definition: ChannelDefinition = {
     const password = input.secrets.password ?? '';
     if (!username || !password) throw Error(msg('请输入翻译服务的用户名和密码。'));
     const token = await login(baseUrl, username, password, input.signal);
-    return {settings: {baseUrl, username}, secrets: {token}};
+    return {settings: {baseUrl, username}, secrets: {token, password}};
   },
   async open(profile, secrets, isCurrent) {
     const base = serviceBase(profile.settings.baseUrl ?? ''), token = secrets.token ?? '';

@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Uzantıya bir çeviri kanalı ekleyin",
         "paragraphs": [
-          "Uzantının ayarlarını açın ve Çeviri kanallarını bulun. Başarılı bir bağlantının ardından uzantı, girdiğiniz parolayı değil hizmet belirtecini saklar. Aşağıdaki etiketler arayüz dilinizdeki ilgili kontrolleri açıklamaktadır."
+          "Uzantının ayarlarını açın ve Çeviri kanallarını bulun. Bağlantı başarılı olduğunda uzantı parolayı ve hizmet belirtecini bu bilgisayarda saklar. Aynı hizmet adresi ve kullanıcı adıyla yeniden bağlanırken parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Aşağıdaki etiketler arayüz dilinizdeki ilgili kontrolleri açıklamaktadır."
         ],
         "steps": [
           "Çeviri kanalı ekle'yi seçin ve hizmet olarak manga-translator-ui'yi onaylayın. İsteğe bağlı olarak “Bilgisayarım” gibi tanınabilir bir ad verin.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Önceki bir bağlantı artık süresi dolmuş bir oturum açma bilgisini rapor ediyor",
-              "Kanal ayarlarında Yeniden Bağlan'ı seçin ve servis şifresini tekrar girin. Uzantı önceki çeviriyi sessizce yeniden göndermez."
+              "Kanal ayarlarında Yeniden Bağlan'ı seçin. Aynı hizmet adresi ve kullanıcı adı için parola alanını boş bırakarak kayıtlı parolayı kullanabilirsiniz. Yalnızca belirteç saklayan eski sürüm ayarlarında, ilk yeniden bağlantıda parolayı bir kez girmeniz gerekir. Adresi veya kullanıcı adını değiştirirseniz ya da parola değişmiş veya geçersiz hale gelmişse parolayı yeniden girin. Uzantı önceki çeviriyi sessizce yeniden göndermez."
             ],
             [
               "Bağlandı ancak çeviri beklemeye devam ediyor",

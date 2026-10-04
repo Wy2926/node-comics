@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Dodaj kanał tłumaczeniowy w rozszerzeniu",
         "paragraphs": [
-          "Otwórz ustawienia rozszerzenia i znajdź kanały tłumaczeń. Po udanym połączeniu rozszerzenie przechowuje token usługi, a nie wprowadzone hasło. Etykiety poniżej opisują odpowiednie elementy sterujące w języku interfejsu."
+          "Otwórz ustawienia rozszerzenia i znajdź kanały tłumaczeń. Po udanym połączeniu rozszerzenie zapisuje hasło i token usługi lokalnie na tym komputerze. Przy ponownym łączeniu z tym samym adresem usługi i nazwą użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika albo hasło zostało zmienione lub przestało działać. Starsze profile zawierające tylko token wymagają jednorazowego wpisania hasła przy pierwszym ponownym połączeniu. Etykiety poniżej opisują odpowiednie elementy sterujące w języku interfejsu."
         ],
         "steps": [
           "Wybierz opcję Dodaj kanał tłumaczeniowy i potwierdź manga-translator-ui jako usługę. Opcjonalnie nadaj mu rozpoznawalną nazwę, na przykład „Mój komputer”.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Poprzednie połączenie zgłasza teraz wygasły login",
-              "W ustawieniach kanału wybierz Połącz ponownie i wprowadź ponownie hasło serwisowe. Rozszerzenie nie wysyła ponownie w trybie cichym poprzedniego tłumaczenia."
+              "W ustawieniach kanału wybierz Połącz ponownie. Przy tym samym adresie usługi i nazwie użytkownika pozostaw pole hasła puste, aby użyć zapisanego hasła. Wpisz je ponownie, jeśli zmienisz adres lub nazwę użytkownika, hasło zostało zmienione lub przestało działać albo starszy profil zawiera tylko token. Rozszerzenie nie wysyła ponownie w trybie cichym poprzedniego tłumaczenia."
             ],
             [
               "Połączono, ale tłumaczenie wciąż czeka",

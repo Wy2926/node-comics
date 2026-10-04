@@ -22,6 +22,7 @@ const baselineCapabilities=():Capabilities=>({modes:[
 
 export const definition:ChannelDefinition={
   id:'nodelane',label:'NodeLane',configurable:false,fields:[],
+  get description(){return msg('使用 NodeLane 官方翻译服务，翻译时需登录账号。');},
   async inspectLocalEntry(entryId){
     const refs=new Map<string,{imageSha256?:string;scope:string;key:string}>(),images=new Set<string>();let after:string|undefined;
     do{

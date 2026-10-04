@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Adicione um canal de tradução na extensão",
         "paragraphs": [
-          "Abra as configurações da extensão e encontre Canais de tradução. Após uma conexão bem-sucedida, a extensão armazena o token de serviço, não a senha inserida. Os rótulos abaixo descrevem os controles correspondentes no idioma da sua interface."
+          "Abra as configurações da extensão e encontre Canais de tradução. Após uma conexão bem-sucedida, a extensão salva a senha e o token do serviço localmente neste computador. Ao reconectar com o mesmo endereço de serviço e nome de usuário, deixe a senha em branco para reutilizar a senha salva. Digite-a novamente se o endereço ou o nome de usuário mudar, ou se a senha tiver sido alterada ou não for mais válida. Perfis antigos que contêm apenas um token precisam que a senha seja informada uma vez na primeira reconexão. Os rótulos abaixo descrevem os controles correspondentes no idioma da sua interface."
         ],
         "steps": [
           "Escolha Adicionar canal de tradução e confirme manga-translator-ui como o serviço. Opcionalmente, atribua um nome reconhecível, como “Meu computador”.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Uma conexão anterior agora informa um login expirado",
-              "Escolha Reconectar nas configurações do canal e digite a senha do serviço novamente. A extensão não reenvia silenciosamente a tradução anterior."
+              "Escolha Reconectar nas configurações do canal. Com o mesmo endereço de serviço e nome de usuário, deixe a senha em branco para reutilizá-la. Digite-a novamente se o endereço ou o nome de usuário mudar, se a senha tiver sido alterada ou não for mais válida, ou se um perfil antigo contiver apenas um token. A extensão não reenvia silenciosamente a tradução anterior."
             ],
             [
               "Conectado, mas a tradução continua esperando",

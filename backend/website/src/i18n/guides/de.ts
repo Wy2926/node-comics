@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Fügen Sie in der Erweiterung einen Übersetzungskanal hinzu",
         "paragraphs": [
-          "Öffnen Sie die Einstellungen der Erweiterung und suchen Sie nach Übersetzungskanälen. Nach einer erfolgreichen Verbindung speichert die Erweiterung das Service-Token, nicht das von Ihnen eingegebene Passwort. Die folgenden Beschriftungen beschreiben die entsprechenden Steuerelemente in Ihrer Benutzeroberflächensprache."
+          "Öffnen Sie die Einstellungen der Erweiterung und suchen Sie nach Übersetzungskanälen. Nach einer erfolgreichen Verbindung speichert die Erweiterung das Dienstpasswort und das Token lokal auf diesem Computer. Wenn Sie dieselbe Dienstadresse und denselben Benutzernamen erneut verbinden, lassen Sie das Passwortfeld leer, um das gespeicherte Passwort zu verwenden. Geben Sie das Passwort erneut ein, wenn sich die Adresse oder der Benutzername ändert oder das Passwort geändert wurde oder nicht mehr gültig ist. Bei älteren Profilen, die nur ein Token enthalten, müssen Sie das Passwort bei der ersten erneuten Verbindung einmal eingeben. Die folgenden Beschriftungen beschreiben die entsprechenden Steuerelemente in Ihrer Benutzeroberflächensprache."
         ],
         "steps": [
           "Wählen Sie Übersetzungskanal hinzufügen und bestätigen Sie manga-translator-ui als Dienst. Geben Sie ihm optional einen erkennbaren Namen, z. B. „Mein Computer“.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Eine frühere Verbindung meldet nun einen abgelaufenen Login",
-              "Wählen Sie in den Kanaleinstellungen „Erneut verbinden“ und geben Sie das Dienstkennwort erneut ein. Die Erweiterung sendet die vorherige Übersetzung nicht stillschweigend erneut."
+              "Wählen Sie in den Kanaleinstellungen „Erneut verbinden“. Bei derselben Dienstadresse und demselben Benutzernamen können Sie das Passwortfeld leer lassen, um das gespeicherte Passwort zu verwenden. Geben Sie es erneut ein, wenn sich die Adresse oder der Benutzername ändert, das Passwort geändert wurde oder nicht mehr gültig ist oder ein älteres Profil nur ein Token enthält. Die Erweiterung sendet die vorherige Übersetzung nicht stillschweigend erneut."
             ],
             [
               "Verbunden, aber die Übersetzung wartet",

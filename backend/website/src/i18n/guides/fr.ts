@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Ajoutez un canal de traduction dans l'extension",
         "paragraphs": [
-          "Ouvrez les paramètres de l'extension et recherchez les canaux de traduction. Après une connexion réussie, l'extension stocke le jeton de service, et non le mot de passe que vous avez saisi. Les étiquettes ci-dessous décrivent les commandes correspondantes dans la langue de votre interface."
+          "Ouvrez les paramètres de l'extension et recherchez les canaux de traduction. Après une connexion réussie, l'extension enregistre le mot de passe et le jeton du service localement sur cet ordinateur. Pour vous reconnecter avec la même adresse de service et le même nom d'utilisateur, laissez le mot de passe vide afin de réutiliser celui qui est enregistré. Saisissez-le à nouveau si l'adresse ou le nom d'utilisateur change, ou si le mot de passe a changé ou n'est plus valide. Les anciens profils qui ne contiennent qu'un jeton nécessitent de saisir le mot de passe une fois lors de leur première reconnexion. Les étiquettes ci-dessous décrivent les commandes correspondantes dans la langue de votre interface."
         ],
         "steps": [
           "Choisissez Ajouter un canal de traduction et confirmez manga-translator-ui comme service. Donnez-lui éventuellement un nom reconnaissable, tel que « Mon ordinateur ».",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Une connexion précédente signale désormais une connexion expirée",
-              "Choisissez Reconnecter dans les paramètres du canal et saisissez à nouveau le mot de passe du service. L'extension ne renvoie pas silencieusement la traduction précédente."
+              "Choisissez Reconnecter dans les paramètres du canal. Avec la même adresse de service et le même nom d'utilisateur, laissez le mot de passe vide pour le réutiliser. Saisissez-le à nouveau si l'adresse ou le nom d'utilisateur change, si le mot de passe a changé ou n'est plus valide, ou si un ancien profil ne contient qu'un jeton. L'extension ne renvoie pas silencieusement la traduction précédente."
             ],
             [
               "Connecté, mais la traduction attend",

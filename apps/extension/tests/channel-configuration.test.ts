@@ -4,7 +4,7 @@ import type {ChannelConnectionInput,ChannelConnectionResult} from '../src/transl
 
 const protocol=vi.hoisted(()=>({connect:vi.fn(),open:vi.fn()}));
 vi.mock('../src/translation/channels/registry',()=>{
-  const local={id:'fixture',label:'Fixture service',configurable:true,fields:[],connect:protocol.connect,open:protocol.open,
+  const local={id:'fixture',label:'Fixture service',configurable:true,fields:[{key:'password',type:'password',required:true}],connect:protocol.connect,open:protocol.open,
     permissionOrigins:(input:ChannelConnectionInput)=>[new URL(input.settings.baseUrl).origin+'/*']};
   const official={id:'nodelane',label:'NodeLane',configurable:false,fields:[],open:vi.fn()};
   return {channelDefinitions:()=>[official,local],channelDefinition:(id:string)=>id==='nodelane'?official:local};
@@ -24,7 +24,7 @@ function input(baseUrl='http://127.0.0.1:8000',password='fixture-password'):Chan
   return {settings:{baseUrl,username:'fixture-reader'},secrets:{password}};
 }
 function result(value:ChannelConnectionInput):ChannelConnectionResult{
-  return {settings:{baseUrl:value.settings.baseUrl,username:value.settings.username},secrets:{token:'private-token-'+value.secrets.password}};
+  return {settings:{baseUrl:value.settings.baseUrl,username:value.settings.username},secrets:{token:'private-token-'+value.secrets.password,password:value.secrets.password}};
 }
 function deferred<T>(){let resolve!:(value:T)=>void;const promise=new Promise<T>(done=>{resolve=done;});return {promise,resolve};}
 
@@ -71,7 +71,7 @@ describe('channel configuration and connection',()=>{
     const rotated=await connectChannel('fixture','New name',input(undefined,'rotated-password'),first.id);
     expect(rotated).toMatchObject({id:first.id,name:'New name',revision:1});expect(listener).toHaveBeenCalledTimes(2);
     expect((metadata[channelSettingsKey] as {changeId:string}).changeId).not.toBe(initialChange);
-    expect(await readChannelSecrets(first.id)).toEqual({token:'private-token-rotated-password'});
+    expect(await readChannelSecrets(first.id)).toEqual({token:'private-token-rotated-password',password:'rotated-password'});
     const moved=await connectChannel('fixture','New name',input('http://127.0.0.1:9000','rotated-password'),first.id);
     expect(moved.revision).toBe(2);expect(listener).toHaveBeenCalledTimes(3);unsubscribe();expect(changes.size).toBe(0);
   });
@@ -80,8 +80,114 @@ describe('channel configuration and connection',()=>{
     const {readChannelSecrets}=await import('../src/translation/channels/configuration');
     const profile=await connectChannel('fixture','Local',input()),secrets=await readChannelSecrets(profile.id);
     const stored=JSON.stringify(metadata);expect(stored).not.toContain('private-token');expect(stored).not.toContain('fixture-password');expect(stored).not.toContain('"password"');expect(stored).not.toContain('"token"');
-    expect(secrets).toEqual({token:'private-token-fixture-password'});await selectChannel(profile.id);
+    expect(secrets).toEqual({token:'private-token-fixture-password',password:'fixture-password'});await selectChannel(profile.id);
     const current=()=>true;await openActiveChannel(current);expect(protocol.open).toHaveBeenCalledWith(profile,secrets,current);
+  });
+  it('reuses only the declared saved password for an unchanged destination without exposing its value to the settings UI',async()=>{
+    const {connectChannel,savedChannelSecretFields}=await import('../src/translation/channels');
+    const {readChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Local',input());
+    expect(await savedChannelSecretFields(profile.id)).toEqual(['token','password']);
+    const supplied=input(undefined,'');
+    const reconnected=await connectChannel('fixture','Renamed',supplied,profile.id);
+    expect(protocol.connect).toHaveBeenLastCalledWith(input());
+    expect(supplied.secrets).toEqual({password:''});
+    expect(reconnected).toMatchObject({id:profile.id,revision:profile.revision,name:'Renamed'});
+    expect(await readChannelSecrets(profile.id)).toEqual(result(input()).secrets);
+  });
+  it.each(['address','username','adapter','added setting','removed setting'])('does not send a saved password after changing the %s',async change=>{
+    const {connectChannel,listChannels}=await import('../src/translation/channels');
+    const {readChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Local',input()),next=input(undefined,'');
+    let adapterId='fixture';
+    if(change==='address')next.settings.baseUrl='http://127.0.0.1:9000';
+    if(change==='username')next.settings.username='different-reader';
+    if(change==='adapter')adapterId='another-fixture';
+    if(change==='added setting')next.settings.extra='new-setting';
+    if(change==='removed setting')delete next.settings.username;
+    protocol.connect.mockRejectedValueOnce(Error('Password required'));
+    await expect(connectChannel(adapterId,'Changed',next,profile.id)).rejects.toThrow('Password required');
+    expect(protocol.connect).toHaveBeenLastCalledWith(next);
+    expect(protocol.connect.mock.calls.at(-1)?.[0].secrets).toEqual({password:''});
+    expect((await listChannels()).profiles.find(item=>item.id===profile.id)).toEqual(profile);
+    expect(await readChannelSecrets(profile.id)).toEqual(result(input()).secrets);
+  });
+  it('requires a password once for a legacy token-only profile, then supports blank-password reconnects',async()=>{
+    const {connectChannel,selectChannel,openActiveChannel,savedChannelSecretFields}=await import('../src/translation/channels');
+    const {readChannelSecrets,writeChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Legacy',input());
+    await writeChannelSecrets(profile.id,{token:'legacy-token'});
+    expect(await savedChannelSecretFields(profile.id)).toEqual([]);
+    await selectChannel(profile.id);
+    const current=()=>true;await openActiveChannel(current);
+    expect(protocol.open).toHaveBeenLastCalledWith(profile,{token:'legacy-token'},current);
+    protocol.connect.mockImplementation(async(value:ChannelConnectionInput)=>{
+      if(!value.secrets.password)throw Error('Password required');return result(value);
+    });
+    await expect(connectChannel('fixture','Legacy',input(undefined,''),profile.id)).rejects.toThrow('Password required');
+    expect(protocol.connect).toHaveBeenLastCalledWith(input(undefined,''));
+    expect(await readChannelSecrets(profile.id)).toEqual({token:'legacy-token'});
+    await connectChannel('fixture','Legacy',input(undefined,'new-password'),profile.id);
+    await connectChannel('fixture','Legacy',input(undefined,''),profile.id);
+    expect(protocol.connect).toHaveBeenLastCalledWith(input(undefined,'new-password'));
+    expect(await readChannelSecrets(profile.id)).toEqual(result(input(undefined,'new-password')).secrets);
+  });
+  it('keeps the selected profile and saved credentials when a replacement password fails to connect',async()=>{
+    const {connectChannel,listChannels,selectChannel}=await import('../src/translation/channels');
+    const {readChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Local',input());await selectChannel(profile.id);
+    const before=structuredClone(metadata);
+    protocol.connect.mockRejectedValueOnce(Error('Login failed'));
+    await expect(connectChannel('fixture','Replacement',input(undefined,'incorrect-password'),profile.id)).rejects.toThrow('Login failed');
+    expect(protocol.connect).toHaveBeenLastCalledWith(input(undefined,'incorrect-password'));
+    expect(metadata).toEqual(before);
+    expect((await listChannels()).activeId).toBe(profile.id);
+    expect(await readChannelSecrets(profile.id)).toEqual(result(input()).secrets);
+  });
+  it.each([true,false])('reads credentials after a concurrent settings mutation completes with Web Locks=%s',async enabled=>{
+    installLocks(enabled);
+    const {connectChannel}=await import('../src/translation/channels');
+    const {readChannelCredentials,updateChannelSettings,writeChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Local',input()),entered=deferred<void>(),release=deferred<void>();
+    const updated={...profile,settings:{...profile.settings,baseUrl:'http://127.0.0.1:9000'}};
+    const updatedSecrets={password:'other-password',token:'other-token'};
+    const mutation=updateChannelSettings(async value=>{
+      await writeChannelSecrets(profile.id,updatedSecrets,updated);entered.resolve();await release.promise;
+      return {...value,profiles:value.profiles.map(item=>item.id===profile.id?updated:item)};
+    });
+    await entered.promise;
+    const credentials=readChannelCredentials(profile.id);
+    release.resolve();await mutation;
+    expect(await credentials).toEqual({profile:updated,secrets:updatedSecrets});
+  });
+  it.each([true,false])('blocks credentials for a different destination after a settings write fails with Web Locks=%s',async enabled=>{
+    installLocks(enabled);
+    const {connectChannel,listChannels,selectChannel,savedChannelSecretFields,openActiveChannel}=await import('../src/translation/channels');
+    const {readChannelCredentials,readChannelSecrets}=await import('../src/translation/channels/configuration');
+    const profile=await connectChannel('fixture','Destination A',input());await selectChannel(profile.id);
+    const before=structuredClone(metadata),destinationB=input('http://127.0.0.1:9000','destination-b-password');
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(Error('Settings write failed'));
+    await expect(connectChannel('fixture','Destination B',destinationB,profile.id)).rejects.toThrow('Settings write failed');
+    expect(protocol.connect).toHaveBeenLastCalledWith(destinationB);
+    expect(metadata).toEqual(before);
+    expect(await readChannelSecrets(profile.id)).toEqual(result(destinationB).secrets);
+    expect(await readChannelCredentials(profile.id)).toEqual({profile,secrets:{}});
+    expect(await savedChannelSecretFields(profile.id)).toEqual([]);
+    const current=()=>true;await openActiveChannel(current);
+    expect(protocol.open).toHaveBeenLastCalledWith(profile,{},current);
+    protocol.connect.mockImplementation(async(value:ChannelConnectionInput)=>{
+      if(!value.secrets.password)throw Error('Password required');return result(value);
+    });
+    await expect(connectChannel('fixture','Destination A',input(undefined,''),profile.id)).rejects.toThrow('Password required');
+    expect(protocol.connect).toHaveBeenLastCalledWith(input(undefined,''));
+    expect(metadata).toEqual(before);
+    const restored=await connectChannel('fixture','Destination A',input(),profile.id);
+    expect(restored).toEqual(profile);
+    expect((await listChannels()).activeId).toBe(profile.id);
+    expect(await savedChannelSecretFields(profile.id)).toEqual(['token','password']);
+    expect(await readChannelSecrets(profile.id,restored)).toEqual(result(input()).secrets);
+    await openActiveChannel(current);
+    expect(protocol.open).toHaveBeenLastCalledWith(restored,result(input()).secrets,current);
   });
   it('does not recreate a removed profile when a pending reconnect returns',async()=>{
     const {connectChannel,selectChannel,removeChannel,listChannels}=await import('../src/translation/channels');

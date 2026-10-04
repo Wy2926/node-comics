@@ -66,7 +66,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "3. Tambahkan saluran terjemahan di ekstensi",
         "paragraphs": [
-          "Buka pengaturan ekstensi dan temukan saluran Terjemahan. Setelah koneksi berhasil, ekstensi menyimpan token layanan, bukan kata sandi yang Anda masukkan. Label di bawah menjelaskan kontrol yang sesuai dalam bahasa antarmuka Anda."
+          "Buka pengaturan ekstensi dan temukan saluran Terjemahan. Setelah koneksi berhasil, ekstensi menyimpan kata sandi dan token layanan di komputer ini. Saat menghubungkan kembali dengan alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Label di bawah menjelaskan kontrol yang sesuai dalam bahasa antarmuka Anda."
         ],
         "steps": [
           "Pilih Tambahkan saluran terjemahan dan konfirmasikan manga-translator-ui sebagai layanan. Secara opsional, beri nama yang dapat dikenali, seperti “Komputer saya”.",
@@ -114,7 +114,7 @@ export const localTranslationGuides: Guide[] = [
             ],
             [
               "Koneksi sebelumnya sekarang melaporkan login yang kedaluwarsa",
-              "Pilih Hubungkan kembali di pengaturan saluran dan masukkan kata sandi layanan lagi. Ekstensi tidak mengirimkan ulang terjemahan sebelumnya secara diam-diam."
+              "Pilih Hubungkan kembali di pengaturan saluran. Untuk alamat layanan dan nama pengguna yang sama, kosongkan kolom kata sandi untuk menggunakan kata sandi yang tersimpan. Konfigurasi dari versi lama yang hanya menyimpan token memerlukan kata sandi sekali saat pertama kali dihubungkan kembali. Jika alamat atau nama pengguna berubah, atau kata sandi telah diubah atau tidak lagi valid, masukkan kata sandi lagi. Ekstensi tidak mengirimkan ulang terjemahan sebelumnya secara diam-diam."
             ],
             [
               "Terhubung, tetapi terjemahan masih menunggu",
