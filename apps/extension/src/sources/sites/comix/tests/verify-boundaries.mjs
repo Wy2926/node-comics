@@ -29,6 +29,7 @@ context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 await context.route('https://*.nodelane.net/**',route=>route.fulfill({status:503,body:'Isolated source acceptance'}));
 await context.route('https://comix.to/**',route=>{
   const url=new URL(route.request().url()),chapter='/title/review-fixture/20-chapter-1';
+  if(url.pathname==='/api/v1/manga/review')return route.fulfill({json:{status:'ok',result:{id:1,hid:'review',url:'/title/review-fixture',title:'来源边界测试'}}});
   if(url.pathname.includes('/manga/'))return route.fulfill({json:{status:'ok',result:{items:[{id:20,number:1,mangaId:1,language:'en',isOfficial:true,url:chapter}],meta:{page:1,lastPage:1,total:1,hasNext:false}}}});
   if(url.pathname.includes('/chapters/'))return route.fulfill({json:{status:'ok',result:{id:20,number:1,url:chapter,pages:{items:[{url:'https://images.wowpic1.store/page.png',width:800,height:1200}]}}}});
   return route.fulfill({contentType:'text/html',body:'<script id="initial-data">'+JSON.stringify({queries:{'["manga","detail","review"]':{id:1,hid:'review',url:'/title/review-fixture',title:'来源边界测试'}}})+'</script>'});
@@ -56,7 +57,7 @@ try {
     const data=await chrome.storage.local.get(null),manifest=Object.values(data).find(v=>v?.adapter==='comix'&&v.items);
     return {manifestId:manifest.id,context:manifest.pageContext,accepted:(await catalog.list('catalogs'))[0].entries.length,shadows:Object.keys(data).filter(k=>k.startsWith('nc-source:'))};
   });assert.equal(record.context,undefined);assert.equal(record.accepted,1);assert.deepEqual(record.shadows,[]);
-  checks.push('Link import uses library state, creates no source tab, and displays the authorized source image');
+  checks.push('Link import uses page-context APIs, closes its temporary source tab, and displays the authorized source image');
   await reader.goto(readerUrl+'?manifest='+record.manifestId);
   await reader.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth===800);checks.push('Reopening the manifest restores a readable cached page');
 

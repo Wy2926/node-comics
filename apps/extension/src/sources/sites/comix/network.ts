@@ -16,13 +16,11 @@ function chapter(value:unknown,hid:string,mangaId:number):Chapter{
   return {id,number,url,official:row.isOfficial===true,group:row.group?text(object(row.group).name):'未标注来源',name:typeof row.name==='string'?row.name:''};
 }
 export const network={
+  pageTransport:['catalog','pages'],
   search,
   async catalog(url,context){
     const loc=location(url);if(loc.chapterId)throw Error('请使用 Comix 漫画详情页链接。');
-    const html=await context.request(url),match=/<script\b[^>]*\bid=["']initial-data["'][^>]*>([\s\S]*?)<\/script>/i.exec(html);
-    if(!match)throw Error('Comix 页面未返回漫画数据，可能需要完成源站验证。');
-    const initial=object(JSON.parse(match[1])),queries=object(initial.queries);
-    const detail=object(queries[JSON.stringify(['manga','detail',loc.hid])]);
+    const detail=await api('/manga/'+loc.hid,context);
     if(detail.hid!==loc.hid)throw Error('Comix 漫画归属已变化。');
     const mangaId=integer(detail.id),canonical=new URL(text(detail.url),'https://comix.to').href;
     if(location(canonical).hid!==loc.hid||location(canonical).chapterId)throw Error('Comix 目录地址无效。');

@@ -37,24 +37,29 @@ function encodeForm(form: Readonly<Record<string, string>>): string {
   if (encoded.length > limit) return invalid();
   return encoded;
 }
+/** Shared authorization for extension HTTP and source-page requests. */
+export async function authorizeSourceRequest(sourceUrl: string, url: string, options: Parameters<SourceNetworkContext['request']>[1],
+  signal?: AbortSignal, allowedOrigins?: readonly string[]) {
+  signal?.throwIfAborted();
+  if (safeImageUrl(url, url) !== url) throw new SourceHttpError('request-denied', '来源请求地址无效。');
+  if (allowedOrigins && !allowedOrigins.some(origin => originMatches(origin, url)))
+    throw new SourceHttpError('request-denied', '来源请求超出声明范围。');
+  if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+    const origins = [new URL(url).origin + '/*'];
+    if (!await chrome.permissions.contains({origins}))
+      throw new SourceHttpError('permission-required', msg('网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。'));
+    signal?.throwIfAborted();
+  }
+  if (options && (safeImageUrl(options.referer, options.referer) !== options.referer || new URL(options.referer).origin !== new URL(url).origin ||
+    resolveSource(options.referer, definitions).definition.id !== resolveSource(sourceUrl, definitions).definition.id))
+    throw new SourceHttpError('request-denied', '来源请求头归属无效。');
+  return options?.form === undefined ? undefined : encodeForm(options.form);
+}
 /** Packaged source parsers share a bounded transport, with an optional operation-specific allowlist. */
 export function createSourceNetworkContext(sourceUrl: string, signal?: AbortSignal, replay: ImportResponse[] = [],
   allowedOrigins?: readonly string[]): SourceNetworkContext {
   return {signal, async request(url, options) {
-    signal?.throwIfAborted();
-    if (safeImageUrl(url, url) !== url) throw new SourceHttpError('request-denied', '来源请求地址无效。');
-    if (allowedOrigins && !allowedOrigins.some(origin => originMatches(origin, url)))
-      throw new SourceHttpError('request-denied', '来源请求超出声明范围。');
-    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-      const origins = [new URL(url).origin + '/*'];
-      if (!await chrome.permissions.contains({origins}))
-        throw new SourceHttpError('permission-required', msg('网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。'));
-      signal?.throwIfAborted();
-    }
-    if (options && (safeImageUrl(options.referer, options.referer) !== options.referer || new URL(options.referer).origin !== new URL(url).origin ||
-      resolveSource(options.referer, definitions).definition.id !== resolveSource(sourceUrl, definitions).definition.id))
-      throw new SourceHttpError('request-denied', '来源请求头归属无效。');
-    const body = options?.form === undefined ? undefined : encodeForm(options.form);
+    const body = await authorizeSourceRequest(sourceUrl,url,options,signal,allowedOrigins);
     const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer) : -1;
     if (cached >= 0) return replay.splice(cached, 1)[0].body;
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);

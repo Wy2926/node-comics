@@ -1,5 +1,9 @@
 /** Image transport/decoding is independent of how a site discovers its directory or pages. */
 export interface SourceImageAdapter {
+  /** Catalog/search artwork only: read bytes in the exact image document's browser session. */
+  coverTransport?: 'page';
+  /** Extension reader/search image requests only; inline images retain the live page policy. */
+  readerReferrerPolicy?: ReferrerPolicy;
   /** Dynamic headers receive only the already authorized image URL. */
   headers?: Readonly<Record<string,string>> | ((url:string)=>Readonly<Record<string,string>>);
   /** Catalog artwork can have different hotlink rules from chapter pages. */

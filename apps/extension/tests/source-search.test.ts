@@ -1,12 +1,14 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {SourceDefinition} from '../src/sources/contracts/definition';
 import type {SourceNetwork} from '../src/sources/contracts/network';
+import type {SourceImageAdapter} from '../src/sources/contracts/image';
 import type {SourceSearchHit, SourceSearchRequest} from '../src/sources/contracts/search';
 const fixture = vi.hoisted(() => ({definitions: [] as SourceDefinition[], networks: {} as Record<string, SourceNetwork>,
-  headers: vi.fn(() => ({referer: 'https://fixture.test/'}))}));
+  images: {} as Record<string,SourceImageAdapter>,pageCover:vi.fn(),headers: vi.fn(() => ({referer: 'https://fixture.test/'}))}));
 vi.mock('../src/sources/registry/definitions', () => ({definitions: fixture.definitions}));
 vi.mock('../src/sources/registry/networks', () => ({sourceNetworks: fixture.networks}));
-vi.mock('../src/sources/registry/images', () => ({sourceImages: {fixture: {coverHeaders: fixture.headers}}}));
+vi.mock('../src/sources/registry/images', () => ({sourceImages: fixture.images}));
+vi.mock('../src/sources/runtime/page-cover', () => ({readPageCover: fixture.pageCover}));
 vi.mock('../src/sources/runtime/image-headers', () => ({withImageHeaders: async (_url: string, _headers: unknown, _signal: unknown, read: () => Promise<unknown>) => read()}));
 import {normalizeSourceSearchRequest, validateSearchCapability, validateSearchPage} from '../src/sources/core/search';
 import {originMatches} from '../src/sources/shared/origins';
@@ -32,6 +34,7 @@ beforeEach(() => {
   fixture.definitions.splice(0, fixture.definitions.length, definition());
   fixture.networks.fixture = {search: vi.fn(async () => ({items: [hit()]}))};
   fixture.headers.mockClear();
+  fixture.images.fixture={coverHeaders:fixture.headers};fixture.pageCover.mockReset().mockResolvedValue(new Blob(['page cover']));
   vi.stubGlobal('chrome', {runtime: {id: 'fixture'}, permissions: {contains: vi.fn(async () => true), request: vi.fn(async () => true)}});
   vi.stubGlobal('fetch', vi.fn(async () => new Response('fixture')));
 });
@@ -158,6 +161,16 @@ describe('single-site search runtime', () => {
     vi.mocked(chrome.permissions.contains).mockImplementation(async () => false);
     await expect(readSearchCover(candidate)).rejects.toThrow();
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('honors the same explicit image-document cover transport after search candidate validation',async()=>{
+    fixture.images.fixture.coverTransport='page';
+    const url='https://images.test/page-cover.png';
+    fixture.networks.fixture.search=async()=>({items:[hit({cover:{url}})]});
+    const candidate=(await searchSource('fixture',query(),{sessionId:'session'})).items[0];
+    expect(await(await readSearchCover(candidate)).text()).toBe('page cover');
+    expect(fixture.pageCover).toHaveBeenCalledExactlyOnceWith(url,undefined);
+    await expect(readSearchCover({...candidate,cover:{url:url+'?forged'}})).rejects.toMatchObject({code:'SOURCE_SEARCH_INVALID'});
+    expect(fixture.pageCover).toHaveBeenCalledOnce();expect(fixture.headers).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
   });
 });
 

@@ -3,9 +3,8 @@ import {SourceSearchError, type SourceSearchOptions, type SourceSearchRequest, t
 import {normalizeSourceSearchRequest, sourceSearchLimits, validateSearchCapability, validateSearchPage} from '../core/search';
 import {definitions} from '../registry/definitions';
 import {sourceNetworks} from '../registry/networks';
-import {sourceImages} from '../registry/images';
 import {createSourceNetworkContext, SourceHttpError} from './http';
-import {fetchSourceImage} from './image-fetch';
+import {readSourceArtwork} from './source-image';
 
 const lifetimeMs = 10 * 60_000;
 const cursors = new Map<string, {binding: string; value: string; sessionId: string; expires: number}>();
@@ -104,7 +103,5 @@ export async function readSearchCover(hit: SourceSearchResult, signal?: AbortSig
   if (!registered || registered.hit.key !== hit.key || !registered.hit.cover) throw new SourceSearchError('SOURCE_SEARCH_INVALID');
   const verified = registered.hit;
   authority(verified.sourceId, verified.siteId);
-  const adapter = sourceImages[verified.sourceId], configured = adapter?.coverHeaders ?? adapter?.headers;
-  const headers = typeof configured === 'function' ? configured(verified.cover!.url) : configured;
-  return (await fetchSourceImage(verified.cover!.url, signal, headers, {pageUrl: verified.catalogUrl})).blob;
+  return readSourceArtwork(verified.sourceId,verified.cover!.url,verified.catalogUrl,signal);
 }

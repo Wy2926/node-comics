@@ -6,6 +6,7 @@ import {validatePages} from '../core/pages';
 import {registerManifest} from './manifests';
 import type {PageManifest,PageSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 import {createSourceNetworkContext as networkContext} from './http';
+import {withPageNetworkContext} from './page-network';
 import {importResponseLimits,rememberImportResponses,takeImportResponses,type ImportResponse} from './import-responses';
 
 /** Select each operation independently; failures never switch transports implicitly. */
@@ -45,7 +46,7 @@ export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal
   let {signal}=options;
   signal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(120_000)]);
   signal.throwIfAborted();
-  const {location}=resolveSource(url,definitions),read=networkOperation(url,'catalog');
+  const {definition,location}=resolveSource(url,definitions),read=networkOperation(url,'catalog');
   if(!read)throw Error('SOURCE_CATALOG_UNSUPPORTED');
   const previous=options.previous&&validateCatalog(options.previous,definitions);
   if(previous&&previous.id!==location.catalog!.key)throw Error('SOURCE_CATALOG_CHANGED');
@@ -56,17 +57,22 @@ export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal
     await options.onCatalogProgress!(snapshot);
     signal.throwIfAborted();
   }:undefined;
-  const snapshot=validateCatalog(await read(url,{...networkContext(url,signal),previous,onCatalogProgress}),definitions);
+  const value=sourceNetworks[definition.id]?.pageTransport?.includes('catalog')
+    ?await withPageNetworkContext(url,signal,context=>read(url,{...context,previous,onCatalogProgress}))
+    :await read(url,{...networkContext(url,signal),previous,onCatalogProgress});
+  const snapshot=validateCatalog(value,definitions);
   if(snapshot.id!==location.catalog!.key||!snapshot.complete||!snapshot.groups.every(group=>group.complete))throw Error('SOURCE_CATALOG_CHANGED');
   signal?.throwIfAborted();
   return snapshot;
 }
 export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<PageManifest>{
   signal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(60_000)]);
-  const {location}=resolveSource(url,definitions),read=networkOperation(url,'pages');
+  const {definition,location}=resolveSource(url,definitions),read=networkOperation(url,'pages');
   if(!read)throw Error('SOURCE_COLLECTION_UNSUPPORTED');
-  const replay=await takeImportResponses(location,signal);
-  const snapshot=validatePages(await read(url,networkContext(url,signal,replay)),location);
+  const value=sourceNetworks[definition.id]?.pageTransport?.includes('pages')
+    ?await withPageNetworkContext(url,signal,context=>read(url,context))
+    :await read(url,networkContext(url,signal,await takeImportResponses(location,signal)));
+  const snapshot=validatePages(value,location);
   signal?.throwIfAborted();
   const manifest:PageSnapshot={adapter:snapshot.adapter,url:snapshot.url,title:snapshot.title,direction:snapshot.direction,
     discoveryComplete:snapshot.discoveryComplete,knownTotal:snapshot.knownTotal,note:snapshot.note,

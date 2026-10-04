@@ -5,6 +5,7 @@ vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(),registerInlineBackground:vi.fn()}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(),registerRegionBackground:vi.fn()}));
 import {registerSourceBackground} from '../src/sources/runtime/background';
+vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 const url='https://comic.naver.com/webtoon/list?titleId=123',reader='https://comic.naver.com/webtoon/detail?titleId=123&no=1';
 const snapshot:SourceCatalogSnapshot={id:'naver:webtoon:123',sourceId:'naver',url,title:'DOM fixture',complete:true,observedAt:1,note:'',groups:[],
   entries:[{id:'episode-1',catalogId:'naver:webtoon:123',remoteId:'1',url:reader,title:'Episode one',order:0,groupIds:[],rawTypes:[],related:false}]};

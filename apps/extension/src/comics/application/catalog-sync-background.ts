@@ -1,5 +1,4 @@
 import {nextCatalogCheckAt, syncNextCatalog} from './catalog-sync';
-import {recoverCatalogTabs} from '../../sources';
 
 export const CATALOG_SYNC_ALARM = 'nc-catalog-sync';
 export const CATALOG_CONTINUE_ALARM = 'nc-catalog-sync-continue';
@@ -8,7 +7,6 @@ export function registerCatalogSyncBackground() {
   const run = () => running ??= (async () => {
     // Schedule recovery before doing work: termination can happen before the finally block runs.
     await chrome.alarms.create(CATALOG_CONTINUE_ALARM, {when:Date.now()+120_000});
-    await recoverCatalogTabs();
     // Keep network work sequential and bounded. Persisted due times survive worker suspension.
     const deadline = Date.now() + 25_000;
     while (Date.now() < deadline && await syncNextCatalog()) { /* drain due comics */ }

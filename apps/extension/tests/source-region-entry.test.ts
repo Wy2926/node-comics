@@ -3,6 +3,7 @@ import {activateInline} from '../src/inline/background';
 import {activateRegion,registerRegionBackground} from '../src/region/background';
 import {requireHostAccess} from '../src/host-permissions';
 import {registerSourceBackground} from '../src/sources/runtime/background';
+vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(),registerInlineBackground:vi.fn()}));

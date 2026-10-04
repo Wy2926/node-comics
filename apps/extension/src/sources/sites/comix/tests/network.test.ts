@@ -12,21 +12,44 @@ import {catalog} from '../../../../comics/repositories';
 import {importCatalog,importManifest} from '../../../../comics/application/import-service';
 import {applyCatalogRefresh} from '../../../../comics/application/catalog-service';
 import {readWebsiteCatalog} from '../../../../comics/application/website-catalog';
+import {withPageNetworkContext} from '../../../runtime/page-network';
+
+// Parser/runtime routing coverage; real tab lifecycle is exercised by source-page-network.test.ts.
+vi.mock('../../../runtime/page-network',async()=>{
+ const {createSourceNetworkContext}=await import('../../../runtime/http');
+ return {withPageNetworkContext:vi.fn(async(url:string,signal:AbortSignal,read:any)=>read(createSourceNetworkContext(url,signal)))};
+});
 
 const url='https://comix.to/title/rrzm-sample';
 const row=(id:number,number:number,official=false)=>({id,number,mangaId:2188,language:'en',isOfficial:official,group:{name:'Group'},name:'',url:`/title/rrzm-sample/${id}-chapter-${number}`});
 function fixture(rows=[row(20,0),row(30,1),row(10,1,true),row(40,1.5)],mutate?:(data:any,page:number)=>void){
  const request=vi.fn(async(target:string)=>{
    const u=new URL(target);
-   if(!u.pathname.startsWith('/api/'))return '<script type="application/json" id="initial-data">'+JSON.stringify({queries:{'["manga","detail","rrzm"]':{id:2188,hid:'rrzm',url:'/title/rrzm-sample',title:'Fixture'}}})+'</script>';
+   if(!u.pathname.startsWith('/api/'))throw Error('Catalog must not fetch or parse the HTML document');
+   if(u.pathname==='/api/v1/manga/rrzm'){
+     expect(u.searchParams.get('_')).toBe(encodeRequest('/manga/rrzm'));
+     return JSON.stringify({status:'ok',result:{id:2188,hid:'rrzm',url:'/title/rrzm-sample',title:'Fixture'}});
+   }
    if(u.pathname.includes('/chapters/'))return JSON.stringify({status:'ok',result:{id:20,mangaId:2188,number:0,url:'/title/rrzm-sample/20-chapter-0',pages:{baseUrl:'',items:[{url:'https://images.example/0.png',width:800,height:1200,s:1}]}}});
    const page=Number(u.searchParams.get('page')),items=rows.slice((page-1)*2,page*2),lastPage=Math.ceil(rows.length/2);
    expect(u.searchParams.get('_')).toBe(encodeRequest(`/manga/rrzm/chapters?limit=100&order[number]=asc&page=${page}`));
    const data={status:'ok',result:{items,meta:{total:rows.length,lastPage,page,hasNext:page<lastPage}}};mutate?.(data,page);return JSON.stringify(data);
  });return {request};
 }
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
 describe('Comix network adapter',()=>{
+ it('explicitly selects page catalog/chapter transport and reads only APIs',async()=>{
+   expect(network.pageTransport).toEqual(['catalog','pages']);
+   const context=fixture();await network.catalog(url,context);
+   expect(context.request.mock.calls.every(([target])=>new URL(target).pathname.startsWith('/api/v1/'))).toBe(true);
+ });
+ it.each(['identity','url'])('rejects mismatched detail %s before requesting chapters',async kind=>{
+   const context=fixture(),request=vi.fn(async(target:string)=>{
+     const body=await context.request(target);
+     return kind==='identity'?body.replace('"hid":"rrzm"','"hid":"other"'):body.replace('/title/rrzm-sample','https://evil.test/title/rrzm-sample');
+   });
+   await expect(network.catalog(url,{request})).rejects.toThrow();expect(request).toHaveBeenCalledOnce();
+ });
  it('preserves large valid page dimensions without a source pixel ceiling',async()=>{
    const context=fixture(),request=async(target:string)=>(await context.request(target)).replace('"width":800,"height":1200','"width":20001,"height":20001');
    expect((await network.pages(url+'/20-chapter-0',{request})).items[0]).toMatchObject({width:20001,height:20001});
@@ -69,12 +92,14 @@ describe('Comix network adapter',()=>{
    expect((await catalog.get('comics',comic.id))?.catalogUpdates?.count).toBe(1);
    expect(await catalog.get('positions',entry.id)).toEqual(position);expect(await catalog.listPages(entry.contentId)).toEqual(pages);
  });
- it('reads catalogs and chapters with zero tab creation and retains a durable image recipe',async()=>{
+ it('routes catalogs and chapters through page transport and keeps HTTP image manifests durable',async()=>{
    const storage:Record<string,unknown>={},tabs={create:vi.fn(()=>{throw Error('must not create tab')})},context=fixture();
    vi.stubGlobal('chrome',{runtime:{id:'fixture'},permissions:{contains:vi.fn(async()=>true)},tabs,storage:{local:{get:async(k:string)=>({[k]:storage[k]}),set:async(v:object)=>Object.assign(storage,v)}}});
    vi.stubGlobal('fetch',vi.fn(async(target:string)=>new Response(await context.request(String(target)))));
    const source=await readSourceCatalog(url),progress=vi.fn(),signal=new AbortController().signal;
+   expect(withPageNetworkContext).toHaveBeenCalledOnce();
    const manifest=await discoverEntry(source,source.entries[0].id,signal,progress);
+   expect(withPageNetworkContext).toHaveBeenCalledTimes(2);
    expect(manifest.items[0].processing).toBe('tiles-v1');expect(storage['manifest:'+manifest.id]).toEqual(manifest);
    expect(manifest.pageContext).toBeUndefined();expect(storage['nc-source:'+source.id]).toBeUndefined();
    await discoverPage(source.entries[0].url,signal,progress);expect(tabs.create).not.toHaveBeenCalled();

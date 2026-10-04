@@ -26,7 +26,9 @@ let saved:Record<string,unknown>,send:ReturnType<typeof vi.fn>,set:ReturnType<ty
 beforeEach(()=>{
   saved={};delete fixture.networks.fixture;delete fixture.images.fixture;
   send=vi.fn();set=vi.fn(async(values:object)=>Object.assign(saved,values));
+  vi.stubGlobal('navigator',{locks:{request:vi.fn(async(_name:unknown,_options:unknown,run:()=>Promise<unknown>)=>run())}});
   vi.stubGlobal('chrome',{runtime:{id:'fixture',sendMessage:send},permissions:{request:vi.fn(async()=>true),contains:vi.fn(async()=>true)},storage:{local:{get:async(k:string)=>({[k]:saved[k]}),set},session:{set:vi.fn(),remove:vi.fn()}},
+    alarms:{get:vi.fn(async()=>undefined),create:vi.fn(async()=>{})},
     tabs:{create:vi.fn(async()=>({id:7})),get:vi.fn(async()=>({id:7,url:book,status:'complete'})),remove:vi.fn(async()=>{}),sendMessage:vi.fn(async()=>source())},scripting:{executeScript:vi.fn()}});
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});

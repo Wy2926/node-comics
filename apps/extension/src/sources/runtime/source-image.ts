@@ -8,17 +8,27 @@ import {safeImageUrl} from '../shared/urls';
 import {validateCatalog} from '../core/catalog';
 import type {SourceCatalogSnapshot} from '../contracts/source';
 import {requireImagePermissions} from './permissions';
+import {readPageCover} from './page-cover';
 
 /** Read only artwork registered in an adapter-validated catalog, outside the page manifest. */
 export async function readSourceCover(snapshot: SourceCatalogSnapshot, signal?: AbortSignal): Promise<Blob> {
   signal?.throwIfAborted();
   const source = validateCatalog(snapshot, definitions), url = source.cover?.url;
   if (!url) throw Error('来源未提供封面。');
+  return readSourceArtwork(source.sourceId,url,source.url,signal);
+}
+
+/** Internal shared artwork reader; callers must first validate a catalog or registered search hit. */
+export async function readSourceArtwork(sourceId:string,url:string,pageUrl:string,signal?:AbortSignal):Promise<Blob> {
+  signal?.throwIfAborted();
+  const adapter = sourceImages[sourceId];
+  if (adapter?.coverTransport === 'page') return readPageCover(url,signal);
   await requireImagePermissions([url]);
   signal?.throwIfAborted();
-  const adapter = sourceImages[source.sourceId], configured = adapter?.coverHeaders ?? adapter?.headers;
+  const configured = adapter?.coverHeaders ?? adapter?.headers;
   const headers = typeof configured === 'function' ? configured(url) : configured;
-  return (await fetchSourceImage(url, signal, headers, {pageUrl: source.url})).blob;
+  return (await fetchSourceImage(url, signal, headers, {pageUrl,
+    ...(adapter?.readerReferrerPolicy ? {referrerPolicy: adapter.readerReferrerPolicy} : {})})).blob;
 }
 
 /** Called after inline activation/document validation, for an HTTP original selected in that page. */
@@ -44,7 +54,8 @@ export async function readSourceImage(reference:SourceImageReference,signal?:Abo
   const adapter=valid.sourceId?sourceImages[valid.sourceId]:undefined;
   if(valid.processing&&!adapter?.decode)throw Error('来源图片处理器不可用。');
   const headers=valid.data?undefined:typeof adapter?.headers==='function'?adapter.headers(valid.url):adapter?.headers;
-  const response=await fetchSourceImage(valid.data??valid.url,signal,headers,valid.data?undefined:{pageUrl:valid.pageUrl});
+  const response=await fetchSourceImage(valid.data??valid.url,signal,headers,valid.data?undefined:{pageUrl:valid.pageUrl,
+    ...(adapter?.readerReferrerPolicy?{referrerPolicy:adapter.readerReferrerPolicy}:{})});
   signal?.throwIfAborted();
   const blob=adapter?.decode?await adapter.decode(response.blob,response.headers,valid.processing,signal):response.blob;
   signal?.throwIfAborted();

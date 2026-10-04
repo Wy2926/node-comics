@@ -11,6 +11,8 @@ export interface SourceNetworkContext {
 }
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {
+  /** Operations that need a real source-page session; omitted operations retain direct HTTP. */
+  pageTransport?: readonly ('catalog'|'pages')[];
   search?(request: SourceSearchRequest, context: SourceNetworkContext): Promise<SourceSearchPage>;
   /** Resolve missing parent identity from HTTP data; catalog/page transports remain independent. */
   resolveCatalog?(url:string, context:SourceNetworkContext):Promise<string>;

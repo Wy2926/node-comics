@@ -20,6 +20,8 @@ try{
   if(url.protocol==='chrome-extension:')return route.continue();
   if(url.hostname==='images.wowpic1.store')return route.fulfill({contentType:'image/png',body:sample});
   if(url.hostname!=='comix.to')return route.abort();
+  const detail=/^\/api\/v1\/manga\/([a-z0-9]+)$/.exec(url.pathname);
+  if(detail)return route.fulfill({status:failCatalog?503:200,json:{status:'ok',result:{id:1,hid:detail[1],url:'/title/'+detail[1]+'-fixture',title:'Comix embedded entry fixture'}}});
   if(url.pathname.includes('/manga/')){const fresh=url.pathname.includes('/fresh/'),base=fresh?chapterCatalog:catalogPath,offset=fresh?119:19;return route.fulfill({status:failCatalog?503:200,json:{status:'ok',result:{items:[1,2].map(n=>({id:offset+n,number:n,mangaId:1,language:'en',isOfficial:true,url:base+'/'+(offset+n)+'-chapter-'+n})),meta:{page:1,lastPage:1,total:2,hasNext:false}}}});}
   if(url.pathname.includes('/chapters/')){const id=Number(url.pathname.split('/').at(-1)),n=id%100-19,base=id>=100?chapterCatalog:catalogPath;return route.fulfill({json:{status:'ok',result:{id,mangaId:1,number:n,url:base+'/'+id+'-chapter-'+n,pages:{items:[1,2].map(page=>({url:`https://images.wowpic1.store/${id}-${page}.png`,width:800,height:1200}))}}}});}
   const hid=/^\/title\/([a-z0-9]+)-/.exec(url.pathname)?.[1]??'entry';

@@ -21,6 +21,7 @@ import {readImportCatalog} from './import';
 import {sourceImages} from '../registry/images';
 import {sourceNetworks} from '../registry/networks';
 import {recoverImageHeaders} from './image-headers';
+import {registerSourceTabRecovery} from './source-tabs';
 import {registerDocumentManifest} from './manifests';
 import {readSourceCatalog} from './catalog-reader';
 import {openSearchFromTab} from './search-entry';
@@ -98,6 +99,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
   const localeReady = registerLocaleBackground();
   registerInlineBackground();
   registerRegionBackground();
+  registerSourceTabRecovery();
   void recoverImageHeaders().catch(()=>{});
   void chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   chrome.runtime.onInstalled.addListener(() => {

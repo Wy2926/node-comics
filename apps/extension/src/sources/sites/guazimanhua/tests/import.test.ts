@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {registerSourceBackground} from '../../../runtime/background';
+vi.mock('../../../runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 import {catalog} from '../../../../comics/repositories';
 import {importCatalog,importManifest} from '../../../../comics/application/import-service';
 import {importWebsiteLink} from '../../../../comics/application/website-import';

@@ -1,5 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import chinese from '../src/i18n/dictionaries/zh-CN.json';
+vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 
 const translation=vi.hoisted(()=>({page:vi.fn(),image:vi.fn(),region:vi.fn()}));
 const browserMocks=vi.hoisted(()=>({tabGet:vi.fn<()=>Promise<chrome.tabs.Tab>>(),hostAccess:vi.fn<()=>Promise<boolean>>()}));

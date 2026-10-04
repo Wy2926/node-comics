@@ -3,6 +3,7 @@ import type { PageManifest,DocumentSnapshot } from '../src/sources/contracts/sou
 vi.mock('../src/i18n/background', () => ({ registerLocaleBackground: () => async () => {} }));
 vi.mock('../src/inline/background', () => ({ activateInline: vi.fn(), registerInlineBackground: vi.fn() }));
 vi.mock('../src/region/background', () => ({ activateRegion: vi.fn(), registerRegionBackground: vi.fn() }));
+vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 
 import { registerSourceBackground } from '../src/sources/runtime/background';
 

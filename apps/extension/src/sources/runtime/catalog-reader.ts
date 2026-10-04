@@ -1,27 +1,10 @@
 import {msg} from '../../i18n/runtime';
 import {resolveSource} from '../core/resolve';
-import {sameSource} from '../core/identity';
 import {validateCatalog} from '../core/catalog';
 import {definitions} from '../registry/definitions';
 import type {SourceCatalogSnapshot} from '../contracts/source';
 import {networkOperation,readNetworkCatalog} from './network';
-
-const prefix = 'nc-catalog-tab:';
-const owns = (url:string | undefined, expected:string) => !!url && sameSource(url, expected, definitions);
-
-/** Recover abandoned background tabs after a worker restart; leave user navigations alone. */
-export async function recoverCatalogTabs() {
-  const records = await chrome.storage.session.get(null);
-  for (const [key, value] of Object.entries(records)) {
-    const record = value as {url?:unknown; expiresAt?:unknown} | undefined;
-    if (!key.startsWith(prefix) || !record || typeof record.url !== 'string' ||
-        typeof record.expiresAt !== 'number' || record.expiresAt > Date.now()) continue;
-    const tabId = Number(key.slice(prefix.length));
-    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (owns(tab?.pendingUrl ?? tab?.url, record.url)) await chrome.tabs.remove(tabId).catch(() => {});
-    await chrome.storage.session.remove(key);
-  }
-}
+import {ownsSourceTab as owns,rememberSourceTab,releaseSourceTab} from './source-tabs';
 
 /** Read the adapter's complete directory without creating import records or loading chapter images. */
 export async function readSourceCatalog(url:string,options:{previous?:SourceCatalogSnapshot;signal?:AbortSignal;onCatalogProgress?:(snapshot:SourceCatalogSnapshot)=>Promise<void>}={}):Promise<SourceCatalogSnapshot> {
@@ -30,9 +13,8 @@ export async function readSourceCatalog(url:string,options:{previous?:SourceCata
   const {location} = resolveSource(url, definitions);
   const tab = await chrome.tabs.create({url, active:false});
   if (tab.id == null) throw Error(msg('无法打开来源页面。'));
-  const key = prefix + tab.id;
   try {
-    await chrome.storage.session.set({[key]:{url, expiresAt:Date.now() + 60_000}});
+    await rememberSourceTab(tab.id,url,Date.now()+60_000);
     const deadline = Date.now() + 20_000;
     let progressReported=false;
     while (Date.now() < deadline) {
@@ -61,8 +43,6 @@ export async function readSourceCatalog(url:string,options:{previous?:SourceCata
     }
     throw Error(msg('目录未完整加载，请打开来源页处理后重试。'));
   } finally {
-    const current = await chrome.tabs.get(tab.id).catch(() => undefined);
-    if (owns(current?.pendingUrl ?? current?.url, url)) await chrome.tabs.remove(tab.id).catch(() => {});
-    await chrome.storage.session.remove(key);
+    await releaseSourceTab(tab.id,url);
   }
 }

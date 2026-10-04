@@ -1,4 +1,4 @@
-// Isolated MV3 browser acceptance. RUN_LIVE_COMIX=1 also imports the real sample via extension HTTP.
+// Isolated MV3 browser acceptance. RUN_LIVE_COMIX=1 also imports the real sample via a source-page session.
 import {createRequire} from 'node:module';
 import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -38,11 +38,11 @@ try{
     return a.getImageData(0,0,w,h).data.every((v,i)=>v===c.getImageData(0,0,w,h).data[i]);
   });assert(pixelResult);checks.push('Canvas decode restores every pixel, including grid remainder');
   if(process.env.RUN_LIVE_COMIX==='1'){
-    const before=created.length;
+    const before=context.pages().length;
     await reader.getByLabel('通过链接添加漫画').fill('https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation');
     await reader.getByRole('button',{name:'添加到书架',exact:true}).click();
     await reader.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth>0,{},{timeout:90000});
-    assert.equal(created.length,before);
+    assert.equal(context.pages().length,before);
     await reader.screenshot({path:path.join(out,'live-reader.png')});
     const details=await reader.evaluate(async()=>{
       const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));const data=await chrome.storage.local.get(null),source=(await catalog.list('catalogs')).find(v=>v.sourceId==='comix'),manifest=Object.values(data).find(v=>v?.adapter==='comix'&&v.items);
@@ -57,7 +57,7 @@ try{
     });assert.equal(imageResult.mime,'image/png');assert(imageResult.width>0);checks.push({liveScrambledImage:imageResult});
     await reader.screenshot({path:path.join(out,'live-decoded-image.png')});await reader.evaluate(()=>{const image=document.getElementById('comix-decoded-preview');URL.revokeObjectURL(image.src);image.remove();});
     const refreshed=await reader.evaluate(async()=>{const {readSourceCatalog}=await import(chrome.runtime.getURL('verify-source.js'));return (await readSourceCatalog('https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation')).entries.length;});
-    assert(refreshed>=details.chapters);assert.equal(created.length,before);checks.push('Live catalog refresh completes with no source tabs');
+    assert(refreshed>=details.chapters);assert.equal(context.pages().length,before);checks.push('Live catalog refresh releases its temporary source tab');
   }
   assert.deepEqual(errors,[]);await writeFile(path.join(out,'browser.json'),JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({checks,errors}));
 }catch(error){if(reader){console.log((await reader.locator('body').innerText()).slice(-2500));await reader.screenshot({path:path.join(out,'failure.png')});}throw error;}
