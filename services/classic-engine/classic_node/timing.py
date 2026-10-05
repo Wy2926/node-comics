@@ -1,4 +1,4 @@
-"""Per-operation diagnostics; never part of image or analysis identity."""
+"""Per-operation node diagnostics; never part of image or analysis identity."""
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock

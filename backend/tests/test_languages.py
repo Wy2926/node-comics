@@ -29,7 +29,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     settings.cache_clear()
     reply = client.get('/v1/capabilities').json()
-    assert len(reply['languages']) == 16
+    assert len(reply['languages']) == 17
     assert set(reply['modes'][0]['languages']) == set(LANGUAGES)
     assert reply['modes'][1]['languages'] == REDRAW_LANGUAGES
     with session_factory()() as db:
@@ -44,7 +44,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
         assert digest(old) != digest(config)
 
 
-def test_node_can_report_all_sixteen_languages(client):
+def test_node_can_report_all_target_languages(client):
     node, auth, admin = provision(client)
     from app.node_config import NodeConfig
     result = register(client, auth, supported_languages=list(LANGUAGES))
@@ -53,13 +53,14 @@ def test_node_can_report_all_sixteen_languages(client):
         assert set(db.get(ComputeNode, node['node_id']).supported_languages) == set(LANGUAGES)
 
 
-def test_extended_job_waits_for_matching_node_then_is_claimable(scheduler_case):
+@pytest.mark.parametrize('language', ['uk', 'ar'])
+def test_extended_job_waits_for_matching_node_then_is_claimable(scheduler_case, language):
     job_id = add_job(scheduler_case, stage='page')
     with session_factory()() as db:
-        db.get(Job, job_id).target_language = 'uk'
+        db.get(Job, job_id).target_language = language
         db.commit()
     assert claim() is None
     with session_factory()() as db:
-        db.get(ComputeNode, 'node-0').supported_languages = ['uk']
+        db.get(ComputeNode, 'node-0').supported_languages = [language]
         db.commit()
     assert claim().job_id == job_id

@@ -33,6 +33,9 @@ class FixtureRuntime:
     version = 'test-v3'
     languages = ['en']
 
+    def validate_analysis(self, analysis):
+        assert 'regions' in analysis  # Controller fixtures use their own image format.
+
     def __init__(self):
         self.analyzed = 0
         self.rendered = 0
@@ -65,8 +68,8 @@ class FixtureRuntime:
 
 def node_for(v3, tmp_path, pages, runtime, lose_replies=False, lose_upload=False, max_leases=4):
     config = {'node_id': v3['node']['node_id'], 'node_token': v3['node']['token'],
-        'resource_id': 'test:vulkan:0', 'control_url': 'https://control.example.test',
-        'engine': {'gpu': -1}, 'local_pages': pages, 'max_leases': max_leases}
+        'resource_id': 'test:cuda:0', 'control_url': 'https://control.example.test',
+        'engine': {'gpu': 0}, 'local_pages': pages, 'max_leases': max_leases}
     lost = set()
     def control(request):
         response = v3['client'].request(request.method, request.url.path, headers=dict(request.headers), content=request.content)
@@ -293,30 +296,46 @@ def test_different_build_resumes_paid_checkpoint_on_another_node(v3, tmp_path):
         journal.close()
 
 
-@pytest.mark.skipif(not os.environ.get('CLASSIC_TEST_MODELS'), reason='Explicit real-model Vulkan acceptance')
-@pytest.mark.parametrize('ocr_language,source_text,font_name', [
-    ('en', 'WHERE ARE YOU GOING?', 'arial.ttf'),
-    ('ja', '明日はきっと晴れる。', 'YuGothR.ttc'),
+@pytest.mark.skipif(not os.environ.get('CLASSIC_TEST_MODELS'), reason='Explicit real-model CUDA acceptance')
+@pytest.mark.parametrize('ocr_language,source_text,font_name,target_language', [
+    ('en', 'WHERE ARE YOU GOING?', 'arial.ttf', 'en'),
+    ('ja', '明日はきっと晴れる。', 'YuGothR.ttc', 'en'),
+    pytest.param('zh-ar', None, None, 'ar', marks=pytest.mark.skipif(
+        not os.environ.get('CLASSIC_TEST_INPUT'), reason='Explicit private Chinese sample, kept outside Git')),
 ])
-def test_real_vulkan_node_uploads_overlay(v3, tmp_path, ocr_language, source_text, font_name):
+def test_real_cuda_node_uploads_overlay(v3, tmp_path, monkeypatch, ocr_language, source_text, font_name, target_language):
     from classic_node.runtime import Runtime
     from app.config import settings
     from conftest import login, submit_asset, upload
+    models = Path(os.environ['CLASSIC_TEST_MODELS'])
+    fonts = json.loads((models.parent / 'licenses/font-sources.json').read_text())['fonts']
     runtime = Runtime({'engine': {
-        'models': os.environ['CLASSIC_TEST_MODELS'], 'gpu': int(os.environ.get('CLASSIC_TEST_GPU', '0')), 'inpaint_gpu': int(os.environ.get('CLASSIC_TEST_INPAINT_GPU', '0')), 'ocr_workers': 8, 'threads': 2,
-        'tile': 768, 'detect_size': 1280, 'ocr_language': ocr_language, 'direction': 'auto',
-        'font': []}})
+            'models': str(models), 'gpu': int(os.environ.get('CLASSIC_TEST_GPU', '0')), 'threads': 2,
+            'keep_lang': 'zh' if source_text is None else None,
+        'font': [str(models.parent / 'fonts' / item['name']) for item in fonts]}})
     runtime.warmup()
-    image = Image.new('RGB', (720, 600), '#777777')
-    draw = ImageDraw.Draw(image)
-    draw.ellipse((35, 65, 685, 535), fill='white', outline='black', width=4)
-    font = ImageFont.truetype('C:/Windows/Fonts/' + font_name, 32)
-    draw.text((360, 300), source_text, font=font, fill='black', anchor='mm')
+    if source_text is None:
+        with Image.open(os.environ['CLASSIC_TEST_INPUT']) as source:
+            image = source.convert('RGB')
+        from app import classic
+        from app.adapters.llm import TextResponse
+        arabic = 'العربية لا لأ لإ لآ مُحَمَّد ٢٠٠،؟…: AMIRA (200)'
+        def arabic_fixture(segments, language, profile):
+            assert language == 'ar'
+            return TextResponse(json.dumps({'translations': {s['id']: arabic for s in segments}}),
+                                {'input_tokens': 10, 'output_tokens': 10}, 'fixture')
+        monkeypatch.setattr(classic, 'call_text', arabic_fixture)
+    else:
+        image = Image.new('RGB', (720, 600), '#777777')
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((35, 65, 685, 535), fill='white', outline='black', width=4)
+        font = ImageFont.truetype('C:/Windows/Fonts/' + font_name, 32)
+        draw.text((360, 300), source_text, font=font, fill='black', anchor='mm')
     buffer = BytesIO()
     image.save(buffer, 'PNG')
     auth = login(v3['client'], 'real-model-reader')
     original = upload(v3['client'], auth, buffer.getvalue())
-    response = create(v3['client'], auth, original, key='real-model', language='en', mode='classic')
+    response = create(v3['client'], auth, original, key='real-model', language=target_language, mode='classic')
     assert response.status_code == 202, response.text
     job_id = response.json()['id']
     agent, transport, journal = node_for(v3, tmp_path, 1, runtime)
@@ -331,17 +350,26 @@ def test_real_vulkan_node_uploads_overlay(v3, tmp_path, ocr_language, source_tex
             asset = db.get(Asset, job.output_asset_id)
             output = get_store().read(asset.storage_key)
             from app.models import ClassicState
-            analysis = db.get(ClassicState, job_id).analysis
-        assert len(analysis['segments']) == 1
-        assert analysis['segments'][0]['source'] == source_text
+            state = db.get(ClassicState, job_id)
+            analysis = state.analysis
+            if source_text is None:
+                assert analysis['segments'] and set(state.translations.values()) == {arabic}
+                assert job.target_language == 'ar'
+        if source_text is not None:
+            assert len(analysis['segments']) == 1
+            assert analysis['segments'][0]['source'] == source_text
         # Check actual removal, not merely a successfully encoded final image.
         import numpy as np
         cleaned = runtime.inpaint(np.array(image), analysis)
-        bounds = draw.textbbox((360, 300), source_text, font=font, anchor='mm')
-        x0, y0, x1, y1 = bounds
-        dark_before = np.count_nonzero(np.array(image)[y0:y1, x0:x1].mean(axis=2) < 180)
-        dark_after = np.count_nonzero(cleaned[y0:y1, x0:x1].mean(axis=2) < 180)
-        assert dark_before > 100 and dark_after < dark_before * .05
+        dark_before = dark_after = None
+        if source_text is not None:
+            bounds = draw.textbbox((360, 300), source_text, font=font, anchor='mm')
+            x0, y0, x1, y1 = bounds
+            dark_before = int(np.count_nonzero(np.array(image)[y0:y1, x0:x1].mean(axis=2) < 180))
+            dark_after = int(np.count_nonzero(cleaned[y0:y1, x0:x1].mean(axis=2) < 180))
+            assert dark_before > 100 and dark_after < dark_before * .05
+        else:
+            assert np.any(cleaned != np.array(image))
         description = job.result_description
         assert description['representation'] == 'overlay-v1'
         box = description['bbox']
@@ -358,9 +386,10 @@ def test_real_vulkan_node_uploads_overlay(v3, tmp_path, ocr_language, source_tex
         Image.fromarray(cleaned).save(destination / f'{ocr_language}-cleaned.png')
         (destination / f'{ocr_language}-report.json').write_text(json.dumps({
             'engine_version': runtime.version, 'protocol_version': 3, 'ocr_language': ocr_language,
-            'ocr_exact': True, 'regions': len(analysis['segments']), 'width': image.width, 'height': image.height,
+            'ocr_exact': True if source_text is not None else None, 'target_language': target_language,
+            'regions': len(analysis['segments']), 'width': image.width, 'height': image.height,
             'inpainting_backend': runtime.engine.inpainter.backend,
-            'dark_text_pixels_before': int(dark_before), 'dark_text_pixels_after': int(dark_after),
+            'dark_text_pixels_before': dark_before, 'dark_text_pixels_after': dark_after,
             'node_uploaded_result': True, 'representation': description['representation'], 'overlay_bytes': len(output), 'source_bytes': len(buffer.getvalue()), 'wall_seconds': time.monotonic() - started,
             'text_provider': 'fixed fixture, no paid calls', 'storage': 'isolated adapter'}, indent=2), encoding='utf-8')
     finally:

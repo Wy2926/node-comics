@@ -2,7 +2,7 @@
 
 Linux NVIDIA 部署使用[Vast CUDA 模板与版本化运行包](linux/README.md)，填写独立身份后自动安装启动；以下为 Windows 独立包。
 
-Windows x64 独立计算节点。发布包内置原生 `node.exe`、Python 运行时、推理模型与固定字体；目标电脑需要 Windows 10/11 和 Vulkan／DirectX 12 显卡驱动。
+Windows x64 独立计算节点。发布包内置原生 `node.exe`、Python 运行时、推理模型与固定字体；目标电脑需要 Windows 10/11 和 支持 CUDA 12.6 的 NVIDIA 显卡驱动。
 
 ## 安装与运行
 
@@ -28,22 +28,22 @@ node.exe status
 
 ## 目录与升级
 
-- `runtime/`、`engine/`、`models/`、`fonts/` 与 `release.json` 随程序保持完整；`licenses/`、`source/` 提供许可证和对应源码。
+- `runtime/`、`engine/`、`upstream/`、`models/`、`fonts/`、`hyphenation/`、`mtu-assets.json` 与 `release.json` 随程序保持完整；`licenses/`、`source/` 提供许可证和对应源码。
 - 私有状态默认保存在 `data/`；所有命令可用 `--home <路径>` 指定新的专用目录。发布包不预置身份或状态。
-- 升级先排空租约、停止节点并移除旧服务。v2 切换到 v3 时，在新的专用数据目录执行 `init`，重新填写中心与节点身份；不复制旧配置和恢复数据库，不用旧目录直接运行 `doctor`。同一协议版本内升级可复用原数据目录。随后用新包运行 `doctor`，核对中心版本，再安装服务；不覆盖运行中的 DLL。
+- 升级先排空租约、停止节点并移除旧服务。v2 切换到 v3 时，在新的专用数据目录执行 `init`，重新填写中心与节点身份；不复制旧配置和恢复数据库，不用旧目录直接运行 `doctor`。MTU 迁移仍需先排空旧租约；删除配置中已移除的引擎参数，按新示例配置。旧分析检查点不能由新引擎恢复。随后用新包运行 `doctor`，核对中心版本，再安装服务；不覆盖运行中的 DLL。
 - 同身份换机前停止旧宿主，复制后执行 `adopt`、`doctor` 和服务安装；`adopt` 拒绝仍有待恢复任务的状态。新增电脑使用未初始化发布包和新身份。
 
 状态、日志、恢复规则及目标机验收见[节点运维](../classic-engine/docs/NODE_OPERATIONS.md)。
 
 ## 开发构建与验证
 
-需要 Windows x64、PowerShell 5.1、系统 `tar.exe`、网络及约 15 GiB 工作空间。从仓库根目录执行：
+需要 Windows x64、PowerShell 5.1、系统 `tar.exe`、网络及至少 25 GiB 工作空间。从仓库根目录执行：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File services/compute-node/build.ps1
 ```
 
-构建自动下载锁定的 Go、CPython、uv、模型和字体，分别创建 OCR／LaMa 转换环境。来源与 SHA-256 由 `toolchain.lock.json`、`assets.json`、引擎模型清单及各 `uv.lock` 固定；不依赖预装开发环境或现有模型。
+构建自动下载锁定的 Go、CPython、uv、MTU 原始源码、CUDA 原生模型、词典和字体。来源与 SHA-256 由 `toolchain.lock.json`、`assets.json`、`mtu_engine/upstream.lock.json` 和 `uv.lock` 固定。Windows／Linux 共用资产准备代码，运行包携带 PyTorch CUDA、Qt 及来源声明。
 
 可传 `-Version`、`-OutputDirectory`、`-WorkDirectory`；默认输出到本模块 `artifacts/dist/`，缓存位于 `.build/`。输出目录必须不存在；同一工作目录只运行一个构建。发布清单包含逐文件摘要，随包保留源码与许可。
 

@@ -5,8 +5,34 @@ import zipfile
 
 import pytest
 
-from build_release import archive_release, sha256
+from build_release import Builder, archive_release, sha256
 from build_support import copy_sources, download, safe_extract_zip, remove_unused_launchers
+
+
+def test_cuda_export_keeps_only_the_matching_windows_wheel_hash(tmp_path, monkeypatch):
+    import build_release
+    project = tmp_path / 'project'
+    project.mkdir()
+    lock = '\n'.join('''[[package]]
+name = "NAME"
+wheels = [
+ { url = "https://download.pytorch.org/NAME-cp312-cp312-win_amd64.whl", hash = "sha256:WIN" },
+ { url = "https://download.pytorch.org/NAME-cp312-cp312-manylinux.whl", hash = "sha256:LINUX" },
+]
+'''.replace('NAME', name) for name in ('torch', 'torchvision'))
+    (project / 'uv.lock').write_text(lock)
+    target = tmp_path / 'requirements.txt'
+    exported = ''.join(name + '==1.0 \\\n    --hash=sha256:WIN \\\n    --hash=sha256:LINUX\n' for name in ('torch', 'torchvision'))
+    exported += 'other==1.0 \\\n    --hash=sha256:OTHER\n'
+    monkeypatch.setattr(build_release, 'run', lambda *args, **kwargs: target.write_text(exported))
+    builder = Builder.__new__(Builder)
+    builder.uv, builder.env = 'uv', {}
+    builder.requirements(project, target)
+    result = target.read_text()
+    assert result.count('--hash=sha256:WIN') == 2
+    assert '--hash=sha256:LINUX' not in result
+    assert '--hash=sha256:OTHER' in result
+    assert 'torch @ https://download.pytorch.org/torch-cp312-cp312-win_amd64.whl' in result
 
 
 def test_archive_preserves_version_name_and_excludes_private_data(tmp_path):

@@ -3,7 +3,7 @@
   "control_url": "https://control.example.com",
   "node_id": "REPLACE_WITH_ADMIN_NODE_ID",
   "node_token": "REPLACE_WITH_NODE_CREDENTIAL_OR_SET_NODE_TOKEN",
-  "resource_id": "machine:vulkan:0",
+  "resource_id": "machine:cuda:0",
   "state_dir": "state",
   "local_pages": 2,
   "render_workers": 1,
@@ -12,14 +12,20 @@
   "delivery_workers": 4,
   "resident_bytes": 1073741824,
   "engine": {
-    "models": "models",
+    "models": ".assets/models",
     "gpu": 0,
-    "inpaint_gpu": 0,
-    "ocr_language": "auto",
-    "ocr_workers": 8,
     "threads": 2,
     "detect_size": 1280,
-    "tile": 768,
-    "font": []
+    "inpainting_size": 512,
+    "font": [
+      ".assets/fonts/Bangers-Regular.ttf",
+      ".assets/fonts/ComicRelief-Bold.ttf",
+      ".assets/fonts/Jua-Regular.ttf",
+      ".assets/fonts/Lalezar-Regular.ttf",
+      ".assets/fonts/LXGWMarkerGothic-Regular.ttf",
+      ".assets/fonts/NotoSans-Regular.ttf",
+      ".assets/fonts/NotoSansCJKsc-Regular.otf",
+      ".assets/fonts/NotoSansArabic.ttf"
+    ]
   }
 }

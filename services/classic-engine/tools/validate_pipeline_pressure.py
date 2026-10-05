@@ -26,8 +26,7 @@ from classic_node.protocol import digest, pack_result, png64
 def fixture_image():
     image = Image.new('RGB', (720, 600), 'white')
     draw = ImageDraw.Draw(image)
-    from manhua_engine.layout import font_paths
-    font = ImageFont.truetype(font_paths((), 'en')[0], 42)
+    font = ImageFont.load_default(size=42)
     draw.text((160, 260), 'Hello world', font=font, fill='black')
     out = BytesIO()
     image.save(out, 'PNG')
@@ -37,6 +36,9 @@ def fixture_image():
 class FixtureRuntime:
     version = 'pressure-fixture'
     languages = ['en']
+
+    def validate_analysis(self, analysis):
+        assert analysis['version'] == self.version
 
     def decode(self, data, metadata):
         return np.array(Image.open(BytesIO(data)).convert('RGB')), None
@@ -285,8 +287,9 @@ def main():
     runtime = None
     if args.models:
         from classic_node.runtime import Runtime
-        runtime = Runtime({'engine': {'models': str(args.models), 'gpu': 0, 'ocr_language': 'en',
-            'threads': 2, 'ocr_workers': 8, 'tile': 768, 'detect_size': 1280}, 'languages': ['en']})
+        fonts = json.loads((args.models.parent / 'licenses/font-sources.json').read_text())['fonts']
+        runtime = Runtime({'engine': {'models': str(args.models), 'gpu': 0, 'threads': 2,
+            'font': [str(args.models.parent / 'fonts' / item['name']) for item in fonts]}})
         runtime.warmup()
     try:
         rows = []

@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from threading import Lock
 
-from manhua_engine.timing import collect, record, waiting_for
+from classic_node.timing import collect, record, waiting_for
 
 
 def test_collector_isolates_pages_and_accumulates_ocr_workers():

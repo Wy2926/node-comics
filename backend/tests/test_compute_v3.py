@@ -45,13 +45,13 @@ def v3(client, monkeypatch, png):
     settings.cache_clear()
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
         '{"translations":{"0":"Hello"}}', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
-    node, auth, admin = provision(client, 'test:vulkan:0')
+    node, auth, admin = provision(client, 'test:cuda:0')
     with session_factory()() as db:
         record = db.get(ComputeNode, node['node_id'])
         record.capacity = 4
         record.desired_config = {**record.desired_config, 'execution_slots': 4}
         db.commit()
-    registration = {'protocol_version': 3, 'engine_version': 'test-v3', 'resource_id': 'test:vulkan:0',
+    registration = {'protocol_version': 3, 'engine_version': 'test-v3', 'resource_id': 'test:cuda:0',
                     'device': 'fixture', 'ready': True, 'supported_languages': ['en', 'zh-Hans']}
     response = client.post(PREFIX + '/nodes/register', headers=auth, json=registration)
     assert response.status_code == 200, response.text

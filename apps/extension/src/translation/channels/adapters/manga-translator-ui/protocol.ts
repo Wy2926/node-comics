@@ -5,7 +5,7 @@ import {ImageTransferError, type ImageTransferRequest} from '../../transport/typ
 // hgmzhn/manga-translator-ui @ 2130ccb: translators/common.py VALID_LANGUAGES.
 export const languages: Readonly<Record<string, string>> = {
   'zh-Hans': 'CHS', 'zh-Hant': 'CHT', en: 'ENG', ja: 'JPN', ko: 'KOR', fr: 'FRA', es: 'ESP',
-  'pt-BR': 'PTB', de: 'DEU', it: 'ITA', ru: 'RUS', pl: 'POL', uk: 'UKR', tr: 'TRK', vi: 'VIN', id: 'IND',
+  'pt-BR': 'PTB', de: 'DEU', it: 'ITA', ru: 'RUS', pl: 'POL', uk: 'UKR', tr: 'TRK', vi: 'VIN', id: 'IND', ar: 'ARA',
 };
 export function serviceBase(value: string): string {
   let url: URL;

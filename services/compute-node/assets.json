@@ -1,6 +1,51 @@
 {
   "fonts": [
     {
+      "name": "Bangers-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/bangers/Bangers-Regular.ttf",
+      "notice": "bangers-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/bangers/OFL.txt",
+      "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
+      "notice_sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "ComicRelief-Bold.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/ComicRelief-Bold.ttf",
+      "notice": "comicrelief-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/OFL.txt",
+      "sha256": "33aee007212b696afd57d50c901135cd723cd188f7ad98f3a1c572ea64e8f0d5",
+      "notice_sha256": "009b3056cef5c9bcaff872bfb0e27fa4a0f8cc6f6984cc490caf5618748d766b",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Jua-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/jua/Jua-Regular.ttf",
+      "notice": "jua-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/jua/OFL.txt",
+      "sha256": "769677aef240bfc3b9965f2b50748075bff885e6c6992fc591a3fb268279f898",
+      "notice_sha256": "44a7c6e4c5572392ae122d3b1d8c6ba6fd640a7797e675384585d947f2773e3c",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Lalezar-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/lalezar/Lalezar-Regular.ttf",
+      "notice": "lalezar-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/lalezar/OFL.txt",
+      "sha256": "7b80807bc831f141de0f7dcf6816412bf0c548968d548c5156ca388733390ea9",
+      "notice_sha256": "327bac41d89cf9f32e0efe353228018e1661cff458a5d4905714958514df7bd5",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "LXGWMarkerGothic-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/lxgw/LxgwMarkerGothic/11ea67e3a46ea84bef4767e6d90bc5c005e13716/fonts/ttf/LXGWMarkerGothic-Regular.ttf",
+      "notice": "LXGWMarkerGothic-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwMarkerGothic/11ea67e3a46ea84bef4767e6d90bc5c005e13716/OFL.txt",
+      "sha256": "dfcef2074fcd6695a8bd128fe1a1a96c376b636171a7985b6836448221b5a87a",
+      "notice_sha256": "58e494ff4a5177d593a97ffc482f4069f59f54a0d4049fd29e531d3b1009e8b4",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
       "name": "NotoSans-Regular.ttf",
       "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
       "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
@@ -17,6 +62,15 @@
       "notice": "NotoSansCJK-LICENSE",
       "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
       "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "name": "NotoSansArabic.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
+      "sha256": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansArabic-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/notosansarabic/OFL.txt",
+      "notice_sha256": "07fc70bfeb985cc1a87a8587d0a0c80bab11c86c9dc3fd95b6f0cb332f983e96"
     }
   ]
 }

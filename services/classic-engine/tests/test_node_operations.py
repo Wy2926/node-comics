@@ -18,7 +18,7 @@ from classic_node.transport import Transport
 def make_agent(tmp_path, handler):
     config = {'node_id': 'node-test', 'node_token': 'private-token',
               'control_url': 'https://control.example.test',
-              'resource_id': 'test:cpu', 'engine': {'gpu': -1}, 'local_pages': 1, 'max_leases': 1}
+              'resource_id': 'test:cuda:0', 'engine': {'gpu': 0}, 'local_pages': 1, 'max_leases': 1}
     transport = Transport(config, control_transport=httpx.MockTransport(handler))
     journal = Journal(tmp_path)
     agent = Agent(config, SimpleNamespace(version='test-v2', languages=['en']), transport, journal)
@@ -34,6 +34,7 @@ def registration():
 def test_process_survives_registration_outage_then_registers(tmp_path):
     attempts = []
     def handler(request):
+        assert json.loads(request.content)['device'] == 'cuda:0'
         attempts.append(request.url.path)
         if len(attempts) == 1:
             raise httpx.ConnectError('private-token?signature=secret', request=request)

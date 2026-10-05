@@ -16,14 +16,5 @@
     "version": "1.27.0",
     "url": "https://go.dev/dl/go1.27.0.windows-amd64.zip",
     "sha256": "f0c0a0d33ba94f4d2c5dbc887334ce678b21813504ddb3aafcb06e60a5a667c4"
-  },
-  "ocr_source": {
-    "revision": "d5a3eee4a7b7b7754b71baa2ee82309dfff468bc",
-    "url": "https://raw.githubusercontent.com/zyddnys/manga-image-translator/d5a3eee4a7b7b7754b71baa2ee82309dfff468bc/manga_translator/ocr/model_48px_ctc.py",
-    "sha256": "4f068e45b2bec8741219a30d1784a30aa058a0bd3058d4247da85f3ab7caf530"
-  },
-  "ocr_checkpoint": {
-    "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr-ctc.zip",
-    "sha256": "fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101"
   }
 }

@@ -316,17 +316,17 @@ def main():
                     'group_bytes': 1800}}), (201,))
             private.clear()
             nodes = checked(client.get('/v1/admin/compute-nodes', headers=admin))['items']
-            existing = next((node for node in nodes if node['resource_id'] == 'overlay-live:vulkan:1'), None)
+            existing = next((node for node in nodes if node['resource_id'] == 'overlay-live:cuda:0'), None)
             if existing:
                 if existing['name'] != 'Isolated real GPU' or existing['running']:
                     raise VerificationFailure('TEST_RESOURCE_HAS_UNRELATED_OR_ACTIVE_NODE')
                 node = checked(client.post('/v1/admin/compute-nodes/' + existing['id'] + '/rotate-credential', headers=admin))
             else:
                 node = checked(client.post('/v1/admin/compute-nodes', headers=admin,
-                    json={'name': 'Isolated real GPU', 'resource_id': 'overlay-live:vulkan:1'}), (201,))
+                    json={'name': 'Isolated real GPU', 'resource_id': 'overlay-live:cuda:0'}), (201,))
             report.update(provider_id=provider['id'], node_id=node['node_id'])
             save()
-            config.update(node_id=node['node_id'], node_token=node['token'], resource_id='overlay-live:vulkan:1',
+            config.update(node_id=node['node_id'], node_token=node['token'], resource_id='overlay-live:cuda:0',
                           control_url=args.base_url, control_ca=str(args.ca.resolve()))
             transport = Transport(config)
             journal = Journal(run / 'node-journal')
@@ -354,8 +354,6 @@ def main():
         agent = transport = journal = None
         del runtime
         gc.collect()
-        import ncnn
-        ncnn.destroy_gpu_instance()
     return 0 if all(p['state'] == 'succeeded' for p in report['pages']) else 1
 
 

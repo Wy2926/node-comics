@@ -26,8 +26,8 @@ def fixture(alpha=None):
                 'width': 80, 'height': 64, 'mime': 'image/png', 'normalization_version': 1}
     runtime = Runtime.__new__(Runtime)
     runtime.version = 'test'
-    runtime.engine = SimpleNamespace(font=[], direction='auto')
-    analysis = {'input_hash': metadata['sha256'], 'segments': [{'id': '0'}],
+    runtime.engine = SimpleNamespace(renderer=SimpleNamespace(render=lambda original, cleaned, *args: cleaned))
+    analysis = {'version': runtime.version, 'format': Runtime.ANALYSIS_FORMAT, 'input_hash': metadata['sha256'], 'segments': [{'id': '0'}],
                 'regions': [{'bbox': [0, 0, 80, 64]}]}
     translated = {'analysis_hash': digest(analysis), 'language': 'en',
                   'translations': {'0': 'Hello'}, 'revision': 'a' * 64}
@@ -36,21 +36,19 @@ def fixture(alpha=None):
 
 @pytest.mark.parametrize('alpha', [None, 255, 90, 1, 0])
 def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alpha(monkeypatch, alpha):
-    import classic_node.runtime as module
     runtime, data, metadata, analysis, translated = fixture(alpha)
     rgb, opacity = runtime.decode(data, metadata)
     cleaned = rgb.copy()
     cleaned[6, 7] = (31, 45, 60)  # Erasure may be outside the new glyph.
-    monkeypatch.setattr(module, 'lettering_areas', lambda *a: [None])
-    monkeypatch.setattr(module, 'resolve_colors', lambda *a: ('black', 'white'))
-    def draw(canvas, *args, **kwargs):
-        canvas.putpixel((10, 10), (100, 101, 102))  # Includes already antialiased RGB.
-        return {'rendered': True}
-    monkeypatch.setattr(module, 'draw_region', draw)
-    from manhua_engine.timing import collect
+    def draw(original, cleaned, *args):
+        rendered = cleaned.copy()
+        rendered[10, 10] = (100, 101, 102)
+        return rendered
+    monkeypatch.setattr(runtime.engine.renderer, 'render', draw)
+    from classic_node.timing import collect
     with collect() as timings:
         packed = runtime.render(rgb, cleaned, analysis, translated, 'en', opacity)
-    assert {'render_areas', 'render_layout', 'render_diff'} <= timings.keys()
+    assert {'render_layout', 'render_diff'} <= timings.keys()
     assert all(value >= 0 for value in timings.values())
     result, output = packed['result'], packed['output_bytes']
     assert 'image' not in packed and result['normalization_version'] == 1
@@ -103,35 +101,18 @@ def test_result_encoding_uses_its_own_byte_limit(monkeypatch):
         pack_result(final, rgb, alpha, runtime.version, analysis, translated)
 
 
-@pytest.mark.parametrize('changed', [False, True])
-def test_all_removed_text_still_completes_with_cleaned_pixels(monkeypatch, changed):
-    import classic_node.runtime as module
-    runtime, data, metadata, analysis, translated = fixture()
-    translated['translations']['0'] = '\U0010FFFF'
-    rgb, alpha = runtime.decode(data, metadata)
-    cleaned = rgb.copy()
-    if changed:
-        cleaned[1, 1] = (10, 20, 30)
-    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
-    result = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
-    assert result['result']['representation'] == ('overlay-v1' if changed else 'original')
-
-
 @pytest.mark.parametrize('empty', ['', ' \n\t ', '\u3000\u00a0'])
 @pytest.mark.parametrize('changed', [False, True])
 def test_all_empty_translations_keep_erasure_pixels_and_skip_lettering(monkeypatch, empty, changed):
-    import classic_node.runtime as module
     runtime, data, metadata, analysis, translated = fixture()
     translated['translations']['0'] = empty
     rgb, alpha = runtime.decode(data, metadata)
     cleaned = rgb.copy()
     if changed:
         cleaned[6, 7] = (31, 45, 60)
-    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
     def unexpected(*args, **kwargs):
         pytest.fail('Empty translations must skip colors and lettering')
-    monkeypatch.setattr(module, 'resolve_colors', unexpected)
-    monkeypatch.setattr(module, 'draw_region', unexpected)
+    monkeypatch.setattr(runtime.engine.renderer, 'render', unexpected)
     packed = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
     result = packed['result']
     assert result['representation'] == ('overlay-v1' if changed else 'original')
@@ -145,7 +126,6 @@ def test_all_empty_translations_keep_erasure_pixels_and_skip_lettering(monkeypat
 
 
 def test_empty_segment_keeps_erasure_and_does_not_block_following_text(monkeypatch):
-    import classic_node.runtime as module
     runtime, data, metadata, analysis, translated = fixture()
     analysis['segments'].append({'id': '1'})
     analysis['regions'].append({'bbox': [0, 0, 80, 64]})
@@ -153,16 +133,15 @@ def test_empty_segment_keeps_erasure_and_does_not_block_following_text(monkeypat
     rgb, alpha = runtime.decode(data, metadata)
     cleaned = rgb.copy()
     cleaned[6, 7] = (31, 45, 60)
-    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None, None])
-    monkeypatch.setattr(module, 'resolve_colors', lambda *args: ('black', 'white'))
     drawn = []
-    def draw(canvas, text, *args, **kwargs):
-        drawn.append(text)
-        canvas.putpixel((10, 10), (100, 101, 102))
-        return {'rendered': True}
-    monkeypatch.setattr(module, 'draw_region', draw)
+    def draw(original, cleaned, regions, texts, *args):
+        drawn.extend(texts)
+        rendered = cleaned.copy()
+        rendered[10, 10] = (100, 101, 102)
+        return rendered
+    monkeypatch.setattr(runtime.engine.renderer, 'render', draw)
     packed = runtime.render(rgb, cleaned, analysis, translated, 'en', alpha)
-    assert drawn == ['Hello']
+    assert drawn == ['', 'Hello']
     result = packed['result']
     assert result['representation'] == 'overlay-v1'
     assert result['bbox'] == {'x': 7, 'y': 6, 'width': 4, 'height': 5}
@@ -173,26 +152,11 @@ def test_empty_segment_keeps_erasure_and_does_not_block_following_text(monkeypat
 
 @pytest.mark.parametrize('invalid', [None, 42, False])
 def test_nonstring_translation_still_fails(monkeypatch, invalid):
-    import classic_node.runtime as module
     runtime, data, metadata, analysis, translated = fixture()
     translated['translations']['0'] = invalid
     rgb, alpha = runtime.decode(data, metadata)
-    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None])
     with pytest.raises(NodeFailure, match='CLASSIC_RENDER_MISMATCH'):
         runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
-
-
-def test_removed_segment_does_not_block_following_text(monkeypatch):
-    import classic_node.runtime as module
-    runtime, data, metadata, analysis, translated = fixture()
-    analysis['regions'][0]['dir'] = 'h'
-    analysis['regions'].append({'bbox': [0, 0, 80, 64], 'dir': 'h'})
-    analysis['segments'].append({'id': '1'})
-    translated.update(analysis_hash=digest(analysis), translations={'0': '\U0010FFFF', '1': 'Hello'})
-    rgb, alpha = runtime.decode(data, metadata)
-    monkeypatch.setattr(module, 'lettering_areas', lambda *args: [None, None])
-    result = runtime.render(rgb, rgb.copy(), analysis, translated, 'en', alpha)
-    assert result['result']['representation'] == 'overlay-v1'
 
 
 def test_render_checkpoint_mismatch_has_specific_error():
@@ -321,6 +285,39 @@ def test_corrupt_input_pixels_fail_before_analysis_or_text_submission():
     page = SimpleNamespace(data=data, metadata=metadata, analysis=None)
     with pytest.raises(NodeFailure, match='^INPUT_INVALID$'):
         pipeline.prepare(page)
+
+
+@pytest.mark.parametrize('blank', [False, True])
+def test_old_engine_checkpoint_cannot_resume_even_when_blank(blank):
+    runtime, data, metadata, analysis, translated = fixture()
+    analysis['version'] = 'retired-engine'
+    analysis.pop('format')
+    if blank:
+        analysis['segments'] = analysis['regions'] = []
+    pipeline = Pipeline.__new__(Pipeline)
+    pipeline.agent = SimpleNamespace(runtime=runtime)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    with pytest.raises(NodeFailure, match='^CLASSIC_ENGINE_MISMATCH$'):
+        pipeline.prepare(page)
+    rgb = np.array(Image.open(BytesIO(data)))
+    with pytest.raises(NodeFailure, match='^CLASSIC_ENGINE_MISMATCH$'):
+        runtime.inpaint(rgb, analysis)
+    with pytest.raises(NodeFailure, match='^CLASSIC_ENGINE_MISMATCH$'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', None)
+
+
+def test_compatible_checkpoint_from_another_build_keeps_its_paid_translation():
+    runtime, data, metadata, analysis, translated = fixture()
+    analysis['version'] = 'another-os-and-dependency-build'
+    analysis['mask'] = png64(Image.new('L', (80, 64), 255))
+    translated['analysis_hash'] = digest(analysis)
+    runtime.analyze = lambda *_: pytest.fail('resuming must not rerun OCR or text work')
+    pipeline = Pipeline.__new__(Pipeline)
+    pipeline.agent = SimpleNamespace(runtime=runtime)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    rgb, alpha, resumed = pipeline.prepare(page)
+    assert resumed is analysis
+    assert runtime.render(rgb, rgb, resumed, translated, 'en', alpha)['result']['representation'] == 'original'
 
 
 def test_input_decode_memory_failure_has_a_terminal_resource_code(monkeypatch):

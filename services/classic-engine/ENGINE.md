@@ -1,94 +1,54 @@
-# Manhua Engine
+# 图像引擎
 
-轻量漫画翻译流水线，参考 [manga-image-translator](https://github.com/zyddnys/manga-image-translator) 和 [Yakuyomi Engine](https://github.com/joyeli/yakuyomi-engine)。检测使用 NCNN Vulkan FP32，局部去字使用 ONNX Runtime GPU FP32 LaMa Large（Windows DirectML、Linux NVIDIA CUDA）；默认多语言 OCR，按目标语言嵌字。安装与 Linux GPU 环境见 [节点说明](README.md)。Windows 不需要 CUDA。
+## 组成
+
+| 阶段 | 直接使用的上游实现 |
+| --- | --- |
+| 检测与段落 | BallonsTranslator `CTDModel` 与其原生 `group_output`，PyTorch CUDA；保留上游段落和阅读顺序 |
+| OCR | MTU 多语言 `Model48pxCTCOCR`，PyTorch CUDA |
+| 文字像素 | MTU DBNet `DefaultDetector` 提供原始文字蒙版，不再次分组或识别 |
+| 气泡 | MangaLens／Ultralytics 分割，CUDA，输入边长 768、置信度 0.25、NMS IoU 0.7；蒙版跟随单张图片，用于抹字和排版 |
+| 文字蒙版 | MTU mask refinement／DenseCRF、膨胀、气泡边界限制 |
+| 抹字 | MTU 纯色气泡填充；剩余区域使用原生 LaMa Large 512 FP32 CUDA，按连通区域修复 |
+| 嵌字 | MTU Qt 渲染器：QTextLayout、QRawFont、QPainter，在 CPU 离屏绘制 |
+| 字体 | Bangers、霞鹜漫黑、Jua、Comic Relief Bold、Lalezar；保留 Noto 字体回退，Qt 负责字形塑形 |
+
+`mtu_engine/` 只处理上游加载、阶段调用和协议数据映射，算法源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录，保持原文件。`classic_node/` 管理租约、检查点、网络和覆盖文件。旧自研排版、气泡推测、修复、OCR 路由及模型转换链路已移除。
+
+## 排版配置
+
+黑字白描边（比例 0.1），最终字号比例 0.96。检测框和段落来自 CTD。MangaLens 蒙版通过上游 `erode_bubble_mask` 按连通区域内缩 2%，使用上游完整包围检查区分框内文字与自由文字；CTD 文字框不作为气泡边界。
+
+框内段落使用 MTU `balloon_fill`，传入原图和气泡蒙版，保留上游字号搜索、锚点与同框段落避让。非中日目标启用 `balloon_fill_mask_layout`；中日保留上游按原文字框分列，再通过同一气泡蒙版约束字号，避免额外的全图内接矩形搜索。长译文通过缩字适配，完整绘制文本，不裁剪越框字形。
+
+未被有效蒙版完整包围的段落继续使用认可版 `smart_scaling`。整页边缘作为输出边界：适配层把上游渲染矩形映射到画布可用空间，再调用 MTU `calc_font_from_box` 的字形测量和字号搜索，防止译文被图片边缘裁掉。气泡模型仍可能漏检或误检；气泡内约束以有效分割为前提。
+
+横排的非中日语言使用 MTU 现有的按词断行接口，关闭单词断词，再由同一上游 dispatch 搜索字号与绘制；预排阶段字号比例保持 1，0.96 仅应用于最终输出。保留上游断行会使部分长译文的行数较多、字号较小。中日保留原方向和上游标点禁则。阿拉伯语由 Qt 原生处理双向排版、连写和组合音标，逻辑字符串不反转、不预转换为显示字形。不维护本地换行、连写或字形算法。
+
+漫画字体按目标文字体系选择：拉丁字母（包括越南语）使用 Bangers，俄／乌使用 Comic Relief Bold，中／日使用霞鹜漫黑，韩文使用 Jua，阿拉伯文使用 Lalezar。Noto Sans、Noto Sans CJK 和完整 Noto Sans Arabic 保留缺字回退；不通过人工加粗或改写字形制造漫画字体。字体文件、原始声明与摘要统一记录在 [assets.json](../compute-node/assets.json)。
+
+`keep_lang` 默认为 `null`，处理所有识别段落。显式配置 ISO 639-1 源语言（例如 `zh`）时，使用上游 TextBlock／py3langid 语言判断筛选段落，其余原文保留。中文样本对照使用 `zh`；不要把该筛选值用于接收任意源语言的公共节点。
+
+当前配置不能保证封面艺术字、跨列长文或复杂背景与人工／其他平台结果一致。分组、OCR 遗漏和 LaMa 修复痕迹需要用实图判断。文本模型仍由中心提供，与节点图像算法独立。
 
 ## 支持范围
 
-| 来源 / `--ocr-language` | 识别方案 | 默认嵌字方向 |
-|---|---|---|
-| 自动 `auto`（默认） | MIT 文字脚本／颜色探针 → PP-OCRv6 small（简繁中、日、英）或 PP-OCRv5 Korean；两个识别器均为 ONNX CPU FP32 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
-| 对照 `ja` | MIT 多语言 48px CTC：Vulkan 特征 + ONNX CPU 解码；使用上游原字表，`ja` 并非日文专用权重 | CJK 目标沿用原区域横 / 竖排，其他目标横排 |
-| 韩文 `ko` | RapidOCR PP-OCRv5 Korean mobile，ONNX CPU FP32 | 韩文目标横排 |
-| 英文 `en` | RapidOCR PP-OCRv5 English mobile，ONNX CPU FP32 | 英文目标横排、单词换行、离线断词 |
-| 中文 `zh` | RapidOCR PP-OCRv5 Chinese mobile，中英日混合字表 | 中文目标沿用原区域横 / 竖排 |
-| 拉丁文字 `latin` | RapidOCR PP-OCRv5 Latin mobile | 横排；带重音字符不拆散 |
+OCR 使用上游 48px CTC 多语言模型，实际识别效果取决于字形与版面。目标语言由 Qt 字形覆盖探测，协议包含中、日、韩、英等 17 个目标语言（包括 `ar`）。阿拉伯语新增范围是目标译文嵌字，不代表阿拉伯原稿 OCR 已验收。非中日目标强制横排。
 
-`--ocr-language auto` 无需输入来源语言；`--source` 仅作为 CLI 文本翻译提示，默认 Auto。自动模式一次加载 MIT 探针、PP-OCRv6 small 和韩文 PP-OCRv5。每行先读取探针原始结果：置信度至少 0.30、存在韩文字母且其占字母字符的比例至少 25% 时选择韩文模型，其余选择 small；不根据目标语言选择 OCR。低于最终 0.50 过滤阈值的探针文字仍可用于分流，最终识别以所选模型置信度过滤，文字颜色沿用探针结果。自动模式按区域文字类型拼接英文、韩文和 CJK 行，不修改漫画默认从右到左的区域顺序。显式 `ja/zh/en/ko/latin` 用于模型对照与专项处理，只加载所选识别器。
+CTD 在合成的英、日长横排样本上存在检测框不完整的已知问题，会造成漏字；不能把目标语言覆盖视为所有源语言识别质量通过。对应真实 CUDA 测试保留完整原文断言，避免把这一限制掩盖为通过。
 
-MIT 探针／`ja` 权重来自上游 `beta-0.3/ocr-ctc.zip`（SHA-256 `fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101`），原模型代码固定于 `d5a3eee4a7b7b7754b71baa2ee82309dfff468bc`，原 `alphabet-all-v5.txt` 字表转换时逐项核对；导出为 FP32 NCNN backbone + ONNX decoder。small 和韩文权重、字典、版本及摘要见 `manhua_engine/models.json`，来源许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。模型字表支持不等于所有艺术字、手写字或语言组合均准确。
+## 上游能力与接入边界
 
-采用 uniseg 的 Unicode 换行 / 字素规则、Pyphen 自带离线词典、fontTools 字体覆盖检查和 Pillow/FreeType 绘制。英文不会逐字符强拆，CJK 标点遵循换行约束；保留显式换行、组合重音、韩文音节和字体回退。不支持的字符先按固定表替换（例如 `❤` → `♥`），仍不支持则移除；整段移空时跳过该段嵌字，保留抹字结果并继续其他段。只调整绘制文本，不修改中心译文。字体覆盖表有界缓存，每段在字号试探前清理一次。`--direction horizontal/vertical` 可覆盖默认方向。
+采用上游模型不等于已选出每种漫画的最优组合。气泡输入尺寸和置信度需要在实际版面上校验；较大的输入可能增加漏检。当前 768 是私有漫画样本的折中值，不能消除非气泡物体的高置信度误检。气泡蒙版提供容器，CTD 提供文字范围，Qt 再计算换行、字号与位置，三者的质量分别验收。
 
-长宽比超过 2.5 的长条漫画自动重叠分段检测、合并掩膜和去重，保留文字分辨率。每个识别器最多进行一次低置信度重裁剪，自动模式的尝试数包含探针与所选识别器；局部修复保持图像比例，最终只修改去字掩膜与文字区域。
+当前 CTD 库最终按分割文字行调用 `group_output`，没有使用 YOLO 框参与分组；其 YOLO `conf_thresh` 不是文字行漏检的调节入口。DBNet 目前只供抹字蒙版，未接管段落检测。改变检测器须同时回归裁图完整性、段落合并、阅读顺序和既有认可图片，不能仅凭单条 OCR 结果替换。
 
-LaMa 推理掩膜与最终回填掩膜独立：给模型的未知区域额外扩展 5 个原图像素，减轻紧贴文字形状导致的笔画残影；实际写入仍限于原去字掩膜。
+MTU 还提供日语 Manga OCR、PaddleOCR 通用／韩语／拉丁／泰语后端和混合 OCR。当前节点没有接入这些识别后端，也没有接入顶层编排中的低置信度复识别；仅改变 `ocr` 配置字段不会让直接调用 `Model48pxCTCOCR` 的路径切换模型。复识别时还需保留行级置信度，当前协议段落未携带完整行级信息。源语言识别方案应按原稿选择，与目标嵌字语言分开；阿拉伯等文字可评估 PaddleOCR 官方对应语言模型，其漫画实图质量尚未在本节点验收。
 
-## 安装与模型
+## 资源与验证
 
-```powershell
-$env:UV_PROJECT_ENVIRONMENT = '.venv-lama'
-uv sync --locked --extra test --extra build
-.\.venv-lama\Scripts\python -m manhua_engine.cli download --ocr-language all
-.\.venv-lama\Scripts\python -m tools.build_lama --models models
-.\.venv-lama\Scripts\python -m manhua_engine.cli devices
-```
+默认检测边长 1280、修复边长 512、CPU 算子线程 2。仅接受非负 CUDA 设备索引。为控制显存和上游模型共享状态，同一设备的图像阶段串行；网络与 Qt 嵌字池仍独立运行。Qt 字体注册在主线程完成，字体和断词缓存共享，因此上游绘制调用串行。增加线程不保证加速。
 
-也可只下载所需模型，如 `download --ocr-language auto` 会准备 small 权重、配套 YAML 字典和韩文模型；现有节点升级自动模式也需补齐这三个文件。MIT 转换模型仍需保留。`download --ocr-language ko` 只准备韩文识别及通用模型。模型清单随包分发，支持从其他工作目录调用；下载和节点身份检查都校验 SHA-256。运行时不会下载模型或断词词典。Windows 自动选择 Arial / 微软雅黑 / 游ゴシック / Malgun Gothic；Linux 安装 Noto Sans CJK 或用可重复的 `--font /path/font.otf` 指定字体。
+模型与 CUDA 工作空间在 `resident_bytes` 页缓冲预算之外。选机器和并发前实测初始化、逐阶段耗时、吞吐、RSS 与显存峰值；Windows 桌面测量不代表 Linux 服务或其他显卡性能。
 
-MIT OCR 与 LaMa 的完整构建使用 [Windows 节点构建入口](../compute-node/README.md#开发构建与验证)或 [Linux NVIDIA 镜像构建](../compute-node/linux/README.md#构建)。两者复用转换器和锁文件，自动下载固定源码与检查点，分别创建锁定的 OCR 和 LaMa 转换环境，不依赖本机已有的 `models/` 或 `.venv-build`。构建不要求 Git 克隆上游完整应用；OCR 所需模型源码单文件以固定提交 URL 和 SHA-256 校验。
-
-转换器 `tools/build_ocr.py` 由构建入口传入已校验的 `--source-file`、`--archive`、`--work` 和 `--output`。它校验检查点和字典；运行只需要 `ocr-fp32/backbone.ncnn.param/bin` 和 `decoder.onnx`。构建工作目录另保留 `ocr.onnx` 与 `build.json` 供数值验证。实际推理始终关闭 FP16。
-
-## 使用
-
-```powershell
-# 日文漫画嵌入英文：即使原文竖排，英文仍按单词横排
-.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/日文' `
-  --source Japanese --target English --translation online --output artifacts/english
-
-# 韩文识别与日文嵌字；设置主要 OCR 语言也适用于包含英文的韩漫
-.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/韩文' `
-  --source Korean --target Japanese --translation online --output artifacts/japanese
-
-# 英文识别与韩文嵌字
-.\.venv-lama\Scripts\python -m manhua_engine.cli run 'D:/漫画/英文' `
-  --source English --target Korean --translation online --output artifacts/korean
-```
-
-在线首次请求前，在当前终端设置 `OPENAI_API_KEY`。用 `--base-url` 和 `--model` 指定兼容 Chat Completions 的服务与模型。默认沿用本地项目的接口与模型配置。相同参数再次运行可改为 `--translation offline`；缺缓存直接报错。在线模式也先读缓存，超时不自动重试，避免重复计费。空白页不请求翻译；错误、缺编号、截断结果不会缓存。
-
-`--glossary terms.json` 接受非空字符串的来源词到目标词映射，例如 `{"明日香":"Asuka"}`，用于统一人名和术语。术语表、完整提示词、来源 / 目标语言、模型、接口和有序原文均参与缓存键，修改任一项就需要新翻译。默认无术语表时仍可复用原缓存。
-
-输出包含 PNG、逐页 JSON 和 `report.json`。JSON 记录检测框、OCR 原文 / 置信度 / 尝试数、翻译、实际排版方向 / 分行 / 字体 / 范围和阶段耗时。源图不覆盖；同名输出冲突会拒绝。
-
-横排嵌字会在擦字后的页面上寻找气泡内部空白，按每行实际可用宽度平衡完整单词，不再受中文竖排窄框限制。轮廓留边距，同一气泡内的多个文本块分区，避开画面和相邻原文框。无法可靠识别气泡、明显旋转文字、显式换行与中日文竖排保留原文字框排版。JSON 中 `layout.area_source` 区分 `bubble` / `text`，`area_bbox` 记录气泡排版范围；OCR 框与擦字范围保持原始几何。
-
-长段落沿用 Pillow/FreeType，不依赖 Qt。字体对象按线程缓存，完整字串度量与字形栅格分层复用；有描边且边界已覆盖末尾字距时，不重复测量最后字体段的 advance，字体回退衔接仍保留精确字距。矩形排版超过高度预算即停止试排；气泡断行按需测量候选并缓存行带，只按非负评分下界剪枝，不缩减译文或改用逐字宽度估算。候选度量缓存上限 8192、行带缓存上限 1024，限于一次字号探测，结束后释放。
-
-## 性能与验证
-
-- `--pages 1` 优先单页延迟，默认 `2` 重叠页间工作；更高并发不保证更快。
-- `--ocr-workers 8` 是全局 OCR 池，ORT 每次只用一个内部线程。自动模式的 MIT Vulkan 探针特征串行、CPU 解码和所选 PP-OCR 推理可并行；同一行不同时运行 small 和韩文识别器。三个模型常驻并在接单前全部预热。额外识别会增加 CPU 耗时与内存，应按目标机器验证并发吞吐。
-- `--threads 2` 控制 CPU 算子线程数；LaMa 同一 DirectML session 的 Run 串行，网络和其他阶段可以并发；`--detect-size 1280` 可选 1024 / 1536 / 2048。
-- `--tile 768` 是局部去字上限，当前 LaMa ONNX 进一步限制为 512，并保持裁剪比例；`--png-compression 1` 默认快速无损输出。
-- `--gpu -1` 显式使用 CPU。模型只加载一次，字体覆盖与网络预热在计时前完成。
-
-```powershell
-.\.venv-lama\Scripts\python -m pytest -q
-.\.venv-lama\Scripts\python tools/validate_multilingual.py
-.\.venv-lama\Scripts\python tools/benchmark.py 'D:/test-comics/source' `
-  --source 'Japanese and Chinese (mixed; preserve existing Chinese)' `
-  --configs '1:8,2:8' --output artifacts/benchmark
-.\.venv-lama\Scripts\python tools/validate_quality.py 'D:/test-comics/source' artifacts/benchmark/d2-w8
-.\.venv-lama\Scripts\python tools/probe_ocr.py 'D:/test-comics/source' --limit 24 --output artifacts/ocr-probe-new
-```
-
-效果检查应覆盖 OCR 漏字、背景残影、缺字、换行、气泡边界和画面保持。生成样张与固定译文验证图像阶段，在线文本质量使用真实样本单独评估；性能须记录设备、引擎版本和阶段耗时。
-
-## 目录
-
-`manhua_engine/` 只保留运行代码、字表和模型清单；`vendor/` 保留有出处的分组 / CTC / 几何算法。`tools/` 放构建、基准、质量与可视化工具，`tests/` 放离线回归。
-
-`models/` 放可加载权重及验证参考，`build-models/` 放上游源码、检查点与中间产物；`cache/` 和 `artifacts/` 保存本地缓存与输出。原图、缓存、模型和生成样张均不提交 Git。
-
-GPL-3.0；具体上游版本和依赖许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+资产准备、真实样本对照和测试命令见 [README](README.md#验证)。`tools.validate_pipeline_pressure` 保留有界流水线的模拟恢复／慢交付测试，`--models` 可接入实际 CUDA 引擎；模拟中心和固定译文不能证明公网或文本供应商质量。

@@ -1,0 +1,52 @@
+{
+  "source": {
+    "repository": "https://github.com/hgmzhn/manga-translator-ui",
+    "revision": "a1ad823b0d679d1a0665b8bc94de7e8a1c38e54d",
+    "url": "https://codeload.github.com/hgmzhn/manga-translator-ui/zip/a1ad823b0d679d1a0665b8bc94de7e8a1c38e54d",
+    "sha256": "f2194c2d8e9cee4c59ae0b309e3255955c2bec2735a298fc3eb07958f259ac19",
+    "license": "GPL-3.0"
+  },
+  "ballons": {
+    "repository": "https://github.com/dmMaze/BallonsTranslator",
+    "revision": "ea9dcd5e18fb26091ec5c44ed947ce5e11b6c8d8",
+    "url": "https://codeload.github.com/dmMaze/BallonsTranslator/zip/ea9dcd5e18fb26091ec5c44ed947ce5e11b6c8d8",
+    "sha256": "a6e46a259693f508f4746868eb04260be4dc485b4119f1b9228484e062156cac",
+    "license": "GPL-3.0"
+  },
+  "hyphenation": {
+    "url": "https://files.pythonhosted.org/packages/7b/1f/c2142d2edf833a90728e5cdeb10bdbdc094dde8dbac078cee0cf33f5e11b/pyphen-0.17.2-py3-none-any.whl",
+    "sha256": "3a07fb017cb2341e1d9ff31b8634efb1ae4dc4b130468c7c39dd3d32e7c3affd",
+    "source": "https://github.com/Kozea/Pyphen/tree/0.17.2",
+    "note": "Only bundled LibreOffice dictionaries and their notices; rendering uses upstream MTU and libhyphen."
+  },
+  "models": [
+    {
+      "url": "https://huggingface.co/dreMaz/mit_models/resolve/main/comictextdetector.pt",
+      "sha256": "1f90fa60aeeb1eb82e2ac1167a66bf139a8a61b8780acd351ead55268540cccb",
+      "file": "detection/comictextdetector.pt"
+    },
+    {
+      "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect-20241225.ckpt",
+      "sha256": "67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e",
+      "file": "detection/detect-20241225.ckpt"
+    },
+    {
+      "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr-ctc.zip",
+      "sha256": "fc61c52f7a811bc72c54f6be85df814c6b60f63585175db27cb94a08e0c30101",
+      "archive": {
+        "ocr-ctc.ckpt": "ocr/ocr-ctc.ckpt",
+        "alphabet-all-v5.txt": "ocr/alphabet-all-v5.txt"
+      }
+    },
+    {
+      "url": "https://huggingface.co/dreMaz/AnimeMangaInpainting/resolve/main/lama_large_512px.ckpt",
+      "sha256": "11d30fbb3000fb2eceae318b75d9ced9229d99ae990a7f8b3ac35c8d31f2c935",
+      "file": "inpainting/lama_large_512px.ckpt"
+    },
+    {
+      "url": "https://www.modelscope.cn/models/hgmzhn/manga-translator-ui/resolve/master/mangalens.pt",
+      "sha256": "4028152940f7c910f40192f46ede3b3f6c7129e5c76849c324d3564f8ac50198",
+      "file": "detection/mangalens.pt"
+    }
+  ]
+}

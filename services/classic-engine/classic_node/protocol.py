@@ -7,7 +7,7 @@ import json
 import struct
 from PIL import Image
 from time import perf_counter
-from manhua_engine.timing import record
+from .timing import record
 
 # png64 utility budget only; input admission is owned by the center.
 MAX_MASK_BYTES = 24 * 1024 * 1024
@@ -125,7 +125,7 @@ def encode_patch(rgb, mask):
     return data
 
 
-def mask_image(value, size):
+def mask_image(value, size, *, allow_empty=False):
     if not isinstance(value, str) or len(value) > ((MAX_CHECKPOINT_BYTES + 2) // 3) * 4:
         raise NodeFailure('INPUT_INVALID')
     mask = None
@@ -135,7 +135,7 @@ def mask_image(value, size):
             if image.format != 'PNG' or image.size != size or getattr(image, 'n_frames', 1) != 1:
                 raise ValueError('Invalid mask dimensions')
             mask = image.convert('L')
-            if not mask.getbbox():
+            if not allow_empty and not mask.getbbox():
                 raise ValueError('Empty mask')
             return mask
     except (OSError, ValueError, SyntaxError) as error:

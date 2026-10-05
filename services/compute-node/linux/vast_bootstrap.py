@@ -87,7 +87,7 @@ def install(args):
         raise ValueError('Requires Ubuntu 24.04')
     if not shutil.which('supervisorctl'):
         raise ValueError('Vast Supervisor is missing')
-    for library in ('libcudart.so.12', 'libcudnn.so.9', 'libvulkan.so.1', 'libGL.so.1'):
+    for library in ('libcudart.so.12', 'libcudnn.so.9', 'libGL.so.1', 'libfontconfig.so.1', 'libxkbcommon.so.0', 'libdbus-1.so.3'):
         ctypes.CDLL(library)
     if not re.fullmatch(r'[a-f0-9]{64}', args.sha256):
         raise ValueError('A pinned SHA-256 is required')

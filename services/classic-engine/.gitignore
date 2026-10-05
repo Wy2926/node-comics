@@ -1,5 +1,5 @@
 .venv/
-.venv-ncnn/
+.venv*/
 node.local.json
 state/
 .venv-build/
@@ -16,3 +16,4 @@ __pycache__/
 !.env.example
 
 .venv-lama/
+.assets/

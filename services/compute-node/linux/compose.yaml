@@ -9,7 +9,7 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     deploy:
       resources:
         reservations:

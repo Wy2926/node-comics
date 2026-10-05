@@ -44,7 +44,7 @@ def lease(key, *, pixels=100):
 
 @pytest.fixture
 def agent(tmp_path):
-    local = {'node_id': 'fixture', 'resource_id': 'fixture', 'engine': {'gpu': -1},
+    local = {'node_id': 'fixture', 'resource_id': 'fixture', 'engine': {'gpu': 0},
              'max_leases': 8, 'local_pages': 2, 'download_workers': 4, 'delivery_workers': 4}
     transport = SimpleNamespace(control=SimpleNamespace(timeout=30), post=lambda *_: None)
     journal = Journal(tmp_path)
@@ -440,7 +440,7 @@ def test_failed_render_does_not_block_other_pages(agent):
 
 
 def test_render_timings_survive_freeze_without_changing_result(agent):
-    from manhua_engine.timing import record
+    from classic_node.timing import record
     page = add_page(agent)
     page.step = 'render'
     def operation():

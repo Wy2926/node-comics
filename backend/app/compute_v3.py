@@ -144,7 +144,7 @@ class Registration(RequestBody):
     engine_version: str = Field(min_length=1, max_length=120)
     resource_id: str = Field(min_length=1, max_length=120)
     device: str = Field(min_length=1, max_length=80)
-    supported_languages: list[Language] = Field(min_length=1, max_length=16)
+    supported_languages: list[Language] = Field(min_length=1, max_length=len(LANGUAGES))
     ready: bool
     result_formats: list[Literal['overlay-v1', 'overlay-tiles-v1']] = Field(default_factory=lambda: ['overlay-v1'], max_length=2)
 

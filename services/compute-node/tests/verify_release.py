@@ -73,7 +73,7 @@ def verify(release, work):
     server.socket = tls.wrap_socket(server.socket, server_side=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     config = {'protocol_version': 3, 'node_id': 'isolated-release-node', 'node_token': 'isolated-fixture-token',
-              'resource_id': 'isolated-vulkan:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
+              'resource_id': 'isolated-cuda:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
               'control_ca': 'ca.pem'}
     source = work / 'fixture.json'
     source.write_text(json.dumps(config), encoding='utf-8')
@@ -96,12 +96,15 @@ def verify(release, work):
     host = None
     try:
         command('init', '--from', str(source))
-        doctor = command('doctor')
-        print(json.dumps({'passed': 'relocated_gpu_doctor', 'result': json.loads(doctor.stdout.strip())}), flush=True)
+        doctor_started = time.monotonic()
+        # The CUDA/Qt distribution verifies every wheel file before GPU startup.
+        doctor = command('doctor', timeout=600)
+        print(json.dumps({'passed': 'relocated_gpu_doctor', 'seconds': time.monotonic() - doctor_started,
+                          'result': json.loads(doctor.stdout.strip())}), flush=True)
         host = subprocess.Popen([str(executable), 'run', '--home', str(home)], cwd=os.environ['TEMP'], env=env,
                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                 creationflags=subprocess.CREATE_NO_WINDOW)
-        connected = wait('initial_registration_recovers', lambda value: value['connected'])
+        connected = wait('initial_registration_recovers', lambda value: value['connected'], timeout=600)
         assert requests['registrations'] >= 3
         pid = connected['supervisor']['worker_pid']
         outage.set()

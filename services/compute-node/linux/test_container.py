@@ -22,55 +22,11 @@ entry_spec.loader.exec_module(entry)
 
 
 class ContainerTests(unittest.TestCase):
-    def test_asset_build_uses_linux_converters_and_excludes_build_only_weights(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            host, engine = root / 'compute-node', root / 'classic-engine'
-            host.mkdir()
-            (engine / 'manhua_engine').mkdir(parents=True)
-            asset = {'url': 'https://example.com/fixture', 'sha256': 'fixture'}
-            (host / 'toolchain.lock.json').write_text(json.dumps({
-                'ocr_source': asset, 'ocr_checkpoint': asset}))
-            (host / 'assets.json').write_text(json.dumps({'fonts': [{
-                **asset, 'name': 'font.otf', 'notice': 'OFL',
-                'notice_url': asset['url'], 'notice_sha256': asset['sha256']}]}))
-            (engine / 'manhua_engine/models.json').write_text(json.dumps({'models': [
-                dict(asset, name='detector.bin'), dict(asset, name='checkpoint', build_only=True),
-                dict(asset, name='ppocr/v6-small.onnx', language='auto'),
-                dict(asset, name='ppocr/v6-small.yml', language='auto'),
-                dict(asset, name='ppocr/ko.onnx', language='ko')]}))
-
-            def download(url, checksum, target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(b'fixture')
-                return target
-
-            def run(command, **kwargs):
-                self.assertIn('.venv/bin/python', command[0].as_posix())
-                if '--source-file' in command:
-                    self.assertEqual(command[command.index('--source-file') + 1].suffix, '.py')
-                    out = command[command.index('--output') + 1]
-                    out.mkdir(parents=True)
-                    for name in ('backbone.ncnn.bin', 'decoder.onnx', 'build.json', 'ocr.onnx'):
-                        (out / name).write_bytes(b'fixture')
-                else:
-                    out = command[-1] / 'lama-onnx'
-                    out.mkdir()
-                    (out / 'lama-large-512.onnx').write_bytes(b'fixture')
-
-            with patch.object(assets, 'ROOT', host), patch.object(assets, 'ENGINE', engine), \
-                 patch.object(assets, 'download', download), patch.object(assets, 'run', run):
-                output = root / 'bundle'
-                assets.build(output, root / 'cache')
-                self.assertFalse((output / 'models/checkpoint').exists())
-                self.assertFalse((output / 'models/ocr-fp32/ocr.onnx').exists())
-                manifest = json.loads((output / 'release.json').read_text())
-                self.assertEqual(manifest['fonts'], ['fonts/font.otf'])
-                self.assertIn('models/lama-onnx/lama-large-512.onnx', manifest['files'])
-                for name in ('v6-small.onnx','v6-small.yml','ko.onnx'):
-                    self.assertIn('models/ppocr/'+name, manifest['files'])
-                with self.assertRaises(FileExistsError):
-                    assets.build(output, root / 'cache')
+    def test_asset_build_refuses_existing_bundle(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(assets, 'prepare') as prepare:
+            with self.assertRaises(FileExistsError):
+                assets.build(Path(directory), Path(directory) / 'cache')
+            prepare.assert_not_called()
 
     def test_health_requires_fresh_connected_running_state(self):
         now = datetime.now(timezone.utc)
@@ -100,7 +56,7 @@ class ContainerTests(unittest.TestCase):
     def test_runtime_is_nonroot_and_keeps_gpu_and_state_contract(self):
         dockerfile = (ROOT / 'Dockerfile').read_text()
         self.assertIn('USER 10001:10001', dockerfile)
-        self.assertIn('NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics', dockerfile)
+        self.assertIn('NVIDIA_DRIVER_CAPABILITIES=compute,utility', dockerfile)
         self.assertIn('/opt/node/source/compute-node/linux/entrypoint.py', dockerfile)
         self.assertIn('STOPSIGNAL SIGTERM', dockerfile)
         self.assertNotIn('COPY . ', dockerfile)
@@ -109,23 +65,12 @@ class ContainerTests(unittest.TestCase):
         self.assertIn('stop_grace_period: 90s', compose)
         self.assertNotIn('ports:', compose)
 
-    def test_runtime_builds_and_checks_the_pinned_gil_releasing_ncnn(self):
-        dockerfile = (ROOT / 'Dockerfile').read_text()
-        self.assertIn('AS ncnn-wheel', dockerfile)
-        self.assertIn('282f0f4a1beec1f5212aa0d22c00737418645055f33c2d2082922931cdbdc537', dockerfile)
-        self.assertIn('patch --batch --fuzz=0', dockerfile)
-        self.assertIn('COPY --from=ncnn-wheel /wheels/', dockerfile)
-        self.assertIn('/opt/node/venv/bin/python /tmp/test_ncnn_gil.py', dockerfile)
-        self.assertIn('/opt/node/source/ncnn/', dockerfile)
-        self.assertIn('1.0.20260526+nodegil1', (ROOT / 'verify_assets.py').read_text())
-
     def test_runtime_does_not_copy_tests_or_local_experiments(self):
         dockerfile = (ROOT / 'Dockerfile').read_text()
         runtime = dockerfile.split('FROM base AS runtime', 1)[1]
         self.assertIn('--mount=type=bind,source=.,target=/src,ro', runtime)
         self.assertNotIn('COPY services/compute-node/linux/ /', runtime)
         self.assertNotIn('COPY services/classic-engine/tools/ /', runtime)
-        self.assertNotIn('COPY services/compute-node/linux/ncnn/ /', dockerfile)
         for line in runtime.splitlines():
             if line.startswith('COPY '):
                 for forbidden in ('test_', 'benchmark', '/wsl/', '/artifacts/'):

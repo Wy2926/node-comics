@@ -29,22 +29,25 @@ class Builder:
         if run([self.uv, '--version'], cwd=ROOT, env=self.env, capture=True).split()[1] != self.lock['uv']['version']:
             raise RuntimeError('uv version mismatch')
         self.downloads = self.work / 'downloads'
-        self.models = self.session / 'models'
+        self.assets = self.session / 'assets'
         self.tool_envs = {}
 
     def requirements(self, project, target):
         run([self.uv, 'export', '--project', project, '--frozen', '--no-dev', '--no-emit-project',
              '--no-editable', '--no-header', '--no-annotate', '--output-file', target], cwd=ROOT, env=self.env, capture=True)
         content = target.read_text(encoding='utf-8')
-        # uv export omits index URLs. Keep the CPU Torch artifact tied directly
+        # uv export omits index URLs. Keep CUDA artifacts tied directly
         # to its locked Windows wheel, without changing global index priority.
         lock = tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))
         for package in lock['package']:
-            if package['name'] == 'torch' and re.search(r'^torch==', content, re.MULTILINE):
+            name = package['name']
+            if name in ('torch', 'torchvision') and re.search(r'^' + name + '==', content, re.MULTILINE):
                 wheels = [item for item in package.get('wheels', []) if item['url'].endswith('cp312-cp312-win_amd64.whl')]
                 if len(wheels) != 1:
-                    raise ValueError('Expected one locked CPython 3.12 Windows Torch wheel')
-                content = re.sub(r'^torch==[^\s]+', 'torch @ ' + wheels[0]['url'], content, flags=re.MULTILINE)
+                    raise ValueError('Expected one locked CPython 3.12 Windows CUDA wheel: ' + name)
+                requirement = name + ' @ ' + wheels[0]['url'] + ' --hash=' + wheels[0]['hash']
+                content = re.sub(r'^' + name + r'==[^\n]*(?:\n[ \t]+[^\n]*)*',
+                                 lambda match: requirement, content, flags=re.MULTILINE)
         target.write_text(content, encoding='utf-8', newline='\n')
 
     def environment(self, name):
@@ -72,24 +75,9 @@ class Builder:
 
     def prepare_models(self):
         event('prepare_models')
-        manifest = json.loads((ENGINE / 'manhua_engine/models.json').read_text(encoding='utf-8'))
-        for asset in manifest['models']:
-            cached = download(asset['url'], asset['sha256'], self.downloads / ('model-' + asset['sha256']))
-            target = self.models / asset['name']
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(cached, target)
-        source = self.lock['ocr_source']
-        source_path = download(source['url'], source['sha256'], self.downloads / 'model_48px_ctc.py')
-        checkpoint = self.lock['ocr_checkpoint']
-        checkpoint_path = download(checkpoint['url'], checkpoint['sha256'], self.downloads / 'ocr-ctc.zip')
-        ocr_python = self.environment('ocr')
-        event('export_ocr')
-        run([ocr_python, '-B', ENGINE / 'tools/build_ocr.py', '--source-file', source_path,
-             '--archive', checkpoint_path, '--work', self.session / 'ocr-work', '--output', self.models / 'ocr-fp32'],
-            cwd=ENGINE, env=self.env)
-        lama_python = self.environment('lama')
-        event('export_lama')
-        run([lama_python, '-B', '-m', 'tools.build_lama', '--models', self.models], cwd=ENGINE, env=self.env)
+        sys.path.insert(0, str(ENGINE))
+        from tools.prepare_mtu import prepare
+        prepare(self.assets, self.downloads)
 
     def package_runtime(self):
         event('package_runtime')
@@ -111,33 +99,22 @@ class Builder:
         run([self.uv, 'pip', 'install', '--python', packaging_python, '--target', runtime / 'Lib/site-packages',
              '--require-hashes', '--no-build-isolation', '-r', requirements], cwd=ROOT, env=self.env)
         remove_unused_launchers(runtime / 'Lib/site-packages')
-        for package in ('classic_node', 'manhua_engine'):
+        for package in ('classic_node', 'mtu_engine'):
             copy_sources(ENGINE / package, self.output / 'engine' / package)
         for name in ('LICENSE', 'THIRD_PARTY.md', 'uv.lock', 'pyproject.toml'):
             shutil.copy2(ENGINE / name, self.output / 'engine' / name)
-        code = ('import json; from classic_node.runtime import model_identity; '
-                'print(json.dumps({k:v for lang in ("auto","en","zh","ko","latin") '
-                'for k,v in model_identity(__import__("sys").argv[1],lang).items()}))')
-        verified = json.loads(run([runtime / 'python.exe', '-B', '-c', code, self.models],
+        for directory in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation'):
+            shutil.copytree(self.assets / directory, self.output / directory)
+        shutil.copy2(self.assets / 'mtu-assets.json', self.output / 'mtu-assets.json')
+        code = ('import json; from mtu_engine.assets import verify; '
+                'print(json.dumps(verify(__import__("sys").argv[1])["files"]))')
+        verified = json.loads(run([runtime / 'python.exe', '-B', '-c', code, self.output / 'models'],
                                   cwd=self.output, env=self.env, capture=True))
-        for name in (*verified, 'ocr-fp32/build.json', 'lama-onnx/build.json'):
-            target = self.output / 'models' / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(self.models / name, target)
-        self.model_hashes = verified
+        self.model_hashes = {name: value for name, value in verified.items() if name.startswith('models/')}
         event('models_verified', files=len(verified))
 
     def package_fonts(self):
         assets = json.loads((ROOT / 'assets.json').read_text(encoding='utf-8'))
-        (self.output / 'fonts').mkdir()
-        (self.output / 'licenses').mkdir()
-        for font in assets['fonts']:
-            for url, checksum, name, directory in (
-                (font['url'], font['sha256'], font['name'], 'fonts'),
-                (font['notice_url'], font['notice_sha256'], font['notice'], 'licenses')):
-                cached = download(url, checksum, self.downloads / name)
-                shutil.copy2(cached, self.output / directory / name)
-        shutil.copy2(ROOT / 'assets.json', self.output / 'licenses/font-sources.json')
         self.fonts = ['fonts/' + font['name'] for font in assets['fonts']]
 
     def package_sources(self):
@@ -150,7 +127,7 @@ class Builder:
         copy_sources(ROOT / 'build-deps', host / 'build-deps')
         copy_sources(ROOT / 'tests', host / 'tests')
         engine = source / 'classic-engine'
-        for directory in ('classic_node', 'manhua_engine', 'tools', 'docs'):
+        for directory in ('classic_node', 'mtu_engine', 'tools', 'docs'):
             copy_sources(ENGINE / directory, engine / directory)
         for name in ('LICENSE', 'THIRD_PARTY.md', 'uv.lock', 'pyproject.toml', 'README.md', 'ENGINE.md'):
             shutil.copy2(ENGINE / name, engine / name)

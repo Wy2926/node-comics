@@ -12,7 +12,7 @@ from .operations import LOG, Operations, configure_logging, report_fatal
 
 
 def main():
-    parser = argparse.ArgumentParser(description='NCNN/Vulkan overlay compute v3 node')
+    parser = argparse.ArgumentParser(description='MTU NVIDIA CUDA/Qt overlay compute v3 node')
     parser.add_argument('command', choices=['check', 'run', 'pending'])
     parser.add_argument('--config', default='node.local.json')
     parser.add_argument('--bundle-root')
@@ -56,7 +56,7 @@ def execute(args):
             runtime.warmup()
             print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
-                'inpainting_backend': runtime.engine.inpainter.backend}))
+                'inpainting_backend': 'pytorch-cuda-fp32', 'renderer': 'mtu-pyqt6'}))
         finally:
             runtime.close()
         return 0
@@ -109,13 +109,4 @@ def execute(args):
 
 
 if __name__ == '__main__':
-    try:
-        exit_code = main()
-    finally:
-        # Release NCNN networks before Vulkan/Python DLL teardown on Windows.
-        # Lightweight commands must not import or initialize the GPU runtime.
-        import gc
-        gc.collect()
-        if 'ncnn' in sys.modules:
-            sys.modules['ncnn'].destroy_gpu_instance()
-    sys.exit(exit_code)
+    sys.exit(main())

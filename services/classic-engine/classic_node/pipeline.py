@@ -6,7 +6,7 @@ import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest, mask_image
 from .operations import report_page_failure
-from manhua_engine.timing import collect
+from .timing import collect
 
 
 class Pipeline:
@@ -84,6 +84,8 @@ class Pipeline:
         analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'])
         if analysis['input_hash'] != page.metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
+        if page.analysis:
+            self.agent.runtime.validate_analysis(analysis)
         if page.analysis and analysis.get('segments'):
             # A restored checkpoint must pass pixel checks before text work can resume.
             with mask_image(analysis['mask'], (page.metadata['width'], page.metadata['height'])):

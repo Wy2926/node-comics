@@ -36,7 +36,7 @@ def main():
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         metadata.write_text(json.dumps({'image_id': inspected['Id'], 'sha256': digest,
             'bytes': output.stat().st_size, 'platform': 'linux/amd64',
-            'runtime_path': '/opt/node', 'requires': 'Ubuntu 24.04, Python 3.12, CUDA 12.8, cuDNN 9, NVIDIA Vulkan'},
+            'runtime_path': '/opt/node', 'requires': 'Ubuntu 24.04, Python 3.12, NVIDIA CUDA, Qt offscreen system libraries'},
             indent=2) + '\n', encoding='utf-8')
         print(json.dumps({'archive': str(output), 'metadata': str(metadata), 'sha256': digest}))
     finally:

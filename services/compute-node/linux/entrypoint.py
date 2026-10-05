@@ -1,5 +1,4 @@
 """Start a credential-free image using per-instance identity or a mounted config."""
-import gc
 import json
 import logging
 import os
@@ -81,9 +80,6 @@ def main():
         return node_main()
     finally:
         LOG.removeHandler(handler)
-        gc.collect()
-        if 'ncnn' in sys.modules:
-            sys.modules['ncnn'].destroy_gpu_instance()
 
 
 if __name__ == '__main__':

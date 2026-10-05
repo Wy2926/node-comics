@@ -28,13 +28,11 @@ def load(path):
     value['node_token'] = os.environ.get('NODE_TOKEN') or value.get('node_token')
     if not value['node_token'] or not value['node_id'] or not value['resource_id']:
         raise ValueError('Node identity and credential are required')
-    defaults = {'models': 'models', 'gpu': 0, 'ocr_workers': 8, 'threads': 2, 'tile': 768,
-                'font': [], 'detect_size': 1280, 'ocr_language': 'auto', 'direction': 'auto', 'inpaint_gpu': 0}
+    defaults = {'models': '.assets/models', 'gpu': 0, 'threads': 2,
+                'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None}
     if set(value.get('engine', {})) - set(defaults):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
-    if value['engine']['ocr_language'] not in ('auto', 'ja', 'zh', 'en', 'ko', 'latin'):
-        raise ValueError('Unsupported ocr_language')
     value.setdefault('local_pages', 2)
     value.setdefault('render_workers', 1)
     value.setdefault('max_leases', 8)
@@ -52,10 +50,17 @@ def load(path):
         raise ValueError('Network worker counts must be between 1 and 16')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
         raise ValueError('Reserve at least 512 MiB for page buffers')
-    if min(value['engine']['threads'], value['engine']['ocr_workers']) < 1:
+    if type(value['engine']['threads']) is not int or value['engine']['threads'] < 1:
         raise ValueError('Thread counts must be positive')
-    if type(value['engine']['inpaint_gpu']) is not int or value['engine']['inpaint_gpu'] < -1:
-        raise ValueError('inpaint_gpu must be a DirectML adapter index or -1 for explicit CPU')
-    if value['engine']['tile'] < 256 or value['engine']['tile'] % 128:
-        raise ValueError('tile must be a multiple of 128 and at least 256')
+    if type(value['engine']['gpu']) is not int or value['engine']['gpu'] < 0:
+        raise ValueError('gpu must be an NVIDIA CUDA device index')
+    if type(value['engine']['inpainting_size']) is not int or value['engine']['inpainting_size'] not in (512, 768, 1024):
+        raise ValueError('inpainting_size must be 512, 768 or 1024')
+    if type(value['engine']['detect_size']) is not int or not 512 <= value['engine']['detect_size'] <= 2048:
+        raise ValueError('detect_size must be between 512 and 2048')
+    if value['engine']['keep_lang'] is not None:
+        from langcodes import tag_is_valid
+        language = value['engine']['keep_lang']
+        if not isinstance(language, str) or len(language) != 2 or not language.islower() or not tag_is_valid(language):
+            raise ValueError('keep_lang must be an ISO 639-1 source language code or null')
     return value
