@@ -94,6 +94,22 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline):
     engine = Engine(models, fonts)
     try:
         engine.warmup()
+        assert engine.ocr.session.get_providers()[0] == 'CUDAExecutionProvider'
+        assert int(engine.ocr.session.get_provider_options()['CUDAExecutionProvider']['device_id']) == engine.gpu
+        assert engine.ocr.session.get_session_options().intra_op_num_threads == 2
+        # Known line geometry isolates recognition from detector crop failures.
+        import asyncio
+        from PIL import Image, ImageDraw, ImageFont
+        from manga_translator.utils import Quadrilateral
+        font = ImageFont.truetype(str(models.parent / 'fonts/NotoSansCJKsc-Regular.otf'), 36)
+        for text in ('WHERE ARE YOU GOING?', '明日はきっと晴れる。', '曾經有一名偉大的魔術師'):
+            image = Image.new('RGB', (600, 100), 'white')
+            draw = ImageDraw.Draw(image)
+            draw.text((12, 8), text, font=font, fill='black')
+            x1, y1, x2, y2 = draw.textbbox((12, 8), text, font=font)
+            line = Quadrilateral(np.array([[x1-3,y1-3],[x2+3,y1-3],[x2+3,y2+3],[x1-3,y2+3]]), '', 1)
+            asyncio.run(engine.ocr.recognize(np.array(image), [line], engine.config.ocr))
+            assert ''.join(line.text.split()) == ''.join(text.split())
         source = np.full((256, 256, 3), 220, dtype=np.uint8)
         source[110:135, 110:135] = 0
         mask = np.zeros(source.shape[:2], dtype=np.uint8)
@@ -169,6 +185,31 @@ def test_translated_glyphs_stay_inside_bubble_mask(assets, offline, monkeypatch,
     assert not np.any(painted & (mask == 0))
     assert re.sub(r'\s*\[BR\]\s*', ' ', observed[0].translation).split() == text.split()
     assert observed[0].font_size < block.font_size
+    # A narrow CJK source box must not force one tiny word per line forever.
+    assert observed[0].font_size >= 26
+    assert observed[0].translation.count('[BR]') < (4 if language == 'vi' else 8)
+
+
+@pytest.mark.parametrize('text', ['NEW', 'STOP!', 'سلام'])
+def test_single_word_preserves_characters_without_internal_breaks(assets, offline, monkeypatch, text):
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator import rendering
+    from manga_translator.utils import TextBlock
+    source = np.full((300, 300, 3), 255, dtype=np.uint8)
+    block = TextBlock(np.array([[[100, 40], [190, 40], [190, 220], [100, 220]]]),
+                      ['原'], font_size=90, direction='v')
+    dispatch, observed = rendering.dispatch, []
+    async def capture(*args, **kwargs):
+        result = await dispatch(*args, **kwargs)
+        observed.extend(args[1])
+        return result
+    monkeypatch.setattr(rendering, 'dispatch', capture)
+    output = renderer.render(source, source, [serialize_region(block)], [text],
+                             'ar' if text == 'سلام' else 'en', None)
+    assert np.any(output != source)
+    assert observed[0].translation == text
+    assert observed[0].font_size > 0
 
 
 @pytest.mark.parametrize('angle', [0, 15, -15])

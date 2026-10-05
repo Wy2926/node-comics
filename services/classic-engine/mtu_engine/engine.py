@@ -19,7 +19,7 @@ def configuration(detect_size=1280, inpainting_size=512):
     from manga_translator.config import Config
     return Config.model_validate({
         'detector': {'detector': 'default', 'detection_size': detect_size},
-        'ocr': {'ocr': '48px_ctc', 'prob': 0.50, 'limit_mask_dilation_to_bubble_mask': True},
+        'ocr': {'ocr': 'paddleocr', 'prob': 0.50, 'limit_mask_dilation_to_bubble_mask': True},
         'inpainter': {'inpainter': 'lama_large', 'inpainting_size': inpainting_size,
                       'inpainting_precision': 'fp32', 'force_use_torch_inpainting': True,
                       'solid_fill_pure_bubbles': True, 'per_block_inpainting': True},
@@ -86,8 +86,9 @@ class Renderer:
         from manga_translator.config import Direction
         from manga_translator.rendering import (
             dispatch, resize_regions_to_font_size, calc_font_from_box, calc_box_from_font,
-            _region_lines_fully_inside_mask, text_render)
+            _region_lines_fully_inside_mask, _apply_default_english_line_break_method, text_render)
         from manga_translator.utils import TextBlock, build_region_reference_mask, erode_bubble_mask
+        from manga_translator.rendering.rich_text import legacy_line_breaks_to_document
         config = configuration()
         target = LANGUAGES[language]
         config.translator.target_lang = target
@@ -120,6 +121,11 @@ class Renderer:
             block.default_stroke_width = 0.1
             if language not in ('zh-Hans', 'zh-Hant', 'ja'):
                 block._direction = config.render.direction.value
+                if len(text.split()) == 1:
+                    # MTU's automatic plain-text fallback can split even a
+                    # single word into characters. Its document path preserves
+                    # the paragraph and still fits glyphs to the available box.
+                    block.set_translation_rich(legacy_line_breaks_to_document(text))
             blocks.append(block)
         if not blocks:
             return cleaned
@@ -139,6 +145,7 @@ class Renderer:
                 inside = labels is not None and _region_lines_fully_inside_mask(
                     block, build_region_reference_mask(block, bubble_mask, labels))
                 (enclosed if inside else free).append(block)
+            enclosed_texts = [block.translation for block in enclosed]
             if language not in ('zh-Hans', 'zh-Hant', 'ja'):
                 # MTU first supplies its word breaks. A second layout
                 # pass runs its Qt size search on those explicit breaks, instead
@@ -180,6 +187,20 @@ class Renderer:
                 # CJK keeps native column breaking; the optional inscribed-box
                 # reflow adds full-mask scans without improving this constraint.
                 config.render.balloon_fill_mask_layout = language not in ('zh-Hans', 'zh-Hant', 'ja')
+                if config.render.balloon_fill_mask_layout:
+                    # Manga2Eng initially wraps at the source CJK font size.
+                    # Feed MTU's mask-fitted size back to its word layout once:
+                    # otherwise the final pass only shrinks those narrow lines.
+                    scale = config.render.font_scale_ratio
+                    config.render.font_scale_ratio = 1.0
+                    resize_regions_to_font_size(rendered, enclosed, config, original,
+                        bubble_mask=bubble_mask, skip_text_replacements=True)
+                    config.render.font_scale_ratio = scale
+                    for block, text in zip(enclosed, enclosed_texts):
+                        block.translation = text
+                        text_render.set_font(block.font_family)
+                        _apply_default_english_line_break_method(
+                            block, round(block.font_size), None, config)
                 # Keep scaling enabled: upstream fits the actual mask, retains
                 # its layout anchor and handles paragraphs in a shared bubble.
                 rendered = asyncio.run(dispatch(rendered, enclosed, config, original,
@@ -209,22 +230,47 @@ class Engine:
         ballons_logger.handlers = [logging.NullHandler()]
         ballons_logger.propagate = False
         ballons_logger.setLevel(logging.CRITICAL + 1)
-        from manga_translator.ocr.model_48px_ctc import Model48pxCTCOCR
+        from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
         # Select only the upstream CUDA checkpoint; do not fetch an unused CPU
         # ONNX model just to satisfy the upstream multi-backend download map.
         class CudaLama(LamaLargeInpainter):
             _MODEL_MAPPING = {'model': LamaLargeInpainter._MODEL_MAPPING['model']}
+        class CudaPaddle(ModelPaddleOCR):
+            # Lettering has fixed black/white colors; no extra 48px color model.
+            _COMMON_MODEL_MAPPING_KEYS = ()
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
             self.ctd = CTDModel(str(self.models / 'detection/comictextdetector.pt'),
                                 detect_size=detect_size, device=f'cuda:{gpu}')
-            self.ocr = Model48pxCTCOCR()
+            self.ocr = CudaPaddle()
             self.inpainter = CudaLama()
             for model in (self.detector, self.ocr, self.inpainter):
+                # Ballons installs a process-wide logger class with its own
+                # handlers; keep subsequently created MTU model logs private.
+                model.logger.handlers = [logging.NullHandler()]
+                model.logger.propagate = False
+                model.logger.setLevel(logging.CRITICAL + 1)
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
                 asyncio.run(model.load('cuda'))
+            # The OCR loader exposes no session options. Recreate its session
+            # once at startup with the native factory: bind the selected GPU,
+            # bound CPU helpers, and avoid spinning against the Qt render pool.
+            from manga_translator.utils.onnx_runtime import create_inference_session, import_onnxruntime
+            options = self.ocr.session.get_session_options()
+            options.intra_op_num_threads = threads
+            options.inter_op_num_threads = 1
+            options.add_session_config_entry('session.intra_op.allow_spinning', '0')
+            options.add_session_config_entry('session.inter_op.allow_spinning', '0')
+            self.ocr.session = None
+            self.ocr.session, _ = create_inference_session(import_onnxruntime(),
+                self.ocr._get_file_path(self.ocr._MODELS[self.ocr.model_type]['onnx']),
+                device='cuda', sess_options=options, cuda_options={'device_id': gpu},
+                fallback_to_cpu=False, logger=self.ocr.logger)
+            if self.ocr.session.get_providers()[0] != 'CUDAExecutionProvider':
+                raise RuntimeError('PP-OCRv6 requires ONNX Runtime CUDAExecutionProvider')
+            self.ocr.session.disable_fallback()
             self.bubbles = MangaLensBubbleDetector(
                 model_path=self.models / 'detection/mangalens.pt', device=f'cuda:{gpu}',
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)

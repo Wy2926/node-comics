@@ -52,7 +52,7 @@ class Runtime:
                 for directory in ('mtu_engine', 'classic_node')
                 for path in sorted((source / directory).glob('*.py'))}
         dependencies = {name: package_version(name) for name in (
-            'torch', 'torchvision', 'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
+            'torch', 'torchvision', 'onnxruntime-gpu', 'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
             'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely')}
         self.version = 'mtu-cuda-v1-' + digest({'upstream': LOCK['source']['revision'],
             'code': code, 'assets': assets, 'dependencies': dependencies,

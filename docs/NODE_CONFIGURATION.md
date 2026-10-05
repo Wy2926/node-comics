@@ -55,7 +55,7 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 产品的常规翻译目标项来自 [backend/app/languages.py](../backend/app/languages.py)：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`，共 16 项。AI 重绘只开放前五项。
 
-节点注册时报告 `supported_languages`，节点启动时依据字体覆盖自动检测目标语言，中心直接使用注册能力；不配置目标语言白名单或默认引擎指纹。来源 OCR 使用 MTU 多语言 48px CTC，不要求客户端传来源语言；具体组合见[引擎支持范围](../services/classic-engine/ENGINE.md#支持范围)。未知或该模式未开放的目标语言返回 `LANGUAGE_UNSUPPORTED`。
+节点注册时报告 `supported_languages`，节点启动时依据字体覆盖自动检测目标语言，中心直接使用注册能力；不配置目标语言白名单或默认引擎指纹。来源 OCR 使用 MTU 的 PP-OCRv6 medium CUDA 后端，不要求客户端传来源语言；具体组合见[引擎支持范围](../services/classic-engine/ENGINE.md#支持范围)。未知或该模式未开放的目标语言返回 `LANGUAGE_UNSUPPORTED`。
 
 仓库包含 [classic-engine](../services/classic-engine/README.md) 源码、模型清单和测试；模型权重与字体需另行准备。产品允许选择某目标语言，不代表已有可用节点，也不代表 OCR 能可靠识别该源语言。接入引擎需要自行验证源语言 OCR、目标字体、换行、缺字和排版边界，并准确报告能力。交互与恢复见[计算协议](COMPUTE_PROTOCOL.md)。
 

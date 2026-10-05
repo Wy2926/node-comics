@@ -1,10 +1,10 @@
 # MTU 计算节点
 
-常规漫画翻译的 v3 图像计算节点。组装固定版本的 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) CTD 段落检测与 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) 的 DBNet 蒙版、48px CTC OCR、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字。神经网络统一使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
+常规漫画翻译的 v3 图像计算节点。组装固定版本的 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) CTD 段落检测与 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) 的 DBNet 蒙版、PP-OCRv6 medium、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字。神经网络统一使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
 
 ## 开发运行
 
-需要 Python 3.12、uv、NVIDIA 显卡及支持 CUDA 12.6 的驱动。Windows 和 Linux 使用同一 PyTorch CUDA 路径。Linux 系统库由 [Dockerfile](../compute-node/linux/Dockerfile) 提供。
+需要 Python 3.12、uv、NVIDIA 显卡及支持 CUDA 12.6 的驱动。Windows 和 Linux 均使用 PyTorch CUDA 与 ONNX Runtime CUDA。Linux 系统库由 [Dockerfile](../compute-node/linux/Dockerfile) 提供。
 
 在本目录执行：
 
