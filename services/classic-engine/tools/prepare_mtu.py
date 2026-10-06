@@ -19,6 +19,14 @@ def prepare(output, cache):
     output.mkdir(parents=True, exist_ok=True)
     if (output / 'node.json').exists() or (output / 'state').exists():
         raise ValueError('Prepare assets outside a configured node state directory')
+    # These generated directories belong to this preparer. Rebuild them from
+    # the checksum cache so removed models/source cannot survive an upgrade.
+    for name in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation'):
+        directory = (output / name).resolve()
+        if not directory.is_relative_to(output) or directory == output:
+            raise ValueError('Unsafe asset output path')
+        if directory.exists():
+            shutil.rmtree(directory)
     for key, repository, module in (('source', 'manga-translator-ui', 'manga_translator'),
                                      ('ballons', 'BallonsTranslator', 'ballontranslator')):
         source = LOCK[key]
@@ -40,12 +48,11 @@ def prepare(output, cache):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with package.open(info) as src, target.open('wb') as dst:
                     shutil.copyfileobj(src, dst)
-    # BallonsTranslator resolves its root using these directories at import.
-    # Prepare them here so an offline/read-only node never creates app state.
+    # The native paragraph grouping imports BallonsTranslator's text types.
     for relative in ('config/textstyles', 'data'):
         directory = output / 'upstream' / relative
         directory.mkdir(parents=True, exist_ok=True)
-        (directory / '.node-prepared').write_text('Prepared for CTD library imports.\n', encoding='utf-8')
+        (directory / '.node-prepared').write_text('Prepared for paragraph grouping imports.\n', encoding='utf-8')
     for asset in LOCK['models']:
         cached = download(asset['url'], asset['sha256'], cache / asset['sha256'])
         if 'archive' in asset:

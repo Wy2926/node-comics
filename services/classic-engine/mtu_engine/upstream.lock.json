@@ -21,11 +21,6 @@
   },
   "models": [
     {
-      "url": "https://huggingface.co/dreMaz/mit_models/resolve/main/comictextdetector.pt",
-      "sha256": "1f90fa60aeeb1eb82e2ac1167a66bf139a8a61b8780acd351ead55268540cccb",
-      "file": "detection/comictextdetector.pt"
-    },
-    {
       "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect-20241225.ckpt",
       "sha256": "67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e",
       "file": "detection/detect-20241225.ckpt"

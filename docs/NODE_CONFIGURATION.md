@@ -59,4 +59,4 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 仓库包含 [classic-engine](../services/classic-engine/README.md) 源码、模型清单和测试；模型权重与字体需另行准备。产品允许选择某目标语言，不代表已有可用节点，也不代表 OCR 能可靠识别该源语言。接入引擎需要自行验证源语言 OCR、目标字体、换行、缺字和排版边界，并准确报告能力。交互与恢复见[计算协议](COMPUTE_PROTOCOL.md)。
 
-`engine.gpu` 是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎选项仅有 `models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang`；未知旧参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 CTD／OCR／LaMa 与 Qt 嵌字后再登记能力。MTU 迁移前排空租约，旧自研引擎检查点不能复用；GPU 初始化失败不降级 CPU。
+`engine.gpu` 是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎选项仅有 `models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang`；未知旧参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`threads` 同时约束 PyTorch、ORT 辅助算子和 OpenCV 的 CPU 线程，不增加租约并发或 CUDA 推理批次；多核节点应结合容器 CPU 配额、分析耗时与并发嵌字负载实测调整。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 DBNet／OCR／LaMa 与 Qt 嵌字后再登记能力。MTU 迁移前排空租约，旧自研引擎检查点不能复用；GPU 初始化失败不降级 CPU。

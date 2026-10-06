@@ -89,7 +89,7 @@ def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, mon
         assert np.array_equal(empty, source)
 
 
-def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline):
+def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypatch):
     models, fonts = assets
     engine = Engine(models, fonts)
     try:
@@ -110,6 +110,29 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline):
             line = Quadrilateral(np.array([[x1-3,y1-3],[x2+3,y1-3],[x2+3,y2+3],[x1-3,y2+3]]), '', 1)
             asyncio.run(engine.ocr.recognize(np.array(image), [line], engine.config.ocr))
             assert ''.join(line.text.split()) == ''.join(text.split())
+        # Exercise the real detector at the page boundary and cross the old
+        # 16+remainder batch boundary without changing ORT convolution shapes.
+        shapes = []
+        infer = engine.ocr.session.run
+        def capture(outputs, feed, *args, **kwargs):
+            shapes.append(next(iter(feed.values())).shape)
+            return infer(outputs, feed, *args, **kwargs)
+        monkeypatch.setattr(engine.ocr.session, 'run', capture)
+        edge_font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 26)
+        sentence = 'BUT UNLIKE ME'
+        for count in (17, 4):
+            image = Image.new('RGB', (720, 1203), 'white')
+            draw = ImageDraw.Draw(image)
+            bounds = draw.textbbox((0, 0), sentence, font=edge_font)
+            bottom_y = image.height - 1 - bounds[3]
+            for index in range(count):
+                draw.text((96, bottom_y - (count - 1 - index) * 44), sentence, font=edge_font, fill='black')
+            regions, mask, _, _ = engine.analyze(np.array(image))
+            recognized = ' '.join(region.text for region in regions)
+            assert recognized.count(sentence) == count
+            assert mask is not None and mask[-8:].any()
+        assert len(shapes) >= 21
+        assert set(shapes) == {(1, 3, 48, 320)}
         source = np.full((256, 256, 3), 220, dtype=np.uint8)
         source[110:135, 110:135] = 0
         mask = np.zeros(source.shape[:2], dtype=np.uint8)

@@ -1,6 +1,6 @@
 # MTU 计算节点
 
-常规漫画翻译的 v3 图像计算节点。组装固定版本的 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) CTD 段落检测与 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) 的 DBNet 蒙版、PP-OCRv6 medium、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字。神经网络统一使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
+常规漫画翻译的 v3 图像计算节点。组装固定版本的 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) DBNet 检测与文字蒙版、PP-OCRv6 medium、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字；段落合并与阅读顺序使用 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 原生分组。神经网络统一使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
 
 ## 开发运行
 
@@ -15,7 +15,7 @@ uv sync --locked --extra test
 .\.venv\Scripts\python.exe -m classic_node run --config node.local.json
 ```
 
-先复制 [node.example.json](node.example.json) 为私有 `node.local.json`，填写中心 HTTPS 地址及独立节点身份。`prepare_mtu` 下载并校验上游源码、原生权重、断词词典和字体到 `.assets/`；`check` 校验资产、字体和 GPU 预热；`run` 才注册接单。运行时不下载资产。Linux 将 Python 路径改为 `.venv/bin/python`。
+先复制 [node.example.json](node.example.json) 为私有 `node.local.json`，填写中心 HTTPS 地址及独立节点身份。`prepare_mtu` 从校验缓存重新生成 `.assets/` 下的 `upstream`、`models`、`fonts`、`licenses`、`hyphenation` 目录，移除已停用资产；这些目录仅存放生成文件。`check` 校验资产、字体和 GPU 预热；`run` 才注册接单。运行时不下载资产。Linux 将 Python 路径改为 `.venv/bin/python`。
 
 ## 验证
 

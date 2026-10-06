@@ -22,7 +22,7 @@ def verify(root):
             raise ValueError('Missing font coverage: ' + language)
     # Import every stage here, so missing binary/module dependencies fail the build.
     from manga_translator.detection.default import DefaultDetector
-    from ballontranslator.modules.textdetector.ctd import CTDModel
+    from ballontranslator.utils.textblock import group_output
     from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
     from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
     from manga_translator.mask_refinement import dispatch

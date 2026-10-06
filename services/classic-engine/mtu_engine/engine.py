@@ -210,6 +210,7 @@ class Renderer:
 
 class Engine:
     def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None):
+        import cv2
         import torch
         if not torch.cuda.is_available() or not 0 <= gpu < torch.cuda.device_count():
             raise RuntimeError('An NVIDIA CUDA GPU is required; there is no CPU/DirectML fallback')
@@ -225,7 +226,6 @@ class Engine:
         from manga_translator.utils import ModelWrapper, MangaLensBubbleDetector
         ModelWrapper._MODEL_DIR = str(self.models)
         from manga_translator.detection.default import DefaultDetector
-        from ballontranslator.modules.textdetector.ctd import CTDModel
         from ballontranslator.utils.logger import logger as ballons_logger
         ballons_logger.handlers = [logging.NullHandler()]
         ballons_logger.propagate = False
@@ -241,13 +241,10 @@ class Engine:
             _COMMON_MODEL_MAPPING_KEYS = ()
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
-            self.ctd = CTDModel(str(self.models / 'detection/comictextdetector.pt'),
-                                detect_size=detect_size, device=f'cuda:{gpu}')
             self.ocr = CudaPaddle()
             self.inpainter = CudaLama()
             for model in (self.detector, self.ocr, self.inpainter):
-                # Ballons installs a process-wide logger class with its own
-                # handlers; keep subsequently created MTU model logs private.
+                # Keep upstream model diagnostics out of operational logs.
                 model.logger.handlers = [logging.NullHandler()]
                 model.logger.propagate = False
                 model.logger.setLevel(logging.CRITICAL + 1)
@@ -274,6 +271,9 @@ class Engine:
             self.bubbles = MangaLensBubbleDetector(
                 model_path=self.models / 'detection/mangalens.pt', device=f'cuda:{gpu}',
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)
+        # Upstream imports can disable OpenCV threading. Apply the node's CPU
+        # budget after loading them, including DBNet and mask bilateral filters.
+        cv2.setNumThreads(threads)
 
     def warmup(self):
         import torch
@@ -285,7 +285,6 @@ class Engine:
             c = self.config
             await self.detector.detect(rgb, c.detector.detection_size, c.detector.text_threshold,
                                        c.detector.box_threshold, c.detector.unclip_ratio)
-            self.ctd(rgb)
             await self.ocr.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
         with self._gpu_lock, torch.cuda.device(self.gpu):
@@ -295,15 +294,23 @@ class Engine:
     def analyze(self, rgb):
         import torch
         from manga_translator.mask_refinement import dispatch as refine
+        from ballontranslator.utils.textblock import group_output
         from manga_translator.utils import (
             TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
-            _, _, blocks = self.ctd(rgb)
+            lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
+                c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
+            # Retain the approved upstream paragraph grouping and reading
+            # order, using DBNet lines without loading or running a CTD model.
+            blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
             groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
-            # OCR mutates the quadrilaterals in place. Retain CTD's paragraph
-            # boundaries and reading order instead of merging the lines again.
-            await self.ocr.recognize(rgb, [line for group in groups for line in group], c.ocr)
+            # Keep ORT's convolution input shape stable: alternating a full
+            # batch and a remainder rebuilds cuDNN plans on the deployed stack.
+            # MTU still owns cropping, resizing, decoding and confidence checks.
+            for group in groups:
+                for line in group:
+                    await self.ocr.recognize(rgb, [line], c.ocr)
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h')
@@ -313,9 +320,6 @@ class Engine:
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
             if not regions:
                 return [], None, None, None
-            # DBNet supplies only the text mask; CTD owns geometry and grouping.
-            _, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
-                c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
             bubbles = build_bubble_mask_from_mangalens_result(
                 self.bubbles.detect(rgb, device=f'cuda:{self.gpu}'), rgb.shape[:2])
             mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
@@ -350,5 +354,4 @@ class Engine:
         with self._gpu_lock, torch.cuda.device(self.gpu):
             for model in (self.detector, self.ocr, self.inpainter):
                 asyncio.run(model.unload())
-            self.ctd.net = None
             self.bubbles.model = None

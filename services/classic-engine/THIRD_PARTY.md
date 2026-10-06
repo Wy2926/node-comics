@@ -8,7 +8,7 @@ The lock also records the DBNet checkpoint from [manga-image-translator](https:/
 
 ## BallonsTranslator
 
-[dmMaze/BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) supplies the unmodified CTD detector and paragraph grouping. Its commit, archive SHA-256 and the native [comictextdetector checkpoint](https://huggingface.co/dreMaz/mit_models) are pinned in the same lock. Preparation retains `ballontranslator/`, the resources required by its library imports, `BallonsTranslator-LICENSE` and its dependency manifest under `upstream/`. The adapter uses CTD geometry with MTU OCR, masking, inpainting and Qt rendering; it does not run the BallonsTranslator GUI or translation modules. No source extraction, rewritten grouping or upstream patch is maintained.
+[dmMaze/BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) supplies the unmodified `group_output` paragraph grouping and reading order, operating on MTU DBNet text lines. Its commit and archive SHA-256 are pinned in the same lock. Preparation retains `ballontranslator/`, the resources required by its library imports, `BallonsTranslator-LICENSE` and its dependency manifest under `upstream/`. No CTD checkpoint is distributed or executed. The adapter does not run the BallonsTranslator GUI or translation modules. No source extraction, rewritten grouping or upstream patch is maintained.
 
 ## Runtime and data
 
