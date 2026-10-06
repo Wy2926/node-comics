@@ -120,6 +120,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
         monkeypatch.setattr(engine.ocr.session, 'run', capture)
         edge_font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 26)
         sentence = 'BUT UNLIKE ME'
+        edge_inputs = []
         for count in (17, 4):
             image = Image.new('RGB', (720, 1203), 'white')
             draw = ImageDraw.Draw(image)
@@ -131,6 +132,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             recognized = ' '.join(region.text for region in regions)
             assert recognized.count(sentence) == count
             assert mask is not None and mask[-8:].any()
+            edge_inputs.append((np.array(image), count))
         assert len(shapes) >= 21
         assert set(shapes) == {(1, 3, 48, 320)}
         source = np.full((256, 256, 3), 220, dtype=np.uint8)
@@ -141,6 +143,23 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
         assert cleaned.shape == source.shape and cleaned.dtype == np.uint8
         assert np.array_equal(cleaned[mask == 0], source[mask == 0])
         assert np.any(cleaned[mask != 0] != source[mask != 0])
+        # Mix different pages and real inpainting on the node's two compute
+        # workers. This catches shared upstream state crossing page boundaries.
+        with ThreadPoolExecutor(2) as workers:
+            jobs = []
+            for image, count in edge_inputs * 2:
+                jobs.append((count, workers.submit(engine.analyze, image)))
+                jobs.append((None, workers.submit(engine.inpaint, source, mask, mask, np.zeros_like(mask), [])))
+            for count, job in jobs:
+                output = job.result()
+                if count is None:
+                    assert np.array_equal(output[mask == 0], source[mask == 0])
+                    assert np.abs(output.astype(np.int16) - cleaned.astype(np.int16)).max() <= 1
+                else:
+                    regions, edge_mask, _, _ = output
+                    assert ' '.join(region.text for region in regions).count(sentence) == count
+                    assert edge_mask is not None and edge_mask[-8:].any()
+        assert set(shapes) == {(1, 3, 48, 320)}
     finally:
         engine.close()
 

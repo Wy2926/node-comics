@@ -219,7 +219,12 @@ class Engine:
         self.keep_lang = keep_lang
         self.renderer = Renderer(models, font)
         self.config = configuration(detect_size, inpainting_size)
-        self._gpu_lock = Lock()
+        # Upstream model wrappers own mutable state. Serialize each instance,
+        # while allowing other models and CPU mask work to make progress.
+        self._detector_lock = Lock()
+        self._ocr_lock = Lock()
+        self._inpaint_lock = Lock()
+        self._bubble_lock = Lock()
         torch.set_num_threads(threads)
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -287,7 +292,7 @@ class Engine:
                                        c.detector.box_threshold, c.detector.unclip_ratio)
             await self.ocr.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
-        with self._gpu_lock, torch.cuda.device(self.gpu):
+        with self._detector_lock, self._ocr_lock, self._inpaint_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
             self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
 
@@ -299,8 +304,9 @@ class Engine:
             TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
-            lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
-                c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
+            with self._detector_lock:
+                lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
+                    c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
             # Retain the approved upstream paragraph grouping and reading
             # order, using DBNet lines without loading or running a CTD model.
             blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
@@ -310,7 +316,8 @@ class Engine:
             # MTU still owns cropping, resizing, decoding and confidence checks.
             for group in groups:
                 for line in group:
-                    await self.ocr.recognize(rgb, [line], c.ocr)
+                    with self._ocr_lock:
+                        await self.ocr.recognize(rgb, [line], c.ocr)
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h')
@@ -320,13 +327,14 @@ class Engine:
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
             if not regions:
                 return [], None, None, None
-            bubbles = build_bubble_mask_from_mangalens_result(
-                self.bubbles.detect(rgb, device=f'cuda:{self.gpu}'), rgb.shape[:2])
+            with self._bubble_lock:
+                detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
+            bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
             mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
                                 kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
                                 bubble_mask=bubbles)
             return regions, mask, raw, bubbles
-        with self._gpu_lock, torch.cuda.device(self.gpu):
+        with torch.cuda.device(self.gpu):
             return asyncio.run(run())
 
     def inpaint(self, rgb, mask, raw_mask, bubble_mask, regions):
@@ -343,15 +351,16 @@ class Engine:
         filled, remaining, _ = solid_fill_pure_bubbles(rgb, mask, blocks, tight,
             erode_bubble_mask(bubble_mask, MODEL_BUBBLE_SHRINK_RATIO), self.config.ocr.model_bubble_overlap_threshold)
         async def inpaint(crop, local_mask):
-            return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
-                                                self.config.inpainter.inpainting_size)
-        with self._gpu_lock, torch.cuda.device(self.gpu):
+            with self._inpaint_lock:
+                return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
+                                                    self.config.inpainter.inpainting_size)
+        with torch.cuda.device(self.gpu):
             result, _ = asyncio.run(inpaint_regions_per_block(filled, remaining.copy(), inpaint))
         return result
 
     def close(self):
         import torch
-        with self._gpu_lock, torch.cuda.device(self.gpu):
+        with self._detector_lock, self._ocr_lock, self._inpaint_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             for model in (self.detector, self.ocr, self.inpainter):
                 asyncio.run(model.unload())
             self.bubbles.model = None
