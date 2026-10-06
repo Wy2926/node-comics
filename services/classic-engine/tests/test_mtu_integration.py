@@ -11,6 +11,7 @@ import pytest
 
 from classic_node.runtime import LANGUAGE_PROBES
 from mtu_engine.engine import Engine, Renderer, serialize_region
+from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
 
 
 @pytest.fixture(scope='module')
@@ -111,7 +112,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             asyncio.run(engine.ocr.recognize(np.array(image), [line], engine.config.ocr))
             assert ''.join(line.text.split()) == ''.join(text.split())
         # Exercise the real detector at the page boundary and cross the old
-        # 16+remainder batch boundary without changing ORT convolution shapes.
+        # 16+remainder boundary with native bounded OCR batches and tail batches.
         shapes = []
         infer = engine.ocr.session.run
         def capture(outputs, feed, *args, **kwargs):
@@ -133,8 +134,9 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             assert recognized.count(sentence) == count
             assert mask is not None and mask[-8:].any()
             edge_inputs.append((np.array(image), count))
-        assert len(shapes) >= 21
-        assert set(shapes) == {(1, 3, 48, 320)}
+        assert sum(shape[0] for shape in shapes) == 21
+        assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
+                   OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)
         source = np.full((256, 256, 3), 220, dtype=np.uint8)
         source[110:135, 110:135] = 0
         mask = np.zeros(source.shape[:2], dtype=np.uint8)
@@ -159,7 +161,8 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
                     regions, edge_mask, _, _ = output
                     assert ' '.join(region.text for region in regions).count(sentence) == count
                     assert edge_mask is not None and edge_mask[-8:].any()
-        assert set(shapes) == {(1, 3, 48, 320)}
+        assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
+                   OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)
     finally:
         engine.close()
 
@@ -169,6 +172,53 @@ def test_missing_cuda_fails_before_loading_an_alternate_backend(monkeypatch):
     monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
     with pytest.raises(RuntimeError, match='NVIDIA CUDA GPU is required'):
         Engine('missing', [])
+
+
+def test_long_lines_and_partial_ocr_preserve_paragraphs_at_different_positions(assets, offline, monkeypatch):
+    from PIL import Image, ImageDraw, ImageFont
+    models, fonts = assets
+    engine = Engine(models, fonts)
+    sentences = ['We read a new story together at the library.',
+                 'The evening sky was full of distant stars.',
+                 'Our next adventure begins early tomorrow.']
+    font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 24)
+    recognize = engine.ocr.recognize
+    failure = None
+
+    async def incomplete(*args, **kwargs):
+        result = await recognize(*args, **kwargs)
+        for line in args[1]:
+            if failure and 'evening' in line.text:
+                if failure == 'empty':
+                    line.text = ''
+                line.prob = 0.1
+        return result
+
+    monkeypatch.setattr(engine.ocr, 'recognize', incomplete)
+    try:
+        engine.warmup()
+        for top in (32, 440, 900):
+            image = Image.new('RGB', (800, 1200), 'white')
+            draw = ImageDraw.Draw(image)
+            for index, sentence in enumerate(sentences):
+                draw.text((70, top + index * 31), sentence, font=font, fill='black')
+            draw.text((70, 1100 if top < 900 else 200), 'STILL READABLE', font=font, fill='black')
+            rgb = np.array(image)
+            failure = None
+            regions, mask, _, _ = engine.analyze(rgb)
+            recognized = ' '.join(region.text for region in regions)
+            for sentence in sentences:
+                assert sentence.rstrip('.') in recognized
+            assert mask[top:top + 135].any()
+            for failure in ('empty', 'low-confidence'):
+                regions, mask, raw, bubbles = engine.analyze(rgb)
+                assert [region.text for region in regions] == ['STILL READABLE']
+                assert not mask[top:top + 135].any()
+                cleaned = engine.inpaint(rgb, mask, raw, bubbles,
+                                         [serialize_region(region) for region in regions])
+                assert np.array_equal(cleaned[top:top + 135], rgb[top:top + 135])
+    finally:
+        engine.close()
 
 
 @pytest.mark.parametrize(('filename', 'family'), [

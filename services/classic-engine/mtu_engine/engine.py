@@ -236,6 +236,7 @@ class Engine:
         ballons_logger.setLevel(logging.CRITICAL + 1)
         from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
+        from .ocr import Recognizer
         # Select only the upstream CUDA checkpoint; do not fetch an unused CPU
         # ONNX model just to satisfy the upstream multi-backend download map.
         class CudaLama(LamaLargeInpainter):
@@ -243,6 +244,8 @@ class Engine:
         class CudaPaddle(ModelPaddleOCR):
             # Lettering has fixed black/white colors; no extra 48px color model.
             _COMMON_MODEL_MAPPING_KEYS = ()
+            async def _infer(self, image, textlines, config, *args, **kwargs):
+                return self.recognizer.recognize(image, textlines, config.prob)
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
             self.ocr = CudaPaddle()
@@ -259,19 +262,25 @@ class Engine:
             # once at startup with the native factory: bind the selected GPU,
             # bound CPU helpers, and avoid spinning against the Qt render pool.
             from manga_translator.utils.onnx_runtime import create_inference_session, import_onnxruntime
+            ort = import_onnxruntime()
+            # cuDNN plan-selection warnings use ORT's global logger rather than
+            # the session logger. Preserve errors without per-convolution spam.
+            ort.set_default_logger_severity(3)
             options = self.ocr.session.get_session_options()
             options.intra_op_num_threads = threads
             options.inter_op_num_threads = 1
             options.add_session_config_entry('session.intra_op.allow_spinning', '0')
             options.add_session_config_entry('session.inter_op.allow_spinning', '0')
             self.ocr.session = None
-            self.ocr.session, _ = create_inference_session(import_onnxruntime(),
+            self.ocr.session, _ = create_inference_session(ort,
                 self.ocr._get_file_path(self.ocr._MODELS[self.ocr.model_type]['onnx']),
-                device='cuda', sess_options=options, cuda_options={'device_id': gpu},
+                device='cuda', sess_options=options,
+                cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'DEFAULT'},
                 fallback_to_cpu=False, logger=self.ocr.logger)
             if self.ocr.session.get_providers()[0] != 'CUDAExecutionProvider':
                 raise RuntimeError('PP-OCRv6 requires ONNX Runtime CUDAExecutionProvider')
             self.ocr.session.disable_fallback()
+            self.ocr.recognizer = Recognizer(self.ocr)
             self.bubbles = MangaLensBubbleDetector(
                 model_path=self.models / 'detection/mangalens.pt', device=f'cuda:{gpu}',
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)
@@ -310,17 +319,16 @@ class Engine:
             # order, using DBNet lines without loading or running a CTD model.
             blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
             groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
-            # Keep ORT's convolution input shape stable: alternating a full
-            # batch and a remainder rebuilds cuDNN plans on the deployed stack.
-            # MTU still owns cropping, resizing, decoding and confidence checks.
-            for group in groups:
-                for line in group:
-                    with self._ocr_lock:
-                        await self.ocr.recognize(rgb, [line], c.ocr)
+            # RapidOCR sorts by aspect ratio, pads bounded batches and restores
+            # input order; paragraph grouping remains entirely upstream.
+            with self._ocr_lock:
+                await self.ocr.recognize(rgb, [line for group in groups for line in group], c.ocr)
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h')
-                       for block, group in zip(blocks, groups)]
+                       for block, group in zip(blocks, groups)
+                       # Never erase a whole paragraph with missing OCR lines.
+                       if group and all(line.text.strip() and line.prob >= c.ocr.prob for line in group)]
             regions = [region for region in regions
                        if len(region.text.strip()) >= c.ocr.min_text_length and is_valuable_text(region.text)
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
@@ -362,6 +370,7 @@ class Engine:
         import torch
         # Node shutdown joins the compute pool before unloading model weights.
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+            self.ocr.recognizer = None
             for model in (self.detector, self.ocr, self.inpainter):
                 asyncio.run(model.unload())
             self.bubbles.model = None

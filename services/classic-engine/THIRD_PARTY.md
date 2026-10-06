@@ -4,7 +4,11 @@
 
 The image pipeline imports unmodified source from [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui), pinned by commit, archive URL and SHA-256 in [upstream.lock.json](mtu_engine/upstream.lock.json). Preparation retains `manga_translator/`, the upstream `LICENSE.txt`, dependency manifests and checksums under `upstream/`. The project carries GPL-3.0 terms; original notices within source files remain intact.
 
-The lock also records the DBNet checkpoint from [manga-image-translator](https://github.com/zyddnys/manga-image-translator), the official [PP-OCRv6 medium ONNX model and dictionary](https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_medium_rec_onnx) from PaddlePaddle, the LaMa Large checkpoint from [AnimeMangaInpainting](https://huggingface.co/dreMaz/AnimeMangaInpainting), and MangaLens weights distributed by the MTU author. PP-OCR uses MTU's unmodified Apache-2.0 adapter and the official model's published files, pinned by SHA-256; no locally exported ONNX/NCNN models or patched inference bindings are shipped.
+The lock also records the DBNet checkpoint from [manga-image-translator](https://github.com/zyddnys/manga-image-translator), the official [PP-OCRv6 medium ONNX model and dictionary](https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_medium_rec_onnx) from PaddlePaddle, the LaMa Large checkpoint from [AnimeMangaInpainting](https://huggingface.co/dreMaz/AnimeMangaInpainting), and MangaLens weights distributed by the MTU author. PP-OCR reuses MTU's Apache-2.0 model loader, perspective crop and CTC decoder with the official model's published files, pinned by SHA-256; no locally exported ONNX/NCNN models or patched inference bindings are shipped.
+
+## RapidOCR
+
+[RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR) 3.9.2 provides the unmodified `TextRecognizer` aspect-ratio sorting, bounded batching, resize/padding and order restoration. Its wheel and SHA-256 are pinned in `uv.lock`; Apache-2.0 notices remain in the package metadata and source. The adapter supplies the existing MTU CUDA session and decoder instead of loading RapidOCR's default models or dictionary. No upstream algorithm is copied or rewritten.
 
 ## BallonsTranslator
 

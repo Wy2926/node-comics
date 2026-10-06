@@ -6,14 +6,14 @@
 | --- | --- |
 | 检测与文字像素 | MTU DBNet `DefaultDetector`，PyTorch CUDA；一次检测同时提供文字行四边形与原始文字蒙版 |
 | 段落与顺序 | BallonsTranslator 原生 `group_output` 合并 DBNet 文字行；不加载 CTD 检测模型 |
-| OCR | MTU `ModelPaddleOCR`，官方 PP-OCRv6 medium 原生 ONNX 与词表，ONNX Runtime CUDA，固定单行批次 |
+| OCR | MTU 裁图与 CTC 解码、RapidOCR 原生等比缩放／排序组批；官方 PP-OCRv6 medium ONNX 与词表，ONNX Runtime CUDA |
 | 气泡 | MangaLens／Ultralytics 分割，CUDA，输入边长 768、置信度 0.25、NMS IoU 0.7；蒙版跟随单张图片，用于抹字和排版 |
 | 文字蒙版 | MTU mask refinement／DenseCRF、膨胀、气泡边界限制 |
 | 抹字 | MTU 纯色气泡填充；剩余区域使用原生 LaMa Large 512 FP32 CUDA，按连通区域修复 |
 | 嵌字 | MTU Qt 渲染器：QTextLayout、QRawFont、QPainter，在 CPU 离屏绘制 |
 | 字体 | Bangers、霞鹜漫黑、Jua、Comic Relief Bold、Lalezar；保留 Noto 字体回退，Qt 负责字形塑形 |
 
-`mtu_engine/` 只处理上游加载、阶段调用和协议数据映射，算法源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录，保持原文件。`classic_node/` 管理租约、检查点、网络和覆盖文件。旧自研排版、气泡推测、修复、OCR 路由及模型转换链路已移除。
+`mtu_engine/` 只处理上游加载、阶段调用、输入校验和协议数据映射。MTU、BallonsTranslator 源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录，保持原文件；RapidOCR 包按 `uv.lock` 固定版本与摘要。`classic_node/` 管理租约、检查点、网络和覆盖文件。旧自研排版、气泡推测、修复、OCR 路由及模型转换链路已移除。
 
 ## 排版配置
 
@@ -35,7 +35,9 @@
 
 OCR 使用上游 PP-OCRv6 medium 多语言识别模型，中文、日文、英文共用该后端；实际效果取决于字形与版面。保留 0.5 识别置信度门槛，不加载与固定黑白字体无关的额外颜色预测模型。目标语言由 Qt 字形覆盖探测，协议包含中、日、韩、英等 17 个目标语言（包括 `ar`）。阿拉伯语新增范围是目标译文嵌字，不代表阿拉伯原稿 OCR 已验收。非中日目标强制横排。
 
-DBNet 同样可能漏检艺术字和小字，不能把目标语言覆盖视为所有源语言识别质量通过。真实 CUDA 测试分别检查已知裁图 OCR、贴底文字的整页检测和跨页批次形状；固定译文的实图对照检查分组、阅读顺序和排版。
+同一原生分组内的每一行都必须有非空文字且通过置信度门槛，段落才参与翻译和抹字；部分识别失败的段落不生成修复区域。该校验不依赖页面位置、语言、站点或图片名称，也不自行补字、拆行或复识别。它不能发现高置信度错字或检测器完全漏掉的行。
+
+DBNet 同样可能漏检艺术字和小字，不能把目标语言覆盖视为所有源语言识别质量通过。真实 CUDA 测试分别检查中日英已知裁图 OCR、贴底文字、跨页批次、不同页面位置的长正文，以及空行／低置信度故障注入后的原像素保留；固定译文的实图对照检查分组、阅读顺序和排版。
 
 ## 上游能力与接入边界
 
@@ -53,7 +55,11 @@ MTU 还提供日文专用 MangaOCR、PaddleOCR 韩语／拉丁／泰语后端和
 
 DBNet、OCR、LaMa 和 MangaLens 各复用一个模型实例。DBNet、OCR 和 MangaLens 分别加锁保护共享调用；已预热的 FP32 LaMa eval 路径只读模型状态，输入和中间张量属于各次调用，允许计算池内并发。不同模型与 CPU 蒙版细化可以交错；退出时先等待计算池结束，再卸载模型。使用框架默认 CUDA 流，不额外复制模型或创建用户流，因此不保证 GPU 内核同时执行。网络与 Qt 嵌字池独立运行；Qt 字体注册在主线程完成，字体和断词缓存共享，因此上游绘制调用串行。增加线程、会话或 CUDA 流前，须验证真实吞吐、结果一致性和显存余量。
 
-OCR 逐行调用上游裁图、缩放和解码，保持 ONNX 输入为 `1×3×48×320`。当前 Linux ORT/cuDNN 组合在完整批次与尾批之间切换形状时会反复重建卷积执行计划，固定形状避免秒级抖动；不改变原图尺寸或重写识别算法。OpenCV 线程数在上游模型导入完成后设为节点的 `threads`，覆盖 Ultralytics 导入时关闭多线程的全局设置。DBNet 和蒙版细化保留上游双边滤波与 DenseCRF；这些 CPU 步骤也计入分析阶段，调整 CPU 线程须用目标机器实测。
+OCR 直接调用 RapidOCR 3.9.2 的 `TextRecognizer.__call__` 和 `resize_norm_img`：按宽高比排序，每批最多 6 行，等比缩放到高 48、按该批最长行补边，最后恢复原顺序。320 是最小输入宽度，不是长行的压缩上限。沿用 PaddleX 的 3200 宽度资源边界；超过该比例的行保留为空，由段落完整性校验保护原文，不强压或截断。复用 MTU 已加载的同一 CUDA 会话、裁图及原生 CTC 解码，不复制模型、不增加语言路由或本地识别算法。
+
+CUDA 使用 ORT 的 `cudnn_conv_algo_search=DEFAULT`，减少动态形状下的执行计划准备开销；仍使用 CUDA，不允许 CPU 降级。默认卷积搜索在当前 Linux 组合上的开销明显更高。RTX 3070 Ti 隔离实测中，15 行长页 OCR 约 0.43–0.48 秒、38 行混合样本约 0.85–0.86 秒；固定 320 输入分别约 0.04、0.10 秒，但长正文会被压坏。这是恢复长行字形所需的当前性能代价，不是线上端到端延迟保证；空格、标点和其他模型误识别仍需样本验收。固定加宽所有行会改变识别结果，不作为替代方案。
+
+OpenCV 线程数在上游模型导入完成后设为节点的 `threads`，覆盖 Ultralytics 导入时关闭多线程的全局设置。DBNet 和蒙版细化保留上游双边滤波与 DenseCRF；这些 CPU 步骤也计入分析阶段，调整 CPU 线程须用目标机器实测。
 
 模型与 CUDA 工作空间在 `resident_bytes` 页缓冲预算之外。选机器和并发前实测初始化、逐阶段耗时、吞吐、RSS 与显存峰值；Windows 桌面测量不代表 Linux 服务或其他显卡性能。
 
