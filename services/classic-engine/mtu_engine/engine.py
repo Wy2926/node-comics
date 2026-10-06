@@ -223,7 +223,6 @@ class Engine:
         # while allowing other models and CPU mask work to make progress.
         self._detector_lock = Lock()
         self._ocr_lock = Lock()
-        self._inpaint_lock = Lock()
         self._bubble_lock = Lock()
         torch.set_num_threads(threads)
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -292,7 +291,7 @@ class Engine:
                                        c.detector.box_threshold, c.detector.unclip_ratio)
             await self.ocr.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
-        with self._detector_lock, self._ocr_lock, self._inpaint_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+        with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
             self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
 
@@ -351,16 +350,18 @@ class Engine:
         filled, remaining, _ = solid_fill_pure_bubbles(rgb, mask, blocks, tight,
             erode_bubble_mask(bubble_mask, MODEL_BUBBLE_SHRINK_RATIO), self.config.ocr.model_bubble_overlap_threshold)
         async def inpaint(crop, local_mask):
-            with self._inpaint_lock:
-                return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
-                                                    self.config.inpainter.inpainting_size)
+            # The loaded FP32 LaMa eval path only reads model state; its input
+            # tensors and padding are per-call. The compute pool bounds readers.
+            return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
+                                                self.config.inpainter.inpainting_size)
         with torch.cuda.device(self.gpu):
             result, _ = asyncio.run(inpaint_regions_per_block(filled, remaining.copy(), inpaint))
         return result
 
     def close(self):
         import torch
-        with self._detector_lock, self._ocr_lock, self._inpaint_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+        # Node shutdown joins the compute pool before unloading model weights.
+        with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             for model in (self.detector, self.ocr, self.inpainter):
                 asyncio.run(model.unload())
             self.bubbles.model = None
