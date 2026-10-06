@@ -9,13 +9,16 @@ export type TranslationProviderConfig = {
 };
 export type TranslationProvider = {
   id: string; name: string; channel: string; enabled: boolean; text_weight: number; title_weight: number; requests_per_minute: number;
+  text_plan_ids: string[] | null;
   revision_id: string; credential_configured: boolean; config: TranslationProviderConfig;
   created_at: string; updated_at: string;
 };
 export type TranslationChannel = {id: string; label: string; protocols: string[]};
-export type TranslationProviders = {items: TranslationProvider[]; channels: TranslationChannel[]};
+export type TranslationPlan = {id: string; name: string};
+export type TranslationProviders = {items: TranslationProvider[]; channels: TranslationChannel[]; plans: TranslationPlan[]};
 export type TranslationProviderInput = {
   name: string; channel: 'openai'; enabled: boolean; text_weight: number; title_weight: number; requests_per_minute: number; config: TranslationProviderConfig; api_key?: string;
+  text_plan_ids: string[] | null;
 };
 export type User = {id: string; name: string; role: string};
 export type Page<T> = {items: T[]; total: number; next_offset: number | null; generated_at: string};

@@ -165,6 +165,39 @@ def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case
         assert call.accounted_micros == 1100 and call.cost_state == 'estimated'
 
 
+@pytest.mark.parametrize(('usage', 'expected'), [
+    ({'input_tokens': 6, 'output_tokens': 7}, 2),  # Binary float arithmetic would exceed 2.
+    ({'input_tokens': 1, 'output_tokens': 1}, 1),
+    ({'input_tokens': 0, 'output_tokens': 0}, 0),
+    (None, 206),
+])
+def test_decimal_metering_keeps_integer_costs_and_frozen_prices(text_case, monkeypatch, usage, expected):
+    from app.classic_config import snapshot
+    job_id, lease_id = text_case
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        provider = configure_text_provider(db, job.config['text']['provider_id'], input_rate=0.1, output_rate=0.2)
+        profile = snapshot(db, provider.id)['text']
+        job.config = {**job.config, 'text': profile}
+        db.commit()
+        configure_text_provider(db, provider.id, input_rate=1.125, output_rate=2.5)
+    monkeypatch.setattr(classic, 'input_bound', lambda *args: 5)
+    call_id, frozen, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
+    assert frozen == profile
+    with session_factory()() as db:
+        call = db.get(TextCall, call_id)
+        assert type(call.reserved_micros) is int and call.reserved_micros == 206
+        assert call.accounted_micros == 206 and call.cost_state == 'unknown'
+    classic.complete_call(call_id, lease_id, response=TextResponse('{}', usage, 'decimal'))
+    # Completion replay must never replace the original accounting.
+    classic.complete_call(call_id, lease_id, response=TextResponse('{}', {'input_tokens': 1000, 'output_tokens': 1000}, 'replay'))
+    with session_factory()() as db:
+        call = db.get(TextCall, call_id)
+        assert type(call.accounted_micros) is int and call.accounted_micros == expected
+        assert call.cost_state == ('estimated' if usage is not None else 'unknown')
+        assert call.usage == usage and call.request_id == 'decimal'
+
+
 def test_refusal_stops_after_one_call_and_preserves_metering(text_case, monkeypatch):
     def refuse(*args):
         raise TextError('TEXT_REFUSED', '文本服务拒绝生成内容',

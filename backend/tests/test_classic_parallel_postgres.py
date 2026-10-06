@@ -6,7 +6,7 @@ from sqlalchemy import URL, create_engine, text
 from app.config import settings
 from app.db import Base, engine, session_factory
 from app.queue_models import SchedulerMutex
-from test_classic import text_case
+from test_classic import text_case, test_decimal_metering_keeps_integer_costs_and_frozen_prices
 from translation_fixtures import configure_text_provider
 from test_classic_parallel import (
     test_inflight_llm_does_not_hold_scheduler_or_image_resources,

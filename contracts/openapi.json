@@ -9472,6 +9472,23 @@
             "title": "Text Weight",
             "default": 1
           },
+          "text_plan_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                },
+                "type": "array",
+                "maxItems": 100,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Plan Ids"
+          },
           "title_weight": {
             "type": "integer",
             "maximum": 10000.0,
@@ -9633,11 +9650,12 @@
                 "uk",
                 "tr",
                 "vi",
-                "id"
+                "id",
+                "ar"
               ]
             },
             "type": "array",
-            "maxItems": 16,
+            "maxItems": 17,
             "minItems": 1,
             "title": "Supported Languages"
           },
@@ -10142,7 +10160,8 @@
                   "uk",
                   "tr",
                   "vi",
-                  "id"
+                  "id",
+                  "ar"
                 ]
               },
               {

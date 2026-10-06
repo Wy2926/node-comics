@@ -118,7 +118,10 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     existing = job_for_request(db, user.id, key, request_hash)
     if existing:
         return existing
-    config = config or configuration(db, mode, language, source_sha256=sha)
+    at = now()
+    benefits = membership_benefits(db, user, at)
+    config = config or configuration(db, mode, language, source_sha256=sha,
+        plan_id='guest' if user.kind == 'guest' else benefits['plan'])
     if result_format == 'overlay-tiles-v1':
         config = {**config, 'result_format': result_format, 'version': digest([config['version'], result_format])}
     if asset:
@@ -126,7 +129,6 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     cached = None if force else find_reusable(db, user, sha, mode, language, config)
     if cached:
         return remember_request(db, user.id, key, request_hash, cached)
-    at = now()
     ck = content_key(sha, mode, language, config)
     if not force:
         last = db.scalar(select(Job).where(Job.owner_id == user.id, Job.source_sha256 == sha,
@@ -135,7 +137,6 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         if last and (last.status in {'failed', 'cancelled', 'unknown_released'} or
                 (last.status in ACTIVE and (last.cancel_requested or last.discard_output))):
             return remember_request(db, user.id, key, request_hash, last)
-    benefits = membership_benefits(db, user, at)
     kind = require_entitlement(user, mode, at, db=db, benefits=benefits)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,

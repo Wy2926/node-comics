@@ -1,5 +1,6 @@
 """Control-plane text stages and fenced OCR checkpoints."""
 import base64
+from decimal import Decimal
 from io import BytesIO
 import json
 import math
@@ -84,6 +85,13 @@ def validate_analysis(result, width, height):
         raise ProcessingError('CLASSIC_OCR_INVALID', 'OCR 区域或掩膜无效，未调用文本服务') from None
 
 
+def _cost_micros(profile, input_tokens, output_tokens):
+    # CNY / million tokens equals micro-CNY / token. Round the combined cost
+    # up once, using decimal arithmetic to avoid binary-float boundary errors.
+    return math.ceil(input_tokens * Decimal(str(profile['input_rate'])) +
+                     output_tokens * Decimal(str(profile['output_rate'])))
+
+
 def reserve_call(job_id, lease_id, group_index, segments, language):
     with session_factory()() as db:
         job = current(db, job_id, lease_id)
@@ -101,7 +109,7 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
             func.coalesce(func.max(TextCall.sequence), 0)).where(TextCall.job_id == job_id, TextCall.group_index == group_index)).one()
         if count >= profile['max_attempts']:
             raise TextError('TEXT_RETRY_EXHAUSTED', '此文本组已达到自动调用次数上限')
-        reserved = input_bound(segments, language) * profile['input_rate'] + profile['max_output_tokens'] * profile['output_rate']
+        reserved = _cost_micros(profile, input_bound(segments, language), profile['max_output_tokens'])
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
                         group_index=group_index, sequence=sequence + 1,
                         provider_id=profile['provider_id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)
@@ -127,7 +135,7 @@ def complete_call(call_id, lease_id, response=None, error=None, translations=Non
         if usage is not None:
             call.usage, call.cost_state = usage, 'estimated'
             profile = job.config['text']
-            call.accounted_micros = usage['input_tokens'] * profile['input_rate'] + usage['output_tokens'] * profile['output_rate']
+            call.accounted_micros = _cost_micros(profile, usage['input_tokens'], usage['output_tokens'])
         # Cost belongs to the original call even after cancellation or lease loss.
         # Translation checkpoints belong only to the current execution generation.
         if translations:

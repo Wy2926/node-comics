@@ -89,7 +89,7 @@ def initialize_providers(db: Session):
     db.commit()
 
 
-def configuration_resolver(db: Session, mode: str, language: str, provider_id=None):
+def configuration_resolver(db: Session, mode: str, language: str, provider_id=None, *, plan_id='free'):
     """Read current suppliers once, then resolve every page against that snapshot."""
     if language not in LANGUAGES or (mode == 'redraw' and language not in REDRAW_LANGUAGES):
         problem("LANGUAGE_UNSUPPORTED", "此目标语言尚未开放", 422)
@@ -105,7 +105,7 @@ def configuration_resolver(db: Session, mode: str, language: str, provider_id=No
         resolve = lambda _: config
     elif mode == "classic":
         from .classic_config import snapshot_resolver
-        resolve = snapshot_resolver(db, provider_id)
+        resolve = snapshot_resolver(db, provider_id, plan_id=plan_id)
     else:
         problem("MODE_UNSUPPORTED", "不支持此翻译方式", 422)
 
@@ -115,8 +115,8 @@ def configuration_resolver(db: Session, mode: str, language: str, provider_id=No
     return configured
 
 
-def configuration(db: Session, mode: str, language: str, provider_id=None, *, source_sha256=''):
-    return configuration_resolver(db, mode, language, provider_id)(source_sha256)
+def configuration(db: Session, mode: str, language: str, provider_id=None, *, source_sha256='', plan_id='free'):
+    return configuration_resolver(db, mode, language, provider_id, plan_id=plan_id)(source_sha256)
 
 
 def validate_input(asset, config):

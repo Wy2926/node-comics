@@ -14,8 +14,8 @@ class TextPolicy(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True, hide_input_in_errors=True)
     max_attempts: int = Field(default=3, ge=1, le=3, strict=True)
     group_bytes: int = Field(default=1800, ge=128, le=16000, strict=True)
-    input_rate: int = Field(default=5, ge=0, le=1000, strict=True)
-    output_rate: int = Field(default=30, ge=0, le=5000, strict=True)
+    input_rate: float = Field(default=5, ge=0, le=1000, strict=True, allow_inf_nan=False)
+    output_rate: float = Field(default=30, ge=0, le=5000, strict=True, allow_inf_nan=False)
     pricing_version: str = Field(default='operator-estimate-v1', min_length=1, max_length=100)
 
 

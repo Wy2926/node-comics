@@ -1,6 +1,7 @@
 """Database-owned translation suppliers. No environment seeding or legacy fallback."""
 from contextlib import contextmanager
 import logging
+from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field, SecretStr, field_validator, model_validator
 from sqlalchemy import func, select
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session, undefer
 from .adapters.llm import TextError
 from .adapters.text import TextPolicy
 from .auth import admin
+from .billing_models import BillingPlan
 from .admin_audit import record_audit, sanitize
 from .db import get_db, session_factory
 from .errors import problem
@@ -20,6 +22,7 @@ from .translation_models import TranslationProvider, TranslationProviderRevision
 
 router = APIRouter(prefix='/v1/admin/translation-providers', tags=['translation-providers'])
 PURPOSE_WEIGHTS = {'text': TranslationProvider.text_weight, 'comic_title': TranslationProvider.title_weight}
+BUILTIN_TEXT_PLANS = {'guest': '匿名体验', 'free': '普通用户', 'plus': 'PLUS'}
 
 
 class ProviderWrite(RequestBody):
@@ -27,6 +30,8 @@ class ProviderWrite(RequestBody):
     channel: str = Field(min_length=1, max_length=40)
     enabled: bool = Field(default=True, strict=True)
     text_weight: int = Field(default=1, ge=0, le=10000, strict=True)
+    text_plan_ids: list[Annotated[str, Field(pattern=r'^[a-z][a-z0-9_-]{0,63}$', strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100)
     title_weight: int = Field(default=1, ge=0, le=10000, strict=True)
     requests_per_minute: int = Field(default=60, ge=1, le=10000, strict=True)
     config: dict
@@ -48,6 +53,11 @@ class ProviderWrite(RequestBody):
         if not value.strip():
             raise ValueError('Name is required')
         return value.strip()
+
+    @field_validator('text_plan_ids')
+    @classmethod
+    def distinct_plans(cls, value):
+        return sorted(set(value)) if value is not None else None
 
     @field_validator('api_key')
     @classmethod
@@ -78,6 +88,7 @@ def provider_json(db, provider):
     revision = db.get(TranslationProviderRevision, provider.revision_id)
     return {'id': provider.id, 'name': provider.name, 'channel': provider.channel,
             'enabled': provider.enabled, 'text_weight': provider.text_weight,
+            'text_plan_ids': provider.text_plan_ids,
             'title_weight': provider.title_weight,
             'requests_per_minute': provider.requests_per_minute,
             'revision_id': provider.revision_id, 'credential_configured': revision is not None,
@@ -88,7 +99,7 @@ def provider_json(db, provider):
 
 def _provider_query(provider_id=None, *, purpose='text'):
     weight = PURPOSE_WEIGHTS[purpose]
-    query = select(TranslationProvider.id, weight.label('weight'),
+    query = select(TranslationProvider.id, weight.label('weight'), TranslationProvider.text_plan_ids,
         TranslationProviderRevision.id.label('revision_id'), TranslationProviderRevision.channel,
         TranslationProviderRevision.config).join(TranslationProviderRevision,
             TranslationProviderRevision.id == TranslationProvider.revision_id).where(
@@ -96,25 +107,33 @@ def _provider_query(provider_id=None, *, purpose='text'):
     return query.where(TranslationProvider.id == provider_id) if provider_id else query.where(weight > 0)
 
 
-def has_provider(db, *, purpose='text'):
-    return db.scalar(_provider_query(purpose=purpose).limit(1)) is not None
+def _matches_plan(plan_ids, purpose, plan_id):
+    return purpose != 'text' or plan_ids is None or plan_id in plan_ids
 
 
-def provider_resolver(db, provider_id=None, *, purpose='text'):
+def has_provider(db, *, purpose='text', plan_id='free'):
+    # Capability checks need scopes only, not every model's configuration JSON.
+    query = _provider_query(purpose=purpose).with_only_columns(TranslationProvider.text_plan_ids)
+    return any(_matches_plan(scope, purpose, plan_id) for scope in db.scalars(query))
+
+
+def provider_resolver(db, provider_id=None, *, purpose='text', plan_id='free'):
     """Freeze this request's eligible weights and secret-free revisions in one read."""
     from .translation_routing import choose_provider
-    candidates = db.execute(_provider_query(provider_id, purpose=purpose)).all()
+    candidates = [row for row in db.execute(_provider_query(provider_id, purpose=purpose))
+                  if _matches_plan(row.text_plan_ids, purpose, plan_id)]
     if not candidates:
         label = '漫画名' if purpose == 'comic_title' else '正文'
-        problem('TRANSLATION_PROVIDER_UNAVAILABLE', f'请在管理后台启用至少一个{label}权重大于 0 的供应商', 503)
+        scope = '适用于当前套餐且' if purpose == 'text' else ''
+        problem('TRANSLATION_PROVIDER_UNAVAILABLE', f'请在管理后台启用至少一个{scope}{label}权重大于 0 的供应商', 503)
     weights = {row.id: 1 if provider_id else row.weight for row in candidates}
     profiles = {row.id: {'provider_id': row.id, 'revision_id': row.revision_id,
                         'channel': row.channel, **row.config} for row in candidates}
     return lambda routing_key='': profiles[choose_provider(weights, routing_key)]
 
 
-def provider_profile(db, provider_id=None, *, purpose='text', routing_key=''):
-    return provider_resolver(db, provider_id, purpose=purpose)(routing_key)
+def provider_profile(db, provider_id=None, *, purpose='text', routing_key='', plan_id='free'):
+    return provider_resolver(db, provider_id, purpose=purpose, plan_id=plan_id)(routing_key)
 
 
 def require_enabled(db, profile):
@@ -140,6 +159,11 @@ def resolve_credentials(profile):
 
 def write_provider(db, body, provider=None):
     """Called under the scheduler mutex; never accesses the upstream service."""
+    if body.text_plan_ids is not None:
+        custom = set(body.text_plan_ids) - BUILTIN_TEXT_PLANS.keys()
+        known = set(db.scalars(select(BillingPlan.id).where(BillingPlan.id.in_(custom)))) if custom else set()
+        if custom - known:
+            problem('TRANSLATION_PLAN_INVALID', '正文适用套餐不存在，请刷新列表后重试', 422)
     previous = db.get(TranslationProviderRevision, provider.revision_id) if provider else None
     if body.api_key is None and previous is None:
         problem('TRANSLATION_KEY_REQUIRED', '创建翻译供应商时必须填写 API Key', 422)
@@ -160,6 +184,9 @@ def write_provider(db, body, provider=None):
         provider.revision_id = revision.id
     provider.name, provider.enabled = body.name, body.enabled
     provider.text_weight = body.text_weight
+    # Older admin clients must not silently widen an existing restricted pool.
+    if 'text_plan_ids' in body.model_fields_set:
+        provider.text_plan_ids = body.text_plan_ids
     provider.title_weight = body.title_weight
     provider.requests_per_minute = body.requests_per_minute
     provider.updated_at = now()
@@ -190,7 +217,9 @@ def provider_transaction(db):
 
 @router.get('')
 def list_providers(user: User = Depends(admin), db: Session = Depends(get_db)):
+    plans = {**BUILTIN_TEXT_PLANS, **dict(db.execute(select(BillingPlan.id, BillingPlan.name).order_by(BillingPlan.id)).all())}
     return {'items': [provider_json(db, row) for row in db.scalars(select(TranslationProvider).order_by(TranslationProvider.created_at, TranslationProvider.id))],
+            'plans': [{'id': key, 'name': value} for key, value in plans.items()],
             'channels': [{'id': key, 'label': value.label, 'protocols': list(value.protocols)} for key, value in CHANNELS.items()]}
 
 

@@ -21,6 +21,8 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
   const canCreate = !!data && channelProtocols(data.channels, 'openai').length > 0;
   const totalWeight = (key: 'text_weight' | 'title_weight') => (data?.items ?? []).reduce(
     (sum, provider) => sum + (provider.enabled && provider.credential_configured ? provider[key] : 0), 0);
+  const unservedPlans = data?.plans.filter(plan => !data.items.some(provider => provider.enabled && provider.credential_configured &&
+    provider.text_weight > 0 && (provider.text_plan_ids === null || provider.text_plan_ids.includes(plan.id)))) ?? [];
 
   const reload = useCallback(async (clearNotice = true) => {
     const controller = new AbortController();
@@ -67,7 +69,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
 
   return <main id="main" tabIndex={-1} className="translation-providers">
     <div className="page-heading"><div><p className="eyebrow">TRANSLATION PROVIDERS</p><h1>翻译供应商</h1>
-      <p className="muted">正文与漫画名分别设置权重，按比例分流到多个 LLM 供应商。</p></div>
+      <p className="muted">正文按用户套餐选择 LLM 模型池；正文与漫画名分别设置分流权重。</p></div>
       <div className="provider-actions"><button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新列表'}</button>
         <button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => {setNotice(''); setEditing('new');}}>＋ 新建供应商</button></div></div>
     <div className="sync-line"><span role="status">{pending ? '正在更新供应商…' : loading ? '正在读取供应商…' : loadError || actionError ? '请刷新列表核实最新状态' : `已更新 ${time(loadedAt)}`}</span>
@@ -75,6 +77,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
     <section className="panel provider-guide" aria-label="供应商生效规则">
       <p><strong>按比例分流 · 两种用途独立配置</strong></p>
       <p>启用且对应用途权重大于 0 的供应商参与分流。权重 3:1 表示大量不同输入约按 75%:25% 分配；相同内容与目标语言稳定选择供应商，便于复用结果。</p>
+      <p>正文先按有效套餐筛选供应商，再计算权重。全部套餐表示不限制；指定套餐无可用供应商时不借用其他模型池。套餐变化和路由调整只影响新任务，已有任务保留模型快照。</p>
       <p>权重为 0 时停止分配新请求，已有正文任务继续原供应商；停用则暂停其已有任务。分流比例不代表 HTTP 并发配额，正文仍受供应商 RPM 与共享文本执行位限制。</p>
       <p>修改模型参数或密钥会产生新版本，已提交的正文任务保持原版本。漫画名只在缓存未命中时分流，调整配置不清除已有缓存。</p>
     </section>
@@ -83,8 +86,10 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
       <button type="button" className="text-link" disabled={busy} onClick={() => void reload(false)}>重新读取列表</button></div>}
     {actionError && <div className="error" role="alert">{actionError}<button type="button" className="text-link" disabled={busy} onClick={() => void reload()}>刷新列表</button></div>}
     {data && !loadError && !loading && !canCreate && <p className="provider-warning" role="status">当前没有可配置的 OpenAI 渠道或支持的协议。请检查服务端渠道配置后刷新列表。</p>}
-    {data && !loadError && !loading && data.items.length > 0 && routingFields.filter(({key}) => !totalWeight(key)).map(({key, label}) =>
-      <p key={key} className="provider-warning" role="status">{label}暂无可用分流供应商。请启用已配置密钥的供应商，并将{label}权重设为大于 0。{key === 'title_weight' ? '已有漫画名缓存仍可使用。' : '常规翻译暂不可提交新任务。'}</p>)}
+    {data && !loadError && !loading && unservedPlans.length > 0 && <p className="provider-warning" role="status">
+      以下套餐暂无可用正文供应商：{unservedPlans.map(plan => plan.name).join('、')}。请配置适用套餐、启用供应商并将正文权重设为大于 0。</p>}
+    {data && !loadError && !loading && !totalWeight('title_weight') && <p className="provider-warning" role="status">
+      漫画名暂无可用分流供应商。请启用已配置密钥的供应商，并将漫画名权重设为大于 0。已有漫画名缓存仍可使用。</p>}
     <section className="panel list-panel provider-list" aria-label="翻译供应商列表" aria-busy={busy}>
       {!data ? <div className="loading" role="status">{loading ? '正在读取翻译供应商…' : '暂时无法读取列表，请刷新重试。'}</div> :
         !data.items.length ? <div className="empty"><span aria-hidden="true">⇄</span><h3>尚未创建翻译供应商</h3>
@@ -95,7 +100,8 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
               return <tr key={provider.id}>
                 <td><div className="provider-name"><b>{provider.name}</b></div>
                   {routingFields.map(({key, label}) => <small key={key}>{provider.enabled && provider.credential_configured && provider[key] > 0 ?
-                    `${label}权重 ${provider[key]} · 约 ${(provider[key] / totalWeight(key) * 100).toFixed(1)}%` : `${label}不分流 · 权重 ${provider[key]}`}</small>)}
+                    `${label}权重 ${provider[key]}${key === 'title_weight' ? ` · 约 ${(provider[key] / totalWeight(key) * 100).toFixed(1)}%` : ' · 按套餐内权重分配'}` : `${label}不分流 · 权重 ${provider[key]}`}</small>)}
+                  <small>正文套餐：{provider.text_plan_ids === null ? '全部套餐' : provider.text_plan_ids.map(id => data.plans.find(plan => plan.id === id)?.name ?? id).join('、')}</small>
                   <small>{data.channels.find(channel => channel.id === provider.channel)?.label ?? provider.channel}</small>
                   <small>ID <code>{provider.id}</code></small></td>
                 <td><b>{provider.config.model}</b><small>{protocolLabels[provider.config.protocol] ?? provider.config.protocol}</small>
@@ -116,7 +122,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
           </Table>}
     </section>
     {data && <p className="footnote provider-footnote">共 {data.items.length} 个供应商 · {data.items.filter(provider => provider.enabled).length} 个已启用。密钥仅显示配置状态。</p>}
-    {editing && data && <TranslationProviderDialog provider={editing === 'new' ? undefined : editing} channels={data.channels} onUnauthorized={onUnauthorized}
+    {editing && data && <TranslationProviderDialog provider={editing === 'new' ? undefined : editing} channels={data.channels} plans={data.plans} onUnauthorized={onUnauthorized}
       onClose={() => setEditing(undefined)} onRefresh={() => {setEditing(undefined); void reload(); requestAnimationFrame(() => document.getElementById('main')?.focus());}}
       onSaved={() => {setNotice(editing === 'new' ? '供应商已创建，按启用状态与两种用途的权重参与分流。' : '供应商已保存，分流权重仅影响后续分配，已提交的正文任务仍保持原版本。'); setEditing(undefined); void reload(false); requestAnimationFrame(() => document.getElementById('main')?.focus());}}/>}
   </main>;

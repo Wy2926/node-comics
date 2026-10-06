@@ -13,6 +13,7 @@ class TranslationProvider(Base):
     channel: Mapped[str] = mapped_column(String(40))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     text_weight: Mapped[int] = mapped_column(Integer, default=1, server_default='0')
+    text_plan_ids: Mapped[list[str] | None] = mapped_column(JSON(none_as_null=True))
     title_weight: Mapped[int] = mapped_column(Integer, default=1, server_default='0')
     revision_id: Mapped[str | None] = mapped_column(String(36))
     requests_per_minute: Mapped[int] = mapped_column(Integer, default=60)

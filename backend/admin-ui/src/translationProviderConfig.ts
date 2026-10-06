@@ -14,8 +14,8 @@ export const numericFields = [
   {key: 'max_attempts', title: '最多尝试次数', unit: '次', min: 1, max: 3, integer: true, group: 'requests', help: '仅用于正文，包含首次请求；漫画名查询不自动重试。'},
   {key: 'max_output_tokens', title: '最大输出长度', unit: 'token', min: 128, max: 32768, integer: true, group: 'requests', help: '单次文本调用允许的最大输出长度，须在模型支持的范围内。'},
   {key: 'group_bytes', title: '文本分组大小', unit: '字节', min: 128, max: 16000, integer: true, group: 'requests', help: '仅用于正文，控制每组待翻译文本的大小。'},
-  {key: 'input_rate', title: '输入单价', unit: '元 / 百万 token', min: 0, max: 1000, integer: true, group: 'pricing', help: '用于记录输入成本，可填写 0。'},
-  {key: 'output_rate', title: '输出单价', unit: '元 / 百万 token', min: 0, max: 5000, integer: true, group: 'pricing', help: '用于记录输出成本，可填写 0。'},
+  {key: 'input_rate', title: '输入单价', unit: '元 / 百万 token', min: 0, max: 1000, integer: false, group: 'pricing', help: '用于记录输入成本，支持小数和 0。'},
+  {key: 'output_rate', title: '输出单价', unit: '元 / 百万 token', min: 0, max: 5000, integer: false, group: 'pricing', help: '用于记录输出成本，支持小数和 0。'},
 ] as const;
 export const upstreamLimit = {key: 'requests_per_minute', min: 1, max: 10000, integer: true} as const;
 export const textLimits = {name: 100, base_url: 1000, model: 120, user_agent: 200, pricing_version: 100, api_key: 4096} as const;
@@ -26,9 +26,9 @@ const defaults: TranslationProviderConfig = {
   timeout_seconds: 60, max_attempts: 3, max_output_tokens: 1024, group_bytes: 1800,
   input_rate: 5, output_rate: 30, pricing_version: 'operator-estimate-v1',
 };
-export type ProviderDraft = Record<keyof TranslationProviderConfig | 'name' | 'channel' | 'api_key' | 'text_weight' | 'title_weight' | 'requests_per_minute', string> & {enabled: boolean};
-export type ProviderField = Exclude<keyof ProviderDraft, 'enabled'>;
-export type ProviderErrors = Partial<Record<ProviderField, string>>;
+export type ProviderDraft = Record<keyof TranslationProviderConfig | 'name' | 'channel' | 'api_key' | 'text_weight' | 'title_weight' | 'requests_per_minute', string> & {enabled: boolean; text_plan_ids: string[] | null};
+export type ProviderField = Exclude<keyof ProviderDraft, 'enabled' | 'text_plan_ids'>;
+export type ProviderErrors = Partial<Record<ProviderField | 'text_plan_ids', string>>;
 
 export function providerDraft(provider?: TranslationProvider): ProviderDraft {
   const config = {...defaults, ...provider?.config};
@@ -36,6 +36,7 @@ export function providerDraft(provider?: TranslationProvider): ProviderDraft {
     ...Object.fromEntries(Object.keys(defaults).map(key => [key, String(config[key as keyof TranslationProviderConfig])])) as Record<keyof TranslationProviderConfig, string>,
     name: provider?.name ?? '', channel: provider?.channel ?? 'openai', enabled: provider?.enabled ?? true, api_key: '',
     text_weight: String(provider?.text_weight ?? 1),
+    text_plan_ids: provider?.text_plan_ids ?? null,
     title_weight: String(provider?.title_weight ?? 1),
     requests_per_minute: String(provider?.requests_per_minute ?? 60),
   };
@@ -54,6 +55,7 @@ export function validateProvider(draft: ProviderDraft, channels: TranslationChan
   if (!channelProtocols(channels, draft.channel).length) errors.channel = '当前渠道暂不可配置，请选择可用的 OpenAI 渠道。';
   if (!channelProtocols(channels, draft.channel).includes(draft.protocol as TranslationProtocol)) errors.protocol = '请选择此渠道支持的接口协议。';
   if (!Object.hasOwn(reasoningLabels, draft.reasoning_effort)) errors.reasoning_effort = '请选择有效的思考程度。';
+  if (draft.text_plan_ids !== null && !draft.text_plan_ids.length) errors.text_plan_ids = '请至少选择一个正文适用套餐，或改为全部套餐。';
   for (const {key} of routingFields) {
     const weight = Number(draft[key]);
     if (!draft[key].trim() || !Number.isInteger(weight) || weight < 0 || weight > 10000) errors[key] = '请输入 0–10000 范围内的整数，0 表示不参与此用途分流。';
@@ -82,6 +84,7 @@ export function providerInput(draft: ProviderDraft): TranslationProviderInput {
   return {
     name: draft.name.trim(), channel: 'openai', enabled: draft.enabled,
     text_weight: Number(draft.text_weight), title_weight: Number(draft.title_weight),
+    text_plan_ids: draft.text_plan_ids,
     requests_per_minute: Number(draft.requests_per_minute),
     config: {
       base_url: draft.base_url.trim(), model: draft.model.trim(), protocol: draft.protocol as TranslationProtocol,

@@ -1,11 +1,11 @@
 import {useEffect, useRef, useState, type InputHTMLAttributes} from 'react';
 import {ApiError, authError, errorText, sendRequest} from './api';
-import type {TranslationChannel, TranslationProvider} from './types';
+import type {TranslationChannel, TranslationPlan, TranslationProvider} from './types';
 import {channelProtocols, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
 import {time} from './ui';
 
-export function TranslationProviderDialog({provider, channels, onClose, onSaved, onRefresh, onUnauthorized}: {
-  provider?: TranslationProvider; channels: TranslationChannel[]; onClose: () => void;
+export function TranslationProviderDialog({provider, channels, plans, onClose, onSaved, onRefresh, onUnauthorized}: {
+  provider?: TranslationProvider; channels: TranslationChannel[]; plans: TranslationPlan[]; onClose: () => void;
   onSaved: () => void; onRefresh: () => void; onUnauthorized: (message: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -39,6 +39,10 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
 
   function close() {if (!saveController.current) onClose();}
   function update(key: ProviderField, value: string) {setDraft(current => ({...current, [key]: value}));}
+  function selectPlan(id: string, checked: boolean) {
+    setDraft(current => ({...current, text_plan_ids: checked ? [...(current.text_plan_ids ?? []), id].sort() :
+      (current.text_plan_ids ?? []).filter(value => value !== id)}));
+  }
   function accessibility(key: ProviderField) {
     return {id: `provider-${key}`, name: key, 'aria-invalid': !!errors[key],
       'aria-describedby': `provider-${key}-help${errors[key] ? ` provider-${key}-error` : ''}`};
@@ -131,6 +135,19 @@ export function TranslationProviderDialog({provider, channels, onClose, onSaved,
           <section className="config-section provider-section" aria-labelledby="provider-routing-title">
             <h3 id="provider-routing-title">按比例分流</h3>
             <p className="muted">两种用途独立计算比例，例如权重 3:1 约为 75%:25%。修改权重只影响后续分配，不改变已有正文任务或漫画名缓存。</p>
+            <fieldset className="provider-plan-scope" aria-describedby="provider-plans-help">
+              <legend>正文适用套餐</legend>
+              <label className="provider-enabled"><input type="checkbox" checked={draft.text_plan_ids === null}
+                onChange={event => setDraft({...draft, text_plan_ids: event.target.checked ? null : []})}/>
+                全部套餐（含以后新增的套餐）</label>
+              {draft.text_plan_ids !== null && <div className="provider-actions">{plans.map(plan =>
+                <label className="provider-enabled" key={plan.id}><input type="checkbox" checked={draft.text_plan_ids?.includes(plan.id) ?? false}
+                  aria-invalid={!!errors.text_plan_ids} aria-describedby={errors.text_plan_ids ? 'provider-plans-error' : 'provider-plans-help'}
+                  onChange={event => selectPlan(plan.id, event.target.checked)}/>{plan.name}</label>
+              )}</div>}
+              <p className="muted" id="provider-plans-help">正文仅在当前有效套餐匹配的供应商中计算权重，无匹配时不分配其他套餐的模型。匿名体验单独配置；漫画名仍使用共享模型池。</p>
+              {errors.text_plan_ids && <p className="settings-field-error" id="provider-plans-error">{errors.text_plan_ids}</p>}
+            </fieldset>
             <div className="settings-fields">{routingFields.map(({key, label}) => field(key, `${label}分流权重`,
               `0 表示不参与${label}分流；大于 0 时按启用供应商的权重比例分配。范围 0–10000，整数。`, {type: 'number', min: 0, max: 10000, step: 1}))}</div>
           </section>

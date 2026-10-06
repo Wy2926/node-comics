@@ -1397,6 +1397,8 @@ dialog::backdrop {
 .provider-revision {display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fc; color: var(--muted); font-size: 11px; margin-bottom: 20px; overflow-wrap: anywhere;}
 .provider-form, .provider-form > .config-body {display: grid; gap: 24px;}
 .provider-section {display: grid; gap: 16px;}
+.provider-plan-scope {display: grid; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 0;}
+.provider-plan-scope legend {padding: 0 6px; font-size: 13px;}
 .provider-form .settings-field input, .provider-form .settings-field select {width: 100%;}
 .provider-form [aria-invalid=true] {border-color: #c45468; background: #fff9fa;}
 .provider-form .settings-field > label {font-size: 12px;}

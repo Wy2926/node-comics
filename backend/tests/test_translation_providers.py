@@ -120,6 +120,41 @@ def test_connection_config_excludes_body_policy_and_preserves_existing_versions(
     assert response.json()['config'] == created['config']
 
 
+def test_decimal_prices_round_trip_and_pin_existing_revision(admin_case):
+    client, auth = admin_case
+    first = create(admin_case, body(input_rate=0.15, output_rate=0.625))
+    assert first['config']['input_rate'] == 0.15 and first['config']['output_rate'] == 0.625
+    with session_factory()() as db:
+        original = snapshot(db)
+    for key, invalid in [('input_rate', -0.1), ('input_rate', 1000.1), ('input_rate', '0.15'),
+                         ('output_rate', 5000.1), ('output_rate', True)]:
+        assert client.post(PATH, headers=auth, json=body(**{key: invalid})).status_code == 422
+    payload = {key: first[key] for key in ('name', 'channel', 'enabled', 'config')}
+    payload['config'] = {**first['config'], 'input_rate': 0.2, 'output_rate': 1.125}
+    updated = client.put(PATH + '/' + first['id'], headers=auth, json=payload)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()['revision_id'] != first['revision_id']
+    assert updated.json()['config']['input_rate'] == 0.2 and updated.json()['config']['output_rate'] == 1.125
+    assert client.put(PATH + '/' + first['id'], headers=auth, json=payload).json()['revision_id'] == updated.json()['revision_id']
+    listed = client.get(PATH, headers=auth).json()['items'][0]
+    assert listed['config'] == updated.json()['config']
+    with session_factory()() as db:
+        assert db.get(TranslationProviderRevision, first['revision_id']).config == first['config']
+        assert original['text']['input_rate'] == 0.15 and original['text']['output_rate'] == 0.625
+        assert snapshot(db)['text']['revision_id'] == updated.json()['revision_id']
+
+
+def test_price_policy_accepts_finite_numbers_only():
+    from pydantic import ValidationError
+    from app.adapters.text import TextPolicy
+    for key, maximum in [('input_rate', 1000), ('output_rate', 5000)]:
+        for value in [0, 0.000001, 0.15, 1.125, maximum]:
+            assert getattr(TextPolicy(**{key: value}), key) == value
+        for value in [True, False, '0.15', None, -0.1, maximum + 0.1, float('nan'), float('inf')]:
+            with pytest.raises(ValidationError):
+                TextPolicy(**{key: value})
+
+
 def test_credentials_load_key_with_revision_but_admin_reads_remain_deferred(admin_case):
     from app.translation_providers import provider_profile, resolve_credentials
     provider = create(admin_case)
