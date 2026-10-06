@@ -111,7 +111,7 @@
 .plan-comparison td{color:var(--muted)}
 .plan-comparison th:last-child,.plan-comparison td:last-child{border-left:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));padding-left:30px;background:var(--accent-soft)}
 .plan-comparison td strong{font-weight:650;color:var(--accent)}
-.plan-comparison tr[data-feature=classic] td:last-child strong,.plan-comparison tr[data-feature=rate] td:last-child strong,.plan-comparison tr[data-feature=redraw] td:last-child strong{font-size:.95rem}
+.plan-comparison tr[data-feature=classic] td:last-child strong,.plan-comparison tr[data-feature=rate] td:last-child strong{font-size:.95rem}
 .plan-comparison td small{display:block;margin-top:3px;font-size:.72rem;font-weight:400;color:var(--muted);line-height:1.55}
 .pricing-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
 .pricing-actions>div{padding:22px 30px 24px;min-width:0}
@@ -148,7 +148,7 @@
   .plan-comparison th,.plan-comparison td{padding:12px 10px;font-size:.73rem;line-height:1.65}
   .plan-comparison thead th{font-size:.68rem;padding-block:10px}
   .plan-comparison th:last-child,.plan-comparison td:last-child{padding-left:11px}
-  .plan-comparison tr[data-feature=classic] td:last-child strong,.plan-comparison tr[data-feature=rate] td:last-child strong,.plan-comparison tr[data-feature=redraw] td:last-child strong{font-size:.79rem}
+  .plan-comparison tr[data-feature=classic] td:last-child strong,.plan-comparison tr[data-feature=rate] td:last-child strong{font-size:.79rem}
   .plan-comparison td small{font-size:.65rem}
   .pricing-actions{grid-template-columns:1fr}
   .pricing-actions>div{padding:20px}

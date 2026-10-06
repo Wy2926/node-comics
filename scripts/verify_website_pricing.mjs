@@ -26,8 +26,8 @@ const comparison=async(target,hourlyPages)=>{
  assert.equal(await frame.locator('.pricing-grid .price-card').count(),2,'both pricing cards share the comparison frame');
  const table=frame.locator('table.plan-comparison');
  assert.equal(await table.locator('thead th').count(),3,'comparison has feature, ordinary and Lite columns');
- assert.equal(await table.locator('tbody tr').count(),6,'six feature comparison rows');
- for(const feature of ['reading','classic','rate','redraw','priority','early']){
+ assert.equal(await table.locator('tbody tr').count(),5,'five feature comparison rows');
+ for(const feature of ['reading','classic','rate','priority','early']){
   const row=table.locator(`tbody tr[data-feature="${feature}"]`);
   assert.equal(await row.count(),1,`comparison feature ${feature}`);
   assert.equal(await row.locator(':scope > th, :scope > td').count(),3,`aligned columns for ${feature}`);
@@ -120,5 +120,5 @@ try {
  done();release=null;onCatalogRequest=null;await live();
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
  assert.deepEqual(errors,[]);
- console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected six-feature comparison, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected five-feature comparison, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

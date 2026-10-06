@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 pages par minute glissante",
       "lite": "100 pages par minute glissante ; {n} pages par heure glissante"
     },
-    "redraw": {
-      "label": "Redessin par IA",
-      "free": "Avec des pages bonus actives",
-      "lite": "Redessin par IA non inclus"
-    },
     "priority": {
       "label": "Réponse à la tâche de traduction",
       "free": "Planification standard",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "À la sortie générale",
       "lite": "Accès anticipé aux fonctionnalités avancées"
     },
-    "note": "Les fenêtres glissantes sont partagées entre les appareils, modes et langues d’un même compte. Les doublons et la réutilisation de résultats terminés ne sont pas comptés à nouveau. Les limites de demandes et la priorité de traitement ne garantissent ni délai de réalisation ni part fixe de la capacité. Lite n’inclut pas le redessin par IA ; les pages bonus de redessin suivent leur propre date d’expiration. Consultez les notes de version pour les nouvelles fonctionnalités."
+    "note": "Les fenêtres glissantes sont partagées entre les appareils, modes et langues d’un même compte. Les doublons et la réutilisation de résultats terminés ne sont pas comptés à nouveau. Les limites de demandes et la priorité de traitement ne garantissent ni délai de réalisation ni part fixe de la capacité. Consultez les notes de version pour les nouvelles fonctionnalités."
   },
   "billingCycle": [
     "Mensuel",

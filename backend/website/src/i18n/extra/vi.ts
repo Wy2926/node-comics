@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 trang trong mỗi khoảng 60 giây trượt",
       "lite": "100 trang trong mỗi khoảng 60 giây trượt; {n} trang trong mỗi khoảng 60 phút trượt"
     },
-    "redraw": {
-      "label": "Vẽ lại bằng AI",
-      "free": "Khi còn trang thưởng hợp lệ",
-      "lite": "Không bao gồm vẽ lại bằng AI"
-    },
     "priority": {
       "label": "Phản hồi tác vụ dịch",
       "free": "Điều phối thông thường",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Khi phát hành chung",
       "lite": "Quyền truy cập sớm vào các tính năng nâng cao"
     },
-    "note": "Giới hạn theo khoảng thời gian trượt được dùng chung giữa các thiết bị, chế độ và ngôn ngữ trong một tài khoản. Yêu cầu trùng lặp và việc dùng lại kết quả đã hoàn tất không bị tính thêm. Giới hạn yêu cầu và điều phối ưu tiên không bảo đảm tốc độ hoàn thành hoặc một phần công suất cố định. Lite không bao gồm vẽ lại bằng AI; các trang vẽ lại được tặng riêng có thời hạn riêng. Xem nhật ký cập nhật để biết tính năng mới."
+    "note": "Giới hạn theo khoảng thời gian trượt được dùng chung giữa các thiết bị, chế độ và ngôn ngữ trong một tài khoản. Yêu cầu trùng lặp và việc dùng lại kết quả đã hoàn tất không bị tính thêm. Giới hạn yêu cầu và điều phối ưu tiên không bảo đảm tốc độ hoàn thành hoặc một phần công suất cố định. Xem nhật ký cập nhật để biết tính năng mới."
   },
   "billingCycle": [
     "Hàng tháng",

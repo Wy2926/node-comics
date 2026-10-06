@@ -210,11 +210,6 @@ export const commerce = {
       "free": "Her kayan 60 saniyelik dönemde 10 sayfa",
       "lite": "Her kayan 60 saniyelik dönemde 100 sayfa; her kayan bir saatlik dönemde {n} sayfa"
     },
-    "redraw": {
-      "label": "Yapay zekâ ile yeniden çizim",
-      "free": "Aktif bonus sayfalarıyla",
-      "lite": "Yapay zekâ ile yeniden çizim dahil değildir"
-    },
     "priority": {
       "label": "Çeviri görevi yanıtı",
       "free": "Standart planlama",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Genel sürümde",
       "lite": "Gelişmiş özelliklere erken erişim"
     },
-    "note": "Kayan süre sınırları, bir hesabın tüm cihazları, modları ve dilleri için ortak uygulanır. Yinelenen istekler ve tamamlanmış sonuçların yeniden kullanılması tekrar sayılmaz. İstek sınırları ve öncelikli planlama, tamamlanma hızını veya kapasiteden sabit bir payı garanti etmez. Lite, yapay zekâ ile yeniden çizimi içermez; ayrıca verilen bonus yeniden çizim sayfalarının kendi geçerlilik süresi vardır. Yeni özellikler için sürüm notlarına bakın."
+    "note": "Kayan süre sınırları, bir hesabın tüm cihazları, modları ve dilleri için ortak uygulanır. Yinelenen istekler ve tamamlanmış sonuçların yeniden kullanılması tekrar sayılmaz. İstek sınırları ve öncelikli planlama, tamamlanma hızını veya kapasiteden sabit bir payı garanti etmez. Yeni özellikler için sürüm notlarına bakın."
   },
   "billingCycle": [
     "Aylık",

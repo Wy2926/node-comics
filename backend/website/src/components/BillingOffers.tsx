@@ -35,7 +35,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free}:Pro
   const offer=matching.find(p=>p.id===selectedPrice)??matching[0];
   const savings=offer?annualSavings(offer,available):null;
   const annual=offer?.interval==='year';
-  const rows=(['reading','classic','rate','redraw','priority','early'] as const).map(key=>({
+  const rows=(['reading','classic','rate','priority','early'] as const).map(key=>({
     key,label:comparison[key].label,free:comparison[key].free,
     lite:key==='rate'?comparison.rate.lite(offer?.hourly_image_limit??publishedLite.hourlyImageLimit):comparison[key].lite,
   }));

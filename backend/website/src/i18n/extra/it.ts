@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 pagine in ogni finestra mobile di un minuto",
       "lite": "100 pagine in ogni finestra mobile di un minuto; {n} pagine in ogni finestra mobile di un’ora"
     },
-    "redraw": {
-      "label": "Ridisegno con IA",
-      "free": "Con pagine bonus attive",
-      "lite": "Ridisegno con IA non incluso"
-    },
     "priority": {
       "label": "Risposta all'attività di traduzione",
       "free": "Pianificazione standard",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Al rilascio generale",
       "lite": "Accesso anticipato alle funzionalità avanzate"
     },
-    "note": "Le finestre mobili sono condivise tra dispositivi, modalità e lingue dello stesso account. Le richieste duplicate e il riutilizzo di risultati completati non vengono conteggiati di nuovo. I limiti delle richieste e la priorità di elaborazione non garantiscono una velocità di completamento né una quota fissa della capacità. Lite non include il ridisegno con IA; le pagine bonus separate di ridisegno seguono la propria scadenza. Consulta le note di rilascio per le nuove funzionalità."
+    "note": "Le finestre mobili sono condivise tra dispositivi, modalità e lingue dello stesso account. Le richieste duplicate e il riutilizzo di risultati completati non vengono conteggiati di nuovo. I limiti delle richieste e la priorità di elaborazione non garantiscono una velocità di completamento né una quota fissa della capacità. Consulta le note di rilascio per le nuove funzionalità."
   },
   "billingCycle": [
     "Mensile",

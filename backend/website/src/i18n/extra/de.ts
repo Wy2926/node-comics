@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 Seiten / gleitendes Minutenfenster",
       "lite": "100 Seiten / gleitendes Minutenfenster; {n} Seiten / gleitendes Stundenfenster"
     },
-    "redraw": {
-      "label": "KI-Neuzeichnung",
-      "free": "Mit aktiven Bonusseiten",
-      "lite": "KI-Neuzeichnung nicht enthalten"
-    },
     "priority": {
       "label": "Antwort auf die Übersetzungsaufgabe",
       "free": "Standardplanung",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Bei der allgemeinen Veröffentlichung",
       "lite": "Frühzeitiger Zugriff auf erweiterte Funktionen"
     },
-    "note": "Die gleitenden Zeitfenster gelten gemeinsam für alle Geräte, Modi und Sprachen eines Kontos. Doppelte Anfragen und die Wiederverwendung abgeschlossener Ergebnisse zählen nicht erneut. Anfragelimits und bevorzugte Planung garantieren weder eine Fertigstellungsgeschwindigkeit noch einen festen Kapazitätsanteil. Lite enthält keine KI-Neuzeichnung; zusätzliche Bonusseiten zum Neuzeichnen haben eigene Ablaufregeln. Neue Funktionen finden Sie in den Versionshinweisen."
+    "note": "Die gleitenden Zeitfenster gelten gemeinsam für alle Geräte, Modi und Sprachen eines Kontos. Doppelte Anfragen und die Wiederverwendung abgeschlossener Ergebnisse zählen nicht erneut. Anfragelimits und bevorzugte Planung garantieren weder eine Fertigstellungsgeschwindigkeit noch einen festen Kapazitätsanteil. Neue Funktionen finden Sie in den Versionshinweisen."
   },
   "billingCycle": [
     "Monatlich",

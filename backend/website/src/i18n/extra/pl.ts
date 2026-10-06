@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 stron / ruchome okno minutowe",
       "lite": "100 stron / ruchome okno minutowe; {n} stron / ruchome okno godzinne"
     },
-    "redraw": {
-      "label": "Przerysowanie przez AI",
-      "free": "Z aktywnymi stronami bonusowymi",
-      "lite": "Przerysowanie przez AI nie jest wliczone"
-    },
     "priority": {
       "label": "Odpowiedź na zadanie tłumaczeniowe",
       "free": "Standardowy harmonogram",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Na powszechnym wydaniu",
       "lite": "Wczesny dostęp do zaawansowanych funkcji"
     },
-    "note": "Ruchome okna czasowe są wspólne dla wszystkich urządzeń, trybów i języków jednego konta. Powtórzone żądania i ponowne użycie gotowych wyników nie są liczone ponownie. Limity żądań i priorytetowe planowanie nie gwarantują szybkości wykonania ani stałego udziału w dostępnej mocy. Lite nie obejmuje przerysowania przez AI; dodatkowe strony bonusowe mają własny termin ważności. Nowe funkcje opisano w informacjach o wydaniach."
+    "note": "Ruchome okna czasowe są wspólne dla wszystkich urządzeń, trybów i języków jednego konta. Powtórzone żądania i ponowne użycie gotowych wyników nie są liczone ponownie. Limity żądań i priorytetowe planowanie nie gwarantują szybkości wykonania ani stałego udziału w dostępnej mocy. Nowe funkcje opisano w informacjach o wydaniach."
   },
   "billingCycle": [
     "Miesięcznie",

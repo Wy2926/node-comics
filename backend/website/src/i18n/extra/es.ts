@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 páginas en cada período móvil de un minuto",
       "lite": "100 páginas en cada período móvil de un minuto; {n} páginas en cada período móvil de una hora"
     },
-    "redraw": {
-      "label": "Redibujado con IA",
-      "free": "Con páginas de bonificación activas",
-      "lite": "Redibujado con IA no incluido"
-    },
     "priority": {
       "label": "Respuesta a la tarea de traducción",
       "free": "Programación estándar",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "En lanzamiento general",
       "lite": "Acceso temprano a funciones avanzadas"
     },
-    "note": "Los períodos móviles se comparten entre los dispositivos, modos e idiomas de una misma cuenta. Las solicitudes duplicadas y la reutilización de resultados completados no vuelven a contar. Los límites de solicitudes y la prioridad de procesamiento no garantizan una velocidad de finalización ni una parte fija de la capacidad. Lite no incluye redibujado con IA; las páginas de redibujado de bonos independientes tienen su propia fecha de vencimiento. Consulta las notas de versión para conocer las nuevas funciones."
+    "note": "Los períodos móviles se comparten entre los dispositivos, modos e idiomas de una misma cuenta. Las solicitudes duplicadas y la reutilización de resultados completados no vuelven a contar. Los límites de solicitudes y la prioridad de procesamiento no garantizan una velocidad de finalización ni una parte fija de la capacidad. Consulta las notas de versión para conocer las nuevas funciones."
   },
   "billingCycle": [
     "Mensual",

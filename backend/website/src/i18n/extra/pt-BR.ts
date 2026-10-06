@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 páginas em cada janela móvel de um minuto",
       "lite": "100 páginas em cada janela móvel de um minuto; {n} páginas em cada janela móvel de uma hora"
     },
-    "redraw": {
-      "label": "Redesenho com IA",
-      "free": "Com páginas de bônus ativas",
-      "lite": "Redesenho com IA não incluído"
-    },
     "priority": {
       "label": "Resposta da tarefa de tradução",
       "free": "Agendamento padrão",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "No lançamento geral",
       "lite": "Acesso antecipado a recursos avançados"
     },
-    "note": "As janelas móveis são compartilhadas entre dispositivos, modos e idiomas da mesma conta. Solicitações duplicadas e reutilização de resultados concluídos não são contadas novamente. Limites de solicitações e prioridade de processamento não garantem velocidade de conclusão nem uma parcela fixa da capacidade. O Lite não inclui redesenho com IA; páginas de redesenho de bônus separados seguem seus próprios prazos de validade. Consulte as notas de versão para conhecer os novos recursos."
+    "note": "As janelas móveis são compartilhadas entre dispositivos, modos e idiomas da mesma conta. Solicitações duplicadas e reutilização de resultados concluídos não são contadas novamente. Limites de solicitações e prioridade de processamento não garantem velocidade de conclusão nem uma parcela fixa da capacidade. Consulte as notas de versão para conhecer os novos recursos."
   },
   "billingCycle": [
     "Mensalmente",

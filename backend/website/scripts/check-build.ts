@@ -92,8 +92,8 @@ for (const file of htmlFiles) {
     const comparison = $('.pricing-comparison');
     const table = comparison.find('table.plan-comparison');
     if (comparison.length !== 1 || comparison.find('.pricing-grid .price-card').length !== 2 || table.length !== 1) errors.push(`${label}: pricing cards and feature comparison must share one connected frame`);
-    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 6) errors.push(`${label}: expected a three-column comparison with six feature rows`);
-    for (const feature of ['reading', 'classic', 'rate', 'redraw', 'priority', 'early']) {
+    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 5) errors.push(`${label}: expected a three-column comparison with five feature rows`);
+    for (const feature of ['reading', 'classic', 'rate', 'priority', 'early']) {
       const row = table.find(`tbody tr[data-feature="${feature}"]`);
       if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
     }

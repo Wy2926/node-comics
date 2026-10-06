@@ -210,11 +210,6 @@ export const commerce = {
       "free": "10 halaman dalam setiap periode bergulir 60 detik",
       "lite": "100 halaman dalam setiap periode bergulir 60 detik; {n} halaman dalam setiap periode bergulir 60 menit"
     },
-    "redraw": {
-      "label": "Gambar ulang AI",
-      "free": "Dengan halaman bonus aktif",
-      "lite": "Gambar ulang AI tidak termasuk"
-    },
     "priority": {
       "label": "Respons tugas terjemahan",
       "free": "Penjadwalan standar",
@@ -225,7 +220,7 @@ export const commerce = {
       "free": "Pada rilis umum",
       "lite": "Akses awal ke fitur-fitur lanjutan"
     },
-    "note": "Batas periode bergulir berlaku bersama untuk semua perangkat, mode, dan bahasa dalam satu akun. Permintaan duplikat dan penggunaan kembali hasil yang sudah selesai tidak dihitung ulang. Batas permintaan dan penjadwalan prioritas tidak menjamin kecepatan penyelesaian atau bagian kapasitas yang tetap. Lite tidak mencakup gambar ulang AI; halaman bonus gambar ulang yang diberikan terpisah memiliki masa berlaku sendiri. Lihat catatan rilis untuk fitur baru."
+    "note": "Batas periode bergulir berlaku bersama untuk semua perangkat, mode, dan bahasa dalam satu akun. Permintaan duplikat dan penggunaan kembali hasil yang sudah selesai tidak dihitung ulang. Batas permintaan dan penjadwalan prioritas tidak menjamin kecepatan penyelesaian atau bagian kapasitas yang tetap. Lihat catatan rilis untuk fitur baru."
   },
   "billingCycle": [
     "Bulanan",
