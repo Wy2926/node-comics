@@ -38,7 +38,7 @@ const copy: HomeCopy = {
     ],
     [
       "Cài đặt chính thức",
-      "Chrome và Firefox cửa hàng, plus gói Edge."
+      "Cửa hàng chính thức của Chrome, Edge và Firefox cùng các gói cài đặt."
     ],
     [
       "Hình ảnh & quyền riêng tư",
@@ -69,7 +69,7 @@ const copy: HomeCopy = {
   "steps": [
       [
         "Cài tiện ích",
-        "Cài từ cửa hàng Chrome, Firefox hoặc lấy gói cài đặt Edge."
+        "Cài từ cửa hàng chính thức hoặc lấy gói phù hợp với trình duyệt."
       ],
       [
         "Thêm truyện hoặc kết nối thư viện",

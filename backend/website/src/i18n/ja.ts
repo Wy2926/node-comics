@@ -95,7 +95,7 @@ export default {
     "freeNote": "日次枠は Asia/Shanghai 時間で更新され、繰り越されません。拡張機能は通常翻訳に対応し、公式サイトの画像ワークスペースの他モードは実際のアカウント権限に従います。",
     "quotaNote": "画像を指定モード・言語で正常に新規生成すると1ページとして計上します。重複リクエストや有効な結果の再利用は二重計上しません。明示的な再翻訳は現在の利用枠を使います。累計上限なしでも短時間の頻度、画像仕様、サービス容量の制限があり、完了速度を保証するものではありません。",
     "downloadTitle": "ブラウザーに漫画翻訳拡張機能を追加",
-    "downloadDescription": "Chrome・Edge・Firefox 用 NodeLane Comics をダウンロード。Chrome Web Store、Firefox Add-ons または配布パッケージから導入できます。Edge ストア版は審査中です。",
+    "downloadDescription": "Chrome・Edge・Firefox 用 NodeLane Comics をダウンロード。Chrome Web Store、Edge Add-ons、Firefox Add-ons、または対応するブラウザ用パッケージから導入できます。",
     "storeDescription": "使い慣れたブラウザーで、新しい物語を開きましょう。",
     "storeUnavailable": "ストア審査中",
     "directDownloadTitle": "拡張機能を直接ダウンロード",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "手動インストール版は自動更新されません。新版をダウンロードして元のフォルダー内のファイルを置き換え、拡張機能の管理画面で再読み込みしてください。インストール先フォルダーは削除しないでください。",
     "downloadXpi": "署名済み XPI をダウンロード",
     "storeHeading": "ブラウザーストアへのリンク",
-    "storeNote": "Edge ストア版は審査中です。現在は Edge ZIP パッケージをご利用ください。Firefox はストアまたは署名済み XPI から導入できます。お問い合わせ：",
+    "storeNote": "Chrome・Edge・Firefox の公式ストアからインストールするか、対応するブラウザ用パッケージをご利用ください。お問い合わせ：",
     "guidesTitle": "ソースと読書場面からガイドを探す",
     "guidesDescription": "ローカル漫画と EPUB、Google Drive、OPDS、ページ内・範囲指定翻訳、翻訳チャンネル、オフライン保存と画像の扱いを解説します。",
     "contents": "このページの内容",
@@ -536,13 +536,13 @@ export default {
       {
         "id": "browsers",
         "question": "漫画翻訳拡張機能は Chrome・Edge・Firefox に対応していますか？",
-        "answer": "デスクトップ版 Chrome、Microsoft Edge、Firefox に対応しています。Chrome と Firefox は各ストアから導入できます。Edge ストア版は審査中のため、現在はダウンロードページの Edge ZIP パッケージをご利用ください。",
+        "answer": "デスクトップ版 Chrome、Microsoft Edge、Firefox に対応しています。ダウンロードページの公式ストアリンク、または対応するブラウザ用パッケージから導入できます。",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "漫画翻訳拡張機能や ZIP パッケージをインストールするには？",
-        "answer": "Chrome と Firefox はダウンロードページの公式ストアリンクから導入できます。Chrome / Edge に手動で導入する場合は、対応 ZIP を展開し、拡張機能の管理画面でデベロッパーモードを有効にして展開済みフォルダーを読み込みます。Firefox はストア版または署名済み XPI を使います。",
+        "answer": "Chrome・Edge・Firefox はダウンロードページの公式ストアリンクから導入できます。Chrome / Edge に手動で導入する場合は、対応 ZIP を展開し、拡張機能の管理画面でデベロッパーモードを有効にして展開済みフォルダーを読み込みます。Firefox はストア版または署名済み XPI を使います。",
         "relatedPath": "/download/"
       },
       {

@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "手动安装版本不会自动更新。更新时下载新版，覆盖原文件夹中的文件，再到扩展管理页点击“重新加载”；请勿删除安装文件夹。",
     "downloadXpi": "下载已签名 XPI",
     "storeHeading": "浏览器商店入口",
-    "storeNote": "Edge 商店版本正在审核，可先下载 Edge ZIP 安装包；Firefox 可从商店安装或使用已签名 XPI。反馈与建议：",
+    "storeNote": "Chrome、Edge、Firefox 均可从官方商店安装，也可下载对应安装包。反馈与建议：",
     "guidesTitle": "阅读、翻译与远程书库指南",
     "guidesDescription": "从 CBZ、PDF、EPUB 入门，连接 OPDS 或 manga-translator-ui，翻译网页图片与选区，了解离线阅读、图片隐私和任务恢复。",
     "contents": "本页目录",
@@ -641,13 +641,13 @@ export default {
       {
         "id": "browsers",
         "question": "漫画翻译插件支持 Chrome、Edge 和 Firefox 吗？",
-        "answer": "支持桌面版 Chrome、Microsoft Edge 和 Firefox。Chrome 与 Firefox 可从各自商店安装；Edge 商店版本正在审核，可先在下载页获取 Edge ZIP 安装包。",
+        "answer": "支持桌面版 Chrome、Microsoft Edge 和 Firefox。可通过下载页的官方商店入口安装，也可获取对应浏览器安装包。",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "如何安装漫画翻译插件和手动安装包？",
-        "answer": "Chrome 和 Firefox 可通过下载页的官方商店入口安装。Chrome / Edge 手动安装时，下载并解压对应 ZIP，在扩展管理页开启开发者模式，选择“加载已解压的扩展程序”。Firefox 使用商店版本或已签名 XPI；手动安装说明见下载页。",
+        "answer": "Chrome、Edge 和 Firefox 可通过下载页的官方商店入口安装。Chrome / Edge 手动安装时，下载并解压对应 ZIP，在扩展管理页开启开发者模式，选择“加载已解压的扩展程序”。Firefox 使用商店版本或已签名 XPI；手动安装说明见下载页。",
         "relatedPath": "/download/"
       },
       {

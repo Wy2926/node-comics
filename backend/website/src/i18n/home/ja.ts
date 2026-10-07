@@ -9,7 +9,7 @@ const copy: HomeCopy = {
     webAccess: 'ゲストで体験でき、ログイン後はアカウントの利用枠を使えます。現在の利用可能回数は画像ワークスペースで確認できます。',
     platformHeading: '対応デスクトップブラウザー', guestEyebrow: 'オンライン画像翻訳',
     popupAlt: '英語が選択され、現在のタブの翻訳ボタンが表示された NodeLane Comics のポップアップ。', popupCaption: '次の一章は、ツールバーから。',
-    trustLinks: [['ソースコード公開', 'GitHub でコードや不具合報告を確認。'], ['公式インストール', 'Chrome・Firefox ストアと Edge 用パッケージ。'], ['画像とプライバシー', '画像の処理方法と保存期間をご案内。']],
+    trustLinks: [['ソースコード公開', 'GitHub でコードや不具合報告を確認。'], ['公式インストール', "Chrome・Edge・Firefox の公式ストアとインストール用パッケージ。"], ['画像とプライバシー', '画像の処理方法と保存期間をご案内。']],
     quickStart: {
       eyebrow: '動画で始める', title: '手順を見ながら、読書を始めよう。', description: '公開済みの動画で、漫画の検索・読み込み・閲覧・翻訳を確認できます。',
       watch: '動画を見る', channel: 'YouTube チャンネルへ',
@@ -22,7 +22,7 @@ const copy: HomeCopy = {
     steps: [
       [
         "拡張機能をインストール",
-        "Chrome・Firefox ストアからインストールするか、Edge 用パッケージを入手。"
+        "Chrome・Edge・Firefox の公式ストアからインストールするか、対応するブラウザ用パッケージを入手。"
       ],
       [
         "漫画を追加・ライブラリーを接続",

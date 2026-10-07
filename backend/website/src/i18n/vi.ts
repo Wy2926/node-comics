@@ -95,7 +95,7 @@ export default {
     "freeNote": "Hạn mức ngày đặt lại theo giờ Asia/Shanghai, không cộng dồn. Tiện ích cung cấp dịch thông thường; chế độ khác trong công cụ dịch ảnh website tùy quyền thực tế của tài khoản.",
     "quotaNote": "Một phiên bản hình ảnh được tạo thành công ở chế độ và ngôn ngữ đã chọn được tính là một trang. Yêu cầu trùng lặp và sử dụng lại kết quả hợp lệ không bị tính phí hai lần. Một bản dịch mới rõ ràng sử dụng quyền hiện tại. Tổng số không giới hạn vẫn phải tuân theo các giới hạn về tốc độ, hình ảnh và dung lượng dịch vụ ngắn hạn; không có tốc độ hoàn thành được đảm bảo.",
     "downloadTitle": "Cài đặt tiện ích mở rộng dịch truyện tranh manga của bạn",
-    "downloadDescription": "Nhận NodeLane Comics cho Chrome, Edge hoặc Firefox. Mở Cửa hàng trực tuyến Chrome hoặc Tiện ích bổ sung Firefox hoặc tải xuống gói trình duyệt. Danh sách cửa hàng Edge đang được xem xét.",
+    "downloadDescription": "Tải NodeLane Comics cho Chrome, Edge hoặc Firefox. Mở Chrome Web Store, Edge Add-ons hoặc Firefox Add-ons, hoặc tải gói phù hợp với trình duyệt.",
     "storeDescription": "Mở câu chuyện tiếp theo của bạn trong trình duyệt mà bạn đã thích.",
     "storeUnavailable": "Đang chờ xem xét cửa hàng",
     "directDownloadTitle": "Tải xuống tiện ích mở rộng trực tiếp",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Cài đặt thủ công không tự động cập nhật. Tải xuống phiên bản mới, thay thế các tệp trong thư mục gốc, sau đó nhấp vào Tải lại trên trang tiện ích mở rộng. Giữ thư mục cài đặt tại chỗ.",
     "downloadXpi": "Tải XPI đã ký",
     "storeHeading": "Liên kết cửa hàng trình duyệt",
-    "storeNote": "Danh sách Edge đang được xem xét; hãy sử dụng gói Edge ZIP ngay bây giờ. Cài đặt Firefox từ cửa hàng của nó hoặc với XPI đã ký. Phản hồi:",
+    "storeNote": "Cài từ cửa hàng chính thức của Chrome, Edge hoặc Firefox, hoặc dùng gói phù hợp với trình duyệt. Phản hồi:",
     "guidesTitle": "Hướng dẫn theo nguồn và nhu cầu đọc",
     "guidesDescription": "Tìm hiểu truyện cục bộ và EPUB, Google Drive, OPDS, dịch trên web và vùng chọn, kênh dịch, lưu ngoại tuyến và quyền riêng tư hình ảnh.",
     "contents": "Nội dung trang này",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Người dịch truyện tranh có làm việc với Chrome, Edge và Firefox không?",
-        "answer": "Có, trên máy tính để bàn Chrome, Microsoft Edge và Firefox. Chrome và Firefox có link cài đặt cửa hàng. Danh sách cửa hàng Edge đang được xem xét; trong thời gian chờ đợi, hãy lấy gói Edge ZIP từ trang tải xuống.",
+        "answer": "Có, trên Chrome, Microsoft Edge và Firefox dành cho máy tính. Dùng liên kết cửa hàng chính thức trên trang tải xuống hoặc lấy gói phù hợp với trình duyệt.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Làm cách nào để cài đặt tiện ích mở rộng dịch truyện tranh hoặc gói ZIP?",
-        "answer": "Sử dụng liên kết cửa hàng Chrome hoặc Firefox chính thức trên trang tải xuống. Để cài đặt Chrome hoặc Edge thủ công, hãy tải xuống và giải nén ZIP phù hợp, bật Chế độ nhà phát triển trong trình quản lý tiện ích mở rộng và chọn Tải giải nén. Firefox sử dụng danh sách cửa hàng hoặc XPI đã ký. Xem trang tải xuống để được hướng dẫn.",
+        "answer": "Sử dụng liên kết cửa hàng Chrome, Edge hoặc Firefox chính thức trên trang tải xuống. Để cài đặt Chrome hoặc Edge thủ công, hãy tải xuống và giải nén ZIP phù hợp, bật Chế độ nhà phát triển trong trình quản lý tiện ích mở rộng và chọn Tải giải nén. Firefox sử dụng danh sách cửa hàng hoặc XPI đã ký. Xem trang tải xuống để được hướng dẫn.",
         "relatedPath": "/download/"
       },
       {

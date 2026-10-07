@@ -38,7 +38,7 @@ const copy: HomeCopy = {
     ],
     [
       "Resmi kurulum",
-      "Chrome ve Firefox depolar, plus ve Edge paketi."
+      "Chrome, Edge ve Firefox resmi mağazaları ve kurulum paketleri."
     ],
     [
       "Resimler ve gizlilik",
@@ -69,7 +69,7 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Uzantıyı kurun",
-      "Chrome veya Firefox mağazasından kurun ya da Edge paketini indirin."
+      "Resmi mağazadan yükleyin veya tarayıcınıza uygun paketi indirin."
     ],
     [
       "Kaynağınızı açın",

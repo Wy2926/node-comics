@@ -95,7 +95,7 @@ export default {
     "freeNote": "Le redessin par IA avec l’offre Gratuit nécessite un bonus promotionnel valide. Le quota quotidien est réinitialisé à l’heure Asia/Shanghai ; les pages inutilisées ne sont pas reportées au jour suivant.",
     "quotaNote": "Chaque version d’une image produite avec succès dans le mode et la langue choisis compte pour une page. Les doublons et la réutilisation de résultats valides ne sont pas facturés deux fois. Une nouvelle traduction demandée explicitement utilise les droits actuels. Les totaux illimités restent soumis aux limites de fréquence, d’image et de capacité du service ; aucun délai de réalisation n’est garanti.",
     "downloadTitle": "Installez votre extension de traducteur de manga",
-    "downloadDescription": "Obtenez NodeLane Comics pour Chrome, Edge ou Firefox. Ouvrez la boutique Web Chrome ou les modules complémentaires Firefox, ou téléchargez un package de navigateur. La fiche du magasin Edge est en cours de révision.",
+    "downloadDescription": "Obtenez NodeLane Comics pour Chrome, Edge ou Firefox. Ouvrez Chrome Web Store, Edge Add-ons ou Firefox Add-ons, ou téléchargez le paquet adapté à votre navigateur.",
     "storeDescription": "Ouvrez votre prochaine histoire dans le navigateur que vous appréciez déjà.",
     "storeUnavailable": "Validation par la boutique en attente",
     "directDownloadTitle": "Téléchargez directement l'extension",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Les installations manuelles ne se mettent pas à jour automatiquement. Téléchargez la nouvelle version, remplacez les fichiers dans le dossier d'origine, puis cliquez sur Recharger sur la page des extensions. Gardez le dossier d'installation en place.",
     "downloadXpi": "Télécharger signé XPI",
     "storeHeading": "Liens vers la boutique du navigateur",
-    "storeNote": "La liste Edge est en cours de révision ; utilisez le package Edge ZIP pour l'instant. Installez Firefox depuis son store ou avec le XPI signé. Commentaires :",
+    "storeNote": "Installez depuis la boutique officielle de Chrome, Edge ou Firefox, ou utilisez le paquet adapté à votre navigateur. Commentaires :",
     "guidesTitle": "Guides de traduction, EPUB, OPDS et lecture hors ligne",
     "guidesDescription": "Importez des fichiers CBZ, CBR, PDF, MOBI et EPUB, connectez une bibliothèque OPDS, traduisez des images ou une zone visible et préparez votre lecture hors ligne. Comparez les originaux et choisissez votre service.",
     "contents": "Sur cette page",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Le traducteur de manga fonctionne-t-il en Chrome, Edge et Firefox ?",
-        "answer": "Oui, sur les ordinateurs de bureau Chrome, Microsoft Edge et Firefox. Chrome et Firefox ont des liens d'installation de magasin. La fiche du magasin Edge est en cours de révision ; en attendant, récupérez le package Edge ZIP sur la page de téléchargement.",
+        "answer": "Oui, sur Chrome, Microsoft Edge et Firefox pour ordinateur. Utilisez les liens des boutiques officielles sur la page de téléchargement ou téléchargez le paquet adapté à votre navigateur.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Comment installer l'extension du traducteur manga ou le package ZIP ?",
-        "answer": "Utilisez les liens officiels de la boutique Chrome ou Firefox sur la page de téléchargement. Pour une installation manuelle de Chrome ou Edge, téléchargez et extrayez le ZIP correspondant, activez le mode développeur dans le gestionnaire d'extensions et sélectionnez Charger décompressé. Firefox utilise sa fiche Play Store ou le XPI signé. Consultez la page de téléchargement pour obtenir des instructions.",
+        "answer": "Utilisez les liens officiels de la boutique Chrome, Edge ou Firefox sur la page de téléchargement. Pour une installation manuelle de Chrome ou Edge, téléchargez et extrayez le ZIP correspondant, activez le mode développeur dans le gestionnaire d'extensions et sélectionnez Charger décompressé. Firefox utilise sa fiche Play Store ou le XPI signé. Consultez la page de téléchargement pour obtenir des instructions.",
         "relatedPath": "/download/"
       },
       {

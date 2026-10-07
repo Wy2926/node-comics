@@ -95,7 +95,7 @@ export default {
     "freeNote": "Gambar ulang AI pada paket Gratis memerlukan kuota promosi yang masih berlaku. Kuota harian diatur ulang menurut zona waktu Asia/Shanghai dan sisanya tidak diakumulasi.",
     "quotaNote": "Satu versi gambar yang berhasil dibuat dalam mode dan bahasa yang dipilih dihitung sebagai satu halaman. Permintaan duplikat dan penggunaan kembali hasil yang valid tidak dikenakan biaya dua kali. Terjemahan baru yang eksplisit menggunakan hak saat ini. Jumlah total yang tidak terbatas tetap tunduk pada batasan tarif, gambar, dan kapasitas layanan jangka pendek; tidak ada kecepatan penyelesaian yang dijamin.",
     "downloadTitle": "Instal ekstensi penerjemah manga Anda",
-    "downloadDescription": "Dapatkan NodeLane Comics untuk Chrome, Edge atau Firefox. Buka Chrome Web Store atau Firefox Add-on, atau unduh paket browser. Daftar toko Edge sedang ditinjau.",
+    "downloadDescription": "Dapatkan NodeLane Comics untuk Chrome, Edge, atau Firefox. Buka Chrome Web Store, Edge Add-ons, atau Firefox Add-ons, atau unduh paket yang sesuai dengan browser Anda.",
     "storeDescription": "Buka cerita Anda berikutnya di browser yang Anda sukai.",
     "storeUnavailable": "Peninjauan toko tertunda",
     "directDownloadTitle": "Unduh ekstensinya secara langsung",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Penginstalan manual tidak diperbarui secara otomatis. Unduh versi baru, ganti file di folder asli, lalu klik Muat Ulang di halaman ekstensi. Simpan folder instalasi di tempatnya.",
     "downloadXpi": "Unduh XPI bertanda tangan",
     "storeHeading": "Tautan toko browser",
-    "storeNote": "Daftar Edge sedang ditinjau; gunakan paket Edge ZIP untuk saat ini. Instal Firefox dari tokonya atau dengan XPI yang ditandatangani. Umpan balik:",
+    "storeNote": "Pasang dari toko resmi Chrome, Edge, atau Firefox, atau gunakan paket yang sesuai dengan browser Anda. Umpan balik:",
     "guidesTitle": "Panduan terjemahan manga dan membaca komik",
     "guidesDescription": "Buka CBZ, CBR, PDF, MOBI, dan EPUB, hubungkan OPDS, terjemahkan gambar web serta area pilihan. Pilih saluran resmi atau MTU dan siapkan bab untuk dibaca offline.",
     "contents": "Di halaman ini",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Apakah penerjemah manga berfungsi di Chrome, Edge dan Firefox?",
-        "answer": "Ya, di desktop Chrome, Microsoft Edge dan Firefox. Chrome dan Firefox memiliki tautan instalasi toko. Daftar toko Edge sedang ditinjau; sementara itu dapatkan paket Edge ZIP dari halaman download.",
+        "answer": "Ya, pada Chrome, Microsoft Edge, dan Firefox desktop. Gunakan tautan toko resmi di halaman unduh atau dapatkan paket yang sesuai dengan browser Anda.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Bagaimana cara menginstal ekstensi penerjemah manga atau paket ZIP?",
-        "answer": "Gunakan tautan toko resmi Chrome atau Firefox di halaman unduh. Untuk instalasi manual Chrome atau Edge, unduh dan ekstrak ZIP yang cocok, aktifkan mode Pengembang di manajer ekstensi dan pilih Load unpacked. Firefox menggunakan listingan tokonya atau XPI yang ditandatangani. Lihat halaman unduh untuk petunjuknya.",
+        "answer": "Gunakan tautan toko resmi Chrome, Edge, atau Firefox di halaman unduh. Untuk instalasi manual Chrome atau Edge, unduh dan ekstrak ZIP yang cocok, aktifkan mode Pengembang di manajer ekstensi dan pilih Load unpacked. Firefox menggunakan listingan tokonya atau XPI yang ditandatangani. Lihat halaman unduh untuk petunjuknya.",
         "relatedPath": "/download/"
       },
       {

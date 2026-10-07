@@ -9,7 +9,7 @@ const copy: HomeCopy = {
     webAccess: '可匿名体验，登录后使用账户额度。当前可用次数以图片工作台显示为准。',
     platformHeading: '支持你的桌面浏览器', guestEyebrow: '在线图片翻译',
     popupAlt: 'NodeLane Comics 插件弹窗，已选择英语，显示翻译当前标签页按钮。', popupCaption: "翻译当前标签页、划取选区，或打开已适配漫画的阅读器。",
-    trustLinks: [['公开源码', '在 GitHub 查看项目代码与问题反馈。'], ['官方安装渠道', 'Chrome、Firefox 商店及 Edge 安装包。'], ['图片与隐私', '了解图片处理方式与保存期限。']],
+    trustLinks: [['公开源码', '在 GitHub 查看项目代码与问题反馈。'], ['官方安装渠道', "Chrome、Edge、Firefox 官方商店与安装包。"], ['图片与隐私', '了解图片处理方式与保存期限。']],
     quickStart: {
       eyebrow: '视频快速开始', title: '跟着操作，开始阅读。', description: '用现有教程熟悉查找、导入、阅读与翻译。',
       watch: '观看教程', channel: '前往 YouTube 频道',

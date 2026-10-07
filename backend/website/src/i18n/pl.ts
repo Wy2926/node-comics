@@ -95,7 +95,7 @@ export default {
     "freeNote": "Przerysowanie przez AI w planie bezpłatnym wymaga aktywnego limitu promocyjnego. Limit dzienny jest odnawiany według strefy Asia/Shanghai, a niewykorzystane strony nie są przenoszone.",
     "quotaNote": "Jedna pomyślnie utworzona wersja obrazu w wybranym trybie i języku liczy się jako jedna strona. Powtórzone żądania i ponowne użycie ważnych wyników nie są rozliczane podwójnie. Wyraźne zlecenie nowego tłumaczenia wykorzystuje aktualne uprawnienia. Nawet bez łącznego limitu obowiązują krótkoterminowe ograniczenia częstotliwości żądań, obrazów i dostępnej mocy usługi; szybkość wykonania nie jest gwarantowana.",
     "downloadTitle": "Zainstaluj rozszerzenie tłumacza mangi",
-    "downloadDescription": "Uzyskaj NodeLane Comics dla Chrome, Edge lub Firefox. Otwórz sklep internetowy Chrome lub dodatki Firefox albo pobierz pakiet przeglądarki. Informacje o sklepie Edge są sprawdzane.",
+    "downloadDescription": "Pobierz NodeLane Comics dla Chrome, Edge lub Firefox. Otwórz Chrome Web Store, Edge Add-ons lub Firefox Add-ons albo pobierz pakiet dla swojej przeglądarki.",
     "storeDescription": "Otwórz następną historię w przeglądarce, z której już korzystasz.",
     "storeUnavailable": "Oczekuje na recenzję sklepu",
     "directDownloadTitle": "Pobierz rozszerzenie bezpośrednio",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Instalacje ręczne nie aktualizują się automatycznie. Pobierz nową wersję, zastąp pliki w oryginalnym folderze, a następnie kliknij Załaduj ponownie na stronie rozszerzeń. Zachowaj folder instalacyjny na miejscu.",
     "downloadXpi": "Pobierz podpisany XPI",
     "storeHeading": "Linki do sklepu przeglądarki",
-    "storeNote": "Lista Edge jest w trakcie sprawdzania; użyj na razie pakietu Edge ZIP. Zainstaluj Firefox ze swojego sklepu lub z podpisanym XPI. Informacje zwrotne:",
+    "storeNote": "Zainstaluj z oficjalnego sklepu Chrome, Edge lub Firefox albo użyj pakietu dla swojej przeglądarki. Opinie:",
     "guidesTitle": "Poradniki tłumaczenia mangi i czytania komiksów",
     "guidesDescription": "Otwieraj CBZ, CBR, PDF, MOBI i EPUB, łącz OPDS, tłumacz obrazy i zaznaczone obszary, wybieraj oficjalny kanał lub MTU i przygotuj rozdziały do czytania offline.",
     "contents": "Na tej stronie",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Czy tłumacz mangi działa w Chrome, Edge i Firefox?",
-        "answer": "Tak, na komputerze stacjonarnym Chrome, Microsoft Edge i Firefox. Chrome i Firefox mają łącza instalacyjne sklepu. Informacje o sklepie Edge są sprawdzane; w międzyczasie pobierz pakiet Edge ZIP ze strony pobierania.",
+        "answer": "Tak, w komputerowych wersjach Chrome, Microsoft Edge i Firefox. Użyj odnośników do oficjalnych sklepów na stronie pobierania albo pobierz pakiet dla swojej przeglądarki.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Jak zainstalować rozszerzenie tłumacza mangi lub pakiet ZIP?",
-        "answer": "Skorzystaj z oficjalnych linków do sklepów Chrome lub Firefox na stronie pobierania. W przypadku ręcznej instalacji Chrome lub Edge pobierz i rozpakuj pasujący ZIP, włącz tryb programisty w menedżerze rozszerzeń i wybierz opcję Załaduj rozpakowane. Firefox korzysta ze swoich informacji o sklepie lub podpisanego XPI. Instrukcje znajdziesz na stronie pobierania.",
+        "answer": "Skorzystaj z oficjalnych linków do sklepów Chrome, Edge lub Firefox na stronie pobierania. W przypadku ręcznej instalacji Chrome lub Edge pobierz i rozpakuj pasujący ZIP, włącz tryb programisty w menedżerze rozszerzeń i wybierz opcję Załaduj rozpakowane. Firefox korzysta ze swoich informacji o sklepie lub podpisanego XPI. Instrukcje znajdziesz na stronie pobierania.",
         "relatedPath": "/download/"
       },
       {

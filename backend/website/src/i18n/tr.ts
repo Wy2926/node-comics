@@ -95,7 +95,7 @@ export default {
     "freeNote": "Ücretsiz planda yapay zekâ ile yeniden çizim için geçerli promosyon kullanım hakkı gerekir. Günlük sayfalar Asia/Shanghai saat dilimine göre sıfırlanır; kullanılmayanlar devretmez.",
     "quotaNote": "Bir görüntünün seçilen mod ve dilde başarıyla oluşturulmuş bir versiyonu bir sayfa olarak sayılır. Tekrarlanan istekler ve geçerli sonuçların yeniden kullanımı için iki kez ücret alınmaz. Açıkça yeni bir çeviri, mevcut yetkiyi kullanır. Sınırsız toplamlar, kısa vadeli oran, görüntü ve hizmet kapasitesi sınırlarına tabi olmaya devam eder; tamamlanma hızı garanti edilmez.",
     "downloadTitle": "Manga çevirmen uzantınızı yükleyin",
-    "downloadDescription": "Chrome, Edge veya Firefox için NodeLane Comics alın. Chrome Web Mağazasını veya Firefox Eklentilerini açın veya bir tarayıcı paketi indirin. Edge mağaza girişi inceleniyor.",
+    "downloadDescription": "Chrome, Edge veya Firefox için NodeLane Comics edinin. Chrome Web Store, Edge Add-ons veya Firefox Add-ons mağazasını açın ya da tarayıcınıza uygun paketi indirin.",
     "storeDescription": "Bir sonraki hikayenizi halihazırda kullandığınız tarayıcıda açın.",
     "storeUnavailable": "Mağaza incelemesi bekleniyor",
     "directDownloadTitle": "Uzantıyı doğrudan indirin",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Manuel kurulumlar otomatik olarak güncellenmez. Yeni sürümü indirin, dosyaları orijinal klasöre yerleştirin ve uzantılar sayfasında Yeniden Yükle'ye tıklayın. Kurulum klasörünü yerinde tutun.",
     "downloadXpi": "İmzalı XPI indir",
     "storeHeading": "Tarayıcı mağazası bağlantıları",
-    "storeNote": "Edge listesi inceleniyor; şimdilik Edge ZIP paketini kullanın. Firefox'yi mağazasından veya imzalı XPI ile yükleyin. Geribildirim:",
+    "storeNote": "Chrome, Edge veya Firefox resmi mağazasından yükleyin ya da tarayıcınıza uygun paketi kullanın. Geri bildirim:",
     "guidesTitle": "Manga çevirisi ve çizgi roman okuma kılavuzları",
     "guidesDescription": "CBZ, CBR, PDF, MOBI ve EPUB açın, OPDS bağlayın, web görselleri ve seçilen alanları çevirin. Resmî kanal veya MTU seçin ve bölümleri çevrimdışı okumaya hazırlayın.",
     "contents": "Bu sayfada",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Manga çevirmeni Chrome, Edge ve Firefox'de çalışıyor mu?",
-        "answer": "Evet, masaüstünde Chrome, Microsoft Edge ve Firefox. Chrome ve Firefox mağaza kurulum bağlantılarına sahiptir. Edge mağaza girişi inceleniyor; Bu arada indirme sayfasından Edge ZIP paketini edinin.",
+        "answer": "Evet, masaüstü Chrome, Microsoft Edge ve Firefox desteklenir. İndirme sayfasındaki resmi mağaza bağlantılarını kullanın veya tarayıcınıza uygun paketi indirin.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Manga çevirmen uzantısını veya ZIP paketini nasıl yüklerim?",
-        "answer": "İndirme sayfasındaki resmi Chrome veya Firefox mağaza bağlantılarını kullanın. Manuel Chrome veya Edge kurulumu için, eşleşen ZIP'yi indirip çıkarın, uzantı yöneticisinde Geliştirici modunu etkinleştirin ve Paketlenmemiş yükle'yi seçin. Firefox mağaza girişini veya imzalı XPI'yı kullanır. Talimatlar için indirme sayfasına bakın.",
+        "answer": "İndirme sayfasındaki resmi Chrome, Edge veya Firefox mağaza bağlantılarını kullanın. Manuel Chrome veya Edge kurulumu için, eşleşen ZIP'yi indirip çıkarın, uzantı yöneticisinde Geliştirici modunu etkinleştirin ve Paketlenmemiş yükle'yi seçin. Firefox mağaza girişini veya imzalı XPI'yı kullanır. Talimatlar için indirme sayfasına bakın.",
         "relatedPath": "/download/"
       },
       {

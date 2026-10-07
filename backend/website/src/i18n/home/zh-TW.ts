@@ -9,7 +9,7 @@ const copy: HomeCopy = {
     webAccess: '可匿名體驗，登入後使用帳戶額度。目前可用次數以圖片工作台顯示為準。',
     platformHeading: '支援你的桌面瀏覽器', guestEyebrow: '線上圖片翻譯',
     popupAlt: 'NodeLane Comics 擴充功能彈窗，已選擇英語，顯示翻譯目前分頁按鈕。', popupCaption: '下一章，從瀏覽器工具列開始。',
-    trustLinks: [['公開原始碼', '在 GitHub 查看專案程式碼與問題回報。'], ['官方安裝管道', 'Chrome、Firefox 商店及 Edge 安裝包。'], ['圖片與隱私', '瞭解圖片處理方式與保存期限。']],
+    trustLinks: [['公開原始碼', '在 GitHub 查看專案程式碼與問題回報。'], ['官方安裝管道', "Chrome、Edge、Firefox 官方商店與安裝套件。"], ['圖片與隱私', '瞭解圖片處理方式與保存期限。']],
     quickStart: {
       eyebrow: '影片快速開始', title: '跟著操作，開始閱讀。', description: '用現有教學熟悉查找、匯入、閱讀與翻譯。',
       watch: '觀看教學', channel: '前往 YouTube 頻道',
@@ -22,7 +22,7 @@ const copy: HomeCopy = {
     steps: [
       [
         "安裝瀏覽器擴充功能",
-        "從 Chrome、Firefox 商店安裝，或取得 Edge 安裝包。"
+        "從 Chrome、Edge、Firefox 官方商店安裝，或取得對應瀏覽器安裝套件。"
       ],
       [
         "加入漫畫或連接書庫",

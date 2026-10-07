@@ -95,7 +95,7 @@ export default {
     "freeNote": "每日額度按 Asia/Shanghai 時間重設，不累積。擴充功能提供常規翻譯；官網圖片工作台的其他模式以帳戶實際權益為準。",
     "quotaNote": "每張原圖在指定模式與語言下成功生成一個新版本，計 1 頁。重複請求和有效結果複用不重複結算；主動重譯生成新版本按當前權益計量。不限累計頁數仍受短時速率、圖片規格和服務容量約束，不是完成速度承諾。",
     "downloadTitle": "為你的瀏覽器安裝漫畫翻譯擴充功能",
-    "downloadDescription": "下載 NodeLane 漫譯 Chrome、Edge、Firefox 擴充功能。前往 Chrome Web Store、Firefox Add-ons，或取得安裝套件；Edge 商店版本正在審核。",
+    "downloadDescription": "下載 NodeLane 漫譯 Chrome、Edge、Firefox 擴充功能。前往 Chrome Web Store、Edge Add-ons、Firefox Add-ons，或取得對應瀏覽器安裝套件。",
     "storeDescription": "在熟悉的瀏覽器裡，打開下一段故事。",
     "storeUnavailable": "商店審核中",
     "directDownloadTitle": "直接下載安裝包",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "手動安裝版本不會自動更新。更新時下載新版，覆蓋原資料夾中的檔案，再到擴充功能管理頁點選「重新載入」；請勿刪除安裝資料夾。",
     "downloadXpi": "下載已簽署 XPI",
     "storeHeading": "瀏覽器商店入口",
-    "storeNote": "Edge 商店版本正在審核，可先下載 Edge ZIP 安裝套件；Firefox 可從商店安裝或使用已簽署 XPI。回饋與建議：",
+    "storeNote": "Chrome、Edge、Firefox 均可從官方商店安裝，也可下載對應安裝套件。回饋與建議：",
     "guidesTitle": "按來源與閱讀場景找到指南",
     "guidesDescription": "從本機漫畫與 EPUB 匯入、Google Drive、OPDS 書庫，到網頁劃圖、翻譯管道、離線閱讀和圖片隱私，查看實際操作與支援邊界。",
     "contents": "本頁目錄",
@@ -629,13 +629,13 @@ export default {
       {
         "id": "browsers",
         "question": "漫畫翻譯擴充功能支援 Chrome、Edge 和 Firefox 嗎？",
-        "answer": "支援桌面版 Chrome、Microsoft Edge 和 Firefox。Chrome 與 Firefox 可從各自商店安裝；Edge 商店版本正在審核，可先在下載頁取得 Edge ZIP 安裝套件。",
+        "answer": "支援桌面版 Chrome、Microsoft Edge 和 Firefox。可透過下載頁的官方商店入口安裝，也可取得對應瀏覽器安裝套件。",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "如何安裝漫畫翻譯擴充功能與手動安裝套件？",
-        "answer": "Chrome 與 Firefox 可透過下載頁的官方商店入口安裝。Chrome / Edge 手動安裝時，下載並解壓縮對應 ZIP，在擴充功能管理頁開啟開發人員模式，再載入解壓縮的擴充功能。Firefox 使用商店版本或已簽署 XPI；詳細步驟見下載頁。",
+        "answer": "Chrome、Edge 與 Firefox 可透過下載頁的官方商店入口安裝。Chrome / Edge 手動安裝時，下載並解壓縮對應 ZIP，在擴充功能管理頁開啟開發人員模式，再載入解壓縮的擴充功能。Firefox 使用商店版本或已簽署 XPI；詳細步驟見下載頁。",
         "relatedPath": "/download/"
       },
       {

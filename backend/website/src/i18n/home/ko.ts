@@ -9,7 +9,7 @@ const copy: HomeCopy = {
     webAccess: '비회원으로 체험하거나 로그인해 계정 이용량을 사용하세요. 현재 이용 가능한 횟수는 이미지 작업 공간에서 확인할 수 있습니다.',
     platformHeading: '지원하는 데스크톱 브라우저', guestEyebrow: '온라인 이미지 번역',
     popupAlt: '영어가 선택되어 있고 현재 탭 번역 버튼이 표시된 NodeLane Comics 팝업.', popupCaption: '다음 이야기는 도구 모음에서 시작됩니다.',
-    trustLinks: [['공개 소스 코드', 'GitHub에서 코드와 문제 보고를 확인하세요.'], ['공식 설치 경로', 'Chrome·Firefox 스토어와 Edge 설치 패키지.'], ['이미지와 개인정보', '이미지 처리 방식과 보관 기간을 확인하세요.']],
+    trustLinks: [['공개 소스 코드', 'GitHub에서 코드와 문제 보고를 확인하세요.'], ['공식 설치 경로', "Chrome·Edge·Firefox 공식 스토어와 브라우저별 설치 파일."], ['이미지와 개인정보', '이미지 처리 방식과 보관 기간을 확인하세요.']],
     quickStart: {
       eyebrow: '동영상으로 시작하기', title: '따라 하며 읽기를 시작하세요.', description: '기존 튜토리얼에서 만화 찾기, 가져오기, 읽기와 번역을 살펴보세요.',
       watch: '튜토리얼 보기', channel: 'YouTube 채널 방문',
@@ -22,7 +22,7 @@ const copy: HomeCopy = {
     steps: [
       [
         "확장 프로그램 설치",
-        "Chrome·Firefox 스토어에서 설치하거나 Edge 설치 패키지를 받으세요."
+        "Chrome·Edge·Firefox 공식 스토어에서 설치하거나 해당 브라우저의 설치 파일을 받으세요."
       ],
       [
         "만화 추가 또는 서재 연결",

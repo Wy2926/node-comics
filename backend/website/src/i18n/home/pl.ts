@@ -38,7 +38,7 @@ const copy: HomeCopy = {
     ],
     [
       "Oficjalna instalacja",
-      "Sklepy Chrome i Firefox oraz pakiet dla Edge."
+      "Oficjalne sklepy Chrome, Edge i Firefox oraz pakiety instalacyjne."
     ],
     [
       "Obrazy i prywatność",
@@ -69,7 +69,7 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Zainstaluj rozszerzenie",
-      "Zainstaluj z Chrome Web Store lub sklepu Firefox albo pobierz pakiet Edge."
+      "Zainstaluj z oficjalnego sklepu albo pobierz pakiet dla swojej przeglądarki."
     ],
     [
       "Otwórz swoje źródło",

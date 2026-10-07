@@ -38,7 +38,7 @@ const copy: HomeCopy = {
     ],
     [
       "Installazione ufficiale",
-      "Negozi Chrome e Firefox, plus un pacchetto Edge."
+      "Store ufficiali di Chrome, Edge e Firefox e pacchetti di installazione."
     ],
     [
       "Immagini e privacy",
@@ -69,7 +69,7 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Installare l’estensione",
-      "Scegli lo store Chrome o Firefox, oppure il pacchetto Edge. Controlla le restrizioni di accesso ai siti del browser."
+      "Scegli lo store ufficiale o il pacchetto per il tuo browser. Controlla le restrizioni di accesso ai siti del browser."
     ],
     [
       "Aprire una storia",

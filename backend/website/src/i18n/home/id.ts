@@ -38,7 +38,7 @@ const copy: HomeCopy = {
     ],
     [
       "Instalasi resmi",
-      "Toko Chrome dan Firefox, plus paket Edge."
+      "Toko resmi Chrome, Edge, dan Firefox serta paket instalasi."
     ],
     [
       "Gambar & privasi",
@@ -69,7 +69,7 @@ const copy: HomeCopy = {
   "steps": [
     [
       "Pasang ekstensi",
-      "Pasang dari toko Chrome atau Firefox, atau unduh paket Edge."
+      "Pasang dari toko resmi atau unduh paket yang sesuai dengan browser Anda."
     ],
     [
       "Buka sumber Anda",

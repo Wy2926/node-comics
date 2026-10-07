@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Manual installations do not update automatically. Download the new version, replace the files in the original folder, then click Reload on the extensions page. Keep the installation folder in place.",
     "downloadXpi": "Download signed XPI",
     "storeHeading": "Browser store links",
-    "storeNote": "The Edge listing is under review; use the Edge ZIP package for now. Install Firefox from its store or with the signed XPI. Feedback:",
+    "storeNote": "Install from the official Chrome, Edge or Firefox store, or use the matching browser package. Feedback:",
     "guidesTitle": "Reading, translation and remote library guides",
     "guidesDescription": "Get started with CBZ, PDF and EPUB, connect OPDS or manga-translator-ui, translate website images or a selected area, and understand offline reading, privacy and recovery.",
     "contents": "On this page",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Does the manga translator work in Chrome, Edge and Firefox?",
-        "answer": "Yes, on desktop Chrome, Microsoft Edge and Firefox. Chrome and Firefox have store installation links. The Edge store listing is under review; get the Edge ZIP package from the download page in the meantime.",
+        "answer": "Yes, on desktop Chrome, Microsoft Edge and Firefox. Use the official store links on the download page or get the matching browser package.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "How do I install the manga translator extension or ZIP package?",
-        "answer": "Use the official Chrome or Firefox store links on the download page. For manual Chrome or Edge installation, download and extract the matching ZIP, enable Developer mode in the extensions manager and select Load unpacked. Firefox uses its store listing or the signed XPI. See the download page for instructions.",
+        "answer": "Use the official Chrome, Edge or Firefox store links on the download page. For manual Chrome or Edge installation, download and extract the matching ZIP, enable Developer mode in the extensions manager and select Load unpacked. Firefox uses its store listing or the signed XPI. See the download page for instructions.",
         "relatedPath": "/download/"
       },
       {

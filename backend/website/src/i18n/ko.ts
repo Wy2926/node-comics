@@ -95,7 +95,7 @@ export default {
     "freeNote": "일일 이용량은 Asia/Shanghai 시간에 초기화되며 이월되지 않습니다. 확장 프로그램은 일반 번역을 제공하고 공식 사이트 이미지 작업 공간의 다른 모드는 실제 계정 권한에 따릅니다.",
     "quotaNote": "선택한 모드와 언어로 이미지의 새 버전을 성공적으로 생성하면 1페이지로 계산합니다. 중복 요청이나 유효한 결과 재사용은 중복 차감하지 않습니다. 직접 재번역하면 현재 이용량이 적용됩니다. 누적 무제한에도 단기 속도, 이미지 규격, 서비스 용량 제한은 적용되며 완료 속도를 보장하지 않습니다.",
     "downloadTitle": "브라우저에 만화 번역 확장 프로그램 설치",
-    "downloadDescription": "Chrome·Edge·Firefox용 NodeLane Comics를 받으세요. Chrome 웹 스토어, Firefox Add-ons 또는 브라우저별 설치 파일을 이용하세요. Edge 스토어 등록은 심사 중입니다.",
+    "downloadDescription": "Chrome·Edge·Firefox용 NodeLane Comics를 받으세요. Chrome 웹 스토어, Edge Add-ons, Firefox Add-ons 또는 해당 브라우저의 설치 파일을 이용하세요.",
     "storeDescription": "즐겨 쓰는 브라우저에서 새로운 이야기를 열어 보세요.",
     "storeUnavailable": "스토어 심사 중",
     "directDownloadTitle": "확장 프로그램 직접 다운로드",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "수동 설치 버전은 자동 업데이트되지 않습니다. 새 버전을 다운로드하여 기존 폴더의 파일을 교체하고 확장 프로그램 관리 페이지에서 새로고침하세요. 설치 폴더를 삭제하지 마세요.",
     "downloadXpi": "서명된 XPI 다운로드",
     "storeHeading": "브라우저 스토어 링크",
-    "storeNote": "Edge 스토어 등록은 심사 중입니다. 현재는 Edge ZIP 설치 파일을 이용하세요. Firefox는 스토어 또는 서명된 XPI로 설치할 수 있습니다. 의견 보내기:",
+    "storeNote": "Chrome·Edge·Firefox 공식 스토어에서 설치하거나 해당 브라우저의 설치 파일을 이용하세요. 의견 보내기:",
     "guidesTitle": "소스와 읽기 상황에 맞는 가이드",
     "guidesDescription": "로컬 만화와 EPUB, Google Drive, OPDS, 웹·영역 번역, 번역 채널, 오프라인 저장과 이미지 개인정보를 확인하세요.",
     "contents": "이 페이지의 내용",
@@ -536,13 +536,13 @@ export default {
       {
         "id": "browsers",
         "question": "만화 번역기는 Chrome·Edge·Firefox를 지원하나요?",
-        "answer": "데스크톱 Chrome, Microsoft Edge, Firefox를 지원합니다. Chrome과 Firefox는 각 공식 스토어에서 설치할 수 있습니다. Edge 스토어 등록은 심사 중이므로 현재는 다운로드 페이지의 Edge ZIP 설치 파일을 이용하세요.",
+        "answer": "데스크톱 Chrome, Microsoft Edge, Firefox를 지원합니다. 다운로드 페이지의 공식 스토어 링크로 설치하거나 해당 브라우저의 설치 파일을 받으세요.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "만화 번역 확장 프로그램이나 ZIP 파일은 어떻게 설치하나요?",
-        "answer": "Chrome과 Firefox는 다운로드 페이지의 공식 스토어 링크로 설치하세요. Chrome / Edge에 수동 설치하려면 해당 ZIP을 다운로드해 압축을 풀고, 확장 관리 화면에서 개발자 모드를 켠 다음 압축 해제된 확장 프로그램을 로드하세요. Firefox는 스토어 버전 또는 서명된 XPI를 사용합니다.",
+        "answer": "Chrome·Edge·Firefox는 다운로드 페이지의 공식 스토어 링크로 설치하세요. Chrome / Edge에 수동 설치하려면 해당 ZIP을 다운로드해 압축을 풀고, 확장 관리 화면에서 개발자 모드를 켠 다음 압축 해제된 확장 프로그램을 로드하세요. Firefox는 스토어 버전 또는 서명된 XPI를 사용합니다.",
         "relatedPath": "/download/"
       },
       {

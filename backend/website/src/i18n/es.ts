@@ -95,7 +95,7 @@ export default {
     "freeNote": "El redibujado con IA en el plan Gratis requiere un bono promocional vigente. Las páginas diarias se restablecen según la hora de Asia/Shanghai y las no utilizadas no se acumulan.",
     "quotaNote": "Cada versión generada correctamente de una imagen en el modo y el idioma elegidos cuenta como una página. Las solicitudes duplicadas y la reutilización de resultados válidos no se cobran dos veces. Una nueva traducción solicitada expresamente utiliza los beneficios actuales. Los totales ilimitados siguen sujetos a límites de frecuencia, imagen y capacidad del servicio; no se garantiza una velocidad de finalización.",
     "downloadTitle": "Instala tu extensión de traductor de manga",
-    "downloadDescription": "Obtenga NodeLane Comics para Chrome, Edge o Firefox. Abra la tienda web Chrome o los complementos Firefox, o descargue un paquete de navegador. La ficha de Play Store Edge está bajo revisión.",
+    "downloadDescription": "Obtén NodeLane Comics para Chrome, Edge o Firefox. Abre Chrome Web Store, Edge Add-ons o Firefox Add-ons, o descarga el paquete correspondiente a tu navegador.",
     "storeDescription": "Abre tu próxima historia en el navegador que ya disfrutas.",
     "storeUnavailable": "Pendiente de revisión en la tienda",
     "directDownloadTitle": "Descarga la extensión directamente",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Las instalaciones manuales no se actualizan automáticamente. Descargue la nueva versión, reemplace los archivos en la carpeta original y luego haga clic en Recargar en la página de extensiones. Mantenga la carpeta de instalación en su lugar.",
     "downloadXpi": "Descargar firmado XPI",
     "storeHeading": "Enlaces a la tienda del navegador",
-    "storeNote": "El listado Edge está bajo revisión; utilice el paquete Edge ZIP por ahora. Instale Firefox desde su tienda o con el XPI firmado. Comentarios:",
+    "storeNote": "Instala desde la tienda oficial de Chrome, Edge o Firefox, o usa el paquete correspondiente a tu navegador. Comentarios:",
     "guidesTitle": "Guías de traducción, EPUB, OPDS y lectura sin conexión",
     "guidesDescription": "Importa CBZ, CBR, PDF, MOBI y EPUB, conecta bibliotecas OPDS, traduce imágenes o un área visible y prepara tu lectura sin conexión. Compara los originales y elige tu servicio.",
     "contents": "En esta página",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "¿El traductor de manga funciona en Chrome, Edge y Firefox?",
-        "answer": "Sí, en el escritorio Chrome, Microsoft Edge y Firefox. Chrome y Firefox tienen enlaces de instalación de tiendas. La ficha de Play Store Edge está bajo revisión; Mientras tanto, obtenga el paquete Edge ZIP de la página de descarga.",
+        "answer": "Sí, en Chrome, Microsoft Edge y Firefox de escritorio. Usa los enlaces a las tiendas oficiales en la página de descarga o consigue el paquete correspondiente a tu navegador.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "¿Cómo instalo la extensión del traductor de manga o el paquete ZIP?",
-        "answer": "Utilice los enlaces oficiales de la tienda Chrome o Firefox en la página de descarga. Para la instalación manual de Chrome o Edge, descargue y extraiga el ZIP correspondiente, habilite el modo Desarrollador en el administrador de extensiones y seleccione Cargar descomprimido. Firefox usa su ficha de Play Store o el XPI firmado. Consulte la página de descarga para obtener instrucciones.",
+        "answer": "Utilice los enlaces oficiales de la tienda Chrome, Edge o Firefox en la página de descarga. Para la instalación manual de Chrome o Edge, descargue y extraiga el ZIP correspondiente, habilite el modo Desarrollador en el administrador de extensiones y seleccione Cargar descomprimido. Firefox usa su ficha de Play Store o el XPI firmado. Consulte la página de descarga para obtener instrucciones.",
         "relatedPath": "/download/"
       },
       {

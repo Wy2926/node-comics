@@ -95,7 +95,7 @@ export default {
     "freeNote": "KI-Neuzeichnung im kostenlosen Tarif erfordert ein gültiges Aktionskontingent. Das tägliche Seitenkontingent wird nach der Zeitzone Asia/Shanghai zurückgesetzt und nicht übertragen.",
     "quotaNote": "Eine erfolgreich erstellte Bildversion in einem gewählten Modus und einer gewählten Sprache zählt als eine Seite. Doppelte Anfragen und die Wiederverwendung gültiger Ergebnisse werden nicht doppelt berechnet. Eine ausdrücklich angeforderte Neuübersetzung verwendet die aktuell verfügbaren Leistungen. Auch ohne Gesamtseitenlimit gelten kurzfristige Anfrage-, Bild- und Kapazitätsgrenzen. Eine bestimmte Fertigstellungsgeschwindigkeit wird nicht garantiert.",
     "downloadTitle": "Installieren Sie Ihre Manga-Übersetzer-Erweiterung",
-    "downloadDescription": "Holen Sie sich NodeLane Comics für Chrome, Edge oder Firefox. Öffnen Sie den Chrome Web Store oder die Firefox Add-ons oder laden Sie ein Browserpaket herunter. Der Edge-Store-Eintrag wird derzeit überprüft.",
+    "downloadDescription": "Hole dir NodeLane Comics für Chrome, Edge oder Firefox. Öffne Chrome Web Store, Edge Add-ons oder Firefox Add-ons oder lade das passende Browserpaket herunter.",
     "storeDescription": "Öffnen Sie Ihre nächste Story in dem Browser, der Ihnen bereits gefällt.",
     "storeUnavailable": "Store-Überprüfung steht noch aus",
     "directDownloadTitle": "Laden Sie die Erweiterung direkt herunter",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Manuelle Installationen werden nicht automatisch aktualisiert. Laden Sie die neue Version herunter, ersetzen Sie die Dateien im Originalordner und klicken Sie dann auf der Erweiterungsseite auf Neu laden. Behalten Sie den Installationsordner bei.",
     "downloadXpi": "Signiert herunterladen XPI",
     "storeHeading": "Browser-Store-Links",
-    "storeNote": "Die Edge-Eintragung wird derzeit überprüft; Verwenden Sie vorerst das Paket Edge ZIP. Installieren Sie Firefox aus dem Store oder mit dem signierten XPI. Feedback:",
+    "storeNote": "Installiere aus dem offiziellen Chrome-, Edge- oder Firefox-Store oder nutze das passende Browserpaket. Feedback:",
     "guidesTitle": "Anleitungen zu Übersetzung, EPUB, OPDS und Offline-Lesen",
     "guidesDescription": "Importiere CBZ, CBR, PDF, MOBI und EPUB, verbinde OPDS-Bibliotheken, übersetze Bilder oder einen sichtbaren Bereich und bereite das Lesen ohne Internet vor. Vergleiche die Originale und wähle deinen Dienst.",
     "contents": "Auf dieser Seite",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Funktioniert der Manga-Übersetzer in Chrome, Edge und Firefox?",
-        "answer": "Ja, auf Desktop Chrome, Microsoft Edge und Firefox. Chrome und Firefox verfügen über Store-Installationslinks. Der Edge-Store-Eintrag wird derzeit überprüft. Holen Sie sich in der Zwischenzeit das Paket Edge ZIP von der Download-Seite.",
+        "answer": "Ja, in Chrome, Microsoft Edge und Firefox auf dem Desktop. Nutze die offiziellen Store-Links auf der Downloadseite oder lade das passende Browserpaket herunter.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Wie installiere ich die Manga-Übersetzer-Erweiterung oder das ZIP-Paket?",
-        "answer": "Verwenden Sie die offiziellen Chrome- oder Firefox-Store-Links auf der Download-Seite. Für die manuelle Chrome- oder Edge-Installation laden Sie das entsprechende ZIP herunter und extrahieren es, aktivieren Sie den Entwicklermodus im Erweiterungsmanager und wählen Sie „Ungepackt laden“. Firefox verwendet seinen Store-Eintrag oder das signierte XPI. Anweisungen finden Sie auf der Download-Seite.",
+        "answer": "Verwenden Sie die offiziellen Chrome-, Edge- oder Firefox-Store-Links auf der Download-Seite. Für die manuelle Chrome- oder Edge-Installation laden Sie das entsprechende ZIP herunter und extrahieren es, aktivieren Sie den Entwicklermodus im Erweiterungsmanager und wählen Sie „Ungepackt laden“. Firefox verwendet seinen Store-Eintrag oder das signierte XPI. Anweisungen finden Sie auf der Download-Seite.",
         "relatedPath": "/download/"
       },
       {

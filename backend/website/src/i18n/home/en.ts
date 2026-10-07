@@ -11,7 +11,7 @@ const copy: HomeCopy = {
   desktop: 'Made for desktop reading', popupAlt: 'NodeLane Comics toolbar popup with English selected and the Translate current tab button.',
   platformHeading: 'Your desktop browser, supported', guestEyebrow: 'ONLINE IMAGE TRANSLATION',
   popupCaption: "Translate the current tab, select an area, or open a supported comic in the reader.",
-  trustLinks: [['Open source', 'Browse the code and report issues on GitHub.'], ['Official installation', 'Chrome and Firefox stores, plus an Edge package.'], ['Images & privacy', 'Read how images are processed and retained.']],
+  trustLinks: [['Open source', 'Browse the code and report issues on GitHub.'], ['Official installation', "Chrome, Edge and Firefox stores and installation packages."], ['Images & privacy', 'Read how images are processed and retained.']],
   quickStart: {
     eyebrow: 'VIDEO QUICK START', title: 'Follow along. Start reading.', description: 'Explore finding, importing, reading and translating comics with our existing tutorials.',
     watch: 'Watch tutorial', channel: 'Visit our YouTube channel',

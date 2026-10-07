@@ -95,7 +95,7 @@ export default {
     "freeNote": "Il ridisegno con IA nel piano Gratuito richiede un bonus promozionale valido. Il limite giornaliero si azzera secondo il fuso Asia/Shanghai e le pagine inutilizzate non si accumulano.",
     "quotaNote": "Ogni versione di un’immagine generata correttamente nella modalità e nella lingua scelte conta come una pagina. Le richieste duplicate e il riutilizzo di risultati validi non vengono addebitati due volte. Una nuova traduzione richiesta esplicitamente usa i diritti attuali. I totali illimitati restano soggetti ai limiti di frequenza, immagine e capacità del servizio; non è garantita una velocità di completamento.",
     "downloadTitle": "Installa l'estensione del tuo traduttore manga",
-    "downloadDescription": "Ottieni NodeLane Comics per Chrome, Edge o Firefox. Apri Chrome Web Store o i componenti aggiuntivi Firefox oppure scarica un pacchetto browser. La scheda dello Store Edge è in fase di revisione.",
+    "downloadDescription": "Ottieni NodeLane Comics per Chrome, Edge o Firefox. Apri Chrome Web Store, Edge Add-ons o Firefox Add-ons, oppure scarica il pacchetto per il tuo browser.",
     "storeDescription": "Apri la tua prossima storia nel browser che già ti piace.",
     "storeUnavailable": "In attesa di approvazione dello store",
     "directDownloadTitle": "Scarica direttamente l'estensione",
@@ -109,7 +109,7 @@ export default {
     "manualUpdateNote": "Le installazioni manuali non si aggiornano automaticamente. Scarica la nuova versione, sostituisci i file nella cartella originale, quindi fai clic su Ricarica nella pagina delle estensioni. Mantieni la cartella di installazione in posizione.",
     "downloadXpi": "Scarica firmato XPI",
     "storeHeading": "Collegamenti al negozio del browser",
-    "storeNote": "L'elenco Edge è in fase di revisione; usa il pacchetto Edge ZIP per ora. Installa Firefox dal suo store o con il XPI firmato. Risposte:",
+    "storeNote": "Installa dallo store ufficiale di Chrome, Edge o Firefox, oppure usa il pacchetto per il tuo browser. Feedback:",
     "guidesTitle": "Guide a traduzione, EPUB, OPDS e lettura offline",
     "guidesDescription": "Importa CBZ, CBR, PDF, MOBI ed EPUB, collega biblioteche OPDS, traduci immagini o un’area visibile e prepara la lettura offline. Confronta gli originali e scegli il servizio.",
     "contents": "In questa pagina",
@@ -548,13 +548,13 @@ export default {
       {
         "id": "browsers",
         "question": "Il traduttore manga funziona in Chrome, Edge e Firefox?",
-        "answer": "Sì, su desktop Chrome, Microsoft Edge e Firefox. Chrome e Firefox hanno collegamenti di installazione del negozio. La scheda del negozio Edge è in fase di revisione; nel frattempo procurati il ​​pacchetto Edge ZIP dalla pagina di download.",
+        "answer": "Sì, su Chrome, Microsoft Edge e Firefox per desktop. Usa i link agli store ufficiali nella pagina di download oppure scarica il pacchetto per il tuo browser.",
         "relatedPath": "/download/"
       },
       {
         "id": "installation",
         "question": "Come installo l'estensione del traduttore manga o il pacchetto ZIP?",
-        "answer": "Utilizza i collegamenti ufficiali dello store Chrome o Firefox nella pagina di download. Per l'installazione manuale di Chrome o Edge, scarica ed estrai il ZIP corrispondente, abilita la modalità sviluppatore nel gestore estensioni e seleziona Carica decompresso. Firefox utilizza la relativa scheda dello Store o il file firmato XPI. Consulta la pagina di download per istruzioni.",
+        "answer": "Utilizza i collegamenti ufficiali dello store Chrome, Edge o Firefox nella pagina di download. Per l'installazione manuale di Chrome o Edge, scarica ed estrai il ZIP corrispondente, abilita la modalità sviluppatore nel gestore estensioni e seleziona Carica decompresso. Firefox utilizza la relativa scheda dello Store o il file firmato XPI. Consulta la pagina di download per istruzioni.",
         "relatedPath": "/download/"
       },
       {
